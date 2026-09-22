@@ -99,15 +99,23 @@ export default function RemovalRequest({
   if (!open) {
     // A real button, the same size/weight class as ListingForm's own Submit
     // — sits right beside it (see ListingForm's footer) so a visitor reads
-    // this as the form's other option, not a buried afterthought. Secondary
-    // (bordered, not filled) since it's the less common of the two and
-    // shouldn't out-compete Submit for attention.
+    // this as the form's other option, not a buried afterthought. Red
+    // OUTLINE (not filled, not neutral) on purpose: a plain gray button gave
+    // no visual cue at rest — exactly when someone is scanning the page for
+    // "how do I report this closed" — and Google Maps' own equivalent flow
+    // has no red anywhere until AFTER a closure is confirmed (their closed-
+    // place banner), which reads wrong for an app whose testers already said
+    // the site doesn't feel editable. Outline, not solid, keeps it a notch
+    // below Submit and below the confirm button inside the expanded panel
+    // (solid red) — three weights in sequence: primary blue, red outline
+    // "start", solid red "confirm" — each step visually heavier than the
+    // last, matching that there's a real extra step before anything happens.
     return (
       <button
         type="button"
         onClick={() => setOpen(true)}
         aria-expanded={false}
-        className="w-full sm:w-auto rounded-md border border-slate-300 bg-white px-5 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 cursor-pointer"
+        className="w-full sm:w-auto rounded-md border border-red-300 bg-white px-5 py-2.5 text-sm font-medium text-red-700 transition-colors hover:bg-red-50 cursor-pointer"
       >
         Request removal
       </button>
@@ -153,7 +161,7 @@ export default function RemovalRequest({
             type="button"
             onClick={submit}
             disabled={submitting || !canSubmit}
-            className="cursor-pointer rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+            className="cursor-pointer rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {submitting ? 'Sending…' : canSubmit ? 'Confirm removal request' : 'Verifying…'}
           </button>
