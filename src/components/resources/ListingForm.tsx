@@ -655,6 +655,27 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
               )
 
               return blocks.map((block) => {
+                // A "More details" catch-all with only one or two stray
+                // fields (nothing an admin bothered naming a section for)
+                // doesn't earn the full label-and-collapse treatment — a
+                // header, a chevron and a click just to see one field is
+                // more machinery than the field itself. Below the
+                // threshold, it's a plain box: no label, no collapse,
+                // always visible — the same quiet, unlabeled treatment
+                // RemovalRequest's own reason/details box already uses for
+                // the same reason (one thing, not worth naming or hiding).
+                // A real named group (an audience section, a formSection)
+                // keeps its header regardless of size — an admin choosing
+                // to name and separate out even one field was deliberate,
+                // not a leftover.
+                if (block.sectionKey === MORE_DETAILS_KEY && block.fields.length < 3) {
+                  return (
+                    <div key={block.sectionKey} className="space-y-4 rounded-md border border-slate-200 p-3">
+                      {block.fields.map((field) => renderField(field))}
+                    </div>
+                  )
+                }
+
                 // An audience section defaults OPEN the moment it exists at
                 // all — checking its gate box (e.g. "Women's Tevillah") is
                 // already the explicit signal that these fields are wanted,

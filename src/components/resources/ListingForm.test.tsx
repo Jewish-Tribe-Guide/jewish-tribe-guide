@@ -593,13 +593,57 @@ describe('ListingForm', () => {
       expect(screen.getByPlaceholderText('e.g. Kosher Mart')).toHaveValue('Kosher Mart')
     })
 
-    it('puts a field with no formSection into a collapsed "More details" group', () => {
-      const category = makeCategory({ detailFields: [textField({ key: 'notes', label: 'Notes' })] })
+    it('puts fields with no formSection into a collapsed "More details" group, once there are 3+', () => {
+      const category = makeCategory({
+        detailFields: [
+          textField({ key: 'notes', label: 'Notes' }),
+          textField({ key: 'notes2', label: 'Notes 2' }),
+          textField({ key: 'notes3', label: 'Notes 3' }),
+        ],
+      })
       renderWithProviders(<ListingForm category={category} mode="create" {...handlers} />)
 
       const toggle = screen.getByRole('button', { name: /More details/ })
       expect(toggle).toHaveAttribute('aria-expanded', 'false')
       expect(screen.getByLabelText('Notes')).toBeInTheDocument()
+    })
+
+    // A one- or two-field "More details" is nothing an admin bothered
+    // naming a section for — the full label-and-collapse treatment (a
+    // header, a chevron, a click just to see the one field) is more
+    // machinery than the content justifies. Below 3 fields it's a plain
+    // box instead: no label, no collapse, always visible — the same
+    // treatment RemovalRequest's own reason/details box already uses for
+    // the same reason.
+    it('renders a "More details" catch-all under 3 fields as a plain, unlabeled, non-collapsible box', () => {
+      const category = makeCategory({
+        detailFields: [textField({ key: 'notes', label: 'Notes' }), textField({ key: 'notes2', label: 'Notes 2' })],
+      })
+      renderWithProviders(<ListingForm category={category} mode="create" {...handlers} />)
+
+      expect(screen.queryByText(/more details/i)).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /Notes/ })).not.toBeInTheDocument()
+      // Both fields already visible, no click needed.
+      expect(screen.getByLabelText('Notes')).toBeInTheDocument()
+      expect(screen.getByLabelText('Notes 2')).toBeInTheDocument()
+    })
+
+    it('still gives a single "More details" field the plain box treatment', () => {
+      const category = makeCategory({ detailFields: [textField({ key: 'notes', label: 'Notes' })] })
+      renderWithProviders(<ListingForm category={category} mode="create" {...handlers} />)
+
+      expect(screen.queryByText(/more details/i)).not.toBeInTheDocument()
+      expect(screen.getByLabelText('Notes')).toBeInTheDocument()
+    })
+
+    it('gives a real admin-named formSection its header even with just one field (the <3 rule is "More details"-only)', () => {
+      const category = makeCategory({
+        formSections: [{ key: 'kosher', label: 'Kosher details' }],
+        detailFields: [textField({ key: 'certification', label: 'Certification', formSection: 'kosher' })],
+      })
+      renderWithProviders(<ListingForm category={category} mode="create" {...handlers} />)
+
+      expect(screen.getByRole('button', { name: /Kosher details/ })).toBeInTheDocument()
     })
 
     it('groups fields sharing a formSection under its admin-defined label and description', () => {
@@ -656,7 +700,13 @@ describe('ListingForm', () => {
     })
 
     it('places Submit after every field group, including a collapsed one', () => {
-      const category = makeCategory({ detailFields: [textField({ key: 'notes', label: 'Notes' })] })
+      const category = makeCategory({
+        detailFields: [
+          textField({ key: 'notes', label: 'Notes' }),
+          textField({ key: 'notes2', label: 'Notes 2' }),
+          textField({ key: 'notes3', label: 'Notes 3' }),
+        ],
+      })
       const { container } = renderWithProviders(<ListingForm category={category} mode="create" {...handlers} />)
 
       const moreDetails = screen.getByRole('button', { name: /More details/ })
@@ -675,7 +725,11 @@ describe('ListingForm', () => {
       const category = makeCategory({
         formSections: [{ key: 'kosher', label: 'Kosher details' }],
         detailFields: [
-          textField({ key: 'notes', label: 'Notes' }), // no section → "More details"
+          // 3 fields, no section → "More details" keeps its collapsible
+          // header (below 3, it'd be a plain box with no button to query).
+          textField({ key: 'notes', label: 'Notes' }),
+          textField({ key: 'notes2', label: 'Notes 2' }),
+          textField({ key: 'notes3', label: 'Notes 3' }),
           textField({ key: 'certification', label: 'Certification', formSection: 'kosher' }),
         ],
       })
@@ -696,7 +750,13 @@ describe('ListingForm', () => {
     // asserts the specific class that caused it is gone, which is what
     // actually fixed it.
     it('does not clip a field group\'s contents (no overflow-hidden on the box)', () => {
-      const category = makeCategory({ detailFields: [textField({ key: 'notes', label: 'Notes' })] })
+      const category = makeCategory({
+        detailFields: [
+          textField({ key: 'notes', label: 'Notes' }),
+          textField({ key: 'notes2', label: 'Notes 2' }),
+          textField({ key: 'notes3', label: 'Notes 3' }),
+        ],
+      })
       renderWithProviders(<ListingForm category={category} mode="create" {...handlers} />)
 
       const basicsBox = screen.getByRole('button', { name: 'Basics' }).closest('div')
