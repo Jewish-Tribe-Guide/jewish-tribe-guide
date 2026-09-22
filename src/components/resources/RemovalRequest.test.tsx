@@ -28,9 +28,24 @@ const listing = { id: 'listing-1', name: 'Kosher Mart' }
 // this suite exercises the panel on its own, so it's always "open" as far as
 // this component is concerned.
 function setup(props: Partial<React.ComponentProps<typeof RemovalRequest>> = {}) {
-  const handlers = { onDone: vi.fn(), onCancel: vi.fn(), resetTurnstile: vi.fn() }
+  const handlers = {
+    onDone: vi.fn(),
+    onCancel: vi.fn(),
+    resetTurnstile: vi.fn(),
+    onSubmitterNameChange: vi.fn(),
+    onSubmitterEmailChange: vi.fn(),
+  }
   renderWithProviders(
-    <RemovalRequest listing={listing} turnstileToken="tok" canSubmit honeypot="" {...handlers} {...props} />,
+    <RemovalRequest
+      listing={listing}
+      turnstileToken="tok"
+      canSubmit
+      honeypot=""
+      submitterName=""
+      submitterEmail=""
+      {...handlers}
+      {...props}
+    />,
   )
   return handlers
 }
@@ -60,7 +75,7 @@ describe('RemovalRequest', () => {
   it('files a reviewed removal (operation delete) for this listing, with the reason and details in the note', async () => {
     const user = userEvent.setup()
     const fetchMock = stubFetch({ ok: true })
-    const { onDone } = setup({ submittedBy: { name: 'Dana' }, honeypot: '' })
+    const { onDone } = setup({ submitterName: 'Dana', honeypot: '' })
     await user.selectOptions(screen.getByRole('combobox'), 'Duplicate listing')
     await user.type(screen.getByRole('textbox', { name: /details/i }), 'Same as Kosher Market')
     await user.click(screen.getByRole('button', { name: 'Confirm removal request' }))
@@ -77,6 +92,24 @@ describe('RemovalRequest', () => {
       company: '',
       turnstileToken: 'tok',
     })
+  })
+
+  // Removal used to be the one screen in the form with no way to leave a
+  // name/email at all — those fields lived in the block this panel replaces,
+  // not inside it. Now it has its own, sharing ListingForm's own state.
+  it('offers name/email fields, pre-filled from the shared state', () => {
+    setup({ submitterName: 'Dana', submitterEmail: 'dana@example.com' })
+    expect(screen.getByLabelText('Your name (optional)')).toHaveValue('Dana')
+    expect(screen.getByLabelText('Your email (optional)')).toHaveValue('dana@example.com')
+  })
+
+  it('reports name/email edits upward instead of holding its own copy', async () => {
+    const user = userEvent.setup()
+    const { onSubmitterNameChange, onSubmitterEmailChange } = setup()
+    await user.type(screen.getByLabelText('Your name (optional)'), 'D')
+    await user.type(screen.getByLabelText('Your email (optional)'), 'd')
+    expect(onSubmitterNameChange).toHaveBeenCalledWith('D')
+    expect(onSubmitterEmailChange).toHaveBeenCalledWith('d')
   })
 
   it('sends just the reason when no details are given', async () => {

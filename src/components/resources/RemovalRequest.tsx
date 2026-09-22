@@ -34,7 +34,10 @@ export default function RemovalRequest({
   canSubmit,
   resetTurnstile,
   honeypot,
-  submittedBy,
+  submitterName,
+  onSubmitterNameChange,
+  submitterEmail,
+  onSubmitterEmailChange,
   onCancel,
   onDone,
 }: {
@@ -44,7 +47,15 @@ export default function RemovalRequest({
   canSubmit: boolean
   resetTurnstile: () => void
   honeypot: string
-  submittedBy?: { name?: string; email?: string }
+  // Same state ListingForm's own "Your name"/"Your email" fields use — lifted
+  // rather than a local copy, so switching back and forth between this panel
+  // and the edit fields never loses what was typed on either screen, and a
+  // removal request carries whichever name/email the visitor actually left,
+  // wherever they left it.
+  submitterName: string
+  onSubmitterNameChange: (v: string) => void
+  submitterEmail: string
+  onSubmitterEmailChange: (v: string) => void
   /** Back to the edit fields — the form itself, not this panel, decides
    *  whether that means unmounting or just hiding it again. */
   onCancel: () => void
@@ -63,6 +74,10 @@ export default function RemovalRequest({
     setSubmitting(true)
     try {
       const note = details.trim() ? `${reason}: ${details.trim()}` : reason
+      const submittedBy =
+        submitterName.trim() || submitterEmail.trim()
+          ? { name: submitterName.trim() || undefined, email: submitterEmail.trim() || undefined }
+          : undefined
       const res = await fetch(withCommunity('/api/submissions', community), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -142,6 +157,22 @@ export default function RemovalRequest({
           className={inputClass}
         />
       </div>
+      {/* Same fields as ListingForm's own "Your name"/"Your email", not a
+          separate ask — a removal request is a bigger claim than a routine
+          edit (a moderator may genuinely want to follow up: "are you sure,
+          or did it just move?"), and unlike the edit fields, this panel used
+          to be the one place in the form with no way to leave one at all —
+          those inputs live in the block this panel replaces, not inside it. */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div>
+          <label htmlFor={`${uid}-name`} className="mb-1 block text-sm font-medium text-slate-700">Your name (optional)</label>
+          <input id={`${uid}-name`} value={submitterName} onChange={(e) => onSubmitterNameChange(e.target.value)} className={inputClass} />
+        </div>
+        <div>
+          <label htmlFor={`${uid}-email`} className="mb-1 block text-sm font-medium text-slate-700">Your email (optional)</label>
+          <input id={`${uid}-email`} type="email" value={submitterEmail} onChange={(e) => onSubmitterEmailChange(e.target.value)} className={inputClass} />
+        </div>
+      </div>
       {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
       <div className="space-y-2">
         {/* Full width, matching the reason/details fields above it and
@@ -150,12 +181,14 @@ export default function RemovalRequest({
             Request removal sits beside Submit and has to read as "the other
             option" at a glance; by the time someone is on this screen, the
             heading above already says "Request removal of {name}", so the
-            button no longer needs to carry that signal itself. */}
+            button no longer needs to carry that signal itself. No text-sm —
+            same ambient (larger) size as Submit/Request removal on the
+            previous screen; this used to render visibly smaller than both. */}
         <button
           type="button"
           onClick={submit}
           disabled={submitting || !canSubmit}
-          className="w-full cursor-pointer rounded-md border border-red-300 bg-white px-4 py-2.5 text-sm font-medium text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+          className="w-full cursor-pointer rounded-md border border-red-300 bg-white px-4 py-2.5 font-medium text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {submitting ? 'Sending…' : canSubmit ? 'Confirm removal request' : 'Verifying…'}
         </button>
@@ -175,7 +208,7 @@ export default function RemovalRequest({
             setError(null)
             onCancel()
           }}
-          className="w-full cursor-pointer rounded-md border border-slate-300 bg-white py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-800"
+          className="w-full cursor-pointer rounded-md border border-slate-300 bg-white py-2.5 font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-800"
         >
           Cancel
         </button>

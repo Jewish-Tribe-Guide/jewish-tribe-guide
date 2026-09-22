@@ -406,8 +406,11 @@ describe('ListingForm', () => {
     const existing = makeListing({ id: 'listing-42', name: 'Old Name' })
     renderWithProviders(<ListingForm category={category} mode="edit" existing={existing} {...handlers} />)
 
-    // Only filling in contact info — no listing field touched at all.
-    await user.type(screen.getByLabelText(/Your name/), 'A Neighbor')
+    // Only filling in contact info — no listing field touched at all. Two
+    // "Your name" fields exist once removal is offered (this one, and
+    // RemovalRequest's own mirror of the same shared state) — index 0 is
+    // this component's, which renders first in the DOM.
+    await user.type(screen.getAllByLabelText(/Your name/)[0], 'A Neighbor')
     await user.click(screen.getByRole('button', { name: 'Submit edit for review' }))
 
     expect(await screen.findByText(/haven.t changed anything yet/)).toBeInTheDocument()

@@ -474,7 +474,12 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
         </p>
       </div>
 
-      <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-6">
+      {/* No outer card here — each group below (Basics, an audience section,
+          a formSection, "More details") is already its own bordered box, so
+          a wrapping card around all of them nested a box around boxes rather
+          than adding any real structure. The form just sits directly on
+          whatever surface embeds it (a dialog's own panel when `embedded`,
+          the page/sheet background otherwise). */}
       <form onSubmit={handleSubmit} className="space-y-4">
         {!adminSubmit && <Honeypot value={honeypot} onChange={setHoneypot} />}
 
@@ -751,7 +756,7 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
             <button
               type="button"
               onClick={() => setRemovalOpen(true)}
-              className="w-full rounded-md bg-red-600 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-red-700 cursor-pointer"
+              className="w-full rounded-md bg-red-600 px-5 py-2.5 font-medium text-white transition-colors hover:bg-red-700 cursor-pointer"
             >
               Request removal
             </button>
@@ -777,11 +782,10 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
               canSubmit={!TURNSTILE_ACTIVE || !!turnstileToken}
               resetTurnstile={resetTurnstile}
               honeypot={honeypot}
-              submittedBy={
-                submitterName.trim() || submitterEmail.trim()
-                  ? { name: submitterName.trim() || undefined, email: submitterEmail.trim() || undefined }
-                  : undefined
-              }
+              submitterName={submitterName}
+              onSubmitterNameChange={setSubmitterName}
+              submitterEmail={submitterEmail}
+              onSubmitterEmailChange={setSubmitterEmail}
               onCancel={() => setRemovalOpen(false)}
               onDone={() => {
                 setDoneKind('removal')
@@ -793,7 +797,6 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
 
         <PrivacyNote />
       </form>
-      </div>
     </div>
   )
 }
