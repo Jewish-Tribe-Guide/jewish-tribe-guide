@@ -26,6 +26,7 @@ import { usePinned } from '@/lib/pinnedContext'
 import { CURRENT_LOCATION_LABEL } from '@/lib/useLiveLocation'
 import { useDroppedPins } from '@/lib/droppedPinsContext'
 import DroppedPinEditor from './DroppedPinEditor'
+import { useMapSidebar, SIDEBAR_MIN_WIDTH, SIDEBAR_MAX_WIDTH, SIDEBAR_SEARCH_INSET } from './useMapSidebar'
 import { useCampaignBanners } from '@/lib/contentContext'
 import { activeCampaignBanner } from '@/lib/campaignBanner'
 import { community } from '@/community.config'
@@ -57,40 +58,6 @@ export const HOSPITAL_ICON = '🏥'
 const DROPPED_PREFIX = 'dropped:'
 const DROPPED_FILTER_ID = '__dropped__'
 const DROPPED_PIN_COLOR = '#D85A30'
-
-// Desktop sidebar's default/min/max px width — draggable from its own right
-// edge (see the resize handle below), same pattern most split-pane apps use
-// (Claude's own sidebar included). Max leaves the map itself a usable
-// amount of room even on a laptop-width screen rather than letting the
-// sidebar eat the whole view. Min is set by what the floating search box
-// (see that element's own doc — its width now TRACKS the sidebar's, inset
-// by SIDEBAR_SEARCH_INSET on each side) can shrink to before it stops
-// looking like a real search box, not by the sidebar's own content
-// wrapping.
-const SIDEBAR_DEFAULT_WIDTH = 380
-const SIDEBAR_MIN_WIDTH = 360
-const SIDEBAR_MAX_WIDTH = 640
-// How much narrower the floating search box is than the sidebar it sits on
-// top of, split evenly left/right — it reads as flush inside the sidebar's
-// own white edge (Google Maps' own search box, by contrast, leaves a much
-// bigger margin on both sides) rather than spanning it edge to edge.
-const SIDEBAR_SEARCH_INSET = 24
-// Persists the chosen width across visits, the same way Claude's own
-// sidebar remembers a dragged width — otherwise every fresh page load (or
-// every time sidebarVisible cycles false→true, which unmounts this) would
-// silently forget it and snap back to the default.
-const SIDEBAR_WIDTH_STORAGE_KEY = 'jpc:map-sidebar-width'
-
-function clampSidebarWidth(px: number): number {
-  return Math.min(SIDEBAR_MAX_WIDTH, Math.max(SIDEBAR_MIN_WIDTH, px))
-}
-
-function loadStoredSidebarWidth(): number {
-  if (typeof window === 'undefined') return SIDEBAR_DEFAULT_WIDTH
-  const raw = window.localStorage.getItem(SIDEBAR_WIDTH_STORAGE_KEY)
-  const parsed = raw === null ? NaN : Number(raw)
-  return Number.isFinite(parsed) ? clampSidebarWidth(parsed) : SIDEBAR_DEFAULT_WIDTH
-}
 
 // Typing one of these in the search box searches "open now" instead of
 // matching literal text.
@@ -400,66 +367,23 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fullscreen])
 
-  // Desktop-only — collapses the results sidebar down to just its edge
-  // toggle, same as Google Maps' own panel-collapse arrow, so a visitor who
-  // wants to see more of the map without losing their search/selection can
-  // tuck the panel away without clearing it. Reset to false at the points
-  // below where the panel would otherwise reopen with new content anyway
-  // (a fresh search, a newly toggled category, a newly selected place) —
-  // collapsing should hide what's already there, not swallow the next
-  // thing the visitor explicitly asks to see.
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
-  // Lets the sidebar be opened even before anything's narrowed — without
-  // this, first-time visitors land on a bare map with no visible way to
-  // browse the (already-loaded) directory at all, since the sidebar
-  // otherwise only appears once a search/category narrows things down.
-  // Independent of sidebarCollapsed (which hides a sidebar that DOES have a
-  // narrowing reason to show); see sidebarVisible/toggleSidebar below for
-  // how the two combine.
-  const [sidebarOpenedManually, setSidebarOpenedManually] = useState(false)
-
-  // Draggable sidebar width — see the resize handle's own doc for the
-  // gesture itself. Lazy-initialized from localStorage (SSR-safe: reads
-  // window only in the initializer, which never runs on the server) so a
-  // returning visitor's chosen width is there on first paint, not snapped
-  // to the default for one frame then corrected.
-  const [sidebarWidth, setSidebarWidth] = useState(loadStoredSidebarWidth)
-  const [isDraggingSidebar, setIsDraggingSidebar] = useState(false)
-  const sidebarDragRef = useRef<{ startX: number; startWidth: number } | null>(null)
-
-  function onSidebarHandlePointerDown(e: React.PointerEvent) {
-    ;(e.currentTarget as Element).setPointerCapture(e.pointerId)
-    sidebarDragRef.current = { startX: e.clientX, startWidth: sidebarWidth }
-    setIsDraggingSidebar(true)
-  }
-
-  function onSidebarHandlePointerMove(e: React.PointerEvent) {
-    const drag = sidebarDragRef.current
-    if (!drag) return
-    setSidebarWidth(clampSidebarWidth(drag.startWidth + (e.clientX - drag.startX)))
-  }
-
-  // Persisted on release, not on every pointermove — dragging is the only
-  // time this changes, so writing localStorage a few dozen times over one
-  // drag (instead of once at the end) would be pure waste.
-  function onSidebarHandlePointerUp() {
-    if (!sidebarDragRef.current) return
-    sidebarDragRef.current = null
-    setIsDraggingSidebar(false)
-    window.localStorage.setItem(SIDEBAR_WIDTH_STORAGE_KEY, String(sidebarWidth))
-  }
-
-  // Same reasoning as MobileSheet's own onHandlePointerCancel: the browser
-  // took the touch over mid-gesture (most commonly an edge swipe recognized
-  // as back-navigation) — snap back to the width the drag actually started
-  // from rather than leaving it wherever the interrupted gesture reached,
-  // since a cancelled gesture is one that never completed.
-  function onSidebarHandlePointerCancel() {
-    const drag = sidebarDragRef.current
-    sidebarDragRef.current = null
-    setIsDraggingSidebar(false)
-    if (drag) setSidebarWidth(drag.startWidth)
-  }
+  // Desktop sidebar's own width/collapse/opened-manually/drag state — see
+  // useMapSidebar's own top comment for why sidebarVisible/toggleSidebar
+  // (which need desktopNarrowed, not computable this early) stay here
+  // instead of living in that hook.
+  const {
+    sidebarWidth,
+    sidebarCollapsed,
+    setSidebarCollapsed,
+    sidebarOpenedManually,
+    setSidebarOpenedManually,
+    isDraggingSidebar,
+    onSidebarHandlePointerDown,
+    onSidebarHandlePointerMove,
+    onSidebarHandlePointerUp,
+    onSidebarHandlePointerCancel,
+    onSidebarHandleKeyDown,
+  } = useMapSidebar()
 
   // follow = map pans with every GPS tick. Turns off the moment the user
   // manually drags the map (see ResourceMap's dragstart listener), and only
@@ -1358,9 +1282,8 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // when the visitor explicitly backs out of it.
   useEffect(() => {
     if (isMobile || desktopSelected || !desktopNarrowed) return
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (visiblePoints.length === 0) setSidebarCollapsed(true)
-  }, [visiblePoints.length, desktopSelected, desktopNarrowed, isMobile])
+  }, [visiblePoints.length, desktopSelected, desktopNarrowed, isMobile, setSidebarCollapsed])
 
   // ── Desktop search box + its autocomplete dropdown — shared between the
   // two places it can render: floating directly on the map (the default
@@ -1740,17 +1663,11 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
               onPointerMove={onSidebarHandlePointerMove}
               onPointerUp={onSidebarHandlePointerUp}
               onPointerCancel={onSidebarHandlePointerCancel}
-              // Same ARROW_STEP both directions — a real keyboard equivalent
-              // for the drag gesture (ARIA's own separator pattern calls
-              // for one), not just a courtesy: dragging with a mouse is the
-              // only way to reach this control otherwise.
-              onKeyDown={(e) => {
-                if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return
-                e.preventDefault()
-                const next = clampSidebarWidth(sidebarWidth + (e.key === 'ArrowRight' ? 16 : -16))
-                setSidebarWidth(next)
-                window.localStorage.setItem(SIDEBAR_WIDTH_STORAGE_KEY, String(next))
-              }}
+              // Real keyboard equivalent for the drag gesture (ARIA's own
+              // separator pattern calls for one), not just a courtesy —
+              // dragging with a mouse is the only way to reach this
+              // control otherwise. See useMapSidebar's own doc.
+              onKeyDown={onSidebarHandleKeyDown}
               tabIndex={0}
               role="separator"
               aria-orientation="vertical"
