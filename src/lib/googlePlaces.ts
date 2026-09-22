@@ -12,10 +12,13 @@
 // consistency with geo.ts / travelTime.ts, which already call the legacy
 // maps.googleapis.com web services with this key.
 
-import type { DayKey, StructuredHours } from './hours'
+import type { BusinessStatus, DayKey, StructuredHours } from './hours'
 import { DAY_KEYS } from './hours'
 
-export type BusinessStatus = 'OPERATIONAL' | 'CLOSED_TEMPORARILY' | 'CLOSED_PERMANENTLY'
+// BusinessStatus used to be declared here too, an identical copy of hours.ts's
+// own — nothing ever imported this one (every real consumer already imported
+// hours.ts's), so it was just a second hand-maintained union that could
+// silently drift out of sync with the one actually in use.
 
 /** What a single sync pulls back from Google for one listing. Any field may be
  *  null when Google doesn't have it (e.g. a place with no posted hours). */
