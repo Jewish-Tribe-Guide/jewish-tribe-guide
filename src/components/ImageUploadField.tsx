@@ -389,8 +389,17 @@ export default function ImageUploadField({
           see its own comment. */}
       {urlInputOpen && (
         <label className="block mt-2">
-          <span className="block text-[11px] text-muted mb-1">…or paste an image URL directly</span>
+          {/* Only when this row has no toggle of its own above it (admin's
+              own uploaders, collapseUrlInput off) — the public form's
+              "Paste URL" button already says what this input is for, so
+              the caption repeating it right underneath was pure noise. The
+              input still needs an accessible name once the caption's gone
+              (aria-label below), since nothing else in the DOM labels it. */}
+          {!collapseUrlInput && (
+            <span className="block text-[11px] text-muted mb-1">…or paste an image URL directly</span>
+          )}
           <input
+            aria-label={collapseUrlInput ? 'Image URL' : undefined}
             value={value}
             onChange={(e) => {
               // A manually-typed/pasted URL IS an original, every bit as much

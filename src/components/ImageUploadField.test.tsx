@@ -232,6 +232,24 @@ describe('ImageUploadField', () => {
       render(<ImageUploadField value="" onChange={vi.fn()} uploadUrl="/api/upload" />)
       expect(screen.getByPlaceholderText('https://…')).toBeInTheDocument()
       expect(screen.queryByRole('button', { name: 'Paste URL' })).not.toBeInTheDocument()
+      // No "Paste URL" toggle button exists in this (uncollapsed) mode, so
+      // the caption is the only thing that ever explains this input —
+      // it stays here.
+      expect(screen.getByText('…or paste an image URL directly')).toBeInTheDocument()
+    })
+
+    // Once there's a "Paste URL" toggle button (collapseUrlInput), it
+    // already says what the input below it is for — repeating that in a
+    // caption right underneath was pure noise. The input still needs an
+    // accessible name once the caption's gone.
+    it('drops the "…or paste an image URL directly" caption once a "Paste URL" toggle already says the same thing', async () => {
+      const user = userEvent.setup()
+      render(<ImageUploadField value="" onChange={vi.fn()} uploadUrl="/api/upload" collapseUrlInput />)
+
+      await user.click(screen.getByRole('button', { name: 'Paste URL' }))
+
+      expect(screen.queryByText('…or paste an image URL directly')).not.toBeInTheDocument()
+      expect(screen.getByRole('textbox', { name: 'Image URL' })).toBe(screen.getByPlaceholderText('https://…'))
     })
 
     // One persistent toggle button — not a trigger that vanishes once
