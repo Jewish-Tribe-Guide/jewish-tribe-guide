@@ -116,12 +116,22 @@ export default function RemovalRequest({
     // rendered above it, and when it's unconfigured (e.g. local dev) that
     // divider became a stray line with nothing above it to separate from.
     <div role="group" aria-labelledby={`${uid}-title`} className="space-y-3">
-      <p id={`${uid}-title`} className="text-sm font-medium text-slate-800">
+      {/* A real title, not a muted paragraph — this panel replaces the whole
+          screen, so it needs to read as "you are here", the way a page
+          title would, not as one more line of body copy. The dialog's own
+          header still says "Suggest an edit" above this; this is the
+          sub-heading for what's actually showing right now. */}
+      <h3 id={`${uid}-title`} className="text-base font-semibold text-slate-900">
         Request removal of {listing.name}
-      </p>
+      </h3>
+      {/* The "a moderator reviews this" part used to repeat ListingForm's own
+          blue banner above (same fact, same words, twice) — cut. What's left
+          is the one thing the banner doesn't say: this isn't the right tool
+          for a wrong address or phone number. "the fields above" no longer
+          means anything since this view replaced them — Cancel is how you'd
+          get back to them now. */}
       <p className="text-sm text-muted">
-        A moderator reviews every request before anything changes. If it just moved or has wrong
-        info, fix it in the fields above instead.
+        Moved or has wrong info? Cancel and edit it instead.
       </p>
       <div>
         <label htmlFor={`${uid}-reason`} className="mb-1 block text-sm font-medium text-slate-700">
@@ -147,9 +157,10 @@ export default function RemovalRequest({
         />
       </div>
       {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
-      <div className="flex flex-wrap items-center gap-3">
-        {/* Outline, not solid, here — the reverse of ListingForm's trigger
-            button. The strong red cue belongs on the PREVIOUS screen, where
+      <div className="space-y-2">
+        {/* Full width, matching the reason/details fields above it and
+            ListingForm's own Submit/Request removal buttons — outline, not
+            solid: the strong red cue belongs on the PREVIOUS screen, where
             Request removal sits beside Submit and has to read as "the other
             option" at a glance; by the time someone is on this screen, the
             heading above already says "Request removal of {name}", so the
@@ -158,17 +169,27 @@ export default function RemovalRequest({
           type="button"
           onClick={submit}
           disabled={submitting || !canSubmit}
-          className="cursor-pointer rounded-md border border-red-300 bg-white px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+          className="w-full cursor-pointer rounded-md border border-red-300 bg-white px-4 py-2.5 text-sm font-medium text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {submitting ? 'Sending…' : canSubmit ? 'Confirm removal request' : 'Verifying…'}
         </button>
+        {/* A real bordered secondary button, visible at rest — same
+            border/rounded/padded treatment this app already uses for a
+            secondary Cancel elsewhere (see CategorySaveConfirmations). A
+            hover-only ghost style (no visible edge until the pointer's over
+            it) doesn't read as clickable at a glance, and doesn't exist at
+            all on touch, where there's no hover to reveal it. Still lighter
+            than Confirm (gray, not red) — unlike Submit/Request removal on
+            the previous screen (two real, comparably weighted
+            destinations), Cancel isn't a comparable alternative here, just
+            "never mind", so it stays visually quieter, just not invisible. */}
         <button
           type="button"
           onClick={() => {
             setError(null)
             onCancel()
           }}
-          className="cursor-pointer text-sm text-slate-500 hover:text-slate-800"
+          className="w-full cursor-pointer rounded-md border border-slate-300 bg-white py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-800"
         >
           Cancel
         </button>
