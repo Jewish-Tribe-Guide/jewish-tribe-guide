@@ -212,23 +212,17 @@ export async function dismissLocationPrompt(page: Page): Promise<void> {
   await notNow.waitFor({ state: 'hidden' })
 }
 
-/** The category page's own Add control — desktop's DirectoryHeader button
- *  (exact "Add") on wide viewports, mobile's floating button (GenericDirectory,
- *  "Add a place") on narrow ones — whichever the current project's viewport
- *  actually renders as visible. Scoped to `main`, not the whole page: SiteHeader
- *  carries a desktop-only "Add a place" button of its own (opens a category
- *  PICKER, not this category's form directly), which shares the mobile
- *  button's exact name and would otherwise be a second, wrong match on desktop
- *  — `main` never contains it, so this can't pick it up regardless of viewport
- *  or DOM order. Used wherever a test needs to open THIS category's own Add
- *  form specifically, not just any Add entry point on the page. */
+/** The category page's own Add control — GenericDirectory's floating
+ *  button, the same one on every viewport now (it used to be mobile-only,
+ *  with desktop instead carrying a DirectoryHeader toolbar button and a
+ *  separate SiteHeader "Add a place" picker; both were removed once every
+ *  category page grew this floating button on desktop too). Scoped to
+ *  `main` on the theory that a future site-wide Add entry point might
+ *  reuse this exact name outside it. Used wherever a test needs to open
+ *  THIS category's own Add form specifically, not just any Add entry point
+ *  on the page. */
 export function categoryAddButton(page: Page): Locator {
-  const main = page.getByRole('main')
-  return main
-    .getByRole('button', { name: 'Add', exact: true })
-    .or(main.getByRole('button', { name: 'Add a place', exact: true }))
-    .filter({ visible: true })
-    .first()
+  return page.getByRole('main').getByRole('button', { name: 'Add a place', exact: true })
 }
 
 /** Waits for the page to be settled enough to assert on.

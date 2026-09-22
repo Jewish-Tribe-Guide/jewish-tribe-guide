@@ -970,29 +970,6 @@ export default function GenericDirectory({ category, items, anchorLabel, address
             addressPrompt={addressPrompt}
             titleInHeader
             banner={categoryBadge}
-            actions={
-              <>
-                {/* Desktop only — mobile's copy moved into the Filters/sort
-                    row below, between Filters and Popularity/Distance. Sat
-                    here on both platforms until then, next to the location
-                    label above (DirectoryHeader's `anchorLabel`), which
-                    read as the wrong two things competing for attention on
-                    mobile: a real bordered/colored button beside plain
-                    text that isn't even this page's main content — the
-                    address is one tap away behind the header's own pin
-                    icon regardless (a normal pattern; see LocationControl),
-                    not something this row needs to repeat. Desktop has the
-                    room for both side by side, so it's unchanged there. */}
-                {canAdd && (
-                  <button
-                    onClick={onAdd}
-                    className="hidden desktop:inline-flex items-center gap-1 text-sm font-medium text-primary border border-primary rounded-md px-3 py-1.5 hover:bg-primary hover:text-white transition-colors cursor-pointer whitespace-nowrap"
-                  >
-                    <PlusIcon className="h-4 w-4" /> Add
-                  </button>
-                )}
-              </>
-            }
           />
 
       {/* Controls — sticky from lg up so search/filters/sort stay reachable
@@ -1032,7 +1009,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
         // position. Applying `lg:-mt-3`/`lg:bg-white` unconditionally used to
         // pull this bar's own solid background up 12px REGARDLESS of scroll
         // position — while still sitting in normal flow, that overlapped
-        // whatever sat directly above it (DirectoryHeader's Add button),
+        // whatever sat directly above it (DirectoryHeader's title row),
         // clipping its bottom few pixels even on a page load with no
         // scrolling at all. The hide-on-scroll transform had the same bug in
         // reverse: applied unconditionally, it reacted to ANY downward
@@ -1478,23 +1455,26 @@ export default function GenericDirectory({ category, items, anchorLabel, address
       )}
       </CategoryBandFrame>
 
-      {/* Mobile's Add — a floating circular button, Gmail-compose-style,
-          instead of a toolbar button. Deliberately per-category rather than
-          a single site-wide entry point: SiteHeader's own "Add a place"
-          button (desktop only — see its comment) opens a category PICKER,
-          since desktop has no "already looking at one category" context to
-          skip that step with. Here, that context already exists — landing
-          straight in this category's own Add form via `onAdd`, no picker
-          detour, is strictly less friction for someone already browsing
-          Grocery who wants to add a grocery. The cost is real too: mobile
-          lost a general Add entry point outside category pages entirely
-          (Home, Map) — accepted deliberately rather than duplicating the
-          site-wide button here as well, on the theory that someone who
-          hasn't picked a category yet is better served by picking one first
-          (Browse Categories) than by a picker popping up from Home.
-          `bottom-[calc(3.75rem+env(safe-area-inset-bottom))]` clears
+      {/* The category page's Add — a floating circular button,
+          Gmail-compose-style, on both mobile and desktop now (used to be
+          mobile-only, with desktop instead carrying a toolbar button up in
+          DirectoryHeader and a site-wide "Add a place" picker in
+          SiteHeader — both removed in favor of this one control everywhere).
+          Deliberately per-category rather than a site-wide entry point:
+          landing straight in this category's own Add form via `onAdd`, no
+          picker detour, is strictly less friction for someone already
+          browsing Grocery who wants to add a grocery. The cost is real too:
+          the site now has no general Add entry point outside a category
+          page at all (Home, Map) — accepted deliberately, on the theory
+          that someone who hasn't picked a category yet is better served by
+          picking one first (Browse Categories) than by a picker popping up
+          from Home.
+          `bottom-[calc(3.75rem+env(safe-area-inset-bottom)+1rem)]` clears
           MobileTabBar the same way ResourceMapView's own fixed mobile
-          panels already do — 3.75rem is that bar's own height. */}
+          panels already do — 3.75rem is that bar's own height. MobileTabBar
+          itself is `desktop:hidden` (no bottom bar to clear there), so
+          desktop gets its own, simpler `bottom-6` instead of that clearance
+          math. */}
       {canAdd && (
         <button
           onClick={onAdd}
@@ -1504,7 +1484,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
           // querying by accessible name (they're both in the DOM at once
           // for an empty category, since this isn't gated on `filtered`).
           aria-label="Add a place"
-          className="desktop:hidden fixed right-4 bottom-[calc(3.75rem+env(safe-area-inset-bottom)+1rem)] z-40 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-white shadow-lg cursor-pointer active:scale-95 transition-transform"
+          className="fixed right-4 bottom-[calc(3.75rem+env(safe-area-inset-bottom)+1rem)] desktop:bottom-6 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-white shadow-lg cursor-pointer active:scale-95 transition-transform"
         >
           <PlusIcon className="h-6 w-6" />
         </button>

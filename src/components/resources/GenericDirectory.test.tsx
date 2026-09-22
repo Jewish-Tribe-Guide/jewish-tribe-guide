@@ -215,12 +215,13 @@ describe('GenericDirectory', () => {
     expect(onAdd).toHaveBeenCalledTimes(1)
   })
 
-  // Mobile's Add is a floating button (Gmail-compose-style), not a control
-  // inside the Filters/sort row — distinguished from DirectoryHeader's
-  // desktop-only "Add" button by its own accessible name ("Add a place"
-  // rather than plain "Add"), so this doesn't depend on `desktop:` CSS
-  // (which jsdom never applies) to tell the two apart.
-  it('has its own floating Add button, separate from the header\'s, that clicks the same onAdd', async () => {
+  // The floating Add button (Gmail-compose-style) — the category page's
+  // only Add control now, on every viewport. `desktop:hidden` (jsdom never
+  // applies CSS anyway, so this can't be caught by rendering behavior) used
+  // to gate it to mobile only; asserting it out of the className is the
+  // regression check for that, now that desktop shares this same button
+  // instead of DirectoryHeader's old toolbar "Add".
+  it('has a floating Add button that clicks onAdd, visible on every viewport', async () => {
     const user = userEvent.setup()
     const onAdd = vi.fn()
     const category = makeCategory({
@@ -230,7 +231,9 @@ describe('GenericDirectory', () => {
     })
     renderWithProviders(<GenericDirectory category={category} items={[makeListing()]} {...handlers} onAdd={onAdd} />)
 
-    await user.click(screen.getByRole('button', { name: 'Add a place' }))
+    const floatingAdd = screen.getByRole('button', { name: 'Add a place' })
+    expect(floatingAdd.className).not.toContain('desktop:hidden')
+    await user.click(floatingAdd)
     expect(onAdd).toHaveBeenCalledTimes(1)
   })
 
@@ -247,6 +250,17 @@ describe('GenericDirectory', () => {
     renderWithProviders(<GenericDirectory category={category} items={[makeListing()]} {...handlers} />)
 
     expect(screen.getByRole('button', { name: 'Add a place' })).toBeInTheDocument()
+  })
+
+  // Regression coverage for DirectoryHeader's old desktop-only toolbar "Add"
+  // button, removed once the floating button above started covering desktop
+  // too — the two used to coexist (one per viewport), so this guards against
+  // it quietly coming back alongside the floating one.
+  it('has no separate DirectoryHeader toolbar Add button any more', () => {
+    const category = makeCategory({ label: 'Grocery Store' })
+    renderWithProviders(<GenericDirectory category={category} items={[makeListing()]} {...handlers} />)
+
+    expect(screen.queryByRole('button', { name: /^Add$/ })).not.toBeInTheDocument()
   })
 
   it('wires a card\'s Edit/tag-click callbacks back to the directory\'s own props/state', async () => {
