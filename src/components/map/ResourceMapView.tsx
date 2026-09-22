@@ -62,15 +62,19 @@ const DROPPED_PIN_COLOR = '#D85A30'
 // edge (see the resize handle below), same pattern most split-pane apps use
 // (Claude's own sidebar included). Max leaves the map itself a usable
 // amount of room even on a laptop-width screen rather than letting the
-// sidebar eat the whole view. Min is set by the floating search box's own
-// fixed 336px width (see that element's own doc), not by content
-// wrapping — that box sits flush against the sidebar's left+bottom edge at
-// every width, so the sidebar can never be dragged narrower than what
-// keeps the box's own right edge inside it, or the box would visibly
-// overhang onto the map.
+// sidebar eat the whole view. Min is set by what the floating search box
+// (see that element's own doc — its width now TRACKS the sidebar's, inset
+// by SIDEBAR_SEARCH_INSET on each side) can shrink to before it stops
+// looking like a real search box, not by the sidebar's own content
+// wrapping.
 const SIDEBAR_DEFAULT_WIDTH = 380
 const SIDEBAR_MIN_WIDTH = 360
 const SIDEBAR_MAX_WIDTH = 640
+// How much narrower the floating search box is than the sidebar it sits on
+// top of, split evenly left/right — it reads as flush inside the sidebar's
+// own white edge (Google Maps' own search box, by contrast, leaves a much
+// bigger margin on both sides) rather than spanning it edge to edge.
+const SIDEBAR_SEARCH_INSET = 24
 // Persists the chosen width across visits, the same way Claude's own
 // sidebar remembers a dragged width — otherwise every fresh page load (or
 // every time sidebarVisible cycles false→true, which unmounts this) would
@@ -1796,20 +1800,31 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                   stacked above the sidebar in z-order (z-40 vs. the
                   sidebar's z-30) so it reads as sitting on top of the
                   sidebar's own top edge, the same way Google Maps' own
-                  search box sits over its results panel. Deliberately
-                  narrower than the sidebar's own MINIMUM width (336px vs.
-                  SIDEBAR_MIN_WIDTH's 360px) — flush left, no visible gap
-                  between the end of the search box and the sidebar's white
-                  below it, unlike Google Maps' own search box, which leaves
-                  a real margin on both sides — and still true at the
-                  narrowest the sidebar can be dragged to, which is the
-                  whole reason SIDEBAR_MIN_WIDTH stops where it does rather
-                  than at some smaller, tighter-feeling floor. This box
-                  itself never moves — only the chips below it (and the
-                  sidebar sliding in and out underneath) track the
-                  (now-draggable) width. ────────────────────────────────── */}
+                  search box sits over its results panel. Its WIDTH now
+                  tracks the sidebar's own (SIDEBAR_SEARCH_INSET narrower on
+                  each side, so it still reads as sitting flush inside the
+                  sidebar rather than spanning its full white edge to edge)
+                  — it used to stay fixed at 336px regardless, which matched
+                  the sidebar exactly at its minimum width but left a
+                  growing, disconnected strip of the sidebar's own white
+                  bare to its right the moment someone dragged the sidebar
+                  wider, undermining the "sits on top of the sidebar" idea
+                  the whole floating-search approach is built on. Same
+                  no-transition-while-dragging reasoning as the sidebar's
+                  own width below, so it tracks the cursor directly instead
+                  of visibly lagging a step behind it. Falls back to the
+                  same 336px when no sidebar is mounted at all (nothing to
+                  track yet). ────────────────────────────────────────────── */}
           {!isMobile && (
-            <div className="absolute left-3 top-3 z-40 hidden w-[336px] desktop:block">{desktopSearchForm}</div>
+            <div
+              className="absolute left-3 top-3 z-40 hidden desktop:block"
+              style={{
+                width: sidebarVisible ? sidebarWidth - SIDEBAR_SEARCH_INSET : SIDEBAR_MIN_WIDTH - SIDEBAR_SEARCH_INSET,
+                transition: isDraggingSidebar ? 'none' : 'width 200ms ease-in-out',
+              }}
+            >
+              {desktopSearchForm}
+            </div>
           )}
 
           {/* ── Floating category chips (desktop) — sits just clear of the

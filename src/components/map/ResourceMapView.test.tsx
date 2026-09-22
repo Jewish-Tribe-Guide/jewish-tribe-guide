@@ -211,18 +211,20 @@ describe('ResourceMapView — search autocomplete', () => {
 })
 
 describe('ResourceMapView — desktop search/filter bar position', () => {
-  // Neither the search box nor the chips move when the sidebar opens or
-  // closes anymore — both used to shift right to dodge the sidebar (first
+  // Neither the search box nor the chips MOVE (left/top) when the sidebar
+  // opens or closes — both used to shift right to dodge the sidebar (first
   // together, then just the chips), which kept reading as things getting
-  // "pushed" every time the sidebar appeared. Instead the search box is
-  // sized narrower than the sidebar's own width, and the chips fixed well
-  // past the sidebar's edge, both with a real gap — flush edges (search box
-  // exactly as wide as the sidebar, chips starting exactly where it ends)
-  // left no visible margin anywhere, unlike Google Maps' own search box and
-  // chip row, which both sit with real breathing room around the panel (see
-  // the reference screenshots). Confirmed both fail against the old
-  // sidebar-tracking offsets, then restored.
-  it('keeps the search box and chips at the same position whether or not the sidebar is open', async () => {
+  // "pushed" every time the sidebar appeared. The search box's WIDTH is a
+  // different story: it now tracks the sidebar's own width (see
+  // SIDEBAR_SEARCH_INSET's own doc) rather than staying a fixed 336px —
+  // reported live as looking disconnected from the sidebar it visually
+  // sits on top of once the sidebar was dragged wider than that fixed
+  // value, leaving a growing bare strip of the sidebar's own white to the
+  // search box's right. The chips stay fixed well past the sidebar's own
+  // edge, with a real gap, unlike Google Maps' own chip row, which sits
+  // with more breathing room around the panel (see the reference
+  // screenshots).
+  it('keeps the search box and chips at the same LEFT position whether or not the sidebar is open', async () => {
     const user = userEvent.setup()
     const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
     const { container } = renderMap(
@@ -231,30 +233,68 @@ describe('ResourceMapView — desktop search/filter bar position', () => {
       [grocery],
     )
 
-    const search = () => container.querySelector('[class*="w-\\[336px\\]"]')
+    const search = () => container.querySelector('[class*="left-3"][class*="top-3"]')
     const chips = () => container.querySelector('[class*="right-16"][class*="z-20"]') as HTMLElement | null
     const before = { searchClass: search()?.className, chipsLeft: chips()?.style.left }
 
     await user.click(screen.getByRole('button', { name: /Grocery Stores/ }))
 
-    // The search box has no position of its own to track (a plain class,
-    // unaffected by the sidebar either way) — only the chips' inline
-    // `left` (now driven by sidebarWidth, not a fixed class — see that
-    // element's own doc) is what actually could have drifted here.
+    // The search box's className (its left/top position) doesn't change —
+    // only its width (a separate inline style, asserted below) does. The
+    // chips' inline `left` (driven by sidebarWidth, not a fixed class —
+    // see that element's own doc) is what actually could have drifted here.
     expect(search()?.className).toBe(before.searchClass)
     expect(chips()?.style.left).toBe(before.chipsLeft)
     expect(search()?.className).toMatch(/\bleft-3\b/)
     expect(chips()?.style.left).toBe('396px')
   })
 
+  // The actual feature: the search box's width TRACKS the sidebar's own
+  // (inset by SIDEBAR_SEARCH_INSET on each side, so it still reads as
+  // sitting flush inside the sidebar rather than spanning it edge to
+  // edge) — confirmed at the sidebar's default width, and confirmed AGAIN
+  // after dragging it wider, which is the exact regression reported live
+  // (the search box used to stay a fixed 336px regardless, leaving a
+  // growing bare strip of the sidebar's own white to its right).
+  it('grows the search box\'s width along with the sidebar\'s, with a consistent inset on each side', async () => {
+    const user = userEvent.setup()
+    const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
+    const { container } = renderMap(
+      <ResourceMapView onUp={vi.fn()} />,
+      [listingWithGeo({ id: 'g1', category: 'grocery', name: 'Acme Grocery' })],
+      [grocery],
+    )
+
+    await user.click(screen.getByRole('button', { name: /Grocery Stores/ }))
+
+    const aside = container.querySelector('aside') as HTMLElement
+    const search = container.querySelector('[class*="left-3"][class*="top-3"]') as HTMLElement
+    const SIDEBAR_SEARCH_INSET = 24
+
+    expect(aside.style.width).toBe('380px') // SIDEBAR_DEFAULT_WIDTH
+    expect(search.style.width).toBe(`${380 - SIDEBAR_SEARCH_INSET}px`)
+
+    // Drag the sidebar wider — the search box must widen with it, not stay
+    // put at its old width.
+    const handle = screen.getByRole('separator', { name: 'Resize sidebar' })
+    fireEvent.pointerDown(handle, { clientX: 380 })
+    fireEvent.pointerMove(handle, { clientX: 480 }) // +100px
+    fireEvent.pointerUp(handle)
+
+    expect(aside.style.width).toBe('480px')
+    expect(search.style.width).toBe(`${480 - SIDEBAR_SEARCH_INSET}px`)
+  })
+
   // The invariant that actually prevents both the overlap AND the flush,
-  // no-breathing-room look: there has to be a real gap between the search
-  // box's right edge and the sidebar's own right edge, and another real gap
-  // between the sidebar's right edge and where the chips start. Widening the
-  // sidebar, or narrowing either gap, later without adjusting to match would
-  // silently reopen one of those two problems — this fails immediately if
-  // that ever drifts, instead of waiting for someone to notice it visually.
-  it('leaves a real gap on both sides of the sidebar — search box to sidebar edge, and sidebar edge to chips', async () => {
+  // no-breathing-room look for the CHIPS specifically (the search box's own
+  // gap to the sidebar is fixed by construction now — see
+  // SIDEBAR_SEARCH_INSET — so it's covered by the width test above, not a
+  // "stays >= some floor" check): there has to be a real gap between the
+  // sidebar's own right edge and where the chips start. Narrowing that gap
+  // later without adjusting to match would silently reopen the flush,
+  // no-breathing-room look — this fails immediately if that ever drifts,
+  // instead of waiting for someone to notice it visually.
+  it('leaves a real gap between the sidebar\'s right edge and the chips', async () => {
     const user = userEvent.setup()
     const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
     const { container } = renderMap(
@@ -266,16 +306,12 @@ describe('ResourceMapView — desktop search/filter bar position', () => {
     await user.click(screen.getByRole('button', { name: /Grocery Stores/ }))
 
     const aside = container.querySelector('aside') as HTMLElement | null
-    const search = container.querySelector('[class*="w-\\[336px\\]"]')
     const chips = container.querySelector('[class*="right-16"][class*="z-20"]') as HTMLElement | null
 
     const sidebarWidth = Number(aside?.style.width.replace('px', ''))
-    const searchLeft = Number(search?.className.match(/\bleft-(\d+)\b/)?.[1]) * 4 // Tailwind spacing unit -> px
-    const searchWidth = Number(search?.className.match(/w-\[(\d+)px\]/)?.[1])
     const chipsLeft = Number(chips?.style.left.replace('px', ''))
     const MIN_GAP_PX = 16
 
-    expect(sidebarWidth - (searchLeft + searchWidth)).toBeGreaterThanOrEqual(MIN_GAP_PX)
     expect(chipsLeft - sidebarWidth).toBeGreaterThanOrEqual(MIN_GAP_PX)
   })
 
