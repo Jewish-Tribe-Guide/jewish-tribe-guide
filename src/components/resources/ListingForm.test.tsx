@@ -69,6 +69,10 @@ function textField(overrides: Partial<CategoryField> = {}): CategoryField {
   return { key: 'kosherItems', label: 'Kosher items', type: 'text', ...overrides }
 }
 
+function imageField(overrides: Partial<CategoryField> = {}): CategoryField {
+  return { key: 'photoOverride', label: 'Photo', type: 'image', ...overrides }
+}
+
 function selectField(overrides: Partial<CategoryField> = {}): CategoryField {
   return {
     key: 'cuisine',
@@ -307,6 +311,18 @@ describe('ListingForm', () => {
     expect(screen.queryByLabelText('Address')).not.toBeInTheDocument()
     expect(screen.queryByLabelText('Phone')).not.toBeInTheDocument()
     expect(screen.getByLabelText(/Name/)).toBeInTheDocument()
+  })
+
+  // ImageUploadField's "Click the preview to reposition/re-zoom it" hint is
+  // opt-out (showRepositionHint) — admin's own logo/hero/category-icon
+  // editors keep it (see SiteSettingsEditor's tests), but a visitor filling
+  // out one form field at a time doesn't need it spelled out.
+  it('never shows the "reposition/re-zoom" hint on a photo field, even once a photo is set', () => {
+    const category = makeCategory({ detailFields: [imageField()] })
+    const existing = makeListing({ id: 'listing-1', photoOverride: 'https://example.com/photo.jpg' })
+    renderWithProviders(<ListingForm category={category} mode="edit" existing={existing} {...handlers} />)
+
+    expect(screen.queryByText('Click the preview to reposition/re-zoom it')).not.toBeInTheDocument()
   })
 
   it('a showIf-gated field only appears once its trigger field is checked', async () => {

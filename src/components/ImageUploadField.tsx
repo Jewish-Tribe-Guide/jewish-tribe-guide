@@ -43,6 +43,13 @@ type Props = {
   originalSource?: File | string | null
   onOriginalSourceChange?: (source: File | string | null) => void
   helpText?: string
+  /** The "Click the preview to reposition/re-zoom it" hint once a photo is
+   *  set. Default true (admin's logo/hero/category-icon editors keep it —
+   *  see SiteSettingsEditor's own tests). Off for the public listing form
+   *  (ListingForm) specifically: confirmed with the site owner that a
+   *  visitor filling out one form field at a time doesn't need it spelled
+   *  out the way an admin configuring branding once might. */
+  showRepositionHint?: boolean
 }
 
 /** A picture picker that isn't just a file input: paste a URL, drag a file
@@ -60,6 +67,7 @@ export default function ImageUploadField({
   originalSource: controlledOriginalSource,
   onOriginalSourceChange,
   helpText,
+  showRepositionHint = true,
 }: Props) {
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -249,11 +257,19 @@ export default function ImageUploadField({
               </button>
             )}
           </div>
-          <span className="text-[11px] text-muted">
-            {value.trim()
-              ? 'Click the preview to reposition/re-zoom it'
-              : 'or drag an image onto the preview, or click it and paste one (⌘V / Ctrl+V)'}
-          </span>
+          {/* The reposition hint is opt-out (showRepositionHint) — see the
+              prop's own doc. The drag/paste shortcut stays unconditional:
+              ⌘V isn't discoverable on its own the way clicking a photo you
+              can already see is. */}
+          {value.trim() ? (
+            showRepositionHint && (
+              <span className="text-[11px] text-muted">Click the preview to reposition/re-zoom it</span>
+            )
+          ) : (
+            <span className="text-[11px] text-muted">
+              or drag an image onto the preview, or click it and paste one (⌘V / Ctrl+V)
+            </span>
+          )}
         </div>
 
         <input

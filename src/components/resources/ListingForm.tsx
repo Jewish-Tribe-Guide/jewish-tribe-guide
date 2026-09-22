@@ -781,6 +781,7 @@ function DetailFieldInput({
           // clipped away later.
           shape="circle"
           helpText="Shown instead of the category's usual icon for this listing — on the map, in search, and in the directory. Optional."
+          showRepositionHint={false}
         />
       </div>
     )
