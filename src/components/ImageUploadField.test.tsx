@@ -228,23 +228,36 @@ describe('ImageUploadField', () => {
   })
 
   describe('collapseUrlInput', () => {
-    it('shows the URL input immediately by default — every admin uploader keeps this', () => {
+    it('shows the URL input immediately by default, with no toggle button at all — every admin uploader keeps this', () => {
       render(<ImageUploadField value="" onChange={vi.fn()} uploadUrl="/api/upload" />)
       expect(screen.getByPlaceholderText('https://…')).toBeInTheDocument()
-      expect(screen.queryByRole('button', { name: /paste an image URL/ })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Paste URL' })).not.toBeInTheDocument()
     })
 
-    it('starts the URL input collapsed behind a link when asked to, and reveals it on click', async () => {
+    // One persistent toggle button — not a trigger that vanishes once
+    // clicked with a separate control elsewhere to undo it (that was tried
+    // and reported live as short-sighted: it added a whole new "Hide"
+    // control that never existed anywhere else in this field, instead of
+    // just not hiding the button). Same button opens AND closes, same as
+    // any other toggle in this app.
+    it('starts the URL input collapsed behind a "Paste URL" toggle, which stays put and opens/closes it', async () => {
       const user = userEvent.setup()
       render(<ImageUploadField value="" onChange={vi.fn()} uploadUrl="/api/upload" collapseUrlInput />)
 
       expect(screen.queryByPlaceholderText('https://…')).not.toBeInTheDocument()
-      const link = screen.getByRole('button', { name: /paste an image URL/ })
+      const toggle = screen.getByRole('button', { name: 'Paste URL' })
+      expect(toggle).toHaveAttribute('aria-pressed', 'false')
 
-      await user.click(link)
+      await user.click(toggle)
 
       expect(screen.getByPlaceholderText('https://…')).toBeInTheDocument()
-      expect(screen.queryByRole('button', { name: /paste an image URL/ })).not.toBeInTheDocument()
+      // Still the SAME button, not replaced or removed — just now pressed.
+      expect(screen.getByRole('button', { name: 'Paste URL' })).toHaveAttribute('aria-pressed', 'true')
+
+      await user.click(screen.getByRole('button', { name: 'Paste URL' }))
+
+      expect(screen.queryByPlaceholderText('https://…')).not.toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Paste URL' })).toHaveAttribute('aria-pressed', 'false')
     })
 
     it('still reports a pasted URL once revealed', async () => {
@@ -255,10 +268,27 @@ describe('ImageUploadField', () => {
       }
       render(<CollapsedControlledField />)
 
-      await user.click(screen.getByRole('button', { name: /paste an image URL/ }))
+      await user.click(screen.getByRole('button', { name: 'Paste URL' }))
       await user.type(screen.getByPlaceholderText('https://…'), 'https://example.com/photo.jpg')
 
       expect(screen.getByPlaceholderText('https://…')).toHaveValue('https://example.com/photo.jpg')
+    })
+
+    it('closing the toggle does not clear whatever URL/photo is already set', async () => {
+      const user = userEvent.setup()
+      function CollapsedControlledField() {
+        const [value, setValue] = useState('https://example.com/existing.jpg')
+        return <ImageUploadField value={value} onChange={setValue} uploadUrl="/api/upload" collapseUrlInput />
+      }
+      render(<CollapsedControlledField />)
+
+      await user.click(screen.getByRole('button', { name: 'Paste URL' }))
+      expect(screen.getByPlaceholderText('https://…')).toHaveValue('https://example.com/existing.jpg')
+
+      await user.click(screen.getByRole('button', { name: 'Paste URL' }))
+
+      expect(screen.queryByPlaceholderText('https://…')).not.toBeInTheDocument()
+      expect(document.querySelector('img')).toHaveAttribute('src', 'https://example.com/existing.jpg')
     })
   })
 })

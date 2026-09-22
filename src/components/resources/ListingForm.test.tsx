@@ -334,7 +334,7 @@ describe('ListingForm', () => {
 
     expect(screen.queryByText(/Shown instead of the category's usual icon/)).not.toBeInTheDocument()
     expect(screen.queryByPlaceholderText('https://…')).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /paste an image URL/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Paste URL' })).toBeInTheDocument()
   })
 
   it('a showIf-gated field only appears once its trigger field is checked', async () => {

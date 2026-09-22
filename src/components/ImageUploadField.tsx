@@ -257,6 +257,33 @@ export default function ImageUploadField({
             >
               Take photo
             </button>
+            {/* A pasted URL is a third real way to add a photo, not a lesser
+                afterthought, so it's a real toggle button in this row —
+                same as Upload image/Take photo — not a trigger that vanishes
+                once clicked with a separate "Hide" bolted on somewhere else
+                to undo it. One control, two states: click to reveal the
+                input below, click again to close it (closing never touches
+                `value` — nothing to lose, since the preview above already
+                reflects it live). Active state matches the app's existing
+                "currently selected" toggle convention (see the directory's
+                own Popularity/Distance sort buttons) rather than inventing
+                a new one. Only rendered at all when the caller asked to
+                collapse this (collapseUrlInput) — admin's own uploaders
+                keep the input permanently visible with no button here. */}
+            {collapseUrlInput && (
+              <button
+                type="button"
+                onClick={() => setUrlInputOpen((open) => !open)}
+                aria-pressed={urlInputOpen}
+                className={`text-sm font-medium rounded-md border px-3 py-1.5 transition-colors cursor-pointer ${
+                  urlInputOpen
+                    ? 'border-primary bg-primary text-white hover:bg-primary/90'
+                    : 'border-slate-300 text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                Paste URL
+              </button>
+            )}
             {value.trim() && (
               <button
                 type="button"
@@ -314,7 +341,12 @@ export default function ImageUploadField({
 
       {error && <span className="block text-[11px] text-red-600 mt-1">{error}</span>}
 
-      {urlInputOpen ? (
+      {/* The trigger for this (when collapsed) now lives in the button row
+          above, next to Upload image/Take photo — see its own comment. */}
+      {/* Closing this (when collapseUrlInput) happens from the same "Paste
+          URL" toggle in the button row above, not a separate control here —
+          see its own comment. */}
+      {urlInputOpen && (
         <label className="block mt-2">
           <span className="block text-[11px] text-muted mb-1">…or paste an image URL directly</span>
           <input
@@ -335,14 +367,6 @@ export default function ImageUploadField({
             className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-primary"
           />
         </label>
-      ) : (
-        <button
-          type="button"
-          onClick={() => setUrlInputOpen(true)}
-          className="mt-2 block text-[11px] text-muted underline underline-offset-2 hover:text-slate-600 cursor-pointer"
-        >
-          …or paste an image URL instead
-        </button>
       )}
       {helpText && <span className="block text-[11px] text-muted mt-1">{helpText}</span>}
 
