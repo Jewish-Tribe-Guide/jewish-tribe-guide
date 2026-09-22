@@ -728,16 +728,15 @@ describe('ListingForm', () => {
       expect(screen.getByRole('button', { name: /Kosher details/ })).toBeInTheDocument()
     })
 
-    // A photo is consistently the field least likely to be filled in at
-    // submission time (same reasoning "More details" itself sorts last) —
-    // so it renders after every other field in its own group, regardless of
-    // where the category happens to list it among its other fields.
-    it('renders the photo field last within whatever group it lands in', () => {
+    // No automatic reordering within a group, including the photo field —
+    // an earlier version forced photo to always sort last, generalized from
+    // one category's own preference into a blanket rule, which then fought
+    // the opposite preference for a different category. A field's position
+    // is exactly whatever order the category lists it in.
+    it('does not reorder the photo field — it renders wherever the category lists it, same as any other field', () => {
       const category = makeCategory({
         formSections: [{ key: 'kosher', label: 'Kosher details' }],
         detailFields: [
-          // key must be PHOTO_FIELD_KEY ('photo') — that's what the
-          // ordering rule actually keys off, not the field's label.
           imageField({ key: 'photo', formSection: 'kosher' }),
           textField({ key: 'certification', label: 'Certification', formSection: 'kosher' }),
         ],
@@ -746,9 +745,10 @@ describe('ListingForm', () => {
 
       const photoLabel = screen.getByText('Photo')
       const certification = screen.getByLabelText('Certification')
-      // DOCUMENT_POSITION_FOLLOWING (4) means the photo field comes after
-      // Certification, the reverse of the category's own field order above.
-      expect(certification.compareDocumentPosition(photoLabel) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+      // DOCUMENT_POSITION_FOLLOWING (4) means Certification comes after
+      // Photo — the SAME order the category's own fields list above, not
+      // reversed.
+      expect(photoLabel.compareDocumentPosition(certification) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     })
 
     // Every other field type gets a border for free (a select/textarea/input

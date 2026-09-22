@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { fieldIsVisible, isCategorySyncEligible, PHOTO_FIELD_KEY, resolveCapabilities, selectValues, type CategoryConfig, type CategoryField } from '@/lib/categories'
+import { fieldIsVisible, isCategorySyncEligible, resolveCapabilities, selectValues, type CategoryConfig, type CategoryField } from '@/lib/categories'
 import { formatPhone, normalizeUrl } from '@/lib/validation'
 import { hasListingChanged } from '@/lib/listingDiff'
 import type { DirectoryResource, ResourceSubmission } from '@/types'
@@ -90,20 +90,6 @@ type FieldGroupBlock = {
 // an admin-assigned formSection.
 const MORE_DETAILS_KEY = 'section:more'
 
-// A photo is consistently the field least likely to be filled in at
-// submission time — the same reasoning "More details" itself always sorts
-// last (see groupNonCoreFields below) — so wherever it lands, it renders
-// after every other field in its own group/box, not wherever the category
-// happens to list it among its other fields.
-function withPhotoLast(fields: CategoryField[]): CategoryField[] {
-  const photoIndex = fields.findIndex((f) => f.key === PHOTO_FIELD_KEY)
-  if (photoIndex === -1 || photoIndex === fields.length - 1) return fields
-  const reordered = [...fields]
-  const [photo] = reordered.splice(photoIndex, 1)
-  reordered.push(photo)
-  return reordered
-}
-
 // Groups fields into blocks — see MORE_DETAILS_KEY's own doc for the three
 // kinds. A group renders where its FIRST field appears (stable, not
 // necessarily contiguous), except "More details" itself, which always
@@ -154,7 +140,16 @@ function groupNonCoreFields(fields: CategoryField[], config: CategoryConfig): Fi
     blocks.push(moreDetailsBlock)
   }
 
-  return blocks.map((block) => ({ ...block, fields: withPhotoLast(block.fields) }))
+  // No reordering within a block beyond that — a field's position is
+  // whatever order the category itself lists it in. An earlier version of
+  // this also forced the photo field to always sort last, generalized from
+  // one category's own preference (Networking: photo below its Description)
+  // into a rule for every category — which then fought the opposite
+  // preference for another (Food: photo above its Short Description). Each
+  // category's own field order is the actual source of truth; reorder the
+  // category's fields (an admin-content change) if the order is wrong, not
+  // this function.
+  return blocks
 }
 
 export default function ListingForm({ category, mode, existing, onUp, onSubmitted, onPreviewSubmit, sharedTurnstile, adminSubmit, embedded, onRemovalOpenChange }: Props) {
