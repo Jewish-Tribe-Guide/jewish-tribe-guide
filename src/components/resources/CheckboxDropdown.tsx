@@ -7,7 +7,7 @@ import { createPortal } from 'react-dom'
 // several kosher certs at once). Renders its popup in a fixed-position layer so
 // it isn't clipped by the toolbar's horizontal scroll container.
 export default function CheckboxDropdown({
-  label, active, isOpen, onToggleOpen, onClose, values, chosen, onToggle, size = 'md', compact = false,
+  label, active, isOpen, onToggleOpen, onClose, values, chosen, onToggle, size = 'md',
 }: {
   label: string
   active: boolean
@@ -22,12 +22,6 @@ export default function CheckboxDropdown({
    *  sitting right next to it); default 'md' is the directory toolbar's own
    *  size, unchanged. */
   size?: 'sm' | 'md'
-  /** 'md' shrunk to mobile's toolbar weight (px-2.5/py-1.5/text-xs) with a
-   *  `desktop:` override restoring the original px-3/py-2/text-sm — for the
-   *  directory's collapsible filter row, which is the one place this trigger
-   *  shows on mobile at all. No effect on 'sm' (the map filter editor, which
-   *  has no separate mobile/desktop weight to begin with). */
-  compact?: boolean
 }) {
   const ref = useRef<HTMLDivElement>(null)
   // The popup itself is portaled to document.body (see below), so it's no
@@ -105,20 +99,15 @@ export default function CheckboxDropdown({
                   : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50',
               ].join(' ')
             : [
-                'flex items-center gap-1.5 rounded-md border cursor-pointer whitespace-nowrap transition-colors',
-                compact
-                  ? 'px-2.5 py-1.5 text-xs gap-1 desktop:px-3 desktop:py-2 desktop:text-sm desktop:gap-1.5'
-                  : 'px-3 py-2 text-sm',
+                'flex items-center gap-1.5 rounded-md border cursor-pointer whitespace-nowrap transition-colors px-3 py-2 text-sm',
                 active
                   ? 'border-primary bg-primary/5 text-primary font-medium'
-                  : compact
-                  ? 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 desktop:border-slate-300'
                   : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50',
               ].join(' ')
         }
       >
         {label}
-        <svg className={`${size === 'sm' ? 'w-3 h-3' : compact ? 'w-3 h-3 desktop:w-3.5 desktop:h-3.5' : 'w-3.5 h-3.5'} transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+        <svg className={`${size === 'sm' ? 'w-3 h-3' : 'w-3.5 h-3.5'} transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
         </svg>
       </button>

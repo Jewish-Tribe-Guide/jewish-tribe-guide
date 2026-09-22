@@ -961,9 +961,16 @@ export default function GenericDirectory({ category, items, anchorLabel, address
           nothing left to prompt for, same gating DirectoryHeader's own
           (desktop-only) copy uses. Desktop keeps its compact pill right next
           to the title instead (DirectoryHeader, `variant="inline"`) — this
-          is `desktop:hidden`, not a second copy of that one. */}
+          is `desktop:hidden`, not a second copy of that one.
+          No `pt` here — `<main>`'s own `pt-8` already clears the fixed
+          mobile header by the same amount every other page opens with, so
+          adding more on top of it would just be extra, inconsistent
+          whitespace above this one page's first element. `pb-4` instead,
+          so the real separation lands where it matters: between this and
+          the search bar right below it, which is the gap that used to read
+          as "attached to search" at a bare 9px. */}
       {addressPrompt && !anchorLabel && (
-        <div className="desktop:hidden px-4 pt-3 sm:px-6">
+        <div className="desktop:hidden px-4 pb-4 sm:px-6">
           <AddressPrompt variant="banner" />
         </div>
       )}
@@ -1209,17 +1216,19 @@ export default function GenericDirectory({ category, items, anchorLabel, address
                   (revealed by the Filters toggle) as well as desktop — the
                   external-link/davening/sort ones further down are
                   desktop-only, their mobile copies live in the row above.
-                  Sized down to match that row's mobile weight (px-2.5/py-1.5/
-                  text-xs) with `desktop:` overrides restoring the original
-                  px-3/py-2/text-sm here, same split used there. */}
+                  Same px-3/py-2/text-sm weight on both viewports now — these
+                  used to be shrunk on mobile (px-2.5/py-1.5/text-xs) with a
+                  `desktop:` override restoring the bigger size, matching a
+                  stint the Filters/sort row above went through too; reverted
+                  on both at the user's request. */}
               {hasFilterableHours && (
                 <button
                   onClick={() => setOpenNow((v) => !v)}
                   className={[
-                    'inline-flex shrink-0 items-center gap-1 px-2.5 py-1.5 text-xs font-medium rounded-md border transition-colors cursor-pointer whitespace-nowrap desktop:gap-1.5 desktop:px-3 desktop:py-2 desktop:text-sm',
+                    'inline-flex shrink-0 items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-md border transition-colors cursor-pointer whitespace-nowrap',
                     openNow
                       ? 'bg-green-600 text-white border-green-600'
-                      : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 desktop:border-slate-300',
+                      : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50',
                   ].join(' ')}
                 >
                   <span className={['inline-block h-2 w-2 rounded-full', openNow ? 'bg-white' : 'bg-green-500'].join(' ')} aria-hidden="true" />
@@ -1233,8 +1242,8 @@ export default function GenericDirectory({ category, items, anchorLabel, address
                     key={f.key}
                     onClick={() => setBoolFilters((prev) => ({ ...prev, [f.key]: !prev[f.key] }))}
                     className={[
-                      'shrink-0 px-2.5 py-1.5 text-xs font-medium rounded-md border transition-colors cursor-pointer whitespace-nowrap desktop:px-3 desktop:py-2 desktop:text-sm',
-                      active ? 'bg-primary text-white border-primary' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 desktop:border-slate-300',
+                      'shrink-0 px-3 py-2 text-sm font-medium rounded-md border transition-colors cursor-pointer whitespace-nowrap',
+                      active ? 'bg-primary text-white border-primary' : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50',
                     ].join(' ')}
                   >
                     {f.filterLabel ?? f.label}
@@ -1268,7 +1277,6 @@ export default function GenericDirectory({ category, items, anchorLabel, address
                     isOpen={isOpen}
                     onToggleOpen={() => setOpenDropdown(isOpen ? null : f.key)}
                     onClose={() => setOpenDropdown(null)}
-                    compact
                     values={presentValues}
                     chosen={chosen}
                     onToggle={toggle}
