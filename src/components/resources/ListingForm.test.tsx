@@ -161,6 +161,50 @@ describe('ListingForm', () => {
       expect(fetchMock).toHaveBeenCalledTimes(1)
       expect(JSON.parse(fetchMock.mock.calls[0][1].body).operation).toBe('delete')
     })
+
+    // Swaps the whole panel — the fields disappear, not an accordion grown
+    // underneath them — the same in-place pattern Edit itself already uses.
+    // jsdom doesn't apply Tailwind's stylesheet, so an element's own computed
+    // visibility can't tell "hidden" (display:none via the `hidden` class)
+    // from a plain rendered element the way a browser would — asserted on
+    // the class directly instead. Fields/buttons stay mounted either way
+    // (see the component's own doc on why), so `toBeInTheDocument` alone
+    // wouldn't catch a regression back to an accordion.
+    const isHidden = (el: HTMLElement) => el.closest('.hidden') !== null
+
+    it('clicking it swaps out the edit fields for the removal panel, and Cancel swaps them back', async () => {
+      const user = userEvent.setup()
+      const listing = existing()
+      renderWithProviders(<ListingForm category={makeCategory()} mode="edit" existing={listing} {...handlers} />)
+
+      expect(isHidden(screen.getByDisplayValue(listing.name))).toBe(false)
+      expect(isHidden(screen.getByRole('button', { name: 'Submit edit for review' }))).toBe(false)
+
+      await user.click(screen.getByRole('button', { name: removalLine }))
+
+      expect(isHidden(screen.getByText(`Request removal of ${listing.name}`))).toBe(false)
+      expect(isHidden(screen.getByDisplayValue(listing.name))).toBe(true)
+      expect(isHidden(screen.getByRole('button', { name: 'Submit edit for review' }))).toBe(true)
+      expect(isHidden(screen.getByRole('button', { name: removalLine }))).toBe(true)
+
+      await user.click(screen.getByRole('button', { name: 'Cancel' }))
+
+      expect(isHidden(screen.getByDisplayValue(listing.name))).toBe(false)
+      expect(isHidden(screen.getByRole('button', { name: 'Submit edit for review' }))).toBe(false)
+      expect(isHidden(screen.getByText(`Request removal of ${listing.name}`))).toBe(true)
+    })
+
+    it('keeps a reason already picked if Cancel is clicked, then Request removal opened again', async () => {
+      const user = userEvent.setup()
+      renderWithProviders(<ListingForm category={makeCategory()} mode="edit" existing={existing()} {...handlers} />)
+
+      await user.click(screen.getByRole('button', { name: removalLine }))
+      await user.selectOptions(screen.getByRole('combobox'), 'Duplicate listing')
+      await user.click(screen.getByRole('button', { name: 'Cancel' }))
+      await user.click(screen.getByRole('button', { name: removalLine }))
+
+      expect(screen.getByRole('combobox')).toHaveValue('Duplicate listing')
+    })
   })
 
   // `embedded` — rendered inside a caller-owned overlay (desktop's Edit

@@ -24,47 +24,39 @@ function stubFetch(body: Record<string, unknown>, ok = true) {
 }
 
 const listing = { id: 'listing-1', name: 'Kosher Mart' }
+// ListingForm now owns the trigger button and mounting/showing this panel —
+// this suite exercises the panel on its own, so it's always "open" as far as
+// this component is concerned.
 function setup(props: Partial<React.ComponentProps<typeof RemovalRequest>> = {}) {
-  const handlers = { onDone: vi.fn(), resetTurnstile: vi.fn() }
+  const handlers = { onDone: vi.fn(), onCancel: vi.fn(), resetTurnstile: vi.fn() }
   renderWithProviders(
     <RemovalRequest listing={listing} turnstileToken="tok" canSubmit honeypot="" {...handlers} {...props} />,
   )
   return handlers
 }
-const open = (user: ReturnType<typeof userEvent.setup>) =>
-  user.click(screen.getByRole('button', { name: 'Request removal' }))
 
 describe('RemovalRequest', () => {
-  it('starts as a real button, the same trigger the rest of the tests click', () => {
+  it('shows the reason picker, details and a request worded as a request (not "Delete")', () => {
     setup()
-    expect(screen.getByRole('button', { name: 'Request removal' })).toBeTruthy()
-    expect(screen.queryByRole('combobox')).toBeNull()
-  })
-
-  it('opens a reason and details, worded as a request (not "Delete")', async () => {
-    const user = userEvent.setup()
-    setup()
-    await open(user)
     expect(screen.getByText('Request removal of Kosher Mart')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Confirm removal request' })).toBeTruthy()
     expect(screen.queryByText(/delete/i)).toBeNull()
     expect(screen.getByRole('combobox', { name: /why should it be removed/i })).toBeTruthy()
   })
 
-  it('Cancel puts it back to the plain trigger button', async () => {
+  it('calls onCancel from Cancel, without submitting anything', async () => {
     const user = userEvent.setup()
-    setup()
-    await open(user)
+    const fetchMock = stubFetch({ ok: true })
+    const { onCancel } = setup()
     await user.click(screen.getByRole('button', { name: 'Cancel' }))
-    expect(screen.queryByRole('button', { name: 'Confirm removal request' })).toBeNull()
-    expect(screen.getByRole('button', { name: 'Request removal' })).toBeTruthy()
+    expect(onCancel).toHaveBeenCalledTimes(1)
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 
   it('files a reviewed removal (operation delete) for this listing, with the reason and details in the note', async () => {
     const user = userEvent.setup()
     const fetchMock = stubFetch({ ok: true })
     const { onDone } = setup({ submittedBy: { name: 'Dana' }, honeypot: '' })
-    await open(user)
     await user.selectOptions(screen.getByRole('combobox'), 'Duplicate listing')
     await user.type(screen.getByRole('textbox', { name: /details/i }), 'Same as Kosher Market')
     await user.click(screen.getByRole('button', { name: 'Confirm removal request' }))
@@ -87,7 +79,6 @@ describe('RemovalRequest', () => {
     const user = userEvent.setup()
     const fetchMock = stubFetch({ ok: true })
     setup()
-    await open(user)
     await user.click(screen.getByRole('button', { name: 'Confirm removal request' }))
     await waitFor(() => expect(fetchMock).toHaveBeenCalled())
     expect(JSON.parse(fetchMock.mock.calls[0][1].body).note).toBe('Permanently closed')
@@ -97,8 +88,7 @@ describe('RemovalRequest', () => {
     const user = userEvent.setup()
     const fetchMock = stubFetch({ ok: true })
     setup({ canSubmit: false, turnstileToken: '' })
-    await open(user)
-    const button = screen.getAllByRole('button', { name: 'Verifying…' })[0] as HTMLButtonElement
+    const button = screen.getByRole('button', { name: 'Verifying…' }) as HTMLButtonElement
     expect(button.disabled).toBe(true)
     await user.click(button)
     expect(fetchMock).not.toHaveBeenCalled()
@@ -108,7 +98,6 @@ describe('RemovalRequest', () => {
     const user = userEvent.setup()
     stubFetch({ ok: false, errors: ['This action is not available for this category.'] }, false)
     const { onDone } = setup()
-    await open(user)
     await user.click(screen.getByRole('button', { name: 'Confirm removal request' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('This action is not available for this category.')
     expect(onDone).not.toHaveBeenCalled()
@@ -118,7 +107,6 @@ describe('RemovalRequest', () => {
     const user = userEvent.setup()
     stubFetch({ ok: false, code: 'turnstile', errors: ['Verification failed.'] }, false)
     const { resetTurnstile } = setup()
-    await open(user)
     await user.click(screen.getByRole('button', { name: 'Confirm removal request' }))
     expect(await screen.findByRole('alert')).toHaveTextContent(/refreshed it/)
     expect(resetTurnstile).toHaveBeenCalledTimes(1)
@@ -131,7 +119,6 @@ describe('RemovalRequest', () => {
     const user = userEvent.setup()
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')))
     setup()
-    await open(user)
     await user.click(screen.getByRole('button', { name: 'Confirm removal request' }))
     expect(await screen.findByRole('alert')).toHaveTextContent(/Network error/)
   })

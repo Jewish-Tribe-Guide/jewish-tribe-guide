@@ -6,12 +6,16 @@ import { withCommunity } from '@/lib/useCommunityData'
 
 const REASONS = ['Permanently closed', 'Duplicate listing', 'Shouldn’t be listed', 'Other'] as const
 
-/** "This place is closed or shouldn't be listed" — the tail of the edit form.
+/** Requesting a listing's removal — the edit form's other real option,
+ *  reached via ListingForm's own "Request removal" button (see that
+ *  component's own doc for the button itself and why it's a full swap, not
+ *  an accordion appended below the fields).
  *
  *  Removal used to be a separate "Report a problem" action in the kebab, which
  *  meant a visitor had to decide up front whether they were fixing a listing
- *  or reporting one. It's the same act — the listing is wrong — so it lives at
- *  the bottom of the edit form, quiet, the way Google Maps and Yelp do it.
+ *  or reporting one. It's the same act — the listing is wrong — so it lives
+ *  inside the edit form now, the way Google Maps and Yelp fold "this place
+ *  closed" into their own edit flow rather than a separate destructive action.
  *
  *  It files the same reviewed removal request Report always did (operation
  *  'delete'); nothing is removed until a moderator approves it. Deliberately
@@ -21,7 +25,9 @@ const REASONS = ['Permanently closed', 'Duplicate listing', 'Shouldn’t be list
  *  controls, so it never nests a form or submits the edit by accident. It
  *  borrows the form's own Turnstile token, honeypot and name/email — a visitor
  *  either edits or requests removal, never both, so one single-use token
- *  covers whichever they do. */
+ *  covers whichever they do. ListingForm keeps this mounted (toggling
+ *  visibility, not presence) whether or not it's showing, so a reason already
+ *  typed survives switching back to the fields and returning. */
 export default function RemovalRequest({
   listing,
   turnstileToken,
@@ -29,6 +35,7 @@ export default function RemovalRequest({
   resetTurnstile,
   honeypot,
   submittedBy,
+  onCancel,
   onDone,
 }: {
   listing: { id: string; name: string }
@@ -38,11 +45,13 @@ export default function RemovalRequest({
   resetTurnstile: () => void
   honeypot: string
   submittedBy?: { name?: string; email?: string }
+  /** Back to the edit fields — the form itself, not this panel, decides
+   *  whether that means unmounting or just hiding it again. */
+  onCancel: () => void
   onDone: () => void
 }) {
   const uid = useId()
   const community = useCommunitySlug()
-  const [open, setOpen] = useState(false)
   const [reason, setReason] = useState<(typeof REASONS)[number]>(REASONS[0])
   const [details, setDetails] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -96,34 +105,8 @@ export default function RemovalRequest({
   const inputClass =
     'w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary'
 
-  if (!open) {
-    // A real button, the same size/weight class as ListingForm's own Submit
-    // — sits right beside it (see ListingForm's footer) so a visitor reads
-    // this as the form's other option, not a buried afterthought. Red
-    // OUTLINE (not filled, not neutral) on purpose: a plain gray button gave
-    // no visual cue at rest — exactly when someone is scanning the page for
-    // "how do I report this closed" — and Google Maps' own equivalent flow
-    // has no red anywhere until AFTER a closure is confirmed (their closed-
-    // place banner), which reads wrong for an app whose testers already said
-    // the site doesn't feel editable. Outline, not solid, keeps it a notch
-    // below Submit and below the confirm button inside the expanded panel
-    // (solid red) — three weights in sequence: primary blue, red outline
-    // "start", solid red "confirm" — each step visually heavier than the
-    // last, matching that there's a real extra step before anything happens.
-    return (
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        aria-expanded={false}
-        className="w-full sm:w-auto rounded-md border border-red-300 bg-white px-5 py-2.5 text-sm font-medium text-red-700 transition-colors hover:bg-red-50 cursor-pointer"
-      >
-        Request removal
-      </button>
-    )
-  }
-
   return (
-    <div className="w-full border-t border-slate-200 pt-4">
+    <div className="space-y-3">
       <div role="group" aria-labelledby={`${uid}-title`} className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
         <p id={`${uid}-title`} className="text-sm font-medium text-slate-800">
           Request removal of {listing.name}
@@ -168,8 +151,8 @@ export default function RemovalRequest({
           <button
             type="button"
             onClick={() => {
-              setOpen(false)
               setError(null)
+              onCancel()
             }}
             className="cursor-pointer text-sm text-slate-500 hover:text-slate-800"
           >

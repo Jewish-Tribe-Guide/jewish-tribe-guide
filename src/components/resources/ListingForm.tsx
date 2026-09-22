@@ -135,6 +135,13 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
   // request get different thank-yous.
   const [doneKind, setDoneKind] = useState<'submission' | 'removal'>('submission')
 
+  // Whether Request removal has swapped out the edit fields for its own
+  // panel — see the removalOpen block near the bottom of this component's
+  // JSX for why it's a swap, not an accordion appended under the fields.
+  const [removalOpen, setRemovalOpen] = useState(false)
+  const canRequestRemoval =
+    mode === 'edit' && !!existing && !adminSubmit && !onPreviewSubmit && ui.contributions.report && resolveCapabilities(config.capabilities).report
+
   // Which audience sections (Women's/Men's/Keilim, …) are expanded — purely a
   // display preference layered on top of fieldIsVisible's hard gate (a
   // section only exists here at all once its checkbox is on; this just lets
@@ -430,6 +437,19 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
       <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-6">
       <form onSubmit={handleSubmit} className="space-y-4">
         {!adminSubmit && <Honeypot value={honeypot} onChange={setHoneypot} />}
+
+        {/* All the edit fields, in their own toggled block — see the
+            removalOpen block below for why this swaps out entirely rather
+            than growing a panel underneath it. `hidden` (display:none), not
+            unmounted: an unmounted TurnstileWidget would lose its pending
+            challenge, and unmounting the fields themselves would drop
+            anything already typed if someone opens Request removal by
+            mistake and comes back. display:none fields are also excluded
+            from native form validation, so a hidden required input can't
+            block anything. space-y-4 is repeated here because Tailwind's
+            spacing utility only affects direct children — this div is now
+            one of the form's, not each field. */}
+        <div className={removalOpen ? 'hidden' : 'space-y-4'}>
         {hasAddress && (
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Address *</label>
@@ -582,7 +602,13 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
             ))}
           </ul>
         )}
+        </div>
 
+        {/* Outside the toggled block above — see its own comment: a
+            TurnstileWidget that unmounted when switching to Request removal
+            would lose its pending challenge and never resolve, leaving that
+            button stuck on "Verifying…" forever. One instance, always
+            mounted, serves both. */}
         {!adminSubmit && !sharedTurnstile && <TurnstileWidget ref={ownTurnstileRef} onVerify={setOwnTurnstileToken} />}
 
         {/* Disabled until a token is actually in hand (when Turnstile is
@@ -590,16 +616,17 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
             the background challenge completes could submit with an empty
             token and get rejected for no visible reason. An admin submission
             has no Turnstile challenge at all, so it's never gated on one. */}
-        {/* Submit and Request removal sit side by side as the form's two real
-            options — a visitor reads this as "save my edit" or "take this
-            listing down", not one primary action with a buried afterthought
-            underneath it. Request removal is secondary (bordered, not
-            filled) since it's the less common of the two. */}
-        <div className="flex flex-wrap items-center gap-3">
+        {/* Submit and Request removal are the form's two real options, equal
+            width and stacked full-width on mobile (flex-col), side by side
+            splitting the row evenly on desktop (sm:flex-row + flex-1 on
+            each) — content-hugging auto-width buttons left a lopsided gap of
+            empty space next to them on a wide dialog, which read as
+            unfinished rather than deliberate. */}
+        <div className={removalOpen ? 'hidden' : 'flex flex-col sm:flex-row gap-3'}>
           <button
             type="submit"
             disabled={submitting || (!adminSubmit && TURNSTILE_ACTIVE && !turnstileToken)}
-            className="w-full sm:w-auto bg-primary text-white font-medium px-5 py-2.5 rounded-md hover:bg-primary/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
+            className="w-full sm:flex-1 bg-primary text-white font-medium px-5 py-2.5 rounded-md hover:bg-primary/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
           >
             {submitting
               ? 'Submitting…'
@@ -612,9 +639,32 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
                     : 'Submit for review'}
           </button>
 
-          {mode === 'edit' && existing && !adminSubmit && !onPreviewSubmit && ui.contributions.report && resolveCapabilities(config.capabilities).report && (
+          {canRequestRemoval && (
+            <button
+              type="button"
+              onClick={() => setRemovalOpen(true)}
+              className="w-full sm:flex-1 rounded-md border border-red-300 bg-white px-5 py-2.5 text-sm font-medium text-red-700 transition-colors hover:bg-red-50 cursor-pointer"
+            >
+              Request removal
+            </button>
+          )}
+        </div>
+
+        {/* Swaps the whole panel in place — the same pattern Edit itself
+            already uses to replace a listing's detail view (see
+            MapPlaceDetail/ListingDetailModal's own doc) — rather than
+            growing an accordion under an already-long field list. Confirmed
+            live as the better call: on a category with a lot of fields
+            (minyanim, audience sections), an appended panel meant scrolling
+            past a form you'd already decided not to submit just to reach
+            the reason picker, and it read as a stray dropdown bolted onto
+            the bottom of an unrelated screen rather than its own real step.
+            Kept in the DOM (hidden, not conditionally unmounted) so a reason
+            already typed survives switching back and forth. */}
+        {canRequestRemoval && (
+          <div className={removalOpen ? '' : 'hidden'}>
             <RemovalRequest
-              listing={{ id: existing.id, name: existing.name }}
+              listing={{ id: existing!.id, name: existing!.name }}
               turnstileToken={turnstileToken}
               canSubmit={!TURNSTILE_ACTIVE || !!turnstileToken}
               resetTurnstile={resetTurnstile}
@@ -624,13 +674,14 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
                   ? { name: submitterName.trim() || undefined, email: submitterEmail.trim() || undefined }
                   : undefined
               }
+              onCancel={() => setRemovalOpen(false)}
               onDone={() => {
                 setDoneKind('removal')
                 setDone(true)
               }}
             />
-          )}
-        </div>
+          </div>
+        )}
 
         <PrivacyNote />
       </form>
