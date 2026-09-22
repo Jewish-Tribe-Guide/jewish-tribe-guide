@@ -968,9 +968,14 @@ export default function GenericDirectory({ category, items, anchorLabel, address
           whitespace above this one page's first element. `pb-4` instead,
           so the real separation lands where it matters: between this and
           the search bar right below it, which is the gap that used to read
-          as "attached to search" at a bare 9px. */}
+          as "attached to search" at a bare 9px. No `px` either — `<main>`
+          already has its own `px-4` (no `sm:px-6` override at that level),
+          so adding a second one here inset this 16px narrower than the
+          search bar/cards below it on each side (311px vs their 343px);
+          this banner should read as the same width as everything else on
+          the page, not its own, oddly-margined column. */}
       {addressPrompt && !anchorLabel && (
-        <div className="desktop:hidden px-4 pb-4 sm:px-6">
+        <div className="desktop:hidden pb-4">
           <AddressPrompt variant="banner" />
         </div>
       )}
