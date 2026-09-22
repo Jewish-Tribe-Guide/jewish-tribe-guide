@@ -226,4 +226,39 @@ describe('ImageUploadField', () => {
 
     expect(screen.getByText('Source: file:vacation.jpg')).toBeInTheDocument()
   })
+
+  describe('collapseUrlInput', () => {
+    it('shows the URL input immediately by default — every admin uploader keeps this', () => {
+      render(<ImageUploadField value="" onChange={vi.fn()} uploadUrl="/api/upload" />)
+      expect(screen.getByPlaceholderText('https://…')).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /paste an image URL/ })).not.toBeInTheDocument()
+    })
+
+    it('starts the URL input collapsed behind a link when asked to, and reveals it on click', async () => {
+      const user = userEvent.setup()
+      render(<ImageUploadField value="" onChange={vi.fn()} uploadUrl="/api/upload" collapseUrlInput />)
+
+      expect(screen.queryByPlaceholderText('https://…')).not.toBeInTheDocument()
+      const link = screen.getByRole('button', { name: /paste an image URL/ })
+
+      await user.click(link)
+
+      expect(screen.getByPlaceholderText('https://…')).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /paste an image URL/ })).not.toBeInTheDocument()
+    })
+
+    it('still reports a pasted URL once revealed', async () => {
+      const user = userEvent.setup()
+      function CollapsedControlledField() {
+        const [value, setValue] = useState('')
+        return <ImageUploadField value={value} onChange={setValue} uploadUrl="/api/upload" collapseUrlInput />
+      }
+      render(<CollapsedControlledField />)
+
+      await user.click(screen.getByRole('button', { name: /paste an image URL/ }))
+      await user.type(screen.getByPlaceholderText('https://…'), 'https://example.com/photo.jpg')
+
+      expect(screen.getByPlaceholderText('https://…')).toHaveValue('https://example.com/photo.jpg')
+    })
+  })
 })

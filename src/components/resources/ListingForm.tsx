@@ -963,8 +963,15 @@ function DetailFieldInput({
           // shape and let corners the visitor thinks are kept quietly get
           // clipped away later.
           shape="circle"
-          helpText="Shown instead of the category's usual icon for this listing — on the map, in search, and in the directory. Optional."
+          // No helpText ("Shown instead of the category's usual icon…") —
+          // same self-explanatory-copy trim as the reposition hint below:
+          // it becomes obvious once there's a photo, and the field is
+          // already labeled "Photo *". No collapseUrlInput exception here
+          // (admin's own uploaders keep the URL row always visible) — most
+          // visitors upload a file, so a permanently-visible label+input for
+          // that edge case was exactly the bulk this field didn't need.
           showRepositionHint={false}
+          collapseUrlInput
         />
       </div>
     )

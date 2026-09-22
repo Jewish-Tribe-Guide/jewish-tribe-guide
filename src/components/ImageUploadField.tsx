@@ -50,6 +50,14 @@ type Props = {
    *  visitor filling out one form field at a time doesn't need it spelled
    *  out the way an admin configuring branding once might. */
   showRepositionHint?: boolean
+  /** Starts the "…or paste an image URL directly" row collapsed behind a
+   *  small link instead of always showing its own label + input. Default
+   *  false (admin's own uploaders keep it always visible — admins actually
+   *  use this for stock-photo links). On for the public listing form
+   *  specifically: most visitors upload a file, and two permanently-visible
+   *  lines for an edge-case path is exactly the bulk that field didn't need
+   *  — see ListingForm's own call site. */
+  collapseUrlInput?: boolean
 }
 
 /** A picture picker that isn't just a file input: paste a URL, drag a file
@@ -68,10 +76,15 @@ export default function ImageUploadField({
   onOriginalSourceChange,
   helpText,
   showRepositionHint = true,
+  collapseUrlInput = false,
 }: Props) {
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [dragOver, setDragOver] = useState(false)
+  // Starts open unless the caller asked to collapse it (see collapseUrlInput's
+  // own doc) — once a visitor/admin clicks to reveal it, it stays open for
+  // the rest of this field's life, same as any other disclosure link.
+  const [urlInputOpen, setUrlInputOpen] = useState(!collapseUrlInput)
   // A picked/dropped/captured/pasted file waits here for the crop step (see
   // ImageCropModal) before it ever reaches `upload` — nothing is sent to the
   // server until the admin/submitter confirms how it's framed. Also doubles
@@ -301,26 +314,36 @@ export default function ImageUploadField({
 
       {error && <span className="block text-[11px] text-red-600 mt-1">{error}</span>}
 
-      <label className="block mt-2">
-        <span className="block text-[11px] text-muted mb-1">…or paste an image URL directly</span>
-        <input
-          value={value}
-          onChange={(e) => {
-            // A manually-typed/pasted URL IS an original, every bit as much
-            // as a picked File is — see getOriginalSource's own doc for why
-            // this used to clear it instead, which was the bug. Setting it
-            // here (not just calling onChange) means a later crop's own
-            // onChange — the resulting upload URL — won't overwrite it, so
-            // "reposition" after that crop still targets THIS url, not the
-            // frame-shaped output.
-            const url = e.target.value.trim()
-            setOriginalSource(url)
-            onChange(url)
-          }}
-          placeholder="https://…"
-          className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-primary"
-        />
-      </label>
+      {urlInputOpen ? (
+        <label className="block mt-2">
+          <span className="block text-[11px] text-muted mb-1">…or paste an image URL directly</span>
+          <input
+            value={value}
+            onChange={(e) => {
+              // A manually-typed/pasted URL IS an original, every bit as much
+              // as a picked File is — see getOriginalSource's own doc for why
+              // this used to clear it instead, which was the bug. Setting it
+              // here (not just calling onChange) means a later crop's own
+              // onChange — the resulting upload URL — won't overwrite it, so
+              // "reposition" after that crop still targets THIS url, not the
+              // frame-shaped output.
+              const url = e.target.value.trim()
+              setOriginalSource(url)
+              onChange(url)
+            }}
+            placeholder="https://…"
+            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-primary"
+          />
+        </label>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setUrlInputOpen(true)}
+          className="mt-2 block text-[11px] text-muted underline underline-offset-2 hover:text-slate-600 cursor-pointer"
+        >
+          …or paste an image URL instead
+        </button>
+      )}
       {helpText && <span className="block text-[11px] text-muted mt-1">{helpText}</span>}
 
       {cropSource && (

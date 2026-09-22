@@ -325,6 +325,18 @@ describe('ListingForm', () => {
     expect(screen.queryByText('Click the preview to reposition/re-zoom it')).not.toBeInTheDocument()
   })
 
+  // Same self-explanatory-copy trim as the reposition hint above, plus the
+  // URL-paste row starting collapsed — both scoped to the public form only
+  // (admin's own photo uploaders keep both; see ImageUploadField's own doc).
+  it('drops the photo field\'s help text and starts its URL-paste row collapsed', () => {
+    const category = makeCategory({ detailFields: [imageField()] })
+    renderWithProviders(<ListingForm category={category} mode="create" {...handlers} />)
+
+    expect(screen.queryByText(/Shown instead of the category's usual icon/)).not.toBeInTheDocument()
+    expect(screen.queryByPlaceholderText('https://…')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /paste an image URL/ })).toBeInTheDocument()
+  })
+
   it('a showIf-gated field only appears once its trigger field is checked', async () => {
     const user = userEvent.setup()
     const category = makeCategory({
