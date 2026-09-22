@@ -12,6 +12,7 @@ import {
   type CategoryCapabilities,
   type CategoryConfig,
   type CategoryField,
+  type CategoryFormSection,
   type CategoryKind,
 } from './categories'
 
@@ -37,6 +38,10 @@ type CategoryRow = {
   icon_image_url: string | null
   map_zoom_radius_miles: number | null
   active: boolean
+  // Optional: undefined on a row read before this column existed (same
+  // "not migrated yet" convention as the other nullable columns above),
+  // null once migrated but never set, either way meaning "no sections".
+  form_sections?: CategoryFormSection[] | null
 }
 
 function toConfig(row: CategoryRow): CategoryConfig {
@@ -67,6 +72,7 @@ function toConfig(row: CategoryRow): CategoryConfig {
     // treat that way.
     mapZoomRadiusMiles: row.map_zoom_radius_miles ?? null,
     active: row.active !== false,
+    formSections: row.form_sections ?? undefined,
   }
 }
 
@@ -267,6 +273,7 @@ export async function updateCategory(
     iconImageUrl?: string | null
     mapZoomRadiusMiles?: number | null
     active?: boolean
+    formSections?: CategoryFormSection[] | null
   },
 ): Promise<CategoryConfig | null> {
   const supabase = getAdminClient()
@@ -293,6 +300,7 @@ export async function updateCategory(
   if (patch.pinColor !== undefined) row.pin_color = patch.pinColor?.trim() || null
   if (patch.iconImageUrl !== undefined) row.icon_image_url = patch.iconImageUrl?.trim() || null
   if (patch.mapZoomRadiusMiles !== undefined) row.map_zoom_radius_miles = patch.mapZoomRadiusMiles
+  if (patch.formSections !== undefined) row.form_sections = patch.formSections
 
   // Scoped by community as well as id — the composite primary key means a
   // second community's identically-slugged category is a different row, and

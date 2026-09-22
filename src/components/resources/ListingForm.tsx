@@ -157,15 +157,40 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [removalOpen])
 
-  // Which audience sections (Women's/Men's/Keilim, …) are expanded — purely a
-  // display preference layered on top of fieldIsVisible's hard gate (a
-  // section only exists here at all once its checkbox is on; this just lets
-  // it be tucked away again without hiding what it means). Absent from the
-  // map = expanded, so a section defaults open the moment it first appears.
+  // Explicit collapse/expand overrides, keyed per group ('basics', an
+  // audience section, a formSection, or the 'More details' catch-all) —
+  // absent from the map means "use the default for this group" (see
+  // groupIsOpen below), not "expanded". Basics defaults open regardless of
+  // content; every other group defaults open only once it already holds a
+  // value (edit) and collapsed otherwise (create, or an untouched group in
+  // edit) — see hasGroupValue. This is what lets a long category's edit
+  // form open exactly the sections that already have something in them
+  // instead of showing every field flat, while a brand-new listing starts
+  // with nothing but Basics expanded.
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({})
+
+  function groupIsOpen(key: string, defaultOpen: boolean): boolean {
+    const explicit = collapsedSections[key]
+    return explicit === undefined ? defaultOpen : !explicit
+  }
+  function toggleGroup(key: string, currentlyOpen: boolean) {
+    setCollapsedSections((prev) => ({ ...prev, [key]: currentlyOpen }))
+  }
 
   function setDetail(key: string, value: unknown) {
     setDetails((prev) => ({ ...prev, [key]: value }))
+  }
+
+  // Whether any field in a group already has a real value — decides that
+  // group's default open/closed state (see groupIsOpen). Deliberately loose:
+  // this only ever needs to distinguish "something's here" from "nothing
+  // is", not validate the value itself.
+  function hasValue(v: unknown): boolean {
+    if (v === undefined || v === null) return false
+    if (typeof v === 'string') return v.trim() !== ''
+    if (Array.isArray(v)) return v.length > 0
+    if (typeof v === 'boolean') return v
+    return true
   }
 
   function handlePlaceSelect(result: PlaceSelectResult) {
@@ -464,87 +489,130 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
             block anything. space-y-4 is repeated here because Tailwind's
             spacing utility only affects direct children — this div is now
             one of the form's, not each field. */}
-        <div className={removalOpen ? 'hidden' : 'space-y-4'}>
-        {hasAddress && (
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Address *</label>
-            <AddressInput
-              value={address}
-              onChange={setAddress}
-              onCoords={setCoords}
-              onPlaceSelect={handlePlaceSelect}
-              placeholder={syncEligible ? 'Search by business name or address…' : 'Start typing an address…'}
-              disableAutocomplete={!!onPreviewSubmit}
-            />
-          </div>
-        )}
+        <div className={removalOpen ? 'hidden' : 'space-y-3'}>
+        {/* Basics: Address/Name/Phone plus any coreSection field (see
+            CategoryField's doc comment) — a Google-autofillable field
+            (Hours, Website, a googleDescription field) that fills in from
+            the same address pick, so it belongs with Address/Name/Phone
+            rather than the optional groups below. One collapsible group,
+            open by default (unlike the optional ones, which default to
+            open only once they already hold a value) since this is what
+            makes the listing a listing at all — see groupIsOpen. */}
+        {(() => {
+          const basicsOpen = groupIsOpen('basics', true)
+          return (
+            <div className="border border-slate-200 rounded-md overflow-hidden">
+              <button
+                type="button"
+                onClick={() => toggleGroup('basics', basicsOpen)}
+                aria-expanded={basicsOpen}
+                className="w-full flex items-center justify-between gap-2 px-3 py-2 bg-slate-50 hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                <span className="text-xs font-semibold uppercase tracking-wide text-slate-600">Basics</span>
+                <svg
+                  className={`w-3.5 h-3.5 text-muted transition-transform duration-200 ${basicsOpen ? 'rotate-180' : ''}`}
+                  fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              {/* Hidden, not unmounted, when collapsed — same reasoning as
+                  the removalOpen swap above: AddressInput and anything
+                  already typed here shouldn't reset just because someone
+                  tapped the collapse control, and a hidden required input
+                  is excluded from native validation, so nothing blocks
+                  submission while this is closed. */}
+              <div className={basicsOpen ? 'p-3 space-y-4' : 'hidden'}>
+                  {hasAddress && (
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Address *</label>
+                      <AddressInput
+                        value={address}
+                        onChange={setAddress}
+                        onCoords={setCoords}
+                        onPlaceSelect={handlePlaceSelect}
+                        placeholder={syncEligible ? 'Search by business name or address…' : 'Start typing an address…'}
+                        disableAutocomplete={!!onPreviewSubmit}
+                      />
+                    </div>
+                  )}
 
-        <div>
-          <label htmlFor="listing-name" className="block text-sm font-medium text-slate-700 mb-1">Name *</label>
-          <input id="listing-name" value={name} onChange={(e) => setName(e.target.value)} className={inputClass} placeholder="e.g. Kosher Mart" />
-        </div>
+                  <div>
+                    <label htmlFor="listing-name" className="block text-sm font-medium text-slate-700 mb-1">Name *</label>
+                    <input id="listing-name" value={name} onChange={(e) => setName(e.target.value)} className={inputClass} placeholder="e.g. Kosher Mart" />
+                  </div>
 
-        {hasPhone && (
-          <div>
-            <label htmlFor="listing-phone" className="block text-sm font-medium text-slate-700 mb-1">Phone</label>
-            <input id="listing-phone" type="tel" value={phone} onChange={(e) => setPhone(formatPhone(e.target.value))} className={inputClass} placeholder="(215) 555-0100" />
-          </div>
-        )}
+                  {hasPhone && (
+                    <div>
+                      <label htmlFor="listing-phone" className="block text-sm font-medium text-slate-700 mb-1">Phone</label>
+                      <input id="listing-phone" type="tel" value={phone} onChange={(e) => setPhone(formatPhone(e.target.value))} className={inputClass} placeholder="(215) 555-0100" />
+                    </div>
+                  )}
 
-        {/* Fields marked coreSection (see CategoryField's doc comment) — a
-            Google-autofillable field (Hours, Website, a googleDescription
-            field) grouped with Address/Name/Phone rather than split off by
-            the divider below, since all of it fills in from the same
-            address pick. Rendered plain, no audience-section grouping —
-            that's for the more involved detail list past the divider. */}
-        {config.detailFields
-          .filter((field) => field.coreSection && fieldIsVisible(field, details))
-          .map((field) => (
-            <DetailFieldInput
-              key={field.key}
-              field={field}
-              value={details[field.key]}
-              onChange={(v) => setDetail(field.key, v)}
-              sometimes={field.type === 'tags' ? ((details[field.key + '_sometimes'] as string[] | undefined) ?? []) : undefined}
-              onChangeSometimes={field.type === 'tags' ? (v) => setDetail(field.key + '_sometimes', v) : undefined}
-            />
-          ))}
+                  {config.detailFields
+                    .filter((field) => field.coreSection && fieldIsVisible(field, details))
+                    .map((field) => (
+                      <DetailFieldInput
+                        key={field.key}
+                        field={field}
+                        value={details[field.key]}
+                        onChange={(v) => setDetail(field.key, v)}
+                        sometimes={field.type === 'tags' ? ((details[field.key + '_sometimes'] as string[] | undefined) ?? []) : undefined}
+                        onChangeSometimes={field.type === 'tags' ? (v) => setDetail(field.key + '_sometimes', v) : undefined}
+                      />
+                    ))}
+              </div>
+            </div>
+          )
+        })()}
 
         {config.detailFields.some((f) => !f.coreSection && fieldIsVisible(f, details)) && (
-          <div className="space-y-4 border-t border-slate-200 pt-4">
+          <div className="space-y-3">
             {(() => {
               const visible = config.detailFields.filter((field) => !field.coreSection && fieldIsVisible(field, details))
 
-              // Group into ungrouped fields and audience sections — see
-              // CategoryField.audienceKey. A section renders where its FIRST
-              // field appears (stable, not necessarily contiguous), so a
-              // mikvah's separate men's/women's/keilim hours & contact info
-              // read as named groups instead of one long undifferentiated
-              // list. `visible` already dropped every audience whose checkbox
-              // isn't on (fieldIsVisible), so a section only ever appears at
-              // all once it applies — nothing to manually reveal.
-              type Block =
-                | { kind: 'field'; field: CategoryField }
-                | { kind: 'section'; audienceKey: string; label: string; fields: CategoryField[] }
+              // Every non-core field lands in exactly one named, independently
+              // collapsible group: its audience section (CategoryField.
+              // audienceKey, unchanged from before), its admin-assigned
+              // formSection (CategoryField.formSection / CategoryConfig.
+              // formSections), or — if it has neither — a single generic
+              // "More details" catch-all, so a category with no sections
+              // defined yet still gets the same decluttered shape instead of
+              // falling back to a flat list. A group renders where its FIRST
+              // field appears (stable, not necessarily contiguous).
+              type Block = { sectionKey: string; label: string; description?: string; isAudience: boolean; fields: CategoryField[] }
+              const MORE_DETAILS_KEY = 'section:more'
               const blocks: Block[] = []
-              const sectionAt = new Map<string, number>()
+              const blockAt = new Map<string, number>()
               for (const field of visible) {
-                if (!field.audienceKey) {
-                  blocks.push({ kind: 'field', field })
-                  continue
-                }
-                const at = sectionAt.get(field.audienceKey)
-                const existingBlock = at !== undefined ? blocks[at] : undefined
-                if (existingBlock?.kind === 'section') {
-                  existingBlock.fields.push(field)
-                } else {
-                  sectionAt.set(field.audienceKey, blocks.length)
+                let sectionKey: string
+                let label: string
+                let description: string | undefined
+                let isAudience = false
+                if (field.audienceKey) {
+                  sectionKey = `section:audience:${field.audienceKey}`
                   // filterLabel is the short form ("Women's") the filter chip
                   // already uses; label ("Women's Tevillah") is the fallback
                   // for a boolean that has no filterLabel set.
                   const audienceField = config.detailFields.find((f) => f.key === field.audienceKey)
-                  const label = audienceField?.filterLabel ?? audienceField?.label ?? field.audienceKey
-                  blocks.push({ kind: 'section', audienceKey: field.audienceKey, label, fields: [field] })
+                  label = audienceField?.filterLabel ?? audienceField?.label ?? field.audienceKey
+                  isAudience = true
+                } else if (field.formSection) {
+                  sectionKey = `section:form:${field.formSection}`
+                  const def = config.formSections?.find((s) => s.key === field.formSection)
+                  label = def?.label ?? field.formSection
+                  description = def?.description
+                } else {
+                  sectionKey = MORE_DETAILS_KEY
+                  label = 'More details'
+                }
+                const at = blockAt.get(sectionKey)
+                const existingBlock = at !== undefined ? blocks[at] : undefined
+                if (existingBlock) {
+                  existingBlock.fields.push(field)
+                } else {
+                  blockAt.set(sectionKey, blocks.length)
+                  blocks.push({ sectionKey, label, description, isAudience, fields: [field] })
                 }
               }
 
@@ -561,35 +629,51 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
               )
 
               return blocks.map((block) => {
-                if (block.kind === 'field') return renderField(block.field)
-
-                // Prefixed so this can never collide with a field's own key —
-                // the audienceKey is itself a field's key (the checkbox this
-                // section is scoped to), so an unprefixed key here would
-                // duplicate that field's `key={field.key}` below.
-                const sectionKey = `section:${block.audienceKey}`
-                const open = !collapsedSections[sectionKey]
+                // An audience section defaults OPEN the moment it exists at
+                // all — checking its gate box (e.g. "Women's Tevillah") is
+                // already the explicit signal that these fields are wanted,
+                // so it shouldn't also require them to already hold a value
+                // before showing. A generic (formSection/"More details")
+                // group has no such gate, so it defaults open only once it
+                // already holds a value (real in edit; never true in create)
+                // and collapsed otherwise — see groupIsOpen/hasValue.
+                const hasData = block.fields.some((f) => hasValue(details[f.key]))
+                const open = groupIsOpen(block.sectionKey, block.isAudience || hasData)
                 return (
-                  <div key={sectionKey} className="border border-slate-200 rounded-md overflow-hidden">
+                  <div key={block.sectionKey} className="border border-slate-200 rounded-md overflow-hidden">
                     <button
                       type="button"
-                      onClick={() => setCollapsedSections((prev) => ({ ...prev, [sectionKey]: !prev[sectionKey] }))}
+                      onClick={() => toggleGroup(block.sectionKey, open)}
                       aria-expanded={open}
                       className="w-full flex items-center justify-between gap-2 px-3 py-2 bg-slate-50 hover:bg-slate-100 transition-colors cursor-pointer"
                     >
-                      <span className="text-xs font-semibold uppercase tracking-wide text-slate-600">{block.label}</span>
+                      <span className="flex flex-col items-start text-left">
+                        <span className="text-xs font-semibold uppercase tracking-wide text-slate-600">
+                          {block.label}
+                          {/* Only in edit: create has nothing filled in
+                              anywhere yet, so labeling every group "not
+                              added" would just be noise, not information. */}
+                          {mode === 'edit' && !hasData && (
+                            <span className="ml-1 font-normal normal-case text-muted">— not added</span>
+                          )}
+                        </span>
+                        {block.description && (
+                          <span className="text-[11px] font-normal normal-case text-muted">{block.description}</span>
+                        )}
+                      </span>
                       <svg
-                        className={`w-3.5 h-3.5 text-muted transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
+                        className={`w-3.5 h-3.5 shrink-0 text-muted transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
                         fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true"
                       >
                         <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
                       </svg>
                     </button>
-                    {open && (
-                      <div className="p-3 space-y-4">
-                        {block.fields.map((field) => renderField(field, field.shortLabel))}
-                      </div>
-                    )}
+                    {/* Hidden, not unmounted — same reasoning as Basics
+                        above: a closed group shouldn't drop anything
+                        already typed inside it. */}
+                    <div className={open ? 'p-3 space-y-4' : 'hidden'}>
+                      {block.fields.map((field) => renderField(field, block.isAudience ? field.shortLabel : undefined))}
+                    </div>
                   </div>
                 )
               })

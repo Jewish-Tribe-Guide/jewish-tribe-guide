@@ -4,7 +4,7 @@ import { getAdminUserForCommunity } from '@/lib/adminAuth'
 import { updateCategory, deleteCategory, renameCategoryId } from '@/lib/categoryStore'
 import { clearCategoryFieldData, applyFieldOptionRenames } from '@/lib/resourceStore'
 import { isHttpUrl } from '@/lib/validation'
-import type { CategoryCapabilities, CategoryField } from '@/lib/categories'
+import type { CategoryCapabilities, CategoryField, CategoryFormSection } from '@/lib/categories'
 import { isValidPinColor } from '@/lib/categoryColor'
 import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
 
@@ -15,6 +15,9 @@ type PatchBody = {
   description?: string
   sortOrder?: number
   fields?: CategoryField[]
+  /** Named groups for the intake/edit form's optional fields — see
+   *  CategoryConfig.formSections. */
+  formSections?: CategoryFormSection[] | null
   hasAddress?: boolean
   hasPhone?: boolean
   upvotesEnabled?: boolean

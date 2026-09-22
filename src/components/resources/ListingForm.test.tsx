@@ -560,4 +560,107 @@ describe('ListingForm', () => {
       expect(screen.getByDisplayValue('Fusion')).toBeInTheDocument()
     })
   })
+
+  // Address/Name/Phone (plus any coreSection field) are grouped under one
+  // "Basics" heading, open by default; every other field lands in exactly
+  // one named, independently-collapsible group — its formSection if the
+  // category defines one, else the generic "More details" catch-all — so a
+  // category with no sections configured yet still declutters instead of
+  // showing everything flat.
+  describe('field grouping', () => {
+    it('groups Address, Name and Phone under an open "Basics" section', () => {
+      renderWithProviders(<ListingForm category={makeCategory()} mode="create" {...handlers} />)
+
+      const basicsToggle = screen.getByRole('button', { name: 'Basics' })
+      expect(basicsToggle).toHaveAttribute('aria-expanded', 'true')
+      expect(screen.getByLabelText('Address')).toBeInTheDocument()
+      expect(screen.getByPlaceholderText('e.g. Kosher Mart')).toBeInTheDocument()
+      expect(screen.getByPlaceholderText('(215) 555-0100')).toBeInTheDocument()
+    })
+
+    it('collapses Basics on click without dropping what was already typed', async () => {
+      const user = userEvent.setup()
+      renderWithProviders(<ListingForm category={makeCategory()} mode="create" {...handlers} />)
+
+      await user.type(screen.getByPlaceholderText('e.g. Kosher Mart'), 'Kosher Mart')
+      await user.click(screen.getByRole('button', { name: 'Basics' }))
+
+      expect(screen.getByRole('button', { name: 'Basics' })).toHaveAttribute('aria-expanded', 'false')
+      // Hidden, not unmounted — the typed value survives the collapse.
+      expect(screen.getByPlaceholderText('e.g. Kosher Mart')).toHaveValue('Kosher Mart')
+    })
+
+    it('puts a field with no formSection into a collapsed "More details" group', () => {
+      const category = makeCategory({ detailFields: [textField({ key: 'notes', label: 'Notes' })] })
+      renderWithProviders(<ListingForm category={category} mode="create" {...handlers} />)
+
+      const toggle = screen.getByRole('button', { name: /More details/ })
+      expect(toggle).toHaveAttribute('aria-expanded', 'false')
+      expect(screen.getByLabelText('Notes')).toBeInTheDocument()
+    })
+
+    it('groups fields sharing a formSection under its admin-defined label and description', () => {
+      const category = makeCategory({
+        formSections: [{ key: 'kosher', label: 'Kosher details', description: 'certification, dairy/meat' }],
+        detailFields: [
+          textField({ key: 'certification', label: 'Certification', formSection: 'kosher' }),
+          textField({ key: 'dietType', label: 'Dairy / meat / pareve', formSection: 'kosher' }),
+        ],
+      })
+      renderWithProviders(<ListingForm category={category} mode="create" {...handlers} />)
+
+      expect(screen.getByRole('button', { name: /Kosher details/ })).toBeInTheDocument()
+      expect(screen.getByText('certification, dairy/meat')).toBeInTheDocument()
+      expect(screen.getByLabelText('Certification')).toBeInTheDocument()
+      expect(screen.getByLabelText('Dairy / meat / pareve')).toBeInTheDocument()
+      // Not also duplicated into the generic catch-all.
+      expect(screen.queryByRole('button', { name: /More details/ })).not.toBeInTheDocument()
+    })
+
+    it('auto-opens a group that already has a value in edit mode, without an empty hint', () => {
+      const category = makeCategory({
+        formSections: [{ key: 'kosher', label: 'Kosher details' }],
+        detailFields: [textField({ key: 'certification', label: 'Certification', formSection: 'kosher' })],
+      })
+      const existing = { ...makeListing(), certification: 'OU' } as unknown as DirectoryResource
+      renderWithProviders(<ListingForm category={category} mode="edit" existing={existing} {...handlers} />)
+
+      const toggle = screen.getByRole('button', { name: /Kosher details/ })
+      expect(toggle).toHaveAttribute('aria-expanded', 'true')
+      expect(toggle).not.toHaveTextContent('not added')
+    })
+
+    it('leaves an empty group collapsed in edit mode and labels it "not added"', () => {
+      const category = makeCategory({
+        formSections: [{ key: 'kosher', label: 'Kosher details' }],
+        detailFields: [textField({ key: 'certification', label: 'Certification', formSection: 'kosher' })],
+      })
+      renderWithProviders(<ListingForm category={category} mode="edit" existing={makeListing()} {...handlers} />)
+
+      const toggle = screen.getByRole('button', { name: /Kosher details/ })
+      expect(toggle).toHaveAttribute('aria-expanded', 'false')
+      expect(toggle).toHaveTextContent('not added')
+    })
+
+    it('does not label an empty group in create mode, where nothing has data yet', () => {
+      const category = makeCategory({
+        formSections: [{ key: 'kosher', label: 'Kosher details' }],
+        detailFields: [textField({ key: 'certification', label: 'Certification', formSection: 'kosher' })],
+      })
+      renderWithProviders(<ListingForm category={category} mode="create" {...handlers} />)
+
+      expect(screen.getByRole('button', { name: /Kosher details/ })).not.toHaveTextContent('not added')
+    })
+
+    it('places Submit after every field group, including a collapsed one', () => {
+      const category = makeCategory({ detailFields: [textField({ key: 'notes', label: 'Notes' })] })
+      const { container } = renderWithProviders(<ListingForm category={category} mode="create" {...handlers} />)
+
+      const moreDetails = screen.getByRole('button', { name: /More details/ })
+      const submit = screen.getByRole('button', { name: 'Submit for review' })
+      // DOCUMENT_POSITION_FOLLOWING (4) means `submit` comes after `moreDetails`.
+      expect(moreDetails.compareDocumentPosition(submit) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+      expect(container).toBeInTheDocument()
+    })
+  })
 })

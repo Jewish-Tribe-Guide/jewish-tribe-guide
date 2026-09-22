@@ -201,6 +201,28 @@ export type CategoryField = {
    *  "Phone" alone would be ambiguous next to a Men's Phone on the same
    *  listing. Ignored on fields without an audienceKey. */
   shortLabel?: string
+  /** Assigns this field to one of the category's named form sections (see
+   *  CategoryConfig.formSections) — an independently-collapsible group shown
+   *  in the intake/edit form after Basics, e.g. "Kosher details". A field
+   *  with no formSection (and no audienceKey — those keep their own
+   *  section grouping, see audienceKey above) falls into a single generic
+   *  "More details" catch-all group instead, so every category gets the same
+   *  decluttered shape even before an admin has defined any real sections.
+   *  Ignored on a coreSection field, which always renders in Basics. */
+  formSection?: string
+}
+
+/** A named, admin-defined group of optional form fields — see
+ *  CategoryField.formSection. Rendered as its own collapsible section in the
+ *  intake/edit form, in the order this array lists them; a section starts
+ *  open if any of its fields already has a value (edit only — create never
+ *  has one yet), collapsed otherwise, same as an audience section. */
+export type CategoryFormSection = {
+  key: string
+  label: string
+  /** Shown next to the label so someone can tell what's inside without
+   *  opening it, e.g. "certification, dairy/meat" under "Kosher details". */
+  description?: string
 }
 
 /** Per-category UI affordances, layered UNDER the site-wide `ui.*` master
@@ -350,6 +372,12 @@ export type CategoryConfig = {
    *  deleting it, keeping its listings and configuration intact for when
    *  it's turned back on. */
   active?: boolean
+  /** Named, collapsible groups for this category's optional fields — see
+   *  CategoryField.formSection and CategoryFormSection. Unset/empty means
+   *  no real sections have been defined yet: every non-core, non-audience
+   *  field falls into one generic "More details" group in the form instead
+   *  of being flatly listed. */
+  formSections?: CategoryFormSection[]
 }
 
 export const DEFAULT_CATEGORY_ICON = '📋'
