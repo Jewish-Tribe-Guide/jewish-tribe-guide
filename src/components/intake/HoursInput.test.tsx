@@ -9,58 +9,20 @@ afterEach(() => {
 })
 
 describe('HoursInput', () => {
-  it('starts collapsed and shows no day count when there are no hours set', () => {
+  // No collapse any more — see the component's own doc for why (it used to
+  // hide behind its own chevron, which was a second layer of collapsing once
+  // it started rendering inside ListingForm's already-collapsible Basics
+  // group, and looked inconsistent next to the plain checkbox beside it).
+  it('always shows all 7 days, with no collapse control', () => {
     render(<HoursInput value={null} onChange={vi.fn()} />)
-    expect(screen.getByRole('button', { expanded: false })).toBeInTheDocument()
-    expect(screen.queryByText(/day.*week set/)).not.toBeInTheDocument()
-  })
-
-  it('shows a "N days/week set" summary while collapsed, using correct singular/plural', () => {
-    const oneDayValue: StructuredHours = { sun: null, mon: { open: '09:00', close: '17:00' }, tue: null, wed: null, thu: null, fri: null, sat: null }
-    render(<HoursInput value={oneDayValue} onChange={vi.fn()} />)
-    expect(screen.getByText('1 day/week set')).toBeInTheDocument()
-
-    cleanup()
-    const twoDayValue: StructuredHours = {
-      sun: null,
-      mon: { open: '09:00', close: '17:00' },
-      tue: { open: '09:00', close: '17:00' },
-      wed: null,
-      thu: null,
-      fri: null,
-      sat: null,
-    }
-    render(<HoursInput value={twoDayValue} onChange={vi.fn()} />)
-    expect(screen.getByText('2 days/week set')).toBeInTheDocument()
+    expect(screen.queryByRole('button')).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Sunday closed')).toBeInTheDocument()
+    expect(screen.getByLabelText('Saturday closed')).toBeInTheDocument()
+    expect(screen.getAllByText('Closed')).toHaveLength(7)
   })
 
   it('treats a non-object value (e.g. an array, or the wrong shape) as empty rather than crashing', () => {
     render(<HoursInput value={['not', 'valid']} onChange={vi.fn()} />)
-    expect(screen.queryByText(/day.*week set/)).not.toBeInTheDocument()
-  })
-
-  it('auto-opens when hours are pushed in from outside (e.g. a Google Places pre-fill), but not on first render with hours already present', () => {
-    const initial: StructuredHours = { sun: null, mon: null, tue: null, wed: null, thu: null, fri: null, sat: null }
-    const { rerender } = render(<HoursInput value={initial} onChange={vi.fn()} />)
-    expect(screen.getByRole('button', { expanded: false })).toBeInTheDocument()
-
-    const filled: StructuredHours = { ...initial, mon: { open: '09:00', close: '17:00' } }
-    rerender(<HoursInput value={filled} onChange={vi.fn()} />)
-    expect(screen.getByRole('button', { expanded: true })).toBeInTheDocument()
-  })
-
-  it('toggles open when the header is clicked, revealing all 7 days', async () => {
-    const user = userEvent.setup()
-    render(<HoursInput value={null} onChange={vi.fn()} />)
-
-    await user.click(screen.getByRole('button'))
-
-    // Visible day labels are 3-letter abbreviations (space-constrained —
-    // see HoursInput's own comment on why); the full name still exists via
-    // each checkbox's aria-label, which is what this checks instead of the
-    // (now abbreviated) visible text.
-    expect(screen.getByLabelText('Sunday closed')).toBeInTheDocument()
-    expect(screen.getByLabelText('Saturday closed')).toBeInTheDocument()
     expect(screen.getAllByText('Closed')).toHaveLength(7)
   })
 
@@ -69,8 +31,6 @@ describe('HoursInput', () => {
     const onChange = vi.fn()
     const value: StructuredHours = { sun: null, mon: { open: '09:00', close: '17:00' }, tue: null, wed: null, thu: null, fri: null, sat: null }
     render(<HoursInput value={value} onChange={onChange} />)
-
-    await user.click(screen.getByRole('button')) // expand
 
     await user.click(screen.getByLabelText('Monday closed'))
 
@@ -82,8 +42,6 @@ describe('HoursInput', () => {
     const onChange = vi.fn()
     const value: StructuredHours = { sun: null, mon: null, tue: null, wed: null, thu: null, fri: null, sat: null }
     render(<HoursInput value={value} onChange={onChange} />)
-
-    await user.click(screen.getByRole('button')) // expand
 
     await user.click(screen.getByLabelText('Monday closed'))
 
@@ -103,7 +61,6 @@ describe('HoursInput', () => {
       sat: null,
     }
     render(<HoursInput value={value} onChange={onChange} />)
-    await user.click(screen.getByRole('button')) // expand
 
     const mondayRow = screen.getByLabelText('Monday closed').closest('div')!
     const timeInputs = mondayRow.querySelectorAll('input[type="time"]')

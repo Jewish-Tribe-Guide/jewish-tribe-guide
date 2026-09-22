@@ -1,6 +1,5 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
 import { type DayKey, type DayHours, type StructuredHours, DAY_KEYS, dayLabel, isStructuredHours } from '@/lib/hours'
 
 export type { DayKey, DayHours, StructuredHours }
@@ -10,32 +9,24 @@ function initHours(value: unknown): StructuredHours {
   return {}
 }
 
-function openDaysCount(hours: StructuredHours): number {
-  return Object.values(hours).filter((v) => v !== null && v !== undefined).length
-}
-
 type Props = {
   label?: string
   value: unknown
   onChange: (value: StructuredHours) => void
 }
 
-// Compact 7-row hours editor, collapsed by default. Auto-opens when hours are
-// pre-filled from outside (e.g. Google Places autocomplete). Each day has a
-// "Closed" toggle and open/close time inputs. Value is stored as StructuredHours.
+// Compact 7-row hours editor. Always expanded — it used to collapse behind
+// its own chevron (defaulting shut, auto-opening once hours were pre-filled
+// from Google), back when it sat in one long flat field list and needed its
+// own space-saving toggle. Now that it renders inside ListingForm's Basics
+// group (itself already collapsed/expanded as a whole), that second layer
+// of hiding was pure friction — open Basics, then still have to click again
+// just to see or set Hours — and looked jarringly different next to a plain
+// boolean field's checkbox right next to it, which reveals what it gates
+// with no toggle of its own either. Each day has a "Closed" toggle and
+// open/close time inputs. Value is stored as StructuredHours.
 export default function HoursInput({ label, value, onChange }: Props) {
   const hours = initHours(value)
-  const count = openDaysCount(hours)
-  const hasHours = count > 0
-
-  const [open, setOpen] = useState(false)
-
-  // Auto-open when parent pushes hours in from outside (Google pre-fill).
-  const prevHasHours = useRef(hasHours)
-  useEffect(() => {
-    if (hasHours && !prevHasHours.current) setOpen(true)
-    prevHasHours.current = hasHours
-  }, [hasHours])
 
   function setDay(key: DayKey, dayHours: DayHours) {
     onChange({ ...hours, [key]: dayHours })
@@ -43,91 +34,65 @@ export default function HoursInput({ label, value, onChange }: Props) {
 
   return (
     <div>
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className="flex items-center gap-1.5 text-left"
-        aria-expanded={open}
-      >
-        <svg
-          className={`w-4 h-4 text-muted transition-transform duration-150 ${open ? 'rotate-180' : '-rotate-90'}`}
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={2}
-          viewBox="0 0 24 24"
-          aria-hidden="true"
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-        </svg>
-        <span className="text-sm font-medium text-slate-700">
-          {label ?? 'Hours'}
-          {!open && hasHours && (
-            <span className="ml-2 text-xs font-normal text-muted">
-              {count} day{count !== 1 ? 's' : ''}/week set
-            </span>
-          )}
-        </span>
-      </button>
+      <span className="block text-sm font-medium text-slate-700 mb-1">{label ?? 'Hours'}</span>
 
-      {open && (
-        <div className="mt-2 border border-slate-200 rounded-md overflow-hidden divide-y divide-slate-100">
-          {DAY_KEYS.map((key) => {
-            const day = hours[key] ?? null
-            const isClosed = day === null
-            const full = dayLabel(key)
-            // 3-letter abbreviation, not the full name — the full names
-            // varied enough in width (Sun vs Wednesday) that a column wide
-            // enough for the longest one left a wide, odd-looking gap before
-            // the checkbox on every shorter day. All the abbreviations are
-            // the same length, so a narrow fixed column stays aligned
-            // without stranding whitespace. The unabbreviated name still
-            // reaches screen readers via the checkbox's aria-label below,
-            // in case "Sun" reads ambiguously.
-            const short = key.charAt(0).toUpperCase() + key.slice(1)
+      <div className="border border-slate-200 rounded-md overflow-hidden divide-y divide-slate-100">
+        {DAY_KEYS.map((key) => {
+          const day = hours[key] ?? null
+          const isClosed = day === null
+          const full = dayLabel(key)
+          // 3-letter abbreviation, not the full name — the full names
+          // varied enough in width (Sun vs Wednesday) that a column wide
+          // enough for the longest one left a wide, odd-looking gap before
+          // the checkbox on every shorter day. All the abbreviations are
+          // the same length, so a narrow fixed column stays aligned
+          // without stranding whitespace. The unabbreviated name still
+          // reaches screen readers via the checkbox's aria-label below,
+          // in case "Sun" reads ambiguously.
+          const short = key.charAt(0).toUpperCase() + key.slice(1)
 
-            return (
-              <div key={key} className="flex flex-wrap items-center gap-x-2 gap-y-1.5 px-3 py-2 bg-white">
-                <span className="text-sm text-slate-700 w-9 shrink-0">{short}</span>
+          return (
+            <div key={key} className="flex flex-wrap items-center gap-x-2 gap-y-1.5 px-3 py-2 bg-white">
+              <span className="text-sm text-slate-700 w-9 shrink-0">{short}</span>
 
-                <label className="flex items-center gap-1.5 cursor-pointer shrink-0">
+              <label className="flex items-center gap-1.5 cursor-pointer shrink-0">
+                <input
+                  type="checkbox"
+                  checked={isClosed}
+                  onChange={(e) =>
+                    setDay(key, e.target.checked ? null : { open: '09:00', close: '17:00' })
+                  }
+                  aria-label={`${full} closed`}
+                  className="h-3.5 w-3.5 rounded border-slate-300 text-primary focus:ring-primary"
+                />
+                <span className="text-xs text-slate-500">Closed</span>
+              </label>
+
+              {!isClosed && (
+                <div className="flex items-center gap-1.5">
                   <input
-                    type="checkbox"
-                    checked={isClosed}
+                    type="time"
+                    value={day?.open ?? '09:00'}
                     onChange={(e) =>
-                      setDay(key, e.target.checked ? null : { open: '09:00', close: '17:00' })
+                      setDay(key, { open: e.target.value, close: day?.close ?? '17:00' })
                     }
-                    aria-label={`${full} closed`}
-                    className="h-3.5 w-3.5 rounded border-slate-300 text-primary focus:ring-primary"
+                    className="hours-time-input rounded border border-slate-300 px-1.5 py-0.5 text-xs focus:outline-none focus:ring-2 focus:ring-primary"
                   />
-                  <span className="text-xs text-slate-500">Closed</span>
-                </label>
-
-                {!isClosed && (
-                  <div className="flex items-center gap-1.5">
-                    <input
-                      type="time"
-                      value={day?.open ?? '09:00'}
-                      onChange={(e) =>
-                        setDay(key, { open: e.target.value, close: day?.close ?? '17:00' })
-                      }
-                      className="hours-time-input rounded border border-slate-300 px-1.5 py-0.5 text-xs focus:outline-none focus:ring-2 focus:ring-primary"
-                    />
-                    <span className="text-slate-400 text-xs">–</span>
-                    <input
-                      type="time"
-                      value={day?.close ?? '17:00'}
-                      onChange={(e) =>
-                        setDay(key, { open: day?.open ?? '09:00', close: e.target.value })
-                      }
-                      className="hours-time-input rounded border border-slate-300 px-1.5 py-0.5 text-xs focus:outline-none focus:ring-2 focus:ring-primary"
-                    />
-                  </div>
-                )}
-              </div>
-            )
-          })}
-        </div>
-      )}
+                  <span className="text-slate-400 text-xs">–</span>
+                  <input
+                    type="time"
+                    value={day?.close ?? '17:00'}
+                    onChange={(e) =>
+                      setDay(key, { open: day?.open ?? '09:00', close: e.target.value })
+                    }
+                    className="hours-time-input rounded border border-slate-300 px-1.5 py-0.5 text-xs focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }
