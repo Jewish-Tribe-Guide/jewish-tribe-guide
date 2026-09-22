@@ -69,9 +69,7 @@ describe('ImageUploadField', () => {
 
     render(<ControlledField />)
 
-    // "Upload image"'s hidden file input has no `capture` attribute; "Take
-    // photo"'s does — this is how the test tells the two apart.
-    const fileInput = document.querySelector('input[type="file"]:not([capture])') as HTMLInputElement
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement
     const original = fakeFile('vacation.jpg')
     await user.upload(fileInput, original)
 
@@ -116,7 +114,7 @@ describe('ImageUploadField', () => {
     expect(screen.getByText('Source: https://example.com/pasted.jpg')).toBeInTheDocument()
     await user.click(screen.getByText('Cancel crop'))
 
-    const fileInput = document.querySelector('input[type="file"]:not([capture])') as HTMLInputElement
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement
     await user.upload(fileInput, fakeFile('vacation.jpg'))
 
     await user.click(screen.getByRole('button', { name: 'Adjust photo' }))
@@ -211,7 +209,7 @@ describe('ImageUploadField', () => {
     }
     render(<CallerOwnedField />)
 
-    const fileInput = document.querySelector('input[type="file"]:not([capture])') as HTMLInputElement
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement
     await user.upload(fileInput, fakeFile('vacation.jpg'))
     await user.click(screen.getByText('Confirm crop'))
     await waitFor(() => expect(document.querySelector('img')).toHaveAttribute('src', 'https://example.com/cropped-1.jpg'))
@@ -308,5 +306,21 @@ describe('ImageUploadField', () => {
       expect(screen.queryByPlaceholderText('https://…')).not.toBeInTheDocument()
       expect(document.querySelector('img')).toHaveAttribute('src', 'https://example.com/existing.jpg')
     })
+  })
+
+  // A plain `<input type="file">` with no `capture` attribute already opens
+  // the OS's own chooser on a phone (Take Photo/Photo Library/Choose File
+  // on iOS Safari, Camera/Files on Android Chrome), so a second button
+  // offering the same camera option via `capture="environment"` was a whole
+  // extra control for what `capture` only saves: skipping past that chooser
+  // instead of one extra tap through it. Desktop has no such chooser at
+  // all, where the second button did nothing "Upload image" didn't.
+  it('offers just one "Upload image" button, no separate "Take photo" — a plain file input already offers the camera on a phone', () => {
+    render(<ImageUploadField value="" onChange={vi.fn()} uploadUrl="/api/upload" />)
+
+    expect(screen.getByRole('button', { name: 'Upload image' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Take photo' })).not.toBeInTheDocument()
+    expect(document.querySelectorAll('input[type="file"]')).toHaveLength(1)
+    expect(document.querySelector('input[type="file"][capture]')).not.toBeInTheDocument()
   })
 })

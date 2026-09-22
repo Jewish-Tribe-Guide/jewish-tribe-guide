@@ -327,8 +327,8 @@ describe('ListingForm', () => {
 
   // Same opt-out (showRepositionHint), the OTHER caption it now covers:
   // before a photo is set, "or drag an image onto the preview, or click it
-  // and paste one (⌘V / Ctrl+V)". Upload image/Take photo/Paste URL are
-  // already visible, self-explanatory buttons on this form.
+  // and paste one (⌘V / Ctrl+V)". Upload image/Paste URL are already
+  // visible, self-explanatory buttons on this form.
   it('never shows the "drag an image onto the preview" hint on a photo field either, before a photo is set', () => {
     const category = makeCategory({ detailFields: [imageField()] })
     renderWithProviders(<ListingForm category={category} mode="create" {...handlers} />)

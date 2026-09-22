@@ -51,8 +51,8 @@ type Props = {
    *  (ListingForm) specifically: confirmed with the site owner that a
    *  visitor filling out one form field at a time doesn't need either
    *  spelled out the way an admin configuring branding once might — Upload
-   *  image/Take photo/Paste URL are already visible, self-explanatory
-   *  buttons, and drag/paste is a bonus shortcut, not something a
+   *  image/Paste URL are already visible, self-explanatory buttons, and
+   *  drag/paste is a bonus shortcut, not something a
    *  first-time visitor needs telling about. */
   showRepositionHint?: boolean
   /** Starts the "…or paste an image URL directly" row collapsed behind a
@@ -134,7 +134,6 @@ export default function ImageUploadField({
     else localOriginalSourceRef.current = source
   }
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const cameraInputRef = useRef<HTMLInputElement>(null)
 
   function pickNewFile(file: File) {
     setOriginalSource(file)
@@ -250,18 +249,23 @@ export default function ImageUploadField({
 
         <div className="flex flex-col gap-1.5">
           <div className="flex flex-wrap gap-2">
-            {/* Each button carries a short mobile label and the full
-                desktop one, swapped with sm:hidden/hidden sm:inline rather
-                than shortened everywhere — on a phone, three buttons this
-                size next to the preview don't fit "Upload image"/"Take
-                photo"/"Paste URL" on one line even stacked full-width (see
-                the outer flex-col above), but the longer, clearer phrasing
-                still reads better once there's room for it on desktop.
-                aria-label pins the accessible name to the full phrase
-                regardless of which one CSS is currently showing — without
-                it, a screen reader (or a test, which doesn't load Tailwind's
-                compiled CSS and so sees BOTH spans as present) reads both
-                pieces of text back to back instead of one real name. */}
+            {/* One button, not two — a plain `<input type="file">` with no
+                `capture` attribute already opens the OS's own chooser on a
+                phone (iOS Safari: "Take Photo", "Photo Library", "Choose
+                File"; Android Chrome: "Camera", "Files"), so a separate
+                "Take photo" button offering the exact same camera option
+                was a whole extra control for what `capture` only saves —
+                skipping straight past that chooser instead of one extra
+                tap through it. Desktop has no such chooser at all, where
+                the second button did literally nothing "Upload image"
+                didn't. Confirmed live. Each label carries a short mobile
+                version and the full desktop one, swapped with
+                sm:hidden/hidden sm:inline — aria-label pins the accessible
+                name to the full phrase regardless of which one CSS is
+                currently showing, since a screen reader (or a test, which
+                doesn't load Tailwind's compiled CSS and so sees BOTH spans
+                as present) would otherwise read both back to back instead
+                of one real name. */}
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
@@ -278,23 +282,9 @@ export default function ImageUploadField({
                 </>
               )}
             </button>
-            {/* `capture` is only meaningful on a phone's camera-equipped
-                browser — desktop browsers just treat this input identically
-                to the plain one above, so there's no need to hide it behind
-                a viewport check. */}
-            <button
-              type="button"
-              onClick={() => cameraInputRef.current?.click()}
-              disabled={uploading}
-              aria-label="Take photo"
-              className="text-sm font-medium border border-slate-300 text-slate-600 rounded-md px-3 py-1.5 hover:bg-slate-50 transition-colors cursor-pointer disabled:opacity-60"
-            >
-              <span aria-hidden="true" className="sm:hidden">Camera</span>
-              <span aria-hidden="true" className="hidden sm:inline">Take photo</span>
-            </button>
-            {/* A pasted URL is a third real way to add a photo, not a lesser
-                afterthought, so it's a real toggle button in this row —
-                same as Upload image/Take photo — not a trigger that vanishes
+            {/* A pasted URL is a second real way to add a photo, not a
+                lesser afterthought, so it's a real toggle button in this
+                row — same as Upload image — not a trigger that vanishes
                 once clicked with a separate "Hide" bolted on somewhere else
                 to undo it. One control, two states: click to reveal the
                 input below, click again to close it (closing never touches
@@ -337,8 +327,8 @@ export default function ImageUploadField({
           {/* Both hint captions are opt-out via showRepositionHint — same
               flag now covers whichever one applies (they're mutually
               exclusive already, based on value). Off for the public listing
-              form specifically: Upload image/Take photo/Paste URL are
-              already visible, self-explanatory buttons, and drag/paste
+              form specifically: Upload image/Paste URL are already visible,
+              self-explanatory buttons, and drag/paste
               (⌘V) is a bonus shortcut for someone who already knows it, not
               something a first-time visitor needs spelled out. Admin's own
               uploaders keep both — see the prop's own doc. */}
@@ -365,25 +355,12 @@ export default function ImageUploadField({
           disabled={uploading}
           className="hidden"
         />
-        <input
-          ref={cameraInputRef}
-          type="file"
-          accept="image/*"
-          capture="environment"
-          onChange={(e) => {
-            const file = e.target.files?.[0]
-            e.target.value = ''
-            if (file) pickNewFile(file)
-          }}
-          disabled={uploading}
-          className="hidden"
-        />
       </div>
 
       {error && <span className="block text-[11px] text-red-600 mt-1">{error}</span>}
 
       {/* The trigger for this (when collapsed) now lives in the button row
-          above, next to Upload image/Take photo — see its own comment. */}
+          above, next to Upload image — see its own comment. */}
       {/* Closing this (when collapseUrlInput) happens from the same "Paste
           URL" toggle in the button row above, not a separate control here —
           see its own comment. */}
