@@ -665,5 +665,44 @@ describe('ListingForm', () => {
       expect(moreDetails.compareDocumentPosition(submit) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
       expect(container).toBeInTheDocument()
     })
+
+    // "More details" is whatever's left over once an admin has named real
+    // sections — usually the fields least likely to matter to whoever's
+    // submitting (a photo, a short blurb) — and shouldn't out-rank a group
+    // someone actually curated just because its fields happen to sit
+    // earlier in the category's own field order.
+    it('renders "More details" last, even when its fields come first in the category\'s field order', () => {
+      const category = makeCategory({
+        formSections: [{ key: 'kosher', label: 'Kosher details' }],
+        detailFields: [
+          textField({ key: 'notes', label: 'Notes' }), // no section → "More details"
+          textField({ key: 'certification', label: 'Certification', formSection: 'kosher' }),
+        ],
+      })
+      renderWithProviders(<ListingForm category={category} mode="create" {...handlers} />)
+
+      const moreDetails = screen.getByRole('button', { name: /More details/ })
+      const kosher = screen.getByRole('button', { name: /Kosher details/ })
+      // DOCUMENT_POSITION_FOLLOWING (4) means `moreDetails` comes after `kosher`,
+      // the reverse of the category's own field order above.
+      expect(kosher.compareDocumentPosition(moreDetails) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    })
+
+    // A field group used to clip a multi-select field's own dropdown to the
+    // group's box (overflow-hidden, meant only to keep the header's rounded
+    // corners tidy, clipped the popover too since it's position: absolute
+    // and meant to render outside the box). jsdom doesn't lay out or clip
+    // anything, so this can't observe the visual bug directly — it instead
+    // asserts the specific class that caused it is gone, which is what
+    // actually fixed it.
+    it('does not clip a field group\'s contents (no overflow-hidden on the box)', () => {
+      const category = makeCategory({ detailFields: [textField({ key: 'notes', label: 'Notes' })] })
+      renderWithProviders(<ListingForm category={category} mode="create" {...handlers} />)
+
+      const basicsBox = screen.getByRole('button', { name: 'Basics' }).closest('div')
+      const moreDetailsBox = screen.getByRole('button', { name: /More details/ }).closest('div')
+      expect(basicsBox?.className).not.toContain('overflow-hidden')
+      expect(moreDetailsBox?.className).not.toContain('overflow-hidden')
+    })
   })
 })

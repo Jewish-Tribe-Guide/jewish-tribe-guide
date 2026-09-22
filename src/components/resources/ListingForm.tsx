@@ -506,12 +506,19 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
         {(() => {
           const basicsOpen = groupIsOpen('basics', true)
           return (
-            <div className="border border-slate-200 rounded-md overflow-hidden">
+            // No overflow-hidden — it was clipping a multi-select field's
+            // own dropdown popover to this box's bounds the moment that
+            // field lived inside a group (the popover is position:absolute,
+            // meant to overlay outside the box). rounded-t-md on the header
+            // below does the (much smaller) job overflow-hidden used to:
+            // keeping its own background from squaring off past the box's
+            // rounded top corners.
+            <div className="border border-slate-200 rounded-md">
               <button
                 type="button"
                 onClick={() => toggleGroup('basics', basicsOpen)}
                 aria-expanded={basicsOpen}
-                className="w-full flex items-center justify-between gap-2 px-3 py-2 bg-slate-50 hover:bg-slate-100 transition-colors cursor-pointer"
+                className="w-full flex items-center justify-between gap-2 rounded-t-md px-3 py-2 bg-slate-50 hover:bg-slate-100 transition-colors cursor-pointer"
               >
                 <span className="text-xs font-semibold uppercase tracking-wide text-slate-600">Basics</span>
                 <svg
@@ -621,6 +628,20 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
                 }
               }
 
+              // "More details" always renders last, regardless of where its
+              // fields happen to sit in the category's own field order. An
+              // admin-named group (an audience section, a formSection) was
+              // deliberately curated as its own thing; the catch-all is
+              // whatever's left over — usually exactly the fields least
+              // likely to matter to a visitor submitting or fixing a
+              // listing (a photo, a short blurb an admin can polish later),
+              // and shouldn't out-rank a group someone actually organized.
+              const moreDetailsAt = blocks.findIndex((b) => b.sectionKey === MORE_DETAILS_KEY)
+              if (moreDetailsAt !== -1 && moreDetailsAt !== blocks.length - 1) {
+                const [moreDetailsBlock] = blocks.splice(moreDetailsAt, 1)
+                blocks.push(moreDetailsBlock)
+              }
+
               const renderField = (field: CategoryField, labelOverride?: string) => (
                 <DetailFieldInput
                   key={field.key}
@@ -645,12 +666,14 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
                 const hasData = block.fields.some((f) => hasValue(details[f.key]))
                 const open = groupIsOpen(block.sectionKey, block.isAudience || hasData)
                 return (
-                  <div key={block.sectionKey} className="border border-slate-200 rounded-md overflow-hidden">
+                  // No overflow-hidden — see Basics above for why (it clips
+                  // a multi-select field's own dropdown to this box).
+                  <div key={block.sectionKey} className="border border-slate-200 rounded-md">
                     <button
                       type="button"
                       onClick={() => toggleGroup(block.sectionKey, open)}
                       aria-expanded={open}
-                      className="w-full flex items-center justify-between gap-2 px-3 py-2 bg-slate-50 hover:bg-slate-100 transition-colors cursor-pointer"
+                      className="w-full flex items-center justify-between gap-2 rounded-t-md px-3 py-2 bg-slate-50 hover:bg-slate-100 transition-colors cursor-pointer"
                     >
                       <span className="flex flex-col items-start text-left">
                         <span className="text-xs font-semibold uppercase tracking-wide text-slate-600">
