@@ -651,6 +651,27 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
             </>
           )
 
+          // Email only, not name — a name has nothing to attach to (no
+          // account, no reply-to relationship with the listing itself), so
+          // almost nobody filled it in, and there's nothing this app
+          // actually does with it besides an optional "Hi {name}" in the
+          // confirmation email, which reads fine falling back to "there".
+          // Email still earns its place: it's how a moderator follows up on
+          // a submission if something's unclear. It used to render bare,
+          // below every box — reported live as a stray field with nothing
+          // grouping it, once every other field on the screen lived inside
+          // one. Now it's the last field in whichever box renders last:
+          // "More details" when one exists (folded in here, or already the
+          // merged Basics box — see mergeMoreDetailsIntoBasics), or the
+          // last named group if a category has sections but no catch-all,
+          // or Basics itself when it's the only box a category has at all.
+          const emailField = !adminSubmit && (
+            <div>
+              <label htmlFor="listing-submitter-email" className="block text-sm font-medium text-slate-700 mb-1">Your email (optional)</label>
+              <input id="listing-submitter-email" type="email" value={submitterEmail} onChange={(e) => setSubmitterEmail(e.target.value)} className={inputClass} />
+            </div>
+          )
+
           return (
         <div className={removalOpen ? 'hidden' : 'space-y-3'}>
         {mergeMoreDetailsIntoBasics ? (
@@ -664,6 +685,7 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
           <div className="space-y-4 rounded-md border border-slate-200 p-3">
             {renderBasicsFields()}
             {basicsExtraFields.map((field) => renderField(field))}
+            {emailField}
           </div>
         ) : (
         /* Basics: one collapsible group, open by default (unlike the
@@ -703,6 +725,11 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
                   submission while this is closed. */}
               <div className={basicsOpen ? 'p-3 space-y-4' : 'hidden'}>
                   {renderBasicsFields()}
+                  {/* Only when Basics is the only box this category has —
+                      otherwise the email field belongs in whichever box
+                      renders last (see emailField's own doc), not doubled
+                      up here too. */}
+                  {groupBlocksToRender.length === 0 && emailField}
               </div>
             </div>
           )
@@ -711,7 +738,7 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
 
         {groupBlocksToRender.length > 0 && (
           <div className="space-y-3">
-            {groupBlocksToRender.map((block) => {
+            {groupBlocksToRender.map((block, index) => {
                 // The plain, unlabeled, non-collapsible treatment (see
                 // mergeMoreDetailsIntoBasics above) is ONLY for a lone small
                 // "More details" that becomes the whole form — it folds into
@@ -769,24 +796,16 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
                         already typed inside it. */}
                     <div className={open ? 'p-3 space-y-4' : 'hidden'}>
                       {block.fields.map((field) => renderField(field, block.isAudience ? field.shortLabel : undefined))}
+                      {/* The email field lands in whichever box renders
+                          LAST — "More details" always sorts last when one
+                          exists (see groupNonCoreFields), so this is it in
+                          the common case; otherwise it's just the last
+                          named group a category happens to have. */}
+                      {index === groupBlocksToRender.length - 1 && emailField}
                     </div>
                   </div>
                 )
             })}
-          </div>
-        )}
-
-        {/* Email only, not name — a name has nothing to attach to (no
-            account, no reply-to relationship with the listing itself), so
-            almost nobody filled it in, and there's nothing this app
-            actually does with it besides an optional "Hi {name}" in the
-            confirmation email, which reads fine falling back to "there".
-            Email still earns its place: it's how a moderator follows up on
-            a submission if something's unclear. */}
-        {!adminSubmit && (
-          <div className="border-t border-slate-200 pt-4">
-            <label htmlFor="listing-submitter-email" className="block text-sm font-medium text-slate-700 mb-1">Your email (optional)</label>
-            <input id="listing-submitter-email" type="email" value={submitterEmail} onChange={(e) => setSubmitterEmail(e.target.value)} className={inputClass} />
           </div>
         )}
 

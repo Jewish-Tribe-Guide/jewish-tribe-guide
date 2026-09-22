@@ -990,5 +990,58 @@ describe('ListingForm', () => {
       expect(basicsBox?.className).not.toContain('overflow-hidden')
       expect(moreDetailsBox?.className).not.toContain('overflow-hidden')
     })
+
+    // The email field used to render bare, below every box — reported live
+    // as a stray field with nothing grouping it once every other field on
+    // the screen lived inside one. It now lands inside whichever box
+    // renders LAST, so it's never left floating outside all of them.
+    describe('the email field lives inside a box, not bare below them', () => {
+      it('puts it inside Basics when Basics is the only box a category has', () => {
+        const category = makeCategory({ detailFields: [] })
+        renderWithProviders(<ListingForm category={category} mode="create" {...handlers} />)
+
+        const basicsBox = screen.getByRole('button', { name: 'Basics' }).closest('div')
+        expect(basicsBox).toContainElement(screen.getByLabelText('Your email (optional)'))
+      })
+
+      it('puts it inside the merged plain box, when a small "More details" is the whole form', () => {
+        const category = makeCategory({ detailFields: [textField({ key: 'notes', label: 'Notes' })] })
+        renderWithProviders(<ListingForm category={category} mode="create" {...handlers} />)
+
+        // The merged case has no "Basics" header at all (see its own tests
+        // above) — the email field's own box is whichever ancestor holds
+        // both it and the Notes field entered alongside it.
+        const mergedBox = screen.getByLabelText('Notes').closest('.rounded-md.border.border-slate-200')
+        expect(mergedBox).toContainElement(screen.getByLabelText('Your email (optional)'))
+      })
+
+      it('puts it inside "More details" specifically, not the first/only other box, once real sections exist too', () => {
+        const category = makeCategory({
+          formSections: [{ key: 'kosher', label: 'Kosher details' }],
+          detailFields: [
+            textField({ key: 'certification', label: 'Certification', formSection: 'kosher' }),
+            textField({ key: 'notes', label: 'Notes' }),
+          ],
+        })
+        renderWithProviders(<ListingForm category={category} mode="create" {...handlers} />)
+
+        const kosherBox = screen.getByRole('button', { name: /Kosher details/ }).closest('div')
+        const moreDetailsBox = screen.getByRole('button', { name: /More details/ }).closest('div')
+        expect(moreDetailsBox).toContainElement(screen.getByLabelText('Your email (optional)'))
+        expect(kosherBox).not.toContainElement(screen.getByLabelText('Your email (optional)'))
+      })
+
+      it('never renders it bare (outside every box) at all', () => {
+        const category = makeCategory({ detailFields: [] })
+        renderWithProviders(<ListingForm category={category} mode="create" {...handlers} />)
+
+        const email = screen.getByLabelText('Your email (optional)')
+        // Its immediate parent is a field wrapper <div>, whose own parent
+        // must be a bordered box — not the form's top-level fields column.
+        // border-slate-200 (not -300, which every plain input/select also
+        // has) is what actually distinguishes a group's own box.
+        expect(email.closest('.rounded-md.border.border-slate-200')).not.toBeNull()
+      })
+    })
   })
 })
