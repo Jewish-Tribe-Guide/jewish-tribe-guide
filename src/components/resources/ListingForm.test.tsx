@@ -114,7 +114,7 @@ describe('ListingForm', () => {
   // the foot of the edit form, since "this listing is wrong" is one thing.
   describe('removal request', () => {
     const existing = () => makeListing({ id: 'listing-1', name: 'Kosher Mart' })
-    const removalLine = /closed or shouldn.t be listed/i
+    const removalLine = 'Request removal'
 
     it('is offered at the bottom of an edit', () => {
       renderWithProviders(<ListingForm category={makeCategory()} mode="edit" existing={existing()} {...handlers} />)
@@ -155,7 +155,7 @@ describe('ListingForm', () => {
       renderWithProviders(<ListingForm category={makeCategory()} mode="edit" existing={existing()} {...handlers} />)
 
       await user.click(screen.getByRole('button', { name: removalLine }))
-      await user.click(screen.getByRole('button', { name: 'Request removal' }))
+      await user.click(screen.getByRole('button', { name: 'Confirm removal request' }))
 
       expect(await screen.findByText(/removal request was received/i)).toBeInTheDocument()
       expect(fetchMock).toHaveBeenCalledTimes(1)

@@ -93,26 +93,29 @@ export default function RemovalRequest({
     }
   }
 
-  if (!open) {
-    return (
-      <div className="border-t border-slate-200 pt-4">
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          aria-expanded={false}
-          className="cursor-pointer text-sm text-slate-500 underline underline-offset-2 hover:text-slate-800"
-        >
-          This place is closed or shouldn&rsquo;t be listed
-        </button>
-      </div>
-    )
-  }
-
   const inputClass =
     'w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary'
 
+  if (!open) {
+    // A real button, the same size/weight class as ListingForm's own Submit
+    // — sits right beside it (see ListingForm's footer) so a visitor reads
+    // this as the form's other option, not a buried afterthought. Secondary
+    // (bordered, not filled) since it's the less common of the two and
+    // shouldn't out-compete Submit for attention.
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        aria-expanded={false}
+        className="w-full sm:w-auto rounded-md border border-slate-300 bg-white px-5 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 cursor-pointer"
+      >
+        Request removal
+      </button>
+    )
+  }
+
   return (
-    <div className="border-t border-slate-200 pt-4">
+    <div className="w-full border-t border-slate-200 pt-4">
       <div role="group" aria-labelledby={`${uid}-title`} className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
         <p id={`${uid}-title`} className="text-sm font-medium text-slate-800">
           Request removal of {listing.name}
@@ -152,7 +155,7 @@ export default function RemovalRequest({
             disabled={submitting || !canSubmit}
             className="cursor-pointer rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {submitting ? 'Sending…' : canSubmit ? 'Request removal' : 'Verifying…'}
+            {submitting ? 'Sending…' : canSubmit ? 'Confirm removal request' : 'Verifying…'}
           </button>
           <button
             type="button"

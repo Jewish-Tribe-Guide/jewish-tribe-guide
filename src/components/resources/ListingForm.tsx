@@ -590,42 +590,49 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
             the background challenge completes could submit with an empty
             token and get rejected for no visible reason. An admin submission
             has no Turnstile challenge at all, so it's never gated on one. */}
-        <button
-          type="submit"
-          disabled={submitting || (!adminSubmit && TURNSTILE_ACTIVE && !turnstileToken)}
-          className="w-full sm:w-auto bg-primary text-white font-medium px-5 py-2.5 rounded-md hover:bg-primary/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
-        >
-          {submitting
-            ? 'Submitting…'
-            : adminSubmit
-              ? 'Add listing'
-              : TURNSTILE_ACTIVE && !turnstileToken
-                ? 'Verifying…'
-                : mode === 'edit'
-                  ? 'Submit edit for review'
-                  : 'Submit for review'}
-        </button>
+        {/* Submit and Request removal sit side by side as the form's two real
+            options — a visitor reads this as "save my edit" or "take this
+            listing down", not one primary action with a buried afterthought
+            underneath it. Request removal is secondary (bordered, not
+            filled) since it's the less common of the two. */}
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            type="submit"
+            disabled={submitting || (!adminSubmit && TURNSTILE_ACTIVE && !turnstileToken)}
+            className="w-full sm:w-auto bg-primary text-white font-medium px-5 py-2.5 rounded-md hover:bg-primary/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
+          >
+            {submitting
+              ? 'Submitting…'
+              : adminSubmit
+                ? 'Add listing'
+                : TURNSTILE_ACTIVE && !turnstileToken
+                  ? 'Verifying…'
+                  : mode === 'edit'
+                    ? 'Submit edit for review'
+                    : 'Submit for review'}
+          </button>
+
+          {mode === 'edit' && existing && !adminSubmit && !onPreviewSubmit && ui.contributions.report && resolveCapabilities(config.capabilities).report && (
+            <RemovalRequest
+              listing={{ id: existing.id, name: existing.name }}
+              turnstileToken={turnstileToken}
+              canSubmit={!TURNSTILE_ACTIVE || !!turnstileToken}
+              resetTurnstile={resetTurnstile}
+              honeypot={honeypot}
+              submittedBy={
+                submitterName.trim() || submitterEmail.trim()
+                  ? { name: submitterName.trim() || undefined, email: submitterEmail.trim() || undefined }
+                  : undefined
+              }
+              onDone={() => {
+                setDoneKind('removal')
+                setDone(true)
+              }}
+            />
+          )}
+        </div>
 
         <PrivacyNote />
-
-        {mode === 'edit' && existing && !adminSubmit && !onPreviewSubmit && ui.contributions.report && resolveCapabilities(config.capabilities).report && (
-          <RemovalRequest
-            listing={{ id: existing.id, name: existing.name }}
-            turnstileToken={turnstileToken}
-            canSubmit={!TURNSTILE_ACTIVE || !!turnstileToken}
-            resetTurnstile={resetTurnstile}
-            honeypot={honeypot}
-            submittedBy={
-              submitterName.trim() || submitterEmail.trim()
-                ? { name: submitterName.trim() || undefined, email: submitterEmail.trim() || undefined }
-                : undefined
-            }
-            onDone={() => {
-              setDoneKind('removal')
-              setDone(true)
-            }}
-          />
-        )}
       </form>
       </div>
     </div>
