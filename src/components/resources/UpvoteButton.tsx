@@ -154,23 +154,20 @@ export default function UpvoteButton({
         aria-pressed={voted}
         title={title}
         className={[
-          // A visible border, not just colored text — this used to be plain
+          // A filled chip, not just colored text — this used to be plain
           // text sitting right next to the (non-interactive) distance,
           // "👍 0 | 📍 0.3 mi", both the exact same weight. Reported live as
-          // unclear that it's tappable at all, and it's the one real control
-          // on this card with no border: every other button in this app
-          // (Add, Filters, the sort toggles) signals "this is a button" the
-          // same way. A filled/colored pill was deliberately avoided — the
-          // badge row below (Bakery, IKC) already uses that language for
-          // category tags, and this would read as one more of those instead
-          // of a control. rounded-full + border + the box variant's own
-          // color pairing (border-primary/bg-primary/5 when voted,
-          // border-slate-300 otherwise) keeps it a recognizable "button",
-          // just compact enough to sit inline.
-          'inline-flex items-center gap-1 rounded-full border px-2 py-1 text-xs font-medium whitespace-nowrap cursor-pointer transition-colors disabled:opacity-60',
+          // unclear that it's tappable at all. A border was tried first, but
+          // at this text-xs size a 1px outline is easy to miss without any
+          // hover state to reinforce it (mobile, no cursor); a background
+          // fill reads as "this is a surface" without depending on someone
+          // noticing a hairline. Neutral gray at rest (not primary-colored)
+          // so it doesn't read as one more badge in the category-tag row
+          // below (Bakery, IKC) — it tints to primary only once voted.
+          'inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium whitespace-nowrap cursor-pointer transition-colors disabled:opacity-60',
           voted
-            ? 'border-primary bg-primary/5 text-primary'
-            : 'border-slate-300 text-slate-500 hover:border-primary hover:text-primary',
+            ? 'bg-primary/10 text-primary'
+            : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
         ].join(' ')}
       >
         <span aria-hidden="true">👍</span>
