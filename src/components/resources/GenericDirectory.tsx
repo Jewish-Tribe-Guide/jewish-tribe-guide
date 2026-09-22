@@ -1107,13 +1107,15 @@ export default function GenericDirectory({ category, items, anchorLabel, address
         {hasFilterRow && (
           <>
             {/* ── Mobile: Filters + Map buttons, then sort toggle — all one line ──
-                    Filters and the Popularity/Distance toggle are back to
-                    py-2/text-sm/slate-300 (matching ordinary buttons) after a
-                    stint at a shrunk py-1.5/text-xs/slate-200 utility-toolbar
-                    weight — reverted, at the user's request, rather than a
-                    reversal of the reasoning behind the shrink. The davening
-                    and external-link buttons alongside them keep that
-                    smaller weight; only these two were asked to grow back. ── */}
+                    Every button in this row (and the Open now/boolean/
+                    dropdown filters below it) is back to py-2/text-sm/
+                    slate-300 (matching ordinary buttons, and matching their
+                    own desktop versions further down) after a stint at a
+                    shrunk py-1.5/text-xs/slate-200 utility-toolbar weight —
+                    reverted piecemeal, at the user's request, as each one
+                    turned out to still look small rather than in one pass;
+                    not a reversal of the reasoning behind the original
+                    shrink. ── */}
             <div className="flex items-center gap-1.5 desktop:hidden">
               {/* Mobile's Add used to live here — moved to its own floating
                   button (see below), Gmail-compose-style, so it stopped
@@ -1157,7 +1159,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
                   href={category.externalLink.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="ml-auto inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium rounded-md border bg-white text-slate-600 border-slate-200 hover:bg-slate-50 transition-colors whitespace-nowrap"
+                  className="ml-auto inline-flex items-center gap-1 px-3 py-2 text-sm font-medium rounded-md border bg-white text-slate-600 border-slate-300 hover:bg-slate-50 transition-colors whitespace-nowrap"
                 >
                   {category.externalLink.label} ↗
                 </a>
@@ -1168,11 +1170,11 @@ export default function GenericDirectory({ category, items, anchorLabel, address
                   aria-label="All davening times"
                   title="All davening times"
                   className={[
-                    'inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium rounded-md border bg-white text-slate-600 border-slate-200 hover:bg-slate-50 transition-colors cursor-pointer whitespace-nowrap',
+                    'inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-md border bg-white text-slate-600 border-slate-300 hover:bg-slate-50 transition-colors cursor-pointer whitespace-nowrap',
                     !upvotes && !category.externalLink ? 'ml-auto' : '',
                   ].join(' ')}
                 >
-                  <ClockIcon className="h-3.5 w-3.5" />
+                  <ClockIcon className="h-4 w-4" />
                   {/* Full label once the row has room — hidden below this so it
                       never crowds Filters/Map on the narrowest phones. */}
                   <span className="hidden min-[390px]:inline">All davening times</span>
