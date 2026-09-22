@@ -111,9 +111,11 @@ export default function RemovalRequest({
     // itself apart from the form above it. Now it's the entire content of
     // the swapped-in view, already sitting inside the dialog's own bordered
     // card, so a second box nested inside that one was just framing around
-    // framing. A hairline top border instead — the same divider convention
-    // ListingForm already uses between its own field groups.
-    <div role="group" aria-labelledby={`${uid}-title`} className="space-y-3 border-t border-slate-200 pt-4">
+    // framing. No top divider either (tried one, dropped it): this panel is
+    // the first VISIBLE thing in the swap — Turnstile is the only sibling
+    // rendered above it, and when it's unconfigured (e.g. local dev) that
+    // divider became a stray line with nothing above it to separate from.
+    <div role="group" aria-labelledby={`${uid}-title`} className="space-y-3">
       <p id={`${uid}-title`} className="text-sm font-medium text-slate-800">
         Request removal of {listing.name}
       </p>

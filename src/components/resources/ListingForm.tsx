@@ -616,17 +616,20 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
             the background challenge completes could submit with an empty
             token and get rejected for no visible reason. An admin submission
             has no Turnstile challenge at all, so it's never gated on one. */}
-        {/* Submit and Request removal are the form's two real options, equal
-            width and stacked full-width on mobile (flex-col), side by side
-            splitting the row evenly on desktop (sm:flex-row + flex-1 on
-            each) — content-hugging auto-width buttons left a lopsided gap of
-            empty space next to them on a wide dialog, which read as
-            unfinished rather than deliberate. */}
-        <div className={removalOpen ? 'hidden' : 'flex flex-col sm:flex-row gap-3'}>
+        {/* Submit and Request removal, both full width, stacked — on both
+            mobile and desktop, not split side by side on the wider one. A
+            50/50 split visually says "two equally likely choices", but
+            almost everyone opening this form wants to fix something, not
+            remove the listing; full width on top, the other option directly
+            below it, reads as "here's the main thing" rather than a coin
+            flip. The dialog itself is capped well under 600px regardless of
+            window size, so a full-width button here was never actually
+            wide enough to look stretched. */}
+        <div className={removalOpen ? 'hidden' : 'flex flex-col gap-3'}>
           <button
             type="submit"
             disabled={submitting || (!adminSubmit && TURNSTILE_ACTIVE && !turnstileToken)}
-            className="w-full sm:flex-1 bg-primary text-white font-medium px-5 py-2.5 rounded-md hover:bg-primary/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
+            className="w-full bg-primary text-white font-medium px-5 py-2.5 rounded-md hover:bg-primary/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
           >
             {submitting
               ? 'Submitting…'
@@ -649,7 +652,7 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
             <button
               type="button"
               onClick={() => setRemovalOpen(true)}
-              className="w-full sm:flex-1 rounded-md bg-red-600 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-red-700 cursor-pointer"
+              className="w-full rounded-md bg-red-600 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-red-700 cursor-pointer"
             >
               Request removal
             </button>
