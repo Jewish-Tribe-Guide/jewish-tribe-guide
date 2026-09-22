@@ -150,6 +150,15 @@ describe('UpvoteButton', () => {
     expect(screen.getByRole('button')).toHaveTextContent('👍5')
   })
 
+  // Reported live as unclear that it's tappable at all — it used to be
+  // plain colored text with no border, sitting right next to the
+  // non-interactive distance text at the exact same visual weight. It's
+  // the one control on the card with no border otherwise.
+  it('gives the inline variant a visible border, so it reads as a button next to the (non-interactive) distance text beside it', () => {
+    render(<UpvoteButton resourceId="r1" count={5} variant="inline" />)
+    expect(screen.getByRole('button').className).toMatch(/\bborder\b/)
+  })
+
   describe('remembered count (cache-lag correction)', () => {
     // Regression coverage for a real thing a user noticed: vote, leave, come
     // back — the count briefly shows its pre-vote value because the listing
