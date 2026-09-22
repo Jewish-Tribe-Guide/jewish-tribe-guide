@@ -102,6 +102,19 @@ describe('RemovalRequest', () => {
     expect(screen.queryByLabelText(/Your name/)).not.toBeInTheDocument()
   })
 
+  // Reason, details and email used to be two separately-bordered blocks
+  // stacked on top of the (also bordered, full-width) buttons — reported
+  // live as three long boxes right on top of each other. Folding email
+  // into the same box as reason/details is a deliberate exception to
+  // "a box means a field group" (which the longer edit form still follows)
+  // made just for this one screen.
+  it('puts the email field inside the same box as reason/details, not its own block below it', () => {
+    setup()
+    const box = screen.getByRole('combobox').closest('.rounded-md.border.border-slate-200')
+    expect(box).not.toBeNull()
+    expect(box).toContainElement(screen.getByLabelText('Your email (optional)'))
+  })
+
   it('reports email edits upward instead of holding its own copy', async () => {
     const user = userEvent.setup()
     const { onSubmitterEmailChange } = setup()

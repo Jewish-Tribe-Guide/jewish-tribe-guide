@@ -127,16 +127,22 @@ export default function RemovalRequest({
     // wasn't worth a permanent line either: Cancel and Confirm are the only
     // two things this screen does, and that's clear on its own.
     <div className="space-y-3">
-      {/* One static box for the actual question this screen asks — the same
-          visual language as ListingForm's own field groups (Basics, an
-          audience/formSection section), just without a collapse control
-          since there's only ever this one. The email field and the actions
-          below stay bare, matching how ListingForm itself treats its own
-          submitter field and Submit/Request removal — a box means "a field
-          group", not "everything on this screen", so contact info and
-          buttons living inside it here (while they don't on the edit
-          screen) read as an inconsistency once both are visible side by
-          side, not a deliberate distinction. */}
+      {/* One static box for everything this screen actually asks — why,
+          optional details, and an optional way to reach the visitor back —
+          the same visual language as ListingForm's own field groups
+          (Basics, an audience/formSection section), just without a collapse
+          control since there's only ever this one. Email used to sit in its
+          own bare block below this box (matching ListingForm's OWN "a box
+          means a field group" rule, where its submitter field stays bare
+          outside every field-group box) — but on this one screen, stacked
+          three bordered blocks deep (this box, the bare email field, then
+          the full-width buttons) read as visual noise rather than three
+          meaningfully different things, since email is still part of "what
+          you're telling us about this removal," not a separate topic the
+          way it's genuinely optional context on the longer edit form.
+          Folding it in here is a deliberate one-screen exception, not a
+          reversal of that rule. The actions below still stay bare, matching
+          ListingForm's own Submit/Request removal. */}
       <div className="space-y-4 rounded-md border border-slate-200 p-4">
         <div>
           <label htmlFor={`${uid}-reason`} className="mb-1 block text-sm font-medium text-slate-700">
@@ -161,18 +167,18 @@ export default function RemovalRequest({
             className={inputClass}
           />
         </div>
-      </div>
-      {/* Same field as ListingForm's own "Your email", not a separate ask —
-          a removal request is a bigger claim than a routine edit (a
-          moderator may genuinely want to follow up: "are you sure, or did
-          it just move?"), and unlike the edit fields, this panel used to be
-          the one place in the form with no way to leave one at all — that
-          input lives in the block this panel replaces, not inside it. No
-          name field, here or on the edit screen — see ListingForm's own
-          comment on why. */}
-      <div>
-        <label htmlFor={`${uid}-email`} className="mb-1 block text-sm font-medium text-slate-700">Your email (optional)</label>
-        <input id={`${uid}-email`} type="email" value={submitterEmail} onChange={(e) => onSubmitterEmailChange(e.target.value)} className={inputClass} />
+        {/* Same field as ListingForm's own "Your email", not a separate ask
+            — a removal request is a bigger claim than a routine edit (a
+            moderator may genuinely want to follow up: "are you sure, or did
+            it just move?"), and unlike the edit fields, this panel used to
+            be the one place in the form with no way to leave one at all —
+            that input lives in the block this panel replaces, not inside
+            it. No name field, here or on the edit screen — see
+            ListingForm's own comment on why. */}
+        <div>
+          <label htmlFor={`${uid}-email`} className="mb-1 block text-sm font-medium text-slate-700">Your email (optional)</label>
+          <input id={`${uid}-email`} type="email" value={submitterEmail} onChange={(e) => onSubmitterEmailChange(e.target.value)} className={inputClass} />
+        </div>
       </div>
       {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
       <div className="space-y-2">
