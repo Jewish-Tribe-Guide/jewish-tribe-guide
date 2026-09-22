@@ -993,6 +993,18 @@ function DetailFieldInput({
   if (field.type === 'boolean') {
     return (
       <div>
+        {/* A title above the box, same as every other field type (select,
+            input, textarea) — a checkbox used to be the one field with no
+            title line at all, just a box whose only content was the label
+            repeated next to the checkbox. Reported live as awkward once it
+            sat next to titled fields for real, especially alone in a box of
+            its own. The box now shows the current state (Yes/No) instead of
+            re-stating the field's own name — same relationship a select's
+            box has to its own label above (the label says what the field
+            is; the box shows the value), and the checkbox keeps the field's
+            real name as its accessible name via aria-label, so nothing is
+            actually lost for anyone not seeing it visually. */}
+        <span className="block text-sm font-medium text-slate-700 mb-1">{label}</span>
         {/* Same border/rounded/px-3 py-2 footprint as a text input or select
             (see inputClass) — a bare checkbox+label with no box at all read
             as a much lighter, stray element next to a stack of full-width
@@ -1006,9 +1018,10 @@ function DetailFieldInput({
             type="checkbox"
             checked={!!value}
             onChange={(e) => onChange(e.target.checked)}
+            aria-label={labelOverride ?? field.label}
             className="h-4 w-4 shrink-0 rounded border-slate-300 text-primary focus:ring-primary"
           />
-          <span className="text-sm text-slate-700">{labelOverride ?? field.label}</span>
+          <span className="text-sm text-slate-600">{value ? 'Yes' : 'No'}</span>
         </label>
         {/* Flush left, matching every other field's help text (no more
             ml-6 offset to align under the label past the checkbox — the

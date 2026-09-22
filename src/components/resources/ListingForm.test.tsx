@@ -765,6 +765,31 @@ describe('ListingForm', () => {
       expect(photoBox?.querySelector('input[type="file"]')).toBeInTheDocument()
     })
 
+    // A checkbox used to be the one field type with no title above its box
+    // — just a box whose only content repeated the field's own name next to
+    // the checkbox. Reported live as awkward, especially alone in a box of
+    // its own. Now it gets the same title-above-box shape as a select/input,
+    // and the box shows the current state (Yes/No) instead of the label a
+    // second time — the checkbox itself still carries the real field name
+    // as its accessible name (aria-label), not just "Yes"/"No".
+    it('titles the boolean field like any other, and shows its state (Yes/No) inside the box instead of repeating the label', async () => {
+      const user = userEvent.setup()
+      const category = makeCategory({ detailFields: [booleanField({ key: 'shabbatFriendly', label: 'Shabbat friendly' })] })
+      renderWithProviders(<ListingForm category={category} mode="create" {...handlers} />)
+
+      expect(screen.getByText('Shabbat friendly')).toBeInTheDocument()
+      const checkbox = screen.getByRole('checkbox', { name: 'Shabbat friendly' })
+      expect(screen.getByText('No')).toBeInTheDocument()
+
+      await user.click(checkbox)
+
+      expect(screen.getByText('Yes')).toBeInTheDocument()
+      expect(screen.queryByText('No')).not.toBeInTheDocument()
+      // Still just the one "Shabbat friendly" on screen — not repeated next
+      // to the checkbox as well.
+      expect(screen.getAllByText('Shabbat friendly')).toHaveLength(1)
+    })
+
     it('gives a real admin-named formSection its header even with just one field (the <3 rule is "More details"-only)', () => {
       const category = makeCategory({
         formSections: [{ key: 'kosher', label: 'Kosher details' }],
