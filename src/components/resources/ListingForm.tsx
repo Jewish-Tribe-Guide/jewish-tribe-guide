@@ -610,17 +610,76 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
             />
           )
 
+          // Address/Name/Phone plus any coreSection field (see
+          // CategoryField's doc comment) — a Google-autofillable field
+          // (Hours, Website, a googleDescription field) that fills in from
+          // the same address pick, so it belongs here rather than the
+          // optional groups below. Shared between both Basics renderings
+          // (normal and merged) so the fields themselves are never
+          // duplicated, only the box/header around them differs.
+          const renderBasicsFields = () => (
+            <>
+              {hasAddress && (
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Address *</label>
+                  <AddressInput
+                    value={address}
+                    onChange={setAddress}
+                    onCoords={setCoords}
+                    onPlaceSelect={handlePlaceSelect}
+                    placeholder={syncEligible ? 'Search by business name or address…' : 'Start typing an address…'}
+                    disableAutocomplete={!!onPreviewSubmit}
+                  />
+                </div>
+              )}
+
+              <div>
+                <label htmlFor="listing-name" className="block text-sm font-medium text-slate-700 mb-1">Name *</label>
+                <input id="listing-name" value={name} onChange={(e) => setName(e.target.value)} className={inputClass} placeholder="e.g. Kosher Mart" />
+              </div>
+
+              {hasPhone && (
+                <div>
+                  <label htmlFor="listing-phone" className="block text-sm font-medium text-slate-700 mb-1">Phone</label>
+                  <input id="listing-phone" type="tel" value={phone} onChange={(e) => setPhone(formatPhone(e.target.value))} className={inputClass} placeholder="(215) 555-0100" />
+                </div>
+              )}
+
+              {config.detailFields
+                .filter((field) => field.coreSection && fieldIsVisible(field, details))
+                .map((field) => (
+                  <DetailFieldInput
+                    key={field.key}
+                    field={field}
+                    value={details[field.key]}
+                    onChange={(v) => setDetail(field.key, v)}
+                    sometimes={field.type === 'tags' ? ((details[field.key + '_sometimes'] as string[] | undefined) ?? []) : undefined}
+                    onChangeSometimes={field.type === 'tags' ? (v) => setDetail(field.key + '_sometimes', v) : undefined}
+                  />
+                ))}
+            </>
+          )
+
           return (
         <div className={removalOpen ? 'hidden' : 'space-y-3'}>
-        {/* Basics: Address/Name/Phone plus any coreSection field (see
-            CategoryField's doc comment) — a Google-autofillable field
-            (Hours, Website, a googleDescription field) that fills in from
-            the same address pick, so it belongs with Address/Name/Phone
-            rather than the optional groups below. One collapsible group,
-            open by default (unlike the optional ones, which default to
-            open only once they already hold a value) since this is what
-            makes the listing a listing at all — see groupIsOpen. */}
-        {(() => {
+        {mergeMoreDetailsIntoBasics ? (
+          // The merged case isn't "Basics with a couple of fields tacked
+          // on" — at that point it IS the whole optional part of the form,
+          // so it gets the same plain, unlabeled, non-collapsible treatment
+          // a small standalone "More details" already uses (see the size
+          // gate below): no "Basics" header, no chevron, nothing to
+          // collapse, since there's nothing else on this screen to hide it
+          // from or distinguish it against.
+          <div className="space-y-4 rounded-md border border-slate-200 p-3">
+            {renderBasicsFields()}
+            {basicsExtraFields.map((field) => renderField(field))}
+          </div>
+        ) : (
+        /* Basics: one collapsible group, open by default (unlike the
+            optional ones, which default to open only once they already
+            hold a value) since this is what makes the listing a listing
+            at all — see groupIsOpen. */
+        (() => {
           const basicsOpen = groupIsOpen('basics', true)
           return (
             // No overflow-hidden — it was clipping a multi-select field's
@@ -652,52 +711,12 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
                   is excluded from native validation, so nothing blocks
                   submission while this is closed. */}
               <div className={basicsOpen ? 'p-3 space-y-4' : 'hidden'}>
-                  {hasAddress && (
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1">Address *</label>
-                      <AddressInput
-                        value={address}
-                        onChange={setAddress}
-                        onCoords={setCoords}
-                        onPlaceSelect={handlePlaceSelect}
-                        placeholder={syncEligible ? 'Search by business name or address…' : 'Start typing an address…'}
-                        disableAutocomplete={!!onPreviewSubmit}
-                      />
-                    </div>
-                  )}
-
-                  <div>
-                    <label htmlFor="listing-name" className="block text-sm font-medium text-slate-700 mb-1">Name *</label>
-                    <input id="listing-name" value={name} onChange={(e) => setName(e.target.value)} className={inputClass} placeholder="e.g. Kosher Mart" />
-                  </div>
-
-                  {hasPhone && (
-                    <div>
-                      <label htmlFor="listing-phone" className="block text-sm font-medium text-slate-700 mb-1">Phone</label>
-                      <input id="listing-phone" type="tel" value={phone} onChange={(e) => setPhone(formatPhone(e.target.value))} className={inputClass} placeholder="(215) 555-0100" />
-                    </div>
-                  )}
-
-                  {config.detailFields
-                    .filter((field) => field.coreSection && fieldIsVisible(field, details))
-                    .map((field) => (
-                      <DetailFieldInput
-                        key={field.key}
-                        field={field}
-                        value={details[field.key]}
-                        onChange={(v) => setDetail(field.key, v)}
-                        sometimes={field.type === 'tags' ? ((details[field.key + '_sometimes'] as string[] | undefined) ?? []) : undefined}
-                        onChangeSometimes={field.type === 'tags' ? (v) => setDetail(field.key + '_sometimes', v) : undefined}
-                      />
-                    ))}
-                  {/* Folded in when "More details" would otherwise be the
-                      ONLY group this category ever shows — see
-                      mergeMoreDetailsIntoBasics above. */}
-                  {basicsExtraFields.map((field) => renderField(field))}
+                  {renderBasicsFields()}
               </div>
             </div>
           )
-        })()}
+        })()
+        )}
 
         {groupBlocksToRender.length > 0 && (
           <div className="space-y-3">

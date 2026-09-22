@@ -652,20 +652,21 @@ describe('ListingForm', () => {
     // all (no admin has defined any real section), splitting it into its
     // own box below Basics — even an unlabeled one — is a distinction
     // without a difference: the entire optional part of the form already IS
-    // that one small set of fields. It folds straight into Basics instead,
-    // so the form is genuinely one box, confirmed here by collapsing Basics
-    // and checking the "extra" field disappears with it.
-    it('folds a lone small "More details" catch-all into Basics, not a separate box', async () => {
-      const user = userEvent.setup()
+    // that one small set of fields. It folds straight into Basics instead —
+    // and at that point it isn't "Basics plus extras" any more, it's the
+    // whole form, so the merged box drops the "Basics" label and the
+    // collapse control entirely, same plain/unlabeled/non-collapsible
+    // treatment a small standalone "More details" already gets.
+    it('folds a lone small "More details" catch-all into one plain, unlabeled, non-collapsible box — no "Basics" left at all', () => {
       const category = makeCategory({ detailFields: [textField({ key: 'notes', label: 'Notes' })] })
       renderWithProviders(<ListingForm category={category} mode="create" {...handlers} />)
 
-      // Only one group box (Basics) in the whole form.
-      expect(screen.getAllByRole('button', { name: 'Basics' })).toHaveLength(1)
+      expect(screen.queryByRole('button', { name: 'Basics' })).not.toBeInTheDocument()
+      expect(screen.queryByText(/more details/i)).not.toBeInTheDocument()
+      // Everything already visible, no click needed anywhere.
+      expect(screen.getByLabelText('Address')).toBeInTheDocument()
+      expect(screen.getByPlaceholderText('e.g. Kosher Mart')).toBeInTheDocument()
       expect(screen.getByLabelText('Notes')).toBeInTheDocument()
-
-      await user.click(screen.getByRole('button', { name: 'Basics' }))
-      expect(screen.getByLabelText('Notes').closest('.hidden')).not.toBeNull()
     })
 
     // The size gate still applies even when it's the only block: a lone
