@@ -7,20 +7,27 @@ import { vi } from 'vitest'
 // (useWatchPosition, the engine behind useLiveLocation) throws without this.
 // Installed once, globally, in vitest.setup.ts (same treatment as the
 // localStorage/matchMedia polyfills there) so every jsdom test gets a safe
-// default; import emitPosition here to drive a specific test's success path.
-// ──
+// default; import emitPosition/emitError here to drive a specific test's
+// success/error path.
+//
+// The error-callback capture below was removed once as dead code (nothing
+// called emitError — see git history around 2026-09-22) and restored the
+// same day once useWatchPosition.test.ts actually needed it: the real
+// lesson wasn't "delete unused test infrastructure," it was "an untested
+// code path and its would-be test helper are the same gap, closed
+// together." See useWatchPosition.test.ts's own doc. ──
 
 type SuccessCb = (pos: GeolocationPosition) => void
+type ErrorCb = (err: GeolocationPositionError) => void
 
 let successCb: SuccessCb | null = null
+let errorCb: ErrorCb | null = null
 let nextWatchId = 1
 
 export const mockGeolocation = {
-  // Real watchPosition() also takes an error callback; not captured here —
-  // nothing in this mock currently drives it (a caller that registers one
-  // just never has it called, the same as a real GPS fix that never fails).
-  watchPosition: vi.fn((success: SuccessCb) => {
+  watchPosition: vi.fn((success: SuccessCb, error?: ErrorCb) => {
     successCb = success
+    errorCb = error ?? null
     return nextWatchId++
   }),
   clearWatch: vi.fn(),
@@ -36,10 +43,11 @@ export function installMockGeolocation(): void {
   })
 }
 
-/** Call in afterEach — clears both the call history and whichever success
- *  callback the component under test last subscribed with. */
+/** Call in afterEach — clears both the call history and whichever
+ *  success/error callback the component under test last subscribed with. */
 export function resetMockGeolocation(): void {
   successCb = null
+  errorCb = null
   mockGeolocation.watchPosition.mockClear()
   mockGeolocation.clearWatch.mockClear()
   mockGeolocation.getCurrentPosition.mockClear()
@@ -62,4 +70,17 @@ export function emitPosition(coords: { lat: number; lng: number; accuracy?: numb
     timestamp: Date.now(),
     toJSON: () => ({}),
   } as GeolocationPosition)
+}
+
+/** Fires the most recent watchPosition() call's error callback. `code`
+ *  matches the real GeolocationPositionError constants (1 = PERMISSION_DENIED,
+ *  2 = POSITION_UNAVAILABLE, 3 = TIMEOUT) — useWatchPosition branches on it. */
+export function emitError(code: 1 | 2 | 3, message = 'geolocation error'): void {
+  errorCb?.({
+    code,
+    message,
+    PERMISSION_DENIED: 1,
+    POSITION_UNAVAILABLE: 2,
+    TIMEOUT: 3,
+  } as GeolocationPositionError)
 }
