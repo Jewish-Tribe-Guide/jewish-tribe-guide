@@ -40,13 +40,6 @@ function useContent(): CommunityContent {
   return ctx
 }
 
-/** True when this content failed to load and what's showing is a fallback.
- *  Lets a screen say "we couldn't load this" instead of rendering an empty
- *  state that reads as "there are none". */
-export function useContentFailed(key: ContentKey): boolean {
-  return useContent().failed.includes(key)
-}
-
 /** Every content read that failed, for the site-wide notice. */
 export function useContentFailures(): ContentKey[] {
   return useContent().failed

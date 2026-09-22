@@ -22,15 +22,6 @@ export function PencilIcon({ className }: IconProps) {
   )
 }
 
-export function FlagIcon({ className }: IconProps) {
-  return (
-    <svg {...base} className={className}>
-      <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V4s-1 1-4 1-5-2-8-2-4 1-4 1z" />
-      <line x1="4" y1="22" x2="4" y2="15" />
-    </svg>
-  )
-}
-
 export function PlusIcon({ className }: IconProps) {
   return (
     <svg {...base} className={className}>
@@ -266,23 +257,6 @@ export function SkylineIcon({ className }: IconProps) {
   )
 }
 
-// Sun — DaveningTimesCard's compact row (Phase 6, desktop mockup rework).
-export function SunIcon({ className }: IconProps) {
-  return (
-    <svg {...base} className={className}>
-      <circle cx="12" cy="12" r="4.5" />
-      <path d="M12 2v3" />
-      <path d="M12 19v3" />
-      <path d="M4.2 4.2l2.1 2.1" />
-      <path d="M17.7 17.7l2.1 2.1" />
-      <path d="M2 12h3" />
-      <path d="M19 12h3" />
-      <path d="M4.2 19.8l2.1-2.1" />
-      <path d="M17.7 6.3l2.1-2.1" />
-    </svg>
-  )
-}
-
 // People — UpdateListingsCard's header icon (Phase 6, desktop mockup
 // rework). Two overlapping figures, not one — "kept by the community" is
 // about the group, not an individual.
@@ -310,12 +284,3 @@ export function LeafIcon({ className }: IconProps) {
   )
 }
 
-// Open book — DaveningTimesCard's "View Times" button.
-export function BookIcon({ className }: IconProps) {
-  return (
-    <svg {...base} className={className}>
-      <path d="M4 5.5c2-1 5-1 8 .5 3-1.5 6-1.5 8-.5v13c-2-1-5-1-8 .5-3-1.5-6-1.5-8-.5z" />
-      <path d="M12 6v13" />
-    </svg>
-  )
-}

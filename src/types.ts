@@ -99,45 +99,6 @@ export type ZmanimData = {
   } | null
 }
 
-export type Resource = {
-  name: string
-  hospitalId: string
-  distance: number
-  notes?: string
-}
-
-export type KosherPlace = {
-  id: string
-  name: string
-  hospitalId: string
-  distance: number
-  address: string
-  phone?: string
-  isKosher: boolean
-}
-
-export type Hotel = {
-  id: string
-  name: string
-  hospitalId: string
-  distance: number
-  address: string
-  phone: string
-  shuttleAvailable: boolean
-  shabbatFriendly: boolean
-  notes?: string
-}
-
-export type MikvahEntry = {
-  id: string
-  name: string
-  hospitalId: string
-  distance: number
-  address: string
-  phone: string
-  hours: string
-}
-
 export type EruvRecord = {
   id: string
   /** Name of the eruv, e.g. "University City Eruv". */
@@ -147,13 +108,6 @@ export type EruvRecord = {
   /** The eruv's site, where current status and the boundary map are both posted. */
   statusLink: string
   notes: string
-}
-
-export type CommunityWhatsAppGroup = {
-  id: string
-  name: string
-  description: string
-  link: string
 }
 
 // ── Supabase resource directory (submission + moderation pipeline) ─────────────
@@ -181,8 +135,7 @@ export type ResourceRow = {
 
 /**
  * A resource normalized for the display components: shared fields at the top
- * level and the category-specific `details` flattened onto it, so existing
- * cards (KosherPlace/Hotel/MikvahEntry shapes) keep working unchanged.
+ * level and the category-specific `details` flattened onto it.
  */
 export type DirectoryResource = {
   id: string
@@ -393,17 +346,15 @@ export type NavigateFn = (
 ) => void
 
 // ── Intake form types ─────────────────────────────────────────────────────────
-
-export type Ride = {
-  pickup: string
-  destination: string
-  date: string
-  time: string
-  recurring: boolean
-  endDate: string
-  numberOfPassengers: string
-  notes: string
-}
+//
+// The rigid per-service shapes this section used to define (Ride, MealsData,
+// TransportationData, FamilyHousingData, the Volunteer*Details family,
+// VolunteerData, VolunteerRemovalData, VisitorsData, IntakeFormData) are gone
+// — the wizard's actual per-response data has been a plain
+// `Record<string, unknown>` for a while now (see formResponseStore.ts), and
+// nothing outside this file still imported any of them. ContactHospitalData
+// is the one survivor: it's still a real, separately-validated shape (see
+// validation.ts's validateContact) used across the response pipeline.
 
 export type ContactHospitalData = {
   fullName: string
@@ -412,112 +363,4 @@ export type ContactHospitalData = {
   preferredContact: string
   hospitalId: string
   unitFloorRoom: string
-}
-
-export type MealsData = {
-  mealsFor: string
-  numberOfPeople: string
-  startDate: string
-  endDate: string
-  mealTypes: string[]
-  dietaryRequirements: string[]
-  dietaryOther: string
-  hechsher: string
-  notes: string
-}
-
-export type TransportationData = {
-  rides: Ride[]
-}
-
-export type FamilyHousingData = {
-  housingFor: string
-  numberOfAdults: string
-  numberOfChildren: string
-  arrivalDate: string
-  departureDate: string
-  maxDistance: string
-  transportationAvailable: string
-  accommodationRequirements: string[]
-  accessibilityRequirements: string[]
-  accessibilityOther: string
-  notes: string
-}
-
-// Extra questions shown when the matching "How can you help?" box is checked —
-// not about the volunteer's general info, but what they can offer for that
-// specific service (so we can match them to a patient/family's preferences).
-export type VolunteerVisitingDetails = {
-  gender: string
-  ageGroup: string
-}
-
-export type VolunteerMealsDetails = {
-  kosherStandard: string
-}
-
-export type VolunteerTransportationDetails = {
-  maxPassengers: string
-}
-
-export type VolunteerHousingDetails = {
-  apartmentType: string
-  numberOfRooms: string
-  numberOfBeds: string
-  address: string
-  wheelchairAccessible: boolean
-  elevatorInBuilding: boolean
-  maxDays: string
-}
-
-export type VolunteerData = {
-  waysToHelp: string[]
-  waysToHelpOther: string
-  hospitals: string[]
-  availability: string[]
-  hasCar: string
-  notes: string
-  visiting: VolunteerVisitingDetails
-  meals: VolunteerMealsDetails
-  transportation: VolunteerTransportationDetails
-  housing: VolunteerHousingDetails
-}
-
-export type VolunteerRemovalData = {
-  reason: string
-}
-
-export type VisitorsData = {
-  patientName: string
-  patientAgeGroup: string
-  visitorType: string[]
-  visitorTypeOther: string
-  visitFrequency: string
-  bestTimes: string[]
-  bestTimesOther: string
-  genderPreference: string
-  startDate: string
-  additionalInfo: string
-}
-
-export type IntakeFormData = {
-  // Shared contact + hospital
-  contact: ContactHospitalData
-  // Patient
-  patientName: string
-  relationship: string
-  // Situation
-  situation: string
-  // Assistance
-  assistanceNeeded: string[]
-  // Timing
-  timing: string
-  specificDate: string
-  // Additional
-  additionalInfo: string
-  // Service sections
-  meals: MealsData
-  transportation: TransportationData
-  familyHousing: FamilyHousingData
-  visitors: VisitorsData
 }
