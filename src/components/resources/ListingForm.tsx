@@ -773,9 +773,16 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
             the reason picker, and it read as a stray dropdown bolted onto
             the bottom of an unrelated screen rather than its own real step.
             Kept in the DOM (hidden, not conditionally unmounted) so a reason
-            already typed survives switching back and forth. */}
+            already typed survives switching back and forth.
+
+            Unlike the edit fields above (Basics/groups are already their own
+            boxes, so a wrapping card there nested a box around boxes), this
+            IS the single card for the whole screen — the reason picker,
+            details, name/email and actions all read as one step, not a set
+            of independent collapsible groups, so the card is real structure
+            here rather than a redundant outer layer. */}
         {canRequestRemoval && (
-          <div className={removalOpen ? '' : 'hidden'}>
+          <div className={removalOpen ? 'bg-white border border-slate-200 rounded-xl shadow-sm p-6' : 'hidden'}>
             <RemovalRequest
               listing={{ id: existing!.id, name: existing!.name }}
               turnstileToken={turnstileToken}
