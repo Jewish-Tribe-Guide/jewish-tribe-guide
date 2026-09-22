@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import { categoryWithListings, defaultCommunity, dismissLocationPrompt, ready } from './helpers'
+import { categoryAddButton, categoryWithListings, defaultCommunity, dismissLocationPrompt, ready } from './helpers'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // The Content-Security-Policy ships in report-only mode (src/lib/csp.ts). That
@@ -80,7 +80,7 @@ test.describe('content security policy (report-only)', () => {
     await dismissLocationPrompt(page)
 
     // Opens the Add form, which is what loads Cloudflare's script and frame.
-    await page.getByRole('button', { name: 'Add', exact: true }).filter({ visible: true }).first().click()
+    await categoryAddButton(page).click()
     await expect(page.getByRole('dialog')).toBeVisible()
     await page.waitForTimeout(6_000)
 

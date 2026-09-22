@@ -887,12 +887,15 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // the "Filters" toggle button itself so it doesn't show (opening onto an
   // empty panel) for a category with upvotes/minyanim but no filterable field.
   const hasActualFilters = filterableBooleans.length > 0 || hasRenderedSelects || hasFilterableHours
-  // Must also cover canAdd and externalLink: both render inside this same row
-  // (mobile's Add button and, on desktop, the external-link button live in the
-  // block this flag gates). Missing them here meant a category with neither
-  // filters, upvotes, nor minyanim — e.g. WhatsApp Groups, Networking — lost
-  // its mobile Add button entirely, even though canAdd was true.
-  const hasFilterRow = hasActualFilters || !!upvotes || hasMinyanim || canAdd || !!category.externalLink
+  // Used to also cover canAdd, back when mobile's Add button lived inside
+  // this row (a category with neither filters, upvotes, nor minyanim — e.g.
+  // WhatsApp Groups, Networking — otherwise lost its mobile Add button
+  // entirely). Mobile Add moved out to its own floating button below (see
+  // that button's own comment), unconditional on this flag, so canAdd no
+  // longer belongs in it — this is purely "is there real filter/sort
+  // content" again. externalLink stays: the desktop version of that button
+  // still lives in the block this flag gates.
+  const hasFilterRow = hasActualFilters || !!upvotes || hasMinyanim || !!category.externalLink
 
   const hasActiveFilters =
     search.trim() !== '' ||
@@ -1107,30 +1110,13 @@ export default function GenericDirectory({ category, items, anchorLabel, address
                     a set of calls to action, and at that weight it was out-competing
                     the search bar above it for attention. ── */}
             <div className="flex items-center gap-1.5 desktop:hidden">
-              {/* Mobile's Add, moved down here from DirectoryHeader's own
-                  row above — see the note on that (now desktop-only)
-                  button for why. Reads as one of a row of view/sort
-                  controls rather than a headline action fighting the
-                  location label for attention, which is the actual goal;
-                  it's a real create action, not a filter, but there's
-                  nowhere else on this row that wouldn't have the same
-                  "different kind of button" mismatch to a lesser degree.
-                  Ordered before Filters: it's the more frequent tap
-                  (Filters is a secondary refinement), and coming first
-                  keeps it from shifting position when Filters gains a
-                  count badge. Styled to match Filters' neutral state
-                  (white/slate) rather than solid primary blue — with
-                  the Distance toggle already blue on this row, a second
-                  solid-blue button read as too much color competing for
-                  attention rather than as a clear call to action. */}
-              {canAdd && (
-                <button
-                  onClick={onAdd}
-                  className="inline-flex items-center gap-1 text-xs font-medium bg-white text-slate-600 border border-slate-200 rounded-md px-2.5 py-1.5 hover:bg-slate-50 transition-colors cursor-pointer whitespace-nowrap"
-                >
-                  <PlusIcon className="h-3.5 w-3.5" /> Add
-                </button>
-              )}
+              {/* Mobile's Add used to live here — moved to its own floating
+                  button (see below), Gmail-compose-style, so it stopped
+                  competing with the location label for attention up in
+                  DirectoryHeader's own row and stopped depending on this
+                  row existing at all (a category with no filters/upvotes/
+                  minyanim/externalLink rendered nothing here, which used to
+                  mean no mobile Add either — see hasFilterRow's own note). */}
               {hasActualFilters && (
                 <button
                   onClick={() => setFiltersOpen((v) => !v)}
@@ -1491,6 +1477,38 @@ export default function GenericDirectory({ category, items, anchorLabel, address
         </div>
       )}
       </CategoryBandFrame>
+
+      {/* Mobile's Add — a floating circular button, Gmail-compose-style,
+          instead of a toolbar button. Deliberately per-category rather than
+          a single site-wide entry point: SiteHeader's own "Add a place"
+          button (desktop only — see its comment) opens a category PICKER,
+          since desktop has no "already looking at one category" context to
+          skip that step with. Here, that context already exists — landing
+          straight in this category's own Add form via `onAdd`, no picker
+          detour, is strictly less friction for someone already browsing
+          Grocery who wants to add a grocery. The cost is real too: mobile
+          lost a general Add entry point outside category pages entirely
+          (Home, Map) — accepted deliberately rather than duplicating the
+          site-wide button here as well, on the theory that someone who
+          hasn't picked a category yet is better served by picking one first
+          (Browse Categories) than by a picker popping up from Home.
+          `bottom-[calc(3.75rem+env(safe-area-inset-bottom))]` clears
+          MobileTabBar the same way ResourceMapView's own fixed mobile
+          panels already do — 3.75rem is that bar's own height. */}
+      {canAdd && (
+        <button
+          onClick={onAdd}
+          // Generic, not "Add {category label}" — the empty-state button
+          // further up already uses that exact phrasing, and giving this
+          // the same name would make the two indistinguishable to anything
+          // querying by accessible name (they're both in the DOM at once
+          // for an empty category, since this isn't gated on `filtered`).
+          aria-label="Add a place"
+          className="desktop:hidden fixed right-4 bottom-[calc(3.75rem+env(safe-area-inset-bottom)+1rem)] z-40 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-white shadow-lg cursor-pointer active:scale-95 transition-transform"
+        >
+          <PlusIcon className="h-6 w-6" />
+        </button>
+      )}
 
       {hasMinyanim && (
         <DaveningTimesModal

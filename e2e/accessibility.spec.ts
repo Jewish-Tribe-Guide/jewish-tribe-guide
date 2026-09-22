@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
-import { categories, categoryWithListings, defaultCommunity, dismissLocationPrompt, ready } from './helpers'
+import { categories, categoryAddButton, categoryWithListings, defaultCommunity, dismissLocationPrompt, ready } from './helpers'
 import { listingSlug } from '../src/lib/listingSlug'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -140,7 +140,7 @@ test.describe('accessibility', () => {
     await ready(page)
     await dismissLocationPrompt(page)
 
-    await page.getByRole('button', { name: 'Add', exact: true }).filter({ visible: true }).first().click()
+    await categoryAddButton(page).click()
     await expect(page.getByRole('dialog')).toBeVisible()
 
     await expectNoViolations(page)

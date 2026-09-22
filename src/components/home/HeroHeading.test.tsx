@@ -272,10 +272,14 @@ describe('HeroHeading — the search dropdown', () => {
   })
 })
 
-// Visitors read the site as a static directory. Both layouts render at once
-// (CSS decides which shows), so the "community-maintained" line has to be in
-// each one — the mobile block used to have no invitation to contribute at all.
-describe('HeroHeading — community-maintained line', () => {
+// The "community-maintained" banner (CommunityStrip) used to render here, in
+// both layouts — it's gone. Its two jobs moved elsewhere: "Add a place" is
+// now a real, persistent header button (SiteHeader.test.tsx), visible on
+// every screen rather than only this one; "suggest a correction" already had
+// a real affordance (Edit/Report on each listing) and the footer's own
+// explanation, so it needed no replacement here at all. See SiteHeader.tsx's
+// own comment on the button for the full reasoning.
+describe('HeroHeading — no community-maintained banner', () => {
   const settings = {
     name: 'Philly Jewish Guide',
     heroTitle: 'What are you looking for?',
@@ -286,21 +290,9 @@ describe('HeroHeading — community-maintained line', () => {
     desktopHeroImage: null,
   }
 
-  it('is in both the mobile block and the desktop band', () => {
-    const { container } = render(<HeroHeading settings={settings} query="" onQueryChange={vi.fn()} />)
-    const mobile = container.querySelector('section.desktop\\:hidden')!
-    const desktop = [...container.querySelectorAll('section')].find((s) => s !== mobile)!
-    expect(mobile.textContent).toContain('Community-maintained.')
-    expect(desktop.textContent).toContain('Community-maintained.')
-  })
-
-  it('sits directly under the mission on mobile, above the search box', () => {
-    const { container } = render(<HeroHeading settings={settings} query="" onQueryChange={vi.fn()} />)
-    const mobile = container.querySelector('section.desktop\\:hidden')!
-    const text = mobile.textContent!
-    expect(text.indexOf('mission')).toBeLessThan(text.indexOf('Community-maintained.'))
-    const strip = [...mobile.querySelectorAll('p')].find((p) => p.textContent?.includes('Community-maintained.'))!
-    const input = mobile.querySelector('input')!
-    expect(strip.compareDocumentPosition(input) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  it('renders neither layout with the old banner copy', () => {
+    render(<HeroHeading settings={settings} query="" onQueryChange={vi.fn()} />)
+    expect(screen.queryByText(/Community-maintained\./)).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Add a place' })).not.toBeInTheDocument()
   })
 })

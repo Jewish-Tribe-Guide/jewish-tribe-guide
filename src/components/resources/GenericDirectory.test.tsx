@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { Activity, forwardRef, useImperativeHandle, useState, type Ref } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { act, cleanup, screen, within } from '@testing-library/react'
+import { act, cleanup, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { mockRouter } from '@/test/nextNavigationMock'
@@ -215,14 +215,12 @@ describe('GenericDirectory', () => {
     expect(onAdd).toHaveBeenCalledTimes(1)
   })
 
-  // Add sits in the mobile Filters/sort row (between Filters and the
-  // Popularity/Distance toggle) rather than its own row up in
-  // DirectoryHeader — DirectoryHeader's own copy is `desktop:inline-flex`
-  // only now (see that component's own doc). Both are always in the DOM at
-  // once here — the split between them is a CSS media query (`desktop:`),
-  // which jsdom doesn't evaluate, same reason the Distance/davening tests
-  // above use getAllByRole rather than assuming a single match.
-  it('places Add in the mobile Filters/sort row, not the header, so it clicks the same onAdd either way', async () => {
+  // Mobile's Add is a floating button (Gmail-compose-style), not a control
+  // inside the Filters/sort row — distinguished from DirectoryHeader's
+  // desktop-only "Add" button by its own accessible name ("Add a place"
+  // rather than plain "Add"), so this doesn't depend on `desktop:` CSS
+  // (which jsdom never applies) to tell the two apart.
+  it('has its own floating Add button, separate from the header\'s, that clicks the same onAdd', async () => {
     const user = userEvent.setup()
     const onAdd = vi.fn()
     const category = makeCategory({
@@ -232,30 +230,23 @@ describe('GenericDirectory', () => {
     })
     renderWithProviders(<GenericDirectory category={category} items={[makeListing()]} {...handlers} onAdd={onAdd} />)
 
-    const filtersButton = screen.getByRole('button', { name: 'Filters' })
-    const filtersRow = filtersButton.parentElement!
-    const addInFiltersRow = within(filtersRow).getByRole('button', { name: 'Add' })
-
-    await user.click(addInFiltersRow)
+    await user.click(screen.getByRole('button', { name: 'Add a place' }))
     expect(onAdd).toHaveBeenCalledTimes(1)
   })
 
-  // Regression coverage: the mobile Add/Filters/sort row used to be gated by
-  // `hasFilterRow`, which only checked for filterable fields, upvotes, or
-  // minyanim — not canAdd or externalLink, both of which render inside that
-  // same row. A category with none of the former (WhatsApp Groups,
-  // Networking — no filterable detail fields, upvotes off, no minyanim) lost
-  // its mobile Add button entirely, even with canAdd true.
-  it('shows the mobile Add button for a category with no filterable fields, upvotes, or minyanim', () => {
+  // Regression coverage for the OLD mobile Filters/sort-row Add button,
+  // which the floating one above replaced: that row was gated by
+  // `hasFilterRow`, and a category with no filterable fields, upvotes, or
+  // minyanim (WhatsApp Groups, Networking) rendered the row empty — which
+  // used to mean no mobile Add either, since Add lived inside it. The
+  // floating button isn't gated on that row at all any more, so this now
+  // just confirms it survives for exactly the category shape that broke it
+  // before.
+  it('still shows the floating Add button for a category with no filterable fields, upvotes, or minyanim', () => {
     const category = makeCategory({ pluralLabel: 'WhatsApp Groups', hasAddress: false })
     renderWithProviders(<GenericDirectory category={category} items={[makeListing()]} {...handlers} />)
 
-    // Two, not one: DirectoryHeader's desktop-only copy (`hidden
-    // desktop:inline-flex`, always in the DOM since jsdom doesn't apply CSS)
-    // plus the mobile Filters/sort row's copy, which is the one that used to
-    // go missing. Asserting a single `getByRole` match here would pass even
-    // with the mobile copy gone, matching only the desktop one.
-    expect(screen.getAllByRole('button', { name: 'Add' })).toHaveLength(2)
+    expect(screen.getByRole('button', { name: 'Add a place' })).toBeInTheDocument()
   })
 
   it('wires a card\'s Edit/tag-click callbacks back to the directory\'s own props/state', async () => {

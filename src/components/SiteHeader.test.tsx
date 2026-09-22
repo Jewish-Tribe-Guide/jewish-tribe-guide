@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { renderWithProviders } from '@/test/renderWithProviders'
@@ -20,11 +20,25 @@ import SiteHeader from './SiteHeader'
 // baked into the harness itself, since most of the ~12 components this
 // harness unlocks don't touch it.
 
+const contributions = vi.hoisted(() => ({ add: true, edit: true, report: true }))
+vi.mock('@/lib/uiConfig', () => ({ ui: { contributions } }))
+vi.mock('@/components/home/ContributePicker', () => ({
+  default: ({ onClose }: { onClose: () => void }) => (
+    <div role="dialog" aria-label="Add a listing">
+      <button onClick={onClose}>close picker</button>
+    </div>
+  ),
+}))
+
 vi.mock('next/navigation', () => ({
   useRouter: () => mockRouter,
   usePathname: () => '/test-community',
   useSearchParams: () => new URLSearchParams(),
 }))
+
+beforeEach(() => {
+  contributions.add = true
+})
 
 afterEach(() => {
   cleanup()
@@ -301,5 +315,71 @@ describe('SiteHeader — collapsed (mobile map)', () => {
 
     const header = container.querySelector('header')!
     expect(header.style.viewTransitionName).toBe('site-header')
+  })
+})
+
+// Replaces CommunityStrip's old hero banner — see SiteHeader.tsx's own
+// comment on the button for the full backstory. Unlike that banner, this
+// renders on every screen (this header mounts everywhere), so there's no
+// "is it on both layouts" question the way HeroHeading's old test had —
+// coverage here is about the one place it actually lives.
+describe('SiteHeader — "Add a place"', () => {
+  it('opens the category picker, and closes it again', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(
+      <HeaderCollapseProvider>
+        <SiteHeader onGoHome={vi.fn()} location={location()} />
+      </HeaderCollapseProvider>,
+    )
+
+    expect(screen.queryByRole('dialog')).toBeNull()
+    await user.click(screen.getByRole('button', { name: 'Add a place' }))
+    expect(screen.getByRole('dialog', { name: 'Add a listing' })).toBeTruthy()
+    await user.click(screen.getByRole('button', { name: 'close picker' }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('is hidden when adding is off (ui.contributions.add)', () => {
+    contributions.add = false
+    renderWithProviders(
+      <HeaderCollapseProvider>
+        <SiteHeader onGoHome={vi.fn()} location={location()} />
+      </HeaderCollapseProvider>,
+    )
+
+    expect(screen.queryByRole('button', { name: 'Add a place' })).toBeNull()
+  })
+
+  // CategoryPreview (the admin category editor's preview) renders this
+  // header with hideNav around one isolated category, detached from the
+  // real routing/provider stack — a real Add flow (deep-linking into
+  // `?form=create`) has nowhere sane to land from inside it. hideNav is the
+  // same "isolated preview" signal HeaderNav itself already keys off.
+  it('is hidden when hideNav is set (the isolated admin category preview)', () => {
+    renderWithProviders(
+      <HeaderCollapseProvider>
+        <SiteHeader onGoHome={vi.fn()} location={location()} hideNav />
+      </HeaderCollapseProvider>,
+    )
+
+    expect(screen.queryByRole('button', { name: 'Add a place' })).toBeNull()
+  })
+
+  // Desktop only — mobile dropped this button entirely once every category
+  // page grew its own floating Add (GenericDirectory.test.tsx), which
+  // skips the picker this opens and deep-links straight into that
+  // category's own form instead. See this button's own comment in
+  // SiteHeader.tsx for the accepted cost (no general Add entry point left
+  // on mobile's Home/Map).
+  it('is hidden on mobile', () => {
+    renderWithProviders(
+      <HeaderCollapseProvider>
+        <ForcedViewport isMobile>
+          <SiteHeader onGoHome={vi.fn()} location={location()} />
+        </ForcedViewport>
+      </HeaderCollapseProvider>,
+    )
+
+    expect(screen.queryByRole('button', { name: 'Add a place' })).toBeNull()
   })
 })

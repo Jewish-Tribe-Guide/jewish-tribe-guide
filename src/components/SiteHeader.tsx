@@ -1,18 +1,20 @@
 'use client'
 
-import type { MouseEvent } from 'react'
+import { useState, type MouseEvent } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import LocationControl, { type LocationControls } from '@/components/home/LocationControl'
 import CommunitySwitcher from '@/components/CommunitySwitcher'
+import ContributePicker from '@/components/home/ContributePicker'
 import HeaderNav from '@/components/HeaderNav'
-import { StarOfDavid } from '@/components/icons'
+import { PlusIcon, StarOfDavid } from '@/components/icons'
 import { useSiteSettings } from '@/lib/useSiteSettings'
 import { useActiveCommunity } from '@/lib/communityContext'
 import { useHeaderCollapsed, useHeaderOverlaid, useScreenHeader, useScrollShowHide, useScrolledPastTop } from '@/lib/headerVisibility'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { routes } from '@/lib/routes'
 import { isModifiedClick } from '@/lib/isModifiedClick'
+import { ui } from '@/lib/uiConfig'
 import type { SiteSettings } from '@/lib/siteSettings'
 
 type Props = {
@@ -38,6 +40,8 @@ export default function SiteHeader({ onGoHome, location, previewSettings, hideNa
   const live = useSiteSettings()
   const settings = previewSettings ?? live
   const { community, communities, setCommunity } = useActiveCommunity()
+
+  const [addOpen, setAddOpen] = useState(false)
   // The admin preview renders this header against a draft, not the live site —
   // a switcher there would change what the real visitor sees from inside a
   // preview, so it's suppressed by passing no communities.
@@ -45,6 +49,23 @@ export default function SiteHeader({ onGoHome, location, previewSettings, hideNa
 
   const collapsed = useHeaderCollapsed()
   const isMobile = useIsMobile()
+
+  // "Add a place" — desktop only. `hideNav` is reused as the "isolated
+  // preview, no site-wide affordances" signal CategoryPreview already
+  // sends: that tool renders this header around one category detached from
+  // the real routing/provider stack, and a real Add flow (a category picker
+  // deep-linking into `?form=create`) has nowhere sane to land from inside
+  // it. Mobile dropped this button entirely (not just restyled to an icon)
+  // once every category page grew its own floating Add button
+  // (GenericDirectory.tsx) that skips the picker and deep-links straight
+  // into that category's own form — a strictly better flow for someone
+  // already browsing a category than a generic picker would be. The
+  // accepted cost: mobile has no general Add entry point outside a category
+  // page any more (Home, Map) — someone starting from Home browses into a
+  // category first (Browse Categories), the same first step the picker
+  // would have made them take anyway, just via the category grid instead of
+  // a search field.
+  const showAdd = !hideNav && !isMobile && ui.contributions.add
 
   // Desktop-only: Landing opts the home screen into a transparent header
   // over its photo hero (useHeaderOverlay) until the page scrolls past the
@@ -307,10 +328,42 @@ export default function SiteHeader({ onGoHome, location, previewSettings, hideNa
             it, and `hideNav`'s own doc for the one caller that opts out. */}
         {!hideNav && <HeaderNav />}
 
-        <div className="ml-auto">
+        <div className="ml-auto flex items-center gap-2">
+          {/* Replaces CommunityStrip, a hero banner that only lived on the
+              home screen and, in its own words, existed to fix mobile
+              having "no way in at all" to add a listing (desktop's own way
+              in was buried in a three-dot menu). That fixed discoverability
+              once someone was already on the home screen; it did nothing
+              for the actual complaint that prompted this — people not
+              realizing the site is more than a static directory in the
+              first place, on any screen. A real, persistent, always-visible
+              control here does both jobs the banner tried to: it's on every
+              screen (this header, not just the home hero), and unlike a
+              bare icon, the "Add a place" label is itself the awareness
+              signal — no separate explanatory sentence needed. "Suggest a
+              correction" needed no equivalent move: it already has a real
+              affordance (Edit/Report on every listing) and the footer
+              already explains it (SiteFooter.tsx). */}
+          {showAdd && (
+            <button
+              type="button"
+              onClick={() => setAddOpen(true)}
+              aria-label="Add a place"
+              className="shrink-0 flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 py-1.5 text-xs sm:text-sm font-medium text-slate-700 shadow-sm transition-all hover:border-slate-300 hover:shadow-md active:bg-slate-50 cursor-pointer desktop:px-4 desktop:py-2"
+            >
+              <PlusIcon className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0 text-primary" />
+              {/* Icon-only below sm — same reasoning LocationControl's own
+                  pill uses for its tightest breakpoint, just applied one
+                  step earlier since this is now a second pill sharing the
+                  same row. The aria-label above carries the name either
+                  way, so this hiding never touches the accessible name. */}
+              <span className="hidden sm:inline">Add a place</span>
+            </button>
+          )}
           <LocationControl controls={location} />
         </div>
       </div>
+      {addOpen && <ContributePicker onClose={() => setAddOpen(false)} />}
       {/* White diagonal shape behind the logo/nav, overlaid+unscrolled only,
           desktop only — the mockup's white panel on the left ending in a
           slanted edge, with the hero photo visible through the rest of the
