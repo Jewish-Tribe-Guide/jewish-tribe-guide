@@ -639,11 +639,17 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
                     : 'Submit for review'}
           </button>
 
+          {/* Solid red — the strong visual cue belongs HERE, where this
+              button sits beside Submit and has to read as "the other
+              option" at a glance. RemovalRequest's own confirm button is the
+              reverse (outline, not solid): once someone is on that screen
+              the heading already says "Request removal of {name}", so the
+              button no longer needs to carry the cue itself. */}
           {canRequestRemoval && (
             <button
               type="button"
               onClick={() => setRemovalOpen(true)}
-              className="w-full sm:flex-1 rounded-md border border-red-300 bg-white px-5 py-2.5 text-sm font-medium text-red-700 transition-colors hover:bg-red-50 cursor-pointer"
+              className="w-full sm:flex-1 rounded-md bg-red-600 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-red-700 cursor-pointer"
             >
               Request removal
             </button>

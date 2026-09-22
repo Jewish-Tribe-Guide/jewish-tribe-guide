@@ -106,59 +106,70 @@ export default function RemovalRequest({
     'w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary'
 
   return (
-    <div className="space-y-3">
-      <div role="group" aria-labelledby={`${uid}-title`} className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
-        <p id={`${uid}-title`} className="text-sm font-medium text-slate-800">
-          Request removal of {listing.name}
-        </p>
-        <p className="text-sm text-muted">
-          A moderator reviews every request before anything changes. If it just moved or has wrong
-          info, fix it in the fields above instead.
-        </p>
-        <div>
-          <label htmlFor={`${uid}-reason`} className="mb-1 block text-sm font-medium text-slate-700">
-            Why should it be removed?
-          </label>
-          <select id={`${uid}-reason`} value={reason} onChange={(e) => setReason(e.target.value as (typeof REASONS)[number])} className={inputClass}>
-            {REASONS.map((r) => (
-              <option key={r} value={r}>{r}</option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label htmlFor={`${uid}-details`} className="mb-1 block text-sm font-medium text-slate-700">
-            Details (optional)
-          </label>
-          <textarea
-            id={`${uid}-details`}
-            value={details}
-            onChange={(e) => setDetails(e.target.value)}
-            rows={2}
-            placeholder="e.g. Closed in August, the space is now a bank."
-            className={inputClass}
-          />
-        </div>
-        {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
-        <div className="flex flex-wrap items-center gap-3">
-          <button
-            type="button"
-            onClick={submit}
-            disabled={submitting || !canSubmit}
-            className="cursor-pointer rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {submitting ? 'Sending…' : canSubmit ? 'Confirm removal request' : 'Verifying…'}
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setError(null)
-              onCancel()
-            }}
-            className="cursor-pointer text-sm text-slate-500 hover:text-slate-800"
-          >
-            Cancel
-          </button>
-        </div>
+    // No card of its own — a bordered/shaded box here made sense when this
+    // was a small callout appended BELOW the edit fields and needed to set
+    // itself apart from the form above it. Now it's the entire content of
+    // the swapped-in view, already sitting inside the dialog's own bordered
+    // card, so a second box nested inside that one was just framing around
+    // framing. A hairline top border instead — the same divider convention
+    // ListingForm already uses between its own field groups.
+    <div role="group" aria-labelledby={`${uid}-title`} className="space-y-3 border-t border-slate-200 pt-4">
+      <p id={`${uid}-title`} className="text-sm font-medium text-slate-800">
+        Request removal of {listing.name}
+      </p>
+      <p className="text-sm text-muted">
+        A moderator reviews every request before anything changes. If it just moved or has wrong
+        info, fix it in the fields above instead.
+      </p>
+      <div>
+        <label htmlFor={`${uid}-reason`} className="mb-1 block text-sm font-medium text-slate-700">
+          Why should it be removed?
+        </label>
+        <select id={`${uid}-reason`} value={reason} onChange={(e) => setReason(e.target.value as (typeof REASONS)[number])} className={inputClass}>
+          {REASONS.map((r) => (
+            <option key={r} value={r}>{r}</option>
+          ))}
+        </select>
+      </div>
+      <div>
+        <label htmlFor={`${uid}-details`} className="mb-1 block text-sm font-medium text-slate-700">
+          Details (optional)
+        </label>
+        <textarea
+          id={`${uid}-details`}
+          value={details}
+          onChange={(e) => setDetails(e.target.value)}
+          rows={2}
+          placeholder="e.g. Closed in August, the space is now a bank."
+          className={inputClass}
+        />
+      </div>
+      {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
+      <div className="flex flex-wrap items-center gap-3">
+        {/* Outline, not solid, here — the reverse of ListingForm's trigger
+            button. The strong red cue belongs on the PREVIOUS screen, where
+            Request removal sits beside Submit and has to read as "the other
+            option" at a glance; by the time someone is on this screen, the
+            heading above already says "Request removal of {name}", so the
+            button no longer needs to carry that signal itself. */}
+        <button
+          type="button"
+          onClick={submit}
+          disabled={submitting || !canSubmit}
+          className="cursor-pointer rounded-md border border-red-300 bg-white px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {submitting ? 'Sending…' : canSubmit ? 'Confirm removal request' : 'Verifying…'}
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setError(null)
+            onCancel()
+          }}
+          className="cursor-pointer text-sm text-slate-500 hover:text-slate-800"
+        >
+          Cancel
+        </button>
       </div>
     </div>
   )
