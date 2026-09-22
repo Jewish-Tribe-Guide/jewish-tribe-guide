@@ -406,6 +406,29 @@ describe('ListingForm', () => {
     expect(await screen.findByText('Thank you!')).toBeInTheDocument()
   })
 
+  // A name has nothing to attach to (no account, no reply-to relationship
+  // with the listing) and nothing downstream actually needs it — email
+  // alone is enough for a moderator to follow up. See this field's own
+  // comment in ListingForm for the full reasoning.
+  it('offers an email field but no name field, and sends submittedBy with just the email', async () => {
+    const user = userEvent.setup()
+    const fetchMock = stubFetchOk({ ok: true })
+    const category = makeCategory({ id: 'grocery' })
+    renderWithProviders(<ListingForm category={category} mode="create" {...handlers} />)
+
+    expect(screen.getByLabelText('Your email (optional)')).toBeInTheDocument()
+    expect(screen.queryByLabelText(/Your name/)).not.toBeInTheDocument()
+
+    await user.type(screen.getByLabelText(/Name/), 'Kosher Mart')
+    await user.type(screen.getByLabelText('Address'), '1 Main St')
+    await user.type(screen.getByLabelText('Your email (optional)'), 'neighbor@example.com')
+    await user.click(screen.getByRole('button', { name: 'Submit for review' }))
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body)
+    expect(body.submittedBy).toEqual({ email: 'neighbor@example.com' })
+  })
+
   it('submits an edit as an update against the existing listing id', async () => {
     const user = userEvent.setup()
     const fetchMock = stubFetchOk({ ok: true })
@@ -430,10 +453,10 @@ describe('ListingForm', () => {
     renderWithProviders(<ListingForm category={category} mode="edit" existing={existing} {...handlers} />)
 
     // Only filling in contact info — no listing field touched at all. Two
-    // "Your name" fields exist once removal is offered (this one, and
+    // "Your email" fields exist once removal is offered (this one, and
     // RemovalRequest's own mirror of the same shared state) — index 0 is
     // this component's, which renders first in the DOM.
-    await user.type(screen.getAllByLabelText(/Your name/)[0], 'A Neighbor')
+    await user.type(screen.getAllByLabelText(/Your email/)[0], 'neighbor@example.com')
     await user.click(screen.getByRole('button', { name: 'Submit edit for review' }))
 
     expect(await screen.findByText(/haven.t changed anything yet/)).toBeInTheDocument()

@@ -50,7 +50,7 @@ type Props = {
   sharedTurnstile?: { token: string; reset: () => void }
   /** Admin console only: adds the listing directly and live via
    *  /api/admin/listings, skipping the public form's anti-abuse layer
-   *  (Turnstile, honeypot), the submitter name/email fields, and the
+   *  (Turnstile, honeypot), the submitter email field, and the
    *  moderation queue entirely — this path is already behind real admin
    *  auth. Only meaningful with mode="create"; see CategoryManager's
    *  "+ Add listing" action. */
@@ -192,7 +192,6 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
     }
     return init
   })
-  const [submitterName, setSubmitterName] = useState('')
   const [submitterEmail, setSubmitterEmail] = useState('')
   // Honeypot — stays empty for humans; bots that auto-fill it get dropped server-side.
   const [honeypot, setHoneypot] = useState('')
@@ -342,7 +341,7 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
     // edited right back to its original value. Skipped in the admin
     // preview, which builds a resource locally rather than submitting a
     // real edit for review. See hasListingChanged's own comment for why
-    // this can't be fooled by only filling in submitter name/email — those
+    // this can't be fooled by only filling in the submitter email — that
     // never enter `visibleDetails`/`payload` at all.
     if (!onPreviewSubmit && mode === 'edit') {
       const unchanged = !hasListingChanged(
@@ -398,10 +397,7 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
       },
       geo: hasAddress ? coords : null,
     }
-    const submittedBy =
-      submitterName.trim() || submitterEmail.trim()
-        ? { name: submitterName.trim() || undefined, email: submitterEmail.trim() || undefined }
-        : undefined
+    const submittedBy = submitterEmail.trim() ? { email: submitterEmail.trim() } : undefined
 
     setSubmitting(true)
     try {
@@ -780,16 +776,17 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
           </div>
         )}
 
+        {/* Email only, not name — a name has nothing to attach to (no
+            account, no reply-to relationship with the listing itself), so
+            almost nobody filled it in, and there's nothing this app
+            actually does with it besides an optional "Hi {name}" in the
+            confirmation email, which reads fine falling back to "there".
+            Email still earns its place: it's how a moderator follows up on
+            a submission if something's unclear. */}
         {!adminSubmit && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t border-slate-200 pt-4">
-            <div>
-              <label htmlFor="listing-submitter-name" className="block text-sm font-medium text-slate-700 mb-1">Your name (optional)</label>
-              <input id="listing-submitter-name" value={submitterName} onChange={(e) => setSubmitterName(e.target.value)} className={inputClass} />
-            </div>
-            <div>
-              <label htmlFor="listing-submitter-email" className="block text-sm font-medium text-slate-700 mb-1">Your email (optional)</label>
-              <input id="listing-submitter-email" type="email" value={submitterEmail} onChange={(e) => setSubmitterEmail(e.target.value)} className={inputClass} />
-            </div>
+          <div className="border-t border-slate-200 pt-4">
+            <label htmlFor="listing-submitter-email" className="block text-sm font-medium text-slate-700 mb-1">Your email (optional)</label>
+            <input id="listing-submitter-email" type="email" value={submitterEmail} onChange={(e) => setSubmitterEmail(e.target.value)} className={inputClass} />
           </div>
         )}
 
@@ -872,7 +869,7 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
             already typed survives switching back and forth. No card here —
             RemovalRequest boxes just its own reason/details question, the
             same "a box is a field group" rule the edit fields above use;
-            name/email and the actions stay bare on both screens instead of
+            the email field and the actions stay bare on both screens instead of
             one nesting everything in an outer card the other doesn't. */}
         {canRequestRemoval && (
           <div className={removalOpen ? '' : 'hidden'}>
@@ -882,8 +879,6 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
               canSubmit={!TURNSTILE_ACTIVE || !!turnstileToken}
               resetTurnstile={resetTurnstile}
               honeypot={honeypot}
-              submitterName={submitterName}
-              onSubmitterNameChange={setSubmitterName}
               submitterEmail={submitterEmail}
               onSubmitterEmailChange={setSubmitterEmail}
               onCancel={() => setRemovalOpen(false)}

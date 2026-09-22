@@ -23,7 +23,7 @@ const REASONS = ['Permanently closed', 'Duplicate listing', 'Shouldn’t be list
  *
  *  Rendered inside ListingForm's <form> but built only from type="button"
  *  controls, so it never nests a form or submits the edit by accident. It
- *  borrows the form's own Turnstile token, honeypot and name/email — a visitor
+ *  borrows the form's own Turnstile token, honeypot and email — a visitor
  *  either edits or requests removal, never both, so one single-use token
  *  covers whichever they do. ListingForm keeps this mounted (toggling
  *  visibility, not presence) whether or not it's showing, so a reason already
@@ -34,8 +34,6 @@ export default function RemovalRequest({
   canSubmit,
   resetTurnstile,
   honeypot,
-  submitterName,
-  onSubmitterNameChange,
   submitterEmail,
   onSubmitterEmailChange,
   onCancel,
@@ -47,13 +45,11 @@ export default function RemovalRequest({
   canSubmit: boolean
   resetTurnstile: () => void
   honeypot: string
-  // Same state ListingForm's own "Your name"/"Your email" fields use — lifted
-  // rather than a local copy, so switching back and forth between this panel
-  // and the edit fields never loses what was typed on either screen, and a
-  // removal request carries whichever name/email the visitor actually left,
+  // Same state ListingForm's own "Your email" field uses — lifted rather
+  // than a local copy, so switching back and forth between this panel and
+  // the edit fields never loses what was typed on either screen, and a
+  // removal request carries whichever email the visitor actually left,
   // wherever they left it.
-  submitterName: string
-  onSubmitterNameChange: (v: string) => void
   submitterEmail: string
   onSubmitterEmailChange: (v: string) => void
   /** Back to the edit fields — the form itself, not this panel, decides
@@ -74,10 +70,7 @@ export default function RemovalRequest({
     setSubmitting(true)
     try {
       const note = details.trim() ? `${reason}: ${details.trim()}` : reason
-      const submittedBy =
-        submitterName.trim() || submitterEmail.trim()
-          ? { name: submitterName.trim() || undefined, email: submitterEmail.trim() || undefined }
-          : undefined
+      const submittedBy = submitterEmail.trim() ? { email: submitterEmail.trim() } : undefined
       const res = await fetch(withCommunity('/api/submissions', community), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -137,9 +130,9 @@ export default function RemovalRequest({
       {/* One static box for the actual question this screen asks — the same
           visual language as ListingForm's own field groups (Basics, an
           audience/formSection section), just without a collapse control
-          since there's only ever this one. Name/email and the actions below
-          stay bare, matching how ListingForm itself treats its own
-          submitter fields and Submit/Request removal — a box means "a field
+          since there's only ever this one. The email field and the actions
+          below stay bare, matching how ListingForm itself treats its own
+          submitter field and Submit/Request removal — a box means "a field
           group", not "everything on this screen", so contact info and
           buttons living inside it here (while they don't on the edit
           screen) read as an inconsistency once both are visible side by
@@ -169,21 +162,17 @@ export default function RemovalRequest({
           />
         </div>
       </div>
-      {/* Same fields as ListingForm's own "Your name"/"Your email", not a
-          separate ask — a removal request is a bigger claim than a routine
-          edit (a moderator may genuinely want to follow up: "are you sure,
-          or did it just move?"), and unlike the edit fields, this panel used
-          to be the one place in the form with no way to leave one at all —
-          those inputs live in the block this panel replaces, not inside it. */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div>
-          <label htmlFor={`${uid}-name`} className="mb-1 block text-sm font-medium text-slate-700">Your name (optional)</label>
-          <input id={`${uid}-name`} value={submitterName} onChange={(e) => onSubmitterNameChange(e.target.value)} className={inputClass} />
-        </div>
-        <div>
-          <label htmlFor={`${uid}-email`} className="mb-1 block text-sm font-medium text-slate-700">Your email (optional)</label>
-          <input id={`${uid}-email`} type="email" value={submitterEmail} onChange={(e) => onSubmitterEmailChange(e.target.value)} className={inputClass} />
-        </div>
+      {/* Same field as ListingForm's own "Your email", not a separate ask —
+          a removal request is a bigger claim than a routine edit (a
+          moderator may genuinely want to follow up: "are you sure, or did
+          it just move?"), and unlike the edit fields, this panel used to be
+          the one place in the form with no way to leave one at all — that
+          input lives in the block this panel replaces, not inside it. No
+          name field, here or on the edit screen — see ListingForm's own
+          comment on why. */}
+      <div>
+        <label htmlFor={`${uid}-email`} className="mb-1 block text-sm font-medium text-slate-700">Your email (optional)</label>
+        <input id={`${uid}-email`} type="email" value={submitterEmail} onChange={(e) => onSubmitterEmailChange(e.target.value)} className={inputClass} />
       </div>
       {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
       <div className="space-y-2">
