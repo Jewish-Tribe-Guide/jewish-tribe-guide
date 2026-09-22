@@ -302,31 +302,36 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
         <span aria-hidden="true" className="text-slate-300">|</span>
       )}
       {travel.length > 0 ? (
-        <div className="flex flex-col items-start gap-0.5 text-xs font-medium text-slate-600 whitespace-nowrap">
-          {travel.map((t) => (
-            <span key={t.text} className="inline-flex items-center gap-1">
-              {t.kind === 'distance' && <PinIcon className="h-3 w-3 text-primary" />}
-              {t.text}
-            </span>
-          ))}
-        </div>
+        // A straight-line distance is measured FROM the visitor's typed
+        // location (see listingTravel.ts), so there's a real action here:
+        // reopen the same picker the empty-state button below opens, to
+        // correct or update it. Same chip treatment as the upvote button
+        // beside it — the row used to be one clickable pill next to one
+        // plain-text fact, which read as lopsided; making both chips means
+        // the whole row reads as "these are controls", which is also what
+        // makes the empty-state chip below read as clickable on sight
+        // rather than needing its own explaining.
+        <button
+          type="button"
+          aria-label="Change your location"
+          onClick={(e) => {
+            e.stopPropagation()
+            document.dispatchEvent(new CustomEvent('jpc:open-location'))
+          }}
+          className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full bg-slate-100 px-2 py-1 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-200 cursor-pointer"
+        >
+          <PinIcon className="h-3 w-3 text-primary" />
+          {travel[0].text}
+        </button>
       ) : showDistanceSlot ? (
-        // Muted text, not a filled pill — a gray pill here read as just
-        // another tag in the badge row below (Bakery, IKC), which is a
-        // filter/fact about the place, not a "tap this" action. Colored blue
-        // like a real action instead drew the eye too much for how minor
-        // this is on a first-glance scan of the list — muted at rest,
-        // primary on hover, same restrained treatment as this card's own
-        // Edit/Report actions just below. Same PinIcon the header's own "Set
-        // location" control uses (icons.tsx), so this reads as the same
-        // concept rather than a different symbol for the same idea, and
-        // still repeated down the list — that repetition is what teaches
-        // "every row has this", not this element's own styling.
-        //
-        // -my-2 py-2: the label itself is under the 24px WCAG-recommended
-        // tap target now that there's no pill padding doing that job.
-        // Padding grows the real hit area; the negative margin cancels it
-        // back out of the layout so the row's height doesn't shift.
+        // Same chip as the resolved-distance case above (see its own
+        // comment) — this used to be plain muted text with no background,
+        // deliberately restrained to avoid reading as "another badge" —
+        // but that meant it was the ONLY thing in the row not styled like a
+        // control, which undercut exactly the "tap this" signal it needed
+        // most. Matching the row's other chips instead teaches "everything
+        // here is tappable" once, rather than needing this one element to
+        // carry that message alone.
         <button
           type="button"
           aria-label="Set your location to see distances"
@@ -336,7 +341,7 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
             e.stopPropagation()
             document.dispatchEvent(new CustomEvent('jpc:open-location'))
           }}
-          className="-my-2 flex shrink-0 items-center gap-1 whitespace-nowrap py-2 text-xs font-medium text-muted transition-colors hover:text-primary cursor-pointer"
+          className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full bg-slate-100 px-2 py-1 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-200 cursor-pointer"
         >
           <PinIcon className="h-3 w-3" />
           Distance

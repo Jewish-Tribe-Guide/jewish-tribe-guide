@@ -35,28 +35,12 @@ describe('travelCompare', () => {
     expect(sortedNames([at('unknown'), at('near', { milesFromAddress: 0.4 })])).toEqual(['near', 'unknown'])
   })
 
-  it('prefers miles over drive time when both are present', () => {
-    // Address mode is the live signal; drive minutes are dormant leftovers.
-    expect(
-      sortedNames([
-        at('closer-by-road', { milesFromAddress: 3, driveMinutes: 1 }),
-        at('closer-as-crow-flies', { milesFromAddress: 1, driveMinutes: 30 }),
-      ]),
-    ).toEqual(['closer-as-crow-flies', 'closer-by-road'])
-  })
-
-  it('falls back to drive time, then walk time', () => {
-    expect(sortedNames([at('b', { driveMinutes: 20 }), at('a', { driveMinutes: 5 })])).toEqual(['a', 'b'])
-    expect(sortedNames([at('b', { walkMinutes: 20 }), at('a', { walkMinutes: 5 })])).toEqual(['a', 'b'])
-  })
-
-  it('breaks a drive-time tie with walk time', () => {
-    expect(
-      sortedNames([
-        at('longer-walk', { driveMinutes: 5, walkMinutes: 40 }),
-        at('shorter-walk', { driveMinutes: 5, walkMinutes: 12 }),
-      ]),
-    ).toEqual(['shorter-walk', 'longer-walk'])
+  it('ignores the dormant drive/walk-minute fields entirely, falling back to alphabetical', () => {
+    // driveMinutes/walkMinutes are never populated on a real listing (see
+    // DirectoryResource's own comment) — this guards against a future
+    // change accidentally reviving them as a sort signal here. Without this,
+    // 'b' would sort first on its lower driveMinutes; alphabetical puts 'a' first.
+    expect(sortedNames([at('b', { driveMinutes: 1 }), at('a', { driveMinutes: 30 })])).toEqual(['a', 'b'])
   })
 
   it('falls back to alphabetical when nothing has travel data', () => {
@@ -132,27 +116,20 @@ describe('withMilesFromAddress', () => {
 })
 
 describe('travelParts', () => {
-  it('shows miles alone when the visitor typed an address', () => {
-    // No embedded emoji on `text` for distance — the caller renders PinIcon
-    // itself based on `kind`, see GenericListingCard.
-    expect(travelParts(at('x', { milesFromAddress: 0.4, driveMinutes: 5 }))).toEqual([
-      { kind: 'distance', text: '0.4 mi' },
-    ])
+  it('shows miles when the visitor typed an address', () => {
+    // No embedded emoji on `text` — the caller renders PinIcon itself, see
+    // GenericListingCard.
+    expect(travelParts(at('x', { milesFromAddress: 0.4 }))).toEqual([{ kind: 'distance', text: '0.4 mi' }])
   })
 
-  it('stacks drive and walk as separate chips so they can wrap', () => {
-    expect(travelParts(at('x', { driveMinutes: 5, walkMinutes: 18 }))).toEqual([
-      { kind: 'drive', text: '🚗 5 min' },
-      { kind: 'walk', text: '🚶 18 min' },
-    ])
+  it('shows nothing when there is no address-based distance, even if the dormant drive/walk fields are set', () => {
+    // driveMinutes/walkMinutes are never populated on a real listing (see
+    // DirectoryResource's own comment) — this guards against a future
+    // change accidentally reviving them as a display source here.
+    expect(travelParts(at('x', { driveMinutes: 5, walkMinutes: 18 }))).toEqual([])
   })
 
   it('shows nothing at all when there is nothing to show', () => {
     expect(travelParts(at('x'))).toEqual([])
-  })
-
-  it('omits the half it does not have', () => {
-    expect(travelParts(at('x', { driveMinutes: 5 }))).toEqual([{ kind: 'drive', text: '🚗 5 min' }])
-    expect(travelParts(at('x', { walkMinutes: 18 }))).toEqual([{ kind: 'walk', text: '🚶 18 min' }])
   })
 })

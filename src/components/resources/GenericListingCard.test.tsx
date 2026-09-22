@@ -1159,6 +1159,34 @@ describe('GenericListingCard — distance slot', () => {
 
     document.removeEventListener('jpc:open-location', opened)
   })
+
+  // The resolved distance is a chip too now, not plain text — see
+  // renderUpvoteDistanceContent's own comment on why: a row with one
+  // clickable pill next to one plain fact read as lopsided, and made the
+  // empty-state chip's own clickability less obvious by contrast.
+  it('also opens the location picker by tapping the resolved distance, once one is shown', async () => {
+    const user = userEvent.setup()
+    const opened = vi.fn()
+    document.addEventListener('jpc:open-location', opened)
+
+    renderWithProviders(
+      <GenericListingCard
+        item={makeListing({ milesFromAddress: 0.42 })}
+        category={makeCategory()}
+        upvotes={false}
+        count={0}
+        showDistanceSlot
+        {...requiredHandlers}
+      />,
+    )
+
+    await user.click(screen.getByRole('button', { name: /change your location/i }))
+
+    expect(opened).toHaveBeenCalledTimes(1)
+    expect(screen.getByRole('button', { name: /show details for/i })).toBeInTheDocument()
+
+    document.removeEventListener('jpc:open-location', opened)
+  })
 })
 
 // ── The collapsed row's actions kebab (Pin/Share/I'm here — see

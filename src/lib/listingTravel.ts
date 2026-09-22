@@ -32,39 +32,31 @@ export function withMilesFromAddress<T extends DirectoryResource>(
   })
 }
 
-// Sort comparator: closest first. Miles take priority when present (address
-// mode); otherwise drive time, then walk time (hospital mode). Missing values
-// sort last. When neither listing has any travel data (no address entered yet,
-// or a category with hasAddress: false, e.g. WhatsApp Groups), falls back to
-// alphabetical by name rather than leaving listings in arbitrary storage
-// order. Shared by every directory so the ordering never drifts.
+// Sort comparator: closest first. Miles (address mode) is the only live
+// travel signal — see DirectoryResource's own comment on why driveMinutes/
+// walkMinutes are dormant fields, never populated on a general listing, so
+// there was never a real tie for them to break here. When neither listing
+// has any travel data (no address entered yet, or a category with
+// hasAddress: false, e.g. WhatsApp Groups), falls back to alphabetical by
+// name rather than leaving listings in arbitrary storage order. Shared by
+// every directory so the ordering never drifts.
 export function travelCompare(a: DirectoryResource, b: DirectoryResource): number {
   if (a.milesFromAddress != null || b.milesFromAddress != null) {
     return (a.milesFromAddress ?? Infinity) - (b.milesFromAddress ?? Infinity)
   }
-  if (a.driveMinutes != null || b.driveMinutes != null) {
-    const drive = (a.driveMinutes ?? Infinity) - (b.driveMinutes ?? Infinity)
-    if (drive !== 0) return drive
-  }
-  if (a.walkMinutes != null || b.walkMinutes != null) {
-    return (a.walkMinutes ?? Infinity) - (b.walkMinutes ?? Infinity)
-  }
   return a.name.localeCompare(b.name)
 }
 
-// The travel chips shown on a card, as separate parts so drive/walk can stack
-// vertically instead of being joined on one wide line. `kind` rather than an
-// embedded emoji so the caller (a .tsx component) can render the straight-line
-// distance with the same PinIcon the rest of the app uses for "location" —
-// this file stays plain .ts, with no JSX of its own. Drive/walk keep their
-// emoji since there's no vector icon for those yet and no report of them
-// reading as broken the way the bare pin-and-dash placeholder did.
-export type TravelPart = { kind: 'distance' | 'drive' | 'walk'; text: string }
+// The travel chip shown on a card. `kind` used to distinguish distance from
+// drive/walk minutes (a dormant, never-populated pair of fields — see
+// DirectoryResource's own comment), which this file no longer renders at
+// all; kept as a single-key union rather than dropped outright so a future
+// travel kind (e.g. transit) has an obvious place to join it, and so the
+// caller's `kind === 'distance'` check (GenericListingCard) still documents
+// what this value actually is rather than just being a bare string.
+export type TravelPart = { kind: 'distance'; text: string }
 
 export function travelParts(item: DirectoryResource): TravelPart[] {
   if (item.milesFromAddress != null) return [{ kind: 'distance', text: `${roundMiles(item.milesFromAddress)} mi` }]
-  const parts: TravelPart[] = []
-  if (item.driveMinutes != null) parts.push({ kind: 'drive', text: `🚗 ${item.driveMinutes} min` })
-  if (item.walkMinutes != null) parts.push({ kind: 'walk', text: `🚶 ${item.walkMinutes} min` })
-  return parts
+  return []
 }
