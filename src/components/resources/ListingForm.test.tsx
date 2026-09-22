@@ -636,6 +636,88 @@ describe('ListingForm', () => {
       expect(screen.getByLabelText('Notes')).toBeInTheDocument()
     })
 
+    // When "More details" would be the ONLY group a category ever shows at
+    // all (no admin has defined any real section), splitting it into its
+    // own box below Basics — even an unlabeled one — is a distinction
+    // without a difference: the entire optional part of the form already IS
+    // that one small set of fields. It folds straight into Basics instead,
+    // so the form is genuinely one box, confirmed here by collapsing Basics
+    // and checking the "extra" field disappears with it.
+    it('folds a lone small "More details" catch-all into Basics, not a separate box', async () => {
+      const user = userEvent.setup()
+      const category = makeCategory({ detailFields: [textField({ key: 'notes', label: 'Notes' })] })
+      renderWithProviders(<ListingForm category={category} mode="create" {...handlers} />)
+
+      // Only one group box (Basics) in the whole form.
+      expect(screen.getAllByRole('button', { name: 'Basics' })).toHaveLength(1)
+      expect(screen.getByLabelText('Notes')).toBeInTheDocument()
+
+      await user.click(screen.getByRole('button', { name: 'Basics' }))
+      expect(screen.getByLabelText('Notes').closest('.hidden')).not.toBeNull()
+    })
+
+    // The size gate still applies even when it's the only block: a lone
+    // bucket of several fields is exactly the "wall of fields in one box"
+    // this whole redesign exists to avoid, so it keeps its own collapsible
+    // box rather than ballooning Basics — confirmed by checking Basics
+    // itself doesn't contain the extra fields.
+    it('does not fold a lone "More details" catch-all into Basics once it has 3+ fields', () => {
+      const category = makeCategory({
+        detailFields: [
+          textField({ key: 'notes', label: 'Notes' }),
+          textField({ key: 'notes2', label: 'Notes 2' }),
+          textField({ key: 'notes3', label: 'Notes 3' }),
+        ],
+      })
+      renderWithProviders(<ListingForm category={category} mode="create" {...handlers} />)
+
+      const basicsBox = screen.getByRole('button', { name: 'Basics' }).closest('div')
+      expect(basicsBox?.textContent).not.toContain('Notes')
+      expect(screen.getByRole('button', { name: /More details/ })).toBeInTheDocument()
+    })
+
+    // A small "More details" alongside a real named section is a different
+    // case from being the form's only content — it still reads as one
+    // bucket among several, so it keeps the plain-box treatment (no merge).
+    it('keeps a small "More details" as its own box when a real section also exists', () => {
+      const category = makeCategory({
+        formSections: [{ key: 'kosher', label: 'Kosher details' }],
+        detailFields: [
+          textField({ key: 'certification', label: 'Certification', formSection: 'kosher' }),
+          textField({ key: 'notes', label: 'Notes' }),
+        ],
+      })
+      renderWithProviders(<ListingForm category={category} mode="create" {...handlers} />)
+
+      const basicsBox = screen.getByRole('button', { name: 'Basics' }).closest('div')
+      expect(basicsBox?.textContent).not.toContain('Notes')
+      expect(screen.getByLabelText('Notes')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /Kosher details/ })).toBeInTheDocument()
+    })
+
+    // A photo is consistently the field least likely to be filled in at
+    // submission time (same reasoning "More details" itself sorts last) —
+    // so it renders after every other field in its own group, regardless of
+    // where the category happens to list it among its other fields.
+    it('renders the photo field last within whatever group it lands in', () => {
+      const category = makeCategory({
+        formSections: [{ key: 'kosher', label: 'Kosher details' }],
+        detailFields: [
+          // key must be PHOTO_FIELD_KEY ('photo') — that's what the
+          // ordering rule actually keys off, not the field's label.
+          imageField({ key: 'photo', formSection: 'kosher' }),
+          textField({ key: 'certification', label: 'Certification', formSection: 'kosher' }),
+        ],
+      })
+      renderWithProviders(<ListingForm category={category} mode="create" {...handlers} />)
+
+      const photoLabel = screen.getByText('Photo')
+      const certification = screen.getByLabelText('Certification')
+      // DOCUMENT_POSITION_FOLLOWING (4) means the photo field comes after
+      // Certification, the reverse of the category's own field order above.
+      expect(certification.compareDocumentPosition(photoLabel) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    })
+
     it('gives a real admin-named formSection its header even with just one field (the <3 rule is "More details"-only)', () => {
       const category = makeCategory({
         formSections: [{ key: 'kosher', label: 'Kosher details' }],

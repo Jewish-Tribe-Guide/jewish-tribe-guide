@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { fieldIsVisible, isCategorySyncEligible, resolveCapabilities, selectValues, type CategoryConfig, type CategoryField } from '@/lib/categories'
+import { fieldIsVisible, isCategorySyncEligible, PHOTO_FIELD_KEY, resolveCapabilities, selectValues, type CategoryConfig, type CategoryField } from '@/lib/categories'
 import { formatPhone, normalizeUrl } from '@/lib/validation'
 import { hasListingChanged } from '@/lib/listingDiff'
 import type { DirectoryResource, ResourceSubmission } from '@/types'
@@ -75,6 +75,87 @@ type Props = {
 
 const inputClass =
   'w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary'
+
+type FieldGroupBlock = {
+  sectionKey: string
+  label: string
+  description?: string
+  isAudience: boolean
+  fields: CategoryField[]
+}
+
+// Every non-core, visible detail field lands in exactly one named,
+// independently-collapsible group: this key for the generic catch-all,
+// `section:audience:{key}` for an audience section, `section:form:{key}` for
+// an admin-assigned formSection.
+const MORE_DETAILS_KEY = 'section:more'
+
+// A photo is consistently the field least likely to be filled in at
+// submission time — the same reasoning "More details" itself always sorts
+// last (see groupNonCoreFields below) — so wherever it lands, it renders
+// after every other field in its own group/box, not wherever the category
+// happens to list it among its other fields.
+function withPhotoLast(fields: CategoryField[]): CategoryField[] {
+  const photoIndex = fields.findIndex((f) => f.key === PHOTO_FIELD_KEY)
+  if (photoIndex === -1 || photoIndex === fields.length - 1) return fields
+  const reordered = [...fields]
+  const [photo] = reordered.splice(photoIndex, 1)
+  reordered.push(photo)
+  return reordered
+}
+
+// Groups fields into blocks — see MORE_DETAILS_KEY's own doc for the three
+// kinds. A group renders where its FIRST field appears (stable, not
+// necessarily contiguous), except "More details" itself, which always
+// renders last regardless of where its fields happen to sit in the
+// category's own field order: an admin-named group (an audience section, a
+// formSection) was deliberately curated as its own thing, while the
+// catch-all is whatever's left over — usually exactly the fields least
+// likely to matter to a visitor submitting or fixing a listing — and
+// shouldn't out-rank a group someone actually organized.
+function groupNonCoreFields(fields: CategoryField[], config: CategoryConfig): FieldGroupBlock[] {
+  const blocks: FieldGroupBlock[] = []
+  const blockAt = new Map<string, number>()
+  for (const field of fields) {
+    let sectionKey: string
+    let label: string
+    let description: string | undefined
+    let isAudience = false
+    if (field.audienceKey) {
+      // filterLabel is the short form ("Women's") the filter chip already
+      // uses; label ("Women's Tevillah") is the fallback for a boolean
+      // that has no filterLabel set.
+      sectionKey = `section:audience:${field.audienceKey}`
+      const audienceField = config.detailFields.find((f) => f.key === field.audienceKey)
+      label = audienceField?.filterLabel ?? audienceField?.label ?? field.audienceKey
+      isAudience = true
+    } else if (field.formSection) {
+      sectionKey = `section:form:${field.formSection}`
+      const def = config.formSections?.find((s) => s.key === field.formSection)
+      label = def?.label ?? field.formSection
+      description = def?.description
+    } else {
+      sectionKey = MORE_DETAILS_KEY
+      label = 'More details'
+    }
+    const at = blockAt.get(sectionKey)
+    const existingBlock = at !== undefined ? blocks[at] : undefined
+    if (existingBlock) {
+      existingBlock.fields.push(field)
+    } else {
+      blockAt.set(sectionKey, blocks.length)
+      blocks.push({ sectionKey, label, description, isAudience, fields: [field] })
+    }
+  }
+
+  const moreDetailsAt = blocks.findIndex((b) => b.sectionKey === MORE_DETAILS_KEY)
+  if (moreDetailsAt !== -1 && moreDetailsAt !== blocks.length - 1) {
+    const [moreDetailsBlock] = blocks.splice(moreDetailsAt, 1)
+    blocks.push(moreDetailsBlock)
+  }
+
+  return blocks.map((block) => ({ ...block, fields: withPhotoLast(block.fields) }))
+}
 
 export default function ListingForm({ category, mode, existing, onUp, onSubmitted, onPreviewSubmit, sharedTurnstile, adminSubmit, embedded, onRemovalOpenChange }: Props) {
   const community = useCommunitySlug()
@@ -494,6 +575,42 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
             block anything. space-y-4 is repeated here because Tailwind's
             spacing utility only affects direct children — this div is now
             one of the form's, not each field. */}
+        {/* Every non-core field, grouped once so both Basics (which may
+            absorb the result — see mergeMoreDetailsIntoBasics below) and
+            the groups rendered further down use the same computation. */}
+        {(() => {
+          const nonCoreVisibleFields = config.detailFields.filter((field) => !field.coreSection && fieldIsVisible(field, details))
+          const otherBlocks = groupNonCoreFields(nonCoreVisibleFields, config)
+          // When "More details" is the ONLY group a category would ever
+          // show — no admin has defined a real formSection or audience
+          // section — AND it's small, splitting it into its own separate
+          // box below Basics is a distinction without a difference: the
+          // entire optional part of the form already IS that one small
+          // set of fields, so folding them straight into Basics makes the
+          // form genuinely one box, not two for what's really a single
+          // handful of fields. Still size-gated (same <3 threshold as the
+          // plain-box rule below) — a lone bucket of 8 fields is exactly
+          // the "wall of fields in one box" this whole redesign exists to
+          // avoid, so it keeps its own collapsible box even with nothing
+          // else to distinguish it from.
+          const mergeMoreDetailsIntoBasics =
+            otherBlocks.length === 1 && otherBlocks[0].sectionKey === MORE_DETAILS_KEY && otherBlocks[0].fields.length < 3
+          const basicsExtraFields = mergeMoreDetailsIntoBasics ? otherBlocks[0].fields : []
+          const groupBlocksToRender = mergeMoreDetailsIntoBasics ? [] : otherBlocks
+
+          const renderField = (field: CategoryField, labelOverride?: string) => (
+            <DetailFieldInput
+              key={field.key}
+              field={field}
+              labelOverride={labelOverride}
+              value={details[field.key]}
+              onChange={(v) => setDetail(field.key, v)}
+              sometimes={field.type === 'tags' ? ((details[field.key + '_sometimes'] as string[] | undefined) ?? []) : undefined}
+              onChangeSometimes={field.type === 'tags' ? (v) => setDetail(field.key + '_sometimes', v) : undefined}
+            />
+          )
+
+          return (
         <div className={removalOpen ? 'hidden' : 'space-y-3'}>
         {/* Basics: Address/Name/Phone plus any coreSection field (see
             CategoryField's doc comment) — a Google-autofillable field
@@ -573,88 +690,18 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
                         onChangeSometimes={field.type === 'tags' ? (v) => setDetail(field.key + '_sometimes', v) : undefined}
                       />
                     ))}
+                  {/* Folded in when "More details" would otherwise be the
+                      ONLY group this category ever shows — see
+                      mergeMoreDetailsIntoBasics above. */}
+                  {basicsExtraFields.map((field) => renderField(field))}
               </div>
             </div>
           )
         })()}
 
-        {config.detailFields.some((f) => !f.coreSection && fieldIsVisible(f, details)) && (
+        {groupBlocksToRender.length > 0 && (
           <div className="space-y-3">
-            {(() => {
-              const visible = config.detailFields.filter((field) => !field.coreSection && fieldIsVisible(field, details))
-
-              // Every non-core field lands in exactly one named, independently
-              // collapsible group: its audience section (CategoryField.
-              // audienceKey, unchanged from before), its admin-assigned
-              // formSection (CategoryField.formSection / CategoryConfig.
-              // formSections), or — if it has neither — a single generic
-              // "More details" catch-all, so a category with no sections
-              // defined yet still gets the same decluttered shape instead of
-              // falling back to a flat list. A group renders where its FIRST
-              // field appears (stable, not necessarily contiguous).
-              type Block = { sectionKey: string; label: string; description?: string; isAudience: boolean; fields: CategoryField[] }
-              const MORE_DETAILS_KEY = 'section:more'
-              const blocks: Block[] = []
-              const blockAt = new Map<string, number>()
-              for (const field of visible) {
-                let sectionKey: string
-                let label: string
-                let description: string | undefined
-                let isAudience = false
-                if (field.audienceKey) {
-                  sectionKey = `section:audience:${field.audienceKey}`
-                  // filterLabel is the short form ("Women's") the filter chip
-                  // already uses; label ("Women's Tevillah") is the fallback
-                  // for a boolean that has no filterLabel set.
-                  const audienceField = config.detailFields.find((f) => f.key === field.audienceKey)
-                  label = audienceField?.filterLabel ?? audienceField?.label ?? field.audienceKey
-                  isAudience = true
-                } else if (field.formSection) {
-                  sectionKey = `section:form:${field.formSection}`
-                  const def = config.formSections?.find((s) => s.key === field.formSection)
-                  label = def?.label ?? field.formSection
-                  description = def?.description
-                } else {
-                  sectionKey = MORE_DETAILS_KEY
-                  label = 'More details'
-                }
-                const at = blockAt.get(sectionKey)
-                const existingBlock = at !== undefined ? blocks[at] : undefined
-                if (existingBlock) {
-                  existingBlock.fields.push(field)
-                } else {
-                  blockAt.set(sectionKey, blocks.length)
-                  blocks.push({ sectionKey, label, description, isAudience, fields: [field] })
-                }
-              }
-
-              // "More details" always renders last, regardless of where its
-              // fields happen to sit in the category's own field order. An
-              // admin-named group (an audience section, a formSection) was
-              // deliberately curated as its own thing; the catch-all is
-              // whatever's left over — usually exactly the fields least
-              // likely to matter to a visitor submitting or fixing a
-              // listing (a photo, a short blurb an admin can polish later),
-              // and shouldn't out-rank a group someone actually organized.
-              const moreDetailsAt = blocks.findIndex((b) => b.sectionKey === MORE_DETAILS_KEY)
-              if (moreDetailsAt !== -1 && moreDetailsAt !== blocks.length - 1) {
-                const [moreDetailsBlock] = blocks.splice(moreDetailsAt, 1)
-                blocks.push(moreDetailsBlock)
-              }
-
-              const renderField = (field: CategoryField, labelOverride?: string) => (
-                <DetailFieldInput
-                  key={field.key}
-                  field={field}
-                  labelOverride={labelOverride}
-                  value={details[field.key]}
-                  onChange={(v) => setDetail(field.key, v)}
-                  sometimes={field.type === 'tags' ? ((details[field.key + '_sometimes'] as string[] | undefined) ?? []) : undefined}
-                  onChangeSometimes={field.type === 'tags' ? (v) => setDetail(field.key + '_sometimes', v) : undefined}
-                />
-              )
-
-              return blocks.map((block) => {
+            {groupBlocksToRender.map((block) => {
                 // A "More details" catch-all with only one or two stray
                 // fields (nothing an admin bothered naming a section for)
                 // doesn't earn the full label-and-collapse treatment — a
@@ -725,8 +772,7 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
                     </div>
                   </div>
                 )
-              })
-            })()}
+            })}
           </div>
         )}
 
@@ -751,6 +797,8 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
           </ul>
         )}
         </div>
+          )
+        })()}
 
         {/* Outside the toggled block above — see its own comment: a
             TurnstileWidget that unmounted when switching to Request removal
