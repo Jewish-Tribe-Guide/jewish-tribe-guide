@@ -1022,16 +1022,14 @@ function DetailFieldInput({
             positively-phrased question like "Everything here is kosher?"
             wants, rather than opening on a negative "No" nobody chose. */}
         {/* The WHOLE row is the switch (one <button>, not a span of inert
-            text next to a separate small control) — reading the state on
-            the left before reaching the control on the right (matching
-            every other left-label/right-control row, e.g. iOS/Android
-            Settings) only works if you can actually ACT from anywhere in
-            that row. A separate `<button role="switch">` stranded at the
-            far right, with plain text beside it doing nothing, made the gap
-            between where you read and where you click feel real instead of
-            just visual — the fix is making the row itself clickable, the
-            same as a native Settings toggle row is, not reordering its
-            contents. */}
+            text next to a separate small control) — a separate
+            `<button role="switch">` stranded at one edge, with plain text
+            beside it doing nothing, made the gap between where you read and
+            where you click feel real instead of just visual. The switch
+            itself comes first (left), its "Yes"/"No" state right next to
+            it — adjacent, not spread to opposite ends of the row — so the
+            two read as one compact unit: the control, then the answer it
+            just gave. */}
         {(() => {
           const displayValue = field.invertDisplay ? !value : !!value
           return (
@@ -1041,9 +1039,8 @@ function DetailFieldInput({
               aria-checked={displayValue}
               aria-label={labelOverride ?? field.label}
               onClick={() => onChange(!value)}
-              className="flex w-full cursor-pointer items-center justify-between rounded-md border border-slate-300 bg-white px-3 py-2 transition-colors hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-primary"
+              className="flex w-full cursor-pointer items-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 transition-colors hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-primary"
             >
-              <span className="text-sm text-slate-600">{displayValue ? 'Yes' : 'No'}</span>
               <span
                 className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
                   displayValue ? 'bg-primary' : 'bg-slate-300'
@@ -1055,6 +1052,7 @@ function DetailFieldInput({
                   }`}
                 />
               </span>
+              <span className="text-sm text-slate-600">{displayValue ? 'Yes' : 'No'}</span>
             </button>
           )
         })()}
