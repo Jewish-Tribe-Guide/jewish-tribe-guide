@@ -53,22 +53,25 @@ describe('DirectoryHeader — the resolved location label', () => {
   })
 })
 
-// Regression coverage for: unlike the resolved address above, the UNSET
-// "Set location" prompt (AddressPrompt) is a real call to action — nothing
-// on the page works right until someone answers it — so it keeps its
-// mobile presence rather than going desktop-only, and needs room to
-// actually stretch across the row (see AddressPrompt's own doc on why it's
-// `w-full` there). The column wrapping it has to stretch too, or the
-// button's own `w-full` has nothing real to fill.
+// Regression coverage for: the UNSET "Set location" prompt (AddressPrompt)
+// used to keep a mobile presence here (a real call to action, so it grew to
+// fill the row rather than shrinking away) — it's desktop-only now, since
+// mobile's own copy moved to a bigger, dismissible `banner` variant at the
+// top of the page (GenericDirectory). This instance renders the compact
+// `inline` variant, wrapped in `hidden desktop:*` same as the resolved
+// address/count branches above it.
 describe('DirectoryHeader — the unset location prompt', () => {
-  it('gives the prompt column room to go full-width on mobile', () => {
+  it('renders the compact "inline" variant, gated to desktop', () => {
     const { container } = render(
       <DirectoryHeader title="Grocery" addressPrompt actions={<button>Add</button>} titleInHeader />,
     )
 
     const prompt = screen.getByRole('button', { name: /Set location to see distances/ })
-    const column = container.querySelector('.mb-2')?.firstElementChild as HTMLElement
-    expect(column.className).toMatch(/(?:^|\s)w-full(?:\s|$)/)
     expect(prompt).toBeInTheDocument()
+
+    const column = container.querySelector('.mb-2')?.firstElementChild as HTMLElement
+    const promptWrapper = column.lastElementChild as HTMLElement
+    expect(promptWrapper.className).toMatch(/(?:^|\s)hidden(?:\s|$)/)
+    expect(promptWrapper.className).toMatch(/desktop:flex/)
   })
 })

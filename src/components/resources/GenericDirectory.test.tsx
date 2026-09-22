@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { Activity, forwardRef, useImperativeHandle, useState, type Ref } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { act, cleanup, screen } from '@testing-library/react'
+import { act, cleanup, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { mockRouter } from '@/test/nextNavigationMock'
@@ -880,6 +880,38 @@ describe('GenericDirectory — distance slot wiring', () => {
       />,
     )
     expect(screen.queryByText('distance-slot Alpha')).not.toBeInTheDocument()
+  })
+})
+
+// Mobile's own copy of the "Set location" prompt used to live inside
+// DirectoryHeader, right above the search bar — moved to the very top of
+// the page (above the category band/title entirely) at the user's request,
+// as a bigger, dismissible `banner`, distinct from desktop's compact
+// `inline` pill that stays put next to the title. Both variants share the
+// same `addressPrompt`/`anchorLabel` gating, so jsdom (which never applies
+// the `desktop:hidden`/`hidden desktop:*` CSS keeping only one visible per
+// viewport) renders both at once — this asserts on DOM position instead.
+describe('GenericDirectory — mobile "Set location" banner at the top of the page', () => {
+  it('renders the banner as the very first thing on the page, plus desktop\'s inline pill', () => {
+    const category = makeCategory()
+    const { container } = renderWithProviders(
+      <GenericDirectory category={category} items={[makeListing()]} addressPrompt {...handlers} />,
+    )
+
+    expect(screen.getAllByRole('button', { name: /Set location to see distances/ })).toHaveLength(2)
+
+    const rootFirstChild = container.firstElementChild!.firstElementChild as HTMLElement
+    expect(rootFirstChild.className).toMatch(/desktop:hidden/)
+    expect(within(rootFirstChild).getByRole('button', { name: /Set location to see distances/ })).toBeInTheDocument()
+  })
+
+  it('shows nothing once a location is resolved (anchorLabel set)', () => {
+    const category = makeCategory()
+    renderWithProviders(
+      <GenericDirectory category={category} items={[makeListing()]} addressPrompt anchorLabel="19103" {...handlers} />,
+    )
+
+    expect(screen.queryByRole('button', { name: /Set location to see distances/ })).not.toBeInTheDocument()
   })
 })
 

@@ -19,7 +19,9 @@ type Props = {
   /** Location label shown under the title once a location is set (typed address
    *  or hospital name). Takes precedence over the address prompt. */
   anchorLabel?: string
-  /** When true and no anchorLabel, show the "Set location" prompt under the title. */
+  /** When true and no anchorLabel, show the "Set location" prompt under the
+   *  title — desktop only; mobile's own copy lives at the top of the page
+   *  instead (GenericDirectory). */
   addressPrompt?: boolean
   /** Right-aligned action buttons (Map, Add). Wrapped in a shrink-0 flex row. */
   actions?: ReactNode
@@ -50,22 +52,18 @@ type Props = {
 // rules — live in ONE place instead of being copy-pasted (and drifting) across
 // the synagogue, generic, and hospital directories.
 //
-// Mobile density: the RESOLVED location label and the listing count are
-// desktop-only now (`hidden desktop:*`); the unset "Set location" prompt
-// stays on mobile but goes full-width (see AddressPrompt's own doc). All
-// three used to share mobile density rules with this component's own
-// `actions` (Add) sitting right beside them — a real bordered/colored
-// button next to plain text that wasn't even this page's main content,
-// which read unevenly no matter how the text itself was styled. The
-// resolved address doesn't need repeating here on mobile: it stays
-// reachable exactly the way it always has been, one tap on the header's own
-// location pin (see LocationControl) — same pattern most directory apps
-// use. The UNSET prompt is different: it's a real call to action (nothing
-// works right until someone answers it), not a standing copy of something
-// shown elsewhere, so it keeps its mobile presence and grows to fill the
-// row instead of shrinking away. Desktop is unchanged either way: there's
-// room, and desktop's `actions` sits in this same row rather than moving
-// elsewhere (see GenericDirectory's own doc on where mobile's Add moved to).
+// Mobile density: the RESOLVED location label, the listing count, AND the
+// unset "Set location" prompt are all desktop-only now (`hidden desktop:*`).
+// The resolved address and the count don't need repeating here on mobile:
+// the address stays reachable exactly the way it always has been, one tap on
+// the header's own location pin (see LocationControl), and the count moved
+// nowhere in particular — it just isn't shown twice. The unset prompt used
+// to be the exception (a real call to action, so it kept its mobile presence
+// and grew to fill this row instead of shrinking away) — it now has its own
+// full-width, bigger `banner` variant at the very top of the mobile page
+// instead (GenericDirectory), separated from the search bar it used to sit
+// right above here. Desktop is unchanged either way: there's room, and
+// desktop's compact `inline` variant stays right here next to the title.
 export default function DirectoryHeader({ title, count, hasAddress, anchorLabel, addressPrompt, actions, titleInHeader, banner }: Props) {
   const noun = hasAddress === false ? 'listing' : 'place'
   const countText = count != null ? `${count} ${noun}${count !== 1 ? 's' : ''}` : null
@@ -85,12 +83,13 @@ export default function DirectoryHeader({ title, count, hasAddress, anchorLabel,
           component's own test). */}
       <div className="hidden desktop:block h-5 mb-[0.5rem]" aria-hidden="true" />
       <div className="flex items-end justify-between gap-2 mb-2">
-        {/* w-full desktop:w-auto: only the unset AddressPrompt below needs
-            this column to actually stretch (it goes full-width on mobile —
-            see that component's own doc); harmless for the other two
-            branches, which size to their own content either way. Reverts
-            on desktop so this stays a normal auto-width flex item there,
-            same as `actions` beside it. */}
+        {/* w-full desktop:w-auto: harmless leftover from when the unset
+            AddressPrompt below needed this column to stretch on mobile —
+            that branch is desktop-only now (see its own comment), so
+            nothing here actually needs the mobile stretch any more, but it
+            doesn't hurt the other branches either, which size to their own
+            content either way. Reverts on desktop so this stays a normal
+            auto-width flex item there, same as `actions` beside it. */}
         <div className="w-full desktop:w-auto">
           {/* h1, not h2: this is the page's own main heading (every category
               directory, the synagogue/hospitals directories, all share this
@@ -129,10 +128,16 @@ export default function DirectoryHeader({ title, count, hasAddress, anchorLabel,
               )}
             </p>
           ) : addressPrompt ? (
-            <div className="flex w-full desktop:w-auto items-center gap-1.5 mt-1.5 flex-wrap">
-              <AddressPrompt />
+            // Desktop only now — mobile's own copy of this moved to the very
+            // top of the page (GenericDirectory's `banner` variant), away
+            // from the search bar it used to sit right above. This compact
+            // pill next to the title is desktop-only chrome and always has
+            // been; it just needs its own `hidden desktop:*` now that
+            // there's no longer a mobile instance sharing this component.
+            <div className="hidden desktop:flex items-center gap-1.5 mt-1.5 flex-wrap">
+              <AddressPrompt variant="inline" />
               {countText && (
-                <span className="hidden desktop:inline text-sm text-muted">
+                <span className="text-sm text-muted">
                   <span aria-hidden="true" className="mr-1">·</span>{countText}
                 </span>
               )}

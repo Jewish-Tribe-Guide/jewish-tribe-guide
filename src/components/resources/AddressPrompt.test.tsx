@@ -4,14 +4,17 @@ import { cleanup, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import AddressPrompt from './AddressPrompt'
 
-afterEach(() => cleanup())
+afterEach(() => {
+  cleanup()
+  sessionStorage.clear()
+})
 
 describe('AddressPrompt', () => {
-  it('fires jpc:open-location when clicked, so the header popover opens without prop drilling', async () => {
+  it.each(['inline', 'banner'] as const)('fires jpc:open-location when clicked (variant=%s)', async (variant) => {
     const user = userEvent.setup()
     const onOpen = vi.fn()
     document.addEventListener('jpc:open-location', onOpen)
-    render(<AddressPrompt />)
+    render(<AddressPrompt variant={variant} />)
 
     await user.click(screen.getByRole('button', { name: /Set location to see distances/ }))
 
@@ -19,17 +22,28 @@ describe('AddressPrompt', () => {
     document.removeEventListener('jpc:open-location', onOpen)
   })
 
-  // Regression coverage for: on mobile, DirectoryHeader no longer shows a
-  // resolved address at all (see that component's own doc) — this prompt is
-  // now the only thing standing in for the whole subline while unset, so it
-  // needs to fill the row rather than read as a small aside next to nothing.
-  // Desktop is unchanged: compact and inline, same as it always was.
-  it('goes full-width on mobile, compact/inline on desktop', () => {
+  it('defaults to the compact "inline" variant when no variant is passed', () => {
     render(<AddressPrompt />)
-    const button = screen.getByRole('button', { name: /Set location to see distances/ })
+    expect(screen.queryByRole('button', { name: 'Dismiss' })).toBeNull()
+  })
 
-    expect(button.className).toMatch(/(?:^|\s)w-full(?:\s|$)/)
-    expect(button.className).toMatch(/desktop:w-auto/)
-    expect(button.className).toMatch(/desktop:inline-flex/)
+  // Regression coverage for the "banner" variant — mobile's own full-width
+  // call to action at the top of the category page (GenericDirectory),
+  // dismissible since it's a real banner competing for attention rather than
+  // a small aside next to the title.
+  it('"banner" variant is dismissible and disappears once dismissed', async () => {
+    const user = userEvent.setup()
+    render(<AddressPrompt variant="banner" />)
+
+    expect(screen.getByRole('button', { name: /Set location to see distances/ })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Dismiss' }))
+    expect(screen.queryByRole('button', { name: /Set location to see distances/ })).toBeNull()
+  })
+
+  // "inline" is desktop's compact pill next to the title (DirectoryHeader) —
+  // no dismiss, since it's a small aside there rather than a banner.
+  it('"inline" variant has no dismiss control', () => {
+    render(<AddressPrompt variant="inline" />)
+    expect(screen.queryByRole('button', { name: 'Dismiss' })).toBeNull()
   })
 })
