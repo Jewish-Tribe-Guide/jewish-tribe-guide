@@ -325,6 +325,17 @@ describe('ListingForm', () => {
     expect(screen.queryByText('Click the preview to reposition/re-zoom it')).not.toBeInTheDocument()
   })
 
+  // Same opt-out (showRepositionHint), the OTHER caption it now covers:
+  // before a photo is set, "or drag an image onto the preview, or click it
+  // and paste one (⌘V / Ctrl+V)". Upload image/Take photo/Paste URL are
+  // already visible, self-explanatory buttons on this form.
+  it('never shows the "drag an image onto the preview" hint on a photo field either, before a photo is set', () => {
+    const category = makeCategory({ detailFields: [imageField()] })
+    renderWithProviders(<ListingForm category={category} mode="create" {...handlers} />)
+
+    expect(screen.queryByText(/drag an image onto the preview/)).not.toBeInTheDocument()
+  })
+
   // Same self-explanatory-copy trim as the reposition hint above, plus the
   // URL-paste row starting collapsed — both scoped to the public form only
   // (admin's own photo uploaders keep both; see ImageUploadField's own doc).

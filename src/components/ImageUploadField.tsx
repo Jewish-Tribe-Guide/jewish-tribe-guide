@@ -43,12 +43,17 @@ type Props = {
   originalSource?: File | string | null
   onOriginalSourceChange?: (source: File | string | null) => void
   helpText?: string
-  /** The "Click the preview to reposition/re-zoom it" hint once a photo is
-   *  set. Default true (admin's logo/hero/category-icon editors keep it —
-   *  see SiteSettingsEditor's own tests). Off for the public listing form
+  /** The small caption under the buttons — "Click the preview to
+   *  reposition/re-zoom it" once a photo is set, or "or drag an image onto
+   *  the preview, or click it and paste one (⌘V / Ctrl+V)" before one is.
+   *  Default true (admin's logo/hero/category-icon editors keep both — see
+   *  SiteSettingsEditor's own tests). Off for the public listing form
    *  (ListingForm) specifically: confirmed with the site owner that a
-   *  visitor filling out one form field at a time doesn't need it spelled
-   *  out the way an admin configuring branding once might. */
+   *  visitor filling out one form field at a time doesn't need either
+   *  spelled out the way an admin configuring branding once might — Upload
+   *  image/Take photo/Paste URL are already visible, self-explanatory
+   *  buttons, and drag/paste is a bonus shortcut, not something a
+   *  first-time visitor needs telling about. */
   showRepositionHint?: boolean
   /** Starts the "…or paste an image URL directly" row collapsed behind a
    *  small link instead of always showing its own label + input. Default
@@ -297,18 +302,22 @@ export default function ImageUploadField({
               </button>
             )}
           </div>
-          {/* The reposition hint is opt-out (showRepositionHint) — see the
-              prop's own doc. The drag/paste shortcut stays unconditional:
-              ⌘V isn't discoverable on its own the way clicking a photo you
-              can already see is. */}
-          {value.trim() ? (
-            showRepositionHint && (
+          {/* Both hint captions are opt-out via showRepositionHint — same
+              flag now covers whichever one applies (they're mutually
+              exclusive already, based on value). Off for the public listing
+              form specifically: Upload image/Take photo/Paste URL are
+              already visible, self-explanatory buttons, and drag/paste
+              (⌘V) is a bonus shortcut for someone who already knows it, not
+              something a first-time visitor needs spelled out. Admin's own
+              uploaders keep both — see the prop's own doc. */}
+          {showRepositionHint && (
+            value.trim() ? (
               <span className="text-[11px] text-muted">Click the preview to reposition/re-zoom it</span>
+            ) : (
+              <span className="text-[11px] text-muted">
+                or drag an image onto the preview, or click it and paste one (⌘V / Ctrl+V)
+              </span>
             )
-          ) : (
-            <span className="text-[11px] text-muted">
-              or drag an image onto the preview, or click it and paste one (⌘V / Ctrl+V)
-            </span>
           )}
         </div>
 
