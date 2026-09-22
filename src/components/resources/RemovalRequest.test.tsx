@@ -36,12 +36,16 @@ function setup(props: Partial<React.ComponentProps<typeof RemovalRequest>> = {})
 }
 
 describe('RemovalRequest', () => {
+  // No title or explanatory copy of its own any more — the embedding caller
+  // (ListingDetailModal/MapPlaceDetail/FindResources) shows "Request removal
+  // of {name}" as its own dialog title via onRemovalOpenChange, instead of a
+  // second, smaller one repeated here. Covered by each of those components'
+  // own tests, not this one, which has no such caller to report to.
   it('shows the reason picker, details and a request worded as a request (not "Delete")', () => {
     setup()
-    expect(screen.getByText('Request removal of Kosher Mart')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Confirm removal request' })).toBeTruthy()
     expect(screen.queryByText(/delete/i)).toBeNull()
-    expect(screen.getByRole('combobox', { name: /why should it be removed/i })).toBeTruthy()
+    expect(screen.getByRole('combobox', { name: /why should .* be removed/i })).toBeTruthy()
   })
 
   it('calls onCancel from Cancel, without submitting anything', async () => {

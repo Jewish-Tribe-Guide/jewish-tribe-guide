@@ -61,10 +61,18 @@ export default function MapPlaceDetail({ item, category, color, onBack }: Props)
   // that one; see its own comment for why (and CategoryEditor's
   // openPreview/closePreview, the precedent both follow).
   const [formOpen, setFormOpen] = useState<'edit' | null>(null)
+  // Whether ListingForm has swapped to its Request removal panel — reported
+  // up via onRemovalOpenChange so the h2 below can become "Request removal
+  // of {name}" instead of a static "Suggest an edit". Reset alongside
+  // formOpen (both directions: opening fresh, and popstate closing it) so a
+  // stale `true` from a previous visit here can't leak into the next one.
+  const [removalOpen, setRemovalOpen] = useState(false)
   useEffect(() => {
     function onPopState(e: PopStateEvent) {
       const state = e.state as { mapSheetForm?: 'edit' } | null
-      setFormOpen(state?.mapSheetForm === 'edit' ? 'edit' : null)
+      const open = state?.mapSheetForm === 'edit' ? 'edit' : null
+      setFormOpen(open)
+      if (!open) setRemovalOpen(false)
     }
     window.addEventListener('popstate', onPopState)
     return () => window.removeEventListener('popstate', onPopState)
@@ -72,6 +80,7 @@ export default function MapPlaceDetail({ item, category, color, onBack }: Props)
   const openForm = (mode: 'edit') => {
     history.pushState({ ...(window.history.state ?? {}), mapSheetForm: mode }, '')
     setFormOpen(mode)
+    setRemovalOpen(false)
   }
   const closeForm = () => history.back()
   const caps = resolveCapabilities(category.capabilities)
@@ -101,11 +110,13 @@ export default function MapPlaceDetail({ item, category, color, onBack }: Props)
             reasoning that the form's own intro copy plus already being on
             this listing's detail gave enough context — confirmed live
             that it read as unfinished next to the other four surfaces,
-            all of which keep a title. */}
+            all of which keep a title. Becomes "Request removal of {name}"
+            once ListingForm reports it's swapped to that panel, rather than
+            a second smaller title nested inside the form for the same fact. */}
         <h2 className="mb-3 text-lg font-semibold text-slate-900">
-          Suggest an edit
+          {removalOpen ? `Request removal of ${item.name}` : 'Suggest an edit'}
         </h2>
-        <ListingForm category={category} mode="edit" existing={item} onUp={closeForm} onSubmitted={closeForm} embedded />
+        <ListingForm category={category} mode="edit" existing={item} onUp={closeForm} onSubmitted={closeForm} onRemovalOpenChange={setRemovalOpen} embedded />
       </>
     )
   }

@@ -31,10 +31,24 @@ vi.mock('next/navigation', () => ({
 // it only needs to prove ListingDetailModal swaps to the right one, in
 // place, without bubbling to onEdit.
 vi.mock('./ListingForm', () => ({
-  default: ({ mode, existing, onUp }: { mode: string; existing?: { name: string }; onUp: () => void }) => (
+  default: ({
+    mode,
+    existing,
+    onUp,
+    onRemovalOpenChange,
+  }: {
+    mode: string
+    existing?: { name: string }
+    onUp: () => void
+    onRemovalOpenChange?: (open: boolean) => void
+  }) => (
     <div>
       <p>ListingForm stub — mode={mode}, existing={existing?.name}</p>
       <button onClick={onUp}>stub cancel</button>
+      {/* Stands in for ListingForm's own Request removal trigger, for the
+          one test that needs to prove the CALLER's title reacts to it —
+          see ListingForm's own test file for the real button/panel swap. */}
+      <button onClick={() => onRemovalOpenChange?.(true)}>stub open removal</button>
     </div>
   ),
 }))
@@ -797,6 +811,29 @@ describe('GenericListingCard — expanded', () => {
     // ReportSheet) shows this same title in its own header.
     expect(screen.getByRole('heading', { name: 'Suggest an edit' })).toBeInTheDocument()
     expect(screen.getByRole('dialog', { name: 'Suggest an edit' })).toBeInTheDocument()
+  })
+
+  // ListingForm no longer shows its own "Request removal of {name}" title
+  // (nested inside a form that already says "Suggest an edit" above it) —
+  // the dialog's OWN title becomes that instead, reported via
+  // onRemovalOpenChange, so there's one title that changes, not two.
+  it('the dialog’s own title becomes "Request removal of {name}" once ListingForm reports the removal panel is open', async () => {
+    const user = userEvent.setup()
+    const category = makeCategory()
+    const item = makeListing({ name: 'Goldi Market' })
+    renderWithProviders(
+      <GenericListingCard item={item} category={category} upvotes={false} count={0} defaultExpanded {...requiredHandlers} />,
+    )
+
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: /more actions for/i }))
+    await user.click(screen.getByRole('menuitem', { name: /^edit$/i }))
+    expect(screen.getByRole('dialog', { name: 'Suggest an edit' })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'stub open removal' }))
+
+    expect(screen.getByRole('dialog', { name: 'Request removal of Goldi Market' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Request removal of Goldi Market' })).toBeInTheDocument()
+    expect(screen.queryByRole('dialog', { name: 'Suggest an edit' })).not.toBeInTheDocument()
   })
 
   // The visible way in to Edit: a plain "Suggest a correction" link under the

@@ -106,36 +106,22 @@ export default function RemovalRequest({
     'w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary'
 
   return (
-    // No card of its own — a bordered/shaded box here made sense when this
-    // was a small callout appended BELOW the edit fields and needed to set
-    // itself apart from the form above it. Now it's the entire content of
-    // the swapped-in view, already sitting inside the dialog's own bordered
-    // card, so a second box nested inside that one was just framing around
-    // framing. No top divider either (tried one, dropped it): this panel is
-    // the first VISIBLE thing in the swap — Turnstile is the only sibling
-    // rendered above it, and when it's unconfigured (e.g. local dev) that
-    // divider became a stray line with nothing above it to separate from.
-    <div role="group" aria-labelledby={`${uid}-title`} className="space-y-3">
-      {/* A real title, not a muted paragraph — this panel replaces the whole
-          screen, so it needs to read as "you are here", the way a page
-          title would, not as one more line of body copy. The dialog's own
-          header still says "Suggest an edit" above this; this is the
-          sub-heading for what's actually showing right now. */}
-      <h3 id={`${uid}-title`} className="text-base font-semibold text-slate-900">
-        Request removal of {listing.name}
-      </h3>
-      {/* The "a moderator reviews this" part used to repeat ListingForm's own
-          blue banner above (same fact, same words, twice) — cut. What's left
-          is the one thing the banner doesn't say: this isn't the right tool
-          for a wrong address or phone number. "the fields above" no longer
-          means anything since this view replaced them — Cancel is how you'd
-          get back to them now. */}
-      <p className="text-sm text-muted">
-        Moved or has wrong info? Cancel and edit it instead.
-      </p>
+    // No title here and no card of its own. The panel used to carry both —
+    // its own "Request removal of {name}" heading plus an explanatory
+    // paragraph — because it was a callout appended BELOW the edit fields
+    // and needed to explain and set itself apart from the form above it.
+    // Now the dialog's OWN title becomes "Request removal of {name}" (see
+    // onRemovalOpenChange, reported to whichever caller embeds this — e.g.
+    // ListingDetailModal), so repeating that fact and a bordered box around
+    // it here was just saying the same thing twice. No "moderator reviews
+    // this" copy either — ListingForm's own blue banner already says that
+    // for every screen, and the rest ("this isn't for a wrong address")
+    // wasn't worth a permanent line either: Cancel and Confirm are the only
+    // two things this screen does, and that's clear on its own.
+    <div className="space-y-3">
       <div>
         <label htmlFor={`${uid}-reason`} className="mb-1 block text-sm font-medium text-slate-700">
-          Why should it be removed?
+          Why should {listing.name} be removed?
         </label>
         <select id={`${uid}-reason`} value={reason} onChange={(e) => setReason(e.target.value as (typeof REASONS)[number])} className={inputClass}>
           {REASONS.map((r) => (

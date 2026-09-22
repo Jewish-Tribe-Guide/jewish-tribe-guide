@@ -229,6 +229,14 @@ export default function FindResources({
 
   const action = actionSubject
 
+  // Whether ListingForm has swapped to its Request removal panel — reported
+  // up via onRemovalOpenChange so the Edit MobileSheet/ActionDialog's own
+  // title can become "Request removal of {name}" instead of a static
+  // "Suggest an edit". Reset at both openAction (a fresh edit starting) and
+  // goToCategoryList (closing back out), the two places a stale `true` from
+  // a previous visit could otherwise leak into the next one.
+  const [removalOpen, setRemovalOpen] = useState(false)
+
   // Adjusting state during render, not in an effect: React re-renders this
   // component immediately with the new value, before anything is painted, so
   // a deep-linked form (?form=create) mounts the widget in its very first
@@ -268,6 +276,7 @@ export default function FindResources({
   // listing grid) behind the dialog that just opened.
   function openAction(act: ListingAction) {
     setActionSubject(act)
+    setRemovalOpen(false)
     setParams(
       {
         form: act.mode,
@@ -300,6 +309,7 @@ export default function FindResources({
   // match openAction opening it — see that function's own doc.
   const goToCategoryList = () => {
     setActionSubject(null)
+    setRemovalOpen(false)
     setParams(
       {
         form: null,
@@ -417,7 +427,12 @@ export default function FindResources({
                 />
               )}
             </MobileSheet>
-            <MobileSheet isOpen={action?.mode === 'edit'} onClose={goToCategoryList} title="Suggest an edit" draggable>
+            <MobileSheet
+              isOpen={action?.mode === 'edit'}
+              onClose={goToCategoryList}
+              title={removalOpen && action?.mode === 'edit' ? `Request removal of ${action.listing.name}` : 'Suggest an edit'}
+              draggable
+            >
               {action?.mode === 'edit' && (
                 <ListingForm
                   category={category}
@@ -426,6 +441,7 @@ export default function FindResources({
                   onUp={goToCategoryList}
                   onSubmitted={goToCategoryList}
                   sharedTurnstile={sharedTurnstile}
+                  onRemovalOpenChange={setRemovalOpen}
                   embedded
                 />
               )}
@@ -445,7 +461,11 @@ export default function FindResources({
                 />
               )}
             </ActionDialog>
-            <ActionDialog isOpen={action?.mode === 'edit'} onClose={goToCategoryList} title="Suggest an edit">
+            <ActionDialog
+              isOpen={action?.mode === 'edit'}
+              onClose={goToCategoryList}
+              title={removalOpen && action?.mode === 'edit' ? `Request removal of ${action.listing.name}` : 'Suggest an edit'}
+            >
               {action?.mode === 'edit' && (
                 <ListingForm
                   category={category}
@@ -454,6 +474,7 @@ export default function FindResources({
                   onUp={goToCategoryList}
                   onSubmitted={goToCategoryList}
                   sharedTurnstile={sharedTurnstile}
+                  onRemovalOpenChange={setRemovalOpen}
                   embedded
                 />
               )}

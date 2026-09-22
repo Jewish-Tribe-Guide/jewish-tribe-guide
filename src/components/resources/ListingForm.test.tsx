@@ -175,23 +175,33 @@ describe('ListingForm', () => {
     it('clicking it swaps out the edit fields for the removal panel, and Cancel swaps them back', async () => {
       const user = userEvent.setup()
       const listing = existing()
-      renderWithProviders(<ListingForm category={makeCategory()} mode="edit" existing={listing} {...handlers} />)
+      const onRemovalOpenChange = vi.fn()
+      renderWithProviders(
+        <ListingForm category={makeCategory()} mode="edit" existing={listing} onRemovalOpenChange={onRemovalOpenChange} {...handlers} />,
+      )
 
       expect(isHidden(screen.getByDisplayValue(listing.name))).toBe(false)
       expect(isHidden(screen.getByRole('button', { name: 'Submit edit for review' }))).toBe(false)
+      // Called on mount too (false) — see the component's own doc on why.
+      expect(onRemovalOpenChange).toHaveBeenLastCalledWith(false)
 
       await user.click(screen.getByRole('button', { name: removalLine }))
 
-      expect(isHidden(screen.getByText(`Request removal of ${listing.name}`))).toBe(false)
+      // No title of its own any more (the embedding caller shows one instead
+      // — see onRemovalOpenChange below and each caller's own test); the
+      // reason picker is what proves the panel itself is now showing.
+      expect(isHidden(screen.getByRole('combobox', { name: /why should .* be removed/i }))).toBe(false)
       expect(isHidden(screen.getByDisplayValue(listing.name))).toBe(true)
       expect(isHidden(screen.getByRole('button', { name: 'Submit edit for review' }))).toBe(true)
       expect(isHidden(screen.getByRole('button', { name: removalLine }))).toBe(true)
+      expect(onRemovalOpenChange).toHaveBeenLastCalledWith(true)
 
       await user.click(screen.getByRole('button', { name: 'Cancel' }))
 
       expect(isHidden(screen.getByDisplayValue(listing.name))).toBe(false)
       expect(isHidden(screen.getByRole('button', { name: 'Submit edit for review' }))).toBe(false)
-      expect(isHidden(screen.getByText(`Request removal of ${listing.name}`))).toBe(true)
+      expect(isHidden(screen.getByRole('combobox', { name: /why should .* be removed/i }))).toBe(true)
+      expect(onRemovalOpenChange).toHaveBeenLastCalledWith(false)
     })
 
     it('keeps a reason already picked if Cancel is clicked, then Request removal opened again', async () => {

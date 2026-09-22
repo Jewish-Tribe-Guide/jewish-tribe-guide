@@ -64,12 +64,19 @@ type Props = {
    *  mobile), but not itself device-gated — the caller decides when to
    *  pass it. */
   embedded?: boolean
+  /** Fires whenever this component swaps between its own fields and the
+   *  Request removal panel — lets an embedding caller's OWN title (this
+   *  component's own heading is suppressed while embedded) become "Request
+   *  removal of {name}" instead of showing a second, smaller title for the
+   *  same thing nested inside the form. See ListingDetailModal/
+   *  MapPlaceDetail/FindResources for the callers that use it. */
+  onRemovalOpenChange?: (open: boolean) => void
 }
 
 const inputClass =
   'w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary'
 
-export default function ListingForm({ category, mode, existing, onUp, onSubmitted, onPreviewSubmit, sharedTurnstile, adminSubmit, embedded }: Props) {
+export default function ListingForm({ category, mode, existing, onUp, onSubmitted, onPreviewSubmit, sharedTurnstile, adminSubmit, embedded, onRemovalOpenChange }: Props) {
   const community = useCommunitySlug()
   const config = category
   const hasAddress = category.hasAddress !== false
@@ -141,6 +148,14 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
   const [removalOpen, setRemovalOpen] = useState(false)
   const canRequestRemoval =
     mode === 'edit' && !!existing && !adminSubmit && !onPreviewSubmit && ui.contributions.report && resolveCapabilities(config.capabilities).report
+  // Runs on mount too (not just on change) — deliberately: an embedding
+  // caller's own removalOpen mirror could otherwise start stale (true) from
+  // a previous open of a DIFFERENT listing if it isn't reset at every entry
+  // point, and this self-corrects it the instant a fresh ListingForm mounts.
+  useEffect(() => {
+    onRemovalOpenChange?.(removalOpen)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [removalOpen])
 
   // Which audience sections (Women's/Men's/Keilim, …) are expanded — purely a
   // display preference layered on top of fieldIsVisible's hard gate (a

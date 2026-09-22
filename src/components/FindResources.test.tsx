@@ -56,10 +56,23 @@ vi.mock('@/components/resources/ResourceLoader', () => ({
   ),
 }))
 vi.mock('@/components/resources/ListingForm', () => ({
-  default: ({ mode, embedded, onUp }: { mode: string; embedded?: boolean; onUp: () => void }) => (
+  default: ({
+    mode,
+    embedded,
+    onUp,
+    onRemovalOpenChange,
+  }: {
+    mode: string
+    embedded?: boolean
+    onUp: () => void
+    onRemovalOpenChange?: (open: boolean) => void
+  }) => (
     <div>
       <p>ListingForm: {mode}{embedded ? ' (embedded)' : ''}</p>
       <button onClick={onUp}>stub cancel</button>
+      {/* Stands in for ListingForm's own Request removal trigger — see the
+          dedicated test below and ListingForm's own file for the real one. */}
+      <button onClick={() => onRemovalOpenChange?.(true)}>stub open removal</button>
     </div>
   ),
 }))
@@ -228,6 +241,26 @@ describe('FindResources — a real listing category', () => {
     expect(screen.getByText('ResourceLoader')).toBeInTheDocument()
     expect(screen.getByRole('dialog', { name: 'Suggest an edit' })).toBeInTheDocument()
     expect(screen.getByText('ListingForm: edit (embedded)')).toBeInTheDocument()
+  })
+
+  // No second, smaller title nested inside the form — the sheet's OWN title
+  // becomes "Request removal of {name}" itself, reported via
+  // onRemovalOpenChange, on both platforms.
+  it('the sheet/dialog title becomes "Request removal of {name}" once ListingForm reports the removal panel is open', async () => {
+    const user = userEvent.setup()
+    const grocery = makeCategory({ id: 'grocery', kind: 'listing' })
+    renderWithProviders(
+      <ForcedViewport isMobile>
+        <FindResources view="grocery" listings={[listing({ id: 'l1', name: 'Kosher Mart' })]} anchor={anchor} onUp={vi.fn()} searchForm="edit" searchItem="l1" />
+      </ForcedViewport>,
+      { content: { categories: [grocery] } },
+    )
+    expect(screen.getByRole('dialog', { name: 'Suggest an edit' })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'stub open removal' }))
+
+    expect(screen.getByRole('dialog', { name: 'Request removal of Kosher Mart' })).toBeInTheDocument()
+    expect(screen.queryByRole('dialog', { name: 'Suggest an edit' })).not.toBeInTheDocument()
   })
 
   // Report was folded into the edit form (RemovalRequest). A link shared before

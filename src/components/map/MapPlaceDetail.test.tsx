@@ -21,10 +21,25 @@ vi.mock('next/navigation', () => ({
 // one with the right listing, not to re-exercise their internals (which
 // pull in the real Google Maps address widget, Turnstile, etc.).
 vi.mock('@/components/resources/ListingForm', () => ({
-  default: ({ mode, existing, onUp, embedded }: { mode: string; existing?: DirectoryResource; onUp: () => void; embedded?: boolean }) => (
+  default: ({
+    mode,
+    existing,
+    onUp,
+    embedded,
+    onRemovalOpenChange,
+  }: {
+    mode: string
+    existing?: DirectoryResource
+    onUp: () => void
+    embedded?: boolean
+    onRemovalOpenChange?: (open: boolean) => void
+  }) => (
     <div>
       <p>ListingForm stub — mode={mode}, existing={existing?.name}{embedded ? ' (embedded)' : ''}</p>
       <button onClick={onUp}>stub cancel</button>
+      {/* Stands in for ListingForm's own Request removal trigger — see the
+          dedicated test below and ListingForm's own file for the real one. */}
+      <button onClick={() => onRemovalOpenChange?.(true)}>stub open removal</button>
     </div>
   ),
 }))
@@ -139,6 +154,28 @@ describe('MapPlaceDetail', () => {
     // every other Edit/Report surface (ActionDialog, MobileSheet,
     // ReportSheet) shows this same title in its own header.
     expect(screen.getByRole('heading', { name: 'Suggest an edit' })).toBeInTheDocument()
+  })
+
+  // No second, smaller title nested inside the form for this — the h2 here
+  // becomes "Request removal of {name}" itself, reported via
+  // onRemovalOpenChange.
+  it('the h2 becomes "Request removal of {name}" once ListingForm reports the removal panel is open', async () => {
+    const userEvent = (await import('@testing-library/user-event')).default
+    const user = userEvent.setup()
+    renderWithProviders(
+      <PinnedProvider>
+        <MapPlaceDetail item={makeListing({ name: 'Goldi Market' })} category={makeCategory()} color="#000" onBack={() => {}} />
+      </PinnedProvider>,
+    )
+
+    await user.click(screen.getByRole('button', { name: /more actions for goldi market/i }))
+    await user.click(screen.getByRole('menuitem', { name: /^edit$/i }))
+    expect(screen.getByRole('heading', { name: 'Suggest an edit' })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'stub open removal' }))
+
+    expect(screen.getByRole('heading', { name: 'Request removal of Goldi Market' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Suggest an edit' })).not.toBeInTheDocument()
   })
 
   it('has a visible "Suggest a correction" link that opens the same edit form as the kebab', async () => {

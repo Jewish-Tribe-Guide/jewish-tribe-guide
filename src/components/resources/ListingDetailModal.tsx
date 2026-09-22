@@ -125,18 +125,28 @@ export default function ListingDetailModal({
   }
   const closeForm = () => history.back()
 
+  // Whether ListingForm has swapped its own fields out for the Request
+  // removal panel — reported up via its onRemovalOpenChange so this
+  // component's own header can become "Request removal of {name}" instead
+  // of a static "Suggest an edit", rather than showing a second, smaller
+  // title inside the form for the same thing.
+  const [removalOpen, setRemovalOpen] = useState(false)
+
   // Resets the next time this dialog opens (a fresh listing, or the same
   // one reopened later) — adjusted during render, the React-docs-
   // recommended way to reset state on a prop change, rather than in an
   // effect: an effect would commit one frame showing the PREVIOUS open's
   // form before its own setState took hold. Component instance stays
   // mounted the whole time (this always renders, just returns null below
-  // while closed), so `formOpen` would otherwise carry over from a
-  // previous open on its own.
+  // while closed), so `formOpen`/`removalOpen` would otherwise carry over
+  // from a previous open on their own.
   const [wasOpen, setWasOpen] = useState(isOpen)
   if (isOpen !== wasOpen) {
     setWasOpen(isOpen)
-    if (isOpen) setFormOpen(null)
+    if (isOpen) {
+      setFormOpen(null)
+      setRemovalOpen(false)
+    }
   }
 
   // Reference-counted, not a plain `document.body.style.overflow = isOpen ?
@@ -240,7 +250,7 @@ export default function ListingDetailModal({
         className={`dialog-in flex flex-col w-full max-h-[85vh] bg-white border border-slate-200 rounded-xl shadow-xl transition-[max-width] duration-200 ease-in-out ${formOpen ? 'max-w-xl' : 'max-w-md'}`}
         role="dialog"
         aria-modal="true"
-        aria-label={formOpen ? 'Suggest an edit' : name}
+        aria-label={formOpen ? (removalOpen ? `Request removal of ${name}` : 'Suggest an edit') : name}
       >
         {/* Badges live inside this same block, under the subtitle — not as
             their own section below a divider. They're facts about this
@@ -262,6 +272,10 @@ export default function ListingDetailModal({
             // title in its own header; this and MapPlaceDetail's identical
             // morph-in-place were the two gaps, confirmed live to read as
             // unfinished next to the other four once compared side by side.
+            // Becomes "Request removal of {name}" once ListingForm reports
+            // (via onRemovalOpenChange) that it's swapped to that panel —
+            // one title that changes, not a second smaller one nested
+            // inside the form repeating the same fact.
             <div className="min-w-0">
               <button
                 onClick={closeForm}
@@ -271,7 +285,7 @@ export default function ListingDetailModal({
                 Back
               </button>
               <h2 className="mt-1 font-semibold text-slate-900 text-lg">
-                Suggest an edit
+                {removalOpen ? `Request removal of ${name}` : 'Suggest an edit'}
               </h2>
             </div>
           ) : (
@@ -372,7 +386,7 @@ export default function ListingDetailModal({
 
         <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
           {formOpen === 'edit' ? (
-            <ListingForm category={category} mode="edit" existing={item} onUp={closeForm} onSubmitted={closeForm} embedded />
+            <ListingForm category={category} mode="edit" existing={item} onUp={closeForm} onSubmitted={closeForm} onRemovalOpenChange={setRemovalOpen} embedded />
           ) : (
             <>
               <PlaceDetailBody
