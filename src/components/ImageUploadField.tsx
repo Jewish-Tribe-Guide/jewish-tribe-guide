@@ -250,13 +250,33 @@ export default function ImageUploadField({
 
         <div className="flex flex-col gap-1.5">
           <div className="flex flex-wrap gap-2">
+            {/* Each button carries a short mobile label and the full
+                desktop one, swapped with sm:hidden/hidden sm:inline rather
+                than shortened everywhere — on a phone, three buttons this
+                size next to the preview don't fit "Upload image"/"Take
+                photo"/"Paste URL" on one line even stacked full-width (see
+                the outer flex-col above), but the longer, clearer phrasing
+                still reads better once there's room for it on desktop.
+                aria-label pins the accessible name to the full phrase
+                regardless of which one CSS is currently showing — without
+                it, a screen reader (or a test, which doesn't load Tailwind's
+                compiled CSS and so sees BOTH spans as present) reads both
+                pieces of text back to back instead of one real name. */}
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
               disabled={uploading}
+              aria-label={uploading ? 'Uploading…' : 'Upload image'}
               className="text-sm font-medium border border-slate-300 text-slate-600 rounded-md px-3 py-1.5 hover:bg-slate-50 transition-colors cursor-pointer disabled:opacity-60"
             >
-              {uploading ? 'Uploading…' : 'Upload image'}
+              {uploading ? (
+                <span aria-hidden="true">Uploading…</span>
+              ) : (
+                <>
+                  <span aria-hidden="true" className="sm:hidden">Upload</span>
+                  <span aria-hidden="true" className="hidden sm:inline">Upload image</span>
+                </>
+              )}
             </button>
             {/* `capture` is only meaningful on a phone's camera-equipped
                 browser — desktop browsers just treat this input identically
@@ -266,9 +286,11 @@ export default function ImageUploadField({
               type="button"
               onClick={() => cameraInputRef.current?.click()}
               disabled={uploading}
+              aria-label="Take photo"
               className="text-sm font-medium border border-slate-300 text-slate-600 rounded-md px-3 py-1.5 hover:bg-slate-50 transition-colors cursor-pointer disabled:opacity-60"
             >
-              Take photo
+              <span aria-hidden="true" className="sm:hidden">Camera</span>
+              <span aria-hidden="true" className="hidden sm:inline">Take photo</span>
             </button>
             {/* A pasted URL is a third real way to add a photo, not a lesser
                 afterthought, so it's a real toggle button in this row —
@@ -288,13 +310,15 @@ export default function ImageUploadField({
                 type="button"
                 onClick={() => setUrlInputOpen((open) => !open)}
                 aria-pressed={urlInputOpen}
+                aria-label="Paste URL"
                 className={`text-sm font-medium rounded-md border px-3 py-1.5 transition-colors cursor-pointer ${
                   urlInputOpen
                     ? 'border-primary bg-primary text-white hover:bg-primary/90'
                     : 'border-slate-300 text-slate-600 hover:bg-slate-50'
                 }`}
               >
-                Paste URL
+                <span aria-hidden="true" className="sm:hidden">URL</span>
+                <span aria-hidden="true" className="hidden sm:inline">Paste URL</span>
               </button>
             )}
             {value.trim() && (

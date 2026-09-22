@@ -1021,25 +1021,43 @@ function DetailFieldInput({
             answer yet reads as "on"/"Yes" — the friendlier default a
             positively-phrased question like "Everything here is kosher?"
             wants, rather than opening on a negative "No" nobody chose. */}
-        <div className="flex items-center justify-between rounded-md border border-slate-300 bg-white px-3 py-2">
-          <span className="text-sm text-slate-600">{(field.invertDisplay ? !value : !!value) ? 'Yes' : 'No'}</span>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={field.invertDisplay ? !value : !!value}
-            aria-label={labelOverride ?? field.label}
-            onClick={() => onChange(!value)}
-            className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1 ${
-              (field.invertDisplay ? !value : !!value) ? 'bg-primary' : 'bg-slate-300'
-            }`}
-          >
-            <span
-              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                (field.invertDisplay ? !value : !!value) ? 'translate-x-6' : 'translate-x-1'
-              }`}
-            />
-          </button>
-        </div>
+        {/* The WHOLE row is the switch (one <button>, not a span of inert
+            text next to a separate small control) — reading the state on
+            the left before reaching the control on the right (matching
+            every other left-label/right-control row, e.g. iOS/Android
+            Settings) only works if you can actually ACT from anywhere in
+            that row. A separate `<button role="switch">` stranded at the
+            far right, with plain text beside it doing nothing, made the gap
+            between where you read and where you click feel real instead of
+            just visual — the fix is making the row itself clickable, the
+            same as a native Settings toggle row is, not reordering its
+            contents. */}
+        {(() => {
+          const displayValue = field.invertDisplay ? !value : !!value
+          return (
+            <button
+              type="button"
+              role="switch"
+              aria-checked={displayValue}
+              aria-label={labelOverride ?? field.label}
+              onClick={() => onChange(!value)}
+              className="flex w-full cursor-pointer items-center justify-between rounded-md border border-slate-300 bg-white px-3 py-2 transition-colors hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-primary"
+            >
+              <span className="text-sm text-slate-600">{displayValue ? 'Yes' : 'No'}</span>
+              <span
+                className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
+                  displayValue ? 'bg-primary' : 'bg-slate-300'
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    displayValue ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </span>
+            </button>
+          )
+        })()}
         {/* Flush left, matching every other field's help text (no more
             ml-6 offset to align under the label past the checkbox — the
             whole control is boxed now, so this reads as "about the box

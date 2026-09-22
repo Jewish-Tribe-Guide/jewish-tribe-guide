@@ -822,6 +822,23 @@ describe('ListingForm', () => {
       expect(screen.getByText('No')).toBeInTheDocument()
     })
 
+    // Reading "Yes"/"No" on the left before reaching the switch on the
+    // right only makes sense if you can actually act from wherever you're
+    // reading — a separate inert span of text next to a small switch
+    // stranded at the far edge makes that gap real, not just visual. The
+    // "Yes"/"No" text has to be inside the same clickable control as the
+    // switch, not just visually beside it.
+    it('makes the whole boolean row the switch, not just a small control at one edge of it', () => {
+      const category = makeCategory({ detailFields: [booleanField({ key: 'shabbatFriendly', label: 'Shabbat friendly' })] })
+      renderWithProviders(<ListingForm category={category} mode="create" {...handlers} />)
+
+      const toggle = screen.getByRole('switch', { name: 'Shabbat friendly' })
+      expect(toggle.tagName).toBe('BUTTON')
+      // The "No" state text is a DESCENDANT of the switch itself, not a
+      // sibling next to it — so it's part of the one clickable control.
+      expect(toggle).toContainElement(screen.getByText('No'))
+    })
+
     it('gives a real admin-named formSection its header even with just one field (the <3 rule is "More details"-only)', () => {
       const category = makeCategory({
         formSections: [{ key: 'kosher', label: 'Kosher details' }],
