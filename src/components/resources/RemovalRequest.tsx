@@ -134,28 +134,40 @@ export default function RemovalRequest({
     // wasn't worth a permanent line either: Cancel and Confirm are the only
     // two things this screen does, and that's clear on its own.
     <div className="space-y-3">
-      <div>
-        <label htmlFor={`${uid}-reason`} className="mb-1 block text-sm font-medium text-slate-700">
-          Why should {listing.name} be removed?
-        </label>
-        <select id={`${uid}-reason`} value={reason} onChange={(e) => setReason(e.target.value as (typeof REASONS)[number])} className={inputClass}>
-          {REASONS.map((r) => (
-            <option key={r} value={r}>{r}</option>
-          ))}
-        </select>
-      </div>
-      <div>
-        <label htmlFor={`${uid}-details`} className="mb-1 block text-sm font-medium text-slate-700">
-          Details (optional)
-        </label>
-        <textarea
-          id={`${uid}-details`}
-          value={details}
-          onChange={(e) => setDetails(e.target.value)}
-          rows={2}
-          placeholder="e.g. Closed in August, the space is now a bank."
-          className={inputClass}
-        />
+      {/* One static box for the actual question this screen asks — the same
+          visual language as ListingForm's own field groups (Basics, an
+          audience/formSection section), just without a collapse control
+          since there's only ever this one. Name/email and the actions below
+          stay bare, matching how ListingForm itself treats its own
+          submitter fields and Submit/Request removal — a box means "a field
+          group", not "everything on this screen", so contact info and
+          buttons living inside it here (while they don't on the edit
+          screen) read as an inconsistency once both are visible side by
+          side, not a deliberate distinction. */}
+      <div className="space-y-4 rounded-md border border-slate-200 p-4">
+        <div>
+          <label htmlFor={`${uid}-reason`} className="mb-1 block text-sm font-medium text-slate-700">
+            Why should {listing.name} be removed?
+          </label>
+          <select id={`${uid}-reason`} value={reason} onChange={(e) => setReason(e.target.value as (typeof REASONS)[number])} className={inputClass}>
+            {REASONS.map((r) => (
+              <option key={r} value={r}>{r}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label htmlFor={`${uid}-details`} className="mb-1 block text-sm font-medium text-slate-700">
+            Details (optional)
+          </label>
+          <textarea
+            id={`${uid}-details`}
+            value={details}
+            onChange={(e) => setDetails(e.target.value)}
+            rows={2}
+            placeholder="e.g. Closed in August, the space is now a bank."
+            className={inputClass}
+          />
+        </div>
       </div>
       {/* Same fields as ListingForm's own "Your name"/"Your email", not a
           separate ask — a removal request is a bigger claim than a routine
