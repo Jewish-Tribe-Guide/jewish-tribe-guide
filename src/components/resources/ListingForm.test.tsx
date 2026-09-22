@@ -357,7 +357,7 @@ describe('ListingForm', () => {
 
     expect(screen.queryByLabelText('Kosher items')).not.toBeInTheDocument()
 
-    await user.click(screen.getByRole('checkbox', { name: 'Kosher' }))
+    await user.click(screen.getByRole('switch', { name: 'Kosher' }))
     expect(screen.getByLabelText('Kosher items')).toBeInTheDocument()
   })
 
@@ -374,7 +374,7 @@ describe('ListingForm', () => {
 
     expect(screen.queryByRole('button', { name: "Women's" })).not.toBeInTheDocument()
 
-    await user.click(screen.getByRole('checkbox', { name: "Women's Tevillah" }))
+    await user.click(screen.getByRole('switch', { name: "Women's Tevillah" }))
 
     const sectionToggle = screen.getByRole('button', { name: "Women's" })
     expect(sectionToggle).toHaveAttribute('aria-expanded', 'true')
@@ -768,26 +768,58 @@ describe('ListingForm', () => {
     // A checkbox used to be the one field type with no title above its box
     // — just a box whose only content repeated the field's own name next to
     // the checkbox. Reported live as awkward, especially alone in a box of
-    // its own. Now it gets the same title-above-box shape as a select/input,
-    // and the box shows the current state (Yes/No) instead of the label a
-    // second time — the checkbox itself still carries the real field name
-    // as its accessible name (aria-label), not just "Yes"/"No".
-    it('titles the boolean field like any other, and shows its state (Yes/No) inside the box instead of repeating the label', async () => {
+    // its own. A first fix titled the box but kept a checkbox with a
+    // separate "Yes"/"No" caption, which still read oddly — a question and
+    // its own answer stacked in one box. It's a switch now (the standard
+    // WAI-ARIA "switch" pattern: role="switch" + aria-checked on a button),
+    // whose two positions ARE the yes/no answer, same as a select's box only
+    // needs to hold the dropdown once its own label sits above it.
+    it('titles the boolean field like any other, and shows its state as a switch instead of repeating the label', async () => {
       const user = userEvent.setup()
       const category = makeCategory({ detailFields: [booleanField({ key: 'shabbatFriendly', label: 'Shabbat friendly' })] })
       renderWithProviders(<ListingForm category={category} mode="create" {...handlers} />)
 
       expect(screen.getByText('Shabbat friendly')).toBeInTheDocument()
-      const checkbox = screen.getByRole('checkbox', { name: 'Shabbat friendly' })
+      const toggle = screen.getByRole('switch', { name: 'Shabbat friendly' })
+      expect(toggle).toHaveAttribute('aria-checked', 'false')
       expect(screen.getByText('No')).toBeInTheDocument()
 
-      await user.click(checkbox)
+      await user.click(toggle)
 
+      expect(toggle).toHaveAttribute('aria-checked', 'true')
       expect(screen.getByText('Yes')).toBeInTheDocument()
       expect(screen.queryByText('No')).not.toBeInTheDocument()
       // Still just the one "Shabbat friendly" on screen — not repeated next
-      // to the checkbox as well.
+      // to the switch as well.
       expect(screen.getAllByText('Shabbat friendly')).toHaveLength(1)
+    })
+
+    // A field like `kosherPartial` is stored/read everywhere else (caveat
+    // badges, showIf) as "true means NOT everything is kosher" — but the
+    // form itself asks the friendlier, positive version of that question
+    // ("Everything here is kosher?"), so what the switch SHOWS is the
+    // opposite of what gets saved on the click that produced it.
+    it('shows an invertDisplay boolean field backwards from what it stores, defaulting to Yes when unanswered', async () => {
+      const user = userEvent.setup()
+      const category = makeCategory({
+        detailFields: [
+          booleanField({ key: 'kosherPartial', label: 'Everything here is kosher', invertDisplay: true }),
+        ],
+      })
+      renderWithProviders(<ListingForm category={category} mode="create" {...handlers} />)
+
+      // Nobody has answered yet — an inverted field reads this as "Yes"
+      // (the stored value is falsy either way), not a negative default.
+      const toggle = screen.getByRole('switch', { name: 'Everything here is kosher' })
+      expect(toggle).toHaveAttribute('aria-checked', 'true')
+      expect(screen.getByText('Yes')).toBeInTheDocument()
+
+      // Clicking flips what's shown to "No" — and stores kosherPartial as
+      // true (not everything is kosher), the real, non-inverted meaning
+      // every other reader of this field expects.
+      await user.click(toggle)
+      expect(toggle).toHaveAttribute('aria-checked', 'false')
+      expect(screen.getByText('No')).toBeInTheDocument()
     })
 
     it('gives a real admin-named formSection its header even with just one field (the <3 rule is "More details"-only)', () => {

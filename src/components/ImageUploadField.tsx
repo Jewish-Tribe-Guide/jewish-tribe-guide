@@ -182,7 +182,15 @@ export default function ImageUploadField({
 
   return (
     <div>
-      <div className="flex items-center gap-3">
+      {/* flex-col on narrow screens: with the preview and buttons side by
+          side, the buttons only had the leftover width after the preview +
+          gap, so "Upload image"/"Take photo" fit one row and "Paste URL"
+          alone wrapped to a second — an obviously cramped, uneven layout
+          reported live on a phone-width form. Stacking the preview above
+          the buttons on narrow screens gives the button row the FULL field
+          width to lay out in, same as it already had on desktop (sm:flex-row
+          restores the side-by-side layout once there's room for it). */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         {/* The preview doubles as the drop target — dragging a file directly
             onto the picture it's about to replace reads more naturally than
             a separate empty dropzone box floating nearby. */}

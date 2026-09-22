@@ -998,31 +998,48 @@ function DetailFieldInput({
             title line at all, just a box whose only content was the label
             repeated next to the checkbox. Reported live as awkward once it
             sat next to titled fields for real, especially alone in a box of
-            its own. The box now shows the current state (Yes/No) instead of
-            re-stating the field's own name — same relationship a select's
-            box has to its own label above (the label says what the field
-            is; the box shows the value), and the checkbox keeps the field's
-            real name as its accessible name via aria-label, so nothing is
-            actually lost for anyone not seeing it visually. */}
+            its own. */}
         <span className="block text-sm font-medium text-slate-700 mb-1">{label}</span>
-        {/* Same border/rounded/px-3 py-2 footprint as a text input or select
-            (see inputClass) — a bare checkbox+label with no box at all read
-            as a much lighter, stray element next to a stack of full-width
-            bordered fields, especially wedged between two of them. Still a
-            checkbox, not a Yes/No dropdown: this is the direct, established
-            control for a boolean everywhere else in the app, and a dropdown
-            would trade one inconsistency (visual weight) for a worse one
-            (an extra click, and a state that starts on neither answer). */}
-        <label className="flex items-center gap-2 cursor-pointer rounded-md border border-slate-300 bg-white px-3 py-2 hover:bg-slate-50">
-          <input
-            type="checkbox"
-            checked={!!value}
-            onChange={(e) => onChange(e.target.checked)}
+        {/* A switch, not a checkbox+repeated-label: a bare tick box reads as
+            "check this to confirm X", so it still needs its own text to say
+            what X is even once a title sits above it — that's the box a
+            checkbox+"Yes"/"No" caption fell back into, and it still read as
+            an odd mix of a question and its own answer stacked in one box.
+            A switch's two positions ARE the yes/no answer (this is the
+            standard WAI-ARIA "switch" pattern — role="switch" + aria-checked
+            on a real <button>, not a styled native checkbox), so the box
+            only needs to hold the control itself, exactly like a select's
+            box only needs to hold the dropdown. Same border/rounded/px-3
+            py-2 footprint as a text input or select (see inputClass), so it
+            still reads as one more field in the same stack, not a stray
+            control. */}
+        {/* invertDisplay (see its own doc on CategoryField): shows the
+            logical opposite of the stored value — clicking still always
+            flips the real stored boolean (onChange(!value)), only what's
+            RENDERED from it differs. `!value` (not `!!value`) is deliberate:
+            an unset field is falsy either way, so an inverted field with no
+            answer yet reads as "on"/"Yes" — the friendlier default a
+            positively-phrased question like "Everything here is kosher?"
+            wants, rather than opening on a negative "No" nobody chose. */}
+        <div className="flex items-center justify-between rounded-md border border-slate-300 bg-white px-3 py-2">
+          <span className="text-sm text-slate-600">{(field.invertDisplay ? !value : !!value) ? 'Yes' : 'No'}</span>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={field.invertDisplay ? !value : !!value}
             aria-label={labelOverride ?? field.label}
-            className="h-4 w-4 shrink-0 rounded border-slate-300 text-primary focus:ring-primary"
-          />
-          <span className="text-sm text-slate-600">{value ? 'Yes' : 'No'}</span>
-        </label>
+            onClick={() => onChange(!value)}
+            className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1 ${
+              (field.invertDisplay ? !value : !!value) ? 'bg-primary' : 'bg-slate-300'
+            }`}
+          >
+            <span
+              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                (field.invertDisplay ? !value : !!value) ? 'translate-x-6' : 'translate-x-1'
+              }`}
+            />
+          </button>
+        </div>
         {/* Flush left, matching every other field's help text (no more
             ml-6 offset to align under the label past the checkbox — the
             whole control is boxed now, so this reads as "about the box

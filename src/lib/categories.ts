@@ -210,6 +210,19 @@ export type CategoryField = {
    *  decluttered shape even before an admin has defined any real sections.
    *  Ignored on a coreSection field, which always renders in Basics. */
   formSection?: string
+  /** For `type: 'boolean'`: shows the SUBMISSION FORM's switch/state as the
+   *  logical opposite of what's actually stored — for a field whose stored
+   *  "true" is naturally a negative (e.g. `kosherPartial: true` means "not
+   *  everything here is kosher"), where the form itself should still ask the
+   *  positive, friendlier version of the question ("Everything here is
+   *  kosher?") and default to "Yes" for a listing nobody has answered this
+   *  for yet, rather than opening on a negatively-phrased "No". Purely a
+   *  form-display concern: the field's own `label` carries the positive
+   *  phrasing, the stored value and its key are untouched, and every other
+   *  reader of this field (caveat badges, showIf, filters) keeps reading the
+   *  real stored boolean exactly as before — nothing downstream needs to
+   *  know this field is asked "backwards" in the form. */
+  invertDisplay?: boolean
 }
 
 /** A named, admin-defined group of optional form fields — see
