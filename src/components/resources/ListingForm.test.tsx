@@ -692,7 +692,14 @@ describe('ListingForm', () => {
     // A small "More details" alongside a real named section is a different
     // case from being the form's only content — it still reads as one
     // bucket among several, so it keeps the plain-box treatment (no merge).
-    it('keeps a small "More details" as its own box when a real section also exists', () => {
+    // The plain/unlabeled/non-collapsible treatment is ONLY for the merge
+    // case (a lone small "More details" that becomes the whole form) — a
+    // small "More details" alongside a real section is one bucket among
+    // several, not the whole form, so it keeps the normal label-and-collapse
+    // header every other bucket has, same as if it had 3+ fields. Confirmed
+    // live and corrected after an earlier version of this over-applied the
+    // <3 rule to this case too.
+    it('gives a small "More details" the normal collapsible header when a real section also exists, not the plain-box treatment', () => {
       const category = makeCategory({
         formSections: [{ key: 'kosher', label: 'Kosher details' }],
         detailFields: [
@@ -704,6 +711,8 @@ describe('ListingForm', () => {
 
       const basicsBox = screen.getByRole('button', { name: 'Basics' }).closest('div')
       expect(basicsBox?.textContent).not.toContain('Notes')
+      const toggle = screen.getByRole('button', { name: /More details/ })
+      expect(toggle).toHaveAttribute('aria-expanded', 'false')
       expect(screen.getByLabelText('Notes')).toBeInTheDocument()
       expect(screen.getByRole('button', { name: /Kosher details/ })).toBeInTheDocument()
     })
@@ -729,6 +738,20 @@ describe('ListingForm', () => {
       // DOCUMENT_POSITION_FOLLOWING (4) means the photo field comes after
       // Certification, the reverse of the category's own field order above.
       expect(certification.compareDocumentPosition(photoLabel) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    })
+
+    // Every other field type gets a border for free (a select/textarea/input
+    // is browser-rendered with one); the photo picker's several loose pieces
+    // (preview, buttons, hint) have none of their own, so it needs an
+    // explicit box to read as one field next to bordered neighbors — same
+    // reasoning the boolean checkbox got its own box for.
+    it('boxes the photo field the same way the boolean checkbox is boxed', () => {
+      const category = makeCategory({ detailFields: [imageField({ key: 'photo' })] })
+      renderWithProviders(<ListingForm category={category} mode="create" {...handlers} />)
+
+      const photoBox = screen.getByText('Photo').closest('div')?.querySelector('.rounded-md.border')
+      expect(photoBox).not.toBeNull()
+      expect(photoBox?.querySelector('input[type="file"]')).toBeInTheDocument()
     })
 
     it('gives a real admin-named formSection its header even with just one field (the <3 rule is "More details"-only)', () => {

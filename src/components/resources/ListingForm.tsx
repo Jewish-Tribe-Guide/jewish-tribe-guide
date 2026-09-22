@@ -721,26 +721,16 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
         {groupBlocksToRender.length > 0 && (
           <div className="space-y-3">
             {groupBlocksToRender.map((block) => {
-                // A "More details" catch-all with only one or two stray
-                // fields (nothing an admin bothered naming a section for)
-                // doesn't earn the full label-and-collapse treatment — a
-                // header, a chevron and a click just to see one field is
-                // more machinery than the field itself. Below the
-                // threshold, it's a plain box: no label, no collapse,
-                // always visible — the same quiet, unlabeled treatment
-                // RemovalRequest's own reason/details box already uses for
-                // the same reason (one thing, not worth naming or hiding).
-                // A real named group (an audience section, a formSection)
-                // keeps its header regardless of size — an admin choosing
-                // to name and separate out even one field was deliberate,
-                // not a leftover.
-                if (block.sectionKey === MORE_DETAILS_KEY && block.fields.length < 3) {
-                  return (
-                    <div key={block.sectionKey} className="space-y-4 rounded-md border border-slate-200 p-3">
-                      {block.fields.map((field) => renderField(field))}
-                    </div>
-                  )
-                }
+                // The plain, unlabeled, non-collapsible treatment (see
+                // mergeMoreDetailsIntoBasics above) is ONLY for a lone small
+                // "More details" that becomes the whole form — it folds into
+                // Basics and never reaches this list at all. Every block
+                // that DOES reach here (an audience section, a formSection,
+                // or "More details" alongside real sections) gets the full
+                // label-and-collapse treatment regardless of its own size:
+                // once other named groups exist, a small "More details"
+                // reads as one bucket among several, not the whole form, so
+                // it keeps the same header every other bucket has.
 
                 // An audience section defaults OPEN the moment it exists at
                 // all — checking its gate box (e.g. "Women's Tevillah") is
@@ -972,26 +962,35 @@ function DetailFieldInput({
     return (
       <div>
         <span className="block text-sm font-medium text-slate-700 mb-1">{labelOverride ?? field.label}</span>
-        <ImageUploadField
-          value={(value as string) ?? ''}
-          onChange={onChange}
-          uploadUrl="/api/submissions/photo"
-          // Wherever this photo actually renders (CategoryIcon's callers —
-          // map pins, listing cards, place detail) it's always circular, so
-          // the crop step's own guide has to match that, not show a square
-          // shape and let corners the visitor thinks are kept quietly get
-          // clipped away later.
-          shape="circle"
-          // No helpText ("Shown instead of the category's usual icon…") —
-          // same self-explanatory-copy trim as the reposition hint below:
-          // it becomes obvious once there's a photo, and the field is
-          // already labeled "Photo *". No collapseUrlInput exception here
-          // (admin's own uploaders keep the URL row always visible) — most
-          // visitors upload a file, so a permanently-visible label+input for
-          // that edge case was exactly the bulk this field didn't need.
-          showRepositionHint={false}
-          collapseUrlInput
-        />
+        {/* Every other field type gets its visual weight for free — a
+            select/textarea/input is browser-rendered with its own border.
+            The photo picker is several loose pieces (a preview, three
+            buttons, a hint line) with no such border of its own, so next to
+            a stack of bordered fields it read as scattered UI rather than
+            one field — same reasoning the boolean checkbox got its own box
+            for earlier. */}
+        <div className="rounded-md border border-slate-300 p-3">
+          <ImageUploadField
+            value={(value as string) ?? ''}
+            onChange={onChange}
+            uploadUrl="/api/submissions/photo"
+            // Wherever this photo actually renders (CategoryIcon's callers —
+            // map pins, listing cards, place detail) it's always circular, so
+            // the crop step's own guide has to match that, not show a square
+            // shape and let corners the visitor thinks are kept quietly get
+            // clipped away later.
+            shape="circle"
+            // No helpText ("Shown instead of the category's usual icon…") —
+            // same self-explanatory-copy trim as the reposition hint below:
+            // it becomes obvious once there's a photo, and the field is
+            // already labeled "Photo *". No collapseUrlInput exception here
+            // (admin's own uploaders keep the URL row always visible) — most
+            // visitors upload a file, so a permanently-visible label+input for
+            // that edge case was exactly the bulk this field didn't need.
+            showRepositionHint={false}
+            collapseUrlInput
+          />
+        </div>
       </div>
     )
   }
