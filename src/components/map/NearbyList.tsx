@@ -57,6 +57,35 @@ function resolveOpenState(dragXValue: number, startX: number, velocity: number):
   return startX === 0 ? traveled < -OPEN_THRESHOLD : !(traveled > OPEN_THRESHOLD)
 }
 
+// Dragging past fully-open or fully-closed used to hard-stop right at the
+// limit — the row stopped dead under the finger with zero resistance, next
+// to iOS/WhatsApp's own rubber-band give at the same limits. Diminishing
+// resistance past `bound`: the further raw pushes beyond it, the less
+// additional visual travel each extra px of drag buys, approaching (but
+// never reaching) bound ± RUBBER_BAND_CONSTANT. Same shape as
+// UIScrollView's own bounce, at a constant tuned to look like a few pixels
+// of give rather than a rope stretching.
+const RUBBER_BAND_CONSTANT = 32
+function rubberBand(raw: number, min: number, max: number): number {
+  if (raw > max) {
+    const over = raw - max
+    return max + (RUBBER_BAND_CONSTANT * over) / (RUBBER_BAND_CONSTANT + over)
+  }
+  if (raw < min) {
+    const under = min - raw
+    return min - (RUBBER_BAND_CONSTANT * under) / (RUBBER_BAND_CONSTANT + under)
+  }
+  return raw
+}
+
+// The settle animation after release — snapping open/closed, or springing
+// back from the rubber-banded overshoot above. A flat `ease` curve doesn't
+// overshoot, which is exactly why it read as mechanical next to iMessage/
+// WhatsApp's own row actions: those settle with a slight spring past the
+// final position before easing back. This cubic-bezier is the standard
+// "back out" curve (dips past 1 around 80% through, then eases into it).
+const SETTLE_EASING = 'cubic-bezier(0.34, 1.56, 0.64, 1)'
+
 // Mouse/trackpad users get the desktop convention instead of the touch one:
 // hovering reveals the row action (iMessage/Mail-on-Mac style) and it stays
 // up for as long as the pointer sits over the row, no drag-and-hold required.
@@ -195,6 +224,13 @@ function NearbyRow({ point: p, canViewListing, canPin, hoverCapable, isOpen, onO
   const lastMoveTimeRef = useRef(0)
   // Trackpad-path equivalent of startDragXRef — see the wheel handler below.
   const wheelStartXRef = useRef(0)
+  // The wheel path's raw, undamped running position — dragXRef itself now
+  // holds the rubber-banded (visual) value, so accumulating deltas against
+  // THAT would re-dampen an already-damped number every tick, stalling much
+  // earlier than a sustained push past the limit should. This tracks the
+  // true total so each tick's rubberBand() call starts from the real
+  // distance past the edge, same as the touch path's startDragXRef + delta.
+  const wheelRawXRef = useRef(0)
   const wheelSettleTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const wrapperRef = useRef<HTMLDivElement>(null)
   const contentRef = useRef<HTMLDivElement>(null)
@@ -278,7 +314,7 @@ function NearbyRow({ point: p, canViewListing, canPin, hoverCapable, isOpen, onO
     // a vertical drag/scroll for the sheet, the same way Spotify/WhatsApp's
     // row swipes don't fight their list's own vertical scroll.
     e.stopPropagation()
-    dragXRef.current = Math.min(0, Math.max(-REVEAL_WIDTH, startDragXRef.current + delta))
+    dragXRef.current = rubberBand(startDragXRef.current + delta, -REVEAL_WIDTH, 0)
     setDragX(dragXRef.current)
     // Instantaneous, not averaged over the whole gesture — a drag that
     // starts slow and ends in a fast flick should commit on that flick, not
@@ -339,13 +375,18 @@ function NearbyRow({ point: p, canViewListing, canPin, hoverCapable, isOpen, onO
       // The first tick since the last settle is this gesture's baseline for
       // resolveOpenState's traveled-distance check — a fresh swipe starting
       // from wherever the row already sat, same as startDragXRef.current on
-      // the touch path.
-      if (!activeGestureRef.current) wheelStartXRef.current = dragXRef.current
+      // the touch path. wheelRawXRef starts there too, undamped — see its
+      // own doc for why it can't just be dragXRef.
+      if (!activeGestureRef.current) {
+        wheelStartXRef.current = dragXRef.current
+        wheelRawXRef.current = dragXRef.current
+      }
       activeGestureRef.current = true
       // Trackpad "swipe left" reports positive deltaX under macOS's default
       // natural-scrolling direction — subtracting it moves the row left, the
       // same direction the fingers moved, mirroring the touch-drag math above.
-      dragXRef.current = Math.min(0, Math.max(-REVEAL_WIDTH, dragXRef.current - e.deltaX))
+      wheelRawXRef.current -= e.deltaX
+      dragXRef.current = rubberBand(wheelRawXRef.current, -REVEAL_WIDTH, 0)
       setDragX(dragXRef.current)
       if (wheelSettleTimer.current) clearTimeout(wheelSettleTimer.current)
       // Wheel events have no discrete "end" the way pointerup does — treat a
@@ -460,7 +501,7 @@ function NearbyRow({ point: p, canViewListing, canPin, hoverCapable, isOpen, onO
           // way a ref never does, and that's exactly the drag math this file's
           // comments above are tuned around.
           // eslint-disable-next-line react-hooks/refs
-          transition: activeGestureRef.current ? 'none' : 'transform 200ms ease',
+          transition: activeGestureRef.current ? 'none' : `transform 220ms ${SETTLE_EASING}`,
         }}
         onClickCapture={onRowClickCapture}
       >
