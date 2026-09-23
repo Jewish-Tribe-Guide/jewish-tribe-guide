@@ -1,4 +1,4 @@
-import type { MouseEvent, ReactNode } from 'react'
+import { useRef, useState, type MouseEvent, type ReactNode } from 'react'
 
 // The small rounded pill used across a listing card: clickable filter/tag chips
 // and static detail badges. Consolidates the tone + size + interactive classes
@@ -32,6 +32,18 @@ const TONE_HOVER: Record<ChipTone, string> = {
   red: 'hover:bg-red-100 active:bg-red-200',
 }
 
+// The "yes, that registered" confirmation for badges that filter the page —
+// held with real state, not CSS `:active` (which reverts the instant the
+// finger lifts, before there's been any chance to notice the list actually
+// changed). One fixed color regardless of the chip's own tone, matching
+// `bg-primary`/`border-primary`, the same blue GenericDirectory's own filter
+// row already uses for "this filter is on" (the Filters button, boolean
+// chips, the sort toggle) — so a badge click reads as the same event as
+// clicking the equivalent control up in the filter row, rather than each
+// tone flashing its own unrelated darker shade.
+const PRESSED_CLASS = 'bg-primary text-white border-primary'
+const PRESSED_HOLD_MS = 400
+
 // Header chips get a taller tap target on mobile; expanded-panel chips are compact.
 const SIZE: Record<ChipSize, string> = {
   header: 'px-2 py-1 sm:py-0.5',
@@ -52,19 +64,28 @@ type Props = {
 }
 
 export default function Chip({ tone, size = 'header', title, className, onClick, children }: Props) {
+  const [pressed, setPressed] = useState(false)
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
   const cls = [
     BASE,
-    TONE_BASE[tone],
+    pressed ? PRESSED_CLASS : TONE_BASE[tone],
     SIZE[size],
-    onClick ? `transition-colors cursor-pointer ${TONE_HOVER[tone]}` : '',
+    onClick ? `transition-colors cursor-pointer ${pressed ? '' : TONE_HOVER[tone]}` : '',
     className,
   ]
     .filter(Boolean)
     .join(' ')
 
   if (onClick) {
+    const handleClick = (e: MouseEvent) => {
+      onClick(e)
+      setPressed(true)
+      if (timerRef.current) clearTimeout(timerRef.current)
+      timerRef.current = setTimeout(() => setPressed(false), PRESSED_HOLD_MS)
+    }
     return (
-      <button onClick={onClick} title={title} className={cls}>
+      <button onClick={handleClick} title={title} className={cls}>
         {children}
       </button>
     )
