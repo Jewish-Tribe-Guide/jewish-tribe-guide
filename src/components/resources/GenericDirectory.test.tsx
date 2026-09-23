@@ -871,48 +871,18 @@ describe('GenericDirectory — scrolling to the next/previous card', () => {
 // A badge on a card (Open/boolean/select) sets the same filter state as the
 // equivalent control up in the search/filter/sort row — but that row isn't
 // sticky on mobile, so clicking a badge deep in a long list can change what's
-// filtered with nothing on screen to show it. Peeking a small copy of the
-// "Filters" pill in from the top (rather than scrolling the real row into
-// view — tried first, but that relocates you every time, disruptive if
-// you're tapping several badges in a row) answers that without moving
-// anything, and only when the real row isn't already visible.
-describe('GenericDirectory — peeking the filter count after a card badge click', () => {
+// filtered with nothing on screen to show it. Scrolling the row into view
+// answers that, but only when it isn't already visible: doing it
+// unconditionally would yank the page around every time, including on
+// desktop where the row is usually docked in view already.
+describe('GenericDirectory — scrolling filter controls into view after a card badge click', () => {
   afterEach(() => {
     vi.restoreAllMocks()
   })
 
-  it('shows the filter peek when a badge sets a filter and the real controls row is off-screen', () => {
-    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
-      top: -500, bottom: -450, left: 0, right: 0, width: 0, height: 50, x: 0, y: -500, toJSON: () => {},
-    } as DOMRect)
-    const category = makeCategory()
-    const items = [makeListing({ id: 'a', name: 'Kosher Mart' })]
-    renderWithProviders(<GenericDirectory category={category} items={items} {...handlers} />)
-
-    expect(screen.getByTestId('filter-peek').className).toContain('opacity-0')
-
-    act(() => {
-      screen.getByRole('button', { name: 'card-filter Kosher Mart' }).click()
-    })
-
-    expect(screen.getByTestId('filter-peek').className).toContain('opacity-100')
-  })
-
-  it('does not show the peek when the controls row is already visible', () => {
-    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
-      top: 100, bottom: 150, left: 0, right: 0, width: 0, height: 50, x: 0, y: 100, toJSON: () => {},
-    } as DOMRect)
-    const category = makeCategory()
-    const items = [makeListing({ id: 'a', name: 'Kosher Mart' })]
-    renderWithProviders(<GenericDirectory category={category} items={items} {...handlers} />)
-
-    screen.getByRole('button', { name: 'card-filter Kosher Mart' }).click()
-
-    expect(screen.getByTestId('filter-peek').className).toContain('opacity-0')
-  })
-
-  it('hides the peek again on its own after a couple seconds', () => {
-    vi.useFakeTimers()
+  it('scrolls the controls row into view when a badge sets a filter and the row is off-screen', () => {
+    const scrollTo = vi.fn()
+    vi.stubGlobal('scrollTo', scrollTo)
     vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
       top: -500, bottom: -450, left: 0, right: 0, width: 0, height: 50, x: 0, y: -500, toJSON: () => {},
     } as DOMRect)
@@ -921,17 +891,30 @@ describe('GenericDirectory — peeking the filter count after a card badge click
       const items = [makeListing({ id: 'a', name: 'Kosher Mart' })]
       renderWithProviders(<GenericDirectory category={category} items={items} {...handlers} />)
 
-      act(() => {
-        screen.getByRole('button', { name: 'card-filter Kosher Mart' }).click()
-      })
-      expect(screen.getByTestId('filter-peek').className).toContain('opacity-100')
+      screen.getByRole('button', { name: 'card-filter Kosher Mart' }).click()
 
-      act(() => {
-        vi.advanceTimersByTime(2000)
-      })
-      expect(screen.getByTestId('filter-peek').className).toContain('opacity-0')
+      expect(scrollTo).toHaveBeenCalledWith(expect.objectContaining({ behavior: 'smooth' }))
     } finally {
-      vi.useRealTimers()
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('does not scroll when the controls row is already visible', () => {
+    const scrollTo = vi.fn()
+    vi.stubGlobal('scrollTo', scrollTo)
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
+      top: 100, bottom: 150, left: 0, right: 0, width: 0, height: 50, x: 0, y: 100, toJSON: () => {},
+    } as DOMRect)
+    try {
+      const category = makeCategory()
+      const items = [makeListing({ id: 'a', name: 'Kosher Mart' })]
+      renderWithProviders(<GenericDirectory category={category} items={items} {...handlers} />)
+
+      screen.getByRole('button', { name: 'card-filter Kosher Mart' }).click()
+
+      expect(scrollTo).not.toHaveBeenCalled()
+    } finally {
+      vi.unstubAllGlobals()
     }
   })
 })
