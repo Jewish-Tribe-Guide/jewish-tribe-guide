@@ -79,12 +79,23 @@ function rubberBand(raw: number, min: number, max: number): number {
 }
 
 // The settle animation after release — snapping open/closed, or springing
-// back from the rubber-banded overshoot above. A flat `ease` curve doesn't
-// overshoot, which is exactly why it read as mechanical next to iMessage/
-// WhatsApp's own row actions: those settle with a slight spring past the
-// final position before easing back. This cubic-bezier is the standard
-// "back out" curve (dips past 1 around 80% through, then eases into it).
-const SETTLE_EASING = 'cubic-bezier(0.34, 1.56, 0.64, 1)'
+// back from the rubber-banded overshoot above.
+//
+// A first attempt here used a "back out" curve that dips past the target
+// before easing into it (cubic-bezier(0.34, 1.56, 0.64, 1)) — modeled on
+// the assumption that a visible overshoot is what makes native row actions
+// (Messages/Mail's own UISwipeActionsConfiguration) feel smooth. Lived in
+// the app and looked wrong: slow, and the dip-then-correct motion read as
+// rubbery rather than crisp. UIKit's own swipe actions don't actually
+// overshoot in practice — they're closer to critically damped, and what
+// actually reads as "smooth" is starting the snap already moving at speed
+// (matching wherever the drag's own motion was) and decelerating cleanly
+// into place, never overshooting. A CSS transition can't pick up the
+// gesture's release velocity, but a fast ease-out gets the "already
+// moving, just settling" feel without the bounce — starts at close to full
+// speed rather than easing up into it the way `ease`/back-out both do,
+// which is most of why the old curve read as sluggish to begin with.
+const SETTLE_EASING = 'cubic-bezier(0.16, 1, 0.3, 1)'
 
 // Mouse/trackpad users get the desktop convention instead of the touch one:
 // hovering reveals the row action (iMessage/Mail-on-Mac style) and it stays
@@ -501,7 +512,7 @@ function NearbyRow({ point: p, canViewListing, canPin, hoverCapable, isOpen, onO
           // way a ref never does, and that's exactly the drag math this file's
           // comments above are tuned around.
           // eslint-disable-next-line react-hooks/refs
-          transition: activeGestureRef.current ? 'none' : `transform 220ms ${SETTLE_EASING}`,
+          transition: activeGestureRef.current ? 'none' : `transform 180ms ${SETTLE_EASING}`,
         }}
         onClickCapture={onRowClickCapture}
       >
