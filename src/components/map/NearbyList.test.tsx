@@ -112,23 +112,17 @@ describe('NearbyList row swipe (desktop trackpad)', () => {
     expect(content.style.transform).toBe('translateX(-168px)')
   })
 
-  // Regression guard for the "hard stop" complaint: dragging well past the
-  // full reveal width used to translate the row by the raw drag amount up
-  // to REVEAL_WIDTH, then stop dead — zero give right at the limit. It
-  // should now overshoot only a damped amount (rubberBand), settling back
-  // to exactly -168px once released. Fails against the old hard
-  // Math.min/Math.max clamp, which shows exactly -168px immediately mid-drag
-  // (no overshoot at all) instead of something past it.
-  it('gives a little past the reveal width instead of stopping dead, then settles exactly at it', async () => {
+  // A rubber-band give past the limit (drag past -168px, spring back on
+  // release) was tried and reverted — reported live as an unwanted "snap
+  // back" once the finger let go. Dragging well past the reveal width
+  // should just hard-stop exactly at it, mid-drag, with no overshoot to
+  // correct back from afterward.
+  it('hard-stops at the reveal width instead of overshooting past it', async () => {
     const { content } = renderRow()
 
     fireEvent.wheel(content, { deltaX: 300, deltaY: 0 })
 
-    // Mid-drag: overshot past -168px, but nowhere near the raw -300px pushed.
-    const midDrag = content.style.transform
-    const midDragPx = Number(midDrag.match(/-?[\d.]+/)?.[0])
-    expect(midDragPx).toBeLessThan(-168)
-    expect(midDragPx).toBeGreaterThan(-220)
+    expect(content.style.transform).toBe('translateX(-168px)')
 
     await settle()
     expect(content.style.transform).toBe('translateX(-168px)')
