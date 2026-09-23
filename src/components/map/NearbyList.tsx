@@ -59,21 +59,19 @@ function resolveOpenState(dragXValue: number, startX: number, velocity: number):
 
 // The settle animation after release, snapping open/closed.
 //
-// A first attempt here used a "back out" curve that dips past the target
-// before easing into it (cubic-bezier(0.34, 1.56, 0.64, 1)) — modeled on
-// the assumption that a visible overshoot is what makes native row actions
-// (Messages/Mail's own UISwipeActionsConfiguration) feel smooth. Lived in
-// the app and looked wrong: slow, and the dip-then-correct motion read as
-// rubbery rather than crisp. UIKit's own swipe actions don't actually
-// overshoot in practice — they're closer to critically damped, and what
-// actually reads as "smooth" is starting the snap already moving at speed
-// (matching wherever the drag's own motion was) and decelerating cleanly
-// into place, never overshooting. A CSS transition can't pick up the
-// gesture's release velocity, but a fast ease-out gets the "already
-// moving, just settling" feel without the bounce — starts at close to full
-// speed rather than easing up into it the way `ease`/back-out both do,
-// which is most of why the old curve read as sluggish to begin with.
-const SETTLE_EASING = 'cubic-bezier(0.16, 1, 0.3, 1)'
+// Been through two wrong attempts already:
+// - A "back out" curve that dips past the target before easing into it
+//   (cubic-bezier(0.34, 1.56, 0.64, 1)) — looked slow and rubbery, the
+//   dip-then-correct motion reading as bouncy rather than crisp.
+// - An aggressive ease-out (cubic-bezier(0.16, 1, 0.3, 1), "expo out") —
+//   effectively full speed the instant it starts, then decelerating hard.
+//   Reported live as aggressive and sudden: no ramp-up at all, just an
+//   immediate burst of motion.
+// This is Material Design's own "decelerate" curve: a moderate
+// acceleration at the very start (not an instant burst) into a smooth
+// deceleration, at a slightly longer duration (see the transition prop
+// below) so the motion has room to read as a glide rather than a snap.
+const SETTLE_EASING = 'cubic-bezier(0, 0, 0.2, 1)'
 
 // Mouse/trackpad users get the desktop convention instead of the touch one:
 // hovering reveals the row action (iMessage/Mail-on-Mac style) and it stays
@@ -478,7 +476,7 @@ function NearbyRow({ point: p, canViewListing, canPin, hoverCapable, isOpen, onO
           // way a ref never does, and that's exactly the drag math this file's
           // comments above are tuned around.
           // eslint-disable-next-line react-hooks/refs
-          transition: activeGestureRef.current ? 'none' : `transform 180ms ${SETTLE_EASING}`,
+          transition: activeGestureRef.current ? 'none' : `transform 230ms ${SETTLE_EASING}`,
         }}
         onClickCapture={onRowClickCapture}
       >
