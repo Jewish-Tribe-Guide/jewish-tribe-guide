@@ -142,6 +142,14 @@ export default function Wizard({
   const clampedIdx = Math.min(idx, maxReachableIdx(visible, answers))
   const step = visible[clampedIdx]
   const isLast = clampedIdx === visible.length - 1
+  // The note belongs on the step where a visitor is first about to type
+  // something identifying — 'name' (see DEFAULT_CONTACT_STEPS), not the
+  // last step, which by then might just be an unrelated single-choice
+  // question that happens to come last. Falls back to the last step only
+  // for the (admin-editable, so possible) case where a form has no 'name'
+  // step at all — never dropping the disclosure entirely.
+  const hasNameStep = visible.some((s) => s.id === 'name')
+  const showPrivacyNote = hasNameStep ? step.id === 'name' : isLast
 
   useEffect(() => () => { if (advanceTimer.current) clearTimeout(advanceTimer.current) }, [])
 
@@ -385,10 +393,11 @@ export default function Wizard({
           </div>
         )}
 
-        {/* Last step only — that's where the answers actually leave the
-            device, and repeating it on every step of a long form would read
-            as a warning rather than as a reassurance. */}
-        {isLast && <PrivacyNote className="mt-5" />}
+        {/* See showPrivacyNote above — the name step, not every step (that
+            would read as a warning rather than a reassurance), and not the
+            last step either, since that's after the visitor already typed
+            their name/phone/email, not before. */}
+        {showPrivacyNote && <PrivacyNote className="mt-5" />}
         {step.kind === 'single' && step.optional && (
           <button
             onClick={() => goToStep(Math.min(clampedIdx + 1, visible.length - 1))}
