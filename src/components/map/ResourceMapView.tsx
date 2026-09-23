@@ -1376,7 +1376,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
               </span>
               <span className="min-w-0 flex-1">
                 <p className="text-sm font-semibold text-slate-900">Open now</p>
-                <p className="truncate text-xs text-slate-400">Show only places open right now</p>
+                <p className="truncate text-xs text-slate-400">Show only listings open right now</p>
               </span>
             </button>
           )}
@@ -2042,7 +2042,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                           </span>
                           <span className="min-w-0 flex-1">
                             <p className="text-sm font-semibold text-slate-900">Open now</p>
-                            <p className="truncate text-xs text-slate-400">Show only places open right now</p>
+                            <p className="truncate text-xs text-slate-400">Show only listings open right now</p>
                           </span>
                         </button>
                       )}

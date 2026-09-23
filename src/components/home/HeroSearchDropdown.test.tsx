@@ -9,8 +9,8 @@ import HeroSearchDropdown from './HeroSearchDropdown'
 afterEach(() => cleanup())
 
 const noopGo = () => {}
-const foodCard: CardDef = { title: 'Food', id: 'restaurant', href: '/philly/restaurant', icon: '🍔', count: '72 places', go: noopGo }
-const groceryCard: CardDef = { title: 'Grocery', id: 'grocery', href: '/philly/grocery', icon: '🛒', count: '22 places', go: noopGo }
+const foodCard: CardDef = { title: 'Food', id: 'restaurant', href: '/philly/restaurant', icon: '🍔', count: '72 listings', go: noopGo }
+const groceryCard: CardDef = { title: 'Grocery', id: 'grocery', href: '/philly/grocery', icon: '🛒', count: '22 listings', go: noopGo }
 
 function makeHit(overrides: Partial<ListingHit> = {}): ListingHit {
   const category = makeCategory()
@@ -40,7 +40,7 @@ describe('HeroSearchDropdown', () => {
     )
 
     expect(screen.getByText('Food')).toBeInTheDocument()
-    expect(screen.getByText('72 places →')).toBeInTheDocument()
+    expect(screen.getByText('72 listings →')).toBeInTheDocument()
     expect(screen.getByText('Grocery')).toBeInTheDocument()
     expect(screen.getByText('Test Grocery')).toBeInTheDocument()
   })

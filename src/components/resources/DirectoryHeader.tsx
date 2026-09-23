@@ -8,14 +8,6 @@ type Props = {
   /** Listing count shown after a dot separator. Omit to hide the count entirely
    *  (e.g. the hospitals list, which isn't a counted directory). */
   count?: number
-  /** Same distinction the home screen's category tiles make (see
-   *  home/sections.tsx's `cardCount`): a category whose listings have no
-   *  address isn't a set of places you can go to — WhatsApp Groups and
-   *  Networking are the live cases — so the count reads "N listings" there
-   *  and "N places" everywhere else, rather than always saying "listings"
-   *  regardless of what the category actually is. Defaults to true (most
-   *  categories have addresses), matching `hasAddress !== false` elsewhere. */
-  hasAddress?: boolean
   /** Location label shown under the title once a location is set (typed address
    *  or hospital name). Takes precedence over the address prompt. */
   anchorLabel?: string
@@ -64,9 +56,8 @@ type Props = {
 // instead (GenericDirectory), separated from the search bar it used to sit
 // right above here. Desktop is unchanged either way: there's room, and
 // desktop's compact `inline` variant stays right here next to the title.
-export default function DirectoryHeader({ title, count, hasAddress, anchorLabel, addressPrompt, actions, titleInHeader, banner }: Props) {
-  const noun = hasAddress === false ? 'listing' : 'place'
-  const countText = count != null ? `${count} ${noun}${count !== 1 ? 's' : ''}` : null
+export default function DirectoryHeader({ title, count, anchorLabel, addressPrompt, actions, titleInHeader, banner }: Props) {
+  const countText = count != null ? `${count} listing${count !== 1 ? 's' : ''}` : null
 
   return (
     <div>

@@ -1059,7 +1059,6 @@ export default function GenericDirectory({ category, items, anchorLabel, address
           <DirectoryHeader
             title={category.pluralLabel}
             count={filtered.length}
-            hasAddress={category.hasAddress}
             anchorLabel={anchorLabel}
             addressPrompt={addressPrompt}
             titleInHeader
@@ -1170,7 +1169,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
           </div>
         )}
         {showSearch && q && tagFields.length > 0 && (
-          <p className="text-xs text-muted">Showing places matching &ldquo;{search.trim()}&rdquo;</p>
+          <p className="text-xs text-muted">Showing listings matching &ldquo;{search.trim()}&rdquo;</p>
         )}
         {hasFilterRow && (
           <>
@@ -1582,7 +1581,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
       {/* The category page's Add — a floating circular button,
           Gmail-compose-style, on both mobile and desktop now (used to be
           mobile-only, with desktop instead carrying a toolbar button up in
-          DirectoryHeader and a site-wide "Add a place" picker in
+          DirectoryHeader and a site-wide "Add a listing" picker in
           SiteHeader — both removed in favor of this one control everywhere).
           Deliberately per-category rather than a site-wide entry point:
           landing straight in this category's own Add form via `onAdd`, no
@@ -1619,11 +1618,11 @@ export default function GenericDirectory({ category, items, anchorLabel, address
           // aria-label always wins for the accessible name regardless, so
           // this keeps mobile's icon-only button correctly named without
           // needing a second, viewport-conditional way of deriving it.
-          aria-label="Add a place"
+          aria-label="Add a listing"
           className="fixed right-4 bottom-[calc(3.75rem+env(safe-area-inset-bottom)+1rem)] desktop:bottom-6 z-40 flex h-14 w-14 desktop:w-auto items-center justify-center gap-2 rounded-full bg-primary px-0 desktop:px-5 text-white shadow-lg cursor-pointer active:scale-95 transition-transform"
         >
           <PlusIcon className="h-6 w-6 shrink-0" />
-          <span className="hidden desktop:inline font-medium whitespace-nowrap">Add a place</span>
+          <span className="hidden desktop:inline font-medium whitespace-nowrap">Add a listing</span>
         </button>
       )}
 

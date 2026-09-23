@@ -144,30 +144,14 @@ describe('GenericDirectory', () => {
     renderWithProviders(<GenericDirectory category={category} items={items} {...handlers} />)
 
     expect(screen.getByRole('heading', { name: 'Grocery Stores' })).toBeInTheDocument()
-    // "places", not "listings" — this category has an address (the fixture
-    // default, same as almost every real category), and DirectoryHeader's
-    // count noun follows `hasAddress` the same way the home screen's own
-    // category tiles do (see home/sections.tsx's cardCount). It used to say
-    // "listings" unconditionally regardless of what the category actually
-    // was — see the regression test below for the case that noun is
-    // actually right for.
-    expect(screen.getByText('2 places')).toBeInTheDocument()
+    // One noun regardless of category — DirectoryHeader used to switch
+    // between "places" (has an address) and "listings" (doesn't, e.g.
+    // WhatsApp Groups/Networking), which made "place" the odd term out
+    // since it doesn't fit an address-less category at all. "Listing" works
+    // either way, so it's the one word now, everywhere.
+    expect(screen.getByText('2 listings')).toBeInTheDocument()
     expect(screen.getByText('Kosher Mart')).toBeInTheDocument()
     expect(screen.getByText('Trader Joe')).toBeInTheDocument()
-  })
-
-  // Regression coverage for DirectoryHeader always saying "N listings"
-  // regardless of category — right for WhatsApp Groups/Networking (no
-  // address, so "places" would be wrong), but the exact same wrong word
-  // for every category that does have one, including this test's own
-  // default fixture above.
-  it('says "listings", not "places", for a category with no address', () => {
-    const category = makeCategory({ pluralLabel: 'Networking', hasAddress: false })
-    const items = [makeListing({ id: 'a', name: 'Young Professionals Chat' })]
-    renderWithProviders(<GenericDirectory category={category} items={items} {...handlers} />)
-
-    expect(screen.getByText('1 listing')).toBeInTheDocument()
-    expect(screen.queryByText('1 place')).not.toBeInTheDocument()
   })
 
   it('filters the list by search text', async () => {
@@ -231,7 +215,7 @@ describe('GenericDirectory', () => {
     })
     renderWithProviders(<GenericDirectory category={category} items={[makeListing()]} {...handlers} onAdd={onAdd} />)
 
-    const floatingAdd = screen.getByRole('button', { name: 'Add a place' })
+    const floatingAdd = screen.getByRole('button', { name: 'Add a listing' })
     expect(floatingAdd.className).not.toContain('desktop:hidden')
     await user.click(floatingAdd)
     expect(onAdd).toHaveBeenCalledTimes(1)
@@ -249,20 +233,20 @@ describe('GenericDirectory', () => {
     const category = makeCategory({ pluralLabel: 'WhatsApp Groups', hasAddress: false })
     renderWithProviders(<GenericDirectory category={category} items={[makeListing()]} {...handlers} />)
 
-    expect(screen.getByRole('button', { name: 'Add a place' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Add a listing' })).toBeInTheDocument()
   })
 
   // A bare icon circle is a mobile convention people already have a
   // reflex for; desktop doesn't have that reflex, so it gets the same
-  // "Add a place" wording made visible instead of relying only on the
+  // "Add a listing" wording made visible instead of relying only on the
   // aria-label. `desktop:inline` on the label span (jsdom never applies
   // CSS, so this is asserted out of the className, same as the
   // desktop:hidden check above) is what makes it show up there but not on
   // mobile, where it would just be redundant with the shape.
-  it('shows the "Add a place" label visibly for desktop, not just as an aria-label', () => {
+  it('shows the "Add a listing" label visibly for desktop, not just as an aria-label', () => {
     renderWithProviders(<GenericDirectory category={makeCategory()} items={[makeListing()]} {...handlers} />)
 
-    const label = screen.getByText('Add a place', { selector: 'span' })
+    const label = screen.getByText('Add a listing', { selector: 'span' })
     expect(label.className).toContain('desktop:inline')
     expect(label.className).toContain('hidden')
   })

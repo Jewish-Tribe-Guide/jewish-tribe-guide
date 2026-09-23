@@ -762,21 +762,22 @@ function labelWords(c: CategoryConfig): string[] {
     .filter((w) => w.length >= 3)
 }
 
-/** "22 places" / "19 listings" for a category's browse-index row, or
- *  undefined when there's nothing honest to say.
+/** "22 listings" for a category's browse-index row, or undefined when
+ *  there's nothing honest to say.
  *
- *  Two nouns, picked off `hasAddress` rather than off a hardcoded list of
- *  category ids: a category whose listings have no address isn't a set of
- *  places you can go to — WhatsApp Groups and Networking are the live cases —
- *  and calling them places would be wrong in the one word the row exists to
- *  add. Any future address-less category gets the right noun for free.
+ *  One noun everywhere, deliberately — this used to split "N places" /
+ *  "N listings" off `hasAddress` (a category with no address, like
+ *  WhatsApp Groups or Networking, isn't a set of places you can go to), but
+ *  that made "place" the odd one out: a single term that works regardless
+ *  of whether the category has an address is simpler than two that have to
+ *  agree with each other everywhere they appear.
  *
  *  Undefined (not "0") when counts haven't loaded or the category has none:
  *  see CompactCard on why silence beats a zero here. */
 export function cardCount(c: CategoryConfig, counts: Record<string, number> | null | undefined): string | undefined {
   const n = counts?.[c.id]
   if (!n) return undefined
-  return `${n} ${c.hasAddress === false ? (n === 1 ? 'listing' : 'listings') : (n === 1 ? 'place' : 'places')}`
+  return `${n} listing${n === 1 ? '' : 's'}`
 }
 
 /** Resource cards: every live category (restaurants, groceries, hotels, …)

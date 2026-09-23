@@ -182,7 +182,7 @@ describe('ResourceMapView — search autocomplete', () => {
     await user.click(screen.getByPlaceholderText(/Search name, address/))
 
     expect(screen.getByText('Open now')).toBeInTheDocument()
-    expect(screen.getByText('Show only places open right now')).toBeInTheDocument()
+    expect(screen.getByText('Show only listings open right now')).toBeInTheDocument()
   })
 
   it('keeps offering "Open now" while the typed text is still heading toward it, and drops it once the text diverges', async () => {
@@ -207,7 +207,7 @@ describe('ResourceMapView — search autocomplete', () => {
     await user.click(screen.getByText('Open now'))
 
     expect(input.value).toBe('open now')
-    expect(screen.queryByText('Show only places open right now')).not.toBeInTheDocument()
+    expect(screen.queryByText('Show only listings open right now')).not.toBeInTheDocument()
   })
 })
 

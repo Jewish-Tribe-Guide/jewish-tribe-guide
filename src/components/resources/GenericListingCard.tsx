@@ -476,7 +476,7 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
           </span>
         </span>
       ) : (
-        <Chip tone="green" onClick={(e) => { e.stopPropagation(); onFilterOpen() }} title="Filter to places open now">
+        <Chip tone="green" onClick={(e) => { e.stopPropagation(); onFilterOpen() }} title="Filter to listings open now">
           Open
         </Chip>
       ))}
