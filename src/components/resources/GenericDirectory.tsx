@@ -1240,7 +1240,22 @@ export default function GenericDirectory({ category, items, anchorLabel, address
                 filtersOpen ? 'flex animate-[backdropIn_150ms_ease-out] desktop:animate-none' : 'hidden',
                 'desktop:flex',
               ].join(' ')}
-              style={{ scrollbarWidth: 'none' }}
+              // The scrollbar's hidden (see scrollbarWidth below) for a
+              // cleaner look, which also removed the one cue this row is
+              // scrollable at all — a chip just got cut off flush at the
+              // container edge, easy to read as "that's all of them." This
+              // fades the trailing edge into the background instead, the
+              // standard cue for a hidden-scrollbar horizontal list. Right
+              // edge only, not both: a left fade would show even at the very
+              // start (scrollLeft 0), falsely implying hidden content behind
+              // the first chip — tracking real scroll position to gate it
+              // would need JS, which is the exact complexity a static CSS
+              // mask is meant to avoid here.
+              style={{
+                scrollbarWidth: 'none',
+                WebkitMaskImage: 'linear-gradient(to right, black calc(100% - 28px), transparent 100%)',
+                maskImage: 'linear-gradient(to right, black calc(100% - 28px), transparent 100%)',
+              }}
             >
               {/* Open now / boolean chips / select dropdowns below are the
                   three controls in this row that actually show on mobile
