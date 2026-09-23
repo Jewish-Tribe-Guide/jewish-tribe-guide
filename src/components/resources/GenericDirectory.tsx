@@ -549,16 +549,29 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // search/filter/sort row — but that row isn't sticky on mobile (only
   // `lg:sticky`, see its own className below), so a badge click deep in a
   // long list changes what's filtered with nothing on screen to show it.
-  // Scrolling the row into view answers exactly that: only when it isn't
-  // already visible, so clicking a badge while the row IS on screen (or on
-  // desktop, where it's usually docked) doesn't move anything.
-  const scrollControlsIntoViewIfNeeded = () => {
+  //
+  // Tried scrolling the real row into view first — it worked, but relocates
+  // you every single time, which gets disruptive if you're tapping a few
+  // badges in a row while staying put further down the list. This instead
+  // holds your scroll position and peeks a small, non-interactive copy of
+  // the "Filters" pill in from the top for a couple seconds — same
+  // information (the count just changed), no navigation.
+  const [filterPeekVisible, setFilterPeekVisible] = useState(false)
+  const filterPeekTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => {
+    return () => {
+      if (filterPeekTimerRef.current) clearTimeout(filterPeekTimerRef.current)
+    }
+  }, [])
+  const showFilterPeekIfNeeded = () => {
     const controls = controlsRef.current
     if (!controls) return
     const headerH = (document.querySelector('header')?.getBoundingClientRect().height ?? 64) + 12
     const rect = controls.getBoundingClientRect()
     if (rect.top >= headerH && rect.bottom <= window.innerHeight) return
-    window.scrollTo({ top: window.scrollY + rect.top - headerH, behavior: 'smooth' })
+    setFilterPeekVisible(true)
+    if (filterPeekTimerRef.current) clearTimeout(filterPeekTimerRef.current)
+    filterPeekTimerRef.current = setTimeout(() => setFilterPeekVisible(false), 1800)
   }
 
   // Same target, but waits for the row's own position to stop moving first —
@@ -1014,6 +1027,37 @@ export default function GenericDirectory({ category, items, anchorLabel, address
             titleInHeader
             banner={categoryBadge}
           />
+
+      {/* The peek shown by showFilterPeekIfNeeded — a non-interactive echo
+          of the mobile "Filters" pill below, fixed under the header so it
+          reads as "the same count, just shown here for a moment" rather
+          than a new, unrelated element. `pointer-events-none`: it's purely
+          informational and disappears on its own; a tap shouldn't land on
+          it instead of whatever's actually under it. Always mounted (never
+          conditionally rendered) so the show/hide is a CSS transition, not
+          a mount/unmount — an unmount mid-animation would just cut it off.
+          `fixed`, so where it sits in the DOM doesn't affect where it draws;
+          placed here (not as the page's literal first child) only so it
+          doesn't disturb the "Set location" banner's own first-child
+          position above. */}
+      <div
+        aria-hidden="true"
+        data-testid="filter-peek"
+        className={[
+          'fixed inset-x-0 top-16 z-40 flex justify-center pointer-events-none transition-all duration-300 desktop:hidden',
+          filterPeekVisible ? 'translate-y-0 opacity-100' : '-translate-y-3 opacity-0',
+        ].join(' ')}
+      >
+        <div className="inline-flex items-center gap-1.5 rounded-full bg-primary px-3 py-1.5 text-sm font-medium text-white shadow-lg">
+          <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+            <path d="M3 4a1 1 0 000 2h14a1 1 0 000-2H3zm3 5a1 1 0 000 2h8a1 1 0 000-2H6zm2 5a1 1 0 000 2h4a1 1 0 000-2H8z" />
+          </svg>
+          Filters
+          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white/30 text-xs font-bold">
+            {activeFilterCount}
+          </span>
+        </div>
+      </div>
 
       {/* Controls — sticky from lg up so search/filters/sort stay reachable
           on a long list instead of scrolling away above the fold. `top-14`
@@ -1487,11 +1531,11 @@ export default function GenericDirectory({ category, items, anchorLabel, address
               onTagClick={setSearch}
               onFilterOpen={() => {
                 setOpenNow((v) => !v)
-                scrollControlsIntoViewIfNeeded()
+                showFilterPeekIfNeeded()
               }}
               onFilterBool={(key) => {
                 setBoolFilters((prev) => ({ ...prev, [key]: !prev[key] }))
-                scrollControlsIntoViewIfNeeded()
+                showFilterPeekIfNeeded()
               }}
               onFilterSelect={(key, value) => {
                 setSelectFilters((prev) => {
@@ -1500,7 +1544,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
                   // the badge again undoes it.
                   return { ...prev, [key]: cur.includes(value) ? cur.filter((x) => x !== value) : [...cur, value] }
                 })
-                scrollControlsIntoViewIfNeeded()
+                showFilterPeekIfNeeded()
               }}
               onEdit={() => onEdit(item)}
             />
