@@ -298,6 +298,50 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   }, [anchorLabel])
   const [voteCounts, setVoteCounts] = useState<Record<string, number>>({})
   const [filtersOpen, setFiltersOpen] = useState(false)
+  // A momentary scroll-position indicator for the filter chip row below —
+  // the row hides its native scrollbar for a cleaner look (see its own
+  // className), which also removed the only cue it scrolls at all. A tried
+  // fade at the trailing edge (see git history) turned out too subtle to
+  // read as a cue, since the chips and the page background are too close
+  // in tone for a gradient between them to show. This instead borrows the
+  // pattern native scroll views already use to hint scrollability up
+  // front: flash a thin thumb once, when the row first has anything to
+  // scroll to, then fade it out. Deliberately NOT re-shown while actually
+  // scrolling (no onScroll handler here) — that's a different, showier
+  // pattern (a scrollbar that tracks your finger) and isn't what this is;
+  // this is a one-time hint, not a scroll aid the row actually needs.
+  const filterRowRef = useRef<HTMLDivElement>(null)
+  const [filterScrollThumb, setFilterScrollThumb] = useState<{ widthPct: number; leftPct: number } | null>(null)
+  const [filterScrollThumbVisible, setFilterScrollThumbVisible] = useState(false)
+  const filterScrollHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const updateFilterScrollThumb = () => {
+    const el = filterRowRef.current
+    if (!el || el.scrollWidth <= el.clientWidth + 1) {
+      setFilterScrollThumb(null)
+      setFilterScrollThumbVisible(false)
+      return
+    }
+    setFilterScrollThumb({
+      widthPct: (el.clientWidth / el.scrollWidth) * 100,
+      leftPct: (el.scrollLeft / el.scrollWidth) * 100,
+    })
+    setFilterScrollThumbVisible(true)
+    if (filterScrollHideTimerRef.current) clearTimeout(filterScrollHideTimerRef.current)
+    filterScrollHideTimerRef.current = setTimeout(() => setFilterScrollThumbVisible(false), 1200)
+  }
+  // Measures on mount (desktop, where the row is always laid out) and again
+  // whenever the mobile Filters toggle actually reveals it — a `display:
+  // none` row (mobile, collapsed) measures 0 either way, so there's nothing
+  // real to flash until it's visible. Also on resize: whether the row
+  // overflows depends on viewport width, and that can flip either way.
+  useEffect(() => {
+    updateFilterScrollThumb()
+    window.addEventListener('resize', updateFilterScrollThumb)
+    return () => {
+      window.removeEventListener('resize', updateFilterScrollThumb)
+      if (filterScrollHideTimerRef.current) clearTimeout(filterScrollHideTimerRef.current)
+    }
+  }, [filtersOpen])
   // A plain lazy initializer here would only ever see the FIRST render:
   // SlugScreen's Suspense fallback renders this tree once with the query
   // string not yet read (openDaveningModal is undefined then, same as
@@ -1233,29 +1277,21 @@ export default function GenericDirectory({ category, items, anchorLabel, address
                     same row also carries the desktop versions of external
                     link/davening/sort (their mobile versions are in the row above),
                     so it still renders even with no actual filter — just without a
-                    mobile Filters button to open it (that's gated separately). ── */}
+                    mobile Filters button to open it (that's gated separately). ──
+                    `relative` on this OUTER wrapper, not the scrolling row itself —
+                    the thumb below needs to stay put while the row's own content
+                    scrolls under it; positioned relative to the scrolling element
+                    it would scroll away with everything else instead of acting as
+                    a fixed overlay on top of it. */}
+            <div className="relative">
             <div
+              ref={filterRowRef}
               className={[
                 'gap-2 flex-nowrap overflow-x-auto pb-1',
                 filtersOpen ? 'flex animate-[backdropIn_150ms_ease-out] desktop:animate-none' : 'hidden',
                 'desktop:flex',
               ].join(' ')}
-              // The scrollbar's hidden (see scrollbarWidth below) for a
-              // cleaner look, which also removed the one cue this row is
-              // scrollable at all — a chip just got cut off flush at the
-              // container edge, easy to read as "that's all of them." This
-              // fades the trailing edge into the background instead, the
-              // standard cue for a hidden-scrollbar horizontal list. Right
-              // edge only, not both: a left fade would show even at the very
-              // start (scrollLeft 0), falsely implying hidden content behind
-              // the first chip — tracking real scroll position to gate it
-              // would need JS, which is the exact complexity a static CSS
-              // mask is meant to avoid here.
-              style={{
-                scrollbarWidth: 'none',
-                WebkitMaskImage: 'linear-gradient(to right, black calc(100% - 28px), transparent 100%)',
-                maskImage: 'linear-gradient(to right, black calc(100% - 28px), transparent 100%)',
-              }}
+              style={{ scrollbarWidth: 'none' }}
             >
               {/* Open now / boolean chips / select dropdowns below are the
                   three controls in this row that actually show on mobile
@@ -1379,6 +1415,17 @@ export default function GenericDirectory({ category, items, anchorLabel, address
                   ))}
                 </div>
               )}
+            </div>
+            {filterScrollThumb && (
+              <div
+                aria-hidden="true"
+                data-testid="filter-scroll-thumb"
+                className={`pointer-events-none absolute bottom-0 h-0.5 rounded-full bg-slate-400 transition-opacity duration-500 ${
+                  filterScrollThumbVisible ? 'opacity-100' : 'opacity-0'
+                }`}
+                style={{ width: `${filterScrollThumb.widthPct}%`, left: `${filterScrollThumb.leftPct}%` }}
+              />
+            )}
             </div>
           </>
         )}

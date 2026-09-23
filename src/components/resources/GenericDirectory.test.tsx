@@ -923,6 +923,54 @@ describe('GenericDirectory — scrolling filter controls into view after a card 
   })
 })
 
+// The filter chip row hides its native scrollbar for a cleaner look, which
+// also removed the only cue it scrolls at all. This flashes a thin custom
+// thumb — matching the fraction of the row actually visible — for a moment
+// whenever the row has overflow to show, then fades it out on its own,
+// borrowing the same "flash once, then get out of the way" behavior native
+// scroll views use.
+describe('GenericDirectory — filter row scroll thumb', () => {
+  // jsdom defines clientWidth/scrollWidth up on Element.prototype, not
+  // HTMLElement.prototype, so there's no own descriptor on HTMLElement to
+  // capture and restore — deleting the own property (added below) instead
+  // falls back to Element.prototype's real getter, same as never having
+  // mocked it.
+  function mockRowMetrics(clientWidth: number, scrollWidth: number) {
+    Object.defineProperty(HTMLElement.prototype, 'clientWidth', { configurable: true, value: clientWidth })
+    Object.defineProperty(HTMLElement.prototype, 'scrollWidth', { configurable: true, value: scrollWidth })
+  }
+
+  afterEach(() => {
+    delete (HTMLElement.prototype as { clientWidth?: number }).clientWidth
+    delete (HTMLElement.prototype as { scrollWidth?: number }).scrollWidth
+    vi.useRealTimers()
+  })
+
+  it('shows a thumb sized to the visible fraction when the row overflows, then fades it out', () => {
+    vi.useFakeTimers()
+    mockRowMetrics(200, 400)
+    const category = makeCategory({ detailFields: [{ key: 'isKosher', label: 'Kosher', type: 'boolean', filterable: true }] })
+    renderWithProviders(<GenericDirectory category={category} items={[makeListing()]} {...handlers} />)
+
+    const thumb = screen.getByTestId('filter-scroll-thumb')
+    expect(thumb.style.width).toBe('50%')
+    expect(thumb.className).toContain('opacity-100')
+
+    act(() => {
+      vi.advanceTimersByTime(1300)
+    })
+    expect(screen.getByTestId('filter-scroll-thumb').className).toContain('opacity-0')
+  })
+
+  it('renders no thumb at all when the row does not overflow', () => {
+    mockRowMetrics(400, 400)
+    const category = makeCategory({ detailFields: [{ key: 'isKosher', label: 'Kosher', type: 'boolean', filterable: true }] })
+    renderWithProviders(<GenericDirectory category={category} items={[makeListing()]} {...handlers} />)
+
+    expect(screen.queryByTestId('filter-scroll-thumb')).not.toBeInTheDocument()
+  })
+})
+
 // The card renders the empty distance slot; the directory decides whether it
 // should. Those are two separate failures — the card supporting it and nobody
 // passing the prop looks exactly like the bug it was built to fix, and the
