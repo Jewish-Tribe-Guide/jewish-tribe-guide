@@ -893,7 +893,11 @@ describe('GenericDirectory — scrolling filter controls into view after a card 
 
       screen.getByRole('button', { name: 'card-filter Kosher Mart' }).click()
 
-      expect(scrollTo).toHaveBeenCalledWith(expect.objectContaining({ behavior: 'smooth' }))
+      // 'instant', not 'smooth' — confirmed live: setting the filter
+      // re-renders the list in the same moment this scroll would be
+      // animating, and Chrome cancels an in-flight smooth scrollTo outright
+      // when that happens, leaving the page stuck partway to the top.
+      expect(scrollTo).toHaveBeenCalledWith(expect.objectContaining({ behavior: 'instant' }))
     } finally {
       vi.unstubAllGlobals()
     }

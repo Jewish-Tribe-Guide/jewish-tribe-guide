@@ -552,13 +552,20 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // Scrolling the row into view answers exactly that: only when it isn't
   // already visible, so clicking a badge while the row IS on screen (or on
   // desktop, where it's usually docked) doesn't move anything.
+  //
+  // `instant`, not `smooth` — confirmed live: setting the filter re-renders
+  // the (often much shorter) filtered list in the same moment this scroll is
+  // animating, and that DOM mutation is enough for Chrome to cancel an
+  // in-flight smooth scrollTo outright, leaving the page stuck partway
+  // instead of ever reaching the top. Same failure mode as the arrow-key
+  // next/prev scroll below, same fix.
   const scrollControlsIntoViewIfNeeded = () => {
     const controls = controlsRef.current
     if (!controls) return
     const headerH = (document.querySelector('header')?.getBoundingClientRect().height ?? 64) + 12
     const rect = controls.getBoundingClientRect()
     if (rect.top >= headerH && rect.bottom <= window.innerHeight) return
-    window.scrollTo({ top: window.scrollY + rect.top - headerH, behavior: 'smooth' })
+    window.scrollTo({ top: window.scrollY + rect.top - headerH, behavior: 'instant' })
   }
 
   // Same target, but waits for the row's own position to stop moving first —
