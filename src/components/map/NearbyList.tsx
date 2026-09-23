@@ -27,6 +27,36 @@ const ACTION_WIDTH = 84
 // first, same as before Share existed.
 const REVEAL_WIDTH = ACTION_WIDTH * 2
 
+// How far a drag/swipe has to travel before release commits it open, absent
+// a fast flick (see FLICK_VELOCITY below) — 50% of REVEAL_WIDTH made this
+// feel like it needed "swipe far" next to iMessage/Mail's own row actions,
+// which commit noticeably sooner. 30% is close to where those apps' own
+// reveal visually crosses the halfway point of the FIRST button (Pin), which
+// reads as "I've clearly exposed something" well before the full two-button
+// width is out.
+const OPEN_THRESHOLD = REVEAL_WIDTH * 0.3
+// A fast flick commits open/closed regardless of how far the drag actually
+// got — the other half of why iMessage/Mail feel quicker: a quick flick that
+// only travels a few px still reads as a deliberate swipe, not an aborted
+// one. px/ms; ~0.5 is a brisk but ordinary flick, well below a hard fling.
+const FLICK_VELOCITY = 0.5
+
+// Whether a finished drag/swipe should leave the row open, given where it
+// ended up (dragXValue), where THIS gesture started (startX — 0 if it began
+// closed, -REVEAL_WIDTH if it began already open) and its velocity at
+// release. The threshold is measured as distance traveled *this gesture*,
+// not absolute position, so opening from closed and closing from open both
+// need the same OPEN_THRESHOLD worth of travel — using an absolute-position
+// midpoint instead (dragXValue < -REVEAL_WIDTH / 2) ties the two together:
+// lowering it to make opening easier make closing correspondingly harder,
+// since the same line now sits closer to the open end.
+function resolveOpenState(dragXValue: number, startX: number, velocity: number): boolean {
+  if (velocity <= -FLICK_VELOCITY) return true
+  if (velocity >= FLICK_VELOCITY) return false
+  const traveled = dragXValue - startX
+  return startX === 0 ? traveled < -OPEN_THRESHOLD : !(traveled > OPEN_THRESHOLD)
+}
+
 // Mouse/trackpad users get the desktop convention instead of the touch one:
 // hovering reveals the row action (iMessage/Mail-on-Mac style) and it stays
 // up for as long as the pointer sits over the row, no drag-and-hold required.
@@ -157,6 +187,14 @@ function NearbyRow({ point: p, canViewListing, canPin, hoverCapable, isOpen, onO
   const startXRef = useRef(0)
   const startYRef = useRef(0)
   const startDragXRef = useRef(0)
+  // Instantaneous velocity of the most recent pointer move (px/ms, negative
+  // = moving left/opening), for the flick-commits-regardless-of-distance
+  // check in endDrag — see FLICK_VELOCITY.
+  const velocityRef = useRef(0)
+  const lastMoveXRef = useRef(0)
+  const lastMoveTimeRef = useRef(0)
+  // Trackpad-path equivalent of startDragXRef — see the wheel handler below.
+  const wheelStartXRef = useRef(0)
   const wheelSettleTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const wrapperRef = useRef<HTMLDivElement>(null)
   const contentRef = useRef<HTMLDivElement>(null)
@@ -202,6 +240,9 @@ function NearbyRow({ point: p, canViewListing, canPin, hoverCapable, isOpen, onO
     startDragXRef.current = dragX
     activeGestureRef.current = false
     movedRef.current = false
+    velocityRef.current = 0
+    lastMoveXRef.current = e.clientX
+    lastMoveTimeRef.current = e.timeStamp
   }
 
   function onPointerMove(e: React.PointerEvent) {
@@ -239,6 +280,13 @@ function NearbyRow({ point: p, canViewListing, canPin, hoverCapable, isOpen, onO
     e.stopPropagation()
     dragXRef.current = Math.min(0, Math.max(-REVEAL_WIDTH, startDragXRef.current + delta))
     setDragX(dragXRef.current)
+    // Instantaneous, not averaged over the whole gesture — a drag that
+    // starts slow and ends in a fast flick should commit on that flick, not
+    // get diluted by the slow start.
+    const dt = e.timeStamp - lastMoveTimeRef.current
+    if (dt > 0) velocityRef.current = (e.clientX - lastMoveXRef.current) / dt
+    lastMoveXRef.current = e.clientX
+    lastMoveTimeRef.current = e.timeStamp
   }
 
   function endDrag(e: React.PointerEvent) {
@@ -251,7 +299,7 @@ function NearbyRow({ point: p, canViewListing, canPin, hoverCapable, isOpen, onO
       // itself to horizontal, turning a pure row-swipe into an unwanted
       // sheet-height change too.
       e.stopPropagation()
-      const shouldOpen = dragX < -REVEAL_WIDTH / 2
+      const shouldOpen = resolveOpenState(dragX, startDragXRef.current, velocityRef.current)
       onOpenChange(shouldOpen)
       dragXRef.current = shouldOpen ? -REVEAL_WIDTH : 0
       setDragX(dragXRef.current)
@@ -288,6 +336,11 @@ function NearbyRow({ point: p, canViewListing, canPin, hoverCapable, isOpen, onO
       // noise floor keeps genuine vertical scrolling (deltaX ~ 0) untouched.
       if (Math.abs(e.deltaX) < 2) return
       e.preventDefault()
+      // The first tick since the last settle is this gesture's baseline for
+      // resolveOpenState's traveled-distance check — a fresh swipe starting
+      // from wherever the row already sat, same as startDragXRef.current on
+      // the touch path.
+      if (!activeGestureRef.current) wheelStartXRef.current = dragXRef.current
       activeGestureRef.current = true
       // Trackpad "swipe left" reports positive deltaX under macOS's default
       // natural-scrolling direction — subtracting it moves the row left, the
@@ -297,10 +350,12 @@ function NearbyRow({ point: p, canViewListing, canPin, hoverCapable, isOpen, onO
       if (wheelSettleTimer.current) clearTimeout(wheelSettleTimer.current)
       // Wheel events have no discrete "end" the way pointerup does — treat a
       // short gap since the last tick as the gesture finishing, then snap
-      // open or closed the same way a touch drag resolves on release.
+      // open or closed the same way a touch drag resolves on release. No
+      // velocity signal on this path (trackpad ticks don't carry timestamps
+      // worth trusting the way pointermove's do), so it's distance-only.
       wheelSettleTimer.current = setTimeout(() => {
         activeGestureRef.current = false
-        const shouldOpen = dragXRef.current < -REVEAL_WIDTH / 2
+        const shouldOpen = resolveOpenState(dragXRef.current, wheelStartXRef.current, 0)
         onOpenChange(shouldOpen)
         dragXRef.current = shouldOpen ? -REVEAL_WIDTH : 0
         setDragX(dragXRef.current)

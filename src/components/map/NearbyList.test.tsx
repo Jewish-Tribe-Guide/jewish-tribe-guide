@@ -98,6 +98,20 @@ describe('NearbyList row swipe (desktop trackpad)', () => {
     expect(content.style.transform).toBe('translateX(0px)')
   })
 
+  // Regression guard for the "requires too big a swipe" complaint: a swipe
+  // well short of half the reveal width (60 of 168px, vs. the old 50%/84px
+  // line) should still commit the row open, matching iMessage/Mail's own
+  // lower reveal threshold. Fails against the old REVEAL_WIDTH/2 threshold,
+  // which would leave this swipe short and snap the row back closed.
+  it('opens on a swipe well short of half the reveal width', async () => {
+    const { content } = renderRow()
+
+    fireEvent.wheel(content, { deltaX: 60, deltaY: 0 })
+    await settle()
+
+    expect(content.style.transform).toBe('translateX(-168px)')
+  })
+
   // A row's own `pinned` badge is driven by the `points` prop its parent
   // passes in (ResourceMapView recomputes that from PinnedContext) — not
   // something NearbyList re-derives for itself mid-render — so this checks
