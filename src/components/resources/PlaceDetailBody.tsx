@@ -448,7 +448,12 @@ export default function PlaceDetailBody({ item, category, onTagClick, onFilterOp
     if (fieldTags.length === 0 && fieldTagsSometimes.length === 0) return []
     return [
       <div key={f.key} className="space-y-2">
-        <p className="text-sm text-muted mb-1">{f.label}</p>
+        {/* mb-2, not the mb-1 every other field label in this file uses — a
+            chip's own background/border starts filling the gap right at its
+            edge, so the same 4px that reads as normal breathing room before
+            plain text (see rowFieldsSection below) reads as cramped before a
+            solid pill. */}
+        <p className="text-sm text-muted mb-2">{f.label}</p>
         <ClampedChipRow>
           {[
             ...fieldTags.map((t) => (
