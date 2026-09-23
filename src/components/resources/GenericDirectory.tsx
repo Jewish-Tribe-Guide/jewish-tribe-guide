@@ -1505,7 +1505,15 @@ export default function GenericDirectory({ category, items, anchorLabel, address
           panels already do — 3.75rem is that bar's own height. MobileTabBar
           itself is `desktop:hidden` (no bottom bar to clear there), so
           desktop gets its own, simpler `bottom-6` instead of that clearance
-          math. */}
+          math.
+          A bare icon circle is a mobile convention (Gmail compose, Google
+          Maps) that people already have a trained reflex for — desktop
+          visitors don't have the same reflex for an icon floating in a
+          corner with no label, and this had none: just an aria-label,
+          invisible unless you already knew to hover-and-guess. Desktop gets
+          the label made visible instead, widening into a pill; mobile stays
+          the plain circle, where the label would just be redundant with the
+          reflex people already bring to the shape. */}
       {canAdd && (
         <button
           onClick={onAdd}
@@ -1514,10 +1522,15 @@ export default function GenericDirectory({ category, items, anchorLabel, address
           // the same name would make the two indistinguishable to anything
           // querying by accessible name (they're both in the DOM at once
           // for an empty category, since this isn't gated on `filtered`).
+          // Kept even now that desktop shows the same words visibly —
+          // aria-label always wins for the accessible name regardless, so
+          // this keeps mobile's icon-only button correctly named without
+          // needing a second, viewport-conditional way of deriving it.
           aria-label="Add a place"
-          className="fixed right-4 bottom-[calc(3.75rem+env(safe-area-inset-bottom)+1rem)] desktop:bottom-6 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-white shadow-lg cursor-pointer active:scale-95 transition-transform"
+          className="fixed right-4 bottom-[calc(3.75rem+env(safe-area-inset-bottom)+1rem)] desktop:bottom-6 z-40 flex h-14 w-14 desktop:w-auto items-center justify-center gap-2 rounded-full bg-primary px-0 desktop:px-5 text-white shadow-lg cursor-pointer active:scale-95 transition-transform"
         >
-          <PlusIcon className="h-6 w-6" />
+          <PlusIcon className="h-6 w-6 shrink-0" />
+          <span className="hidden desktop:inline font-medium whitespace-nowrap">Add a place</span>
         </button>
       )}
 

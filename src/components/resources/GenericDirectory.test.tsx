@@ -252,6 +252,21 @@ describe('GenericDirectory', () => {
     expect(screen.getByRole('button', { name: 'Add a place' })).toBeInTheDocument()
   })
 
+  // A bare icon circle is a mobile convention people already have a
+  // reflex for; desktop doesn't have that reflex, so it gets the same
+  // "Add a place" wording made visible instead of relying only on the
+  // aria-label. `desktop:inline` on the label span (jsdom never applies
+  // CSS, so this is asserted out of the className, same as the
+  // desktop:hidden check above) is what makes it show up there but not on
+  // mobile, where it would just be redundant with the shape.
+  it('shows the "Add a place" label visibly for desktop, not just as an aria-label', () => {
+    renderWithProviders(<GenericDirectory category={makeCategory()} items={[makeListing()]} {...handlers} />)
+
+    const label = screen.getByText('Add a place', { selector: 'span' })
+    expect(label.className).toContain('desktop:inline')
+    expect(label.className).toContain('hidden')
+  })
+
   // Regression coverage for DirectoryHeader's old desktop-only toolbar "Add"
   // button, removed once the floating button above started covering desktop
   // too — the two used to coexist (one per viewport), so this guards against
