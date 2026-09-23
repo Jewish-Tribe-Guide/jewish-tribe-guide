@@ -544,6 +544,23 @@ export default function GenericDirectory({ category, items, anchorLabel, address
     window.scrollTo({ top: Math.max(0, top), behavior })
   }
 
+  // Badges on a card (Open/boolean/select) each set a filter that lives in
+  // this component's own state, same as the equivalent control up in the
+  // search/filter/sort row — but that row isn't sticky on mobile (only
+  // `lg:sticky`, see its own className below), so a badge click deep in a
+  // long list changes what's filtered with nothing on screen to show it.
+  // Scrolling the row into view answers exactly that: only when it isn't
+  // already visible, so clicking a badge while the row IS on screen (or on
+  // desktop, where it's usually docked) doesn't move anything.
+  const scrollControlsIntoViewIfNeeded = () => {
+    const controls = controlsRef.current
+    if (!controls) return
+    const headerH = (document.querySelector('header')?.getBoundingClientRect().height ?? 64) + 12
+    const rect = controls.getBoundingClientRect()
+    if (rect.top >= headerH && rect.bottom <= window.innerHeight) return
+    window.scrollTo({ top: window.scrollY + rect.top - headerH, behavior: 'smooth' })
+  }
+
   // Same target, but waits for the row's own position to stop moving first —
   // for a scroll fired around the same moment something else can still
   // reorder the list under it (distance-sort landing once geolocation
@@ -1468,16 +1485,23 @@ export default function GenericDirectory({ category, items, anchorLabel, address
               onExpandedChange={(expanded) => onParamsChange?.({ item: expanded ? item.id : null }, { replace: true })}
               onVote={(c) => setVoteCounts((prev) => ({ ...prev, [item.id]: c }))}
               onTagClick={setSearch}
-              onFilterOpen={() => setOpenNow((v) => !v)}
-              onFilterBool={(key) => setBoolFilters((prev) => ({ ...prev, [key]: !prev[key] }))}
-              onFilterSelect={(key, value) =>
+              onFilterOpen={() => {
+                setOpenNow((v) => !v)
+                scrollControlsIntoViewIfNeeded()
+              }}
+              onFilterBool={(key) => {
+                setBoolFilters((prev) => ({ ...prev, [key]: !prev[key] }))
+                scrollControlsIntoViewIfNeeded()
+              }}
+              onFilterSelect={(key, value) => {
                 setSelectFilters((prev) => {
                   const cur = prev[key] ?? []
                   // Add/remove this value from the filter's chosen set. Clicking
                   // the badge again undoes it.
                   return { ...prev, [key]: cur.includes(value) ? cur.filter((x) => x !== value) : [...cur, value] }
                 })
-              }
+                scrollControlsIntoViewIfNeeded()
+              }}
               onEdit={() => onEdit(item)}
             />
             </div>

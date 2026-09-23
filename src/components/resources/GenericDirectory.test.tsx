@@ -868,6 +868,57 @@ describe('GenericDirectory — scrolling to the next/previous card', () => {
   })
 })
 
+// A badge on a card (Open/boolean/select) sets the same filter state as the
+// equivalent control up in the search/filter/sort row — but that row isn't
+// sticky on mobile, so clicking a badge deep in a long list can change what's
+// filtered with nothing on screen to show it. Scrolling the row into view
+// answers that, but only when it isn't already visible: doing it
+// unconditionally would yank the page around every time, including on
+// desktop where the row is usually docked in view already.
+describe('GenericDirectory — scrolling filter controls into view after a card badge click', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('scrolls the controls row into view when a badge sets a filter and the row is off-screen', () => {
+    const scrollTo = vi.fn()
+    vi.stubGlobal('scrollTo', scrollTo)
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
+      top: -500, bottom: -450, left: 0, right: 0, width: 0, height: 50, x: 0, y: -500, toJSON: () => {},
+    } as DOMRect)
+    try {
+      const category = makeCategory()
+      const items = [makeListing({ id: 'a', name: 'Kosher Mart' })]
+      renderWithProviders(<GenericDirectory category={category} items={items} {...handlers} />)
+
+      screen.getByRole('button', { name: 'card-filter Kosher Mart' }).click()
+
+      expect(scrollTo).toHaveBeenCalledWith(expect.objectContaining({ behavior: 'smooth' }))
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('does not scroll when the controls row is already visible', () => {
+    const scrollTo = vi.fn()
+    vi.stubGlobal('scrollTo', scrollTo)
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
+      top: 100, bottom: 150, left: 0, right: 0, width: 0, height: 50, x: 0, y: 100, toJSON: () => {},
+    } as DOMRect)
+    try {
+      const category = makeCategory()
+      const items = [makeListing({ id: 'a', name: 'Kosher Mart' })]
+      renderWithProviders(<GenericDirectory category={category} items={items} {...handlers} />)
+
+      screen.getByRole('button', { name: 'card-filter Kosher Mart' }).click()
+
+      expect(scrollTo).not.toHaveBeenCalled()
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+})
+
 // The card renders the empty distance slot; the directory decides whether it
 // should. Those are two separate failures — the card supporting it and nobody
 // passing the prop looks exactly like the bug it was built to fix, and the
