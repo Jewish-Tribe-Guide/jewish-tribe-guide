@@ -193,7 +193,14 @@ export default function HeroHeading({
     <>
       {/* Mobile — unchanged plain centered block. */}
       <section className="pt-12 sm:pt-16 text-center desktop:hidden">
-        <h1 className="text-3xl sm:text-[40px] font-bold tracking-tight text-slate-900 leading-tight">
+        {/* leading-snug, not -tight — heroTitle is admin-editable text with
+            no length limit, so it wraps to two lines depending on what an
+            admin sets it to (e.g. "Your Guide to Jewish Philadelphia"), and
+            -tight's 1.25 line-height read as the two lines pressed together
+            rather than sitting apart, at this size/weight. Only mattered
+            once wrapping actually started happening — a single line never
+            showed it. */}
+        <h1 className="text-3xl sm:text-[40px] font-bold tracking-tight text-slate-900 leading-snug">
           {settings.heroTitle}
         </h1>
         <p className="mt-3 max-w-2xl mx-auto text-[15px] sm:text-base text-slate-500">
