@@ -410,6 +410,22 @@ describe('ListingForm', () => {
   // with the listing) and nothing downstream actually needs it — email
   // alone is enough for a moderator to follow up. See this field's own
   // comment in ListingForm for the full reasoning.
+  // Regression guard: the note used to render as a bare paragraph after the
+  // Submit/Request removal buttons, outside every field box — by the time a
+  // visitor got there they'd already typed their email or already clicked
+  // past it. It should instead sit right under the one field it's actually
+  // about, inside that field's own box. Fails against the old placement,
+  // where the note is a sibling of the email field's div, not a child of it.
+  it('shows the privacy note directly under the email field, inside its box', () => {
+    const category = makeCategory({ id: 'grocery' })
+    renderWithProviders(<ListingForm category={category} mode="create" {...handlers} />)
+
+    const emailInput = screen.getByLabelText('Your email (optional)')
+    const note = screen.getByText(/never for marketing/)
+    expect(emailInput.parentElement).toContainElement(note)
+    expect(emailInput.parentElement?.closest('.border')).not.toBeNull()
+  })
+
   it('offers an email field but no name field, and sends submittedBy with just the email', async () => {
     const user = userEvent.setup()
     const fetchMock = stubFetchOk({ ok: true })

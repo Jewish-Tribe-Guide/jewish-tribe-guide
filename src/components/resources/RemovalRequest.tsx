@@ -3,6 +3,7 @@
 import { useId, useState } from 'react'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { withCommunity } from '@/lib/useCommunityData'
+import PrivacyNote from '@/components/PrivacyNote'
 
 const REASONS = ['Permanently closed', 'Duplicate listing', 'Shouldn’t be listed', 'Other'] as const
 
@@ -178,6 +179,9 @@ export default function RemovalRequest({
         <div>
           <label htmlFor={`${uid}-email`} className="mb-1 block text-sm font-medium text-slate-700">Your email (optional)</label>
           <input id={`${uid}-email`} type="email" value={submitterEmail} onChange={(e) => onSubmitterEmailChange(e.target.value)} className={inputClass} />
+          {/* Directly under this field, inside the same box — same reasoning
+              as ListingForm's own placement (see its comment on emailField). */}
+          <PrivacyNote className="mt-2" />
         </div>
       </div>
       {error && <p role="alert" className="text-sm text-red-600">{error}</p>}

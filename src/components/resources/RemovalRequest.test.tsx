@@ -115,6 +115,18 @@ describe('RemovalRequest', () => {
     expect(box).toContainElement(screen.getByLabelText('Your email (optional)'))
   })
 
+  // This panel had no privacy note of its own — ListingForm's copy used to
+  // live outside the removalOpen-hidden block and cover both screens, but
+  // moving it to live inside ListingForm's own email field (see that
+  // component's test) means this screen needs its own. Fails without the
+  // <PrivacyNote /> added alongside RemovalRequest's own email field.
+  it('shows its own privacy note directly under its own email field', () => {
+    setup()
+    const emailInput = screen.getByLabelText('Your email (optional)')
+    const note = screen.getByText(/never for marketing/)
+    expect(emailInput.parentElement).toContainElement(note)
+  })
+
   it('reports email edits upward instead of holding its own copy', async () => {
     const user = userEvent.setup()
     const { onSubmitterEmailChange } = setup()

@@ -669,6 +669,14 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
             <div>
               <label htmlFor="listing-submitter-email" className="block text-sm font-medium text-slate-700 mb-1">Your email (optional)</label>
               <input id="listing-submitter-email" type="email" value={submitterEmail} onChange={(e) => setSubmitterEmail(e.target.value)} className={inputClass} />
+              {/* Directly under the one field it's actually about, inside
+                  whichever box emailField itself ends up in — same as any
+                  other field's own helper text (e.g. a select field's
+                  description) — not a bare paragraph after the whole box,
+                  which is where this used to sit (all the way at the bottom
+                  of the form, after the Submit button, divorced from the
+                  field it's explaining). */}
+              <PrivacyNote className="mt-2" />
             </div>
           )
 
@@ -908,8 +916,6 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
             />
           </div>
         )}
-
-        <PrivacyNote />
       </form>
     </div>
   )
