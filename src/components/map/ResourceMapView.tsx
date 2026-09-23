@@ -505,6 +505,18 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
     return out
   }, [listings, categories, colorById, hospitalsData, pinnedIds])
 
+  // `pinned` (from usePinned) is every pinned listing regardless of category —
+  // it has no idea a category can be non-mappable (WhatsApp Groups, Networking:
+  // `hasAddress: false`, so `capabilities.map` is forced off — see categories.ts).
+  // `allPoints` above already excludes those (no geo, no map capability), so an
+  // entry that made it in and is still marked `pinned` is guaranteed mappable.
+  // The Pinned chip's visibility/count must be driven by THIS, not by
+  // `pinned.length` directly — otherwise pinning a WhatsApp group flips the
+  // chip on and counts a pin that can never actually appear as a marker, the
+  // same "chip with nothing behind it" bug categories.ts's own doc describes
+  // for a stale/deleted category.
+  const mappablePinnedCount = useMemo(() => allPoints.filter((p) => p.pinned).length, [allPoints])
+
   // Restores the pin `initialPlaceId` named, once it's actually in allPoints
   // (a plain state initializer would run before listings have loaded).
   // Guarded to fire only once — after that, selectedPointId and the effect
@@ -991,7 +1003,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // counts when it actually renders (see pinnedChip below), so a visitor
   // who's never pinned anything isn't blocked from "narrow to just this
   // one" by a chip they can't see.
-  const hasPinnedChip = ui.map.pins && pinned.length > 0
+  const hasPinnedChip = ui.map.pins && mappablePinnedCount > 0
   const allChipsOn = effectiveSelected.size === options.length && (!hasPinnedChip || pinnedSelected)
   // The full-screen category picker (mobile "More") lets a visitor uncheck
   // every box while browsing its own draft (draftSelected) — see
@@ -1091,9 +1103,9 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // already keep for an on-screen tap; this covers the one way the same
   // "nothing selected" state can be reached from OUTSIDE a chip tap.
   useEffect(() => {
-    if (pinnedSelected && pinned.length === 0 && effectiveSelected.size === 0) showAll()
+    if (pinnedSelected && mappablePinnedCount === 0 && effectiveSelected.size === 0) showAll()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pinned.length, pinnedSelected, effectiveSelected.size])
+  }, [mappablePinnedCount, pinnedSelected, effectiveSelected.size])
   // Same "surface the results" side effects toggling a category chip gets
   // (raise the mobile sheet, drop the desktop sidebar's collapse) — without
   // them, turning Pinned on looked like it did nothing when nothing else
@@ -1437,7 +1449,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // already said. The real toggle state (aria-pressed, the click handler)
   // stays keyed on `pinnedSelected` itself.
   const pinnedHighlighted = pinnedSelected && !allChipsOn
-  const pinnedChip = ui.map.pins && pinned.length > 0 && (
+  const pinnedChip = ui.map.pins && mappablePinnedCount > 0 && (
     <div
       className={`relative flex shrink-0 items-stretch rounded-full border text-xs font-medium transition-colors ${
         pinnedHighlighted ? 'border-transparent text-white' : 'border-slate-300 bg-white text-slate-500'
@@ -1460,7 +1472,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
         />
         <span aria-hidden="true">📌</span>
         <span>Pinned</span>
-        <span className={pinnedHighlighted ? 'text-white/80' : 'text-slate-400'}>{pinned.length}</span>
+        <span className={pinnedHighlighted ? 'text-white/80' : 'text-slate-400'}>{mappablePinnedCount}</span>
       </button>
     </div>
   )

@@ -5,6 +5,7 @@ import { cleanup, fireEvent, render, screen, within } from '@testing-library/rea
 import userEvent from '@testing-library/user-event'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { makeCategory, makeCommunity, makeContent, makeListing } from '@/test/providerFixtures'
+import { resolveCapabilities } from '@/lib/categories'
 import { CommunityProvider } from '@/lib/communityContext'
 import { ContentProvider } from '@/lib/contentContext'
 import { ListingsProvider } from '@/lib/listingsContext'
@@ -704,6 +705,53 @@ describe('ResourceMapView — pinning', () => {
     await user.click(screen.getByRole('button', { name: 'Long-press Acme Grocery' }))
 
     expect(await screen.findByRole('button', { name: /^Pinned/ })).toBeInTheDocument()
+  })
+
+  // Real bug: a listing in a non-mappable category (WhatsApp Groups,
+  // Networking — `hasAddress: false`, which forces `capabilities.map` off
+  // via resolveCapabilities) can still be pinned from its own directory row
+  // (ListingActionsMenu's Pin action has no capability gate), so it lands in
+  // usePinned()'s `pinned` array like any other pin. The map's Pinned chip
+  // used to read `pinned.length` directly — a raw count with no idea some
+  // pins are for categories the map never plots at all — so pinning a
+  // WhatsApp group flipped the chip on and counted a pin nothing would ever
+  // show for. It must be driven by `allPoints` instead (already excludes
+  // non-mappable categories the same way it excludes missing coordinates),
+  // same fix categories.ts's own doc describes for the "chip with nothing
+  // behind it" shape of bug.
+  //
+  // Seeded directly via the real pinned.ts storage shape (see
+  // GenericDirectory.test.tsx's "pinned listings sort first" for the same
+  // pattern) — the mocked ResourceMap only renders a Long-press button for
+  // points actually passed to it, and this listing is never one of them.
+  it('does not show the Pinned chip for a pin in a non-mappable category (e.g. WhatsApp Groups)', () => {
+    localStorage.setItem('jpc:pinned-listings', JSON.stringify([{ id: 'wa1', categoryId: 'whatsapp' }]))
+    // A normal mappable category alongside it — a map with only a
+    // non-mappable category would hide the whole chip row regardless of the
+    // bug, which is a false pass, not a real regression check (confirmed:
+    // this test still passed against the unfixed source until Grocery was
+    // added here). Real categories pages always have at least one mappable
+    // one, so this matches the actual scenario the bug report describes.
+    const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
+    const whatsapp = makeCategory({
+      id: 'whatsapp',
+      pluralLabel: 'WhatsApp Groups',
+      hasAddress: false,
+      capabilities: resolveCapabilities(undefined, false),
+    })
+    // Real geo on the WhatsApp listing, so this is testing the
+    // category-capability exclusion specifically, not just the pre-existing
+    // missing-coordinates one.
+    renderMap(
+      <ResourceMapView onUp={vi.fn()} />,
+      [
+        listingWithGeo({ id: 'g1', category: 'grocery', name: 'Acme Grocery' }),
+        listingWithGeo({ id: 'wa1', category: 'whatsapp', name: 'Shul Chat' }),
+      ],
+      [grocery, whatsapp],
+    )
+
+    expect(screen.queryByRole('button', { name: /^Pinned/ })).not.toBeInTheDocument()
   })
 })
 
