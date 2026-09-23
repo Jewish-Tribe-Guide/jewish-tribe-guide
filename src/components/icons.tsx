@@ -53,6 +53,50 @@ export function PinIcon({ className, filled }: IconProps & { filled?: boolean })
   )
 }
 
+// Thumbtack — "save to my shortlist" (ListingActionsMenu's Pin/Pinned item),
+// deliberately a different shape from PinIcon's map-marker teardrop: that one
+// means "a place on a map," this one means "I bookmarked this," and reusing
+// the same glyph for both blurred the distinction.
+//
+// Pinned (filled) is the real 📌 emoji, not a hand-drawn stroke path — every
+// attempt at redrawing a pushpin from scratch (a circle + a line/wedge,
+// rotated or not) read as a balloon, a key, or a magnifying glass instead, at
+// both large and icon-sized (16px) previews. The actual glyph is instantly
+// recognizable at every size specifically because of the head/needle
+// proportions no simple stroke shape reproduced. `brightness-0` flattens its
+// color to a plain black silhouette (alpha-preserving, unlike grayscale) so
+// it reads as one of this menu's monochrome icons rather than standing out
+// in red; `opacity-75` is the "thinner/lighter" match for their 1.8px stroke
+// weight — full opacity read noticeably heavier side by side with
+// PencilIcon/ExternalIcon in a live comparison.
+//
+// Unpinned (unfilled) can't reuse that trick — there's no hollow/outline
+// variant of an emoji glyph, no CSS filter turns a raster glyph into a line
+// drawing. Falls back to a hand-drawn outline instead, same `fill="none"` /
+// `currentColor`-stroke convention PinIcon itself uses for its own unset
+// state — traced against real reference pushpin-outline icons (cap, a
+// bulged body wider than the cap tapering to a point, then the needle),
+// not the abstract circle/wedge shapes tried first, which read as a
+// balloon or a key rather than a tack even in isolation.
+export function ThumbtackIcon({ className, filled }: IconProps & { filled?: boolean }) {
+  if (filled) {
+    return (
+      <span aria-hidden="true" className={`inline-flex items-center justify-center text-base leading-none brightness-0 opacity-75 ${className ?? ''}`}>
+        📌
+      </span>
+    )
+  }
+  return (
+    <svg {...base} className={className}>
+      <g transform="rotate(42 12 12)">
+        <rect x="8" y="1" width="8" height="4" rx="2" />
+        <path d="M7.5 4.7C5.5 7.5 6 10 8.5 12L12 16l3.5-4C18 10 18.5 7.5 16.5 4.7Z" />
+        <line x1="12" y1="16" x2="12" y2="22" />
+      </g>
+    </svg>
+  )
+}
+
 // Magen David — the app's brand mark (thinner 1.7 stroke, no linecap, so it
 // renders identically everywhere rather than falling back to the ✡ emoji glyph).
 // To rebrand for another community, replace this SVG (and src/app/favicon.ico).

@@ -386,7 +386,7 @@ export default function PlaceDetailBody({ item, category, onTagClick, onFilterOp
       )}
 
       {showAddress && (
-        // "Set location" used to live here too, right after the address —
+        // "Set as location" used to live here too, right after the address —
         // now only in the kebab (ListingActionsMenu) on the collapsed card/
         // dialog/map panel this renders inside.
         <div className="flex items-start gap-3">

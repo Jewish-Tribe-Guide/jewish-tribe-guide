@@ -171,7 +171,7 @@ export default function MapPlaceDetail({ item, category, color, onBack }: Props)
             line — a rule this component used to make a deliberate exception
             to, before that same rule got applied elsewhere in the app.
             Mocked up first (both options, side by side) before this landed.
-            Pin/Share/"Set location" all live behind this one menu now — see
+            Pin/Share/"Set as location" all live behind this one menu now — see
             ListingActionsMenu — so there's no separate Share button in the
             footer below any more, and PlaceDetailBody's own address row has
             no SetLocationButton either. */}
@@ -201,7 +201,7 @@ export default function MapPlaceDetail({ item, category, color, onBack }: Props)
 
       <div className="pt-2 border-t border-slate-200 space-y-2">
         <FreshnessFooter resourceId={item.id} confirmedAt={item.confirmedAt} onSuggestCorrection={canEdit ? () => openForm('edit') : undefined} />
-        {/* Edit lives in the kebab above, with Pin/Share/Set location, plus
+        {/* Edit lives in the kebab above, with Pin/Share/Set as location, plus
             FreshnessFooter's own quiet "Suggest a correction" link so it's
             visible a listing can be fixed. */}
       </div>

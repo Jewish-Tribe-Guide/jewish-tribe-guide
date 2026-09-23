@@ -8,7 +8,7 @@ import { usePinned } from '@/lib/pinnedContext'
 import { useShareLink } from '@/lib/useShareLink'
 import { useOptionalLocation } from '@/lib/locationContext'
 import { ui } from '@/lib/uiConfig'
-import { DotsIcon, PinIcon, ExternalIcon, CrosshairIcon, CheckIcon, PencilIcon } from '@/components/icons'
+import { DotsIcon, PinIcon, ThumbtackIcon, ExternalIcon, CheckIcon, PencilIcon } from '@/components/icons'
 
 // ── The kebab menu on a listing — Pin, Share, and "Set location" all
 // reachable without expanding the card first. Rendered by GenericListingCard
@@ -314,8 +314,8 @@ export default function ListingActionsMenu({
                 {/* No aria-pressed on these two items: it isn't a supported
                     attribute of role="menuitem" (axe: aria-allowed-attr,
                     critical). Their labels already carry the state —
-                    "Pin"/"Pinned", "Set location"/"Location set" — which is
-                    what a screen reader reads. */}
+                    "Pin"/"Pinned", "Set as location"/"Location set" — which
+                    is what a screen reader reads. */}
                 {ui.map.pins && (
                   <button
                     type="button"
@@ -327,7 +327,14 @@ export default function ListingActionsMenu({
                     }}
                     className={menuItemClass}
                   >
-                    <PinIcon filled={pinned} className="h-4 w-4 shrink-0" />
+                    {/* ThumbtackIcon, not PinIcon — this is "save to my
+                        shortlist," not "set my location." PinIcon's
+                        map-marker teardrop is freed up for the "Set as
+                        location" item below, which is the one actually
+                        about a place on a map. See ThumbtackIcon's own doc
+                        for why this is the real 📌 glyph (blackened/dimmed
+                        to match) rather than a redrawn shape. */}
+                    <ThumbtackIcon filled={pinned} className="h-4 w-4 shrink-0" />
                     {pinned ? 'Pinned' : 'Pin'}
                   </button>
                 )}
@@ -352,8 +359,8 @@ export default function ListingActionsMenu({
                     }}
                     className={menuItemClass}
                   >
-                    {active ? <CheckIcon className="h-4 w-4 shrink-0" /> : <CrosshairIcon className="h-4 w-4 shrink-0" />}
-                    {active ? 'Location set' : 'Set location'}
+                    {active ? <CheckIcon className="h-4 w-4 shrink-0" /> : <PinIcon className="h-4 w-4 shrink-0" />}
+                    {active ? 'Location set' : 'Set as location'}
                   </button>
                 )}
                 {canEdit && <div role="separator" className="my-1 h-px bg-slate-100" />}

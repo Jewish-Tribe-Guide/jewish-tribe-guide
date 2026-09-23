@@ -83,7 +83,7 @@ describe('ListingActionsMenu', () => {
 
   // aria-pressed isn't a supported attribute of role="menuitem" (axe:
   // aria-allowed-attr, critical). The items' labels already carry the state —
-  // "Pin"/"Pinned", "Set location"/"Location set" — so nothing is lost.
+  // "Pin"/"Pinned", "Set as location"/"Location set" — so nothing is lost.
   it('puts no aria-pressed on any menu item, which the menuitem role does not support', async () => {
     vi.mocked(locationContext.useOptionalLocation).mockReturnValue({
       anchorListingId: null,
@@ -96,7 +96,7 @@ describe('ListingActionsMenu', () => {
     await user.click(screen.getByRole('button', { name: /more actions/i }))
 
     const items = screen.getAllByRole('menuitem')
-    // Pin and Set location are the two that used to carry it.
+    // Pin and Set as location are the two that used to carry it.
     expect(items.length).toBeGreaterThanOrEqual(3)
     for (const item of items) expect(item, item.textContent ?? '').not.toHaveAttribute('aria-pressed')
   })
@@ -249,16 +249,16 @@ describe('ListingActionsMenu', () => {
     scrollable.remove()
   })
 
-  it('does not render "Set location" when there is no location context (e.g. the admin preview)', async () => {
+  it('does not render "Set as location" when there is no location context (e.g. the admin preview)', async () => {
     vi.mocked(locationContext.useOptionalLocation).mockReturnValue(null)
     const user = userEvent.setup()
     renderMenu()
 
     await user.click(screen.getByRole('button', { name: /more actions/i }))
-    expect(screen.queryByRole('menuitem', { name: /set location/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('menuitem', { name: /set as location/i })).not.toBeInTheDocument()
   })
 
-  it('does not render "Set location" when the listing has no geo coordinates', async () => {
+  it('does not render "Set as location" when the listing has no geo coordinates', async () => {
     vi.mocked(locationContext.useOptionalLocation).mockReturnValue({
       anchorListingId: null,
       setListingAnchor: vi.fn(),
@@ -268,10 +268,10 @@ describe('ListingActionsMenu', () => {
     renderMenu({ geo: undefined })
 
     await user.click(screen.getByRole('button', { name: /more actions/i }))
-    expect(screen.queryByRole('menuitem', { name: /set location/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('menuitem', { name: /set as location/i })).not.toBeInTheDocument()
   })
 
-  it('shows "Set location", calls setListingAnchor, and closes the menu', async () => {
+  it('shows "Set as location", calls setListingAnchor, and closes the menu', async () => {
     const setListingAnchor = vi.fn()
     vi.mocked(locationContext.useOptionalLocation).mockReturnValue({
       anchorListingId: null,
@@ -282,7 +282,7 @@ describe('ListingActionsMenu', () => {
     renderMenu({ geo: { lat: 39.95, lng: -75.16 } })
 
     await user.click(screen.getByRole('button', { name: /more actions/i }))
-    await user.click(screen.getByRole('menuitem', { name: /^set location$/i }))
+    await user.click(screen.getByRole('menuitem', { name: /^set as location$/i }))
 
     expect(setListingAnchor).toHaveBeenCalledWith({ id: 'listing-1', name: 'Goldi Market', coords: { lat: 39.95, lng: -75.16 } })
     expect(screen.queryByRole('menu')).not.toBeInTheDocument()

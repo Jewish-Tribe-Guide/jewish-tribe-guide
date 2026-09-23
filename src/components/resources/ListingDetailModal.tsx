@@ -341,14 +341,14 @@ export default function ListingDetailModal({
               </div>
             </div>
           )}
-          {/* Pin/Share/Set location used to live in a kebab here too, same
+          {/* Pin/Share/Set as location used to live in a kebab here too, same
               spot MapPlaceDetail gives it next to the name — removed: those
               are all pre-opening actions, already one click away on the
               card behind this dialog (dimmed but a click away once you
               close this), so having them here too was pure duplication.
               Edit moved up here instead, still as a kebab (not
               plain buttons — see hidePrimaryActions' own doc on
-              ListingActionsMenu) — unlike Pin/Share/Set location, they're
+              ListingActionsMenu) — unlike Pin/Share/Set as location, they're
               things you'd genuinely want only once you're actually looking
               at the full details, not before, so they stay. Hidden while
               formOpen, when the kebab would have nothing left to show. */}
