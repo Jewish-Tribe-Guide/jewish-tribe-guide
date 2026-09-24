@@ -440,7 +440,7 @@ export default function ListingDetailModal({
                     duplication the header's kebab was removed for. The freshness
                     STATUS stays: "Confirmed 3 days ago · Still right?" is a
                     different, one-tap contribution, not a second door to the form.
-                    The map's panel was the link's last user; it has a docked bar
+                    The map's panel was the link's last user; it has the same bar
                     of its own now, and FreshnessFooter no longer has the link. */}
               </div>
             </>

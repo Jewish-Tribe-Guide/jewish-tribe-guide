@@ -1499,13 +1499,10 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
     />
   )
 
-  // The sidebar's scroll region, as a function so the place detail can render
-  // into it while keeping its docked edit bar as a sibling of it rather than
-  // a child — pinned to the sidebar's bottom edge instead of scrolling away
-  // with the content (see MapPlaceDetail's renderScroll). One definition for
-  // the list and the detail, so neither can lose the overscroll-contain
-  // below. No safe-area inset to hand over here, unlike the mobile sheet's
-  // version, so it ignores `barBelow`.
+  // The sidebar's scroll region. One definition for the list and the place
+  // detail, so neither can lose the overscroll-contain below. Keyed on what
+  // it's showing, so each starts at the top: shared, the list's scroll
+  // offset carried into a place picked from deep in it.
   //
   // overscroll-contain: without it, a trackpad swipe closing a
   // NearbyList row's pin action can still bleed into the
@@ -1524,8 +1521,8 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // surface" limitation everywhere, so this screen having it
   // too, specifically here, is a smaller cost than a broken
   // row swipe.
-  const sidebarScroll = (content: ReactNode) => (
-    <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-3">{content}</div>
+  const sidebarScroll = (key: string, content: ReactNode) => (
+    <div key={key} className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-3">{content}</div>
   )
 
   return (
@@ -1636,15 +1633,18 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
               <div className="h-16 shrink-0" />
               {ui.map.nearbyList &&
                 (desktopSelected && desktopSelected.raw && desktopSelectedCategory ? (
-                  <MapPlaceDetail
-                    item={desktopSelected.raw}
-                    category={desktopSelectedCategory}
-                    color={desktopSelected.color}
-                    onBack={() => setDesktopSelected(null)}
-                    renderScroll={sidebarScroll}
-                  />
+                  sidebarScroll(
+                    `place:${desktopSelected.id}`,
+                    <MapPlaceDetail
+                      item={desktopSelected.raw}
+                      category={desktopSelectedCategory}
+                      color={desktopSelected.color}
+                      onBack={() => setDesktopSelected(null)}
+                    />,
+                  )
                 ) : (
                   sidebarScroll(
+                    'list',
                     <>
                       {activeLocation && (
                         <p className="mb-2 px-1 text-xs text-slate-400">

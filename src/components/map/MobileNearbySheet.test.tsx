@@ -27,33 +27,12 @@ vi.mock('./NearbyList', () => ({
     </div>
   ),
 }))
-// The stub honours MapPlaceDetail's renderScroll/showEditBar contract, since
-// how this sheet drives those two is part of its own job: which region the
-// detail renders into, and whether it's allowed a docked bar at the current
-// snap. A stub that ignored them — as this one did until the bar existed —
-// would let the sheet's half of that contract break with every test green.
 vi.mock('./MapPlaceDetail', () => ({
-  default: ({
-    item,
-    onBack,
-    renderScroll = (c: React.ReactNode) => c,
-    showEditBar = true,
-  }: {
-    item: Point
-    onBack: () => void
-    renderScroll?: (content: React.ReactNode, opts: { barBelow: boolean }) => React.ReactNode
-    showEditBar?: boolean
-  }) => (
-    <>
-      {renderScroll(
-        <div>
-          <p>detail for {item.name}</p>
-          <button onClick={onBack}>Back to list</button>
-        </div>,
-        { barBelow: showEditBar },
-      )}
-      {showEditBar && <div data-testid="docked-edit-bar" />}
-    </>
+  default: ({ item, onBack }: { item: Point; onBack: () => void }) => (
+    <div>
+      <p>detail for {item.name}</p>
+      <button onClick={onBack}>Back to list</button>
+    </div>
   ),
 }))
 
@@ -419,13 +398,13 @@ describe('MobileNearbySheet', () => {
     expect(screen.getByText('detail for Goldi Market')).toBeInTheDocument()
   })
 
-  // ── The place detail's docked edit bar ────────────────────────────────
+  // ── Where the place detail renders ─────────────────────────────────
 
-  // Docked means a sibling of the scroll region, not a child of it: inside,
-  // it would scroll away with the content, and it would sit under that
-  // region's own content-drag handlers — so a tap on it could begin a sheet
-  // drag.
-  it('docks the place detail\'s edit bar below the scroll region, not inside it', async () => {
+  // Inside the same hand-driven scroll region the list uses, so a long
+  // listing scrolls, and dragging it at the top resizes the sheet, exactly
+  // as the list does. Its edit bar is the last thing in that content (see
+  // MapPlaceDetail), no longer docked below the region.
+  it('renders the place detail inside the scroll region the list uses', async () => {
     const user = userEvent.setup()
     const { container } = render(
       <MobileNearbySheet points={[point]} userLocation={null} categories={[category]} containerHeight={600} />,
@@ -434,31 +413,17 @@ describe('MobileNearbySheet', () => {
 
     const region = container.querySelector('.overscroll-contain')!
     expect(region).toContainElement(screen.getByText('detail for Goldi Market'))
-    expect(region).not.toContainElement(screen.getByTestId('docked-edit-bar'))
   })
 
-  // Peek is 64px, the whole sheet: a bar would swallow it. Selecting a place
-  // snaps to half, so this is the case where someone drags back down with
-  // the place still open — here via the handle, whose tap cycles
-  // half -> full -> peek.
-  it('drops the bar at peek and brings it back above it, with the place still selected', async () => {
+  // Its own element, not the list's: a shared one kept the list's scroll
+  // offset, so a place picked from deep in the list opened partway down.
+  it('gives the place detail a fresh scroll region, not the list\'s', async () => {
     const user = userEvent.setup()
-    render(<MobileNearbySheet points={[point]} userLocation={null} categories={[category]} containerHeight={600} />)
+    const { container } = render(
+      <MobileNearbySheet points={[point]} userLocation={null} categories={[category]} containerHeight={600} />,
+    )
+    const listRegion = container.querySelector('.overscroll-contain')
     await user.click(screen.getByRole('button', { name: /select Goldi Market/ }))
-    expect(screen.getByTestId('docked-edit-bar')).toBeInTheDocument()
-
-    const tapHandle = (name: string) => {
-      const handle = screen.getByRole('button', { name })
-      fireEvent.pointerDown(handle, { clientY: 300 })
-      fireEvent.pointerUp(handle)
-    }
-    tapHandle('Drag to resize nearby list') // half -> full
-    expect(screen.getByTestId('docked-edit-bar')).toBeInTheDocument()
-    tapHandle('Drag to resize nearby list') // full -> peek
-    expect(screen.getByText('detail for Goldi Market')).toBeInTheDocument()
-    expect(screen.queryByTestId('docked-edit-bar')).not.toBeInTheDocument()
-
-    tapHandle('Expand nearby list') // peek -> half
-    expect(screen.getByTestId('docked-edit-bar')).toBeInTheDocument()
+    expect(container.querySelector('.overscroll-contain')).not.toBe(listRegion)
   })
 })

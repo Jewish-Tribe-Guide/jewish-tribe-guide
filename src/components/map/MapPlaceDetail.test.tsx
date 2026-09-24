@@ -158,10 +158,10 @@ describe('MapPlaceDetail', () => {
     expect(screen.getByText(/ListingForm stub/)).toBeInTheDocument()
   })
 
-  // ── The docked bar ────────────────────────────────────────────────────
+  // ── The edit bar ───────────────────────────────────────────────────────
 
   // Where Edit, Pin, Share and Set as location live now: one "Suggest an
-  // edit" bar docked under the panel, with the other three in its overflow.
+  // edit" bar at the end of the panel, with the other three in its overflow.
   // They used to sit behind a kebab next to the name, which people open
   // expecting Share and never expecting to author anything — plus a quiet
   // grey "Suggest a correction" link in the footer, now gone.
@@ -186,76 +186,58 @@ describe('MapPlaceDetail', () => {
     expect(screen.queryByRole('menuitem', { name: /report|remov/i })).not.toBeInTheDocument()
   })
 
-  // The whole point of the renderScroll split. The bar has to sit OUTSIDE the
-  // region the parent scrolls: inside, it would scroll away with the content
-  // — and on the mobile sheet it would sit under that region's content-drag
-  // handlers, so a tap on it could begin a sheet drag.
-  it('renders the bar as a sibling of the scroll region, never inside it', () => {
-    renderWithProviders(
+  // Part of the listing, the way it closes the directory's dropdown: the
+  // last thing in the content, after the freshness line, so it scrolls with
+  // the place rather than sitting docked over it (which phase 3 did).
+  it('ends the content with the bar, after the freshness line', () => {
+    const { container } = renderWithProviders(
       <PinnedProvider>
-        <MapPlaceDetail
-          item={makeListing({ name: 'Goldi Market' })}
-          category={makeCategory()}
-          color="#000"
-          onBack={() => {}}
-          renderScroll={(content) => <div data-testid="scroll-region">{content}</div>}
-        />
+        <MapPlaceDetail item={makeListing({ name: 'Goldi Market' })} category={makeCategory()} color="#000" onBack={() => {}} />
       </PinnedProvider>,
     )
-    const region = screen.getByTestId('scroll-region')
-    expect(region).toContainElement(screen.getByRole('link', { name: 'Goldi Market' }))
-    expect(region).not.toContainElement(screen.getByRole('button', { name: 'Suggest an edit' }))
-    expect(region).not.toContainElement(screen.getByRole('button', { name: 'Actions for Goldi Market' }))
+    const content = container.firstElementChild as HTMLElement
+    const last = content.lastElementChild as HTMLElement
+    expect(last).toContainElement(screen.getByRole('button', { name: 'Suggest an edit' }))
+    expect(last).toContainElement(screen.getByRole('button', { name: 'Actions for Goldi Market' }))
+    const freshness = screen.getByText('Is this info current?')
+    expect(freshness.compareDocumentPosition(last) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
-  // The bar carries the phone's safe-area inset when it's there, so the
-  // parent needs to know whether to pad its region for it instead.
-  it('tells the scroll region whether a bar sits below it', async () => {
+  // The bar is the last thing in the listing, so whoever taps it is usually
+  // scrolled to the bottom, and the parent's scroll region stays mounted
+  // when the form replaces the listing. Without a reset, the form opens at
+  // that depth with its Back and title out of view; closing it has the same
+  // problem the other way.
+  it('scrolls the parent region back to the top when the form opens and closes', async () => {
     const user = (await import('@testing-library/user-event')).default.setup()
-    const calls: boolean[] = []
-    const renderScroll = (content: React.ReactNode, { barBelow }: { barBelow: boolean }) => {
-      calls.push(barBelow)
-      return <div>{content}</div>
-    }
+    const writes: number[] = []
     renderWithProviders(
       <PinnedProvider>
-        <MapPlaceDetail item={makeListing({ name: 'Goldi Market' })} category={makeCategory()} color="#000" onBack={() => {}} renderScroll={renderScroll} />
+        <div
+          data-testid="region"
+          style={{ overflowY: 'auto' }}
+          ref={(el) => {
+            // jsdom has no layout, so its own scrollTop setter does nothing.
+            if (el) Object.defineProperty(el, 'scrollTop', { configurable: true, get: () => writes.at(-1) ?? 0, set: (v: number) => writes.push(v) })
+          }}
+        >
+          <MapPlaceDetail item={makeListing({ name: 'Goldi Market' })} category={makeCategory()} color="#000" onBack={() => {}} />
+        </div>
       </PinnedProvider>,
     )
-    expect(calls.at(-1)).toBe(true)
+    writes.length = 0
+    screen.getByTestId('region').scrollTop = 480
 
     await user.click(screen.getByRole('button', { name: 'Suggest an edit' }))
-    expect(calls.at(-1)).toBe(false) // the form has no bar under it
+    expect(writes.at(-1)).toBe(0)
 
-    // Fresh render rather than rerender — rerender bypasses the test
-    // providers renderWithProviders wraps things in.
-    cleanup()
-    renderWithProviders(
-      <PinnedProvider>
-        <MapPlaceDetail
-          item={makeListing({ name: 'Goldi Market' })}
-          category={makeCategory()}
-          color="#000"
-          onBack={() => {}}
-          renderScroll={renderScroll}
-          showEditBar={false}
-        />
-      </PinnedProvider>,
-    )
-    expect(calls.at(-1)).toBe(false) // nor does peek
-  })
-
-  // The mobile sheet's peek snap is 64px — the whole sheet. A bar there
-  // would swallow it.
-  it('renders no bar at all when told not to', () => {
-    renderWithProviders(
-      <PinnedProvider>
-        <MapPlaceDetail item={makeListing({ name: 'Goldi Market' })} category={makeCategory()} color="#000" onBack={() => {}} showEditBar={false} />
-      </PinnedProvider>,
-    )
-    expect(screen.queryByRole('button', { name: 'Suggest an edit' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Actions for Goldi Market' })).not.toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Goldi Market' })).toBeInTheDocument()
+    screen.getByTestId('region').scrollTop = 480
+    // What a swipe-back or the form's own Back delivers (see above).
+    act(() => {
+      window.dispatchEvent(new PopStateEvent('popstate', { state: {} }))
+    })
+    expect(screen.queryByRole('heading', { name: 'Suggest an edit' })).not.toBeInTheDocument()
+    expect(writes.at(-1)).toBe(0)
   })
 
   // Pin, Share and Set as location have no other home on the map now, and

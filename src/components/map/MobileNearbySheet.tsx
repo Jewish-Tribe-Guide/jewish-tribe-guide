@@ -520,20 +520,20 @@ const MobileNearbySheet = forwardRef<MobileNearbySheetHandle, Props>(function Mo
   const selectedCategory = selected ? categories.find((c) => c.id === selected.filterId) : undefined
 
   // The sheet's scroll region, as a function rather than inline JSX so the
-  // place detail can render into it while keeping its docked edit bar a
-  // SIBLING of it — outside this region's content-drag handlers, so a tap
-  // on the bar can never begin a sheet drag (see MapPlaceDetail's
-  // renderScroll). One definition for both branches below, so the list and
-  // the detail can't drift apart on any of this region's load-bearing
-  // details: the ref the momentum loop reads, the hand-driven pointer
-  // scrolling, touch-none.
+  // list and the place detail can't drift apart on any of this region's
+  // load-bearing details: the ref the momentum loop reads, the hand-driven
+  // pointer scrolling, touch-none.
   //
-  // The detail branch mounts its own copy rather than sharing the list's
-  // element. Everything that reads contentRef does so fresh at the moment
-  // it needs it, so that's safe — and nothing restores the list's scroll
-  // position on the way back, so there's no saved offset to lose either.
-  const scrollRegion = (content: ReactNode, { barBelow }: { barBelow: boolean }) => (
+  // Keyed on what it's showing, so the list and each place get their own
+  // element, each starting at the top. Shared, the list's scroll offset
+  // carried straight into a place picked from deep in it, opening the
+  // detail partway down. Everything that reads contentRef does so fresh at
+  // the moment it needs it, so the remount is safe — and nothing restores
+  // the list's scroll position on the way back, so there's no saved offset
+  // to lose either.
+  const scrollRegion = (key: string, content: ReactNode) => (
     <div
+      key={key}
       ref={contentRef}
       onPointerDown={onContentPointerDown}
       onPointerMove={onContentPointerMove}
@@ -543,11 +543,7 @@ const MobileNearbySheet = forwardRef<MobileNearbySheetHandle, Props>(function Mo
       // own scrolling is hand-driven (see onContentPointerMove) rather
       // than native touch-action: pan-y panning, so there's no longer a
       // snap state where the browser needs panning permission here.
-      // The safe-area inset belongs to whatever is the sheet's LAST row: this
-      // region normally, the docked edit bar when there is one.
-      className={`min-h-0 flex-1 touch-none overflow-y-auto overscroll-contain px-3 ${
-        barBelow ? 'pb-3' : 'pb-[calc(0.75rem+env(safe-area-inset-bottom))]'
-      }`}
+      className="min-h-0 flex-1 touch-none overflow-y-auto overscroll-contain px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]"
     >
       {content}
     </div>
@@ -577,23 +573,13 @@ const MobileNearbySheet = forwardRef<MobileNearbySheetHandle, Props>(function Mo
           </span>
         )}
       </div>
-      {selected && selected.raw && selectedCategory ? (
-        <MapPlaceDetail
-          item={selected.raw}
-          category={selectedCategory}
-          color={selected.color}
-          onBack={clearSelection}
-          renderScroll={scrollRegion}
-          // Not at peek: 64px is the whole sheet, and the bar would swallow
-          // it. Keyed off the settled snap rather than the live drag height,
-          // so it doesn't flicker in and out while a finger crosses the line.
-          showEditBar={snap !== 'peek'}
-        />
-      ) : (
-        scrollRegion(
-          <NearbyList points={points} userLocation={userLocation} onViewListing={onViewListing} onSelectPlace={selectPlace} />,
-          { barBelow: false },
-        )
+      {scrollRegion(
+        selected ? `place:${selected.id}` : 'list',
+        selected && selected.raw && selectedCategory ? (
+          <MapPlaceDetail item={selected.raw} category={selectedCategory} color={selected.color} onBack={clearSelection} />
+        ) : (
+          <NearbyList points={points} userLocation={userLocation} onViewListing={onViewListing} onSelectPlace={selectPlace} />
+        ),
       )}
     </div>
   )

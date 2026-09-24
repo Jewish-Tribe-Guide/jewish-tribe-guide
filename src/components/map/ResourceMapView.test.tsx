@@ -692,10 +692,11 @@ describe('ResourceMapView — selecting a place', () => {
     expect(await screen.findByRole('button', { name: 'Back to list' })).toBeInTheDocument()
     expect(screen.getByTestId('frame-token').textContent).not.toBe(initialFrameToken)
   })
-  // The desktop half of MapPlaceDetail's renderScroll contract, through the
-  // real component: the sidebar's edit bar is its last row, a sibling of the
-  // scroll region, so it stays put while a long listing scrolls under it.
-  it('docks the selected place\'s edit bar at the bottom of the sidebar, outside its scroll region', async () => {
+  // Through the real component: the sidebar's edit bar is part of the
+  // place's content, inside the scroll region, so it's reached at the end of
+  // a long listing the way the directory's dropdown ends with it — not
+  // docked to the sidebar's bottom edge the way phase 3 had it.
+  it('ends the selected place\'s content with its edit bar, inside the sidebar\'s scroll region', async () => {
     const user = userEvent.setup()
     const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
     const synagogue = makeCategory({ id: 'synagogue', pluralLabel: 'Synagogues' })
@@ -707,6 +708,10 @@ describe('ResourceMapView — selecting a place', () => {
     // Two categories, so the sidebar lists results rather than auto-selecting.
     await user.click(screen.getByRole('button', { name: /Grocery Stores/ }))
     await user.click(screen.getByRole('button', { name: /Synagogues/ }))
+    // The sidebar's own row (the first of two: the mobile sheet stays
+    // mounted on desktop too), not the map marker, which is outside it.
+    const listRegion = screen.getAllByRole('button', { name: /^Acme Grocery/ })[0]!.closest('.overscroll-contain')
+    expect(listRegion).not.toBeNull()
     await user.click(screen.getByRole('button', { name: 'Select Acme Grocery' }))
 
     const back = await screen.findByRole('button', { name: 'Back to list' })
@@ -714,7 +719,10 @@ describe('ResourceMapView — selecting a place', () => {
     const sidebar = back.closest('aside')!
     const pill = screen.getByRole('button', { name: 'Suggest an edit' })
     expect(sidebar).toContainElement(pill)
-    expect(region).not.toContainElement(pill)
+    expect(region).toContainElement(pill)
+    // And a fresh region, not the list's: a shared one carried the list's
+    // scroll offset into a place picked from deep in it.
+    expect(region).not.toBe(listRegion)
   })
 })
 

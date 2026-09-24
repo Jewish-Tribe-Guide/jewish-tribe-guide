@@ -810,7 +810,7 @@ describe('GenericListingCard — expanded', () => {
   // that the bar carries this job — two doors to the same form, one of them
   // near-invisible, is the duplication the bar was built to end. The
   // freshness STATUS stays: "Still right?" is its own one-tap contribution.
-  // (The map's place panel dropped it too once it got a docked bar, and
+  // (The map's place panel dropped it too once it got the bar, and
   // FreshnessFooter no longer has the link at all.)
   it('drops the quiet "Suggest a correction" link from both surfaces, keeping the freshness line', async () => {
     renderWithProviders(
