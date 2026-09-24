@@ -510,5 +510,43 @@ describe('MobileSheet', () => {
 
       expect(sheet().style.height).toBe(`${HALF_PX}px`)
     })
+
+    // For content that opens with its own heading — a listing, whose name is
+    // the title. The header row goes, the handle stays (it's the one drag
+    // target left above the content), and the dialog keeps its name.
+    it('titleHidden drops the header row but keeps the handle and the dialog name', () => {
+      render(
+        <MobileSheet isOpen onClose={vi.fn()} title="Goldi Market" draggable titleHidden>
+          <h2>Goldi Market</h2>
+        </MobileSheet>,
+      )
+      expect(screen.getByRole('dialog', { name: 'Goldi Market' })).toBeInTheDocument()
+      expect(screen.getAllByRole('heading')).toHaveLength(1)
+      expect(screen.getByRole('button', { name: 'Drag to resize' })).toBeInTheDocument()
+    })
+
+    // Without drag there'd be nothing to grab and no ✕: the header is where
+    // the non-draggable close button lives, so it can't be hidden there.
+    it('ignores titleHidden without draggable, keeping the close button', () => {
+      render(
+        <MobileSheet isOpen onClose={vi.fn()} title="Suggest an edit" titleHidden>
+          <p>form contents</p>
+        </MobileSheet>,
+      )
+      expect(screen.getByRole('button', { name: 'Close' })).toBeInTheDocument()
+    })
+
+    // The panel runs to the screen's bottom edge, so whatever ends its
+    // content sits under an iPhone's home indicator without this. Asserted
+    // from the class because jsdom has no safe-area inset to measure; a real
+    // phone is the only place the result can be seen.
+    it('pads the end of its content for the home indicator', () => {
+      render(
+        <MobileSheet isOpen onClose={vi.fn()} title="Suggest an edit" draggable>
+          <p>form contents</p>
+        </MobileSheet>,
+      )
+      expect(screen.getByText('form contents').parentElement!.className).toContain('env(safe-area-inset-bottom)')
+    })
   })
 })

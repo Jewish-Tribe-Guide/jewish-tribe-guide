@@ -113,19 +113,16 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // Multi-select: each key maps to the set of chosen values (empty = no filter).
   const [selectFilters, setSelectFilters] = useState<Record<string, string[]>>({})
 
-  // Which card currently has its DESKTOP detail dialog open. Only used to
-  // get the floating Add button out of the way while that dialog is up:
-  // the dialog's overlay is z-50 and the Add button z-40, so it sits under
-  // the backdrop — dimmed, still plainly a button, and completely inert
-  // (a click lands on the overlay and closes the dialog instead). Now that
-  // the dialog hangs its own blue "Suggest an edit" pill below itself, the
-  // two read as a pair of peers competing at the same height, and the one
-  // that does nothing is the more eye-catching of the two.
-  // Deliberately not driven off `?item=` (which onExpandedChange already
-  // syncs): that param is set on mobile too, where the expanded card is an
-  // inline accordion with no backdrop over it — the Add button there is
-  // still visible, still works, and hiding it for as long as a card happens
-  // to be expanded would take away the page's primary action for no reason.
+  // Which card currently has its listing open — the desktop dialog or the
+  // mobile sheet. Only used to get the floating Add button out of the way
+  // while it's up: both overlays are z-50 and the Add button z-40, so it
+  // sits under the backdrop — dimmed, still plainly a button, and
+  // completely inert (a tap lands on the overlay and closes the listing
+  // instead). Next to the listing's own blue "Suggest an edit" pill, the
+  // two read as peers competing for attention, and the one that does
+  // nothing is the more eye-catching of the two.
+  // Mobile used to be exempt: its listing expanded inline, with no backdrop
+  // over the Add button, which stayed usable. The sheet changed that.
   const [openDialogItemId, setOpenDialogItemId] = useState<string | null>(null)
   const [openDropdown, setOpenDropdown] = useState<string | null>(null)
   const [openNow, setOpenNow] = useState(arrivedViaBackForward ? false : (initialOpenNow ?? false))
@@ -1571,12 +1568,12 @@ export default function GenericDirectory({ category, items, anchorLabel, address
               // FindResources' openAction) reasonably does.
               onExpandedChange={(expanded) => {
                 onParamsChange?.({ item: expanded ? item.id : null }, { replace: true })
-                // Desktop only — see openDialogItemId's own note. Cleared by
-                // id rather than unconditionally: arrow-key next/prev closes
+                // See openDialogItemId's own note. Cleared by id rather
+                // than unconditionally: arrow-key next/prev closes
                 // one card and opens a sibling in the same commit, and the
                 // closing card's callback can run after the opening one's,
                 // which would otherwise clear the flag the new dialog just set.
-                if (!isMobile) setOpenDialogItemId((prev) => (expanded ? item.id : prev === item.id ? null : prev))
+                setOpenDialogItemId((prev) => (expanded ? item.id : prev === item.id ? null : prev))
               }}
               onVote={(c) => setVoteCounts((prev) => ({ ...prev, [item.id]: c }))}
               onTagClick={setSearch}

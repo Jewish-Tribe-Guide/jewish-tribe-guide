@@ -1,11 +1,9 @@
 import { expect, test } from '@playwright/test'
 import { categoryWithListings, largestCategory, defaultCommunity, dismissLocationPrompt } from './helpers'
 
-// A multi-column desktop grid has nowhere sensible to push an expanding
-// card's panel — it would have to span every column in its row or overlap
-// its neighbors — so desktop opens the same detail content in a dialog
-// instead of the mobile inline accordion. See GenericListingCard's
-// `isMobile` branch and ListingDetailModal.
+// Desktop opens a listing in a centered dialog (ListingDetailModal); a phone
+// opens it in a bottom sheet, the one Add and Edit use (MobileSheet). Neither
+// expands inline. See GenericListingCard's `isMobile` branch.
 
 test.describe('listing detail — desktop', () => {
   test.skip(({ isMobile }) => isMobile, 'desktop viewport only')
@@ -214,7 +212,11 @@ test.describe('listing detail — desktop', () => {
 test.describe('listing detail — mobile', () => {
   test.skip(({ isMobile }) => !isMobile, 'mobile viewport only')
 
-  test('clicking a listing expands it inline, not a dialog', async ({ page, request }) => {
+  // The listing opens in the same sheet Add and Edit use, not inline. Here
+  // rather than only in the unit tests because the parts that matter need
+  // real layout: that it opens at half the screen with the list still
+  // showing above it, and that a real tap on that dimmed list closes it.
+  test('clicking a listing opens it in a sheet at half height, which a tap on the list closes', async ({ page, request }) => {
     const community = await defaultCommunity(page)
     const { category } = await categoryWithListings(request, community)
 
@@ -225,11 +227,46 @@ test.describe('listing detail — mobile', () => {
     const name = (await trigger.getAttribute('aria-label'))!.replace(/^Show details for /, '')
     await trigger.click()
 
-    await expect(page.getByRole('button', { name: `Hide details for ${name}` })).toBeVisible()
-    await expect(page.getByRole('dialog')).toHaveCount(0)
+    const sheet = page.getByRole('dialog', { name })
+    await expect(sheet).toBeVisible()
+    await expect(page.getByRole('button', { name: `Hide details for ${name}` })).toBeAttached()
+    // The listing view, ending in its edit bar (or, where the category can't
+    // be edited, just the overflow the bar keeps).
+    await expect(sheet.getByRole('button', { name: `Actions for ${name}` })).toBeAttached()
 
-    // Tapping again collapses it back.
-    await page.getByRole('button', { name: `Hide details for ${name}` }).click()
+    // Settled at half: the open transition is 280ms, so poll rather than
+    // snapshot the height mid-animation.
+    const viewport = page.viewportSize()!
+    await expect
+      .poll(async () => Math.round((await sheet.boundingBox())!.height), { message: 'sheet height at rest' })
+      .toBe(Math.round(viewport.height * 0.5))
+
+    // A tap on the dimmed list above it closes it, like Add and Edit.
+    await page.mouse.click(viewport.width / 2, 40)
+    await expect(page.getByRole('dialog')).toHaveCount(0)
     await expect(page.getByRole('button', { name: `Show details for ${name}` })).toBeVisible()
+  })
+
+  // A shared link (`?item=`) opens the sheet on arrival, and closing it has
+  // to clear the param, or a reload reopens a listing the visitor closed.
+  // Next keeps the previous URL's tree alive, hidden, so a copy of the open
+  // sheet can linger in the DOM under display:none; getByRole ignores
+  // hidden elements, which is what "closed" means to a visitor.
+  test('a listing opened from a shared link closes, and stays closed', async ({ page, request }) => {
+    const community = await defaultCommunity(page)
+    const { category } = await categoryWithListings(request, community)
+    const res = await request.get(`/api/resources?category=${category.id}&community=${community}`)
+    const item = (await res.json()).resources[0] as { id: string; name: string }
+
+    await page.goto(`/${community}/${category.id}?item=${item.id}`)
+    await dismissLocationPrompt(page)
+
+    const sheet = page.getByRole('dialog', { name: item.name })
+    await expect(sheet).toBeVisible()
+    await page.mouse.click(page.viewportSize()!.width / 2, 40)
+
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+    await expect.poll(() => new URL(page.url()).searchParams.get('item')).toBeNull()
+    await expect(page.getByRole('button', { name: `Show details for ${item.name}` }).first()).toBeVisible()
   })
 })

@@ -7,7 +7,7 @@ import { renderWithProviders } from '@/test/renderWithProviders'
 import { makeCategory, makeListing } from '@/test/providerFixtures'
 import { mockRouter } from '@/test/nextNavigationMock'
 import { ForcedViewport } from '@/lib/useIsMobile'
-import { GenericListingCard, MOBILE_PANEL_TRANSITION_MS, type GenericListingCardHandle } from './GenericListingCard'
+import { GenericListingCard, type GenericListingCardHandle } from './GenericListingCard'
 
 // The first component test built on the CommunityProvider/ContentProvider
 // harness (renderWithProviders) — this was the specific component the
@@ -795,15 +795,22 @@ describe('GenericListingCard — expanded', () => {
     expect(screen.getByRole('dialog', { name: 'Suggest an edit' })).toBeInTheDocument()
   })
 
-  it('offers the same bar in the expanded mobile card, calling onEdit', async () => {
+  // In place, the way the desktop dialog and the map do it: the sheet stays
+  // the same sheet and its content becomes the form, rather than closing
+  // and handing off to FindResources' separate Edit sheet.
+  it('offers the same bar in the mobile listing sheet, which swaps the sheet to the edit form', async () => {
     const user = userEvent.setup()
     renderWithProviders(
       <ForcedViewport isMobile>
-        <GenericListingCard item={makeListing()} category={makeCategory()} upvotes={false} count={0} defaultExpanded {...requiredHandlers} />
+        <GenericListingCard item={makeListing({ name: 'Goldi Market' })} category={makeCategory()} upvotes={false} count={0} defaultExpanded {...requiredHandlers} />
       </ForcedViewport>,
     )
-    await user.click(screen.getByRole('button', { name: 'Suggest an edit' }))
-    expect(requiredHandlers.onEdit).toHaveBeenCalledTimes(1)
+    const sheet = screen.getByRole('dialog', { name: 'Goldi Market' })
+    await user.click(within(sheet).getByRole('button', { name: 'Suggest an edit' }))
+
+    expect(within(sheet).getByText('ListingForm stub — mode=edit, existing=Goldi Market')).toBeInTheDocument()
+    expect(within(sheet).getByRole('heading', { name: 'Suggest an edit' })).toBeInTheDocument()
+    expect(screen.getAllByRole('dialog')).toHaveLength(1)
   })
 
   // The quiet link is deliberately gone from both directory surfaces now
@@ -826,9 +833,9 @@ describe('GenericListingCard — expanded', () => {
   // only home Set-as-location has, and the only route to Pin/Share a
   // keyboard or screen reader can reach — the card's swipe and hover-reveal
   // are pointer-only precisely because this exists. Both surfaces, since
-  // they gate independently (the mobile accordion here, ListingDetailModal
-  // on desktop).
-  for (const [surface, isMobile] of [['mobile accordion', true], ['desktop dialog', false]] as const) {
+  // they gate independently (MapPlaceDetail in the mobile sheet,
+  // ListingDetailModal on desktop).
+  for (const [surface, isMobile] of [['mobile sheet', true], ['desktop dialog', false]] as const) {
     it(`keeps the overflow, without the pill, when the category cannot be edited (${surface})`, async () => {
       const user = userEvent.setup()
       renderWithProviders(
@@ -1377,52 +1384,89 @@ describe('GenericListingCard — swipe actions', () => {
   })
 })
 
-// The chevron used to be the only visible signal that this row expands at
-// all on mobile (no hover state exists there to hint at it another way).
-// Removing it (see the toggle button's own comment) meant the mobile panel
-// itself had to take over that job by animating open instead of popping in
-// silently — these two things ship together, not independently.
-describe('GenericListingCard — mobile accordion animation', () => {
+describe('GenericListingCard — mobile listing sheet', () => {
   afterEach(() => {
     cleanup()
     vi.useRealTimers()
   })
 
-  it('renders no visible chevron svg any more, on either breakpoint', () => {
-    renderWithProviders(
+  function renderMobile(props: Partial<React.ComponentProps<typeof GenericListingCard>> = {}) {
+    return renderWithProviders(
       <ForcedViewport isMobile>
-        <GenericListingCard item={makeListing()} category={makeCategory()} upvotes={false} count={0} {...requiredHandlers} />
+        <GenericListingCard item={makeListing({ name: 'Goldi Market' })} category={makeCategory()} upvotes={false} count={0} {...requiredHandlers} {...props} />
       </ForcedViewport>,
     )
+  }
+
+  // The chevron used to be the only visible signal that this row opens at
+  // all on mobile (no hover state exists there to hint at it); the sheet
+  // sliding up on the tap is that signal now.
+  it('renders no visible chevron svg any more', () => {
+    renderMobile()
     const toggle = screen.getByRole('button', { name: /show details for/i })
     expect(toggle.querySelector('svg')).not.toBeInTheDocument()
   })
 
-  it('keeps the panel mounted through its close transition, then removes it', () => {
+  // A tap opens a sheet over the list rather than expanding the row inline.
+  // The sheet is the Add/Edit one; what's inside is the map's listing view.
+  it('opens the listing in a sheet over the list, not inline', async () => {
+    const user = userEvent.setup()
+    const onExpandedChange = vi.fn()
+    renderMobile({ onExpandedChange })
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /show details for Goldi Market/i }))
+    const sheet = screen.getByRole('dialog', { name: 'Goldi Market' })
+    expect(sheet).toHaveAttribute('aria-modal', 'true')
+    expect(within(sheet).getByRole('button', { name: /^mark as current$/i })).toBeInTheDocument()
+    expect(within(sheet).getByRole('button', { name: 'Suggest an edit' })).toBeInTheDocument()
+    expect(onExpandedChange).toHaveBeenLastCalledWith(true)
+  })
+
+  // No title row and no "Back to list": the name, at the top of the
+  // listing's own view, is the title, and the list is the page behind.
+  // One heading means MobileSheet's header didn't come back alongside it.
+  it('has the listing name as its only title, and no Back to list', () => {
+    renderMobile({ defaultExpanded: true })
+    const sheet = screen.getByRole('dialog', { name: 'Goldi Market' })
+    const headings = within(sheet).getAllByRole('heading')
+    expect(headings).toHaveLength(1)
+    expect(headings[0]).toHaveTextContent('Goldi Market')
+    expect(within(sheet).queryByRole('button', { name: 'Back to list' })).not.toBeInTheDocument()
+  })
+
+  // Tapping the dimmed list closes it, like Add and Edit — and it stays on
+  // screen long enough to animate away rather than vanishing on the tap.
+  it('closes on a tap on the dimmed list, animating out before it unmounts', () => {
     vi.useFakeTimers()
-    const category = makeCategory()
-    const item = makeListing()
-    renderWithProviders(
-      <ForcedViewport isMobile>
-        <GenericListingCard item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />
-      </ForcedViewport>,
-    )
+    const onExpandedChange = vi.fn()
+    renderMobile({ defaultExpanded: true, onExpandedChange })
+    const backdrop = screen.getByRole('dialog', { name: 'Goldi Market' }).parentElement!
 
-    const toggle = screen.getByRole('button', { name: /show details for/i })
-    act(() => fireEvent.click(toggle))
-    // FreshnessFooter's own button — unconditional, unlike Edit (which
-    // depends on the category's capabilities, see ListingEditBar), so
-    // it's a marker for "is the panel still mounted" that doesn't depend on
-    // what this category/listing happens to allow.
-    expect(screen.getByRole('button', { name: /^mark as current$/i })).toBeInTheDocument()
+    act(() => void fireEvent.click(backdrop))
+    expect(onExpandedChange).toHaveBeenLastCalledWith(false)
+    expect(screen.getByRole('dialog', { name: 'Goldi Market' })).toBeInTheDocument()
 
-    const collapseToggle = screen.getByRole('button', { name: /hide details for/i })
-    act(() => fireEvent.click(collapseToggle))
-    // Still in the DOM immediately after collapsing starts — an instant
-    // unmount here is exactly the silent pop this animation replaced.
-    expect(screen.getByRole('button', { name: /^mark as current$/i })).toBeInTheDocument()
+    act(() => void vi.advanceTimersByTime(300))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
 
-    act(() => void vi.advanceTimersByTime(MOBILE_PANEL_TRANSITION_MS))
-    expect(screen.queryByRole('button', { name: /^mark as current$/i })).not.toBeInTheDocument()
+  // A tag narrows the list behind the sheet, so the sheet gets out of the
+  // way first — filtering out of sight would look like the tap did nothing.
+  it('closes itself before applying a tag filter to the list behind it', async () => {
+    const user = userEvent.setup()
+    const onTagClick = vi.fn()
+    const onExpandedChange = vi.fn()
+    renderMobile({
+      defaultExpanded: true,
+      onTagClick,
+      onExpandedChange,
+      category: makeCategory({ detailFields: [{ key: 'items', label: 'Kosher items available', type: 'tags' }] }),
+      item: makeListing({ name: 'Goldi Market', items: ['Challah'] }),
+    })
+    await user.click(within(screen.getByRole('dialog', { name: 'Goldi Market' })).getByRole('button', { name: 'Challah' }))
+
+    expect(onTagClick).toHaveBeenCalledWith('Challah')
+    expect(onExpandedChange).toHaveBeenLastCalledWith(false)
   })
 })

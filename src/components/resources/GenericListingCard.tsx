@@ -1,6 +1,6 @@
 'use client'
 
-import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
+import { forwardRef, useImperativeHandle, useRef, useState } from 'react'
 import { track } from '@vercel/analytics'
 import type { DirectoryResource } from '@/types'
 import { PHOTO_FIELD_KEY, resolveCapabilities, selectValues, type CategoryConfig, type CategoryField } from '@/lib/categories'
@@ -15,10 +15,9 @@ import CategoryIcon from '@/components/CategoryIcon'
 import PinnedBadge from '@/components/PinnedBadge'
 import { CheckIcon, ExternalIcon, PinIcon, ThumbtackIcon } from '@/components/icons'
 import UpvoteButton from './UpvoteButton'
-import FreshnessFooter from './FreshnessFooter'
-import PlaceDetailBody from './PlaceDetailBody'
 import ListingDetailModal from './ListingDetailModal'
-import ListingEditBar from './ListingEditBar'
+import MobileSheet from './MobileSheet'
+import MapPlaceDetail from '@/components/map/MapPlaceDetail'
 import { useListingActions, type ListingAction } from './useListingActions'
 import SwipeRow, { type SwipeAction } from '@/components/SwipeRow'
 import Chip from './Chip'
@@ -26,14 +25,6 @@ import { travelParts } from '@/lib/listingTravel'
 import { ui } from '@/lib/uiConfig'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { usePinned } from '@/lib/pinnedContext'
-
-// How long mobile's inline accordion panel takes to open/close — the height
-// (grid-template-rows) and opacity transition below, and the delay before
-// actually unmounting it on close (see the panelMounted effect), share this
-// one value so the unmount can't fire mid-animation and cut it off. Exported
-// so GenericListingCard.test.tsx can advance fake timers by exactly this
-// much rather than a guessed duration that drifts if this one changes.
-export const MOBILE_PANEL_TRANSITION_MS = 240
 
 /** Pin and Share are the two that belong to SCANNING a list — shortlisting
  *  as you read, sending one to someone. "Set as location" is deliberately
@@ -191,64 +182,6 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
   onExpandedChange,
 }, ref) {
   const [expanded, setExpanded] = useState(!!defaultExpanded)
-  // Mobile's inline panel (see the isMobile branch far below) animates open
-  // and closed instead of popping in/out silently — replacing the chevron
-  // that used to be the only signal this row was expandable at all (see
-  // that button's own comment).
-  //
-  // Two pieces of state, not one, because "in the DOM" and "in its open CSS
-  // state" can't be the same flag:
-  //
-  // panelMounted — whether the panel exists in the DOM at all. A closing
-  // panel still needs to be there WHILE it animates away, so this can't
-  // just flip false the instant `expanded` does (the old plain
-  // `isMobile && expanded &&` render did exactly that) — it stays mounted
-  // through the close transition and only unmounts once that's actually
-  // finished (MOBILE_PANEL_TRANSITION_MS later).
-  //
-  // panelOpen — the flag the actual grid-rows/opacity classes read. This is
-  // the one that needs the double-rAF below: if the panel mounted with
-  // panelOpen already true in the SAME commit (i.e. just used `expanded`
-  // directly), the browser never gets a frame where the closed classes are
-  // actually painted, so there's nothing for the transition to animate
-  // FROM — it would just snap straight to fully open, which is exactly the
-  // silent pop this was built to replace. Closing has no such gap:
-  // panelOpen can drop to false immediately, since the panel is already
-  // mounted and showing its open classes at that point.
-  const [panelMounted, setPanelMounted] = useState(!!defaultExpanded)
-  const [panelOpen, setPanelOpen] = useState(!!defaultExpanded)
-  // The synchronous setState below is the point, not an oversight: panelMounted has to flip
-  // before the double-rAF below can schedule panelOpen, which is what gives
-  // the transition a closed state to animate FROM (see the block comment
-  // above for the full reasoning). Deriving it during render instead would
-  // mean mounting and opening in the same commit, i.e. the silent pop this
-  // was built to replace. Pre-dates the swipe/hover work in this commit —
-  // that change didn't touch this effect, it only made the rule start
-  // reporting on it; refactoring carefully-timed animation code is not
-  // something to do incidentally.
-  useEffect(() => {
-    if (!expanded) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- see above
-      setPanelOpen(false)
-      const timer = setTimeout(() => setPanelMounted(false), MOBILE_PANEL_TRANSITION_MS)
-      return () => clearTimeout(timer)
-    }
-    setPanelMounted(true)
-    // Double rAF: the first callback runs before the NEXT paint (still too
-    // early — same frame the mount itself lands in), the second runs after
-    // that paint has happened, i.e. once the closed state has genuinely hit
-    // the screen. A single rAF is a common enough source of flaky "it
-    // sometimes doesn't animate" bugs elsewhere that it's worth spelling
-    // out rather than risking it here.
-    let raf2 = 0
-    const raf1 = requestAnimationFrame(() => {
-      raf2 = requestAnimationFrame(() => setPanelOpen(true))
-    })
-    return () => {
-      cancelAnimationFrame(raf1)
-      cancelAnimationFrame(raf2)
-    }
-  }, [expanded])
   // Two independent alignment segments — see GenericListingCardHandle's own
   // doc for why this is two spacers, not one. cardRootRef anchors segment
   // 1 (icon/name/address/header text, ending at the upvote row); the
@@ -290,15 +223,13 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
   }))
   const categories = useCategories()
   const community = useCommunitySlug()
-  // Which UI opens on click: a single-column mobile list has room to push an
-  // inline panel down; a multi-column desktop grid doesn't (expanding one
-  // card among several in a row has no sensible place to put the panel), so
-  // desktop opens the same content in ListingDetailModal instead. Same
+  // Which UI opens on click: a sheet on a phone (MobileSheet, like Add and
+  // Edit), a centered dialog on desktop (ListingDetailModal). Same
   // `expanded` state either way — just where it renders. `useIsMobile`
   // starts `false` until mount (see its own SSR-safe note), so a listing
   // reopened via `defaultExpanded` can flash as "modal open" on a phone for
-  // one tick before settling into the inline panel — accepted the same way
-  // the other isMobile-gated layout branches in this app already are.
+  // one tick before settling into the sheet — accepted the same way the
+  // other isMobile-gated layout branches in this app already are.
   const isMobile = useIsMobile()
   // The Share path the card's own actions (and the edit bar's fan) need.
   const listingPath = routes.listing(community, category.id, listingSlug(item))
@@ -462,7 +393,7 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
   // via showCountInHeader — a grocery category's "which kosher items does
   // this place carry" is the motivating case, but this isn't hardcoded to
   // kosher: tags fields are excluded from badgeFields entirely (they're meant
-  // for the expanded panel), and a field's key/label/tagGroup are all
+  // for the opened listing), and a field's key/label/tagGroup are all
   // per-community admin text with nothing stable to match against — tagGroup
   // in particular is auto-derived from the label (see categoryEditorLogic.ts)
   // and drifts the moment someone edits it. showCountInHeader is the same
@@ -493,6 +424,12 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
   const subtitle = subtitleParts.length > 0 ? subtitleParts.join(' · ') : (item.googleDescription as string | undefined) || null
 
   const color = getCategoryColor(categories, category.id)
+  // Closes whichever surface the listing is open in: the sheet on a phone,
+  // the dialog on desktop.
+  const close = () => {
+    setExpanded(false)
+    onExpandedChange?.(false)
+  }
   // Shared with ListingDetailModal's own header avatar on desktop — computed
   // once here rather than duplicated, since it's the same "which photo (if
   // any) represents this listing" decision either way.
@@ -605,8 +542,8 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
 
   return (
     // No `overflow-hidden`: it would clip the cert badge's hover tooltip on a
-    // collapsed card. Corners stay clean because the header and expanded panel
-    // round their own edges below. h-full: in the desktop grid (see
+    // collapsed card. Corners stay clean because the row rounds its own
+    // edges below. h-full: in the desktop grid (see
     // GenericDirectory) the wrapper div around each card is the actual grid
     // item, and a CSS grid row already stretches that wrapper to match its
     // tallest neighbor — but a plain block child doesn't inherit that height
@@ -633,7 +570,7 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
         // Mobile only: desktop reveals the same two actions by hovering the
         // row instead (see the hover-reveal in the corner below).
         enabled={isMobile}
-        className={expanded && isMobile ? 'rounded-t-lg' : 'rounded-lg'}
+        className="rounded-lg"
         contentRef={cardRootRef}
         // SwipeRow keeps this from firing for the click a swipe ends with,
         // and for a tap on a row whose actions are showing — that tap puts
@@ -671,9 +608,7 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
         // its own (group/tip on the cert badges).
         // relative + bg-white so this row paints OVER the swipe actions
         // behind it; without an opaque background they'd show through.
-        contentClassName={`group/row relative h-full w-full bg-white px-4 py-3 hover:bg-slate-50 active:bg-slate-100 cursor-pointer transition-colors duration-200 ease-out ${
-          expanded && isMobile ? 'rounded-t-lg' : 'rounded-lg'
-        }`}
+        contentClassName="group/row relative h-full w-full rounded-lg bg-white px-4 py-3 hover:bg-slate-50 active:bg-slate-100 cursor-pointer transition-colors duration-200 ease-out"
       >
         {/* items-center, not items-start, on mobile: the row's only ever
             2 lines there (name + subtitle — headerTextFields below is
@@ -894,11 +829,9 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
                 hover state this button never had anyway).
                 Mobile is different — no hover to hint at it, and removing
                 the chevron there needed a real substitute, not just
-                deleting the affordance: the panel below now animates
-                open/closed (height+opacity) instead of popping in silently,
-                so the motion itself teaches "tapping this row does
-                something" the moment it happens, tied directly to the tap.
-                See the panel's own comment on that transition.
+                deleting the affordance: the listing sheet slides up from
+                the bottom on the tap, so the motion itself teaches "tapping
+                this row does something" the moment it happens.
                 The button itself stays — <button> is the actual accessible
                 toggle a keyboard/screen-reader visitor needs
                 (aria-expanded/aria-label above), it just no longer draws
@@ -1034,81 +967,42 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
         )}
       </SwipeRow>
 
-      {/* Mobile: inline accordion, pushing the rest of the list down — see
-          the isMobile note above the state declaration. Animated (height via
-          grid-template-rows, the standard trick for transitioning to/from an
-          unknown "auto" height with no JS measurement — plus opacity) rather
-          than popping in/out silently, since this is the only thing left
-          signaling "tapping this row does something" now that the chevron
-          is gone (see that button's own comment) — no hover state exists on
-          mobile to hint at it beforehand, so the motion itself has to carry
-          that job on the way in. min-h-0 on the inner div is load-bearing:
-          a grid track's default min-height is auto (its content's natural
-          size), which overrides `0fr` and defeats the whole animation
-          without it. */}
-      {isMobile && panelMounted && (
-        <div
-          className={`grid overflow-hidden transition-[grid-template-rows,opacity] ease-out ${panelOpen ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}
-          style={{ transitionDuration: `${MOBILE_PANEL_TRANSITION_MS}ms` }}
-        >
-        <div className="min-h-0 border-t border-slate-100 px-4 py-4 space-y-3 bg-slate-50 rounded-b-lg">
-          <PlaceDetailBody
+      {/* Mobile: the listing opens in a sheet, the same one Add and Edit
+          use (MobileSheet), holding the same listing view the map's sheet
+          shows (MapPlaceDetail). It used to expand inline, pushing the list
+          down, with its own copy of that view; now a listing reads the same
+          wherever it's opened, and "Suggest an edit" is the last thing in
+          it, as it was at the foot of the dropdown.
+          Like Add and Edit: it's only there once tapped, opens at half,
+          pulls to full, and closes by dragging down, tapping the dimmed
+          list, or Escape. No title row: the listing's name, at the top of
+          its own view, is the title, and names the dialog for a screen
+          reader. No "Back to list" either — the list is the page behind.
+          Always mounted on mobile rather than `expanded &&`, so the sheet
+          stays on screen long enough to animate closed. */}
+      {isMobile && (
+        <MobileSheet isOpen={expanded} onClose={close} title={item.name} draggable titleHidden>
+          <MapPlaceDetail
             item={item}
             category={category}
-            onTagClick={onTagClick}
-            onFilterOpen={onFilterOpen}
-            onFilterBool={onFilterBool}
-            onFilterSelect={onFilterSelect}
-            hideOpenStatus
-            // headerBadges (the full set), not visibleHeaderBadges — a badge
-            // countReplacesKey suppressed from the collapsed row shouldn't
-            // reappear down here either. It was excluded from
-            // visibleHeaderBadges specifically so the count could take its
-            // spot, not because the badge stopped applying; showing it again
-            // once expanded reintroduces the exact "says the same thing
-            // twice" duplication the count was built to avoid, just one tap
-            // later instead of never.
-            hiddenBadgeKeys={headerBadges.map((f) => f.key)}
-            // Same reasoning as hideOpenStatus — the collapsed header above
-            // already shows the "N kosher items" count.
-            hideCountBadge
+            color={color}
+            // A filter tap narrows the list behind the sheet, so the sheet
+            // gets out of the way first rather than filtering out of sight.
+            filters={{
+              onTagClick: (tag) => { close(); onTagClick(tag) },
+              onFilterOpen: () => { close(); onFilterOpen() },
+              onFilterBool: (key) => { close(); onFilterBool(key) },
+              onFilterSelect: (key, value) => { close(); onFilterSelect(key, value) },
+            }}
           />
-
-          <div className="pt-2 border-t border-slate-200 space-y-2">
-            {/* No "Suggest a correction" link: that 12px grey link was the one visible
-                way in to Edit while Edit itself lived in the collapsed row's
-                kebab, and it was never up to the job — it sat at the same
-                weight as the timestamp next to it. ListingEditBar below is
-                that way in now. The freshness STATUS stays: "Still right?" is
-                a one-tap contribution of its own, not a second door to the
-                form. */}
-            <FreshnessFooter resourceId={item.id} confirmedAt={item.confirmedAt} />
-          </div>
-          {/* Sits on the panel's own slate-50 ground rather than inside the
-              white detail block above it — the point is that it reads as its
-              own object rather than as one more row of content. It stays
-              INSIDE the bordered card (not a sibling of it) on purpose: the
-              card root carries the h-full that makes desktop's grid rows line
-              up (see its comment), and hanging a sibling off it would mean
-              restructuring that for a difference of one hairline border.
-              mt-1 rather than relying on the panel's space-y-3, so the gap
-              between the details and this reads as a separation rather than
-              as the next item in a list. */}
-          {/* Not gated on canEdit — see ListingEditBar on why the overflow
-              has to survive a listing that can't be edited. */}
-          <ListingEditBar onEdit={canEdit ? onEdit : undefined} item={item} category={category} path={listingPath} className="mt-1" />
-        </div>
-        </div>
+        </MobileSheet>
       )}
 
       {/* Desktop: same content, centered dialog instead — see ListingDetailModal. */}
       {!isMobile && (
         <ListingDetailModal
           isOpen={expanded}
-          onClose={() => {
-            setExpanded(false)
-            onExpandedChange?.(false)
-          }}
+          onClose={close}
           item={item}
           category={category}
           color={color}

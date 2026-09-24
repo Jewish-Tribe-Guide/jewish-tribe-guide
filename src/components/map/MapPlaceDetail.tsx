@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type ComponentProps } from 'react'
 import Link from 'next/link'
 import type { DirectoryResource } from '@/types'
 import { PHOTO_FIELD_KEY, resolveCapabilities, type CategoryConfig } from '@/lib/categories'
@@ -21,7 +21,14 @@ type Props = {
   item: DirectoryResource
   category: CategoryConfig
   color: string
-  onBack: () => void
+  /** "Back to list", to the nearby list this place was picked from. Omitted
+   *  by the category listing sheet, where the list is the page behind the
+   *  sheet and dragging down or tapping it away is the way back. */
+  onBack?: () => void
+  /** The directory's filter taps: a tag, "Open", a filterable badge. The
+   *  map has no such filters, so it passes none and those chips are plain
+   *  labels. */
+  filters?: Pick<ComponentProps<typeof PlaceDetailBody>, 'onTagClick' | 'onFilterOpen' | 'onFilterBool' | 'onFilterSelect'>
 }
 
 /** The nearest ancestor that scrolls, i.e. the parent's scroll region. */
@@ -36,7 +43,9 @@ function scrollingAncestor(el: HTMLElement | null): HTMLElement | null {
 /**
  * Full place details shown inline in the mobile map's bottom sheet — the
  * Google-Maps-style alternative to navigating away to the category
- * directory. Renders the same `PlaceDetailBody` the category directory's
+ * directory — and, since the category list stopped expanding inline, in
+ * that list's own listing sheet on a phone too (GenericListingCard), so a
+ * listing reads the same wherever it's opened. Renders the same `PlaceDetailBody` the category directory's
  * expanded listing card does (hours, tags, badges, davening times, freeform
  * fields, caveat notes), read-only (no filter callbacks — the map has no
  * such filters of its own), plus its own header and back button, the same
@@ -47,7 +56,7 @@ function scrollingAncestor(el: HTMLElement | null): HTMLElement | null {
  * results against each other), which doesn't mean anything for a single
  * place already selected on the map.
  */
-export default function MapPlaceDetail({ item, category, color, onBack }: Props) {
+export default function MapPlaceDetail({ item, category, color, onBack, filters }: Props) {
   const community = useCommunitySlug()
   const listingPath = routes.listing(community, category.id, listingSlug(item))
   const { isPinned } = usePinned()
@@ -57,9 +66,9 @@ export default function MapPlaceDetail({ item, category, color, onBack }: Props)
       ? (item[PHOTO_FIELD_KEY] as string)
       : category.iconImageUrl) ?? undefined
   // Edit swaps this whole detail view for the same form the category
-  // directory uses (ListingForm), same as GenericListingCard's own mobile
-  // accordion — scoped to this one component, since the map has no separate
-  // "form view" of its own to navigate to. Returns to this same place's
+  // directory uses (ListingForm), same as the desktop listing dialog —
+  // scoped to this one component, since neither sheet it lives in has a
+  // separate "form view" of its own to navigate to. Returns to this same place's
   // detail (not the list) on cancel or submit. Requesting a removal is part
   // of that form (see RemovalRequest), so there's no separate Report view.
   //
@@ -142,7 +151,7 @@ export default function MapPlaceDetail({ item, category, color, onBack }: Props)
 
   return (
     <div ref={rootRef} className="space-y-4 pb-2">
-      <UpButton label="Back to list" onClick={onBack} className="" />
+      {onBack && <UpButton label="Back to list" onClick={onBack} className="" />}
 
       {/* ── Header: icon, name, category, pin ────────────────────────────── */}
       <div className="flex items-start gap-3">
@@ -181,7 +190,7 @@ export default function MapPlaceDetail({ item, category, color, onBack }: Props)
           GenericListingCard's mobile accordion does — a showInHeader url
           field (e.g. Networking's Website link) had nowhere to show at all
           here. See the prop's own comment. */}
-      <PlaceDetailBody item={item} category={category} includeHeaderUrlFields />
+      <PlaceDetailBody item={item} category={category} includeHeaderUrlFields {...filters} />
 
       <div className="pt-2 border-t border-slate-200 space-y-2">
         {/* The freshness STATUS only. Its quiet "Suggest a correction" link

@@ -21,6 +21,14 @@ type Props = {
    *  benefits from the extra room. See this component's own doc below for
    *  why the drag math itself isn't shared with MobileNearbySheet's. */
   draggable?: boolean
+  /** Drops the header row, leaving only the drag handle, for content that
+   *  opens with its own heading: a listing, whose name at the top of its
+   *  own view is the title (see GenericListingCard's mobile sheet). `title`
+   *  still names the dialog for a screen reader. Only meaningful together
+   *  with `draggable` — without it there'd be nothing left to close the
+   *  sheet with but the backdrop and Escape, since the header is where the
+   *  non-draggable ✕ lives. */
+  titleHidden?: boolean
 }
 
 type Snap = 'half' | 'full'
@@ -101,7 +109,7 @@ const MOMENTUM_MIN_VELOCITY = 0.02
  *  instead of resizing/dismissing the sheet the way the map's list already
  *  does — see onContentPointerDown's own doc for why the fix is the same
  *  hand-driven-scroll takeover MobileNearbySheet uses, not a smaller one. */
-export default function MobileSheet({ isOpen, onClose, title, children, draggable = false }: Props) {
+export default function MobileSheet({ isOpen, onClose, title, children, draggable = false, titleHidden = false }: Props) {
   const [phase, setPhase] = useState<Phase>(isOpen ? 'open' : 'closed')
   useBodyScrollLock(phase !== 'closed')
 
@@ -481,31 +489,33 @@ export default function MobileSheet({ isOpen, onClose, title, children, draggabl
             ListingDetailModal and ActionDialog give desktop — it has no
             drag to fall back on) gets none of this — nothing here to
             grab, and it keeps its own X below. */}
-        <div
-          {...(draggable
-            ? {
-                onPointerDown: onHandlePointerDown,
-                onPointerMove: onHandlePointerMove,
-                onPointerUp: onHandlePointerUp,
-                onPointerCancel: onHandlePointerCancel,
-              }
-            : {})}
-          className={`flex items-center justify-between px-5 py-4 border-b border-slate-200 shrink-0 ${draggable ? 'touch-none select-none cursor-grab active:cursor-grabbing' : ''}`}
-        >
-          <h2 className="text-base font-semibold text-slate-900">{title}</h2>
-          {!draggable && (
-            <button
-              type="button"
-              onClick={close}
-              aria-label="Close"
-              className="-m-2 flex cursor-pointer items-center justify-center rounded-full p-2 text-muted hover:text-slate-700"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          )}
-        </div>
+        {!(draggable && titleHidden) && (
+          <div
+            {...(draggable
+              ? {
+                  onPointerDown: onHandlePointerDown,
+                  onPointerMove: onHandlePointerMove,
+                  onPointerUp: onHandlePointerUp,
+                  onPointerCancel: onHandlePointerCancel,
+                }
+              : {})}
+            className={`flex items-center justify-between px-5 py-4 border-b border-slate-200 shrink-0 ${draggable ? 'touch-none select-none cursor-grab active:cursor-grabbing' : ''}`}
+          >
+            <h2 className="text-base font-semibold text-slate-900">{title}</h2>
+            {!draggable && (
+              <button
+                type="button"
+                onClick={close}
+                aria-label="Close"
+                className="-m-2 flex cursor-pointer items-center justify-center rounded-full p-2 text-muted hover:text-slate-700"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            )}
+          </div>
+        )}
         <div
           ref={contentRef}
           {...(draggable
@@ -516,7 +526,11 @@ export default function MobileSheet({ isOpen, onClose, title, children, draggabl
                 onPointerCancel: onContentPointerCancel,
               }
             : {})}
-          className={`overflow-y-auto overscroll-contain px-5 py-4 ${draggable ? 'touch-none' : ''}`}
+          // The bottom padding clears the phone's home indicator, the way the
+          // map's sheet already does: this panel runs to the screen's bottom
+          // edge, and whatever ends its content (a form's Submit, a
+          // listing's "Suggest an edit") would otherwise sit under it.
+          className={`overflow-y-auto overscroll-contain px-5 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))] ${draggable ? 'touch-none' : ''}`}
         >
           {children}
         </div>

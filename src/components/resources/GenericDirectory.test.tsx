@@ -261,18 +261,18 @@ describe('GenericDirectory', () => {
     expect(screen.getByRole('button', { name: 'Add a listing' })).toBeInTheDocument()
   })
 
-  // Mobile has no dialog and no backdrop — the expanded card is an inline
-  // accordion, and the Add button stays both visible and working. Hiding it
-  // there for as long as a card happens to be expanded would take the
-  // page's primary action away for no reason.
-  it('keeps the floating Add button on mobile, where the expanded card has no backdrop', () => {
+  // Mobile used to be the exception: the listing expanded inline, with no
+  // backdrop over the Add button, so it stayed visible and working. The
+  // listing opens in a sheet now, whose backdrop covers the button the same
+  // way the desktop dialog's does, so it gets out of the way there too.
+  it('hides the floating Add button on mobile too, while a listing sheet is open', () => {
     const item = makeListing()
     renderWithProviders(
       <ForcedViewport isMobile>
         <GenericDirectory category={makeCategory()} items={[item]} {...handlers} reopenItemId={item.id} />
       </ForcedViewport>,
     )
-    expect(screen.getByRole('button', { name: 'Add a listing' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Add a listing' })).not.toBeInTheDocument()
   })
 
   // A bare icon circle is a mobile convention people already have a
