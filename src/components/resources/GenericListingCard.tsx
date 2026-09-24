@@ -1142,9 +1142,9 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
               mt-1 rather than relying on the panel's space-y-3, so the gap
               between the details and this reads as a separation rather than
               as the next item in a list. */}
-          {canEdit && (
-            <ListingEditBar onEdit={onEdit} item={item} category={category} path={listingPath} className="mt-1" />
-          )}
+          {/* Not gated on canEdit — see ListingEditBar on why the overflow
+              has to survive a listing that can't be edited. */}
+          <ListingEditBar onEdit={canEdit ? onEdit : undefined} item={item} category={category} path={listingPath} className="mt-1" />
         </div>
         </div>
       )}

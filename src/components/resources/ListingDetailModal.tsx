@@ -200,7 +200,10 @@ export default function ListingDetailModal({
   // The bar is the way IN to the form, so it has nothing to say once the
   // form is open — the dialog's own header carries Back/"Suggest an edit"
   // from there.
-  const showEditBar = canEdit && !formOpen
+  // Not gated on canEdit — the bar carries the overflow too, and a listing
+  // that can't be edited still needs Pin/Share/Set as location. See
+  // ListingEditBar.
+  const showEditBar = !formOpen
 
   return (
     <div
@@ -451,7 +454,7 @@ export default function ListingDetailModal({
         // click anywhere else outside the card does.
         <div className="pointer-events-none absolute inset-x-0 top-full mt-3 flex">
           <ListingEditBar
-            onEdit={() => openForm('edit')}
+            onEdit={canEdit ? () => openForm('edit') : undefined}
             item={item}
             category={category}
             path={listingPath}

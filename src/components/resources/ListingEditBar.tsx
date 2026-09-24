@@ -36,6 +36,13 @@ import ListingActionsFan from './ListingActionsFan'
 // stopPropagation because every surface that shows this has a click handler
 // somewhere above it — the dialog's backdrop closes on a click that reaches
 // it, and the directory card's row toggles itself.
+//
+// Rendered even when the listing can't be edited, as the overflow alone.
+// It used to be gated on edit wholesale, which looked harmless and wasn't:
+// this overflow is the only place Set-as-location lives, and the only route
+// to Pin/Share that a keyboard or screen reader can reach — the card's own
+// swipe and hover-reveal are deliberately pointer-only BECAUSE this exists.
+// A category with editing turned off lost all three for those visitors.
 export default function ListingEditBar({
   onEdit,
   item,
@@ -43,7 +50,9 @@ export default function ListingEditBar({
   path,
   className = '',
 }: {
-  onEdit: () => void
+  /** Omitted when the listing can't be edited — the bar then renders the
+   *  overflow on its own. See above for why it never disappears outright. */
+  onEdit?: () => void
   item: DirectoryResource
   category: CategoryConfig
   /** The listing's own URL — what the overflow's Share copies. */
@@ -57,18 +66,27 @@ export default function ListingEditBar({
     // instead of dangling from the middle of the card above it — and it
     // keeps the one action worth finding visually dominant over three that
     // are merely useful.
-    <div className={`flex w-full items-stretch gap-2 ${className}`}>
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation()
-          onEdit()
-        }}
-        className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-full bg-primary px-5 py-3 text-sm font-semibold text-white shadow-lg transition-transform active:scale-[0.98]"
-      >
-        <PencilIcon className="h-4 w-4 shrink-0" />
-        Suggest an edit
-      </button>
+    //
+    // Without the pill the row shrinks to the overflow's own size and sits at
+    // the trailing edge (ml-auto works whether the parent is a flex strip or
+    // plain block flow). It must not stay w-full: the dialog hangs this in a
+    // pointer-events-none strip and re-enables pointers on this element, so
+    // a full-width row with nothing in most of it would swallow the clicks
+    // that are meant to reach the backdrop and close the dialog.
+    <div className={`flex items-stretch gap-2 ${onEdit ? 'w-full' : 'ml-auto w-fit'} ${className}`}>
+      {onEdit && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation()
+            onEdit()
+          }}
+          className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-full bg-primary px-5 py-3 text-sm font-semibold text-white shadow-lg transition-transform active:scale-[0.98]"
+        >
+          <PencilIcon className="h-4 w-4 shrink-0" />
+          Suggest an edit
+        </button>
+      )}
       <ListingActionsFan item={item} category={category} path={path} />
     </div>
   )

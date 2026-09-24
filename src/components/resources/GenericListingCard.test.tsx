@@ -819,22 +819,36 @@ describe('GenericListingCard — expanded', () => {
     expect(screen.getByRole('button', { name: /still right|mark as current/i })).toBeInTheDocument()
   })
 
-  it('hides the bar for a category that cannot be edited', async () => {
-    renderWithProviders(
-      <ForcedViewport isMobile>
-        <GenericListingCard
-          item={makeListing()}
-          category={makeCategory({ capabilities: { add: true, edit: false, report: true, directorySearch: true, map: true } })}
-          upvotes={false}
-          count={0}
-          defaultExpanded
-          {...requiredHandlers}
-        />
-      </ForcedViewport>,
-    )
-    await Promise.resolve()
-    expect(screen.queryByRole('button', { name: 'Suggest an edit' })).not.toBeInTheDocument()
-  })
+  // A category that can't be edited loses the pill and KEEPS the overflow.
+  // This test used to assert only the first half, and so certified a real
+  // regression: the bar was gated on edit wholesale, and the overflow is the
+  // only home Set-as-location has, and the only route to Pin/Share a
+  // keyboard or screen reader can reach — the card's swipe and hover-reveal
+  // are pointer-only precisely because this exists. Both surfaces, since
+  // they gate independently (the mobile accordion here, ListingDetailModal
+  // on desktop).
+  for (const [surface, isMobile] of [['mobile accordion', true], ['desktop dialog', false]] as const) {
+    it(`keeps the overflow, without the pill, when the category cannot be edited (${surface})`, async () => {
+      const user = userEvent.setup()
+      renderWithProviders(
+        <ForcedViewport isMobile={isMobile}>
+          <GenericListingCard
+            item={makeListing({ name: 'Goldi Market' })}
+            category={makeCategory({ capabilities: { add: true, edit: false, report: true, directorySearch: true, map: true } })}
+            upvotes={false}
+            count={0}
+            defaultExpanded
+            {...requiredHandlers}
+          />
+        </ForcedViewport>,
+      )
+      await Promise.resolve()
+      expect(screen.queryByRole('button', { name: 'Suggest an edit' })).not.toBeInTheDocument()
+
+      await user.click(screen.getByRole('button', { name: 'Actions for Goldi Market' }))
+      expect(screen.getByRole('menuitem', { name: 'Share' })).toBeInTheDocument()
+    })
+  }
 
   // Removal is requested at the foot of the edit form (RemovalRequest), not
   // from a Report row, so nothing in the expanded dialog offers one — and
