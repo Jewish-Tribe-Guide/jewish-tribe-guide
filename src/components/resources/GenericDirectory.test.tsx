@@ -9,6 +9,7 @@ import { makeCategory, makeListing } from '@/test/providerFixtures'
 import { resetMockIntersectionObserver, setAllIntersecting } from '@/test/intersectionObserverMock'
 import type { DirectoryResource } from '@/types'
 import { didArriveViaBackForward } from '@/lib/backForwardNavigation'
+import { ForcedViewport } from '@/lib/useIsMobile'
 import GenericDirectory from './GenericDirectory'
 
 vi.mock('next/navigation', () => ({
@@ -233,6 +234,44 @@ describe('GenericDirectory', () => {
     const category = makeCategory({ pluralLabel: 'WhatsApp Groups', hasAddress: false })
     renderWithProviders(<GenericDirectory category={category} items={[makeListing()]} {...handlers} />)
 
+    expect(screen.getByRole('button', { name: 'Add a listing' })).toBeInTheDocument()
+  })
+
+  // The floating Add button sits at z-40; ListingDetailModal's overlay is
+  // z-50 — so while a desktop listing dialog is open, this button is under
+  // the backdrop: dimmed, still unmistakably a button, and completely inert
+  // (a click lands on the overlay and closes the dialog instead). It was
+  // only ever mild visual noise until the dialog started hanging its own
+  // blue "Suggest an edit" pill beneath itself; two blue pills at the same
+  // height, one of which does nothing, is the kind of thing that makes the
+  // real one harder to trust. So it gets out of the way.
+  it('hides the floating Add button while a desktop listing dialog is open', () => {
+    const item = makeListing()
+    // reopenItemId drives GenericDirectory's own cardRefs.get(id).open(),
+    // which fires onExpandedChange — the same path a real click takes,
+    // without needing the stubbed card to grow a toggle of its own.
+    renderWithProviders(
+      <GenericDirectory category={makeCategory()} items={[item]} {...handlers} reopenItemId={item.id} />,
+    )
+    expect(screen.queryByRole('button', { name: 'Add a listing' })).not.toBeInTheDocument()
+  })
+
+  it('shows the floating Add button when no dialog is open', () => {
+    renderWithProviders(<GenericDirectory category={makeCategory()} items={[makeListing()]} {...handlers} />)
+    expect(screen.getByRole('button', { name: 'Add a listing' })).toBeInTheDocument()
+  })
+
+  // Mobile has no dialog and no backdrop — the expanded card is an inline
+  // accordion, and the Add button stays both visible and working. Hiding it
+  // there for as long as a card happens to be expanded would take the
+  // page's primary action away for no reason.
+  it('keeps the floating Add button on mobile, where the expanded card has no backdrop', () => {
+    const item = makeListing()
+    renderWithProviders(
+      <ForcedViewport isMobile>
+        <GenericDirectory category={makeCategory()} items={[item]} {...handlers} reopenItemId={item.id} />
+      </ForcedViewport>,
+    )
     expect(screen.getByRole('button', { name: 'Add a listing' })).toBeInTheDocument()
   })
 

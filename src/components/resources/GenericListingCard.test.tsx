@@ -770,14 +770,15 @@ describe('GenericListingCard — expanded', () => {
     await user.click(screen.getByRole('button', { name: /show details for/i }))
 
     expect(screen.getByText('1 Main St, Philadelphia, PA 19104')).toBeInTheDocument()
-    // Edit/Report live in a second kebab, inside the dialog's own header —
-    // separate from the collapsed row's kebab underneath it (dimmed while
-    // this dialog is open) — see ListingActionsMenu's hidePrimaryActions doc.
-    // Scoped with `within`: the collapsed row's own kebab, still in the DOM
-    // behind the dialog, shares the same accessible name.
+    // The dialog carries no kebab of its own any more. It used to hold
+    // exactly one row — Edit — which is the whole reason this moved: people
+    // open a kebab looking for Share and Save, never for "I can change
+    // this." Edit is a labelled bar below the dialog now (ListingEditBar),
+    // and the only kebab left in the DOM is the collapsed row's, behind the
+    // backdrop. Scoped with `within` so this can't accidentally pass on it.
     const dialog = screen.getByRole('dialog')
-    await user.click(within(dialog).getByRole('button', { name: /more actions for/i }))
-    expect(screen.getByRole('menuitem', { name: /^edit$/i })).toBeInTheDocument()
+    expect(within(dialog).queryByRole('button', { name: /more actions for/i })).not.toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: 'Suggest an edit' })).toBeInTheDocument()
   })
 
   // Desktop's Edit/Report used to close this dialog and hand off to a
@@ -798,8 +799,7 @@ describe('GenericListingCard — expanded', () => {
     )
 
     const dialog = screen.getByRole('dialog')
-    await user.click(within(dialog).getByRole('button', { name: /more actions for/i }))
-    await user.click(screen.getByRole('menuitem', { name: /^edit$/i }))
+    await user.click(within(dialog).getByRole('button', { name: 'Suggest an edit' }))
 
     expect(screen.getByText('ListingForm stub — mode=edit, existing=Goldi Market')).toBeInTheDocument()
     // Not bubbled — this dialog handled it itself.
@@ -825,8 +825,7 @@ describe('GenericListingCard — expanded', () => {
       <GenericListingCard item={item} category={category} upvotes={false} count={0} defaultExpanded {...requiredHandlers} />,
     )
 
-    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: /more actions for/i }))
-    await user.click(screen.getByRole('menuitem', { name: /^edit$/i }))
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Suggest an edit' }))
     expect(screen.getByRole('dialog', { name: 'Suggest an edit' })).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'stub open removal' }))
@@ -836,10 +835,14 @@ describe('GenericListingCard — expanded', () => {
     expect(screen.queryByRole('dialog', { name: 'Suggest an edit' })).not.toBeInTheDocument()
   })
 
-  // The visible way in to Edit: a plain "Suggest a correction" link under the
-  // details, opposite the freshness line — the kebab alone doesn't tell a
-  // visitor that a wrong phone number is theirs to fix.
-  it('offers "Suggest a correction" in the expanded dialog, which swaps to the same edit form as the kebab', async () => {
+  // ── The edit bar ──────────────────────────────────────────────────────
+  // Repeated feedback was that the site doesn't look editable. Both of the
+  // ways in were things a visitor is trained to ignore: a kebab, which says
+  // "overflow," and FreshnessFooter's 12px grey "Suggest a correction" link,
+  // which sat at the same weight as the timestamp beside it. These assert
+  // the replacement is a real, labelled control on BOTH surfaces — the point
+  // is its prominence, so "reachable somehow" is not what's being checked.
+  it('offers a labelled "Suggest an edit" bar in the expanded dialog, which swaps to the edit form', async () => {
     const user = userEvent.setup()
     const category = makeCategory()
     const item = makeListing({ name: 'Goldi Market' })
@@ -847,32 +850,62 @@ describe('GenericListingCard — expanded', () => {
       <GenericListingCard item={item} category={category} upvotes={false} count={0} defaultExpanded {...requiredHandlers} />,
     )
 
-    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Suggest a correction' }))
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Suggest an edit' }))
     expect(screen.getByText('ListingForm stub — mode=edit, existing=Goldi Market')).toBeInTheDocument()
     expect(screen.getByRole('dialog', { name: 'Suggest an edit' })).toBeInTheDocument()
   })
 
-  it('offers "Suggest a correction" in the expanded mobile card, calling the same onEdit the kebab does', async () => {
+  it('offers the same bar in the expanded mobile card, calling onEdit', async () => {
     const user = userEvent.setup()
     renderWithProviders(
       <ForcedViewport isMobile>
         <GenericListingCard item={makeListing()} category={makeCategory()} upvotes={false} count={0} defaultExpanded {...requiredHandlers} />
       </ForcedViewport>,
     )
-    await user.click(screen.getByRole('button', { name: 'Suggest a correction' }))
+    await user.click(screen.getByRole('button', { name: 'Suggest an edit' }))
     expect(requiredHandlers.onEdit).toHaveBeenCalledTimes(1)
   })
 
+  // The quiet link is deliberately gone from both directory surfaces now
+  // that the bar carries this job — two doors to the same form, one of them
+  // near-invisible, is the duplication the bar was built to end. The
+  // freshness STATUS stays: "Still right?" is its own one-tap contribution.
+  // (MapPlaceDetail still shows the link — the map has no bar yet.)
+  it('drops the quiet "Suggest a correction" link from both surfaces, keeping the freshness line', async () => {
+    renderWithProviders(
+      <GenericListingCard item={makeListing()} category={makeCategory()} upvotes={false} count={0} defaultExpanded {...requiredHandlers} />,
+    )
+    expect(screen.queryByRole('button', { name: 'Suggest a correction' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /still right|mark as current/i })).toBeInTheDocument()
+  })
+
+  it('hides the bar for a category that cannot be edited', async () => {
+    renderWithProviders(
+      <ForcedViewport isMobile>
+        <GenericListingCard
+          item={makeListing()}
+          category={makeCategory({ capabilities: { add: true, edit: false, report: true, directorySearch: true, map: true } })}
+          upvotes={false}
+          count={0}
+          defaultExpanded
+          {...requiredHandlers}
+        />
+      </ForcedViewport>,
+    )
+    await Promise.resolve()
+    expect(screen.queryByRole('button', { name: 'Suggest an edit' })).not.toBeInTheDocument()
+  })
+
   // Removal is requested at the foot of the edit form (RemovalRequest), not
-  // from a Report row, so neither kebab in the expanded dialog offers one.
-  it('the expanded dialog\'s kebab offers Edit and no Report', async () => {
-    const user = userEvent.setup()
+  // from a Report row, so nothing in the expanded dialog offers one — and
+  // the dialog has no kebab left to offer it from either.
+  it('the expanded dialog offers the edit bar, no kebab and no Report', async () => {
     renderWithProviders(
       <GenericListingCard item={makeListing({ name: 'Goldi Market' })} category={makeCategory()} upvotes={false} count={0} defaultExpanded {...requiredHandlers} />,
     )
     const dialog = screen.getByRole('dialog')
-    await user.click(within(dialog).getByRole('button', { name: /more actions for/i }))
-    expect(screen.getByRole('menuitem', { name: /^edit$/i })).toBeInTheDocument()
+    expect(within(dialog).queryByRole('button', { name: /more actions for/i })).not.toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: 'Suggest an edit' })).toBeInTheDocument()
     expect(screen.queryByRole('menuitem', { name: /report/i })).not.toBeInTheDocument()
   })
 
@@ -891,8 +924,7 @@ describe('GenericListingCard — expanded', () => {
     )
 
     const dialog = screen.getByRole('dialog')
-    await user.click(within(dialog).getByRole('button', { name: /more actions for/i }))
-    await user.click(screen.getByRole('menuitem', { name: /^edit$/i }))
+    await user.click(within(dialog).getByRole('button', { name: 'Suggest an edit' }))
 
     await user.click(screen.getByRole('button', { name: /^back$/i }))
     expect(backSpy).toHaveBeenCalled()
@@ -908,30 +940,9 @@ describe('GenericListingCard — expanded', () => {
     )
 
     const dialog = screen.getByRole('dialog')
-    await user.click(within(dialog).getByRole('button', { name: /more actions for/i }))
-    await user.click(screen.getByRole('menuitem', { name: /^edit$/i }))
+    await user.click(within(dialog).getByRole('button', { name: 'Suggest an edit' }))
 
     expect(pushSpy).toHaveBeenCalledWith(expect.objectContaining({ detailModalForm: 'edit' }), '')
-  })
-
-  // Pin/Share/Set location used to be restated in this dialog's own kebab
-  // too — removed as pure duplication of the collapsed row's kebab, which
-  // is still one click away (dimmed, not gone) behind this dialog. Only
-  // Edit/Report — things you'd want once you're actually looking at the
-  // details, not before — stay here.
-  it('does not offer Pin/Share/Set location from the dialog\'s own kebab', async () => {
-    const user = userEvent.setup()
-    const category = makeCategory()
-    const item = makeListing({ geo: { lat: 39.95, lng: -75.16 } })
-    renderWithProviders(
-      <GenericListingCard item={item} category={category} upvotes={false} count={0} defaultExpanded {...requiredHandlers} />,
-    )
-
-    const dialog = screen.getByRole('dialog')
-    await user.click(within(dialog).getByRole('button', { name: /more actions for/i }))
-    expect(screen.queryByRole('menuitem', { name: /^pin$/i })).not.toBeInTheDocument()
-    expect(screen.queryByRole('menuitem', { name: /^share$/i })).not.toBeInTheDocument()
-    expect(screen.queryByRole('menuitem', { name: /set location/i })).not.toBeInTheDocument()
   })
 
   // onExpandedChange — lets GenericDirectory keep ?item=<id> in sync with

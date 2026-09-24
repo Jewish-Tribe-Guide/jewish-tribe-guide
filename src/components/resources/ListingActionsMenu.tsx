@@ -80,7 +80,6 @@ export default function ListingActionsMenu({
   className,
   onEdit,
   canEdit,
-  hidePrimaryActions,
 }: {
   item: DirectoryResource
   category: CategoryConfig
@@ -103,14 +102,6 @@ export default function ListingActionsMenu({
    *  earlier. */
   onEdit?: () => void
   canEdit?: boolean
-  /** ListingDetailModal only: Pin/Share/Set location are pre-opening
-   *  actions — already one click away on the card behind this dialog, so
-   *  restating them here (this dialog used to) was pure duplication. Edit/
-   *  Report are different: things you'd genuinely want only once you're
-   *  actually looking at the full details, not before — so this hides
-   *  everything BUT those two (and the divider, which would otherwise
-   *  precede nothing), rather than hiding the whole kebab. */
-  hidePrimaryActions?: boolean
 }) {
   const [open, setOpen] = useState(false)
   // Fixed-position coordinates for the portaled popup — measured fresh every
@@ -146,9 +137,8 @@ export default function ListingActionsMenu({
       // measure the real thing (same reasoning as CheckboxDropdown's own
       // ESTIMATED_ROW_PX). ~44px per row (see menuItemClass), +8px for the
       // popup's own vertical padding/border.
-      const itemCount = hidePrimaryActions
-        ? (canEdit ? 1 : 0)
-        : (ui.map.pins ? 1 : 0) + 1 /* Share always renders */ + (canSetLocation ? 1 : 0) + (canEdit ? 1 : 0)
+      const itemCount =
+        (ui.map.pins ? 1 : 0) + 1 /* Share always renders */ + (canSetLocation ? 1 : 0) + (canEdit ? 1 : 0)
       const estimatedHeight = itemCount * 44 + 8
       const left = Math.min(rect.left, window.innerWidth - MENU_WIDTH - EDGE_MARGIN)
       // Clamped inward from the kebab's own left edge means the popup is
@@ -304,9 +294,7 @@ export default function ListingActionsMenu({
             }}
             className="z-[56] w-48 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg animate-[menuIn_140ms_ease-out]"
           >
-            {!hidePrimaryActions && (
-              <>
-                {/* ui.map.pins is the same flag the map's own pin filter
+            {/* ui.map.pins is the same flag the map's own pin filter
                     chip and (formerly) PinButton respected — the original
                     build of this menu missed it and showed Pin
                     unconditionally even with pinning turned off
@@ -363,9 +351,7 @@ export default function ListingActionsMenu({
                     {active ? 'Location set' : 'Set as location'}
                   </button>
                 )}
-                {canEdit && <div role="separator" className="my-1 h-px bg-slate-100" />}
-              </>
-            )}
+            {canEdit && <div role="separator" className="my-1 h-px bg-slate-100" />}
             {canEdit && (
               <button
                 type="button"

@@ -111,6 +111,21 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   const [boolFilters, setBoolFilters] = useState<Record<string, boolean>>({})
   // Multi-select: each key maps to the set of chosen values (empty = no filter).
   const [selectFilters, setSelectFilters] = useState<Record<string, string[]>>({})
+
+  // Which card currently has its DESKTOP detail dialog open. Only used to
+  // get the floating Add button out of the way while that dialog is up:
+  // the dialog's overlay is z-50 and the Add button z-40, so it sits under
+  // the backdrop — dimmed, still plainly a button, and completely inert
+  // (a click lands on the overlay and closes the dialog instead). Now that
+  // the dialog hangs its own blue "Suggest an edit" pill below itself, the
+  // two read as a pair of peers competing at the same height, and the one
+  // that does nothing is the more eye-catching of the two.
+  // Deliberately not driven off `?item=` (which onExpandedChange already
+  // syncs): that param is set on mobile too, where the expanded card is an
+  // inline accordion with no backdrop over it — the Add button there is
+  // still visible, still works, and hiding it for as long as a card happens
+  // to be expanded would take away the page's primary action for no reason.
+  const [openDialogItemId, setOpenDialogItemId] = useState<string | null>(null)
   const [openDropdown, setOpenDropdown] = useState<string | null>(null)
   const [openNow, setOpenNow] = useState(arrivedViaBackForward ? false : (initialOpenNow ?? false))
   // Drives the "Open now" filter below. Without it the filter answers for the
@@ -1550,7 +1565,15 @@ export default function GenericDirectory({ category, items, anchorLabel, address
               // pile up browser-back history entries the way opening an
               // Add/Edit/Report form (which does use push, see
               // FindResources' openAction) reasonably does.
-              onExpandedChange={(expanded) => onParamsChange?.({ item: expanded ? item.id : null }, { replace: true })}
+              onExpandedChange={(expanded) => {
+                onParamsChange?.({ item: expanded ? item.id : null }, { replace: true })
+                // Desktop only — see openDialogItemId's own note. Cleared by
+                // id rather than unconditionally: arrow-key next/prev closes
+                // one card and opens a sibling in the same commit, and the
+                // closing card's callback can run after the opening one's,
+                // which would otherwise clear the flag the new dialog just set.
+                if (!isMobile) setOpenDialogItemId((prev) => (expanded ? item.id : prev === item.id ? null : prev))
+              }}
               onVote={(c) => setVoteCounts((prev) => ({ ...prev, [item.id]: c }))}
               onTagClick={setSearch}
               onFilterOpen={() => {
@@ -1606,7 +1629,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
           the label made visible instead, widening into a pill; mobile stays
           the plain circle, where the label would just be redundant with the
           reflex people already bring to the shape. */}
-      {canAdd && (
+      {canAdd && !openDialogItemId && (
         <button
           onClick={onAdd}
           // Generic, not "Add {category label}" — the empty-state button

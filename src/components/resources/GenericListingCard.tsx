@@ -19,6 +19,7 @@ import FreshnessFooter from './FreshnessFooter'
 import PlaceDetailBody from './PlaceDetailBody'
 import ListingDetailModal from './ListingDetailModal'
 import ListingActionsMenu from './ListingActionsMenu'
+import ListingEditBar from './ListingEditBar'
 import Chip from './Chip'
 import { travelParts } from '@/lib/listingTravel'
 import { ui } from '@/lib/uiConfig'
@@ -579,12 +580,22 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
       <div
         ref={cardRootRef}
         onClick={() => {
-          setExpanded((p) => {
-            const next = !p
-            if (next) track('listing_opened', { listing: item.name, category: category.id })
-            onExpandedChange?.(next)
-            return next
-          })
+          // The side effects deliberately sit OUTSIDE the state update, not
+          // inside an updater function. A `setExpanded((p) => { …effects…;
+          // return !p })` reads like the safe way to toggle, but React calls
+          // an updater during the render pass and may call it more than once
+          // (StrictMode does so on purpose) — so `track` could double-count,
+          // and a parent that does any state of its own in onExpandedChange
+          // gets "Cannot update a component while rendering a different
+          // component" (GenericDirectory does exactly that now, to hide its
+          // floating Add button while this card's dialog covers it).
+          // Reading `expanded` straight from the closure is correct here
+          // because this is an event handler: it runs after the last commit,
+          // so the value is current.
+          const next = !expanded
+          setExpanded(next)
+          if (next) track('listing_opened', { listing: item.name, category: category.id })
+          onExpandedChange?.(next)
         }}
         // h-full: on desktop this row is the ENTIRE visible card (the outer
         // wrapper's own h-full — see its comment — only stretches the
@@ -964,12 +975,26 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
           />
 
           <div className="pt-2 border-t border-slate-200 space-y-2">
-            <FreshnessFooter resourceId={item.id} confirmedAt={item.confirmedAt} onSuggestCorrection={canEdit ? onEdit : undefined} />
-            {/* Share used to sit here too, and Edit followed it — Edit lives in
-                the collapsed row's own kebab (ListingActionsMenu), with
-                Pin/Set location. FreshnessFooter's own "Suggest a
-                correction" link is the one visible way to Edit from here. */}
+            {/* No onSuggestCorrection: that 12px grey link was the one visible
+                way in to Edit while Edit itself lived in the collapsed row's
+                kebab, and it was never up to the job — it sat at the same
+                weight as the timestamp next to it. ListingEditBar below is
+                that way in now. The freshness STATUS stays: "Still right?" is
+                a one-tap contribution of its own, not a second door to the
+                form. */}
+            <FreshnessFooter resourceId={item.id} confirmedAt={item.confirmedAt} />
           </div>
+          {/* Sits on the panel's own slate-50 ground rather than inside the
+              white detail block above it — the point is that it reads as its
+              own object rather than as one more row of content. It stays
+              INSIDE the bordered card (not a sibling of it) on purpose: the
+              card root carries the h-full that makes desktop's grid rows line
+              up (see its comment), and hanging a sibling off it would mean
+              restructuring that for a difference of one hairline border.
+              mt-1 rather than relying on the panel's space-y-3, so the gap
+              between the details and this reads as a separation rather than
+              as the next item in a list. */}
+          {canEdit && <ListingEditBar onEdit={onEdit} className="mt-1" />}
         </div>
         </div>
       )}

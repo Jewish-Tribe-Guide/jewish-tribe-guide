@@ -4,13 +4,10 @@ import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { DirectoryResource } from '@/types'
 import type { CategoryConfig, CategoryField } from '@/lib/categories'
-import { useCommunitySlug } from '@/lib/communityContext'
-import { routes } from '@/lib/routes'
-import { listingSlug } from '@/lib/listingSlug'
 import CategoryIcon from '@/components/CategoryIcon'
 import PlaceDetailBody from './PlaceDetailBody'
 import FreshnessFooter from './FreshnessFooter'
-import ListingActionsMenu from './ListingActionsMenu'
+import ListingEditBar from './ListingEditBar'
 import ListingForm from './ListingForm'
 import { ChevronLeftIcon, ChevronRightIcon } from '@/components/icons'
 import { useBodyScrollLock } from '@/lib/useBodyScrollLock'
@@ -99,9 +96,6 @@ export default function ListingDetailModal({
   hasPrev,
   hasNext,
 }: Props) {
-  const community = useCommunitySlug()
-  const listingPath = routes.listing(community, category.id, listingSlug(item))
-
   // Own history entry, nested on top of whatever real navigation got this
   // dialog open in the first place — so browser back closes the form and
   // returns to the detail view, not out of the dialog (or off the page)
@@ -196,6 +190,11 @@ export default function ListingDetailModal({
   // mean anything, and the form's own fields want those keys for editing.
   const showNav = !!onNavigate && !formOpen
 
+  // The bar is the way IN to the form, so it has nothing to say once the
+  // form is open — the dialog's own header carries Back/"Suggest an edit"
+  // from there.
+  const showEditBar = canEdit && !formOpen
+
   return (
     <div
       className="overlay-in fixed inset-0 z-50 flex items-center justify-center gap-3 p-4 bg-slate-900/40"
@@ -228,6 +227,29 @@ export default function ListingDetailModal({
           <ChevronLeftIcon className="h-5 w-5" />
         </button>
       )}
+      {/* The dialog and the edit bar as one positioned unit. The bar is
+          hung off this wrapper with `absolute top-full` rather than being a
+          third flex child of the overlay, and that is load-bearing: the
+          overlay is `items-center`, so any element stacked below the dialog
+          re-centres the whole column and drags the ‹ › arrows down with it —
+          they'd sit on the midline of "dialog + bar" instead of the dialog's
+          own, roughly half a bar-height too low. Out of flow, the dialog
+          stays exactly where it was and the arrows never move.
+          The width classes (and their transition) live here rather than on
+          the dialog so the bar grows with it when the form opens. */}
+      <div
+        className={`relative flex w-full transition-[max-width] duration-200 ease-in-out ${formOpen ? 'max-w-xl' : 'max-w-md'}`}
+        // The dialog ROLE lives on this wrapper, not on the white card
+        // inside it, so that the edit bar hanging below is inside the
+        // dialog's own boundary. aria-modal="true" tells assistive tech to
+        // ignore everything outside the element carrying it — a bar left on
+        // the far side of that line would be invisible to a screen reader
+        // while being the most prominent control on screen for everyone
+        // else. The card keeps its own visual styling and nothing else.
+        role="dialog"
+        aria-modal="true"
+        aria-label={formOpen ? (removalOpen ? `Request removal of ${name}` : 'Suggest an edit') : name}
+      >
       <div
         // max-w-md (448px) — this went 512 (cramped, page had room to
         // spare) → 672 (fixed that, but read too wide/short the other way)
@@ -247,10 +269,12 @@ export default function ListingDetailModal({
         // replacing it. That's the entire point of keeping this one element
         // mounted instead of swapping to ActionDialog: a resize is still
         // continuous, a close-then-reopen never is.
-        className={`dialog-in flex flex-col w-full max-h-[85vh] bg-white border border-slate-200 rounded-xl shadow-xl transition-[max-width] duration-200 ease-in-out ${formOpen ? 'max-w-xl' : 'max-w-md'}`}
-        role="dialog"
-        aria-modal="true"
-        aria-label={formOpen ? (removalOpen ? `Request removal of ${name}` : 'Suggest an edit') : name}
+        // max-h shrinks by the bar's own height (44px pill + 12px gap +
+        // breathing room) whenever the bar is showing, so a long listing
+        // can't grow to the full 85vh and push the bar off the bottom of
+        // the window. Nothing hangs below while formOpen, so the form gets
+        // the full height back.
+        className={`dialog-in flex w-full flex-col ${showEditBar ? 'max-h-[calc(85vh-4.5rem)]' : 'max-h-[85vh]'} bg-white border border-slate-200 rounded-xl shadow-xl`}
       >
         {/* Badges live inside this same block, under the subtitle — not as
             their own section below a divider. They're facts about this
@@ -346,23 +370,14 @@ export default function ListingDetailModal({
               are all pre-opening actions, already one click away on the
               card behind this dialog (dimmed but a click away once you
               close this), so having them here too was pure duplication.
-              Edit moved up here instead, still as a kebab (not
-              plain buttons — see hidePrimaryActions' own doc on
-              ListingActionsMenu) — unlike Pin/Share/Set as location, they're
-              things you'd genuinely want only once you're actually looking
-              at the full details, not before, so they stay. Hidden while
-              formOpen, when the kebab would have nothing left to show. */}
+              Edit then moved up here in their place, still as a kebab —
+              and that was the mistake this corner is now free of. A kebab
+              is where people look for Share and Save, never for "I can
+              change this," so the one action we most want found was the
+              one hidden behind a control that says "overflow." It lives
+              below the dialog now, as its own object (ListingEditBar), and
+              this corner is back to holding nothing but Close. */}
           <div className="flex shrink-0 items-center gap-1">
-            {!formOpen && canEdit && (
-              <ListingActionsMenu
-                item={item}
-                category={category}
-                path={listingPath}
-                onEdit={() => openForm('edit')}
-                canEdit={canEdit}
-                hidePrimaryActions
-              />
-            )}
             {/* Closes the WHOLE dialog regardless of formOpen — a second,
                 faster way out beyond stepping back with Escape/the Back
                 button above, not a second meaning for this one control. */}
@@ -406,16 +421,31 @@ export default function ListingDetailModal({
               />
 
               <div className="pt-3 border-t border-slate-200 space-y-2.5">
-                <FreshnessFooter resourceId={item.id} confirmedAt={item.confirmedAt} onSuggestCorrection={canEdit ? () => openForm('edit') : undefined} />
-                {/* Share, Edit and Report used to sit here as a row of links, which
-                    cluttered the details; they live in the header's kebab
-                    (ListingActionsMenu). The one exception is FreshnessFooter's own
-                    "Suggest a correction" link above, so it's visible that a
-                    listing can be fixed. */}
+                <FreshnessFooter resourceId={item.id} confirmedAt={item.confirmedAt} />
+                {/* No onSuggestCorrection here any more: that 12px grey link was
+                    the only visible way in to Edit while Edit itself sat in a
+                    kebab, and it carried that job badly — same weight as the
+                    timestamp beside it. ListingEditBar below the dialog is the
+                    visible way in now, so repeating it here would be the same
+                    duplication the header's kebab was removed for. The freshness
+                    STATUS stays: "Confirmed 3 days ago · Still right?" is a
+                    different, one-tap contribution, not a second door to the form.
+                    MapPlaceDetail still passes the prop — the map has no bar of
+                    its own yet (see this component's counterpart there). */}
               </div>
             </>
           )}
         </div>
+      </div>
+      {showEditBar && (
+        // pointer-events-none on the strip, auto on the button: the strip
+        // spans the dialog's full width, and a click on the empty part of it
+        // should still reach the backdrop and close the dialog the way a
+        // click anywhere else outside the card does.
+        <div className="pointer-events-none absolute inset-x-0 top-full mt-3 flex">
+          <ListingEditBar onEdit={() => openForm('edit')} className="pointer-events-auto" />
+        </div>
+      )}
       </div>
       {showNav && (
         <button
