@@ -24,6 +24,7 @@ import RemovalRequest from './RemovalRequest'
 import { DetailFieldInput } from './ListingForm'
 import { useListingDraft } from './useListingDraft'
 import { TURNSTILE_ACTIVE, useListingSubmit } from './useListingSubmit'
+import { SUBMIT_PILL } from './submitPill'
 
 type Props = {
   item: DirectoryResource
@@ -44,6 +45,14 @@ type Props = {
   sharedTurnstile?: { token: string; reset: () => void }
   /** See ListingForm's prop of the same name. */
   onRemovalOpenChange?: (open: boolean) => void
+  /** Whether the Request removal screen is showing, when the host owns
+   *  that — so its Back can step out of removal into the edit, rather than
+   *  out of editing altogether, and removal can have its own history entry
+   *  (the phone's back swipe, the browser's Back). The editor asks for a
+   *  change through onRemovalOpenChange. A host that owns it gets no Cancel
+   *  button on the removal screen: its Back is the way out. Omitted, the
+   *  editor keeps it itself and the removal screen has a Cancel. */
+  removalOpen?: boolean
 }
 
 // ── Pieces ────────────────────────────────────────────────────────────────
@@ -128,86 +137,100 @@ function InlinePanel({ title, onDone, children }: { title: string; onDone: () =>
   )
 }
 
+/** What typing `text` into a field's "Other…" adds: the listed option it
+ *  names, if it names one ("ou" is OU), otherwise the text itself — or
+ *  nothing, if it's blank or already picked. */
+function otherValue(field: CategoryField, chosen: string[], text: string): string | null {
+  const v = text.trim()
+  if (!v || chosen.some((c) => c.toLowerCase() === v.toLowerCase())) return null
+  const match = (field.options ?? []).find((o) => o.label.toLowerCase() === v.toLowerCase())
+  if (match && chosen.includes(match.value)) return null
+  return match?.value ?? v
+}
+
+/** "+ Other…", and the box it opens for typing a choice that isn't listed
+ *  — a certifier the admin hasn't added, say. Sits among a field's pills;
+ *  the box takes a line of its own. */
+function OtherChoice({ field, chosen, onAdd }: { field: CategoryField; chosen: string[]; onAdd: (value: string) => void }) {
+  const [adding, setAdding] = useState(false)
+  const [text, setText] = useState('')
+  function commit() {
+    const value = otherValue(field, chosen, text)
+    setAdding(false)
+    setText('')
+    if (value !== null) onAdd(value)
+  }
+  if (!adding) {
+    return (
+      <button
+        type="button"
+        onClick={() => setAdding(true)}
+        className="cursor-pointer rounded-full border border-dashed border-slate-400 bg-white px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100"
+      >
+        + Other…
+      </button>
+    )
+  }
+  return (
+    <div className="flex basis-full gap-1.5">
+      <input
+        aria-label={`Other ${field.label.toLowerCase()}`}
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault()
+            commit()
+          } else if (e.key === 'Escape') {
+            setAdding(false)
+            setText('')
+          }
+        }}
+        placeholder="Type it in…"
+        autoFocus
+        className="min-w-0 flex-1 rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+      />
+      <button type="button" onClick={commit} className="shrink-0 cursor-pointer rounded-md bg-primary px-3 text-xs font-semibold text-white">
+        Add
+      </button>
+    </div>
+  )
+}
+
 /** A choice field's options as pills: one pick replaces the other for a
  *  single choice, several can be on for a multi-choice. A field that allows
- *  "Other" (see CategoryField.allowOther) ends with "+ Other…", for typing
- *  one that isn't listed — a certifier the admin hasn't added, say. What's
- *  typed becomes a pill of its own, the same as in the form. */
+ *  "Other" (see CategoryField.allowOther) ends with "+ Other…" (OtherChoice).
+ *  What's typed becomes a pill of its own, the same as in the form. */
 function OptionPills({ field, value, onChange }: { field: CategoryField; value: unknown; onChange: (v: unknown) => void }) {
   const chosen = selectValues(value)
   const options = field.options ?? []
   const known = new Set(options.map((o) => o.value))
   const custom = chosen.filter((v) => !known.has(v))
   const pills = [...options, ...custom.map((v) => ({ value: v, label: v }))]
-  const [addingOther, setAddingOther] = useState(false)
-  const [otherText, setOtherText] = useState('')
   function pick(v: string) {
     const on = chosen.includes(v)
     if (field.multiSelect) onChange(on ? chosen.filter((x) => x !== v) : [...chosen, v])
     else onChange(on ? '' : v)
   }
-  function commitOther() {
-    const v = otherText.trim()
-    setAddingOther(false)
-    setOtherText('')
-    if (!v || chosen.some((c) => c.toLowerCase() === v.toLowerCase())) return
-    const match = options.find((o) => o.label.toLowerCase() === v.toLowerCase())
-    const value = match?.value ?? v
-    onChange(field.multiSelect ? [...chosen, value] : value)
-  }
   return (
-    <div className="space-y-2">
-      <div className="flex flex-wrap gap-1.5" role="group" aria-label={field.label}>
-        {pills.map((o) => {
-          const on = chosen.includes(o.value)
-          return (
-            <button
-              key={o.value}
-              type="button"
-              aria-pressed={on}
-              onClick={() => pick(o.value)}
-              className={`cursor-pointer rounded-full border px-2.5 py-1 text-xs font-medium transition-colors ${
-                on ? 'border-primary bg-primary text-white' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-100'
-              }`}
-            >
-              {o.label}
-            </button>
-          )
-        })}
-        {field.allowOther && !addingOther && (
+    <div className="flex flex-wrap gap-1.5" role="group" aria-label={field.label}>
+      {pills.map((o) => {
+        const on = chosen.includes(o.value)
+        return (
           <button
+            key={o.value}
             type="button"
-            onClick={() => setAddingOther(true)}
-            className="cursor-pointer rounded-full border border-dashed border-slate-400 bg-white px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100"
+            aria-pressed={on}
+            onClick={() => pick(o.value)}
+            className={`cursor-pointer rounded-full border px-2.5 py-1 text-xs font-medium transition-colors ${
+              on ? 'border-primary bg-primary text-white' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-100'
+            }`}
           >
-            + Other…
+            {o.label}
           </button>
-        )}
-      </div>
-      {addingOther && (
-        <div className="flex gap-1.5">
-          <input
-            aria-label={`Other ${field.label.toLowerCase()}`}
-            value={otherText}
-            onChange={(e) => setOtherText(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault()
-                commitOther()
-              } else if (e.key === 'Escape') {
-                setAddingOther(false)
-                setOtherText('')
-              }
-            }}
-            placeholder="Type it in…"
-            autoFocus
-            className="min-w-0 flex-1 rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-          />
-          <button type="button" onClick={commitOther} className="shrink-0 cursor-pointer rounded-md bg-primary px-3 text-xs font-semibold text-white">
-            Add
-          </button>
-        </div>
-      )}
+        )
+      })}
+      {field.allowOther && <OtherChoice field={field} chosen={chosen} onAdd={(v) => onChange(field.multiSelect ? [...chosen, v] : v)} />}
     </div>
   )
 }
@@ -269,14 +292,16 @@ function focusAndReveal(id: string) {
  * listingChanges'; what gets sent is useListingDraft's, the same as the
  * form's.
  */
-export default function ListingEditor({ item, category, onClose, sendSlot, titleSlot, sharedTurnstile, onRemovalOpenChange }: Props) {
+export default function ListingEditor({ item, category, onClose, sendSlot, titleSlot, sharedTurnstile, onRemovalOpenChange, removalOpen: removalOpenProp }: Props) {
   const draft = useListingDraft(category, item)
   const { hasAddress, hasPhone, syncEligible, name, setName, address, setAddress, phone, setPhone, details, setDetail } = draft
   const { ownTurnstileRef, setOwnTurnstileToken, ...sender } = useListingSubmit({ mode: 'edit', existing: item, sharedTurnstile })
   const [openPanel, setOpenPanel] = useState<string | null>(null)
   const [openHours, setOpenHours] = useState<Record<string, boolean>>({})
   const [revealed, setRevealed] = useState<Record<string, boolean>>({})
-  const [removalOpen, setRemovalOpenState] = useState(false)
+  const [removalOpenState, setRemovalOpenState] = useState(false)
+  const removalControlled = removalOpenProp !== undefined
+  const removalOpen = removalOpenProp ?? removalOpenState
   const [sent, setSent] = useState<ListingChange[]>([])
   const now = new Date(useNow())
 
@@ -378,7 +403,7 @@ export default function ListingEditor({ item, category, onClose, sendSlot, title
       type="button"
       onClick={send}
       disabled={changes.length === 0 || sender.submitting || sender.verifying}
-      className="w-full cursor-pointer rounded-full bg-primary px-5 py-3 text-sm font-semibold text-white shadow-lg transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500 disabled:shadow-none"
+      className={SUBMIT_PILL}
     >
       {sendLabel}
     </button>
@@ -536,7 +561,10 @@ export default function ListingEditor({ item, category, onClose, sendSlot, title
             : [{ value: '__on', label: f.filterLabel ?? f.label }]
           : (f.options ?? []).filter((o) => !selectValues(details[f.key]).includes(o.value)),
     }))
-    .filter((x) => x.options.length > 0 && (x.f.type === 'boolean' || x.f.multiSelect || selectValues(details[x.f.key]).length === 0))
+    // A field that takes a typed-in choice is always addable: its "+
+    // Other…" is the only way to add a certifier that isn't listed to a
+    // listing that has none yet, since there's no badge to open.
+    .filter((x) => (x.options.length > 0 || (x.f.type === 'select' && !!x.f.allowOther)) && (x.f.type === 'boolean' || x.f.multiSelect || selectValues(details[x.f.key]).length === 0))
 
   function addBadge(f: CategoryField, v: string) {
     if (f.type === 'boolean') setDetail(f.key, true)
@@ -627,6 +655,9 @@ export default function ListingEditor({ item, category, onClose, sendSlot, title
                       + {o.label}
                     </button>
                   ))}
+                  {f.type === 'select' && f.allowOther && (
+                    <OtherChoice field={f} chosen={selectValues(details[f.key])} onAdd={(v) => addBadge(f, v)} />
+                  )}
                 </div>
               </div>
             ))}
@@ -932,11 +963,14 @@ export default function ListingEditor({ item, category, onClose, sendSlot, title
   // line, not the form's old blue box, which would be the first thing on
   // screen that doesn't look like the listing.
   const title = (
-    <h2 className="truncate text-base font-semibold text-slate-900">{removalOpen ? 'Request removal' : 'Suggest an edit'}</h2>
+    // No size of its own: the host's slot sets it (larger in the desktop
+    // dialog, where it sits beside the dialog's Close, than beside a
+    // phone sheet's Back).
+    <h2 className="truncate font-semibold text-slate-900">{removalOpen ? 'Request removal' : 'Suggest an edit'}</h2>
   )
   const reviewLine = (
     <div className="space-y-2">
-      {!titleSlot && title}
+      {!titleSlot && <div className="text-base">{title}</div>}
       <p className="rounded-md bg-slate-100 px-3 py-1.5 text-xs text-slate-600">Reviewed by a moderator before it goes live</p>
     </div>
   )
@@ -1010,8 +1044,14 @@ export default function ListingEditor({ item, category, onClose, sendSlot, title
             honeypot={sender.honeypot}
             submitterEmail={sender.submitterEmail}
             onSubmitterEmailChange={sender.setSubmitterEmail}
-            onCancel={() => setRemovalOpen(false)}
+            onCancel={removalControlled ? undefined : () => setRemovalOpen(false)}
             onDone={sender.markRemovalDone}
+            // Where Send was: the same slot, the same button. Only while
+            // this screen shows — hidden, it stays mounted (so a typed
+            // reason survives), and a portaled button would escape the
+            // `hidden` around it.
+            submitSlot={removalOpen ? sendSlot : null}
+            submitClassName={SUBMIT_PILL}
           />
         </div>
       )}

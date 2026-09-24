@@ -112,10 +112,19 @@ export default function ListingDetailModal({
   // onExpandedChange) — that stays exactly as it was the whole time this
   // is open, same as it does while just viewing details.
   const [formOpen, setFormOpen] = useState<'edit' | null>(null)
+  // Whether the editor is on its Request removal screen. Owned here, not in
+  // the editor, because it's a step of its own: it has its own history
+  // entry on top of the form's, so Back, Escape and the browser's Back each
+  // step out of removal into the edit (with whatever was typed there still
+  // there) rather than out of editing altogether — the removal screen has
+  // no Cancel of its own. Also names the dialog "Request removal of
+  // {name}" instead of "Suggest an edit".
+  const [removalOpen, setRemovalOpen] = useState(false)
   useEffect(() => {
     function onPopState(e: PopStateEvent) {
-      const state = e.state as { detailModalForm?: 'edit' } | null
+      const state = e.state as { detailModalForm?: 'edit'; detailModalRemoval?: boolean } | null
       setFormOpen(state?.detailModalForm === 'edit' ? 'edit' : null)
+      setRemovalOpen(state?.detailModalForm === 'edit' && !!state.detailModalRemoval)
     }
     window.addEventListener('popstate', onPopState)
     return () => window.removeEventListener('popstate', onPopState)
@@ -124,12 +133,18 @@ export default function ListingDetailModal({
     history.pushState({ ...(window.history.state ?? {}), detailModalForm: mode }, '')
     setFormOpen(mode)
   }
-  const closeForm = () => history.back()
-
-  // Whether the editor has swapped to its Request removal panel — reported
-  // up via onRemovalOpenChange so the dialog's accessible name can become
-  // "Request removal of {name}" instead of "Suggest an edit".
-  const [removalOpen, setRemovalOpen] = useState(false)
+  // One step back: from removal to the edit, from the edit to the listing.
+  const stepBack = () => history.back()
+  // All the way out of the form — which, after a removal request is sent,
+  // is two entries back (the receipt's "Back to the listing").
+  const closeForm = () => (removalOpen ? history.go(-2) : history.back())
+  const changeRemovalOpen = (open: boolean) => {
+    if (open === removalOpen) return
+    if (open) {
+      history.pushState({ ...(window.history.state ?? {}), detailModalRemoval: true }, '')
+      setRemovalOpen(true)
+    } else stepBack()
+  }
   // Where ListingEditor portals its Send button — the floating slot below
   // the dialog. State, not a ref, so the editor re-renders once it exists.
   const [sendSlot, setSendSlot] = useState<HTMLElement | null>(null)
@@ -168,7 +183,7 @@ export default function ListingDetailModal({
         // Steps back one level at a time, same as a real nested screen
         // would: out of the form to the detail view first, and only a
         // SECOND Escape (formOpen now null) closes the dialog entirely.
-        if (formOpen) closeForm()
+        if (formOpen) stepBack()
         else onClose()
         return
       }
@@ -303,14 +318,14 @@ export default function ListingDetailModal({
             <>
             <div className="min-w-0 flex-1">
               <button
-                onClick={closeForm}
+                onClick={stepBack}
                 className="inline-flex items-center gap-1 text-sm font-medium text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
               >
                 <ChevronLeftIcon className="h-4 w-4" />
                 Back
               </button>
             </div>
-            <div ref={setTitleSlot} className="min-w-0 text-center" />
+            <div ref={setTitleSlot} className="min-w-0 text-center text-lg" />
             </>
           ) : (
             <div className="flex items-start gap-3 min-w-0">
@@ -401,7 +416,7 @@ export default function ListingDetailModal({
 
         <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
           {formOpen === 'edit' ? (
-            <ListingEditor item={item} category={category} onClose={closeForm} sendSlot={sendSlot} titleSlot={titleSlot} onRemovalOpenChange={setRemovalOpen} />
+            <ListingEditor item={item} category={category} onClose={closeForm} sendSlot={sendSlot} titleSlot={titleSlot} removalOpen={removalOpen} onRemovalOpenChange={changeRemovalOpen} />
           ) : (
             <>
               <PlaceDetailBody

@@ -784,6 +784,33 @@ describe('GenericListingCard — expanded', () => {
     expect(within(header as HTMLElement).getByRole('button', { name: 'Close' })).toBeInTheDocument()
   })
 
+  // Removal is a step of its own, with no Cancel: Back and Escape step out
+  // of it into the edit, not out of editing. Its own history entry is what
+  // makes the browser's Back do the same.
+  it('steps back from the removal screen to the edit, with Back or Escape', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(
+      <GenericListingCard item={makeListing({ name: 'Goldi Market' })} category={makeCategory()} upvotes={false} count={0} defaultExpanded {...requiredHandlers} />,
+    )
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Suggest an edit' }))
+    const push = vi.spyOn(window.history, 'pushState')
+    await user.click(screen.getByRole('button', { name: 'stub open removal' }))
+    expect(push).toHaveBeenLastCalledWith(expect.objectContaining({ detailModalForm: 'edit', detailModalRemoval: true }), '')
+
+    const back = vi.spyOn(window.history, 'back').mockImplementation(() => {})
+    await user.click(screen.getByRole('button', { name: 'Back' }))
+    await user.keyboard('{Escape}')
+    expect(back).toHaveBeenCalledTimes(2)
+    // What that Back delivers: the edit's own entry.
+    act(() => {
+      window.dispatchEvent(new PopStateEvent('popstate', { state: { detailModalForm: 'edit' } }))
+    })
+    expect(screen.getByRole('dialog', { name: 'Suggest an edit' })).toBeInTheDocument()
+    expect(screen.getByText('ListingEditor stub — item=Goldi Market')).toBeInTheDocument()
+    push.mockRestore()
+    back.mockRestore()
+  })
+
   // The dialog's accessible name follows the editor into its removal
   // panel, reported via onRemovalOpenChange.
   it('the dialog’s own name becomes "Request removal of {name}" once the editor reports the removal panel is open', async () => {

@@ -266,6 +266,24 @@ describe('ListingEditor — badges, edited where they sit', () => {
     expect(chip.className).toContain('text-caution')
   })
 
+  // A listing with no certification has no badge to open, so the "+" is
+  // the only way in — and it has to take a certifier that isn't listed.
+  it('adds a certifier that isn\'t listed from the "+", on a listing with none', async () => {
+    const u = user()
+    const withOther = makeCategory({
+      ...food,
+      detailFields: food.detailFields.map((f) => (f.key === 'kosherCert' ? { ...f, allowOther: true } : f)),
+    })
+    renderEditor({ category: withOther, item: { ...barBombon, kosherCert: [], kosherPartial: false } })
+    expect(screen.queryByRole('button', { name: 'IKC' })).not.toBeInTheDocument()
+
+    await u.click(screen.getByRole('button', { name: 'Add a badge' }))
+    await u.click(screen.getByRole('button', { name: '+ Other…' }))
+    await u.type(screen.getByRole('textbox', { name: 'Other kosher certification' }), 'Badatz{Enter}')
+    expect(screen.getByRole('button', { name: 'Remove Badatz' })).toBeInTheDocument()
+    expect(send()).toHaveTextContent('Send 1 change')
+  })
+
   it('offers no "Other…" on a field that doesn\'t allow it', async () => {
     const u = user()
     renderEditor()
@@ -420,6 +438,43 @@ describe('ListingEditor — sending', () => {
     expect(within(slot).queryByRole('button', { name: 'No changes yet' })).not.toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Request removal' })).toBeInTheDocument()
     slot.remove()
+  })
+
+  // Removal's confirm is where Send was, and looks the same: it's a request
+  // a moderator reviews, not a deletion, so it isn't the red of danger.
+  it('puts the removal confirm in Send\'s slot, looking the same as Send', async () => {
+    const u = user()
+    const slot = document.createElement('div')
+    document.body.appendChild(slot)
+    renderEditor({ sendSlot: slot })
+    const sendClass = within(slot).getByRole('button', { name: 'No changes yet' }).className
+
+    await u.click(screen.getByRole('button', { name: /Request removal/ }))
+    const confirm = within(slot).getByRole('button', { name: /^(Confirm removal request|Verifying…)$/ })
+    expect(confirm.className).toBe(sendClass)
+    slot.remove()
+  })
+
+  // A host that owns the removal step has a Back that leaves it, so the
+  // screen has no Cancel; on its own, the editor keeps one.
+  it('drops the removal screen\'s Cancel when the host owns the step', async () => {
+    const u = user()
+    const onRemovalOpenChange = vi.fn()
+    const { rerenderWithProviders } = renderEditor({ removalOpen: false, onRemovalOpenChange })
+    await u.click(screen.getByRole('button', { name: /Request removal/ }))
+    expect(onRemovalOpenChange).toHaveBeenLastCalledWith(true)
+
+    rerenderWithProviders(<ListingEditor item={barBombon} category={food} onClose={() => {}} removalOpen onRemovalOpenChange={onRemovalOpenChange} />)
+    expect(screen.getByRole('heading', { name: 'Request removal' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument()
+  })
+
+  it('keeps a Cancel on the removal screen when it owns the step itself', async () => {
+    const u = user()
+    renderEditor()
+    await u.click(screen.getByRole('button', { name: /Request removal/ }))
+    await u.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(screen.getByRole('heading', { name: 'Suggest an edit' })).toBeInTheDocument()
   })
 
   // The host's header row (Back … Close) would otherwise be an empty band;

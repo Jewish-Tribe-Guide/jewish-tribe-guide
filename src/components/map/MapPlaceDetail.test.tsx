@@ -259,6 +259,32 @@ describe('MapPlaceDetail', () => {
     expect(within(row).getByRole('heading', { name: 'stub title' })).toBeInTheDocument()
   })
 
+  // Removal has no Cancel, so Back has to step out of it into the edit —
+  // and a history entry of its own makes the phone's back swipe do the same.
+  it('steps back from the removal screen to the edit, not out of editing', async () => {
+    const userEvent = (await import('@testing-library/user-event')).default
+    const user = userEvent.setup()
+    renderWithProviders(
+      <PinnedProvider>
+        <MapPlaceDetail item={makeListing({ name: 'Goldi Market' })} category={makeCategory()} color="#000" />
+      </PinnedProvider>,
+    )
+    await user.click(screen.getByRole('button', { name: 'Suggest an edit' }))
+    const push = vi.spyOn(window.history, 'pushState')
+    await user.click(screen.getByRole('button', { name: 'stub open removal' }))
+    expect(push).toHaveBeenLastCalledWith(expect.objectContaining({ mapSheetForm: 'edit', mapSheetRemoval: true }), '')
+
+    const back = vi.spyOn(window.history, 'back').mockImplementation(() => {})
+    await user.click(screen.getByRole('button', { name: 'Back' }))
+    expect(back).toHaveBeenCalledTimes(1)
+    act(() => {
+      window.dispatchEvent(new PopStateEvent('popstate', { state: { mapSheetForm: 'edit' } }))
+    })
+    expect(screen.getByText(/ListingEditor stub/)).toBeInTheDocument()
+    push.mockRestore()
+    back.mockRestore()
+  })
+
   // Pin, Share and Set as location have no other home on the map now, and
   // none of them is a contribution — so a category with editing off keeps
   // them, and loses only the pill.

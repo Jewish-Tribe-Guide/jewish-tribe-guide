@@ -80,11 +80,18 @@ export default function MapPlaceDetail({ item, category, color, onBack, filters 
   // openPreview/closePreview, the precedent both follow).
   const [formOpen, setFormOpen] = useState<'edit' | null>(null)
   const [titleSlot, setTitleSlot] = useState<HTMLElement | null>(null)
+  // The editor's Request removal screen is a step of its own, one more
+  // history entry on top of the form's — so Back and the phone's back
+  // swipe step out of removal into the edit (what was typed there still
+  // there), not out of editing altogether. It has no Cancel of its own.
+  // Same as the desktop dialog (ListingDetailModal).
+  const [removalOpen, setRemovalOpen] = useState(false)
   useEffect(() => {
     function onPopState(e: PopStateEvent) {
-      const state = e.state as { mapSheetForm?: 'edit' } | null
+      const state = e.state as { mapSheetForm?: 'edit'; mapSheetRemoval?: boolean } | null
       const open = state?.mapSheetForm === 'edit' ? 'edit' : null
       setFormOpen(open)
+      setRemovalOpen(open === 'edit' && !!state?.mapSheetRemoval)
     }
     window.addEventListener('popstate', onPopState)
     return () => window.removeEventListener('popstate', onPopState)
@@ -93,7 +100,18 @@ export default function MapPlaceDetail({ item, category, color, onBack, filters 
     history.pushState({ ...(window.history.state ?? {}), mapSheetForm: mode }, '')
     setFormOpen(mode)
   }
-  const closeForm = () => history.back()
+  // One step back: from removal to the edit, from the edit to the listing.
+  const stepBack = () => history.back()
+  // All the way out of the form — two entries back once a removal request
+  // has been sent from its own screen.
+  const closeForm = () => (removalOpen ? history.go(-2) : history.back())
+  const changeRemovalOpen = (open: boolean) => {
+    if (open === removalOpen) return
+    if (open) {
+      history.pushState({ ...(window.history.state ?? {}), mapSheetRemoval: true }, '')
+      setRemovalOpen(true)
+    } else stepBack()
+  }
   // Opening or closing the form swaps everything inside the parent's scroll
   // region, and that region stays mounted, so it would keep its offset: the
   // bar is the LAST thing in the listing, so the form typically opened
@@ -117,10 +135,17 @@ export default function MapPlaceDetail({ item, category, color, onBack, filters 
             dialog's Back and Close; the empty third column keeps it
             centred. */}
         <div className="mb-3 grid grid-cols-[1fr_auto_1fr] items-center gap-2">
-          <UpButton label="Back" onClick={closeForm} className="" />
-          <div ref={setTitleSlot} className="min-w-0 text-center" />
+          <UpButton label="Back" onClick={stepBack} className="" />
+          <div ref={setTitleSlot} className="min-w-0 text-center text-base" />
         </div>
-        <ListingEditor item={item} category={category} onClose={closeForm} titleSlot={titleSlot} />
+        <ListingEditor
+          item={item}
+          category={category}
+          onClose={closeForm}
+          titleSlot={titleSlot}
+          removalOpen={removalOpen}
+          onRemovalOpenChange={changeRemovalOpen}
+        />
       </div>
     )
   }

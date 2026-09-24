@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { categoryWithListings, largestCategory, defaultCommunity, dismissLocationPrompt } from './helpers'
+import { categoryWithHoursField, categoryWithListings, largestCategory, defaultCommunity, dismissLocationPrompt } from './helpers'
 
 // Desktop opens a listing in a centered dialog (ListingDetailModal); a phone
 // opens it in a bottom sheet, the one Add and Edit use (MobileSheet). Neither
@@ -269,4 +269,55 @@ test.describe('listing detail — mobile', () => {
     await expect.poll(() => new URL(page.url()).searchParams.get('item')).toBeNull()
     await expect(page.getByRole('button', { name: `Show details for ${item.name}` }).first()).toBeVisible()
   })
+})
+
+// Requesting removal is a step of its own inside Suggest an edit, with no
+// Cancel: Back (and Escape, and the browser's or phone's Back) steps out of
+// it into the edit, not out of editing. Here as well as in the unit tests
+// because those mock the history; this is the real history stack, with the
+// directory's own URL syncing running alongside it. Opens nothing that
+// writes: the confirm is never pressed.
+test('Back steps out of Request removal into the edit, not out of editing', async ({ page, request, isMobile }) => {
+  const community = await defaultCommunity(page)
+  const { category, item } = await categoryWithHoursField(request, community)
+
+  await page.goto(`/${community}/${category.id}`)
+  await dismissLocationPrompt(page)
+  await page.getByRole('button', { name: `Show details for ${item.name}` }).first().click()
+  const listing = page.getByRole('dialog', { name: item.name })
+  await expect(listing).toBeVisible()
+
+  const suggest = listing.getByRole('button', { name: 'Suggest an edit' })
+  test.skip((await suggest.count()) === 0, `${category.id} can't be edited`)
+  await suggest.click()
+  const editTitle = page.getByRole('heading', { name: 'Suggest an edit' })
+  await expect(editTitle).toBeVisible()
+  const removalLink = page.getByRole('button', { name: 'Closed for good? Request removal' })
+  test.skip((await removalLink.count()) === 0, `${category.id} doesn't take removal requests`)
+
+  await removalLink.click()
+  await expect(page.getByRole('heading', { name: 'Request removal' })).toBeVisible()
+  await expect(page.getByRole('button', { name: /^(Confirm removal request|Verifying…)$/ })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Cancel' })).toHaveCount(0)
+
+  await page.getByRole('button', { name: 'Back', exact: true }).click()
+  await expect(editTitle).toBeVisible()
+
+  // The other ways back, each one step: the browser's own Back (a phone's
+  // back swipe is the same thing), and on desktop, Escape.
+  await removalLink.click()
+  await expect(page.getByRole('heading', { name: 'Request removal' })).toBeVisible()
+  await page.goBack()
+  await expect(editTitle).toBeVisible()
+  if (!isMobile) {
+    await removalLink.click()
+    await expect(page.getByRole('heading', { name: 'Request removal' })).toBeVisible()
+    await page.keyboard.press('Escape')
+    await expect(editTitle).toBeVisible()
+  }
+
+  // And one more Back leaves the edit for the listing it came from.
+  await page.getByRole('button', { name: 'Back', exact: true }).click()
+  await expect(page.getByRole('dialog', { name: item.name })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Suggest an edit' })).toHaveCount(0)
 })

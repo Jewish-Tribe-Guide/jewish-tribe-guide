@@ -1,6 +1,7 @@
 'use client'
 
 import { useId, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { withCommunity } from '@/lib/useCommunityData'
 import PrivacyNote from '@/components/PrivacyNote'
@@ -39,6 +40,8 @@ export default function RemovalRequest({
   onSubmitterEmailChange,
   onCancel,
   onDone,
+  submitSlot,
+  submitClassName,
 }: {
   listing: { id: string; name: string }
   turnstileToken: string
@@ -54,9 +57,19 @@ export default function RemovalRequest({
   submitterEmail: string
   onSubmitterEmailChange: (v: string) => void
   /** Back to the edit fields — the form itself, not this panel, decides
-   *  whether that means unmounting or just hiding it again. */
-  onCancel: () => void
+   *  whether that means unmounting or just hiding it again. Omitted, there's
+   *  no Cancel button: the listing editor's host has a Back that steps out
+   *  of this screen (and Escape, and the phone's back swipe), so a Cancel
+   *  beside Confirm would be a second way to do the same thing. */
+  onCancel?: () => void
   onDone: () => void
+  /** Where the confirm button goes when the host floats it outside the
+   *  content — the listing editor's slot under the desktop dialog, the same
+   *  place its Send sits. */
+  submitSlot?: HTMLElement | null
+  /** The confirm button's look, when the host wants it to match its own
+   *  submit (the listing editor's Send). */
+  submitClassName?: string
 }) {
   const uid = useId()
   const community = useCommunitySlug()
@@ -113,6 +126,20 @@ export default function RemovalRequest({
 
   const inputClass =
     'w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary'
+
+  const confirm = (
+    <button
+      type="button"
+      onClick={submit}
+      disabled={submitting || !canSubmit}
+      className={
+        submitClassName ??
+        'w-full cursor-pointer rounded-md border border-red-300 bg-white px-4 py-2.5 font-medium text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60'
+      }
+    >
+      {submitting ? 'Sending…' : canSubmit ? 'Confirm removal request' : 'Verifying…'}
+    </button>
+  )
 
   return (
     // No title here and no card of its own. The panel used to carry both —
@@ -186,43 +213,37 @@ export default function RemovalRequest({
       </div>
       {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
       <div className="space-y-2">
-        {/* Full width, matching the reason/details fields above it and
-            ListingForm's own Submit/Request removal buttons — outline, not
-            solid: the strong red cue belongs on the PREVIOUS screen, where
-            Request removal sits beside Submit and has to read as "the other
-            option" at a glance; by the time someone is on this screen, the
-            heading above already says "Request removal of {name}", so the
-            button no longer needs to carry that signal itself. No text-sm —
-            same ambient (larger) size as Submit/Request removal on the
-            previous screen; this used to render visibly smaller than both. */}
-        <button
-          type="button"
-          onClick={submit}
-          disabled={submitting || !canSubmit}
-          className="w-full cursor-pointer rounded-md border border-red-300 bg-white px-4 py-2.5 font-medium text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {submitting ? 'Sending…' : canSubmit ? 'Confirm removal request' : 'Verifying…'}
-        </button>
+        {/* The default look (for ListingForm) — full width, matching
+            the reason/details fields above it and ListingForm's own
+            Submit/Request removal buttons — outline, not solid: the
+            strong red cue belongs on the PREVIOUS screen, where Request
+            removal sits beside Submit and has to read as "the other
+            option" at a glance; by the time someone is on this screen,
+            the heading above already says "Request removal of {name}",
+            so the button no longer needs to carry that signal itself.
+            The listing editor passes its own Send's look instead. */}
+        {submitSlot ? createPortal(confirm, submitSlot) : confirm}
         {/* A real bordered secondary button, visible at rest — same
             border/rounded/padded treatment this app already uses for a
             secondary Cancel elsewhere (see CategorySaveConfirmations). A
-            hover-only ghost style (no visible edge until the pointer's over
-            it) doesn't read as clickable at a glance, and doesn't exist at
-            all on touch, where there's no hover to reveal it. Still lighter
-            than Confirm (gray, not red) — unlike Submit/Request removal on
-            the previous screen (two real, comparably weighted
-            destinations), Cancel isn't a comparable alternative here, just
-            "never mind", so it stays visually quieter, just not invisible. */}
-        <button
-          type="button"
-          onClick={() => {
-            setError(null)
-            onCancel()
-          }}
-          className="w-full cursor-pointer rounded-md border border-slate-300 bg-white py-2.5 font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-800"
-        >
-          Cancel
-        </button>
+            hover-only ghost style (no visible edge until the pointer's
+            over it) doesn't read as clickable at a glance, and doesn't
+            exist at all on touch, where there's no hover to reveal it.
+            Still lighter than Confirm (gray, not red) — Cancel isn't a
+            comparable alternative here, just "never mind", so it stays
+            visually quieter, just not invisible. */}
+        {onCancel && (
+          <button
+            type="button"
+            onClick={() => {
+              setError(null)
+              onCancel()
+            }}
+            className="w-full cursor-pointer rounded-md border border-slate-300 bg-white py-2.5 font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-800"
+          >
+            Cancel
+          </button>
+        )}
       </div>
     </div>
   )
