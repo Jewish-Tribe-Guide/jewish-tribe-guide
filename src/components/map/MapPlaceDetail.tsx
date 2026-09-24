@@ -79,6 +79,7 @@ export default function MapPlaceDetail({ item, category, color, onBack, filters 
   // that one; see its own comment for why (and CategoryEditor's
   // openPreview/closePreview, the precedent both follow).
   const [formOpen, setFormOpen] = useState<'edit' | null>(null)
+  const [titleSlot, setTitleSlot] = useState<HTMLElement | null>(null)
   useEffect(() => {
     function onPopState(e: PopStateEvent) {
       const state = e.state as { mapSheetForm?: 'edit' } | null
@@ -111,10 +112,15 @@ export default function MapPlaceDetail({ item, category, color, onBack, filters 
       <div ref={rootRef}>
         {/* "Back" alone rather than naming a destination: unlike "Back to
             list", which really does go to a different screen, this returns
-            to the same place you were already on. The editor carries its own
-            "Suggesting an edit" line and heading. */}
-        <UpButton label="Back" onClick={closeForm} className="mb-2" />
-        <ListingEditor item={item} category={category} onClose={closeForm} />
+            to the same place you were already on. The editor's title goes
+            in the middle of the same row, as it does between the desktop
+            dialog's Back and Close; the empty third column keeps it
+            centred. */}
+        <div className="mb-3 grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+          <UpButton label="Back" onClick={closeForm} className="" />
+          <div ref={setTitleSlot} className="min-w-0 text-center" />
+        </div>
+        <ListingEditor item={item} category={category} onClose={closeForm} titleSlot={titleSlot} />
       </div>
     )
   }

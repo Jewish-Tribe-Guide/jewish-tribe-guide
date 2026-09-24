@@ -36,6 +36,10 @@ type Props = {
    *  thing in the content, the same "part of the list" rule the edit bar
    *  follows there. */
   sendSlot?: HTMLElement | null
+  /** Where the title ("Suggest an edit", or "Request removal") goes: the
+   *  host's own header row, beside Back, which would otherwise be an empty
+   *  band. Omitted, the title leads the content instead. */
+  titleSlot?: HTMLElement | null
   /** See ListingForm's prop of the same name. */
   sharedTurnstile?: { token: string; reset: () => void }
   /** See ListingForm's prop of the same name. */
@@ -265,7 +269,7 @@ function focusAndReveal(id: string) {
  * listingChanges'; what gets sent is useListingDraft's, the same as the
  * form's.
  */
-export default function ListingEditor({ item, category, onClose, sendSlot, sharedTurnstile, onRemovalOpenChange }: Props) {
+export default function ListingEditor({ item, category, onClose, sendSlot, titleSlot, sharedTurnstile, onRemovalOpenChange }: Props) {
   const draft = useListingDraft(category, item)
   const { hasAddress, hasPhone, syncEligible, name, setName, address, setAddress, phone, setPhone, details, setDetail } = draft
   const { ownTurnstileRef, setOwnTurnstileToken, ...sender } = useListingSubmit({ mode: 'edit', existing: item, sharedTurnstile })
@@ -461,48 +465,46 @@ export default function ListingEditor({ item, category, onClose, sendSlot, share
     const nowValues = currentValues(f)
     const amber = isAmber(f)
     const panelOpen = openPanel === `badge:${f.key}`
+    // Every badge carries an ×, the way a chip you can change does anywhere
+    // else — one that was already there as much as one you just added, or
+    // adding one teaches "chips come off with ×" and the old ones then look
+    // fixed. Tapping the badge itself still opens its group's panel. The ×
+    // is fainter on an existing badge so the row still reads as the
+    // listing first. Removing the last certification needs nothing extra
+    // for its caveat: the listing only shows a caveat beside a badge it
+    // has, so it goes quiet, and comes back with the badge.
     const chips = nowValues.map((v) => {
       const label = chipText(f, v)
       const isNew = !before.includes(v)
-      // One you've just added carries its own ×: taking back your own
-      // addition should be one tap, not a trip into the panel. Badges that
-      // were already there don't, so the row still reads like the listing;
-      // they change from their panel.
-      if (isNew) {
-        return (
-          <span
-            key={`${f.key}:${v}`}
-            // The blue edge says "new"; the fill is what the listing will
-            // show — amber when the caveat applies, like the badges beside it.
-            className={`inline-flex items-center rounded-full border border-primary text-xs font-medium ${amber ? 'bg-caution/10 text-caution' : 'bg-blue-50 text-primary'} ${panelOpen ? 'outline-solid outline-2 outline-offset-1 outline-primary' : ''}`}
-          >
-            <button type="button" onClick={() => togglePanel(`badge:${f.key}`)} aria-expanded={panelOpen} className="cursor-pointer py-0.5 pl-2 pr-1">
-              {label}
-            </button>
-            <button
-              type="button"
-              aria-label={`Remove ${label}`}
-              onClick={() => removeBadge(f, v)}
-              className="flex h-4 w-4 cursor-pointer items-center justify-center rounded-full mr-1 text-primary hover:bg-primary/15"
-            >
-              <svg className="h-2.5 w-2.5" fill="none" stroke="currentColor" strokeWidth={3} viewBox="0 0 24 24" aria-hidden="true">
-                <path strokeLinecap="round" d="M6 6l12 12M18 6L6 18" />
-              </svg>
-            </button>
-          </span>
-        )
-      }
-      const tone = amber ? 'border-caution/30 bg-caution/10 text-caution' : 'border-slate-200 bg-slate-100 text-slate-600'
+      // The blue edge says "new"; the fill is what the listing will show —
+      // amber when the caveat applies, like the badges beside it.
+      const tone = isNew
+        ? `border-primary ${amber ? 'bg-caution/10 text-caution' : 'bg-blue-50 text-primary'}`
+        : amber
+          ? 'border-caution/30 bg-caution/10 text-caution'
+          : 'border-slate-200 bg-slate-100 text-slate-600'
+      const outline = panelOpen ? 'outline-solid outline-2 outline-offset-1 outline-primary' : isNew ? '' : TAPPABLE
       return (
-        <button
+        <span
           key={`${f.key}:${v}`}
-          type="button"
-          onClick={() => togglePanel(`badge:${f.key}`)}
-          aria-expanded={panelOpen}
-          className={`cursor-pointer rounded-full border px-2 py-0.5 text-xs font-medium ${tone} ${TAPPABLE} ${panelOpen ? 'outline-solid outline-2 outline-primary' : ''}`}
+          className={`inline-flex items-center rounded-full border text-xs font-medium ${tone} ${outline}`}
         >
-          {label}
-        </button>
+          <button type="button" onClick={() => togglePanel(`badge:${f.key}`)} aria-expanded={panelOpen} className="cursor-pointer py-0.5 pl-2 pr-1">
+            {label}
+          </button>
+          <button
+            type="button"
+            aria-label={`Remove ${label}`}
+            onClick={() => removeBadge(f, v)}
+            // A 16px circle with a 24px hit area (the ::after), so it's
+            // tappable on a phone without making the chip any bigger.
+            className={`relative mr-1 flex h-4 w-4 cursor-pointer items-center justify-center rounded-full after:absolute after:-inset-1 after:content-[''] ${isNew ? 'text-primary hover:bg-primary/15' : 'opacity-50 hover:bg-slate-900/10 hover:opacity-100'}`}
+          >
+            <svg className="h-2.5 w-2.5" fill="none" stroke="currentColor" strokeWidth={3} viewBox="0 0 24 24" aria-hidden="true">
+              <path strokeLinecap="round" d="M6 6l12 12M18 6L6 18" />
+            </svg>
+          </button>
+        </span>
       )
     })
     // A removed badge stays, crossed out, so the change is visible where it
@@ -922,24 +924,27 @@ export default function ListingEditor({ item, category, onClose, sendSlot, share
     otherSection,
   ].filter(Boolean)
 
-  // The one thing at the top that isn't the listing: it says you're editing
-  // (the layout below deliberately doesn't change) and that nothing goes
-  // live unreviewed, which is what makes a stranger willing to touch it.
-  // A quiet line, not the form's old blue box, which would be the first
-  // thing on screen that doesn't look like the listing.
+  // The title says you're editing (the layout below deliberately doesn't
+  // change) — "Suggest an edit", the words on the button that opened it,
+  // and a verb that already says someone else decides; "Edit listing" would
+  // promise the change goes live. The line under it says nothing goes live
+  // unreviewed, which is what makes a stranger willing to touch it: a quiet
+  // line, not the form's old blue box, which would be the first thing on
+  // screen that doesn't look like the listing.
+  const title = (
+    <h2 className="truncate text-base font-semibold text-slate-900">{removalOpen ? 'Request removal' : 'Suggest an edit'}</h2>
+  )
   const reviewLine = (
-    <div>
-      <h2 className="sr-only">{removalOpen ? `Request removal of ${item.name}` : 'Suggest an edit'}</h2>
-      <p className="rounded-md bg-slate-100 px-3 py-1.5 text-xs text-slate-600">
-        <span className="font-semibold text-slate-700">{removalOpen ? `Request removal of ${item.name}` : 'Suggesting an edit'}</span>
-        {' · '}reviewed before it goes live
-      </p>
+    <div className="space-y-2">
+      {!titleSlot && title}
+      <p className="rounded-md bg-slate-100 px-3 py-1.5 text-xs text-slate-600">Reviewed by a moderator before it goes live</p>
     </div>
   )
 
   return (
     <div className="space-y-4">
       <Honeypot value={sender.honeypot} onChange={sender.setHoneypot} />
+      {titleSlot && createPortal(title, titleSlot)}
       {reviewLine}
 
       <div className={removalOpen ? 'hidden' : 'space-y-4'}>

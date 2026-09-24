@@ -36,11 +36,13 @@ vi.mock('./ListingEditor', async () => {
       onClose,
       onRemovalOpenChange,
       sendSlot,
+      titleSlot,
     }: {
       item: { name: string }
       onClose: () => void
       onRemovalOpenChange?: (open: boolean) => void
       sendSlot?: HTMLElement | null
+      titleSlot?: HTMLElement | null
     }) => (
       <div>
         <p>ListingEditor stub — item={item.name}</p>
@@ -49,6 +51,7 @@ vi.mock('./ListingEditor', async () => {
             prove the HOST's title reacts to it. */}
         <button onClick={() => onRemovalOpenChange?.(true)}>stub open removal</button>
         {sendSlot && createPortal(<button>stub send</button>, sendSlot)}
+        {titleSlot && createPortal(<h2>stub title</h2>, titleSlot)}
       </div>
     ),
   }
@@ -764,6 +767,21 @@ describe('GenericListingCard — expanded', () => {
     const sendButton = within(dialog).getByRole('button', { name: 'stub send' })
     const card = screen.getByText('ListingEditor stub — item=Goldi Market').closest('.dialog-in')!
     expect(card).not.toContainElement(sendButton)
+  })
+
+  // The header band beside Back would otherwise be empty while editing;
+  // the editor's title goes there, between Back and Close.
+  it('puts the editor\'s title in the dialog header, between Back and Close', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(
+      <GenericListingCard item={makeListing({ name: 'Goldi Market' })} category={makeCategory()} upvotes={false} count={0} defaultExpanded {...requiredHandlers} />,
+    )
+    const dialog = screen.getByRole('dialog')
+    await user.click(within(dialog).getByRole('button', { name: 'Suggest an edit' }))
+
+    const header = within(dialog).getByRole('button', { name: 'Back' }).closest('.border-b')!
+    expect(within(header as HTMLElement).getByRole('heading', { name: 'stub title' })).toBeInTheDocument()
+    expect(within(header as HTMLElement).getByRole('button', { name: 'Close' })).toBeInTheDocument()
   })
 
   // The dialog's accessible name follows the editor into its removal

@@ -133,6 +133,8 @@ export default function ListingDetailModal({
   // Where ListingEditor portals its Send button — the floating slot below
   // the dialog. State, not a ref, so the editor re-renders once it exists.
   const [sendSlot, setSendSlot] = useState<HTMLElement | null>(null)
+  // The editor's title, between Back and Close in this header.
+  const [titleSlot, setTitleSlot] = useState<HTMLElement | null>(null)
 
   // Resets the next time this dialog opens (a fresh listing, or the same
   // one reopened later) — adjusted during render, the React-docs-
@@ -289,14 +291,17 @@ export default function ListingDetailModal({
             hard rule between "who this is" and "what it is" read as if the
             badges belonged with the action icons below instead. The divider
             now marks the real boundary: identity above it, actions below. */}
-        <div className="flex items-start justify-between gap-3 px-6 py-5 border-b border-slate-200 shrink-0">
+        <div className={`flex justify-between gap-3 px-6 py-5 border-b border-slate-200 shrink-0 ${formOpen ? 'items-center' : 'items-start'}`}>
           {formOpen ? (
             // Replaces the name/icon block while editing — the editor
-            // brings its own editable name and photo, and its own
-            // "Suggesting an edit" line. "Back" alone, as MapPlaceDetail's:
-            // this returns to the listing you were just on, not to another
-            // screen, so it doesn't name a destination.
-            <div className="min-w-0">
+            // brings its own editable name and photo, and puts its title in
+            // the slot between Back and Close. "Back" alone, as
+            // MapPlaceDetail's: this returns to the listing you were just
+            // on, not to another screen, so it doesn't name a destination.
+            // Back and Close each take an equal share of what's left, so
+            // the title sits in the middle of the dialog, not of the gap.
+            <>
+            <div className="min-w-0 flex-1">
               <button
                 onClick={closeForm}
                 className="inline-flex items-center gap-1 text-sm font-medium text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
@@ -305,6 +310,8 @@ export default function ListingDetailModal({
                 Back
               </button>
             </div>
+            <div ref={setTitleSlot} className="min-w-0 text-center" />
+            </>
           ) : (
             <div className="flex items-start gap-3 min-w-0">
               <CategoryIcon
@@ -370,7 +377,7 @@ export default function ListingDetailModal({
               one hidden behind a control that says "overflow." It lives
               below the dialog now, as its own object (ListingEditBar), and
               this corner is back to holding nothing but Close. */}
-          <div className="flex shrink-0 items-center gap-1">
+          <div className={`flex shrink-0 items-center justify-end gap-1 ${formOpen ? 'flex-1' : ''}`}>
             {/* Closes the WHOLE dialog regardless of formOpen — a second,
                 faster way out beyond stepping back with Escape/the Back
                 button above, not a second meaning for this one control. */}
@@ -394,7 +401,7 @@ export default function ListingDetailModal({
 
         <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
           {formOpen === 'edit' ? (
-            <ListingEditor item={item} category={category} onClose={closeForm} sendSlot={sendSlot} onRemovalOpenChange={setRemovalOpen} />
+            <ListingEditor item={item} category={category} onClose={closeForm} sendSlot={sendSlot} titleSlot={titleSlot} onRemovalOpenChange={setRemovalOpen} />
           ) : (
             <>
               <PlaceDetailBody

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { act, cleanup, screen } from '@testing-library/react'
+import { act, cleanup, screen, within } from '@testing-library/react'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { makeCategory, makeListing } from '@/test/providerFixtures'
 import { mockRouter } from '@/test/nextNavigationMock'
@@ -27,11 +27,13 @@ vi.mock('@/components/resources/ListingEditor', async () => {
       onClose,
       onRemovalOpenChange,
       sendSlot,
+      titleSlot,
     }: {
       item: { name: string }
       onClose: () => void
       onRemovalOpenChange?: (open: boolean) => void
       sendSlot?: HTMLElement | null
+      titleSlot?: HTMLElement | null
     }) => (
       <div>
         <p>ListingEditor stub — item={item.name}</p>
@@ -40,6 +42,7 @@ vi.mock('@/components/resources/ListingEditor', async () => {
             prove the HOST's title reacts to it. */}
         <button onClick={() => onRemovalOpenChange?.(true)}>stub open removal</button>
         {sendSlot && createPortal(<button>stub send</button>, sendSlot)}
+        {titleSlot && createPortal(<h2>stub title</h2>, titleSlot)}
       </div>
     ),
   }
@@ -239,6 +242,21 @@ describe('MapPlaceDetail', () => {
     })
     expect(screen.queryByRole('heading', { name: 'Suggest an edit' })).not.toBeInTheDocument()
     expect(writes.at(-1)).toBe(0)
+  })
+
+  // The row Back sits in carries the editor's title too, as the desktop
+  // dialog's header does.
+  it('puts the editor\'s title in the same row as Back', async () => {
+    const userEvent = (await import('@testing-library/user-event')).default
+    const user = userEvent.setup()
+    renderWithProviders(
+      <PinnedProvider>
+        <MapPlaceDetail item={makeListing({ name: 'Goldi Market' })} category={makeCategory()} color="#000" />
+      </PinnedProvider>,
+    )
+    await user.click(screen.getByRole('button', { name: 'Suggest an edit' }))
+    const row = screen.getByRole('button', { name: 'Back' }).parentElement!
+    expect(within(row).getByRole('heading', { name: 'stub title' })).toBeInTheDocument()
   })
 
   // Pin, Share and Set as location have no other home on the map now, and

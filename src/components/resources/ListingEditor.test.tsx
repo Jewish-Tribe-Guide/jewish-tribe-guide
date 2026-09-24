@@ -106,7 +106,7 @@ describe('ListingEditor — the listing, editable', () => {
   it('shows the listing\'s own pieces, not a form: photo, name, badges, buttons, hours', () => {
     renderEditor()
     expect(screen.getByRole('heading', { name: 'Suggest an edit' })).toBeInTheDocument()
-    expect(screen.getByText(/reviewed before it goes live/)).toBeInTheDocument()
+    expect(screen.getByText('Reviewed by a moderator before it goes live')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Change photo' })).toBeInTheDocument()
     expect(screen.getByRole('textbox', { name: 'Name' })).toHaveValue('Bar Bombón')
     for (const badge of ['Open', 'Parve', 'IKC']) expect(screen.getByRole('button', { name: badge })).toBeInTheDocument()
@@ -195,9 +195,34 @@ describe('ListingEditor — badges, edited where they sit', () => {
 
     await u.click(screen.getByRole('button', { name: 'Remove Meat' }))
     expect(send()).toHaveTextContent('No changes yet')
-    // Only additions carry one; a badge that was already there changes from
-    // its panel, so the row still reads like the listing.
-    expect(screen.queryByRole('button', { name: 'Remove Parve' })).not.toBeInTheDocument()
+  })
+
+  // A badge that was already there comes off the same way as one you added
+  // — otherwise adding one teaches "chips have an ×" and the old ones look
+  // fixed. It stays, crossed out, to be brought back.
+  it('takes an existing badge off with its ×, crossed out and one tap from coming back', async () => {
+    const u = user()
+    renderEditor()
+    await u.click(screen.getByRole('button', { name: 'Remove Parve' }))
+    expect(send()).toHaveTextContent('Send 1 change')
+    expect(screen.getByText('Parve → None')).toBeInTheDocument()
+
+    await u.click(screen.getByRole('button', { name: 'Bring back Parve' }))
+    expect(send()).toHaveTextContent('No changes yet')
+  })
+
+  // The listing only shows a caveat beside a certification it has, so
+  // taking the last one off quiets the caveat without a second change —
+  // in particular, never a "Yes, everything is kosher" nobody said.
+  it('quiets the caveat when the last certification comes off, without counting it as a change', async () => {
+    const u = user()
+    renderEditor()
+    await u.click(screen.getByRole('button', { name: 'Remove IKC' }))
+    expect(screen.queryByRole('button', { name: 'Edit: What isn’t kosher?' })).not.toBeInTheDocument()
+    expect(send()).toHaveTextContent('Send 1 change')
+
+    await u.click(screen.getByRole('button', { name: 'Bring back IKC' }))
+    expect(screen.getByRole('button', { name: 'Edit: What isn’t kosher?' })).toBeInTheDocument()
   })
 
   it('brings a removed badge back with a tap on its crossed-out chip', async () => {
@@ -288,7 +313,7 @@ describe('ListingEditor — badges, edited where they sit', () => {
   it('edits the kosher caveat from the certification badge, as one change', async () => {
     const u = user()
     renderEditor()
-    expect(screen.getByRole('button', { name: 'IKC' }).className).toContain('text-caution')
+    expect(screen.getByRole('button', { name: 'IKC' }).parentElement!.className).toContain('text-caution')
     expect(screen.getByRole('button', { name: 'Edit: What isn’t kosher?' })).toHaveTextContent('Alcoholic beverages are NOT under supervision')
 
     await u.click(screen.getByRole('button', { name: 'IKC' }))
@@ -298,7 +323,7 @@ describe('ListingEditor — badges, edited where they sit', () => {
     expect(screen.queryByRole('textbox', { name: 'What isn’t kosher?' })).not.toBeInTheDocument()
     expect(send()).toHaveTextContent('Send 1 change')
     const row = screen.getByRole('button', { name: 'Add a badge' }).parentElement!
-    expect(within(row).getByRole('button', { name: 'IKC' }).className).not.toContain('text-caution')
+    expect(within(row).getByRole('button', { name: 'IKC' }).parentElement!.className).not.toContain('text-caution')
   })
 })
 
@@ -393,7 +418,22 @@ describe('ListingEditor — sending', () => {
 
     await u.click(screen.getByRole('button', { name: /Request removal/ }))
     expect(within(slot).queryByRole('button', { name: 'No changes yet' })).not.toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Request removal of Bar Bombón' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Request removal' })).toBeInTheDocument()
+    slot.remove()
+  })
+
+  // The host's header row (Back … Close) would otherwise be an empty band;
+  // the title goes there, and isn't repeated in the content.
+  it('puts its title in the host\'s header slot when given one', async () => {
+    const u = user()
+    const slot = document.createElement('div')
+    document.body.appendChild(slot)
+    const { container } = renderEditor({ titleSlot: slot })
+    expect(within(slot).getByRole('heading', { name: 'Suggest an edit' })).toBeInTheDocument()
+    expect(within(container).queryByRole('heading', { name: 'Suggest an edit' })).not.toBeInTheDocument()
+
+    await u.click(screen.getByRole('button', { name: /Request removal/ }))
+    expect(within(slot).getByRole('heading', { name: 'Request removal' })).toBeInTheDocument()
     slot.remove()
   })
 })
