@@ -22,6 +22,16 @@ export function PencilIcon({ className }: IconProps) {
   )
 }
 
+/** A camera, for "change this photo" on the editor's avatar. */
+export function CameraIcon({ className }: IconProps) {
+  return (
+    <svg {...base} className={className}>
+      <path d="M4 8h3l2-3h6l2 3h3v11H4z" />
+      <circle cx="12" cy="13" r="3.5" />
+    </svg>
+  )
+}
+
 export function PlusIcon({ className }: IconProps) {
   return (
     <svg {...base} className={className}>

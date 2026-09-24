@@ -193,14 +193,15 @@ test.describe('mobile', () => {
     await page.goto(`/${community}/${category.id}/${item.id}`)
     await dismissLocationPrompt(page)
 
-    // Edit is its own labelled bar below the expanded listing now
-    // (ListingEditBar) — it used to be a row inside the kebab menu, and
-    // before that a quiet "Suggest a correction" link in the footer. Only
-    // the expanded listing has one, so no scoping by name is needed here
-    // the way the kebab-per-row version required.
+    // Edit is its own labelled bar below the opened listing (ListingEditBar)
+    // — it used to be a row inside the kebab menu, and before that a quiet
+    // "Suggest a correction" link in the footer. Only the opened listing has
+    // one, so no scoping by name is needed here.
     await page.getByRole('button', { name: 'Suggest an edit' }).click()
 
-    const hoursToggle = page.getByRole('button', { name: /^Hours/ })
+    // The editor reads hours the way the listing does: today's line, tapped
+    // to open the week (see ListingEditor).
+    const hoursToggle = page.getByRole('button', { name: /^(Today:|Closed today)/ })
     await expect(hoursToggle).toBeVisible()
     await hoursToggle.click()
 

@@ -23,35 +23,36 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
 }))
 
-// ListingForm is the same form the category directory's own Edit uses —
-// already covered by its own test file, and by
-// MapPlaceDetail.test.tsx's identical stubbing for the same reason (see that
-// file's own comment): rendering them for real pulls in the Google Maps
-// address widget and Turnstile, which this file has no need to exercise —
-// it only needs to prove ListingDetailModal swaps to the right one, in
-// place, without bubbling to onEdit.
-vi.mock('./ListingForm', () => ({
-  default: ({
-    mode,
-    existing,
-    onUp,
-    onRemovalOpenChange,
-  }: {
-    mode: string
-    existing?: { name: string }
-    onUp: () => void
-    onRemovalOpenChange?: (open: boolean) => void
-  }) => (
-    <div>
-      <p>ListingForm stub — mode={mode}, existing={existing?.name}</p>
-      <button onClick={onUp}>stub cancel</button>
-      {/* Stands in for ListingForm's own Request removal trigger, for the
-          one test that needs to prove the CALLER's title reacts to it —
-          see ListingForm's own test file for the real button/panel swap. */}
-      <button onClick={() => onRemovalOpenChange?.(true)}>stub open removal</button>
-    </div>
-  ),
-}))
+// ListingEditor is covered by its own test file; rendering it for real pulls
+// in the Google Maps address widget and Turnstile, which this file has no
+// need to exercise. The stub proves the host swaps to it, in place, with the
+// right listing — and, where the host passes one, that Send goes into the
+// host's floating slot.
+vi.mock('./ListingEditor', async () => {
+  const { createPortal } = await import('react-dom')
+  return {
+    default: ({
+      item,
+      onClose,
+      onRemovalOpenChange,
+      sendSlot,
+    }: {
+      item: { name: string }
+      onClose: () => void
+      onRemovalOpenChange?: (open: boolean) => void
+      sendSlot?: HTMLElement | null
+    }) => (
+      <div>
+        <p>ListingEditor stub — item={item.name}</p>
+        <button onClick={onClose}>stub cancel</button>
+        {/* Stands in for the editor's Request removal link, for tests that
+            prove the HOST's title reacts to it. */}
+        <button onClick={() => onRemovalOpenChange?.(true)}>stub open removal</button>
+        {sendSlot && createPortal(<button>stub send</button>, sendSlot)}
+      </div>
+    ),
+  }
+})
 
 afterEach(() => {
   // Pinned state lives in localStorage, and a test that throws before its own
@@ -741,23 +742,33 @@ describe('GenericListingCard — expanded', () => {
     const dialog = screen.getByRole('dialog')
     await user.click(within(dialog).getByRole('button', { name: 'Suggest an edit' }))
 
-    expect(screen.getByText('ListingForm stub — mode=edit, existing=Goldi Market')).toBeInTheDocument()
+    expect(screen.getByText('ListingEditor stub — item=Goldi Market')).toBeInTheDocument()
     // Not bubbled — this dialog handled it itself.
     expect(requiredHandlers.onEdit).not.toHaveBeenCalled()
     // Still the SAME dialog, not a second one stacked or swapped in.
     expect(screen.getAllByRole('dialog')).toHaveLength(1)
-    // Stands in for ListingForm's own heading, suppressed by `embedded` —
-    // every other Edit/Report surface (ActionDialog, MobileSheet,
-    // ReportSheet) shows this same title in its own header.
-    expect(screen.getByRole('heading', { name: 'Suggest an edit' })).toBeInTheDocument()
     expect(screen.getByRole('dialog', { name: 'Suggest an edit' })).toBeInTheDocument()
   })
 
-  // ListingForm no longer shows its own "Request removal of {name}" title
-  // (nested inside a form that already says "Suggest an edit" above it) —
-  // the dialog's OWN title becomes that instead, reported via
-  // onRemovalOpenChange, so there's one title that changes, not two.
-  it('the dialog’s own title becomes "Request removal of {name}" once ListingForm reports the removal panel is open', async () => {
+  // Send floats under the dialog, in the spot the "Suggest an edit" pill
+  // held: outside the scrolling card, so a long listing can't scroll it
+  // away, but inside the dialog, so assistive tech still reaches it.
+  it('floats the editor\'s Send under the dialog, where the edit pill was', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(
+      <GenericListingCard item={makeListing({ name: 'Goldi Market' })} category={makeCategory()} upvotes={false} count={0} defaultExpanded {...requiredHandlers} />,
+    )
+    const dialog = screen.getByRole('dialog')
+    await user.click(within(dialog).getByRole('button', { name: 'Suggest an edit' }))
+
+    const sendButton = within(dialog).getByRole('button', { name: 'stub send' })
+    const card = screen.getByText('ListingEditor stub — item=Goldi Market').closest('.dialog-in')!
+    expect(card).not.toContainElement(sendButton)
+  })
+
+  // The dialog's accessible name follows the editor into its removal
+  // panel, reported via onRemovalOpenChange.
+  it('the dialog’s own name becomes "Request removal of {name}" once the editor reports the removal panel is open', async () => {
     const user = userEvent.setup()
     const category = makeCategory()
     const item = makeListing({ name: 'Goldi Market' })
@@ -771,7 +782,6 @@ describe('GenericListingCard — expanded', () => {
     await user.click(screen.getByRole('button', { name: 'stub open removal' }))
 
     expect(screen.getByRole('dialog', { name: 'Request removal of Goldi Market' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Request removal of Goldi Market' })).toBeInTheDocument()
     expect(screen.queryByRole('dialog', { name: 'Suggest an edit' })).not.toBeInTheDocument()
   })
 
@@ -791,7 +801,7 @@ describe('GenericListingCard — expanded', () => {
     )
 
     await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Suggest an edit' }))
-    expect(screen.getByText('ListingForm stub — mode=edit, existing=Goldi Market')).toBeInTheDocument()
+    expect(screen.getByText('ListingEditor stub — item=Goldi Market')).toBeInTheDocument()
     expect(screen.getByRole('dialog', { name: 'Suggest an edit' })).toBeInTheDocument()
   })
 
@@ -808,8 +818,7 @@ describe('GenericListingCard — expanded', () => {
     const sheet = screen.getByRole('dialog', { name: 'Goldi Market' })
     await user.click(within(sheet).getByRole('button', { name: 'Suggest an edit' }))
 
-    expect(within(sheet).getByText('ListingForm stub — mode=edit, existing=Goldi Market')).toBeInTheDocument()
-    expect(within(sheet).getByRole('heading', { name: 'Suggest an edit' })).toBeInTheDocument()
+    expect(within(sheet).getByText('ListingEditor stub — item=Goldi Market')).toBeInTheDocument()
     expect(screen.getAllByRole('dialog')).toHaveLength(1)
   })
 

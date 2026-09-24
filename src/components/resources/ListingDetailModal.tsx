@@ -11,7 +11,7 @@ import CategoryIcon from '@/components/CategoryIcon'
 import PlaceDetailBody from './PlaceDetailBody'
 import FreshnessFooter from './FreshnessFooter'
 import ListingEditBar from './ListingEditBar'
-import ListingForm from './ListingForm'
+import ListingEditor from './ListingEditor'
 import { ChevronLeftIcon, ChevronRightIcon } from '@/components/icons'
 import { useBodyScrollLock } from '@/lib/useBodyScrollLock'
 
@@ -67,9 +67,9 @@ type Props = {
  *  Follows DaveningTimesModal's own conventions: backdrop click and Escape
  *  both close it, body scroll locks while open.
  *
- *  Edit swaps THIS dialog's own content to the form (ListingForm; a removal
- *  request is the last part of that form, see RemovalRequest), the same
- *  in-place pattern MapPlaceDetail already uses —
+ *  Edit swaps THIS dialog's own content to the listing-shaped editor
+ *  (ListingEditor; a removal request is at its foot, see RemovalRequest),
+ *  the same in-place pattern MapPlaceDetail already uses —
  *  not a hand-off to a separate ActionDialog. That used to close this
  *  dialog and open a differently-sized one in its place (448px → 576px,
  *  no shared backdrop), which read as a completely different popup
@@ -126,12 +126,13 @@ export default function ListingDetailModal({
   }
   const closeForm = () => history.back()
 
-  // Whether ListingForm has swapped its own fields out for the Request
-  // removal panel — reported up via its onRemovalOpenChange so this
-  // component's own header can become "Request removal of {name}" instead
-  // of a static "Suggest an edit", rather than showing a second, smaller
-  // title inside the form for the same thing.
+  // Whether the editor has swapped to its Request removal panel — reported
+  // up via onRemovalOpenChange so the dialog's accessible name can become
+  // "Request removal of {name}" instead of "Suggest an edit".
   const [removalOpen, setRemovalOpen] = useState(false)
+  // Where ListingEditor portals its Send button — the floating slot below
+  // the dialog. State, not a ref, so the editor re-renders once it exists.
+  const [sendSlot, setSendSlot] = useState<HTMLElement | null>(null)
 
   // Resets the next time this dialog opens (a fresh listing, or the same
   // one reopened later) — adjusted during render, the React-docs-
@@ -248,7 +249,7 @@ export default function ListingDetailModal({
           The width classes (and their transition) live here rather than on
           the dialog so the bar grows with it when the form opens. */}
       <div
-        className={`relative flex w-full transition-[max-width] duration-200 ease-in-out ${formOpen ? 'max-w-xl' : 'max-w-md'}`}
+        className="relative flex w-full max-w-md"
         // The dialog ROLE lives on this wrapper, not on the white card
         // inside it, so that the edit bar hanging below is inside the
         // dialog's own boundary. aria-modal="true" tells assistive tech to
@@ -272,19 +273,14 @@ export default function ListingDetailModal({
         // against the busiest real case (4 action buttons + a cert badge)
         // to confirm nothing wraps awkwardly at this width.
         //
-        // Widens to max-w-xl (576px, matching ActionDialog's own width)
-        // while formOpen — a real form (address/hours/photo fields) needs
-        // more room than the detail view — animated via transition-[max-width]
-        // so it reads as this SAME dialog growing, not a different one
-        // replacing it. That's the entire point of keeping this one element
-        // mounted instead of swapping to ActionDialog: a resize is still
-        // continuous, a close-then-reopen never is.
-        // max-h shrinks by the bar's own height (44px pill + 12px gap +
-        // breathing room) whenever the bar is showing, so a long listing
-        // can't grow to the full 85vh and push the bar off the bottom of
-        // the window. Nothing hangs below while formOpen, so the form gets
-        // the full height back.
-        className={`dialog-in flex w-full flex-col ${showEditBar ? 'max-h-[calc(85vh-4.5rem)]' : 'max-h-[85vh]'} bg-white border border-slate-200 rounded-xl shadow-xl`}
+        // The same width while editing: the editor is the listing itself,
+        // made editable (ListingEditor), so nothing about the dialog should
+        // move when you start — it used to widen to 576px for a form.
+        // max-h leaves room for what hangs below the dialog in both modes:
+        // the edit bar while reading, the Send button while editing (44px
+        // pill + 12px gap + breathing room), so a long listing can't push
+        // either off the bottom of the window.
+        className="dialog-in flex w-full flex-col max-h-[calc(85vh-4.5rem)] bg-white border border-slate-200 rounded-xl shadow-xl"
       >
         {/* Badges live inside this same block, under the subtitle — not as
             their own section below a divider. They're facts about this
@@ -295,21 +291,11 @@ export default function ListingDetailModal({
             now marks the real boundary: identity above it, actions below. */}
         <div className="flex items-start justify-between gap-3 px-6 py-5 border-b border-slate-200 shrink-0">
           {formOpen ? (
-            // Replaces the name/icon block while editing — same "Back"
-            // wording and chevron MapPlaceDetail's own formOpen uses (see
-            // that component's doc): this returns to the detail view you
-            // were just on, not up to some other screen, so it doesn't
-            // name a destination the way "Back to list" elsewhere does.
-            // The title below stands in for ListingForm's own heading
-            // (suppressed by `embedded`) — every other edit surface
-            // (ActionDialog, MobileSheet) shows this same
-            // title in its own header; this and MapPlaceDetail's identical
-            // morph-in-place were the two gaps, confirmed live to read as
-            // unfinished next to the other four once compared side by side.
-            // Becomes "Request removal of {name}" once ListingForm reports
-            // (via onRemovalOpenChange) that it's swapped to that panel —
-            // one title that changes, not a second smaller one nested
-            // inside the form repeating the same fact.
+            // Replaces the name/icon block while editing — the editor
+            // brings its own editable name and photo, and its own
+            // "Suggesting an edit" line. "Back" alone, as MapPlaceDetail's:
+            // this returns to the listing you were just on, not to another
+            // screen, so it doesn't name a destination.
             <div className="min-w-0">
               <button
                 onClick={closeForm}
@@ -318,9 +304,6 @@ export default function ListingDetailModal({
                 <ChevronLeftIcon className="h-4 w-4" />
                 Back
               </button>
-              <h2 className="mt-1 font-semibold text-slate-900 text-lg">
-                {removalOpen ? `Request removal of ${name}` : 'Suggest an edit'}
-              </h2>
             </div>
           ) : (
             <div className="flex items-start gap-3 min-w-0">
@@ -411,7 +394,7 @@ export default function ListingDetailModal({
 
         <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
           {formOpen === 'edit' ? (
-            <ListingForm category={category} mode="edit" existing={item} onUp={closeForm} onSubmitted={closeForm} onRemovalOpenChange={setRemovalOpen} embedded />
+            <ListingEditor item={item} category={category} onClose={closeForm} sendSlot={sendSlot} onRemovalOpenChange={setRemovalOpen} />
           ) : (
             <>
               <PlaceDetailBody
@@ -447,6 +430,11 @@ export default function ListingDetailModal({
           )}
         </div>
       </div>
+      {/* While editing, the same spot holds the editor's Send button (see
+          ListingEditor's sendSlot): the pill you clicked to start editing
+          becomes the one you finish with. Same pointer-events rule as the
+          bar's strip below. */}
+      {formOpen && <div ref={setSendSlot} className="pointer-events-none absolute inset-x-0 top-full mt-3 flex [&>*]:pointer-events-auto" />}
       {showEditBar && (
         // pointer-events-none on the strip, auto on the button: the strip
         // spans the dialog's full width, and a click on the empty part of it

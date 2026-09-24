@@ -704,7 +704,11 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
   )
 }
 
-function DetailFieldInput({
+/** One detail field's input, by type. Exported for ListingEditor, which
+ *  edits most fields in their listing-shaped place but uses this for the
+ *  ones whose editor is the same either way (yes/no switches, the kosher
+ *  caveat's question and note, and any field type it has no layout for). */
+export function DetailFieldInput({
   field,
   labelOverride,
   value,

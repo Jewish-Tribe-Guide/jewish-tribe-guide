@@ -6,7 +6,6 @@ import { makeCategory, makeListing } from '@/test/providerFixtures'
 import { mockRouter } from '@/test/nextNavigationMock'
 import { PinnedProvider } from '@/lib/pinnedContext'
 import { CATEGORY_CAPABILITY_DEFAULTS } from '@/lib/categories'
-import type { DirectoryResource } from '@/types'
 import MapPlaceDetail from './MapPlaceDetail'
 
 vi.mock('next/navigation', () => ({
@@ -15,34 +14,36 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
 }))
 
-// ListingForm/ReportListing are the same forms the category directory's own
-// Edit/Report use (see GenericListingCard) — already covered by their own
-// test files. Stubbed here to just prove MapPlaceDetail swaps to the right
-// one with the right listing, not to re-exercise their internals (which
-// pull in the real Google Maps address widget, Turnstile, etc.).
-vi.mock('@/components/resources/ListingForm', () => ({
-  default: ({
-    mode,
-    existing,
-    onUp,
-    embedded,
-    onRemovalOpenChange,
-  }: {
-    mode: string
-    existing?: DirectoryResource
-    onUp: () => void
-    embedded?: boolean
-    onRemovalOpenChange?: (open: boolean) => void
-  }) => (
-    <div>
-      <p>ListingForm stub — mode={mode}, existing={existing?.name}{embedded ? ' (embedded)' : ''}</p>
-      <button onClick={onUp}>stub cancel</button>
-      {/* Stands in for ListingForm's own Request removal trigger — see the
-          dedicated test below and ListingForm's own file for the real one. */}
-      <button onClick={() => onRemovalOpenChange?.(true)}>stub open removal</button>
-    </div>
-  ),
-}))
+// ListingEditor is covered by its own test file; rendering it for real pulls
+// in the Google Maps address widget and Turnstile, which this file has no
+// need to exercise. The stub proves the host swaps to it, in place, with the
+// right listing — and, where the host passes one, that Send goes into the
+// host's floating slot.
+vi.mock('@/components/resources/ListingEditor', async () => {
+  const { createPortal } = await import('react-dom')
+  return {
+    default: ({
+      item,
+      onClose,
+      onRemovalOpenChange,
+      sendSlot,
+    }: {
+      item: { name: string }
+      onClose: () => void
+      onRemovalOpenChange?: (open: boolean) => void
+      sendSlot?: HTMLElement | null
+    }) => (
+      <div>
+        <p>ListingEditor stub — item={item.name}</p>
+        <button onClick={onClose}>stub cancel</button>
+        {/* Stands in for the editor's Request removal link, for tests that
+            prove the HOST's title reacts to it. */}
+        <button onClick={() => onRemovalOpenChange?.(true)}>stub open removal</button>
+        {sendSlot && createPortal(<button>stub send</button>, sendSlot)}
+      </div>
+    ),
+  }
+})
 afterEach(() => {
   cleanup()
   // The push/pop history tests leave real entries behind (jsdom's History
@@ -122,7 +123,7 @@ describe('MapPlaceDetail', () => {
     )
 
     await user.click(screen.getByRole('button', { name: 'Suggest an edit' }))
-    expect(screen.getByText(/ListingForm stub/)).toBeInTheDocument()
+    expect(screen.getByText(/ListingEditor stub/)).toBeInTheDocument()
 
     // Simulates what a real swipe-back/browser-back delivers: a popstate
     // whose state no longer carries mapSheetForm, because history.back()
@@ -131,7 +132,7 @@ describe('MapPlaceDetail', () => {
       window.dispatchEvent(new PopStateEvent('popstate', { state: {} }))
     })
 
-    expect(screen.queryByText(/ListingForm stub/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/ListingEditor stub/)).not.toBeInTheDocument()
     expect(screen.getByText('Is this info current?')).toBeInTheDocument()
   })
 
@@ -155,7 +156,7 @@ describe('MapPlaceDetail', () => {
     // Mocked no-op above, so no popstate actually fired — the form staying
     // put confirms the component didn't ALSO reset its own state directly,
     // only delegated to the browser.
-    expect(screen.getByText(/ListingForm stub/)).toBeInTheDocument()
+    expect(screen.getByText(/ListingEditor stub/)).toBeInTheDocument()
   })
 
   // ── The edit bar ───────────────────────────────────────────────────────
