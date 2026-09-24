@@ -1,30 +1,24 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { fieldIsVisible, isCategorySyncEligible, resolveCapabilities, selectValues, type CategoryConfig, type CategoryField } from '@/lib/categories'
+import { fieldIsVisible, resolveCapabilities, selectValues, type CategoryConfig, type CategoryField } from '@/lib/categories'
 import { formatPhone, normalizeUrl } from '@/lib/validation'
 import { hasListingChanged } from '@/lib/listingDiff'
-import type { DirectoryResource, ResourceSubmission } from '@/types'
+import type { DirectoryResource } from '@/types'
 import TagsInput from './TagsInput'
 import ImageUploadField from '@/components/ImageUploadField'
-import AddressInput, { type PlaceSelectResult } from '@/components/intake/AddressInput'
+import AddressInput from '@/components/intake/AddressInput'
 import HoursInput from '@/components/intake/HoursInput'
 import MinyanimInput from '@/components/intake/MinyanimInput'
 import UpButton from '@/components/UpButton'
 import Honeypot from '@/components/Honeypot'
-import TurnstileWidget, { type TurnstileHandle } from '@/components/TurnstileWidget'
+import TurnstileWidget from '@/components/TurnstileWidget'
 import PrivacyNote from '@/components/PrivacyNote'
 import RemovalRequest from './RemovalRequest'
 import { ui } from '@/lib/uiConfig'
-import { useCommunitySlug } from '@/lib/communityContext'
-import { withCommunity } from '@/lib/useCommunityData'
 import { useSetScreenHeader } from '@/lib/headerVisibility'
-
-// Whether the Turnstile challenge is actually active for this deploy — mirrors
-// TurnstileWidget's own check. When it's not configured, the widget renders
-// nothing and never calls back with a token, so submission can't be gated on
-// having one.
-const TURNSTILE_ACTIVE = !!process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY
+import { useListingDraft } from './useListingDraft'
+import { TURNSTILE_ACTIVE, useListingSubmit } from './useListingSubmit'
 
 type Props = {
   /** The category this listing belongs to (fixed by where the form was opened). */
@@ -153,69 +147,27 @@ function groupNonCoreFields(fields: CategoryField[], config: CategoryConfig): Fi
 }
 
 export default function ListingForm({ category, mode, existing, onUp, onSubmitted, onPreviewSubmit, sharedTurnstile, adminSubmit, embedded, onRemovalOpenChange }: Props) {
-  const community = useCommunitySlug()
   const config = category
-  const hasAddress = category.hasAddress !== false
-  const hasPhone = category.hasPhone !== false
-  const syncEligible = isCategorySyncEligible(category)
-
-  const [name, setName] = useState(existing?.name ?? '')
-  const [address, setAddress] = useState(existing?.address ?? '')
-  const [phone, setPhone] = useState(existing?.phone ?? '')
-  const [placeId, setPlaceId] = useState<string | null>(
-    typeof existing?.placeId === 'string' ? existing.placeId : null,
-  )
-  const [businessStatus, setBusinessStatus] = useState<PlaceSelectResult['businessStatus']>(
-    typeof existing?.businessStatus === 'string'
-      ? (existing.businessStatus as PlaceSelectResult['businessStatus'])
-      : null,
-  )
-  // What picking an address autofilled into the syncable fields, this session
-  // — sent along in the submission (see the payload below) so the server can
-  // tell "matches what Google gave us" from "the submitter typed something
-  // different" without an extra Google API call for the common case where
-  // autofill did run. Populated by handlePlaceSelect; a ref because nothing
-  // renders from it.
-  const autofilled = useRef<{ name?: string; phone?: string; hours?: string; website?: string; description?: string }>({})
-  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(
-    (existing?.geo as { lat: number; lng: number } | undefined) ?? null,
-  )
-  const [details, setDetails] = useState<Record<string, unknown>>(() => {
-    const init: Record<string, unknown> = {}
-    for (const field of config?.detailFields ?? []) {
-      if (existing && field.key in existing) init[field.key] = existing[field.key]
-      // Load companion "sometimes" array for tag fields.
-      if (field.type === 'tags' && existing) {
-        const sk = field.key + '_sometimes'
-        if (sk in existing) init[sk] = existing[sk]
-      }
-    }
-    return init
-  })
-  const [submitterEmail, setSubmitterEmail] = useState('')
-  // Honeypot — stays empty for humans; bots that auto-fill it get dropped server-side.
-  const [honeypot, setHoneypot] = useState('')
-  const [ownTurnstileToken, setOwnTurnstileToken] = useState('')
-  const ownTurnstileRef = useRef<TurnstileHandle>(null)
-  const turnstileToken = sharedTurnstile ? sharedTurnstile.token : ownTurnstileToken
-  const resetTurnstile = () => {
-    if (sharedTurnstile) sharedTurnstile.reset()
-    else {
-      ownTurnstileRef.current?.reset()
-      setOwnTurnstileToken('')
-    }
-  }
-
-  // Whether we've already refreshed the challenge once for this form. A second
-  // failure means retrying is not the answer, so stop telling the visitor it is
-  // — see handleSubmit.
-  const [retriedVerification, setRetriedVerification] = useState(false)
-  const [submitting, setSubmitting] = useState(false)
-  const [errors, setErrors] = useState<string[]>([])
-  const [done, setDone] = useState(false)
-  // What was submitted, for the confirmation copy: an edit and a removal
-  // request get different thank-yous.
-  const [doneKind, setDoneKind] = useState<'submission' | 'removal'>('submission')
+  const draft = useListingDraft(category, existing)
+  const { hasAddress, hasPhone, syncEligible, name, setName, address, setAddress, phone, setPhone, coords, setCoords, details, setDetail, handlePlaceSelect } = draft
+  const {
+    submitterEmail,
+    setSubmitterEmail,
+    honeypot,
+    setHoneypot,
+    turnstileToken,
+    ownTurnstileRef,
+    setOwnTurnstileToken,
+    resetTurnstile,
+    verifying,
+    submitting,
+    errors,
+    setErrors,
+    done,
+    doneKind,
+    markRemovalDone,
+    submit,
+  } = useListingSubmit({ mode, existing, sharedTurnstile, adminSubmit, onAdminSubmitted: onSubmitted })
 
   // Whether Request removal has swapped out the edit fields for its own
   // panel — see the removalOpen block near the bottom of this component's
@@ -252,10 +204,6 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
     setCollapsedSections((prev) => ({ ...prev, [key]: currentlyOpen }))
   }
 
-  function setDetail(key: string, value: unknown) {
-    setDetails((prev) => ({ ...prev, [key]: value }))
-  }
-
   // Whether any field in a group already has a real value — decides that
   // group's default open/closed state (see groupIsOpen). Deliberately loose:
   // this only ever needs to distinguish "something's here" from "nothing
@@ -268,73 +216,10 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
     return true
   }
 
-  function handlePlaceSelect(result: PlaceSelectResult) {
-    if (syncEligible) setPlaceId(result.placeId)
-    // Carried through so the listing is never published with no status at all.
-    // The sync overwrites this on its first run either way — this just covers
-    // the window between someone submitting and a moderator approving, during
-    // which the queue can show that Google already reports the place closed.
-    if (syncEligible) setBusinessStatus(result.businessStatus)
-    // Always overwrite — if you switch from "Trader Joe's" to "Giant", all
-    // auto-filled fields should update to match the new selection.
-    if (result.name) setName(result.name)
-    if (result.phone) setPhone(formatPhone(result.phone))
-    if (result.hours) {
-      const hoursField = config.detailFields.find((f) => f.type === 'hours')
-      if (hoursField) setDetail(hoursField.key, result.hours)
-    }
-    // Matched by label, not key — existing categories' Website fields
-    // predate a fixed key convention (e.g. keyed "w" or "whatsapp"), so
-    // matching on the label people actually see is the reliable signal.
-    const websiteField = config.detailFields.find(
-      (f) => f.type === 'url' && f.label.trim().toLowerCase() === 'website',
-    )
-    if (result.website && websiteField) setDetail(websiteField.key, result.website)
-
-    // Remember exactly what autofill put in the syncable fields. Whether these
-    // values survive to submit is what tells the recurring Google sync which
-    // fields it owns — see googleFieldsForSubmit below. website is only
-    // recorded when the category actually has a Website field to compare
-    // against (websiteKey there mirrors this same lookup).
-    // Matched by key (the fixed `googleDescription` convention — see
-    // src/lib/categories.ts's showInHeader doc), not label, since a category
-    // names this field's display label whatever it wants ("Description",
-    // "About", …). Unlike name/phone/hours above, only FILLS a gap rather
-    // than always overwriting: re-picking the address on an edit shouldn't
-    // risk clobbering hand-written text. Ownership (below) is still recorded
-    // against what Google actually returned regardless — a description
-    // that's already present and therefore left alone is exactly the case
-    // that should compare as "differs from Google" once submitted.
-    const descriptionField = config.detailFields.find((f) => f.key === 'googleDescription')
-    if (result.description && descriptionField && !details[descriptionField.key]) {
-      setDetail(descriptionField.key, result.description)
-    }
-
-    autofilled.current = {
-      name: result.name ?? undefined,
-      phone: result.phone ? formatPhone(result.phone) : undefined,
-      hours: result.hours ? JSON.stringify(result.hours) : undefined,
-      website: result.website && websiteField ? result.website : undefined,
-      description: result.description && descriptionField ? result.description : undefined,
-    }
-  }
-
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setErrors([])
-
-    // Only submit values for fields that are actually shown (respects showIf and
-    // community categories that hide hospital/address/distance/phone).
-    const visibleDetails: Record<string, unknown> = {}
-    for (const field of config.detailFields) {
-      if (fieldIsVisible(field, details)) {
-        visibleDetails[field.key] = details[field.key]
-        // Carry the companion "sometimes" array for tag fields.
-        if (field.type === 'tags') {
-          visibleDetails[field.key + '_sometimes'] = details[field.key + '_sometimes'] ?? []
-        }
-      }
-    }
+    const visibleDetails = draft.visibleDetails()
 
     // Nothing to review if the edit doesn't actually propose any change —
     // whether nothing was touched at all, or a field was edited and then
@@ -370,106 +255,7 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
       return
     }
 
-    const payload: ResourceSubmission = {
-      category: category.id,
-      name,
-      // Listings aren't hospital-scoped; distance is computed from the geocoded
-      // address. `anchorId` is just a grouping key ('community' for categories
-      // with no address at all; 'all' otherwise).
-      anchorId: hasAddress ? 'all' : 'community',
-      distance: null,
-      address: hasAddress ? address : '',
-      phone: hasPhone ? phone : '',
-      details: {
-        ...visibleDetails,
-        // Carry the Google place id through so the sync job can pick it up as
-        // soon as the listing is approved. Only set for sync-eligible categories.
-        ...(syncEligible && placeId ? { placeId } : {}),
-        ...(syncEligible && businessStatus ? { businessStatus } : {}),
-        // What autofill put in each syncable field this session, if picking an
-        // address triggered it — free evidence of "this is what Google had"
-        // for whichever fields it covers. The server (submissionStore.ts's
-        // resolveGoogleFields, on approval) compares the submitted value
-        // against this to decide Google-ownership without an API call for the
-        // common case; it only spends a live Google lookup for a
-        // new/changed field that was never autofilled at all.
-        ...(syncEligible ? { googleAutofill: autofilled.current } : {}),
-      },
-      geo: hasAddress ? coords : null,
-    }
-    const submittedBy = submitterEmail.trim() ? { email: submitterEmail.trim() } : undefined
-
-    setSubmitting(true)
-    try {
-      const res = adminSubmit
-        ? await fetch(withCommunity('/api/admin/listings', community), {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminSubmit.token}` },
-            body: JSON.stringify({ payload }),
-          })
-        : await fetch(withCommunity('/api/submissions', community), {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              operation: mode === 'edit' ? 'update' : 'create',
-              targetType: 'listing',
-              targetId: mode === 'edit' ? existing?.id : undefined,
-              payload,
-              submittedBy,
-              company: honeypot,
-              turnstileToken,
-            }),
-          })
-      const body = await res.json()
-      if (!res.ok || !body.ok) {
-        // Turnstile tokens are single-use and expire after ~5 min — on a form
-        // with this many fields (especially editing, reviewing everything
-        // already filled in) it's easy to take longer than that before
-        // hitting Submit. The server's own message says to refresh the page,
-        // which would lose everything just filled in — so re-run the challenge
-        // for a fresh token instead and let a second tap on Submit work.
-        //
-        // Gated on `code`, not on the 403 alone. This route answers 403 for
-        // several unrelated refusals — a contribution type disabled site-wide,
-        // a category with edits turned off — and treating those as an expired
-        // challenge produced an endless "we've refreshed it, tap Submit again"
-        // that no amount of tapping could clear, while hiding the real reason
-        // the server gave. Not reachable in admin mode — there's no Turnstile
-        // challenge to expire — but the check is harmless either way since
-        // /api/admin/listings never returns this code.
-        if (body.code === 'turnstile') {
-          // And only offer the retry once. If a fresh token fails too, the
-          // problem isn't staleness, and repeating the same hopeful message is
-          // exactly the loop this is meant to end.
-          if (retriedVerification) {
-            setErrors([
-              'Verification keeps failing. Please reload the page and try again — your details will need re-entering, sorry.',
-            ])
-            return
-          }
-          resetTurnstile()
-          setRetriedVerification(true)
-          setErrors(['Verification expired. We’ve refreshed it — please tap Submit again.'])
-          return
-        }
-        // Any other outcome clears the flag: it means "the attempt just before
-        // this one ended in a challenge refresh", so a genuine expiry twenty
-        // minutes and several edits later still gets its own free retry.
-        setRetriedVerification(false)
-        setErrors(body.errors ?? ['Something went wrong. Please try again.'])
-        return
-      }
-      setRetriedVerification(false)
-      // Admin mode: the listing is already live — nothing to review, so skip
-      // the "Thank you!" pending screen and just close back out.
-      if (adminSubmit) onSubmitted()
-      else setDone(true)
-    } catch {
-      setRetriedVerification(false)
-      setErrors(['Network error. Please check your connection and try again.'])
-    } finally {
-      setSubmitting(false)
-    }
+    await submit(draft.buildSubmission())
   }
 
   const heading =
@@ -852,14 +638,14 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
         <div className={removalOpen ? 'hidden' : 'flex flex-col gap-3'}>
           <button
             type="submit"
-            disabled={submitting || (!adminSubmit && TURNSTILE_ACTIVE && !turnstileToken)}
+            disabled={submitting || verifying}
             className="w-full bg-primary text-white font-medium px-5 py-2.5 rounded-md hover:bg-primary/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
           >
             {submitting
               ? 'Submitting…'
               : adminSubmit
                 ? 'Add listing'
-                : TURNSTILE_ACTIVE && !turnstileToken
+                : verifying
                   ? 'Verifying…'
                   : mode === 'edit'
                     ? 'Submit edit for review'
@@ -909,10 +695,7 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
               submitterEmail={submitterEmail}
               onSubmitterEmailChange={setSubmitterEmail}
               onCancel={() => setRemovalOpen(false)}
-              onDone={() => {
-                setDoneKind('removal')
-                setDone(true)
-              }}
+              onDone={markRemovalDone}
             />
           </div>
         )}

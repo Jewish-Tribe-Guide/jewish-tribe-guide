@@ -461,6 +461,26 @@ describe('ListingForm', () => {
     expect(body.targetId).toBe('listing-42')
   })
 
+  // A tags field keeps a second, "sometimes in stock" list beside its main
+  // one (key + "_sometimes"). It has no field definition of its own, so it
+  // only reaches the submission because the tags field carries it along —
+  // drop that and an edit to anything else silently wipes every "~" tag.
+  it('carries a tags field\'s "sometimes" list into the submission, untouched', async () => {
+    const user = userEvent.setup()
+    const fetchMock = stubFetchOk({ ok: true })
+    const category = makeCategory({ detailFields: [{ key: 'items', label: 'Kosher items', type: 'tags' }] })
+    const existing = makeListing({ id: 'listing-42', name: 'Old Name', items: ['Challah'], items_sometimes: ['Steak'] })
+    renderWithProviders(<ListingForm category={category} mode="edit" existing={existing} {...handlers} />)
+
+    await user.type(screen.getByDisplayValue('Old Name'), ' & Deli')
+    await user.click(screen.getByRole('button', { name: 'Submit edit for review' }))
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
+    const { details } = JSON.parse(fetchMock.mock.calls[0][1].body).payload
+    expect(details.items).toEqual(['Challah'])
+    expect(details.items_sometimes).toEqual(['Steak'])
+  })
+
   it('refuses to submit an edit where nothing about the listing actually changed', async () => {
     const user = userEvent.setup()
     const fetchMock = stubFetchOk({ ok: true })
