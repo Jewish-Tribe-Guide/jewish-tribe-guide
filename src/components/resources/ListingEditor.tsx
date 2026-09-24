@@ -472,7 +472,9 @@ export default function ListingEditor({ item, category, onClose, sendSlot, share
         return (
           <span
             key={`${f.key}:${v}`}
-            className={`inline-flex items-center rounded-full border border-primary bg-blue-50 text-xs font-medium text-primary ${panelOpen ? 'outline-solid outline-2 outline-offset-1 outline-primary' : ''}`}
+            // The blue edge says "new"; the fill is what the listing will
+            // show — amber when the caveat applies, like the badges beside it.
+            className={`inline-flex items-center rounded-full border border-primary text-xs font-medium ${amber ? 'bg-caution/10 text-caution' : 'bg-blue-50 text-primary'} ${panelOpen ? 'outline-solid outline-2 outline-offset-1 outline-primary' : ''}`}
           >
             <button type="button" onClick={() => togglePanel(`badge:${f.key}`)} aria-expanded={panelOpen} className="cursor-pointer py-0.5 pl-2 pr-1">
               {label}

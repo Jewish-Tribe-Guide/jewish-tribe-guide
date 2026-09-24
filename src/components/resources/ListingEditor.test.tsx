@@ -229,6 +229,18 @@ describe('ListingEditor — badges, edited where they sit', () => {
     expect(screen.getByText('IKC → IKC, Badatz')).toBeInTheDocument()
   })
 
+  // Still marked new (the blue edge), but in the colour the listing will
+  // show it: a certification added under the caveat is amber like the rest.
+  it('colours an added certification amber when the caveat applies, keeping its "new" edge', async () => {
+    const u = user()
+    renderEditor()
+    await u.click(screen.getByRole('button', { name: 'Add a badge' }))
+    await u.click(screen.getByRole('button', { name: '+ OU' }))
+    const chip = screen.getByRole('button', { name: 'Remove OU' }).parentElement!
+    expect(chip.className).toContain('border-primary')
+    expect(chip.className).toContain('text-caution')
+  })
+
   it('offers no "Other…" on a field that doesn\'t allow it', async () => {
     const u = user()
     renderEditor()
