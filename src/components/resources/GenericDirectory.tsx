@@ -26,6 +26,7 @@ import { useCategories } from '@/lib/useCategories'
 import { didArriveViaBackForward } from '@/lib/backForwardNavigation'
 import { getCategoryColor } from '@/lib/categoryColor'
 import { CategoryGlyph } from '@/lib/categoryIcons'
+import { SwipeRowGroup } from '@/components/SwipeRow'
 
 type Props = {
   category: CategoryConfig
@@ -1527,6 +1528,9 @@ export default function GenericDirectory({ category, items, anchorLabel, address
         // doing the work here — it only matters on a viewport wide enough
         // that even a properly-counted track's 1fr share would exceed a
         // normal card's width.
+        // SwipeRowGroup: only one card's swipe actions stay revealed at a
+        // time, the same rule the map's nearby list follows.
+        <SwipeRowGroup>
         <div className="space-y-2 sm:space-y-0 sm:grid sm:gap-3 sm:grid-cols-[repeat(auto-fill,minmax(280px,1fr))]">
           {filtered.map((item, index) => (
             // sm:max-w-md (matches the grid's own breakpoint above), no
@@ -1598,6 +1602,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
             </div>
           ))}
         </div>
+        </SwipeRowGroup>
       )}
       </CategoryBandFrame>
 

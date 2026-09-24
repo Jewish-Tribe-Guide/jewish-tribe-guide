@@ -51,14 +51,17 @@ function renderRow(point = makePoint()) {
       <NearbyList points={[point]} userLocation={null} onViewListing={vi.fn()} />
     </PinnedProvider>,
   )
-  const pinButton = screen.getByRole('button', { name: /Pin Test Grocery/ })
-  // The row's outer wrapper — the ancestor common to both the content row
-  // and the revealed Pin/Share strip, and (per the fix under test) where the
-  // wheel listener actually lives now.
-  const wrapper = pinButton.closest('div.relative.overflow-hidden') as HTMLElement
-  const content = wrapper.lastElementChild as HTMLElement
-  return { pinButton, wrapper, content }
+  // The row's sliding content, found through the row's own name: the
+  // Pin/Share strip is only mounted while a row is swiped open (see
+  // SwipeRow), so there's no Pin button to find it by at rest.
+  const content = screen.getByText('Test Grocery').closest('div.px-4') as HTMLElement
+  // The wrapper spans the content and the revealed strip both, and is where
+  // the wheel listener lives — see the closing-swipe test below.
+  const wrapper = content.parentElement as HTMLElement
+  return { wrapper, content }
 }
+
+const pinButton = () => screen.getByRole('button', { name: /Pin Test Grocery/ })
 
 // A trackpad swipe has no discrete "end" the way a touch release does — the
 // row treats a 150ms gap since the last wheel tick as the gesture finishing
@@ -70,12 +73,14 @@ async function settle() {
 describe('NearbyList row swipe (desktop trackpad)', () => {
   it('opens on a leftward swipe, revealing the Pin/Share strip', async () => {
     const { content } = renderRow()
-    expect(content.style.transform).toBe('translateX(0px)')
+    expect(content.style.transform).toBe('')
+    expect(screen.queryByRole('button', { name: /Pin Test Grocery/ })).not.toBeInTheDocument()
 
     fireEvent.wheel(content, { deltaX: 100, deltaY: 0 })
     await settle()
 
-    expect(content.style.transform).toBe('translateX(-168px)')
+    expect(content.style.transform).toBe('translateX(-104px)')
+    expect(pinButton()).toBeInTheDocument()
   })
 
   // The bug this guards: the wheel listener used to live on the content row
@@ -86,30 +91,30 @@ describe('NearbyList row swipe (desktop trackpad)', () => {
   // spans the revealed strip too, regardless of the content's own transform)
   // is what makes this pass.
   it('closes on a rightward swipe even when it starts over the revealed Pin button', async () => {
-    const { pinButton, content } = renderRow()
+    const { content } = renderRow()
 
     fireEvent.wheel(content, { deltaX: 100, deltaY: 0 })
     await settle()
-    expect(content.style.transform).toBe('translateX(-168px)')
+    expect(content.style.transform).toBe('translateX(-104px)')
 
-    fireEvent.wheel(pinButton, { deltaX: -100, deltaY: 0 })
+    fireEvent.wheel(pinButton(), { deltaX: -100, deltaY: 0 })
     await settle()
 
-    expect(content.style.transform).toBe('translateX(0px)')
+    expect(content.style.transform).toBe('')
   })
 
   // Regression guard for the "requires too big a swipe" complaint: a swipe
-  // well short of half the reveal width (60 of 168px, vs. the old 50%/84px
-  // line) should still commit the row open, matching iMessage/Mail's own
-  // lower reveal threshold. Fails against the old REVEAL_WIDTH/2 threshold,
-  // which would leave this swipe short and snap the row back closed.
+  // well short of half the reveal width (40 of 104px, vs. a 50%/52px line)
+  // should still commit the row open, matching iMessage/Mail's own lower
+  // reveal threshold. Fails against a half-width threshold, which would
+  // leave this swipe short and snap the row back closed.
   it('opens on a swipe well short of half the reveal width', async () => {
     const { content } = renderRow()
 
-    fireEvent.wheel(content, { deltaX: 60, deltaY: 0 })
+    fireEvent.wheel(content, { deltaX: 40, deltaY: 0 })
     await settle()
 
-    expect(content.style.transform).toBe('translateX(-168px)')
+    expect(content.style.transform).toBe('translateX(-104px)')
   })
 
   // A rubber-band give past the limit (drag past -168px, spring back on
@@ -122,10 +127,10 @@ describe('NearbyList row swipe (desktop trackpad)', () => {
 
     fireEvent.wheel(content, { deltaX: 300, deltaY: 0 })
 
-    expect(content.style.transform).toBe('translateX(-168px)')
+    expect(content.style.transform).toBe('translateX(-104px)')
 
     await settle()
-    expect(content.style.transform).toBe('translateX(-168px)')
+    expect(content.style.transform).toBe('translateX(-104px)')
   })
 
   // A row's own `pinned` badge is driven by the `points` prop its parent
@@ -133,10 +138,12 @@ describe('NearbyList row swipe (desktop trackpad)', () => {
   // something NearbyList re-derives for itself mid-render — so this checks
   // the actual persisted effect of the click (localStorage, via
   // PinnedProvider) rather than an aria-label this component doesn't own.
-  it('still lets a plain click on the Pin button toggle pinning', () => {
-    const { pinButton } = renderRow()
+  it('still lets a plain click on the Pin button toggle pinning', async () => {
+    const { content } = renderRow()
+    fireEvent.wheel(content, { deltaX: 100, deltaY: 0 })
+    await settle()
 
-    fireEvent.click(pinButton)
+    fireEvent.click(pinButton())
 
     expect(localStorage.getItem('jpc:pinned-listings')).toContain('listing-1')
   })

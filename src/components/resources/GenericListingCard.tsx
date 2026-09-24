@@ -20,7 +20,7 @@ import PlaceDetailBody from './PlaceDetailBody'
 import ListingDetailModal from './ListingDetailModal'
 import ListingEditBar from './ListingEditBar'
 import { useListingActions, type ListingAction } from './useListingActions'
-import { useSwipeActions } from './useSwipeActions'
+import SwipeRow, { type SwipeAction } from '@/components/SwipeRow'
 import Chip from './Chip'
 import { travelParts } from '@/lib/listingTravel'
 import { ui } from '@/lib/uiConfig'
@@ -38,13 +38,10 @@ export const MOBILE_PANEL_TRANSITION_MS = 240
 /** Pin and Share are the two that belong to SCANNING a list — shortlisting
  *  as you read, sending one to someone. "Set as location" is deliberately
  *  not here: it re-sorts the entire directory, which is a deliberate act
- *  rather than something you do in passing, and two panels is the practical
+ *  rather than something you do in passing, and two actions is the practical
  *  ceiling for a swipe on a phone. It lives in the fan below an opened
  *  listing instead. */
 const CARD_ACTION_IDS: ListingAction['id'][] = ['pin', 'share']
-/** One panel per action. 74px each is comfortably past the 44-48px tap-target
- *  floor Apple and Material both set, with room for a word under the glyph. */
-const SWIPE_PANEL_PX = 74
 
 function CardActionIcon({ action }: { action: ListingAction }) {
   const cls = 'h-4 w-4 shrink-0'
@@ -309,14 +306,22 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
   const pinned = isPinned(item.id)
 
   // Pin/Share for the collapsed row: revealed by a swipe on mobile, by
-  // hovering (or focusing into) the row on desktop. Both are shortcuts —
-  // ListingActionsFan below an opened listing is where these are reachable
-  // by every visitor, which is what makes it safe for the card's own copies
-  // to be invisible until asked for.
-  const swipeActions = useListingActions(item, category, listingPath).filter((a) =>
+  // hovering the row on desktop. Both are shortcuts — ListingActionsFan
+  // below an opened listing is where these are reachable by every visitor,
+  // which is what makes it safe for the card's own copies to be invisible
+  // until asked for.
+  const cardActions = useListingActions(item, category, listingPath).filter((a) =>
     CARD_ACTION_IDS.includes(a.id),
   )
-  const swipe = useSwipeActions(isMobile && swipeActions.length > 0, swipeActions.length * SWIPE_PANEL_PX)
+  // The mobile swipe is SwipeRow, the same one the map's nearby list uses,
+  // so the gesture and the circles it reveals are identical on both. Worded
+  // the way that swipe always has been: "Unpin" says what the tap will do,
+  // where the fan's "Pinned" (a menu item, whose label is its only state
+  // cue) says what's true now.
+  const rowSwipeActions: SwipeAction[] = cardActions.map((a) => {
+    const label = a.id === 'pin' ? (a.active ? 'Unpin' : 'Pin') : a.label
+    return { id: a.id as SwipeAction['id'], label, ariaLabel: `${label} ${item.name}`, active: a.active, onSelect: a.onSelect }
+  })
 
   const fields = category.detailFields
   // Per-category capabilities layered under the global `ui.contributions` switches.
@@ -611,76 +616,29 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
     // no-op everywhere the card isn't a stretched grid item (mobile's single
     // column, the admin category preview).
     <div className="h-full border border-slate-200 rounded-lg bg-white shadow-sm">
-      {/* Swipe container. `overflow-hidden` ONLY while the row is actually
-          displaced — at rest this element is transparent to layout, which
-          matters because the card root deliberately has no overflow clipping
-          (it would cut off the cert badge's hover tooltip, see that comment).
-          Nobody is hovering a badge mid-drag, so clipping during the gesture
-          costs nothing and is what keeps the displaced row from spilling past
-          the card's left edge. */}
-      <div
-        className={`relative ${swipe.isOpen || swipe.dragging ? 'overflow-hidden' : ''} ${expanded && isMobile ? 'rounded-t-lg' : 'rounded-lg'}`}
-      >
-        {/* Sits UNDER the row rather than beside it, so revealing it is the
-            row moving rather than the list reflowing. Rendered only when
-            there's a displacement to reveal it — an always-mounted panel
-            behind an opaque row is invisible either way, and mounting it only
-            while it's reachable is also what keeps two extra copies of Pin
-            and Share out of the accessibility tree at rest.
-            They are NOT aria-hidden while they are up, though, which was
-            tempting for the same reason: a VoiceOver user performs this
-            swipe like anyone else, and hiding what it reveals would leave
-            them holding a panel of controls their screen reader says aren't
-            there. */}
-        {isMobile && (swipe.isOpen || swipe.dragging) && swipeActions.length > 0 && (
-          <div className="absolute inset-y-0 right-0 flex">
-            {swipeActions.map((action) => (
-              <button
-                key={action.id}
-                type="button"
-                aria-label={`${action.label} ${item.name}`}
-                onClick={(e) => {
-                  e.stopPropagation()
-                  action.onSelect()
-                  swipe.close()
-                }}
-                style={{ width: SWIPE_PANEL_PX }}
-                className={`flex flex-col items-center justify-center gap-1 text-[11px] font-semibold text-white cursor-pointer ${
-                  action.id === 'pin' ? 'bg-brand-teal' : 'bg-slate-500'
-                }`}
-              >
-                <CardActionIcon action={action} />
-                {action.label}
-              </button>
-            ))}
-          </div>
-        )}
       {/* Not role="button"/tabIndex any more — the row also contains real
           interactive children (UpvoteButton, an external-link <a>, the
           Open/badge Chips), and an ARIA button role can't legally contain
           other interactive controls (axe's nested-interactive rule: a
           screen reader can't reliably operate one nested inside another).
-          The onClick below stays as a mouse/touch convenience — "click
+          The onContentClick below stays as a mouse/touch convenience — "click
           anywhere on the row" — but the actual accessible, keyboard-operable
           toggle is now the chevron <button> further down. It carries no
           onClick of its own; a native button's click (mouse or keyboard)
           bubbles right up to this handler, so there's exactly one place the
           toggle logic lives, not two copies to keep in sync. */}
-      <div
-        ref={cardRootRef}
-        {...swipe.handlers}
-        style={swipe.offset ? { transform: `translateX(${swipe.offset}px)` } : undefined}
-        onClick={() => {
-          // A drag ends by dispatching a click. Swallow that one, or swiping
-          // a row open would also expand it. Reading this clears it.
-          if (swipe.consumeDrag()) return
-          // While the panels are showing, a tap on the row dismisses them
-          // rather than expanding — the same "first tap puts it away" rule
-          // any open menu follows.
-          if (swipe.isOpen) {
-            swipe.close()
-            return
-          }
+      <SwipeRow
+        rowId={item.id}
+        actions={rowSwipeActions}
+        // Mobile only: desktop reveals the same two actions by hovering the
+        // row instead (see the hover-reveal in the corner below).
+        enabled={isMobile}
+        className={expanded && isMobile ? 'rounded-t-lg' : 'rounded-lg'}
+        contentRef={cardRootRef}
+        // SwipeRow keeps this from firing for the click a swipe ends with,
+        // and for a tap on a row whose actions are showing — that tap puts
+        // them away instead of expanding the card.
+        onContentClick={() => {
           // The side effects deliberately sit OUTSIDE the state update, not
           // inside an updater function. A `setExpanded((p) => { …effects…;
           // return !p })` reads like the safe way to toggle, but React calls
@@ -711,15 +669,11 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
         // group/row drives the desktop hover-reveal in the corner — named
         // rather than bare `group` because the card already nests groups of
         // its own (group/tip on the cert badges).
-        // relative + bg-white so this row paints OVER the swipe panels
+        // relative + bg-white so this row paints OVER the swipe actions
         // behind it; without an opaque background they'd show through.
-        // touch-action-pan-y hands vertical scrolling back to the browser and
-        // keeps only horizontal movement for the gesture — see useSwipeActions.
-        // The transition is dropped mid-drag so the row tracks the finger
-        // exactly, and restored for the release so it snaps.
-        className={`group/row relative h-full w-full bg-white px-4 py-3 hover:bg-slate-50 active:bg-slate-100 cursor-pointer touch-pan-y ${
-          swipe.dragging ? 'transition-colors' : 'transition-[colors,transform] duration-200 ease-out'
-        } ${expanded && isMobile ? 'rounded-t-lg' : 'rounded-lg'}`}
+        contentClassName={`group/row relative h-full w-full bg-white px-4 py-3 hover:bg-slate-50 active:bg-slate-100 cursor-pointer transition-colors duration-200 ease-out ${
+          expanded && isMobile ? 'rounded-t-lg' : 'rounded-lg'
+        }`}
       >
         {/* items-center, not items-start, on mobile: the row's only ever
             2 lines there (name + subtitle — headerTextFields below is
@@ -968,9 +922,9 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
               page, not theorised. Declining to duplicate a control is not the
               same as denying access to it.
               Desktop only: mobile has no hover to reveal anything with. */}
-          {!isMobile && swipeActions.length > 0 && (
+          {!isMobile && cardActions.length > 0 && (
             <span aria-hidden="true" className="hidden desktop:flex items-center gap-1 opacity-0 transition-opacity group-hover/row:opacity-100">
-              {swipeActions.map((action) => (
+              {cardActions.map((action) => (
                 <button
                   key={action.id}
                   type="button"
@@ -1078,9 +1032,7 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
             </div>
           </>
         )}
-      </div>
-
-      </div>
+      </SwipeRow>
 
       {/* Mobile: inline accordion, pushing the rest of the list down — see
           the isMobile note above the state declaration. Animated (height via

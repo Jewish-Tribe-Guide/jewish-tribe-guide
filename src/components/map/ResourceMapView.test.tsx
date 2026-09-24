@@ -838,6 +838,14 @@ describe('ResourceMapView — campaign chip', () => {
 })
 
 describe('ResourceMapView — nested touch gestures', () => {
+  // The row's sliding content — SwipeRow's content element. Found through the
+  // row's own name, not its Pin button: the Pin/Share strip is only mounted
+  // while a row is actually swiped open (see SwipeRow), so at rest there's no
+  // Pin button to find.
+  function rowContentFor(scope: HTMLElement, name: string) {
+    return within(scope).getByText(name).closest('div.px-4') as HTMLElement
+  }
+
   // Real bug: MobileNearbySheet's content area used to capture the pointer
   // on every touchdown (an attempted fix for a different, unrelated
   // smoothness issue) — which won the race against NearbyList's own row-level
@@ -859,16 +867,14 @@ describe('ResourceMapView — nested touch gestures', () => {
     // only ancestor with this class, so it's enough to scope into the
     // sheet's own copy of the row rather than the sidebar's.
     const sheetContent = document.querySelector('.overscroll-contain') as HTMLElement
-    const pinButton = within(sheetContent).getByRole('button', { name: 'Pin Nosh Deli' })
-    // The row's draggable content div is the reveal buttons' next sibling —
-    // both are direct children of NearbyRow's own wrapper (see its return).
-    const rowContent = pinButton.parentElement!.nextElementSibling as HTMLElement
+    const rowContent = rowContentFor(sheetContent, 'Nosh Deli')
 
     fireEvent.pointerDown(rowContent, { clientX: 300 })
-    fireEvent.pointerMove(rowContent, { clientX: 190 }) // 110px left — past both the 8px activation threshold and REVEAL_WIDTH/2
+    fireEvent.pointerMove(rowContent, { clientX: 190 }) // 110px left — past both the 8px activation threshold and the open threshold
     fireEvent.pointerUp(rowContent, { clientX: 190 })
 
-    expect(rowContent.style.transform).toBe('translateX(-168px)') // REVEAL_WIDTH (84) * 2 — fully revealed
+    expect(rowContent.style.transform).toBe('translateX(-104px)') // two 52px actions — fully revealed
+    expect(within(sheetContent).getByRole('button', { name: 'Pin Nosh Deli' })).toBeInTheDocument()
   })
 
   // Real bug, the other direction: a plain `abs(deltaX) >= 8` threshold
@@ -882,8 +888,7 @@ describe('ResourceMapView — nested touch gestures', () => {
     renderMap(<ResourceMapView onUp={vi.fn()} />, [listingWithGeo({ id: 'row-swipe-2', category: 'grocery', name: 'Corner Bakery' })], [grocery])
 
     const sheetContent = document.querySelector('.overscroll-contain') as HTMLElement
-    const pinButton = within(sheetContent).getByRole('button', { name: 'Pin Corner Bakery' })
-    const rowContent = pinButton.parentElement!.nextElementSibling as HTMLElement
+    const rowContent = rowContentFor(sheetContent, 'Corner Bakery')
 
     fireEvent.pointerDown(rowContent, { clientX: 300, clientY: 300 })
     // 10px left, 50px down — past the row's own 8px X threshold, but
@@ -895,7 +900,9 @@ describe('ResourceMapView — nested touch gestures', () => {
     // tests reading dragHeight mid-drag instead of the post-release snap.
     fireEvent.pointerMove(rowContent, { clientX: 290, clientY: 350 })
 
-    expect(rowContent.style.transform).toBe('translateX(0px)')
+    // No transform at all at rest — SwipeRow only sets one while displaced.
+    expect(rowContent.style.transform).toBe('')
+    expect(within(sheetContent).queryByRole('button', { name: 'Pin Corner Bakery' })).not.toBeInTheDocument()
 
     fireEvent.pointerUp(rowContent, { clientX: 290, clientY: 350 })
   })
@@ -928,16 +935,18 @@ describe('ResourceMapView — nested touch gestures', () => {
     const idleTransition = sheetEl.style.transition
     expect(idleTransition).toContain('280ms')
 
-    const pinButton = within(sheetContent).getByRole('button', { name: 'Pin Test Grocery' })
-    const rowContent = pinButton.parentElement!.nextElementSibling as HTMLElement
+    const rowContent = rowContentFor(sheetContent, 'Test Grocery')
 
     fireEvent.pointerDown(rowContent, { clientX: 300, clientY: 300 })
-    fireEvent.pointerMove(rowContent, { clientX: 190, clientY: 320 }) // 110px horizontal, 20px vertical — clearly horizontal, but a real Y component too
+    // 90px horizontal, 20px vertical — clearly horizontal, but a real Y
+    // component too. Short of the 104px strip, so the row sits at a live,
+    // unclamped position that proves it's following the finger.
+    fireEvent.pointerMove(rowContent, { clientX: 210, clientY: 320 })
 
-    expect(rowContent.style.transform).toBe('translateX(-110px)') // the row did respond
+    expect(rowContent.style.transform).toBe('translateX(-90px)') // the row did respond
     expect(sheetEl.style.transition).toBe(idleTransition) // ...but the sheet did not
 
-    fireEvent.pointerUp(rowContent, { clientX: 190, clientY: 320 })
+    fireEvent.pointerUp(rowContent, { clientX: 210, clientY: 320 })
   })
 })
 

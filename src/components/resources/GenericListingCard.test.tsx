@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { createRef } from 'react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { renderWithProviders } from '@/test/renderWithProviders'
@@ -1252,9 +1252,10 @@ describe('GenericListingCard — collapsed row actions', () => {
 // ── Swipe to reveal, on mobile ───────────────────────────────────────────
 // A gesture is invisible and unreachable by keyboard, so everything here is
 // a SHORTCUT: Pin and Share are also in the fan below an opened listing,
-// which is the route that works for everyone. What's worth testing is the
-// gesture's own rules, because each one exists to stop it fighting something
-// else on the page.
+// which is the route that works for everyone. The gesture itself is
+// SwipeRow, shared with the map's nearby list, and its own rules are tested
+// there (SwipeRow.test.tsx). These check the card's side: that it's wired
+// in, on mobile only, and that a swipe never also counts as opening the card.
 describe('GenericListingCard — swipe actions', () => {
   function renderRow() {
     renderWithProviders(
@@ -1265,8 +1266,23 @@ describe('GenericListingCard — swipe actions', () => {
     return screen.getByRole('button', { name: /show details for Goldi Market/i }).closest('div[class*="cursor-pointer"]')!
   }
 
+  // SwipeRow treats a fast release as a flick and commits it regardless of
+  // distance, reading each event's timeStamp — which jsdom takes from
+  // Date.now() in whole milliseconds. Fired back to back, two events usually
+  // share a millisecond (no velocity), but not always: one tick apart turns
+  // any drag into a flick, and a drag meant to spring back opens instead.
+  // So the clock is frozen here, and every drag takes a deliberate 300ms —
+  // unmistakably slow — instead of whatever the machine happened to allow.
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
   function drag(row: Element, from: { x: number; y: number }, to: { x: number; y: number }) {
     fireEvent.pointerDown(row, { pointerType: 'touch', clientX: from.x, clientY: from.y })
+    vi.setSystemTime(Date.now() + 300)
     fireEvent.pointerMove(row, { pointerType: 'touch', clientX: to.x, clientY: to.y })
     fireEvent.pointerUp(row, { pointerType: 'touch', clientX: to.x, clientY: to.y })
   }
@@ -1282,12 +1298,12 @@ describe('GenericListingCard — swipe actions', () => {
   // Releasing past the threshold settles at the panels' FULL width, not
   // wherever the finger happened to stop — a row resting at some arbitrary
   // offset leaves the panels partly clipped and reads as broken.
-  it('snaps open to the panels\' full width on release, not to where the drag ended', () => {
+  it('snaps open to the actions\' full width on release, not to where the drag ended', () => {
     const row = renderRow()
     drag(row, { x: 300, y: 100 }, { x: 180, y: 100 })
 
-    // Two panels at 74px each.
-    expect(row.getAttribute('style')).toContain('translateX(-148px)')
+    // Two 52px actions — the same strip the map's nearby list reveals.
+    expect(row.getAttribute('style')).toContain('translateX(-104px)')
   })
 
   it('springs back when the drag stops short, rather than half-opening', () => {
@@ -1310,13 +1326,6 @@ describe('GenericListingCard — swipe actions', () => {
   // iOS treats a drag from the left screen edge as "go back", and this app is
   // an installed PWA, so that gesture is live. Competing with it would mean
   // losing sometimes and, worse, winning sometimes.
-  it('leaves a drag starting at the screen edge to the browser', () => {
-    const row = renderRow()
-    drag(row, { x: 5, y: 100 }, { x: 5 - 120, y: 100 })
-
-    expect(screen.queryByRole('button', { name: 'Pin Goldi Market' })).not.toBeInTheDocument()
-  })
-
   // A drag ends by dispatching a click. Without swallowing it, a swipe would
   // also expand the card underneath in the same motion.
   //
@@ -1335,26 +1344,36 @@ describe('GenericListingCard — swipe actions', () => {
     expect(screen.getByRole('button', { name: /show details for Goldi Market/i })).toHaveAttribute('aria-expanded', 'false')
   })
 
-  // Once the panels are up, the next tap on the row puts them away — the
+  // Once the actions are up, the next tap on the row puts them away — the
   // same "first tap dismisses" rule any open menu follows — instead of
-  // expanding the card.
-  it('closes the panels on the next tap, without expanding', () => {
+  // expanding the card. One tap, not a synthetic post-drag click plus a tap:
+  // a phone only turns a touch into a click when it barely moved, so a swipe
+  // long enough to open the row ends with no click at all.
+  it('closes the actions on the next tap, without expanding', () => {
     const row = renderRow()
     drag(row, { x: 300, y: 100 }, { x: 180, y: 100 })
-    fireEvent.click(row)
+    expect(screen.getByRole('button', { name: 'Pin Goldi Market' })).toBeInTheDocument()
+    // A real tap, pointerdown first — see SwipeRow.test.tsx's tap() for why
+    // a bare click can't reach the rule this checks.
+    fireEvent.pointerDown(row, { pointerType: 'touch', clientX: 200, clientY: 100 })
+    fireEvent.pointerUp(row, { pointerType: 'touch', clientX: 200, clientY: 100 })
     fireEvent.click(row)
 
     expect(screen.queryByRole('button', { name: 'Pin Goldi Market' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: /show details for Goldi Market/i })).toHaveAttribute('aria-expanded', 'false')
   })
 
-  it('does not arm the gesture for a mouse, which has the hover row instead', () => {
-    const row = renderRow()
-    fireEvent.pointerDown(row, { pointerType: 'mouse', clientX: 300, clientY: 100 })
-    fireEvent.pointerMove(row, { pointerType: 'mouse', clientX: 180, clientY: 100 })
-    fireEvent.pointerUp(row, { pointerType: 'mouse', clientX: 180, clientY: 100 })
+  // Desktop reveals the same two actions by hovering the row instead.
+  it('has no swipe on desktop, which has the hover row instead', () => {
+    renderWithProviders(
+      <ForcedViewport isMobile={false}>
+        <GenericListingCard item={makeListing({ name: 'Goldi Market' })} category={makeCategory()} upvotes={false} count={0} {...requiredHandlers} />
+      </ForcedViewport>,
+    )
+    const row = screen.getByRole('button', { name: /show details for Goldi Market/i }).closest('div[class*="cursor-pointer"]')!
+    drag(row, { x: 300, y: 100 }, { x: 180, y: 100 })
 
-    expect(screen.queryByRole('button', { name: 'Pin Goldi Market' })).not.toBeInTheDocument()
+    expect(row.getAttribute('style') ?? '').not.toContain('translateX')
   })
 })
 

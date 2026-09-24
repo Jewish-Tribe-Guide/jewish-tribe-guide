@@ -20,6 +20,7 @@ import CategoryIcon from '@/components/CategoryIcon'
 import { DotsIcon } from '@/components/icons'
 import { getCategoryColor } from '@/lib/categoryColor'
 import { useIsMobile } from '@/lib/useIsMobile'
+import { SwipeRowGroup } from '@/components/SwipeRow'
 
 export type CardDef = {
   title: string
@@ -716,6 +717,8 @@ export function PlacesResults({
           track-sizing pitfalls, already solved once) as GenericDirectory's
           own listing grid — see that component's own doc for why
           auto-fill/minmax/1fr, not a fixed column count or auto-fit. */}
+      {/* One card's swipe actions revealed at a time — see SwipeRowGroup. */}
+      <SwipeRowGroup>
       <div className="space-y-2 desktop:space-y-0 desktop:grid desktop:gap-3 desktop:grid-cols-[repeat(auto-fill,minmax(280px,1fr))]">
         {hits.map((hit) => (
           <div key={hit.item.id} className="desktop:max-w-md">
@@ -736,6 +739,7 @@ export function PlacesResults({
           </div>
         ))}
       </div>
+      </SwipeRowGroup>
     </section>
   )
 }
