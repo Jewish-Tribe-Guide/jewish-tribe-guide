@@ -181,7 +181,69 @@ describe('ListingEditor — badges, edited where they sit', () => {
     await u.click(within(group).getByRole('button', { name: 'Dairy' }))
     // The badge row now holds Dairy too, outside the panel.
     const row = screen.getByRole('button', { name: 'Add a badge' }).parentElement!
-    expect(within(row).getByRole('button', { name: 'Dairy' }).className).toContain('border-primary')
+    expect(within(row).getByRole('button', { name: 'Dairy' }).parentElement!.className).toContain('border-primary')
+  })
+
+  // Taking back your own addition is one tap on its ×, not a trip back into
+  // the panel to find the pill again.
+  it('takes an added badge straight back off with its ×', async () => {
+    const u = user()
+    renderEditor()
+    await u.click(screen.getByRole('button', { name: 'Add a badge' }))
+    await u.click(screen.getByRole('button', { name: '+ Meat' }))
+    expect(send()).toHaveTextContent('Send 1 change')
+
+    await u.click(screen.getByRole('button', { name: 'Remove Meat' }))
+    expect(send()).toHaveTextContent('No changes yet')
+    // Only additions carry one; a badge that was already there changes from
+    // its panel, so the row still reads like the listing.
+    expect(screen.queryByRole('button', { name: 'Remove Parve' })).not.toBeInTheDocument()
+  })
+
+  it('brings a removed badge back with a tap on its crossed-out chip', async () => {
+    const u = user()
+    renderEditor()
+    await u.click(screen.getByRole('button', { name: 'Parve' }))
+    await u.click(within(screen.getByRole('group', { name: 'Kashrus' })).getByRole('button', { name: 'Parve' }))
+    expect(send()).toHaveTextContent('Send 1 change')
+
+    await u.click(screen.getByRole('button', { name: 'Bring back Parve' }))
+    expect(send()).toHaveTextContent('No changes yet')
+  })
+
+  // A certifier the admin hasn't listed can still be named, the way the form
+  // allows it for a field with allowOther.
+  it('lets you type your own choice when the field allows "Other"', async () => {
+    const u = user()
+    const withOther = makeCategory({
+      ...food,
+      detailFields: food.detailFields.map((f) => (f.key === 'kosherCert' ? { ...f, allowOther: true } : f)),
+    })
+    renderEditor({ category: withOther })
+    await u.click(screen.getByRole('button', { name: 'IKC' }))
+    await u.click(screen.getByRole('button', { name: '+ Other…' }))
+    await u.type(screen.getByRole('textbox', { name: 'Other kosher certification' }), 'Badatz{Enter}')
+
+    const group = screen.getByRole('group', { name: 'Kosher Certification' })
+    expect(within(group).getByRole('button', { name: 'Badatz' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByText('IKC → IKC, Badatz')).toBeInTheDocument()
+  })
+
+  it('offers no "Other…" on a field that doesn\'t allow it', async () => {
+    const u = user()
+    renderEditor()
+    await u.click(screen.getByRole('button', { name: 'IKC' }))
+    expect(screen.queryByRole('button', { name: '+ Other…' })).not.toBeInTheDocument()
+  })
+
+  // The orange note is where your eye goes to fix it, so it's tappable too,
+  // but it opens the one editor for it rather than a second box.
+  it('opens the caveat\'s editor from the orange note, with the cursor in the note', async () => {
+    const u = user()
+    renderEditor()
+    await u.click(screen.getByRole('button', { name: 'Edit: What isn’t kosher?' }))
+    await waitFor(() => expect(screen.getByRole('textbox', { name: 'What isn’t kosher?' })).toHaveFocus())
+    expect(screen.getAllByRole('textbox', { name: 'What isn’t kosher?' })).toHaveLength(1)
   })
 
   it('crosses out a badge that was switched off, rather than just dropping it', async () => {
@@ -215,7 +277,7 @@ describe('ListingEditor — badges, edited where they sit', () => {
     const u = user()
     renderEditor()
     expect(screen.getByRole('button', { name: 'IKC' }).className).toContain('text-caution')
-    expect(screen.getByText('Alcoholic beverages are NOT under supervision', { selector: 'p' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Edit: What isn’t kosher?' })).toHaveTextContent('Alcoholic beverages are NOT under supervision')
 
     await u.click(screen.getByRole('button', { name: 'IKC' }))
     expect(screen.getByRole('textbox', { name: 'What isn’t kosher?' })).toHaveValue('Alcoholic beverages are NOT under supervision')
@@ -244,6 +306,16 @@ describe('ListingEditor — buttons and derived pieces', () => {
     renderEditor()
     await u.click(screen.getByRole('button', { name: 'Call' }))
     expect(screen.getByRole('textbox', { name: 'Phone' })).toHaveFocus()
+  })
+
+  // The address's id sits on the box around the address picker, not on
+  // the input itself — so this checks the jump lands IN the field. It
+  // didn't at first: the scroll happened, and the cursor went nowhere.
+  it('takes Directions into the address field itself', async () => {
+    const u = user()
+    renderEditor()
+    await u.click(screen.getByRole('button', { name: 'Directions' }))
+    expect(screen.getByRole('textbox', { name: 'Address' })).toHaveFocus()
   })
 
   it('reads hours as the listing does, opens the week on a tap, and names the day that changed', async () => {

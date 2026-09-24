@@ -125,36 +125,85 @@ function InlinePanel({ title, onDone, children }: { title: string; onDone: () =>
 }
 
 /** A choice field's options as pills: one pick replaces the other for a
- *  single choice, several can be on for a multi-choice. */
+ *  single choice, several can be on for a multi-choice. A field that allows
+ *  "Other" (see CategoryField.allowOther) ends with "+ Other…", for typing
+ *  one that isn't listed — a certifier the admin hasn't added, say. What's
+ *  typed becomes a pill of its own, the same as in the form. */
 function OptionPills({ field, value, onChange }: { field: CategoryField; value: unknown; onChange: (v: unknown) => void }) {
   const chosen = selectValues(value)
   const options = field.options ?? []
   const known = new Set(options.map((o) => o.value))
   const custom = chosen.filter((v) => !known.has(v))
   const pills = [...options, ...custom.map((v) => ({ value: v, label: v }))]
+  const [addingOther, setAddingOther] = useState(false)
+  const [otherText, setOtherText] = useState('')
   function pick(v: string) {
     const on = chosen.includes(v)
     if (field.multiSelect) onChange(on ? chosen.filter((x) => x !== v) : [...chosen, v])
     else onChange(on ? '' : v)
   }
+  function commitOther() {
+    const v = otherText.trim()
+    setAddingOther(false)
+    setOtherText('')
+    if (!v || chosen.some((c) => c.toLowerCase() === v.toLowerCase())) return
+    const match = options.find((o) => o.label.toLowerCase() === v.toLowerCase())
+    const value = match?.value ?? v
+    onChange(field.multiSelect ? [...chosen, value] : value)
+  }
   return (
-    <div className="flex flex-wrap gap-1.5" role="group" aria-label={field.label}>
-      {pills.map((o) => {
-        const on = chosen.includes(o.value)
-        return (
+    <div className="space-y-2">
+      <div className="flex flex-wrap gap-1.5" role="group" aria-label={field.label}>
+        {pills.map((o) => {
+          const on = chosen.includes(o.value)
+          return (
+            <button
+              key={o.value}
+              type="button"
+              aria-pressed={on}
+              onClick={() => pick(o.value)}
+              className={`cursor-pointer rounded-full border px-2.5 py-1 text-xs font-medium transition-colors ${
+                on ? 'border-primary bg-primary text-white' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-100'
+              }`}
+            >
+              {o.label}
+            </button>
+          )
+        })}
+        {field.allowOther && !addingOther && (
           <button
-            key={o.value}
             type="button"
-            aria-pressed={on}
-            onClick={() => pick(o.value)}
-            className={`cursor-pointer rounded-full border px-2.5 py-1 text-xs font-medium transition-colors ${
-              on ? 'border-primary bg-primary text-white' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-100'
-            }`}
+            onClick={() => setAddingOther(true)}
+            className="cursor-pointer rounded-full border border-dashed border-slate-400 bg-white px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100"
           >
-            {o.label}
+            + Other…
           </button>
-        )
-      })}
+        )}
+      </div>
+      {addingOther && (
+        <div className="flex gap-1.5">
+          <input
+            aria-label={`Other ${field.label.toLowerCase()}`}
+            value={otherText}
+            onChange={(e) => setOtherText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault()
+                commitOther()
+              } else if (e.key === 'Escape') {
+                setAddingOther(false)
+                setOtherText('')
+              }
+            }}
+            placeholder="Type it in…"
+            autoFocus
+            className="min-w-0 flex-1 rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+          />
+          <button type="button" onClick={commitOther} className="shrink-0 cursor-pointer rounded-md bg-primary px-3 text-xs font-semibold text-white">
+            Add
+          </button>
+        </div>
+      )}
     </div>
   )
 }
@@ -174,11 +223,21 @@ function AddButton({ label, onClick, id }: { label: string; onClick: () => void;
   )
 }
 
+/** Takes you to a field from something that comes from it (Directions →
+ *  the address, Call → the phone, the orange note → its editor): scrolls it
+ *  into view, puts the cursor in it, and flashes it, because on a phone the
+ *  scroll can be too small to notice and you'd otherwise not know where
+ *  you'd landed. The id can be on the field or on a box around it. */
 function focusAndReveal(id: string) {
   const el = typeof document !== 'undefined' ? document.getElementById(id) : null
   if (!el) return
-  el.scrollIntoView?.({ block: 'center', behavior: 'smooth' })
-  if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLButtonElement) el.focus({ preventScroll: true })
+  const target = el.matches('input, textarea, select, button') ? el : (el.querySelector<HTMLElement>('input, textarea, select, button') ?? el)
+  target.scrollIntoView?.({ block: 'center', behavior: 'smooth' })
+  target.focus({ preventScroll: true })
+  target.animate?.(
+    [{ boxShadow: '0 0 0 4px rgba(29, 78, 216, 0.45)' }, { boxShadow: '0 0 0 0 rgba(29, 78, 216, 0)' }],
+    { duration: 1400, easing: 'ease-out' },
+  )
 }
 
 // ── The editor ────────────────────────────────────────────────────────────
@@ -385,38 +444,79 @@ export default function ListingEditor({ item, category, onClose, sendSlot, share
   const chipText = (f: CategoryField, v: string) =>
     v === '__on' ? (f.filterLabel ?? f.label) : (f.options?.find((o) => o.value === v)?.label ?? v)
 
+  function removeBadge(f: CategoryField, v: string) {
+    if (f.type === 'boolean') setDetail(f.key, false)
+    else if (f.multiSelect) setDetail(f.key, selectValues(details[f.key]).filter((x) => x !== v))
+    else setDetail(f.key, '')
+  }
+  function restoreBadge(f: CategoryField, v: string) {
+    if (f.type === 'boolean') setDetail(f.key, true)
+    else if (f.multiSelect) setDetail(f.key, [...selectValues(details[f.key]), v])
+    else setDetail(f.key, v)
+  }
+
   const badgeChips = badgeFields.flatMap((f) => {
     if (f.key === suppressedBadgeKey) return []
     const before = originalValues(f)
     const nowValues = currentValues(f)
     const amber = isAmber(f)
+    const panelOpen = openPanel === `badge:${f.key}`
     const chips = nowValues.map((v) => {
+      const label = chipText(f, v)
       const isNew = !before.includes(v)
-      const tone = isNew
-        ? 'border-primary bg-blue-50 text-primary'
-        : amber
-          ? 'border-caution/30 bg-caution/10 text-caution'
-          : 'border-slate-200 bg-slate-100 text-slate-600'
+      // One you've just added carries its own ×: taking back your own
+      // addition should be one tap, not a trip into the panel. Badges that
+      // were already there don't, so the row still reads like the listing;
+      // they change from their panel.
+      if (isNew) {
+        return (
+          <span
+            key={`${f.key}:${v}`}
+            className={`inline-flex items-center rounded-full border border-primary bg-blue-50 text-xs font-medium text-primary ${panelOpen ? 'outline-solid outline-2 outline-offset-1 outline-primary' : ''}`}
+          >
+            <button type="button" onClick={() => togglePanel(`badge:${f.key}`)} aria-expanded={panelOpen} className="cursor-pointer py-0.5 pl-2 pr-1">
+              {label}
+            </button>
+            <button
+              type="button"
+              aria-label={`Remove ${label}`}
+              onClick={() => removeBadge(f, v)}
+              className="flex h-4 w-4 cursor-pointer items-center justify-center rounded-full mr-1 text-primary hover:bg-primary/15"
+            >
+              <svg className="h-2.5 w-2.5" fill="none" stroke="currentColor" strokeWidth={3} viewBox="0 0 24 24" aria-hidden="true">
+                <path strokeLinecap="round" d="M6 6l12 12M18 6L6 18" />
+              </svg>
+            </button>
+          </span>
+        )
+      }
+      const tone = amber ? 'border-caution/30 bg-caution/10 text-caution' : 'border-slate-200 bg-slate-100 text-slate-600'
       return (
         <button
           key={`${f.key}:${v}`}
           type="button"
           onClick={() => togglePanel(`badge:${f.key}`)}
-          aria-expanded={openPanel === `badge:${f.key}`}
-          className={`cursor-pointer rounded-full border px-2 py-0.5 text-xs font-medium ${tone} ${isNew ? '' : TAPPABLE} ${
-            openPanel === `badge:${f.key}` ? 'outline-solid outline-2 outline-primary' : ''
-          }`}
+          aria-expanded={panelOpen}
+          className={`cursor-pointer rounded-full border px-2 py-0.5 text-xs font-medium ${tone} ${TAPPABLE} ${panelOpen ? 'outline-solid outline-2 outline-primary' : ''}`}
         >
-          {chipText(f, v)}
+          {label}
         </button>
       )
     })
+    // A removed badge stays, crossed out, so the change is visible where it
+    // happened — and a tap brings it back.
     const removed = before
       .filter((v) => !nowValues.includes(v))
       .map((v) => (
-        <span key={`${f.key}:was:${v}`} className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-xs text-slate-400 line-through">
+        <button
+          key={`${f.key}:was:${v}`}
+          type="button"
+          aria-label={`Bring back ${chipText(f, v)}`}
+          onClick={() => restoreBadge(f, v)}
+          className="cursor-pointer rounded-full border border-slate-200 bg-white px-2 py-0.5 text-xs text-slate-400 line-through hover:text-slate-600"
+        >
           {chipText(f, v)}
-        </span>
+        </button>
       ))
     return [...removed, ...chips]
   })
@@ -779,12 +879,24 @@ export default function ListingEditor({ item, category, onClose, sendSlot, share
   })
 
   // ── Caveat notes, as the listing shows them — edited from their badge ─
+  // Shown where the listing shows it, and tappable there too — it's where
+  // your eye goes to fix it. It opens the certification panel with the
+  // cursor in the note, so there's still only ever one box for it.
   const caveatNotes = badgeFields
     .filter((f) => f.caveat && details[f.caveat.flagField] && currentValues(f).length > 0)
     .map((f) => (
-      <p key={f.key} className="text-[12px] leading-snug text-caution">
+      <button
+        key={f.key}
+        type="button"
+        aria-label={`Edit: ${noteField(f)?.label ?? 'what isn’t kosher'}`}
+        onClick={() => {
+          setOpenPanel(`badge:${f.key}`)
+          setTimeout(() => focusAndReveal(`detail-${f.caveat!.noteField}`), 0)
+        }}
+        className={`block w-full cursor-pointer rounded text-left text-[12px] leading-snug text-caution ${TAPPABLE}`}
+      >
         {textOf(details[f.caveat!.noteField]).trim() || 'Not everything here is kosher — please verify.'}
-      </p>
+      </button>
     ))
 
   const otherSection = otherHidden.length > 0 && (
