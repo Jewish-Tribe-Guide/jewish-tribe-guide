@@ -81,6 +81,8 @@ export default function ListingActionsFan({
   const isMobile = useIsMobile()
   const triggerRef = useRef<HTMLButtonElement>(null)
   const [placement, setPlacement] = useState<Placement | null>(null)
+  /** Where the page was when the fan opened — see the scroll handler. */
+  const scrollAnchor = useRef(0)
   const open = placement !== null
 
   useEffect(() => {
@@ -94,7 +96,30 @@ export default function ListingActionsFan({
     // Same reasoning as ListingActionsMenu's: a scroll means the visitor has
     // moved on, and leaving a floating thing behind while the page slides
     // under it reads as stuck rather than dismissed.
-    const onScroll = () => setPlacement(null)
+    //
+    // But "a scroll event fired" is NOT the same as "the page moved", and
+    // the difference is a real bug rather than a technicality. A scroll
+    // position changes synchronously; the event announcing it is queued and
+    // arrives a frame or more later — measured at 26ms for a plain
+    // scrollIntoView. So anything that scrolls this trigger into view and
+    // then activates it — a phone still coasting through momentum scrolling
+    // when the thumb comes down, and every automated click, which scrolls
+    // its target into view first — opens the fan and is then closed by the
+    // event belonging to the scroll that had already finished. It reads as
+    // the fan flashing and vanishing for no reason.
+    //
+    // So compare positions instead of counting events. The anchor is taken
+    // when the fan opens, by which time a synchronous scroll has already
+    // landed, so a late event for it reports no movement and is ignored,
+    // while genuine scrolling always differs. A scroll inside some nested
+    // element still closes outright: nothing here ever scrolls one of those
+    // programmatically, so those events can only mean a real visitor.
+    const onScroll = (e: Event) => {
+      const target = e.target
+      const isPageScroll = target === document || target === document.scrollingElement
+      if (isPageScroll && window.scrollY === scrollAnchor.current) return
+      setPlacement(null)
+    }
     document.addEventListener('keydown', onKey)
     document.addEventListener('scroll', onScroll, { capture: true, passive: true })
     return () => {
@@ -108,6 +133,7 @@ export default function ListingActionsFan({
   function openFan() {
     const rect = triggerRef.current?.getBoundingClientRect()
     if (!rect) return
+    scrollAnchor.current = window.scrollY
     const n = actions.length
     const columnHeight = n * CIRCLE + (n - 1) * GAP
 

@@ -193,22 +193,12 @@ test.describe('mobile', () => {
     await page.goto(`/${community}/${category.id}/${item.id}`)
     await dismissLocationPrompt(page)
 
-    // Edit now lives inside the kebab menu (ListingActionsMenu), not as its
-    // own standalone button. Scoped to this listing's own name — the
-    // category list underneath the expanded card has one "More actions for
-    // ..." kebab per row, so an unscoped query is ambiguous.
-    //
-    // Pre-scrolled into view before clicking: ListingActionsMenu closes
-    // itself on ANY document scroll (by design — see its own doc, same as
-    // a native action sheet), and Playwright's .click() auto-scrolls its
-    // target into view first. Clicking the menu item directly (without
-    // this) can trigger exactly that auto-scroll, which closes the menu a
-    // beat before the click lands on it — leaving the kebab in view first
-    // means opening and clicking the menu needs no further scroll at all.
-    const kebab = page.getByRole('button', { name: `More actions for ${item.name}` })
-    await kebab.scrollIntoViewIfNeeded()
-    await kebab.click()
-    await page.getByRole('menuitem', { name: 'Edit' }).click()
+    // Edit is its own labelled bar below the expanded listing now
+    // (ListingEditBar) — it used to be a row inside the kebab menu, and
+    // before that a quiet "Suggest a correction" link in the footer. Only
+    // the expanded listing has one, so no scoping by name is needed here
+    // the way the kebab-per-row version required.
+    await page.getByRole('button', { name: 'Suggest an edit' }).click()
 
     const hoursToggle = page.getByRole('button', { name: /^Hours/ })
     await expect(hoursToggle).toBeVisible()

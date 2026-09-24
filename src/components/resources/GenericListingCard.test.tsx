@@ -54,6 +54,12 @@ vi.mock('./ListingForm', () => ({
 }))
 
 afterEach(() => {
+  // Pinned state lives in localStorage, and a test that throws before its own
+  // cleanup used to poison every test after it — a listing silently pinned
+  // turns "Pin" into "Pinned" and adds a second 📌 to the card, which reads
+  // as half a dozen unrelated failures somewhere far away. Cleared here so a
+  // failure stays where it happened.
+  localStorage.clear()
   cleanup()
   // The Edit-history-push tests below leave real entries behind — jsdom's
   // History is a live, module-level object, not reset between tests — so
@@ -123,107 +129,41 @@ describe('GenericListingCard — collapsed', () => {
     expect(row).toHaveClass('h-full')
   })
 
-  // The kebab/toggle group is absolutely positioned (right-0, top-1/2
+  // The corner group is absolutely positioned (right-1, top-1/2
   // -translate-y-1/2) against the relative wrapper spanning the whole
   // pre-badge-divider block, not just the icon/name/address row it used to
-  // share a flex row with — self-centering WITHIN that row (an earlier,
-  // narrower fix) only matched the row's own short height, and still
-  // pinned the kebab near the top of a taller card once a header text
-  // field or an upvote/distance row added real height below it. Centering
-  // against the CARD's real header height needed pulling it out of normal
-  // flex flow entirely, not just changing its align-self — see that
-  // group's own comment for the fuller reasoning, and this component's
-  // Storybook-free live-verification notes in the commit that introduced
-  // this for the getBoundingClientRect check that actually caught the gap
-  // a self-center-only fix left behind.
-  it('positions the kebab absolutely, centered against the full pre-badge block', () => {
+  // share a flex row with — self-centering WITHIN that row only matched the
+  // row's own short height, and still pinned the group near the top of a
+  // taller card once a header text field or an upvote/distance row added
+  // real height below it. That reasoning outlived the kebab: the group still
+  // holds the invisible toggle and, on desktop, the hover-revealed Pin and
+  // Share, and it still has to sit at the card's true vertical middle.
+  // What DID change is the wrapper's `pr-8` — the reserve existed to keep
+  // the name clear of the kebab, and with the kebab gone the name takes
+  // those 32px back (346px -> 378px on a real card at phone width).
+  it('centers the corner group against the full pre-badge block, with no reserve left for a kebab', () => {
     renderWithProviders(
-      <GenericListingCard item={makeListing()} category={makeCategory()} upvotes={false} count={0} {...requiredHandlers} />,
+      <GenericListingCard item={makeListing({ name: 'Goldi Market' })} category={makeCategory()} upvotes={false} count={0} {...requiredHandlers} />,
     )
 
-    const kebab = screen.getByRole('button', { name: /more actions for/i })
-    const positioned = kebab.closest('div[class*="absolute"]')
+    const toggle = screen.getByRole('button', { name: /show details for Goldi Market/i })
+    const positioned = toggle.closest('div[class*="absolute"]')
     expect(positioned).not.toBeNull()
     expect(positioned).toHaveClass('absolute', 'right-1', 'top-1/2', '-translate-y-1/2')
 
-    // Its positioning context (the nearest `relative` ancestor an absolute
-    // child measures against) is the wrapper spanning the icon/name row AND
-    // the rows below it, not the narrow icon/name row alone — that's the
-    // actual "the whole card" the kebab centers against now.
-    expect(positioned!.parentElement).toHaveClass('relative', 'pr-8')
+    const wrapper = positioned!.parentElement!
+    expect(wrapper).toHaveClass('relative')
+    expect(wrapper.className).not.toContain('pr-8')
   })
 
-  // The outside click that dismisses the kebab almost always lands ON this
-  // row (it's most of the visible card) — without something to stop it,
-  // that same tap also silently expanded the card in the same motion.
-  // Confirmed live before this landed (getBoundingClientRect + aria-expanded
-  // before/after showed it flipping to true on the dismiss tap itself).
-  // Two fix attempts came before the one this now tests: a capture-phase
-  // stopPropagation inside ListingActionsMenu (worked here, not on real
-  // iPhones), then a per-card suppression ref/shared module keyed off
-  // ListingActionsMenu's own onOutsideDismiss callback (worked, but every
-  // new caller — the map's background tap, a directory's Add button — needed
-  // its own bespoke wiring, and some never got it). ListingActionsMenu now
-  // owns this itself with a real, invisible backdrop covering the whole
-  // viewport while the menu is open (see its own top-of-file doc) — this
-  // test clicks that backdrop directly (by test id, not the row), since in
-  // jsdom (no real hit-testing from screen position) that's what actually
-  // receives an outside tap now; a real browser routes the same tap there
-  // by ordinary z-order, whatever it looks like it landed on.
-  it('does not expand the card on the same tap that dismisses its kebab menu', async () => {
-    const user = userEvent.setup()
-    renderWithProviders(
-      <GenericListingCard item={makeListing()} category={makeCategory()} upvotes={false} count={0} {...requiredHandlers} />,
-    )
-
-    await user.click(screen.getByRole('button', { name: /more actions for/i }))
-    expect(screen.getByRole('menu')).toBeInTheDocument()
-
-    await user.click(screen.getByTestId('listing-actions-backdrop'))
-    const toggle = screen.getByRole('button', { name: /show details for/i })
-    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
-    expect(toggle).toHaveAttribute('aria-expanded', 'false')
-
-    // A later, genuinely separate tap on the row must still work.
-    const row = toggle.closest('div[class*="cursor-pointer"]')!
-    await user.click(row)
-    expect(toggle).toHaveAttribute('aria-expanded', 'true')
-  })
-
-  // Same failure mode as the test above, but across two different cards —
-  // the popup is portaled (see ListingActionsMenu's own doc), so an outside
-  // tap dismissing card A's menu could land anywhere on the page, including
-  // card B's own row. The backdrop fixes this the same way as the same-card
-  // case: card B is never involved in the click at all (the backdrop
-  // belongs to card A's own React tree and stops its own propagation — see
-  // ListingActionsMenu's own doc), so this is really confirming there's
-  // nothing card-specific left to keep in sync between the two cases any
-  // more, not a separate mechanism.
-  it("does not expand a different card on the tap that dismisses another card's kebab menu", async () => {
-    const user = userEvent.setup()
-    const category = makeCategory()
-    const itemA = makeListing({ id: 'listing-a', name: 'Card A' })
-    const itemB = makeListing({ id: 'listing-b', name: 'Card B' })
-    renderWithProviders(
-      <>
-        <GenericListingCard item={itemA} category={category} upvotes={false} count={0} {...requiredHandlers} />
-        <GenericListingCard item={itemB} category={category} upvotes={false} count={0} {...requiredHandlers} />
-      </>,
-    )
-
-    await user.click(screen.getByRole('button', { name: /more actions for card a/i }))
-    expect(screen.getByRole('menu')).toBeInTheDocument()
-
-    await user.click(screen.getByTestId('listing-actions-backdrop'))
-    const toggleB = screen.getByRole('button', { name: /show details for card b/i })
-    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
-    expect(toggleB).toHaveAttribute('aria-expanded', 'false')
-
-    // A later, genuinely separate tap on card B must still work.
-    const rowB = toggleB.closest('div[class*="cursor-pointer"]')!
-    await user.click(rowB)
-    expect(toggleB).toHaveAttribute('aria-expanded', 'true')
-  })
+  // The two tests that used to sit here — "a tap dismissing the kebab must
+  // not also expand the card", on this card and on a neighbouring one — are
+  // gone with the kebab itself. The behaviour they guarded is not: it belongs
+  // to ListingActionsMenu's own invisible backdrop, it is still live for the
+  // map's place panel, which still uses that menu, and it is covered where it
+  // lives (ListingActionsMenu.test.tsx, "closes the menu on an outside click,
+  // via the invisible backdrop" and the test below it). Deleted rather than
+  // rewritten because a card with no kebab cannot exercise any of it.
 
   it('does not render an upvote count when upvotes is false', () => {
     const category = makeCategory()
@@ -1200,70 +1140,206 @@ describe('GenericListingCard — distance slot', () => {
   })
 })
 
-// ── The collapsed row's actions kebab (Pin/Share/I'm here — see
-// ListingActionsMenu.tsx) and the layout change that made room for it: the
-// upvote/distance stat moved from a mobile-only corner column into the same
-// pl-[52px] row desktop already used, freeing the corner for the kebab on
-// both platforms. ──────────────────────────────────────────────────────────
-describe('GenericListingCard — actions menu corner', () => {
-  it('renders the actions kebab on desktop, in the collapsed row', () => {
+// ── The collapsed row's actions ──────────────────────────────────────────
+// These used to live in a kebab in the card's corner. The kebab is gone:
+// people open a ⋯ expecting Share and Save, never expecting to author
+// anything, which is exactly why Edit spent so long invisible in there.
+// Pin and Share are reached by swiping the row on mobile and by hovering it
+// on desktop; Edit and Set-as-location live below an opened listing (the
+// edit bar and its fan). Both card routes are SHORTCUTS — the fan is where
+// every visitor can reach these, which is what makes it safe for the card's
+// own copies to be invisible until asked for.
+describe('GenericListingCard — collapsed row actions', () => {
+  it('no longer renders a kebab on either viewport', () => {
     renderWithProviders(
       <GenericListingCard item={makeListing()} category={makeCategory()} upvotes={false} count={0} {...requiredHandlers} />,
     )
-    expect(screen.getByRole('button', { name: /more actions for/i })).toBeInTheDocument()
-  })
+    expect(screen.queryByRole('button', { name: /more actions for/i })).not.toBeInTheDocument()
+    cleanup()
 
-  it('renders the actions kebab on mobile too, in the same collapsed row', () => {
     renderWithProviders(
       <ForcedViewport isMobile>
         <GenericListingCard item={makeListing()} category={makeCategory()} upvotes={false} count={0} {...requiredHandlers} />
       </ForcedViewport>,
     )
-    expect(screen.getByRole('button', { name: /more actions for/i })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /more actions for/i })).not.toBeInTheDocument()
   })
 
-  // Edit is in this kebab on both platforms — reachable straight from the
-  // collapsed row, no need to expand the card first. There is no Report row:
-  // requesting a removal is the last part of the edit form itself.
-  it('on mobile, the kebab itself offers Edit (and no Report), without expanding the card', async () => {
-    const user = userEvent.setup()
+  // Hover can't be simulated meaningfully in jsdom (no layout, no real
+  // pointer), so this asserts the mechanism and, more importantly, the
+  // decision underneath it: these are a POINTER-ONLY shortcut.
+  //
+  // The first version made them focusable and revealed them on focus-within,
+  // reasoning that keyboard parity was the accessible choice. Measured on a
+  // real directory page it was the opposite — `opacity-0` removes an element
+  // from neither the tab order nor the accessibility tree, so a twenty-card
+  // list gained forty extra tab stops and forty announcements for controls
+  // nobody can see. Pin and Share stay reachable for everyone in the fan
+  // below an opened listing (ListingActionsFan), which is the same route
+  // that makes the touch-only swipe acceptable.
+  it('keeps the desktop hover actions out of the tab order and the a11y tree', () => {
     renderWithProviders(
-      <ForcedViewport isMobile>
-        <GenericListingCard item={makeListing()} category={makeCategory()} upvotes={false} count={0} {...requiredHandlers} />
-      </ForcedViewport>,
+      <GenericListingCard item={makeListing({ name: 'Goldi Market' })} category={makeCategory()} upvotes={false} count={0} {...requiredHandlers} />,
     )
 
-    await user.click(screen.getByRole('button', { name: /more actions for/i }))
-    expect(screen.queryByRole('menuitem', { name: /report/i })).not.toBeInTheDocument()
-    await user.click(screen.getByRole('menuitem', { name: /^edit$/i }))
-    expect(requiredHandlers.onEdit).toHaveBeenCalledTimes(1)
+    // Not queryable by role at all — that IS the assertion.
+    expect(screen.queryByRole('button', { name: 'Pin Goldi Market' })).not.toBeInTheDocument()
+
+    const reveal = document.querySelector('[aria-hidden="true"][class*="group-hover/row:opacity-100"]')
+    expect(reveal).not.toBeNull()
+    const buttons = reveal!.querySelectorAll('button')
+    expect(buttons).toHaveLength(2)
+    buttons.forEach((b) => expect(b).toHaveAttribute('tabindex', '-1'))
+    expect([...buttons].map((b) => b.getAttribute('aria-label'))).toEqual(['Pin Goldi Market', 'Share Goldi Market'])
   })
 
-  it('on desktop too, the collapsed row kebab offers Edit (and no Report)', async () => {
-    const user = userEvent.setup()
+  // Set-as-location re-sorts the whole directory — a deliberate act, not a
+  // scanning one — so it is deliberately NOT one of the card's two.
+  it('keeps Set as location off the card, where only scanning actions belong', () => {
     renderWithProviders(
       <GenericListingCard item={makeListing()} category={makeCategory()} upvotes={false} count={0} {...requiredHandlers} />,
     )
-
-    await user.click(screen.getByRole('button', { name: /more actions for/i }))
-    expect(screen.queryByRole('menuitem', { name: /report/i })).not.toBeInTheDocument()
-    await user.click(screen.getByRole('menuitem', { name: /^edit$/i }))
-    expect(requiredHandlers.onEdit).toHaveBeenCalledTimes(1)
+    expect(screen.queryByRole('button', { name: /set as location/i })).not.toBeInTheDocument()
   })
 
-  it('on mobile, expanding the card no longer shows standalone Edit/Report buttons — the kebab is the only way there now', async () => {
-    const user = userEvent.setup()
+  // This assertion used to read `expect(toggle.className).toContain(
+  // 'pointer-events-none')`, and it is worth saying why it is gone rather
+  // than just deleting it. The toggle carries no icon and no onClick — it
+  // exists so a keyboard or screen-reader visitor has a real control to
+  // activate — and once the kebab's `pr-8` reserve came off, making it
+  // transparent to pointers looked like a free win: a click landing on an
+  // invisible spacer would fall through to the name beneath.
+  //
+  // It was not free, and the test could not have told us. With pointer
+  // events off, hit-testing at the button's own centre returns the
+  // absolutely-positioned group around it, so the button stopped being
+  // clickable as itself — five listing-detail e2e tests that open a listing
+  // by clicking `Show details for ...` failed on it, across both viewports.
+  // The old test asserted the CSS class that WAS the bug, so it passed the
+  // whole time: jsdom loads no stylesheet, so nothing here can observe a
+  // computed `pointer-events` or a hit test, and a class-name assertion is
+  // not a substitute for either. Pointer-clickability is covered where it
+  // is real, in e2e/listing-detail.spec.ts.
+  //
+  // What this file CAN still guarantee is the part that made the button
+  // worth keeping: it is in the DOM, it is reachable by keyboard, and it
+  // reports its state.
+  it('keeps the invisible toggle in the DOM, keyboard-reachable and stateful', () => {
+    renderWithProviders(
+      <GenericListingCard item={makeListing({ name: 'Goldi Market' })} category={makeCategory()} upvotes={false} count={0} {...requiredHandlers} />,
+    )
+    const toggle = screen.getByRole('button', { name: /show details for Goldi Market/i })
+    expect(toggle).not.toHaveAttribute('tabindex', '-1')
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+  })
+})
+
+// ── Swipe to reveal, on mobile ───────────────────────────────────────────
+// A gesture is invisible and unreachable by keyboard, so everything here is
+// a SHORTCUT: Pin and Share are also in the fan below an opened listing,
+// which is the route that works for everyone. What's worth testing is the
+// gesture's own rules, because each one exists to stop it fighting something
+// else on the page.
+describe('GenericListingCard — swipe actions', () => {
+  function renderRow() {
     renderWithProviders(
       <ForcedViewport isMobile>
-        <GenericListingCard item={makeListing()} category={makeCategory()} upvotes={false} count={0} defaultExpanded {...requiredHandlers} />
+        <GenericListingCard item={makeListing({ name: 'Goldi Market' })} category={makeCategory()} upvotes={false} count={0} {...requiredHandlers} />
       </ForcedViewport>,
     )
+    return screen.getByRole('button', { name: /show details for Goldi Market/i }).closest('div[class*="cursor-pointer"]')!
+  }
 
-    expect(screen.queryByRole('button', { name: /^edit$/i })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /^report$/i })).not.toBeInTheDocument()
-    // The kebab is still the way there.
-    await user.click(screen.getByRole('button', { name: /more actions for/i }))
-    expect(screen.getByRole('menuitem', { name: /^edit$/i })).toBeInTheDocument()
+  function drag(row: Element, from: { x: number; y: number }, to: { x: number; y: number }) {
+    fireEvent.pointerDown(row, { pointerType: 'touch', clientX: from.x, clientY: from.y })
+    fireEvent.pointerMove(row, { pointerType: 'touch', clientX: to.x, clientY: to.y })
+    fireEvent.pointerUp(row, { pointerType: 'touch', clientX: to.x, clientY: to.y })
+  }
+
+  it('reveals Pin and Share when dragged far enough left', () => {
+    const row = renderRow()
+    drag(row, { x: 300, y: 100 }, { x: 180, y: 100 })
+
+    expect(screen.getByRole('button', { name: 'Pin Goldi Market' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Share Goldi Market' })).toBeInTheDocument()
+  })
+
+  // Releasing past the threshold settles at the panels' FULL width, not
+  // wherever the finger happened to stop — a row resting at some arbitrary
+  // offset leaves the panels partly clipped and reads as broken.
+  it('snaps open to the panels\' full width on release, not to where the drag ended', () => {
+    const row = renderRow()
+    drag(row, { x: 300, y: 100 }, { x: 180, y: 100 })
+
+    // Two panels at 74px each.
+    expect(row.getAttribute('style')).toContain('translateX(-148px)')
+  })
+
+  it('springs back when the drag stops short, rather than half-opening', () => {
+    const row = renderRow()
+    drag(row, { x: 300, y: 100 }, { x: 280, y: 100 })
+
+    expect(screen.queryByRole('button', { name: 'Pin Goldi Market' })).not.toBeInTheDocument()
+  })
+
+  // The row sits in a scrolling list. A drag that is mostly vertical has to
+  // stay a scroll — ties go to vertical on purpose, because a scroll that
+  // fails is far more annoying than a swipe that fails.
+  it('ignores a mostly-vertical drag so the list can still scroll', () => {
+    const row = renderRow()
+    drag(row, { x: 300, y: 100 }, { x: 240, y: 260 })
+
+    expect(screen.queryByRole('button', { name: 'Pin Goldi Market' })).not.toBeInTheDocument()
+  })
+
+  // iOS treats a drag from the left screen edge as "go back", and this app is
+  // an installed PWA, so that gesture is live. Competing with it would mean
+  // losing sometimes and, worse, winning sometimes.
+  it('leaves a drag starting at the screen edge to the browser', () => {
+    const row = renderRow()
+    drag(row, { x: 5, y: 100 }, { x: 5 - 120, y: 100 })
+
+    expect(screen.queryByRole('button', { name: 'Pin Goldi Market' })).not.toBeInTheDocument()
+  })
+
+  // A drag ends by dispatching a click. Without swallowing it, a swipe would
+  // also expand the card underneath in the same motion.
+  //
+  // The drag here is deliberately SHORT — below the commit threshold, so the
+  // row springs back shut. A long drag cannot test this: it leaves the panels
+  // open, and the click then hits the "tap dismisses the panels" branch,
+  // which returns early for its own reasons. Written the obvious way first,
+  // this test passed with the guard deleted; only the springs-back case
+  // actually isolates it.
+  it('does not expand the card on the click ending a drag that sprang back', () => {
+    const row = renderRow()
+    drag(row, { x: 300, y: 100 }, { x: 275, y: 100 })
+    fireEvent.click(row)
+
+    expect(screen.queryByRole('button', { name: 'Pin Goldi Market' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /show details for Goldi Market/i })).toHaveAttribute('aria-expanded', 'false')
+  })
+
+  // Once the panels are up, the next tap on the row puts them away — the
+  // same "first tap dismisses" rule any open menu follows — instead of
+  // expanding the card.
+  it('closes the panels on the next tap, without expanding', () => {
+    const row = renderRow()
+    drag(row, { x: 300, y: 100 }, { x: 180, y: 100 })
+    fireEvent.click(row)
+    fireEvent.click(row)
+
+    expect(screen.queryByRole('button', { name: 'Pin Goldi Market' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /show details for Goldi Market/i })).toHaveAttribute('aria-expanded', 'false')
+  })
+
+  it('does not arm the gesture for a mouse, which has the hover row instead', () => {
+    const row = renderRow()
+    fireEvent.pointerDown(row, { pointerType: 'mouse', clientX: 300, clientY: 100 })
+    fireEvent.pointerMove(row, { pointerType: 'mouse', clientX: 180, clientY: 100 })
+    fireEvent.pointerUp(row, { pointerType: 'mouse', clientX: 180, clientY: 100 })
+
+    expect(screen.queryByRole('button', { name: 'Pin Goldi Market' })).not.toBeInTheDocument()
   })
 })
 

@@ -58,6 +58,9 @@ afterEach(() => {
   // a spy's overridden implementation, which would otherwise leak into
   // every test after it.
   vi.restoreAllMocks()
+  // The movement tests redefine this; leave it where every other test in
+  // this file expects to find it.
+  Object.defineProperty(window, 'scrollY', { value: 0, configurable: true })
   // usePinned is backed by real localStorage (see pinnedContext.tsx) — every
   // test here uses the same listing id, so a pin left set by one test would
   // otherwise leak into the next.
@@ -247,6 +250,42 @@ describe('ListingActionsMenu', () => {
 
     expect(screen.queryByRole('menu')).not.toBeInTheDocument()
     scrollable.remove()
+  })
+
+  // The distinction the pair below exists for: a scroll POSITION changes
+  // synchronously, but the event announcing it is queued and arrives a
+  // frame or more later — 26ms for a plain scrollIntoView, measured in a
+  // real browser. So scrolling this button into view and then activating it
+  // (a phone still coasting on momentum when the thumb lands, or any
+  // automated click, which scrolls its target into view first) used to open
+  // the menu and then have it closed by the event for a scroll that had
+  // already finished. e2e/mobile.spec.ts carried a pre-scroll workaround
+  // for precisely this.
+  it('ignores a page scroll event that reports no actual movement', async () => {
+    vi.mocked(locationContext.useOptionalLocation).mockReturnValue(null)
+    const user = userEvent.setup()
+    renderMenu()
+
+    await user.click(screen.getByRole('button', { name: /more actions/i }))
+    expect(screen.getByRole('menu')).toBeInTheDocument()
+
+    // The shape of the late event: the position is exactly what it was when
+    // the menu opened, because the scroll it belongs to already landed.
+    fireEvent.scroll(document)
+
+    expect(screen.getByRole('menu')).toBeInTheDocument()
+  })
+
+  it('still closes when the page has genuinely moved', async () => {
+    vi.mocked(locationContext.useOptionalLocation).mockReturnValue(null)
+    const user = userEvent.setup()
+    renderMenu()
+
+    await user.click(screen.getByRole('button', { name: /more actions/i }))
+    Object.defineProperty(window, 'scrollY', { value: 240, configurable: true })
+    fireEvent.scroll(document)
+
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
   })
 
   it('does not render "Set as location" when there is no location context (e.g. the admin preview)', async () => {

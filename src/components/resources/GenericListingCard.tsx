@@ -13,13 +13,14 @@ import { routes } from '@/lib/routes'
 import { listingSlug } from '@/lib/listingSlug'
 import CategoryIcon from '@/components/CategoryIcon'
 import PinnedBadge from '@/components/PinnedBadge'
-import { PinIcon } from '@/components/icons'
+import { CheckIcon, ExternalIcon, PinIcon, ThumbtackIcon } from '@/components/icons'
 import UpvoteButton from './UpvoteButton'
 import FreshnessFooter from './FreshnessFooter'
 import PlaceDetailBody from './PlaceDetailBody'
 import ListingDetailModal from './ListingDetailModal'
-import ListingActionsMenu from './ListingActionsMenu'
 import ListingEditBar from './ListingEditBar'
+import { useListingActions, type ListingAction } from './useListingActions'
+import { useSwipeActions } from './useSwipeActions'
 import Chip from './Chip'
 import { travelParts } from '@/lib/listingTravel'
 import { ui } from '@/lib/uiConfig'
@@ -33,6 +34,30 @@ import { usePinned } from '@/lib/pinnedContext'
 // so GenericListingCard.test.tsx can advance fake timers by exactly this
 // much rather than a guessed duration that drifts if this one changes.
 export const MOBILE_PANEL_TRANSITION_MS = 240
+
+/** Pin and Share are the two that belong to SCANNING a list — shortlisting
+ *  as you read, sending one to someone. "Set as location" is deliberately
+ *  not here: it re-sorts the entire directory, which is a deliberate act
+ *  rather than something you do in passing, and two panels is the practical
+ *  ceiling for a swipe on a phone. It lives in the fan below an opened
+ *  listing instead. */
+const CARD_ACTION_IDS: ListingAction['id'][] = ['pin', 'share']
+/** One panel per action. 74px each is comfortably past the 44-48px tap-target
+ *  floor Apple and Material both set, with room for a word under the glyph. */
+const SWIPE_PANEL_PX = 74
+
+function CardActionIcon({ action }: { action: ListingAction }) {
+  const cls = 'h-4 w-4 shrink-0'
+  // Always the outline thumbtack, never ThumbtackIcon's filled variant.
+  // Filled renders the literal 📌 glyph, and PinnedBadge already puts one of
+  // those on this very card's avatar when a listing is pinned — two on one
+  // card is redundant to look at and genuinely ambiguous to query. The state
+  // still reaches everyone: the label these buttons carry is "Pin" or
+  // "Pinned" straight from useListingActions.
+  if (action.id === 'pin') return <ThumbtackIcon className={cls} />
+  if (action.id === 'share') return action.active ? <CheckIcon className={cls} /> : <ExternalIcon className={cls} />
+  return <PinIcon className={cls} />
+}
 
 // ── Card field helpers ──────────────────────────────────────────────────────────
 
@@ -195,8 +220,18 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
   // mounted and showing its open classes at that point.
   const [panelMounted, setPanelMounted] = useState(!!defaultExpanded)
   const [panelOpen, setPanelOpen] = useState(!!defaultExpanded)
+  // The synchronous setState below is the point, not an oversight: panelMounted has to flip
+  // before the double-rAF below can schedule panelOpen, which is what gives
+  // the transition a closed state to animate FROM (see the block comment
+  // above for the full reasoning). Deriving it during render instead would
+  // mean mounting and opening in the same commit, i.e. the silent pop this
+  // was built to replace. Pre-dates the swipe/hover work in this commit —
+  // that change didn't touch this effect, it only made the rule start
+  // reporting on it; refactoring carefully-timed animation code is not
+  // something to do incidentally.
   useEffect(() => {
     if (!expanded) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- see above
       setPanelOpen(false)
       const timer = setTimeout(() => setPanelMounted(false), MOBILE_PANEL_TRANSITION_MS)
       return () => clearTimeout(timer)
@@ -268,10 +303,20 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
   // one tick before settling into the inline panel — accepted the same way
   // the other isMobile-gated layout branches in this app already are.
   const isMobile = useIsMobile()
-  // The Share path ListingActionsMenu's kebab needs.
+  // The Share path the card's own actions (and the edit bar's fan) need.
   const listingPath = routes.listing(community, category.id, listingSlug(item))
   const { isPinned } = usePinned()
   const pinned = isPinned(item.id)
+
+  // Pin/Share for the collapsed row: revealed by a swipe on mobile, by
+  // hovering (or focusing into) the row on desktop. Both are shortcuts —
+  // ListingActionsFan below an opened listing is where these are reachable
+  // by every visitor, which is what makes it safe for the card's own copies
+  // to be invisible until asked for.
+  const swipeActions = useListingActions(item, category, listingPath).filter((a) =>
+    CARD_ACTION_IDS.includes(a.id),
+  )
+  const swipe = useSwipeActions(isMobile && swipeActions.length > 0, swipeActions.length * SWIPE_PANEL_PX)
 
   const fields = category.detailFields
   // Per-category capabilities layered under the global `ui.contributions` switches.
@@ -566,6 +611,50 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
     // no-op everywhere the card isn't a stretched grid item (mobile's single
     // column, the admin category preview).
     <div className="h-full border border-slate-200 rounded-lg bg-white shadow-sm">
+      {/* Swipe container. `overflow-hidden` ONLY while the row is actually
+          displaced — at rest this element is transparent to layout, which
+          matters because the card root deliberately has no overflow clipping
+          (it would cut off the cert badge's hover tooltip, see that comment).
+          Nobody is hovering a badge mid-drag, so clipping during the gesture
+          costs nothing and is what keeps the displaced row from spilling past
+          the card's left edge. */}
+      <div
+        className={`relative ${swipe.isOpen || swipe.dragging ? 'overflow-hidden' : ''} ${expanded && isMobile ? 'rounded-t-lg' : 'rounded-lg'}`}
+      >
+        {/* Sits UNDER the row rather than beside it, so revealing it is the
+            row moving rather than the list reflowing. Rendered only when
+            there's a displacement to reveal it — an always-mounted panel
+            behind an opaque row is invisible either way, and mounting it only
+            while it's reachable is also what keeps two extra copies of Pin
+            and Share out of the accessibility tree at rest.
+            They are NOT aria-hidden while they are up, though, which was
+            tempting for the same reason: a VoiceOver user performs this
+            swipe like anyone else, and hiding what it reveals would leave
+            them holding a panel of controls their screen reader says aren't
+            there. */}
+        {isMobile && (swipe.isOpen || swipe.dragging) && swipeActions.length > 0 && (
+          <div className="absolute inset-y-0 right-0 flex">
+            {swipeActions.map((action) => (
+              <button
+                key={action.id}
+                type="button"
+                aria-label={`${action.label} ${item.name}`}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  action.onSelect()
+                  swipe.close()
+                }}
+                style={{ width: SWIPE_PANEL_PX }}
+                className={`flex flex-col items-center justify-center gap-1 text-[11px] font-semibold text-white cursor-pointer ${
+                  action.id === 'pin' ? 'bg-brand-teal' : 'bg-slate-500'
+                }`}
+              >
+                <CardActionIcon action={action} />
+                {action.label}
+              </button>
+            ))}
+          </div>
+        )}
       {/* Not role="button"/tabIndex any more — the row also contains real
           interactive children (UpvoteButton, an external-link <a>, the
           Open/badge Chips), and an ARIA button role can't legally contain
@@ -579,7 +668,19 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
           toggle logic lives, not two copies to keep in sync. */}
       <div
         ref={cardRootRef}
+        {...swipe.handlers}
+        style={swipe.offset ? { transform: `translateX(${swipe.offset}px)` } : undefined}
         onClick={() => {
+          // A drag ends by dispatching a click. Swallow that one, or swiping
+          // a row open would also expand it. Reading this clears it.
+          if (swipe.consumeDrag()) return
+          // While the panels are showing, a tap on the row dismisses them
+          // rather than expanding — the same "first tap puts it away" rule
+          // any open menu follows.
+          if (swipe.isOpen) {
+            swipe.close()
+            return
+          }
           // The side effects deliberately sit OUTSIDE the state update, not
           // inside an updater function. A `setExpanded((p) => { …effects…;
           // return !p })` reads like the safe way to toggle, but React calls
@@ -607,7 +708,18 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
         // the bottom of the card: inside the visible border, past where this
         // div's own content ended, unclickable and with no hover state,
         // which is exactly what read as "the whole card isn't clickable."
-        className={`h-full w-full px-4 py-3 hover:bg-slate-50 active:bg-slate-100 transition-colors cursor-pointer ${expanded && isMobile ? 'rounded-t-lg' : 'rounded-lg'}`}
+        // group/row drives the desktop hover-reveal in the corner — named
+        // rather than bare `group` because the card already nests groups of
+        // its own (group/tip on the cert badges).
+        // relative + bg-white so this row paints OVER the swipe panels
+        // behind it; without an opaque background they'd show through.
+        // touch-action-pan-y hands vertical scrolling back to the browser and
+        // keeps only horizontal movement for the gesture — see useSwipeActions.
+        // The transition is dropped mid-drag so the row tracks the finger
+        // exactly, and restored for the release so it snaps.
+        className={`group/row relative h-full w-full bg-white px-4 py-3 hover:bg-slate-50 active:bg-slate-100 cursor-pointer touch-pan-y ${
+          swipe.dragging ? 'transition-colors' : 'transition-[colors,transform] duration-200 ease-out'
+        } ${expanded && isMobile ? 'rounded-t-lg' : 'rounded-lg'}`}
       >
         {/* items-center, not items-start, on mobile: the row's only ever
             2 lines there (name + subtitle — headerTextFields below is
@@ -623,7 +735,7 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
             without items-start the icon (and the trailing column) drift
             toward the middle of that taller block instead of staying
             anchored near the name's own line. */}
-        {/* relative + pr-8: the positioning context for the absolutely-
+        {/* relative: the positioning context for the absolutely-
             placed kebab/toggle group further down, and the reserved space
             that keeps this row's name text (and the description/upvote
             rows below, though neither actually gets close to the edge in
@@ -632,7 +744,7 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
             which is the actual "centered against the whole card" the
             kebab is centered against; see that group's own comment for why
             this wrapper's exact extent is what it is. */}
-        <div className="relative pr-8">
+        <div className="relative">
         <div className="flex items-center desktop:items-start gap-3">
           {/* Icon avatar — same glyph/image + tinted color as this category's
               map pin (see getCategoryColor), so a place reads as the same
@@ -745,7 +857,7 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
         </div>
 
         {/* Pin / Share / "I'm here" and the toggle — absolutely positioned
-            against the relative pr-8 wrapper above (which spans this row
+            against the relative wrapper above (which spans this row
             through the upvote/distance row below, stopping short of the
             badge divider) rather than sitting inline in the row above,
             specifically so "centered" means centered against the CARD'S
@@ -763,12 +875,12 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
             8px — that read as adrift from the corner rather than anchored
             to it) is what makes it read as placed on purpose. top-1/2
             -translate-y-1/2 is the actual vertical centering. The
-            wrapper's own pr-8 reserves this group's width (plus the 4px
-            inset) so the name/description text never wraps under it — a
-            fixed reserve is safe here because this group's own width is
-            small and fixed (an icon-only kebab + an invisible toggle), not
-            content-driven like the URL chips above, which stay in normal
-            flex flow instead specifically because they aren't.
+            wrapper's pr-8 reserve is gone along with the kebab that needed
+            it. What's left in this corner is the invisible toggle and, on
+            desktop only, two action buttons that aren't painted until the
+            row is hovered — neither is anything for the name to collide
+            with, so the name gets those 32px back (measured 346px -> 378px
+            on a real card at phone width).
             Same negative-margin tap-target-growing trick and gap-5 spacing
             both controls already used inline here — see each one's own
             className for why. */}
@@ -806,6 +918,18 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
             // invisible spacer below for why, and why this button stays in
             // the DOM at all despite having no icon on either breakpoint
             // now.
+            // Deliberately NOT pointer-events-none, which was tried here
+            // once pr-8 came off, on the reasoning that a click landing on
+            // an invisible spacer should fall through to the name beneath
+            // it. It costs more than it sounds like: with pointer events
+            // off, hit-testing at this button's own centre returns the
+            // absolutely-positioned group around it instead, so the button
+            // stops being clickable as itself — five e2e tests that open a
+            // listing by clicking `Show details for ...` failed on exactly
+            // that, on both viewports. Nothing was gained either way: this
+            // button has no onClick, so a click here has always just
+            // bubbled to the row's handler, and the name underneath is
+            // plain text with nothing of its own to receive.
             className="-m-2.5 cursor-pointer p-2.5"
           >
             {/* No visible chevron on either breakpoint any more — this row
@@ -829,18 +953,40 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
                 visual purpose. */}
             <span className="block h-4 w-4" aria-hidden="true" />
           </button>
-          <ListingActionsMenu
-            item={item}
-            category={category}
-            path={listingPath}
-            // Both platforms — a visitor reaching for Edit goes straight to
-            // this kebab first, same muscle memory as Pin/Share/Set
-            // location, rather than opening the expanded card first.
-            // (Requesting a removal is the last part of the edit form itself
-            // — see RemovalRequest — so there's no separate Report action.)
-            onEdit={onEdit}
-            canEdit={canEdit}
-          />
+          {/* Desktop's replacement for the kebab that used to sit here,
+              revealed on row hover. Deliberately a POINTER-ONLY shortcut:
+              aria-hidden and tabIndex={-1}, exactly like the mobile swipe is
+              a touch-only one. Both have the same real route behind them —
+              the fan below an opened listing — which is what makes it
+              legitimate for either to be unreachable on its own.
+              The first version of this did the opposite: focusable, revealed
+              on focus-within, on the theory that keyboard parity was the
+              accessible choice. In a directory it is the reverse. `opacity-0`
+              removes nothing from the tab order or the accessibility tree, so
+              a twenty-card list grew forty extra tab stops and forty
+              announcements of controls nobody can see — measured on a real
+              page, not theorised. Declining to duplicate a control is not the
+              same as denying access to it.
+              Desktop only: mobile has no hover to reveal anything with. */}
+          {!isMobile && swipeActions.length > 0 && (
+            <span aria-hidden="true" className="hidden desktop:flex items-center gap-1 opacity-0 transition-opacity group-hover/row:opacity-100">
+              {swipeActions.map((action) => (
+                <button
+                  key={action.id}
+                  type="button"
+                  tabIndex={-1}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    action.onSelect()
+                  }}
+                  aria-label={`${action.label} ${item.name}`}
+                  className="flex h-8 w-8 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 cursor-pointer"
+                >
+                  <CardActionIcon action={action} />
+                </button>
+              ))}
+            </span>
+          )}
         </div>
 
         {/* Mobile-only twin of the headerTextFields loop above — see the
@@ -932,6 +1078,8 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
             </div>
           </>
         )}
+      </div>
+
       </div>
 
       {/* Mobile: inline accordion, pushing the rest of the list down — see

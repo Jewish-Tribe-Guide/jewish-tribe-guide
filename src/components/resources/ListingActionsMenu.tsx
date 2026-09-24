@@ -124,6 +124,8 @@ export default function ListingActionsMenu({
   // opens downward from the kebab unless there isn't room below it.
   const [popupPos, setPopupPos] = useState<{ top?: number; bottom?: number; left: number; anchorRight: boolean } | null>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
+  /** Where the page was when the menu opened — see the scroll handler. */
+  const scrollAnchor = useRef(0)
   // Pin/Share/Set-as-location, already gated and already labelled for their
   // current state — see useListingActions. The collapsed card's swipe and
   // hover actions and the edit bar's own overflow read from the same hook,
@@ -131,6 +133,7 @@ export default function ListingActionsMenu({
   const actions = useListingActions(item, category, path)
 
   function openMenu() {
+    scrollAnchor.current = window.scrollY
     const rect = wrapRef.current?.getBoundingClientRect()
     if (rect) {
       // A rough estimate of the popup's height — good enough to decide
@@ -178,7 +181,31 @@ export default function ListingActionsMenu({
     // which is what most scrolling in this app actually is. `{ passive:
     // true }`: this never calls preventDefault, so the browser doesn't
     // need to wait for it before it can start scrolling.
-    const onScroll = () => setOpen(false)
+    //
+    // But "a scroll event fired" is NOT the same as "the page moved", and
+    // the gap between them is wide enough to be a bug. A scroll position
+    // changes synchronously; the event announcing it is queued and lands a
+    // frame or more later — measured at 26ms for a plain scrollIntoView. So
+    // anything that scrolls this button into view and then activates it — a
+    // phone still coasting through momentum scrolling when the thumb comes
+    // down, and every automated click, which scrolls its target into view
+    // first — opens the menu and then has it shut by the event for a scroll
+    // that had already finished. e2e/mobile.spec.ts used to carry a
+    // pre-scroll-then-click dance with a paragraph explaining it, which is
+    // what tipped this off: a test working around a dismissal it had not
+    // asked for was describing this bug without naming it.
+    //
+    // So compare positions rather than counting events. The anchor is taken
+    // when the menu opens, by which point a synchronous scroll has already
+    // landed, so its late event reports no movement and is ignored, while
+    // real scrolling always differs. A scroll in a nested element still
+    // closes outright: nothing here ever scrolls one programmatically, so
+    // those events can only mean a real visitor.
+    const onScroll = (e: Event) => {
+      const isPageScroll = e.target === document || e.target === document.scrollingElement
+      if (isPageScroll && window.scrollY === scrollAnchor.current) return
+      setOpen(false)
+    }
     document.addEventListener('keydown', onKey)
     document.addEventListener('scroll', onScroll, { capture: true, passive: true })
     return () => {

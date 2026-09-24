@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, screen, within } from '@testing-library/react'
+import { act, cleanup, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { makeCategory, makeListing } from '@/test/providerFixtures'
@@ -41,6 +41,9 @@ function withLocation() {
 afterEach(() => {
   cleanup()
   vi.clearAllMocks()
+  // The movement tests below redefine this; leave it where every other test
+  // in the file expects to find it.
+  Object.defineProperty(window, 'scrollY', { value: 0, configurable: true })
 })
 
 describe('ListingActionsFan', () => {
@@ -108,6 +111,47 @@ describe('ListingActionsFan', () => {
 
     expect(shareMock).toHaveBeenCalledTimes(1)
     expect(screen.getByRole('menu')).toBeInTheDocument()
+  })
+
+  // The regression this pair exists for: the fan used to close on any scroll
+  // EVENT, and a scroll event outlives the scroll it describes. Scrolling
+  // the trigger into view and then activating it — a phone still coasting on
+  // momentum when the thumb lands, or any automated click, which scrolls its
+  // target into view first — opened the fan and then had it shut by the
+  // event for a scroll that had already finished. Caught in a real browser,
+  // where scrollIntoView's event arrived 26ms after the click.
+  it('ignores a scroll event that reports no actual movement', async () => {
+    withLocation()
+    const user = userEvent.setup()
+    renderFan()
+
+    await user.click(screen.getByRole('button', { name: 'Actions for Goldi Market' }))
+    expect(screen.getByRole('menu')).toBeInTheDocument()
+
+    // Exactly the shape of the late event: the position is whatever it was
+    // when the fan opened, because the scroll it belongs to already landed.
+    // Wrapped in act() deliberately — a bare dispatch leaves React's state
+    // update unflushed, so the assertion reads the PREVIOUS render and both
+    // of these tests pass no matter what the handler does. That is how they
+    // were first written, and the mutation run is what exposed it.
+    act(() => {
+      document.dispatchEvent(new Event('scroll'))
+    })
+    expect(screen.getByRole('menu')).toBeInTheDocument()
+  })
+
+  it('still closes when the page has genuinely moved', async () => {
+    withLocation()
+    const user = userEvent.setup()
+    renderFan()
+
+    await user.click(screen.getByRole('button', { name: 'Actions for Goldi Market' }))
+    Object.defineProperty(window, 'scrollY', { value: 240, configurable: true })
+    act(() => {
+      document.dispatchEvent(new Event('scroll'))
+    })
+
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
   })
 
   it('closes on Escape', async () => {
