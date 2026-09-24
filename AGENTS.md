@@ -216,6 +216,35 @@ This is not a formality. Tests that would have passed against the broken thing h
 
 Do NOT use `git stash` to swap the old behaviour back in. Pathspec `git stash push` silently stashes nothing when the paths are untracked, and an unconditional `git stash pop` after it then pops whatever unrelated stash was on top — which has already happened here, applying someone's months-old work-in-progress into a clean tree as a merge conflict. Copy the file aside and copy it back.
 
+**Stop the dev server before running `npm run test:e2e`, and read the
+summary block, not the tail.** Two separate traps, both hit in one session
+(2026-09-24):
+
+- `test:e2e` runs `npm run build`, which shares `.next` with a running
+  `npm run dev`. With a dev server live on port 3000, `budgets.spec.ts`
+  measured the home screen's initial JS at **610 KB** against its 400 KB
+  ceiling; with the dev server stopped, the same commit measured **329 KB**.
+  Nothing warns you. The symptoms look like a real regression and are
+  wonderfully misleading — the same assertion passed on mobile and failed on
+  desktop in one run, and two other budget tests flipped between two runs of
+  identical code.
+- Playwright prints `N failed` ABOVE `N passed` in its summary. Reading the
+  last few lines of the output shows only the pass count, so a run with 13
+  failures reads as green. `npm run test:e2e` also exited 0 with failures
+  present, so the exit code is not a substitute either. Grep the whole
+  summary block: `grep -E '^\s+[0-9]+ (failed|passed|flaky|skipped)'`.
+
+**There is a standing set of local e2e failures that is not your change.**
+Measured against a clean worktree at `d8ccd8b`: 11 tests fail locally on both
+viewports before any of the current work —
+`accessibility.spec.ts:136` (Add form dialog), `budgets.spec.ts:174`
+(Turnstile), `csp.spec.ts:73`, `pins.spec.ts:62` and `:91`, plus
+`mobile.spec.ts:189` on mobile. `offline.spec.ts:138` joins them about half
+the time (see [[project-e2e-flakiness-baseline]]). Before concluding you broke
+something, get a baseline: `git worktree add --detach <tmp> <pre-change-sha>`,
+`npm ci` inside it (a symlinked `node_modules` makes Turbopack panic with
+"points out of the filesystem root"), then diff the two failure lists.
+
 **Run `npm run test:e2e` before calling any change to routing, data loading, caching, or metadata done.** That is where the expensive mistakes have been, and every test in `e2e/` exists because something actually broke:
 
 - `/` silently stopped being an HTTP redirect and became a JavaScript one, so crawlers and WhatsApp link previews saw a blank 200. Caused by wrapping `redirect()` in a `<Suspense>` boundary for Cache Components.
