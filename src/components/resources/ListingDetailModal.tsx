@@ -4,6 +4,9 @@ import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { DirectoryResource } from '@/types'
 import type { CategoryConfig, CategoryField } from '@/lib/categories'
+import { useCommunitySlug } from '@/lib/communityContext'
+import { routes } from '@/lib/routes'
+import { listingSlug } from '@/lib/listingSlug'
 import CategoryIcon from '@/components/CategoryIcon'
 import PlaceDetailBody from './PlaceDetailBody'
 import FreshnessFooter from './FreshnessFooter'
@@ -96,6 +99,10 @@ export default function ListingDetailModal({
   hasPrev,
   hasNext,
 }: Props) {
+  const community = useCommunitySlug()
+  // The listing's own URL, for the edit bar's overflow Share.
+  const listingPath = routes.listing(community, category.id, listingSlug(item))
+
   // Own history entry, nested on top of whatever real navigation got this
   // dialog open in the first place — so browser back closes the form and
   // returns to the detail view, not out of the dialog (or off the page)
@@ -443,7 +450,13 @@ export default function ListingDetailModal({
         // should still reach the backdrop and close the dialog the way a
         // click anywhere else outside the card does.
         <div className="pointer-events-none absolute inset-x-0 top-full mt-3 flex">
-          <ListingEditBar onEdit={() => openForm('edit')} className="pointer-events-auto" />
+          <ListingEditBar
+            onEdit={() => openForm('edit')}
+            item={item}
+            category={category}
+            path={listingPath}
+            className="pointer-events-auto"
+          />
         </div>
       )}
       </div>

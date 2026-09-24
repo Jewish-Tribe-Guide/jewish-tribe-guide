@@ -1,6 +1,9 @@
 'use client'
 
+import type { DirectoryResource } from '@/types'
+import type { CategoryConfig } from '@/lib/categories'
 import { PencilIcon } from '@/components/icons'
+import ListingActionsFan from './ListingActionsFan'
 
 // ── The one visible way to edit an open listing ──────────────────────────
 // A full-width pill that sits BELOW the listing rather than inside it, in
@@ -35,23 +38,38 @@ import { PencilIcon } from '@/components/icons'
 // it, and the directory card's row toggles itself.
 export default function ListingEditBar({
   onEdit,
+  item,
+  category,
+  path,
   className = '',
 }: {
   onEdit: () => void
-  /** Surface-specific spacing/shadow. The shape itself never varies. */
+  item: DirectoryResource
+  category: CategoryConfig
+  /** The listing's own URL — what the overflow's Share copies. */
+  path: string
+  /** Surface-specific spacing. The shape itself never varies. */
   className?: string
 }) {
   return (
-    <button
-      type="button"
-      onClick={(e) => {
-        e.stopPropagation()
-        onEdit()
-      }}
-      className={`flex w-full cursor-pointer items-center justify-center gap-2 rounded-full bg-primary px-5 py-3 text-sm font-semibold text-white shadow-lg transition-transform active:scale-[0.98] ${className}`}
-    >
-      <PencilIcon className="h-4 w-4 shrink-0" />
-      Suggest an edit
-    </button>
+    // A wide primary plus a small round overflow, not two peers. The shape
+    // is doing work: it gives the row an end-stop, so the bar sits on a base
+    // instead of dangling from the middle of the card above it — and it
+    // keeps the one action worth finding visually dominant over three that
+    // are merely useful.
+    <div className={`flex w-full items-stretch gap-2 ${className}`}>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation()
+          onEdit()
+        }}
+        className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-full bg-primary px-5 py-3 text-sm font-semibold text-white shadow-lg transition-transform active:scale-[0.98]"
+      >
+        <PencilIcon className="h-4 w-4 shrink-0" />
+        Suggest an edit
+      </button>
+      <ListingActionsFan item={item} category={category} path={path} />
+    </div>
   )
 }

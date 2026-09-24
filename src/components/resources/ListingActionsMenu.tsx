@@ -4,10 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { DirectoryResource } from '@/types'
 import type { CategoryConfig } from '@/lib/categories'
-import { usePinned } from '@/lib/pinnedContext'
-import { useShareLink } from '@/lib/useShareLink'
-import { useOptionalLocation } from '@/lib/locationContext'
-import { ui } from '@/lib/uiConfig'
+import { useListingActions, type ListingAction } from './useListingActions'
 import { DotsIcon, PinIcon, ThumbtackIcon, ExternalIcon, CheckIcon, PencilIcon } from '@/components/icons'
 
 // ── The kebab menu on a listing — Pin, Share, and "Set location" all
@@ -73,6 +70,18 @@ const MENU_WIDTH = 192
 // the very edge of the screen even when it JUST fits.
 const EDGE_MARGIN = 8
 
+/** Which glyph a menu row draws. Lives with the renderer rather than in
+ *  useListingActions because each surface draws these differently — and the
+ *  split matters: ThumbtackIcon is "save to my shortlist", while PinIcon's
+ *  map-marker teardrop is reserved for "set as location", the one actually
+ *  about a place on a map. */
+function ActionIcon({ action }: { action: ListingAction }) {
+  const cls = 'h-4 w-4 shrink-0'
+  if (action.id === 'pin') return <ThumbtackIcon filled={action.active} className={cls} />
+  if (action.id === 'share') return <ExternalIcon className={cls} />
+  return action.active ? <CheckIcon className={cls} /> : <PinIcon className={cls} />
+}
+
 export default function ListingActionsMenu({
   item,
   category,
@@ -115,19 +124,11 @@ export default function ListingActionsMenu({
   // opens downward from the kebab unless there isn't room below it.
   const [popupPos, setPopupPos] = useState<{ top?: number; bottom?: number; left: number; anchorRight: boolean } | null>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
-  const { isPinned, toggle } = usePinned()
-  const { share, copied } = useShareLink(path, item.name)
-  // Optional, not useLocation() — this renders inside the admin's category
-  // preview too, which has no LocationProvider on purpose (see
-  // SetLocationButton's own note).
-  const location = useOptionalLocation()
-  // Computed here (not down by `active`, which also needs it) so openMenu's
-  // own row-count estimate below can use it without forward-referencing a
-  // `const` declared later in the function. Same gate the old
-  // SetLocationButton used — a listing whose address failed to geocode has
-  // no geo key, and a category with no physical place (e.g. a WhatsApp
-  // group) has hasAddress === false.
-  const canSetLocation = !!location && category.hasAddress !== false && !!item.geo
+  // Pin/Share/Set-as-location, already gated and already labelled for their
+  // current state — see useListingActions. The collapsed card's swipe and
+  // hover actions and the edit bar's own overflow read from the same hook,
+  // so none of that gating lives in more than one place.
+  const actions = useListingActions(item, category, path)
 
   function openMenu() {
     const rect = wrapRef.current?.getBoundingClientRect()
@@ -137,8 +138,7 @@ export default function ListingActionsMenu({
       // measure the real thing (same reasoning as CheckboxDropdown's own
       // ESTIMATED_ROW_PX). ~44px per row (see menuItemClass), +8px for the
       // popup's own vertical padding/border.
-      const itemCount =
-        (ui.map.pins ? 1 : 0) + 1 /* Share always renders */ + (canSetLocation ? 1 : 0) + (canEdit ? 1 : 0)
+      const itemCount = actions.length + (canEdit ? 1 : 0)
       const estimatedHeight = itemCount * 44 + 8
       const left = Math.min(rect.left, window.innerWidth - MENU_WIDTH - EDGE_MARGIN)
       // Clamped inward from the kebab's own left edge means the popup is
@@ -186,9 +186,6 @@ export default function ListingActionsMenu({
       document.removeEventListener('scroll', onScroll, true)
     }
   }, [open])
-
-  const pinned = isPinned(item.id)
-  const active = canSetLocation && location!.anchorListingId === item.id
 
   // py-3 + text-sm (~44px row height), not the old py-2 + text-xs (~36px) —
   // Material's and Apple HIG's own tap-target minimum is ~44-48px, and the
@@ -294,63 +291,30 @@ export default function ListingActionsMenu({
             }}
             className="z-[56] w-48 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg animate-[menuIn_140ms_ease-out]"
           >
-            {/* ui.map.pins is the same flag the map's own pin filter
-                    chip and (formerly) PinButton respected — the original
-                    build of this menu missed it and showed Pin
-                    unconditionally even with pinning turned off
-                    community-wide. */}
-                {/* No aria-pressed on these two items: it isn't a supported
-                    attribute of role="menuitem" (axe: aria-allowed-attr,
-                    critical). Their labels already carry the state —
-                    "Pin"/"Pinned", "Set as location"/"Location set" — which
-                    is what a screen reader reads. */}
-                {ui.map.pins && (
-                  <button
-                    type="button"
-                    role="menuitem"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      toggle({ id: item.id, categoryId: category.id })
-                      setOpen(false)
-                    }}
-                    className={menuItemClass}
-                  >
-                    {/* ThumbtackIcon, not PinIcon — this is "save to my
-                        shortlist," not "set my location." PinIcon's
-                        map-marker teardrop is freed up for the "Set as
-                        location" item below, which is the one actually
-                        about a place on a map. See ThumbtackIcon's own doc
-                        for why this is the real 📌 glyph (blackened/dimmed
-                        to match) rather than a redrawn shape. */}
-                    <ThumbtackIcon filled={pinned} className="h-4 w-4 shrink-0" />
-                    {pinned ? 'Pinned' : 'Pin'}
-                  </button>
-                )}
-                <button
-                  type="button"
-                  role="menuitem"
-                  onClick={share}
-                  className={menuItemClass}
-                >
-                  <ExternalIcon className="h-4 w-4 shrink-0" />
-                  {copied ? 'Copied!' : 'Share'}
-                </button>
-                {canSetLocation && (
-                  <button
-                    type="button"
-                    role="menuitem"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      if (active) location!.unsetListingAnchor()
-                      else location!.setListingAnchor({ id: item.id, name: item.name, coords: item.geo! })
-                      setOpen(false)
-                    }}
-                    className={menuItemClass}
-                  >
-                    {active ? <CheckIcon className="h-4 w-4 shrink-0" /> : <PinIcon className="h-4 w-4 shrink-0" />}
-                    {active ? 'Location set' : 'Set as location'}
-                  </button>
-                )}
+            {/* No aria-pressed on these: it isn't a supported attribute of
+                role="menuitem" (axe: aria-allowed-attr, critical). Each label
+                already carries its own state — "Pin"/"Pinned", "Set as
+                location"/"Location set" — which is what a screen reader
+                actually reads out. */}
+            {actions.map((action) => (
+              <button
+                key={action.id}
+                type="button"
+                role="menuitem"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  action.onSelect()
+                  // Share is the exception: its own label becomes "Copied!"
+                  // as the confirmation, which nobody sees if the menu closes
+                  // out from under it.
+                  if (action.id !== 'share') setOpen(false)
+                }}
+                className={menuItemClass}
+              >
+                <ActionIcon action={action} />
+                {action.label}
+              </button>
+            ))}
             {canEdit && <div role="separator" className="my-1 h-px bg-slate-100" />}
             {canEdit && (
               <button
