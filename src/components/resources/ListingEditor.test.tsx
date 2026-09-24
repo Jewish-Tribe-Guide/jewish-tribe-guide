@@ -440,6 +440,14 @@ describe('ListingEditor — sending', () => {
     slot.remove()
   })
 
+  // Send is the last thing on every screen: under the desktop dialog, and
+  // the end of the content on a phone, after the removal link, not before.
+  it('ends with Send, after the removal link, when Send is in the content', () => {
+    renderEditor()
+    const link = screen.getByRole('button', { name: 'Closed for good? Request removal' })
+    expect(link.compareDocumentPosition(send()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
   // Removal's confirm is where Send was, and looks the same: it's a request
   // a moderator reviews, not a deletion, so it isn't the red of danger.
   it('puts the removal confirm in Send\'s slot, looking the same as Send', async () => {

@@ -1021,10 +1021,10 @@ export default function ListingEditor({ item, category, onClose, sendSlot, title
           </ul>
         )}
 
-        {/* Not while the removal panel is up: a portaled button isn't inside
-            this block's `hidden`, so it would stay on screen beside it. */}
-        {sendSlot ? !removalOpen && createPortal(sendButton, sendSlot) : sendButton}
-
+        {/* Above Send, so Send is the last thing on every screen: under the
+            dialog on desktop (portaled), and the end of the content on a
+            phone. The rare alternative comes before the main action, and
+            an edit doesn't end on a red "request removal". */}
         {canRequestRemoval && (
           <p className="text-center">
             <button type="button" onClick={() => setRemovalOpen(true)} className="cursor-pointer text-sm text-red-600 hover:underline">
@@ -1032,6 +1032,10 @@ export default function ListingEditor({ item, category, onClose, sendSlot, title
             </button>
           </p>
         )}
+
+        {/* Not while the removal panel is up: a portaled button isn't inside
+            this block's `hidden`, so it would stay on screen beside it. */}
+        {sendSlot ? !removalOpen && createPortal(sendButton, sendSlot) : sendButton}
       </div>
 
       {canRequestRemoval && (
