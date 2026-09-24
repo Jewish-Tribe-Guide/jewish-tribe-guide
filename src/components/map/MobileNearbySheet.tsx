@@ -1,6 +1,6 @@
 'use client'
 
-import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState, type ReactNode } from 'react'
 import NearbyList from './NearbyList'
 import MapPlaceDetail from './MapPlaceDetail'
 import type { MapPoint } from './ResourceMap'
@@ -217,11 +217,11 @@ const MobileNearbySheet = forwardRef<MobileNearbySheetHandle, Props>(function Mo
 
   function collapse() {
     // Used to need to check whether the tap it's reacting to actually just
-    // dismissed MapPlaceDetail's own kebab menu instead of genuinely tapping
+    // dismissed the place detail's popup menu instead of genuinely tapping
     // the map away — the map's background tap is Google Maps' own event,
     // not a plain DOM click, so it could fire before, after, or instead of
-    // this component's own outside-click detection. Moot now: the kebab's
-    // own invisible backdrop (see ListingActionsMenu's own doc) sits on top
+    // this component's own outside-click detection. Moot now: the popup's
+    // own invisible backdrop (see ListingActionsFan's own doc) sits on top
     // of the ENTIRE screen while it's open, so a tap dismissing it never
     // reaches Google Maps' canvas at all — this collapse() simply never
     // gets called for that tap in the first place.
@@ -519,6 +519,40 @@ const MobileNearbySheet = forwardRef<MobileNearbySheetHandle, Props>(function Mo
 
   const selectedCategory = selected ? categories.find((c) => c.id === selected.filterId) : undefined
 
+  // The sheet's scroll region, as a function rather than inline JSX so the
+  // place detail can render into it while keeping its docked edit bar a
+  // SIBLING of it — outside this region's content-drag handlers, so a tap
+  // on the bar can never begin a sheet drag (see MapPlaceDetail's
+  // renderScroll). One definition for both branches below, so the list and
+  // the detail can't drift apart on any of this region's load-bearing
+  // details: the ref the momentum loop reads, the hand-driven pointer
+  // scrolling, touch-none.
+  //
+  // The detail branch mounts its own copy rather than sharing the list's
+  // element. Everything that reads contentRef does so fresh at the moment
+  // it needs it, so that's safe — and nothing restores the list's scroll
+  // position on the way back, so there's no saved offset to lose either.
+  const scrollRegion = (content: ReactNode, { barBelow }: { barBelow: boolean }) => (
+    <div
+      ref={contentRef}
+      onPointerDown={onContentPointerDown}
+      onPointerMove={onContentPointerMove}
+      onPointerUp={onContentPointerUp}
+      onPointerCancel={onContentPointerCancel}
+      // touch-none unconditionally now, in every snap state — the list's
+      // own scrolling is hand-driven (see onContentPointerMove) rather
+      // than native touch-action: pan-y panning, so there's no longer a
+      // snap state where the browser needs panning permission here.
+      // The safe-area inset belongs to whatever is the sheet's LAST row: this
+      // region normally, the docked edit bar when there is one.
+      className={`min-h-0 flex-1 touch-none overflow-y-auto overscroll-contain px-3 ${
+        barBelow ? 'pb-3' : 'pb-[calc(0.75rem+env(safe-area-inset-bottom))]'
+      }`}
+    >
+      {content}
+    </div>
+  )
+
   return (
     <div
       className="absolute inset-x-0 bottom-0 z-20 flex flex-col rounded-t-2xl bg-white shadow-[0_-4px_24px_rgba(0,0,0,0.18)] desktop:hidden"
@@ -543,29 +577,24 @@ const MobileNearbySheet = forwardRef<MobileNearbySheetHandle, Props>(function Mo
           </span>
         )}
       </div>
-      <div
-        ref={contentRef}
-        onPointerDown={onContentPointerDown}
-        onPointerMove={onContentPointerMove}
-        onPointerUp={onContentPointerUp}
-        onPointerCancel={onContentPointerCancel}
-        // touch-none unconditionally now, in every snap state — the list's
-        // own scrolling is hand-driven (see onContentPointerMove) rather
-        // than native touch-action: pan-y panning, so there's no longer a
-        // snap state where the browser needs panning permission here.
-        className="min-h-0 flex-1 touch-none overflow-y-auto overscroll-contain px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]"
-      >
-        {selected && selected.raw && selectedCategory ? (
-          <MapPlaceDetail
-            item={selected.raw}
-            category={selectedCategory}
-            color={selected.color}
-            onBack={clearSelection}
-          />
-        ) : (
-          <NearbyList points={points} userLocation={userLocation} onViewListing={onViewListing} onSelectPlace={selectPlace} />
-        )}
-      </div>
+      {selected && selected.raw && selectedCategory ? (
+        <MapPlaceDetail
+          item={selected.raw}
+          category={selectedCategory}
+          color={selected.color}
+          onBack={clearSelection}
+          renderScroll={scrollRegion}
+          // Not at peek: 64px is the whole sheet, and the bar would swallow
+          // it. Keyed off the settled snap rather than the live drag height,
+          // so it doesn't flicker in and out while a finger crosses the line.
+          showEditBar={snap !== 'peek'}
+        />
+      ) : (
+        scrollRegion(
+          <NearbyList points={points} userLocation={userLocation} onViewListing={onViewListing} onSelectPlace={selectPlace} />,
+          { barBelow: false },
+        )
+      )}
     </div>
   )
 })

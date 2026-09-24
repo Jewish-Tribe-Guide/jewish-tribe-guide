@@ -18,18 +18,36 @@ import { useListingActions, type ListingAction } from './useListingActions'
 // **Every circle carries a visible caption, always.** That isn't decoration
 // and it isn't negotiable: Pin and Set-as-location are a thumbtack and a
 // map-marker, two glyphs this codebase already had to split apart on purpose
-// (see ActionIcon in ListingActionsMenu), and stripped of text they are a
+// (see ActionGlyph below, and ThumbtackIcon's own doc), and stripped of text they are a
 // coin toss. The same lesson is written on the Add button itself, which
 // grew a visible label on desktop precisely because a bare icon floating in
 // a corner was "invisible unless you already knew to hover-and-guess".
 //
-// Mobile brings its own dim backdrop; desktop doesn't, because the dialog's
-// own scrim is already there. Both still render a full-viewport backdrop
-// element — on desktop it's simply transparent. That element is what makes
-// outside-tap dismissal work at all: it's the actual topmost thing at that
-// screen position, so a tap hits IT by the browser's own hit-testing rather
-// than reaching the card, map, or Add button underneath. ListingActionsMenu
-// has the long version of why every other approach to this failed.
+// The `stack` placement brings its own dim backdrop; the others don't,
+// because the directory dialog's own scrim is already behind them. All of
+// them still render a full-viewport backdrop element — transparent when
+// there's a scrim already. That element is what makes outside-tap dismissal
+// work at all, and it replaced two earlier approaches that both failed, so
+// the history is worth keeping (it used to live in ListingActionsMenu, the
+// kebab this replaced, deleted in phase 3 of the edit-discoverability work):
+//
+//   - Per-caller suppression flags. An outside tap that closes a popup
+//     almost always lands on something with its own click behaviour — the
+//     same card's row, a different card's row, the map's background
+//     tap-to-collapse, the Add button — and each needed its own "ignore the
+//     next click" flag. New ones kept surfacing.
+//   - A capture-phase stopPropagation. It passed this codebase's synthetic-
+//     event tests and failed consistently on real iPhones, in both Safari
+//     and Chrome, for reasons never pinned down.
+//
+// The backdrop wins by being the actual topmost element at that screen
+// position — a property of ordinary DOM stacking every browser agrees on —
+// so an outside tap hits IT and never reaches whatever is underneath.
+// Nothing needs to opt in, including callers that don't exist yet. The
+// popup is portaled for the related reason: an in-place `absolute` popup
+// only wins z-index fights inside its nearest stacking context, and the
+// directory's cards sit in a tree where raising it kept losing to the next
+// sibling (the sticky sort toggle, then a neighbouring card's upvote icon).
 const CIRCLE = 46
 const GAP = 12
 /** Generous enough for the longest label ("Set as location") plus its gap. */
@@ -57,8 +75,10 @@ type Placement =
    *  side clearance at all — three circles are ~162px, which fits under the
    *  bar at any width — so it's what a narrow window falls back to. */
   | { kind: 'row'; right: number; top: number }
-  /** Mobile: column rising from the trigger, captions to the LEFT so they
-   *  never run off the right edge of a phone. */
+  /** Column rising from the trigger, captions to the LEFT so they never run
+   *  off the right edge, over its OWN dim backdrop. Always used on mobile,
+   *  and wherever there is no scrim for the captions to sit on — see the
+   *  `placement` prop. */
   | { kind: 'stack'; right: number; bottom: number }
 
 function ActionGlyph({ action }: { action: ListingAction }) {
@@ -72,10 +92,18 @@ export default function ListingActionsFan({
   item,
   category,
   path,
+  placement: requested = 'auto',
 }: {
   item: DirectoryResource
   category: CategoryConfig
   path: string
+  /** `stack` for a surface with no scrim behind it — the map's panels,
+   *  whose background is a live map. The captions are white with a text
+   *  shadow, written for the dark ground of a scrim or of `stack`'s own
+   *  backdrop; the desktop `side` placement would put them straight onto
+   *  pale greens and greys. `side` and `row` also clear the directory
+   *  dialog's ‹ › arrows (NAV_CLEARANCE), which nothing else has. */
+  placement?: 'auto' | 'stack'
 }) {
   const actions = useListingActions(item, category, path)
   const isMobile = useIsMobile()
@@ -93,8 +121,8 @@ export default function ListingActionsFan({
         triggerRef.current?.focus()
       }
     }
-    // Same reasoning as ListingActionsMenu's: a scroll means the visitor has
-    // moved on, and leaving a floating thing behind while the page slides
+    // Standard for any floating menu (native action sheets, Material menus):
+    // a scroll means the visitor has moved on, and leaving a floating thing behind while the page slides
     // under it reads as stuck rather than dismissed.
     //
     // But "a scroll event fired" is NOT the same as "the page moved", and
@@ -137,7 +165,7 @@ export default function ListingActionsFan({
     const n = actions.length
     const columnHeight = n * CIRCLE + (n - 1) * GAP
 
-    if (isMobile) {
+    if (isMobile || requested === 'stack') {
       setPlacement({ kind: 'stack', right: window.innerWidth - rect.right, bottom: window.innerHeight - rect.top + GAP })
       return
     }
@@ -177,13 +205,13 @@ export default function ListingActionsFan({
         type="button"
         aria-haspopup="menu"
         aria-expanded={open}
-        // "Actions for", NOT "More actions for" — that exact string is the
-        // collapsed row's kebab (ListingActionsMenu), which is still in the
-        // DOM behind this until the card loses it. Two controls sharing an
-        // accessible name is a real problem for anyone navigating by name,
-        // and it has bitten this codebase before (the floating Add button vs
-        // the empty-state Add button). "More" was also never accurate here:
-        // it implies some of the set is already visible, and none of it is.
+        // "Actions for", NOT "More actions for". That was the kebab's label
+        // (ListingActionsMenu, since deleted), and while both existed they
+        // were in the DOM together — two controls sharing an accessible name
+        // is a real problem for anyone navigating by name, and it has bitten
+        // this codebase before (the floating Add button vs the empty-state
+        // Add button). "More" was also never accurate here: it implies some
+        // of the set is already visible, and none of it is.
         aria-label={open ? `Close actions for ${item.name}` : `Actions for ${item.name}`}
         onClick={(e) => {
           e.stopPropagation()
@@ -208,14 +236,18 @@ export default function ListingActionsFan({
         createPortal(
           <>
             <div
-              // Dimmed on mobile only — desktop already has the dialog's own
-              // scrim behind this. Transparent or not, it's the element that
-              // catches an outside tap.
+              // Dimmed exactly when the placement is `stack` — keyed on the
+              // placement, NOT on isMobile, which it was until `stack`
+              // stopped being mobile-only. The map sidebar forces `stack` on
+              // desktop, and an isMobile check there left the backdrop
+              // transparent: white captions over a white sidebar. Transparent
+              // or not, it's the element that catches an outside tap.
               onClick={(e) => {
                 e.stopPropagation()
                 setPlacement(null)
               }}
-              className={`fixed inset-0 z-[55] ${isMobile ? 'bg-slate-900/55' : ''}`}
+              className={`fixed inset-0 z-[55] ${placement.kind === 'stack' ? 'bg-slate-900/55' : ''}`}
+              data-testid="listing-actions-fan-backdrop"
               aria-hidden="true"
             />
             <div

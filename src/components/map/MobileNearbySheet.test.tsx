@@ -27,12 +27,33 @@ vi.mock('./NearbyList', () => ({
     </div>
   ),
 }))
+// The stub honours MapPlaceDetail's renderScroll/showEditBar contract, since
+// how this sheet drives those two is part of its own job: which region the
+// detail renders into, and whether it's allowed a docked bar at the current
+// snap. A stub that ignored them — as this one did until the bar existed —
+// would let the sheet's half of that contract break with every test green.
 vi.mock('./MapPlaceDetail', () => ({
-  default: ({ item, onBack }: { item: Point; onBack: () => void }) => (
-    <div>
-      <p>detail for {item.name}</p>
-      <button onClick={onBack}>Back to list</button>
-    </div>
+  default: ({
+    item,
+    onBack,
+    renderScroll = (c: React.ReactNode) => c,
+    showEditBar = true,
+  }: {
+    item: Point
+    onBack: () => void
+    renderScroll?: (content: React.ReactNode, opts: { barBelow: boolean }) => React.ReactNode
+    showEditBar?: boolean
+  }) => (
+    <>
+      {renderScroll(
+        <div>
+          <p>detail for {item.name}</p>
+          <button onClick={onBack}>Back to list</button>
+        </div>,
+        { barBelow: showEditBar },
+      )}
+      {showEditBar && <div data-testid="docked-edit-bar" />}
+    </>
   ),
 }))
 
@@ -99,17 +120,16 @@ describe('MobileNearbySheet', () => {
   })
 
   // collapse() used to carry two independent guards here, needed because a
-  // tap dismissing MapPlaceDetail's own kebab menu could otherwise ALSO
+  // tap dismissing the place detail's popup menu could otherwise ALSO
   // collapse this whole sheet in the same motion (the map's background tap
   // is Google Maps' own 'click' event, not a plain DOM click this
   // component's own outside-click detection could reliably order itself
   // against). Removed along with the callback props that drove them
-  // (onOutsideDismiss/onOpenChange) once ListingActionsMenu started
-  // covering this itself: an invisible backdrop sits over the ENTIRE
-  // screen while its menu is open (see that component's own doc), so a
-  // dismissing tap never reaches Google Maps' canvas at all — collapse()
-  // simply never gets called for that tap in the first place, and there's
-  // nothing left here to guard against or test.
+  // (onOutsideDismiss/onOpenChange) once the popup covered this itself: an
+  // invisible backdrop sits over the ENTIRE screen while it's open (see
+  // ListingActionsFan's own doc), so a dismissing tap never reaches Google
+  // Maps' canvas at all — collapse() simply never gets called for that tap
+  // in the first place, and there's nothing left here to guard against.
   it('returns to the list (not the home screen) when a swipe-back fires while a place is selected', async () => {
     const user = userEvent.setup()
 
@@ -397,5 +417,48 @@ describe('MobileNearbySheet', () => {
     // staying put confirms deselectPoint delegated to the browser instead
     // of also clearing its own state directly.
     expect(screen.getByText('detail for Goldi Market')).toBeInTheDocument()
+  })
+
+  // ── The place detail's docked edit bar ────────────────────────────────
+
+  // Docked means a sibling of the scroll region, not a child of it: inside,
+  // it would scroll away with the content, and it would sit under that
+  // region's own content-drag handlers — so a tap on it could begin a sheet
+  // drag.
+  it('docks the place detail\'s edit bar below the scroll region, not inside it', async () => {
+    const user = userEvent.setup()
+    const { container } = render(
+      <MobileNearbySheet points={[point]} userLocation={null} categories={[category]} containerHeight={600} />,
+    )
+    await user.click(screen.getByRole('button', { name: /select Goldi Market/ }))
+
+    const region = container.querySelector('.overscroll-contain')!
+    expect(region).toContainElement(screen.getByText('detail for Goldi Market'))
+    expect(region).not.toContainElement(screen.getByTestId('docked-edit-bar'))
+  })
+
+  // Peek is 64px, the whole sheet: a bar would swallow it. Selecting a place
+  // snaps to half, so this is the case where someone drags back down with
+  // the place still open — here via the handle, whose tap cycles
+  // half -> full -> peek.
+  it('drops the bar at peek and brings it back above it, with the place still selected', async () => {
+    const user = userEvent.setup()
+    render(<MobileNearbySheet points={[point]} userLocation={null} categories={[category]} containerHeight={600} />)
+    await user.click(screen.getByRole('button', { name: /select Goldi Market/ }))
+    expect(screen.getByTestId('docked-edit-bar')).toBeInTheDocument()
+
+    const tapHandle = (name: string) => {
+      const handle = screen.getByRole('button', { name })
+      fireEvent.pointerDown(handle, { clientY: 300 })
+      fireEvent.pointerUp(handle)
+    }
+    tapHandle('Drag to resize nearby list') // half -> full
+    expect(screen.getByTestId('docked-edit-bar')).toBeInTheDocument()
+    tapHandle('Drag to resize nearby list') // full -> peek
+    expect(screen.getByText('detail for Goldi Market')).toBeInTheDocument()
+    expect(screen.queryByTestId('docked-edit-bar')).not.toBeInTheDocument()
+
+    tapHandle('Expand nearby list') // peek -> half
+    expect(screen.getByTestId('docked-edit-bar')).toBeInTheDocument()
   })
 })

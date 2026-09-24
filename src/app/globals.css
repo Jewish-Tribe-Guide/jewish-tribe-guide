@@ -232,7 +232,7 @@ body {
 .dialog-in  { animation: dialogIn 200ms cubic-bezier(0.32, 0.72, 0, 1); }
 
 /* A small dropdown easing open from its own anchor corner (see
-   ListingActionsMenu) — same family as fadeIn above, just a shorter, subtler
+   CommunitySwitcher, LocationControl) — same family as fadeIn above, just a shorter, subtler
    scale+opacity move sized for a compact popover rather than a full screen,
    closer to how Gmail's own overflow menus ease in instead of popping in
    instantly. transform-origin is set inline per instance (it depends on
@@ -393,7 +393,7 @@ body {
 /* prefers-reduced-motion: reduce — was only wired for the View Transition
    pseudo-elements above (the mobile slide, the desktop badge morph), which
    left every other animation in the app — fadeIn (page content, the wizard),
-   menuIn (the kebab dropdown), and the mobile listing card's accordion
+   menuIn (the small dropdowns), and the mobile listing card's accordion
    reveal (a plain CSS `transition`, not `animation`, so the old rule's
    animation-duration override wouldn't have touched it even if it had been
    written broadly enough to try) — running at full speed regardless of this

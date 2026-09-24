@@ -387,8 +387,8 @@ export default function PlaceDetailBody({ item, category, onTagClick, onFilterOp
 
       {showAddress && (
         // "Set as location" used to live here too, right after the address —
-        // now only in the kebab (ListingActionsMenu) on the collapsed card/
-        // dialog/map panel this renders inside.
+        // now only in the edit bar's overflow (ListingActionsFan), under the
+        // dialog, the mobile card, or the map panel this renders inside.
         <div className="flex items-start gap-3">
           <PinIcon className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
           <p className="min-w-0 text-sm text-slate-800">{item.address}</p>

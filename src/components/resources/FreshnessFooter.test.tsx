@@ -1,38 +1,32 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, render, screen } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
 import FreshnessFooter from './FreshnessFooter'
 
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  vi.useRealTimers()
+})
 
-describe('FreshnessFooter — suggest a correction', () => {
-  it('shows a "Suggest a correction" link beside the freshness line when given a handler', () => {
-    render(<FreshnessFooter resourceId="r1" confirmedAt="2026-09-01T00:00:00.000Z" onSuggestCorrection={() => {}} />)
-    expect(screen.getByRole('button', { name: 'Suggest a correction' })).toBeTruthy()
-    expect(screen.getByText(/Confirmed/)).toBeTruthy()
+describe('FreshnessFooter', () => {
+  it('says how long ago a listing was confirmed, and offers to confirm it again', () => {
+    vi.useFakeTimers({ now: new Date('2026-09-24T12:00:00.000Z') })
+    render(<FreshnessFooter resourceId="r1" confirmedAt="2026-09-21T12:00:00.000Z" />)
+    expect(screen.getByText(/Confirmed 3 days ago/)).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Still right?' })).toBeTruthy()
   })
 
-  it('shows it for a listing that has never been confirmed too', () => {
-    render(<FreshnessFooter resourceId="r1" onSuggestCorrection={() => {}} />)
-    expect(screen.getByRole('button', { name: 'Suggest a correction' })).toBeTruthy()
-    expect(screen.getByText(/Is this info current/)).toBeTruthy()
+  it('asks instead, for a listing nobody has confirmed yet', () => {
+    render(<FreshnessFooter resourceId="r1" />)
+    expect(screen.getByText(/Is this info current\?/)).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Mark as current' })).toBeTruthy()
   })
 
-  it('shows nothing extra when editing is off for the listing', () => {
+  // The link that used to sit beside this line is gone on purpose — see the
+  // component's doc. Asserted so it can't quietly come back as a second,
+  // near-invisible door to the same form the "Suggest an edit" bar opens.
+  it('offers no route into the edit form of its own', () => {
     render(<FreshnessFooter resourceId="r1" confirmedAt="2026-09-01T00:00:00.000Z" />)
-    expect(screen.queryByRole('button', { name: 'Suggest a correction' })).toBeNull()
-    expect(screen.getByText(/Confirmed/)).toBeTruthy()
-  })
-
-  it('calls the handler when clicked, without confirming the listing', async () => {
-    const fetchSpy = vi.fn()
-    vi.stubGlobal('fetch', fetchSpy)
-    const onSuggest = vi.fn()
-    render(<FreshnessFooter resourceId="r1" confirmedAt="2026-09-01T00:00:00.000Z" onSuggestCorrection={onSuggest} />)
-    await userEvent.click(screen.getByRole('button', { name: 'Suggest a correction' }))
-    expect(onSuggest).toHaveBeenCalledTimes(1)
-    expect(fetchSpy).not.toHaveBeenCalled()
-    vi.unstubAllGlobals()
+    expect(screen.queryByRole('button', { name: /suggest/i })).toBeNull()
   })
 })

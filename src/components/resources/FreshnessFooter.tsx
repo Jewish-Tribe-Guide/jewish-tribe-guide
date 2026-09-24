@@ -22,32 +22,22 @@ type Props = {
   confirmedAt?: string
 }
 
-// Shown in the footer of every expanded listing card. Lets visitors signal that
-// the community-curated fields (kosher info, tags, hours) are still accurate —
+// Shown in the footer of every expanded listing — the directory card, its
+// desktop dialog, and the map's place panel. Lets visitors signal that the
+// community-curated fields (kosher info, tags, hours) are still accurate —
 // separate from the Google-synced fields which don't need this.
-/** The "Confirmed 3 days ago · Still right?" line, plus — when the listing
- *  can be edited — a quiet "Suggest a correction" link opposite it. The link
- *  lives here rather than in a kebab because a stale phone number is noticed
- *  exactly where this line is read, and a three-dot menu doesn't say that a
- *  visitor can fix it. */
-export default function FreshnessFooter({
-  resourceId,
-  confirmedAt,
-  onSuggestCorrection,
-}: Props & { onSuggestCorrection?: () => void }) {
-  if (!onSuggestCorrection) return <FreshnessStatus resourceId={resourceId} confirmedAt={confirmedAt} />
-  return (
-    <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-      <FreshnessStatus resourceId={resourceId} confirmedAt={confirmedAt} />
-      <button
-        type="button"
-        onClick={onSuggestCorrection}
-        className="text-xs text-slate-500 underline underline-offset-2 hover:text-slate-800 cursor-pointer"
-      >
-        Suggest a correction
-      </button>
-    </div>
-  )
+/** The "Confirmed 3 days ago · Still right?" line.
+ *
+ *  It used to carry a quiet "Suggest a correction" link opposite it too, on
+ *  the theory that a stale phone number gets noticed right where this line
+ *  is read. In practice it sat at the same 12px grey weight as the timestamp
+ *  and read as part of it, and it was the least findable of three routes to
+ *  one form. Every surface that showed it now has the "Suggest an edit" bar
+ *  instead (ListingEditBar), and the map was its last caller, so the prop
+ *  went with it. What stays is the confirmation itself: a one-tap
+ *  contribution of its own, not a second door to the edit form. */
+export default function FreshnessFooter(props: Props) {
+  return <FreshnessStatus {...props} />
 }
 
 function FreshnessStatus({ resourceId, confirmedAt: initialConfirmedAt }: Props) {

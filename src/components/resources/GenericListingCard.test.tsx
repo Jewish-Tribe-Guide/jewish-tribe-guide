@@ -159,10 +159,10 @@ describe('GenericListingCard — collapsed', () => {
   // The two tests that used to sit here — "a tap dismissing the kebab must
   // not also expand the card", on this card and on a neighbouring one — are
   // gone with the kebab itself. The behaviour they guarded is not: it belongs
-  // to ListingActionsMenu's own invisible backdrop, it is still live for the
-  // map's place panel, which still uses that menu, and it is covered where it
-  // lives (ListingActionsMenu.test.tsx, "closes the menu on an outside click,
-  // via the invisible backdrop" and the test below it). Deleted rather than
+  // to the invisible backdrop every popup of listing actions uses, and it is
+  // covered where it lives now (ListingActionsFan.test.tsx, "closes on an
+  // outside tap, via its invisible backdrop" and the test below it — ported
+  // there when the kebab's own file was deleted). Deleted rather than
   // rewritten because a card with no kebab cannot exercise any of it.
 
   it('does not render an upvote count when upvotes is false', () => {
@@ -810,7 +810,8 @@ describe('GenericListingCard — expanded', () => {
   // that the bar carries this job — two doors to the same form, one of them
   // near-invisible, is the duplication the bar was built to end. The
   // freshness STATUS stays: "Still right?" is its own one-tap contribution.
-  // (MapPlaceDetail still shows the link — the map has no bar yet.)
+  // (The map's place panel dropped it too once it got a docked bar, and
+  // FreshnessFooter no longer has the link at all.)
   it('drops the quiet "Suggest a correction" link from both surfaces, keeping the freshness line', async () => {
     renderWithProviders(
       <GenericListingCard item={makeListing()} category={makeCategory()} upvotes={false} count={0} defaultExpanded {...requiredHandlers} />,
@@ -1390,8 +1391,8 @@ describe('GenericListingCard — mobile accordion animation', () => {
 
     const toggle = screen.getByRole('button', { name: /show details for/i })
     act(() => fireEvent.click(toggle))
-    // FreshnessFooter's own button — unconditional, unlike Edit/Report
-    // (which moved into this row's own kebab, see ListingActionsMenu), so
+    // FreshnessFooter's own button — unconditional, unlike Edit (which
+    // depends on the category's capabilities, see ListingEditBar), so
     // it's a marker for "is the panel still mounted" that doesn't depend on
     // what this category/listing happens to allow.
     expect(screen.getByRole('button', { name: /^mark as current$/i })).toBeInTheDocument()

@@ -1033,8 +1033,8 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
             alongside its address, than a stat pinned to the card's corner.
             Mobile used to get its own top-right corner instead, stacked
             above the chevron — moved down to this same row once that corner
-            needed to fit a kebab menu too (see ListingActionsMenu and this
-            component's own corner comment); mobile has no grid to squeeze
+            needed to fit a kebab menu too (since removed — its actions are
+            in the edit bar's overflow now); mobile has no grid to squeeze
             columns in, so there was never anything here to protect the name
             from either way. */}
         {hasUpvoteRow && (
@@ -1123,7 +1123,7 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
           />
 
           <div className="pt-2 border-t border-slate-200 space-y-2">
-            {/* No onSuggestCorrection: that 12px grey link was the one visible
+            {/* No "Suggest a correction" link: that 12px grey link was the one visible
                 way in to Edit while Edit itself lived in the collapsed row's
                 kebab, and it was never up to the job — it sat at the same
                 weight as the timestamp next to it. ListingEditBar below is

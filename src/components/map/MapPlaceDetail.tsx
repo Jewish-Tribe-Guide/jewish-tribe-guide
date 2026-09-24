@@ -1,12 +1,12 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import type { DirectoryResource } from '@/types'
 import { PHOTO_FIELD_KEY, resolveCapabilities, type CategoryConfig } from '@/lib/categories'
 import PlaceDetailBody from '@/components/resources/PlaceDetailBody'
 import FreshnessFooter from '@/components/resources/FreshnessFooter'
-import ListingActionsMenu from '@/components/resources/ListingActionsMenu'
+import ListingEditBar from '@/components/resources/ListingEditBar'
 import ListingForm from '@/components/resources/ListingForm'
 import CategoryIcon from '@/components/CategoryIcon'
 import PinnedBadge from '@/components/PinnedBadge'
@@ -22,7 +22,31 @@ type Props = {
   category: CategoryConfig
   color: string
   onBack: () => void
+  /** Wraps the part of the panel that scrolls. The PARENT owns that region —
+   *  its ref, and on mobile its hand-driven scrolling and drag-to-resize
+   *  pointer handlers — so it hands this component a function to render
+   *  into it rather than wrapping the whole of it. That's what lets the
+   *  edit bar below be a sibling of the scroll region instead of a child:
+   *  docked to the panel's bottom edge, never scrolling away, and outside
+   *  the mobile sheet's content-drag handlers entirely, so a tap on it
+   *  can't begin a sheet drag. A portal couldn't have done this — React
+   *  events bubble through the component tree, not the DOM, so a portaled
+   *  bar would still have delivered its pointerdowns to those handlers.
+   *  Defaults to rendering in place, for tests and any caller with no
+   *  scroll region of its own.
+   *
+   *  `barBelow` says whether the bar is being rendered under this region
+   *  right now (it isn't while the edit form is open, or at peek). The bar
+   *  carries the phone's safe-area inset when it's there, so a region that
+   *  also padded for it would leave that much dead space at the end of the
+   *  content — ~34px on an iPhone with a home indicator. */
+  renderScroll?: (content: ReactNode, opts: { barBelow: boolean }) => ReactNode
+  /** False at the mobile sheet's peek snap: 64px is the whole sheet, and a
+   *  docked bar would swallow it. Everywhere else it shows. */
+  showEditBar?: boolean
 }
+
+const renderInPlace = (content: ReactNode) => content
 
 /**
  * Full place details shown inline in the mobile map's bottom sheet — the
@@ -30,15 +54,17 @@ type Props = {
  * directory. Renders the same `PlaceDetailBody` the category directory's
  * expanded listing card does (hours, tags, badges, davening times, freeform
  * fields, caveat notes), read-only (no filter callbacks — the map has no
- * such filters of its own), plus its own header, back button, and the same
- * FreshnessFooter/Share/Edit/Report bottom section GenericListingCard shows
- * once expanded — so a place reads (and can be corrected) the same whether
+ * such filters of its own), plus its own header and back button, the same
+ * FreshnessFooter line, and the same "Suggest an edit" bar and overflow the
+ * directory shows — docked to the panel's bottom edge here rather than
+ * floating, since this panel has no layer to float in (see the bar's own
+ * comment below). So a place reads, and can be corrected, the same whether
  * you found it here or in the category directory. Still doesn't show
  * upvote inline: that's a directory-list affordance (ranking search
  * results against each other), which doesn't mean anything for a single
  * place already selected on the map.
  */
-export default function MapPlaceDetail({ item, category, color, onBack }: Props) {
+export default function MapPlaceDetail({ item, category, color, onBack, renderScroll = renderInPlace, showEditBar = true }: Props) {
   const community = useCommunitySlug()
   const listingPath = routes.listing(community, category.id, listingSlug(item))
   const { isPinned } = usePinned()
@@ -87,7 +113,7 @@ export default function MapPlaceDetail({ item, category, color, onBack }: Props)
   const canEdit = ui.contributions.edit && caps.edit
 
   if (formOpen) {
-    return (
+    return renderScroll(
       <>
         {/* Own back affordance on BOTH platforms — not just mobile.
             `embedded` suppresses useSetScreenHeader's "‹ ..." call (never
@@ -117,11 +143,12 @@ export default function MapPlaceDetail({ item, category, color, onBack }: Props)
           {removalOpen ? `Request removal of ${item.name}` : 'Suggest an edit'}
         </h2>
         <ListingForm category={category} mode="edit" existing={item} onUp={closeForm} onSubmitted={closeForm} onRemovalOpenChange={setRemovalOpen} embedded />
-      </>
+      </>,
+      { barBelow: false },
     )
   }
 
-  return (
+  const body = (
     <div className="space-y-4 pb-2">
       <UpButton label="Back to list" onClick={onBack} className="" />
 
@@ -141,18 +168,13 @@ export default function MapPlaceDetail({ item, category, color, onBack }: Props)
           />
           {pinned && <PinnedBadge />}
         </span>
-        {/* min-w-0 flex-1 — the kebab used to sit right after the name
-            (back when this spot held a text-label Pin button, short and
-            meant to read as part of the name line) instead of at the row's
-            far edge. Now that it's an icon-only overflow menu, the far edge
-            is the more standard spot for it (same trailing placement the
-            directory card's own kebab already uses) — flex-1 here is what
-            pushes it there regardless of how short the name is.
-            No top padding either — self-start on the icon above already
-            puts its top edge flush with this block's, i.e. with the name's
-            first line. A pt would reintroduce exactly the few-pixel gap
-            that made the icon and the name look unaligned in the first
-            place. */}
+        {/* min-w-0 flex-1 so a long name wraps rather than pushing the row
+            wider. No top padding — self-start on the icon above already puts
+            its top edge flush with this block's, i.e. with the name's first
+            line; a pt would reintroduce the few-pixel gap that made the two
+            look unaligned. Nothing trails the name any more: Pin, Share and
+            Set as location moved from a kebab here into the docked bar's
+            overflow below, same as they did in the directory. */}
         <div className="min-w-0 flex-1">
           <h2 className="text-lg font-bold leading-tight text-slate-900">
             <Link href={listingPath} className="hover:underline">
@@ -161,36 +183,6 @@ export default function MapPlaceDetail({ item, category, color, onBack }: Props)
           </h2>
           <p className="text-sm text-muted">{category.label}</p>
         </div>
-        {/* self-center — was self-start (the flex row's own default,
-            un-overridden) until this centered against just the name line
-            instead of the whole name+category block. Reversed to match the
-            category directory's own kebab (GenericListingCard), which
-            centers against its full header block for the same reason:
-            Material Design's own guidance is that a row's leading/trailing
-            elements center against the row as a whole, not just its first
-            line — a rule this component used to make a deliberate exception
-            to, before that same rule got applied elsewhere in the app.
-            Mocked up first (both options, side by side) before this landed.
-            Pin/Share/"Set as location" all live behind this one menu now — see
-            ListingActionsMenu — so there's no separate Share button in the
-            footer below any more, and PlaceDetailBody's own address row has
-            no SetLocationButton either. */}
-        {/* mr-1 — a small trailing gap so the kebab doesn't sit flush
-            against this edge-to-edge mobile sheet's own true edge, matching
-            Spotify's own overflow-menu spacing rather than butting right up
-            against it. (Which way the dropdown itself opens is measured
-            automatically — see ListingActionsMenu's own doc.) */}
-        {/* onEdit/canEdit: same optional props GenericListingCard's own kebab
-            passes. Edit swaps this whole panel via the history-backed
-            formOpen state above — see its own doc. */}
-        <ListingActionsMenu
-          item={item}
-          category={category}
-          path={listingPath}
-          className="mr-1 self-center"
-          onEdit={() => openForm('edit')}
-          canEdit={canEdit}
-        />
       </div>
 
       {/* This has never had a persistent collapsed-row header the way
@@ -200,11 +192,40 @@ export default function MapPlaceDetail({ item, category, color, onBack }: Props)
       <PlaceDetailBody item={item} category={category} includeHeaderUrlFields />
 
       <div className="pt-2 border-t border-slate-200 space-y-2">
-        <FreshnessFooter resourceId={item.id} confirmedAt={item.confirmedAt} onSuggestCorrection={canEdit ? () => openForm('edit') : undefined} />
-        {/* Edit lives in the kebab above, with Pin/Share/Set as location, plus
-            FreshnessFooter's own quiet "Suggest a correction" link so it's
-            visible a listing can be fixed. */}
+        {/* The freshness STATUS only. Its quiet "Suggest a correction" link
+            is gone — it was the map's one visible way in to Edit while Edit
+            lived in the kebab, and it sat at the same weight as the
+            timestamp beside it. The docked bar is that way in now, as it is
+            on both directory surfaces. */}
+        <FreshnessFooter resourceId={item.id} confirmedAt={item.confirmedAt} />
       </div>
     </div>
+  )
+
+  return (
+    <>
+      {renderScroll(body, { barBelow: showEditBar })}
+      {/* Docked, not floating — the directory's bar floats because there's
+          somewhere to float (a dialog on a scrim, a card with the list behind
+          it), and this panel has neither: it's flush to the viewport edge and
+          its background is a live map. So it's the panel's last row instead,
+          a sibling of the scroll region (see renderScroll), and carries the
+          safe-area inset the scroll region's own bottom padding used to.
+          Rendered even without edit: the overflow is the only home Pin,
+          Share and Set as location have here now. `stack` for the overflow
+          because the captions need a dark ground, and there's no scrim here
+          to give them one — see ListingActionsFan's `placement`. */}
+      {showEditBar && (
+        <div className="shrink-0 border-t border-slate-200 bg-white px-3 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
+          <ListingEditBar
+            onEdit={canEdit ? () => openForm('edit') : undefined}
+            item={item}
+            category={category}
+            path={listingPath}
+            fanPlacement="stack"
+          />
+        </div>
+      )}
+    </>
   )
 }

@@ -53,7 +53,8 @@ export function PinIcon({ className, filled }: IconProps & { filled?: boolean })
   )
 }
 
-// Thumbtack — "save to my shortlist" (ListingActionsMenu's Pin/Pinned item),
+// Thumbtack — "save to my shortlist" (the Pin/Pinned action, wherever
+// useListingActions' actions are drawn),
 // deliberately a different shape from PinIcon's map-marker teardrop: that one
 // means "a place on a map," this one means "I bookmarked this," and reusing
 // the same glyph for both blurred the distinction.

@@ -49,6 +49,7 @@ export default function ListingEditBar({
   category,
   path,
   className = '',
+  fanPlacement = 'auto',
 }: {
   /** Omitted when the listing can't be edited — the bar then renders the
    *  overflow on its own. See above for why it never disappears outright. */
@@ -59,6 +60,9 @@ export default function ListingEditBar({
   path: string
   /** Surface-specific spacing. The shape itself never varies. */
   className?: string
+  /** Passed through to the overflow — `stack` where there's no scrim behind
+   *  the bar (the map). See ListingActionsFan's own `placement` prop. */
+  fanPlacement?: 'auto' | 'stack'
 }) {
   return (
     // A wide primary plus a small round overflow, not two peers. The shape
@@ -87,7 +91,7 @@ export default function ListingEditBar({
           Suggest an edit
         </button>
       )}
-      <ListingActionsFan item={item} category={category} path={path} />
+      <ListingActionsFan item={item} category={category} path={path} placement={fanPlacement} />
     </div>
   )
 }

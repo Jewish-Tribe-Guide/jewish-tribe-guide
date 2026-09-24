@@ -224,9 +224,9 @@ export default function ListingDetailModal({
           onClick={(e) => { e.stopPropagation(); onNavigate!(-1) }}
           disabled={!hasPrev}
           aria-label="Previous listing"
-          // active:bg-slate-100 — one step past hover's slate-50, same
-          // escalation ListingActionsMenu's kebab uses for its own state
-          // layer, so this circular icon button darkens visibly for the
+          // active:bg-slate-100 — one step past hover's slate-50, Material's
+          // state-layer escalation for an icon-only button, so this circular
+          // icon button darkens visibly for the
           // instant it's actually pressed rather than only on hover.
           // transition-[opacity,background-color], not the original plain
           // transition-opacity: the disabled fade still needs its own
@@ -393,8 +393,8 @@ export default function ListingDetailModal({
                 button above, not a second meaning for this one control. */}
             <button
               onClick={onClose}
-              // hover:bg-slate-100/active:bg-slate-200 — same state-layer
-              // treatment as ListingActionsMenu's kebab: this had a text-color
+              // hover:bg-slate-100/active:bg-slate-200 — Material's state-layer
+              // treatment for an icon-only button: this had a text-color
               // hover but nothing behind it, so a tap gave no visual
               // acknowledgment at all before the whole dialog closed.
               // rounded-full (was plain `rounded`) to match that same
@@ -432,7 +432,7 @@ export default function ListingDetailModal({
 
               <div className="pt-3 border-t border-slate-200 space-y-2.5">
                 <FreshnessFooter resourceId={item.id} confirmedAt={item.confirmedAt} />
-                {/* No onSuggestCorrection here any more: that 12px grey link was
+                {/* No "Suggest a correction" link here any more: that 12px grey link was
                     the only visible way in to Edit while Edit itself sat in a
                     kebab, and it carried that job badly — same weight as the
                     timestamp beside it. ListingEditBar below the dialog is the
@@ -440,8 +440,8 @@ export default function ListingDetailModal({
                     duplication the header's kebab was removed for. The freshness
                     STATUS stays: "Confirmed 3 days ago · Still right?" is a
                     different, one-tap contribution, not a second door to the form.
-                    MapPlaceDetail still passes the prop — the map has no bar of
-                    its own yet (see this component's counterpart there). */}
+                    The map's panel was the link's last user; it has a docked bar
+                    of its own now, and FreshnessFooter no longer has the link. */}
               </div>
             </>
           )}

@@ -1,7 +1,7 @@
 'use client'
 
 import { track } from '@vercel/analytics'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import ResourceMap, { type MapPoint } from './ResourceMap'
 import CategoryFilter, { type FilterOption } from './CategoryFilter'
 import CategoryPickerList from './CategoryPickerList'
@@ -1499,6 +1499,35 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
     />
   )
 
+  // The sidebar's scroll region, as a function so the place detail can render
+  // into it while keeping its docked edit bar as a sibling of it rather than
+  // a child — pinned to the sidebar's bottom edge instead of scrolling away
+  // with the content (see MapPlaceDetail's renderScroll). One definition for
+  // the list and the detail, so neither can lose the overscroll-contain
+  // below. No safe-area inset to hand over here, unlike the mobile sheet's
+  // version, so it ignores `barBelow`.
+  //
+  // overscroll-contain: without it, a trackpad swipe closing a
+  // NearbyList row's pin action can still bleed into the
+  // browser's own swipe-to-go-back gesture once it reaches
+  // this scroll boundary, even though the row's own wheel
+  // handler already calls preventDefault (see NearbyList).
+  //
+  // This WAS removed once, on the theory that the row-level
+  // handler's own `< 2` noise-floor threshold (see NearbyList's
+  // own comment) already closed that gap on its own — tested
+  // live and it didn't: without this, the row's own swipe
+  // itself started misbehaving (the back-gesture recognizer
+  // competing with it mid-drag), which is worse than losing
+  // back-swipe over this panel. Put back; a bare Google Maps
+  // embed has this same "no back-swipe over the interactive
+  // surface" limitation everywhere, so this screen having it
+  // too, specifically here, is a smaller cost than a broken
+  // row swipe.
+  const sidebarScroll = (content: ReactNode) => (
+    <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-3">{content}</div>
+  )
+
   return (
     // Mobile: a flex column that grows to fill <main> (itself a flex column —
     // see page.tsx) via flex-1/min-h-0, so the map below can flex-1 to fill
@@ -1605,33 +1634,17 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                   list rows would slide up underneath the floating bar since
                   padding is part of the same scrolling content. ────────── */}
               <div className="h-16 shrink-0" />
-              {ui.map.nearbyList && (
-                // overscroll-contain: without it, a trackpad swipe closing a
-                // NearbyList row's pin action can still bleed into the
-                // browser's own swipe-to-go-back gesture once it reaches
-                // this scroll boundary, even though the row's own wheel
-                // handler already calls preventDefault (see NearbyList).
-                //
-                // This WAS removed once, on the theory that the row-level
-                // handler's own `< 2` noise-floor threshold (see NearbyList's
-                // own comment) already closed that gap on its own — tested
-                // live and it didn't: without this, the row's own swipe
-                // itself started misbehaving (the back-gesture recognizer
-                // competing with it mid-drag), which is worse than losing
-                // back-swipe over this panel. Put back; a bare Google Maps
-                // embed has this same "no back-swipe over the interactive
-                // surface" limitation everywhere, so this screen having it
-                // too, specifically here, is a smaller cost than a broken
-                // row swipe.
-                <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-3">
-                  {desktopSelected && desktopSelected.raw && desktopSelectedCategory ? (
-                    <MapPlaceDetail
-                      item={desktopSelected.raw}
-                      category={desktopSelectedCategory}
-                      color={desktopSelected.color}
-                      onBack={() => setDesktopSelected(null)}
-                    />
-                  ) : (
+              {ui.map.nearbyList &&
+                (desktopSelected && desktopSelected.raw && desktopSelectedCategory ? (
+                  <MapPlaceDetail
+                    item={desktopSelected.raw}
+                    category={desktopSelectedCategory}
+                    color={desktopSelected.color}
+                    onBack={() => setDesktopSelected(null)}
+                    renderScroll={sidebarScroll}
+                  />
+                ) : (
+                  sidebarScroll(
                     <>
                       {activeLocation && (
                         <p className="mb-2 px-1 text-xs text-slate-400">
@@ -1644,10 +1657,9 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                         onViewListing={onViewListing}
                         onSelectPlace={selectPlace}
                       />
-                    </>
-                  )}
-                </div>
-              )}
+                    </>,
+                  )
+                ))}
             </aside>
           )}
 

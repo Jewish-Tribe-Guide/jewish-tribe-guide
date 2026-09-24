@@ -26,11 +26,13 @@ export type ListingAction = {
 
 /** The shared source of truth for a listing's non-edit actions.
  *
- *  Extracted from ListingActionsMenu, which was the only thing that knew how
- *  to pin/share/anchor a listing, so that the same three actions can appear
- *  wherever they now need to: the collapsed card (a swipe panel on mobile, a
- *  hover-reveal on desktop) and the overflow fan hanging off an open
- *  listing's edit bar. Duplicating the gating alone would have been a bug
+ *  Extracted from ListingActionsMenu (the kebab, since deleted), which was the
+ *  only thing that knew how to pin/share/anchor a listing, so that the same
+ *  three actions can appear wherever they now need to: the collapsed card (a
+ *  swipe panel on mobile, a hover-reveal on desktop) and the overflow fan
+ *  hanging off every edit bar — under the directory dialog, the mobile card,
+ *  and the map's place panel. Its behaviour is tested through that fan
+ *  (ListingActionsFan.test.tsx), its main renderer. Duplicating the gating alone would have been a bug
  *  waiting to happen — `ui.map.pins`, `category.hasAddress`, a listing whose
  *  address failed to geocode, and a missing LocationProvider each suppress a
  *  different one of them. */

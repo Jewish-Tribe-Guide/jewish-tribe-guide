@@ -692,6 +692,30 @@ describe('ResourceMapView — selecting a place', () => {
     expect(await screen.findByRole('button', { name: 'Back to list' })).toBeInTheDocument()
     expect(screen.getByTestId('frame-token').textContent).not.toBe(initialFrameToken)
   })
+  // The desktop half of MapPlaceDetail's renderScroll contract, through the
+  // real component: the sidebar's edit bar is its last row, a sibling of the
+  // scroll region, so it stays put while a long listing scrolls under it.
+  it('docks the selected place\'s edit bar at the bottom of the sidebar, outside its scroll region', async () => {
+    const user = userEvent.setup()
+    const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
+    const synagogue = makeCategory({ id: 'synagogue', pluralLabel: 'Synagogues' })
+    renderMap(
+      <ResourceMapView onUp={vi.fn()} />,
+      [listingWithGeo({ id: 'g1', category: 'grocery', name: 'Acme Grocery' }), listingWithGeo({ id: 's1', category: 'synagogue', name: 'Beth Shalom' })],
+      [grocery, synagogue],
+    )
+    // Two categories, so the sidebar lists results rather than auto-selecting.
+    await user.click(screen.getByRole('button', { name: /Grocery Stores/ }))
+    await user.click(screen.getByRole('button', { name: /Synagogues/ }))
+    await user.click(screen.getByRole('button', { name: 'Select Acme Grocery' }))
+
+    const back = await screen.findByRole('button', { name: 'Back to list' })
+    const region = back.closest('.overscroll-contain')!
+    const sidebar = back.closest('aside')!
+    const pill = screen.getByRole('button', { name: 'Suggest an edit' })
+    expect(sidebar).toContainElement(pill)
+    expect(region).not.toContainElement(pill)
+  })
 })
 
 describe('ResourceMapView — pinning', () => {
@@ -710,7 +734,7 @@ describe('ResourceMapView — pinning', () => {
   // Real bug: a listing in a non-mappable category (WhatsApp Groups,
   // Networking — `hasAddress: false`, which forces `capabilities.map` off
   // via resolveCapabilities) can still be pinned from its own directory row
-  // (ListingActionsMenu's Pin action has no capability gate), so it lands in
+  // (the card's Pin action has no capability gate), so it lands in
   // usePinned()'s `pinned` array like any other pin. The map's Pinned chip
   // used to read `pinned.length` directly — a raw count with no idea some
   // pins are for categories the map never plots at all — so pinning a

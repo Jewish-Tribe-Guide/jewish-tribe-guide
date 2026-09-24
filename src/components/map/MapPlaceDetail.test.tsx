@@ -5,7 +5,7 @@ import { renderWithProviders } from '@/test/renderWithProviders'
 import { makeCategory, makeListing } from '@/test/providerFixtures'
 import { mockRouter } from '@/test/nextNavigationMock'
 import { PinnedProvider } from '@/lib/pinnedContext'
-import { CATEGORY_CAPABILITY_DEFAULTS, type CategoryConfig } from '@/lib/categories'
+import { CATEGORY_CAPABILITY_DEFAULTS } from '@/lib/categories'
 import type { DirectoryResource } from '@/types'
 import MapPlaceDetail from './MapPlaceDetail'
 
@@ -88,172 +88,8 @@ describe('MapPlaceDetail', () => {
     expect(document.querySelector('[class*="-right-1.5"][class*="-top-1.5"]')).not.toBeInTheDocument()
   })
 
-  // Same PinnedBadge GenericListingCard/NearbyList put on their own avatars
-  // (see each file's identical test) — shows up here too now.
-  it('shows a pin badge on the header avatar once the listing is pinned', () => {
-    const category = makeCategory({ id: 'grocery', label: 'Grocery Store' })
-    const item = makeListing({ id: 'goldi-1', name: 'Goldi Market' })
-    localStorage.setItem('jpc:pinned-listings', JSON.stringify([{ id: 'goldi-1', categoryId: 'grocery' }]))
 
-    renderWithProviders(
-      <PinnedProvider>
-        <MapPlaceDetail item={item} category={category} color="#000" onBack={() => {}} />
-      </PinnedProvider>,
-    )
 
-    expect(screen.getByText('📌')).toBeInTheDocument()
-    localStorage.clear()
-  })
-
-  it('shows FreshnessFooter, with Edit/Pin/Share/Set location behind one kebab in the header and no Report row', async () => {
-    const category = makeCategory()
-    const item = makeListing({ name: 'Goldi Market' })
-    const user = (await import('@testing-library/user-event')).default.setup()
-
-    renderWithProviders(
-      <PinnedProvider>
-        <MapPlaceDetail item={item} category={category} color="#000" onBack={() => {}} />
-      </PinnedProvider>,
-    )
-
-    expect(screen.getByText('Is this info current?')).toBeInTheDocument()
-    // Edit/Report used to be standalone buttons right under FreshnessFooter
-    // — both now live only in the kebab, same place Pin/Share/Set location
-    // do (see GenericListingCard's own identical move).
-    expect(screen.queryByRole('button', { name: /^edit$/i })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /^report$/i })).not.toBeInTheDocument()
-
-    const kebab = screen.getByRole('button', { name: /more actions for goldi market/i })
-    await user.click(kebab)
-    expect(screen.getByRole('menuitem', { name: /^pin$/i })).toBeInTheDocument()
-    expect(screen.getByRole('menuitem', { name: /^share$/i })).toBeInTheDocument()
-    expect(screen.getByRole('menuitem', { name: /^edit$/i })).toBeInTheDocument()
-    // Removal is requested at the foot of the edit form now, not from here.
-    expect(screen.queryByRole('menuitem', { name: /report/i })).not.toBeInTheDocument()
-  })
-
-  it('swaps to the edit form (same one the category directory uses) when Edit is clicked, and back on cancel', async () => {
-    const userEvent = (await import('@testing-library/user-event')).default
-    const user = userEvent.setup()
-    const category = makeCategory()
-    const item = makeListing({ name: 'Goldi Market' })
-
-    renderWithProviders(
-      <PinnedProvider>
-        <MapPlaceDetail item={item} category={category} color="#000" onBack={() => {}} />
-      </PinnedProvider>,
-    )
-
-    await user.click(screen.getByRole('button', { name: /more actions for goldi market/i }))
-    await user.click(screen.getByRole('menuitem', { name: /^edit$/i }))
-
-    expect(screen.getByText('ListingForm stub — mode=edit, existing=Goldi Market (embedded)')).toBeInTheDocument()
-    // Swapped out entirely, not layered on top.
-    expect(screen.queryByRole('button', { name: 'Back to list' })).not.toBeInTheDocument()
-    // Stands in for ListingForm's own heading, suppressed by `embedded` —
-    // every other Edit/Report surface (ActionDialog, MobileSheet,
-    // ReportSheet) shows this same title in its own header.
-    expect(screen.getByRole('heading', { name: 'Suggest an edit' })).toBeInTheDocument()
-  })
-
-  // No second, smaller title nested inside the form for this — the h2 here
-  // becomes "Request removal of {name}" itself, reported via
-  // onRemovalOpenChange.
-  it('the h2 becomes "Request removal of {name}" once ListingForm reports the removal panel is open', async () => {
-    const userEvent = (await import('@testing-library/user-event')).default
-    const user = userEvent.setup()
-    renderWithProviders(
-      <PinnedProvider>
-        <MapPlaceDetail item={makeListing({ name: 'Goldi Market' })} category={makeCategory()} color="#000" onBack={() => {}} />
-      </PinnedProvider>,
-    )
-
-    await user.click(screen.getByRole('button', { name: /more actions for goldi market/i }))
-    await user.click(screen.getByRole('menuitem', { name: /^edit$/i }))
-    expect(screen.getByRole('heading', { name: 'Suggest an edit' })).toBeInTheDocument()
-
-    await user.click(screen.getByRole('button', { name: 'stub open removal' }))
-
-    expect(screen.getByRole('heading', { name: 'Request removal of Goldi Market' })).toBeInTheDocument()
-    expect(screen.queryByRole('heading', { name: 'Suggest an edit' })).not.toBeInTheDocument()
-  })
-
-  it('has a visible "Suggest a correction" link that opens the same edit form as the kebab', async () => {
-    const userEvent = (await import('@testing-library/user-event')).default
-    const user = userEvent.setup()
-    renderWithProviders(
-      <PinnedProvider>
-        <MapPlaceDetail item={makeListing({ name: 'Goldi Market' })} category={makeCategory()} color="#000" onBack={() => {}} />
-      </PinnedProvider>,
-    )
-    await user.click(screen.getByRole('button', { name: 'Suggest a correction' }))
-    expect(screen.getByText('ListingForm stub — mode=edit, existing=Goldi Market (embedded)')).toBeInTheDocument()
-  })
-
-  it('shows no "Suggest a correction" link when the category has editing turned off', () => {
-    renderWithProviders(
-      <PinnedProvider>
-        <MapPlaceDetail
-          item={makeListing({ name: 'Goldi Market' })}
-          category={makeCategory({ capabilities: { add: true, edit: false, report: true, directorySearch: true, map: true } })}
-          color="#000"
-          onBack={() => {}}
-        />
-      </PinnedProvider>,
-    )
-    expect(screen.queryByRole('button', { name: 'Suggest a correction' })).not.toBeInTheDocument()
-    expect(screen.getByText('Is this info current?')).toBeInTheDocument()
-  })
-
-  // Regression: the edit form used to open with no way back at all on
-  // mobile — ListingForm's own back affordance (formerly a Breadcrumb,
-  // since removed everywhere) never became visible here since MapScreen
-  // deliberately collapses the shared header on this screen. Confirmed
-  // live before this landed. This button replaces it on BOTH platforms
-  // (see this component's own doc on why naming a destination was
-  // actually wrong here, not just redundant) — closes the form the same
-  // way cancelling it does: via history.back(), not a direct state reset.
-  it('shows a Back button once the edit form is open, and it closes the form via history.back()', async () => {
-    const userEvent = (await import('@testing-library/user-event')).default
-    const user = userEvent.setup()
-    const category = makeCategory()
-    const item = makeListing({ name: 'Goldi Market' })
-    const backSpy = vi.spyOn(window.history, 'back').mockImplementation(() => {})
-
-    renderWithProviders(
-      <PinnedProvider>
-        <MapPlaceDetail item={item} category={category} color="#000" onBack={() => {}} />
-      </PinnedProvider>,
-    )
-
-    await user.click(screen.getByRole('button', { name: /more actions for goldi market/i }))
-    await user.click(screen.getByRole('menuitem', { name: /^edit$/i }))
-
-    await user.click(screen.getByRole('button', { name: /^back$/i }))
-    expect(backSpy).toHaveBeenCalled()
-  })
-
-  it('hides Edit when the category has turned it off', async () => {
-    const user = (await import('@testing-library/user-event')).default.setup()
-    const category: CategoryConfig = makeCategory({
-      capabilities: { ...CATEGORY_CAPABILITY_DEFAULTS, edit: false, report: false },
-    })
-    const item = makeListing({ name: 'Goldi Market' })
-
-    renderWithProviders(
-      <PinnedProvider>
-        <MapPlaceDetail item={item} category={category} color="#000" onBack={() => {}} />
-      </PinnedProvider>,
-    )
-
-    const kebab = screen.getByRole('button', { name: /more actions for goldi market/i })
-    // The kebab (Pin/Share/Set location) stays available regardless — none
-    // of those are contribution capabilities.
-    expect(kebab).toBeInTheDocument()
-    await user.click(kebab)
-    expect(screen.queryByRole('menuitem', { name: /^edit$/i })).not.toBeInTheDocument()
-    expect(screen.queryByRole('menuitem', { name: /report/i })).not.toBeInTheDocument()
-  })
 
   it('pushes a history entry when Edit opens, so a swipe-back returns here instead of leaving the map', async () => {
     const userEvent = (await import('@testing-library/user-event')).default
@@ -268,8 +104,7 @@ describe('MapPlaceDetail', () => {
       </PinnedProvider>,
     )
 
-    await user.click(screen.getByRole('button', { name: /more actions for goldi market/i }))
-    await user.click(screen.getByRole('menuitem', { name: /^edit$/i }))
+    await user.click(screen.getByRole('button', { name: 'Suggest an edit' }))
 
     expect(pushSpy).toHaveBeenCalledWith(expect.objectContaining({ mapSheetForm: 'edit' }), '')
   })
@@ -286,8 +121,7 @@ describe('MapPlaceDetail', () => {
       </PinnedProvider>,
     )
 
-    await user.click(screen.getByRole('button', { name: /more actions for goldi market/i }))
-    await user.click(screen.getByRole('menuitem', { name: /^edit$/i }))
+    await user.click(screen.getByRole('button', { name: 'Suggest an edit' }))
     expect(screen.getByText(/ListingForm stub/)).toBeInTheDocument()
 
     // Simulates what a real swipe-back/browser-back delivers: a popstate
@@ -314,8 +148,7 @@ describe('MapPlaceDetail', () => {
       </PinnedProvider>,
     )
 
-    await user.click(screen.getByRole('button', { name: /more actions for goldi market/i }))
-    await user.click(screen.getByRole('menuitem', { name: /^edit$/i }))
+    await user.click(screen.getByRole('button', { name: 'Suggest an edit' }))
     await user.click(screen.getByRole('button', { name: 'stub cancel' }))
 
     expect(backSpy).toHaveBeenCalled()
@@ -325,41 +158,142 @@ describe('MapPlaceDetail', () => {
     expect(screen.getByText(/ListingForm stub/)).toBeInTheDocument()
   })
 
-  it('calls onBack when the back button is clicked', async () => {
-    const onBack = vi.fn()
-    const { default: userEvent } = await import('@testing-library/user-event')
-    const category = makeCategory()
-    const item = makeListing()
+  // ── The docked bar ────────────────────────────────────────────────────
 
+  // Where Edit, Pin, Share and Set as location live now: one "Suggest an
+  // edit" bar docked under the panel, with the other three in its overflow.
+  // They used to sit behind a kebab next to the name, which people open
+  // expecting Share and never expecting to author anything — plus a quiet
+  // grey "Suggest a correction" link in the footer, now gone.
+  it('offers Suggest an edit and the overflow, with no kebab and no quiet correction link', async () => {
+    const user = (await import('@testing-library/user-event')).default.setup()
     renderWithProviders(
       <PinnedProvider>
-        <MapPlaceDetail item={item} category={category} color="#000" onBack={onBack} />
+        <MapPlaceDetail item={makeListing({ name: 'Goldi Market' })} category={makeCategory()} color="#000" onBack={() => {}} />
       </PinnedProvider>,
     )
 
-    await userEvent.setup().click(screen.getByRole('button', { name: 'Back to list' }))
-    expect(onBack).toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: 'Suggest an edit' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /more actions/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Suggest a correction' })).not.toBeInTheDocument()
+    // The freshness STATUS stays: it's a contribution of its own.
+    expect(screen.getByText('Is this info current?')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Actions for Goldi Market' }))
+    expect(screen.getByRole('menuitem', { name: 'Pin' })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: 'Share' })).toBeInTheDocument()
+    // Removal is requested at the foot of the edit form, not from here.
+    expect(screen.queryByRole('menuitem', { name: /report|remov/i })).not.toBeInTheDocument()
   })
 
-  // Was self-start (the header row's own default) until this centered
-  // against just the name line instead of the whole name+category block —
-  // reversed to match GenericListingCard's own kebab, which centers
-  // against its full header for the same reason (Material Design: a row's
-  // trailing element centers against the row as a whole, not just its
-  // first line). Mocked up both options before this landed.
-  it('centers the kebab against the whole name+category block, not just the name', () => {
-    const category = makeCategory()
-    const item = makeListing()
-
+  // The whole point of the renderScroll split. The bar has to sit OUTSIDE the
+  // region the parent scrolls: inside, it would scroll away with the content
+  // — and on the mobile sheet it would sit under that region's content-drag
+  // handlers, so a tap on it could begin a sheet drag.
+  it('renders the bar as a sibling of the scroll region, never inside it', () => {
     renderWithProviders(
       <PinnedProvider>
-        <MapPlaceDetail item={item} category={category} color="#000" onBack={() => {}} />
+        <MapPlaceDetail
+          item={makeListing({ name: 'Goldi Market' })}
+          category={makeCategory()}
+          color="#000"
+          onBack={() => {}}
+          renderScroll={(content) => <div data-testid="scroll-region">{content}</div>}
+        />
       </PinnedProvider>,
     )
+    const region = screen.getByTestId('scroll-region')
+    expect(region).toContainElement(screen.getByRole('link', { name: 'Goldi Market' }))
+    expect(region).not.toContainElement(screen.getByRole('button', { name: 'Suggest an edit' }))
+    expect(region).not.toContainElement(screen.getByRole('button', { name: 'Actions for Goldi Market' }))
+  })
 
-    const kebab = screen.getByRole('button', { name: /more actions for/i })
-    const positioned = kebab.closest('div[class*="mr-1"]')
-    expect(positioned).not.toBeNull()
-    expect(positioned).toHaveClass('self-center')
+  // The bar carries the phone's safe-area inset when it's there, so the
+  // parent needs to know whether to pad its region for it instead.
+  it('tells the scroll region whether a bar sits below it', async () => {
+    const user = (await import('@testing-library/user-event')).default.setup()
+    const calls: boolean[] = []
+    const renderScroll = (content: React.ReactNode, { barBelow }: { barBelow: boolean }) => {
+      calls.push(barBelow)
+      return <div>{content}</div>
+    }
+    renderWithProviders(
+      <PinnedProvider>
+        <MapPlaceDetail item={makeListing({ name: 'Goldi Market' })} category={makeCategory()} color="#000" onBack={() => {}} renderScroll={renderScroll} />
+      </PinnedProvider>,
+    )
+    expect(calls.at(-1)).toBe(true)
+
+    await user.click(screen.getByRole('button', { name: 'Suggest an edit' }))
+    expect(calls.at(-1)).toBe(false) // the form has no bar under it
+
+    // Fresh render rather than rerender — rerender bypasses the test
+    // providers renderWithProviders wraps things in.
+    cleanup()
+    renderWithProviders(
+      <PinnedProvider>
+        <MapPlaceDetail
+          item={makeListing({ name: 'Goldi Market' })}
+          category={makeCategory()}
+          color="#000"
+          onBack={() => {}}
+          renderScroll={renderScroll}
+          showEditBar={false}
+        />
+      </PinnedProvider>,
+    )
+    expect(calls.at(-1)).toBe(false) // nor does peek
+  })
+
+  // The mobile sheet's peek snap is 64px — the whole sheet. A bar there
+  // would swallow it.
+  it('renders no bar at all when told not to', () => {
+    renderWithProviders(
+      <PinnedProvider>
+        <MapPlaceDetail item={makeListing({ name: 'Goldi Market' })} category={makeCategory()} color="#000" onBack={() => {}} showEditBar={false} />
+      </PinnedProvider>,
+    )
+    expect(screen.queryByRole('button', { name: 'Suggest an edit' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Actions for Goldi Market' })).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Goldi Market' })).toBeInTheDocument()
+  })
+
+  // Pin, Share and Set as location have no other home on the map now, and
+  // none of them is a contribution — so a category with editing off keeps
+  // them, and loses only the pill.
+  it('keeps the overflow, without the pill, when the category cannot be edited', async () => {
+    const user = (await import('@testing-library/user-event')).default.setup()
+    renderWithProviders(
+      <PinnedProvider>
+        <MapPlaceDetail
+          item={makeListing({ name: 'Goldi Market' })}
+          category={makeCategory({ capabilities: { ...CATEGORY_CAPABILITY_DEFAULTS, edit: false, report: false } })}
+          color="#000"
+          onBack={() => {}}
+        />
+      </PinnedProvider>,
+    )
+    expect(screen.queryByRole('button', { name: 'Suggest an edit' })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Actions for Goldi Market' }))
+    expect(screen.getByRole('menuitem', { name: 'Share' })).toBeInTheDocument()
+  })
+
+  // The overflow's captions are white with a text shadow, written for a dark
+  // ground. The map has no scrim, so its overflow must use `stack`, which
+  // brings its own — the desktop default would put them on a live map.
+  // Asserted here, not just in ListingActionsFan's tests, because what can
+  // break is the THREADING: MapPlaceDetail -> ListingEditBar -> the fan.
+  it('opens its overflow in the stack placement, even on desktop', async () => {
+    const user = (await import('@testing-library/user-event')).default.setup()
+    renderWithProviders(
+      <PinnedProvider>
+        <MapPlaceDetail item={makeListing({ name: 'Goldi Market' })} category={makeCategory()} color="#000" onBack={() => {}} />
+      </PinnedProvider>,
+    )
+    await user.click(screen.getByRole('button', { name: 'Actions for Goldi Market' }))
+    const menu = screen.getByRole('menu')
+    expect(menu.style.right).not.toBe('')
+    expect(menu.style.bottom).not.toBe('')
+    expect(menu.style.top).toBe('')
   })
 })
