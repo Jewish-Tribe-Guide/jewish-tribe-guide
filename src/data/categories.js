@@ -77,8 +77,10 @@ export const categories = [
           { value: 'OK Kosher', label: 'OK Kosher' },
           { value: 'cRc', label: 'cRc' },
           { value: 'Kof-K', label: 'Kof-K' },
-          { value: 'Other Kosher', label: 'Other Kosher' },
         ],
+        // A certifier that isn't listed is typed in, not filed under a
+        // catch-all "Other Kosher" that says nothing about who certifies it.
+        allowOther: true,
         renderAs: 'badge',
         filterable: true,
         filterLabel: 'Kosher Cert',

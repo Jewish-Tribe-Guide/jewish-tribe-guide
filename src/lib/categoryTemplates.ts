@@ -167,8 +167,10 @@ export const CATEGORY_TEMPLATES: CategoryTemplate[] = [
           { label: 'OK Kosher', value: 'OK Kosher' },
           { label: 'cRc', value: 'cRc' },
           { label: 'Kof-K', value: 'Kof-K' },
-          { label: 'Other Kosher', value: 'Other Kosher' },
         ],
+        // A certifier that isn't listed is typed in, not filed under a
+        // catch-all "Other Kosher" that says nothing about who certifies it.
+        allowOther: true,
         renderAs: 'badge',
         filterable: true,
         filterLabel: 'Kosher Cert',
