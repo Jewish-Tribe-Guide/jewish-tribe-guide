@@ -235,15 +235,26 @@ summary block, not the tail.** Two separate traps, both hit in one session
   summary block: `grep -E '^\s+[0-9]+ (failed|passed|flaky|skipped)'`.
 
 **There is a standing set of local e2e failures that is not your change.**
-Measured against a clean worktree at `d8ccd8b`: 11 tests fail locally on both
-viewports before any of the current work —
-`accessibility.spec.ts:136` (Add form dialog), `budgets.spec.ts:174`
-(Turnstile), `csp.spec.ts:73`, `pins.spec.ts:62` and `:91`, plus
-`mobile.spec.ts:189` on mobile. `offline.spec.ts:138` joins them about half
-the time (see [[project-e2e-flakiness-baseline]]). Before concluding you broke
-something, get a baseline: `git worktree add --detach <tmp> <pre-change-sha>`,
-`npm ci` inside it (a symlinked `node_modules` makes Turbopack panic with
-"points out of the filesystem root"), then diff the two failure lists.
+Today that is `pins.spec.ts:62` and `:91` on both viewports (4 tests).
+`offline.spec.ts` fails about one run in two (the service worker not taking
+control in time; see [[project-e2e-flakiness-baseline]]), and
+`server-rendering.spec.ts:127` desktop occasionally (two copies of the count
+text mid-transition). Before concluding you broke something, get a baseline:
+`git worktree add --detach <tmp> <pre-change-sha>`, `npm ci` inside it (a
+symlinked `node_modules` makes Turbopack panic with "points out of the
+filesystem root"), then diff the two failure lists.
+
+**But a "standing" failure is a lead, not a fact of life.** This list used to
+be 11 tests, measured at `d8ccd8b`. Six of them —
+`accessibility.spec.ts:148` (Add dialog), `budgets.spec.ts:174` and
+`csp.spec.ts:73`, on both viewports — were never environmental: `d8ccd8b`
+itself renamed the Add button to "Add a listing" and missed
+`categoryAddButton` in `e2e/helpers.ts`, so every test that opens Add failed
+to find the button. Writing them off as the baseline meant the Add dialog's
+accessibility check, the CSP check on Turnstile and the Turnstile budget ran
+against nothing for months. When a failure is on this list, read its error
+once in a while; "element not found" on a button is worth a grep of the
+source before it's worth a shrug.
 
 **Run `npm run test:e2e` before calling any change to routing, data loading, caching, or metadata done.** That is where the expensive mistakes have been, and every test in `e2e/` exists because something actually broke:
 

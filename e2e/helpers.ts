@@ -222,7 +222,12 @@ export async function dismissLocationPrompt(page: Page): Promise<void> {
  *  THIS category's own Add form specifically, not just any Add entry point
  *  on the page. */
 export function categoryAddButton(page: Page): Locator {
-  return page.getByRole('main').getByRole('button', { name: 'Add a place', exact: true })
+  // "Add a listing" since d8ccd8b ("listing" everywhere, dropping
+  // "place"). This still said "Add a place" for a while afterwards, so every
+  // test that opens Add failed to find the button — and those failures were
+  // written off as the standing local baseline (AGENTS.md), measured at
+  // that same commit.
+  return page.getByRole('main').getByRole('button', { name: 'Add a listing', exact: true })
 }
 
 /** Waits for the page to be settled enough to assert on.
