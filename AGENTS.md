@@ -234,25 +234,30 @@ summary block, not the tail.** Two separate traps, both hit in one session
   present, so the exit code is not a substitute either. Grep the whole
   summary block: `grep -E '^\s+[0-9]+ (failed|passed|flaky|skipped)'`.
 
-**There is a standing set of local e2e failures that is not your change.**
-Today that is `pins.spec.ts:62` and `:91` on both viewports (4 tests).
+**No e2e test fails on every local run any more, but two are flaky.**
 `offline.spec.ts` fails about one run in two (the service worker not taking
 control in time; see [[project-e2e-flakiness-baseline]]), and
-`server-rendering.spec.ts:127` desktop occasionally (two copies of the count
-text mid-transition). Before concluding you broke something, get a baseline:
+`server-rendering.spec.ts:127` desktop about one in four (two copies of the
+count text mid-transition). Anything else red is worth taking seriously.
+Before concluding you broke something, get a baseline:
 `git worktree add --detach <tmp> <pre-change-sha>`, `npm ci` inside it (a
 symlinked `node_modules` makes Turbopack panic with "points out of the
 filesystem root"), then diff the two failure lists.
 
-**But a "standing" failure is a lead, not a fact of life.** This list used to
-be 11 tests, measured at `d8ccd8b`. Six of them —
+**A "standing" failure is a lead, not a fact of life.** This list used to
+be 11 tests, measured at `d8ccd8b`, and none of them were environmental.
+Six of them —
 `accessibility.spec.ts:148` (Add dialog), `budgets.spec.ts:174` and
 `csp.spec.ts:73`, on both viewports — were never environmental: `d8ccd8b`
 itself renamed the Add button to "Add a listing" and missed
 `categoryAddButton` in `e2e/helpers.ts`, so every test that opens Add failed
 to find the button. Writing them off as the baseline meant the Add dialog's
 accessibility check, the CSP check on Turnstile and the Turnstile budget ran
-against nothing for months. When a failure is on this list, read its error
+against nothing for months. Four more, `pins.spec.ts:62` and `:91`, pinned
+the first listing of the alphabetically first category with any listings —
+a test fixture with no coordinates, or on the real site Cemetery, which has
+no address — and the map's Pinned chip only counts places it can plot.
+(`mobile.spec.ts:189` stopped failing on its own.) When a failure is on this list, read its error
 once in a while; "element not found" on a button is worth a grep of the
 source before it's worth a shrug.
 

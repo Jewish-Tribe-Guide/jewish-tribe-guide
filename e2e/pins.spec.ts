@@ -1,5 +1,5 @@
-import { expect, test, type Page } from '@playwright/test'
-import { categoryWithListings, defaultCommunity } from './helpers'
+import { expect, test, type APIRequestContext, type Page } from '@playwright/test'
+import { categoryWithMapPoints, defaultCommunity } from './helpers'
 
 // A more patient version of helpers.ts' dismissLocationPrompt: that one is a
 // single point-in-time check (`isVisible()`, no retry), which assumes the
@@ -51,6 +51,23 @@ async function dismissLocationPromptIfItAppears(page: Page): Promise<void> {
 // it reaches the map screen's Pinned chip. PinButton's own click/toggle
 // behavior is exercised elsewhere it doesn't require a live map (it renders
 // the same everywhere it's used).
+// The Pinned chip counts only pinned places the map can show (see
+// ResourceMapView's mappablePinnedCount), so the pinned listing has to have
+// coordinates. These tests used to pin the first listing of whichever
+// category came first, alphabetically, with any listings at all — on the
+// test project a fixture category whose one listing has no geo, and on the
+// real site Cemetery, which collects no address — so the chip never
+// appeared and both tests failed on every run, written off for a long time
+// as local noise.
+async function mappableListing(request: APIRequestContext, community: string): Promise<{ id: string; category: string }> {
+  const { category } = await categoryWithMapPoints(request, community)
+  const res = await request.get(`/api/resources?category=${category.id}&community=${community}`)
+  const resources = (await res.json()).resources as { id: string; geo?: unknown }[]
+  const listing = resources.find((r) => r.geo)
+  if (!listing) throw new Error(`categoryWithMapPoints returned ${category.id}, but none of its listings has geo`)
+  return { id: listing.id, category: category.id }
+}
+
 async function seedPinned(page: Page, listing: { id: string; categoryId: string }): Promise<void> {
   await page.addInitScript(
     ([key, value]) => localStorage.setItem(key, value),
@@ -61,12 +78,9 @@ async function seedPinned(page: Page, listing: { id: string; categoryId: string 
 test.describe('pinned listings', () => {
   test('a pin already in storage survives a reload', async ({ page, request }) => {
     const community = await defaultCommunity(page)
-    const { category } = await categoryWithListings(request, community)
-    const res = await request.get(`/api/resources?category=${category.id}&community=${community}`)
-    const body = await res.json()
-    const listing = (body.resources as { id: string }[])[0]
+    const listing = await mappableListing(request, community)
 
-    await seedPinned(page, { id: listing.id, categoryId: category.id })
+    await seedPinned(page, { id: listing.id, categoryId: listing.category })
 
     await page.goto(`/${community}/map`)
     const searchInput = page.getByPlaceholder(/Search name, address/)
@@ -90,10 +104,7 @@ test.describe('pinned listings', () => {
 
   test('reaches the map screen\'s Pinned filter chip', async ({ page, request }) => {
     const community = await defaultCommunity(page)
-    const { category } = await categoryWithListings(request, community)
-    const res = await request.get(`/api/resources?category=${category.id}&community=${community}`)
-    const body = await res.json()
-    const listing = (body.resources as { id: string }[])[0]
+    const listing = await mappableListing(request, community)
 
     // Nothing pinned yet — the chip shouldn't exist at all (see the
     // pinned.length > 0 gate on it in ResourceMapView).
@@ -103,7 +114,7 @@ test.describe('pinned listings', () => {
     await dismissLocationPromptIfItAppears(page)
     await expect(page.getByRole('button', { name: /^Pinned \d+$/ })).toHaveCount(0)
 
-    await seedPinned(page, { id: listing.id, categoryId: category.id })
+    await seedPinned(page, { id: listing.id, categoryId: listing.category })
     await page.reload()
     await searchInput.waitFor({ state: 'visible' })
     await dismissLocationPromptIfItAppears(page)
