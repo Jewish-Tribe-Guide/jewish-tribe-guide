@@ -25,6 +25,10 @@ export const SYNC_INTERNAL_FIELDS = [
   'googleDescription',
   'verifiedPlaceId',
   'legacyId',
+  // When each grocery item was last seen. Computed on approval from the
+  // stored row (submissionStore's withItemDates), never taken from a
+  // submission, and not something a moderator is approving.
+  'itemSeen',
 ] as const
 
 /** Additionally hidden from the moderation diff, though a submitter MAY change

@@ -25,6 +25,7 @@ import { travelParts } from '@/lib/listingTravel'
 import { ui } from '@/lib/uiConfig'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { usePinned } from '@/lib/pinnedContext'
+import { countEvent } from '@/lib/countEvent'
 
 /** Pin and Share are the two that belong to SCANNING a list — shortlisting
  *  as you read, sending one to someone. "Set as location" is deliberately
@@ -590,7 +591,10 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
           // so the value is current.
           const next = !expanded
           setExpanded(next)
-          if (next) track('listing_opened', { listing: item.name, category: category.id })
+          if (next) {
+            track('listing_opened', { listing: item.name, category: category.id })
+            countEvent(community, 'listing_view', item.id)
+          }
           onExpandedChange?.(next)
         }}
         // h-full: on desktop this row is the ENTIRE visible card (the outer

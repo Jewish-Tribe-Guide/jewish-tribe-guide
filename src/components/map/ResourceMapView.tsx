@@ -31,6 +31,8 @@ import { useCampaignBanners } from '@/lib/contentContext'
 import { activeCampaignBanner } from '@/lib/campaignBanner'
 import { community } from '@/community.config'
 import { mapQueryString } from '@/lib/routes'
+import { countEvent } from '@/lib/countEvent'
+import { useOptionalCommunitySlug } from '@/lib/communityContext'
 import type { DirectoryResource, MapFilters } from '@/types'
 
 // Shared by the initial useState below and the resync effect further down
@@ -274,6 +276,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // (Google-Maps-app-style) instead of opening the small info-window bubble
   // ResourceMap shows by default — desktop keeps that default.
   const isMobile = useIsMobile()
+  const countCommunity = useOptionalCommunitySlug()
   // Measured px height of the floating search+filter-chips overlay (mobile
   // only) — it sits on top of the map, not the sheet, but blocks the same
   // amount of the map visually. ResourceMap needs this too so it centers a
@@ -406,6 +409,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // the pin-tap handler passed to ResourceMap below, which is the one place
   // that does.
   const selectPlace = (p: SelectablePoint, frame = true) => {
+    if (p.raw?.id && countCommunity) countEvent(countCommunity, 'listing_view', p.raw.id)
     if (isMobile) nearbySheetRef.current?.selectPoint(p, frame)
     else {
       setDesktopSelected(p)

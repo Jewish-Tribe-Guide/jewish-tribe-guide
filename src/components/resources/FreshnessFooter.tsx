@@ -46,6 +46,13 @@ function FreshnessStatus({ resourceId, confirmedAt: initialConfirmedAt }: Props)
   // misclick be undone back to the prior state instead of just cleared.
   const [previousConfirmedAt, setPreviousConfirmedAt] = useState<string | undefined>(undefined)
   const [justConfirmedNow, setJustConfirmedNow] = useState(false)
+  // What the server handed back for this browser's own confirmation, sent
+  // back on undo: the stamp lets the server refuse to undo if someone else
+  // has confirmed since, and the activity id takes it back out of the log.
+  // `undoable` is false when the tap landed inside the server's cooldown
+  // (someone confirmed minutes ago): nothing changed, so there's nothing to
+  // undo, and offering Undo would restore a stamp this browser never set.
+  const [mine, setMine] = useState<{ confirmedAt: string; activityId: number | null; undoable: boolean } | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(false)
 
@@ -54,10 +61,11 @@ function FreshnessStatus({ resourceId, confirmedAt: initialConfirmedAt }: Props)
     setError(false)
     try {
       const res = await fetch(`/api/resource/${resourceId}/confirm`, { method: 'POST' })
-      const json = (await res.json()) as { ok: boolean; confirmedAt?: string }
+      const json = (await res.json()) as { ok: boolean; confirmedAt?: string; changed?: boolean; activityId?: number | null }
       if (json.ok && json.confirmedAt) {
         setPreviousConfirmedAt(confirmedAt)
         setConfirmedAt(json.confirmedAt)
+        setMine({ confirmedAt: json.confirmedAt, activityId: json.activityId ?? null, undoable: json.changed !== false })
         setJustConfirmedNow(true)
       } else {
         setError(true)
@@ -76,11 +84,12 @@ function FreshnessStatus({ resourceId, confirmedAt: initialConfirmedAt }: Props)
       const res = await fetch(`/api/resource/${resourceId}/confirm`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ previousConfirmedAt }),
+        body: JSON.stringify({ previousConfirmedAt, confirmedAt: mine?.confirmedAt, activityId: mine?.activityId }),
       })
       const json = (await res.json()) as { ok: boolean; confirmedAt?: string | null }
       if (json.ok) {
         setConfirmedAt(json.confirmedAt ?? undefined)
+        setMine(null)
         setJustConfirmedNow(false)
       } else {
         setError(true)
@@ -96,13 +105,15 @@ function FreshnessStatus({ resourceId, confirmedAt: initialConfirmedAt }: Props)
     return (
       <span className="text-xs text-green-600 font-medium">
         ✓ Confirmed — thanks!{' '}
-        <button
-          onClick={undo}
-          disabled={loading}
-          className="text-slate-400 hover:text-slate-600 hover:underline cursor-pointer disabled:opacity-50 font-normal"
-        >
-          {loading ? 'Undoing…' : 'Undo'}
-        </button>
+        {mine?.undoable !== false && (
+          <button
+            onClick={undo}
+            disabled={loading}
+            className="text-slate-400 hover:text-slate-600 hover:underline cursor-pointer disabled:opacity-50 font-normal"
+          >
+            {loading ? 'Undoing…' : 'Undo'}
+          </button>
+        )}
         {error && <span className="ml-1 text-red-500">Failed — try again</span>}
       </span>
     )

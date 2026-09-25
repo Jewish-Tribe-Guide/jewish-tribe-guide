@@ -5,6 +5,8 @@ import { isCategorySyncEligible } from './categories'
 import { fetchPlaceSync, namesOverlap, OWNABLE_SYNC_FIELDS, type OwnableSyncField } from './googlePlaces'
 import { upsertTags } from './tagStore'
 import { geocode } from './geo'
+import { addedItems, itemFieldKeys, nextItemSeen, normalizeEmail, sourceOfSubmission, type ActivityInput } from './activity'
+import { recordActivity } from './activityStore'
 import type {
   ResourceRow,
   ResourceSubmission,
@@ -308,8 +310,9 @@ export async function approveSubmission(id: string, community?: string, reviewed
   }
 
   let affectedResourceId: string | null = null
+  let newItems: { fieldKey: string; item: string }[] = []
   if (submission.target_type === 'listing') {
-    affectedResourceId = await applyListing(submission)
+    ;({ id: affectedResourceId, newItems } = await applyListing(submission))
   } else if (submission.target_type === 'category') {
     await applyCategory(submission)
   } else {
@@ -335,7 +338,36 @@ export async function approveSubmission(id: string, community?: string, reviewed
     .select('*')
     .single()
   if (error) throw new Error(`Failed to mark submission approved: ${error.message}`)
+
+  if (submission.target_type === 'listing') {
+    await recordActivity(activityForApproval(submission, affectedResourceId, newItems))
+  }
   return data as SubmissionRow
+}
+
+const APPROVAL_KIND = { create: 'listing_added', update: 'listing_edited', delete: 'listing_removed' } as const
+
+/** The activity-log rows an approved listing submission produces: one for the
+ *  listing, plus one per grocery item it newly added (so "Challah added at
+ *  Trader Joe's" can appear on its own later). Credited to the email the
+ *  submitter gave, if any. Recorded after the approval is saved, so a failed
+ *  approval never leaves a history of something that didn't happen. */
+export function activityForApproval(
+  submission: SubmissionRow,
+  resourceId: string | null,
+  newItems: { fieldKey: string; item: string }[],
+): ActivityInput[] {
+  const base = {
+    community: submission.community_id,
+    resourceId,
+    source: sourceOfSubmission(submission.submitted_by),
+    actorEmail: normalizeEmail(submission.submitted_by?.email),
+    submissionId: submission.id,
+  }
+  return [
+    { ...base, kind: APPROVAL_KIND[submission.operation] },
+    ...newItems.map((i) => ({ ...base, kind: 'item_added' as const, fieldKey: i.fieldKey, item: i.item })),
+  ]
 }
 
 // `community`, when given, must match — same cross-community guard as
@@ -635,7 +667,40 @@ function withConfirmedNow(details: Record<string, unknown>, now: string): Record
   return { ...details, confirmedAt: now }
 }
 
-async function applyListing(submission: SubmissionRow): Promise<string | null> {
+/** Dates the grocery items this approval newly adds (details.itemSeen) and
+ *  returns which ones they were. Everything else on the listing keeps its
+ *  date: approving a new phone number says nothing about the challah. */
+async function withItemDates(
+  community: string,
+  details: Record<string, unknown>,
+  categoryId: string,
+  existing: Record<string, unknown> | null,
+  now: string,
+): Promise<{ details: Record<string, unknown>; newItems: { fieldKey: string; item: string }[] }> {
+  // Best-effort like the rest of the approval's extras: a category that can't
+  // be read just means no item dates this time, never a failed approval.
+  let fields: ReadonlyArray<{ key: string; type: string }> = []
+  try {
+    fields = (await getCategoryById(community, categoryId))?.detailFields ?? []
+  } catch (err) {
+    console.error('[submissions] could not read category for item dates:', err)
+  }
+  const keys = itemFieldKeys(fields)
+  const next = { ...details }
+  delete next.itemSeen
+  if (keys.length === 0) {
+    if (existing?.itemSeen !== undefined) next.itemSeen = existing.itemSeen
+    return { details: next, newItems: [] }
+  }
+  const newItems = addedItems(existing, details, keys)
+  const seen = nextItemSeen(existing?.itemSeen, details, keys, newItems, now)
+  if (Object.keys(seen).length > 0) next.itemSeen = seen
+  return { details: next, newItems }
+}
+
+type AppliedListing = { id: string | null; newItems: { fieldKey: string; item: string }[] }
+
+async function applyListing(submission: SubmissionRow): Promise<AppliedListing> {
   const supabase = getAdminClient()
   const now = new Date().toISOString()
 
@@ -645,6 +710,8 @@ async function applyListing(submission: SubmissionRow): Promise<string | null> {
     const googleFields = await resolveGoogleFields(submission.community_id, payload, null)
     payload.details = withResolvedGoogleFields(payload.details, googleFields)
     payload.details = withConfirmedNow(payload.details, now)
+    const dated = await withItemDates(submission.community_id, payload.details, payload.category, null, now)
+    payload.details = dated.details
     const { data: created, error } = await supabase
       .from('resource')
       .insert({
@@ -658,7 +725,7 @@ async function applyListing(submission: SubmissionRow): Promise<string | null> {
       .single()
     if (error) throw new Error(`Failed to create listing: ${error.message}`)
     await growTagVocabulary(submission.community_id, payload)
-    return (created as { id: string } | null)?.id ?? null
+    return { id: (created as { id: string } | null)?.id ?? null, newItems: dated.newItems }
   }
 
   if (submission.operation === 'update') {
@@ -680,6 +747,14 @@ async function applyListing(submission: SubmissionRow): Promise<string | null> {
     payload.details = withPreservedInternals(payload.details, existingData as ResourceRow | null)
     payload.details = withClearedSyncOnNewPlaceId(payload.details, existingData as ResourceRow | null)
     payload.details = withConfirmedNow(payload.details, now)
+    const dated = await withItemDates(
+      submission.community_id,
+      payload.details,
+      payload.category,
+      ((existingData as ResourceRow | null)?.details as Record<string, unknown> | undefined) ?? null,
+      now,
+    )
+    payload.details = dated.details
     const { error } = await supabase
       .from('resource')
       .update({ ...(await listingColumnsWithGeo(payload)), reviewed_at: now })
@@ -687,7 +762,7 @@ async function applyListing(submission: SubmissionRow): Promise<string | null> {
       .eq('id', submission.target_id)
     if (error) throw new Error(`Failed to update listing: ${error.message}`)
     await growTagVocabulary(submission.community_id, payload)
-    return submission.target_id
+    return { id: submission.target_id, newItems: dated.newItems }
   }
 
   if (submission.operation === 'delete') {
@@ -699,10 +774,10 @@ async function applyListing(submission: SubmissionRow): Promise<string | null> {
       .eq('community_id', submission.community_id)
       .eq('id', submission.target_id)
     if (error) throw new Error(`Failed to archive listing: ${error.message}`)
-    return submission.target_id
+    return { id: submission.target_id, newItems: [] }
   }
 
-  return null
+  return { id: null, newItems: [] }
 }
 
 // When a listing with tag fields is approved, add any newly-typed tags to the

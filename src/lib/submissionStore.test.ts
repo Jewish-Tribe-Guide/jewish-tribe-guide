@@ -56,7 +56,16 @@ vi.mock('./googlePlaces', async () => {
   return { ...actual, fetchPlaceSync: mockFetchPlaceSync }
 })
 
+// The activity log is its own store with its own tests; mocked here so an
+// approval's history rows don't land in the resource-insert assertions below
+// (several read "the last insert"), and so what gets recorded can be asserted.
+const mockRecordActivity = vi.hoisted(() => vi.fn())
+vi.mock('./activityStore', () => ({
+  recordActivity: mockRecordActivity,
+}))
+
 const {
+  activityForApproval,
   approveSubmission,
   getSubmissionFunnelStats,
   listPendingSubmissions,
@@ -109,6 +118,7 @@ afterEach(() => {
   mockUpsertTags.mockReset()
   mockGeocode.mockReset()
   mockFetchPlaceSync.mockReset()
+  mockRecordActivity.mockReset()
 })
 
 // ── listPendingSubmissions: category-label resolution ───────────────────────
@@ -1433,5 +1443,136 @@ describe('getSubmissionFunnelStats', () => {
   it('throws with the Supabase error message on failure', async () => {
     mockFrom.mockReturnValue(chainable({ data: null, error: { message: 'boom' } }))
     await expect(getSubmissionFunnelStats('philly')).rejects.toThrow('Failed to load submission stats: boom')
+  })
+})
+
+// ── The activity log and item dates ──────────────────────────────────────────
+
+describe('approveSubmission: activity log and grocery item dates', () => {
+  function groceryCategory() {
+    return {
+      id: 'grocery',
+      label: 'Grocery',
+      hasAddress: true,
+      detailFields: [{ key: 'm', label: 'Kosher items', type: 'tags', tagGroup: 'kosher_product' }],
+    }
+  }
+
+  function mockFlow(sub: SubmissionRow, existing: Record<string, unknown> | null = null) {
+    const submissionBuilder = chainable({ data: sub, error: null })
+    const approveBuilder = chainable({ data: { ...sub, status: 'approved' }, error: null })
+    const resourceBuilder = chainable({ data: existing ?? { id: 'res-new' }, error: null })
+    let submissionCalls = 0
+    mockFrom.mockImplementation((table: string) => {
+      if (table === 'submission') {
+        submissionCalls += 1
+        return submissionCalls === 1 ? submissionBuilder : approveBuilder
+      }
+      if (table === 'resource') return resourceBuilder
+      throw new Error(`unexpected table ${table}`)
+    })
+    mockGetCategoryById.mockResolvedValue(groceryCategory())
+    mockRecordActivity.mockResolvedValue([])
+    return resourceBuilder
+  }
+
+  it('dates every item on a new listing, and logs the listing and each item', async () => {
+    const sub = baseSubmission({
+      operation: 'create',
+      submitted_by: { email: ' Rachel@Example.com ' },
+      payload: listingPayload({ category: 'grocery', details: { m: ['Challah', 'Wine'] } }) as unknown as Record<string, unknown>,
+    })
+    const resource = mockFlow(sub)
+
+    await approveSubmission('sub-1')
+
+    const written = lastCallArg(resource.insert)
+    const seen = written.details.itemSeen as Record<string, Record<string, string>>
+    expect(Object.keys(seen.m)).toEqual(['Challah', 'Wine'])
+    expect(seen.m.Challah).toBe(written.details.confirmedAt)
+    const rows = mockRecordActivity.mock.calls[0][0]
+    expect(rows.map((r: { kind: string; item?: string }) => [r.kind, r.item ?? null])).toEqual([
+      ['listing_added', null],
+      ['item_added', 'Challah'],
+      ['item_added', 'Wine'],
+    ])
+    expect(rows[0]).toMatchObject({ community: 'philly', source: 'submission', actorEmail: 'rachel@example.com', submissionId: 'sub-1' })
+  })
+
+  it('on an edit, dates only the items it adds, keeps the rest, and drops removed ones', async () => {
+    const sub = baseSubmission({
+      operation: 'update',
+      target_id: 'res-1',
+      payload: listingPayload({
+        category: 'grocery',
+        // A made-up date in the submission must never win.
+        details: { m: ['Challah', 'Stew meat'], itemSeen: { m: { Challah: '2099-01-01T00:00:00.000Z' } } },
+      }) as unknown as Record<string, unknown>,
+    })
+    const resource = mockFlow(sub, {
+      id: 'res-1',
+      details: { m: ['Challah', 'Wine'], itemSeen: { m: { Challah: '2026-08-11T00:00:00.000Z', Wine: '2026-08-11T00:00:00.000Z' } } },
+    })
+
+    await approveSubmission('sub-1')
+
+    const seen = lastCallArg(resource.update).details.itemSeen as Record<string, Record<string, string>>
+    expect(seen.m.Challah).toBe('2026-08-11T00:00:00.000Z')
+    expect(seen.m.Wine).toBeUndefined()
+    expect(Date.parse(seen.m['Stew meat'])).toBeGreaterThan(Date.parse('2026-09-01'))
+    const rows = mockRecordActivity.mock.calls[0][0]
+    expect(rows.map((r: { kind: string; item?: string }) => [r.kind, r.item ?? null])).toEqual([
+      ['listing_edited', null],
+      ['item_added', 'Stew meat'],
+    ])
+  })
+
+  it('drops a made-up itemSeen even when the edit dates nothing itself', async () => {
+    const sub = baseSubmission({
+      operation: 'update',
+      target_id: 'res-1',
+      payload: listingPayload({
+        category: 'grocery',
+        details: { m: ['Challah'], itemSeen: { m: { Challah: '2099-01-01T00:00:00.000Z' } } },
+      }) as unknown as Record<string, unknown>,
+    })
+    // Challah was already there, from before items had dates.
+    const resource = mockFlow(sub, { id: 'res-1', details: { m: ['Challah'] } })
+
+    await approveSubmission('sub-1')
+
+    expect(lastCallArg(resource.update).details.itemSeen).toBeUndefined()
+  })
+
+  it('logs nothing when the approval itself fails to save', async () => {
+    const sub = baseSubmission({ operation: 'create', payload: listingPayload() as unknown as Record<string, unknown> })
+    mockFlow(sub)
+    const failing = chainable({ data: null, error: { message: 'boom' } })
+    let submissionCalls = 0
+    const resource = chainable({ data: { id: 'res-new' }, error: null })
+    mockFrom.mockImplementation((table: string) => {
+      if (table === 'submission') {
+        submissionCalls += 1
+        return submissionCalls === 1 ? chainable({ data: sub, error: null }) : failing
+      }
+      return resource
+    })
+
+    await expect(approveSubmission('sub-1')).rejects.toThrow('Failed to mark submission approved')
+    expect(mockRecordActivity).not.toHaveBeenCalled()
+  })
+})
+
+describe('activityForApproval', () => {
+  it('credits Google closure reports to Google, and a removal as a removal', () => {
+    const sub = baseSubmission({ operation: 'delete', target_id: 'res-1', submitted_by: { name: 'Google Places (automated)' } })
+    expect(activityForApproval(sub, 'res-1', [])).toEqual([
+      expect.objectContaining({ kind: 'listing_removed', source: 'google', actorEmail: null, resourceId: 'res-1' }),
+    ])
+  })
+
+  it('leaves an edit with no email as "a neighbor" (no actor)', () => {
+    const sub = baseSubmission({ operation: 'update', target_id: 'res-1', submitted_by: { email: 'not an email' } })
+    expect(activityForApproval(sub, 'res-1', [])[0].actorEmail).toBeNull()
   })
 })

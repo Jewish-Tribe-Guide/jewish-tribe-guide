@@ -112,6 +112,13 @@ export function useCommunitySlug(): string {
   return useActiveCommunity().community.slug
 }
 
+/** The same slug, or null outside a community route (the admin console renders
+ *  some public components in previews). For callers that can simply skip
+ *  their work there, like counting a view, rather than throw. */
+export function useOptionalCommunitySlug(): string | null {
+  return useContext(CommunityContext)?.community.slug ?? null
+}
+
 // ── The "/" redirect hint ────────────────────────────────────────────────────
 
 /** Records the community the visitor is reading, so a later bare "/" can send

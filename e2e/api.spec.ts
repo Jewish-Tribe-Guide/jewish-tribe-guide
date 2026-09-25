@@ -103,6 +103,31 @@ test.describe('a forged token is refused too', () => {
   }
 })
 
+// The public, unauthenticated write endpoints a one-tap button calls. Each
+// refuses input it can't use before it reaches the database, which is also
+// what lets this suite call them without writing anything: every request
+// here is one the route turns away up front.
+test.describe('the one-tap write endpoints refuse what they can’t use', () => {
+  test('"Mark as current" on something that isn’t a listing id', async ({ request }) => {
+    for (const method of ['post', 'delete'] as const) {
+      const res = await request[method]('/api/resource/not-a-listing/confirm', { failOnStatusCode: false })
+      expect(res.status(), method).toBe(404)
+    }
+  })
+
+  test('a count that isn’t a listing view or an empty search', async ({ request }) => {
+    for (const data of [
+      'not json',
+      { community: 'philly', kind: 'vote', key: NO_SUCH_ID },
+      { community: 'philly', kind: 'listing_view', key: 'not-a-listing' },
+      { community: 'philly', kind: 'search_miss', key: 'someone@example.com' },
+    ]) {
+      const res = await request.post('/api/counts', { data, failOnStatusCode: false })
+      expect(res.status(), JSON.stringify(data)).toBe(400)
+    }
+  })
+})
+
 test.describe('the dev login shortcut', () => {
   // It mints a real admin session with no email round-trip. It refuses unless
   // NODE_ENV !== 'production' AND DEV_ADMIN_BYPASS_SECRET is set — and the e2e

@@ -22,6 +22,7 @@ import { useLocation } from '@/lib/locationContext'
 import { useHeaderOverlay } from '@/lib/headerVisibility'
 import { community } from '@/community.config'
 import { useCommunitySlug } from '@/lib/communityContext'
+import { countEvent } from '@/lib/countEvent'
 import type { NavigateFn } from '@/types'
 import type { Flow } from '@/types'
 import { useSiteSettings } from '@/lib/useSiteSettings'
@@ -133,7 +134,10 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: LandingProps
   // carry `findAction` so the directory opens straight into that form
   // instead of just the expanded card.
   const openPlace = (hit: (typeof placeHits)[number], action?: 'edit') => {
-    if (!action) track('listing_opened', { listing: hit.item.name, category: hit.item.category, source: 'search' })
+    if (!action) {
+      track('listing_opened', { listing: hit.item.name, category: hit.item.category, source: 'search' })
+      countEvent(communitySlug, 'listing_view', hit.item.id)
+    }
     onNavigate('patient', 'find', {
       findView: hit.item.category,
       findItemId: hit.item.id,
