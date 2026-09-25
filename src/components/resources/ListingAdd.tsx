@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { isCategorySyncEligible, type CategoryConfig } from '@/lib/categories'
 import type { DirectoryResource } from '@/types'
 import AddressInput from '@/components/intake/AddressInput'
-import UpButton from '@/components/UpButton'
+import BackIconButton from '@/components/BackIconButton'
 import ActionDialog from './ActionDialog'
 import ListingEditor from './ListingEditor'
 import MobileSheet from './MobileSheet'
@@ -77,7 +77,7 @@ export default function ListingAdd({ category, listings, isMobile, isOpen, onClo
             (MapPlaceDetail); the empty third column keeps the title
             centred. */}
         <div className="mb-3 grid grid-cols-[1fr_auto_1fr] items-center gap-2">
-          {onBack ? <UpButton label="Back" onClick={onBack} className="" /> : <span />}
+          {onBack ? <span><BackIconButton onClick={onBack} /></span> : <span />}
           <h2 className="truncate text-center text-base font-semibold text-slate-900">{title}</h2>
         </div>
         {flow}

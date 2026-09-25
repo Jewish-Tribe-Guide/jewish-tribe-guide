@@ -14,6 +14,7 @@ import ListingEditBar from './ListingEditBar'
 import ListingEditor from './ListingEditor'
 import { ChevronLeftIcon, ChevronRightIcon } from '@/components/icons'
 import { useBodyScrollLock } from '@/lib/useBodyScrollLock'
+import BackIconButton from '@/components/BackIconButton'
 
 type Props = {
   isOpen: boolean
@@ -310,20 +311,14 @@ export default function ListingDetailModal({
           {formOpen ? (
             // Replaces the name/icon block while editing — the editor
             // brings its own editable name and photo, and puts its title in
-            // the slot between Back and Close. "Back" alone, as
-            // MapPlaceDetail's: this returns to the listing you were just
-            // on, not to another screen, so it doesn't name a destination.
+            // the slot between Back and Close. Back is a chevron alone
+            // (BackIconButton), as in MapPlaceDetail: it returns to the
+            // listing you were just on, so there's no destination to name.
             // Back and Close each take an equal share of what's left, so
             // the title sits in the middle of the dialog, not of the gap.
             <>
             <div className="min-w-0 flex-1">
-              <button
-                onClick={stepBack}
-                className="inline-flex items-center gap-1 text-sm font-medium text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
-              >
-                <ChevronLeftIcon className="h-4 w-4" />
-                Back
-              </button>
+              <BackIconButton onClick={stepBack} />
             </div>
             <div ref={setTitleSlot} className="min-w-0 text-center text-lg" />
             </>

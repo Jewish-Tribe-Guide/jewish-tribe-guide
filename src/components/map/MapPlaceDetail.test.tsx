@@ -255,7 +255,9 @@ describe('MapPlaceDetail', () => {
       </PinnedProvider>,
     )
     await user.click(screen.getByRole('button', { name: 'Suggest an edit' }))
-    const row = screen.getByRole('button', { name: 'Back' }).parentElement!
+    // A chevron alone, named for screen readers only.
+    expect(screen.getByRole('button', { name: 'Back' })).toHaveTextContent(/^$/)
+    const row = screen.getByRole('button', { name: 'Back' }).closest('.grid') as HTMLElement
     expect(within(row).getByRole('heading', { name: 'stub title' })).toBeInTheDocument()
   })
 

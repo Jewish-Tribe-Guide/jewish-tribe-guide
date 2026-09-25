@@ -149,6 +149,8 @@ describe('ListingAdd — find it first', () => {
     const u = userEvent.setup()
     renderAdd()
     await u.click(screen.getByRole('button', { name: 'pick the place' }))
+    // A chevron alone, as in Edit.
+    expect(screen.getByRole('button', { name: 'Back' })).toHaveTextContent(/^$/)
     await u.click(screen.getByRole('button', { name: 'Back' }))
     expect(screen.getByLabelText('Find the place')).toHaveValue('1200 Example Ave, Philadelphia, PA')
   })
@@ -248,6 +250,15 @@ describe('ListingAdd — a category with no address', () => {
     await u.click(screen.getByRole('button', { name: 'Add Join group link' }))
     await u.type(screen.getByRole('textbox', { name: 'Join group link' }), 'chat.whatsapp.com/AbC123')
     expect(screen.getByRole('status')).toHaveTextContent('Philly Shabbos Meals is already in the guide. It has the same join group link.')
+  })
+
+  it('has a wordless Back on the phone sheet too, once past the search', async () => {
+    const u = userEvent.setup()
+    renderAdd({ isMobile: true })
+    await u.click(screen.getByRole('button', { name: 'pick the place' }))
+    expect(screen.getByRole('button', { name: 'Back' })).toHaveTextContent(/^$/)
+    await u.click(screen.getByRole('button', { name: 'Back' }))
+    expect(screen.getByLabelText('Find the place')).toBeInTheDocument()
   })
 
   it('uses the phone sheet, with the title in its own row, on mobile', () => {

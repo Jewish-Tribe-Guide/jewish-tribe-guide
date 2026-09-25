@@ -779,6 +779,8 @@ describe('GenericListingCard — expanded', () => {
     const dialog = screen.getByRole('dialog')
     await user.click(within(dialog).getByRole('button', { name: 'Suggest an edit' }))
 
+    // A chevron alone: the word isn't needed, and the site is text-heavy.
+    expect(within(dialog).getByRole('button', { name: 'Back' })).toHaveTextContent(/^$/)
     const header = within(dialog).getByRole('button', { name: 'Back' }).closest('.border-b')!
     expect(within(header as HTMLElement).getByRole('heading', { name: 'stub title' })).toBeInTheDocument()
     expect(within(header as HTMLElement).getByRole('button', { name: 'Close' })).toBeInTheDocument()

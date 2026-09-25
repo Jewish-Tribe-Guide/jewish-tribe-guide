@@ -16,6 +16,7 @@ import { routes } from '@/lib/routes'
 import { listingSlug } from '@/lib/listingSlug'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { usePinned } from '@/lib/pinnedContext'
+import BackIconButton from '@/components/BackIconButton'
 
 type Props = {
   item: DirectoryResource
@@ -128,14 +129,17 @@ export default function MapPlaceDetail({ item, category, color, onBack, filters 
   if (formOpen) {
     return (
       <div ref={rootRef}>
-        {/* "Back" alone rather than naming a destination: unlike "Back to
-            list", which really does go to a different screen, this returns
-            to the same place you were already on. The editor's title goes
+        {/* A chevron alone (BackIconButton) rather than naming a
+            destination: unlike "Back to list", which really does go to a
+            different screen, this returns to the same place you were
+            already on. The editor's title goes
             in the middle of the same row, as it does between the desktop
             dialog's Back and Close; the empty third column keeps it
             centred. */}
         <div className="mb-3 grid grid-cols-[1fr_auto_1fr] items-center gap-2">
-          <UpButton label="Back" onClick={stepBack} className="" />
+          <span>
+            <BackIconButton onClick={stepBack} />
+          </span>
           <div ref={setTitleSlot} className="min-w-0 text-center text-base" />
         </div>
         <ListingEditor

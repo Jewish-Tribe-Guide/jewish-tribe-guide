@@ -2,6 +2,7 @@
 
 import { useEffect, type ReactNode } from 'react'
 import { useBodyScrollLock } from '@/lib/useBodyScrollLock'
+import BackIconButton from '@/components/BackIconButton'
 
 type Props = {
   isOpen: boolean
@@ -75,18 +76,7 @@ export default function ActionDialog({ isOpen, onClose, title, children, listing
           <div className="dialog-in flex max-h-[calc(85vh-4.5rem)] w-full flex-col rounded-xl border border-slate-200 bg-white shadow-xl">
             <div className="flex shrink-0 items-center gap-3 border-b border-slate-200 px-6 py-5">
               <div className="min-w-0 flex-1">
-                {onBack && (
-                  <button
-                    type="button"
-                    onClick={onBack}
-                    className="inline-flex cursor-pointer items-center gap-1 text-sm font-medium text-slate-500 transition-colors hover:text-slate-800"
-                  >
-                    <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-                    </svg>
-                    Back
-                  </button>
-                )}
+                {onBack && <BackIconButton onClick={onBack} />}
               </div>
               <h2 className="min-w-0 truncate text-center text-lg font-semibold text-slate-900">{title}</h2>
               <div className="flex min-w-0 flex-1 justify-end">{closeButton}</div>
