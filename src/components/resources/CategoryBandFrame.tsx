@@ -8,8 +8,7 @@ import { useIsMobile } from '@/lib/useIsMobile'
 
 type FrameProps = {
   /** The band's color — a category's own pin color (getCategoryColor), or a
-   *  fixed color for a pseudo-category with no CategoryConfig row (see
-   *  HospitalsDirectory's HOSPITAL_COLOR). */
+   *  fixed color for a pseudo-category with no CategoryConfig row. */
   color: string
   /** A photo to show muted under the color, e.g. CategoryConfig.cardImageUrl.
    *  Omit (or null) for the plain wash — most categories, and every caller

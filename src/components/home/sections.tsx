@@ -803,29 +803,10 @@ export function resourceCards(
 ): CardDef[] | null {
   if (categories === null) return null
 
-  const medical = categories.find((c) => c.kind === 'medical')
   const zmanim = categories.find((c) => c.kind === 'zmanim')
   const eruv = categories.find((c) => c.kind === 'eruv')
 
   const cards = [
-    ...(medical
-      ? [{
-          title: medical.pluralLabel,
-          id: 'medical',
-          icon: medical.icon,
-          cardImageUrl: medical.cardImageUrl,
-          cardTextColor: medical.cardTextColor,
-          keywords: [
-            'hospital', 'hospitals', 'about your hospital', 'chaplain', 'rabbi', 'prayer room',
-            'prayer space', 'shabbat elevator', 'shabbos elevator', 'kosher cafeteria',
-            'jewish doctor', 'medical staff', 'bikur cholim room', 'shabbos accommodations',
-            'hup', 'penn', 'university of pennsylvania', 'jefferson', 'chop', 'childrens hospital',
-            'temple', 'einstein',
-          ],
-          go: () => nav('patient', 'find', { findView: 'hospitals' }),
-          href: routes.slug(communitySlug, 'hospitals'),
-        }]
-      : []),
     ...categories.filter((c) => c.kind === 'listing').map((c) => ({
       title: c.pluralLabel,
       id: c.id,

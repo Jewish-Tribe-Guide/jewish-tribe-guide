@@ -47,10 +47,7 @@ const HOSPITALS_ID = '__hospitals__'
 // has a hundred and fifty pins on it. DROPPED_PIN_COLOR below deliberately
 // stays as-is: there is only ever a handful of those, they're the visitor's
 // own transient marks, and standing out is the entire point of one.
-// Exported so HospitalsDirectory's own header band uses the identical color
-// and glyph — a hospital should read as the same "thing" on the map and on
-// its own directory page, not two independently-chosen reds.
-export const HOSPITAL_COLOR = '#b6302b'
+const HOSPITAL_COLOR = '#b6302b'
 export const HOSPITAL_ICON = '🏥'
 // A dropped pin's marker id is prefixed with this so a click handler can
 // tell it apart from a real listing/hospital point without a separate prop
@@ -863,9 +860,8 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // category chips, committed search/filters, and selected pin — so a
   // shared map link (or hitting browser Back) reopens the exact same view,
   // the same way a category directory's own filters/search already round-
-  // trip through its URL. mapQueryString is the same builder viewMapForCategory
-  // uses for the initial navigation there, so a link built by either one
-  // reads back identically via parseMapQuery.
+  // trip through its URL. Built with mapQueryString and read back with
+  // parseMapQuery, so a link written here reads back identically.
   //
   // Plain history.replaceState, not next/navigation's router: router.replace
   // re-subscribes every useSearchParams() caller (this component now among

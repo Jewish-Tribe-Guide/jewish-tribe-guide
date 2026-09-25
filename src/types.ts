@@ -268,35 +268,12 @@ export type CategorySubmissionPayload = {
   }
 }
 
-export type JewishMedicalProfessional = {
-  name: string
-  specialty: string
-}
-
-export type BikurCholimContact = {
-  name: string
-  phone: string
-}
-
-export type JewishChaplain = {
-  name: string
-  phone: string
-}
-
-export type HospitalInfo = {
-  jewishMedicalProfessionals: JewishMedicalProfessional[]
-  bikurCholim: {
-    room: string
-    contact: BikurCholimContact
-  }
-  prayerSpace: string
-  jewishChaplain: JewishChaplain
-  shabbatAccommodations: string
-}
-
-/** A hospital as stored in the DB (the `hospital` table) — a landmark plus its
- *  optional per-hospital "Jewish life" details. */
-export type Hospital = Landmark & { info?: HospitalInfo | null }
+/** A hospital as stored in the DB (the `hospital` table): a name and a place.
+ *  The volunteer form offers these as choices, and the map can pin them. It
+ *  used to carry per-hospital "Jewish life" details too, but those were only
+ *  ever made-up placeholders and have been removed; the real hospital pages
+ *  are built from the hospital listings instead. */
+export type Hospital = Landmark
 
 // ── Audience + directory anchor ────────────────────────────────────────────────
 

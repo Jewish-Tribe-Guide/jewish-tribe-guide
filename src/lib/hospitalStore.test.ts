@@ -31,7 +31,7 @@ afterEach(() => {
 describe('listHospitals', () => {
   it('maps rows, ordering by sort_order then name', async () => {
     const builder = chainable({
-      data: [{ id: 'h1', name: 'General', latitude: 1, longitude: 2, timezone: 'America/New_York', info: null }],
+      data: [{ id: 'h1', name: 'General', latitude: 1, longitude: 2, timezone: 'America/New_York' }],
       error: null,
     })
     mockFrom.mockReturnValue(builder)
@@ -44,10 +44,27 @@ describe('listHospitals', () => {
       latitude: 1,
       longitude: 2,
       timezone: 'America/New_York',
-      info: undefined,
     })
     expect(builder.order).toHaveBeenCalledWith('sort_order', { ascending: true })
     expect(builder.order).toHaveBeenCalledWith('name', { ascending: true })
+  })
+
+  // The `info` column only ever held made-up placeholder details (fake phone
+  // numbers, invented chaplains and doctors), and this list ships inside every
+  // page. It must be neither asked for nor passed through.
+  it('never reads or returns the placeholder `info` details', async () => {
+    const builder = chainable({
+      data: [{ id: 'h1', name: 'General', latitude: 1, longitude: 2, timezone: 'UTC', info: { jewishChaplain: { name: 'Rabbi X', phone: '(215) 555-2150' } } }],
+      error: null,
+    })
+    mockFrom.mockReturnValue(builder)
+
+    const [hospital] = await listHospitals('philly')
+
+    expect(builder.select).toHaveBeenCalledTimes(1)
+    expect(String((builder.select as ReturnType<typeof vi.fn>).mock.calls[0][0])).not.toMatch(/\binfo\b/)
+    expect(hospital).not.toHaveProperty('info')
+    expect(JSON.stringify(hospital)).not.toContain('555')
   })
 
   it('throws with the Supabase error message on failure', async () => {
@@ -61,8 +78,8 @@ describe('hospitalNameMap', () => {
     mockFrom.mockReturnValue(
       chainable({
         data: [
-          { id: 'h1', name: 'General', latitude: 0, longitude: 0, timezone: 'UTC', info: null },
-          { id: 'h2', name: 'Memorial', latitude: 0, longitude: 0, timezone: 'UTC', info: null },
+          { id: 'h1', name: 'General', latitude: 0, longitude: 0, timezone: 'UTC' },
+          { id: 'h2', name: 'Memorial', latitude: 0, longitude: 0, timezone: 'UTC' },
         ],
         error: null,
       }),

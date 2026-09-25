@@ -2,9 +2,9 @@
 
 import { useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import type { AppMode, MapFilters, NavigateFn } from '@/types'
+import type { AppMode, NavigateFn } from '@/types'
 import { useCommunitySlug } from './communityContext'
-import { mapQueryString, routes } from './routes'
+import { routes } from './routes'
 import { markHomeReveal } from './homeRevealSignal'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -63,7 +63,6 @@ export type SiteNavigation = {
   openFlow: (kind: string, preselect?: string[]) => void
   goHome: (opts?: { transitionTypes?: string[] }) => void
   viewListing: (categoryId: string, listingId: string) => void
-  viewMapForCategory: (categoryId: string, query?: string, filters?: MapFilters) => void
 }
 
 export function useSiteNavigation(): SiteNavigation {
@@ -126,22 +125,8 @@ export function useSiteNavigation(): SiteNavigation {
     [router, community],
   )
 
-  const viewMapForCategory = useCallback(
-    (categoryId: string, query?: string, filters?: MapFilters) => {
-      const qs = mapQueryString({
-        categories: [categoryId],
-        query,
-        openNow: filters?.openNow,
-        bool: filters?.bool,
-        select: filters?.select,
-      })
-      router.push(`${routes.map(community)}${qs}`)
-    },
-    [router, community],
-  )
-
   return useMemo(
-    () => ({ navigate, openFlow, goHome, viewListing, viewMapForCategory }),
-    [navigate, openFlow, goHome, viewListing, viewMapForCategory],
+    () => ({ navigate, openFlow, goHome, viewListing }),
+    [navigate, openFlow, goHome, viewListing],
   )
 }

@@ -24,10 +24,9 @@ type Props = {
    *  needs to exist for a screen reader (`sr-only`, not removed) even where
    *  it's redundant to a sighted visitor. Desktop's header never swaps to a
    *  per-screen title the way mobile's does, so the h1 there stays visible
-   *  regardless of this prop. Left `false` for a caller like
-   *  HospitalsDirectory that still has its own mobile UpButton instead of a
-   *  header title — hiding its only visible title would leave mobile with
-   *  none at all. */
+   *  regardless of this prop. Leave it `false` for a caller that has its own
+   *  mobile UpButton instead of a header title — hiding its only visible
+   *  title would leave mobile with none at all. */
   titleInHeader?: boolean
   /** Desktop-only category icon badge, shown above everything else in this
    *  header — see GenericDirectory's own doc on how this pairs (a matching

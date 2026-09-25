@@ -1299,8 +1299,7 @@ describe('ResourceMapView — standalone map Escape/exit', () => {
 // directory's own filters/search already round-trip through its URL the
 // same way (FindResourcesConnected); this closes the same gap here, so a
 // map link is shareable down to the exact chips/search/pin someone had
-// open, the way viewMapForCategory's own initial-navigation link already
-// was — see mapQueryString/parseMapQuery.
+// open — see mapQueryString/parseMapQuery.
 describe('ResourceMapView — the shareable URL (standalone)', () => {
   afterEach(() => window.history.replaceState(null, '', '/test-community/map'))
 

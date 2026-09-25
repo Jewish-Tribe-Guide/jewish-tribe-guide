@@ -72,8 +72,6 @@ export const community = {
     eruv: true,
     /** "Zmanim & Shabbos" (candle-lighting / davening times) card + page. */
     zmanim: true,
-    /** "Jewish Medical Resources" card — per-hospital Jewish life. */
-    medicalResources: true,
     /** "Patient & Family Support" request flow. */
     patientSupport: true,
     /** "Volunteer for Patients" flow. */

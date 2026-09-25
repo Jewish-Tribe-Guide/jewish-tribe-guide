@@ -41,7 +41,6 @@ export function useCardOptions(): CardOption[] {
 
   return useMemo(() => {
     if (!categories) return []
-    const medical = categories.find((c) => c.kind === 'medical')
     const zmanim = categories.find((c) => c.kind === 'zmanim')
     const eruv = categories.find((c) => c.kind === 'eruv')
     const customForms = (forms ?? []).filter((f) => f.id !== 'support' && f.id !== 'volunteer')
@@ -55,7 +54,6 @@ export function useCardOptions(): CardOption[] {
       ...(community.features.patientSupport && supportForm ? [{ id: 'support', label: 'Patient & Family Support' }] : []),
       ...(community.features.volunteer && volunteerForm ? [{ id: 'volunteer', label: 'Volunteer for Patients' }] : []),
       ...customForms.map((f) => ({ id: f.id, label: f.title })),
-      ...(medical ? [{ id: 'medical', label: medical.pluralLabel }] : []),
       ...categories.filter((c) => c.kind === 'listing').map((c) => ({ id: c.id, label: c.pluralLabel })),
       ...(zmanim ? [{ id: 'zmanim', label: zmanim.pluralLabel }] : []),
       ...(eruv ? [{ id: 'eruv', label: eruv.pluralLabel }] : []),
