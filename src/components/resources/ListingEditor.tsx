@@ -2,9 +2,13 @@
 
 import { useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
+import Link from 'next/link'
 import type { DirectoryResource } from '@/types'
 import { PHOTO_FIELD_KEY, fieldIsVisible, resolveCapabilities, selectValues, type CategoryConfig, type CategoryField, type FieldType } from '@/lib/categories'
-import { changedHoursDays, listingChanges, type ListingChange } from '@/lib/listingDiff'
+import { changedHoursDays, listingChanges, sameFieldValue, type ListingChange } from '@/lib/listingDiff'
+import { routes } from '@/lib/routes'
+import { listingSlug } from '@/lib/listingSlug'
+import { useCommunitySlug } from '@/lib/communityContext'
 import { dayLabel, formatTodayHours, getOpenStatus, syncedLabel, CLOSURE_LABELS } from '@/lib/hours'
 import { formatPhone, normalizeUrl } from '@/lib/validation'
 import { useNow } from '@/lib/useNow'
@@ -22,13 +26,26 @@ import DaveningTimes, { hasDaveningTimes } from './DaveningTimes'
 import TagsInput from './TagsInput'
 import RemovalRequest from './RemovalRequest'
 import { DetailFieldInput } from './ListingForm'
-import { useListingDraft } from './useListingDraft'
+import { useListingDraft, type ListingDraft } from './useListingDraft'
 import { TURNSTILE_ACTIVE, useListingSubmit } from './useListingSubmit'
 import { SUBMIT_PILL } from './submitPill'
 
 type Props = {
-  item: DirectoryResource
+  /** The listing being edited. Omitted, the editor adds a new one: the
+   *  same layout, starting from `draft` (a Google pick, see ListingAdd) or
+   *  empty, sent as a new listing rather than an edit. */
+  item?: DirectoryResource
   category: CategoryConfig
+  /** A draft the host already started — ListingAdd's, which its Google
+   *  search step filled in. Omitted, the editor starts its own from `item`. */
+  draft?: ListingDraft
+  /** Adding only: the draft came from a Google pick, so the line at the top
+   *  says to check it rather than just that it's reviewed. */
+  fromGoogle?: boolean
+  /** Adding only: the category's listings, to say when what's being added
+   *  looks like one that's already there (same name, same link, same
+   *  Google place). */
+  existingListings?: DirectoryResource[]
   /** Leaves the editor: Back after sending, or after a removal request. */
   onClose: () => void
   /** Where the Send button goes, when the host wants it outside the scrolling
@@ -93,6 +110,55 @@ const isSpecial = (f: CategoryField) => EDITED_AS[f.type] !== 'badge or row' && 
  *  number fields set to show as badges are edited as rows instead — they
  *  have no options to pick between. */
 const isBadgeField = (f: CategoryField) => !isSpecial(f) && placement(f) === 'badge' && (f.type === 'boolean' || f.type === 'select')
+
+type Lookalike = { listing: DirectoryResource; reason: string }
+
+/** The first listing that looks like the one being added, and why: the
+ *  same Google place (certain), the same link in one of its link fields —
+ *  a WhatsApp group's invite, a website (near-certain) — or the same name
+ *  (likely). Exported for its tests. */
+export function findLookalike(
+  listings: DirectoryResource[],
+  draft: { name: string; placeId: string | null; details: Record<string, unknown> },
+  fields: CategoryField[],
+): Lookalike | null {
+  if (draft.placeId) {
+    const hit = listings.find((l) => l.placeId === draft.placeId)
+    if (hit) return { listing: hit, reason: 'It’s the same place on Google.' }
+  }
+  for (const f of fields.filter((x) => x.type === 'url')) {
+    const v = draft.details[f.key]
+    if (typeof v !== 'string' || !v.trim()) continue
+    const hit = listings.find((l) => typeof l[f.key] === 'string' && sameFieldValue('url', l[f.key], v))
+    if (hit) return { listing: hit, reason: `It has the same ${f.label.toLowerCase()} link.` }
+  }
+  const name = draft.name.trim().toLowerCase()
+  if (name) {
+    const hit = listings.find((l) => l.name.trim().toLowerCase() === name)
+    if (hit) return { listing: hit, reason: 'It has the same name.' }
+  }
+  return null
+}
+
+function AlreadyListed({ listing, reason, category }: { listing: DirectoryResource; reason: string; category: CategoryConfig }) {
+  const community = useCommunitySlug()
+  return (
+    <div role="status" className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+      <span className="font-semibold">{listing.name} is already in the guide.</span> {reason}{' '}
+      <Link href={routes.listing(community, category.id, listingSlug(listing))} className="font-semibold text-primary hover:underline">
+        View it
+      </Link>{' '}
+      to suggest an edit instead, or carry on if this is a different place.
+    </div>
+  )
+}
+
+/** No answer at all — the server's own test for a required field. */
+function isBlank(v: unknown): boolean {
+  if (v === undefined || v === null) return true
+  if (Array.isArray(v)) return v.length === 0
+  return String(v).trim() === ''
+}
 
 function textOf(v: unknown): string {
   if (v === undefined || v === null) return ''
@@ -292,10 +358,29 @@ function focusAndReveal(id: string) {
  * listingChanges'; what gets sent is useListingDraft's, the same as the
  * form's.
  */
-export default function ListingEditor({ item, category, onClose, sendSlot, titleSlot, sharedTurnstile, onRemovalOpenChange, removalOpen: removalOpenProp }: Props) {
-  const draft = useListingDraft(category, item)
+export default function ListingEditor({
+  item: itemProp,
+  category,
+  draft: draftProp,
+  fromGoogle = false,
+  existingListings,
+  onClose,
+  sendSlot,
+  titleSlot,
+  sharedTurnstile,
+  onRemovalOpenChange,
+  removalOpen: removalOpenProp,
+}: Props) {
+  // Adding: nothing to compare against, so every value is simply what's
+  // there — no change marks, no Undo, no crossed-out "before". A blank
+  // listing stands in for `item` so the reads below don't each need a
+  // guard; `creating` switches off what only makes sense for an edit.
+  const creating = !itemProp
+  const item: DirectoryResource = itemProp ?? { id: '', category: category.id, name: '', anchorId: 'all', distance: 0, address: '' }
+  const ownDraft = useListingDraft(category, itemProp)
+  const draft = draftProp ?? ownDraft
   const { hasAddress, hasPhone, syncEligible, name, setName, address, setAddress, phone, setPhone, details, setDetail } = draft
-  const { ownTurnstileRef, setOwnTurnstileToken, ...sender } = useListingSubmit({ mode: 'edit', existing: item, sharedTurnstile })
+  const { ownTurnstileRef, setOwnTurnstileToken, ...sender } = useListingSubmit({ mode: creating ? 'create' : 'edit', existing: itemProp, sharedTurnstile })
   const [openPanel, setOpenPanel] = useState<string | null>(null)
   const [openHours, setOpenHours] = useState<Record<string, boolean>>({})
   const [revealed, setRevealed] = useState<Record<string, boolean>>({})
@@ -322,7 +407,7 @@ export default function ListingEditor({ item, category, onClose, sendSlot, title
     { name, address: hasAddress ? address : '', phone: hasPhone ? phone : '', details: draft.visibleDetails() },
     fields.filter((f) => fieldIsVisible(f, details)),
   )
-  const changeFor = (key: string) => changes.find((c) => c.key === key)
+  const changeFor = (key: string) => (creating ? undefined : changes.find((c) => c.key === key))
   const current: DirectoryResource = { ...item, name, address, phone, ...details }
 
   function undo(key: string) {
@@ -358,6 +443,13 @@ export default function ListingEditor({ item, category, onClose, sendSlot, title
   const suppressedBadgeKey = count > 0 ? countField?.countReplacesKey : undefined
   const isAmber = (f: CategoryField) => !!f.caveat && !!details[f.caveat.flagField]
 
+  // Adding: one that looks like a listing the guide already has — the same
+  // Google place, the same link (a WhatsApp group's invite, a website), or
+  // the same name. Said, not blocked: two places can share a name (a
+  // chain's two branches), and the way on is plainly an edit of the
+  // existing one instead.
+  const lookalike = creating ? findLookalike(existingListings ?? [], { name, placeId: draft.placeId, details }, fields) : null
+
   // ── Done: a receipt of what was sent ──────────────────────────────────
   if (sender.done) {
     return (
@@ -365,6 +457,8 @@ export default function ListingEditor({ item, category, onClose, sendSlot, title
         <h2 className="text-lg font-semibold text-green-800">Thank you!</h2>
         {sender.doneKind === 'removal' ? (
           <p className="mt-1 text-sm text-green-700">Your removal request was received. A moderator will review it before anything changes.</p>
+        ) : creating ? (
+          <p className="mt-1 text-sm text-green-700">Sent for review. A moderator checks it before it goes live.</p>
         ) : (
           <>
             <p className="mt-1 text-sm text-green-700">Sent for review. A moderator checks it before it goes live.</p>
@@ -378,14 +472,30 @@ export default function ListingEditor({ item, category, onClose, sendSlot, title
           </>
         )}
         <button type="button" onClick={onClose} className="mt-4 cursor-pointer text-sm font-semibold text-primary hover:underline">
-          Back to the listing
+          {creating ? 'Back to the list' : 'Back to the listing'}
         </button>
       </div>
     )
   }
 
+  // Adding: what a listing can't go without — a name, an address where the
+  // category has one, and whatever the admin marked required — named on
+  // Send until it's there, the way an edit's Send says "No changes yet".
+  // The same rules the server applies (resourceStore's validateSubmission),
+  // so Send is never on for something that would be refused.
+  const missing = creating
+    ? [
+        !name.trim() && 'Name',
+        hasAddress && !address.trim() && 'Address',
+        ...fields
+          .filter((f) => f.required && visible(f) && isBlank(details[f.key]))
+          .map((f) => f.label),
+      ].filter((x): x is string => !!x)
+    : []
+  const nothingToSend = creating ? missing.length > 0 : changes.length === 0
+
   async function send() {
-    if (changes.length === 0 || sender.submitting || sender.verifying) return
+    if (nothingToSend || sender.submitting || sender.verifying) return
     sender.setErrors([])
     setSent(changes)
     await sender.submit(draft.buildSubmission())
@@ -393,23 +503,27 @@ export default function ListingEditor({ item, category, onClose, sendSlot, title
 
   const sendLabel = sender.submitting
     ? 'Sending…'
-    : changes.length === 0
-      ? 'No changes yet'
+    : nothingToSend
+      ? creating
+        ? `Still needed: ${missing.join(', ')}`
+        : 'No changes yet'
       : sender.verifying
         ? 'Verifying…'
-        : `Send ${changes.length} change${changes.length === 1 ? '' : 's'}`
+        : creating
+          ? 'Send for review'
+          : `Send ${changes.length} change${changes.length === 1 ? '' : 's'}`
   const sendButton = (
     <button
       type="button"
       onClick={send}
-      disabled={changes.length === 0 || sender.submitting || sender.verifying}
+      disabled={nothingToSend || sender.submitting || sender.verifying}
       className={SUBMIT_PILL}
     >
       {sendLabel}
     </button>
   )
 
-  const canRequestRemoval = ui.contributions.report && resolveCapabilities(category.capabilities).report
+  const canRequestRemoval = !creating && ui.contributions.report && resolveCapabilities(category.capabilities).report
 
   // ── Header: photo and name ────────────────────────────────────────────
   const photo = photoField ? textOf(details[photoField.key]) : ''
@@ -443,6 +557,9 @@ export default function ListingEditor({ item, category, onClose, sendSlot, title
             <input
               id="edit-name"
               aria-label="Name"
+              placeholder="Name"
+              // Adding by hand: the name is the first thing to fill in.
+              autoFocus={creating && !fromGoogle}
               value={name}
               onChange={(e) => setName(e.target.value)}
               className="w-full rounded-md border border-slate-300 bg-white px-2 py-1 text-lg font-bold leading-tight text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary"
@@ -500,7 +617,8 @@ export default function ListingEditor({ item, category, onClose, sendSlot, title
     // has, so it goes quiet, and comes back with the badge.
     const chips = nowValues.map((v) => {
       const label = chipText(f, v)
-      const isNew = !before.includes(v)
+      // When adding, everything is new, so nothing is marked as such.
+      const isNew = !creating && !before.includes(v)
       // The blue edge says "new"; the fill is what the listing will show —
       // amber when the caveat applies, like the badges beside it.
       const tone = isNew
@@ -565,6 +683,17 @@ export default function ListingEditor({ item, category, onClose, sendSlot, title
     // Other…" is the only way to add a certifier that isn't listed to a
     // listing that has none yet, since there's no badge to open.
     .filter((x) => (x.options.length > 0 || (x.f.type === 'select' && !!x.f.allowOther)) && (x.f.type === 'boolean' || x.f.multiSelect || selectValues(details[x.f.key]).length === 0))
+    // Adding: a group with nothing picked has its own named chip (below),
+    // so the "+" only offers more for groups that already have a badge.
+    .filter((x) => !creating || currentValues(x.f).length > 0)
+
+  // Adding: every badge group with nothing in it yet, as a named dashed
+  // chip ("+ Food Type") where it'll sit. On an edit the listing's own
+  // badges are there to tap and a bare "+" covers the rest; a new listing
+  // has none, so a lone "+" would hide every choice behind it. A yes/no
+  // turns on from its chip; a choice opens its panel, the same one Edit
+  // uses.
+  const emptyGroups = creating ? badgeFields.filter((f) => f.key !== suppressedBadgeKey && currentValues(f).length === 0) : []
 
   function addBadge(f: CategoryField, v: string) {
     if (f.type === 'boolean') setDetail(f.key, true)
@@ -604,6 +733,20 @@ export default function ListingEditor({ item, category, onClose, sendSlot, title
           </button>
         )}
         {badgeChips}
+        {emptyGroups.map((f) => {
+          const panelOpen = openPanel === `badge:${f.key}`
+          return (
+            <button
+              key={`empty:${f.key}`}
+              type="button"
+              aria-expanded={f.type === 'boolean' ? undefined : panelOpen}
+              onClick={() => (f.type === 'boolean' ? setDetail(f.key, true) : togglePanel(`badge:${f.key}`))}
+              className={`cursor-pointer rounded-full border border-dashed border-blue-300 bg-white px-2 py-0.5 text-xs font-medium text-primary hover:bg-blue-50 ${panelOpen ? 'outline-solid outline-2 outline-offset-1 outline-primary' : ''}`}
+            >
+              + {f.type === 'boolean' ? (f.filterLabel ?? f.label) : f.label}
+            </button>
+          )
+        })}
         {addable.length > 0 && (
           <button
             type="button"
@@ -759,6 +902,7 @@ export default function ListingEditor({ item, category, onClose, sendSlot, title
                 onChange={setAddress}
                 onCoords={draft.setCoords}
                 onPlaceSelect={draft.handlePlaceSelect}
+                ariaLabel="Address"
                 placeholder={syncEligible ? 'Search by business name or address…' : 'Start typing an address…'}
               />
             </div>
@@ -968,18 +1112,29 @@ export default function ListingEditor({ item, category, onClose, sendSlot, title
     // phone sheet's Back).
     <h2 className="truncate font-semibold text-slate-900">{removalOpen ? 'Request removal' : 'Suggest an edit'}</h2>
   )
+  // Adding has no title of its own here: "Add a {category}" spans the
+  // search step before this one too, so the host (ListingAdd) owns it.
   const reviewLine = (
     <div className="space-y-2">
-      {!titleSlot && <div className="text-base">{title}</div>}
-      <p className="rounded-md bg-slate-100 px-3 py-1.5 text-xs text-slate-600">Reviewed by a moderator before it goes live</p>
+      {!titleSlot && !creating && <div className="text-base">{title}</div>}
+      <p className="rounded-md bg-slate-100 px-3 py-1.5 text-xs text-slate-600">
+        {creating && fromGoogle ? (
+          <>
+            <span className="font-semibold text-slate-700">Filled in from Google.</span> Check it, then add what Google can’t know. Reviewed by a moderator before it goes live.
+          </>
+        ) : (
+          'Reviewed by a moderator before it goes live'
+        )}
+      </p>
     </div>
   )
 
   return (
     <div className="space-y-4">
       <Honeypot value={sender.honeypot} onChange={sender.setHoneypot} />
-      {titleSlot && createPortal(title, titleSlot)}
+      {titleSlot && !creating && createPortal(title, titleSlot)}
       {reviewLine}
+      {lookalike && <AlreadyListed listing={lookalike.listing} reason={lookalike.reason} category={category} />}
 
       <div className={removalOpen ? 'hidden' : 'space-y-4'}>
         {header}
@@ -997,7 +1152,7 @@ export default function ListingEditor({ item, category, onClose, sendSlot, title
           <PrivacyNote className="mt-2" />
         </div>
 
-        {changes.length > 0 && (
+        {!creating && changes.length > 0 && (
           <div className="rounded-lg border border-slate-200 p-3 text-sm">
             <p className="mb-1.5 font-semibold text-slate-800">
               Your suggestion · {changes.length} change{changes.length === 1 ? '' : 's'}

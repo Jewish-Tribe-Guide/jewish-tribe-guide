@@ -42,6 +42,12 @@ vi.mock('@/components/resources/ResourceLoader', () => ({
 vi.mock('@/components/resources/ListingForm', () => ({
   default: ({ mode }: { mode: string }) => <p>ListingForm: {mode}</p>,
 }))
+// Add's first step is the Google search; the real one loads the Maps SDK.
+vi.mock('@/components/intake/AddressInput', () => ({
+  default: ({ id, value, onChange }: { id?: string; value: string; onChange: (v: string) => void }) => (
+    <input id={id} value={value} onChange={(e) => onChange(e.target.value)} />
+  ),
+}))
 vi.mock('@/components/TurnstileWidget', () => ({ default: () => null }))
 
 afterEach(() => {
@@ -86,6 +92,6 @@ describe('FindResourcesConnected', () => {
 
     expect(mockRouter.push).not.toHaveBeenCalled()
     expect(window.location.search).toBe('?form=create')
-    expect(screen.getByText('ListingForm: create')).toBeInTheDocument()
+    expect(screen.getByLabelText('Find the place')).toBeInTheDocument()
   })
 })

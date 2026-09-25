@@ -2,6 +2,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { useState } from 'react'
 import AddressInput from './AddressInput'
 
 const mockMapsAuthFailed = vi.hoisted(() => vi.fn(() => false))
@@ -72,6 +73,27 @@ describe('AddressInput', () => {
 
     await waitFor(() => expect(screen.getByText('Test Shul')).toBeInTheDocument())
     expect(screen.getByText('Philadelphia, PA')).toBeInTheDocument()
+  })
+
+  // Add marks places the guide already has right in the list, before
+  // anyone picks one.
+  it('shows suggestionNote\'s note under the suggestions it names, and nothing under the rest', async () => {
+    const user = userEvent.setup()
+    mockFetchAddressSuggestions.mockResolvedValue([
+      makeSuggestion({ placeId: 'known', mainText: 'Kosher Mart' }),
+      makeSuggestion({ placeId: 'new', mainText: 'Shalom Bagels' }),
+    ])
+    function Harness() {
+      const [value, setValue] = useState('')
+      return <AddressInput value={value} onChange={setValue} suggestionNote={(id) => (id === 'known' ? 'Already in the guide' : null)} />
+    }
+    render(<Harness />)
+    await user.type(screen.getByPlaceholderText('Address or location'), 'kosher')
+    await waitOutDebounce()
+
+    const known = await screen.findByRole('button', { name: /Kosher Mart/ })
+    expect(known).toHaveTextContent('Already in the guide')
+    expect(screen.getByRole('button', { name: /Shalom Bagels/ })).not.toHaveTextContent('Already in the guide')
   })
 
   it('clears stale coordinates the moment the user types again after a prior selection', async () => {

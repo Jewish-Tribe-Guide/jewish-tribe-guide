@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, screen } from '@testing-library/react'
+import { cleanup, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { makeCategory } from '@/test/providerFixtures'
@@ -76,6 +76,12 @@ vi.mock('@/components/resources/ListingForm', () => ({
     </div>
   ),
 }))
+// Add's first step is the Google search; the real one loads the Maps SDK.
+vi.mock('@/components/intake/AddressInput', () => ({
+  default: ({ id, value, onChange }: { id?: string; value: string; onChange: (v: string) => void }) => (
+    <input id={id} value={value} onChange={(e) => onChange(e.target.value)} />
+  ),
+}))
 vi.mock('@/components/TurnstileWidget', () => ({ default: () => <div data-testid="turnstile" /> }))
 
 afterEach(() => cleanup())
@@ -145,7 +151,7 @@ describe('FindResources — a real listing category', () => {
     await user.click(screen.getByText('Add listing'))
 
     expect(onParamsChange).toHaveBeenCalledWith({ form: 'create' }, { replace: true })
-    expect(screen.getByText('ListingForm: create (embedded)')).toBeInTheDocument()
+    expect(screen.getByLabelText('Find the place')).toBeInTheDocument()
   })
 
   // The bug this session actually fixed: clicking Edit on a collapsed row
@@ -204,7 +210,7 @@ describe('FindResources — a real listing category', () => {
       { content: { categories: [grocery] } },
     )
 
-    expect(screen.getByText('ListingForm: create (embedded)')).toBeInTheDocument()
+    expect(screen.getByLabelText('Find the place')).toBeInTheDocument()
   })
 
   // Mobile: a bottom sheet over the still-mounted directory, matching
@@ -220,7 +226,7 @@ describe('FindResources — a real listing category', () => {
 
     expect(screen.getByText('ResourceLoader')).toBeInTheDocument()
     expect(screen.getByRole('dialog', { name: 'Add a Grocery Store' })).toBeInTheDocument()
-    expect(screen.getByText('ListingForm: create (embedded)')).toBeInTheDocument()
+    expect(screen.getByLabelText('Find the place')).toBeInTheDocument()
   })
 
   // Mobile: a bottom sheet layered over the still-mounted directory (see
@@ -294,7 +300,7 @@ describe('FindResources — a real listing category', () => {
 
     expect(screen.getByText('ResourceLoader')).toBeInTheDocument()
     expect(screen.getByRole('dialog', { name: 'Add a Grocery Store' })).toBeInTheDocument()
-    expect(screen.getByText('ListingForm: create (embedded)')).toBeInTheDocument()
+    expect(screen.getByLabelText('Find the place')).toBeInTheDocument()
   })
 
   it('on desktop, resolves a deep-linked edit to a dialog over the still-mounted directory', () => {
@@ -382,7 +388,7 @@ describe('FindResources — a real listing category', () => {
   // something 'create' never did. Covers the real case: viewing one
   // listing's details, clicking "Add" for a different one, cancelling —
   // the original listing should stay expanded, not lose its `item`.
-  it('the create form\'s cancel reports only ?form=null, leaving an unrelated ?item= alone', async () => {
+  it('the create form\'s close reports only ?form=null, leaving an unrelated ?item= alone', async () => {
     const user = userEvent.setup()
     const onParamsChange = vi.fn()
     const grocery = makeCategory({ id: 'grocery', kind: 'listing' })
@@ -399,7 +405,8 @@ describe('FindResources — a real listing category', () => {
       { content: { categories: [grocery] } },
     )
 
-    await user.click(screen.getByRole('button', { name: 'stub cancel' }))
+    // Add has no Cancel of its own: its dialog's Close.
+    await user.click(within(screen.getByRole('dialog', { name: /^Add a / })).getByRole('button', { name: 'Close' }))
 
     expect(onParamsChange).toHaveBeenCalledWith({ form: null }, { replace: true })
   })
@@ -456,9 +463,10 @@ describe('FindResources — the shared Turnstile widget', () => {
     })
 
     await user.click(screen.getByText('Add listing'))
-    await user.click(screen.getByRole('button', { name: 'stub cancel' }))
+    // Add has no Cancel of its own: its dialog's Close.
+    await user.click(within(screen.getByRole('dialog', { name: /^Add a / })).getByRole('button', { name: 'Close' }))
 
-    expect(screen.queryByText('ListingForm: create (embedded)')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Find the place')).not.toBeInTheDocument()
     expect(screen.getByTestId('turnstile')).toBeInTheDocument()
   })
 

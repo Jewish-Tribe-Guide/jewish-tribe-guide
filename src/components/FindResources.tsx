@@ -5,6 +5,7 @@ import AboutYourHospital from '@/components/tabs/AboutYourHospital'
 import { eruvim } from '@/data/resources'
 import HospitalsDirectory from '@/components/resources/HospitalsDirectory'
 import ResourceLoader from '@/components/resources/ResourceLoader'
+import ListingAdd from '@/components/resources/ListingAdd'
 import ListingForm from '@/components/resources/ListingForm'
 import ActionDialog from '@/components/resources/ActionDialog'
 import MobileSheet from '@/components/resources/MobileSheet'
@@ -410,23 +411,21 @@ export default function FindResources({
             open) already narrows correctly against `isMobile` here —
             re-checked per-branch below only because TypeScript can't carry
             that narrowing through sibling JSX on its own. */}
+        {/* Add: find the place on Google, then finish it in the listing's
+            own shape — the same editor Suggest an edit uses. See ListingAdd. */}
+        <ListingAdd
+          category={category}
+          listings={listings ?? []}
+          isMobile={isMobile}
+          isOpen={action?.mode === 'create'}
+          onClose={goToCategoryList}
+          sharedTurnstile={sharedTurnstile}
+        />
         {isMobile ? (
           <>
             {/* draggable on both: a consistent grab-anywhere, slide-to-dismiss
                 feel across Add and Edit, so they read as one shell rather
                 than one having a nicer sheet than the other. */}
-            <MobileSheet isOpen={action?.mode === 'create'} onClose={goToCategoryList} title={`Add a ${category.label}`} draggable>
-              {action?.mode === 'create' && (
-                <ListingForm
-                  category={category}
-                  mode="create"
-                  onUp={goToCategoryList}
-                  onSubmitted={goToCategoryList}
-                  sharedTurnstile={sharedTurnstile}
-                  embedded
-                />
-              )}
-            </MobileSheet>
             <MobileSheet
               isOpen={action?.mode === 'edit'}
               onClose={goToCategoryList}
@@ -449,18 +448,6 @@ export default function FindResources({
           </>
         ) : (
           <>
-            <ActionDialog isOpen={action?.mode === 'create'} onClose={goToCategoryList} title={`Add a ${category.label}`}>
-              {action?.mode === 'create' && (
-                <ListingForm
-                  category={category}
-                  mode="create"
-                  onUp={goToCategoryList}
-                  onSubmitted={goToCategoryList}
-                  sharedTurnstile={sharedTurnstile}
-                  embedded
-                />
-              )}
-            </ActionDialog>
             <ActionDialog
               isOpen={action?.mode === 'edit'}
               onClose={goToCategoryList}

@@ -56,6 +56,21 @@ type Props = {
    *  (ListingForm's `address` field must stay a real address; it gets the
    *  place's name separately via onPlaceSelect). */
   preferPlaceName?: boolean
+  /** A short note to show under a suggestion, by its Google place id — Add
+   *  uses it to mark places the guide already has ("Already in the guide")
+   *  right in the list, before anyone picks one. */
+  suggestionNote?: (placeId: string) => string | null
+  /** Lists suggestions in the page, under the input, rather than floating
+   *  over what's below it — for a screen that is just the search (Add's
+   *  first step), where a floating list would be clipped by the short
+   *  dialog around it and there's nothing underneath to cover anyway. */
+  inlineSuggestions?: boolean
+  /** For a <label htmlFor> outside the component. */
+  id?: string
+  /** The input's accessible name, where there's no visible label (the
+   *  listing editor's address row, which has a pin icon instead). */
+  ariaLabel?: string
+  autoFocus?: boolean
 }
 
 // Renders our own input and dropdown over Google's Autocomplete DATA API
@@ -68,7 +83,7 @@ type Props = {
 // inline under the field like everywhere else in this app. This is that same
 // underlying API, just rendered with our own markup, so it's a normal inline
 // dropdown on every screen size.
-export default function AddressInput({ value, onChange, placeholder = 'Address or location', onCoords, onPlaceSelect, includedPrimaryTypes, disableAutocomplete, preferPlaceName }: Props) {
+export default function AddressInput({ value, onChange, placeholder = 'Address or location', onCoords, onPlaceSelect, includedPrimaryTypes, disableAutocomplete, preferPlaceName, suggestionNote, inlineSuggestions, id, ariaLabel, autoFocus }: Props) {
   const [authFailed, setAuthFailed] = useState(mapsAuthFailed())
   const [open, setOpen] = useState(false)
   const [suggestions, setSuggestions] = useState<AddressSuggestion[]>([])
@@ -213,6 +228,9 @@ export default function AddressInput({ value, onChange, placeholder = 'Address o
   return (
     <div ref={containerRef} className="relative w-full">
       <TextInput
+        id={id}
+        aria-label={ariaLabel}
+        autoFocus={autoFocus}
         type="text"
         autoComplete="off"
         value={value}
@@ -240,7 +258,9 @@ export default function AddressInput({ value, onChange, placeholder = 'Address o
       )}
 
       {open && suggestions.length > 0 && (
-        <div className="absolute inset-x-0 top-full z-10 mt-1 overflow-hidden rounded-md border border-slate-200 bg-white shadow-lg">
+        <div
+          className={`mt-1 overflow-hidden rounded-md border border-slate-200 bg-white ${inlineSuggestions ? '' : 'absolute inset-x-0 top-full z-10 shadow-lg'}`}
+        >
           {suggestions.map((s, i) => (
             <button
               key={s.prediction.placeId}
@@ -255,6 +275,12 @@ export default function AddressInput({ value, onChange, placeholder = 'Address o
             >
               <span className="block text-slate-900">{s.mainText}</span>
               {s.secondaryText && <span className="block text-xs text-slate-400">{s.secondaryText}</span>}
+              {(() => {
+                const note = suggestionNote?.(s.prediction.placeId)
+                return note ? (
+                  <span className="mt-1 inline-block rounded-full bg-green-50 px-2 py-0.5 text-[11px] font-semibold text-green-700">{note}</span>
+                ) : null
+              })()}
             </button>
           ))}
         </div>
