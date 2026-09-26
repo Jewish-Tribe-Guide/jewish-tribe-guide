@@ -167,6 +167,23 @@ describe('GenericDirectory', () => {
     expect(screen.queryByText('Trader Joe')).not.toBeInTheDocument()
   })
 
+  // The phrasing a real visitor typed, and a spelling the listing doesn't use:
+  // the item is tagged "Chalav". Word-for-word matching found neither.
+  it('reads the search as a question, whatever the spelling', async () => {
+    const user = userEvent.setup()
+    const category = makeCategory({ detailFields: [{ key: 'm', label: 'Kosher items', type: 'tags' }] })
+    const items = [
+      makeListing({ id: 'a', name: 'ShopRite', m: ['Chalav Yisroel Milk', 'Challah'] }),
+      makeListing({ id: 'b', name: 'Trader Joe', m: ['Challah'] }),
+    ]
+    renderWithProviders(<GenericDirectory category={category} items={items} {...handlers} />)
+
+    await user.type(screen.getByPlaceholderText(/^Search grocery stores or/), 'where can I buy cholov yisroel milk')
+
+    expect(screen.getByText('ShopRite')).toBeInTheDocument()
+    expect(screen.queryByText('Trader Joe')).not.toBeInTheDocument()
+  })
+
   it('shows a "no matches" empty state with a clear button when a search narrows to nothing', async () => {
     const user = userEvent.setup()
     const category = makeCategory({ pluralLabel: 'Grocery Stores' })

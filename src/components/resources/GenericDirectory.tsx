@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useLayoutEffect, useRef, useState, ViewTransition } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, ViewTransition } from 'react'
 import type { DirectoryResource } from '@/types'
 import { resolveCapabilities, selectValues, bandImageFor, type CategoryConfig } from '@/lib/categories'
 import { hoursOpenNow, businessClosure } from '@/lib/hours'
@@ -16,7 +16,7 @@ import DaveningTimesModal from '@/components/synagogues/DaveningTimesModal'
 import { PlusIcon, ClockIcon } from '@/components/icons'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { useScrollShowHide, useSetScreenHeader } from '@/lib/headerVisibility'
-import { listingSearchText } from '@/lib/searchListing'
+import { searchAsk } from '@/lib/askSearch'
 import { travelCompare } from '@/lib/listingTravel'
 import { useLogSearchMiss } from '@/lib/useLogSearchMiss'
 import { ui } from '@/lib/uiConfig'
@@ -735,15 +735,15 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   }, [anchorListingId])
 
   const q = search.trim().toLowerCase()
-  const tokens = q.split(/\s+/).filter(Boolean)
-  // Every word must appear somewhere in the listing's search text — name, address,
-  // tags, or scalar detail fields (AND across words). Shares listingSearchText with
-  // the landing search, so a place tapped there ("kosher cheese") survives this filter.
-  const matchesSearch = (item: DirectoryResource) => {
-    if (tokens.length === 0) return true
-    const hay = listingSearchText(item, category)
-    return tokens.every((t) => hay.includes(t))
-  }
+  // Read as a question, the same way as the home search (see askSearch.ts),
+  // limited to this category — so a place tapped there ("where can I get
+  // cholov yisroel milk") survives this filter, and "kosher food" on the
+  // restaurant page means every restaurant rather than none.
+  const askMatches = useMemo(
+    () => (q ? new Set(searchAsk(items, [category], search, { categoryId: category.id }).hits.map((h) => h.item.id)) : null),
+    [q, items, category, search],
+  )
+  const matchesSearch = (item: DirectoryResource) => askMatches === null || askMatches.has(item.id)
 
   const filtered = items
     .filter((item) => {

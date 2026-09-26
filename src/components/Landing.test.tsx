@@ -163,7 +163,9 @@ describe('Landing', () => {
   it('mobile: narrows its own permanent grid to matching cards when typing, and hides the rest', async () => {
     const user = userEvent.setup()
     const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
-    const synagogue = makeCategory({ id: 'synagogue', pluralLabel: 'Synagogues' })
+    // A real label, not makeCategory's default "Grocery Store": search now reads
+    // a category's label to know what kind of place it is (see ask.ts).
+    const synagogue = makeCategory({ id: 'synagogue', label: 'Synagogue', pluralLabel: 'Synagogues' })
     const { container } = renderLanding(undefined, { content: { categories: [grocery, synagogue] } })
 
     // Scoped to mobile's own results section specifically (CSS-only toggle
@@ -179,6 +181,37 @@ describe('Landing', () => {
 
     expect(within(mobileSection).getByText('Grocery Stores')).toBeInTheDocument()
     expect(within(mobileSection).queryByText('Synagogues')).not.toBeInTheDocument()
+  })
+
+  // Two people tried the redesign prototype: one typed a question the way
+  // they would into Google, and the item is tagged "Chalav", not "Cholov".
+  // Word-for-word matching found nothing for either.
+  it('answers a question typed like into Google, with the store and the food card', async () => {
+    const user = userEvent.setup()
+    const grocery = makeCategory({
+      id: 'grocery',
+      label: 'Grocery Store',
+      pluralLabel: 'Grocery Stores',
+      detailFields: [{ key: 'm', label: 'Kosher items', type: 'tags' }],
+    })
+    const food = makeCategory({ id: 'restaurant', label: 'Food Establishment', pluralLabel: 'Food Establishments' })
+    const listings = [
+      makeListing({ id: 'g1', category: 'grocery', name: 'ShopRite', m: ['Chalav Yisroel Milk'] }),
+      makeListing({ id: 'g2', category: 'grocery', name: 'Acme Grocery', m: ['Challah'] }),
+    ]
+    const { container } = renderLanding(undefined, { content: { categories: [grocery, food] } }, listings)
+    // Mobile's own results section — see the test above for why it's scoped.
+    const results = container.querySelector<HTMLElement>('.mt-12.desktop\\:hidden')!
+    const box = screen.getAllByLabelText('Search resources')[0]!
+
+    await user.type(box, 'where can I buy cholov yisroel milk')
+    expect(within(results).getByText('ShopRite')).toBeInTheDocument()
+    expect(within(results).queryByText('Acme Grocery')).not.toBeInTheDocument()
+
+    await user.clear(box)
+    await user.type(box, 'kosher food')
+    expect(within(results).getByText('Food Establishments')).toBeInTheDocument()
+    expect(within(results).queryByText('Grocery Stores')).not.toBeInTheDocument()
   })
 
   // Reported live: mobile has no HeroSearchDropdown of its own (see

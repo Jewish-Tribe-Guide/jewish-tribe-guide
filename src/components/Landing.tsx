@@ -119,7 +119,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: LandingProps
 
   const q = query.trim()
   const loading = !q && allCards === null
-  const filtered = q && allCards ? allCards.filter((c) => cardMatches(c, q)) : allCards
+  const filtered = q && allCards ? allCards.filter((c) => cardMatches(c, q, categories ?? [])) : allCards
 
   // Individual places that match the query by name + tags (e.g. a grocery store
   // with a "cheese" tag for "kosher cheese"). Only computed once the visitor types.

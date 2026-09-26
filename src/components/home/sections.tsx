@@ -7,9 +7,9 @@ import type { CategoryConfig } from '@/lib/categories'
 import type { HomeSection } from '@/lib/homeSections'
 import type { DirectoryResource, NavigateFn } from '@/types'
 import { isOptimizableImage } from '@/lib/imageHosts'
-import { listingSearchText } from '@/lib/searchListing'
 import { haversineMiles } from '@/lib/geo'
-import { travelCompare } from '@/lib/listingTravel'
+import { conceptCategories, parseAsk, termMatches, termsRequired, words } from '@/lib/ask'
+import { searchAsk } from '@/lib/askSearch'
 import { GenericListingCard } from '@/components/resources/GenericListingCard'
 import { useForm, useForms } from '@/lib/useForms'
 import { community } from '@/community.config'
@@ -554,13 +554,25 @@ export function CategoryTileRow({
   )
 }
 
-/** Does a card match the typed query? Every word must appear in the title or a
- *  hidden keyword (AND across words). */
-export function cardMatches(card: CardDef, query: string): boolean {
-  const tokens = query.toLowerCase().split(/\s+/).filter(Boolean)
-  if (tokens.length === 0) return true
-  const hay = [card.title, ...(card.keywords ?? [])].join(' ').toLowerCase()
-  return tokens.every((t) => hay.includes(t))
+/** Does a card match the typed query? Read the same way as the listing
+ *  search (see ask.ts): a category card matches when the question names its
+ *  kind of place ("where can I eat" → the food card), and any card matches
+ *  when its title or hidden keywords hold the question's words. */
+export function cardMatches(card: CardDef, query: string, categories: readonly CategoryConfig[] = []): boolean {
+  const q = parseAsk(query)
+  if (!q.raw) return true
+  const resolved = q.concepts.map((c) => ({ ...c, ids: conceptCategories(c.concept, categories) }))
+  if (card.id && resolved.some(({ ids }) => ids.includes(card.id!))) return true
+  // A kind of place this community has no category for is still a word to
+  // look for in titles and keywords. One it does have isn't: "kosher food"
+  // means the food card, not every card whose keywords mention food (the
+  // grocery card's say "food shopping").
+  const terms = [...q.terms, ...resolved.filter(({ ids }) => ids.length === 0).map((c) => c.word)]
+  if (terms.length === 0) return false
+  const hay = words([card.title, ...(card.keywords ?? [])].join(' '))
+  const required = q.partial ? terms.filter((t) => t !== q.partial) : terms
+  const matched = required.filter((t) => termMatches(t, hay)).length
+  return matched >= termsRequired(required.length) && (required.length > 0 || termMatches(q.partial ?? '', hay, 1))
 }
 
 // ── Home-screen sections ──────────────────────────────────────────────────────
@@ -615,22 +627,10 @@ export type ListingHit = {
   term: string
 }
 
-// Collect every string-array value from a listing (tags, _sometimes, etc.) for
-// matching and ranking. Stays decoupled from per-category field config.
-function listingTags(item: DirectoryResource): string[] {
-  const out: string[] = []
-  for (const value of Object.values(item)) {
-    if (Array.isArray(value) && value.every((x) => typeof x === 'string')) {
-      out.push(...(value as string[]))
-    }
-  }
-  return out
-}
-
-/** Find individual listings matching the query against their full search text —
- *  name, address, tags, and scalar detail fields (every query word must appear).
- *  Returns at most `limit` hits so a broad word like "kosher" can't flood the
- *  landing page. */
+/** Individual listings that answer the query (see askSearch.ts): name,
+ *  address, items and details, read as a question rather than word for word.
+ *  At most `limit` hits, so a broad question like "kosher food" can't flood
+ *  the home page; the matching category card carries the rest. */
 export function searchListings(
   listings: DirectoryResource[],
   categories: CategoryConfig[],
@@ -638,53 +638,20 @@ export function searchListings(
   coords: { lat: number; lng: number } | null = null,
   limit = 8,
 ): ListingHit[] {
-  const tokens = query.toLowerCase().split(/\s+/).filter(Boolean)
-  if (tokens.length === 0) return []
-  const labelById = new Map(categories.map((c) => [c.id, c.pluralLabel]))
-  const configById = new Map(categories.map((c) => [c.id, c]))
-
-  // How many query words a tag contains — used to rank "Kosher Wine" (2) above
-  // "Glatt Kosher Meat" (1) for the query "kosher wine".
-  const score = (tag: string) => {
-    const t = tag.toLowerCase()
-    return tokens.reduce((n, tok) => n + (t.includes(tok) ? 1 : 0), 0)
-  }
-
-  const hits: ListingHit[] = []
-  for (const item of listings) {
-    const category = configById.get(item.category)
-    if (!category) continue
-    const tags = listingTags(item)
-    const hay = listingSearchText(item, category)
-    if (!tokens.every((t) => hay.includes(t))) continue
-    const matchedTags = tags
-      .filter((tag) => score(tag) > 0)
-      .sort((a, b) => score(b) - score(a) || a.length - b.length)
-      .slice(0, 3)
-    // Stamp straight-line distance the same way the directory does (see
-    // withMilesFromAddress) — unrounded, so two close-together hits don't tie
-    // and fall back to arbitrary order below: address-anchored categories
-    // only, when the listing has coordinates.
-    const withDistance =
-      coords && category.hasAddress !== false && item.geo
-        ? { ...item, milesFromAddress: haversineMiles(coords, item.geo) }
-        : item
-    hits.push({
-      item: withDistance,
-      category,
-      categoryLabel: labelById.get(item.category) ?? item.category,
-      matchedTags,
-      term: matchedTags[0] ?? query.trim(),
-    })
-  }
-  // Closest first when the visitor has a location; otherwise most-upvoted first,
-  // so the landing search doesn't fall back to arbitrary storage order.
-  hits.sort((a, b) =>
-    a.item.milesFromAddress != null || b.item.milesFromAddress != null
-      ? travelCompare(a.item, b.item)
-      : (b.item.upvotes ?? 0) - (a.item.upvotes ?? 0) || a.item.name.localeCompare(b.item.name),
-  )
-  return hits.slice(0, limit)
+  const { hits } = searchAsk(listings, categories, query, { coords, limit })
+  return hits.map((h) => ({
+    // The distance shown is always from the visitor, the way every other
+    // list shows it, even when the order is by distance from a place the
+    // question named ("food near HUP").
+    item:
+      coords && h.category.hasAddress !== false && h.item.geo
+        ? { ...h.item, milesFromAddress: haversineMiles(coords, h.item.geo) }
+        : h.item,
+    category: h.category,
+    categoryLabel: h.category.pluralLabel,
+    matchedTags: h.matchedTags,
+    term: h.matchedTags[0] ?? query.trim(),
+  }))
 }
 
 /** The "Places" results list: each hit rendered as the same card its category

@@ -1373,3 +1373,35 @@ describe('ResourceMapView — the shareable URL (standalone)', () => {
     expect(params.get('q')).toBeNull()
   })
 })
+
+// The map's search is the same question-reading search as the home and
+// category pages (see askSearch.ts). Word for word, this question matched
+// nothing: no listing says "where", "buy" or "cholov".
+describe('ResourceMapView — search reads a question', () => {
+  it('pins only the store the question is about', async () => {
+    const user = userEvent.setup()
+    const grocery = makeCategory({
+      id: 'grocery',
+      label: 'Grocery Store',
+      pluralLabel: 'Grocery Stores',
+      detailFields: [{ key: 'm', label: 'Kosher items', type: 'tags' }],
+    })
+    const { container } = renderMap(
+      <HeaderCollapseProvider>
+        <ResourceMapView onUp={vi.fn()} standalone visible />
+      </HeaderCollapseProvider>,
+      [
+        listingWithGeo({ id: 'g1', category: 'grocery', name: 'ShopRite', m: ['Chalav Yisroel Milk'] }),
+        listingWithGeo({ id: 'g2', category: 'grocery', name: 'Acme Grocery', m: ['Challah'] }),
+      ],
+      [grocery],
+    )
+    const input = container.querySelector<HTMLInputElement>('input[placeholder^="Search name, address"]')!
+
+    await user.type(input, 'where can I buy cholov yisroel milk')
+    await user.keyboard('{Enter}')
+
+    expect(screen.getByRole('button', { name: 'Select ShopRite' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Select Acme Grocery' })).not.toBeInTheDocument()
+  })
+})

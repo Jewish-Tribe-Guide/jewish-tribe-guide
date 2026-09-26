@@ -16,6 +16,7 @@ import { useHospitals } from '@/lib/useHospitals'
 import { useIsMobile } from '@/lib/useIsMobile'
 import type { LatLng } from '@/lib/googleMapsLinks'
 import { listingSearchText } from '@/lib/searchListing'
+import { searchAsk } from '@/lib/askSearch'
 import { hoursOpenNow, businessClosure } from '@/lib/hours'
 import { useNow } from '@/lib/useNow'
 import { ui } from '@/lib/uiConfig'
@@ -712,6 +713,16 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
     const q = stripApostrophes(committedQuery.trim().toLowerCase())
     return q && !isOpenNowWord(q) ? [q] : []
   }, [committedQuery])
+  // The listings the committed query answers, read as a question the same
+  // way as the home and category searches (see askSearch.ts): "where can I
+  // get cholov yisroel milk" pins the store that has it, "food" pins every
+  // food place. Null when there's no query. Hospital pins carry no listing,
+  // so they keep matching on their name (see visiblePoints).
+  const askIds = useMemo(() => {
+    if (activeTerms.length === 0) return null
+    const raws = allPoints.flatMap((p) => (p.raw ? [p.raw] : []))
+    return new Set(searchAsk(raws, categories ?? [], committedQuery).hits.map((h) => h.item.id))
+  }, [activeTerms, allPoints, categories, committedQuery])
 
   // ── Field filters (kosher / type / … carried from the directory) ─────────
   // Held as a serializable spec (also what's persisted to history). "Open
@@ -942,10 +953,12 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
       // to be on, while an unpinned place in a selected category still
       // shows too (see the Pinned chip's own comment above).
       .filter((p) => effectiveSelected.has(p.filterId) || (pinnedSelected && p.pinned))
-      .filter((p) => activeTerms.every((t) => stripApostrophes(p.searchText).includes(t)))
+      .filter((p) =>
+        askIds === null ? true : p.raw ? askIds.has(p.raw.id) : activeTerms.every((t) => stripApostrophes(p.searchText).includes(t)),
+      )
       .filter((p) => !p.raw || filterChips.every((c) => c.test(p.raw as DirectoryResource)))
       .filter((p) => !openNow || openNow.has(p.id))
-  }, [allPoints, effectiveSelected, activeTerms, filterChips, openNowActive, openNowIds, pinnedSelected])
+  }, [allPoints, effectiveSelected, askIds, activeTerms, filterChips, openNowActive, openNowIds, pinnedSelected])
   // A plain `[...visiblePoints, ...droppedMapPoints]` spread inline in the
   // JSX below would build a fresh array on every ResourceMapView render —
   // including ones that don't touch either input, e.g. a background tap
