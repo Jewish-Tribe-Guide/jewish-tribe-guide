@@ -161,6 +161,45 @@ describe('HeroSearchDropdown', () => {
     expect(reason.querySelector('mark')?.textContent).toBe('OU')
   })
 
+  // Last, after anything close: where to ask and how to add the answer.
+  it('offers the WhatsApp groups and adding the answer when nothing matches', () => {
+    render(
+      <HeroSearchDropdown
+        query="dentist"
+        cards={[]}
+        placeHits={[]}
+        categories={[]}
+        onCardClick={noop}
+        onOpenPlace={noop}
+        askGroup={{ nothingClose: true, askHref: '/philly/whatsapp', addHref: '/philly/feedback?about=dentist' }}
+      />,
+    )
+    expect(screen.getByText('Nothing in the guide for “dentist” yet.')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /Ask in a community WhatsApp group/ })).toHaveAttribute('href', '/philly/whatsapp')
+    expect(screen.getByRole('link', { name: /Add it to the guide/ })).toHaveAttribute('href', '/philly/feedback?about=dentist')
+    expect(screen.queryByText(/Nothing matches/)).not.toBeInTheDocument()
+  })
+
+  it('puts asking the group after the closest matches, not instead of them', () => {
+    render(
+      <HeroSearchDropdown
+        query="packaged pretzels"
+        cards={[]}
+        placeHits={[makeHit()]}
+        categories={[]}
+        onCardClick={noop}
+        onOpenPlace={noop}
+        answer={{ text: 'Nothing in the guide for “packaged pretzels”. 3 places have pretzels.', rows: [] }}
+        askGroup={{ nothingClose: false, askHref: null, addHref: '/philly/feedback?about=x' }}
+      />,
+    )
+    const listing = screen.getByText('Listings')
+    const ask = screen.getByTestId('ask-the-group')
+    expect(listing.compareDocumentPosition(ask) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(ask).toHaveTextContent('Not what you’re looking for?')
+    expect(screen.queryByRole('link', { name: /WhatsApp/ })).not.toBeInTheDocument()
+  })
+
   it('says when a place closes, for an "open now" question', () => {
     render(
       <HeroSearchDropdown

@@ -131,3 +131,21 @@ describe('FeedbackForm — inline variant (the mobile Feedback tab)', () => {
     expect(container.contains(backdrop)).toBe(false)
   })
 })
+
+// "Add it to the guide", from a search that found nothing, arrives with the
+// question in the link: it's already written in.
+describe('FeedbackForm — arriving from a search that found nothing', () => {
+  it('starts with the question written in', async () => {
+    window.history.replaceState(null, '', '/philly/feedback?about=frozen%20gefilte%20fish')
+    renderWithProviders(<FeedbackForm heading="Send feedback" successMessage="Thanks!" onClose={vi.fn()} />)
+    expect(await screen.findByDisplayValue('“frozen gefilte fish” isn’t in the guide. You can find it at:', { exact: false })).toBeInTheDocument()
+    window.history.replaceState(null, '', '/')
+  })
+
+  it('starts empty otherwise', async () => {
+    window.history.replaceState(null, '', '/philly/feedback')
+    renderWithProviders(<FeedbackForm heading="Send feedback" successMessage="Thanks!" onClose={vi.fn()} />)
+    expect(await screen.findByRole('textbox', { name: /feedback/i })).toHaveValue('')
+    window.history.replaceState(null, '', '/')
+  })
+})

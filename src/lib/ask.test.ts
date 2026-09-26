@@ -197,3 +197,30 @@ describe('wordMatches', () => {
     expect(wordMatches('Cheese', ['chese'], true)).toBe(true)
   })
 })
+
+describe('parseAsk — "than Giant"', () => {
+  it('reads the place after "than" or "besides" as one to leave out, not to look for', () => {
+    // One of the questions actually asked in the group.
+    const q = parseAsk('a better place for kosher wine than Giant')
+    expect(q.excluding).toEqual(['giant'])
+    expect(q.terms).toEqual(['wine'])
+    expect(parseAsk("challah besides trader joe's").excluding).toEqual(['trader', 'joe'])
+  })
+
+  it('stops the name at a filler or kind-of-place word', () => {
+    const q = parseAsk('wine other than giant near me')
+    expect(q.excluding).toEqual(['giant'])
+    expect(q.nearMe).toBe(true)
+    const inCity = parseAsk('challah other than giant in center city')
+    expect(inCity.excluding).toEqual(['giant'])
+    expect(inCity.terms).toEqual(['challah', 'center', 'city'])
+  })
+
+  it('leaves out nothing when nothing follows', () => {
+    expect(parseAsk('more wine than').excluding).toEqual([])
+  })
+
+  it('does not search for "good" or a hechsher every listing has', () => {
+    expect(parseAsk('a date restaurant with a good hechsher').terms).toEqual(['date'])
+  })
+})

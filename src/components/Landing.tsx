@@ -4,8 +4,11 @@ import { useEffect, useMemo, useRef, useState, ViewTransition } from 'react'
 import { track } from '@vercel/analytics'
 import { CardGrid, CategoryTileRow, PlacesResults, cardMatches, listingHitsFrom, groupCardsIntoSections, resourceCards, useEntryCards } from '@/components/home/sections'
 import AskAnswer from '@/components/home/AskAnswer'
-import { searchAsk } from '@/lib/askSearch'
-import { answerFor } from '@/lib/askAnswer'
+import AskTheGroup from '@/components/home/AskTheGroup'
+import { nearMiss, searchAsk } from '@/lib/askSearch'
+import { answerFor, nearMissAnswer } from '@/lib/askAnswer'
+import { resolveCapabilities } from '@/lib/categories'
+import { routes } from '@/lib/routes'
 import { listMinyanim } from '@/lib/upcomingDavening'
 import { useMinyanSchedule } from '@/lib/useMinyanSchedule'
 import HeroHeading from '@/components/home/HeroHeading'
@@ -135,8 +138,8 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: LandingProps
   // Not wrapped in useMemo: the React Compiler memoizes this component, and
   // searchAsk caches each listing's words, so a keystroke stays cheap.
   const askResult = q && listings ? searchAsk(listings, categories ?? [], q, { coords, now: new Date(schedule.now) }) : null
-  const placeHits = askResult ? listingHitsFrom(askResult, coords) : []
-  const answer = askResult
+  const strictHits = askResult ? listingHitsFrom(askResult, coords) : []
+  const strictAnswer = askResult
     ? answerFor(askResult, {
         coords,
         schedule: askResult.query.minyan
@@ -151,6 +154,34 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: LandingProps
             }
           : null,
       })
+    : null
+
+  // Found nothing as asked: first the closest question that does find
+  // something ("packaged pretzels" → pretzels, see nearMiss), then where to
+  // ask and how to add the answer (AskTheGroup), last. The near miss is shown
+  // as such, never as a hit — and the search-miss log below still counts the
+  // question as a miss, since it is one.
+  const foundNothing = !!askResult && askResult.hits.length === 0 && askResult.noHours.length === 0 && strictAnswer === null
+  const miss = foundNothing && listings ? nearMiss(listings, categories ?? [], q, { coords, now: new Date(schedule.now) }) : null
+  const placeHits = miss ? listingHitsFrom(miss.result, coords) : strictHits
+  const answer = miss ? nearMissAnswer(miss, q, { coords }) : strictAnswer
+  // Where to ask: the community's WhatsApp groups page, when it has one.
+  const whatsapp = categories?.find((c) => /whatsapp/i.test(`${c.id} ${c.label}`))
+  // Where to add the answer: the Add form of the one kind of place asked
+  // about ("vegan food near HUP" → a food place), when it takes additions.
+  // Otherwise a note to the admins with the question already in it — an
+  // item like "frozen gefilte fish" usually belongs on a store already
+  // listed, which a new listing would be the wrong form for.
+  const askedKind = askResult?.categoryIds?.length === 1 ? categories?.find((c) => c.id === askResult.categoryIds![0]) : undefined
+  const addsTo = askedKind && ui.contributions.add && resolveCapabilities(askedKind.capabilities).add ? askedKind : undefined
+  const askGroup = foundNothing
+    ? {
+        nothingClose: !miss,
+        askHref: whatsapp ? routes.slug(communitySlug, whatsapp.id) : null,
+        addHref: addsTo
+          ? `${routes.slug(communitySlug, addsTo.id)}?form=create`
+          : `${routes.feedback(communitySlug)}?about=${encodeURIComponent(q)}`,
+      }
     : null
   // A shul named in a minyan answer opens its listing, the same way a place
   // in the results does.
@@ -190,7 +221,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: LandingProps
   // looks like a "miss".
   useLogSearchMiss({
     query,
-    hasResults: (filtered?.length ?? 0) > 0 || placeHits.length > 0 || answer !== null,
+    hasResults: (filtered?.length ?? 0) > 0 || strictHits.length > 0 || strictAnswer !== null,
     ready: allCards !== null && listings !== null,
     source: 'Home',
   })
@@ -234,7 +265,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: LandingProps
 
   // Shared between mobile's permanent grid and desktop's search results —
   // see below for why the two don't share one JSX node any more.
-  const noMatchesMessage = q && !answer && (filtered?.length ?? 0) === 0 && placeHits.length === 0 && (
+  const noMatchesMessage = q && !askGroup && !answer && (filtered?.length ?? 0) === 0 && placeHits.length === 0 && (
     <p className="text-center text-sm text-slate-500">
       Nothing matches “{q}”. Try a different word or clear the filter.
     </p>
@@ -282,6 +313,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: LandingProps
         ))
       )}
       {placesNode}
+      {askGroup && <AskTheGroup query={q} {...askGroup} />}
     </>
   )
 
@@ -401,6 +433,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: LandingProps
           searchCards={filtered}
           searchPlaceHits={placeHits}
           searchAnswer={answer}
+          searchAskGroup={askGroup}
           onOpenAnswerShul={openShul}
           categories={categories}
           onSearchCardClick={(card) => track('category_opened', { category: card.id ?? card.title, source: 'hero-search' })}

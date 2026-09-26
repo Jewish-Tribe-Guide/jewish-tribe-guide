@@ -16,6 +16,7 @@ import { mockRouter } from '@/test/nextNavigationMock'
 import { markHomeReveal } from '@/lib/homeRevealSignal'
 import { ForcedViewport } from '@/lib/useIsMobile'
 import Landing from './Landing'
+import { useLogSearchMiss } from '@/lib/useLogSearchMiss'
 
 // Card tiles now render as real <Link>s (see sections.tsx's CardDef.href),
 // which is what makes cmd/ctrl-click "open in new tab" work — that pulled
@@ -40,6 +41,8 @@ vi.mock('next/navigation', () => ({
 // into these independent cards, so this preserves that.
 
 vi.mock('@vercel/analytics', () => ({ track: vi.fn() }))
+// Recorded, not run: the tests read what the search-miss log was told.
+vi.mock('@/lib/useLogSearchMiss', () => ({ useLogSearchMiss: vi.fn() }))
 vi.mock('@/components/home/DaveningTimesCard', () => ({
   default: () => <div data-testid="davening-stub" />,
 }))
@@ -857,4 +860,65 @@ describe('Landing', () => {
     })
   })
 
+})
+
+// A search that finds nothing shows what's close, then where to ask and how
+// to add the answer — and still counts as a miss, since it is one.
+describe('Landing — when nothing matches', () => {
+  const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores', detailFields: [{ key: 'm', label: 'Kosher items', type: 'tags' }] })
+  const whatsapp = makeCategory({ id: 'whatsapp', label: 'WhatsApp Group', pluralLabel: 'WhatsApp Groups' })
+  const store = makeListing({ id: 'l1', category: 'grocery', name: 'Test Grocery', m: ['Pretzel Buns'] })
+
+  it('shows the closest match as such, then where to ask', async () => {
+    const user = userEvent.setup()
+    renderLanding(undefined, { content: { categories: [grocery, whatsapp] } }, [store])
+    await user.type(screen.getAllByLabelText('Search resources')[0]!, 'packaged pretzels')
+
+    expect(screen.getAllByText('Nothing in the guide for “packaged pretzels”. Test Grocery has Pretzel Buns.').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Test Grocery').length).toBeGreaterThan(0)
+    const ask = screen.getAllByRole('link', { name: /Ask in a community WhatsApp group/ })[0]
+    expect(ask).toHaveAttribute('href', '/test-community/whatsapp')
+    const lastCall = vi.mocked(useLogSearchMiss).mock.calls.at(-1)![0]
+    expect(lastCall).toMatchObject({ query: 'packaged pretzels', hasResults: false })
+  })
+
+  it('with nothing close either, offers to add the answer, the question written in', async () => {
+    const user = userEvent.setup()
+    renderLanding(undefined, { content: { categories: [grocery] } }, [store])
+    await user.type(screen.getAllByLabelText('Search resources')[0]!, 'dentist')
+
+    expect(screen.getAllByText('Nothing in the guide for “dentist” yet.').length).toBeGreaterThan(0)
+    expect(screen.getAllByRole('link', { name: /Add it to the guide/ })[0]).toHaveAttribute('href', '/test-community/feedback?about=dentist')
+    // No WhatsApp groups in this community: nowhere to send anyone.
+    expect(screen.queryByRole('link', { name: /WhatsApp/ })).not.toBeInTheDocument()
+  })
+
+  it('mobile: puts where to ask at the end of the results', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(
+      <ForcedViewport isMobile>
+        <HeaderCollapseProvider>
+          <LocationProvider>
+            <ListingsProvider listings={[store]}>
+              <Landing {...handlers} />
+            </ListingsProvider>
+          </LocationProvider>
+        </HeaderCollapseProvider>
+      </ForcedViewport>,
+      { content: { categories: [grocery, whatsapp] } },
+    )
+    await user.type(screen.getAllByLabelText('Search resources')[0]!, 'packaged pretzels')
+    const boxes = screen.getAllByTestId('ask-the-group')
+    const places = screen.getByRole('heading', { name: 'Places' })
+    expect(boxes.some((b) => places.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true)
+  })
+
+  it('adds to the one kind of place the question named', async () => {
+    const user = userEvent.setup()
+    const food = makeCategory({ id: 'restaurant', label: 'Food', pluralLabel: 'Food' })
+    renderLanding(undefined, { content: { categories: [grocery, food] } }, [store])
+    await user.type(screen.getAllByLabelText('Search resources')[0]!, 'vegan food')
+
+    expect(screen.getAllByRole('link', { name: /Add it to the guide/ })[0]).toHaveAttribute('href', '/test-community/restaurant?form=create')
+  })
 })

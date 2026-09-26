@@ -1,4 +1,4 @@
-import { describedByItsText, type AskHit, type AskResult, type HoursWindow } from '@/lib/askSearch'
+import { describedByItsText, type AskHit, type AskResult, type HoursWindow, type NearMiss } from '@/lib/askSearch'
 import { termMatches, termsAsTyped, words, type MinyanAsk } from '@/lib/ask'
 import { TEFILLAH_LABELS, type Tefillah } from '@/lib/davening'
 import type { MinyanSlot } from '@/lib/upcomingDavening'
@@ -207,9 +207,10 @@ function baseAnswer(
   const milesOf = (h: AskHit) => (h.miles != null ? `, ${roundMiles(h.miles)} mi` : '')
   const hoursOf = (h: AskHit) => (asksOpen && h.today.length ? `, ${hoursText(h, query.openNow)}` : '')
 
-  // A question about a place ("food near HUP"): the nearest one, measured
-  // from there.
-  if (result.anchor) {
+  // A question about a place and nothing else ("food near HUP"): the
+  // nearest one, measured from there. With something to look for too
+  // ("sushi near HUP"), it's who has it, nearest to there first.
+  if (result.anchor && result.terms.length === 0) {
     const kind = top.category.pluralLabel.toLowerCase()
     return { text: `Closest ${kind} to ${result.anchor.name}: ${top.item.name}${milesOf(top)}.`, rows: [] }
   }
@@ -225,14 +226,24 @@ function baseAnswer(
   // count…
   const typed = query.terms.filter((t) => t !== query.partial)
   let asked = typed
-  const covers = (h: AskHit) =>
-    Math.max(
-      h.matched.length ? coverage(h.matched[0].tag, asked) : 0,
-      ...h.matchedFields.filter((f) => f.describes).map((f) => coverage(f.text, asked)),
-      // …and by its name, which says what it serves: Espresso Cafe & Sushi
-      // Bar. Unless the question was the name itself, looking the place up.
-      describedByItsText(h.category) && coverage(h.item.name, asked) < words(h.item.name).length ? coverage(h.item.name, asked) : 0,
-    )
+  // How many of the words asked a place has: in its best-matching item, its
+  // own description if it's a food place, and its name — "giant wine" is
+  // GIANT's name and its Wine. A name alone counts only for a food place
+  // ("Espresso Cafe & Sushi Bar" has sushi), and not when the question is
+  // most of the name, which is looking the place up.
+  const covers = (h: AskHit) => {
+    const has = new Set<string>()
+    const add = (text: string) => {
+      const ws = words(text)
+      for (const t of asked) if (termMatches(t, ws)) has.add(t)
+    }
+    if (h.matched.length) add(h.matched[0].tag)
+    for (const f of h.matchedFields) if (f.describes) add(f.text)
+    const food = describedByItsText(h.category)
+    if (has.size === 0 && !food) return 0
+    if (!food || coverage(h.item.name, asked) < words(h.item.name).length) add(h.item.name)
+    return has.size
+  }
   let best = Math.max(0, ...hits.map(covers))
   // …unless it's the item itself: "giant wine", before the space.
   if (best === 0 && typed.length < query.terms.length) {
@@ -244,17 +255,25 @@ function baseAnswer(
   // has something. One word of "Center City Pretzel Co." isn't.
   const nameCovered = coverage(top.item.name, query.terms)
   const namesTop = nameCovered === query.terms.length && nameCovered * 2 > words(top.item.name).length
-  const having = best > 0 && !namesTop ? hits.filter((h) => covers(h) === best) : []
+  // And only when some place has everything asked: "chalav yisrael ice
+  // cream" is not answered by ShopRite's Chalav Yisroel Milk, nor "frozen
+  // gefilte fish" by a fish market's frozen meat.
+  const having = best > 0 && best === asked.length && !namesTop ? hits.filter((h) => covers(h) === best) : []
   if (having.length) {
     const thing = itemName(having, query.raw, asked)
     const sometimes = having.filter((h) => h.matched.length > 0 && h.matched.every((m) => m.sometimes)).length
     const note = sometimes === having.length ? ' (only sometimes in stock)' : sometimes > 0 ? ` (${sometimes} only sometimes)` : ''
     const near = nearest(having)
     const closedNote = asksOpen && closed ? ` ${closed} more ${closed === 1 ? 'is' : 'are'} closed ${later}.` : ''
-    if (having.length === 1) return { text: `${near.item.name} has ${thing}${note}${milesOf(near)}${hoursOf(near)}.${closedNote}`, rows: [] }
-    const nearText = near.miles != null ? ` Nearest: ${near.item.name}${milesOf(near)}${hoursOf(near)}.` : ''
+    // Measured from the place asked about, it says so: "8.1 mi from HUP".
+    const fromAnchor = result.anchor && near.miles != null ? ` from ${result.anchor.name}` : ''
+    if (having.length === 1) return { text: `${near.item.name} has ${thing}${note}${milesOf(near)}${fromAnchor}${hoursOf(near)}.${closedNote}`, rows: [] }
+    const nearestLabel = result.anchor ? `Nearest to ${result.anchor.name}` : 'Nearest'
+    const nearText = near.miles != null ? ` ${nearestLabel}: ${near.item.name}${milesOf(near)}${hoursOf(near)}.` : ''
     const open = query.openNow ? ' open' : query.openToday ? ' open today' : ''
-    return { text: `${having.length}${open} places have ${thing}${note}.${nearText}${closedNote}`, rows: [] }
+    // "Than Giant": the places that aren't it.
+    const besides = result.excluded.length ? ` besides ${[...new Set(result.excluded)].join(' or ')}` : ''
+    return { text: `${having.length}${open} places${besides} have ${thing}${note}.${nearText}${closedNote}`, rows: [] }
   }
 
   // Asked only what's open ("is there a mikvah open today"): what is, and
@@ -318,4 +337,18 @@ export function hitHoursNote(hit: AskHit, query: AskResult['query']): { text: st
   const text = hoursText(hit, query.openNow)
   if (!text) return null
   return { text: text[0].toUpperCase() + text.slice(1), known: true }
+}
+
+/** For a question that found nothing, the answer to the closest one that
+ *  did (see nearMiss): says plainly that the question itself isn't in the
+ *  guide, then what is — "Nothing in the guide for “packaged pretzels”.
+ *  3 places have pretzels. Nearest: ALDI, 0.8 mi." Never passes the near
+ *  miss off as the thing asked for. */
+export function nearMissAnswer(miss: NearMiss, raw: string, options: { coords?: LatLng | null } = {}): Answer {
+  const { hits } = miss.result
+  const kinds = new Set(hits.map((h) => h.category.id))
+  const kind = kinds.size === 1 ? hits[0].category.pluralLabel.toLowerCase() : 'places'
+  const closest =
+    answerFor(miss.result, options)?.text ?? `Closest: ${hits.length} ${hits.length === 1 ? 'place' : kind} with “${miss.kept}”.`
+  return { text: `Nothing in the guide for “${raw}”. ${closest}`, rows: [] }
 }

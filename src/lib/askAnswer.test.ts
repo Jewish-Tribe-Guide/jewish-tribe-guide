@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { makeCategory } from '@/test/providerFixtures'
 import type { DirectoryResource } from '@/types'
-import { searchAsk } from './askSearch'
-import { answerFor, hitHoursNote, type AnswerSchedule } from './askAnswer'
+import { nearMiss, searchAsk } from './askSearch'
+import { answerFor, hitHoursNote, nearMissAnswer, type AnswerSchedule } from './askAnswer'
 import type { MinyanSlot } from './upcomingDavening'
 
 const synagogue = makeCategory({
@@ -328,5 +328,47 @@ describe('answerFor — "is there a mikvah open today"', () => {
     expect(hitHoursNote(result.noHours[0], result.query)).toEqual({ text: 'No hours listed', known: false })
     const plain = searchAsk([lowerMerion], [mikvah], 'mikvah', { now: at(7) })
     expect(hitHoursNote(plain.hits[0], plain.query)).toBeNull()
+  })
+})
+
+describe('answerFor — only what the guide actually says', () => {
+  it('does not say a place has something when its item has only some of the words', () => {
+    // Reported: "chalav yisrael ice cream" answered "ShopRite has Chalav
+    // Yisroel Milk".
+    const result = searchAsk(listings, categories, 'chalav yisroel cheese ')
+    expect(result.hits.map((h) => h.item.name)).toEqual(['ShopRite']) // found, by two of the three words
+    expect(answerFor(result)).toBeNull()
+  })
+
+  it('says "besides" the place the question already knows', () => {
+    expect(ask('a better place for challah than giant')?.text).toBe('ShopRite has Challah.')
+    const wine = [
+      listing('grocery', 'g', 'GIANT', 39.94, { m: ['Wine'] }),
+      listing('grocery', 't', "Trader Joe's", 39.951, { m: ['Wine'] }),
+      listing('grocery', 'f', 'Food & Friends', 39.96, { m: ['Wine'] }),
+    ]
+    expect(answerFor(searchAsk(wine, categories, 'a better place for kosher wine than giant', { coords: here }), { coords: here })?.text).toBe(
+      "2 places besides GIANT have Wine. Nearest: Trader Joe's, 0.1 mi.",
+    )
+  })
+
+  it('names the place it measured from', () => {
+    const wine = [
+      listing('grocery', 'g', 'GIANT', 39.94, { m: ['Wine'] }),
+      listing('grocery', 't', "Trader Joe's", 39.96, { m: ['Wine'] }),
+    ]
+    const nearHup = answerFor(searchAsk([...wine, hup], categories, 'wine near HUP'))
+    expect(nearHup?.text).toBe('2 places have Wine. Nearest to Hospital of the University of Pennsylvania: GIANT, 0.7 mi.')
+    const one = answerFor(searchAsk([wine[0], hup], categories, 'wine near HUP'))
+    expect(one?.text).toBe('GIANT has Wine, 0.7 mi from Hospital of the University of Pennsylvania.')
+  })
+})
+
+describe('nearMissAnswer', () => {
+  it('says the question itself is not in the guide, then what is', () => {
+    const miss = nearMiss(listings, categories, 'packaged challah')!
+    expect(nearMissAnswer(miss, 'packaged challah').text).toBe(
+      'Nothing in the guide for “packaged challah”. 2 places have Challah (1 only sometimes).',
+    )
   })
 })

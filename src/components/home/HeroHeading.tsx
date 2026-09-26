@@ -56,6 +56,8 @@ type Props = {
   /** The answer to the query, when there is one (see askAnswer.ts) — shown
    *  at the top of the dropdown. */
   searchAnswer?: Answer | null
+  /** Where to ask and add, for a search that found nothing (see AskTheGroup). */
+  searchAskGroup?: { nothingClose: boolean; askHref: string | null; addHref: string } | null
   onOpenAnswerShul?: (shulId: string) => void
 }
 
@@ -135,6 +137,7 @@ export default function HeroHeading({
   onSearchCardClick,
   onOpenSearchPlace,
   searchAnswer = null,
+  searchAskGroup = null,
   onOpenAnswerShul,
 }: Props) {
   const { desktopHeroHeadline: headline, desktopHeroSubhead: subhead, desktopHeroImage: heroImage } = settings
@@ -378,6 +381,7 @@ export default function HeroHeading({
                   onCardClick={(card) => onSearchCardClick?.(card)}
                   onOpenPlace={(hit) => onOpenSearchPlace?.(hit)}
                   answer={searchAnswer}
+                  askGroup={searchAskGroup}
                   onOpenShul={onOpenAnswerShul}
                 />
               )}

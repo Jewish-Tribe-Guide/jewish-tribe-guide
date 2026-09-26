@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { makeCategory } from '@/test/providerFixtures'
 import type { DirectoryResource } from '@/types'
-import { foundFor, searchAsk } from './askSearch'
+import { foundFor, nearMiss, searchAsk } from './askSearch'
 
 // Shaped on real Philly listings: the fields, tags and spellings are the ones
 // the guide actually has, so a phrasing that works here works on the site.
@@ -424,5 +424,58 @@ describe('searchAsk — why each result is there', () => {
   it('carries nothing into a listing found only by its name', () => {
     const result = searchAsk(listings, categories, 'mekor habracha')
     expect(foundFor(result.hits[0], result)).toBeNull()
+  })
+})
+
+describe('searchAsk — "than Giant" and "near" without a kind of place', () => {
+  it('leaves out the place the question already knows', () => {
+    const result = searchAsk(listings, categories, 'a better place for kosher wine than giant')
+    expect(result.hits.map((h) => h.item.name)).toEqual(expect.arrayContaining(['ShopRite of Garden State Pavilion', "Trader Joe's"]))
+    expect(result.hits.map((h) => h.item.name)).not.toContain('GIANT')
+    expect(result.excluded).toEqual(['GIANT'])
+  })
+
+  it('measures from the place named with "near", with no kind of place asked', () => {
+    // "sushi near HUP" was measured from the visitor, not HUP.
+    const result = searchAsk(listings, categories, 'wine near HUP')
+    expect(result.anchor?.name).toBe('Hospital of the University of Pennsylvania')
+    expect(result.terms).toEqual(['wine'])
+  })
+})
+
+describe('nearMiss — the closest thing when nothing matches', () => {
+  it('drops the word nothing has, keeping the one something does', () => {
+    const miss = nearMiss(listings, categories, 'packaged challah')
+    expect(miss?.kept).toBe('challah')
+    expect(miss?.dropped).toBe('packaged')
+    expect(miss?.result.hits.map((h) => h.item.name)).toContain("Trader Joe's")
+  })
+
+  it('does not count every place of a kind as close', () => {
+    // "vegan food" loosened to "food" would be every restaurant.
+    expect(nearMiss(listings, categories, 'vegan food')).toBeNull()
+  })
+
+  it('keeps where the question was about: the food nearest HUP is close', () => {
+    const miss = nearMiss(listings, categories, 'vegan food near HUP')
+    expect(miss?.result.anchor?.name).toBe('Hospital of the University of Pennsylvania')
+    expect(miss?.result.hits.length).toBeGreaterThan(0)
+  })
+
+  it('of two looser questions, keeps the one more places list as an item', () => {
+    // No store has both. Challah is listed at three, brie at one.
+    const miss = nearMiss(listings, categories, 'brie challah ')
+    expect(miss?.kept).toBe('challah')
+  })
+
+  it('finds nothing close for a word nothing has', () => {
+    expect(nearMiss(listings, categories, 'dentist')).toBeNull()
+  })
+
+  it('leaves a minyan question to the schedules', () => {
+    // Loosened, "mekor" alone would find the shul; the schedules answer a
+    // minyan question, not a looser search.
+    expect(nearMiss(listings, categories, 'mincha at mekor zzyzx ')).toBeNull()
+    expect(nearMiss(listings, categories, 'shul mekor zzyzx ')).not.toBeNull()
   })
 })

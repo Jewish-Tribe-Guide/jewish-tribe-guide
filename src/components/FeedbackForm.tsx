@@ -43,6 +43,12 @@ export default function FeedbackForm({ heading, successMessage, variant = 'modal
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setMounted(true)
+    // Arrived from a search that found nothing (AskTheGroup's "Add it to
+    // the guide"): the question is already written in, so someone who knows
+    // the answer only has to add where. Read here rather than with
+    // useSearchParams, which would take this prerendered page dynamic.
+    const about = new URLSearchParams(window.location.search).get('about')?.trim()
+    if (about) setMessage((m) => m || `“${about}” isn’t in the guide. You can find it at: `)
   }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {

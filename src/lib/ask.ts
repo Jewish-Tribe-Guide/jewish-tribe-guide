@@ -83,7 +83,10 @@ const STOPWORDS = new Set([
   'sell', 'sells', 'selling', 'sold', 'carry', 'carries', 'carrying', 'stock', 'stocks', 'offer', 'offers',
   'have', 'has', 'had', 'having', 'go', 'goes', 'going', 'went', 'come', 'coming', 'take',
   'know', 'knows', 'knew', 'recommend', 'recommendation', 'recommendations', 'suggest', 'suggestion', 'suggestions',
-  'good', 'best', 'great', 'nice', 'decent', 'reliable', 'favorite', 'favourite',
+  'good', 'best', 'better', 'great', 'nice', 'decent', 'reliable', 'reputable', 'favorite', 'favourite',
+  // Every listing here is kosher, so asking for "a good hechsher" narrows
+  // nothing; a named one ("OU") is still searched for.
+  'hechsher', 'hechsherim', 'hashgacha', 'certified', 'certification',
   'please', 'pls', 'thanks', 'thank', 'hi', 'hey', 'hello', 'help',
   'place', 'places', 'spot', 'spots', 'option', 'options', 'somewhere', 'anywhere', 'location', 'locations',
   'store', 'stores', 'shop', 'shops',
@@ -160,6 +163,16 @@ function plainWords(text: string): string[] {
   return plain ? plain.split(' ') : []
 }
 
+/** The question's words as typed, each with the term it became (or null
+ *  for a filler or kind-of-place word) — for loosening a question one
+ *  searched word at a time. */
+export function typedWords(raw: string, terms: readonly string[]): { word: string; term: string | null }[] {
+  return plainWords(raw).map((w) => {
+    const f = fold(w)
+    return { word: w, term: terms.includes(f) ? f : null }
+  })
+}
+
 /** The words of `raw` that became `terms`, as they were typed: "cheeses" for
  *  the term "cheese". For an answer to use the asker's own word for a thing
  *  when the listings each word it differently. */
@@ -201,6 +214,12 @@ export type AskQuery = {
   /** "within 2 miles", "within a 15 minute drive", "10 minute walk": the
    *  farthest a result may be, in straight-line miles (see WITHIN). */
   within: Within | null
+  /** "than Giant", "besides ShopRite", "other than Trader Joe's": a place
+   *  the asker already knows and wants something else than — its name's
+   *  words, folded. A listing whose name has all of them is left out. One
+   *  of the questions actually asked in the group: "a better place for
+   *  kosher wine than Giant". */
+  excluding: string[]
   /** Set when the question is about minyan times ("next maariv", "is there
    *  a mincha at 1:30", "upcoming minyanim"), for the answer to be worked out
    *  from the schedules rather than from listing text. */
@@ -280,6 +299,26 @@ function readWithin(input: string): { within: Within | null; rest: string } {
   return { within: { miles: n * MILES_PER_MINUTE[by], asked: { minutes: n, by } }, rest }
 }
 
+// "than Giant", "besides ShopRite": what follows names a place to leave out.
+const EXCLUDING = /\b(?:other than|better than|rather than|instead of|apart from|besides|except|than)\s+(.+)$/
+
+/** Takes a "than X" off the end of the text: the words of X, up to the first
+ *  filler or kind-of-place word ("than giant near center city" leaves out
+ *  only Giant). */
+function readExcluding(text: string): { excluding: string[]; rest: string } {
+  const m = text.match(EXCLUDING)
+  if (!m) return { excluding: [], rest: text }
+  const after = m[1].split(' ')
+  const name: string[] = []
+  for (const w of after) {
+    if (STOPWORDS.has(w) || CONCEPT_BY_WORD.has(fold(w))) break
+    name.push(w)
+  }
+  if (name.length === 0) return { excluding: [], rest: text }
+  const rest = `${text.slice(0, m.index)} ${after.slice(name.length).join(' ')}`
+  return { excluding: name.map(fold), rest }
+}
+
 const NEAR_ME = /\b(?:(?:near|close to|closest to|nearest to|around|by|next to) (?:me|here|us)|nearby|near by|close by)\b/g
 const OPEN_TODAY = /\b(?:open (?:today|tonight|later(?: today| tonight)?|this (?:evening|afternoon))|still open (?:today|tonight))\b/g
 const OPEN_NOW = /\b(?:open (?:right now|now|late|on sunday|on friday)|(?:whats|what is|anything|something|who is|whos) open|open)\b/g
@@ -301,8 +340,9 @@ export function parseAsk(input: string): AskQuery {
   const nearMe = withoutNear !== typed
   const withoutToday = withoutNear.replace(OPEN_TODAY, ' ')
   const openToday = withoutToday !== withoutNear
-  const plain = withoutToday.replace(OPEN_NOW, ' ')
-  const openNow = !openToday && plain !== withoutToday
+  const withoutOpen = withoutToday.replace(OPEN_NOW, ' ')
+  const openNow = !openToday && withoutOpen !== withoutToday
+  const { excluding, rest: plain } = readExcluding(withoutOpen.replace(/\s+/g, ' ').trim())
 
   const terms: string[] = []
   const concepts: AskQuery['concepts'] = []
@@ -335,11 +375,11 @@ export function parseAsk(input: string): AskQuery {
   const last = plainWords(raw).at(-1)
   if (terms.length === 0 && concepts.length === 0 && !nearMe && !openNow && !openToday) {
     const all = words(raw)
-    return { raw, terms: all, concepts, nearMe, openNow, openToday, within: withinAsked, minyan, partial: typing && all.length > 1 ? (all.at(-1) ?? null) : null }
+    return { raw, terms: all, concepts, nearMe, openNow, openToday, excluding, within: withinAsked, minyan, partial: typing && all.length > 1 ? (all.at(-1) ?? null) : null }
   }
   // Only the word under the cursor, and only if it survived as a term.
   const partial = typing && last !== undefined && terms.at(-1) === fold(last) && terms.length > 1 ? (terms.at(-1) ?? null) : null
-  return { raw, terms, concepts, nearMe, openNow, openToday, within: withinAsked, minyan, partial }
+  return { raw, terms, concepts, nearMe, openNow, openToday, excluding, within: withinAsked, minyan, partial }
 }
 
 /** The categories a concept stands for in this community: those whose id or

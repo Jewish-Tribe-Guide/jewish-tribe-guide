@@ -9,6 +9,7 @@ import type { CardDef, ListingHit } from './sections'
 import type { Answer } from '@/lib/askAnswer'
 import Highlight from '@/components/resources/Highlight'
 import AskAnswer from './AskAnswer'
+import AskTheGroup from './AskTheGroup'
 
 // How many of each to show before "See all" — matches the mockup this was
 // built from. Categories and listings are capped independently: a broad
@@ -41,6 +42,7 @@ export default function HeroSearchDropdown({
   onCardClick,
   onOpenPlace,
   answer = null,
+  askGroup = null,
   onOpenShul,
 }: {
   /** The trimmed, non-empty query this panel is showing results for. */
@@ -53,6 +55,9 @@ export default function HeroSearchDropdown({
   onOpenPlace: (hit: ListingHit) => void
   /** The answer to the query, above everything else (see askAnswer.ts). */
   answer?: Answer | null
+  /** For a search that found nothing: where to ask and how to add the
+   *  answer, last (see AskTheGroup). */
+  askGroup?: { nothingClose: boolean; askHref: string | null; addHref: string } | null
   onOpenShul?: (shulId: string) => void
 }) {
   const [expanded, setExpanded] = useState(false)
@@ -65,12 +70,16 @@ export default function HeroSearchDropdown({
     'absolute left-0 right-0 top-[calc(100%+8px)] z-20 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_4px_10px_rgba(15,23,42,0.06),0_20px_40px_rgba(15,23,42,0.12)]'
 
   const answerNode = answer && <AskAnswer answer={answer} onOpenShul={onOpenShul} className="mx-2 mt-2" />
+  const askGroupNode = askGroup && <AskTheGroup query={query} {...askGroup} className="mx-2 mb-2" />
 
   if (totalCount === 0) {
     return (
       <div className={panelClassName}>
-        {answerNode ? (
-          <div className="pb-2">{answerNode}</div>
+        {answerNode || askGroupNode ? (
+          <div className="space-y-2 pb-0.5 pt-2 [&>*]:mt-0">
+            {answerNode}
+            {askGroupNode}
+          </div>
         ) : (
           <p className="px-4 py-4 text-center text-sm text-slate-500">
             Nothing matches &ldquo;{query}&rdquo;. Try a different word.
@@ -195,6 +204,7 @@ export default function HeroSearchDropdown({
           </button>
         </>
       )}
+      {askGroupNode}
     </div>
   )
 }

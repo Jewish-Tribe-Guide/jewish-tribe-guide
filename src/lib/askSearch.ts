@@ -3,7 +3,7 @@ import type { CategoryConfig } from '@/lib/categories'
 import { listingSearchText } from '@/lib/searchListing'
 import { haversineMiles } from '@/lib/geo'
 import { DAY_KEYS, businessClosure, fmt12, getOpenStatus, isStructuredHours, type DayHours } from '@/lib/hours'
-import { conceptCategories, initialisms, parseAsk, termMatches, termsRequired, wordMatches, words, type AskQuery } from '@/lib/ask'
+import { conceptCategories, initialisms, parseAsk, termMatches, termsRequired, typedWords, wordMatches, words, type AskQuery } from '@/lib/ask'
 
 // Runs an `ask` query (see ask.ts) against the listings a page already holds.
 // Shared by the home search, every category page's own search box and the
@@ -93,6 +93,9 @@ export type AskResult = {
   /** The words the listings were searched for, once kinds of place and the
    *  place asked about are taken out — what to highlight in a result. */
   terms: string[]
+  /** The names of the places left out for "than Giant" (see AskQuery's
+   *  `excluding`), each once, for the answer to say "besides GIANT". */
+  excluded: string[]
 }
 
 type Prepared = {
@@ -330,7 +333,7 @@ export function searchAsk(
   { coords = null, now = new Date(), categoryId, limit }: AskOptions = {},
 ): AskResult {
   const query = parseAsk(input)
-  const empty: AskResult = { query, hits: [], categoryIds: null, anchor: null, closedCount: 0, noHours: [], terms: [] }
+  const empty: AskResult = { query, hits: [], categoryIds: null, anchor: null, closedCount: 0, noHours: [], terms: [], excluded: [] }
   if (!query.raw) return empty
 
   const configById = new Map(categories.map((c) => [c.id, c]))
@@ -352,7 +355,10 @@ export function searchAsk(
     }
   }
 
-  const found = categoryIds ? findAnchor(terms, all, categoryIds, SAYS_WHERE.test(query.raw)) : null
+  // Somewhere named with "near"/"at" counts without a kind of place too:
+  // "sushi near HUP" is measured from HUP.
+  const saysWhere = SAYS_WHERE.test(query.raw)
+  const found = categoryIds || saysWhere ? findAnchor(terms, all, categoryIds ?? [], saysWhere) : null
   const anchor = found?.anchor ?? null
   const searchTerms = found ? terms.filter((t) => !found.used.includes(t)) : terms
   const origin = anchor?.geo ?? coords ?? null
@@ -367,10 +373,15 @@ export function searchAsk(
   const required = partial ? searchTerms.slice(0, -1) : searchTerms
   const needed = termsRequired(required.length)
   const hits: AskHit[] = []
+  const excluded = new Set<string>()
   for (const p of all) {
     if (categoryId && p.category.id !== categoryId) continue
     if (categoryIds && !categoryIds.includes(p.category.id)) continue
     if (anchor && p.item === anchor) continue
+    if (query.excluding.length && query.excluding.every((w) => termMatches(w, p.nameWords, 3, false))) {
+      excluded.add(p.item.name)
+      continue
+    }
 
     let score = 0
     let matched = 0
@@ -459,5 +470,69 @@ export function searchAsk(
     closedCount: asksOpen ? hits.filter((h) => !openEnough(h) && h.open !== null && inReach(h)).length : 0,
     noHours,
     terms: searchTerms,
+    excluded: [...excluded],
   }
+}
+
+/** A looser version of a question that found nothing, and what it found:
+ *  "packaged pretzels" finds nothing, "pretzels" finds three places. */
+export type NearMiss = {
+  /** The words kept and the words dropped, as typed. */
+  kept: string
+  dropped: string
+  result: AskResult
+}
+
+/**
+ * When a question finds nothing, the closest thing the guide does have: the
+ * same question with a searched word or two left out, keeping as many as
+ * still find something. Only words that were searched for are ever dropped
+ * — never the kind of place or where — and a looser question that leaves
+ * nothing to look for but a kind of place ("vegan food" → every food place)
+ * doesn't count, unless it was about somewhere ("vegan food near HUP" →
+ * the food nearest HUP), which is exactly what's close. Null when nothing
+ * looser finds anything either, or for a minyan question, which the
+ * schedules answer.
+ */
+export function nearMiss(
+  listings: readonly DirectoryResource[],
+  categories: readonly CategoryConfig[],
+  input: string,
+  options: AskOptions = {},
+): NearMiss | null {
+  const query = parseAsk(input)
+  if (!query.raw || query.minyan) return null
+  const typed = typedWords(query.raw, query.terms)
+  const searched = typed.flatMap((w, i) => (w.term ? [i] : []))
+  if (searched.length === 0) return null
+
+  const tryWithout = (drop: number[]): NearMiss | null => {
+    // A trailing space: nothing left is a word still being typed.
+    const looser = typed.filter((_, i) => !drop.includes(i)).map((w) => w.word).join(' ') + ' '
+    const result = searchAsk(listings, categories, looser, options)
+    if (result.hits.length === 0 || (result.terms.length === 0 && !result.anchor)) return null
+    return {
+      kept: typed.filter((w, i) => w.term && !drop.includes(i)).map((w) => w.word).join(' '),
+      dropped: drop.map((i) => typed[i].word).join(' '),
+      result,
+    }
+  }
+  // Better is: more of what was asked kept, then more places that list it
+  // as an item, then more places.
+  const rank = (m: NearMiss) => [m.kept.split(' ').length, m.result.hits.filter((h) => h.matched.length).length, m.result.hits.length]
+  const better = (a: NearMiss, b: NearMiss) => {
+    const [x, y] = [rank(a), rank(b)]
+    for (let i = 0; i < x.length; i++) if (x[i] !== y[i]) return x[i] > y[i]
+    return false
+  }
+  const pick = (drops: number[][]) =>
+    drops.reduce<NearMiss | null>((best, d) => {
+      const m = tryWithout(d)
+      return m && (!best || better(m, best)) ? m : best
+    }, null)
+
+  const one = searched.length > 1 || query.concepts.length > 0 ? pick(searched.map((i) => [i])) : null
+  if (one || searched.length < 3) return one
+  const pairs = searched.flatMap((a, x) => searched.slice(x + 1).map((b) => [a, b]))
+  return pick(pairs)
 }
