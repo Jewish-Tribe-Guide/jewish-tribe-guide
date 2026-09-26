@@ -513,6 +513,42 @@ describe('GenericDirectory', () => {
     })
   })
 
+  // Reported live on desktop: open a listing, press Back to home, pick
+  // another from the home search, and both dialogs were up, the new one on
+  // top of the old. Leaving hides this screen under <Activity> instead of
+  // unmounting it, so the first card was still open underneath.
+  describe('a listing left open when the screen was hidden', () => {
+    const category = makeCategory()
+    const items = [makeListing({ id: 'a', name: 'Kosher Mart' }), makeListing({ id: 'b', name: 'Regular Mart' })]
+    const screenWith = (mode: 'visible' | 'hidden', reopenItemId: string | null) => (
+      <Activity mode={mode}>
+        <GenericDirectory category={category} items={items} {...handlers} reopenItemId={reopenItemId} />
+      </Activity>
+    )
+
+    // "Expanded <name>" is the card mock's open state (see the mock at the top).
+    it('closes when a different listing is opened on the way back', () => {
+      const { rerenderWithProviders } = renderWithProviders(screenWith('visible', 'a'))
+      expect(screen.getByText('Expanded Kosher Mart')).toBeInTheDocument()
+
+      rerenderWithProviders(screenWith('hidden', null))
+      rerenderWithProviders(screenWith('visible', 'b'))
+
+      expect(screen.getByText('Expanded Regular Mart')).toBeInTheDocument()
+      expect(screen.queryByText('Expanded Kosher Mart')).not.toBeInTheDocument()
+    })
+
+    it('closes when the screen comes back with no listing asked for', () => {
+      const { rerenderWithProviders } = renderWithProviders(screenWith('visible', 'a'))
+      expect(screen.getByText('Expanded Kosher Mart')).toBeInTheDocument()
+
+      rerenderWithProviders(screenWith('hidden', null))
+      rerenderWithProviders(screenWith('visible', null))
+
+      expect(screen.queryByText(/^Expanded /)).not.toBeInTheDocument()
+    })
+  })
+
   describe('the Popularity/Distance sort toggle', () => {
     it('opens the location picker instead of switching to Distance when nothing is anchored yet', async () => {
       const user = userEvent.setup()

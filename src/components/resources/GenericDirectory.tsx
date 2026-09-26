@@ -673,8 +673,27 @@ export default function GenericDirectory({ category, items, anchorLabel, address
     if (handle) cardRefs.current.set(id, handle)
     else cardRefs.current.delete(id)
   }
+  // Which cards have their listing open right now, kept by each card's
+  // onExpandedChange (below). A ref, not state: the effect below reads it on
+  // Activity's reveal, where a state value from an earlier render would be
+  // exactly the stale answer this exists to avoid.
+  const openCardIdsRef = useRef(new Set<string>())
 
   useEffect(() => {
+    // A listing left open from an earlier visit closes first. Leaving a
+    // category (browser Back to home) hides this screen under <Activity>
+    // rather than unmounting it, so the card that was open stays open in
+    // the hidden tree. Coming back with a different `?item=` then opened a
+    // second dialog on top of the first — reported live on desktop: open a
+    // listing, press Back, pick another from the home search, and both were
+    // up, one over the other. Coming back with no `?item=` at all (the
+    // Categories menu) showed the old one again. This effect re-runs on
+    // Activity's reveal as well as on a new `?item=`, which covers both.
+    // Only open cards are closed: close() clears `?item=` in the URL, so
+    // calling it on every card would write the URL once per listing.
+    for (const id of [...openCardIdsRef.current]) {
+      if (id !== reopenItemId) cardRefs.current.get(id)?.close()
+    }
     if (!reopenItemId) return
     // Actually opens the card too, not just scrolls to it — `defaultExpanded`
     // (below, on each card) only seeds that card's OWN expand state on ITS
@@ -1567,6 +1586,8 @@ export default function GenericDirectory({ category, items, anchorLabel, address
               // Add/Edit/Report form (which does use push, see
               // FindResources' openAction) reasonably does.
               onExpandedChange={(expanded) => {
+                if (expanded) openCardIdsRef.current.add(item.id)
+                else openCardIdsRef.current.delete(item.id)
                 onParamsChange?.({ item: expanded ? item.id : null }, { replace: true })
                 // See openDialogItemId's own note. Cleared by id rather
                 // than unconditionally: arrow-key next/prev closes
