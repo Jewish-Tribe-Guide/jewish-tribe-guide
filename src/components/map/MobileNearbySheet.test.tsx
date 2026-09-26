@@ -28,9 +28,10 @@ vi.mock('./NearbyList', () => ({
   ),
 }))
 vi.mock('./MapPlaceDetail', () => ({
-  default: ({ item, onBack }: { item: Point; onBack: () => void }) => (
+  default: ({ item, onBack, found }: { item: Point; onBack: () => void; found?: { items: { tag: string }[] } | null }) => (
     <div>
       <p>detail for {item.name}</p>
+      {found && <p>marked {found.items.map((m) => m.tag).join(', ')}</p>}
       <button onClick={onBack}>Back to list</button>
     </div>
   ),
@@ -402,6 +403,16 @@ describe('MobileNearbySheet', () => {
 
   // Inside the same hand-driven scroll region the list uses, so a long
   // listing scrolls, and dragging it at the top resizes the sheet, exactly
+  // Opened from the map's search, the place marks what the search matched.
+  it("passes the search's matches for the selected place to its detail", async () => {
+    const user = userEvent.setup()
+    const foundOn = (id: string | undefined) =>
+      id === 'p1' ? { terms: ['wine'], items: [{ tag: 'Wine', sometimes: false }], fields: [] } : null
+    render(<MobileNearbySheet points={[point]} userLocation={null} categories={[category]} foundOn={foundOn} containerHeight={600} />)
+    await user.click(screen.getByRole('button', { name: /select Goldi Market/ }))
+    expect(screen.getByText('marked Wine')).toBeInTheDocument()
+  })
+
   // as the list does. Its edit bar is the last thing in that content (see
   // MapPlaceDetail), no longer docked below the region.
   it('renders the place detail inside the scroll region the list uses', async () => {

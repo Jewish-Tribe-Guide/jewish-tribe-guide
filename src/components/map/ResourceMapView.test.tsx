@@ -1404,4 +1404,30 @@ describe('ResourceMapView — search reads a question', () => {
     expect(screen.getByRole('button', { name: 'Select ShopRite' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Select Acme Grocery' })).not.toBeInTheDocument()
   })
+
+  // Opened from the map's search, a place marks what the search matched, the
+  // same as a listing opened from any other search (see PlaceDetailBody).
+  it('marks what the search matched in the place it opens', async () => {
+    const user = userEvent.setup()
+    const grocery = makeCategory({
+      id: 'grocery',
+      label: 'Grocery Store',
+      pluralLabel: 'Grocery Stores',
+      detailFields: [{ key: 'm', label: 'Kosher items', type: 'tags' }],
+    })
+    const { container } = renderMap(
+      <HeaderCollapseProvider>
+        <ResourceMapView onUp={vi.fn()} standalone visible />
+      </HeaderCollapseProvider>,
+      [listingWithGeo({ id: 'g1', category: 'grocery', name: 'ShopRite', m: ['Challah', 'Chalav Yisroel Milk'] })],
+      [grocery],
+    )
+    const input = container.querySelector<HTMLInputElement>('input[placeholder^="Search name, address"]')!
+    await user.type(input, 'cholov yisroel milk')
+    await user.keyboard('{Enter}')
+    await user.click(screen.getByRole('button', { name: 'Select ShopRite' }))
+
+    const box = await screen.findByTestId('search-found')
+    expect(box).toHaveTextContent('Chalav Yisroel Milk')
+  })
 })

@@ -16,7 +16,7 @@ import { useHospitals } from '@/lib/useHospitals'
 import { useIsMobile } from '@/lib/useIsMobile'
 import type { LatLng } from '@/lib/googleMapsLinks'
 import { listingSearchText } from '@/lib/searchListing'
-import { searchAsk } from '@/lib/askSearch'
+import { foundFor, searchAsk, type SearchFound } from '@/lib/askSearch'
 import { hoursOpenNow, businessClosure } from '@/lib/hours'
 import { useNow } from '@/lib/useNow'
 import { ui } from '@/lib/uiConfig'
@@ -718,11 +718,15 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // get cholov yisroel milk" pins the store that has it, "food" pins every
   // food place. Null when there's no query. Hospital pins carry no listing,
   // so they keep matching on their name (see visiblePoints).
+  // Each keeps what it matched on, for the place panel to mark it (see
+  // SearchFound), the same as a listing opened from any other search.
   const askIds = useMemo(() => {
     if (activeTerms.length === 0) return null
     const raws = allPoints.flatMap((p) => (p.raw ? [p.raw] : []))
-    return new Set(searchAsk(raws, categories ?? [], committedQuery).hits.map((h) => h.item.id))
+    const result = searchAsk(raws, categories ?? [], committedQuery)
+    return new Map<string, SearchFound | null>(result.hits.map((h) => [h.item.id, foundFor(h, result)]))
   }, [activeTerms, allPoints, categories, committedQuery])
+  const foundOnPoint = (id: string | undefined) => (id ? (askIds?.get(id) ?? null) : null)
 
   // ── Field filters (kosher / type / … carried from the directory) ─────────
   // Held as a serializable spec (also what's persisted to history). "Open
@@ -1657,6 +1661,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                       category={desktopSelectedCategory}
                       color={desktopSelected.color}
                       onBack={() => setDesktopSelected(null)}
+                      found={foundOnPoint(desktopSelected.raw.id)}
                     />,
                   )
                 ) : (
@@ -2164,6 +2169,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                   userLocation={activeLocation}
                   onViewListing={onViewListing}
                   categories={categories ?? []}
+                  foundOn={foundOnPoint}
                   containerHeight={mapBoxHeight}
                   onSelectionChange={(point, frame) => {
                     setSelectedPointId(point?.id)

@@ -347,7 +347,7 @@ describe('PlaceDetailBody — what the search found', () => {
   })
 
   it('shows the field it matched on when no item did', () => {
-    const cert = { terms: ['keystone'], items: [], fields: [{ label: 'Hechsher', text: 'Keystone-K' }] }
+    const cert = { terms: ['keystone'], items: [], fields: [{ label: 'Hechsher', text: 'Keystone-K', describes: false }] }
     render(<PlaceDetailBody item={item} category={category} found={cert} />)
     expect(screen.getByTestId('search-found')).toHaveTextContent('Hechsher: Keystone-K')
     expect(screen.getByTestId('search-found').querySelector('mark')?.textContent).toBe('Keystone')

@@ -352,13 +352,13 @@ describe('searchAsk — why each result is there', () => {
     const result = searchAsk(listings, categories, 'keystone restaurants')
     const hit = result.hits.find((h) => h.item.name === 'Chalavita')!
     expect(hit.matched).toEqual([])
-    expect(hit.matchedFields).toEqual([{ label: 'Hechsher', text: 'Keystone-K' }])
-    expect(foundFor(hit, result)).toEqual({ terms: ['keystone'], items: [], fields: [{ label: 'Hechsher', text: 'Keystone-K' }] })
+    expect(hit.matchedFields).toEqual([{ label: 'Hechsher', text: 'Keystone-K', describes: false }])
+    expect(foundFor(hit, result)).toEqual({ terms: ['keystone'], items: [], fields: [{ label: 'Hechsher', text: 'Keystone-K', describes: false }] })
   })
 
   it('names a yes/no field that is switched on', () => {
     const result = searchAsk(listings, categories, 'shabbat friendly hotel')
-    expect(result.hits[0].matchedFields).toEqual([{ label: 'Shabbat Friendly', text: '' }])
+    expect(result.hits[0].matchedFields).toEqual([{ label: 'Shabbat Friendly', text: '', describes: false }])
   })
 
   it('does not quote a field when an item already explains the match', () => {

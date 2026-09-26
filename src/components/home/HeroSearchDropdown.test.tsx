@@ -150,7 +150,7 @@ describe('HeroSearchDropdown', () => {
       <HeroSearchDropdown
         query="ou restaurants"
         cards={[]}
-        placeHits={[makeHit({ found: { terms: ['ou'], items: [], fields: [{ label: 'Hechsher', text: 'OU' }] } })]}
+        placeHits={[makeHit({ found: { terms: ['ou'], items: [], fields: [{ label: 'Hechsher', text: 'OU', describes: false }] } })]}
         categories={[]}
         onCardClick={noop}
         onOpenPlace={noop}

@@ -1,4 +1,4 @@
-import type { AskHit, AskResult, HoursWindow } from '@/lib/askSearch'
+import { describedByItsText, type AskHit, type AskResult, type HoursWindow } from '@/lib/askSearch'
 import { termMatches, termsAsTyped, words, type MinyanAsk } from '@/lib/ask'
 import { TEFILLAH_LABELS, type Tefillah } from '@/lib/davening'
 import type { MinyanSlot } from '@/lib/upcomingDavening'
@@ -217,16 +217,35 @@ function baseAnswer(
   // A question about an item ("cholov yisroel milk"): who has it. Every
   // place with a matching item counts, however it words it: the nine stores
   // with cheese list "Sliced Cheeses", "Goat Cheese", "Cheese Sticks"…, and
-  // counting only one wording said a single store had cheese. But only as
-  // good a match as the best: for "sliced goat cheese", a store with plain
-  // "Goat Cheese" doesn't have it. The word still being typed doesn't count.
-  const asked = query.terms.filter((t) => t !== query.partial)
-  const covers = (h: AskHit) => (h.matched.length ? coverage(h.matched[0].tag, asked) : 0)
-  const best = Math.max(0, ...hits.map(covers))
-  const having = best > 0 ? hits.filter((h) => covers(h) === best) : []
+  // counting only one wording said a single store had cheese. A place with
+  // no item list counts by its own description: asked for pretzels, the
+  // pretzel bakery has them as surely as the store with pretzel buns. But
+  // only as good a match as the best: for "sliced goat cheese", a store with
+  // plain "Goat Cheese" doesn't have it. The word still being typed doesn't
+  // count…
+  const typed = query.terms.filter((t) => t !== query.partial)
+  let asked = typed
+  const covers = (h: AskHit) =>
+    Math.max(
+      h.matched.length ? coverage(h.matched[0].tag, asked) : 0,
+      ...h.matchedFields.filter((f) => f.describes).map((f) => coverage(f.text, asked)),
+      // …and by its name, which says what it serves: Espresso Cafe & Sushi
+      // Bar. Unless the question was the name itself, looking the place up.
+      describedByItsText(h.category) && coverage(h.item.name, asked) < words(h.item.name).length ? coverage(h.item.name, asked) : 0,
+    )
+  let best = Math.max(0, ...hits.map(covers))
+  // …unless it's the item itself: "giant wine", before the space.
+  if (best === 0 && typed.length < query.terms.length) {
+    asked = query.terms
+    best = Math.max(0, ...hits.map(covers))
+  }
+  // Every word asked is in the top result's name: that's looking the place
+  // up ("20th street pizza"), not asking who has something.
+  const namesTop = coverage(top.item.name, query.terms) === query.terms.length
+  const having = best > 0 && !namesTop ? hits.filter((h) => covers(h) === best) : []
   if (having.length) {
     const thing = itemName(having, query.raw, asked)
-    const sometimes = having.filter((h) => h.matched.every((m) => m.sometimes)).length
+    const sometimes = having.filter((h) => h.matched.length > 0 && h.matched.every((m) => m.sometimes)).length
     const note = sometimes === having.length ? ' (only sometimes in stock)' : sometimes > 0 ? ` (${sometimes} only sometimes)` : ''
     const near = nearest(having)
     const closedNote = asksOpen && closed ? ` ${closed} more ${closed === 1 ? 'is' : 'are'} closed ${later}.` : ''
@@ -260,12 +279,13 @@ function nearest(hits: AskHit[]): AskHit {
 /** What to call the item asked about: the listings' own word for it when
  *  they agree ("Chalav Yisroel Milk"), the asker's when they don't. */
 function itemName(having: AskHit[], raw: string, terms: string[]): string {
-  const tops = new Set(having.map((h) => h.matched[0].tag))
-  if (tops.size === 1) return [...tops][0]
+  const tops = new Set(having.map((h) => h.matched[0]?.tag ?? ''))
+  if (tops.size === 1 && !tops.has('')) return [...tops][0]
+  tops.delete('')
   const typed = termsAsTyped(raw, terms)
   if (typed) return typed
   // Nothing typed survived as a term (an abbreviation, say): the shortest.
-  return [...tops].sort((a, b) => a.length - b.length)[0]
+  return [...tops].sort((a, b) => a.length - b.length)[0] ?? raw
 }
 
 /** How many of the words asked an item has. */

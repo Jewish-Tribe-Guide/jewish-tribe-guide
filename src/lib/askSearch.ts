@@ -43,7 +43,14 @@ export type AskHit = {
   today: HoursWindow[]
 }
 
-export type MatchedField = { label: string; text: string }
+export type MatchedField = {
+  label: string
+  text: string
+  /** A describing field (see describingFields): what the place offers, so
+   *  an answer can count it as having the thing asked for. A hechsher or a
+   *  denomination matching doesn't mean the place "has" it. */
+  describes: boolean
+}
 
 /** Why a listing turned up for a search, as a page shows it: the items and
  *  other fields that matched, and the words to bold in them. Carried from a
@@ -97,6 +104,10 @@ type Prepared = {
   /** The name's and the tags' words: what a listing says it is, as against
    *  what an address or a Google description happens to mention. */
   ownWords: string[]
+  /** For a place with no item list (a restaurant), the words of its own
+   *  descriptions: what it serves, said the only way it's said. Counts as
+   *  fully as an item, without forgiving typos in running text. */
+  describes: string[]
   nameWords: string[]
   initials: string[]
   tags: { tag: string; words: string[]; sometimes: boolean }[]
@@ -122,6 +133,21 @@ function listingTags(item: DirectoryResource): { tag: string; sometimes: boolean
 // there. So where a category lists items, the description isn't searched.
 // A restaurant's is — everything a kosher restaurant serves is kosher, and
 // "pretzels" finding the pretzel bakery is the description doing its job.
+/** A food place with no item list says what it serves in its name and its
+ *  own text — "Center City Pretzel Co.", "hand-rolled soft pretzels" — so
+ *  those answer "who has pretzels" the way a store's items do. Only food
+ *  places: a shul's name matching doesn't mean it "has" anything. And not
+ *  where a category lists items: there the list is the answer, and a
+ *  description is only a general one. */
+export function describedByItsText(category: CategoryConfig): boolean {
+  return !category.detailFields.some((f) => f.type === 'tags') && conceptCategories('food', [category]).length > 0
+}
+
+function describingFields(category: CategoryConfig) {
+  if (!describedByItsText(category)) return []
+  return category.detailFields.filter((f) => f.type === 'text' || f.type === 'textarea')
+}
+
 function searchableFields(category: CategoryConfig): CategoryConfig {
   if (!category.detailFields.some((f) => f.type === 'tags')) return category
   return { ...category, detailFields: category.detailFields.filter((f) => f.key !== 'googleDescription') }
@@ -150,6 +176,7 @@ function prepare(item: DirectoryResource, category: CategoryConfig): Prepared {
     nameWords,
     initials,
     tags,
+    describes: describingFields(category).flatMap((f) => (typeof item[f.key] === 'string' ? words(item[f.key] as string) : [])),
   }
   byCategory.set(category.id, p)
   return p
@@ -159,12 +186,13 @@ function prepare(item: DirectoryResource, category: CategoryConfig): Prepared {
  *  text matched: see AskHit.matchedFields. At most two. */
 function matchedFieldsOf(item: DirectoryResource, category: CategoryConfig, terms: string[]): MatchedField[] {
   if (terms.length === 0) return []
+  const describing = new Set(describingFields(category).map((f) => f.key))
   const out: MatchedField[] = []
   for (const f of searchableFields(category).detailFields) {
     if (out.length === 2) break
     const v = item[f.key]
     if (f.type === 'boolean') {
-      if (v === true && f.label.split(/\s+/).some((w) => wordMatches(w, terms))) out.push({ label: f.label, text: '' })
+      if (v === true && f.label.split(/\s+/).some((w) => wordMatches(w, terms))) out.push({ label: f.label, text: '', describes: false })
       continue
     }
     let text: string | null = null
@@ -176,7 +204,7 @@ function matchedFieldsOf(item: DirectoryResource, category: CategoryConfig, term
     }
     if (text) {
       const cut = snippetAround(text, terms)
-      if (cut) out.push({ label: f.label, text: cut })
+      if (cut) out.push({ label: f.label, text: cut, describes: describing.has(f.key) })
     }
   }
   return out
@@ -338,9 +366,15 @@ export function searchAsk(
     // turns up elsewhere (its address, a Google description saying "most sell
     // wine"), but name and items count the same: "meat restaurant" should put
     // the nearest meat restaurant first, not the farthest place called Meat.
-    // Typos are forgiven only in the name and items.
+    // Typos are forgiven only in the name and items. A restaurant's own
+    // description counts as its items: "pretzels" puts the pretzel bakery
+    // level with a store stocking pretzel buns, nearest first.
     const scoreTerm = (t: string, minPrefix?: number) =>
-      termMatches(t, p.ownWords, minPrefix) ? 10 : termMatches(t, p.hay, minPrefix, false) ? 7 : 0
+      termMatches(t, p.ownWords, minPrefix) || termMatches(t, p.describes, minPrefix, false)
+        ? 10
+        : termMatches(t, p.hay, minPrefix, false)
+          ? 7
+          : 0
     for (const t of required) {
       const s = scoreTerm(t)
       if (!s) continue

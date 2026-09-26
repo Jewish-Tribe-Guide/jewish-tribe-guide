@@ -581,7 +581,7 @@ describe('GenericListingCard — the field a search matched, when no item did', 
         upvotes={false}
         count={0}
         {...requiredHandlers}
-        found={{ terms: ['ou'], items: [], fields: [{ label: 'Hechsher', text: 'OU' }] }}
+        found={{ terms: ['ou'], items: [], fields: [{ label: 'Hechsher', text: 'OU', describes: false }] }}
       />,
     )
     // The label is its own muted span; the line is its parent.

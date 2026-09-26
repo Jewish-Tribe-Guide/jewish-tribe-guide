@@ -5,6 +5,7 @@ import NearbyList from './NearbyList'
 import MapPlaceDetail from './MapPlaceDetail'
 import type { MapPoint } from './ResourceMap'
 import type { CategoryConfig } from '@/lib/categories'
+import type { SearchFound } from '@/lib/askSearch'
 import type { DirectoryResource } from '@/types'
 
 type Snap = 'peek' | 'half' | 'full'
@@ -54,6 +55,9 @@ type Props = {
    *  — same category config the directory pages use, so fields/hours/tags
    *  render identically. */
   categories: CategoryConfig[]
+  /** What the map's search matched on a listing, by id, for its detail
+   *  panel to mark (see PlaceDetailBody's `found`). */
+  foundOn?: (listingId: string | undefined) => SearchFound | null
   /** Measured px height of the map box this sheet overlays — snap points
    *  (half/full) are computed relative to it, not the viewport, since the
    *  map box itself doesn't always fill the viewport (e.g. desktop, though
@@ -119,7 +123,7 @@ export type MobileNearbySheetHandle = {
  * is still visible underneath.
  */
 const MobileNearbySheet = forwardRef<MobileNearbySheetHandle, Props>(function MobileNearbySheet(
-  { points, userLocation, onViewListing, categories, containerHeight, onSelectionChange, onHeightChange },
+  { points, userLocation, onViewListing, categories, foundOn, containerHeight, onSelectionChange, onHeightChange },
   ref,
 ) {
   const [snap, setSnap] = useState<Snap>('peek')
@@ -576,7 +580,7 @@ const MobileNearbySheet = forwardRef<MobileNearbySheetHandle, Props>(function Mo
       {scrollRegion(
         selected ? `place:${selected.id}` : 'list',
         selected && selected.raw && selectedCategory ? (
-          <MapPlaceDetail item={selected.raw} category={selectedCategory} color={selected.color} onBack={clearSelection} />
+          <MapPlaceDetail item={selected.raw} category={selectedCategory} color={selected.color} onBack={clearSelection} found={foundOn?.(selected.raw.id) ?? null} />
         ) : (
           <NearbyList points={points} userLocation={userLocation} onViewListing={onViewListing} onSelectPlace={selectPlace} />
         ),

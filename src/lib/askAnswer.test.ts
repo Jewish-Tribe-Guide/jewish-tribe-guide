@@ -207,6 +207,44 @@ describe('answerFor — other questions', () => {
     )
   })
 
+  it('counts a food place that serves it, by its description or name, not only stores that stock it', () => {
+    // Reported: "pretzels" answered "ALDI has Pretzel Buns" over two pretzel
+    // bakeries, because only item lists counted.
+    const food = makeCategory({
+      id: 'restaurant',
+      label: 'Food',
+      pluralLabel: 'Food',
+      detailFields: [{ key: 'googleDescription', label: 'Description', type: 'textarea' }],
+    })
+    const places = [
+      listing('grocery', 'aldi', 'ALDI', 39.99, { m: ['Pretzel Buns'] }),
+      listing('restaurant', 'twisters', 'Tasty Twisters Bakery', 39.951, { googleDescription: 'Family-owned bakery crafting hand-rolled soft pretzels.' }),
+      listing('restaurant', 'pretzelco', 'Center City Pretzel Co.', 39.96),
+    ]
+    const result = searchAsk(places, [grocery, food], 'pretzels', { coords: here })
+    // The bakery is nearest, and its description counts as fully as an item.
+    expect(result.hits[0].item.name).toBe('Tasty Twisters Bakery')
+    expect(answerFor(result, { coords: here })?.text).toBe('3 places have pretzels. Nearest: Tasty Twisters Bakery, 0.1 mi.')
+  })
+
+  it("does not say a shul 'has' what its name or denomination says", () => {
+    // Food places are described by their text and names; a shul isn't:
+    // "orthodox shtiebel" is looking for a shul, not asking who has something.
+    expect(ask('orthodox shtiebel')).toBeNull()
+  })
+
+  it('says nothing about having it when the question is a place’s own name', () => {
+    const food = makeCategory({ id: 'restaurant', label: 'Food', pluralLabel: 'Food', detailFields: [{ key: 'd', label: 'Description', type: 'textarea' }] })
+    const pizza = listing('restaurant', 'p', '20th Street Pizza', 39.95, { d: 'Kosher pizza on 20th Street.' })
+    expect(answerFor(searchAsk([pizza], [food], '20th street pizza'))).toBeNull()
+  })
+
+  it('answers when the item is the word still being typed', () => {
+    // "giant wine", before a space: the last word was set aside as still
+    // being typed, which left nothing to answer with.
+    expect(ask('giant wine')?.text).toBe('GIANT has Wine.')
+  })
+
   it('names the closest place to the one a question is about', () => {
     expect(ask('kosher food near HUP')?.text).toBe('Closest food establishments to Hospital of the University of Pennsylvania: Insomnia Cookies, 0.2 mi.')
   })
