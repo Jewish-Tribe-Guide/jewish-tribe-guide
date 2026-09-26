@@ -290,12 +290,14 @@ function baseAnswer(
   if (asksOpen) {
     const near = nearest(hits)
     if (hits.length === 1) return { text: `${near.item.name}: ${hoursText(near, query.openNow)}${milesOf(near)}.${noHoursNote(true)}`, rows: [] }
-    const kinds = new Set(hits.map((h) => h.category.id))
-    const kind = kinds.size === 1 ? top.category.pluralLabel.toLowerCase() : 'places'
-    return {
-      text: `${hits.length} ${kind} open ${query.openNow ? 'now' : 'today'}. Nearest: ${near.item.name}, ${hoursText(near, query.openNow)}${milesOf(near)}.${noHoursNote(true)}`,
-      rows: [],
-    }
+    const kind = kindOf(hits)
+    const count = `${hits.length} ${kind} open ${query.openNow ? 'now' : 'today'}`
+    // "Nearest" only with somewhere to measure from; otherwise just one of them.
+    const example =
+      near.miles != null
+        ? `. Nearest: ${near.item.name}, ${hoursText(near, query.openNow)}${milesOf(near)}.`
+        : `, such as ${near.item.name} (${hoursText(near, query.openNow)}).`
+    return { text: `${count}${example}${noHoursNote(true)}`, rows: [] }
   }
 
   return null
@@ -366,9 +368,8 @@ export function hitHoursNote(hit: AskHit, query: AskResult['query']): { text: st
  *  miss off as the thing asked for. */
 export function nearMissAnswer(miss: NearMiss, raw: string, options: { coords?: LatLng | null } = {}): Answer {
   const { hits } = miss.result
-  const kinds = new Set(hits.map((h) => h.category.id))
-  const kind = kinds.size === 1 ? hits[0].category.pluralLabel.toLowerCase() : 'places'
+  const kind = kindOf(hits)
   const closest =
-    answerFor(miss.result, options)?.text ?? `Closest: ${hits.length} ${hits.length === 1 ? 'place' : kind} with “${miss.kept}”.`
+    answerFor(miss.result, options)?.text ?? `Closest: ${hits.length} ${kind} with “${miss.kept}”.`
   return { text: `Nothing in the guide for “${raw}”. ${closest}`, rows: [] }
 }

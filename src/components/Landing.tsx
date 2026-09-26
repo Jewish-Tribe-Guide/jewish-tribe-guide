@@ -10,6 +10,7 @@ import { answerFor, nearMissAnswer } from '@/lib/askAnswer'
 import { resolveCapabilities } from '@/lib/categories'
 import { routes } from '@/lib/routes'
 import { neighborhoodsFor } from '@/lib/places'
+import { answersWell, candidatePrompts, pickPrompts } from '@/lib/searchPrompts'
 import { listMinyanim } from '@/lib/upcomingDavening'
 import { useMinyanSchedule } from '@/lib/useMinyanSchedule'
 import HeroHeading from '@/components/home/HeroHeading'
@@ -141,24 +142,39 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: LandingProps
   // The community's neighborhoods, for "food in Center City" (towns come
   // from the listings' own addresses — see places.ts).
   const places = neighborhoodsFor(communitySlug)
-  const askResult = q && listings ? searchAsk(listings, categories ?? [], q, { coords, now: new Date(schedule.now), places }) : null
+  // One question, searched and answered — the typed query, and each example
+  // question under the box, which is only offered if it answers well.
+  const ask = (text: string) => {
+    const result = searchAsk(listings ?? [], categories ?? [], text, { coords, now: new Date(schedule.now), places })
+    const answer = answerFor(result, {
+      coords,
+      schedule: result.query.minyan
+        ? {
+            ...listMinyanim(schedule.shuls, {
+              today: schedule.todayDayKeys,
+              tomorrow: [schedule.tomorrowKey],
+              season: schedule.season,
+              anchors: schedule.anchors,
+            }),
+            nowMinutes: schedule.nowMinutes,
+          }
+        : null,
+    })
+    return { result, answer }
+  }
+  const asked = q && listings ? ask(q) : null
+  const askResult = asked?.result ?? null
   const strictHits = askResult ? listingHitsFrom(askResult, coords) : []
-  const strictAnswer = askResult
-    ? answerFor(askResult, {
-        coords,
-        schedule: askResult.query.minyan
-          ? {
-              ...listMinyanim(schedule.shuls, {
-                today: schedule.todayDayKeys,
-                tomorrow: [schedule.tomorrowKey],
-                season: schedule.season,
-                anchors: schedule.anchors,
-              }),
-              nowMinutes: schedule.nowMinutes,
-            }
-          : null,
-      })
-    : null
+  const strictAnswer = asked?.answer ?? null
+  // Questions to tap under the empty box: the first try at search, made one
+  // that works (see searchPrompts.ts).
+  const prompts =
+    !q && listings
+      ? pickPrompts(candidatePrompts({ day: schedule.todayKey, minutes: schedule.nowMinutes }), (p) => {
+          const tried = ask(p)
+          return answersWell(tried.answer, tried.result.hits.length)
+        })
+      : []
 
   // Found nothing as asked: first the closest question that does find
   // something ("packaged pretzels" → pretzels, see nearMiss), then where to
@@ -439,6 +455,8 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: LandingProps
           searchAnswer={answer}
           searchAskGroup={askGroup}
           onOpenAnswerShul={openShul}
+          searchPrompts={prompts}
+          onPickPrompt={(prompt) => track('search_prompt_tapped', { prompt })}
           categories={categories}
           onSearchCardClick={(card) => track('category_opened', { category: card.id ?? card.title, source: 'hero-search' })}
           onOpenSearchPlace={(hit) => openPlace(hit)}

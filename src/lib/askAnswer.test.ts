@@ -401,3 +401,19 @@ describe('answerFor — towns and neighborhoods', () => {
     expect(answerFor(searchAsk([pizza], [food], 'food near center city', { places }))?.text).toBe('Closest food places to Center City: 20th Street Pizza, 0.6 mi.')
   })
 })
+
+describe('answerFor — "open now" without a location', () => {
+  it('names one open place without calling it the nearest', () => {
+    const allDay = Object.fromEntries(['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'].map((d) => [d, { open: '06:00', close: '23:00' }]))
+    const food = makeCategory({ id: 'restaurant', label: 'Food', pluralLabel: 'Food', detailFields: [{ key: 'hours', label: 'Hours', type: 'hours' }] })
+    const places = [
+      listing('restaurant', 'a', 'A Cafe', 39.95, { hours: allDay }),
+      listing('restaurant', 'b', 'B Cafe', 39.96, { hours: allDay }),
+    ]
+    const now = new Date(2026, 8, 28, 12, 0)
+    expect(answerFor(searchAsk(places, [food], 'food open now', { now }))?.text).toBe('2 food places open now, such as A Cafe (open until 11:00 PM).')
+    expect(answerFor(searchAsk(places, [food], 'food open now', { now, coords: here }), { coords: here })?.text).toBe(
+      '2 food places open now. Nearest: A Cafe, open until 11:00 PM, 0 mi.',
+    )
+  })
+})

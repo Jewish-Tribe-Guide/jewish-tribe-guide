@@ -935,3 +935,25 @@ describe('Landing — neighborhoods', () => {
     expect(screen.getAllByText('1 food in Rittenhouse: Square Cafe.').length).toBeGreaterThan(0)
   })
 })
+
+// The questions under the box are only ones the guide answers well right
+// now: a tap is a first try that works.
+describe('Landing — example questions', () => {
+  const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores', detailFields: [{ key: 'm', label: 'Kosher items', type: 'tags' }] })
+
+  it('offers a question the guide answers, and a tap shows the answer', async () => {
+    const user = userEvent.setup()
+    const store = makeListing({ id: 'w', category: 'grocery', name: 'Wine Shop', m: ['Wine'] })
+    renderLanding(undefined, { content: { categories: [grocery] } }, [store])
+    await user.click(screen.getAllByRole('button', { name: 'Kosher wine' })[0])
+    expect(screen.getAllByText('Wine Shop has Wine.').length).toBeGreaterThan(0)
+    expect(vi.mocked(track)).toHaveBeenCalledWith('search_prompt_tapped', { prompt: 'Kosher wine' })
+  })
+
+  it('does not offer a question the guide has no answer to', () => {
+    const store = makeListing({ id: 'c', category: 'grocery', name: 'Challah Shop', m: ['Challah'] })
+    renderLanding(undefined, { content: { categories: [grocery] } }, [store])
+    expect(screen.queryByRole('button', { name: 'Kosher wine' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Where can I get chalav yisroel milk?' })).not.toBeInTheDocument()
+  })
+})

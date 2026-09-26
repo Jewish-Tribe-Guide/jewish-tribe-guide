@@ -189,7 +189,7 @@ export const DEFAULT_FEEDBACK_BUTTON_LABEL = 'Have general feedback about the si
 export const DEFAULT_FEEDBACK_HEADING = 'Send feedback'
 export const DEFAULT_FEEDBACK_SUCCESS_MESSAGE = 'We appreciate your feedback and will take it into account.'
 
-export const DEFAULT_SEARCH_PLACEHOLDER = 'Search — kosher food, mikvah, shuls, schools…'
+export const DEFAULT_SEARCH_PLACEHOLDER = 'Ask a question: food, minyan times, mikvah…'
 export const DEFAULT_DESKTOP_BROWSE_EYEBROW = 'Get started'
 export const DEFAULT_DESKTOP_ACCENT_COLOR = '#b45309'
 

@@ -296,3 +296,44 @@ describe('HeroHeading — no community-maintained banner', () => {
     expect(screen.queryByRole('button', { name: 'Add a place' })).not.toBeInTheDocument()
   })
 })
+
+// Questions to tap under the empty box: the first try at search, made one
+// that works (see searchPrompts.ts).
+describe('HeroHeading — example questions', () => {
+  const settings = {
+    name: 'Philly Jewish Guide',
+    heroTitle: 'What are you looking for?',
+    mission: 'Your guide to Jewish Philadelphia',
+    searchPlaceholder: 'Ask a question',
+    desktopHeroHeadline: 'Your guide to Jewish Philadelphia',
+    desktopHeroSubhead: '',
+    desktopHeroImage: null,
+  }
+
+  it('offers them under an empty box, and a tap asks it', async () => {
+    const user = userEvent.setup()
+    const onQueryChange = vi.fn()
+    const onPickPrompt = vi.fn()
+    render(
+      <HeroHeading settings={settings} query="" onQueryChange={onQueryChange} searchPrompts={['Next Mincha', 'Kosher wine']} onPickPrompt={onPickPrompt} searchCards={[]} />,
+    )
+    await user.click(screen.getAllByRole('button', { name: 'Kosher wine' })[0])
+    expect(onQueryChange).toHaveBeenCalledWith('Kosher wine')
+    expect(onPickPrompt).toHaveBeenCalledWith('Kosher wine')
+  })
+
+  it('shows them on the phone layout and the desktop one', () => {
+    render(<HeroHeading settings={settings} query="" onQueryChange={vi.fn()} searchPrompts={['Next Mincha']} />)
+    expect(screen.getAllByTestId('search-prompts')).toHaveLength(2)
+  })
+
+  it('hides them once something is typed: the answer is the point then', () => {
+    render(<HeroHeading settings={settings} query="wine" onQueryChange={vi.fn()} searchPrompts={['Next Mincha']} />)
+    expect(screen.queryByTestId('search-prompts')).not.toBeInTheDocument()
+  })
+
+  it('hides them in the admin preview, where there is nothing to search', () => {
+    render(<HeroHeading settings={settings} query="" onQueryChange={vi.fn()} interactive={false} searchPrompts={['Next Mincha']} />)
+    expect(screen.queryByTestId('search-prompts')).not.toBeInTheDocument()
+  })
+})

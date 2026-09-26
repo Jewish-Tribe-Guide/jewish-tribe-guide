@@ -10,6 +10,7 @@ import { isOptimizableImage } from '@/lib/imageHosts'
 import { SkylineIcon } from '@/components/icons'
 import SearchBox from './SearchBox'
 import HeroSearchDropdown from './HeroSearchDropdown'
+import SearchPrompts from './SearchPrompts'
 import type { Answer } from '@/lib/askAnswer'
 import type { CardDef, ListingHit } from './sections'
 
@@ -59,6 +60,10 @@ type Props = {
   /** Where to ask and add, for a search that found nothing (see AskTheGroup). */
   searchAskGroup?: { nothingClose: boolean; askHref: string | null; addHref: string } | null
   onOpenAnswerShul?: (shulId: string) => void
+  /** Questions to tap under the empty box, each known to answer well right
+   *  now (see searchPrompts.ts). */
+  searchPrompts?: string[]
+  onPickPrompt?: (prompt: string) => void
 }
 
 // The home screen's heading, mission, and the filter box + "View Map" button
@@ -139,6 +144,8 @@ export default function HeroHeading({
   searchAnswer = null,
   searchAskGroup = null,
   onOpenAnswerShul,
+  searchPrompts = [],
+  onPickPrompt,
 }: Props) {
   const { desktopHeroHeadline: headline, desktopHeroSubhead: subhead, desktopHeroImage: heroImage } = settings
 
@@ -198,6 +205,12 @@ export default function HeroHeading({
     setDismissed(false)
     onQueryChange(next)
   }
+  // Only under an empty box: once something's typed, the answer is the point.
+  const prompts = interactive && !trimmedQuery ? searchPrompts : []
+  const pickPrompt = (p: string) => {
+    onPickPrompt?.(p)
+    handleQueryChange(p)
+  }
 
   return (
     <>
@@ -219,6 +232,7 @@ export default function HeroHeading({
         {ui.search.landing && (
           <div className="mt-8 max-w-xl mx-auto">
             <SearchBox query={query} onQueryChange={onQueryChange} interactive={interactive} placeholder={settings.searchPlaceholder} />
+            <SearchPrompts prompts={prompts} onPick={pickPrompt} className="mt-3 justify-center" />
           </div>
         )}
       </section>
@@ -385,6 +399,7 @@ export default function HeroHeading({
                   onOpenShul={onOpenAnswerShul}
                 />
               )}
+              <SearchPrompts prompts={prompts} onPick={pickPrompt} className="mt-3" />
             </div>
           )}
           <div className="mt-6 flex flex-wrap items-center gap-3">
