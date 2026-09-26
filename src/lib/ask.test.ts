@@ -69,6 +69,19 @@ describe('parseAsk', () => {
     expect(parseAsk('challah').openNow).toBe(false)
   })
 
+  it('reads "open today" as open at any point left today, not only now', () => {
+    // Asked at 7 AM, a mikvah that opens at 8 PM is open today; reading
+    // this as "open now" said there was none.
+    for (const input of ["is there a mikvah that's open today", 'mikvah open tonight', 'anything open later']) {
+      const q = parseAsk(input)
+      expect(q.openToday, input).toBe(true)
+      expect(q.openNow, input).toBe(false)
+      expect(q.terms, input).not.toContain('open')
+    }
+    expect(parseAsk('is there a place open that sells cheese').openToday).toBe(false)
+    expect(parseAsk('is there a place open that sells cheese').openNow).toBe(true)
+  })
+
   it('gives the same answer every time it is asked', () => {
     // Both patterns are global regexes; `.test()` on one keeps its place
     // between calls, which would make every second "near me" come out false.

@@ -192,6 +192,100 @@ describe('searchAsk — "open now"', () => {
   })
 })
 
+describe('searchAsk — "open today", and hours nobody has entered', () => {
+  const mikvah = makeCategory({
+    id: 'mikvah',
+    label: 'Mikvah',
+    pluralLabel: 'Mikvaot',
+    detailFields: [
+      { key: 'hours', label: 'Hours', type: 'hours' },
+      { key: 'women_s_hours', label: 'Women’s Hours', type: 'hours' },
+      { key: 'men_s_hours', label: "Men's Hours", type: 'hours' },
+    ],
+  })
+  const allWeek = (open: string, close: string) =>
+    Object.fromEntries(['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'].map((d) => [d, { open, close }]))
+  const noDays = Object.fromEntries(['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'].map((d) => [d, null]))
+  // Lower Merion's real shape: men's in the early morning, women's at night.
+  const both = listing('mikvah', 'Both Mikvah', 39.95, -75.17, {
+    men_s_hours: allWeek('04:30', '10:00'),
+    women_s_hours: allWeek('20:00', '22:00'),
+  })
+  const womenOnly = listing('mikvah', 'Women Mikvah', 39.96, -75.17, { women_s_hours: allWeek('20:00', '22:00') })
+  // Two of Philly's four: no hours field at all, and one saved with every day empty.
+  const none = listing('mikvah', 'No Hours Mikvah', 39.951, -75.17)
+  const empty = listing('mikvah', 'Empty Hours Mikvah', 39.952, -75.17, { hours: noDays })
+  const all = [both, womenOnly, none, empty]
+  const at = (h: number) => new Date(2026, 8, 26, h, 0)
+
+  it('counts a place that opens later today as open today', () => {
+    const result = searchAsk(all, [mikvah], "is there a mikvah that's open today", { now: at(7) })
+    expect(result.hits.map((h) => h.item.name)).toEqual(['Both Mikvah', 'Women Mikvah'])
+  })
+
+  it('says which of its hours are open now and which open later', () => {
+    const [hit] = searchAsk([both], [mikvah], 'mikvah open today', { now: at(7) }).hits
+    expect(hit.today).toEqual([
+      { label: "Men's", opens: '4:30 AM', closes: '10:00 AM', openNow: true },
+      { label: 'Women’s', opens: '8:00 PM', closes: '10:00 PM', openNow: false },
+    ])
+  })
+
+  it('drops hours already over for the day', () => {
+    const [hit] = searchAsk([both], [mikvah], 'mikvah open today', { now: at(12) }).hits
+    expect(hit.today.map((w) => w.label)).toEqual(['Women’s'])
+    expect(searchAsk(all, [mikvah], 'mikvah open today', { now: at(23) }).hits).toEqual([])
+  })
+
+  it('does not count a place with no hours saved as closed', () => {
+    const result = searchAsk(all, [mikvah], 'mikvah open now', { now: at(7) })
+    expect(result.hits.map((h) => h.item.name)).toEqual(['Both Mikvah'])
+    expect(result.closedCount).toBe(1) // Women Mikvah, which opens tonight
+    expect(result.noHours.map((h) => h.item.name).sort()).toEqual(['Empty Hours Mikvah', 'No Hours Mikvah'])
+    expect(result.noHours.every((h) => h.open === null)).toBe(true)
+  })
+
+  it('lists nothing as having no hours when the question is not about hours', () => {
+    expect(searchAsk(all, [mikvah], 'mikvah', { now: at(7) }).noHours).toEqual([])
+  })
+})
+
+describe('searchAsk — a Google description is not a kosher item list', () => {
+  it('does not find a store by a product only its Google description mentions', () => {
+    const groceryWithDescription = makeCategory({
+      id: 'grocery',
+      label: 'Grocery Store',
+      pluralLabel: 'Grocery Stores',
+      detailFields: [
+        { key: 'googleDescription', label: 'Description', type: 'textarea' },
+        { key: 'm', label: 'Kosher items', type: 'tags' },
+      ],
+    })
+    // Reported: Di Bruno Bros. answered "cheese" off Google's "imported
+    // cheeses", with no kosher cheese listed there.
+    const diBruno = listing('grocery', 'Di Bruno Bros.', 39.95, -75.17, {
+      googleDescription: 'Longstanding market-style venue offering imported cheeses, meats & specialty foods.',
+      m: ['Challah'],
+    })
+    const withCheese = listing('grocery', 'GIANT', 39.94, -75.17, { m: ['Cheese Sticks'] })
+    const hits = searchAsk([diBruno, withCheese], [groceryWithDescription], 'is there a place that sells cheese').hits
+    expect(hits.map((h) => h.item.name)).toEqual(['GIANT'])
+  })
+
+  it('still finds a restaurant by its description, where everything served is kosher', () => {
+    const restaurantWithDescription = makeCategory({
+      id: 'restaurant',
+      label: 'Food Establishment',
+      pluralLabel: 'Food Establishments',
+      detailFields: [{ key: 'googleDescription', label: 'Description', type: 'textarea' }],
+    })
+    const bakery = listing('restaurant', 'Tasty Twisters Bakery', 39.95, -75.17, {
+      googleDescription: 'Family-owned bakery crafting hand-rolled soft pretzels.',
+    })
+    expect(searchAsk([bakery], [restaurantWithDescription], 'pretzels').hits.map((h) => h.item.name)).toEqual(['Tasty Twisters Bakery'])
+  })
+})
+
 describe('searchAsk — distance and mikvah hours', () => {
   const mikvah = makeCategory({
     id: 'mikvah',

@@ -2,7 +2,7 @@ import type { DirectoryResource } from '@/types'
 import type { CategoryConfig } from '@/lib/categories'
 import { listingSearchText } from '@/lib/searchListing'
 import { haversineMiles } from '@/lib/geo'
-import { getOpenStatus } from '@/lib/hours'
+import { DAY_KEYS, businessClosure, fmt12, getOpenStatus, isStructuredHours, type DayHours } from '@/lib/hours'
 import { conceptCategories, initialisms, parseAsk, termMatches, termsRequired, words, type AskQuery } from '@/lib/ask'
 
 // Runs an `ask` query (see ask.ts) against the listings a page already holds.
@@ -25,10 +25,26 @@ export type AskHit = {
    *  that, from the visitor. Null when neither is known or the listing has no
    *  coordinates. */
   miles: number | null
-  /** Open right now, by its saved hours. */
-  open: boolean
+  /** Open right now, by its saved hours; null when it has no hours saved at
+   *  all, which is not the same as closed — a mikvah nobody has entered hours
+   *  for may well be open, and saying "closed" would be the guide making it up. */
+  open: boolean | null
   /** When it closes today, "9:00 PM", while it's open; otherwise null. */
   closesAt: string | null
+  /** Each of its hours still to come today, open ones first, then by when
+   *  they open: a mikvah's men's hours this morning, its women's tonight.
+   *  What an answer names, so "open" says which part is open. */
+  today: HoursWindow[]
+}
+
+export type HoursWindow = {
+  /** Which hours these are — the field's label less "Hours": "Men's",
+   *  "Keilim". Empty for a category's plain Hours. */
+  label: string
+  opens: string
+  closes: string
+  /** Open right now, rather than later today. */
+  openNow: boolean
 }
 
 export type AskResult = {
@@ -39,10 +55,16 @@ export type AskResult = {
   /** The place the question was about, when it said where: "food at HUP",
    *  "shul near Jefferson". Results are measured from it. */
   anchor: DirectoryResource | null
-  /** For an "open now" question: how many places matched but are closed
-   *  right now, and so aren't in `hits`. Lets the page say "none open right
-   *  now" instead of showing nothing, or showing closed places as answers. */
+  /** For an "open now" or "open today" question: how many places matched
+   *  but are closed then, and so aren't in `hits`. Lets the page say "none
+   *  open right now" instead of showing nothing, or showing closed places as
+   *  answers. */
   closedCount: number
+  /** For the same questions: places that matched but have no hours saved.
+   *  Kept out of `hits` (the map and category pages show only what's known
+   *  to be open) but not counted as closed; the home screen lists them after
+   *  the open ones, marked as having no hours listed. */
+  noHours: AskHit[]
 }
 
 type Prepared = {
@@ -75,6 +97,18 @@ function listingTags(item: DirectoryResource): { tag: string; sometimes: boolean
 // The per-listing words, worked out once per listing object. A page searches
 // the same few hundred listings on every keystroke, so this is what keeps a
 // keystroke cheap.
+// A store's Google description says what the chain sells in general ("imported
+// cheeses", "most sell wine"), not what this one has that's kosher: that's
+// what its item list is for, and a match only in the description put Di
+// Bruno Bros. forward for "cheese" when nobody had listed a kosher cheese
+// there. So where a category lists items, the description isn't searched.
+// A restaurant's is — everything a kosher restaurant serves is kosher, and
+// "pretzels" finding the pretzel bakery is the description doing its job.
+function searchableFields(category: CategoryConfig): CategoryConfig {
+  if (!category.detailFields.some((f) => f.type === 'tags')) return category
+  return { ...category, detailFields: category.detailFields.filter((f) => f.key !== 'googleDescription') }
+}
+
 const prepared = new WeakMap<DirectoryResource, Map<string, Prepared>>()
 function prepare(item: DirectoryResource, category: CategoryConfig): Prepared {
   let byCategory = prepared.get(item)
@@ -90,7 +124,7 @@ function prepare(item: DirectoryResource, category: CategoryConfig): Prepared {
   const p: Prepared = {
     item,
     category,
-    hay: [...words(listingSearchText(item, category)), ...words(flags.join(' ')), ...initials],
+    hay: [...words(listingSearchText(item, searchableFields(category))), ...words(flags.join(' ')), ...initials],
     ownWords: [...nameWords, ...initials, ...tags.flatMap((t) => t.words), ...words(flags.join(' '))],
     nameWords,
     initials,
@@ -102,6 +136,44 @@ function prepare(item: DirectoryResource, category: CategoryConfig): Prepared {
 
 function hoursKeys(category: CategoryConfig): string[] {
   return category.detailFields.filter((f) => f.type === 'hours').map((f) => f.key)
+}
+
+const toMinutes = (hhmm: string) => {
+  const [h, m] = hhmm.split(':').map(Number)
+  return h * 60 + m
+}
+
+/** Whether any of a listing's hours fields has a day with times in it. An
+ *  hours field saved with every day empty says nothing, same as none. */
+function hasHours(item: DirectoryResource, category: CategoryConfig): boolean {
+  return hoursKeys(category).some((k) => {
+    const v = item[k]
+    return isStructuredHours(v) && Object.values(v).some((d) => !!d?.open && !!d?.close)
+  })
+}
+
+/** The hours still ahead today, one per hours field: open now, or opening
+ *  later today. Reads the day and time the same way getOpenStatus does, so
+ *  the two never disagree about whether a place is open. */
+function hoursToday(item: DirectoryResource, category: CategoryConfig, now: Date): HoursWindow[] {
+  if (businessClosure(item as Record<string, unknown>)) return []
+  const nowMinutes = now.getHours() * 60 + now.getMinutes()
+  const out: (HoursWindow & { at: number })[] = []
+  for (const f of category.detailFields) {
+    const v = item[f.key]
+    if (f.type !== 'hours' || !isStructuredHours(v)) continue
+    const day = (v as Record<string, DayHours>)[DAY_KEYS[now.getDay()]]
+    if (!day?.open || !day.close || nowMinutes > toMinutes(day.close)) continue
+    out.push({
+      label: f.label.replace(/\s*hours$/i, '').trim(),
+      opens: fmt12(day.open),
+      closes: fmt12(day.close),
+      openNow: nowMinutes >= toMinutes(day.open),
+      at: toMinutes(day.open),
+    })
+  }
+  // What's open now first, then the rest in the order they open.
+  return out.sort((a, b) => Number(b.openNow) - Number(a.openNow) || a.at - b.at).map((w) => ({ label: w.label, opens: w.opens, closes: w.closes, openNow: w.openNow }))
 }
 
 /** Finds the place a question is about. Only asked when the question also
@@ -146,7 +218,7 @@ export function searchAsk(
   { coords = null, now = new Date(), categoryId, limit }: AskOptions = {},
 ): AskResult {
   const query = parseAsk(input)
-  const empty: AskResult = { query, hits: [], categoryIds: null, anchor: null, closedCount: 0 }
+  const empty: AskResult = { query, hits: [], categoryIds: null, anchor: null, closedCount: 0, noHours: [] }
   if (!query.raw) return empty
 
   const configById = new Map(categories.map((c) => [c.id, c]))
@@ -223,8 +295,20 @@ export function searchAsk(
     const miles = origin && p.item.geo && p.category.hasAddress !== false ? haversineMiles(origin, p.item.geo) : null
     const keys = hoursKeys(p.category)
     const status = keys.length > 0 ? getOpenStatus(p.item as Record<string, unknown>, keys, now) : null
-    const open = !!status?.isOpen
-    hits.push({ item: p.item, category: p.category, score, matchedTags, matched: matchedItems, miles, open, closesAt: status?.closing?.closeLabel ?? null })
+    const known = hasHours(p.item, p.category)
+    // A closed business is closed whether or not it has hours saved.
+    const open = status?.isOpen ? true : known || status?.closure ? false : null
+    hits.push({
+      item: p.item,
+      category: p.category,
+      score,
+      matchedTags,
+      matched: matchedItems,
+      miles,
+      open,
+      closesAt: status?.closing?.closeLabel ?? null,
+      today: known ? hoursToday(p.item, p.category, now) : [],
+    })
   }
 
   // "Open now" is a condition, not a preference: a closed place doesn't
@@ -235,19 +319,23 @@ export function searchAsk(
   // asked about or the visitor. With neither known there's nothing to
   // measure from, so it can't rule anything out; the answer says so.
   const inReach = (h: AskHit) => !query.within || !origin || (h.miles !== null && h.miles <= query.within.miles)
-  const answering = hits.filter((h) => (!query.openNow || h.open) && inReach(h))
-  answering.sort(
-    (a, b) =>
+  const openEnough = (h: AskHit) => (query.openNow ? h.open === true : query.openToday ? h.today.length > 0 : true)
+  const asksOpen = query.openNow || query.openToday
+  const answering = hits.filter((h) => openEnough(h) && inReach(h))
+  const noHours = asksOpen ? hits.filter((h) => h.open === null && inReach(h)) : []
+  const byMatch = (a: AskHit, b: AskHit) =>
       b.score - a.score ||
       (a.miles ?? Infinity) - (b.miles ?? Infinity) ||
       (b.item.upvotes ?? 0) - (a.item.upvotes ?? 0) ||
-      a.item.name.localeCompare(b.item.name),
-  )
+      a.item.name.localeCompare(b.item.name)
+  answering.sort(byMatch)
+  noHours.sort(byMatch)
   return {
     query,
     hits: limit ? answering.slice(0, limit) : answering,
     categoryIds,
     anchor,
-    closedCount: hits.length - answering.length,
+    closedCount: asksOpen ? hits.filter((h) => !openEnough(h) && h.open !== null && inReach(h)).length : 0,
+    noHours,
   }
 }

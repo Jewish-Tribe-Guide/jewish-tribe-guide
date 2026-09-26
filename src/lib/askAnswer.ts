@@ -1,5 +1,5 @@
-import type { AskResult } from '@/lib/askSearch'
-import type { MinyanAsk } from '@/lib/ask'
+import type { AskHit, AskResult, HoursWindow } from '@/lib/askSearch'
+import { termMatches, termsAsTyped, words, type MinyanAsk } from '@/lib/ask'
 import { TEFILLAH_LABELS, type Tefillah } from '@/lib/davening'
 import type { MinyanSlot } from '@/lib/upcomingDavening'
 import { haversineMiles, roundMiles, type LatLng } from '@/lib/geo'
@@ -27,8 +27,12 @@ export type AnswerRow = {
 export type Answer = {
   /** The sentence. */
   text: string
-  /** For a minyan question, the minyanim it's about, in time order. */
+  /** For a minyan question, the minyanim it's about, in time order: all of
+   *  them, so "9 more today" can be opened up rather than just counted. */
   rows: AnswerRow[]
+  /** How many of `rows` to show before a "Show all" — the answer is a
+   *  glance, the full list is a tap away. Absent means show every row. */
+  shown?: number
 }
 
 export type AnswerSchedule = {
@@ -97,8 +101,13 @@ function minyanAnswer(
     miles: origin && s.shulGeo ? roundMiles(haversineMiles(origin, s.shulGeo)) : null,
     tomorrow,
   })
-  const today = schedule.today.filter(fits)
-  const tomorrow = schedule.tomorrow.filter(fits)
+  // Two minyanim at the same time: the nearer shul first, since the first
+  // is the one the sentence names. The schedule breaks ties by name, which
+  // named the farther of two 9:00 Shacharises.
+  const away = (s: MinyanSlot) => (origin && s.shulGeo ? haversineMiles(origin, s.shulGeo) : Infinity)
+  const byTime = (a: MinyanSlot, b: MinyanSlot) => a.minutes - b.minutes || away(a) - away(b)
+  const today = schedule.today.filter(fits).sort(byTime)
+  const tomorrow = schedule.tomorrow.filter(fits).sort(byTime)
   if (today.length === 0 && tomorrow.length === 0) return null
   const what = tefillahWords(ask.tefillos)
   // "No more minyanim today", but "no more Maariv today".
@@ -133,13 +142,15 @@ function minyanAnswer(
     const soon = inMin === 0 ? 'now' : inMin < 60 ? `in ${inMin} min` : null
     return {
       text: `Next ${what}: ${next.time}${soon ? ` (${soon})` : ''}, ${where(next)}.${upcoming.length > 1 ? ` ${upcoming.length - 1} more today.` : ''}`,
-      rows: upcoming.slice(0, 5),
+      rows: upcoming,
+      shown: 5,
     }
   }
   const first = tomorrow.map((s) => toRow(s, true))
   return {
     text: first.length ? `No more ${whatAll} today. First tomorrow: ${first[0].time}, ${where(first[0])}.` : `No more ${whatAll} today.`,
-    rows: first.slice(0, 3),
+    rows: first,
+    shown: 3,
   }
 }
 
@@ -175,32 +186,114 @@ function baseAnswer(
     if (answer) return answer
   }
 
-  if (query.openNow && hits.length === 0 && result.closedCount > 0) {
-    const n = result.closedCount
-    return { text: `Nothing open right now. ${n} ${n === 1 ? 'place matches, but it is' : 'places match, but all are'} closed.`, rows: [] }
+  const asksOpen = query.openNow || query.openToday
+  const later = query.openNow ? 'right now' : 'for the rest of today'
+  const { closedCount: closed, noHours } = result
+  const noHoursNote = (more: boolean) =>
+    noHours.length ? ` ${noHours.length}${more ? ' more' : ''} ${noHours.length === 1 ? 'has' : 'have'} no hours listed.` : ''
+
+  if (asksOpen && hits.length === 0 && (closed > 0 || noHours.length > 0)) {
+    // Saying "closed" of a place with no hours saved would be the guide
+    // making it up; it says it doesn't know instead.
+    if (!noHours.length) {
+      return { text: `Nothing open ${later}. ${closed} ${closed === 1 ? 'place matches, but it is' : 'places match, but all are'} closed.`, rows: [] }
+    }
+    const closedNote = closed ? ` ${closed} ${closed === 1 ? 'is' : 'are'} closed.` : ''
+    return { text: `Nothing listed as open ${later}.${noHoursNote(false)}${closedNote}`, rows: [] }
   }
 
   if (hits.length === 0) return null
   const top = hits[0]
-  const milesText = top.miles != null ? `, ${roundMiles(top.miles)} mi` : ''
+  const milesOf = (h: AskHit) => (h.miles != null ? `, ${roundMiles(h.miles)} mi` : '')
+  const hoursOf = (h: AskHit) => (asksOpen && h.today.length ? `, ${hoursText(h, query.openNow)}` : '')
 
   // A question about a place ("food near HUP"): the nearest one, measured
   // from there.
   if (result.anchor) {
     const kind = top.category.pluralLabel.toLowerCase()
-    return { text: `Closest ${kind} to ${result.anchor.name}: ${top.item.name}${milesText}.`, rows: [] }
+    return { text: `Closest ${kind} to ${result.anchor.name}: ${top.item.name}${milesOf(top)}.`, rows: [] }
   }
 
-  // A question about an item ("cholov yisroel milk"): who has it.
-  const item = top.matched[0]
-  if (item && query.terms.length > 0) {
-    const having = hits.filter((h) => h.matched.some((m) => m.tag === item.tag))
-    const sometimes = having.filter((h) => h.matched.find((m) => m.tag === item.tag)?.sometimes).length
+  // A question about an item ("cholov yisroel milk"): who has it. Every
+  // place with a matching item counts, however it words it: the nine stores
+  // with cheese list "Sliced Cheeses", "Goat Cheese", "Cheese Sticks"…, and
+  // counting only one wording said a single store had cheese. But only as
+  // good a match as the best: for "sliced goat cheese", a store with plain
+  // "Goat Cheese" doesn't have it. The word still being typed doesn't count.
+  const asked = query.terms.filter((t) => t !== query.partial)
+  const covers = (h: AskHit) => (h.matched.length ? coverage(h.matched[0].tag, asked) : 0)
+  const best = Math.max(0, ...hits.map(covers))
+  const having = best > 0 ? hits.filter((h) => covers(h) === best) : []
+  if (having.length) {
+    const thing = itemName(having, query.raw, asked)
+    const sometimes = having.filter((h) => h.matched.every((m) => m.sometimes)).length
     const note = sometimes === having.length ? ' (only sometimes in stock)' : sometimes > 0 ? ` (${sometimes} only sometimes)` : ''
-    if (having.length === 1) return { text: `${top.item.name} has ${item.tag}${note}${milesText}.`, rows: [] }
-    const nearest = top.miles != null ? ` Nearest: ${top.item.name}${milesText}.` : ''
-    return { text: `${having.length} places have ${item.tag}${note}.${nearest}`, rows: [] }
+    const near = nearest(having)
+    const closedNote = asksOpen && closed ? ` ${closed} more ${closed === 1 ? 'is' : 'are'} closed ${later}.` : ''
+    if (having.length === 1) return { text: `${near.item.name} has ${thing}${note}${milesOf(near)}${hoursOf(near)}.${closedNote}`, rows: [] }
+    const nearText = near.miles != null ? ` Nearest: ${near.item.name}${milesOf(near)}${hoursOf(near)}.` : ''
+    const open = query.openNow ? ' open' : query.openToday ? ' open today' : ''
+    return { text: `${having.length}${open} places have ${thing}${note}.${nearText}${closedNote}`, rows: [] }
+  }
+
+  // Asked only what's open ("is there a mikvah open today"): what is, and
+  // which of its hours — a mikvah's men's hours are not its women's.
+  if (asksOpen) {
+    const near = nearest(hits)
+    if (hits.length === 1) return { text: `${near.item.name}: ${hoursText(near, query.openNow)}${milesOf(near)}.${noHoursNote(true)}`, rows: [] }
+    const kinds = new Set(hits.map((h) => h.category.id))
+    const kind = kinds.size === 1 ? top.category.pluralLabel.toLowerCase() : 'places'
+    return {
+      text: `${hits.length} ${kind} open ${query.openNow ? 'now' : 'today'}. Nearest: ${near.item.name}, ${hoursText(near, query.openNow)}${milesOf(near)}.${noHoursNote(true)}`,
+      rows: [],
+    }
   }
 
   return null
+}
+
+/** The nearest of some hits, or the best match when there's no distance. */
+function nearest(hits: AskHit[]): AskHit {
+  return hits.reduce((best, h) => (h.miles != null && (best.miles == null || h.miles < best.miles) ? h : best), hits[0])
+}
+
+/** What to call the item asked about: the listings' own word for it when
+ *  they agree ("Chalav Yisroel Milk"), the asker's when they don't. */
+function itemName(having: AskHit[], raw: string, terms: string[]): string {
+  const tops = new Set(having.map((h) => h.matched[0].tag))
+  if (tops.size === 1) return [...tops][0]
+  const typed = termsAsTyped(raw, terms)
+  if (typed) return typed
+  // Nothing typed survived as a term (an abbreviation, say): the shortest.
+  return [...tops].sort((a, b) => a.length - b.length)[0]
+}
+
+/** How many of the words asked an item has. */
+function coverage(tag: string, terms: string[]): number {
+  const tagWords = words(tag)
+  return terms.filter((t) => termMatches(t, tagWords)).length
+}
+
+/** "Men's open until 10:00 AM", "Women's opens 8:00 PM", "open until 9:00 PM":
+ *  a place's hours for the rest of today, each named. For "open now", only
+ *  what's open now. */
+function hoursText(hit: AskHit, nowOnly: boolean): string {
+  const windows = nowOnly ? hit.today.filter((w) => w.openNow) : hit.today
+  return windows.map(windowText).join(', ')
+}
+
+function windowText(w: HoursWindow): string {
+  const when = w.openNow ? `open until ${w.closes}` : `opens ${w.opens}`
+  return w.label ? `${w.label} ${when}` : when
+}
+
+/** For a result of an "open now" or "open today" question: the line that
+ *  says why it's there — "Open until 9:00 PM", "Women's opens 8:00 PM" — or
+ *  that it has no hours listed. Null for any other question. */
+export function hitHoursNote(hit: AskHit, query: AskResult['query']): { text: string; known: boolean } | null {
+  if (!query.openNow && !query.openToday) return null
+  if (hit.open === null) return { text: 'No hours listed', known: false }
+  const text = hoursText(hit, query.openNow)
+  if (!text) return null
+  return { text: text[0].toUpperCase() + text.slice(1), known: true }
 }

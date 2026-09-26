@@ -10,6 +10,7 @@ import { isOptimizableImage } from '@/lib/imageHosts'
 import { haversineMiles } from '@/lib/geo'
 import { conceptCategories, parseAsk, termMatches, termsRequired, words } from '@/lib/ask'
 import { searchAsk, type AskResult } from '@/lib/askSearch'
+import { hitHoursNote } from '@/lib/askAnswer'
 import { GenericListingCard } from '@/components/resources/GenericListingCard'
 import { useForm, useForms } from '@/lib/useForms'
 import { community } from '@/community.config'
@@ -628,9 +629,10 @@ export type ListingHit = {
   /** The items it matched, each marked if only sometimes in stock — shown on
    *  the result as the reason it's there (see askSearch's AskHit.matched). */
   matched: { tag: string; sometimes: boolean }[]
-  /** For an "open now" question, when it closes ("9:00 PM"), or '' when its
-   *  hours say open but not until when. Null for any other question. */
-  openUntil: string | null
+  /** For an "open now" or "open today" question, which of its hours answer
+   *  it ("Men's open until 10:00 AM"), or that it has none listed. Null for
+   *  any other question. */
+  hours: { text: string; known: boolean } | null
 }
 
 /** Individual listings that answer the query (see askSearch.ts): name,
@@ -654,8 +656,10 @@ export function listingHitsFrom(
   coords: { lat: number; lng: number } | null = null,
   limit = 8,
 ): ListingHit[] {
-  const { hits: all, query: asked } = result
-  const hits = all.slice(0, limit)
+  const { query: asked } = result
+  // Places with no hours saved come after the open ones, not in with the
+  // closed: nobody knows they're closed (see AskResult.noHours).
+  const hits = [...result.hits, ...result.noHours].slice(0, limit)
   const query = asked.raw
   return hits.map((h) => ({
     // The distance shown is always from the visitor, the way every other
@@ -670,7 +674,7 @@ export function listingHitsFrom(
     matchedTags: h.matchedTags,
     term: h.matchedTags[0] ?? query.trim(),
     matched: h.matched,
-    openUntil: asked.openNow && h.open ? (h.closesAt ?? '') : null,
+    hours: hitHoursNote(h, asked),
   }))
 }
 

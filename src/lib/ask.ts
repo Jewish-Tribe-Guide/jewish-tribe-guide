@@ -160,6 +160,15 @@ function plainWords(text: string): string[] {
   return plain ? plain.split(' ') : []
 }
 
+/** The words of `raw` that became `terms`, as they were typed: "cheeses" for
+ *  the term "cheese". For an answer to use the asker's own word for a thing
+ *  when the listings each word it differently. */
+export function termsAsTyped(raw: string, terms: readonly string[]): string {
+  return plainWords(raw)
+    .filter((w) => terms.includes(fold(w)))
+    .join(' ')
+}
+
 /** Text as the list of folded words it's matched on. Used for listing text. */
 export function words(text: string): string[] {
   const out: string[] = []
@@ -182,8 +191,13 @@ export type AskQuery = {
   concepts: { concept: Concept; word: string }[]
   /** "near me", "close to me", "nearby" — closest to the visitor first. */
   nearMe: boolean
-  /** "open now", "open late", "what's open" — open places first. */
+  /** "open now", "open late", "what's open" — only places open right now. */
   openNow: boolean
+  /** "open today", "open tonight", "open later": open now or opening later
+   *  today. A mikvah asked about at 7 AM that opens at 8 PM answers "is there
+   *  a mikvah open today"; only reading it as "open now" said no. Never set
+   *  together with `openNow`. */
+  openToday: boolean
   /** "within 2 miles", "within a 15 minute drive", "10 minute walk": the
    *  farthest a result may be, in straight-line miles (see WITHIN). */
   within: Within | null
@@ -267,7 +281,8 @@ function readWithin(input: string): { within: Within | null; rest: string } {
 }
 
 const NEAR_ME = /\b(?:(?:near|close to|closest to|nearest to|around|by|next to) (?:me|here|us)|nearby|near by|close by)\b/g
-const OPEN_NOW = /\b(?:open (?:right now|now|late|today|tonight|on sunday|on friday)|(?:whats|what is|anything|something|who is|whos) open|open)\b/g
+const OPEN_TODAY = /\b(?:open (?:today|tonight|later(?: today| tonight)?|this (?:evening|afternoon))|still open (?:today|tonight))\b/g
+const OPEN_NOW = /\b(?:open (?:right now|now|late|on sunday|on friday)|(?:whats|what is|anything|something|who is|whos) open|open)\b/g
 
 /** Reads a query into its parts. It never loses the query entirely: if only
  *  filler was typed ("kosher", "where"), those words are kept as terms, since
@@ -284,8 +299,10 @@ export function parseAsk(input: string): AskQuery {
   const typed = plainWords(clock.rest).join(' ')
   const withoutNear = typed.replace(NEAR_ME, ' ')
   const nearMe = withoutNear !== typed
-  const plain = withoutNear.replace(OPEN_NOW, ' ')
-  const openNow = plain !== withoutNear
+  const withoutToday = withoutNear.replace(OPEN_TODAY, ' ')
+  const openToday = withoutToday !== withoutNear
+  const plain = withoutToday.replace(OPEN_NOW, ' ')
+  const openNow = !openToday && plain !== withoutToday
 
   const terms: string[] = []
   const concepts: AskQuery['concepts'] = []
@@ -316,13 +333,13 @@ export function parseAsk(input: string): AskQuery {
   const withinAsked = within.within
   const typing = raw !== '' && !/\s$/.test(input)
   const last = plainWords(raw).at(-1)
-  if (terms.length === 0 && concepts.length === 0 && !nearMe && !openNow) {
+  if (terms.length === 0 && concepts.length === 0 && !nearMe && !openNow && !openToday) {
     const all = words(raw)
-    return { raw, terms: all, concepts, nearMe, openNow, within: withinAsked, minyan, partial: typing && all.length > 1 ? (all.at(-1) ?? null) : null }
+    return { raw, terms: all, concepts, nearMe, openNow, openToday, within: withinAsked, minyan, partial: typing && all.length > 1 ? (all.at(-1) ?? null) : null }
   }
   // Only the word under the cursor, and only if it survived as a term.
   const partial = typing && last !== undefined && terms.at(-1) === fold(last) && terms.length > 1 ? (terms.at(-1) ?? null) : null
-  return { raw, terms, concepts, nearMe, openNow, within: withinAsked, minyan, partial }
+  return { raw, terms, concepts, nearMe, openNow, openToday, within: withinAsked, minyan, partial }
 }
 
 /** The categories a concept stands for in this community: those whose id or

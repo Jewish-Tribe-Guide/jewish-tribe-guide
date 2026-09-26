@@ -135,11 +135,14 @@ export default function HeroSearchDropdown({
                   {/* Why it's here, before where it is: a list of stores for
                       "wine" used to say nothing about wine until one was
                       opened. The item it matched, marked when it's only
-                      sometimes in stock, and for "open now" when it closes. */}
+                      sometimes in stock, and for "open now" which of its
+                      hours are open, or that it has none listed. */}
                   <p className="flex min-w-0 items-center gap-1.5 text-[12px] text-slate-500">
-                    {hit.openUntil !== null && (
-                      <span className="shrink-0 rounded-full bg-green-50 px-1.5 font-semibold text-green-700">
-                        {hit.openUntil ? `Open until ${hit.openUntil}` : 'Open now'}
+                    {hit.hours && (
+                      <span
+                        className={`shrink-0 rounded-full px-1.5 font-semibold ${hit.hours.known ? 'bg-green-50 text-green-700' : 'bg-slate-100 text-slate-600'}`}
+                      >
+                        {hit.hours.text}
                       </span>
                     )}
                     {hit.matched.slice(0, 2).map((m) => (

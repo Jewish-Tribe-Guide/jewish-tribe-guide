@@ -21,7 +21,7 @@ function makeHit(overrides: Partial<ListingHit> = {}): ListingHit {
     matchedTags: [],
     term: 'food',
     matched: [],
-    openUntil: null,
+    hours: null,
     ...overrides,
   }
 }
@@ -149,7 +149,7 @@ describe('HeroSearchDropdown', () => {
       <HeroSearchDropdown
         query="meat open now"
         cards={[]}
-        placeHits={[makeHit({ openUntil: '11:30 PM' })]}
+        placeHits={[makeHit({ hours: { text: 'Open until 11:30 PM', known: true } })]}
         categories={[]}
         onCardClick={noop}
         onOpenPlace={noop}
@@ -180,6 +180,37 @@ describe('HeroSearchDropdown', () => {
     expect(screen.getByText('Next Maariv: 7:15 PM, South Philly Shtiebel.')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: /7:15 PM/ }))
     expect(onOpenShul).toHaveBeenCalledWith('s1')
+  })
+
+  it('opens up the rest of the minyanim an answer counts', async () => {
+    // "9 more today" used to be a count with nowhere to go.
+    const user = userEvent.setup()
+    const rows = Array.from({ length: 7 }, (_, i) => ({
+      time: `9:0${i} AM`,
+      label: 'Shacharis',
+      shulId: `s${i}`,
+      shulName: `Shul ${i}`,
+      miles: null,
+      tomorrow: false,
+    }))
+    const dropdown = (text: string) => (
+      <HeroSearchDropdown
+        query="next minyan"
+        cards={[]}
+        placeHits={[]}
+        categories={[]}
+        onCardClick={noop}
+        onOpenPlace={noop}
+        answer={{ text, rows, shown: 5 }}
+      />
+    )
+    const { rerender } = render(dropdown('Next minyan: 9:00 AM, Shul 0. 6 more today.'))
+    expect(screen.queryByText('Shul 6', { exact: false })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Show all 7 today' }))
+    expect(screen.getByText('· Shul 6', { exact: false })).toBeInTheDocument()
+    // A new question starts collapsed again.
+    rerender(dropdown('Next minyan: 9:05 AM, Shul 0. 6 more today.'))
+    expect(screen.queryByText('Shul 6', { exact: false })).not.toBeInTheDocument()
   })
 
   it('shows the answer instead of "nothing matches" when the answer is that nothing is open', () => {
