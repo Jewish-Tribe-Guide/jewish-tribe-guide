@@ -9,7 +9,7 @@
 //                                  /business status for the auto-sync job.
 //
 // The legacy `/maps/api/place/*` endpoints are used (not Places API "New") for
-// consistency with geo.ts / travelTime.ts, which already call the legacy
+// consistency with geo.ts, which already calls the legacy
 // maps.googleapis.com web services with this key.
 
 import type { BusinessStatus, DayKey, StructuredHours } from './hours'

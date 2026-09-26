@@ -128,6 +128,18 @@ test.describe('the one-tap write endpoints refuse what they can’t use', () => 
   })
 })
 
+// /api/travel asked Google's Distance Matrix for drive and walk times, a paid
+// lookup per destination, and nothing in the app had called it for a long
+// time. It stayed reachable by anyone who found it. Removed; if it comes back
+// it should come back with a caller and this test changed on purpose.
+test('the old paid travel-time endpoint is gone', async ({ request }) => {
+  const res = await request.post('/api/travel', {
+    data: { origin: { lat: 0, lng: 0 }, destinations: [] },
+    failOnStatusCode: false,
+  })
+  expect(res.status()).toBe(404)
+})
+
 test.describe('the dev login shortcut', () => {
   // It mints a real admin session with no email round-trip. It refuses unless
   // NODE_ENV !== 'production' AND DEV_ADMIN_BYPASS_SECRET is set — and the e2e

@@ -12,7 +12,8 @@ import { Redis } from '@upstash/redis'
 //     (free tier is plenty) for real coverage.
 //
 // The point of all this is cost control: every submission geocodes + emails,
-// every /api/travel call hits Google. Capping request *rate* caps the bill.
+// and several public routes call paid Google APIs. Capping request *rate*
+// caps the bill.
 
 type Decision = { ok: true } | { ok: false; retryAfter: number }
 

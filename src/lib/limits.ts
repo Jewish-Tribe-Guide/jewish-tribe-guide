@@ -13,8 +13,6 @@ export const LIMITS = {
   category: 100,
   shortText: 300,
   longText: 2000,
-  /** Max items in /api/travel destinations (each is a paid Google lookup). */
-  travelDestinations: 300,
   /** Max serialized size of a whole request body / payload, in bytes. */
   payloadBytes: 100_000,
   /** Max length for any single string found inside a details/formData object. */
