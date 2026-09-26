@@ -227,6 +227,14 @@ describe('answerFor — other questions', () => {
     expect(answerFor(result, { coords: here })?.text).toBe('3 places have pretzels. Nearest: Tasty Twisters Bakery, 0.1 mi.')
   })
 
+  it('answers when one word of a place’s name is what was asked for', () => {
+    // "restaurant with pretzels": Center City Pretzel Co. is on top, but one
+    // word of its four isn't looking it up by name.
+    const food = makeCategory({ id: 'restaurant', label: 'Food', pluralLabel: 'Food' })
+    const places = [listing('restaurant', 'pc', 'Center City Pretzel Co.', 39.951)]
+    expect(answerFor(searchAsk(places, [food], 'restaurant with pretzels'))?.text).toBe('Center City Pretzel Co. has pretzels.')
+  })
+
   it("does not say a shul 'has' what its name or denomination says", () => {
     // Food places are described by their text and names; a shul isn't:
     // "orthodox shtiebel" is looking for a shul, not asking who has something.

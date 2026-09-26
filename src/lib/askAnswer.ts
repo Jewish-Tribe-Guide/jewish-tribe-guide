@@ -239,9 +239,11 @@ function baseAnswer(
     asked = query.terms
     best = Math.max(0, ...hits.map(covers))
   }
-  // Every word asked is in the top result's name: that's looking the place
-  // up ("20th street pizza"), not asking who has something.
-  const namesTop = coverage(top.item.name, query.terms) === query.terms.length
+  // Every word asked is in the top result's name, and they make up most of
+  // it: that's looking the place up ("20th street pizza"), not asking who
+  // has something. One word of "Center City Pretzel Co." isn't.
+  const nameCovered = coverage(top.item.name, query.terms)
+  const namesTop = nameCovered === query.terms.length && nameCovered * 2 > words(top.item.name).length
   const having = best > 0 && !namesTop ? hits.filter((h) => covers(h) === best) : []
   if (having.length) {
     const thing = itemName(having, query.raw, asked)

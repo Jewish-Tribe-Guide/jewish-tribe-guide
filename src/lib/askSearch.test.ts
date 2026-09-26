@@ -346,6 +346,33 @@ describe('searchAsk — what it must not do', () => {
   })
 })
 
+describe('searchAsk — the place a question is about', () => {
+  const pretzelCo = listing('restaurant', 'Center City Pretzel Co.', 39.94, -75.157)
+  const aldiPretzels = listing('grocery', 'ALDI Washington Ave', 39.938, -75.178, { m: ['Pretzel Buns'] })
+  const jefferson = listing('hospital', 'Thomas Jefferson University Hospital', 39.9496, -75.1577)
+  const places = [pretzelCo, aldiPretzels, jefferson, chalavita, insomnia]
+
+  it('does not take an item for the name of a place to be near', () => {
+    // Reported: "grocery store with pretzels" answered with the grocery
+    // closest to Center City Pretzel Co.
+    const result = searchAsk(places, categories, 'grocery store with pretzels')
+    expect(result.anchor).toBeNull()
+    expect(result.hits.map((h) => h.item.name)).toEqual(['ALDI Washington Ave'])
+  })
+
+  it('takes a name as the place when the question says near it', () => {
+    // A food place on Jefferson Street matches the word too; "near" is what
+    // says the hospital is the place.
+    const onJefferson = { ...listing('restaurant', 'Corner Cafe', 39.97, -75.16), address: '100 Jefferson St' }
+    expect(searchAsk([...places, onJefferson], categories, 'food near jefferson').anchor?.name).toBe('Thomas Jefferson University Hospital')
+  })
+
+  it('takes a name as the place when nothing of the kind asked for has that word', () => {
+    // No food place is called Jefferson, so "food jefferson" is about the hospital.
+    expect(searchAsk(places, categories, 'food jefferson').anchor?.name).toBe('Thomas Jefferson University Hospital')
+  })
+})
+
 describe('searchAsk — why each result is there', () => {
   it('names the field a result matched on when no item explains it', () => {
     // "keystone" is in the hechsher, not in any item.

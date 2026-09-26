@@ -234,6 +234,10 @@ export function foundFor(hit: AskHit, result: AskResult): SearchFound | null {
   return { terms: result.terms, items: hit.matched, fields: hit.matchedFields }
 }
 
+/** A question naming a place to be near: "food near Jefferson", "shul by
+ *  Penn", "kosher food at HUP". */
+const SAYS_WHERE = /\b(?:near|nearest|nearby|at|by|around|close to|closest to|next to|across from|walking distance)\b/i
+
 function hoursKeys(category: CategoryConfig): string[] {
   return category.detailFields.filter((f) => f.type === 'hours').map((f) => f.key)
 }
@@ -285,6 +289,7 @@ function findAnchor(
   terms: string[],
   all: Prepared[],
   categoryIds: string[],
+  saysWhere: boolean,
 ): { anchor: DirectoryResource; used: string[] } | null {
   if (terms.length === 0) return null
   const candidates = all.filter((p) => !categoryIds.includes(p.category.id) && p.item.geo)
@@ -292,6 +297,13 @@ function findAnchor(
     const used = terms.filter((t) => p.initials.includes(t))
     if (used.length) return { anchor: p.item, used }
   }
+  // A name only when the question says it's a place to be near, or when
+  // the words find nothing of the kind asked for otherwise: "grocery store
+  // with pretzels" is asking for pretzels (a grocery has them), not for the
+  // grocery closest to Center City Pretzel Co.; "food jefferson" finds no
+  // food called Jefferson, so it's about the hospital.
+  const foundAsAsked = all.some((p) => categoryIds.includes(p.category.id) && terms.every((t) => termMatches(t, p.hay, 3, false)))
+  if (!saysWhere && foundAsAsked) return null
   for (const p of candidates) {
     if (terms.every((t) => p.nameWords.includes(t))) return { anchor: p.item, used: terms }
   }
@@ -340,7 +352,7 @@ export function searchAsk(
     }
   }
 
-  const found = categoryIds ? findAnchor(terms, all, categoryIds) : null
+  const found = categoryIds ? findAnchor(terms, all, categoryIds, SAYS_WHERE.test(query.raw)) : null
   const anchor = found?.anchor ?? null
   const searchTerms = found ? terms.filter((t) => !found.used.includes(t)) : terms
   const origin = anchor?.geo ?? coords ?? null
