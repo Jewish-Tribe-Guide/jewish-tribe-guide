@@ -1195,3 +1195,16 @@ describe('GenericDirectory — what a search matched', () => {
     expect(onParamsChange).toHaveBeenCalledWith({ item: null, match: null }, { replace: true })
   })
 })
+
+describe('GenericDirectory — neighborhoods', () => {
+  it("keeps this page's search to the neighborhood it names", () => {
+    const shuls = makeCategory({ id: 'synagogue', label: 'Synagogue', pluralLabel: 'Synagogues' })
+    const near = makeListing({ id: 'm', name: 'Mekor Habracha', category: 'synagogue', geo: { lat: 39.9494, lng: -75.1661 } })
+    const far = makeListing({ id: 'x', name: 'Far Shul', category: 'synagogue', geo: { lat: 40.1, lng: -75.0 } })
+    renderWithProviders(<GenericDirectory category={shuls} items={[near, far]} {...handlers} initialSearch="in center city" />, {
+      community: { slug: 'philly' },
+    })
+    expect(screen.getByText('Mekor Habracha')).toBeInTheDocument()
+    expect(screen.queryByText('Far Shul')).not.toBeInTheDocument()
+  })
+})

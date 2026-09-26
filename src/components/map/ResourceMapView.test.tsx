@@ -1431,3 +1431,32 @@ describe('ResourceMapView — search reads a question', () => {
     expect(box).toHaveTextContent('Chalav Yisroel Milk')
   })
 })
+
+describe('ResourceMapView — neighborhoods', () => {
+  it("keeps the map's search to the neighborhood it names", async () => {
+    const user = userEvent.setup()
+    const shuls = makeCategory({ id: 'synagogue', label: 'Synagogue', pluralLabel: 'Synagogues' })
+    const { container } = renderWithProviders(
+      <PinnedProvider>
+        <DroppedPinsProvider>
+          <ListingsProvider
+            listings={[
+              listingWithGeo({ id: 'm', category: 'synagogue', name: 'Mekor Habracha', geo: { lat: 39.9494, lng: -75.1661 } }),
+              listingWithGeo({ id: 'x', category: 'synagogue', name: 'Far Shul', geo: { lat: 40.1, lng: -75.0 } }),
+            ]}
+          >
+            <HeaderCollapseProvider>
+              <ResourceMapView onUp={vi.fn()} standalone visible />
+            </HeaderCollapseProvider>
+          </ListingsProvider>
+        </DroppedPinsProvider>
+      </PinnedProvider>,
+      { content: { categories: [shuls], campaignBanners: [] }, community: { slug: 'philly' } },
+    )
+    const input = container.querySelector<HTMLInputElement>('input[placeholder^="Search name, address"]')!
+    await user.type(input, 'shul in center city')
+    await user.keyboard('{Enter}')
+    expect(screen.getByRole('button', { name: 'Select Mekor Habracha' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Select Far Shul' })).not.toBeInTheDocument()
+  })
+})

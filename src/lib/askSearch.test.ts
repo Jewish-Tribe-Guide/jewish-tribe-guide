@@ -479,3 +479,52 @@ describe('nearMiss — the closest thing when nothing matches', () => {
     expect(nearMiss(listings, categories, 'shul mekor zzyzx ')).not.toBeNull()
   })
 })
+
+describe('searchAsk — towns and neighborhoods', () => {
+  const food = makeCategory({ id: 'restaurant', label: 'Food', pluralLabel: 'Food' })
+  const town = (name: string, address: string, lat: number, lng: number, category = 'restaurant') => ({
+    ...listing(category, name, lat, lng),
+    address,
+  })
+  const bagels = town('The Bagel Spot', '1 Haddonfield Rd, Cherry Hill Township, NJ 08034, USA', 39.93, -75.02)
+  const cookies = town('Cherry Hill Cookies', '2 Kings Hwy, Cherry Hill Township, NJ 08034, USA', 39.92, -75.01)
+  const city = town('Center Cafe', '100 Walnut St, Philadelphia, PA 19103, USA', 39.95, -75.165)
+  const cambria = town('Cambria Hotel Philadelphia Downtown - Center City', '219 S Broad St, Philadelphia, PA 19107, USA', 39.948, -75.164, 'hotel')
+  const shul = town('Mekor Habracha', '1500 Walnut St, Philadelphia, PA 19102, USA', 39.9494, -75.1661, 'synagogue')
+  const places = [{ name: 'Center City', geo: { lat: 39.9524, lng: -75.1636 }, radius: 1.3 }]
+  const all = [bagels, cookies, city, cambria, shul]
+  const cats = [food, hotel, synagogue]
+
+  it('keeps only what is inside a town the listings name', () => {
+    const result = searchAsk(all, cats, 'restaurants in cherry hill', { places })
+    expect(result.place).toEqual({ name: 'Cherry Hill', inside: true })
+    expect(result.hits.map((h) => h.item.name).sort()).toEqual(['Cherry Hill Cookies', 'The Bagel Spot'])
+  })
+
+  it('measures from a neighborhood, and does not search for its name', () => {
+    const result = searchAsk(all, cats, 'shul near center city', { places })
+    expect(result.place).toEqual({ name: 'Center City', inside: false })
+    expect(result.terms).toEqual([])
+    expect(result.hits[0].miles).toBeLessThan(0.5)
+  })
+
+  it('is not a hotel with the neighborhood in its name, when a shul was asked for', () => {
+    expect(searchAsk(all, cats, 'shul near center city', { places }).anchor).toBeNull()
+    // Even without "near": no shul is called Center City, so it's the place.
+    expect(searchAsk(all, cats, 'center city shul', { places }).place).toEqual({ name: 'Center City', inside: false })
+  })
+
+  it('is the listing itself when the question is a listing’s own name', () => {
+    const result = searchAsk(all, cats, 'cambria center city', { places })
+    expect(result.place).toBeNull()
+    expect(result.hits[0].item.name).toBe('Cambria Hotel Philadelphia Downtown - Center City')
+  })
+
+  it('with nothing inside, the closest to it is what is close', () => {
+    const result = searchAsk([city, shul], cats, 'food in cherry hill', { places })
+    expect(result.hits).toEqual([])
+    const miss = nearMiss([city, shul, bagels], cats, 'shul in cherry hill', { places })
+    expect(miss?.kept).toBe('near Cherry Hill')
+    expect(miss?.result.hits.map((h) => h.item.name)).toEqual(['Mekor Habracha'])
+  })
+})

@@ -221,6 +221,15 @@ describe('parseAsk — "than Giant"', () => {
   })
 
   it('does not search for "good" or a hechsher every listing has', () => {
-    expect(parseAsk('a date restaurant with a good hechsher').terms).toEqual(['date'])
+    expect(parseAsk('a pizza place with a good hechsher').terms).toEqual(['pizza'])
+  })
+})
+
+describe('parseAsk — a date', () => {
+  it('reads "a date restaurant" as an outing, but "dates" as the fruit', () => {
+    expect(parseAsk('date restaurant near cherry hill').terms).toEqual(['cherry', 'hill'])
+    expect(parseAsk('food for a date').terms).toEqual([])
+    expect(parseAsk('date night restaurant').terms).toEqual([])
+    expect(parseAsk('medjool dates').terms).toEqual(['medjool', 'date'])
   })
 })

@@ -922,3 +922,16 @@ describe('Landing — when nothing matches', () => {
     expect(screen.getAllByRole('link', { name: /Add it to the guide/ })[0]).toHaveAttribute('href', '/test-community/restaurant?form=create')
   })
 })
+
+// The community's neighborhoods reach the home search: "food in Rittenhouse".
+describe('Landing — neighborhoods', () => {
+  it('keeps a search to the neighborhood it names', async () => {
+    const user = userEvent.setup()
+    const food = makeCategory({ id: 'restaurant', label: 'Food', pluralLabel: 'Food' })
+    const near = makeListing({ id: 'n', category: 'restaurant', name: 'Square Cafe', geo: { lat: 39.9497, lng: -75.172 } })
+    const far = makeListing({ id: 'f', category: 'restaurant', name: 'Far Cafe', geo: { lat: 40.1, lng: -75.0 } })
+    renderLanding(undefined, { content: { categories: [food] }, community: { slug: 'philly' } }, [near, far])
+    await user.type(screen.getAllByLabelText('Search resources')[0]!, 'food in rittenhouse')
+    expect(screen.getAllByText('1 food in Rittenhouse: Square Cafe.').length).toBeGreaterThan(0)
+  })
+})

@@ -17,6 +17,8 @@ import { PlusIcon, ClockIcon } from '@/components/icons'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { useScrollShowHide, useSetScreenHeader } from '@/lib/headerVisibility'
 import { foundFor, searchAsk } from '@/lib/askSearch'
+import { neighborhoodsFor } from '@/lib/places'
+import { useOptionalCommunitySlug } from '@/lib/communityContext'
 import { travelCompare } from '@/lib/listingTravel'
 import { useLogSearchMiss } from '@/lib/useLogSearchMiss'
 import { ui } from '@/lib/uiConfig'
@@ -739,6 +741,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   }, [anchorListingId])
 
   const q = search.trim().toLowerCase()
+  const communitySlug = useOptionalCommunitySlug()
   // Read as a question, the same way as the home search (see askSearch.ts),
   // limited to this category — so a place tapped there ("where can I get
   // cholov yisroel milk") survives this filter, and "kosher food" on the
@@ -747,9 +750,9 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // say why it's here and the listing to mark it once opened.
   const askMatches = useMemo(() => {
     if (!q) return null
-    const result = searchAsk(items, [category], search, { categoryId: category.id })
+    const result = searchAsk(items, [category], search, { categoryId: category.id, places: neighborhoodsFor(communitySlug) })
     return new Map(result.hits.map((h) => [h.item.id, foundFor(h, result)]))
-  }, [q, items, category, search])
+  }, [q, items, category, search, communitySlug])
   const matchesSearch = (item: DirectoryResource) => askMatches === null || askMatches.has(item.id)
   // A listing opened from the home search: what that search matched in it.
   // Until that listing is closed — reopened later, it's just the listing.

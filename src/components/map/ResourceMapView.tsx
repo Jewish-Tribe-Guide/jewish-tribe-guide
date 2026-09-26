@@ -34,6 +34,7 @@ import { community } from '@/community.config'
 import { mapQueryString } from '@/lib/routes'
 import { countEvent } from '@/lib/countEvent'
 import { useOptionalCommunitySlug } from '@/lib/communityContext'
+import { neighborhoodsFor } from '@/lib/places'
 import type { DirectoryResource, MapFilters } from '@/types'
 
 // Shared by the initial useState below and the resync effect further down
@@ -723,9 +724,9 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   const askIds = useMemo(() => {
     if (activeTerms.length === 0) return null
     const raws = allPoints.flatMap((p) => (p.raw ? [p.raw] : []))
-    const result = searchAsk(raws, categories ?? [], committedQuery)
+    const result = searchAsk(raws, categories ?? [], committedQuery, { places: neighborhoodsFor(countCommunity) })
     return new Map<string, SearchFound | null>(result.hits.map((h) => [h.item.id, foundFor(h, result)]))
-  }, [activeTerms, allPoints, categories, committedQuery])
+  }, [activeTerms, allPoints, categories, committedQuery, countCommunity])
   const foundOnPoint = (id: string | undefined) => (id ? (askIds?.get(id) ?? null) : null)
 
   // ── Field filters (kosher / type / … carried from the directory) ─────────

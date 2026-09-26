@@ -319,6 +319,8 @@ function readExcluding(text: string): { excluding: string[]; rest: string } {
   return { excluding: name.map(fold), rest }
 }
 
+const DATE_OUT = /\b(?:for a date|date night|date (?=restaurants?\b|places?\b|spots?\b|food\b|ideas?\b))/g
+
 const NEAR_ME = /\b(?:(?:near|close to|closest to|nearest to|around|by|next to) (?:me|here|us)|nearby|near by|close by)\b/g
 const OPEN_TODAY = /\b(?:open (?:today|tonight|later(?: today| tonight)?|this (?:evening|afternoon))|still open (?:today|tonight))\b/g
 const OPEN_NOW = /\b(?:open (?:right now|now|late|on sunday|on friday)|(?:whats|what is|anything|something|who is|whos) open|open)\b/g
@@ -342,7 +344,10 @@ export function parseAsk(input: string): AskQuery {
   const openToday = withoutToday !== withoutNear
   const withoutOpen = withoutToday.replace(OPEN_NOW, ' ')
   const openNow = !openToday && withoutOpen !== withoutToday
-  const { excluding, rest: plain } = readExcluding(withoutOpen.replace(/\s+/g, ' ').trim())
+  const { excluding, rest: excludedOut } = readExcluding(withoutOpen.replace(/\s+/g, ' ').trim())
+  // "A date restaurant", "for a date", "date night": a kind of outing, not
+  // the fruit, and nothing a listing says — "date" alone is still dates.
+  const plain = excludedOut.replace(DATE_OUT, ' ')
 
   const terms: string[] = []
   const concepts: AskQuery['concepts'] = []

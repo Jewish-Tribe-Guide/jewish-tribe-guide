@@ -9,6 +9,7 @@ import { nearMiss, searchAsk } from '@/lib/askSearch'
 import { answerFor, nearMissAnswer } from '@/lib/askAnswer'
 import { resolveCapabilities } from '@/lib/categories'
 import { routes } from '@/lib/routes'
+import { neighborhoodsFor } from '@/lib/places'
 import { listMinyanim } from '@/lib/upcomingDavening'
 import { useMinyanSchedule } from '@/lib/useMinyanSchedule'
 import HeroHeading from '@/components/home/HeroHeading'
@@ -137,7 +138,10 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: LandingProps
   const schedule = useMinyanSchedule(coords)
   // Not wrapped in useMemo: the React Compiler memoizes this component, and
   // searchAsk caches each listing's words, so a keystroke stays cheap.
-  const askResult = q && listings ? searchAsk(listings, categories ?? [], q, { coords, now: new Date(schedule.now) }) : null
+  // The community's neighborhoods, for "food in Center City" (towns come
+  // from the listings' own addresses — see places.ts).
+  const places = neighborhoodsFor(communitySlug)
+  const askResult = q && listings ? searchAsk(listings, categories ?? [], q, { coords, now: new Date(schedule.now), places }) : null
   const strictHits = askResult ? listingHitsFrom(askResult, coords) : []
   const strictAnswer = askResult
     ? answerFor(askResult, {
@@ -162,7 +166,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: LandingProps
   // as such, never as a hit — and the search-miss log below still counts the
   // question as a miss, since it is one.
   const foundNothing = !!askResult && askResult.hits.length === 0 && askResult.noHours.length === 0 && strictAnswer === null
-  const miss = foundNothing && listings ? nearMiss(listings, categories ?? [], q, { coords, now: new Date(schedule.now) }) : null
+  const miss = foundNothing && listings ? nearMiss(listings, categories ?? [], q, { coords, now: new Date(schedule.now), places }) : null
   const placeHits = miss ? listingHitsFrom(miss.result, coords) : strictHits
   const answer = miss ? nearMissAnswer(miss, q, { coords }) : strictAnswer
   // Where to ask: the community's WhatsApp groups page, when it has one.

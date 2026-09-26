@@ -2,6 +2,7 @@ import type { DirectoryResource } from '@/types'
 import type { CategoryConfig } from '@/lib/categories'
 import { listingSearchText } from '@/lib/searchListing'
 import { haversineMiles } from '@/lib/geo'
+import { findPlace, townsFrom, type Place } from '@/lib/places'
 import { DAY_KEYS, businessClosure, fmt12, getOpenStatus, isStructuredHours, type DayHours } from '@/lib/hours'
 import { conceptCategories, initialisms, parseAsk, termMatches, termsRequired, typedWords, wordMatches, words, type AskQuery } from '@/lib/ask'
 
@@ -80,6 +81,10 @@ export type AskResult = {
   /** The place the question was about, when it said where: "food at HUP",
    *  "shul near Jefferson". Results are measured from it. */
   anchor: DirectoryResource | null
+  /** The town or neighborhood the question was about, when it named one
+   *  that isn't a listing: "food in Cherry Hill", "shul near Center City".
+   *  Results are measured from it, and for "in" kept to within it. */
+  place: { name: string; inside: boolean } | null
   /** For an "open now" or "open today" question: how many places matched
    *  but are closed then, and so aren't in `hits`. Lets the page say "none
    *  open right now" instead of showing nothing, or showing closed places as
@@ -237,6 +242,14 @@ export function foundFor(hit: AskHit, result: AskResult): SearchFound | null {
   return { terms: result.terms, items: hit.matched, fields: hit.matchedFields }
 }
 
+// The towns a set of listings' addresses name, worked out once per set.
+const townCache = new WeakMap<readonly DirectoryResource[], Place[]>()
+function townsOf(listings: readonly DirectoryResource[]): Place[] {
+  let towns = townCache.get(listings)
+  if (!towns) townCache.set(listings, (towns = townsFrom(listings)))
+  return towns
+}
+
 /** A question naming a place to be near: "food near Jefferson", "shul by
  *  Penn", "kosher food at HUP". */
 const SAYS_WHERE = /\b(?:near|nearest|nearby|at|by|around|close to|closest to|next to|across from|walking distance)\b/i
@@ -324,16 +337,19 @@ export type AskOptions = {
   categoryId?: string
   /** At most this many hits. Defaults to all of them. */
   limit?: number
+  /** The community's own neighborhoods (see places.ts). Towns come from
+   *  the listings' addresses without being given. */
+  places?: readonly Place[]
 }
 
 export function searchAsk(
   listings: readonly DirectoryResource[],
   categories: readonly CategoryConfig[],
   input: string,
-  { coords = null, now = new Date(), categoryId, limit }: AskOptions = {},
+  { coords = null, now = new Date(), categoryId, limit, places = [] }: AskOptions = {},
 ): AskResult {
   const query = parseAsk(input)
-  const empty: AskResult = { query, hits: [], categoryIds: null, anchor: null, closedCount: 0, noHours: [], terms: [], excluded: [] }
+  const empty: AskResult = { query, hits: [], categoryIds: null, anchor: null, closedCount: 0, noHours: [], terms: [], excluded: [], place: null }
   if (!query.raw) return empty
 
   const configById = new Map(categories.map((c) => [c.id, c]))
@@ -355,17 +371,32 @@ export function searchAsk(
     }
   }
 
+  // A town or neighborhood named ("in Cherry Hill"): its words are where,
+  // not what. Unless they're a listing's own name being looked up —
+  // "center city pretzel" is the store, not pretzels near Center City.
+  // Only a listing of the kind asked for: "shul near center city" isn't
+  // looking up the Cambria Hotel … Center City.
+  const lookingUp =
+    terms.length > 0 &&
+    all.some((p) => (!categoryIds || categoryIds.includes(p.category.id)) && terms.every((t) => p.nameWords.includes(t)))
+  const placeSaid = findPlace(query.raw, [...places, ...townsOf(listings)])
+  const named = placeSaid && (placeSaid.introduced || !lookingUp) ? placeSaid : null
+  const unplaced = named ? terms.filter((t) => !named.used.includes(t)) : terms
+
   // Somewhere named with "near"/"at" counts without a kind of place too:
   // "sushi near HUP" is measured from HUP.
   const saysWhere = SAYS_WHERE.test(query.raw)
-  const found = categoryIds || saysWhere ? findAnchor(terms, all, categoryIds ?? [], saysWhere) : null
+  const found = categoryIds || saysWhere ? findAnchor(unplaced, all, categoryIds ?? [], saysWhere) : null
   const anchor = found?.anchor ?? null
-  const searchTerms = found ? terms.filter((t) => !found.used.includes(t)) : terms
-  const origin = anchor?.geo ?? coords ?? null
+  const searchTerms = found ? unplaced.filter((t) => !found.used.includes(t)) : unplaced
+  const origin = anchor?.geo ?? named?.place.geo ?? coords ?? null
+  // A place named with nothing else to look for ("cherry hill") is every
+  // listing in it.
+  const inside = named && (named.inside || (searchTerms.length === 0 && !categoryIds)) ? named.place : null
 
   // With nothing left to look for, the question was only a kind of place
   // ("kosher food", "shul near me"): every listing of that kind answers it.
-  if (searchTerms.length === 0 && !categoryIds && !categoryId) return empty
+  if (searchTerms.length === 0 && !categoryIds && !categoryId && !named) return empty
 
   // The word still being typed is scored but not required (see AskQuery's
   // `partial`), and may be as short as a letter, since the others narrow it.
@@ -450,7 +481,9 @@ export function searchAsk(
   // "Within 15 minutes' drive" is a condition too, measured from the place
   // asked about or the visitor. With neither known there's nothing to
   // measure from, so it can't rule anything out; the answer says so.
-  const inReach = (h: AskHit) => !query.within || !origin || (h.miles !== null && h.miles <= query.within.miles)
+  const inReach = (h: AskHit) =>
+    (!query.within || !origin || (h.miles !== null && h.miles <= query.within.miles)) &&
+    (!inside || (!!h.item.geo && haversineMiles(inside.geo, h.item.geo) <= inside.radius))
   const openEnough = (h: AskHit) => (query.openNow ? h.open === true : query.openToday ? h.today.length > 0 : true)
   const asksOpen = query.openNow || query.openToday
   const answering = hits.filter((h) => openEnough(h) && inReach(h))
@@ -471,6 +504,7 @@ export function searchAsk(
     noHours,
     terms: searchTerms,
     excluded: [...excluded],
+    place: named ? { name: named.place.name, inside: !!inside } : null,
   }
 }
 
@@ -502,6 +536,13 @@ export function nearMiss(
 ): NearMiss | null {
   const query = parseAsk(input)
   if (!query.raw || query.minyan) return null
+  // Nothing in the place asked about ("shul in the northeast"): what's
+  // closest to it is what's close.
+  const strict = searchAsk(listings, categories, input, options)
+  if (strict.place?.inside) {
+    const near = searchAsk(listings, categories, `${query.raw.replace(/\b(in|within)\b/gi, 'near')} `, options)
+    if (near.hits.length) return { kept: `near ${strict.place.name}`, dropped: 'in', result: near }
+  }
   const typed = typedWords(query.raw, query.terms)
   const searched = typed.flatMap((w, i) => (w.term ? [i] : []))
   if (searched.length === 0) return null

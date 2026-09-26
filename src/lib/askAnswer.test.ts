@@ -372,3 +372,32 @@ describe('nearMissAnswer', () => {
     )
   })
 })
+
+describe('answerFor — towns and neighborhoods', () => {
+  const food = makeCategory({ id: 'restaurant', label: 'Food', pluralLabel: 'Food' })
+  const at = (id: string, name: string, address: string, lat: number, lng = -75.17) => ({ ...listing('restaurant', id, name, lat), address, geo: { lat, lng } })
+  const inCherryHill = [
+    at('b', 'The Bagel Spot', '1 Rd, Cherry Hill Township, NJ 08034, USA', 39.93, -75.02),
+    at('c', 'Cherry Hill Cookies', '2 Rd, Cherry Hill Township, NJ 08034, USA', 39.92, -75.01),
+  ]
+  const pizza = at('p', '20th Street Pizza', '20th St, Philadelphia, PA 19103, USA', 39.951, -75.174)
+  const places = [{ name: 'Center City', geo: { lat: 39.9524, lng: -75.1636 }, radius: 1.3 }]
+
+  it('counts what is in a town, calling a mass-noun category "food places"', () => {
+    expect(answerFor(searchAsk(inCherryHill, [food], 'restaurants in cherry hill'))?.text).toBe('2 food places in Cherry Hill.')
+  })
+
+  it('names the one place when there is only one', () => {
+    expect(answerFor(searchAsk([inCherryHill[0]], [food], 'restaurants in cherry hill'))?.text).toBe('1 food in Cherry Hill: The Bagel Spot.')
+  })
+
+  it('asks about pizza, not about the words that said where', () => {
+    // Reported: "pizza in center city" gave no answer — "center" and "city"
+    // were counted as words the pizza place had to have.
+    expect(answerFor(searchAsk([pizza], [food], 'pizza in center city', { places }))?.text).toBe('20th Street Pizza has pizza, 0.6 mi from Center City.')
+  })
+
+  it('names where it measured from for a kind of place', () => {
+    expect(answerFor(searchAsk([pizza], [food], 'food near center city', { places }))?.text).toBe('Closest food places to Center City: 20th Street Pizza, 0.6 mi.')
+  })
+})

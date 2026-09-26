@@ -210,9 +210,15 @@ function baseAnswer(
   // A question about a place and nothing else ("food near HUP"): the
   // nearest one, measured from there. With something to look for too
   // ("sushi near HUP"), it's who has it, nearest to there first.
-  if (result.anchor && result.terms.length === 0) {
-    const kind = top.category.pluralLabel.toLowerCase()
-    return { text: `Closest ${kind} to ${result.anchor.name}: ${top.item.name}${milesOf(top)}.`, rows: [] }
+  const where = result.anchor?.name ?? result.place?.name ?? null
+  if (where && result.terms.length === 0) {
+    const kind = kindOf(hits, Math.max(2, hits.length))
+    // "Food in Cherry Hill": how many there are; the list names them.
+    if (result.place?.inside && !result.anchor) {
+      const count = `${hits.length} ${hits.length === 1 ? kindOf(hits, 1) : kind} in ${where}`
+      return { text: hits.length === 1 ? `${count}: ${top.item.name}.` : `${count}.`, rows: [] }
+    }
+    return { text: `Closest ${kind} to ${where}: ${top.item.name}${milesOf(top)}.`, rows: [] }
   }
 
   // A question about an item ("cholov yisroel milk"): who has it. Every
@@ -224,7 +230,10 @@ function baseAnswer(
   // only as good a match as the best: for "sliced goat cheese", a store with
   // plain "Goat Cheese" doesn't have it. The word still being typed doesn't
   // count…
-  const typed = query.terms.filter((t) => t !== query.partial)
+  // The words searched for, not the ones that said where ("pizza in center
+  // city" asks about pizza) — see AskResult's `terms`.
+  const searched = result.terms
+  const typed = searched.filter((t) => t !== query.partial)
   let asked = typed
   // How many of the words asked a place has: in its best-matching item, its
   // own description if it's a food place, and its name — "giant wine" is
@@ -246,15 +255,15 @@ function baseAnswer(
   }
   let best = Math.max(0, ...hits.map(covers))
   // …unless it's the item itself: "giant wine", before the space.
-  if (best === 0 && typed.length < query.terms.length) {
-    asked = query.terms
+  if (best === 0 && typed.length < searched.length) {
+    asked = searched
     best = Math.max(0, ...hits.map(covers))
   }
   // Every word asked is in the top result's name, and they make up most of
   // it: that's looking the place up ("20th street pizza"), not asking who
   // has something. One word of "Center City Pretzel Co." isn't.
-  const nameCovered = coverage(top.item.name, query.terms)
-  const namesTop = nameCovered === query.terms.length && nameCovered * 2 > words(top.item.name).length
+  const nameCovered = coverage(top.item.name, searched)
+  const namesTop = nameCovered === searched.length && nameCovered * 2 > words(top.item.name).length
   // And only when some place has everything asked: "chalav yisrael ice
   // cream" is not answered by ShopRite's Chalav Yisroel Milk, nor "frozen
   // gefilte fish" by a fish market's frozen meat.
@@ -266,9 +275,9 @@ function baseAnswer(
     const near = nearest(having)
     const closedNote = asksOpen && closed ? ` ${closed} more ${closed === 1 ? 'is' : 'are'} closed ${later}.` : ''
     // Measured from the place asked about, it says so: "8.1 mi from HUP".
-    const fromAnchor = result.anchor && near.miles != null ? ` from ${result.anchor.name}` : ''
+    const fromAnchor = where && near.miles != null ? ` from ${where}` : ''
     if (having.length === 1) return { text: `${near.item.name} has ${thing}${note}${milesOf(near)}${fromAnchor}${hoursOf(near)}.${closedNote}`, rows: [] }
-    const nearestLabel = result.anchor ? `Nearest to ${result.anchor.name}` : 'Nearest'
+    const nearestLabel = where ? `Nearest to ${where}` : 'Nearest'
     const nearText = near.miles != null ? ` ${nearestLabel}: ${near.item.name}${milesOf(near)}${hoursOf(near)}.` : ''
     const open = query.openNow ? ' open' : query.openToday ? ' open today' : ''
     // "Than Giant": the places that aren't it.
@@ -290,6 +299,17 @@ function baseAnswer(
   }
 
   return null
+}
+
+/** What to call some hits: their category's plural when they share one and
+ *  it reads as a plural ("synagogues"), "food places" for a category named
+ *  like a mass noun ("Food", "Grocery"), "places" for a mix. */
+function kindOf(hits: AskHit[], count = hits.length): string {
+  const kinds = new Set(hits.map((h) => h.category.id))
+  if (kinds.size !== 1) return count === 1 ? 'place' : 'places'
+  const { label, pluralLabel } = hits[0].category
+  if (count === 1) return label.toLowerCase()
+  return pluralLabel !== label ? pluralLabel.toLowerCase() : `${label.toLowerCase()} places`
 }
 
 /** The nearest of some hits, or the best match when there's no distance. */
