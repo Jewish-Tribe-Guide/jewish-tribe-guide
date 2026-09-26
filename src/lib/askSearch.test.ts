@@ -141,6 +141,13 @@ describe('searchAsk — the questions people actually typed', () => {
     const [hit] = searchAsk(listings, categories, 'cholov yisroel milk').hits
     expect(hit.matchedTags[0]).toBe('Chalav Yisroel Milk')
   })
+
+  it('marks an item that is only sometimes in stock', () => {
+    const hits = searchAsk(listings, categories, 'challah').hits
+    // GIANT lists challah as a "sometimes" item; ShopRite always has it.
+    expect(hits.find((h) => h.item.name === 'GIANT')?.matched).toEqual([{ tag: 'Challah', sometimes: true }])
+    expect(hits.find((h) => h.item.name.startsWith('ShopRite'))?.matched).toEqual([{ tag: 'Challah', sometimes: false }])
+  })
 })
 
 describe('searchAsk — ranking', () => {
@@ -158,6 +165,68 @@ describe('searchAsk — ranking', () => {
   it('forgives a typo in a name or an item, never in a street name', () => {
     // "Grant" is one letter from "giant".
     expect(searchAsk(more, categories, 'giant').hits.map((h) => h.item.name)).toEqual(['GIANT'])
+  })
+})
+
+describe('searchAsk — "open now"', () => {
+  const allWeek = (open: string, close: string) =>
+    Object.fromEntries(['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'].map((d) => [d, { open, close }]))
+  const lateGrill = listing('restaurant', 'Late Night Grill', 39.95, -75.17, { t: ['Meat'], hours: allWeek('11:00', '23:30') })
+  const lunchGrill = listing('restaurant', 'Lunch Grill', 39.95, -75.17, { t: ['Meat'], hours: allWeek('11:00', '15:00') })
+  // "Meat Grill" in its name, so it matches better than either of the others.
+  const meatGrill = listing('restaurant', 'Meat Grill', 39.95, -75.17, { t: ['Meat'], hours: allWeek('11:00', '15:00') })
+  const places = [lateGrill, lunchGrill, meatGrill]
+  const tenPmThursday = new Date(2026, 8, 24, 22, 0)
+
+  it('lists only places open right now, however well a closed one matches', () => {
+    // Reported live: "which meat restaurants are open now" listed closed ones.
+    const result = searchAsk(places, categories, 'which meat restaurants are open now', { now: tenPmThursday })
+    expect(result.hits.map((h) => h.item.name)).toEqual(['Late Night Grill'])
+    expect(result.closedCount).toBe(2)
+  })
+
+  it('says how many matched but are closed when none is open', () => {
+    const result = searchAsk([lunchGrill, meatGrill], categories, 'meat open now', { now: tenPmThursday })
+    expect(result.hits).toEqual([])
+    expect(result.closedCount).toBe(2)
+  })
+})
+
+describe('searchAsk — distance and mikvah hours', () => {
+  const mikvah = makeCategory({
+    id: 'mikvah',
+    label: 'Mikvah',
+    pluralLabel: 'Mikvaot',
+    detailFields: [
+      { key: 'hours', label: 'Hours', type: 'hours' },
+      { key: 'men_s_hours', label: "Men's Hours", type: 'hours' },
+    ],
+  })
+  const allWeek = (open: string, close: string) =>
+    Object.fromEntries(['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'].map((d) => [d, { open, close }]))
+  const near = listing('mikvah', 'Near Mikvah', 39.95, -75.17, { men_s_hours: allWeek('20:00', '23:00') })
+  const far = listing('mikvah', 'Far Mikvah', 40.2, -75.17, { men_s_hours: allWeek('20:00', '23:00') })
+  const unlisted = listing('mikvah', 'No Hours Mikvah', 39.951, -75.17)
+  const nine = new Date(2026, 8, 24, 21, 0)
+  const here = { lat: 39.95, lng: -75.17 }
+
+  it("counts men's hours as opening hours, ready for when they're entered", () => {
+    const hits = searchAsk([near, far, unlisted], [mikvah], 'mikvah open tonight', { now: nine }).hits
+    expect(hits.map((h) => h.item.name).sort()).toEqual(['Far Mikvah', 'Near Mikvah'])
+  })
+
+  it('keeps only places within the distance asked, from the visitor', () => {
+    const hits = searchAsk([near, far], [mikvah], 'mikvah open tonight within a 15 minute drive of my location', {
+      now: nine,
+      coords: here,
+    }).hits
+    // Far Mikvah is about 17 miles away; 15 minutes' drive is about 6.
+    expect(hits.map((h) => h.item.name)).toEqual(['Near Mikvah'])
+  })
+
+  it('rules nothing out on distance when there is nowhere to measure from', () => {
+    const hits = searchAsk([near, far], [mikvah], 'mikvah within 1 mile', { now: nine }).hits
+    expect(hits).toHaveLength(2)
   })
 })
 

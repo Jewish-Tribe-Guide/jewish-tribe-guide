@@ -9,7 +9,7 @@ import type { DirectoryResource, NavigateFn } from '@/types'
 import { isOptimizableImage } from '@/lib/imageHosts'
 import { haversineMiles } from '@/lib/geo'
 import { conceptCategories, parseAsk, termMatches, termsRequired, words } from '@/lib/ask'
-import { searchAsk } from '@/lib/askSearch'
+import { searchAsk, type AskResult } from '@/lib/askSearch'
 import { GenericListingCard } from '@/components/resources/GenericListingCard'
 import { useForm, useForms } from '@/lib/useForms'
 import { community } from '@/community.config'
@@ -625,6 +625,12 @@ export type ListingHit = {
   /** The term to pre-fill the category's own search with on tap: the matched tag
    *  when there is one (so the place survives that page's filter), else the query. */
   term: string
+  /** The items it matched, each marked if only sometimes in stock — shown on
+   *  the result as the reason it's there (see askSearch's AskHit.matched). */
+  matched: { tag: string; sometimes: boolean }[]
+  /** For an "open now" question, when it closes ("9:00 PM"), or '' when its
+   *  hours say open but not until when. Null for any other question. */
+  openUntil: string | null
 }
 
 /** Individual listings that answer the query (see askSearch.ts): name,
@@ -638,7 +644,19 @@ export function searchListings(
   coords: { lat: number; lng: number } | null = null,
   limit = 8,
 ): ListingHit[] {
-  const { hits } = searchAsk(listings, categories, query, { coords, limit })
+  return listingHitsFrom(searchAsk(listings, categories, query, { coords }), coords, limit)
+}
+
+/** The same, from a search already run — Landing runs it once and reads both
+ *  these hits and the answer (askAnswer.ts) off the one result. */
+export function listingHitsFrom(
+  result: AskResult,
+  coords: { lat: number; lng: number } | null = null,
+  limit = 8,
+): ListingHit[] {
+  const { hits: all, query: asked } = result
+  const hits = all.slice(0, limit)
+  const query = asked.raw
   return hits.map((h) => ({
     // The distance shown is always from the visitor, the way every other
     // list shows it, even when the order is by distance from a place the
@@ -651,6 +669,8 @@ export function searchListings(
     categoryLabel: h.category.pluralLabel,
     matchedTags: h.matchedTags,
     term: h.matchedTags[0] ?? query.trim(),
+    matched: h.matched,
+    openUntil: asked.openNow && h.open ? (h.closesAt ?? '') : null,
   }))
 }
 
@@ -702,6 +722,7 @@ export function PlacesResults({
               onFilterBool={() => onOpen(hit)}
               onFilterSelect={() => onOpen(hit)}
               onEdit={() => onOpen(hit, 'edit')}
+              matchedItems={hit.matched}
             />
           </div>
         ))}

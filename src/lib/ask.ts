@@ -1,4 +1,5 @@
 import type { CategoryConfig } from '@/lib/categories'
+import type { Tefillah } from '@/lib/davening'
 
 // ── Understanding a question typed into search ───────────────────────────────
 // Search used to need every typed word to appear in a listing. That worked for
@@ -88,6 +89,7 @@ const STOPWORDS = new Set([
   'store', 'stores', 'shop', 'shops',
   'area', 'around', 'close', 'closest', 'nearest', 'near', 'nearby', 'local', 'locally',
   'today', 'tonight', 'tomorrow', 'week', 'weekend', 'now', 'right',
+  'next', 'upcoming', 'still', 'later', 'soon', 'left', 'anymore', 'yet', 'time', 'times', 'schedule', 'list', 'pull', 'up', 'show', 'give', 'tell',
   'kosher', 'kasher', 'jewish', 'frum',
 ])
 
@@ -105,7 +107,7 @@ const CONCEPTS: Record<Concept, { words: string[]; category: string[] }> = {
   },
   synagogue: {
     words: ['shul', 'synagogue', 'synagogues', 'daven', 'minyan', 'mincha', 'maariv', 'shacharis', 'pray',
-      'praying', 'prayer', 'prayers'],
+      'praying', 'prayer', 'prayers', 'mussaf', 'musaf', 'service', 'services'],
     category: ['synagogue', 'shul'],
   },
   grocery: {
@@ -182,11 +184,86 @@ export type AskQuery = {
   nearMe: boolean
   /** "open now", "open late", "what's open" — open places first. */
   openNow: boolean
+  /** "within 2 miles", "within a 15 minute drive", "10 minute walk": the
+   *  farthest a result may be, in straight-line miles (see WITHIN). */
+  within: Within | null
+  /** Set when the question is about minyan times ("next maariv", "is there
+   *  a mincha at 1:30", "upcoming minyanim"), for the answer to be worked out
+   *  from the schedules rather than from listing text. */
+  minyan: MinyanAsk | null
   /** The last term, when the query doesn't end in a space: a word still
    *  being typed. It can raise a result but never rule one out — "trader jo"
    *  must not lose Trader Joe's for want of three letters, and "challah th"
    *  (on its way to "the") must not lose every store with challah. */
   partial: string | null
+}
+
+export type MinyanAsk = {
+  /** The tefillos asked about, or null for any minyan. Mincha and Maariv
+   *  include the combined Mincha & Maariv, which answers either. */
+  tefillos: Tefillah[] | null
+  /** A clock time asked about ("at 6:45"), with am/pm only when it was said;
+   *  the answer resolves a bare "6:45" against the tefillah and the clock. */
+  at: { hour: number; minute: number; meridiem: 'am' | 'pm' | null } | null
+}
+
+const TEFILLAH_WORDS: Record<string, Tefillah[] | null> = {
+  shacharis: ['shacharis'],
+  mincha: ['mincha', 'mincha_maariv'],
+  maariv: ['maariv', 'mincha_maariv'],
+  mussaf: ['shabbos_mussaf'],
+  musaf: ['shabbos_mussaf'],
+  minyan: null,
+  daven: null,
+  service: null,
+}
+
+// A time someone typed: "6:45", "6:45pm", "7 pm", "at 7". A bare number
+// counts only after "at", so "1500 walnut" or "20th street" isn't a time.
+const CLOCK = /(?:\bat\s+)?\b(\d{1,2}):(\d{2})\s*(am|pm|a\.m\.|p\.m\.)?|\b(\d{1,2})\s*(am|pm|a\.m\.|p\.m\.)|\bat\s+(\d{1,2})\b(?!:)/i
+
+function readClock(input: string): { at: MinyanAsk['at']; rest: string } {
+  const m = input.match(CLOCK)
+  if (!m) return { at: null, rest: input }
+  const hour = Number(m[1] ?? m[4] ?? m[6])
+  const minute = Number(m[2] ?? 0)
+  const said = (m[3] ?? m[5] ?? '').toLowerCase().replace(/\./g, '')
+  if (hour > 23 || minute > 59) return { at: null, rest: input }
+  const meridiem = said === 'am' || said === 'pm' ? said : hour > 12 ? 'pm' : null
+  return { at: { hour: hour > 12 ? hour - 12 : hour, minute, meridiem }, rest: input.replace(m[0], ' ') }
+}
+
+export type Within = {
+  /** Straight-line miles — what the guide can measure without a paid lookup. */
+  miles: number
+  /** How it was asked, so an answer can say so ("about a 15-minute drive"). */
+  asked: { minutes: number; by: 'drive' | 'walk' } | null
+}
+
+// Minutes of travel to straight-line miles. The guide measures distance as
+// the crow flies, not by road (drive and walk times would be a paid Google
+// lookup per place), so these are deliberately rough: walking at about 3 mph
+// over roughly a quarter more path than the straight line, and driving at an
+// average of about 24 mph once lights, turns and parking are in. Answers say
+// "about", never a promise.
+const MILES_PER_MINUTE = { walk: 1 / 25, drive: 0.4 }
+
+const WITHIN =
+  /\b(?:within|under|less than|no more than|up to)\s+(?:a\s+|an\s+)?(\d+(?:\.\d+)?)\s*(?:-\s*)?(miles?|mi|minutes?|mins?)\b(?:\s+(drive|driving|walk|walking|by car|on foot))?|\b(\d+)\s*(?:-\s*)?(?:minutes?|mins?)\s+(drive|driving|walk|walking)\b/i
+
+function readWithin(input: string): { within: Within | null; rest: string } {
+  const m = input.match(WITHIN)
+  if (!m) return { within: null, rest: input }
+  const rest = input.replace(m[0], ' ')
+  const byWord = (m[3] ?? m[5] ?? '').toLowerCase()
+  const by: 'drive' | 'walk' = byWord.startsWith('walk') || byWord === 'on foot' ? 'walk' : 'drive'
+  if (m[4]) {
+    const minutes = Number(m[4])
+    return { within: { miles: minutes * MILES_PER_MINUTE[by], asked: { minutes, by } }, rest }
+  }
+  const n = Number(m[1])
+  if (/^mi/.test(m[2].toLowerCase()) && !/^min/.test(m[2].toLowerCase())) return { within: { miles: n, asked: null }, rest }
+  return { within: { miles: n * MILES_PER_MINUTE[by], asked: { minutes: n, by } }, rest }
 }
 
 const NEAR_ME = /\b(?:(?:near|close to|closest to|nearest to|around|by|next to) (?:me|here|us)|nearby|near by|close by)\b/g
@@ -197,10 +274,14 @@ const OPEN_NOW = /\b(?:open (?:right now|now|late|today|tonight|on sunday|on fri
  *  searching for them beats showing nothing. */
 export function parseAsk(input: string): AskQuery {
   const raw = input.trim()
+  // A time is read off the text first: once punctuation becomes spaces,
+  // "6:45" is just two numbers that no listing contains.
+  const within = readWithin(raw)
+  const clock = readClock(within.rest)
   // Compared by what `replace` removed rather than with `.test()`: both
   // patterns are global, and a global regex's `.test()` keeps its position
   // between calls, so the next query would be checked from the wrong place.
-  const typed = plainWords(raw).join(' ')
+  const typed = plainWords(clock.rest).join(' ')
   const withoutNear = typed.replace(NEAR_ME, ' ')
   const nearMe = withoutNear !== typed
   const plain = withoutNear.replace(OPEN_NOW, ' ')
@@ -208,7 +289,14 @@ export function parseAsk(input: string): AskQuery {
 
   const terms: string[] = []
   const concepts: AskQuery['concepts'] = []
+  let asksMinyan = false
+  let tefillos: Tefillah[] | null = null
   for (const w of plain.split(' ').filter(Boolean)) {
+    const tefillah = TEFILLAH_WORDS[fold(w)]
+    if (tefillah !== undefined) {
+      asksMinyan = true
+      if (tefillah) tefillos = [...new Set([...(tefillos ?? []), ...tefillah])]
+    }
     const abbreviation = ABBREVIATIONS[w]
     if (abbreviation) {
       terms.push(...abbreviation)
@@ -224,15 +312,17 @@ export function parseAsk(input: string): AskQuery {
     terms.push(folded)
   }
 
+  const minyan: MinyanAsk | null = asksMinyan ? { tefillos, at: clock.at } : null
+  const withinAsked = within.within
   const typing = raw !== '' && !/\s$/.test(input)
   const last = plainWords(raw).at(-1)
   if (terms.length === 0 && concepts.length === 0 && !nearMe && !openNow) {
     const all = words(raw)
-    return { raw, terms: all, concepts, nearMe, openNow, partial: typing && all.length > 1 ? (all.at(-1) ?? null) : null }
+    return { raw, terms: all, concepts, nearMe, openNow, within: withinAsked, minyan, partial: typing && all.length > 1 ? (all.at(-1) ?? null) : null }
   }
   // Only the word under the cursor, and only if it survived as a term.
   const partial = typing && last !== undefined && terms.at(-1) === fold(last) && terms.length > 1 ? (terms.at(-1) ?? null) : null
-  return { raw, terms, concepts, nearMe, openNow, partial }
+  return { raw, terms, concepts, nearMe, openNow, within: withinAsked, minyan, partial }
 }
 
 /** The categories a concept stands for in this community: those whose id or

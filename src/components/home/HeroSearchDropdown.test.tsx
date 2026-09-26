@@ -20,6 +20,8 @@ function makeHit(overrides: Partial<ListingHit> = {}): ListingHit {
     categoryLabel: category.pluralLabel,
     matchedTags: [],
     term: 'food',
+    matched: [],
+    openUntil: null,
     ...overrides,
   }
 }
@@ -120,5 +122,79 @@ describe('HeroSearchDropdown', () => {
 
     await user.click(screen.getByText('Test Grocery'))
     expect(onOpenPlace).toHaveBeenCalledWith(hit)
+  })
+
+  // Reported live: a list of stores for "wine" said nothing about wine until
+  // one was opened. Each result now says what it matched.
+  it('shows the item each listing matched, and when it is only sometimes in stock', () => {
+    render(
+      <HeroSearchDropdown
+        query="challah"
+        cards={[]}
+        placeHits={[
+          makeHit({ item: makeListing({ id: 'a', name: 'ShopRite' }), matched: [{ tag: 'Challah', sometimes: false }] }),
+          makeHit({ item: makeListing({ id: 'b', name: 'GIANT' }), matched: [{ tag: 'Challah', sometimes: true }] }),
+        ]}
+        categories={[]}
+        onCardClick={noop}
+        onOpenPlace={noop}
+      />,
+    )
+    expect(screen.getByText('Challah')).toBeInTheDocument()
+    expect(screen.getByText('Challah · sometimes')).toBeInTheDocument()
+  })
+
+  it('says when a place closes, for an "open now" question', () => {
+    render(
+      <HeroSearchDropdown
+        query="meat open now"
+        cards={[]}
+        placeHits={[makeHit({ openUntil: '11:30 PM' })]}
+        categories={[]}
+        onCardClick={noop}
+        onOpenPlace={noop}
+      />,
+    )
+    expect(screen.getByText('Open until 11:30 PM')).toBeInTheDocument()
+  })
+
+  // The answer to the question sits above the results (see askAnswer.ts).
+  it('shows the answer above the results, and its minyanim open their shul', async () => {
+    const user = userEvent.setup()
+    const onOpenShul = vi.fn()
+    render(
+      <HeroSearchDropdown
+        query="next maariv"
+        cards={[]}
+        placeHits={[makeHit()]}
+        categories={[]}
+        onCardClick={noop}
+        onOpenPlace={noop}
+        answer={{
+          text: 'Next Maariv: 7:15 PM, South Philly Shtiebel.',
+          rows: [{ time: '7:15 PM', label: 'Maariv', shulId: 's1', shulName: 'South Philly Shtiebel', miles: null, tomorrow: false }],
+        }}
+        onOpenShul={onOpenShul}
+      />,
+    )
+    expect(screen.getByText('Next Maariv: 7:15 PM, South Philly Shtiebel.')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /7:15 PM/ }))
+    expect(onOpenShul).toHaveBeenCalledWith('s1')
+  })
+
+  it('shows the answer instead of "nothing matches" when the answer is that nothing is open', () => {
+    render(
+      <HeroSearchDropdown
+        query="meat open now"
+        cards={[]}
+        placeHits={[]}
+        categories={[]}
+        onCardClick={noop}
+        onOpenPlace={noop}
+        answer={{ text: 'Nothing open right now. 11 places match, but all are closed.', rows: [] }}
+      />,
+    )
+    expect(screen.getByText('Nothing open right now. 11 places match, but all are closed.')).toBeInTheDocument()
+    expect(screen.queryByText(/Nothing matches/)).not.toBeInTheDocument()
   })
 })

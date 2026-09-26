@@ -10,6 +10,7 @@ import { isOptimizableImage } from '@/lib/imageHosts'
 import { SkylineIcon } from '@/components/icons'
 import SearchBox from './SearchBox'
 import HeroSearchDropdown from './HeroSearchDropdown'
+import type { Answer } from '@/lib/askAnswer'
 import type { CardDef, ListingHit } from './sections'
 
 /** The `desktop:` variant's own media query (see globals.css) — the hero band is
@@ -52,6 +53,10 @@ type Props = {
   categories?: CategoryConfig[] | null
   onSearchCardClick?: (card: CardDef) => void
   onOpenSearchPlace?: (hit: ListingHit) => void
+  /** The answer to the query, when there is one (see askAnswer.ts) — shown
+   *  at the top of the dropdown. */
+  searchAnswer?: Answer | null
+  onOpenAnswerShul?: (shulId: string) => void
 }
 
 // The home screen's heading, mission, and the filter box + "View Map" button
@@ -129,6 +134,8 @@ export default function HeroHeading({
   categories = null,
   onSearchCardClick,
   onOpenSearchPlace,
+  searchAnswer = null,
+  onOpenAnswerShul,
 }: Props) {
   const { desktopHeroHeadline: headline, desktopHeroSubhead: subhead, desktopHeroImage: heroImage } = settings
 
@@ -370,6 +377,8 @@ export default function HeroHeading({
                   categories={categories}
                   onCardClick={(card) => onSearchCardClick?.(card)}
                   onOpenPlace={(hit) => onOpenSearchPlace?.(hit)}
+                  answer={searchAnswer}
+                  onOpenShul={onOpenAnswerShul}
                 />
               )}
             </div>

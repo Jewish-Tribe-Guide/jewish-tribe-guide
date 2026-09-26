@@ -2,21 +2,13 @@
 
 import Link from 'next/link'
 import Image from 'next/image'
-import { useCategories } from '@/lib/useCategories'
-import { useAllListings } from '@/lib/useAllListings'
 import { useCommunitySlug } from '@/lib/communityContext'
-import { useNow } from '@/lib/useNow'
-import { currentSeason } from '@/lib/season'
-import { DAY_KEYS, dayAndMinutesInTimezone } from '@/lib/hours'
-import { isMinyanim, type Minyan } from '@/lib/davening'
-import { nextUpcomingDavening, type ShulMinyanim } from '@/lib/upcomingDavening'
+import { nextUpcomingDavening } from '@/lib/upcomingDavening'
 import { secularHolidayTomorrow } from '@/lib/secularHolidays'
-import { useZmanim } from '@/lib/useZmanim'
-import { useZmanAnchors, geoOrCommunityDefault } from '@/lib/useZmanAnchors'
+import { useMinyanSchedule } from '@/lib/useMinyanSchedule'
 import type { LatLng } from '@/lib/geo'
 import { routes } from '@/lib/routes'
 import { community } from '@/community.config'
-import type { CategoryConfig, CategoryField } from '@/lib/categories'
 
 // ── The home screen's davening-times card — one line, deliberately. ────────
 //
@@ -49,61 +41,10 @@ import type { CategoryConfig, CategoryField } from '@/lib/categories'
 // (settings.desktopDaveningEyebrow/Heading have no render site left) —
 // same call the user made for the Browse card's "Explore by Category".
 export default function DaveningTimesCard({ coords }: { coords: LatLng | null }) {
-  const categories = useCategories()
-  const listings = useAllListings()
   const communitySlug = useCommunitySlug()
-  const now = useNow()
-
-  const minyanimCategories: { category: CategoryConfig; field: CategoryField }[] = (categories ?? [])
-    .map((c) => ({ category: c, field: c.detailFields.find((f) => f.type === 'minyanim') }))
-    .filter((x): x is { category: CategoryConfig; field: CategoryField } => !!x.field)
-
-  // No community running this app today has more than one such category —
-  // Synagogues — but nothing above assumes exactly one, so this picks the
-  // first (by the categories list's own order) purely to have a single
-  // link target for "All davening times". A community that somehow split
-  // minyanim across two categories would still aggregate every shul's
-  // times correctly above; it would just link to one of them.
-  const linkCategoryId = minyanimCategories[0]?.category.id
-
-  const categoryFieldKey: Record<string, string> = {}
-  for (const { category, field } of minyanimCategories) categoryFieldKey[category.id] = field.key
-
-  const shuls: ShulMinyanim[] = (listings ?? [])
-    .filter((l) => l.category in categoryFieldKey)
-    .map((l) => {
-      const raw = l[categoryFieldKey[l.category]]
-      return { name: l.name, geo: l.geo, minyanim: isMinyanim(raw) ? (raw as Minyan[]) : [] }
-    })
-    .filter((s) => s.minyanim.length > 0)
-
-  // Only shuls with at least one anchor-based row need a resolved sunset —
-  // fetching zmanim for every shul's location regardless would cost a
-  // request per distinct address for a card that mostly doesn't need it.
-  const anchorGeos = shuls
-    .filter((s) => s.minyanim.some((m) => m.anchor))
-    .map((s) => geoOrCommunityDefault(s.geo))
-  const anchors = useZmanAnchors(anchorGeos)
-
-  // In the community's own timezone, not the visitor's device — a visitor
-  // whose device timezone doesn't match (a phone that travelled, a hospital
-  // kiosk set to UTC) would otherwise get handed the wrong day's minyanim
-  // entirely, or a `nowMinutes` off by hours. See dayAndMinutesInTimezone's
-  // own doc for the exact symptom that traced back to here: a "this jumped
-  // to tomorrow" or "showed an afternoon time for a morning minyan" report
-  // that a plain `new Date(now).getDay()`/`.getHours()` would produce
-  // whenever the two timezones disagree.
-  const { day: todayKey, minutes: nowMinutes } = dayAndMinutesInTimezone(now, community.timezone)
-  const tomorrowKey = DAY_KEYS[(DAY_KEYS.indexOf(todayKey) + 1) % 7]
-  const season = currentSeason(now, community.timezone)
-
-  // Falls back to the community's own default location, same as
-  // ShabbatTimesCard — whether today is Yom Tov doesn't depend on which
-  // exact address a visitor set (or hasn't), unlike `coords` above, which
-  // stays the real, ungated visitor location because `nearestMiles` below
-  // would be actively misleading measured from a fallback.
-  const { data: zmanimData } = useZmanim(coords ?? community.mapCenter)
-  const todayDayKeys = zmanimData?.isYomTov ? [todayKey, 'yom_tov' as const] : [todayKey]
+  // Every shul's minyanim, today's day keys and the resolved sunset times —
+  // shared with the search's minyan answers (see useMinyanSchedule).
+  const { linkCategoryId, shuls, anchors, now, tomorrowKey, todayDayKeys, nowMinutes, season } = useMinyanSchedule(coords)
 
   const result = nextUpcomingDavening(shuls, {
     today: todayDayKeys,

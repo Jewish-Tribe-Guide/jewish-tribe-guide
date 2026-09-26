@@ -17,12 +17,18 @@ export type AskHit = {
   /** The listing's tags that the query matched, best first — "Chalav Yisroel
    *  Milk" for "cholov yisroel". */
   matchedTags: string[]
+  /** The same, with whether each is only sometimes in stock (a tag field's
+   *  `_sometimes` companion). What a result shows as the reason it's there:
+   *  a list of stores for "wine" said nothing about wine until you opened one. */
+  matched: { tag: string; sometimes: boolean }[]
   /** Straight-line miles from the place asked about ("near HUP") or, failing
    *  that, from the visitor. Null when neither is known or the listing has no
    *  coordinates. */
   miles: number | null
   /** Open right now, by its saved hours. */
   open: boolean
+  /** When it closes today, "9:00 PM", while it's open; otherwise null. */
+  closesAt: string | null
 }
 
 export type AskResult = {
@@ -33,6 +39,10 @@ export type AskResult = {
   /** The place the question was about, when it said where: "food at HUP",
    *  "shul near Jefferson". Results are measured from it. */
   anchor: DirectoryResource | null
+  /** For an "open now" question: how many places matched but are closed
+   *  right now, and so aren't in `hits`. Lets the page say "none open right
+   *  now" instead of showing nothing, or showing closed places as answers. */
+  closedCount: number
 }
 
 type Prepared = {
@@ -46,18 +56,20 @@ type Prepared = {
   ownWords: string[]
   nameWords: string[]
   initials: string[]
-  tags: { tag: string; words: string[] }[]
+  tags: { tag: string; words: string[]; sometimes: boolean }[]
 }
 
 // Every string-array value on a listing (tag fields and their `_sometimes`
 // companions), for reporting which tags matched. Same set the old home search
-// ranked on.
-function listingTags(item: DirectoryResource): string[] {
-  const out: string[] = []
-  for (const value of Object.values(item)) {
-    if (Array.isArray(value) && value.every((x) => typeof x === 'string')) out.push(...(value as string[]))
+// ranked on. A tag listed both ways counts as always.
+function listingTags(item: DirectoryResource): { tag: string; sometimes: boolean }[] {
+  const out = new Map<string, boolean>()
+  for (const [key, value] of Object.entries(item)) {
+    if (!Array.isArray(value) || !value.every((x) => typeof x === 'string')) continue
+    const sometimes = key.endsWith('_sometimes')
+    for (const tag of value as string[]) out.set(tag, (out.get(tag) ?? true) && sometimes)
   }
-  return out
+  return [...out].map(([tag, sometimes]) => ({ tag, sometimes }))
 }
 
 // The per-listing words, worked out once per listing object. A page searches
@@ -74,7 +86,7 @@ function prepare(item: DirectoryResource, category: CategoryConfig): Prepared {
   // ("Shabbat Friendly"), which listingSearchText leaves out.
   const flags = category.detailFields.filter((f) => f.type === 'boolean' && item[f.key] === true).map((f) => f.label)
   const nameWords = words(item.name)
-  const tags = [...new Set(listingTags(item))].map((tag) => ({ tag, words: words(tag) }))
+  const tags = listingTags(item).map(({ tag, sometimes }) => ({ tag, words: words(tag), sometimes }))
   const p: Prepared = {
     item,
     category,
@@ -134,7 +146,7 @@ export function searchAsk(
   { coords = null, now = new Date(), categoryId, limit }: AskOptions = {},
 ): AskResult {
   const query = parseAsk(input)
-  const empty: AskResult = { query, hits: [], categoryIds: null, anchor: null }
+  const empty: AskResult = { query, hits: [], categoryIds: null, anchor: null, closedCount: 0 }
   if (!query.raw) return empty
 
   const configById = new Map(categories.map((c) => [c.id, c]))
@@ -199,27 +211,43 @@ export function searchAsk(
     }
     if (searchTerms.length && matched === searchTerms.length) score += 5
 
-    const matchedTags = searchTerms.length
+    const matchedItems = searchTerms.length
       ? p.tags
-          .map(({ tag, words: tw }) => ({ tag, n: searchTerms.filter((t) => termMatches(t, tw)).length }))
+          .map(({ tag, words: tw, sometimes }) => ({ tag, sometimes, n: searchTerms.filter((t) => termMatches(t, tw)).length }))
           .filter((t) => t.n > 0)
           .sort((a, b) => b.n - a.n || a.tag.length - b.tag.length)
           .slice(0, 3)
-          .map((t) => t.tag)
+          .map(({ tag, sometimes }) => ({ tag, sometimes }))
       : []
+    const matchedTags = matchedItems.map((m) => m.tag)
     const miles = origin && p.item.geo && p.category.hasAddress !== false ? haversineMiles(origin, p.item.geo) : null
     const keys = hoursKeys(p.category)
-    const open = keys.length > 0 && getOpenStatus(p.item as Record<string, unknown>, keys, now).isOpen
-    hits.push({ item: p.item, category: p.category, score, matchedTags, miles, open })
+    const status = keys.length > 0 ? getOpenStatus(p.item as Record<string, unknown>, keys, now) : null
+    const open = !!status?.isOpen
+    hits.push({ item: p.item, category: p.category, score, matchedTags, matched: matchedItems, miles, open, closesAt: status?.closing?.closeLabel ?? null })
   }
 
-  hits.sort(
+  // "Open now" is a condition, not a preference: a closed place doesn't
+  // answer "which meat restaurants are open now", however well it matches.
+  // It used to only sort open places first, so a better-matching closed one
+  // still came out on top.
+  // "Within 15 minutes' drive" is a condition too, measured from the place
+  // asked about or the visitor. With neither known there's nothing to
+  // measure from, so it can't rule anything out; the answer says so.
+  const inReach = (h: AskHit) => !query.within || !origin || (h.miles !== null && h.miles <= query.within.miles)
+  const answering = hits.filter((h) => (!query.openNow || h.open) && inReach(h))
+  answering.sort(
     (a, b) =>
       b.score - a.score ||
-      (query.openNow ? Number(b.open) - Number(a.open) : 0) ||
       (a.miles ?? Infinity) - (b.miles ?? Infinity) ||
       (b.item.upvotes ?? 0) - (a.item.upvotes ?? 0) ||
       a.item.name.localeCompare(b.item.name),
   )
-  return { query, hits: limit ? hits.slice(0, limit) : hits, categoryIds, anchor }
+  return {
+    query,
+    hits: limit ? answering.slice(0, limit) : answering,
+    categoryIds,
+    anchor,
+    closedCount: hits.length - answering.length,
+  }
 }

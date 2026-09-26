@@ -6,6 +6,8 @@ import type { CategoryConfig } from '@/lib/categories'
 import { getCategoryColor } from '@/lib/categoryColor'
 import CategoryIcon from '@/components/CategoryIcon'
 import type { CardDef, ListingHit } from './sections'
+import type { Answer } from '@/lib/askAnswer'
+import AskAnswer from './AskAnswer'
 
 // How many of each to show before "See all" — matches the mockup this was
 // built from. Categories and listings are capped independently: a broad
@@ -37,6 +39,8 @@ export default function HeroSearchDropdown({
   categories,
   onCardClick,
   onOpenPlace,
+  answer = null,
+  onOpenShul,
 }: {
   /** The trimmed, non-empty query this panel is showing results for. */
   query: string
@@ -46,6 +50,9 @@ export default function HeroSearchDropdown({
   categories: CategoryConfig[] | null
   onCardClick: (card: CardDef) => void
   onOpenPlace: (hit: ListingHit) => void
+  /** The answer to the query, above everything else (see askAnswer.ts). */
+  answer?: Answer | null
+  onOpenShul?: (shulId: string) => void
 }) {
   const [expanded, setExpanded] = useState(false)
   const totalCount = cards.length + placeHits.length
@@ -56,18 +63,25 @@ export default function HeroSearchDropdown({
   const panelClassName =
     'absolute left-0 right-0 top-[calc(100%+8px)] z-20 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_4px_10px_rgba(15,23,42,0.06),0_20px_40px_rgba(15,23,42,0.12)]'
 
+  const answerNode = answer && <AskAnswer answer={answer} onOpenShul={onOpenShul} className="mx-2 mt-2" />
+
   if (totalCount === 0) {
     return (
       <div className={panelClassName}>
-        <p className="px-4 py-4 text-center text-sm text-slate-500">
-          Nothing matches &ldquo;{query}&rdquo;. Try a different word.
-        </p>
+        {answerNode ? (
+          <div className="pb-2">{answerNode}</div>
+        ) : (
+          <p className="px-4 py-4 text-center text-sm text-slate-500">
+            Nothing matches &ldquo;{query}&rdquo;. Try a different word.
+          </p>
+        )}
       </div>
     )
   }
 
   return (
     <div className={panelClassName}>
+      {answerNode}
       <div className="py-1.5">
         {visibleCards.length > 0 && (
           <div>
@@ -118,9 +132,29 @@ export default function HeroSearchDropdown({
                 />
                 <div className="min-w-0">
                   <p className="truncate text-[13.5px] font-semibold text-ink">{hit.item.name}</p>
-                  <p className="truncate text-[12px] text-slate-500">
-                    {hit.categoryLabel}
-                    {hit.item.address ? ` · ${hit.item.address}` : ''}
+                  {/* Why it's here, before where it is: a list of stores for
+                      "wine" used to say nothing about wine until one was
+                      opened. The item it matched, marked when it's only
+                      sometimes in stock, and for "open now" when it closes. */}
+                  <p className="flex min-w-0 items-center gap-1.5 text-[12px] text-slate-500">
+                    {hit.openUntil !== null && (
+                      <span className="shrink-0 rounded-full bg-green-50 px-1.5 font-semibold text-green-700">
+                        {hit.openUntil ? `Open until ${hit.openUntil}` : 'Open now'}
+                      </span>
+                    )}
+                    {hit.matched.slice(0, 2).map((m) => (
+                      <span
+                        key={m.tag}
+                        className={`shrink-0 rounded-full px-1.5 font-semibold ${m.sometimes ? 'bg-caution/10 text-caution' : 'bg-slate-100 text-slate-700'}`}
+                      >
+                        {m.tag}
+                        {m.sometimes ? ' · sometimes' : ''}
+                      </span>
+                    ))}
+                    <span className="truncate">
+                      {hit.categoryLabel}
+                      {hit.item.address ? ` · ${hit.item.address}` : ''}
+                    </span>
                   </p>
                 </div>
               </button>

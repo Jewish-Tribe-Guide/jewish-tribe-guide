@@ -78,6 +78,31 @@ describe('parseAsk', () => {
     }
   })
 
+  it('reads a distance limit, turning travel minutes into rough miles', () => {
+    expect(parseAsk('shul within 1 mile').within).toEqual({ miles: 1, asked: null })
+    expect(parseAsk('grocery within 2 mi').within).toEqual({ miles: 2, asked: null })
+    expect(parseAsk('mikvah open tonight within a 15 minute drive of my location').within).toEqual({
+      miles: 6,
+      asked: { minutes: 15, by: 'drive' },
+    })
+    expect(parseAsk('kosher food 10 minute walk').within?.asked).toEqual({ minutes: 10, by: 'walk' })
+    // The words that said it aren't left behind as things to search for.
+    expect(parseAsk('mikvah within a 15 minute drive').terms).toEqual([])
+  })
+
+  it('reads a minyan question: which tefillah, and a time if one was said', () => {
+    expect(parseAsk('is there a maariv minyan at 6:45').minyan).toEqual({
+      tefillos: ['maariv', 'mincha_maariv'],
+      at: { hour: 6, minute: 45, meridiem: null },
+    })
+    expect(parseAsk('mincha at 1:30pm').minyan?.at).toEqual({ hour: 1, minute: 30, meridiem: 'pm' })
+    expect(parseAsk('upcoming minyanim').minyan).toEqual({ tefillos: null, at: null })
+    expect(parseAsk('can you pull up a list of upcoming minyanim').terms).toEqual([])
+    // A number in an address is not a time, and not a minyan question.
+    expect(parseAsk('1500 walnut').minyan).toBeNull()
+    expect(parseAsk('food at HUP').minyan).toBeNull()
+  })
+
   it('never throws the question away: filler on its own is still searched for', () => {
     expect(parseAsk('kosher').terms).toEqual(['kosher'])
     expect(parseAsk('   ').terms).toEqual([])

@@ -2,7 +2,12 @@
 
 import { useEffect, useMemo, useRef, useState, ViewTransition } from 'react'
 import { track } from '@vercel/analytics'
-import { CardGrid, CategoryTileRow, PlacesResults, cardMatches, searchListings, groupCardsIntoSections, resourceCards, useEntryCards } from '@/components/home/sections'
+import { CardGrid, CategoryTileRow, PlacesResults, cardMatches, listingHitsFrom, groupCardsIntoSections, resourceCards, useEntryCards } from '@/components/home/sections'
+import AskAnswer from '@/components/home/AskAnswer'
+import { searchAsk } from '@/lib/askSearch'
+import { answerFor } from '@/lib/askAnswer'
+import { listMinyanim } from '@/lib/upcomingDavening'
+import { useMinyanSchedule } from '@/lib/useMinyanSchedule'
 import HeroHeading from '@/components/home/HeroHeading'
 import DaveningTimesCard from '@/components/home/DaveningTimesCard'
 import UpdateListingsCard from '@/components/home/UpdateListingsCard'
@@ -121,9 +126,41 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: LandingProps
   const loading = !q && allCards === null
   const filtered = q && allCards ? allCards.filter((c) => cardMatches(c, q, categories ?? [])) : allCards
 
-  // Individual places that match the query by name + tags (e.g. a grocery store
-  // with a "cheese" tag for "kosher cheese"). Only computed once the visitor types.
-  const placeHits = q && listings ? searchListings(listings, categories ?? [], q, coords) : []
+  // The search, read as a question (see askSearch.ts), run once: the places
+  // it finds and the answer above them (see askAnswer.ts) both come off this
+  // one result. Only computed once the visitor types. Against useMinyanSchedule's
+  // clock, not a fresh `new Date()` in render (which Cache Components rejects),
+  // so "open now" and the next minyan agree on what now is.
+  const schedule = useMinyanSchedule(coords)
+  // Not wrapped in useMemo: the React Compiler memoizes this component, and
+  // searchAsk caches each listing's words, so a keystroke stays cheap.
+  const askResult = q && listings ? searchAsk(listings, categories ?? [], q, { coords, now: new Date(schedule.now) }) : null
+  const placeHits = askResult ? listingHitsFrom(askResult, coords) : []
+  const answer = askResult
+    ? answerFor(askResult, {
+        coords,
+        schedule: askResult.query.minyan
+          ? {
+              ...listMinyanim(schedule.shuls, {
+                today: schedule.todayDayKeys,
+                tomorrow: [schedule.tomorrowKey],
+                season: schedule.season,
+                anchors: schedule.anchors,
+              }),
+              nowMinutes: schedule.nowMinutes,
+            }
+          : null,
+      })
+    : null
+  // A shul named in a minyan answer opens its listing, the same way a place
+  // in the results does.
+  const openShul = (shulId: string) => {
+    const shul = listings?.find((l) => l.id === shulId)
+    if (!shul) return
+    track('listing_opened', { listing: shul.name, category: shul.category, source: 'search-answer' })
+    countEvent(communitySlug, 'listing_view', shul.id)
+    onNavigate('patient', 'find', { findView: shul.category, findItemId: shul.id })
+  }
 
   // Tapping a place opens its category directory with just that place
   // expanded — not also pre-filtered to the matched search term. That used
@@ -150,7 +187,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: LandingProps
   // looks like a "miss".
   useLogSearchMiss({
     query,
-    hasResults: (filtered?.length ?? 0) > 0 || placeHits.length > 0,
+    hasResults: (filtered?.length ?? 0) > 0 || placeHits.length > 0 || answer !== null,
     ready: allCards !== null && listings !== null,
     source: 'Home',
   })
@@ -194,7 +231,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: LandingProps
 
   // Shared between mobile's permanent grid and desktop's search results —
   // see below for why the two don't share one JSX node any more.
-  const noMatchesMessage = q && (filtered?.length ?? 0) === 0 && placeHits.length === 0 && (
+  const noMatchesMessage = q && !answer && (filtered?.length ?? 0) === 0 && placeHits.length === 0 && (
     <p className="text-center text-sm text-slate-500">
       Nothing matches “{q}”. Try a different word or clear the filter.
     </p>
@@ -219,6 +256,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: LandingProps
   // styled like "Places", over every matching card regardless of section.
   const mobileResultsNode = (
     <>
+      {q && answer && <AskAnswer answer={answer} onOpenShul={openShul} />}
       {noMatchesMessage}
       {loading ? (
         <CardGrid cards={entryCards} loadingCount={6} />
@@ -359,6 +397,8 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: LandingProps
           }}
           searchCards={filtered}
           searchPlaceHits={placeHits}
+          searchAnswer={answer}
+          onOpenAnswerShul={openShul}
           categories={categories}
           onSearchCardClick={(card) => track('category_opened', { category: card.id ?? card.title, source: 'hero-search' })}
           onOpenSearchPlace={(hit) => openPlace(hit)}

@@ -7,6 +7,9 @@ import type { LatLng } from './geo'
  *  DirectoryResource carries far more than this, and this stays independent
  *  of that type so it can be unit-tested with plain literals. */
 export type ShulMinyanim = {
+  /** The listing's id, when the caller has one — carried through to
+   *  `MinyanSlot` so an answer can open the shul it names. */
+  id?: string
   name: string
   geo?: LatLng | null
   minyanim: Minyan[]
@@ -41,6 +44,7 @@ export type UpcomingDavening = {
 }
 
 type Candidate = {
+  shulId?: string
   shulName: string
   shulGeo: LatLng | null | undefined
   tefillah: Tefillah
@@ -132,7 +136,7 @@ function collectCandidates(
       const minutes = parseTimeToMinutes(time)
       if (!Number.isFinite(minutes)) continue // free text ("Call to Confirm") — no number to sort by
 
-      out.push({ shulName: shul.name, shulGeo: shul.geo, tefillah: row.tefillah, minutes, time })
+      out.push({ shulId: shul.id, shulName: shul.name, shulGeo: shul.geo, tefillah: row.tefillah, minutes, time })
     }
   }
   return out
@@ -159,6 +163,38 @@ function buildResult(candidates: Candidate[], isTomorrow: boolean): UpcomingDave
     shul: shulNames.length === 1 ? { name: shulNames[0], geo: group[0].shulGeo } : null,
     shulCount: shulNames.length,
     shulGeos: group.map((c) => c.shulGeo),
+  }
+}
+
+/** One minyan on one day, resolved to a clock time. */
+export type MinyanSlot = {
+  shulId?: string
+  shulName: string
+  shulGeo: LatLng | null | undefined
+  tefillah: Tefillah
+  /** "7:14 PM", or the row's own clock text ("7:00am") for a fixed time. */
+  time: string
+  /** Minutes since local midnight of its own day. */
+  minutes: number
+}
+
+/**
+ * Every minyan today and tomorrow that resolves to a real time, earliest
+ * first — the full list nextUpcomingDavening picks its one answer from, for a
+ * search that asks about more than the next minyan ("is there a maariv at
+ * 6:45", "upcoming minyanim"). Same rules for what counts: the day keys the
+ * caller resolved, in season, and a time that parses (see
+ * nextUpcomingDavening's own doc). Not filtered by the clock: the caller
+ * decides whether a minyan earlier today still matters to the question.
+ */
+export function listMinyanim(
+  shuls: ShulMinyanim[],
+  opts: { today: MinyanDayKey[]; tomorrow: MinyanDayKey[]; season: Season | null; anchors: Record<string, AnchorTimes> },
+): { today: MinyanSlot[]; tomorrow: MinyanSlot[] } {
+  const sorted = (c: Candidate[]) => c.sort((a, b) => a.minutes - b.minutes || a.shulName.localeCompare(b.shulName))
+  return {
+    today: sorted(collectCandidates(shuls, opts.today, opts.season, opts.anchors)),
+    tomorrow: sorted(collectCandidates(shuls, opts.tomorrow, opts.season, opts.anchors)),
   }
 }
 

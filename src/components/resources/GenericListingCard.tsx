@@ -160,6 +160,10 @@ type Props = {
    *  inert arrow at either end instead of no arrow at all. */
   hasPrev?: boolean
   hasNext?: boolean
+  /** The items a search matched on this listing, shown as chips on the
+   *  collapsed card so a search result says why it's there ("Wine",
+   *  "Challah · sometimes") instead of only "6 kosher items". */
+  matchedItems?: { tag: string; sometimes: boolean }[]
 }
 
 export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(function GenericListingCard({
@@ -180,6 +184,7 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
   onNavigate,
   hasPrev,
   hasNext,
+  matchedItems,
   onExpandedChange,
 }, ref) {
   const [expanded, setExpanded] = useState(!!defaultExpanded)
@@ -445,7 +450,8 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
   // restated in its own header on desktop (the card behind it is obscured by
   // the modal's backdrop), and computing it twice would be two places a
   // badge rule could drift out of sync.
-  const badgeRow = (isOpen || closure || visibleHeaderBadges.length > 0 || countHeaderCount > 0) ? (
+  const matchedChips = matchedItems?.length ? matchedItems : null
+  const badgeRow = (isOpen || closure || visibleHeaderBadges.length > 0 || countHeaderCount > 0 || matchedChips) ? (
     <>
       {/* Closure outranks everything: it used to appear only once the card
           was expanded, so a temporarily-closed shop was indistinguishable
@@ -467,6 +473,14 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
       ) : (
         <Chip tone="green" onClick={(e) => { e.stopPropagation(); onFilterOpen() }} title="Filter to listings open now">
           Open
+        </Chip>
+      ))}
+      {/* What a search matched here — see matchedItems. Not clickable: the
+          card's own tap target opens the listing, which is where to go next. */}
+      {matchedChips?.map((m) => (
+        <Chip key={m.tag} tone={m.sometimes ? 'amber' : 'slate'}>
+          {m.tag}
+          {m.sometimes ? ' · sometimes' : ''}
         </Chip>
       ))}
       {countHeaderCount > 0 && countHeaderField && (() => {

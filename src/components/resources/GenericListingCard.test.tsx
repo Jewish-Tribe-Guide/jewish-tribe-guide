@@ -547,6 +547,30 @@ describe('GenericListingCard — desktop modal header url field', () => {
   })
 })
 
+// A search result shows what it matched, so a list of stores for "wine" says
+// wine without opening each one.
+describe('GenericListingCard — items a search matched', () => {
+  it('shows each matched item on the collapsed card, marking "sometimes" ones', () => {
+    const category = makeCategory({
+      detailFields: [{ key: 'items', label: 'Kosher items available', type: 'tags', showCountInHeader: true, countLabel: 'kosher item' }],
+    })
+    const item = makeListing({ items: ['Wine', 'Bread'], items_sometimes: ['Challah'] })
+    renderWithProviders(
+      <GenericListingCard
+        item={item}
+        category={category}
+        upvotes={false}
+        count={0}
+        {...requiredHandlers}
+        matchedItems={[{ tag: 'Wine', sometimes: false }, { tag: 'Challah', sometimes: true }]}
+      />,
+    )
+
+    expect(screen.getByText('Wine')).toBeInTheDocument()
+    expect(screen.getByText('Challah · sometimes')).toBeInTheDocument()
+  })
+})
+
 describe('GenericListingCard — count badge', () => {
   // The count itself is bold (see GenericListingCard's own comment on why —
   // a slate chip is deliberately quiet, but the number needs to stand out as
