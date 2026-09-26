@@ -9,6 +9,8 @@ import { useNow } from '@/lib/useNow'
 import HoursDisplay from './HoursDisplay'
 import DaveningTimes, { hasDaveningTimes } from './DaveningTimes'
 import Chip from './Chip'
+import Highlight from './Highlight'
+import type { SearchFound } from '@/lib/askSearch'
 import { directionsUrl, destinationQuery } from '@/lib/googleMapsLinks'
 import { formatPhone } from '@/lib/validation'
 import { useOptionalLocation } from '@/lib/locationContext'
@@ -149,6 +151,11 @@ type Props = {
    *  at all, so it leaves this off and gets the chip here instead — it was
    *  otherwise invisible there entirely, not just duplicated. */
   hideCountBadge?: boolean
+  /** What the search that opened this listing matched in it (see
+   *  SearchFound). Named at the top and marked in the item list, first:
+   *  opening Trader Joe's for "cheese" used to leave the cheese to be found
+   *  again among everything else it stocks. */
+  found?: SearchFound | null
 }
 
 /**
@@ -160,7 +167,7 @@ type Props = {
  * where it's opened from. Callers add their own header and any
  * caller-specific extras (e.g. the card's Edit/Report footer) around this.
  */
-export default function PlaceDetailBody({ item, category, onTagClick, onFilterOpen, onFilterBool, onFilterSelect, hideOpenStatus, hiddenBadgeKeys = [], includeHeaderUrlFields = false, hideCountBadge }: Props) {
+export default function PlaceDetailBody({ item, category, onTagClick, onFilterOpen, onFilterBool, onFilterSelect, hideOpenStatus, hiddenBadgeKeys = [], includeHeaderUrlFields = false, hideCountBadge, found = null }: Props) {
   // null outside a LocationProvider (the admin's category preview) — see
   // useOptionalLocation's own doc comment.
   const location = useOptionalLocation()
@@ -442,9 +449,12 @@ export default function PlaceDetailBody({ item, category, onTagClick, onFilterOp
   // one indistinguishable list. Captioned with the field's own admin-set
   // `label`, the same pattern daveningSection already uses. Fields with no
   // values on this listing are skipped, not shown empty.
+  const foundTags = new Set(found?.items.map((m) => m.tag) ?? [])
+  // What the search asked for goes first, so a long list's clamp can't hide it.
+  const foundFirst = (tags: string[]) => [...tags.filter((t) => foundTags.has(t)), ...tags.filter((t) => !foundTags.has(t))]
   const tagsSections = tagFields.flatMap((f) => {
-    const fieldTags = asTags(item[f.key])
-    const fieldTagsSometimes = asTags(item[f.key + '_sometimes'])
+    const fieldTags = foundFirst(asTags(item[f.key]))
+    const fieldTagsSometimes = foundFirst(asTags(item[f.key + '_sometimes']))
     if (fieldTags.length === 0 && fieldTagsSometimes.length === 0) return []
     return [
       <div key={f.key} className="space-y-2">
@@ -457,13 +467,13 @@ export default function PlaceDetailBody({ item, category, onTagClick, onFilterOp
         <ClampedChipRow>
           {[
             ...fieldTags.map((t) => (
-              <Chip key={t} tone="slate" size="expanded" onClick={onTagClick && ((e) => { e.stopPropagation(); onTagClick(t) })} title={onTagClick ? `Find places with ${t}` : undefined}>
+              <Chip key={t} tone={foundTags.has(t) ? 'match' : 'slate'} size="expanded" onClick={onTagClick && ((e) => { e.stopPropagation(); onTagClick(t) })} title={onTagClick ? `Find places with ${t}` : undefined}>
                 {t}
               </Chip>
             )),
             ...fieldTagsSometimes.map((t) => (
               <span key={`sometimes:${t}`} className="relative group/tip">
-                <Chip tone="amber" size="expanded" onClick={onTagClick && ((e) => { e.stopPropagation(); onTagClick(t) })}>
+                <Chip tone={foundTags.has(t) ? 'match' : 'amber'} size="expanded" onClick={onTagClick && ((e) => { e.stopPropagation(); onTagClick(t) })}>
                   ~{t}
                 </Chip>
                 <span className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-1.5 whitespace-nowrap rounded bg-slate-800 px-2 py-1 text-[11px] leading-none text-white opacity-0 transition-opacity duration-150 group-hover/tip:opacity-100 hidden desktop:block z-10">
@@ -567,7 +577,39 @@ export default function PlaceDetailBody({ item, category, onTagClick, onFilterOp
   // Caught live: Networking's "The Chevra" (no address/phone/hours — an
   // empty addressSection) showed a stray `<hr>` before its Description
   // with nothing above it.
-  const sections = [statusSection, actionsSection, addressSection, daveningSection, detailBadgesSection, rowFieldsSection, ...tagsSections, caveatSection]
+  // ── What the search found here ─────────────────────────────────────────
+  // First thing in the listing: the items the search matched, or the other
+  // field it matched on, with the words asked for in bold. The item list
+  // itself is usually well down a grocery's page.
+  const foundSection = found && (found.items.length > 0 || found.fields.length > 0) && (
+    <div className="rounded-lg bg-brand-teal/[0.07] px-3 py-2.5" data-testid="search-found">
+      <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wide text-brand-teal-dark">Matches your search</p>
+      {found.items.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {found.items.map((m) => (
+            <Chip key={m.tag} tone="match" size="expanded">
+              <Highlight text={m.tag} terms={found.terms} allowTypos />
+              {m.sometimes ? ' · not always in stock' : ''}
+            </Chip>
+          ))}
+        </div>
+      )}
+      {found.fields.map((f) => (
+        <p key={f.label} className="text-sm text-slate-700">
+          {f.text ? (
+            <>
+              <span className="text-muted">{f.label}: </span>
+              <Highlight text={f.text} terms={found.terms} />
+            </>
+          ) : (
+            <Highlight text={f.label} terms={found.terms} />
+          )}
+        </p>
+      ))}
+    </div>
+  )
+
+  const sections = [foundSection, statusSection, actionsSection, addressSection, daveningSection, detailBadgesSection, rowFieldsSection, ...tagsSections, caveatSection]
     .filter((s): s is Exclude<typeof s, false | null | undefined> => !!s)
 
   return (

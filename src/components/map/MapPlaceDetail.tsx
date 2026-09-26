@@ -30,6 +30,8 @@ type Props = {
    *  map has no such filters, so it passes none and those chips are plain
    *  labels. */
   filters?: Pick<ComponentProps<typeof PlaceDetailBody>, 'onTagClick' | 'onFilterOpen' | 'onFilterBool' | 'onFilterSelect'>
+  /** What the search that opened it matched — see PlaceDetailBody's `found`. */
+  found?: ComponentProps<typeof PlaceDetailBody>['found']
 }
 
 /** The nearest ancestor that scrolls, i.e. the parent's scroll region. */
@@ -57,7 +59,7 @@ function scrollingAncestor(el: HTMLElement | null): HTMLElement | null {
  * results against each other), which doesn't mean anything for a single
  * place already selected on the map.
  */
-export default function MapPlaceDetail({ item, category, color, onBack, filters }: Props) {
+export default function MapPlaceDetail({ item, category, color, onBack, filters, found }: Props) {
   const community = useCommunitySlug()
   const listingPath = routes.listing(community, category.id, listingSlug(item))
   const { isPinned } = usePinned()
@@ -195,7 +197,7 @@ export default function MapPlaceDetail({ item, category, color, onBack, filters 
           GenericListingCard's mobile accordion does — a showInHeader url
           field (e.g. Networking's Website link) had nowhere to show at all
           here. See the prop's own comment. */}
-      <PlaceDetailBody item={item} category={category} includeHeaderUrlFields {...filters} />
+      <PlaceDetailBody item={item} category={category} includeHeaderUrlFields found={found} {...filters} />
 
       <div className="pt-2 border-t border-slate-200 space-y-2">
         {/* The freshness STATUS only. Its quiet "Suggest a correction" link

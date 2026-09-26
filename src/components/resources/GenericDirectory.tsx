@@ -16,7 +16,7 @@ import DaveningTimesModal from '@/components/synagogues/DaveningTimesModal'
 import { PlusIcon, ClockIcon } from '@/components/icons'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { useScrollShowHide, useSetScreenHeader } from '@/lib/headerVisibility'
-import { searchAsk } from '@/lib/askSearch'
+import { foundFor, searchAsk } from '@/lib/askSearch'
 import { travelCompare } from '@/lib/listingTravel'
 import { useLogSearchMiss } from '@/lib/useLogSearchMiss'
 import { ui } from '@/lib/uiConfig'
@@ -38,6 +38,10 @@ type Props = {
   addressPrompt?: boolean
   /** A listing to mount already expanded (restored after returning from a form). */
   reopenItemId?: string | null
+  /** The search that found `reopenItemId` elsewhere (the home search, as
+   *  `?match=`). Doesn't filter this list; only marks, in that listing,
+   *  what the search matched. */
+  reopenMatch?: string | null
   /** Seed the search box (e.g. "cheese" from a landing "Places" result). */
   initialSearch?: string
   /** Seed the "Open now" filter — `?openNow=1`, see onParamsChange below. */
@@ -88,7 +92,7 @@ type Props = {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function GenericDirectory({ category, items, anchorLabel, addressPrompt, reopenItemId, initialSearch, initialOpenNow, initialFilters, openDaveningModal, initialDaveningDay, onUp, onAdd, onEdit, onParamsChange }: Props) {
+export default function GenericDirectory({ category, items, anchorLabel, addressPrompt, reopenItemId, reopenMatch = null, initialSearch, initialOpenNow, initialFilters, openDaveningModal, initialDaveningDay, onUp, onAdd, onEdit, onParamsChange }: Props) {
   // Hands the shared header this screen's own title + "up" handler — on
   // mobile, SiteHeader shows "‹ {category.pluralLabel}" in place of the site
   // name while this is mounted, and reverts automatically on unmount (see
@@ -739,11 +743,26 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // limited to this category — so a place tapped there ("where can I get
   // cholov yisroel milk") survives this filter, and "kosher food" on the
   // restaurant page means every restaurant rather than none.
-  const askMatches = useMemo(
-    () => (q ? new Set(searchAsk(items, [category], search, { categoryId: category.id }).hits.map((h) => h.item.id)) : null),
-    [q, items, category, search],
-  )
+  // Each match keeps what it matched on (see SearchFound), for the card to
+  // say why it's here and the listing to mark it once opened.
+  const askMatches = useMemo(() => {
+    if (!q) return null
+    const result = searchAsk(items, [category], search, { categoryId: category.id })
+    return new Map(result.hits.map((h) => [h.item.id, foundFor(h, result)]))
+  }, [q, items, category, search])
   const matchesSearch = (item: DirectoryResource) => askMatches === null || askMatches.has(item.id)
+  // A listing opened from the home search: what that search matched in it.
+  // Until that listing is closed — reopened later, it's just the listing.
+  const [closedMatchFor, setClosedMatchFor] = useState<string | null>(null)
+  const reopenKey = reopenItemId && reopenMatch ? `${reopenItemId}\n${reopenMatch}` : null
+  const reopenFound = useMemo(() => {
+    const reopened = reopenKey && items.find((i) => i.id === reopenItemId)
+    if (!reopened || !reopenMatch) return null
+    const result = searchAsk([reopened], [category], reopenMatch, { categoryId: category.id })
+    return result.hits[0] ? foundFor(result.hits[0], result) : null
+  }, [reopenKey, reopenItemId, reopenMatch, items, category])
+  const foundOn = (item: DirectoryResource) =>
+    askMatches?.get(item.id) ?? (item.id === reopenItemId && closedMatchFor !== reopenKey ? reopenFound : null)
 
   const filtered = items
     .filter((item) => {
@@ -1566,8 +1585,10 @@ export default function GenericDirectory({ category, items, anchorLabel, address
               // pile up browser-back history entries the way opening an
               // Add/Edit/Report form (which does use push, see
               // FindResources' openAction) reasonably does.
+              found={foundOn(item)}
               onExpandedChange={(expanded) => {
-                onParamsChange?.({ item: expanded ? item.id : null }, { replace: true })
+                onParamsChange?.({ item: expanded ? item.id : null, ...(expanded ? {} : { match: null }) }, { replace: true })
+                if (!expanded && item.id === reopenItemId) setClosedMatchFor(reopenKey)
                 // See openDialogItemId's own note. Cleared by id rather
                 // than unconditionally: arrow-key next/prev closes
                 // one card and opens a sibling in the same commit, and the

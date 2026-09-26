@@ -313,3 +313,48 @@ describe('PlaceDetailBody — tags field caption', () => {
     expect(screen.queryByText('Kosher Items')).not.toBeInTheDocument()
   })
 })
+
+// Opening a listing from a search used to leave what was searched for to be
+// found again among everything the store stocks.
+describe('PlaceDetailBody — what the search found', () => {
+  const category = makeCategory({ detailFields: [{ key: 'm', label: 'Kosher items', type: 'tags' }] })
+  const item = makeListing({ m: ['Challah', 'Wine', 'Cheddar Cheese', 'Hummus'], m_sometimes: ['Goat Cheese'] })
+  const found = {
+    terms: ['cheese'],
+    items: [
+      { tag: 'Cheddar Cheese', sometimes: false },
+      { tag: 'Goat Cheese', sometimes: true },
+    ],
+    fields: [],
+  }
+
+  it('names what matched at the top, with the words asked for in bold', () => {
+    render(<PlaceDetailBody item={item} category={category} found={found} />)
+    const box = screen.getByTestId('search-found')
+    expect(box).toHaveTextContent('Matches your search')
+    expect(box).toHaveTextContent('Cheddar Cheese')
+    expect(box).toHaveTextContent('Goat Cheese · not always in stock')
+    expect([...box.querySelectorAll('mark')].map((m) => m.textContent)).toEqual(['Cheese', 'Cheese'])
+  })
+
+  it('puts the matched items first in the item list, marked', () => {
+    render(<PlaceDetailBody item={item} category={category} found={found} />)
+    const list = screen.getByText('Kosher items').parentElement!
+    const chips = [...list.querySelectorAll('span, button')].filter((el) => el.children.length === 0 && el.textContent)
+    expect(chips.map((c) => c.textContent)[0]).toBe('Cheddar Cheese')
+    expect(chips[0].className).toContain('brand-teal')
+    expect(chips.find((c) => c.textContent === 'Challah')!.className).not.toContain('brand-teal')
+  })
+
+  it('shows the field it matched on when no item did', () => {
+    const cert = { terms: ['keystone'], items: [], fields: [{ label: 'Hechsher', text: 'Keystone-K' }] }
+    render(<PlaceDetailBody item={item} category={category} found={cert} />)
+    expect(screen.getByTestId('search-found')).toHaveTextContent('Hechsher: Keystone-K')
+    expect(screen.getByTestId('search-found').querySelector('mark')?.textContent).toBe('Keystone')
+  })
+
+  it('shows nothing extra without a search', () => {
+    render(<PlaceDetailBody item={item} category={category} />)
+    expect(screen.queryByTestId('search-found')).not.toBeInTheDocument()
+  })
+})

@@ -178,6 +178,9 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: LandingProps
     onNavigate('patient', 'find', {
       findView: hit.item.category,
       findItemId: hit.item.id,
+      // The search itself, so the listing it opens can mark what matched
+      // (see PlaceDetailBody's `found`).
+      ...(hit.found && !action ? { findMatch: q } : {}),
       ...(action ? { findAction: action } : {}),
     })
   }

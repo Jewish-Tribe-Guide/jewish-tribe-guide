@@ -328,6 +328,28 @@ describe('Landing', () => {
     })
   })
 
+  // …but it does carry the search, for the opened listing to mark what
+  // matched (not to narrow anything).
+  it('opening a listing found by one of its items carries the search along, to mark it', async () => {
+    const user = userEvent.setup()
+    vi.mocked(handlers.onNavigate).mockClear()
+    const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores', detailFields: [{ key: 'm', label: 'Kosher items', type: 'tags' }] })
+    renderLanding(
+      undefined,
+      { content: { categories: [grocery] } },
+      [makeListing({ id: 'l1', category: 'grocery', name: 'Test Grocery', m: ['Cheddar Cheese'] })],
+    )
+
+    await user.type(screen.getAllByLabelText('Search resources')[0]!, 'cheddar')
+    await user.click(screen.getAllByText('Test Grocery')[0]!)
+
+    expect(handlers.onNavigate).toHaveBeenCalledWith('patient', 'find', {
+      findView: 'grocery',
+      findItemId: 'l1',
+      findMatch: 'cheddar',
+    })
+  })
+
   // The map is retired as a home-screen card (the user's own call — it only
   // ever lives at its own full-screen route now), so the hero's "View Map"
   // button has one job unconditionally: navigate there. No more "scroll to

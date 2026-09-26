@@ -9,7 +9,7 @@ import type { DirectoryResource, NavigateFn } from '@/types'
 import { isOptimizableImage } from '@/lib/imageHosts'
 import { haversineMiles } from '@/lib/geo'
 import { conceptCategories, parseAsk, termMatches, termsRequired, words } from '@/lib/ask'
-import { searchAsk, type AskResult } from '@/lib/askSearch'
+import { foundFor, searchAsk, type AskResult, type SearchFound } from '@/lib/askSearch'
 import { hitHoursNote } from '@/lib/askAnswer'
 import { GenericListingCard } from '@/components/resources/GenericListingCard'
 import { useForm, useForms } from '@/lib/useForms'
@@ -633,6 +633,9 @@ export type ListingHit = {
    *  it ("Men's open until 10:00 AM"), or that it has none listed. Null for
    *  any other question. */
   hours: { text: string; known: boolean } | null
+  /** Everything the search matched on it, and the words to bold — shown as
+   *  its reason, and carried into the listing it opens (see SearchFound). */
+  found: SearchFound | null
 }
 
 /** Individual listings that answer the query (see askSearch.ts): name,
@@ -675,6 +678,7 @@ export function listingHitsFrom(
     term: h.matchedTags[0] ?? query.trim(),
     matched: h.matched,
     hours: hitHoursNote(h, asked),
+    found: foundFor(h, result),
   }))
 }
 
@@ -726,7 +730,7 @@ export function PlacesResults({
               onFilterBool={() => onOpen(hit)}
               onFilterSelect={() => onOpen(hit)}
               onEdit={() => onOpen(hit, 'edit')}
-              matchedItems={hit.matched}
+              found={hit.found}
             />
           </div>
         ))}

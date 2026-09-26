@@ -46,6 +46,7 @@ vi.mock('./GenericListingCard', () => ({
       onNavigate,
       showDistanceSlot,
       onExpandedChange,
+      found,
     }: {
       item: DirectoryResource
       defaultExpanded?: boolean
@@ -55,6 +56,7 @@ vi.mock('./GenericListingCard', () => ({
       onNavigate?: (direction: 1 | -1) => void
       showDistanceSlot?: boolean
       onExpandedChange?: (expanded: boolean) => void
+      found?: { items: { tag: string }[]; fields: { label: string }[] } | null
     },
     ref: Ref<{
       open: () => void
@@ -85,6 +87,7 @@ vi.mock('./GenericListingCard', () => ({
         <span>{item.name}</span>
         {showDistanceSlot && <span>distance-slot {item.name}</span>}
         {expanded && <span>Expanded {item.name}</span>}
+        {found && <span>found on {item.name}: {[...found.items.map((m) => m.tag), ...found.fields.map((f) => f.label)].join(', ')}</span>}
         <button onClick={onEdit}>Edit {item.name}</button>
         <button onClick={() => onTagClick('cheese')}>tag {item.name}</button>
         <button onClick={() => onFilterBool('isKosher')}>card-filter {item.name}</button>
@@ -876,7 +879,7 @@ describe('GenericDirectory — syncing ?item with the expanded listing', () => {
 
     await user.click(screen.getByRole('button', { name: 'Collapse Kosher Mart' }))
 
-    expect(onParamsChange).toHaveBeenCalledWith({ item: null }, { replace: true })
+    expect(onParamsChange).toHaveBeenCalledWith({ item: null, match: null }, { replace: true })
   })
 })
 
@@ -1151,5 +1154,44 @@ describe('GenericDirectory — desktop category badge (morph target)', () => {
     renderWithProviders(<GenericDirectory category={category} items={[]} {...handlers} />)
 
     expect(document.querySelector('[class*="h-16"][class*="w-16"]')).not.toBeInTheDocument()
+  })
+})
+
+// What a search matched on a listing, for the card to say why it's there
+// and the listing to mark it once opened (see SearchFound).
+describe('GenericDirectory — what a search matched', () => {
+  const grocery = makeCategory({ id: 'grocery', detailFields: [{ key: 'm', label: 'Kosher items', type: 'tags' }] })
+  const cheesy = makeListing({ id: 'tj', name: "Trader Joe's", category: 'grocery', m: ['Challah', 'Cheddar Cheese'] })
+  const plain = makeListing({ id: 'ac', name: 'ACME', category: 'grocery', m: ['Challah'] })
+
+  it("gives each match on this page's own search what it matched", () => {
+    renderWithProviders(<GenericDirectory category={grocery} items={[cheesy, plain]} {...handlers} initialSearch="cheese" />)
+    expect(screen.getByText("found on Trader Joe's: Cheddar Cheese")).toBeInTheDocument()
+  })
+
+  it('marks what the home search matched in the listing it opened, without filtering the list', () => {
+    renderWithProviders(
+      <GenericDirectory category={grocery} items={[cheesy, plain]} {...handlers} reopenItemId="tj" reopenMatch="cheese" />,
+    )
+    expect(screen.getByText("found on Trader Joe's: Cheddar Cheese")).toBeInTheDocument()
+    expect(screen.getByText('ACME')).toBeInTheDocument()
+  })
+
+  it('stops marking it once that listing is closed, and clears ?match', async () => {
+    const user = userEvent.setup()
+    const onParamsChange = vi.fn()
+    renderWithProviders(
+      <GenericDirectory
+        category={grocery}
+        items={[cheesy, plain]}
+        {...handlers}
+        reopenItemId="tj"
+        reopenMatch="cheese"
+        onParamsChange={onParamsChange}
+      />,
+    )
+    await user.click(screen.getByRole('button', { name: "Collapse Trader Joe's" }))
+    expect(screen.queryByText(/found on Trader Joe's/)).not.toBeInTheDocument()
+    expect(onParamsChange).toHaveBeenCalledWith({ item: null, match: null }, { replace: true })
   })
 })

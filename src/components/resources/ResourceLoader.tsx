@@ -20,6 +20,8 @@ type Props = {
   anchor: DirectoryAnchor
   /** When returning from a form, re-expand this listing's card. */
   reopenItemId?: string | null
+  /** The search that found `reopenItemId` — see GenericDirectory's own doc. */
+  reopenMatch?: string | null
   /** Pre-fill the directory's search box (from a landing "Places" result). */
   initialSearch?: string
   /** Pre-set the "Open now" filter — see GenericDirectory's own doc. */
@@ -46,7 +48,7 @@ type Props = {
 
 // Every category renders via the generic, hint-driven card renderer (badges,
 // filters, kosher-item tags + search, and upvotes — all from category config).
-export default function ResourceLoader({ category, items, anchor, reopenItemId, initialSearch, initialOpenNow, initialFilters, openDaveningModal, initialDaveningDay, onUp, upLabel = 'All resources', onAdd, onEdit, onParamsChange }: Props) {
+export default function ResourceLoader({ category, items, anchor, reopenItemId, reopenMatch, initialSearch, initialOpenNow, initialFilters, openDaveningModal, initialDaveningDay, onUp, upLabel = 'All resources', onAdd, onEdit, onParamsChange }: Props) {
   const title = category.pluralLabel
 
   // Extract a stable dep from the anchor object (anchor itself is re-created
@@ -106,6 +108,6 @@ export default function ResourceLoader({ category, items, anchor, reopenItemId, 
   const addressPrompt = !anchor.label && category.hasAddress !== false
 
   return (
-    <GenericDirectory category={category} items={withDistance} anchorLabel={anchorLabel} addressPrompt={addressPrompt} reopenItemId={reopenItemId} initialSearch={initialSearch} initialOpenNow={initialOpenNow} initialFilters={initialFilters} openDaveningModal={openDaveningModal} initialDaveningDay={initialDaveningDay} onUp={onUp} onAdd={onAdd} onEdit={onEdit} onParamsChange={onParamsChange} />
+    <GenericDirectory category={category} items={withDistance} anchorLabel={anchorLabel} addressPrompt={addressPrompt} reopenItemId={reopenItemId} reopenMatch={reopenMatch} initialSearch={initialSearch} initialOpenNow={initialOpenNow} initialFilters={initialFilters} openDaveningModal={openDaveningModal} initialDaveningDay={initialDaveningDay} onUp={onUp} onAdd={onAdd} onEdit={onEdit} onParamsChange={onParamsChange} />
   )
 }

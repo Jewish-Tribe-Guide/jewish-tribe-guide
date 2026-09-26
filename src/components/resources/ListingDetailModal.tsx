@@ -9,6 +9,7 @@ import { routes } from '@/lib/routes'
 import { listingSlug } from '@/lib/listingSlug'
 import CategoryIcon from '@/components/CategoryIcon'
 import PlaceDetailBody from './PlaceDetailBody'
+import type { SearchFound } from '@/lib/askSearch'
 import FreshnessFooter from './FreshnessFooter'
 import ListingEditBar from './ListingEditBar'
 import ListingEditor from './ListingEditor'
@@ -57,6 +58,8 @@ type Props = {
    *  meaningful together with onNavigate; ignored otherwise. */
   hasPrev?: boolean
   hasNext?: boolean
+  /** What the search that opened it matched — see PlaceDetailBody's `found`. */
+  found?: SearchFound | null
 }
 
 /** Desktop's counterpart to the card's inline expand. A multi-column grid has
@@ -99,6 +102,7 @@ export default function ListingDetailModal({
   onNavigate,
   hasPrev,
   hasNext,
+  found,
 }: Props) {
   const community = useCommunitySlug()
   // The listing's own URL, for the edit bar's overflow Share.
@@ -424,6 +428,7 @@ export default function ListingDetailModal({
                 hideOpenStatus
                 hiddenBadgeKeys={headerBadgeKeys}
                 hideCountBadge
+                found={found}
                 // Not includeHeaderUrlFields here — that field now has a home in
                 // this dialog's own header, next to the name (see above), the
                 // same reason PlaceDetailBody's default excludes it from this

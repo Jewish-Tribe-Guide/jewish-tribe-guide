@@ -3,7 +3,7 @@ import type { CategoryConfig } from '@/lib/categories'
 import { listingSearchText } from '@/lib/searchListing'
 import { haversineMiles } from '@/lib/geo'
 import { DAY_KEYS, businessClosure, fmt12, getOpenStatus, isStructuredHours, type DayHours } from '@/lib/hours'
-import { conceptCategories, initialisms, parseAsk, termMatches, termsRequired, words, type AskQuery } from '@/lib/ask'
+import { conceptCategories, initialisms, parseAsk, termMatches, termsRequired, wordMatches, words, type AskQuery } from '@/lib/ask'
 
 // Runs an `ask` query (see ask.ts) against the listings a page already holds.
 // Shared by the home search, every category page's own search box and the
@@ -21,6 +21,12 @@ export type AskHit = {
    *  `_sometimes` companion). What a result shows as the reason it's there:
    *  a list of stores for "wine" said nothing about wine until you opened one. */
   matched: { tag: string; sometimes: boolean }[]
+  /** The other things about it the query matched, when not an item: its
+   *  hechsher, a note, a yes/no field that's on ("Shabbat Friendly") — each
+   *  with the field's label and the matching text, cut down around the
+   *  match. What a result shows as its reason when there's no item to show:
+   *  "OU restaurants" used to list places with nothing to say why. */
+  matchedFields: MatchedField[]
   /** Straight-line miles from the place asked about ("near HUP") or, failing
    *  that, from the visitor. Null when neither is known or the listing has no
    *  coordinates. */
@@ -35,6 +41,18 @@ export type AskHit = {
    *  they open: a mikvah's men's hours this morning, its women's tonight.
    *  What an answer names, so "open" says which part is open. */
   today: HoursWindow[]
+}
+
+export type MatchedField = { label: string; text: string }
+
+/** Why a listing turned up for a search, as a page shows it: the items and
+ *  other fields that matched, and the words to bold in them. Carried from a
+ *  search result into the listing it opens, so the listing can mark what
+ *  was asked for instead of leaving it to be found again. */
+export type SearchFound = {
+  terms: string[]
+  items: { tag: string; sometimes: boolean }[]
+  fields: MatchedField[]
 }
 
 export type HoursWindow = {
@@ -65,6 +83,9 @@ export type AskResult = {
    *  to be open) but not counted as closed; the home screen lists them after
    *  the open ones, marked as having no hours listed. */
   noHours: AskHit[]
+  /** The words the listings were searched for, once kinds of place and the
+   *  place asked about are taken out — what to highlight in a result. */
+  terms: string[]
 }
 
 type Prepared = {
@@ -94,9 +115,6 @@ function listingTags(item: DirectoryResource): { tag: string; sometimes: boolean
   return [...out].map(([tag, sometimes]) => ({ tag, sometimes }))
 }
 
-// The per-listing words, worked out once per listing object. A page searches
-// the same few hundred listings on every keystroke, so this is what keeps a
-// keystroke cheap.
 // A store's Google description says what the chain sells in general ("imported
 // cheeses", "most sell wine"), not what this one has that's kosher: that's
 // what its item list is for, and a match only in the description put Di
@@ -109,6 +127,9 @@ function searchableFields(category: CategoryConfig): CategoryConfig {
   return { ...category, detailFields: category.detailFields.filter((f) => f.key !== 'googleDescription') }
 }
 
+// The per-listing words, worked out once per listing object. A page searches
+// the same few hundred listings on every keystroke, so this is what keeps a
+// keystroke cheap.
 const prepared = new WeakMap<DirectoryResource, Map<string, Prepared>>()
 function prepare(item: DirectoryResource, category: CategoryConfig): Prepared {
   let byCategory = prepared.get(item)
@@ -132,6 +153,57 @@ function prepare(item: DirectoryResource, category: CategoryConfig): Prepared {
   }
   byCategory.set(category.id, p)
   return p
+}
+
+/** The listing's own fields, other than its name, address and items, whose
+ *  text matched: see AskHit.matchedFields. At most two. */
+function matchedFieldsOf(item: DirectoryResource, category: CategoryConfig, terms: string[]): MatchedField[] {
+  if (terms.length === 0) return []
+  const out: MatchedField[] = []
+  for (const f of searchableFields(category).detailFields) {
+    if (out.length === 2) break
+    const v = item[f.key]
+    if (f.type === 'boolean') {
+      if (v === true && f.label.split(/\s+/).some((w) => wordMatches(w, terms))) out.push({ label: f.label, text: '' })
+      continue
+    }
+    let text: string | null = null
+    if (f.type === 'select') {
+      const values = (Array.isArray(v) ? v : typeof v === 'string' && v ? [v] : []) as string[]
+      text = values.map((val) => f.options?.find((o) => o.value === val)?.label ?? val).join(', ') || null
+    } else if ((f.type === 'text' || f.type === 'textarea') && typeof v === 'string' && v.trim()) {
+      text = v.trim()
+    }
+    if (text) {
+      const cut = snippetAround(text, terms)
+      if (cut) out.push({ label: f.label, text: cut })
+    }
+  }
+  return out
+}
+
+/** The text around its first matching word, about a line's worth, or null
+ *  if no word in it matches. */
+function snippetAround(text: string, terms: string[], room = 90): string | null {
+  const flat = text.replace(/\s+/g, ' ')
+  for (const m of flat.matchAll(/[\p{L}\p{N}'’]+/gu)) {
+    if (!wordMatches(m[0], terms)) continue
+    if (flat.length <= room) return flat
+    const at = m.index ?? 0
+    let start = Math.max(0, at - 30)
+    if (start > 0) start = flat.indexOf(' ', start) + 1 || start
+    let end = Math.min(flat.length, start + room)
+    if (end < flat.length) end = flat.lastIndexOf(' ', end) > at ? flat.lastIndexOf(' ', end) : end
+    return `${start > 0 ? '…' : ''}${flat.slice(start, end).trim()}${end < flat.length ? '…' : ''}`
+  }
+  return null
+}
+
+/** What a result carries into the listing it opens: see SearchFound. Null
+ *  when nothing beyond the name matched. */
+export function foundFor(hit: AskHit, result: AskResult): SearchFound | null {
+  if (!hit.matched.length && !hit.matchedFields.length) return null
+  return { terms: result.terms, items: hit.matched, fields: hit.matchedFields }
 }
 
 function hoursKeys(category: CategoryConfig): string[] {
@@ -218,7 +290,7 @@ export function searchAsk(
   { coords = null, now = new Date(), categoryId, limit }: AskOptions = {},
 ): AskResult {
   const query = parseAsk(input)
-  const empty: AskResult = { query, hits: [], categoryIds: null, anchor: null, closedCount: 0, noHours: [] }
+  const empty: AskResult = { query, hits: [], categoryIds: null, anchor: null, closedCount: 0, noHours: [], terms: [] }
   if (!query.raw) return empty
 
   const configById = new Map(categories.map((c) => [c.id, c]))
@@ -304,6 +376,9 @@ export function searchAsk(
       score,
       matchedTags,
       matched: matchedItems,
+      // Only when no item explains it: a store found by "cheese" doesn't
+      // need its Google description quoted as well.
+      matchedFields: matchedItems.length ? [] : matchedFieldsOf(p.item, p.category, searchTerms),
       miles,
       open,
       closesAt: status?.closing?.closeLabel ?? null,
@@ -337,5 +412,6 @@ export function searchAsk(
     anchor,
     closedCount: asksOpen ? hits.filter((h) => !openEnough(h) && h.open !== null && inReach(h)).length : 0,
     noHours,
+    terms: searchTerms,
   }
 }

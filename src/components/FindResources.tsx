@@ -69,6 +69,9 @@ export type FindResourcesProps = {
   // these set, which is exactly the plain-URL render already needed.
   /** `?item=` */
   searchItem?: string | null
+  /** `?match=` — the search that found `?item=`, for its listing to mark
+   *  what matched. */
+  searchMatch?: string | null
   /** `?q=` */
   searchQuery?: string | null
   /** `?openNow=1` */
@@ -110,6 +113,7 @@ export default function FindResources({
   onUp,
   onViewMap,
   searchItem = null,
+  searchMatch = null,
   searchQuery = null,
   searchOpenNow = null,
   searchFilters = null,
@@ -396,6 +400,7 @@ export default function FindResources({
           items={listings}
           anchor={anchor}
           reopenItemId={cardReopenItemId}
+          reopenMatch={searchMatch}
           initialSearch={initialSearch ?? undefined}
           initialOpenNow={initialOpenNow}
           initialFilters={searchFilters}

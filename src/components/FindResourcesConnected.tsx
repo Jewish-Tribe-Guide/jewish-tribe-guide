@@ -5,7 +5,7 @@ import FindResources, { type FindResourcesProps } from './FindResources'
 
 type Props = Omit<
   FindResourcesProps,
-  'searchItem' | 'searchQuery' | 'searchOpenNow' | 'searchFilters' | 'searchHospital' | 'searchForm' | 'searchDavening' | 'searchDaveningDay' | 'onParamsChange'
+  'searchItem' | 'searchMatch' | 'searchQuery' | 'searchOpenNow' | 'searchFilters' | 'searchHospital' | 'searchForm' | 'searchDavening' | 'searchDaveningDay' | 'onParamsChange'
 >
 
 // The query-string-aware half of FindResources, split out so the plain-URL
@@ -75,6 +75,7 @@ export default function FindResourcesConnected(props: Props) {
     <FindResources
       {...props}
       searchItem={params.get('item')}
+      searchMatch={params.get('match')}
       searchQuery={params.get('q')}
       searchOpenNow={params.get('openNow')}
       searchFilters={Object.fromEntries(params.entries())}

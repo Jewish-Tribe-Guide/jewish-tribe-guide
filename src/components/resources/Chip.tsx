@@ -7,7 +7,7 @@ import type { MouseEvent, ReactNode } from 'react'
 // as a <button> and gets the hover/active/cursor treatment; otherwise it's a
 // plain <span>.
 
-export type ChipTone = 'slate' | 'slateMuted' | 'amber' | 'green' | 'greenSolid' | 'red'
+export type ChipTone = 'slate' | 'slateMuted' | 'amber' | 'green' | 'greenSolid' | 'red' | 'match'
 export type ChipSize = 'header' | 'expanded'
 
 // Always-on background/text/border for each tone.
@@ -20,6 +20,8 @@ const TONE_BASE: Record<ChipTone, string> = {
   // Matches the "Permanently closed" badge PlaceDetailBody already renders, so
   // the collapsed card and the expanded body say the same thing the same way.
   red: 'bg-red-50 text-red-700 border-red-200',
+  // An item a search asked for, marked in the listing it opened.
+  match: 'bg-brand-teal/10 text-brand-teal-dark border-brand-teal/40',
 }
 
 // Hover/active shades, applied only when the chip is interactive.
@@ -30,6 +32,7 @@ const TONE_HOVER: Record<ChipTone, string> = {
   green: 'hover:bg-green-100 active:bg-green-200',
   greenSolid: 'hover:bg-green-700 active:bg-green-800',
   red: 'hover:bg-red-100 active:bg-red-200',
+  match: 'hover:bg-brand-teal/20 active:bg-brand-teal/30',
 }
 
 // Header chips get a taller tap target on mobile; expanded-panel chips are compact.

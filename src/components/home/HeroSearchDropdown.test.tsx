@@ -22,6 +22,7 @@ function makeHit(overrides: Partial<ListingHit> = {}): ListingHit {
     term: 'food',
     matched: [],
     hours: null,
+    found: null,
     ...overrides,
   }
 }
@@ -142,6 +143,22 @@ describe('HeroSearchDropdown', () => {
     )
     expect(screen.getByText('Challah')).toBeInTheDocument()
     expect(screen.getByText('Challah · sometimes')).toBeInTheDocument()
+  })
+
+  it('says what a place matched on when no item explains it', () => {
+    render(
+      <HeroSearchDropdown
+        query="ou restaurants"
+        cards={[]}
+        placeHits={[makeHit({ found: { terms: ['ou'], items: [], fields: [{ label: 'Hechsher', text: 'OU' }] } })]}
+        categories={[]}
+        onCardClick={noop}
+        onOpenPlace={noop}
+      />,
+    )
+    const reason = screen.getByText('Hechsher:', { exact: false })
+    expect(reason).toHaveTextContent('Hechsher: OU')
+    expect(reason.querySelector('mark')?.textContent).toBe('OU')
   })
 
   it('says when a place closes, for an "open now" question', () => {

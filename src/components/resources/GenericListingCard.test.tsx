@@ -562,12 +562,32 @@ describe('GenericListingCard — items a search matched', () => {
         upvotes={false}
         count={0}
         {...requiredHandlers}
-        matchedItems={[{ tag: 'Wine', sometimes: false }, { tag: 'Challah', sometimes: true }]}
+        found={{ terms: ['wine'], items: [{ tag: 'Wine', sometimes: false }, { tag: 'Challah', sometimes: true }], fields: [] }}
       />,
     )
 
     expect(screen.getByText('Wine')).toBeInTheDocument()
     expect(screen.getByText('Challah · sometimes')).toBeInTheDocument()
+  })
+})
+
+describe('GenericListingCard — the field a search matched, when no item did', () => {
+  it('says what it matched on, with the words asked for in bold', () => {
+    const category = makeCategory({ detailFields: [{ key: 'kosherCert', label: 'Hechsher', type: 'text' }] })
+    renderWithProviders(
+      <GenericListingCard
+        item={makeListing({ kosherCert: 'OU' })}
+        category={category}
+        upvotes={false}
+        count={0}
+        {...requiredHandlers}
+        found={{ terms: ['ou'], items: [], fields: [{ label: 'Hechsher', text: 'OU' }] }}
+      />,
+    )
+    // The label is its own muted span; the line is its parent.
+    const reason = screen.getByText('Hechsher:', { exact: false }).parentElement!
+    expect(reason).toHaveTextContent('Hechsher: OU')
+    expect(reason.querySelector('mark')?.textContent).toBe('OU')
   })
 })
 

@@ -40,12 +40,16 @@ function pathForMode(community: string, mode: AppMode, extra?: Record<string, un
       // findAction ('edit', from a search result's Edit button)
       // becomes ?form=, which FindResources resolves against the loaded listing
       // to open that form directly rather than just expanding the card.
+      // findMatch (the search that found it) becomes ?match=, for the
+      // opened listing to mark what matched, without filtering the list.
       const query = typeof extra?.findQuery === 'string' ? extra.findQuery : null
       const itemId = typeof extra?.findItemId === 'string' ? extra.findItemId : null
       const action = typeof extra?.findAction === 'string' ? extra.findAction : null
+      const match = typeof extra?.findMatch === 'string' ? extra.findMatch : null
       const params = new URLSearchParams()
       if (query) params.set('q', query)
       if (itemId) params.set('item', itemId)
+      if (itemId && match) params.set('match', match)
       if (action) params.set('form', action)
       const qs = params.toString()
       return qs ? `${routes.slug(community, view)}?${qs}` : routes.slug(community, view)

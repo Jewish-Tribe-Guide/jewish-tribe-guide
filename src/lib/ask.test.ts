@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { makeCategory } from '@/test/providerFixtures'
-import { conceptCategories, editDistance, initialisms, parseAsk, termMatches, termsRequired, words } from './ask'
+import { conceptCategories, editDistance, initialisms, parseAsk, termMatches, termsRequired, wordMatches, words } from './ask'
 
 describe('words', () => {
   it('folds spellings so a visitor and a listing meet whichever way each spelled it', () => {
@@ -182,5 +182,18 @@ describe('initialisms', () => {
 
   it('has nothing for a one-word name', () => {
     expect(initialisms('Chalavita')).toEqual([])
+  })
+})
+
+describe('wordMatches', () => {
+  it('matches a written word the way the search does, spelling folded', () => {
+    expect(wordMatches('Chalav', ['cholov'].map((w) => words(w)[0]))).toBe(true)
+    expect(wordMatches('Cheeses', ['cheese'])).toBe(true)
+    expect(wordMatches('Challah', ['cheese'])).toBe(false)
+  })
+
+  it('forgives a typo only when asked to', () => {
+    expect(wordMatches('Cheese', ['chese'])).toBe(false)
+    expect(wordMatches('Cheese', ['chese'], true)).toBe(true)
   })
 })

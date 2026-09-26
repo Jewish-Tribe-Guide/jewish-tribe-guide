@@ -400,6 +400,14 @@ export function termMatches(term: string, haystack: readonly string[], minPrefix
   return false
 }
 
+/** Whether one word of text, as written, is a match for any of the terms —
+ *  what a page bolds to show why a result is there. Same matching as the
+ *  search itself, so it bolds exactly what was found. */
+export function wordMatches(word: string, terms: readonly string[], allowTypos = false): boolean {
+  const ws = words(word)
+  return ws.length > 0 && terms.some((t) => termMatches(t, ws, 3, allowTypos))
+}
+
 /** How many of the terms a listing needs to count as a match: all of them for
  *  one or two words; for longer questions most of them, so "cholov yisroel
  *  milk in center city" still finds the milk. */

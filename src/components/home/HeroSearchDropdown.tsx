@@ -7,6 +7,7 @@ import { getCategoryColor } from '@/lib/categoryColor'
 import CategoryIcon from '@/components/CategoryIcon'
 import type { CardDef, ListingHit } from './sections'
 import type { Answer } from '@/lib/askAnswer'
+import Highlight from '@/components/resources/Highlight'
 import AskAnswer from './AskAnswer'
 
 // How many of each to show before "See all" — matches the mockup this was
@@ -154,6 +155,14 @@ export default function HeroSearchDropdown({
                         {m.sometimes ? ' · sometimes' : ''}
                       </span>
                     ))}
+                    {/* No item explains it: the field that does, with the
+                        words asked for in bold ("Hechsher: OU"). */}
+                    {hit.matched.length === 0 && hit.found?.fields[0] && (
+                      <span className="min-w-0 shrink truncate text-slate-600">
+                        {hit.found.fields[0].text ? `${hit.found.fields[0].label}: ` : ''}
+                        <Highlight text={hit.found.fields[0].text || hit.found.fields[0].label} terms={hit.found.terms} />
+                      </span>
+                    )}
                     <span className="truncate">
                       {hit.categoryLabel}
                       {hit.item.address ? ` · ${hit.item.address}` : ''}

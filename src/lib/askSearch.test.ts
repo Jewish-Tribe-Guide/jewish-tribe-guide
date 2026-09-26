@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { makeCategory } from '@/test/providerFixtures'
 import type { DirectoryResource } from '@/types'
-import { searchAsk } from './askSearch'
+import { foundFor, searchAsk } from './askSearch'
 
 // Shaped on real Philly listings: the fields, tags and spellings are the ones
 // the guide actually has, so a phrasing that works here works on the site.
@@ -343,5 +343,59 @@ describe('searchAsk — what it must not do', () => {
     expect(onRestaurants('dairy').sort()).toEqual(['Chalavita', 'Insomnia Cookies'])
     expect(onRestaurants('kosher food').sort()).toEqual(['Chalavita', 'Cherry Grill', 'Insomnia Cookies'])
     expect(onRestaurants('challah')).toEqual([])
+  })
+})
+
+describe('searchAsk — why each result is there', () => {
+  it('names the field a result matched on when no item explains it', () => {
+    // "keystone" is in the hechsher, not in any item.
+    const result = searchAsk(listings, categories, 'keystone restaurants')
+    const hit = result.hits.find((h) => h.item.name === 'Chalavita')!
+    expect(hit.matched).toEqual([])
+    expect(hit.matchedFields).toEqual([{ label: 'Hechsher', text: 'Keystone-K' }])
+    expect(foundFor(hit, result)).toEqual({ terms: ['keystone'], items: [], fields: [{ label: 'Hechsher', text: 'Keystone-K' }] })
+  })
+
+  it('names a yes/no field that is switched on', () => {
+    const result = searchAsk(listings, categories, 'shabbat friendly hotel')
+    expect(result.hits[0].matchedFields).toEqual([{ label: 'Shabbat Friendly', text: '' }])
+  })
+
+  it('does not quote a field when an item already explains the match', () => {
+    const withNotes = makeCategory({
+      id: 'grocery',
+      label: 'Grocery Store',
+      pluralLabel: 'Grocery Stores',
+      detailFields: [
+        { key: 'notes', label: 'Notes', type: 'textarea' },
+        { key: 'm', label: 'Kosher items', type: 'tags' },
+      ],
+    })
+    const store = listing('grocery', 'ALDI', 39.95, -75.17, { m: ['Goat Cheese'], notes: 'Cheese is in the back.' })
+    const [hit] = searchAsk([store], [withNotes], 'goat cheese').hits
+    expect(hit.matched.map((m) => m.tag)).toEqual(['Goat Cheese'])
+    expect(hit.matchedFields).toEqual([])
+  })
+
+  it('cuts a long note down to the part around the match', () => {
+    const notes = makeCategory({
+      id: 'grocery',
+      label: 'Grocery Store',
+      pluralLabel: 'Grocery Stores',
+      detailFields: [{ key: 'notes', label: 'Notes', type: 'textarea' }],
+    })
+    const store = listing('grocery', 'Corner Store', 39.95, -75.17, {
+      notes: 'Open late most nights and closed on Sundays in the summer. Ask at the deli counter for the kosher section, which has frozen gefilte fish near the back.',
+    })
+    const [hit] = searchAsk([store], [notes], 'gefilte fish').hits
+    const text = hit.matchedFields[0].text
+    expect(text).toContain('gefilte fish')
+    expect(text.startsWith('…')).toBe(true)
+    expect(text.length).toBeLessThanOrEqual(95)
+  })
+
+  it('carries nothing into a listing found only by its name', () => {
+    const result = searchAsk(listings, categories, 'mekor habracha')
+    expect(foundFor(result.hits[0], result)).toBeNull()
   })
 })

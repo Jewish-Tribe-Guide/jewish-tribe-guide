@@ -17,6 +17,8 @@ import { CheckIcon, ExternalIcon, PinIcon, ThumbtackIcon } from '@/components/ic
 import UpvoteButton from './UpvoteButton'
 import ListingDetailModal from './ListingDetailModal'
 import MobileSheet from './MobileSheet'
+import Highlight from './Highlight'
+import type { SearchFound } from '@/lib/askSearch'
 import MapPlaceDetail from '@/components/map/MapPlaceDetail'
 import { useListingActions, type ListingAction } from './useListingActions'
 import SwipeRow, { type SwipeAction } from '@/components/SwipeRow'
@@ -160,10 +162,12 @@ type Props = {
    *  inert arrow at either end instead of no arrow at all. */
   hasPrev?: boolean
   hasNext?: boolean
-  /** The items a search matched on this listing, shown as chips on the
-   *  collapsed card so a search result says why it's there ("Wine",
-   *  "Challah · sometimes") instead of only "6 kosher items". */
-  matchedItems?: { tag: string; sometimes: boolean }[]
+  /** What a search matched on this listing (see SearchFound). Its items
+   *  show as chips on the collapsed card, so a search result says why it's
+   *  there ("Wine", "Challah · sometimes") instead of only "6 kosher
+   *  items"; with no item, the field it matched ("Hechsher: OU"). Opened,
+   *  the listing names them at the top and marks them in its item list. */
+  found?: SearchFound | null
 }
 
 export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(function GenericListingCard({
@@ -184,7 +188,7 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
   onNavigate,
   hasPrev,
   hasNext,
-  matchedItems,
+  found = null,
   onExpandedChange,
 }, ref) {
   const [expanded, setExpanded] = useState(!!defaultExpanded)
@@ -450,8 +454,9 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
   // restated in its own header on desktop (the card behind it is obscured by
   // the modal's backdrop), and computing it twice would be two places a
   // badge rule could drift out of sync.
-  const matchedChips = matchedItems?.length ? matchedItems : null
-  const badgeRow = (isOpen || closure || visibleHeaderBadges.length > 0 || countHeaderCount > 0 || matchedChips) ? (
+  const matchedChips = found?.items.length ? found.items : null
+  const matchedFields = !matchedChips && found?.fields.length ? found.fields : null
+  const badgeRow = (isOpen || closure || visibleHeaderBadges.length > 0 || countHeaderCount > 0 || matchedChips || matchedFields) ? (
     <>
       {/* Closure outranks everything: it used to appear only once the card
           was expanded, so a temporarily-closed shop was indistinguishable
@@ -475,7 +480,7 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
           Open
         </Chip>
       ))}
-      {/* What a search matched here — see matchedItems. Not clickable: the
+      {/* What a search matched here — see `found`. Not clickable: the
           card's own tap target opens the listing, which is where to go next. */}
       {matchedChips?.map((m) => (
         <Chip key={m.tag} tone={m.sometimes ? 'amber' : 'slate'}>
@@ -483,6 +488,18 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
           {m.sometimes ? ' · sometimes' : ''}
         </Chip>
       ))}
+      {matchedFields?.map((f) =>
+        f.text ? (
+          <span key={f.label} className="basis-full text-xs text-slate-600">
+            <span className="text-muted">{f.label}: </span>
+            <Highlight text={f.text} terms={found!.terms} />
+          </span>
+        ) : (
+          <Chip key={f.label} tone="slate">
+            <Highlight text={f.label} terms={found!.terms} />
+          </Chip>
+        ),
+      )}
       {countHeaderCount > 0 && countHeaderField && (() => {
         // countLabel is meant to be a clean singular noun ("kosher item"),
         // but the fallback — a field's own `label`, just lowercased — is
@@ -1004,6 +1021,7 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
             item={item}
             category={category}
             color={color}
+            found={found}
             // A filter tap narrows the list behind the sheet, so the sheet
             // gets out of the way first rather than filtering out of sight.
             filters={{
@@ -1038,6 +1056,7 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
           onNavigate={onNavigate}
           hasPrev={hasPrev}
           hasNext={hasNext}
+          found={found}
         />
       )}
     </div>
