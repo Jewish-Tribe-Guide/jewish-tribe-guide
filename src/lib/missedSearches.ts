@@ -89,6 +89,10 @@ export function classifyMiss(
 ): ClassifiedMiss {
   const options = { places, now }
   const asked = parseAsk(tally.term)
+  // "Is the eruv up": answered with where each eruv posts its status.
+  if (asked.eruv && categories.some((c) => c.kind === 'eruv')) {
+    return { ...tally, askedCategory: null, verdict: { kind: 'found', summary: "Answered with each eruv's status link.", places: [] } }
+  }
   const asksOpen = asked.openNow || asked.openToday || !!asked.openAt
   // A trailing space when anything was taken out: what's left was typed in
   // full, not a word still being typed (see AskQuery.partial).

@@ -1,3 +1,4 @@
+import type { EruvRecord } from '@/types'
 import { describedByItsText, type AskHit, type DayWindow, type AskResult, type HoursWindow, type NearMiss } from '@/lib/askSearch'
 import { formatOpenAtTime, termMatches, termsAsTyped, words, type MinyanAsk } from '@/lib/ask'
 import { TEFILLAH_LABELS, type Tefillah } from '@/lib/davening'
@@ -30,6 +31,9 @@ export type Answer = {
   /** For a minyan question, the minyanim it's about, in time order: all of
    *  them, so "9 more today" can be opened up rather than just counted. */
   rows: AnswerRow[]
+  /** Where to go for what the guide itself can't say: each eruv's own
+   *  status page, the page about something. Shown under the sentence. */
+  links?: AnswerLink[]
   /** Set when this isn't an answer to what was asked but to the closest
    *  question that has one (see nearMissAnswer): the page shows it, and the
    *  places under it, as close rather than as found. */
@@ -37,6 +41,15 @@ export type Answer = {
   /** How many of `rows` to show before a "Show all" — the answer is a
    *  glance, the full list is a tap away. Absent means show every row. */
   shown?: number
+}
+
+export type AnswerLink = {
+  label: string
+  /** "Penn, Drexel & West Philadelphia": what it covers. */
+  detail?: string
+  href: string
+  /** Another site, opened in a new tab. */
+  external: boolean
 }
 
 export type AnswerSchedule = {
@@ -438,4 +451,17 @@ export function nearMissAnswer(miss: NearMiss, raw: string, options: { coords?: 
   const closest =
     answerFor(miss.result, options)?.text ?? `Closest: ${hits.length} ${kind} with “${miss.kept}”.`
   return { text: `Nothing in the guide for “${raw}”. ${closest}`, rows: [], closest: true }
+}
+
+/** "Is the eruv up?" The guide can't know: each eruv posts its own status,
+ *  and a week-old "yes" copied here would be worse than none. So the answer
+ *  is where to look, each eruv with what it covers, and the guide's own
+ *  page about them. */
+export function eruvAnswer(eruvim: readonly Pick<EruvRecord, 'name' | 'area' | 'statusLink'>[], pageHref: string | null): Answer {
+  const links: AnswerLink[] = eruvim.map((e) => ({ label: e.name, detail: e.area, href: e.statusLink, external: true }))
+  if (pageHref) links.push({ label: 'More about the eruvim', href: pageHref, external: false })
+  const text = eruvim.length
+    ? "The guide can't say whether an eruv is up this week: each one posts its own status. Check before Shabbos:"
+    : "The guide can't say whether an eruv is up this week. See what it has:"
+  return { text, rows: [], links }
 }

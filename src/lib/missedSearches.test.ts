@@ -86,9 +86,13 @@ describe('classifyMiss', () => {
     expect(verdict.summary).toContain('the hours decided')
   })
 
-  it('counts a page the home cards answer with as found: "eruv" is the Eruv page', () => {
-    const { verdict } = classify('eruv')
+  it('counts a page the home cards answer with as found: a stroller on Shabbos is the Eruv page', () => {
+    const { verdict } = classify('stroller on shabbos')
     expect(verdict).toEqual({ kind: 'found', summary: 'Matches the Eruv Information page.', places: [] })
+  })
+
+  it('counts "is the eruv up" as answered, by the eruv status links', () => {
+    expect(classify('is the eruv up').verdict).toEqual({ kind: 'found', summary: "Answered with each eruv's status link.", places: [] })
   })
 
   it('doesn’t let the kind of place alone make a page answer it: no vegan food is still a gap', () => {

@@ -4,6 +4,7 @@ import { searchAsk, type AskResult } from './askSearch'
 import type { CategoryConfig } from './categories'
 import type { Place } from './places'
 import type { DirectoryResource } from '@/types'
+import { eruvim } from '@/data/resources'
 
 export { questionFromSlug, questionSlug } from './routes'
 
@@ -56,6 +57,11 @@ export function shareSummary(
   if (asked.minyan) {
     const shuls = searchAsk(listings, categories, question, options).hits.length
     return shuls ? `Minyan times from ${shuls} ${shuls === 1 ? 'shul' : 'shuls'} in the guide, worked out when you open it.` : 'Minyan times from the guide.'
+  }
+  if (asked.eruv && categories.some((c) => c.kind === 'eruv')) {
+    return eruvim.length
+      ? `Each eruv posts its own status: ${eruvim.map((e) => e.name).join(' and ')}. Open for the links.`
+      : 'Where to check the eruv before Shabbos.'
   }
   const at = asked.openAt
   const hoursAsked = asked.openNow || asked.openToday || !!at

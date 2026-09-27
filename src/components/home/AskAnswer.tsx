@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { track } from '@vercel/analytics'
 import type { Answer } from '@/lib/askAnswer'
 import { useShareLink } from '@/lib/useShareLink'
@@ -93,6 +94,24 @@ export default function AskAnswer({
               </li>
             )
           })}
+        </ul>
+      )}
+      {answer.links && answer.links.length > 0 && (
+        <ul className="mt-2 space-y-1">
+          {answer.links.map((l) => (
+            <li key={l.href} className="text-[13px]">
+              {l.external ? (
+                <a href={l.href} target="_blank" rel="noopener noreferrer" className="font-semibold text-brand-teal hover:text-brand-teal-dark hover:underline">
+                  {l.label} ↗
+                </a>
+              ) : (
+                <Link href={l.href} className="font-semibold text-brand-teal hover:text-brand-teal-dark hover:underline">
+                  {l.label} →
+                </Link>
+              )}
+              {l.detail && <span className="text-slate-500"> · {l.detail}</span>}
+            </li>
+          ))}
         </ul>
       )}
       {hidden > 0 && (

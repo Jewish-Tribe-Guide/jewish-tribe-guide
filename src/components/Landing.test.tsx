@@ -6,6 +6,7 @@ import userEvent from '@testing-library/user-event'
 import { track } from '@vercel/analytics'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { tipStillOffered } from '@/lib/browsingTips'
+import { eruvim } from '@/data/resources'
 import { makeCategory, makeListing } from '@/test/providerFixtures'
 import { SITE_SETTINGS_DEFAULTS } from '@/lib/siteSettings'
 import { LocationProvider } from '@/lib/locationContext'
@@ -1019,5 +1020,27 @@ describe('Landing — the category pages’ "you can just ask" tip', () => {
     expect(tipStillOffered()).toBe(true)
     await user.type(screen.getAllByLabelText('Search resources')[0]!, 'challah')
     expect(tipStillOffered()).toBe(false)
+  })
+})
+
+describe('Landing — "is the eruv up"', () => {
+  const eruv = makeCategory({ id: 'eruv-information', label: 'Eruv Information', pluralLabel: 'Eruv Information', kind: 'eruv' })
+
+  it('answers with where each eruv posts its status, and the eruv page', async () => {
+    const user = userEvent.setup()
+    renderLanding(undefined, { content: { categories: [makeCategory(), eruv] } }, [])
+    await user.type(screen.getAllByLabelText('Search resources')[0]!, 'is the eruv up')
+    expect(screen.getAllByText(/The guide can't say whether an eruv is up this week/).length).toBeGreaterThan(0)
+    for (const e of eruvim) {
+      expect(screen.getAllByRole('link', { name: `${e.name} ↗` })[0]).toHaveAttribute('href', e.statusLink)
+    }
+    expect(screen.getAllByRole('link', { name: 'More about the eruvim →' })[0]).toHaveAttribute('href', '/test-community/eruv')
+  })
+
+  it('doesn’t, for a community with no eruv page', async () => {
+    const user = userEvent.setup()
+    renderLanding(undefined, { content: { categories: [makeCategory()] } }, [])
+    await user.type(screen.getAllByLabelText('Search resources')[0]!, 'is the eruv up')
+    expect(screen.queryByText(/The guide can't say whether an eruv is up/)).toBeNull()
   })
 })

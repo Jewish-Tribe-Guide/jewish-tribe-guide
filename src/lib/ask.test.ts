@@ -281,3 +281,19 @@ describe('parseAsk — "best"', () => {
     expect(parseAsk('kosher pizza').best).toBe(false)
   })
 })
+
+describe('parseAsk — the eruv', () => {
+  it('reads a question about the eruv itself', () => {
+    for (const input of ['is the eruv up', 'where is the eruv', 'eruv status this shabbos', 'is the eruv up tonight', 'eruv map', 'can I carry this Shabbos', 'can I carry?']) {
+      const q = parseAsk(input)
+      expect(q.eruv, input).toBe(true)
+      expect(q.terms, input).toEqual([])
+    }
+  })
+
+  it('leaves a search that only mentions it to the listings', () => {
+    expect(parseAsk('hotel inside the eruv').eruv).toBe(false)
+    expect(parseAsk('who carries challah').eruv).toBe(false)
+    expect(parseAsk('shabbos').eruv).toBe(false)
+  })
+})
