@@ -270,3 +270,14 @@ describe('parseAsk — "open after 6"', () => {
     expect(q.minyan?.at).toMatchObject({ hour: 6 })
   })
 })
+
+describe('parseAsk — "best"', () => {
+  it('reads a ranking, and never searches for the word', () => {
+    for (const input of ['best kosher pizza', 'top grocery store', 'recommended restaurant', 'highest rated bakery', 'a better place for wine than Giant']) {
+      const q = parseAsk(input)
+      expect(q.best, input).toBe(true)
+      expect(q.terms.some((t) => /best|top|recommend|rated|highest|better/.test(t)), input).toBe(false)
+    }
+    expect(parseAsk('kosher pizza').best).toBe(false)
+  })
+})

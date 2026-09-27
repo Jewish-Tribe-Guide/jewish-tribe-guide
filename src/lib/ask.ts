@@ -82,8 +82,8 @@ const STOPWORDS = new Set([
   'need', 'needs', 'needed', 'want', 'wants', 'wanted', 'like', 'love', 'try', 'trying',
   'sell', 'sells', 'selling', 'sold', 'carry', 'carries', 'carrying', 'stock', 'stocks', 'offer', 'offers',
   'have', 'has', 'had', 'having', 'go', 'goes', 'going', 'went', 'come', 'coming', 'take',
-  'know', 'knows', 'knew', 'recommend', 'recommendation', 'recommendations', 'suggest', 'suggestion', 'suggestions',
-  'good', 'best', 'better', 'great', 'nice', 'decent', 'reliable', 'reputable', 'favorite', 'favourite',
+  'know', 'knows', 'knew', 'recommend', 'recommended', 'recommendation', 'recommendations', 'rated', 'highest', 'highly', 'suggest', 'suggestion', 'suggestions',
+  'good', 'best', 'better', 'top', 'popular', 'great', 'nice', 'decent', 'reliable', 'reputable', 'favorite', 'favourite',
   // Every listing here is kosher, so asking for "a good hechsher" narrows
   // nothing; a named one ("OU") is still searched for.
   'hechsher', 'hechsherim', 'hashgacha', 'certified', 'certification',
@@ -215,6 +215,9 @@ export type AskQuery = {
    *  time today the place has to be open around. Never set together with
    *  `openNow` or `openToday`. */
   openAt: OpenAt | null
+  /** "best", "better", "top", "favorite", "most popular", "recommend": a
+   *  ranking, which the guide can only give from neighbors' upvotes. */
+  best: boolean
   /** "within 2 miles", "within a 15 minute drive", "10 minute walk": the
    *  farthest a result may be, in straight-line miles (see WITHIN). */
   within: Within | null
@@ -390,6 +393,8 @@ function readExcluding(text: string): { excluding: string[]; rest: string } {
 
 const DATE_OUT = /\b(?:for a date|date night|date (?=restaurants?\b|places?\b|spots?\b|food\b|ideas?\b))/g
 
+const BEST = /\b(?:best|better|top|favou?rite|most popular|highest rated|highly rated|top rated|recommend(?:ed|ation|ations)?)\b/
+
 const NEAR_ME = /\b(?:(?:near|close to|closest to|nearest to|around|by|next to) (?:me|here|us)|nearby|near by|close by)\b/g
 const OPEN_TODAY = /\b(?:open (?:today|tonight|later(?: today| tonight)?|this (?:evening|afternoon))|still open (?:today|tonight))\b/g
 const OPEN_NOW = /\b(?:open (?:right now|now|late|on sunday|on friday)|(?:whats|what is|anything|something|who is|whos) open|open)\b/g
@@ -455,15 +460,18 @@ export function parseAsk(input: string): AskQuery {
 
   const minyan: MinyanAsk | null = asksMinyan ? { tefillos, at: clock.at } : null
   const withinAsked = within.within
+  // Read before "better than Giant" is taken out: that's still asking
+  // for a better one.
+  const best = BEST.test(typed)
   const typing = raw !== '' && !/\s$/.test(input)
   const last = plainWords(raw).at(-1)
   if (terms.length === 0 && concepts.length === 0 && !nearMe && !openNow && !openToday && !openAt) {
     const all = words(raw)
-    return { raw, terms: all, concepts, nearMe, openNow, openToday, openAt, excluding, within: withinAsked, minyan, partial: typing && all.length > 1 ? (all.at(-1) ?? null) : null }
+    return { raw, terms: all, concepts, nearMe, openNow, openToday, openAt, best, excluding, within: withinAsked, minyan, partial: typing && all.length > 1 ? (all.at(-1) ?? null) : null }
   }
   // Only the word under the cursor, and only if it survived as a term.
   const partial = typing && last !== undefined && terms.at(-1) === fold(last) && terms.length > 1 ? (terms.at(-1) ?? null) : null
-  return { raw, terms, concepts, nearMe, openNow, openToday, openAt, excluding, within: withinAsked, minyan, partial }
+  return { raw, terms, concepts, nearMe, openNow, openToday, openAt, best, excluding, within: withinAsked, minyan, partial }
 }
 
 /** The categories a concept stands for in this community: those whose id or

@@ -158,6 +158,41 @@ function minyanAnswer(
   }
 }
 
+/** For "best pizza": the most upvoted, when upvotes actually tell them
+ *  apart. Never a winner out of a tie: three places at zero upvotes have
+ *  no best, and saying one did would be the guide making it up. A kind of
+ *  place neighbors can't upvote has no ranking at all, and it says so. */
+function withBest(result: AskResult, answer: Answer | null): Answer | null {
+  const { query, hits } = result
+  // One place is the answer; there's nothing to rank it against.
+  if (!query.best || query.minyan || hits.length < 2) return answer
+  const rest = answer ? ` ${answer.text}` : ''
+  // "Better than Giant" is asking for somewhere else: the places that
+  // aren't Giant answer it. A clear favorite among them is worth saying;
+  // that there's no ranking isn't.
+  const quiet = query.excluding.length > 0
+  const ranked = hits.filter((h) => h.category.upvotesEnabled)
+  if (ranked.length === 0) return quiet ? answer : { text: `${answer ? `${answer.text} ` : ''}The guide doesn't rank these.`, rows: answer?.rows ?? [] }
+  const votes = (h: AskHit) => h.item.upvotes ?? 0
+  const top = ranked.reduce((a, b) => (votes(b) > votes(a) ? b : a))
+  const beaten = votes(top) > 0 && ranked.every((h) => h === top || votes(h) < votes(top))
+  if (beaten) {
+    const n = votes(top)
+    return { text: `Most upvoted by neighbors: ${top.item.name}, ${n} ${n === 1 ? 'upvote' : 'upvotes'}.${rest}`, rows: answer?.rows ?? [] }
+  }
+  // A few sharing the top, with upvotes to share: name them together.
+  const tied = ranked.filter((h) => votes(h) === votes(top))
+  const names = [...new Set(tied.map((h) => h.item.name))]
+  if (votes(top) > 0 && names.length <= 3 && tied.length < hits.length) {
+    const list = names.length === 1 ? names[0] : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`
+    const n = votes(top)
+    const count = names.length === 1 ? `${n} ${n === 1 ? 'upvote' : 'upvotes'}` : `${n} each`
+    return { text: `Most upvoted by neighbors: ${list}, ${count}.${rest}`, rows: answer?.rows ?? [] }
+  }
+  if (quiet) return answer
+  return { text: `${answer ? `${answer.text} ` : ''}Not enough upvotes yet to say which is best.`, rows: answer?.rows ?? [] }
+}
+
 /** The answer to a search, or null when there's nothing to say beyond the
  *  results themselves. `result` should be unlimited (searchAsk with no
  *  `limit`), so counts ("3 places carry it") are true. */
@@ -165,7 +200,7 @@ export function answerFor(
   result: AskResult,
   options: { schedule?: AnswerSchedule | null; coords?: LatLng | null } = {},
 ): Answer | null {
-  const answer = baseAnswer(result, options)
+  const answer = withBest(result, baseAnswer(result, options))
   // "Within a 15-minute drive" needs somewhere to measure from. Without the
   // visitor's location (or a place named in the question) it limited nothing,
   // and saying so beats letting a far place pass as within reach.

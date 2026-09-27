@@ -530,7 +530,9 @@ export function searchAsk(
   const asksOpen = query.openNow || query.openToday || !!query.openAt
   const answering = hits.filter((h) => openEnough(h) && inReach(h))
   const noHours = asksOpen ? hits.filter((h) => h.open === null && inReach(h)) : []
+  // "Best pizza": neighbors' upvotes first, the only ranking the guide has.
   const byMatch = (a: AskHit, b: AskHit) =>
+      (query.best ? (b.item.upvotes ?? 0) - (a.item.upvotes ?? 0) : 0) ||
       b.score - a.score ||
       (a.miles ?? Infinity) - (b.miles ?? Infinity) ||
       (b.item.upvotes ?? 0) - (a.item.upvotes ?? 0) ||

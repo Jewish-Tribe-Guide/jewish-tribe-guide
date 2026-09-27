@@ -463,3 +463,55 @@ describe('nearMissAnswer — shown as close, not found', () => {
     expect(answerFor(searchAsk([store], [grocery], 'challah'))?.closest).toBeUndefined()
   })
 })
+
+describe('answerFor — "best", from upvotes only', () => {
+  const food = makeCategory({ id: 'restaurant', label: 'Food', pluralLabel: 'Food', upvotesEnabled: true, detailFields: [{ key: 't', label: 'Items', type: 'tags' }] })
+  const shul = makeCategory({ id: 'synagogue', label: 'Synagogue', pluralLabel: 'Synagogues' })
+  const pizza = (id: string, name: string, upvotes: number) => ({ ...listing('restaurant', id, name, 39.95, { t: ['Pizza'] }), upvotes })
+  const say = (q: string, places: DirectoryResource[], cats = [food]) => answerFor(searchAsk(places, cats, q))?.text
+
+  it('names the most upvoted, when upvotes tell them apart, and lists it first', () => {
+    const places = [pizza('a', 'A Pizza', 1), pizza('b', 'B Pizza', 4), pizza('c', 'C Pizza', 0)]
+    expect(say('best pizza', places)).toBe('Most upvoted by neighbors: B Pizza, 4 upvotes. 3 places have Pizza.')
+    // Ahead of a nearer place with fewer: the ranking asked for, not the distance.
+    const near = { ...pizza('n', 'Near Pizza', 1), geo: here }
+    const far = { ...pizza('f', 'Far Pizza', 4), geo: { lat: here.lat + 0.1, lng: here.lng } }
+    expect(searchAsk([near, far], [food], 'best pizza', { coords: here }).hits[0].item.name).toBe('Far Pizza')
+    expect(searchAsk([near, far], [food], 'pizza', { coords: here }).hits[0].item.name).toBe('Near Pizza')
+  })
+
+  it('never makes a winner out of a tie', () => {
+    expect(say('best pizza', [pizza('a', 'A Pizza', 0), pizza('b', 'B Pizza', 0)])).toBe('2 places have Pizza. Not enough upvotes yet to say which is best.')
+  })
+
+  it('names a few sharing the top together', () => {
+    const places = [pizza('a', 'A Pizza', 2), pizza('b', 'B Pizza', 2), pizza('c', 'C Pizza', 0)]
+    expect(say('best pizza', places)).toBe('Most upvoted by neighbors: A Pizza and B Pizza, 2 each. 3 places have Pizza.')
+  })
+
+  it('says it doesn’t rank what neighbors can’t upvote', () => {
+    const shuls = [listing('synagogue', 's1', 'Shul One', 39.95), listing('synagogue', 's2', 'Shul Two', 39.96)]
+    expect(say('best shul', shuls, [shul])).toBe("The guide doesn't rank these.")
+  })
+
+  it('never names a winner on zero upvotes, even the only place that can be upvoted', () => {
+    const shuls = [listing('synagogue', 's1', 'Pizza Shul', 39.95)]
+    const text = say('best pizza', [pizza('a', 'A Pizza', 0), ...shuls], [food, shul])
+    expect(text).not.toMatch(/Most upvoted/)
+  })
+
+  it('keeps "better than Giant" to the places that aren’t Giant, without ranking notes', () => {
+    const places = [pizza('a', 'A Pizza', 0), pizza('b', 'B Pizza', 0), pizza('g', 'Giant Pizza', 5)]
+    expect(say('a better place for pizza than giant', places)).toBe('2 places besides Giant Pizza have Pizza.')
+    expect(say('a better place for pizza than giant', [...places, pizza('c', 'C Pizza', 2)])).toMatch(/^Most upvoted by neighbors: C Pizza, 2 upvotes\./)
+  })
+
+  it('has nothing to rank with one place', () => {
+    expect(say('best shul', [listing('synagogue', 's1', 'Shul One', 39.95)], [shul])).toBeUndefined()
+  })
+
+  it('leaves an ordinary question alone', () => {
+    const places = [pizza('a', 'A Pizza', 1), pizza('b', 'B Pizza', 4)]
+    expect(say('pizza', places)).toBe('2 places have Pizza.')
+  })
+})
