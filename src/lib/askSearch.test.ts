@@ -581,3 +581,22 @@ describe('searchAsk — "open after 6"', () => {
     expect(result.noHours.map((h) => h.item.name)).toEqual(['No Hours Grill'])
   })
 })
+
+describe('searchAsk — a sukkah', () => {
+  const sukkahs = makeCategory({ id: 'sukkahs', label: 'Sukkah', pluralLabel: 'Sukkahs' })
+  // What a sukkah listing is: a family and an address, nothing saying "sukkah".
+  const cohen = listing('sukkahs', 'Cohen family', 39.95, -75.17)
+  const withSukkah = listing('restaurant', 'Garden Grill', 39.95, -75.17, { t: ['Meat', 'Sukkah'] })
+
+  it('finds the sukkah listings by their category, around Sukkos', () => {
+    for (const q of ['where can I find a sukkah', 'sukkah near me', 'sukkos']) {
+      expect(searchAsk([cohen, withSukkah], [...categories, sukkahs], q).hits.map((h) => h.item.name), q).toContain('Cohen family')
+    }
+  })
+
+  it('searches for the word the rest of the year, when there’s no sukkah category', () => {
+    const result = searchAsk([withSukkah], categories, 'sukkah')
+    expect(result.categoryIds).toBeNull()
+    expect(result.hits.map((h) => h.item.name)).toEqual(['Garden Grill'])
+  })
+})

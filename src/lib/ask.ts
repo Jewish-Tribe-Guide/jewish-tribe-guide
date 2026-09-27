@@ -100,7 +100,7 @@ const STOPWORDS = new Set([
  *  community's own categories (id and labels), not searched for as text — so
  *  "food" means the food category whatever an admin called it, as long as its
  *  name says restaurant or food. */
-export type Concept = 'food' | 'synagogue' | 'grocery' | 'hotel' | 'mikvah' | 'hospital' | 'school' | 'childcare' | 'cemetery'
+export type Concept = 'food' | 'synagogue' | 'grocery' | 'hotel' | 'mikvah' | 'hospital' | 'school' | 'childcare' | 'cemetery' | 'sukkah'
 
 const CONCEPTS: Record<Concept, { words: string[]; category: string[] }> = {
   food: {
@@ -129,6 +129,10 @@ const CONCEPTS: Record<Concept, { words: string[]; category: string[] }> = {
     category: ['childcare', 'daycare'],
   },
   cemetery: { words: ['cemetery', 'cemeteries', 'burial', 'funeral'], category: ['cemetery', 'burial'] },
+  // A sukkah listing is a family name and an address: nothing in it says
+  // "sukkah" but its category. Only there around Sukkos (a campaign puts
+  // it up); the rest of the year the word is searched for as usual.
+  sukkah: { words: ['sukkah', 'sukkahs', 'sukka', 'succah', 'sukkot', 'sukkos', 'succot'], category: ['sukkah', 'succah'] },
 }
 
 /** One word, in the form both sides are compared in: spelling-folded, and
