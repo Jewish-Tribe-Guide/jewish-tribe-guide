@@ -122,9 +122,6 @@ export async function PATCH(request: Request) {
   if (body.desktopHeroHeadline !== undefined && !body.desktopHeroHeadline.trim()) {
     return Response.json({ ok: false, errors: ['The hero headline cannot be empty.'] }, { status: 400 })
   }
-  if (body.desktopAccentColor !== undefined && !/^#[0-9a-fA-F]{6}$/.test(body.desktopAccentColor)) {
-    return Response.json({ ok: false, errors: ['The accent color must be a 6-digit hex value like #b45309.'] }, { status: 400 })
-  }
   if (body.desktopNavItems !== undefined) {
     const items = body.desktopNavItems
     if (!validDesktopNavItems(items)) {

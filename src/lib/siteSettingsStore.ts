@@ -43,6 +43,9 @@ type Row = {
   desktop_hero_headline: string | null
   desktop_hero_subhead: string | null
   desktop_hero_image: unknown
+  /** Nothing reads this: the admin's accent colour was never applied to the
+   *  site, and the redesign's one look retired it. The column stays rather
+   *  than dropping data with a migration. */
   desktop_accent_color: string | null
 }
 
@@ -127,7 +130,6 @@ function toSettings(row: Row | null, fallback: SiteSettings = SITE_SETTINGS_DEFA
     desktopHeroHeadline: row.desktop_hero_headline || heroSplit.headline,
     desktopHeroSubhead: row.desktop_hero_subhead ?? heroSplit.subhead,
     desktopHeroImage: toHeroImage(row.desktop_hero_image) ?? fallback.desktopHeroImage,
-    desktopAccentColor: row.desktop_accent_color || fallback.desktopAccentColor,
   }
 }
 
@@ -218,7 +220,6 @@ export async function updateSiteSettings(
         desktop_hero_headline: merged.desktopHeroHeadline,
         desktop_hero_subhead: merged.desktopHeroSubhead,
         desktop_hero_image: merged.desktopHeroImage,
-        desktop_accent_color: merged.desktopAccentColor,
         updated_at: new Date().toISOString(),
       },
       { onConflict: 'community_id' },

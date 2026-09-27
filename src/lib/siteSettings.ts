@@ -90,10 +90,6 @@ export type SiteSettings = {
   /** Desktop only — the hero band's photo. Null shows the CSS gradient
    *  placeholder instead. */
   desktopHeroImage: { url: string; alt: string } | null
-  /** Desktop only — the home screen's accent color (eyebrows, the hero
-   *  band, Update Listings/Subscribe's CTAs), as a 6-digit hex. Lighter/darker
-   *  shades used alongside it are derived from this one value. */
-  desktopAccentColor: string
 }
 
 /** One entry in the desktop header's top nav, or in the "More" panel it can
@@ -191,7 +187,6 @@ export const DEFAULT_FEEDBACK_SUCCESS_MESSAGE = 'We appreciate your feedback and
 
 export const DEFAULT_SEARCH_PLACEHOLDER = 'Ask a question: food, minyan times, mikvah…'
 export const DEFAULT_DESKTOP_BROWSE_EYEBROW = 'Get started'
-export const DEFAULT_DESKTOP_ACCENT_COLOR = '#b45309'
 
 // Every desktop card's default eyebrow/heading — exactly today's literal
 // strings, so nothing changes on screen until an admin edits one. See
@@ -206,19 +201,6 @@ export const DEFAULT_DESKTOP_MAP_HEADING = 'Explore the Map'
 export const DEFAULT_DESKTOP_SUBSCRIBE_EYEBROW = 'Email updates'
 export const DEFAULT_DESKTOP_SUBSCRIBE_HEADING = 'Stay in the Loop'
 export const DEFAULT_DESKTOP_JEWISH_TIMES_HEADING = 'Shabbat & Holiday Times'
-
-/** A small curated set — same idea as CategoryEditor's PIN_COLORS — so the
- *  admin picker offers a one-click palette instead of demanding a hex value
- *  from someone who's never used one. Still just a starting point: the input
- *  beside it takes any 6-digit hex. */
-export const DESKTOP_ACCENT_PRESETS = [
-  '#b45309', // amber-700 — today's default
-  '#0f766e', // teal-700
-  '#7c3aed', // violet-600
-  '#be123c', // rose-700
-  '#1d4ed8', // blue-700
-  '#166534', // green-800
-] as const
 
 // Same split HeroHeading.tsx's own splitMission() does, duplicated rather
 // than imported: that's a 'use client' component and this defaults object is
@@ -262,7 +244,6 @@ export const SITE_SETTINGS_DEFAULTS: SiteSettings = {
   desktopHeroHeadline: heroSplit.headline,
   desktopHeroSubhead: heroSplit.subhead,
   desktopHeroImage: community.heroImage,
-  desktopAccentColor: DEFAULT_DESKTOP_ACCENT_COLOR,
 }
 
 /** Bump when the icon RENDERING changes — the inset, the trim, the padding

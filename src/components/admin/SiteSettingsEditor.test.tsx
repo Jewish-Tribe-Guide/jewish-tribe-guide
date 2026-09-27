@@ -244,21 +244,23 @@ describe('SiteSettingsEditor — the Desktop tab', () => {
     expect(screen.getByText('Click the preview to reposition/re-zoom it')).toBeInTheDocument()
   })
 
-  it('shows the top nav editor, hero, colors, and home screen cards sections — not Featured cards, which was removed', async () => {
+  it('shows the top nav editor, hero, and home screen cards sections — not Featured cards or Colors, which were removed', async () => {
     await renderEditor('desktop')
     expect(screen.getByText('Top nav bar')).toBeInTheDocument()
     expect(screen.getByText('Hero')).toBeInTheDocument()
-    expect(screen.getByText('Colors')).toBeInTheDocument()
     expect(screen.getByText('Home screen cards')).toBeInTheDocument()
     expect(screen.queryByText('Featured cards')).not.toBeInTheDocument()
+    // The accent colour picker changed nothing on the site (never wired up),
+    // and the redesign's one look leaves nothing for it to change.
+    expect(screen.queryByText('Colors')).not.toBeInTheDocument()
     // Mobile-only fields don't leak onto this tab.
     expect(screen.queryByText('Mobile tab bar')).not.toBeInTheDocument()
   })
 
-  it('orders Top nav bar, then Hero, then Colors, then Home screen cards', async () => {
+  it('orders Top nav bar, then Hero, then Home screen cards', async () => {
     await renderEditor('desktop')
     const headings = screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent)
-    const order = ['Top nav bar', 'Hero', 'Colors', 'Home screen cards']
+    const order = ['Top nav bar', 'Hero', 'Home screen cards']
     const indices = order.map((label) => headings.indexOf(label))
     expect(indices).toEqual([...indices].sort((a, b) => a - b))
     expect(indices.every((i) => i !== -1)).toBe(true)

@@ -20,7 +20,6 @@ import ImageUploadField from '@/components/ImageUploadField'
 import {
   DEFAULT_MOBILE_TABS,
   DEFAULT_DESKTOP_NAV_ITEMS,
-  DESKTOP_ACCENT_PRESETS,
 } from '@/lib/siteSettings'
 
 // ── One component, three tabs — Site (shared), Desktop, Mobile — sharing a
@@ -29,8 +28,8 @@ import {
 // passes `section`). Site carries the branding shared by both devices (name,
 // mission, logo, search placeholder), the home-screen section grouping, and
 // the feedback form. Desktop carries the top nav, the home screen's cards
-// and their order, the Browse card's own eyebrow/heading, the hero band, and
-// the accent color. Mobile carries the home screen heading, the tagline, and
+// and their order, the Browse card's own eyebrow/heading, and the hero band.
+// Mobile carries the home screen heading, the tagline, and
 // the bottom tab bar. Nothing goes live until you save.
 
 const inputClass =
@@ -251,7 +250,7 @@ export default function SiteSettingsEditor({
       {isDesktop && (
         <p className="text-sm text-muted mb-4">
           Everything that exists on desktop only — the top nav, the home screen&rsquo;s cards and
-          their order, the hero band, and the accent color. Everything shared by both devices —
+          their order, and the hero band. Everything shared by both devices —
           branding, sections, search placeholder — is on the Site tab. Nothing goes live until you
           click Save changes below.
         </p>
@@ -409,47 +408,6 @@ export default function SiteSettingsEditor({
               <span className="block text-[11px] text-muted mt-1">
                 Leave blank to show a plain gradient instead of a photo.
               </span>
-            </div>
-          </CollapsibleSection>
-        </div>
-      )}
-
-      {isDesktop && (
-        <div className="mt-6 max-w-2xl">
-          <CollapsibleSection
-            title="Colors"
-            description="The home screen’s accent color — the eyebrows above each card, the hero band, and the Davening/Shabbat cards’ call-to-action buttons."
-            contentClassName="p-4 space-y-3"
-          >
-            <div className="flex flex-wrap items-center gap-2">
-              {DESKTOP_ACCENT_PRESETS.map((hex) => (
-                <button
-                  key={hex}
-                  type="button"
-                  onClick={() => set('desktopAccentColor', hex)}
-                  aria-label={`Use ${hex}`}
-                  aria-pressed={draft.desktopAccentColor.toLowerCase() === hex.toLowerCase()}
-                  className={`h-8 w-8 rounded-full border-2 cursor-pointer ${
-                    draft.desktopAccentColor.toLowerCase() === hex.toLowerCase() ? 'border-slate-900' : 'border-transparent'
-                  }`}
-                  style={{ backgroundColor: hex }}
-                />
-              ))}
-              <label className="flex items-center gap-2">
-                <input
-                  type="color"
-                  value={/^#[0-9a-f]{6}$/i.test(draft.desktopAccentColor) ? draft.desktopAccentColor : '#b45309'}
-                  onChange={(e) => set('desktopAccentColor', e.target.value)}
-                  className="h-8 w-8 cursor-pointer rounded border border-slate-300 p-0"
-                  aria-label="Custom color"
-                />
-                <input
-                  value={draft.desktopAccentColor}
-                  onChange={(e) => set('desktopAccentColor', e.target.value)}
-                  placeholder="#b45309"
-                  className="w-28 rounded-md border border-slate-300 px-2 py-1.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary"
-                />
-              </label>
             </div>
           </CollapsibleSection>
         </div>
