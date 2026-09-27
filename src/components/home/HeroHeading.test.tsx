@@ -247,6 +247,24 @@ describe('HeroHeading — the search dropdown', () => {
     expect(screen.queryByText('Food')).not.toBeInTheDocument()
   })
 
+  // Reported via a shared answer (/philly/ask/…): it opened with the answer
+  // showing, the location prompt came up over it, and tapping "Not now"
+  // closed the answer.
+  it('stays open through a click in a dialog over the page', async () => {
+    const user = userEvent.setup()
+    const { container } = render(
+      <>
+        <Wrapper />
+        <div role="dialog" aria-modal="true">
+          <button type="button">Not now</button>
+        </div>
+      </>,
+    )
+    await user.type(desktopSearchInput(container), 'food')
+    await user.click(screen.getByRole('button', { name: 'Not now' }))
+    expect(screen.getByText('Food')).toBeInTheDocument()
+  })
+
   // Escape (and "See all") close the dropdown without necessarily blurring
   // the input — refocusing/clicking it again has to reopen the dropdown on
   // its own, without requiring the visitor to edit the text first.

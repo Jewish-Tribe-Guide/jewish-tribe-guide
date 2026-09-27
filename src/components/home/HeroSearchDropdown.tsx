@@ -44,6 +44,7 @@ export default function HeroSearchDropdown({
   answer = null,
   askGroup = null,
   onOpenShul,
+  share = null,
 }: {
   /** The trimmed, non-empty query this panel is showing results for. */
   query: string
@@ -59,6 +60,8 @@ export default function HeroSearchDropdown({
    *  answer, last (see AskTheGroup). */
   askGroup?: { nothingClose: boolean; askHref: string | null; addHref: string } | null
   onOpenShul?: (shulId: string) => void
+  /** See AskAnswer's `share`. */
+  share?: { path: string; title: string } | null
 }) {
   const [expanded, setExpanded] = useState(false)
   const totalCount = cards.length + placeHits.length
@@ -69,7 +72,7 @@ export default function HeroSearchDropdown({
   const panelClassName =
     'absolute left-0 right-0 top-[calc(100%+8px)] z-20 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_4px_10px_rgba(15,23,42,0.06),0_20px_40px_rgba(15,23,42,0.12)]'
 
-  const answerNode = answer && <AskAnswer answer={answer} onOpenShul={onOpenShul} className="mx-2 mt-2" />
+  const answerNode = answer && <AskAnswer answer={answer} onOpenShul={onOpenShul} share={share} className="mx-2 mt-2" />
   const askGroupNode = askGroup && <AskTheGroup query={query} {...askGroup} className="mx-2 mb-2" />
 
   if (totalCount === 0) {

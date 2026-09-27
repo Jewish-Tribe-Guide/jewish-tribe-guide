@@ -1,7 +1,31 @@
 'use client'
 
 import { useState } from 'react'
+import { track } from '@vercel/analytics'
 import type { Answer } from '@/lib/askAnswer'
+import { useShareLink } from '@/lib/useShareLink'
+
+/** The answer's own link (see shareAnswer.ts), to send to whoever asked:
+ *  the phone's share sheet, or a copied link. The analytics event carries
+ *  no question text, same as the search events (see useLogSearchMiss). */
+function ShareAnswer({ path, title }: { path: string; title: string }) {
+  const { share, copied } = useShareLink(path, title)
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        track('answer_shared')
+        void share()
+      }}
+      className="mt-1.5 inline-flex cursor-pointer items-center gap-1.5 text-[13px] font-semibold text-brand-teal transition-colors hover:text-brand-teal-dark"
+    >
+      <svg aria-hidden="true" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4">
+        <path d="M10 3v10M6 7l4-4 4 4M4 12v3a2 2 0 002 2h8a2 2 0 002-2v-3" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+      {copied ? 'Link copied' : 'Share this answer'}
+    </button>
+  )
+}
 
 // The one-line answer above search results (see askAnswer.ts): the sentence,
 // then for a minyan question the minyanim it's about, each opening its shul.
@@ -11,10 +35,15 @@ import type { Answer } from '@/lib/askAnswer'
 export default function AskAnswer({
   answer,
   onOpenShul,
+  share = null,
   className = '',
 }: {
   answer: Answer
   onOpenShul?: (shulId: string) => void
+  /** The answer's own page (see shareAnswer.ts) and the question as its
+   *  title, when it's worth sending: not for a near miss, which answers a
+   *  different question. */
+  share?: { path: string; title: string } | null
   className?: string
 }) {
   // Open for this answer only: a new question starts collapsed again,
@@ -76,6 +105,7 @@ export default function AskAnswer({
           {expanded ? 'Show fewer' : `Show all ${answer.rows.length}${allTomorrow ? ' tomorrow' : ' today'}`}
         </button>
       )}
+      {share && !answer.closest && <div><ShareAnswer path={share.path} title={share.title} /></div>}
     </div>
   )
 }

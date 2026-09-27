@@ -22,6 +22,7 @@ import ShabbatTimesCard from '@/components/home/ShabbatTimesCard'
 import SubscribeSection from '@/components/home/SubscribeSection'
 import CampaignBannerCard from '@/components/home/CampaignBannerCard'
 import { useLogSearchMiss } from '@/lib/useLogSearchMiss'
+import { useHydrated } from '@/lib/useHydrated'
 import { useCategories } from '@/lib/useCategories'
 import { useHomeSections } from '@/lib/useHomeSections'
 import { BUILT_IN_BLOCKS, type HomeBlockKind } from '@/lib/homeSections'
@@ -47,6 +48,9 @@ export type LandingProps = {
    *  distance, exactly like the category directory does, and feeds the
    *  Davening Times/Shabbat & Holiday Times cards' own nearest-location calc. */
   coords: { lat: number; lng: number } | null
+  /** A shared question (/philly/ask/…, see shareAnswer.ts): asked as soon as
+   *  the page is running, as if typed. */
+  initialQuery?: string
 }
 
 // ── The home screen ───────────────────────────────────────────────────────────
@@ -72,12 +76,26 @@ export type LandingProps = {
 // surfaces Synagogues). On desktop, where the grid isn't on screen, typing
 // reveals it inline as a results list — a search that appeared to do nothing
 // would be worse than a slightly longer page.
-export default function Landing({ onNavigate, onOpenFlow, coords }: LandingProps) {
+export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }: LandingProps) {
   const communitySlug = useCommunitySlug()
   const categories = useCategories()
   const homeSections = useHomeSections()
   const listings = useAllListings()
-  const [query, setQuery] = useState('')
+  // A shared question is asked once the page runs in the browser, not in the
+  // server render: its answer can depend on the visitor's clock ("open
+  // now"), which a page built ahead of time doesn't know (see useHydrated).
+  // Null until the visitor types.
+  const [typed, setQuery] = useState<string | null>(null)
+  const hydrated = useHydrated()
+  const query = typed ?? (hydrated && initialQuery ? initialQuery : '')
+  // Once they ask something else, the address stops naming the shared
+  // question: a reload or a copied link would otherwise bring it back.
+  const changeQuery = (text: string) => {
+    setQuery(text)
+    if (initialQuery && window.location.pathname !== routes.home(communitySlug)) {
+      window.history.replaceState(null, '', routes.home(communitySlug))
+    }
+  }
   // "View all" (desktop "Explore by Category" card) — collapsed shows the
   // first COLLAPSED_TILE_COUNT cards plus a trailing "More" tile, expanded
   // shows every card in a full wrapped grid. Lives here, not inside
@@ -186,6 +204,9 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: LandingProps
   const miss = foundNothing && listings ? nearMiss(listings, categories ?? [], q, { coords, now: new Date(schedule.now), places }) : null
   const placeHits = miss ? listingHitsFrom(miss.result, coords) : strictHits
   const answer = miss ? nearMissAnswer(miss, q, { coords }) : strictAnswer
+  // The answer's own link, for the Share button (which AskAnswer leaves off
+  // a near miss: that answers a different question).
+  const share = q && answer ? { path: routes.ask(communitySlug, q), title: q } : null
   // Where to ask: the community's WhatsApp groups page, when it has one.
   const whatsapp = categories?.find((c) => /whatsapp/i.test(`${c.id} ${c.label}`))
   // Where to add the answer: the Add form of the one kind of place asked
@@ -311,7 +332,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: LandingProps
   // styled like "Places", over every matching card regardless of section.
   const mobileResultsNode = (
     <>
-      {q && answer && <AskAnswer answer={answer} onOpenShul={openShul} />}
+      {q && answer && <AskAnswer answer={answer} onOpenShul={openShul} share={share} />}
       {noMatchesMessage}
       {loading ? (
         <CardGrid cards={entryCards} loadingCount={6} />
@@ -439,7 +460,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: LandingProps
         <HeroHeading
           settings={settings}
           query={query}
-          onQueryChange={setQuery}
+          onQueryChange={changeQuery}
           mapIcon={hasMap ? mapIcon : null}
           onViewMap={() => onNavigate(null, 'map')}
           onBrowseCategories={() => {
@@ -454,6 +475,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: LandingProps
           searchCards={filtered}
           searchPlaceHits={placeHits}
           searchAnswer={answer}
+          searchShare={share}
           searchAskGroup={askGroup}
           onOpenAnswerShul={openShul}
           searchPrompts={prompts}

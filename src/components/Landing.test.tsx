@@ -960,3 +960,51 @@ describe('Landing — example questions', () => {
     expect(screen.queryByRole('button', { name: 'Where can I get chalav yisroel milk?' })).not.toBeInTheDocument()
   })
 })
+
+// "Share this answer": the answer's own link, and that link opening with the
+// question already asked (see shareAnswer.ts and /[community]/ask/[question]).
+describe('Landing — sharing an answer', () => {
+  const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores', detailFields: [{ key: 'm', label: 'Kosher items', type: 'tags' }] })
+  const store = makeListing({ id: 'l1', category: 'grocery', name: 'Test Grocery', m: ['Challah'] })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    window.history.replaceState(null, '', '/')
+  })
+
+  it('opens a shared question already asked', () => {
+    renderLanding({ initialQuery: 'where can I get challah' }, { content: { categories: [grocery] } }, [store])
+    expect(screen.getAllByText('Test Grocery has Challah.').length).toBeGreaterThan(0)
+    expect((screen.getAllByLabelText('Search resources')[0] as HTMLInputElement).value).toBe('where can I get challah')
+  })
+
+  it('shares the answer’s own link', async () => {
+    const shareFn = vi.fn().mockResolvedValue(undefined)
+    vi.stubGlobal('navigator', { ...navigator, share: shareFn })
+    const user = userEvent.setup()
+    renderLanding(undefined, { content: { categories: [grocery] } }, [store])
+    await user.type(screen.getAllByLabelText('Search resources')[0]!, 'where can I get challah?')
+    await user.click(screen.getAllByRole('button', { name: 'Share this answer' })[0]!)
+    expect(shareFn).toHaveBeenCalledWith({
+      title: 'where can I get challah?',
+      url: `${window.location.origin}/test-community/ask/where-can-i-get-challah`,
+    })
+  })
+
+  it('offers no share for a near miss, which answers a different question', async () => {
+    const user = userEvent.setup()
+    renderLanding(undefined, { content: { categories: [grocery] } }, [store])
+    await user.type(screen.getAllByLabelText('Search resources')[0]!, 'frozen challah')
+    expect(screen.getAllByText(/Nothing in the guide for “frozen challah”/).length).toBeGreaterThan(0)
+    expect(screen.queryByRole('button', { name: 'Share this answer' })).toBeNull()
+  })
+
+  it('stops naming the shared question in the address once another is asked', async () => {
+    window.history.replaceState(null, '', '/test-community/ask/where-can-i-get-challah')
+    const user = userEvent.setup()
+    renderLanding({ initialQuery: 'where can I get challah' }, { content: { categories: [grocery] } }, [store])
+    await user.clear(screen.getAllByLabelText('Search resources')[0]!)
+    await user.type(screen.getAllByLabelText('Search resources')[0]!, 'wine')
+    expect(window.location.pathname).toBe('/test-community')
+  })
+})

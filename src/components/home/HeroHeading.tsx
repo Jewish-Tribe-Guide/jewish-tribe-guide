@@ -57,6 +57,8 @@ type Props = {
   /** The answer to the query, when there is one (see askAnswer.ts) — shown
    *  at the top of the dropdown. */
   searchAnswer?: Answer | null
+  /** The answer's share link — see AskAnswer's `share`. */
+  searchShare?: { path: string; title: string } | null
   /** Where to ask and add, for a search that found nothing (see AskTheGroup). */
   searchAskGroup?: { nothingClose: boolean; askHref: string | null; addHref: string } | null
   onOpenAnswerShul?: (shulId: string) => void
@@ -142,6 +144,7 @@ export default function HeroHeading({
   onSearchCardClick,
   onOpenSearchPlace,
   searchAnswer = null,
+  searchShare = null,
   searchAskGroup = null,
   onOpenAnswerShul,
   searchPrompts = [],
@@ -188,6 +191,12 @@ export default function HeroHeading({
   useEffect(() => {
     if (!dropdownOpen) return
     function onPointerDown(e: MouseEvent) {
+      // A click in a dialog open over the page (the "Share your live
+      // location?" prompt) is an answer to the dialog, not a click away from
+      // the results. It used to close them: a shared answer
+      // (/philly/ask/…) opened, the visitor tapped "Not now", and the answer
+      // was gone.
+      if (document.querySelector('[aria-modal="true"]')) return
       if (searchShellRef.current && !searchShellRef.current.contains(e.target as Node)) setDismissed(true)
     }
     function onKeyDown(e: KeyboardEvent) {
@@ -395,6 +404,7 @@ export default function HeroHeading({
                   onCardClick={(card) => onSearchCardClick?.(card)}
                   onOpenPlace={(hit) => onOpenSearchPlace?.(hit)}
                   answer={searchAnswer}
+                  share={searchShare}
                   askGroup={searchAskGroup}
                   onOpenShul={onOpenAnswerShul}
                 />

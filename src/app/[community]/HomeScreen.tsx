@@ -12,13 +12,14 @@ import { useSiteNavigation } from '@/lib/useSiteNavigation'
 // (via LandingConnected) purely to read `?at=map` for the now-retired
 // embedded map band. Nothing under Landing reads the query string any more,
 // so this prerenders for real with no fallback shell to flash first.
-export default function HomeScreen() {
+/** `initialQuery`: a shared question, from /[community]/ask/[question]. */
+export default function HomeScreen({ initialQuery }: { initialQuery?: string } = {}) {
   const { coords } = useLocation()
   const { navigate, openFlow } = useSiteNavigation()
 
   return (
     <div className="flex-1">
-      <Landing onNavigate={navigate} onOpenFlow={openFlow} coords={coords} />
+      <Landing onNavigate={navigate} onOpenFlow={openFlow} coords={coords} initialQuery={initialQuery} />
     </div>
   )
 }

@@ -70,6 +70,8 @@ export const RESERVED_SLUGS = new Set([
   // would otherwise shadow the real screen at that same URL.
   'about',
   'privacy',
+  // A shared search answer: /[community]/ask/[question] (see shareAnswer.ts).
+  'ask',
   // Generated app icons.
   'icons',
   // Framework and metadata paths.
@@ -115,6 +117,41 @@ export function assertUsableSlug(slug: string): void {
   if (reason) throw new Error(reason)
 }
 
+// ── A shared question's URL segment ─────────────────────────────────────────
+// See shareAnswer.ts. Here rather than there so building a link doesn't pull
+// the whole search in.
+
+/** Longest question a link carries. A question longer than this isn't one
+ *  anybody shares. */
+const MAX_QUESTION_LENGTH = 100
+
+/** The question as a URL segment: lower case, words joined by hyphens,
+ *  trailing punctuation dropped. "Where can I get challah?" →
+ *  "where-can-i-get-challah". Search reads the hyphens as spaces. Lower
+ *  case so one question is one page: "…get-Challah" and "…get-challah"
+ *  were two, and on a filesystem that ignores case, one built page was
+ *  served for both. */
+export function questionSlug(question: string): string {
+  return question
+    .trim()
+    .toLowerCase()
+    .replace(/[?!.,\s]+$/, '')
+    .replace(/\s+/g, '-')
+    .slice(0, MAX_QUESTION_LENGTH)
+}
+
+/** The question back from its segment, or null when there isn't one. */
+export function questionFromSlug(segment: string): string | null {
+  let text: string
+  try {
+    text = decodeURIComponent(segment)
+  } catch {
+    return null
+  }
+  const question = text.replace(/-/g, ' ').replace(/\s+/g, ' ').trim()
+  return question && question.length <= MAX_QUESTION_LENGTH ? question : null
+}
+
 // ── URL builders ─────────────────────────────────────────────────────────────
 // Every link in the app goes through these rather than composing paths inline,
 // so the URL shape stays changeable from one file.
@@ -138,6 +175,9 @@ export const routes = {
    *  resolving. */
   listing: (community: string, slug: string, listingIdOrSlug: string) =>
     `/${community}/${slug}/${listingIdOrSlug}`,
+  /** A search question's own page, the link "Share" copies:
+   *  /philly/ask/challah-near-rittenhouse. See shareAnswer.ts. */
+  ask: (community: string, question: string) => `/${community}/ask/${encodeURIComponent(questionSlug(question))}`,
 }
 
 /** Serializes the map's live view into query params, so a shared map link
