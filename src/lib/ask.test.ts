@@ -297,3 +297,23 @@ describe('parseAsk — the eruv', () => {
     expect(parseAsk('shabbos').eruv).toBe(false)
   })
 })
+
+describe('parseAsk — Shabbos and the day’s times', () => {
+  it('reads which time is asked for', () => {
+    const cases: [string, string][] = [
+      ['when is candle lighting', 'candles'], ['candle lighting this Friday', 'candles'], ['licht bentchen', 'candles'], ['when does Shabbos start', 'candles'],
+      ['when does shabbos end', 'havdalah'], ['havdalah', 'havdalah'], ['when is Shabbat over', 'havdalah'], ['motzei shabbos', 'havdalah'],
+      ['shabbos times', 'shabbos'], ['when is shabbos', 'shabbos'],
+      ['when is shkia today', 'Sunset'], ['sunset', 'Sunset'], ['netz', 'Sunrise'], ['latest shema', 'Latest Shema'], ['tzeis', 'Nightfall'],
+    ]
+    for (const [input, times] of cases) {
+      const q = parseAsk(input)
+      expect(q.times, input).toBe(times)
+      expect(q.terms, input).toEqual([])
+    }
+  })
+
+  it('leaves searches for things to the listings', () => {
+    for (const input of ['shabbos', 'shabbos candles', 'havdalah candles', 'havdalah set', 'shabbos food', 'mincha before shkia']) expect(parseAsk(input).times, input).toBeNull()
+  })
+})

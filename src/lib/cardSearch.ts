@@ -91,6 +91,8 @@ export function cardMatches(card: SearchableCard, query: string, categories: rea
   // "Is the eruv up" has no words left to look for (see AskQuery.eruv), and
   // the Eruv page is still the page it's about.
   if (q.eruv && card.id === 'eruv') return true
+  // Likewise "when is candle lighting" and the Zmanim page (AskQuery.times).
+  if (q.times && card.id === 'zmanim') return true
   // A kind of place this community has no category for is still a word to
   // look for in titles and keywords. One it does have isn't: "kosher food"
   // means the food card, not every card whose keywords mention food (the

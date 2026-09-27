@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { makeCategory } from '@/test/providerFixtures'
 import type { DirectoryResource } from '@/types'
 import { nearMiss, searchAsk } from './askSearch'
-import { answerFor, eruvAnswer, hitHoursNote, nearMissAnswer, type AnswerSchedule } from './askAnswer'
+import { answerFor, eruvAnswer, hitHoursNote, nearMissAnswer, timesAnswer, type AnswerSchedule } from './askAnswer'
+import type { ZmanimData } from '@/types'
 import type { MinyanSlot } from './upcomingDavening'
 
 const synagogue = makeCategory({
@@ -524,5 +525,44 @@ describe('eruvAnswer', () => {
       { label: 'Center City Eruv', detail: 'Center City', href: 'https://example.org/eruv', external: true },
       { label: 'More about the eruvim', href: '/philly/eruv', external: false },
     ])
+  })
+})
+
+describe('timesAnswer', () => {
+  const week: ZmanimData = {
+    hebrewDate: '', dayOfWeek: 3, isFriday: false, isShabbos: false,
+    dailyZmanim: [{ label: 'Sunset', time: '6:52 PM' }, { label: 'Latest Shema', time: '9:48 AM' }],
+    shabbos: { candleLighting: { label: 'Friday', time: '6:34 PM', iso: '2026-10-02T18:34:00-04:00' }, havdalah: { label: 'Saturday', time: '7:36 PM' } },
+  }
+  const opts = { nowMs: Date.parse('2026-09-30T12:00:00-04:00'), pageHref: '/philly/zmanim' }
+
+  it('gives candle lighting, havdalah, or both', () => {
+    expect(timesAnswer('candles', week, opts).text).toBe('Candle lighting: Friday, 6:34 PM.')
+    expect(timesAnswer('havdalah', week, opts).text).toBe('Shabbos ends: Saturday, 7:36 PM.')
+    expect(timesAnswer('shabbos', week, opts).text).toBe('Candle lighting: Friday, 6:34 PM. Shabbos ends: Saturday, 7:36 PM.')
+    expect(timesAnswer('shabbos', week, opts).links).toEqual([{ label: 'All zmanim', href: '/philly/zmanim', external: false }])
+  })
+
+  it('gives the day’s zmanim', () => {
+    expect(timesAnswer('Sunset', week, opts).text).toBe('Sunset today: 6:52 PM.')
+    expect(timesAnswer('Latest Shema', week, opts).text).toBe('Latest Shema today: 9:48 AM.')
+  })
+
+  it('names a Yom Tov that comes first, as the Shabbos card does', () => {
+    const withYomTov: ZmanimData = {
+      ...week,
+      holidayPeriod: {
+        name: 'Sukkot',
+        begins: { label: 'Thursday', time: '6:36 PM', iso: '2026-10-01T18:36:00-04:00' },
+        candleLightings: [{ label: 'Thursday', time: '6:36 PM', iso: '2026-10-01T18:36:00-04:00' }],
+        ends: { label: 'Saturday', time: '7:36 PM' },
+      },
+    }
+    expect(timesAnswer('candles', withYomTov, opts).text).toBe('Sukkot begins Thursday, 6:36 PM. Candle lighting: Friday, 6:34 PM.')
+  })
+
+  it('says it’s looking, or that it couldn’t, while there are no times', () => {
+    expect(timesAnswer('candles', null, opts).text).toBe('Looking up the times…')
+    expect(timesAnswer('candles', null, { ...opts, failed: true }).text).toBe("Couldn't load the times just now.")
   })
 })

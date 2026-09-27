@@ -78,6 +78,11 @@ describe('shareSummary: the link preview', () => {
     expect(say('next mincha')).toBe('Minyan times from 1 shul in the guide, worked out when you open it.')
   })
 
+  it('leaves Shabbos times to the page, since they change every week', () => {
+    expect(say('when is candle lighting')).toBe("This week's candle lighting, worked out when you open it.")
+    expect(say('shkia')).toBe("Today's sunset, worked out when you open it.")
+  })
+
   it('points an eruv question to each eruv’s own status', () => {
     const eruv = makeCategory({ id: 'eruv-information', label: 'Eruv Information', pluralLabel: 'Eruv Information', kind: 'eruv' })
     expect(shareSummary('is the eruv up', listings, [...categories, eruv])).toMatch(/^Each eruv posts its own status: .+\. Open for the links\.$/)

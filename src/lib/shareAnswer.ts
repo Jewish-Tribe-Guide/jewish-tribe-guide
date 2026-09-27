@@ -58,6 +58,14 @@ export function shareSummary(
     const shuls = searchAsk(listings, categories, question, options).hits.length
     return shuls ? `Minyan times from ${shuls} ${shuls === 1 ? 'shul' : 'shuls'} in the guide, worked out when you open it.` : 'Minyan times from the guide.'
   }
+  // Times change weekly or daily, and depend on where: the page works
+  // them out when it's opened.
+  if (asked.times) {
+    if (asked.times === 'candles') return "This week's candle lighting, worked out when you open it."
+    if (asked.times === 'havdalah') return 'When Shabbos ends this week, worked out when you open it.'
+    if (asked.times === 'shabbos') return "This week's candle lighting and havdalah, worked out when you open it."
+    return `Today's ${asked.times.toLowerCase()}, worked out when you open it.`
+  }
   if (asked.eruv && categories.some((c) => c.kind === 'eruv')) {
     return eruvim.length
       ? `Each eruv posts its own status: ${eruvim.map((e) => e.name).join(' and ')}. Open for the links.`

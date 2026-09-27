@@ -218,6 +218,11 @@ export type AskQuery = {
   /** "best", "better", "top", "favorite", "most popular", "recommend": a
    *  ranking, which the guide can only give from neighbors' upvotes. */
   best: boolean
+  /** A question about a time of day or of Shabbos, which the zmanim answer
+   *  rather than any listing: "when is candle lighting" (candles), "when
+   *  does Shabbos end" (havdalah), "Shabbos times" (shabbos: both), "when
+   *  is shkia" (a daily zman, by its label in ZmanimData). */
+  times: TimesAsk | null
   /** A question about the eruv itself ("is the eruv up", "can I carry this
    *  Shabbos"), which no listing answers: each eruv posts its own status.
    *  Not set when it's one word of a search for something else ("a hotel
@@ -400,6 +405,41 @@ const DATE_OUT = /\b(?:for a date|date night|date (?=restaurants?\b|places?\b|sp
 
 const BEST = /\b(?:best|better|top|favou?rite|most popular|highest rated|highly rated|top rated|recommend(?:ed|ation|ations)?)\b/
 
+export type TimesAsk = 'candles' | 'havdalah' | 'shabbos' | 'Sunrise' | 'Latest Shema' | 'Sunset' | 'Nightfall'
+
+// Words that name a daily zman, by the label ZmanimData gives it. Folded.
+const DAILY_ZMAN: Record<string, TimesAsk> = {
+  sunrise: 'Sunrise', netz: 'Sunrise', hanetz: 'Sunrise',
+  sunset: 'Sunset', shkia: 'Sunset', shkiah: 'Sunset', shkiya: 'Sunset', shekia: 'Sunset',
+  shema: 'Latest Shema', shma: 'Latest Shema',
+  nightfall: 'Nightfall', tzeis: 'Nightfall', tzais: 'Nightfall', tzeit: 'Nightfall', tzet: 'Nightfall',
+}
+// What can come with them without making it a question about something
+// else: "when is candle lighting this Friday". Folded.
+const TIMES_CONTEXT = new Set([
+  'candle', 'lighting', 'licht', 'bentchen', 'bentching', 'benching', 'havdalah', 'havdala', 'motzei', 'motzash',
+  'shabbos', 'start', 'begin', 'end', 'over', 'out', 'time', 'zman', 'zmanim', 'latest', 'sof',
+  'today', 'tonight', 'friday', 'saturday', 'this', 'week', 'weekend', 'day', 'when',
+])
+
+/** What time a question asks for, from its searched words, or null when
+ *  it's about something else ("shabbos candles" is the item). */
+function readTimes(terms: readonly string[], plain: string): TimesAsk | null {
+  if (terms.length === 0 || !terms.every((t) => TIMES_CONTEXT.has(t) || t in DAILY_ZMAN)) return null
+  const has = (...ws: string[]) => ws.some((w) => terms.includes(w))
+  // Candles without the lighting are the candles: "havdalah candles" is
+  // something to buy, not a time.
+  if (has('candle') && !has('lighting', 'licht', 'bentchen', 'bentching', 'benching')) return null
+  const daily = terms.find((t) => t in DAILY_ZMAN)
+  if (daily) return DAILY_ZMAN[daily]
+  if (has('havdalah', 'havdala', 'motzei', 'motzash') || (has('shabbos') && has('end', 'over', 'out'))) return 'havdalah'
+  if (has('lighting', 'licht', 'bentchen', 'bentching', 'benching') || (has('shabbos') && has('start', 'begin'))) return 'candles'
+  // "When is Shabbos", "Shabbos times": not "shabbos" alone, which is as
+  // often Shabbos food or a Shabbos-friendly hotel.
+  if (has('shabbos') && (/\bwhen\b/.test(plain) || /\b(times?|zmanim)\b/.test(plain))) return 'shabbos'
+  return null
+}
+
 // The words of a question about the eruv, and the ones that can come with
 // them without making it about something else. Folded (see fold).
 const ERUV_WORDS = new Set(['eruv', 'eruvin', 'eruvim', 'eiruv', 'techum'])
@@ -471,6 +511,9 @@ export function parseAsk(input: string): AskQuery {
     terms.push(folded)
   }
 
+  const times = concepts.length === 0 ? readTimes(terms, plain) : null
+  if (times) terms.length = 0
+
   // "Is the eruv up", "can I carry this Shabbos": nothing asked but the
   // eruv. "Carry" is otherwise filler ("who carries challah"), so it only
   // counts with nothing else to look for, which the check below makes sure of.
@@ -480,20 +523,20 @@ export function parseAsk(input: string): AskQuery {
     mentionsEruv && concepts.length === 0 && terms.every((t) => ERUV_WORDS.has(t) || ERUV_CONTEXT.has(t))
   if (eruv) terms.length = 0
 
-  const minyan: MinyanAsk | null = asksMinyan ? { tefillos, at: clock.at } : null
+  const minyan: MinyanAsk | null = asksMinyan && !times ? { tefillos, at: clock.at } : null
   const withinAsked = within.within
   // Read before "better than Giant" is taken out: that's still asking
   // for a better one.
   const best = BEST.test(typed)
   const typing = raw !== '' && !/\s$/.test(input)
   const last = plainWords(raw).at(-1)
-  if (terms.length === 0 && concepts.length === 0 && !nearMe && !openNow && !openToday && !openAt && !eruv) {
+  if (terms.length === 0 && concepts.length === 0 && !nearMe && !openNow && !openToday && !openAt && !eruv && !times) {
     const all = words(raw)
-    return { raw, terms: all, concepts, nearMe, openNow, openToday, openAt, best, eruv, excluding, within: withinAsked, minyan, partial: typing && all.length > 1 ? (all.at(-1) ?? null) : null }
+    return { raw, terms: all, concepts, nearMe, openNow, openToday, openAt, best, eruv, times, excluding, within: withinAsked, minyan, partial: typing && all.length > 1 ? (all.at(-1) ?? null) : null }
   }
   // Only the word under the cursor, and only if it survived as a term.
   const partial = typing && last !== undefined && terms.at(-1) === fold(last) && terms.length > 1 ? (terms.at(-1) ?? null) : null
-  return { raw, terms, concepts, nearMe, openNow, openToday, openAt, best, eruv, excluding, within: withinAsked, minyan, partial }
+  return { raw, terms, concepts, nearMe, openNow, openToday, openAt, best, eruv, times, excluding, within: withinAsked, minyan, partial }
 }
 
 /** The categories a concept stands for in this community: those whose id or

@@ -1,6 +1,7 @@
-import type { EruvRecord } from '@/types'
+import type { EruvRecord, ZmanimData } from '@/types'
+import { resolvePrimaryZmanimBlock } from '@/lib/zmanim'
 import { describedByItsText, type AskHit, type DayWindow, type AskResult, type HoursWindow, type NearMiss } from '@/lib/askSearch'
-import { formatOpenAtTime, termMatches, termsAsTyped, words, type MinyanAsk } from '@/lib/ask'
+import { formatOpenAtTime, termMatches, termsAsTyped, words, type MinyanAsk, type TimesAsk } from '@/lib/ask'
 import { TEFILLAH_LABELS, type Tefillah } from '@/lib/davening'
 import type { MinyanSlot } from '@/lib/upcomingDavening'
 import { haversineMiles, roundMiles, type LatLng } from '@/lib/geo'
@@ -464,4 +465,36 @@ export function eruvAnswer(eruvim: readonly Pick<EruvRecord, 'name' | 'area' | '
     ? "The guide can't say whether an eruv is up this week: each one posts its own status. Check before Shabbos:"
     : "The guide can't say whether an eruv is up this week. See what it has:"
   return { text, rows: [], links }
+}
+
+/** "When is candle lighting?", "when does Shabbos end?", "shkia": straight
+ *  from the zmanim the home screen's Shabbos card shows, so the two never
+ *  disagree. A Yom Tov coming before Shabbos is named too, as the card
+ *  does. `zmanim` is null while they load, and `failed` when they couldn't
+ *  be; the answer says so rather than falling through to "nothing in the
+ *  guide". */
+export function timesAnswer(
+  times: TimesAsk,
+  zmanim: ZmanimData | null,
+  { nowMs, pageHref, failed = false }: { nowMs: number; pageHref: string | null; failed?: boolean },
+): Answer {
+  const links: AnswerLink[] = pageHref ? [{ label: 'All zmanim', href: pageHref, external: false }] : []
+  if (!zmanim) return { text: failed ? "Couldn't load the times just now." : 'Looking up the times…', rows: [], links }
+  const at = (e: { label: string; time: string }) => `${e.label}, ${e.time}`
+  if (times !== 'candles' && times !== 'havdalah' && times !== 'shabbos') {
+    const z = zmanim.dailyZmanim.find((e) => e.label === times)
+    return { text: z ? `${z.label} today: ${z.time}.` : `No ${times.toLowerCase()} time for today.`, rows: [], links }
+  }
+  const lines: string[] = []
+  const holiday = zmanim.holidayPeriod && resolvePrimaryZmanimBlock(zmanim, nowMs) === 'holiday' ? zmanim.holidayPeriod : null
+  const { candleLighting, havdalah } = zmanim.shabbos
+  if (times !== 'havdalah') {
+    if (holiday) lines.push(`${holiday.name} begins ${at(holiday.begins)}.`)
+    if (candleLighting) lines.push(`Candle lighting: ${at(candleLighting)}.`)
+  }
+  if (times !== 'candles') {
+    if (holiday) lines.push(`${holiday.name} ends ${at(holiday.ends)}.`)
+    if (havdalah) lines.push(`Shabbos ends: ${at(havdalah)}.`)
+  }
+  return { text: lines.join(' ') || "Couldn't find this week's times.", rows: [], links }
 }

@@ -45,6 +45,10 @@ vi.mock('next/navigation', () => ({
 vi.mock('@vercel/analytics', () => ({ track: vi.fn() }))
 // Recorded, not run: the tests read what the search-miss log was told.
 vi.mock('@/lib/useLogSearchMiss', () => ({ useLogSearchMiss: vi.fn() }))
+// Zmanim come from a network request; each test says what it has. Loading
+// by default, as on a page that's just opened.
+const zmanimMock = vi.hoisted(() => ({ result: { data: null as unknown, status: 'loading' as string } }))
+vi.mock('@/lib/useZmanim', () => ({ useZmanim: () => zmanimMock.result }))
 vi.mock('@/components/home/DaveningTimesCard', () => ({
   default: () => <div data-testid="davening-stub" />,
 }))
@@ -1042,5 +1046,39 @@ describe('Landing — "is the eruv up"', () => {
     renderLanding(undefined, { content: { categories: [makeCategory()] } }, [])
     await user.type(screen.getAllByLabelText('Search resources')[0]!, 'is the eruv up')
     expect(screen.queryByText(/The guide can't say whether an eruv is up/)).toBeNull()
+  })
+})
+
+describe('Landing — Shabbos times', () => {
+  const zmanimCat = makeCategory({ id: 'zmanim', kind: 'zmanim', pluralLabel: 'Zmanim' })
+  afterEach(() => {
+    zmanimMock.result = { data: null, status: 'loading' }
+  })
+
+  it('answers "when is candle lighting" from the zmanim, linking to them', async () => {
+    zmanimMock.result = {
+      status: 'ready',
+      data: {
+        hebrewDate: '', dayOfWeek: 3, isFriday: false, isShabbos: false,
+        dailyZmanim: [{ label: 'Sunset', time: '6:52 PM' }],
+        shabbos: { candleLighting: { label: 'Friday', time: '6:34 PM' }, havdalah: { label: 'Saturday', time: '7:36 PM' } },
+      },
+    }
+    const user = userEvent.setup()
+    renderLanding(undefined, { content: { categories: [makeCategory(), zmanimCat] } }, [])
+    await user.type(screen.getAllByLabelText('Search resources')[0]!, 'when is candle lighting')
+    expect(screen.getAllByText('Candle lighting: Friday, 6:34 PM.').length).toBeGreaterThan(0)
+    expect(screen.getAllByRole('link', { name: 'All zmanim →' })[0]).toHaveAttribute('href', '/test-community/zmanim')
+    await user.clear(screen.getAllByLabelText('Search resources')[0]!)
+    await user.type(screen.getAllByLabelText('Search resources')[0]!, 'shkia')
+    expect(screen.getAllByText('Sunset today: 6:52 PM.').length).toBeGreaterThan(0)
+  })
+
+  it('says it’s looking them up while they load, rather than "nothing in the guide"', async () => {
+    const user = userEvent.setup()
+    renderLanding(undefined, { content: { categories: [makeCategory()] } }, [])
+    await user.type(screen.getAllByLabelText('Search resources')[0]!, 'havdalah')
+    expect(screen.getAllByText('Looking up the times…').length).toBeGreaterThan(0)
+    expect(screen.queryByText(/Nothing in the guide/)).toBeNull()
   })
 })

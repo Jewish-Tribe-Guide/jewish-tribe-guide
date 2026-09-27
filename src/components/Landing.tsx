@@ -7,7 +7,8 @@ import { cardMatches } from '@/lib/cardSearch'
 import AskAnswer from '@/components/home/AskAnswer'
 import AskTheGroup from '@/components/home/AskTheGroup'
 import { nearMiss, searchAsk } from '@/lib/askSearch'
-import { answerFor, eruvAnswer, nearMissAnswer } from '@/lib/askAnswer'
+import { answerFor, eruvAnswer, nearMissAnswer, timesAnswer } from '@/lib/askAnswer'
+import { useZmanim } from '@/lib/useZmanim'
 import { eruvim } from '@/data/resources'
 import { resolveCapabilities } from '@/lib/categories'
 import { routes } from '@/lib/routes'
@@ -166,6 +167,9 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
   // One question, searched and answered — the typed query, and each example
   // question under the box, which is only offered if it answers well.
   const eruvPage = categories?.some((c) => c.kind === 'eruv') ?? false
+  const zmanimPage = categories?.some((c) => c.kind === 'zmanim') ?? false
+  // The same request the minyan schedule makes (same place, so one fetch).
+  const zmanim = useZmanim(coords ?? community.mapCenter)
   const ask = (text: string) => {
     const result = searchAsk(listings ?? [], categories ?? [], text, { coords, now: new Date(schedule.now), places })
     const answer = answerFor(result, {
@@ -182,6 +186,17 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
           }
         : null,
     })
+    // "When is candle lighting?": from the zmanim (see timesAnswer).
+    if (result.query.times) {
+      return {
+        result,
+        answer: timesAnswer(result.query.times, zmanim.data, {
+          nowMs: schedule.now,
+          pageHref: zmanimPage ? routes.slug(communitySlug, 'zmanim') : null,
+          failed: zmanim.status === 'error',
+        }),
+      }
+    }
     // "Is the eruv up?": where to check, when the community has an eruv
     // page (see eruvAnswer).
     if (result.query.eruv && eruvPage) return { result, answer: eruvAnswer(eruvim, routes.slug(communitySlug, 'eruv')) }
