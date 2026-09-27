@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
 import type { ComponentProps } from 'react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, screen, within, type RenderResult } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { track } from '@vercel/analytics'
 import { renderWithProviders } from '@/test/renderWithProviders'
+import { tipStillOffered } from '@/lib/browsingTips'
 import { makeCategory, makeListing } from '@/test/providerFixtures'
 import { SITE_SETTINGS_DEFAULTS } from '@/lib/siteSettings'
 import { LocationProvider } from '@/lib/locationContext'
@@ -1006,5 +1007,17 @@ describe('Landing — sharing an answer', () => {
     await user.clear(screen.getAllByLabelText('Search resources')[0]!)
     await user.type(screen.getAllByLabelText('Search resources')[0]!, 'wine')
     expect(window.location.pathname).toBe('/test-community')
+  })
+})
+
+describe('Landing — the category pages’ "you can just ask" tip', () => {
+  beforeEach(() => localStorage.clear())
+
+  it('retires once the visitor asks the home search something themselves', async () => {
+    const user = userEvent.setup()
+    renderLanding(undefined, { content: { categories: [makeCategory()] } }, [])
+    expect(tipStillOffered()).toBe(true)
+    await user.type(screen.getAllByLabelText('Search resources')[0]!, 'challah')
+    expect(tipStillOffered()).toBe(false)
   })
 })

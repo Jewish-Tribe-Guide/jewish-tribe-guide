@@ -21,6 +21,7 @@ import { neighborhoodsFor } from '@/lib/places'
 import { useOptionalCommunitySlug } from '@/lib/communityContext'
 import { travelCompare } from '@/lib/listingTravel'
 import { useLogSearchMiss } from '@/lib/useLogSearchMiss'
+import AskTip from './AskTip'
 import { ui } from '@/lib/uiConfig'
 import { useOptionalLocation } from '@/lib/locationContext'
 import { usePinned } from '@/lib/pinnedContext'
@@ -1203,6 +1204,9 @@ export default function GenericDirectory({ category, items, anchorLabel, address
             )}
           </div>
         )}
+        {/* One quiet line on the first couple of visits: the home search
+            answers questions (see AskTip / browsingTips.ts). */}
+        <AskTip category={category} items={items} />
         {showSearch && q && tagFields.length > 0 && (
           <p className="text-xs text-muted">Showing listings matching &ldquo;{search.trim()}&rdquo;</p>
         )}
