@@ -561,6 +561,33 @@ describe('timesAnswer', () => {
     expect(timesAnswer('candles', withYomTov, opts).text).toBe('Sukkot begins Thursday, 6:36 PM. Candle lighting: Friday, 6:34 PM.')
   })
 
+  it('gives a Yom Tov already under way its next candle lighting, not its start', () => {
+    // Reported live on the second day of Sukkos: "Sukkot begins Sat, Sep 26" — yesterday.
+    const secondDay: ZmanimData = {
+      ...week,
+      holidayPeriod: {
+        name: 'Sukkot',
+        begins: { label: 'Sat, Sep 26', time: '7:31 PM', iso: '2026-09-26T19:31:00-04:00' },
+        candleLightings: [
+          { label: 'Sat, Sep 26', time: '7:31 PM', iso: '2026-09-26T19:31:00-04:00' },
+          { label: 'Sun, Sep 27', time: '7:29 PM', iso: '2026-09-27T19:29:00-04:00' },
+        ],
+        ends: { label: 'Mon, Sep 28', time: '7:27 PM' },
+      },
+    }
+    const sundayNoon = { ...opts, nowMs: Date.parse('2026-09-27T12:00:00-04:00') }
+    expect(timesAnswer('candles', secondDay, sundayNoon).text).toBe('Sukkot candle lighting: Sun, Sep 27, 7:29 PM. Candle lighting: Friday, 6:34 PM.')
+    // A Yom Tov night that's also Friday night is said once.
+    const intoShabbos: ZmanimData = {
+      ...secondDay,
+      holidayPeriod: { ...secondDay.holidayPeriod!, candleLightings: [secondDay.holidayPeriod!.candleLightings[0], week.shabbos.candleLighting!] },
+    }
+    expect(timesAnswer('candles', intoShabbos, sundayNoon).text).toBe('Candle lighting: Friday, 6:34 PM.')
+    // After the last one, only Shabbos is left to say.
+    const mondayNoon = { ...opts, nowMs: Date.parse('2026-09-28T12:00:00-04:00') }
+    expect(timesAnswer('candles', secondDay, mondayNoon).text).toBe('Candle lighting: Friday, 6:34 PM.')
+  })
+
   it('says it’s looking, or that it couldn’t, while there are no times', () => {
     expect(timesAnswer('candles', null, opts).text).toBe('Looking up the times…')
     expect(timesAnswer('candles', null, { ...opts, failed: true }).text).toBe("Couldn't load the times just now.")

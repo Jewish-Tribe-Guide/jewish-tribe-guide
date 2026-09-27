@@ -80,6 +80,8 @@ describe('shareSummary: the link preview', () => {
 
   it('previews a question about the guide itself as that', () => {
     expect(say("what's on this site")).toBe('What the guide has, and how the community keeps it.')
+    expect(say('who runs this')).toBe('Who keeps the guide, and how.')
+    expect(say('how do I add a listing')).toBe('How to add a listing to the guide.')
   })
 
   it('leaves Shabbos times to the page, since they change every week', () => {

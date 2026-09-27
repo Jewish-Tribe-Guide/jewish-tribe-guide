@@ -58,7 +58,14 @@ export function shareSummary(
     const shuls = searchAsk(listings, categories, question, options).hits.length
     return shuls ? `Minyan times from ${shuls} ${shuls === 1 ? 'shul' : 'shuls'} in the guide, worked out when you open it.` : 'Minyan times from the guide.'
   }
-  if (asked.meta) return 'What the guide has, and how the community keeps it.'
+  if (asked.meta) {
+    return {
+      contents: 'What the guide has, and how the community keeps it.',
+      ask: 'What you can ask the guide, and how it answers.',
+      about: 'Who keeps the guide, and how.',
+      add: 'How to add a listing to the guide.',
+    }[asked.meta]
+  }
   // Times change weekly or daily, and depend on where: the page works
   // them out when it's opened.
   if (asked.times) {

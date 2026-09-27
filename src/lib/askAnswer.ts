@@ -489,8 +489,15 @@ export function timesAnswer(
   const lines: string[] = []
   const holiday = zmanim.holidayPeriod && resolvePrimaryZmanimBlock(zmanim, nowMs) === 'holiday' ? zmanim.holidayPeriod : null
   const { candleLighting, havdalah } = zmanim.shabbos
+  // Once a Yom Tov has begun, its start is history: what's asked is the
+  // next candle lighting in it (the second night's), if there is one.
+  const ahead = (e: { iso?: string }) => !e.iso || Date.parse(e.iso) > nowMs
   if (times !== 'havdalah') {
-    if (holiday) lines.push(`${holiday.name} begins ${at(holiday.begins)}.`)
+    if (holiday) {
+      const next = holiday.candleLightings.find(ahead)
+      if (ahead(holiday.begins)) lines.push(`${holiday.name} begins ${at(holiday.begins)}.`)
+      else if (next && next.iso !== candleLighting?.iso) lines.push(`${holiday.name} candle lighting: ${at(next)}.`)
+    }
     if (candleLighting) lines.push(`Candle lighting: ${at(candleLighting)}.`)
   }
   if (times !== 'candles') {
