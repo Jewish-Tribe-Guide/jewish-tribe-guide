@@ -1,7 +1,8 @@
-import type { EruvRecord, ZmanimData } from '@/types'
+import type { DirectoryResource, EruvRecord, ZmanimData } from '@/types'
+import type { CategoryConfig } from '@/lib/categories'
 import { resolvePrimaryZmanimBlock } from '@/lib/zmanim'
 import { describedByItsText, type AskHit, type DayWindow, type AskResult, type HoursWindow, type NearMiss } from '@/lib/askSearch'
-import { formatOpenAtTime, termMatches, termsAsTyped, words, type MinyanAsk, type TimesAsk } from '@/lib/ask'
+import { formatOpenAtTime, termMatches, termsAsTyped, words, type MetaAsk, type MinyanAsk, type TimesAsk } from '@/lib/ask'
 import { TEFILLAH_LABELS, type Tefillah } from '@/lib/davening'
 import type { MinyanSlot } from '@/lib/upcomingDavening'
 import { haversineMiles, roundMiles, type LatLng } from '@/lib/geo'
@@ -497,4 +498,60 @@ export function timesAnswer(
     if (havdalah) lines.push(`Shabbos ends: ${at(havdalah)}.`)
   }
   return { text: lines.join(' ') || "Couldn't find this week's times.", rows: [], links }
+}
+
+/** "12 grocery stores", "1 hotel", "73 food places": a count of one kind. */
+function countOf(category: CategoryConfig, n: number): string {
+  const kind = n === 1 ? category.label.toLowerCase() : category.pluralLabel !== category.label ? category.pluralLabel.toLowerCase() : `${category.label.toLowerCase()} places`
+  return `${n} ${kind}`
+}
+
+/** Questions about the guide itself (see AskQuery.meta): what's on it,
+ *  what to ask, who keeps it, how to add to it. Counts come from the
+ *  listings visitors can see, so "what's here" is never out of date. */
+export function metaAnswer(
+  meta: MetaAsk,
+  ctx: {
+    listings: readonly DirectoryResource[]
+    categories: readonly CategoryConfig[]
+    aboutHref: string
+    /** The Add form of the kind of place the question named, if any. */
+    addTo?: { label: string; href: string } | null
+  },
+): Answer {
+  if (meta === 'contents') {
+    const byKind = ctx.categories
+      .filter((c) => c.kind === 'listing')
+      .map((c) => ({ c, n: ctx.listings.filter((l) => l.category === c.id).length }))
+      .filter((x) => x.n > 0)
+      .sort((a, b) => b.n - a.n)
+    const total = byKind.reduce((sum, x) => sum + x.n, 0)
+    const shown = byKind.slice(0, 4).map((x) => countOf(x.c, x.n))
+    const more = byKind.length > shown.length ? ', and more' : ''
+    return {
+      text: `${total} listings, kept by the community: ${shown.join(', ')}${more}. Ask about any of it, the way you'd ask a neighbor.`,
+      rows: [],
+      links: [{ label: 'About the guide', href: ctx.aboutHref, external: false }],
+    }
+  }
+  if (meta === 'ask') {
+    return {
+      text: 'Ask the way you\'d ask a neighbor: where to get something ("where can I get challah"), what\'s open ("bagels open now"), the next minyan, or when candle lighting is. Every answer comes from what\'s in the guide.',
+      rows: [],
+    }
+  }
+  if (meta === 'about') {
+    return {
+      text: 'The guide is kept by the community: anyone can add or correct a listing, and an admin checks each change before it goes live.',
+      rows: [],
+      links: [{ label: 'About the guide', href: ctx.aboutHref, external: false }],
+    }
+  }
+  return {
+    text: ctx.addTo
+      ? `Anyone can add one. An admin checks it before it goes live.`
+      : 'Open the kind of place it is and tap "Add a listing", or "Suggest an edit" on one that\'s there. An admin checks each change before it goes live.',
+    rows: [],
+    links: ctx.addTo ? [{ label: `Add a ${ctx.addTo.label.toLowerCase()} listing`, href: ctx.addTo.href, external: false }] : [],
+  }
 }

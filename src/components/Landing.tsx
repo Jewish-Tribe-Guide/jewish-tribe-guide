@@ -7,7 +7,7 @@ import { cardMatches } from '@/lib/cardSearch'
 import AskAnswer from '@/components/home/AskAnswer'
 import AskTheGroup from '@/components/home/AskTheGroup'
 import { nearMiss, searchAsk } from '@/lib/askSearch'
-import { answerFor, eruvAnswer, nearMissAnswer, timesAnswer } from '@/lib/askAnswer'
+import { answerFor, eruvAnswer, metaAnswer, nearMissAnswer, timesAnswer } from '@/lib/askAnswer'
 import { useZmanim } from '@/lib/useZmanim'
 import { eruvim } from '@/data/resources'
 import { resolveCapabilities } from '@/lib/categories'
@@ -186,6 +186,17 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
           }
         : null,
     })
+    // "What's on this site?", "how do I add a listing?" (see metaAnswer).
+    if (result.query.meta) {
+      const kind = result.categoryIds?.length === 1 ? categories?.find((c) => c.id === result.categoryIds![0]) : undefined
+      const addTo = kind && ui.contributions.add && resolveCapabilities(kind.capabilities).add
+        ? { label: kind.label, href: `${routes.slug(communitySlug, kind.id)}?form=create` }
+        : null
+      return {
+        result,
+        answer: metaAnswer(result.query.meta, { listings: listings ?? [], categories: categories ?? [], aboutHref: routes.about(communitySlug), addTo }),
+      }
+    }
     // "When is candle lighting?": from the zmanim (see timesAnswer).
     if (result.query.times) {
       return {
@@ -204,7 +215,9 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
   }
   const asked = q && listings ? ask(q) : null
   const askResult = asked?.result ?? null
-  const strictHits = askResult ? listingHitsFrom(askResult, coords) : []
+  // A question about the guide itself has no places to list ("how do I add
+  // a restaurant" isn't asking for every restaurant).
+  const strictHits = askResult && !askResult.query.meta ? listingHitsFrom(askResult, coords) : []
   const strictAnswer = asked?.answer ?? null
   // Questions to tap under the empty box: the first try at search, made one
   // that works (see searchPrompts.ts).

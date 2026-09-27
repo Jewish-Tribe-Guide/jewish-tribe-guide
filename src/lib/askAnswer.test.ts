@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { makeCategory } from '@/test/providerFixtures'
 import type { DirectoryResource } from '@/types'
 import { nearMiss, searchAsk } from './askSearch'
-import { answerFor, eruvAnswer, hitHoursNote, nearMissAnswer, timesAnswer, type AnswerSchedule } from './askAnswer'
+import { answerFor, eruvAnswer, hitHoursNote, metaAnswer, nearMissAnswer, timesAnswer, type AnswerSchedule } from './askAnswer'
 import type { ZmanimData } from '@/types'
 import type { MinyanSlot } from './upcomingDavening'
 
@@ -564,5 +564,31 @@ describe('timesAnswer', () => {
   it('says it’s looking, or that it couldn’t, while there are no times', () => {
     expect(timesAnswer('candles', null, opts).text).toBe('Looking up the times…')
     expect(timesAnswer('candles', null, { ...opts, failed: true }).text).toBe("Couldn't load the times just now.")
+  })
+})
+
+describe('metaAnswer', () => {
+  const food = makeCategory({ id: 'restaurant', label: 'Food', pluralLabel: 'Food' })
+  const hotel = makeCategory({ id: 'hotel', label: 'Hotel', pluralLabel: 'Hotels' })
+  const eruvCat = makeCategory({ id: 'eruv', label: 'Eruv', pluralLabel: 'Eruv', kind: 'eruv' })
+  const places = [listing('restaurant', 'f1', 'A', 39.95), listing('restaurant', 'f2', 'B', 39.95), listing('hotel', 'h1', 'C', 39.95)]
+  // Hotels first here, so the answer's order is its own, most first.
+  const ctx = { listings: places, categories: [hotel, food, eruvCat], aboutHref: '/philly/about' }
+
+  it('counts what the guide has, most first, from the listings', () => {
+    const answer = metaAnswer('contents', ctx)
+    expect(answer.text).toBe("3 listings, kept by the community: 2 food places, 1 hotel. Ask about any of it, the way you'd ask a neighbor.")
+    expect(answer.links).toEqual([{ label: 'About the guide', href: '/philly/about', external: false }])
+  })
+
+  it('says who keeps it', () => {
+    expect(metaAnswer('about', ctx).text).toMatch(/^The guide is kept by the community/)
+  })
+
+  it('links straight to the Add form of the kind of place named', () => {
+    expect(metaAnswer('add', { ...ctx, addTo: { label: 'Food', href: '/philly/restaurant?form=create' } }).links).toEqual([
+      { label: 'Add a food listing', href: '/philly/restaurant?form=create', external: false },
+    ])
+    expect(metaAnswer('add', ctx).text).toMatch(/^Open the kind of place it is and tap "Add a listing"/)
   })
 })

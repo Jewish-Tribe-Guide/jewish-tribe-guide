@@ -218,6 +218,9 @@ export type AskQuery = {
   /** "best", "better", "top", "favorite", "most popular", "recommend": a
    *  ranking, which the guide can only give from neighbors' upvotes. */
   best: boolean
+  /** A question about the guide itself: what's on it ("contents"), what to
+   *  ask ("ask"), who runs it ("about"), how to add to it ("add"). */
+  meta: MetaAsk | null
   /** A question about a time of day or of Shabbos, which the zmanim answer
    *  rather than any listing: "when is candle lighting" (candles), "when
    *  does Shabbos end" (havdalah), "Shabbos times" (shabbos: both), "when
@@ -405,6 +408,17 @@ const DATE_OUT = /\b(?:for a date|date night|date (?=restaurants?\b|places?\b|sp
 
 const BEST = /\b(?:best|better|top|favou?rite|most popular|highest rated|highly rated|top rated|recommend(?:ed|ation|ations)?)\b/
 
+export type MetaAsk = 'contents' | 'ask' | 'about' | 'add'
+
+// Read off the plain words (lower case, apostrophes gone: "what's" is
+// "whats"). Checked in this order: "how do I add" before "what's on".
+const META: [MetaAsk, RegExp][] = [
+  ['add', /\b(?:how (?:do|can|would) (?:i|we|you) (?:add|submit|suggest|list|update|edit|correct|fix|change)|(?:add|submit|suggest) (?:a |my |our )?(?:new )?(?:listing|place|business|store|shul|restaurant))\b/],
+  ['about', /\b(?:who (?:runs|made|built|maintains|owns|keeps|updates|is behind|are you)|about (?:this|the) (?:site|website|guide|app)|is this (?:site |website |guide )?(?:reliable|accurate|official|up to date))\b/],
+  ['ask', /\b(?:what (?:can|should|do) (?:i|you) (?:ask|search|type)|how (?:does|do i use) (?:this|the) (?:search|site|guide|app)|how do i (?:use|search) (?:this|it))\b/],
+  ['contents', /\b(?:(?:whats|what is) (?:on |in )?(?:here|this (?:site|website|guide|app)|the (?:site|website|guide|app))|what (?:does|do) (?:this|the|you) (?:site |website |guide |app )?(?:have|has|cover|include|list)|what can (?:i|you) find (?:here|on (?:this|the) (?:site|website|app)|in (?:this|the) guide))\b/],
+]
+
 export type TimesAsk = 'candles' | 'havdalah' | 'shabbos' | 'Sunrise' | 'Latest Shema' | 'Sunset' | 'Nightfall'
 
 // Words that name a daily zman, by the label ZmanimData gives it. Folded.
@@ -511,6 +525,8 @@ export function parseAsk(input: string): AskQuery {
     terms.push(folded)
   }
 
+  const meta = META.find(([, re]) => re.test(plain))?.[0] ?? null
+  if (meta) terms.length = 0
   const times = concepts.length === 0 ? readTimes(terms, plain) : null
   if (times) terms.length = 0
 
@@ -530,13 +546,13 @@ export function parseAsk(input: string): AskQuery {
   const best = BEST.test(typed)
   const typing = raw !== '' && !/\s$/.test(input)
   const last = plainWords(raw).at(-1)
-  if (terms.length === 0 && concepts.length === 0 && !nearMe && !openNow && !openToday && !openAt && !eruv && !times) {
+  if (terms.length === 0 && concepts.length === 0 && !nearMe && !openNow && !openToday && !openAt && !eruv && !times && !meta) {
     const all = words(raw)
-    return { raw, terms: all, concepts, nearMe, openNow, openToday, openAt, best, eruv, times, excluding, within: withinAsked, minyan, partial: typing && all.length > 1 ? (all.at(-1) ?? null) : null }
+    return { raw, terms: all, concepts, nearMe, openNow, openToday, openAt, best, eruv, times, meta, excluding, within: withinAsked, minyan, partial: typing && all.length > 1 ? (all.at(-1) ?? null) : null }
   }
   // Only the word under the cursor, and only if it survived as a term.
   const partial = typing && last !== undefined && terms.at(-1) === fold(last) && terms.length > 1 ? (terms.at(-1) ?? null) : null
-  return { raw, terms, concepts, nearMe, openNow, openToday, openAt, best, eruv, times, excluding, within: withinAsked, minyan, partial }
+  return { raw, terms, concepts, nearMe, openNow, openToday, openAt, best, eruv, times, meta, excluding, within: withinAsked, minyan, partial }
 }
 
 /** The categories a concept stands for in this community: those whose id or

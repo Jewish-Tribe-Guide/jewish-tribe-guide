@@ -89,6 +89,8 @@ export function classifyMiss(
 ): ClassifiedMiss {
   const options = { places, now }
   const asked = parseAsk(tally.term)
+  // "What's on this site": answered about the guide itself.
+  if (asked.meta) return { ...tally, askedCategory: null, verdict: { kind: 'found', summary: 'Answered about the guide itself.', places: [] } }
   // "When is candle lighting": answered from the zmanim.
   if (asked.times) return { ...tally, askedCategory: null, verdict: { kind: 'found', summary: 'Answered from the zmanim.', places: [] } }
   // "Is the eruv up": answered with where each eruv posts its status.

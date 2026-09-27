@@ -78,6 +78,10 @@ describe('shareSummary: the link preview', () => {
     expect(say('next mincha')).toBe('Minyan times from 1 shul in the guide, worked out when you open it.')
   })
 
+  it('previews a question about the guide itself as that', () => {
+    expect(say("what's on this site")).toBe('What the guide has, and how the community keeps it.')
+  })
+
   it('leaves Shabbos times to the page, since they change every week', () => {
     expect(say('when is candle lighting')).toBe("This week's candle lighting, worked out when you open it.")
     expect(say('shkia')).toBe("Today's sunset, worked out when you open it.")

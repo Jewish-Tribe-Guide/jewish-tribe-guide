@@ -317,3 +317,21 @@ describe('parseAsk — Shabbos and the day’s times', () => {
     for (const input of ['shabbos', 'shabbos candles', 'havdalah candles', 'havdalah set', 'shabbos food', 'mincha before shkia']) expect(parseAsk(input).times, input).toBeNull()
   })
 })
+
+describe('parseAsk — questions about the guide itself', () => {
+  it('reads what’s asked', () => {
+    const cases: [string, string][] = [
+      ["what's on this site", 'contents'], ['what does this site have', 'contents'], ['what can I find here', 'contents'], ['what is this site', 'contents'],
+      ['what can I ask', 'ask'], ['how does the search work', 'ask'],
+      ['who runs this', 'about'], ['who made this site', 'about'], ['is this site reliable', 'about'],
+      ['how do I add a listing', 'add'], ['how can I suggest an edit', 'add'], ['add my business', 'add'], ['how do I add a restaurant', 'add'],
+    ]
+    for (const [input, meta] of cases) expect(parseAsk(input).meta, input).toBe(meta)
+  })
+
+  it('leaves questions about things alone', () => {
+    for (const input of ["what's in the kiddush", 'what can I find in center city', 'whats on the menu', "what's open now", 'who has challah']) {
+      expect(parseAsk(input).meta, input).toBeNull()
+    }
+  })
+})

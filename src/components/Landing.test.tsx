@@ -1082,3 +1082,14 @@ describe('Landing — Shabbos times', () => {
     expect(screen.queryByText(/Nothing in the guide/)).toBeNull()
   })
 })
+
+describe('Landing — questions about the guide itself', () => {
+  it('answers "how do I add a restaurant" with its Add form, and lists no restaurants', async () => {
+    const food = makeCategory({ id: 'restaurant', label: 'Food', pluralLabel: 'Food' })
+    const user = userEvent.setup()
+    renderLanding(undefined, { content: { categories: [food] } }, [makeListing({ id: 'r1', category: 'restaurant', name: 'Some Cafe' })])
+    await user.type(screen.getAllByLabelText('Search resources')[0]!, 'how do I add a restaurant')
+    expect(screen.getAllByRole('link', { name: 'Add a food listing →' })[0]).toHaveAttribute('href', '/test-community/restaurant?form=create')
+    expect(screen.queryByText('Some Cafe')).toBeNull()
+  })
+})

@@ -91,6 +91,10 @@ describe('classifyMiss', () => {
     expect(verdict).toEqual({ kind: 'found', summary: 'Matches the Eruv Information page.', places: [] })
   })
 
+  it('counts a question about the guide itself as answered', () => {
+    expect(classify('who runs this').verdict).toEqual({ kind: 'found', summary: 'Answered about the guide itself.', places: [] })
+  })
+
   it('counts a Shabbos-times question as answered, from the zmanim', () => {
     expect(classify('when is candle lighting').verdict).toEqual({ kind: 'found', summary: 'Answered from the zmanim.', places: [] })
   })
