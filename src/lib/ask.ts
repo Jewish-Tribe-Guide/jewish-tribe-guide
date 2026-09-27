@@ -325,6 +325,12 @@ const NEAR_ME = /\b(?:(?:near|close to|closest to|nearest to|around|by|next to) 
 const OPEN_TODAY = /\b(?:open (?:today|tonight|later(?: today| tonight)?|this (?:evening|afternoon))|still open (?:today|tonight))\b/g
 const OPEN_NOW = /\b(?:open (?:right now|now|late|on sunday|on friday)|(?:whats|what is|anything|something|who is|whos) open|open)\b/g
 
+/** The question with "open now" / "open today" taken out, for judging it
+ *  without the clock: what the guide has, whatever the hour. */
+export function withoutOpenWords(input: string): string {
+  return plainWords(input).join(' ').replace(OPEN_TODAY, ' ').replace(OPEN_NOW, ' ').replace(/\s+/g, ' ').trim()
+}
+
 /** Reads a query into its parts. It never loses the query entirely: if only
  *  filler was typed ("kosher", "where"), those words are kept as terms, since
  *  searching for them beats showing nothing. */

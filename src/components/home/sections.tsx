@@ -8,7 +8,7 @@ import type { HomeSection } from '@/lib/homeSections'
 import type { DirectoryResource, NavigateFn } from '@/types'
 import { isOptimizableImage } from '@/lib/imageHosts'
 import { haversineMiles } from '@/lib/geo'
-import { conceptCategories, parseAsk, termMatches, termsRequired, words } from '@/lib/ask'
+import { categoryCards } from '@/lib/cardSearch'
 import { foundFor, searchAsk, type AskResult, type SearchFound } from '@/lib/askSearch'
 import { hitHoursNote } from '@/lib/askAnswer'
 import { GenericListingCard } from '@/components/resources/GenericListingCard'
@@ -555,27 +555,6 @@ export function CategoryTileRow({
   )
 }
 
-/** Does a card match the typed query? Read the same way as the listing
- *  search (see ask.ts): a category card matches when the question names its
- *  kind of place ("where can I eat" → the food card), and any card matches
- *  when its title or hidden keywords hold the question's words. */
-export function cardMatches(card: CardDef, query: string, categories: readonly CategoryConfig[] = []): boolean {
-  const q = parseAsk(query)
-  if (!q.raw) return true
-  const resolved = q.concepts.map((c) => ({ ...c, ids: conceptCategories(c.concept, categories) }))
-  if (card.id && resolved.some(({ ids }) => ids.includes(card.id!))) return true
-  // A kind of place this community has no category for is still a word to
-  // look for in titles and keywords. One it does have isn't: "kosher food"
-  // means the food card, not every card whose keywords mention food (the
-  // grocery card's say "food shopping").
-  const terms = [...q.terms, ...resolved.filter(({ ids }) => ids.length === 0).map((c) => c.word)]
-  if (terms.length === 0) return false
-  const hay = words([card.title, ...(card.keywords ?? [])].join(' '))
-  const required = q.partial ? terms.filter((t) => t !== q.partial) : terms
-  const matched = required.filter((t) => termMatches(t, hay)).length
-  return matched >= termsRequired(required.length) && (required.length > 0 || termMatches(q.partial ?? '', hay, 1))
-}
-
 // ── Home-screen sections ──────────────────────────────────────────────────────
 // The grouping shown on the home page — admin-editable (title + which cards, in
 // what order) via the Sections tab in /admin; see src/lib/homeSections.ts and
@@ -742,26 +721,6 @@ export function PlacesResults({
 
 // ── Card definitions ──────────────────────────────────────────────────────────
 
-// Hidden synonyms for the well-known categories — the words people type that
-// won't appear in a category's label or description. Keyed by category id.
-const CATEGORY_KEYWORDS: Record<string, string[]> = {
-  synagogue: ['shul', 'shuls', 'minyan', 'minyanim', 'davening', 'shtiebel', 'beis medrash'],
-  mikvah: ['mikveh', 'mikvaos', 'immersion'],
-  grocery: ['groceries', 'supermarket', 'market', 'food shopping'],
-  restaurant: ['restaurants', 'dining', 'eat out', 'takeout', 'bakery', 'bakeries', 'cafe', 'cafes', 'coffee', 'ice cream', 'dessert', 'sweets', 'donuts', 'pastry', 'bagel'],
-  hotel: ['hotels', 'motel', 'lodging', 'place to stay'],
-  whatsapp: ['whatsapp', 'group chat', 'community group', 'chat'],
-}
-
-// Words pulled from a category's own label + description, so newly added
-// categories are searchable without touching this file.
-function labelWords(c: CategoryConfig): string[] {
-  return `${c.pluralLabel} ${c.description}`
-    .toLowerCase()
-    .split(/[^a-z'’]+/)
-    .filter((w) => w.length >= 3)
-}
-
 /** "22 listings" for a category's browse-index row, or undefined when
  *  there's nothing honest to say.
  *
@@ -799,72 +758,20 @@ export function resourceCards(
 ): CardDef[] | null {
   if (categories === null) return null
 
-  const medical = categories.find((c) => c.kind === 'medical')
-  const zmanim = categories.find((c) => c.kind === 'zmanim')
-  const eruv = categories.find((c) => c.kind === 'eruv')
-
-  const cards = [
-    ...(medical
-      ? [{
-          title: medical.pluralLabel,
-          id: 'medical',
-          icon: medical.icon,
-          cardImageUrl: medical.cardImageUrl,
-          cardTextColor: medical.cardTextColor,
-          keywords: [
-            'hospital', 'hospitals', 'about your hospital', 'chaplain', 'rabbi', 'prayer room',
-            'prayer space', 'shabbat elevator', 'shabbos elevator', 'kosher cafeteria',
-            'jewish doctor', 'medical staff', 'bikur cholim room', 'shabbos accommodations',
-            'hup', 'penn', 'university of pennsylvania', 'jefferson', 'chop', 'childrens hospital',
-            'temple', 'einstein',
-          ],
-          go: () => nav('patient', 'find', { findView: 'hospitals' }),
-          href: routes.slug(communitySlug, 'hospitals'),
-        }]
-      : []),
-    ...categories.filter((c) => c.kind === 'listing').map((c) => ({
-      title: c.pluralLabel,
-      id: c.id,
-      icon: c.icon,
-      count: cardCount(c, counts),
-      cardImageUrl: c.cardImageUrl,
-      cardTextColor: c.cardTextColor,
-      keywords: [...new Set([...labelWords(c), ...(CATEGORY_KEYWORDS[c.id] ?? []), c.id.replaceAll('-', ' ')])],
-      go: () => nav('patient', 'find', { findView: c.id }),
-      href: routes.slug(communitySlug, c.id),
-    })),
-    ...(zmanim
-      ? [{
-          title: zmanim.pluralLabel,
-          id: 'zmanim',
-          icon: zmanim.icon,
-          cardImageUrl: zmanim.cardImageUrl,
-          cardTextColor: zmanim.cardTextColor,
-          keywords: [
-            'zmanim', 'zman', 'candle lighting', 'candles', 'havdalah', 'shabbat times', 'shabbos',
-            'shabbat', 'sunset', 'sunrise', 'shkia', 'netz', 'hebrew date', 'davening times', 'shema',
-            'mincha', 'maariv', 'shacharis', 'parsha', 'molad',
-          ],
-          go: () => nav('patient', 'find', { findView: 'zmanim' }),
-          href: routes.slug(communitySlug, 'zmanim'),
-        }]
-      : []),
-    ...(eruv
-      ? [{
-          title: eruv.pluralLabel,
-          id: 'eruv',
-          icon: eruv.icon,
-          cardImageUrl: eruv.cardImageUrl,
-          cardTextColor: eruv.cardTextColor,
-          keywords: [
-            'eruv', 'carry', 'carrying', 'eruv map', 'eruv status', 'eruv hotline', 'shabbat boundary',
-            'techum', 'stroller on shabbos',
-          ],
-          go: () => nav('patient', 'find', { findView: 'eruv' }),
-          href: routes.slug(communitySlug, 'eruv'),
-        }]
-      : []),
-  ]
+  // Which cards there are and what each answers to live in cardSearch.ts,
+  // shared with the server's re-run of missed searches; this adds how each
+  // one looks and where it goes.
+  const cards: CardDef[] = categoryCards(categories).map(({ id, view, title, keywords, category: c }) => ({
+    title,
+    id,
+    icon: c.icon,
+    ...(c.kind === 'listing' ? { count: cardCount(c, counts) } : {}),
+    cardImageUrl: c.cardImageUrl,
+    cardTextColor: c.cardTextColor,
+    keywords,
+    go: () => nav('patient', 'find', { findView: view }),
+    href: routes.slug(communitySlug, view),
+  }))
 
   // Hospitals/Zmanim/Eruv are built above as one-off cards (they're pseudo-
   // categories, not `kind === 'listing'`), so without this they always land

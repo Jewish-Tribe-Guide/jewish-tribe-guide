@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState, ViewTransition } from 'react'
 import { track } from '@vercel/analytics'
-import { CardGrid, CategoryTileRow, PlacesResults, cardMatches, listingHitsFrom, groupCardsIntoSections, resourceCards, useEntryCards } from '@/components/home/sections'
+import { CardGrid, CategoryTileRow, PlacesResults, listingHitsFrom, groupCardsIntoSections, resourceCards, useEntryCards } from '@/components/home/sections'
+import { cardMatches } from '@/lib/cardSearch'
 import AskAnswer from '@/components/home/AskAnswer'
 import AskTheGroup from '@/components/home/AskTheGroup'
 import { nearMiss, searchAsk } from '@/lib/askSearch'

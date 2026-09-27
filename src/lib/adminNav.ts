@@ -34,6 +34,7 @@ export type AdminTab =
   | 'mobile'
   | 'campaigns'
   | 'metrics'
+  | 'searches'
   | 'team'
   | 'communities'
 
@@ -48,6 +49,8 @@ export function adminTabs(community: string, isSuperAdmin: boolean): { tab: Admi
   return [
     { tab: 'queue', href: base, label: 'Moderation queue' },
     { tab: 'metrics', href: `${base}/metrics`, label: 'Metrics' },
+    // What visitors searched for and didn't find: the seeding to-do list.
+    { tab: 'searches', href: `${base}/searches`, label: 'Missed searches' },
     { tab: 'responses', href: `${base}/responses`, label: 'Responses' },
     { tab: 'archived', href: `${base}/archived`, label: 'Archived' },
     { tab: 'site', href: `${base}/site`, label: 'Site' },
