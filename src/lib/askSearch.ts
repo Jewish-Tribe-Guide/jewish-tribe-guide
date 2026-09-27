@@ -4,7 +4,7 @@ import { listingSearchText } from '@/lib/searchListing'
 import { haversineMiles } from '@/lib/geo'
 import { findPlace, townsFrom, type Place } from '@/lib/places'
 import { DAY_KEYS, businessClosure, fmt12, getOpenStatus, isStructuredHours, type DayHours } from '@/lib/hours'
-import { conceptCategories, initialisms, parseAsk, termMatches, termsRequired, typedWords, wordMatches, words, type AskQuery } from '@/lib/ask'
+import { conceptCategories, initialisms, parseAsk, termMatches, termsRequired, typedWords, wordMatches, words, type AskQuery, type OpenAt, withoutOpenAt } from '@/lib/ask'
 
 // Runs an `ask` query (see ask.ts) against the listings a page already holds.
 // Shared by the home search, every category page's own search box and the
@@ -42,7 +42,14 @@ export type AskHit = {
    *  they open: a mikvah's men's hours this morning, its women's tonight.
    *  What an answer names, so "open" says which part is open. */
   today: HoursWindow[]
+  /** For "open after 6" and its kin (AskQuery.openAt): today's hours that
+   *  answer it, each named. Empty when none do; null for any other
+   *  question. */
+  atTime: DayWindow[] | null
 }
+
+/** One stretch of a day's hours: "Men's", 4:30 AM to 10:00 AM. */
+export type DayWindow = { label: string; opens: string; closes: string }
 
 export type MatchedField = {
   label: string
@@ -296,6 +303,31 @@ function hoursToday(item: DirectoryResource, category: CategoryConfig, now: Date
   return out.sort((a, b) => Number(b.openNow) - Number(a.openNow) || a.at - b.at).map((w) => ({ label: w.label, opens: w.opens, closes: w.closes, openNow: w.openNow }))
 }
 
+/** Today's hours that answer "open after 6", "open until 10", "open at
+ *  8am". A place that closes after midnight ("11:00 AM to 1:00 AM") is open
+ *  after 10 PM, not closed before it opened. */
+function hoursAt(item: DirectoryResource, category: CategoryConfig, now: Date, at: OpenAt): DayWindow[] {
+  if (businessClosure(item as Record<string, unknown>)) return []
+  const out: DayWindow[] = []
+  for (const f of category.detailFields) {
+    const v = item[f.key]
+    if (f.type !== 'hours' || !isStructuredHours(v)) continue
+    const day = (v as Record<string, DayHours>)[DAY_KEYS[now.getDay()]]
+    if (!day?.open || !day.close) continue
+    const opens = toMinutes(day.open)
+    let closes = toMinutes(day.close)
+    if (closes <= opens) closes += 1440
+    const t = at.minutes
+    const fits =
+      at.how === 'after' ? closes > t
+      : at.how === 'until' ? opens < t && closes >= t
+      : at.how === 'at' ? opens <= t && closes > t
+      : opens < t
+    if (fits) out.push({ label: f.label.replace(/\s*hours$/i, '').trim(), opens: fmt12(day.open), closes: fmt12(day.close) })
+  }
+  return out
+}
+
 /** Finds the place a question is about. Only asked when the question also
  *  named a kind of place ("food at HUP"): on its own, "HUP" is simply a search
  *  for that listing. A match is a listing outside the categories asked for
@@ -379,13 +411,15 @@ export function searchAsk(
   const lookingUp =
     terms.length > 0 &&
     all.some((p) => (!categoryIds || categoryIds.includes(p.category.id)) && terms.every((t) => p.nameWords.includes(t)))
-  const placeSaid = findPlace(query.raw, [...places, ...townsOf(listings)])
+  // Where is read without "open at 8am": that "at" names a time, not a place.
+  const whereText = query.openAt ? withoutOpenAt(query.raw) : query.raw
+  const placeSaid = findPlace(whereText, [...places, ...townsOf(listings)])
   const named = placeSaid && (placeSaid.introduced || !lookingUp) ? placeSaid : null
   const unplaced = named ? terms.filter((t) => !named.used.includes(t)) : terms
 
   // Somewhere named with "near"/"at" counts without a kind of place too:
   // "sushi near HUP" is measured from HUP.
-  const saysWhere = SAYS_WHERE.test(query.raw)
+  const saysWhere = SAYS_WHERE.test(whereText)
   const found = categoryIds || saysWhere ? findAnchor(unplaced, all, categoryIds ?? [], saysWhere) : null
   const anchor = found?.anchor ?? null
   const searchTerms = found ? unplaced.filter((t) => !found.used.includes(t)) : unplaced
@@ -396,7 +430,10 @@ export function searchAsk(
 
   // With nothing left to look for, the question was only a kind of place
   // ("kosher food", "shul near me"): every listing of that kind answers it.
-  if (searchTerms.length === 0 && !categoryIds && !categoryId && !named) return empty
+  // "What's open after 10" asks about every kind of place, though: the
+  // hours are what's being looked for.
+  const asksHours = query.openNow || query.openToday || !!query.openAt
+  if (searchTerms.length === 0 && !categoryIds && !categoryId && !named && !asksHours) return empty
 
   // The word still being typed is scored but not required (see AskQuery's
   // `partial`), and may be as short as a letter, since the others narrow it.
@@ -408,6 +445,9 @@ export function searchAsk(
   for (const p of all) {
     if (categoryId && p.category.id !== categoryId) continue
     if (categoryIds && !categoryIds.includes(p.category.id)) continue
+    // "What's open" with nothing else asked: only kinds of place that keep
+    // hours. A WhatsApp group isn't a place with "no hours listed".
+    if (asksHours && searchTerms.length === 0 && !categoryIds && !categoryId && hoursKeys(p.category).length === 0) continue
     if (anchor && p.item === anchor) continue
     if (query.excluding.length && query.excluding.every((w) => termMatches(w, p.nameWords, 3, false))) {
       excluded.add(p.item.name)
@@ -471,6 +511,7 @@ export function searchAsk(
       open,
       closesAt: status?.closing?.closeLabel ?? null,
       today: known ? hoursToday(p.item, p.category, now) : [],
+      atTime: query.openAt ? (known ? hoursAt(p.item, p.category, now, query.openAt) : []) : null,
     })
   }
 
@@ -484,8 +525,9 @@ export function searchAsk(
   const inReach = (h: AskHit) =>
     (!query.within || !origin || (h.miles !== null && h.miles <= query.within.miles)) &&
     (!inside || (!!h.item.geo && haversineMiles(inside.geo, h.item.geo) <= inside.radius))
-  const openEnough = (h: AskHit) => (query.openNow ? h.open === true : query.openToday ? h.today.length > 0 : true)
-  const asksOpen = query.openNow || query.openToday
+  const openEnough = (h: AskHit) =>
+    query.openAt ? !!h.atTime?.length : query.openNow ? h.open === true : query.openToday ? h.today.length > 0 : true
+  const asksOpen = query.openNow || query.openToday || !!query.openAt
   const answering = hits.filter((h) => openEnough(h) && inReach(h))
   const noHours = asksOpen ? hits.filter((h) => h.open === null && inReach(h)) : []
   const byMatch = (a: AskHit, b: AskHit) =>

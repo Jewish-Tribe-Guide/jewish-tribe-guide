@@ -668,8 +668,12 @@ export function PlacesResults({
   hits,
   onOpen,
   showDistanceSlot,
+  closest = false,
 }: {
   hits: ListingHit[]
+  /** The places answer a question close to the one asked, not the one
+   *  asked (see nearMiss): headed as such, so they aren't read as results. */
+  closest?: boolean
   onOpen: (hit: ListingHit, action?: 'edit') => void
   /** No location set yet — hold each distance-based hit's distance column
    *  open with a tappable placeholder instead of omitting it, same as
@@ -684,9 +688,10 @@ export function PlacesResults({
 
   return (
     <section className="mt-10 sm:mt-12">
-      <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">
-        Places
+      <h2 className={`${closest ? 'mb-0.5' : 'mb-3'} text-sm font-semibold uppercase tracking-wide text-slate-500`}>
+        {closest ? 'Closest matches' : 'Places'}
       </h2>
+      {closest && <p className="mb-3 text-sm text-slate-500">Not exactly what you searched for.</p>}
       {/* desktop: a grid instead of a single column, same reasoning (and same
           track-sizing pitfalls, already solved once) as GenericDirectory's
           own listing grid — see that component's own doc for why

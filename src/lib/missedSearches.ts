@@ -89,7 +89,7 @@ export function classifyMiss(
 ): ClassifiedMiss {
   const options = { places, now }
   const asked = parseAsk(tally.term)
-  const asksOpen = asked.openNow || asked.openToday
+  const asksOpen = asked.openNow || asked.openToday || !!asked.openAt
   // A trailing space when anything was taken out: what's left was typed in
   // full, not a word still being typed (see AskQuery.partial).
   // "What's open" alone leaves nothing to look for, so it's judged as asked.

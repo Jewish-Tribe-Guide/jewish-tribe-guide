@@ -528,3 +528,56 @@ describe('searchAsk — towns and neighborhoods', () => {
     expect(miss?.result.hits.map((h) => h.item.name)).toEqual(['Mekor Habracha'])
   })
 })
+
+describe('searchAsk — "open after 6"', () => {
+  const allWeek = (open: string, close: string) =>
+    Object.fromEntries(['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'].map((d) => [d, { open, close }]))
+  const lunch = listing('restaurant', 'Lunch Grill', 39.95, -75.17, { t: ['Meat'], hours: allWeek('11:00', '15:00') })
+  const late = listing('restaurant', 'Late Grill', 39.95, -75.17, { t: ['Meat'], hours: allWeek('11:00', '23:30') })
+  const overnight = listing('restaurant', 'Night Owl Grill', 39.95, -75.17, { t: ['Meat'], hours: allWeek('18:00', '01:00') })
+  const unknown = listing('restaurant', 'No Hours Grill', 39.95, -75.17, { t: ['Meat'] })
+  const places = [lunch, late, overnight, unknown, cambria]
+  // Asked at noon: "open now" and "open after 6" must not agree by accident.
+  const noon = new Date(2026, 8, 24, 12, 0)
+  const names = (q: string) => searchAsk(places, categories, q, { now: noon }).hits.map((h) => h.item.name)
+
+  it('keeps only places open at some point after the time, whatever the hour now', () => {
+    expect(names('meat open after 6')).toEqual(['Late Grill', 'Night Owl Grill'])
+  })
+
+  it('counts a place that closes after midnight as open late, not closed', () => {
+    expect(names('meat open after 11pm')).toEqual(['Late Grill', 'Night Owl Grill'])
+    expect(names('meat open past midnight')).toEqual(['Night Owl Grill'])
+  })
+
+  it('reads until, at and before against the day’s hours', () => {
+    expect(names('meat open until 11')).toEqual(['Late Grill', 'Night Owl Grill'])
+    expect(names('meat open at 1pm')).toEqual(['Late Grill', 'Lunch Grill'])
+    expect(names('meat open before 5pm')).toEqual(['Late Grill', 'Lunch Grill'])
+  })
+
+  it('doesn’t read "at 8am" as a place to be near', () => {
+    // Reported: "bagels open at 8am" found nothing. "At" read as "at a
+    // place", the bagel bakery became where to measure from, and nothing
+    // was left to look for.
+    const bakery = listing('restaurant', 'New York Bagel Bakery', 39.95, -75.17, { t: ['Bagels'], hours: allWeek('07:00', '12:00') })
+    const cafe = listing('restaurant', 'Corner Cafe', 39.96, -75.17, { t: ['Bagels'], hours: allWeek('06:00', '10:00') })
+    const result = searchAsk([bakery, cafe], categories, 'bagels open at 8am', { now: noon })
+    expect(result.anchor).toBeNull()
+    expect(result.hits.map((h) => h.item.name)).toEqual(['Corner Cafe', 'New York Bagel Bakery'])
+  })
+
+  it('keeps a place with no hours apart, and counts the rest as not open then', () => {
+    const result = searchAsk(places, categories, 'meat open after 6', { now: noon })
+    expect(result.noHours.map((h) => h.item.name)).toEqual(['No Hours Grill'])
+    expect(result.closedCount).toBe(1)
+    expect(result.hits[0].atTime).toEqual([{ label: '', opens: '11:00 AM', closes: '11:30 PM' }])
+  })
+
+  it('answers "what’s open after 10" from every kind of place that keeps hours', () => {
+    const result = searchAsk(places, categories, "what's open after 10", { now: noon })
+    expect(result.hits.map((h) => h.item.name)).toEqual(['Late Grill', 'Night Owl Grill'])
+    // The hotel keeps no hours, so it isn't "no hours listed" either.
+    expect(result.noHours.map((h) => h.item.name)).toEqual(['No Hours Grill'])
+  })
+})

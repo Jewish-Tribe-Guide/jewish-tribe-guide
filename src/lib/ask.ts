@@ -211,6 +211,10 @@ export type AskQuery = {
    *  a mikvah open today"; only reading it as "open now" said no. Never set
    *  together with `openNow`. */
   openToday: boolean
+  /** "open after 6", "open past 9pm", "open until 10", "open at 8am": a
+   *  time today the place has to be open around. Never set together with
+   *  `openNow` or `openToday`. */
+  openAt: OpenAt | null
   /** "within 2 miles", "within a 15 minute drive", "10 minute walk": the
    *  farthest a result may be, in straight-line miles (see WITHIN). */
   within: Within | null
@@ -264,6 +268,71 @@ function readClock(input: string): { at: MinyanAsk['at']; rest: string } {
   if (hour > 23 || minute > 59) return { at: null, rest: input }
   const meridiem = said === 'am' || said === 'pm' ? said : hour > 12 ? 'pm' : null
   return { at: { hour: hour > 12 ? hour - 12 : hour, minute, meridiem }, rest: input.replace(m[0], ' ') }
+}
+
+/** "open after 6" and its kin: how the time was asked, and the time. */
+export type OpenAt = {
+  /** after: open at some point after it ("open after 6", "open past 9").
+   *  until: open right up to it ("open until 10", "open till midnight").
+   *  at: open at that moment ("open at 8am", "open by 7").
+   *  before: opens before it ("open before 8am"). */
+  how: 'after' | 'until' | 'at' | 'before'
+  /** Minutes after midnight today; 1440 is midnight tonight. */
+  minutes: number
+}
+
+const OPEN_AT =
+  /\b(?:(?:whats|what's|what is|anything|something|who is|whos|who's|is there anything|still)\s+)*open(?:s|ed)?\s+(past|after|later than|until|till|til|at|by|around|before)\s+(?:(midnight|noon)|(\d{1,2})(?::(\d{2}))?\s*(am|pm|a\.m\.|p\.m\.)?)(?:\s+(?:today|tonight|this evening))?\b/i
+
+const OPEN_HOW: Record<string, OpenAt['how']> = {
+  past: 'after', after: 'after', 'later than': 'after',
+  until: 'until', till: 'until', til: 'until',
+  at: 'at', by: 'at', around: 'at',
+  before: 'before',
+}
+
+/** The time in "open after 6". A bare hour is read the way people mean it:
+ *  asking what's open after or until 6 is asking about the evening, so it's
+ *  6 PM, and midnight for 12; asking what's open at or before 8 is usually
+ *  the morning, so 5 to 11 are AM and 1 to 4 PM. An answer always says the
+ *  time it used ("open after 6:00 PM"), so a wrong guess shows. */
+function readOpenAt(input: string): { openAt: OpenAt | null; rest: string } {
+  const m = input.match(OPEN_AT)
+  if (!m) return { openAt: null, rest: input }
+  const how = OPEN_HOW[m[1].toLowerCase().replace(/\s+/g, ' ')]
+  let minutes: number
+  if (m[2]) {
+    minutes = m[2].toLowerCase() === 'noon' ? 720 : 1440
+  } else {
+    const hour = Number(m[3])
+    const minute = Number(m[4] ?? 0)
+    const said = (m[5] ?? '').toLowerCase().replace(/\./g, '')
+    if (hour > 23 || minute > 59) return { openAt: null, rest: input }
+    let h: number
+    if (said === 'pm') h = (hour % 12) + 12
+    else if (said === 'am') h = hour === 12 ? 24 : hour
+    else if (hour === 0 || hour > 12) h = hour
+    else if (how === 'after' || how === 'until') h = hour === 12 ? 24 : hour + 12
+    else h = hour === 12 ? 12 : hour <= 4 ? hour + 12 : hour
+    minutes = h * 60 + minute
+  }
+  return { openAt: { how, minutes: Math.min(minutes, 1440) }, rest: input.replace(m[0], ' ') }
+}
+
+/** The question without its "open at 8am": what's left can say where
+ *  ("near HUP") without "at 8am" reading as a place. */
+export function withoutOpenAt(input: string): string {
+  return readOpenAt(input).rest
+}
+
+/** "6:00 PM", "midnight", "noon": a time from OpenAt, as answers say it. */
+export function formatOpenAtTime(minutes: number): string {
+  if (minutes === 1440 || minutes === 0) return 'midnight'
+  if (minutes === 720) return 'noon'
+  const h24 = Math.floor(minutes / 60)
+  const m = minutes % 60
+  const h = h24 % 12 === 0 ? 12 : h24 % 12
+  return `${h}:${String(m).padStart(2, '0')} ${h24 < 12 ? 'AM' : 'PM'}`
 }
 
 export type Within = {
@@ -328,7 +397,7 @@ const OPEN_NOW = /\b(?:open (?:right now|now|late|on sunday|on friday)|(?:whats|
 /** The question with "open now" / "open today" taken out, for judging it
  *  without the clock: what the guide has, whatever the hour. */
 export function withoutOpenWords(input: string): string {
-  return plainWords(input).join(' ').replace(OPEN_TODAY, ' ').replace(OPEN_NOW, ' ').replace(/\s+/g, ' ').trim()
+  return plainWords(readOpenAt(input).rest).join(' ').replace(OPEN_TODAY, ' ').replace(OPEN_NOW, ' ').replace(/\s+/g, ' ').trim()
 }
 
 /** Reads a query into its parts. It never loses the query entirely: if only
@@ -338,7 +407,11 @@ export function parseAsk(input: string): AskQuery {
   const raw = input.trim()
   // A time is read off the text first: once punctuation becomes spaces,
   // "6:45" is just two numbers that no listing contains.
-  const within = readWithin(raw)
+  // "Open after 6" before anything else reads a time: it isn't a minyan
+  // at 6, and "6pm" isn't a word to look for.
+  const openAtRead = readOpenAt(raw)
+  const openAt = openAtRead.openAt
+  const within = readWithin(openAtRead.rest)
   const clock = readClock(within.rest)
   // Compared by what `replace` removed rather than with `.test()`: both
   // patterns are global, and a global regex's `.test()` keeps its position
@@ -347,9 +420,9 @@ export function parseAsk(input: string): AskQuery {
   const withoutNear = typed.replace(NEAR_ME, ' ')
   const nearMe = withoutNear !== typed
   const withoutToday = withoutNear.replace(OPEN_TODAY, ' ')
-  const openToday = withoutToday !== withoutNear
+  const openToday = !openAt && withoutToday !== withoutNear
   const withoutOpen = withoutToday.replace(OPEN_NOW, ' ')
-  const openNow = !openToday && withoutOpen !== withoutToday
+  const openNow = !openAt && !openToday && withoutOpen !== withoutToday
   const { excluding, rest: excludedOut } = readExcluding(withoutOpen.replace(/\s+/g, ' ').trim())
   // "A date restaurant", "for a date", "date night": a kind of outing, not
   // the fruit, and nothing a listing says — "date" alone is still dates.
@@ -384,13 +457,13 @@ export function parseAsk(input: string): AskQuery {
   const withinAsked = within.within
   const typing = raw !== '' && !/\s$/.test(input)
   const last = plainWords(raw).at(-1)
-  if (terms.length === 0 && concepts.length === 0 && !nearMe && !openNow && !openToday) {
+  if (terms.length === 0 && concepts.length === 0 && !nearMe && !openNow && !openToday && !openAt) {
     const all = words(raw)
-    return { raw, terms: all, concepts, nearMe, openNow, openToday, excluding, within: withinAsked, minyan, partial: typing && all.length > 1 ? (all.at(-1) ?? null) : null }
+    return { raw, terms: all, concepts, nearMe, openNow, openToday, openAt, excluding, within: withinAsked, minyan, partial: typing && all.length > 1 ? (all.at(-1) ?? null) : null }
   }
   // Only the word under the cursor, and only if it survived as a term.
   const partial = typing && last !== undefined && terms.at(-1) === fold(last) && terms.length > 1 ? (terms.at(-1) ?? null) : null
-  return { raw, terms, concepts, nearMe, openNow, openToday, excluding, within: withinAsked, minyan, partial }
+  return { raw, terms, concepts, nearMe, openNow, openToday, openAt, excluding, within: withinAsked, minyan, partial }
 }
 
 /** The categories a concept stands for in this community: those whose id or

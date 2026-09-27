@@ -125,7 +125,12 @@ export default function HeroSearchDropdown({
 
         {visiblePlaces.length > 0 && (
           <div>
-            <p className="px-4 pb-1 pt-2 text-[11px] font-bold uppercase tracking-wide text-slate-500">Listings</p>
+            {/* A near miss's places answer a question close to the one
+                asked (see nearMiss), so they're headed as close. */}
+            <p className="px-4 pb-1 pt-2 text-[11px] font-bold uppercase tracking-wide text-slate-500">
+              {answer?.closest ? 'Closest matches' : 'Listings'}
+              {answer?.closest && <span className="font-normal normal-case tracking-normal"> · not exactly what you searched for</span>}
+            </p>
             {visiblePlaces.map((hit) => (
               <button
                 key={hit.item.id}

@@ -876,6 +876,9 @@ describe('Landing — when nothing matches', () => {
 
     expect(screen.getAllByText('Nothing in the guide for “packaged pretzels”. Test Grocery has Pretzel Buns.').length).toBeGreaterThan(0)
     expect(screen.getAllByText('Test Grocery').length).toBeGreaterThan(0)
+    // Headed as close, so the places aren't read as the answer.
+    expect(screen.getAllByText('Closest matches').length).toBeGreaterThan(0)
+    expect(screen.queryByRole('heading', { name: 'Places' })).toBeNull()
     const ask = screen.getAllByRole('link', { name: /Ask in a community WhatsApp group/ })[0]
     expect(ask).toHaveAttribute('href', '/test-community/whatsapp')
     const lastCall = vi.mocked(useLogSearchMiss).mock.calls.at(-1)![0]
@@ -909,7 +912,7 @@ describe('Landing — when nothing matches', () => {
     )
     await user.type(screen.getAllByLabelText('Search resources')[0]!, 'packaged pretzels')
     const boxes = screen.getAllByTestId('ask-the-group')
-    const places = screen.getByRole('heading', { name: 'Places' })
+    const places = screen.getByRole('heading', { name: 'Closest matches' })
     expect(boxes.some((b) => places.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true)
   })
 

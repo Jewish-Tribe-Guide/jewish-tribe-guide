@@ -417,3 +417,49 @@ describe('answerFor — "open now" without a location', () => {
     )
   })
 })
+
+describe('answerFor — "open after 6"', () => {
+  const allWeek = (open: string, close: string) =>
+    Object.fromEntries(['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'].map((d) => [d, { open, close }]))
+  const food = makeCategory({
+    id: 'restaurant',
+    label: 'Food',
+    pluralLabel: 'Food',
+    detailFields: [
+      { key: 't', label: 'Items', type: 'tags' },
+      { key: 'hours', label: 'Hours', type: 'hours' },
+    ],
+  })
+  const early = listing('restaurant', 'e', 'Early Bagels', 39.95, { t: ['Bagels'], hours: allWeek('06:00', '14:00') })
+  const late = listing('restaurant', 'l', 'Late Bagels', 39.96, { t: ['Bagels'], hours: allWeek('07:00', '21:00') })
+  const noon = new Date(2026, 8, 28, 12, 0)
+  const say = (q: string, places = [early, late]) => answerFor(searchAsk(places, [food], q, { now: noon }))?.text
+
+  it('says the time it read, and which places are open then', () => {
+    expect(say('food open past 6 with bagels')).toBe("Late Bagels has Bagels, open 7:00 AM–9:00 PM. 1 more isn't open then.")
+  })
+
+  it('says plainly when nothing is open then', () => {
+    expect(say('food open past 6 with bagels', [early])).toBe('Nothing open after 6:00 PM today. 1 place matches, but it isn\'t open then.')
+  })
+
+  it('names the time for a question about hours alone', () => {
+    expect(say('food open until 8')).toBe('Late Bagels: open 7:00 AM–9:00 PM.')
+    expect(say('food open at 8am')).toBe('2 food places open at 8:00 AM today, such as Early Bagels (open 6:00 AM–2:00 PM).')
+  })
+
+  it('shows each result’s hours for that time', () => {
+    const result = searchAsk([early, late], [food], 'food open at 8am', { now: noon })
+    expect(hitHoursNote(result.hits[0], result.query)).toEqual({ text: 'Open 6:00 AM–2:00 PM', known: true })
+  })
+})
+
+describe('nearMissAnswer — shown as close, not found', () => {
+  it('is marked as the closest question’s answer', () => {
+    const grocery = makeCategory({ id: 'grocery', detailFields: [{ key: 'm', label: 'Items', type: 'tags' }] })
+    const store = listing('grocery', 'g', 'Store', 39.95, { m: ['Challah'] })
+    const miss = nearMiss([store], [grocery], 'packaged challah')!
+    expect(nearMissAnswer(miss, 'packaged challah').closest).toBe(true)
+    expect(answerFor(searchAsk([store], [grocery], 'challah'))?.closest).toBeUndefined()
+  })
+})

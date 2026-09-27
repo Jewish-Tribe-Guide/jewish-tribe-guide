@@ -26,7 +26,13 @@ export default function AskAnswer({
   const hidden = answer.rows.length - limit
   const allTomorrow = answer.rows.every((r) => r.tomorrow)
   return (
-    <div className={`rounded-xl bg-brand-teal/[0.07] px-3.5 py-3 ${className}`} role="status" aria-live="polite">
+    // Not an answer to what was asked, only to something close: amber like
+    // a caution rather than the teal of an answer, so it can't be read as one.
+    <div
+      className={`rounded-xl px-3.5 py-3 ${answer.closest ? 'border border-caution/25 bg-caution/[0.06]' : 'bg-brand-teal/[0.07]'} ${className}`}
+      role="status"
+      aria-live="polite"
+    >
       <p className="text-[14px] font-semibold leading-snug text-ink">{answer.text}</p>
       {answer.rows.length > 0 && (
         <ul className="mt-2 divide-y divide-brand-teal/10">

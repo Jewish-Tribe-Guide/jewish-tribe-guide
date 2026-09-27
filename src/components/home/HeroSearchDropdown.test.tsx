@@ -284,4 +284,18 @@ describe('HeroSearchDropdown', () => {
     expect(screen.getByText('Nothing open right now. 11 places match, but all are closed.')).toBeInTheDocument()
     expect(screen.queryByText(/Nothing matches/)).not.toBeInTheDocument()
   })
+
+  it('heads a near miss’s places as close, not as listings', () => {
+    const answer = { text: 'Nothing in the guide for “bagels open late”. 3 places have bagels.', rows: [], closest: true }
+    render(<HeroSearchDropdown query="bagels open late" cards={[]} placeHits={[makeHit()]} categories={[]} onCardClick={noop} onOpenPlace={noop} answer={answer} />)
+    expect(screen.getByText('Closest matches')).toBeInTheDocument()
+    expect(screen.queryByText('Listings')).toBeNull()
+  })
+
+  it('heads real results as listings', () => {
+    const answer = { text: '3 places have bagels.', rows: [] }
+    render(<HeroSearchDropdown query="bagels" cards={[]} placeHits={[makeHit()]} categories={[]} onCardClick={noop} onOpenPlace={noop} answer={answer} />)
+    expect(screen.getByText('Listings')).toBeInTheDocument()
+    expect(screen.queryByText('Closest matches')).toBeNull()
+  })
 })

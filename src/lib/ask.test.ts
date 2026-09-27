@@ -233,3 +233,40 @@ describe('parseAsk — a date', () => {
     expect(parseAsk('medjool dates').terms).toEqual(['medjool', 'date'])
   })
 })
+
+// Reported: "Food open past 6 with bagels" searched for the words "past" and
+// "6" (and "past" matched pastries), read "open" as open right now, and so
+// showed bagel places open now under a sentence saying that wasn't it.
+describe('parseAsk — "open after 6"', () => {
+  it('reads the time the place has to be open around, not words to look for', () => {
+    for (const input of ['Food open past 6 with bagels', 'Food open after 6pm with bagels', 'food open after 6:00 PM with bagels']) {
+      const q = parseAsk(input)
+      expect(q.openAt, input).toEqual({ how: 'after', minutes: 18 * 60 })
+      expect(q.terms, input).toEqual(['bagel'])
+      expect(q.openNow, input).toBe(false)
+    }
+  })
+
+  it('reads until, at and before, and a bare hour the way it is meant', () => {
+    expect(parseAsk('bagels open until 9').openAt).toEqual({ how: 'until', minutes: 21 * 60 })
+    expect(parseAsk('pizza open till 11 tonight').openAt).toEqual({ how: 'until', minutes: 23 * 60 })
+    expect(parseAsk('anything open till midnight').openAt).toEqual({ how: 'until', minutes: 24 * 60 })
+    expect(parseAsk('bagels open at 8am').openAt).toEqual({ how: 'at', minutes: 8 * 60 })
+    expect(parseAsk('coffee open at 7').openAt).toEqual({ how: 'at', minutes: 7 * 60 })
+    expect(parseAsk('mikvah open at 9pm').openAt).toEqual({ how: 'at', minutes: 21 * 60 })
+    expect(parseAsk('food open by 2').openAt).toEqual({ how: 'at', minutes: 14 * 60 })
+    expect(parseAsk('coffee open before 7').openAt).toEqual({ how: 'before', minutes: 7 * 60 })
+  })
+
+  it('takes "what’s open" and "anything open" along with the time', () => {
+    for (const input of ["what's open after 10", 'anything open past midnight']) {
+      expect(parseAsk(input).terms, input).toEqual([])
+    }
+  })
+
+  it('leaves a minyan time alone', () => {
+    const q = parseAsk('mincha at 6')
+    expect(q.openAt).toBeNull()
+    expect(q.minyan?.at).toMatchObject({ hour: 6 })
+  })
+})

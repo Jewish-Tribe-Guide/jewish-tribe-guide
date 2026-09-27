@@ -1,5 +1,5 @@
-import { describedByItsText, type AskHit, type AskResult, type HoursWindow, type NearMiss } from '@/lib/askSearch'
-import { termMatches, termsAsTyped, words, type MinyanAsk } from '@/lib/ask'
+import { describedByItsText, type AskHit, type DayWindow, type AskResult, type HoursWindow, type NearMiss } from '@/lib/askSearch'
+import { formatOpenAtTime, termMatches, termsAsTyped, words, type MinyanAsk } from '@/lib/ask'
 import { TEFILLAH_LABELS, type Tefillah } from '@/lib/davening'
 import type { MinyanSlot } from '@/lib/upcomingDavening'
 import { haversineMiles, roundMiles, type LatLng } from '@/lib/geo'
@@ -30,6 +30,10 @@ export type Answer = {
   /** For a minyan question, the minyanim it's about, in time order: all of
    *  them, so "9 more today" can be opened up rather than just counted. */
   rows: AnswerRow[]
+  /** Set when this isn't an answer to what was asked but to the closest
+   *  question that has one (see nearMissAnswer): the page shows it, and the
+   *  places under it, as close rather than as found. */
+  closest?: boolean
   /** How many of `rows` to show before a "Show all" — the answer is a
    *  glance, the full list is a tap away. Absent means show every row. */
   shown?: number
@@ -186,8 +190,8 @@ function baseAnswer(
     if (answer) return answer
   }
 
-  const asksOpen = query.openNow || query.openToday
-  const later = query.openNow ? 'right now' : 'for the rest of today'
+  const asksOpen = query.openNow || query.openToday || !!query.openAt
+  const later = query.openAt ? `${query.openAt.how} ${formatOpenAtTime(query.openAt.minutes)} today` : query.openNow ? 'right now' : 'for the rest of today'
   const { closedCount: closed, noHours } = result
   const noHoursNote = (more: boolean) =>
     noHours.length ? ` ${noHours.length}${more ? ' more' : ''} ${noHours.length === 1 ? 'has' : 'have'} no hours listed.` : ''
@@ -195,17 +199,22 @@ function baseAnswer(
   if (asksOpen && hits.length === 0 && (closed > 0 || noHours.length > 0)) {
     // Saying "closed" of a place with no hours saved would be the guide
     // making it up; it says it doesn't know instead.
+    const shut = query.openAt ? (closed === 1 ? "isn't open then" : "aren't open then") : closed === 1 ? 'is closed' : 'are closed'
     if (!noHours.length) {
-      return { text: `Nothing open ${later}. ${closed} ${closed === 1 ? 'place matches, but it is' : 'places match, but all are'} closed.`, rows: [] }
+      const but = query.openAt ? (closed === 1 ? "it isn't open then" : 'none are open then') : closed === 1 ? 'it is closed' : 'all are closed'
+      return { text: `Nothing open ${later}. ${closed} ${closed === 1 ? 'place matches' : 'places match'}, but ${but}.`, rows: [] }
     }
-    const closedNote = closed ? ` ${closed} ${closed === 1 ? 'is' : 'are'} closed.` : ''
+    const closedNote = closed ? ` ${closed} ${shut}.` : ''
     return { text: `Nothing listed as open ${later}.${noHoursNote(false)}${closedNote}`, rows: [] }
   }
 
   if (hits.length === 0) return null
   const top = hits[0]
   const milesOf = (h: AskHit) => (h.miles != null ? `, ${roundMiles(h.miles)} mi` : '')
-  const hoursOf = (h: AskHit) => (asksOpen && h.today.length ? `, ${hoursText(h, query.openNow)}` : '')
+  const hoursOf = (h: AskHit) => {
+    if (h.atTime) return h.atTime.length ? `, ${h.atTime.map(dayWindowText).join(', ')}` : ''
+    return asksOpen && h.today.length ? `, ${hoursText(h, query.openNow)}` : ''
+  }
 
   // A question about a place and nothing else ("food near HUP"): the
   // nearest one, measured from there. With something to look for too
@@ -273,7 +282,9 @@ function baseAnswer(
     const sometimes = having.filter((h) => h.matched.length > 0 && h.matched.every((m) => m.sometimes)).length
     const note = sometimes === having.length ? ' (only sometimes in stock)' : sometimes > 0 ? ` (${sometimes} only sometimes)` : ''
     const near = nearest(having)
-    const closedNote = asksOpen && closed ? ` ${closed} more ${closed === 1 ? 'is' : 'are'} closed ${later}.` : ''
+    const closedNote = !asksOpen || !closed ? ''
+      : query.openAt ? ` ${closed} more ${closed === 1 ? "isn't" : "aren't"} open then.`
+      : ` ${closed} more ${closed === 1 ? 'is' : 'are'} closed ${later}.`
     // Measured from the place asked about, it says so: "8.1 mi from HUP".
     const fromAnchor = where && near.miles != null ? ` from ${where}` : ''
     if (having.length === 1) return { text: `${near.item.name} has ${thing}${note}${milesOf(near)}${fromAnchor}${hoursOf(near)}.${closedNote}`, rows: [] }
@@ -282,11 +293,21 @@ function baseAnswer(
     const open = query.openNow ? ' open' : query.openToday ? ' open today' : ''
     // "Than Giant": the places that aren't it.
     const besides = result.excluded.length ? ` besides ${[...new Set(result.excluded)].join(' or ')}` : ''
-    return { text: `${having.length}${open} places${besides} have ${thing}${note}.${nearText}${closedNote}`, rows: [] }
+    // "Open after 6:00 PM today" is too long to go before "places".
+    const openAt = query.openAt ? `, open ${later}` : ''
+    return { text: `${having.length}${open} places${besides} have ${thing}${note}${openAt}.${nearText}${closedNote}`, rows: [] }
   }
 
   // Asked only what's open ("is there a mikvah open today"): what is, and
   // which of its hours — a mikvah's men's hours are not its women's.
+  if (query.openAt) {
+    const near = nearest(hits)
+    const hoursNear = near.atTime?.map(dayWindowText).join(', ') ?? ''
+    if (hits.length === 1) return { text: `${near.item.name}: ${hoursNear}${milesOf(near)}.${noHoursNote(true)}`, rows: [] }
+    const count = `${hits.length} ${kindOf(hits)} open ${later}`
+    const example = near.miles != null ? `. Nearest: ${near.item.name}, ${hoursNear}${milesOf(near)}.` : `, such as ${near.item.name} (${hoursNear}).`
+    return { text: `${count}${example}${noHoursNote(true)}`, rows: [] }
+  }
   if (asksOpen) {
     const near = nearest(hits)
     if (hits.length === 1) return { text: `${near.item.name}: ${hoursText(near, query.openNow)}${milesOf(near)}.${noHoursNote(true)}`, rows: [] }
@@ -345,6 +366,12 @@ function hoursText(hit: AskHit, nowOnly: boolean): string {
   return windows.map(windowText).join(', ')
 }
 
+/** "open 11:00 AM–9:00 PM", "Women's 8:00 PM–10:00 PM": a stretch of
+ *  today's hours in full, for "open after 6", where both ends matter. */
+function dayWindowText(w: DayWindow): string {
+  return w.label ? `${w.label} ${w.opens}–${w.closes}` : `open ${w.opens}–${w.closes}`
+}
+
 function windowText(w: HoursWindow): string {
   const when = w.openNow ? `open until ${w.closes}` : `opens ${w.opens}`
   return w.label ? `${w.label} ${when}` : when
@@ -354,8 +381,12 @@ function windowText(w: HoursWindow): string {
  *  says why it's there — "Open until 9:00 PM", "Women's opens 8:00 PM" — or
  *  that it has no hours listed. Null for any other question. */
 export function hitHoursNote(hit: AskHit, query: AskResult['query']): { text: string; known: boolean } | null {
-  if (!query.openNow && !query.openToday) return null
+  if (!query.openNow && !query.openToday && !query.openAt) return null
   if (hit.open === null) return { text: 'No hours listed', known: false }
+  if (hit.atTime) {
+    const text = hit.atTime.map(dayWindowText).join(', ')
+    return text ? { text: text[0].toUpperCase() + text.slice(1), known: true } : null
+  }
   const text = hoursText(hit, query.openNow)
   if (!text) return null
   return { text: text[0].toUpperCase() + text.slice(1), known: true }
@@ -371,5 +402,5 @@ export function nearMissAnswer(miss: NearMiss, raw: string, options: { coords?: 
   const kind = kindOf(hits)
   const closest =
     answerFor(miss.result, options)?.text ?? `Closest: ${hits.length} ${kind} with “${miss.kept}”.`
-  return { text: `Nothing in the guide for “${raw}”. ${closest}`, rows: [] }
+  return { text: `Nothing in the guide for “${raw}”. ${closest}`, rows: [], closest: true }
 }
