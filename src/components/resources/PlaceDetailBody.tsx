@@ -582,8 +582,8 @@ export default function PlaceDetailBody({ item, category, onTagClick, onFilterOp
   // field it matched on, with the words asked for in bold. The item list
   // itself is usually well down a grocery's page.
   const foundSection = found && (found.items.length > 0 || found.fields.length > 0) && (
-    <div className="rounded-lg bg-brand-teal/[0.07] px-3 py-2.5" data-testid="search-found">
-      <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wide text-brand-teal-dark">Matches your search</p>
+    <div className="rounded-lg bg-primary/[0.07] px-3 py-2.5" data-testid="search-found">
+      <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wide text-primary-dark">Matches your search</p>
       {found.items.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
           {found.items.map((m) => (

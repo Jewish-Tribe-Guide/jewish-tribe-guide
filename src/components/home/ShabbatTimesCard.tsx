@@ -18,7 +18,7 @@ import { routes } from '@/lib/routes'
 //
 // The regular two rows show every day of the week — see the render's own
 // comment on why the `&&` guards below aren't a real "sometimes missing"
-// case — but only one gets the amber highlight, and only on the day it
+// case — but only one gets the gold highlight, and only on the day it
 // actually applies (Friday for candle lighting, Saturday for havdalah). The
 // rest of the week both render in a plain, equally-weighted style: candle
 // lighting and havdalah are both worth knowing on, say, a Tuesday, but
@@ -73,7 +73,7 @@ export default function ShabbatTimesCard({
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-6">
-      <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-amber-700">
+      <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-primary">
         {status === 'ready' && data ? data.hebrewDate : 'Today'} · {locationLabel}
       </p>
       <h3 className="mb-4 text-lg font-semibold text-slate-900">{heading}</h3>
@@ -92,8 +92,8 @@ export default function ShabbatTimesCard({
             // `ends` is nullable (see lib/zmanim.ts's findFastPeriod on
             // Ta'anit Bechorot, ended early by a siyum rather than a
             // published zman).
-            <div className="rounded-lg border border-amber-100 bg-amber-50/60 px-3 py-2.5">
-              <p className="text-[11px] font-extrabold uppercase tracking-wider text-amber-700">
+            <div className="rounded-lg border border-gold/30 bg-gold/10 px-3 py-2.5">
+              <p className="text-[11px] font-extrabold uppercase tracking-wider text-gold-dark">
                 {data.fastPeriod.name}
               </p>
               <div className="mt-1.5 flex items-baseline justify-between gap-3 text-[13px] font-semibold text-slate-800">
@@ -108,8 +108,8 @@ export default function ShabbatTimesCard({
               )}
             </div>
           ) : primaryBlock === 'holiday' && data.holidayPeriod ? (
-            <div className="rounded-lg border border-amber-100 bg-amber-50/60 px-3 py-2.5">
-              <p className="text-[11px] font-extrabold uppercase tracking-wider text-amber-700">
+            <div className="rounded-lg border border-gold/30 bg-gold/10 px-3 py-2.5">
+              <p className="text-[11px] font-extrabold uppercase tracking-wider text-gold-dark">
                 {data.holidayPeriod.name}
               </p>
               <div className="mt-1.5 flex items-baseline justify-between gap-3 text-[13px] font-semibold text-slate-800">
@@ -127,7 +127,7 @@ export default function ShabbatTimesCard({
             // following havdalah together, every day of the week, so the
             // `&&` guards below are type-narrowing, not a real "sometimes
             // missing" case. What used to vary was styling: both rows always
-            // got the amber highlight regardless of the day, which read as
+            // got the highlight regardless of the day, which read as
             // "both of these are happening imminently" on a Tuesday just as
             // loudly as on the Friday it's actually true. Highlighted now
             // only on the day it applies — `isFriday` for candle lighting,
@@ -139,13 +139,13 @@ export default function ShabbatTimesCard({
               {data.shabbos.candleLighting && (
                 <div
                   className={`flex items-baseline justify-between gap-3 rounded-lg px-3 py-1.5 ${
-                    data.isFriday ? 'bg-amber-50' : 'bg-slate-50'
+                    data.isFriday ? 'bg-gold/15' : 'bg-slate-50'
                   }`}
                 >
-                  <span className={`text-[13px] font-semibold ${data.isFriday ? 'text-amber-800' : 'text-slate-700'}`}>
+                  <span className={`text-[13px] font-semibold ${data.isFriday ? 'text-gold-dark' : 'text-slate-700'}`}>
                     Candles {data.shabbos.candleLighting.label}
                   </span>
-                  <span className={`text-[13px] font-semibold tabular-nums ${data.isFriday ? 'text-amber-800' : 'text-slate-700'}`}>
+                  <span className={`text-[13px] font-semibold tabular-nums ${data.isFriday ? 'text-gold-dark' : 'text-slate-700'}`}>
                     {data.shabbos.candleLighting.time}
                   </span>
                 </div>
@@ -153,13 +153,13 @@ export default function ShabbatTimesCard({
               {data.shabbos.havdalah && (
                 <div
                   className={`flex items-baseline justify-between gap-3 rounded-lg px-3 py-1.5 ${
-                    data.isShabbos ? 'bg-amber-50' : 'bg-slate-50'
+                    data.isShabbos ? 'bg-gold/15' : 'bg-slate-50'
                   }`}
                 >
-                  <span className={`text-[13px] font-semibold ${data.isShabbos ? 'text-amber-800' : 'text-slate-700'}`}>
+                  <span className={`text-[13px] font-semibold ${data.isShabbos ? 'text-gold-dark' : 'text-slate-700'}`}>
                     Havdalah {data.shabbos.havdalah.label}
                   </span>
-                  <span className={`text-[13px] font-semibold tabular-nums ${data.isShabbos ? 'text-amber-800' : 'text-slate-700'}`}>
+                  <span className={`text-[13px] font-semibold tabular-nums ${data.isShabbos ? 'text-gold-dark' : 'text-slate-700'}`}>
                     {data.shabbos.havdalah.time}
                   </span>
                 </div>
@@ -184,7 +184,7 @@ export default function ShabbatTimesCard({
                 title, which is where an actual "do this" action belongs. */}
             <Link
               href={routes.slug(communitySlug, 'zmanim')}
-              className="shrink-0 text-[11px] font-semibold text-amber-700 transition-colors hover:text-amber-800 hover:underline"
+              className="shrink-0 text-[11px] font-semibold text-primary transition-colors hover:text-primary-dark hover:underline"
             >
               See full zmanim →
             </Link>

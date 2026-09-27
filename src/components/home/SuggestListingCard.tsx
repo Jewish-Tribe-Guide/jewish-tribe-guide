@@ -56,8 +56,8 @@ export default function SuggestListingCard() {
         />
       </div>
       <div className="relative max-w-[58%]">
-        <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-amber-700">Get involved</p>
-        <h3 className="font-serif text-lg font-semibold text-ink">Suggest a Listing</h3>
+        <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-primary">Get involved</p>
+        <h3 className="text-lg font-bold text-ink">Suggest a Listing</h3>
         <p className="mt-2 text-sm text-slate-600">Help keep our community guide accurate and useful.</p>
         <button
           type="button"

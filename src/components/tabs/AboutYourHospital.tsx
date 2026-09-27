@@ -92,11 +92,11 @@ export default function AboutYourHospital({ hospitalName, info, onUp, upLabel = 
         {/* Kosher & Shabbos — amber because these usually need planning ahead. */}
         <SectionCard
           icon={<CandleIcon className="h-5 w-5" />}
-          iconClass="bg-accent/10 text-accent"
+          iconClass="bg-amber-50 text-amber-700"
           title="Kosher & Shabbos"
         >
           <p className="text-sm text-slate-700 leading-relaxed">{info.shabbatAccommodations}</p>
-          <p className="mt-3 flex items-start gap-2 rounded-lg bg-accent/10 px-3 py-2 text-xs text-accent-dark">
+          <p className="mt-3 flex items-start gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
             <ClockIcon className="h-4 w-4 shrink-0 mt-0.5" />
             <span>Kosher meals and Shabbos arrangements usually need advance notice — call ahead to set them up.</span>
           </p>

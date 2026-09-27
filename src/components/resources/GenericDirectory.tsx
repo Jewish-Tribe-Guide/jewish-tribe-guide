@@ -1147,7 +1147,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
         // become sticky, let alone been scrolled past.
         //
         // lg:border-x once docked: the bar's white is only a few shades off
-        // the page's own cream background, and the shadow above only reads
+        // the page's own grey background, and the shadow above only reads
         // on its bottom edge — with nothing marking the left/right edges,
         // the two near-whites just ran together there. A thin border gives
         // it the same framing the full-bleed results panel below already

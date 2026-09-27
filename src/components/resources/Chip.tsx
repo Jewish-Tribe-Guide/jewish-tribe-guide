@@ -21,7 +21,7 @@ const TONE_BASE: Record<ChipTone, string> = {
   // the collapsed card and the expanded body say the same thing the same way.
   red: 'bg-red-50 text-red-700 border-red-200',
   // An item a search asked for, marked in the listing it opened.
-  match: 'bg-brand-teal/10 text-brand-teal-dark border-brand-teal/40',
+  match: 'bg-primary/10 text-primary-dark border-primary/40',
 }
 
 // Hover/active shades, applied only when the chip is interactive.
@@ -32,7 +32,7 @@ const TONE_HOVER: Record<ChipTone, string> = {
   green: 'hover:bg-green-100 active:bg-green-200',
   greenSolid: 'hover:bg-green-700 active:bg-green-800',
   red: 'hover:bg-red-100 active:bg-red-200',
-  match: 'hover:bg-brand-teal/20 active:bg-brand-teal/30',
+  match: 'hover:bg-primary/20 active:bg-primary/30',
 }
 
 // Header chips get a taller tap target on mobile; expanded-panel chips are compact.

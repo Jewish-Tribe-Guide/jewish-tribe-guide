@@ -262,7 +262,7 @@ export default function HeroHeading({
           the site).
           The photo itself is NOT full-bleed any more — it's confined to a
           `w-[58%]` box anchored to the right edge, matching a reference
-          image the user supplied: solid `bg-cream` (the section's own
+          image the user supplied: solid `bg-surface` (the section's own
           background) on the left where the headline/search/buttons sit,
           photo only on the right. A full-bleed photo washed to fake a
           plain left side (the previous design) computed object-cover's
@@ -302,7 +302,7 @@ export default function HeroHeading({
           z-30 (not something arbitrarily high) stays under SiteHeader's own
           sticky z-40, so the dropdown still tucks correctly behind the
           header on scroll instead of painting over it too. */}
-      <section className="hidden desktop:block relative z-30 left-1/2 isolate min-h-[435px] w-screen -translate-x-1/2 bg-cream desktop:-mt-[60px]">
+      <section className="hidden desktop:block relative z-30 left-1/2 isolate min-h-[435px] w-screen -translate-x-1/2 bg-surface desktop:-mt-[60px]">
         {/* The photo lives in its OWN right-anchored box — NOT the full
             w-screen band (that was the earlier design: one full-bleed photo
             with a wash faked over the left side to look plain). The user
@@ -314,7 +314,7 @@ export default function HeroHeading({
             far less extreme shape (~1.9:1 at typical desktop widths), so
             object-cover keeps far more of the original scene — the "whole
             picture" look the reference image has. The left ~42% is now a
-            genuinely flat `bg-cream` (the section's own background, set
+            genuinely flat `bg-surface` (the section's own background, set
             above) with no photo pixels under it at all, matching that
             reference exactly instead of approximating it with a gradient. */}
         <div className="absolute inset-y-0 right-0 -z-10 w-[58%]">
@@ -352,7 +352,7 @@ export default function HeroHeading({
             // here once already.
             <div
               aria-hidden="true"
-              className="absolute inset-0 bg-gradient-to-br from-amber-200/60 via-amber-300/40 to-amber-700/40"
+              className="absolute inset-0 bg-gradient-to-br from-slate-200/70 via-primary/15 to-primary/35"
             >
               <div className="absolute inset-0 flex items-center justify-center opacity-15">
                 <svg width="130" height="130" viewBox="0 0 100 100" fill="none" stroke="white" strokeWidth="2.5">
@@ -362,13 +362,13 @@ export default function HeroHeading({
             </div>
           )}
           {/* A short soft fade at the photo box's OWN left edge, not a wash
-              spanning most of the band any more — the flat bg-cream to its
+              spanning most of the band any more — the flat bg-surface to its
               left already does the "plain on the left" job, so this only
               needs to soften the seam between the two rather than fake an
               entire plain region out of a still-visible photo. */}
           <div
             aria-hidden="true"
-            className="absolute inset-y-0 left-0 w-1/3 bg-[linear-gradient(to_right,var(--color-cream)_0%,transparent_100%)]"
+            className="absolute inset-y-0 left-0 w-1/3 bg-[linear-gradient(to_right,var(--color-surface)_0%,transparent_100%)]"
           />
         </div>
         {/* Faint skyline, low and behind the text column — purely
@@ -377,7 +377,7 @@ export default function HeroHeading({
             above. */}
         <SkylineIcon className="pointer-events-none absolute bottom-0 left-0 -z-10 h-auto w-[360px] text-slate-400 opacity-15" />
         <div className="mx-auto flex min-h-[435px] max-w-6xl desktop:max-w-7xl flex-col justify-center px-4 pt-[calc(3.5rem+60px)] pb-14 sm:px-6">
-          <h1 className="max-w-2xl font-serif text-[64px] font-bold leading-[1.02] tracking-tight text-ink text-balance">
+          <h1 className="max-w-2xl text-[60px] font-extrabold leading-[1.02] tracking-tight text-ink text-balance">
             {headline}
           </h1>
           {subhead && (
@@ -415,7 +415,7 @@ export default function HeroHeading({
           <div className="mt-6 flex flex-wrap items-center gap-3">
             <button
               onClick={onBrowseCategories}
-              className="inline-flex items-center gap-2 rounded-full bg-brand-teal px-6 py-3 text-[15px] font-semibold text-white shadow-sm transition-colors hover:bg-brand-teal-dark cursor-pointer"
+              className="inline-flex items-center gap-2 rounded-full bg-primary px-6 py-3 text-[15px] font-semibold text-white shadow-sm transition-colors hover:bg-primary-dark cursor-pointer"
             >
               Browse Categories
             </button>

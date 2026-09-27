@@ -111,7 +111,7 @@ describe('ShabbatTimesCard', () => {
 })
 
 // Both rows show every day of the week — only the highlight moves. This
-// used to give both rows the amber treatment regardless of the day, which
+// used to give both rows the highlight regardless of the day, which
 // claimed "this is happening imminently" on a Tuesday exactly as loudly as
 // on the Friday it's actually true.
 describe('ShabbatTimesCard — the highlight follows the day, not both rows always', () => {
@@ -131,7 +131,7 @@ describe('ShabbatTimesCard — the highlight follows the day, not both rows alwa
     mockUseZmanim.mockReturnValue({ data: { ...readyData, isFriday: true }, status: 'ready' })
     render(<ShabbatTimesCard coords={{ lat: 1, lng: 2 }} locationLabel="Philadelphia" />)
 
-    expect(rowFor('Candles')).toHaveClass('bg-amber-50')
+    expect(rowFor('Candles')).toHaveClass('bg-gold/15')
     expect(rowFor('Havdalah')).toHaveClass('bg-slate-50')
   })
 
@@ -140,7 +140,7 @@ describe('ShabbatTimesCard — the highlight follows the day, not both rows alwa
     render(<ShabbatTimesCard coords={{ lat: 1, lng: 2 }} locationLabel="Philadelphia" />)
 
     expect(rowFor('Candles')).toHaveClass('bg-slate-50')
-    expect(rowFor('Havdalah')).toHaveClass('bg-amber-50')
+    expect(rowFor('Havdalah')).toHaveClass('bg-gold/15')
   })
 })
 

@@ -21,7 +21,7 @@ export default function SearchPrompts({
           key={p}
           type="button"
           onClick={() => onPick(p)}
-          className="cursor-pointer rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[13.5px] font-medium text-ink shadow-sm transition-colors hover:border-brand-teal/50 hover:text-brand-teal-dark"
+          className="cursor-pointer rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[13.5px] font-medium text-ink shadow-sm transition-colors hover:border-primary/50 hover:text-primary-dark"
         >
           {p}
         </button>

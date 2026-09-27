@@ -18,7 +18,7 @@ function ShareAnswer({ path, title }: { path: string; title: string }) {
         track('answer_shared')
         void share()
       }}
-      className="mt-1.5 inline-flex cursor-pointer items-center gap-1.5 text-[13px] font-semibold text-brand-teal transition-colors hover:text-brand-teal-dark"
+      className="mt-1.5 inline-flex cursor-pointer items-center gap-1.5 text-[13px] font-semibold text-primary transition-colors hover:text-primary-dark"
     >
       <svg aria-hidden="true" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4">
         <path d="M10 3v10M6 7l4-4 4 4M4 12v3a2 2 0 002 2h8a2 2 0 002-2v-3" strokeLinecap="round" strokeLinejoin="round" />
@@ -59,13 +59,13 @@ export default function AskAnswer({
     // Not an answer to what was asked, only to something close: amber like
     // a caution rather than the teal of an answer, so it can't be read as one.
     <div
-      className={`rounded-xl px-3.5 py-3 ${answer.closest ? 'border border-caution/25 bg-caution/[0.06]' : 'bg-brand-teal/[0.07]'} ${className}`}
+      className={`rounded-xl px-3.5 py-3 ${answer.closest ? 'border border-caution/25 bg-caution/[0.06]' : 'bg-primary/[0.07]'} ${className}`}
       role="status"
       aria-live="polite"
     >
       <p className="text-[14px] font-semibold leading-snug text-ink">{answer.text}</p>
       {answer.rows.length > 0 && (
-        <ul className="mt-2 divide-y divide-brand-teal/10">
+        <ul className="mt-2 divide-y divide-primary/10">
           {rows.map((r) => {
             const row = (
               <>
@@ -84,7 +84,7 @@ export default function AskAnswer({
                   <button
                     type="button"
                     onClick={() => onOpenShul(r.shulId!)}
-                    className="flex w-full cursor-pointer items-center gap-2 py-1.5 text-left text-[13px] transition-colors hover:text-brand-teal"
+                    className="flex w-full cursor-pointer items-center gap-2 py-1.5 text-left text-[13px] transition-colors hover:text-primary"
                   >
                     {row}
                   </button>
@@ -101,11 +101,11 @@ export default function AskAnswer({
           {answer.links.map((l) => (
             <li key={l.href} className="text-[13px]">
               {l.external ? (
-                <a href={l.href} target="_blank" rel="noopener noreferrer" className="font-semibold text-brand-teal hover:text-brand-teal-dark hover:underline">
+                <a href={l.href} target="_blank" rel="noopener noreferrer" className="font-semibold text-primary hover:text-primary-dark hover:underline">
                   {l.label} ↗
                 </a>
               ) : (
-                <Link href={l.href} className="font-semibold text-brand-teal hover:text-brand-teal-dark hover:underline">
+                <Link href={l.href} className="font-semibold text-primary hover:text-primary-dark hover:underline">
                   {l.label} →
                 </Link>
               )}
@@ -119,7 +119,7 @@ export default function AskAnswer({
           type="button"
           onClick={() => setExpandedFor(expanded ? null : answer.text)}
           aria-expanded={expanded}
-          className="mt-1 cursor-pointer text-[13px] font-semibold text-brand-teal transition-colors hover:text-brand-teal-dark"
+          className="mt-1 cursor-pointer text-[13px] font-semibold text-primary transition-colors hover:text-primary-dark"
         >
           {expanded ? 'Show fewer' : `Show all ${answer.rows.length}${allTomorrow ? ' tomorrow' : ' today'}`}
         </button>

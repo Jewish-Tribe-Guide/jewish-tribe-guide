@@ -195,9 +195,9 @@ export default function SubscribeSection({
 
   const content = (
     <>
-        {/* Same amber eyebrow every other home-screen card carries — both
+        {/* Same eyebrow every other home-screen card carries — both
             admin-editable now (Desktop tab's Home screen cards). */}
-        <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-accent">{eyebrow}</p>
+        <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-primary">{eyebrow}</p>
         <h2 className="mb-1 text-lg font-semibold text-slate-900">{heading}</h2>
 
         {done ? (
@@ -225,17 +225,15 @@ export default function SubscribeSection({
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@example.com"
                   aria-label="Email address"
-                  className="min-w-0 flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-accent"
+                  className="min-w-0 flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary"
                 />
-                {/* --color-accent, matching HomeBreak's own Add/Edit/Report
-                    buttons and this card's eyebrow — "home screen stays
-                    warm, every other screen's interactive color is blue" as
-                    a deliberate split rather than one color bleeding into
-                    the other's territory. */}
+                {/* The community's own blue, like every other button on
+                    the site. The home screen used to have a warm amber of
+                    its own; one look now (step 2), phone and desktop. */}
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="shrink-0 cursor-pointer rounded-full bg-accent px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-accent-dark disabled:opacity-60"
+                  className="shrink-0 cursor-pointer rounded-full bg-primary px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary-dark disabled:opacity-60"
                 >
                   {submitting ? 'Subscribing…' : 'Subscribe'}
                 </button>

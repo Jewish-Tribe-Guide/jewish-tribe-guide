@@ -31,13 +31,13 @@ export default function AskTheGroup({
       <ul className="mt-1.5 space-y-1 text-[13.5px]">
         {askHref && (
           <li>
-            <Link href={askHref} className="font-semibold text-brand-teal hover:text-brand-teal-dark">
+            <Link href={askHref} className="font-semibold text-primary hover:text-primary-dark">
               Ask in a community WhatsApp group →
             </Link>
           </li>
         )}
         <li>
-          <Link href={addHref} className="font-semibold text-brand-teal hover:text-brand-teal-dark">
+          <Link href={addHref} className="font-semibold text-primary hover:text-primary-dark">
             Know where to find it? Add it to the guide →
           </Link>
         </li>

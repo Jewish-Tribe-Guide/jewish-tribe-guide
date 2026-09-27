@@ -199,7 +199,7 @@ export default function HeroSearchDropdown({
             type="button"
             onClick={() => setExpanded((e) => !e)}
             aria-expanded={expanded}
-            className="flex w-full cursor-pointer items-center justify-between px-4 py-2.5 text-[13px] font-semibold text-brand-teal transition-colors hover:text-brand-teal-dark"
+            className="flex w-full cursor-pointer items-center justify-between px-4 py-2.5 text-[13px] font-semibold text-primary transition-colors hover:text-primary-dark"
           >
             {expanded ? (
               <span>Show fewer results</span>

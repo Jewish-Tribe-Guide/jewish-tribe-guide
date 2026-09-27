@@ -30,10 +30,10 @@ export default function UpdateListingsCard({ eyebrow, heading }: { eyebrow: stri
     <div className="flex flex-col rounded-2xl border border-slate-200 bg-white p-6">
       <div className="mb-4 flex items-start justify-between gap-3">
         <div>
-          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-amber-700">{eyebrow}</p>
-          <h3 className="font-serif text-lg font-semibold text-ink">{heading}</h3>
+          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-primary">{eyebrow}</p>
+          <h3 className="text-lg font-bold text-ink">{heading}</h3>
         </div>
-        <PeopleIcon className="h-8 w-8 shrink-0 text-brand-teal" />
+        <PeopleIcon className="h-8 w-8 shrink-0 text-primary" />
       </div>
       {/* max-w keeps this wrapping onto its own couple of lines — without
           it, this card's wider desktop width (the 3-up community row) lets

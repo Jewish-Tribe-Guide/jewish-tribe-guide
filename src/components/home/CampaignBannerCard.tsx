@@ -32,20 +32,11 @@ import { LeafIcon } from '@/components/icons'
 // before it disappears again; that trade-off is the same one every other
 // localStorage-backed UI in this app already makes.
 //
-// The accent color itself is deliberately NOT the same on both breakpoints.
-// Desktop used to be amber — the theory was that it's already this app's
-// "live campaign" color (the map's own chip, DaveningTimesCard's rail) —
-// but that reasoning didn't hold up: amber is actually the desktop home
-// screen's whole ambient "today / next up" tint (also the hero, Shabbat
-// Times' Friday highlight), not something specific to a campaign. A
-// stronger amber banner just matched five other things instead of
-// standing apart from one. It's `--color-sage` now (globals.css) — warm
-// enough for a Sukkot-season banner, but a genuinely different hue from
-// everything else on the page, including this app's actual "always in
-// stock" green (see that token's own comment on why it isn't reused here).
-// Mobile has no existing amber precedent, so it uses the app's own primary
-// blue instead — the color every other mobile button/link already is —
-// rather than teaching a brand-new "special" color with no learned meaning.
+// Blue on both breakpoints, the colour every other button and link on the
+// site already is. Desktop had its own palette (amber, then a sage green)
+// from when the desktop home screen was a separate warm look; the redesign
+// (step 2) gives phone and desktop one look, so a banner is set apart by its
+// place and its photo, not by teaching a colour with no learned meaning.
 //
 // Both real destinations (the map, and the category's own listings) show as
 // two buttons rather than the one the old single-CTA version forced a
@@ -107,7 +98,7 @@ export default function CampaignBannerCard() {
           // active:bg-blue-900/20 — one step past the existing hover fill;
           // this and its desktop twin below both had a hover state with
           // nothing past it for a real press.
-          className="absolute right-3 top-3 flex h-7 w-7 cursor-pointer items-center justify-center rounded-md text-stone-400 transition-colors hover:bg-blue-900/10 hover:text-blue-900 active:bg-blue-900/20"
+          className="absolute right-3 top-3 flex h-7 w-7 cursor-pointer items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-blue-900/10 hover:text-blue-900 active:bg-blue-900/20"
         >
           ✕
         </button>
@@ -128,7 +119,7 @@ export default function CampaignBannerCard() {
           {banner.title}
         </h2>
         {banner.subtitle && (
-          <p className="mb-4 mt-1 text-sm leading-relaxed text-stone-600">{banner.subtitle}</p>
+          <p className="mb-4 mt-1 text-sm leading-relaxed text-slate-600">{banner.subtitle}</p>
         )}
 
         <div className="mt-4 flex gap-2.5">
@@ -150,7 +141,7 @@ export default function CampaignBannerCard() {
       {/* Desktop — horizontal: a photo on the left fading into the banner,
           text in the middle, buttons pinned to the right. No left colour
           rail here (that's a mobile-only accent). */}
-      <div className="relative hidden items-center overflow-hidden rounded-2xl border border-sage-200 bg-sage-50 desktop:flex min-h-[120px]">
+      <div className="relative hidden items-center overflow-hidden rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/[0.06] to-white desktop:flex min-h-[120px]">
         <div
           aria-hidden="true"
           // `absolute inset-y-0` rather than a flex `self-stretch` child —
@@ -185,15 +176,15 @@ export default function CampaignBannerCard() {
         </div>
 
         <div className="flex-1 py-6 pl-[calc(24%+1.5rem)] pr-6">
-          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-sage-700">
+          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-primary">
             Happening now
           </p>
           {/* h2 — same heading-order reasoning as the mobile block above. */}
-          <h2 className="max-w-[32ch] font-serif text-[24px] font-semibold text-ink">
+          <h2 className="max-w-[32ch] text-[24px] font-extrabold text-ink">
             {banner.title}
           </h2>
           {banner.subtitle && (
-            <p className="mt-1 max-w-[44ch] text-[15px] text-stone-600">{banner.subtitle}</p>
+            <p className="mt-1 max-w-[44ch] text-[15px] text-slate-600">{banner.subtitle}</p>
           )}
         </div>
 
@@ -202,18 +193,18 @@ export default function CampaignBannerCard() {
             behind the buttons rather than competing with them for clicks
             (the wrapper's own overflow-hidden also keeps it from spilling
             past the rounded corner). */}
-        <LeafIcon className="pointer-events-none absolute -right-4 bottom-0 -z-10 h-28 w-28 text-sage-900/10" />
+        <LeafIcon className="pointer-events-none absolute -right-4 bottom-0 -z-10 h-28 w-28 text-primary/10" />
 
         <div className="flex shrink-0 items-center gap-3 pr-16">
           <Link
             href={primary.href}
-            className="inline-flex items-center gap-1.5 cursor-pointer rounded-lg bg-sage-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition-colors hover:bg-sage-700"
+            className="inline-flex items-center gap-1.5 cursor-pointer rounded-lg bg-primary px-4 py-2.5 text-sm font-bold text-white shadow-sm transition-colors hover:bg-primary-dark"
           >
             {primary.label}
           </Link>
           <Link
             href={secondary.href}
-            className="cursor-pointer rounded-lg border border-sage-200 bg-white px-4 py-2.5 text-sm font-bold text-sage-700 transition-colors hover:bg-sage-50"
+            className="cursor-pointer rounded-lg border border-primary/25 bg-white px-4 py-2.5 text-sm font-bold text-primary transition-colors hover:bg-primary/5"
           >
             {secondary.label}
           </Link>
@@ -224,8 +215,8 @@ export default function CampaignBannerCard() {
           onClick={() => dismiss(banner.id)}
           aria-label="Dismiss"
           // See the mobile dismiss button's own doc above — same
-          // active:bg-*-900/20 addition, this block's own sage token.
-          className="absolute right-3 top-3 flex h-7 w-7 cursor-pointer items-center justify-center rounded-md text-stone-400 transition-colors hover:bg-sage-900/10 hover:text-sage-900 active:bg-sage-900/20"
+          // pressed state one step past the hover fill.
+          className="absolute right-3 top-3 flex h-7 w-7 cursor-pointer items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-primary/10 hover:text-primary-dark active:bg-primary/20"
         >
           ✕
         </button>

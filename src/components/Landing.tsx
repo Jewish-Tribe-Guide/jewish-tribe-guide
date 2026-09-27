@@ -667,13 +667,13 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
                       user's own call, moving it back from below the grid
                       (where the "More" tile it collapses used to be). */}
                   <div className="flex items-center justify-between gap-4">
-                    <h2 className="font-serif text-2xl font-bold text-ink">Explore by Category</h2>
+                    <h2 className="text-2xl font-extrabold text-ink">Explore by Category</h2>
                     {browseExpanded && (
                       <button
                         type="button"
                         onClick={() => setBrowseExpanded(false)}
                         aria-expanded={browseExpanded}
-                        className="shrink-0 cursor-pointer text-sm font-semibold text-ink transition-colors hover:text-brand-teal"
+                        className="shrink-0 cursor-pointer text-sm font-semibold text-ink transition-colors hover:text-primary"
                       >
                         Show fewer categories
                       </button>

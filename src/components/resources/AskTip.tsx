@@ -60,7 +60,7 @@ export default function AskTip({ category, items }: { category: CategoryConfig; 
     <p className="flex items-start gap-2 text-[13px] text-slate-500" data-testid="ask-tip">
       <span className="min-w-0 flex-1">
         Tip: you can just ask. Try{' '}
-        <Link href={routes.ask(community, question)} onClick={() => done('tapped')} className="font-medium text-brand-teal hover:text-brand-teal-dark hover:underline">
+        <Link href={routes.ask(community, question)} onClick={() => done('tapped')} className="font-medium text-primary hover:text-primary-dark hover:underline">
           “{question}”
         </Link>
       </span>

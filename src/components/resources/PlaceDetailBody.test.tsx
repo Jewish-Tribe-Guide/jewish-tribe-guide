@@ -342,8 +342,8 @@ describe('PlaceDetailBody — what the search found', () => {
     const list = screen.getByText('Kosher items').parentElement!
     const chips = [...list.querySelectorAll('span, button')].filter((el) => el.children.length === 0 && el.textContent)
     expect(chips.map((c) => c.textContent)[0]).toBe('Cheddar Cheese')
-    expect(chips[0].className).toContain('brand-teal')
-    expect(chips.find((c) => c.textContent === 'Challah')!.className).not.toContain('brand-teal')
+    expect(chips[0].className).toContain('bg-primary/10')
+    expect(chips.find((c) => c.textContent === 'Challah')!.className).not.toContain('bg-primary/10')
   })
 
   it('shows the field it matched on when no item did', () => {

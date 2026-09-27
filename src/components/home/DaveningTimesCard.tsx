@@ -121,8 +121,8 @@ export default function DaveningTimesCard({ coords }: { coords: LatLng | null })
         />
       </div>
       <div className="relative max-w-[58%]">
-        <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-amber-700">Upcoming</p>
-        <h3 className="font-serif text-lg font-semibold text-ink">Davening Times</h3>
+        <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-primary">Upcoming</p>
+        <h3 className="text-lg font-bold text-ink">Davening Times</h3>
         <p className="mt-2 text-sm text-slate-600">See minyanim near you.</p>
         <Link
           href={seeAllHref}

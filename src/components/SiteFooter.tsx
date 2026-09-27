@@ -32,7 +32,7 @@ export default function SiteFooter({
   const communitySlug = useCommunitySlug()
 
   return (
-    <footer className="mt-16 border-t border-slate-200/80 bg-cream">
+    <footer className="mt-16 border-t border-slate-200/80 bg-surface">
       {/* desktop:max-w-7xl matches the home screen's own content container
           (Landing.tsx/HeroHeading.tsx) so this footer's edges line up with
           the cards above it — not the narrower max-w-6xl category/listing
