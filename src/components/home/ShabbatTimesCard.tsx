@@ -3,9 +3,11 @@
 import Link from 'next/link'
 import { useZmanim } from '@/lib/useZmanim'
 import { useCommunitySlug } from '@/lib/communityContext'
+import { useCategories } from '@/lib/contentContext'
 import { useNow } from '@/lib/useNow'
-import { resolvePrimaryZmanimBlock } from '@/lib/zmanim'
+import { countdown, shabbosCardView, type CardTime } from '@/lib/shabbosCard'
 import { routes } from '@/lib/routes'
+import { CandleIcon } from '@/components/icons'
 
 // ── Shabbat & Holiday Times — candle lighting and havdalah, plus the next
 // Yom Tov when there is one. ────────────────────────────────────────────────
@@ -16,17 +18,20 @@ import { routes } from '@/lib/routes'
 // lighting/havdalah on the reasoning that a card meant to be glanced at
 // shouldn't need to be read.
 //
-// The regular two rows show every day of the week — see the render's own
-// comment on why the `&&` guards below aren't a real "sometimes missing"
-// case — but only one gets the gold highlight, and only on the day it
-// actually applies (Friday for candle lighting, Saturday for havdalah). The
-// rest of the week both render in a plain, equally-weighted style: candle
-// lighting and havdalah are both worth knowing on, say, a Tuesday, but
-// neither is "happening imminently" the way the highlight used to claim
-// every day.
+// Night ink with a gold glow, as in the redesign's Today mockups: the one
+// card on the home screen that's about time rather than places, and the one
+// place gold (candles) appears. It leads with one big time, the next thing
+// to happen (see lib/shabbosCard.ts): "Candles 6:23 PM, in 2 h 54 min" on a
+// Friday afternoon, havdalah once candles are lit. The period's other times
+// sit under it, smaller. It used to show candle lighting and havdalah as
+// two equal rows, highlighting one on its own day; the big time now does
+// that job every day, since the next one is always the one that matters.
+//
+// Under the times, the three places people go next: the minyanim, the full
+// zmanim, and the eruv, each only when the community has that page.
 //
 // `data.holidayPeriod` (see lib/zmanim.ts's own doc on how far ahead it
-// looks and how it's grouped) replaces those two rows entirely rather than
+// looks and how it's grouped) replaces the Shabbos times entirely rather than
 // sitting alongside them, whenever there's an upcoming Yom Tov within the
 // window. The reason isn't just tidiness: on a week like Rosh Hashana,
 // Hebcal's own feed doesn't produce a plain "Friday candle lighting" AND a
@@ -68,130 +73,81 @@ export default function ShabbatTimesCard({
 }) {
   const { data, status } = useZmanim(coords)
   const communitySlug = useCommunitySlug()
+  const categories = useCategories()
   const now = useNow()
-  const primaryBlock = data ? resolvePrimaryZmanimBlock(data, now) : 'shabbos'
+  const view = data ? shabbosCardView(data, now) : null
+  const soon = view?.next ? countdown(view.next.iso, now) : null
+
+  const minyanCategory = categories?.find((c) => c.detailFields.some((f) => f.type === 'minyanim'))
+  const eruvCategory = categories?.find((c) => c.kind === 'eruv')
+  const actions = [
+    ...(minyanCategory ? [{ label: 'Minyanim', href: `${routes.slug(communitySlug, minyanCategory.id)}?davening=1` }] : []),
+    { label: 'All zmanim', href: routes.slug(communitySlug, 'zmanim') },
+    ...(eruvCategory ? [{ label: 'Eruv', href: routes.slug(communitySlug, eruvCategory.id) }] : []),
+  ]
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-6">
-      <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-primary">
-        {status === 'ready' && data ? data.hebrewDate : 'Today'} · {locationLabel}
-      </p>
-      <h3 className="mb-4 text-lg font-semibold text-slate-900">{heading}</h3>
+    <div className="relative isolate overflow-hidden rounded-2xl bg-ink p-6 text-white">
+      {/* The candle's glow, top right. Decoration only. */}
+      <div
+        aria-hidden="true"
+        className="absolute -right-12 -top-12 -z-10 h-48 w-48 rounded-full bg-[radial-gradient(circle,color-mix(in_oklab,var(--color-gold)_40%,transparent),transparent_70%)]"
+      />
+      <h3 className="flex items-center gap-2 text-[13px] font-semibold text-slate-300">
+        <CandleIcon className="h-4 w-4 text-gold" />
+        {heading}
+      </h3>
 
       {status === 'loading' ? (
-        <div className="space-y-2" aria-live="polite" aria-busy="true">
-          <div className="h-4 w-full animate-pulse rounded bg-slate-100" />
-          <div className="h-4 w-2/3 animate-pulse rounded bg-slate-100" />
+        <div className="mt-4 space-y-2" aria-live="polite" aria-busy="true">
+          <div className="h-8 w-1/2 animate-pulse rounded bg-white/10" />
+          <div className="h-4 w-2/3 animate-pulse rounded bg-white/10" />
           <span className="sr-only">Loading zmanim…</span>
         </div>
-      ) : status === 'ready' && data ? (
+      ) : status === 'ready' && data && view ? (
         <>
-          {primaryBlock === 'fast' && data.fastPeriod ? (
-            // The fast has priority over the holiday-or-Shabbos block below
-            // while it's still current — see resolvePrimaryZmanimBlock.
-            // `ends` is nullable (see lib/zmanim.ts's findFastPeriod on
-            // Ta'anit Bechorot, ended early by a siyum rather than a
-            // published zman).
-            <div className="rounded-lg border border-gold/30 bg-gold/10 px-3 py-2.5">
-              <p className="text-[11px] font-extrabold uppercase tracking-wider text-gold-dark">
-                {data.fastPeriod.name}
+          <p className="mt-3 text-[15px] font-semibold text-gold">{view.name}</p>
+          {view.next && (
+            <>
+              <p className="mt-0.5 text-[38px] font-extrabold leading-tight tracking-tight tabular-nums" data-testid="shabbos-next">
+                {view.next.label} <span>{view.next.time}</span>
               </p>
-              <div className="mt-1.5 flex items-baseline justify-between gap-3 text-[13px] font-semibold text-slate-800">
-                <span>Fast begins {data.fastPeriod.begins.label}</span>
-                <span className="tabular-nums text-slate-900">{data.fastPeriod.begins.time}</span>
-              </div>
-              {data.fastPeriod.ends && (
-                <div className="mt-0.5 flex items-baseline justify-between gap-3 text-[13px] font-semibold text-slate-800">
-                  <span>Fast ends {data.fastPeriod.ends.label}</span>
-                  <span className="tabular-nums text-slate-900">{data.fastPeriod.ends.time}</span>
-                </div>
-              )}
-            </div>
-          ) : primaryBlock === 'holiday' && data.holidayPeriod ? (
-            <div className="rounded-lg border border-gold/30 bg-gold/10 px-3 py-2.5">
-              <p className="text-[11px] font-extrabold uppercase tracking-wider text-gold-dark">
-                {data.holidayPeriod.name}
-              </p>
-              <div className="mt-1.5 flex items-baseline justify-between gap-3 text-[13px] font-semibold text-slate-800">
-                <span>Begins {data.holidayPeriod.begins.label}</span>
-                <span className="tabular-nums text-slate-900">{data.holidayPeriod.begins.time}</span>
-              </div>
-              <div className="mt-0.5 flex items-baseline justify-between gap-3 text-[13px] font-semibold text-slate-800">
-                <span>Ends {data.holidayPeriod.ends.label}</span>
-                <span className="tabular-nums text-slate-900">{data.holidayPeriod.ends.time}</span>
-              </div>
-            </div>
-          ) : (
-            // Both rows always show — Hebcal's own /shabbat response always
-            // carries the upcoming Shabbos's candle lighting AND the
-            // following havdalah together, every day of the week, so the
-            // `&&` guards below are type-narrowing, not a real "sometimes
-            // missing" case. What used to vary was styling: both rows always
-            // got the highlight regardless of the day, which read as
-            // "both of these are happening imminently" on a Tuesday just as
-            // loudly as on the Friday it's actually true. Highlighted now
-            // only on the day it applies — `isFriday` for candle lighting,
-            // `isShabbos` for havdalah — with a plain row the rest of the
-            // week. Never hides the other row: the point is always knowing
-            // both times, just not being told twice a week that "right now"
-            // is imminent when it isn't.
-            <div className="space-y-1.5">
-              {data.shabbos.candleLighting && (
-                <div
-                  className={`flex items-baseline justify-between gap-3 rounded-lg px-3 py-1.5 ${
-                    data.isFriday ? 'bg-gold/15' : 'bg-slate-50'
-                  }`}
-                >
-                  <span className={`text-[13px] font-semibold ${data.isFriday ? 'text-gold-dark' : 'text-slate-700'}`}>
-                    Candles {data.shabbos.candleLighting.label}
-                  </span>
-                  <span className={`text-[13px] font-semibold tabular-nums ${data.isFriday ? 'text-gold-dark' : 'text-slate-700'}`}>
-                    {data.shabbos.candleLighting.time}
-                  </span>
-                </div>
-              )}
-              {data.shabbos.havdalah && (
-                <div
-                  className={`flex items-baseline justify-between gap-3 rounded-lg px-3 py-1.5 ${
-                    data.isShabbos ? 'bg-gold/15' : 'bg-slate-50'
-                  }`}
-                >
-                  <span className={`text-[13px] font-semibold ${data.isShabbos ? 'text-gold-dark' : 'text-slate-700'}`}>
-                    Havdalah {data.shabbos.havdalah.label}
-                  </span>
-                  <span className={`text-[13px] font-semibold tabular-nums ${data.isShabbos ? 'text-gold-dark' : 'text-slate-700'}`}>
-                    {data.shabbos.havdalah.time}
-                  </span>
-                </div>
-              )}
-            </div>
+              <p className="text-sm text-slate-300">{soon ? `${soon} · ${view.next.when}` : view.next.when}</p>
+            </>
           )}
-          <div className="flex items-baseline justify-between gap-3 pt-3">
-            {/* Same attribution/link as the real Zmanim & Shabbos page
-                (ZmanimBody) — this card shows the same Hebcal-sourced data, so
-                it carries the same credit. */}
-            <p className="text-[11px] text-muted">
-              Zmanim from{' '}
-              <a href="https://www.hebcal.com" target="_blank" rel="noopener noreferrer" className="underline hover:text-primary">
-                Hebcal.com
-              </a>
+          {view.also.map((t: CardTime) => (
+            <p key={t.label} className="mt-2 flex items-baseline justify-between gap-3 border-t border-white/10 pt-2 text-sm text-slate-200">
+              <span>
+                {t.label} {t.when}
+              </span>
+              <span className="font-semibold tabular-nums text-white">{t.time}</span>
             </p>
-            {/* Quiet, not a pill like DaveningTimesCard's own CTA — this card
-                already shows today's times; this is a secondary path to the
-                fuller ZmanimBody page (sunrise, latest Shema/Shacharis,
-                nightfall), not the point of the card. Shares this trailing
-                row with the Hebcal credit rather than sitting up by the
-                title, which is where an actual "do this" action belongs. */}
-            <Link
-              href={routes.slug(communitySlug, 'zmanim')}
-              className="shrink-0 text-[11px] font-semibold text-primary transition-colors hover:text-primary-dark hover:underline"
-            >
-              See full zmanim →
-            </Link>
+          ))}
+          <p className="mt-3 text-xs text-slate-400">
+            {data.hebrewDate} · {locationLabel}
+          </p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            {actions.map((a) => (
+              <Link
+                key={a.label}
+                href={a.href}
+                className="flex-1 whitespace-nowrap rounded-lg bg-white/10 px-3 py-2 text-center text-[13px] font-semibold text-white transition-colors hover:bg-white/20"
+              >
+                {a.label}
+              </Link>
+            ))}
           </div>
+          {/* Same credit as the real Zmanim & Shabbos page (ZmanimBody): this
+              card shows the same Hebcal-sourced data. */}
+          <p className="mt-3 text-[11px] text-slate-400">
+            Zmanim from{' '}
+            <a href="https://www.hebcal.com" target="_blank" rel="noopener noreferrer" className="underline hover:text-white">
+              Hebcal.com
+            </a>
+          </p>
         </>
       ) : (
-        <p className="text-[13px] text-muted">Zmanim are unavailable right now. Please try again in a moment.</p>
+        <p className="mt-3 text-[13px] text-slate-300">Zmanim are unavailable right now. Please try again in a moment.</p>
       )}
     </div>
   )

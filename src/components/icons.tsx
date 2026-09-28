@@ -344,3 +344,14 @@ export function LeafIcon({ className }: IconProps) {
   )
 }
 
+
+// A candle and its flame — the Shabbos card's mark (ShabbatTimesCard), in
+// gold, the colour kept for candle lighting.
+export function CandleIcon({ className }: IconProps) {
+  return (
+    <svg {...base} className={className}>
+      <path d="M12 3c1 1.2 1.5 2.1 1.5 3a1.5 1.5 0 1 1-3 0c0-.9.5-1.8 1.5-3z" />
+      <path d="M9 10.5h6V20a1 1 0 0 1-1 1h-4a1 1 0 0 1-1-1v-9.5z" />
+    </svg>
+  )
+}
