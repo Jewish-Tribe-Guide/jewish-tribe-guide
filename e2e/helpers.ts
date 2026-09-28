@@ -105,6 +105,23 @@ export async function categoryWithDistances(
   throw new Error('No distance-based listing category has any listings')
 }
 
+/** A distance-based category with at least one listing that has map
+ *  coordinates — what a distance needs. categoryWithDistances only checks
+ *  there are listings, and the first category with any may have none
+ *  geocoded. */
+export async function categoryWithGeocodedListings(
+  request: APIRequestContext,
+  community: string,
+): Promise<{ category: Category }> {
+  const all = await categories(request, community)
+  for (const category of all.filter((c) => c.kind === 'listing' && c.hasAddress !== false)) {
+    const body = await apiGet(request, `/api/resources?category=${category.id}&community=${community}`)
+    const resources = (body.resources ?? []) as { geo?: { lat: number; lng: number } | null }[]
+    if (body.ok && resources.some((r) => r.geo)) return { category }
+  }
+  throw new Error('No distance-based listing category has a geocoded listing')
+}
+
 /** A listing-kind category with an Hours-type field and at least one real
  *  listing, plus that listing itself — for tests that need to open the edit
  *  form's Hours editor on a real listing rather than an empty one. */

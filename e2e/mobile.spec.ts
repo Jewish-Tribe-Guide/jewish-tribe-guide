@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { categoryWithDistances, categoryWithHoursField, defaultCommunity, dismissLocationPrompt, largestCategory } from './helpers'
+import { categoryWithGeocodedListings, categoryWithHoursField, defaultCommunity, dismissLocationPrompt, largestCategory } from './helpers'
 
 // The mobile tab bar and the inline card grid only exist below the `sm`
 // breakpoint, so the desktop project can't cover them at all. Mobile is also
@@ -236,12 +236,13 @@ test.describe('mobile', () => {
   // link is a usable tap target on a phone.
   test('shows distances from the centre, with a tappable "Use my location"', async ({ page, request }) => {
     const community = await defaultCommunity(page)
-    const { category } = await categoryWithDistances(request, community)
+    const { category } = await categoryWithGeocodedListings(request, community)
 
     await page.goto(`/${community}/${category.id}`)
     await dismissLocationPrompt(page)
 
-    await expect(page.getByText(/^Distances from central /)).toBeVisible()
+    // The desktop copy under the title is in the page too, hidden.
+    await expect(page.getByText(/^Distances from central /).locator('visible=true')).toBeVisible()
     await expect(page.getByTestId('row-facts').filter({ hasText: / mi(?:\b|$)/ }).first()).toBeVisible()
 
     const link = page.getByRole('button', { name: 'Use my location' })

@@ -69,15 +69,11 @@ test.describe('listing detail — desktop', () => {
     expect(columnCount, 'the directory grid should lay out more than one column at desktop width').toBeGreaterThan(1)
   })
 
-  // Was anchored to `lg` (1024px), a full breakpoint above where the grid
-  // even turns on for `isMobile` purposes (`sm`, 640px — see the grid's own
-  // doc). 1024px of content width is already comfortably enough for
-  // auto-fill to reserve all 3 of its 280px tracks, so nothing between
-  // "wide enough for 3" and "not a grid at all" ever got a chance to be 2 —
-  // the grid jumped straight from 3 columns to a single one. Aligning the
-  // grid's own breakpoint to `sm` lets auto-fill do the same job at the
-  // narrower widths where only 2 of those tracks fit.
-  test('narrows 3 columns to 2 before collapsing to 1, rather than jumping straight from 3 to 1', async ({ page, request }) => {
+  // Rows are two lines (name, then a facts line) and need the width: three
+  // 280px columns squeezed each one into a third of the page. The grid's
+  // tracks are 420px at least, so a laptop gets two, and a narrow window
+  // one — never three, however wide the screen (the page itself is capped).
+  test('lays out two columns at most, and one on a narrow window', async ({ page, request }) => {
     const community = await defaultCommunity(page)
     const { category } = await largestCategory(request, community)
     const trigger = () => page.getByRole('button', { name: /^Show details for / }).first()
@@ -93,8 +89,9 @@ test.describe('listing detail — desktop', () => {
     await page.goto(`/${community}/${category.id}`)
     await dismissLocationPrompt(page)
 
-    expect(await columnsAt(1400)).toBe(3)
-    expect(await columnsAt(750)).toBe(2)
+    expect(await columnsAt(1920)).toBe(2)
+    expect(await columnsAt(1400)).toBe(2)
+    expect(await columnsAt(750)).toBe(1)
     expect(await columnsAt(600)).toBe(1)
   })
 
