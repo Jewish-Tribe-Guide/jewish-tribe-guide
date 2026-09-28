@@ -8,7 +8,7 @@ import { useNow } from '@/lib/useNow'
 import { ALL_MINYAN_DAYS, isMinyanim, type MinyanDayKey } from '@/lib/davening'
 import type { Minyan } from '@/lib/davening'
 import DirectoryHeader from './DirectoryHeader'
-import AddressPrompt from './AddressPrompt'
+import DistanceNote from './DistanceNote'
 import { CategoryBandFrame, CategoryBandBadge } from './CategoryBandFrame'
 import CheckboxDropdown from './CheckboxDropdown'
 import { GenericListingCard, type GenericListingCardHandle } from './GenericListingCard'
@@ -958,31 +958,11 @@ export default function GenericDirectory({ category, items, anchorLabel, address
 
   return (
     <div>
-      {/* Mobile's own "Set location" call to action — the very top of the
-          page, above the category photo band and title, not tucked under
-          the title where it used to sit right above the search bar and read
-          as glued to it. `!anchorLabel`: once a location IS resolved there's
-          nothing left to prompt for, same gating DirectoryHeader's own
-          (desktop-only) copy uses. Desktop keeps its compact pill right next
-          to the title instead (DirectoryHeader, `variant="inline"`) — this
-          is `desktop:hidden`, not a second copy of that one.
-          No `pt` here — `<main>`'s own `pt-8` already clears the fixed
-          mobile header by the same amount every other page opens with, so
-          adding more on top of it would just be extra, inconsistent
-          whitespace above this one page's first element. `pb-4` instead,
-          so the real separation lands where it matters: between this and
-          the search bar right below it, which is the gap that used to read
-          as "attached to search" at a bare 9px. No `px` either — `<main>`
-          already has its own `px-4` (no `sm:px-6` override at that level),
-          so adding a second one here inset this 16px narrower than the
-          search bar/cards below it on each side (311px vs their 343px);
-          this banner should read as the same width as everything else on
-          the page, not its own, oddly-margined column. */}
-      {addressPrompt && !anchorLabel && (
-        <div className="desktop:hidden pb-4">
-          <AddressPrompt variant="banner" />
-        </div>
-      )}
+      {/* Phones: where the distances on each row are measured from, when
+          the visitor hasn't set a location, with the way to set one. At the
+          top, above the category band, as the old banner was; desktop has
+          the same line under the title (DirectoryHeader). */}
+      {addressPrompt && !anchorLabel && <DistanceNote className="desktop:hidden pb-3" />}
       <CategoryBandFrame color={bandColor} imageUrl={bandImage}>
           {/* Mobile used to have its own "‹ {upLabel}" row here (UpButton,
               desktop:hidden). It's gone now that useSetScreenHeader (above)

@@ -1990,9 +1990,9 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                             same tracking-dot swap) rather than a bespoke
                             look, just collapsed to icon-only — there's no
                             room for the pill's label in this row. Opens the
-                            same header popover as AddressPrompt, via the
+                            same header popover as DistanceNote, via the
                             TOGGLING 'jpc:toggle-location' event rather than
-                            AddressPrompt's plain "open" one — this is a
+                            DistanceNote's plain "open" one — this is a
                             standing button a visitor can tap again while the
                             popover is already up, and a second tap should
                             close it, not re-open what's already open —

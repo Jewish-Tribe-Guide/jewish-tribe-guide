@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { categoryWithHoursField, defaultCommunity, dismissLocationPrompt, largestCategory } from './helpers'
+import { categoryWithDistances, categoryWithHoursField, defaultCommunity, dismissLocationPrompt, largestCategory } from './helpers'
 
 // The mobile tab bar and the inline card grid only exist below the `sm`
 // breakpoint, so the desktop project can't cover them at all. Mobile is also
@@ -225,5 +225,32 @@ test.describe('mobile', () => {
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth),
     ).toBe(false)
+  })
+
+  // With no location set, rows used to show a "Distance" chip with no number
+  // and the page a rust banner that read as an error. Now each row's facts
+  // line has a real distance, measured from the community's centre, and one
+  // quiet line says so, with "Use my location".
+  //
+  // Here rather than in a unit test because it needs real layout: that the
+  // link is a usable tap target on a phone.
+  test('shows distances from the centre, with a tappable "Use my location"', async ({ page, request }) => {
+    const community = await defaultCommunity(page)
+    const { category } = await categoryWithDistances(request, community)
+
+    await page.goto(`/${community}/${category.id}`)
+    await dismissLocationPrompt(page)
+
+    await expect(page.getByText(/^Distances from central /)).toBeVisible()
+    await expect(page.getByTestId('row-facts').filter({ hasText: / mi(?:\b|$)/ }).first()).toBeVisible()
+
+    const link = page.getByRole('button', { name: 'Use my location' })
+    // WCAG 2.5.8 wants 24x24 at least; the padding that gets it there is
+    // invisible, so it's the kind of thing a tidy-up deletes.
+    const box = (await link.boundingBox())!
+    expect(Math.round(box.height), 'tap target height').toBeGreaterThanOrEqual(24)
+
+    await link.click()
+    await expect(page.getByPlaceholder('Enter your address')).toBeVisible()
   })
 })

@@ -4,7 +4,14 @@ import { cleanup, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import type { Hospital } from '@/types'
+import { mockRouter } from '@/test/nextNavigationMock'
 import HospitalsDirectory from './HospitalsDirectory'
+
+vi.mock('next/navigation', () => ({
+  useRouter: () => mockRouter,
+  usePathname: () => '/test-community',
+  useSearchParams: () => new URLSearchParams(),
+}))
 
 afterEach(() => cleanup())
 
@@ -110,11 +117,21 @@ describe('HospitalsDirectory', () => {
       expect(screen.getByText('Nearest you')).toBeInTheDocument()
     })
 
-    it('shows no distance or "Nearest you" badge without an anchor', () => {
-      const hospitals = [makeHospital({ id: 'a', name: 'Jefferson' })]
-      renderWithProviders(<HospitalsDirectory anchor={noAnchor} {...handlers} />, { content: { hospitals } })
+    // Without a location, each hospital shows its distance from the
+    // community's centre (the line above the list says so), but "Nearest
+    // you" is about the visitor, so it waits for a real location.
+    it('shows the distance from the centre, and no "Nearest you" badge, without an anchor', () => {
+      const hospitals = [
+        makeHospital({ id: 'a', name: 'Jefferson', latitude: 0, longitude: 1 }),
+        makeHospital({ id: 'b', name: 'Einstein', latitude: 0, longitude: 2 }),
+      ]
+      renderWithProviders(<HospitalsDirectory anchor={noAnchor} {...handlers} />, {
+        content: { hospitals },
+        community: { mapCenter: { lat: 0, lng: 0 } },
+      })
 
-      expect(screen.queryByText(/mi$/)).not.toBeInTheDocument()
+      expect(screen.getByText('📍 69.1 mi')).toBeInTheDocument()
+      expect(screen.getByText('📍 138.2 mi')).toBeInTheDocument()
       expect(screen.queryByText('Nearest you')).not.toBeInTheDocument()
     })
   })

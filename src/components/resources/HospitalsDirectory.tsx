@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useHospitals } from '@/lib/useHospitals'
 import type { DirectoryAnchor, HospitalInfo } from '@/types'
 import { haversineMiles, roundMiles } from '@/lib/geo'
+import { useActiveCommunity } from '@/lib/communityContext'
 import DirectoryHeader from './DirectoryHeader'
 import { CategoryBandFrame, CategoryBandBadge } from './CategoryBandFrame'
 import { HOSPITAL_COLOR } from '@/components/map/ResourceMapView'
@@ -52,9 +53,14 @@ export default function HospitalsDirectory({ anchor, onSelect, onUp, onViewMap }
   // Unrounded — sorted on directly below, so two hospitals a couple hundred
   // feet apart don't round to the same 0.1-mile bucket and tie into
   // arbitrary order. Only the label (below) rounds.
+  // With no location set, the distance shown is from the community's centre
+  // (see DistanceNote above the list) — for reading only: it neither sorts
+  // the list nor earns the "Nearest" badge, which are about the visitor.
+  const { community } = useActiveCommunity()
   const withDistance = hospitals.map((h) => ({
     ...h,
     miles: coords ? haversineMiles(coords, { lat: h.latitude, lng: h.longitude }) : null,
+    milesFromCenter: coords ? null : haversineMiles(community.mapCenter, { lat: h.latitude, lng: h.longitude }),
   }))
 
   // A search box only earns its space once the list is long; with a handful of
@@ -180,8 +186,8 @@ export default function HospitalsDirectory({ anchor, onSelect, onUp, onViewMap }
                 </div>
 
                 <span className="flex flex-col items-end gap-2 shrink-0 pt-0.5">
-                  {h.miles != null && (
-                    <span className="text-xs font-medium text-slate-600 whitespace-nowrap">📍 {roundMiles(h.miles)} mi</span>
+                  {(h.miles ?? h.milesFromCenter) != null && (
+                    <span className="text-xs font-medium text-slate-600 whitespace-nowrap">📍 {roundMiles((h.miles ?? h.milesFromCenter)!)} mi</span>
                   )}
                   <svg className="w-5 h-5 text-slate-300 group-hover:text-primary group-hover:translate-x-0.5 transition-all" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />

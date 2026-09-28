@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import AddressPrompt from './AddressPrompt'
+import DistanceNote from './DistanceNote'
 import { PinIcon } from '@/components/icons'
 
 type Props = {
@@ -11,9 +11,10 @@ type Props = {
   /** Location label shown under the title once a location is set (typed address
    *  or hospital name). Takes precedence over the address prompt. */
   anchorLabel?: string
-  /** When true and no anchorLabel, show the "Set location" prompt under the
-   *  title — desktop only; mobile's own copy lives at the top of the page
-   *  instead (GenericDirectory). */
+  /** When true and no anchorLabel, say where the list's distances are
+   *  measured from, with "Use my location" (DistanceNote), under the title —
+   *  desktop only; mobile's own copy is at the top of the page
+   *  (GenericDirectory). */
   addressPrompt?: boolean
   /** Right-aligned action buttons (Map, Add). Wrapped in a shrink-0 flex row. */
   actions?: ReactNode
@@ -75,7 +76,7 @@ export default function DirectoryHeader({ title, count, anchorLabel, addressProm
       <div className="hidden desktop:block h-5 mb-[0.5rem]" aria-hidden="true" />
       <div className="flex items-end justify-between gap-2 mb-2">
         {/* w-full desktop:w-auto: harmless leftover from when the unset
-            AddressPrompt below needed this column to stretch on mobile —
+            the unset-location prompt below needed this column to stretch on mobile —
             that branch is desktop-only now (see its own comment), so
             nothing here actually needs the mobile stretch any more, but it
             doesn't hurt the other branches either, which size to their own
@@ -106,7 +107,7 @@ export default function DirectoryHeader({ title, count, anchorLabel, addressProm
                   address typed as a landmark) reads as plain text right
                   under the heading — easy to mistake for content rather
                   than "this is where you're anchored." The unset state
-                  right below (AddressPrompt) already pairs its own prompt
+                  right below (DistanceNote) already pairs its own line
                   with this same pin; this just matches it once a location
                   actually is set. */}
               <PinIcon className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
@@ -119,14 +120,10 @@ export default function DirectoryHeader({ title, count, anchorLabel, addressProm
               )}
             </p>
           ) : addressPrompt ? (
-            // Desktop only now — mobile's own copy of this moved to the very
-            // top of the page (GenericDirectory's `banner` variant), away
-            // from the search bar it used to sit right above. This compact
-            // pill next to the title is desktop-only chrome and always has
-            // been; it just needs its own `hidden desktop:*` now that
-            // there's no longer a mobile instance sharing this component.
-            <div className="hidden desktop:flex items-center gap-1.5 mt-1.5 flex-wrap">
-              <AddressPrompt variant="inline" />
+            // Desktop only — phones get the same line at the top of the page
+            // (GenericDirectory).
+            <div className="hidden desktop:flex items-center gap-1.5 mt-1 flex-wrap">
+              <DistanceNote />
               {countText && (
                 <span className="text-sm text-muted">
                   <span aria-hidden="true" className="mr-1">·</span>{countText}

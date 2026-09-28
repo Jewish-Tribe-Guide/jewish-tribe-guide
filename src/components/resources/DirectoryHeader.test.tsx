@@ -1,7 +1,15 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, render, screen } from '@testing-library/react'
+import { renderWithProviders } from '@/test/renderWithProviders'
+import { mockRouter } from '@/test/nextNavigationMock'
 import DirectoryHeader from './DirectoryHeader'
+
+vi.mock('next/navigation', () => ({
+  useRouter: () => mockRouter,
+  usePathname: () => '/test-community',
+  useSearchParams: () => new URLSearchParams(),
+}))
 
 afterEach(() => cleanup())
 
@@ -53,25 +61,22 @@ describe('DirectoryHeader — the resolved location label', () => {
   })
 })
 
-// Regression coverage for: the UNSET "Set location" prompt (AddressPrompt)
-// used to keep a mobile presence here (a real call to action, so it grew to
-// fill the row rather than shrinking away) — it's desktop-only now, since
-// mobile's own copy moved to a bigger, dismissible `banner` variant at the
-// top of the page (GenericDirectory). This instance renders the compact
-// `inline` variant, wrapped in `hidden desktop:*` same as the resolved
-// address/count branches above it.
-describe('DirectoryHeader — the unset location prompt', () => {
-  it('renders the compact "inline" variant, gated to desktop', () => {
-    const { container } = render(
+// With no location set, the list's distances are from the community's
+// centre, and the line under the title says so, with "Use my location"
+// (DistanceNote). Desktop only here: phones get the same line at the top of
+// the page (GenericDirectory).
+describe('DirectoryHeader — no location set', () => {
+  it('says where distances are from, gated to desktop', () => {
+    const { container } = renderWithProviders(
       <DirectoryHeader title="Grocery" addressPrompt actions={<button>Add</button>} titleInHeader />,
     )
 
-    const prompt = screen.getByRole('button', { name: /Set location to see distances/ })
-    expect(prompt).toBeInTheDocument()
+    expect(screen.getByText('Distances from central Test Region')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Use my location' })).toBeInTheDocument()
 
     const column = container.querySelector('.mb-2')?.firstElementChild as HTMLElement
-    const promptWrapper = column.lastElementChild as HTMLElement
-    expect(promptWrapper.className).toMatch(/(?:^|\s)hidden(?:\s|$)/)
-    expect(promptWrapper.className).toMatch(/desktop:flex/)
+    const wrapper = column.lastElementChild as HTMLElement
+    expect(wrapper.className).toMatch(/(?:^|\s)hidden(?:\s|$)/)
+    expect(wrapper.className).toMatch(/desktop:flex/)
   })
 })

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { travelCompare, travelParts, withMilesFromAddress } from './listingTravel'
+import { travelCompare, travelParts, withMilesFromAddress, withMilesFromCenter } from './listingTravel'
 import type { DirectoryResource } from '@/types'
 
 // This comparator decides the order of every directory. The case worth guarding
@@ -131,5 +131,34 @@ describe('travelParts', () => {
 
   it('shows nothing at all when there is nothing to show', () => {
     expect(travelParts(at('x'))).toEqual([])
+  })
+
+  it('falls back to the distance from the community’s centre, with no address typed', () => {
+    expect(travelParts(at('x', { milesFromCenter: 3.14 }))).toEqual([{ kind: 'distance', text: '3.1 mi' }])
+  })
+
+  it('prefers the visitor’s own distance over the centre’s', () => {
+    expect(travelParts(at('x', { milesFromAddress: 0.4, milesFromCenter: 3.1 }))).toEqual([{ kind: 'distance', text: '0.4 mi' }])
+  })
+})
+
+describe('withMilesFromCenter', () => {
+  const cityHall = { lat: 39.9526, lng: -75.1652 }
+
+  it('stamps miles from the centre on listings with coordinates, and leaves the rest alone', () => {
+    const [near, nowhere] = withMilesFromCenter([at('near', { geo: { lat: 39.9526, lng: -75.1452 } }), at('nowhere')], cityHall)
+    expect(near.milesFromCenter).toBeCloseTo(1.06, 1)
+    expect(nowhere.milesFromCenter).toBeUndefined()
+  })
+
+  // Distance from City Hall is something to read, not an order to sort by:
+  // with no location set the list stays in its own order (popularity, then
+  // name), not "nearest to the centre first".
+  it('doesn’t change the sort order', () => {
+    const items = withMilesFromCenter(
+      [at('Zeta', { geo: { lat: 39.95, lng: -75.16 } }), at('Alpha', { geo: { lat: 40.2, lng: -75.5 } })],
+      cityHall,
+    )
+    expect(sortedNames(items)).toEqual(['Alpha', 'Zeta'])
   })
 })

@@ -99,7 +99,7 @@ export default function LocationControl({ controls }: Props) {
     return () => document.removeEventListener('pointerdown', onDown, true)
   }, [open, mapAnchor])
 
-  // Allow any component (e.g. AddressPrompt) to open the picker without prop drilling.
+  // Allow any component (e.g. DistanceNote) to open the picker without prop drilling.
   useEffect(() => {
     function onOpen() { setOpen(true) }
     document.addEventListener('jpc:open-location', onOpen)
@@ -107,7 +107,7 @@ export default function LocationControl({ controls }: Props) {
   }, [])
 
   // A second, TOGGLING variant of the same event — used by the mobile map's
-  // pin button, which (unlike AddressPrompt's plain "open" link) is a button
+  // pin button, which (unlike DistanceNote's plain "open" link) is a button
   // a visitor can tap again while the popover it opened is still up, and
   // expects that second tap to close it, the same as tapping the header pill
   // itself twice would. Its `detail.anchor` (the button's own DOM node) is

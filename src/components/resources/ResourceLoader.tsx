@@ -3,7 +3,8 @@
 import { useMemo } from 'react'
 import type { DirectoryResource, DirectoryAnchor } from '@/types'
 import type { CategoryConfig } from '@/lib/categories'
-import { withMilesFromAddress } from '@/lib/listingTravel'
+import { withMilesFromAddress, withMilesFromCenter } from '@/lib/listingTravel'
+import { useActiveCommunity } from '@/lib/communityContext'
 import { useOptionalLocation } from '@/lib/locationContext'
 import GenericDirectory from './GenericDirectory'
 import UpButton from '@/components/UpButton'
@@ -61,12 +62,16 @@ export default function ResourceLoader({ category, items, anchor, reopenItemId, 
   const anchorListingId = useOptionalLocation()?.anchorListingId ?? null
 
   // Distance to the visitor's anchor: straight-line miles (haversine) from their
-  // typed address to each listing's geocoded coordinates.
+  // typed address to each listing's geocoded coordinates. With no anchor,
+  // from the community's centre instead, for display (withMilesFromCenter).
+  const { community } = useActiveCommunity()
+  const center = community.mapCenter
   const withDistance = useMemo(() => {
     if (!items) return items
     if (category.hasAddress === false) return items
+    if (!anchorCoords) return withMilesFromCenter(items, center)
     return withMilesFromAddress(items, anchorCoords, anchorListingId)
-  }, [items, anchorCoords, category.hasAddress, anchorListingId])
+  }, [items, anchorCoords, category.hasAddress, anchorListingId, center])
 
   // The listings failed to load. Said plainly, because the alternative — an
   // empty directory — is a confident, wrong answer: it tells someone there are

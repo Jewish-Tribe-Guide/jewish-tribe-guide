@@ -157,6 +157,11 @@ export type DirectoryResource = {
   /** Straight-line miles from the visitor's typed address (address-anchor mode).
    *  Computed client-side from `details.geo` — see ResourceLoader. */
   milesFromAddress?: number
+  /** Straight-line miles from the community's centre (its map centre), for
+   *  a visitor who hasn't set a location — so a list still says how far out
+   *  each place is. Display only: sorting by distance still needs a real
+   *  location (see withMilesFromCenter). */
+  milesFromCenter?: number
   /** Coordinates carried over from `details.geo` (spread onto the row). */
   geo?: { lat: number; lng: number } | null
   // ── Google Places sync (carried over from `details`, set by the sync job) ──

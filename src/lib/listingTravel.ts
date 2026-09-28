@@ -40,6 +40,17 @@ export function withMilesFromAddress<T extends DirectoryResource>(
 // hasAddress: false, e.g. WhatsApp Groups), falls back to alphabetical by
 // name rather than leaving listings in arbitrary storage order. Shared by
 // every directory so the ordering never drifts.
+/** Stamps `milesFromCenter` — straight-line miles from the community's
+ *  centre — on every listing with coordinates, for a visitor who hasn't set
+ *  a location. The list reads "Distances from central Philadelphia" above
+ *  it, so "1.2 mi" is still a real number, where it used to be a "Distance"
+ *  chip with none. Kept apart from `milesFromAddress` on purpose: that one
+ *  sorts the list, and "nearest to City Hall" isn't an order anyone asked
+ *  for. */
+export function withMilesFromCenter<T extends DirectoryResource>(items: T[], center: LatLng): T[] {
+  return items.map((item) => (item.geo ? { ...item, milesFromCenter: haversineMiles(center, item.geo) } : item))
+}
+
 export function travelCompare(a: DirectoryResource, b: DirectoryResource): number {
   if (a.milesFromAddress != null || b.milesFromAddress != null) {
     return (a.milesFromAddress ?? Infinity) - (b.milesFromAddress ?? Infinity)
@@ -57,6 +68,7 @@ export function travelCompare(a: DirectoryResource, b: DirectoryResource): numbe
 export type TravelPart = { kind: 'distance'; text: string }
 
 export function travelParts(item: DirectoryResource): TravelPart[] {
-  if (item.milesFromAddress != null) return [{ kind: 'distance', text: `${roundMiles(item.milesFromAddress)} mi` }]
+  const miles = item.milesFromAddress ?? item.milesFromCenter
+  if (miles != null) return [{ kind: 'distance', text: `${roundMiles(miles)} mi` }]
   return []
 }
