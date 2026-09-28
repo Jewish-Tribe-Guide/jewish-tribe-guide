@@ -13,6 +13,7 @@ import type { AnchorTimes } from '@/lib/useZmanAnchors'
 import type { LatLng } from '@/lib/geo'
 import { community } from '@/community.config'
 import type { CategoryConfig, CategoryField } from '@/lib/categories'
+import type { DirectoryResource } from '@/types'
 
 export type MinyanSchedule = {
   /** The first category with a minyanim field — where "All davening times"
@@ -38,9 +39,12 @@ export type MinyanSchedule = {
  * "today" or "the next Maariv" means. Lifted out of DaveningTimesCard, whose
  * comments explain each rule below.
  */
-export function useMinyanSchedule(coords: LatLng | null): MinyanSchedule {
+export function useMinyanSchedule(coords: LatLng | null, only?: readonly DirectoryResource[]): MinyanSchedule {
   const categories = useCategories()
-  const listings = useAllListings()
+  // A category page passes its own listings (`only`): it has no provider of
+  // every listing on the site, which only the home screen and the map load.
+  const all = useAllListings()
+  const listings = only ?? all
   const now = useNow()
 
   const minyanimCategories: { category: CategoryConfig; field: CategoryField }[] = (categories ?? [])

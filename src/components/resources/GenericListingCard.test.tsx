@@ -8,6 +8,7 @@ import { makeCategory, makeListing } from '@/test/providerFixtures'
 import { mockRouter } from '@/test/nextNavigationMock'
 import { ForcedViewport } from '@/lib/useIsMobile'
 import { GenericListingCard, type GenericListingCardHandle } from './GenericListingCard'
+import { NextMinyansContext } from './nextMinyans'
 
 // The first component test built on the CommunityProvider/ContentProvider
 // harness (renderWithProviders) — this was the specific component the
@@ -1047,9 +1048,12 @@ describe('GenericListingCard — the row', () => {
     expect(cert).toHaveAttribute('title', 'Only the bakery case')
   })
 
-  it('shows a shul’s next minyan when the directory gives one', () => {
+  it('shows a shul’s next minyan when the list works one out', () => {
+    const item = makeListing({ id: 'shul-1' })
     renderWithProviders(
-      <GenericListingCard item={makeListing()} category={makeCategory()} upvotes={false} count={0} nextMinyan="Mincha 6:34 PM" {...requiredHandlers} />,
+      <NextMinyansContext.Provider value={{ 'shul-1': 'Mincha 6:34 PM' }}>
+        <GenericListingCard item={item} category={makeCategory()} upvotes={false} count={0} {...requiredHandlers} />
+      </NextMinyansContext.Provider>,
     )
 
     expect(within(screen.getByTestId('row-facts')).getByText('Mincha 6:34 PM')).toBeInTheDocument()

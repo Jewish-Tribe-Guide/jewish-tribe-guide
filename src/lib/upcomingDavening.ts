@@ -220,3 +220,31 @@ export function formatStartsIn(nowMinutes: number, target: number, isTomorrow: b
   if (minutes === 0) return `In ${hours} hr`
   return `In ${hours} hr ${minutes} min`
 }
+
+/** Each shul's own next minyan, for its row in a list of shuls: "Mincha
+ *  6:34 PM", or "Shacharis 7 AM tomorrow" once today's are over. The same
+ *  rules as nextUpcomingDavening (it runs once per shul), so a row and the
+ *  home screen's davening card can't disagree about what's next. Keyed by
+ *  listing id; a shul with nothing today or tomorrow is left out. */
+export function nextMinyanByShul(
+  shuls: ShulMinyanim[],
+  opts: Parameters<typeof nextUpcomingDavening>[1],
+): Record<string, string> {
+  const out: Record<string, string> = {}
+  for (const shul of shuls) {
+    if (!shul.id) continue
+    const next = nextUpcomingDavening([shul], opts)
+    if (next) out[shul.id] = `${next.label} ${clockTime(next.minutes)}${next.isTomorrow ? ' tomorrow' : ''}`
+  }
+  return out
+}
+
+/** Minutes since midnight → "7 AM" / "6:34 PM". A fixed-time row stores its
+ *  own text ("7:00am"), a sunset-based one a formatted time ("6:34 PM"); a
+ *  list of rows reads better in one style. */
+function clockTime(minutes: number): string {
+  const h = Math.floor(minutes / 60) % 24
+  const m = minutes % 60
+  const hour = h % 12 || 12
+  return `${m === 0 ? hour : `${hour}:${String(m).padStart(2, '0')}`} ${h < 12 ? 'AM' : 'PM'}`
+}

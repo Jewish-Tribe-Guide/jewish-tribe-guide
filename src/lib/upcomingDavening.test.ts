@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatStartsIn, nextUpcomingDavening, type ShulMinyanim } from './upcomingDavening'
+import { formatStartsIn, nextMinyanByShul, nextUpcomingDavening, type ShulMinyanim } from './upcomingDavening'
 import type { Minyan } from './davening'
 import { geoKey } from './useZmanAnchors'
 
@@ -251,5 +251,28 @@ describe('formatStartsIn', () => {
   it('tomorrow — target is measured from the NEXT day\'s midnight, 24h ahead of today\'s', () => {
     // 11pm tonight, tomorrow's minyan at 7am: 8 hours away.
     expect(formatStartsIn(23 * 60, 7 * 60, true)).toBe('In 8 hr')
+  })
+})
+
+describe('nextMinyanByShul', () => {
+  const opts = (nowMinutes: number) => ({ today: ['mon' as const], tomorrow: ['tue' as const], nowMinutes, season: null, anchors: {} })
+  const kk = { ...kahalKadosh, id: 'kk' }
+  const quiet: ShulMinyanim = { id: 'quiet', name: 'Shabbos only', minyanim: [{ id: 'x', tefillah: 'shacharis', days: ['sat'], time: '9:00am' }] }
+
+  it('gives each shul its own next minyan, keyed by listing id, in one clock style', () => {
+    // 7:00 AM Monday: Shacharis at 7:15 is next.
+    expect(nextMinyanByShul([kk], opts(7 * 60))).toEqual({ kk: 'Shacharis 7:15 AM' })
+    // 10 AM: Shacharis is over; Mincha at 2:00pm, written "2 PM".
+    expect(nextMinyanByShul([kk], opts(10 * 60))).toEqual({ kk: 'Mincha 2 PM' })
+  })
+
+  it('says "tomorrow" once today’s are over', () => {
+    expect(nextMinyanByShul([kk], opts(15 * 60))).toEqual({ kk: 'Mincha 2 PM tomorrow' })
+  })
+
+  it('leaves out a shul with nothing today or tomorrow, and one with no listing id', () => {
+    const { id: _id, ...noId } = kk
+    void _id
+    expect(nextMinyanByShul([quiet, noId], opts(7 * 60))).toEqual({})
   })
 })

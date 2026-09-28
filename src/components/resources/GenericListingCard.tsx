@@ -24,6 +24,7 @@ import { useListingActions, type ListingAction } from './useListingActions'
 import SwipeRow, { type SwipeAction } from '@/components/SwipeRow'
 import Chip from './Chip'
 import { initialsOf, listingRowFacts, type RowFactTone } from '@/lib/listingRow'
+import { useNextMinyan } from './nextMinyans'
 import { ui } from '@/lib/uiConfig'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { usePinned } from '@/lib/pinnedContext'
@@ -90,10 +91,6 @@ type Props = {
    *  single-category directory page, which already says the category once in
    *  its header. Defaults on. */
   showCategoryLabel?: boolean
-  /** A shul's next minyan today or tomorrow ("Mincha 6:34 PM"), for the
-   *  row's second line. Worked out once for the whole list by the directory
-   *  (see useNextMinyans), so each row doesn't recompute every shul's times. */
-  nextMinyan?: string | null
   onVote: (count: number) => void
   onTagClick: (tag: string) => void
   /** When provided, clicking the listing's name navigates to that item's own
@@ -154,7 +151,6 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
   onFilterSelect,
   onEdit,
   showCategoryLabel = true,
-  nextMinyan = null,
   onNameClick,
   onNavigate,
   hasPrev,
@@ -226,7 +222,7 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
   const { isOpen, closing, closure } = getOpenStatus(item, hoursFields.map((f) => f.key), now)
   // The row's second line: open status, next minyan, distance, what kind of
   // place, how many items. See lib/listingRow.ts.
-  const facts = listingRowFacts(item, category, now, { nextMinyan })
+  const facts = listingRowFacts(item, category, now, { nextMinyan: useNextMinyan(item.id) })
   // Upvotes live in the opened listing now (the sheet on a phone, the dialog
   // on desktop), not on every row: a column of "👍 0" said nothing while a
   // list was being scanned. Popularity still orders the list.

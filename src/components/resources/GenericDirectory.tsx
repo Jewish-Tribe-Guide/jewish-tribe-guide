@@ -9,6 +9,7 @@ import { ALL_MINYAN_DAYS, isMinyanim, type MinyanDayKey } from '@/lib/davening'
 import type { Minyan } from '@/lib/davening'
 import DirectoryHeader from './DirectoryHeader'
 import DistanceNote from './DistanceNote'
+import { NextMinyans } from './nextMinyans'
 import { CategoryBandFrame, CategoryBandBadge } from './CategoryBandFrame'
 import CheckboxDropdown from './CheckboxDropdown'
 import { GenericListingCard, type GenericListingCardHandle } from './GenericListingCard'
@@ -1389,6 +1390,8 @@ export default function GenericDirectory({ category, items, anchorLabel, address
         //
         // SwipeRowGroup: only one card's swipe actions stay revealed at a
         // time, the same rule the map's nearby list follows.
+        // NextMinyans: each shul row's next minyan (shul categories only).
+        <NextMinyans enabled={hasMinyanim} items={items}>
         <SwipeRowGroup>
         <div className="space-y-2 sm:space-y-0 sm:grid sm:gap-3 sm:grid-cols-[repeat(auto-fill,minmax(420px,1fr))]">
           {filtered.map((item, index) => (
@@ -1448,6 +1451,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
           ))}
         </div>
         </SwipeRowGroup>
+        </NextMinyans>
       )}
       </CategoryBandFrame>
 

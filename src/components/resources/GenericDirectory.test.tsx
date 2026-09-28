@@ -29,7 +29,9 @@ vi.mock('@/lib/backForwardNavigation', () => ({
 // — stubbed here, same "mock the heavy leaf child" pattern as Landing.test.tsx's
 // DaveningTimesCard, so what's under test is GenericDirectory's own
 // filtering/search/wiring logic, not the card's own rendering.
-vi.mock('./GenericListingCard', () => ({
+vi.mock('./GenericListingCard', async () => {
+  const { useNextMinyan } = await import('./nextMinyans')
+  return {
   // A real forwardRef + useImperativeHandle open()/close(), same shape as
   // the real GenericListingCardHandle — needed so the reopenItemId→open()
   // wiring (GenericDirectory's own cardRefs.current.get(id)?.open()) is
@@ -42,7 +44,6 @@ vi.mock('./GenericListingCard', () => ({
       onTagClick,
       onFilterBool,
       onNavigate,
-      nextMinyan,
       onExpandedChange,
       found,
     }: {
@@ -52,7 +53,6 @@ vi.mock('./GenericListingCard', () => ({
       onTagClick: (t: string) => void
       onFilterBool: (key: string) => void
       onNavigate?: (direction: 1 | -1) => void
-      nextMinyan?: string | null
       onExpandedChange?: (expanded: boolean) => void
       found?: { items: { tag: string }[]; fields: { label: string }[] } | null
     },
@@ -75,7 +75,7 @@ vi.mock('./GenericListingCard', () => ({
     return (
       <div>
         <span>{item.name}</span>
-        {nextMinyan && <span>next minyan at {item.name}: {nextMinyan}</span>}
+        <NextMinyanNote id={item.id} name={item.name} />
         {item.milesFromAddress != null && <span>{item.name} is {item.milesFromAddress} mi</span>}
         {expanded && <span>Expanded {item.name}</span>}
         {found && <span>found on {item.name}: {[...found.items.map((m) => m.tag), ...found.fields.map((f) => f.label)].join(', ')}</span>}
@@ -92,7 +92,12 @@ vi.mock('./GenericListingCard', () => ({
       </div>
     )
   }),
-}))
+  }
+  function NextMinyanNote({ id, name }: { id: string; name: string }) {
+    const next = useNextMinyan(id)
+    return next ? <span>next minyan at {name}: {next}</span> : null
+  }
+})
 
 // DaveningTimesModal pulls in its own heavy davening-time rendering — out of
 // scope here, GenericDirectory only cares whether it opens (and, for the
@@ -125,6 +130,10 @@ afterEach(() => {
   cleanup()
   resetMockIntersectionObserver()
 })
+
+// Whether today is Yom Tov comes from the zmanim; nothing here needs it.
+// Stubbed so a shul list doesn't reach for /api/zmanim.
+vi.mock('@/lib/useZmanim', () => ({ useZmanim: () => ({ data: null, status: 'loading' }) }))
 
 const handlers = {
   onUp: vi.fn(),
@@ -1171,5 +1180,35 @@ describe('GenericDirectory — neighborhoods', () => {
     })
     expect(screen.getByText('Mekor Habracha')).toBeInTheDocument()
     expect(screen.queryByText('Far Shul')).not.toBeInTheDocument()
+  })
+})
+
+// Each shul row says its next minyan. Worked out once for the list by
+// NextMinyans (see nextMinyanByShul's own tests for the rules); this checks
+// the directory hands it to the right rows, and only on a shul page.
+describe('GenericDirectory — each shul’s next minyan', () => {
+  const shulCategory = makeCategory({ id: 'synagogue', detailFields: [{ key: 'minyanim', label: 'Minyanim', type: 'minyanim' }] })
+  const shul = (id: string, name: string, time: string) =>
+    makeListing({ id, name, category: 'synagogue', minyanim: [{ id: 'm', tefillah: 'mincha', days: ['mon'], time }] })
+
+  afterEach(() => vi.useRealTimers())
+
+  it('shows each shul’s own next minyan on its row', () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-09-28T11:00:00-04:00')) // a Monday morning in Philadelphia
+    renderWithProviders(
+      <GenericDirectory category={shulCategory} items={[shul('a', 'Alpha Shul', '1:30pm'), shul('b', 'Beta Shul', '6:45pm')]} {...handlers} />,
+      { content: { categories: [shulCategory] } },
+    )
+
+    expect(screen.getByText('next minyan at Alpha Shul: Mincha 1:30 PM')).toBeInTheDocument()
+    expect(screen.getByText('next minyan at Beta Shul: Mincha 6:45 PM')).toBeInTheDocument()
+  })
+
+  it('works nothing out for a category without minyanim', () => {
+    const minyanim = [{ id: 'm', tefillah: 'mincha', days: ['mon'], time: '1:30pm' }]
+    renderWithProviders(<GenericDirectory category={makeCategory()} items={[makeListing({ name: 'Acme', minyanim })]} {...handlers} />)
+
+    expect(screen.queryByText(/next minyan at/)).not.toBeInTheDocument()
   })
 })
