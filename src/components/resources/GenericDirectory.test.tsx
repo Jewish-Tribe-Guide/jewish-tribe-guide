@@ -34,8 +34,6 @@ vi.mock('./GenericListingCard', () => ({
   // the real GenericListingCardHandle — needed so the reopenItemId→open()
   // wiring (GenericDirectory's own cardRefs.current.get(id)?.open()) is
   // actually exercisable here, not silently swallowed by a ref-less mock.
-  // measure*/setSpacer* are no-ops: this suite doesn't cover the alignment
-  // logic that calls them.
   GenericListingCard: forwardRef(function GenericListingCard(
     {
       item,
@@ -44,7 +42,7 @@ vi.mock('./GenericListingCard', () => ({
       onTagClick,
       onFilterBool,
       onNavigate,
-      showDistanceSlot,
+      nextMinyan,
       onExpandedChange,
       found,
     }: {
@@ -54,17 +52,13 @@ vi.mock('./GenericListingCard', () => ({
       onTagClick: (t: string) => void
       onFilterBool: (key: string) => void
       onNavigate?: (direction: 1 | -1) => void
-      showDistanceSlot?: boolean
+      nextMinyan?: string | null
       onExpandedChange?: (expanded: boolean) => void
       found?: { items: { tag: string }[]; fields: { label: string }[] } | null
     },
     ref: Ref<{
       open: () => void
       close: () => void
-      measureUpvoteRowOffset: () => number | null
-      measureBadgeGap: () => number | null
-      setUpvoteSpacerHeight: (px: number) => void
-      setBadgeSpacerHeight: (px: number) => void
     }>,
   ) {
     const [expanded, setExpanded] = useState(!!defaultExpanded)
@@ -77,15 +71,12 @@ vi.mock('./GenericListingCard', () => ({
         setExpanded(false)
         onExpandedChange?.(false)
       },
-      measureUpvoteRowOffset: () => null,
-      measureBadgeGap: () => null,
-      setUpvoteSpacerHeight: () => {},
-      setBadgeSpacerHeight: () => {},
     }))
     return (
       <div>
         <span>{item.name}</span>
-        {showDistanceSlot && <span>distance-slot {item.name}</span>}
+        {nextMinyan && <span>next minyan at {item.name}: {nextMinyan}</span>}
+        {item.milesFromAddress != null && <span>{item.name} is {item.milesFromAddress} mi</span>}
         {expanded && <span>Expanded {item.name}</span>}
         {found && <span>found on {item.name}: {[...found.items.map((m) => m.tag), ...found.fields.map((f) => f.label)].join(', ')}</span>}
         <button onClick={onEdit}>Edit {item.name}</button>
@@ -1018,32 +1009,6 @@ describe('GenericDirectory — filter row scroll thumb', () => {
 // should. Those are two separate failures — the card supporting it and nobody
 // passing the prop looks exactly like the bug it was built to fix, and the
 // card's own test cannot see that.
-describe('GenericDirectory — distance slot wiring', () => {
-  it('asks every card for the slot when no location is set', () => {
-    const category = makeCategory()
-    const items = [makeListing({ id: 'a', name: 'Alpha' }), makeListing({ id: 'b', name: 'Beta' })]
-    renderWithProviders(
-      <GenericDirectory category={category} items={items} addressPrompt {...handlers} />,
-    )
-    expect(screen.getByText('distance-slot Alpha')).toBeInTheDocument()
-    expect(screen.getByText('distance-slot Beta')).toBeInTheDocument()
-  })
-
-  it('does not once a location is set', () => {
-    const category = makeCategory()
-    renderWithProviders(
-      <GenericDirectory
-        category={category}
-        items={[makeListing({ name: 'Alpha' })]}
-        anchorLabel="19103"
-        addressPrompt={false}
-        {...handlers}
-      />,
-    )
-    expect(screen.queryByText('distance-slot Alpha')).not.toBeInTheDocument()
-  })
-})
-
 // Mobile's own copy of the "Set location" prompt used to live inside
 // DirectoryHeader, right above the search bar — moved to the very top of
 // the page (above the category band/title entirely) at the user's request,

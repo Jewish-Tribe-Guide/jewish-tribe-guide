@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useLayoutEffect, useRef, useState, type ComponentProps } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type ComponentProps, type ReactNode } from 'react'
 import Link from 'next/link'
 import type { DirectoryResource } from '@/types'
 import { PHOTO_FIELD_KEY, resolveCapabilities, type CategoryConfig } from '@/lib/categories'
@@ -32,6 +32,10 @@ type Props = {
   filters?: Pick<ComponentProps<typeof PlaceDetailBody>, 'onTagClick' | 'onFilterOpen' | 'onFilterBool' | 'onFilterSelect'>
   /** What the search that opened it matched — see PlaceDetailBody's `found`. */
   found?: ComponentProps<typeof PlaceDetailBody>['found']
+  /** The directory's upvote control, under the name. Upvotes rank a
+   *  category's list, so only the directory's sheet passes one; the map
+   *  has no list order for it to change. */
+  upvote?: ReactNode
 }
 
 /** The nearest ancestor that scrolls, i.e. the parent's scroll region. */
@@ -55,11 +59,10 @@ function scrollingAncestor(el: HTMLElement | null): HTMLElement | null {
  * FreshnessFooter line, and the same "Suggest an edit" bar and overflow the
  * directory shows, as the last thing in the content. So a place reads, and
  * can be corrected, the same whether you found it here or in the category
- * directory. Still doesn't show upvote inline: that's a directory-list affordance (ranking search
- * results against each other), which doesn't mean anything for a single
- * place already selected on the map.
+ * directory. The upvote shows only when the directory's sheet passes one
+ * (`upvote`): upvotes rank a category's list, which the map doesn't have.
  */
-export default function MapPlaceDetail({ item, category, color, onBack, filters, found }: Props) {
+export default function MapPlaceDetail({ item, category, color, onBack, filters, found, upvote }: Props) {
   const community = useCommunitySlug()
   const listingPath = routes.listing(community, category.id, listingSlug(item))
   const { isPinned } = usePinned()
@@ -190,6 +193,7 @@ export default function MapPlaceDetail({ item, category, color, onBack, filters,
             </Link>
           </h2>
           <p className="text-sm text-muted">{category.label}</p>
+          {upvote && <div className="mt-2">{upvote}</div>}
         </div>
       </div>
 

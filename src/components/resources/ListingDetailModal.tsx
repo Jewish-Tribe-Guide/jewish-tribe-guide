@@ -60,6 +60,9 @@ type Props = {
   hasNext?: boolean
   /** What the search that opened it matched — see PlaceDetailBody's `found`. */
   found?: SearchFound | null
+  /** The directory's upvote control, under the name — see
+   *  GenericListingCard's `upvote` for why it moved here off the row. */
+  upvote?: ReactNode
 }
 
 /** Desktop's counterpart to the card's inline expand. A multi-column grid has
@@ -103,6 +106,7 @@ export default function ListingDetailModal({
   hasPrev,
   hasNext,
   found,
+  upvote,
 }: Props) {
   const community = useCommunitySlug()
   // The listing's own URL, for the edit bar's overflow Share.
@@ -376,6 +380,7 @@ export default function ListingDetailModal({
                     {badgeRow}
                   </div>
                 )}
+                {upvote && <div className="mt-2">{upvote}</div>}
               </div>
             </div>
           )}

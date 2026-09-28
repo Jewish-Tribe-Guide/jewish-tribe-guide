@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, ViewTransition } from 'react'
+import { useEffect, useMemo, useRef, useState, ViewTransition } from 'react'
 import type { DirectoryResource } from '@/types'
 import { resolveCapabilities, selectValues, bandImageFor, type CategoryConfig } from '@/lib/categories'
 import { hoursOpenNow, businessClosure } from '@/lib/hours'
@@ -574,8 +574,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
     // resizing a browser window, reshuffles the whole page above the
     // sentinel — the mobile address banner disappears, the desktop hero/
     // badge appear. Debounced to the quiet period after the last event in a
-    // resize burst (same shape as this file's other resize listener, see
-    // alignRows above) so it resyncs against the settled size once, not a
+    // resize burst so it resyncs against the settled size once, not a
     // different mid-transition layout on every intermediate event.
     if (document.readyState === 'complete') {
       requestAnimationFrame(() => requestAnimationFrame(resync))
@@ -816,105 +815,6 @@ export default function GenericDirectory({ category, items, anchorLabel, address
         ? liveCount(b) - liveCount(a) || travelCompare(a, b)
         : travelCompare(a, b)
     })
-
-  // Aligns each visual row's content to the same height — real per-card
-  // measurement (see GenericListingCardHandle's own doc), not a guess based
-  // on name length or anything else static. An earlier version reserved a
-  // fixed 2-line name height across an entire CATEGORY the moment any one
-  // listing's name was long enough to wrap — which put a blank gap between
-  // the name and address on every OTHER card in that category too, most of
-  // which were nowhere near the actual long-named listing and never needed
-  // it. This only ever adjusts a card that's actually sharing a row with a
-  // taller one, and never touches the name/address gap at all.
-  //
-  // Two independent spacer segments, not one — the popularity/distance LINE
-  // itself needs to land at the same height across a row (not just the
-  // badges further down it), so the single old spacer (address/header-text
-  // block → badge row) is split into segment 1 (→ upvote/distance row) and
-  // segment 2 (upvote/distance row → badge row). Segment 2 is measured and
-  // applied AFTER segment 1 is applied, not in the same pass — its "from"
-  // point is the upvote row's own rendered bottom edge, which shifts once
-  // segment 1's spacer above it changes height.
-  //
-  // Row membership is read from the DOM (itemRowRefs' own getBoundingClientRect
-  // top, rounded, grouped) rather than computed from column count — this
-  // grid's auto-fill column count depends on the container's actual pixel
-  // width, which isn't something to re-derive here when the browser has
-  // already laid it out.
-  const filteredIds = filtered.map((item) => item.id).join(',')
-  useLayoutEffect(() => {
-    function groupRows() {
-      const rows = new Map<number, string[]>()
-      for (const item of filtered) {
-        const rowEl = itemRowRefs.current.get(item.id)
-        if (!rowEl) continue
-        const top = Math.round(rowEl.getBoundingClientRect().top)
-        const existing = rows.get(top)
-        if (existing) existing.push(item.id)
-        else rows.set(top, [item.id])
-      }
-      return [...rows.values()]
-    }
-
-    function alignRows() {
-      // Reset every spacer first — a stale spacer from a previous pass
-      // (or a previous, wider layout) would otherwise inflate this pass's
-      // own reading of "natural" content height.
-      for (const item of filtered) {
-        cardRefs.current.get(item.id)?.setUpvoteSpacerHeight(0)
-        cardRefs.current.get(item.id)?.setBadgeSpacerHeight(0)
-      }
-
-      const rows = groupRows()
-
-      // Segment 1: card root → upvote/distance row. Only among cards that
-      // actually have one — a card with no upvote row has nothing to align
-      // at this segment, and gets its total height caught up entirely by
-      // segment 2 instead (measureBadgeGap falls back to the card root when
-      // there's no upvote row).
-      for (const ids of rows) {
-        if (ids.length < 2) continue
-        const heights = ids
-          .map((id) => [id, cardRefs.current.get(id)?.measureUpvoteRowOffset()] as const)
-          .filter((pair): pair is [string, number] => pair[1] !== null && pair[1] !== undefined)
-        if (heights.length < 2) continue
-        const max = Math.max(...heights.map(([, h]) => h))
-        for (const [id, h] of heights) {
-          if (max - h > 0) cardRefs.current.get(id)?.setUpvoteSpacerHeight(max - h)
-        }
-      }
-
-      // Segment 2: upvote/distance row's own bottom (or the card root, for
-      // a card with no upvote row) → badge row. Measured after segment 1 is
-      // applied, since it reads the upvote row's real rendered position.
-      for (const ids of rows) {
-        if (ids.length < 2) continue
-        const heights = ids
-          .map((id) => [id, cardRefs.current.get(id)?.measureBadgeGap()] as const)
-          .filter((pair): pair is [string, number] => pair[1] !== null && pair[1] !== undefined)
-        if (heights.length < 2) continue
-        const max = Math.max(...heights.map(([, h]) => h))
-        for (const [id, h] of heights) {
-          if (max - h > 0) cardRefs.current.get(id)?.setBadgeSpacerHeight(max - h)
-        }
-      }
-    }
-
-    alignRows()
-
-    // Column count (and therefore row membership) depends on the grid's
-    // actual pixel width, which only a real resize can change — window
-    // resize, not a ResizeObserver on any one card, is what should trigger
-    // a re-pass here.
-    window.addEventListener('resize', alignRows)
-    return () => window.removeEventListener('resize', alignRows)
-    // Re-aligns when the actual rendered SET of listings changes
-    // (filter/search/sort narrows or reorders it) — filteredIds, not
-    // filtered itself: a vote-count-only re-render produces a new array
-    // reference with the same ids in the same order, which shouldn't
-    // trigger a re-pass.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filteredIds])
 
   // fromId is the card issuing the request (arrow key pressed while ITS
   // dialog is open) — direction moves through `filtered`, the same order
@@ -1496,79 +1396,23 @@ export default function GenericDirectory({ category, items, anchorLabel, address
           </div>
         </div>
       ) : (
-        // sm+ (640px — matches useIsMobile's own cutover, not an arbitrary
-        // choice), not lg+: a grid instead of a single column — see
-        // GenericListingCard's isMobile split, which is what makes this
-        // safe: desktop cards open their detail in a dialog rather than
-        // expanding in place, so a card growing taller never has to fight
-        // its grid neighbors for space. Anchoring the breakpoint to `lg`
-        // (1024px) instead of this made the grid jump straight from 3
-        // columns to 1 the moment the window narrowed past 1024 — nothing
-        // in between ever got a chance to be 2, since 1024px of content
-        // width is already comfortably enough for auto-fill to reserve all
-        // 3 of its 280px tracks. Starting the grid at `sm` instead means
-        // auto-fill (see its own doc below) does the same job it already
-        // does at 3 columns, just also at the narrower widths where only 2
-        // of those tracks actually fit — a real 3 → 2 → 1 progression
-        // driven by the same mechanism, not a second one bolted on.
+        // One column on a phone. From sm up, a grid of 420px-minimum
+        // columns: one on a narrow window, two on a laptop, never three.
+        // Rows are two lines now (see listingRow.ts) and read best wide;
+        // three 280px columns squeezed a name and its facts line into a
+        // third of the page each.
         //
-        // auto-fill, not auto-fit and not a fixed grid-cols-2/xl:grid-cols-3.
+        // auto-fill, not auto-fit: auto-fit collapses empty tracks and hands
+        // their width to the cards that exist, so a category of two listings
+        // got two page-wide cards. auto-fill keeps the empty track as space
+        // at the end of the row.
         //
-        // Not fixed columns: a sparse category (Networking's 7 plain
-        // name+link cards, WhatsApp Groups' 2) doesn't know how many items
-        // it has ahead of time, and a fixed column count left short
-        // categories with cards pinned to the top-left of a max-w-6xl row.
-        //
-        // Not a definite max like 448px in place of 1fr (tried and reverted
-        // — see git history if this comes up again): how many tracks
-        // auto-fill/auto-fit even creates is computed from a track's MAX
-        // sizing function when it's definite — swap in a definite max and
-        // the browser counts columns using THAT instead of the 280px
-        // minimum, so a full 72-listing category collapsed from its normal
-        // 3-up layout down to 2 much-wider columns with dead space reserved
-        // on the right (`getComputedStyle` showed `448px 448px`, not three
-        // tracks). `1fr` is a flex value, not definite, so the count falls
-        // back to the 280px minimum, same as before any of this.
-        //
-        // Not auto-fit: auto-fit COLLAPSES a track with nothing placed in
-        // it, and a collapsed track's `1fr` share gets redistributed to
-        // whatever tracks remain — so with only 1-2 real listings, the
-        // handful of tracks that DO exist grow to split the ENTIRE row
-        // between just them, each item then sitting left-aligned in an
-        // oversized track (confirmed live: a 2-item row left a 118px gap
-        // between the cards, not the normal 12px). auto-fill reserves the
-        // SAME number of tracks a full row would (still computed from the
-        // 280px minimum) whether or not there's a card to put in each one —
-        // an unfilled trailing track keeps its normal 1fr share as empty
-        // space at the END of the row, not redistributed into the cards
-        // that do exist, so 1-2 real listings render at the exact same
-        // width and gap a full row's cards would, just followed by blank
-        // space instead of more cards. Verified live: 3 tracks reserved,
-        // each ~365px (the same width as the full 72-listing case), cards
-        // packed with the normal 12px gap between them.
-        //
-        // lg:max-w-md on each item below is a safety cap, not the mechanism
-        // doing the work here — it only matters on a viewport wide enough
-        // that even a properly-counted track's 1fr share would exceed a
-        // normal card's width.
         // SwipeRowGroup: only one card's swipe actions stay revealed at a
         // time, the same rule the map's nearby list follows.
         <SwipeRowGroup>
-        <div className="space-y-2 sm:space-y-0 sm:grid sm:gap-3 sm:grid-cols-[repeat(auto-fill,minmax(280px,1fr))]">
+        <div className="space-y-2 sm:space-y-0 sm:grid sm:gap-3 sm:grid-cols-[repeat(auto-fill,minmax(420px,1fr))]">
           {filtered.map((item, index) => (
-            // sm:max-w-md (matches the grid's own breakpoint above), no
-            // auto-margin: a 1fr track stretches to the
-            // grid's normal per-column share, which is fine once there are
-            // enough cards to fill it (the typical case) — capped here only
-            // matters when a sparse row hands one card way more than a
-            // normal card's worth of width. CSS Grid's default item
-            // alignment (justify-self: stretch) falls back to sitting at the
-            // START of an over-wide track once max-width stops it from
-            // actually filling that track — this needs nothing explicit to
-            // left-align, and previous attempts that added `mx-auto` here
-            // were undoing that default to center it instead, which is the
-            // opposite of what a normal packed-left layout looks like.
-            <div key={item.id} ref={setItemRowRef(item.id)} className="sm:max-w-md">
+            <div key={item.id} ref={setItemRowRef(item.id)}>
             <GenericListingCard
               ref={setCardRef(item.id)}
               onNavigate={(direction) => navigateFromCard(item.id, direction)}
@@ -1577,10 +1421,6 @@ export default function GenericDirectory({ category, items, anchorLabel, address
               item={item}
               category={category}
               showCategoryLabel={false}
-              // Same signal the header's prompt already uses: no location set,
-              // and this category is distance-based. In the row it is the one
-              // that gets seen — the header's pill sits above the fold once.
-              showDistanceSlot={addressPrompt}
               upvotes={upvotes}
               count={liveCount(item)}
               defaultExpanded={item.id === reopenItemId}

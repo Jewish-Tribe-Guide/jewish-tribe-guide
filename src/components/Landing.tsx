@@ -357,7 +357,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
   // uses to hold each distance-based card's distance column open with a
   // placeholder instead of omitting it outright (see PlacesResults' own doc).
   const placesNode = placeHits.length > 0 && (
-    <PlacesResults hits={placeHits} onOpen={openPlace} showDistanceSlot={!anchor.label} closest={!!miss} />
+    <PlacesResults hits={placeHits} onOpen={openPlace} closest={!!miss} />
   )
 
   // Mobile's own permanent grid — this doubles as its whole "browse

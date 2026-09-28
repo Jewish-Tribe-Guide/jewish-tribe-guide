@@ -667,7 +667,6 @@ export function listingHitsFrom(
 export function PlacesResults({
   hits,
   onOpen,
-  showDistanceSlot,
   closest = false,
 }: {
   hits: ListingHit[]
@@ -675,14 +674,6 @@ export function PlacesResults({
    *  asked (see nearMiss): headed as such, so they aren't read as results. */
   closest?: boolean
   onOpen: (hit: ListingHit, action?: 'edit') => void
-  /** No location set yet — hold each distance-based hit's distance column
-   *  open with a tappable placeholder instead of omitting it, same as
-   *  GenericDirectory's own `addressPrompt` (see GenericListingCard's
-   *  `showDistanceSlot` doc). A mixed-category list can mix distance-based
-   *  hits with ones that have no address at all (e.g. WhatsApp groups), so
-   *  this is combined per-hit with that hit's own `category.hasAddress`
-   *  rather than applied blindly to every card. */
-  showDistanceSlot?: boolean
 }) {
   const [voteCounts, setVoteCounts] = useState<Record<string, number>>({})
 
@@ -692,19 +683,16 @@ export function PlacesResults({
         {closest ? 'Closest matches' : 'Places'}
       </h2>
       {closest && <p className="mb-3 text-sm text-slate-500">Not exactly what you searched for.</p>}
-      {/* desktop: a grid instead of a single column, same reasoning (and same
-          track-sizing pitfalls, already solved once) as GenericDirectory's
-          own listing grid — see that component's own doc for why
-          auto-fill/minmax/1fr, not a fixed column count or auto-fit. */}
+      {/* desktop: the same grid as a category page's listings — see
+          GenericDirectory's own note on the 420px columns. */}
       {/* One card's swipe actions revealed at a time — see SwipeRowGroup. */}
       <SwipeRowGroup>
-      <div className="space-y-2 desktop:space-y-0 desktop:grid desktop:gap-3 desktop:grid-cols-[repeat(auto-fill,minmax(280px,1fr))]">
+      <div className="space-y-2 desktop:space-y-0 desktop:grid desktop:gap-3 desktop:grid-cols-[repeat(auto-fill,minmax(420px,1fr))]">
         {hits.map((hit) => (
-          <div key={hit.item.id} className="desktop:max-w-md">
+          <div key={hit.item.id}>
             <GenericListingCard
               item={hit.item}
               category={hit.category}
-              showDistanceSlot={!!showDistanceSlot && hit.category.hasAddress !== false}
               upvotes={!!hit.category.upvotesEnabled}
               count={voteCounts[hit.item.id] ?? hit.item.upvotes ?? 0}
               onVote={(c) => setVoteCounts((prev) => ({ ...prev, [hit.item.id]: c }))}

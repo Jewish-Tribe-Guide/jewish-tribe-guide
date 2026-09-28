@@ -194,7 +194,7 @@ describe('GenericListingCard — collapsed', () => {
   // nothing in the app ticked, and nothing listened for the tab coming back.
   // A phone backgrounded in a hospital corridor at 4pm and looked at again at
   // 10pm still showed "Open" for a shop that had closed at 5.
-  it('drops the "Open" badge once the listing has closed, when the tab comes back', () => {
+  it('says "Closed now" instead of open once the listing has closed, when the tab comes back', () => {
     vi.useFakeTimers()
     try {
       // A Friday, mid-afternoon, for a place open 09:00–17:00 that day.
@@ -207,7 +207,7 @@ describe('GenericListingCard — collapsed', () => {
       renderWithProviders(
         <GenericListingCard item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />,
       )
-      expect(screen.getByText('Open')).toBeInTheDocument()
+      expect(screen.getByText('Open until 5 PM')).toBeInTheDocument()
 
       // Away past closing time. A hidden tab doesn't tick, so this has to be
       // the visibilitychange that corrects it, not an interval.
@@ -217,7 +217,8 @@ describe('GenericListingCard — collapsed', () => {
       Object.defineProperty(document, 'hidden', { value: false, configurable: true })
       act(() => document.dispatchEvent(new Event('visibilitychange')))
 
-      expect(screen.queryByText('Open')).not.toBeInTheDocument()
+      expect(screen.queryByText('Open until 5 PM')).not.toBeInTheDocument()
+      expect(screen.getByText('Closed now')).toBeInTheDocument()
     } finally {
       Object.defineProperty(document, 'hidden', { value: false, configurable: true })
       vi.useRealTimers()
@@ -245,7 +246,7 @@ describe('GenericListingCard — collapsed', () => {
       )
 
       expect(screen.getByText('Temporarily closed')).toBeInTheDocument()
-      expect(screen.queryByText('Open')).not.toBeInTheDocument()
+      expect(screen.queryByText(/^Open/)).not.toBeInTheDocument()
     } finally {
       vi.useRealTimers()
     }
@@ -253,7 +254,7 @@ describe('GenericListingCard — collapsed', () => {
 
   // Nothing is remembered between syncs — businessStatus is rewritten on every
   // run — so the badge has to disappear on its own the day Google reopens it.
-  it('goes back to a plain Open badge once the status is OPERATIONAL again', () => {
+  it('goes back to open once the status is OPERATIONAL again', () => {
     vi.useFakeTimers()
     try {
       vi.setSystemTime(new Date('2026-08-31T12:00:00'))
@@ -269,7 +270,7 @@ describe('GenericListingCard — collapsed', () => {
         <GenericListingCard item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />,
       )
 
-      expect(screen.getByText('Open')).toBeInTheDocument()
+      expect(screen.getByText('Open until 5 PM')).toBeInTheDocument()
       expect(screen.queryByText('Temporarily closed')).not.toBeInTheDocument()
     } finally {
       vi.useRealTimers()
@@ -337,9 +338,8 @@ describe('GenericListingCard — showInHeader text/textarea fields', () => {
       <GenericListingCard item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />,
     )
 
-    for (const note of screen.getAllByText('Sit-down glatt kosher steakhouse')) {
-      expect(note).toHaveClass('truncate')
-    }
+    // One copy, for both viewports, cut to one line.
+    expect(screen.getByText('Sit-down glatt kosher steakhouse')).toHaveStyle({ whiteSpace: 'nowrap', textOverflow: 'ellipsis' })
   })
 
   // `textarea` clamps to a few lines instead — a real free-form description
@@ -355,8 +355,6 @@ describe('GenericListingCard — showInHeader text/textarea fields', () => {
       <GenericListingCard item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />,
     )
 
-    // Rendered twice (a desktop version and a mobile twin — see
-    // GenericListingCard's own comment on why); both should carry the clamp.
     // Inline style, not a `line-clamp-3` className — see
     // headerTextClampStyle's own comment on why className-based line-clamp
     // silently did nothing here (a `desktop:block`/`desktop:hidden` display
@@ -368,15 +366,10 @@ describe('GenericListingCard — showInHeader text/textarea fields', () => {
     }
   })
 
-  // Regression: a no-address category (WhatsApp Groups, Networking) used to
-  // render this same mobile preview as every other category — but those
-  // listings are just a name plus a website, so the free-form description is
-  // usually the longest thing on the card, and on a single-column mobile
-  // list that meant one listing's card dwarfed its neighbors instead of
-  // letting a visitor scan names quickly. Desktop keeps it (a multi-column
-  // grid doesn't have that problem), so this only asserts mobile's copy is
-  // gone — not the desktop one.
-  it('does not render the mobile description preview for a category with no address', () => {
+  // A no-address category (WhatsApp Groups, Networking) is just a name plus
+  // a website, so on a phone the description would be the longest thing on
+  // the card and one listing would dwarf its neighbours. Desktop keeps it.
+  it('keeps the description off phones for a category with no address', () => {
     const category = makeCategory({
       hasAddress: false,
       detailFields: [{ key: 'd', label: 'Description', type: 'textarea', showInHeader: true }],
@@ -386,140 +379,16 @@ describe('GenericListingCard — showInHeader text/textarea fields', () => {
       <GenericListingCard item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />,
     )
 
-    // Exactly one copy now (desktop's), not the usual two.
-    expect(screen.getAllByText(/A network of young leaders/)).toHaveLength(1)
+    expect(screen.getByText(/A network of young leaders/).closest('p')).toHaveClass('hidden', 'desktop:block')
   })
 
-  // Regression: mobile used to render this description AFTER the upvote/
-  // distance row instead of before it, unlike desktop (whose own copy of
-  // this field sits inside the name column, ahead of that row entirely) —
-  // so mobile visitors saw popularity/distance outrank the description.
-  it('renders the mobile-only description before the upvote/distance row, matching desktop\'s own order', () => {
-    const category = makeCategory({
-      detailFields: [{ key: 'note', label: 'Note', type: 'text', showInHeader: true }],
-      upvotesEnabled: true,
-    })
-    const item = makeListing({ note: 'Sit-down glatt kosher steakhouse' })
+  it('shows it on every viewport for a category with addresses', () => {
+    const category = makeCategory({ detailFields: [{ key: 'note', label: 'Note', type: 'text', showInHeader: true }] })
     renderWithProviders(
-      <GenericListingCard item={item} category={category} upvotes count={0} {...requiredHandlers} />,
+      <GenericListingCard item={makeListing({ note: 'Sit-down glatt kosher steakhouse' })} category={category} upvotes={false} count={0} {...requiredHandlers} />,
     )
 
-    // Not `[class*="pl-[52px]"]` alone — the mobile description paragraph
-    // itself also carries that class (it's indented to match), so that
-    // selector matches it first regardless of order. mt-1.5 + justify-start
-    // together are unique to the upvote/distance row.
-    const mobileDescription = document.querySelector('p.desktop\\:hidden.truncate')!
-    const upvoteRow = document.querySelector('div[class*="mt-1.5"][class*="justify-start"]')!
-    expect(mobileDescription.compareDocumentPosition(upvoteRow) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-  })
-})
-
-// The row-alignment handle GenericDirectory uses to measure each card's
-// content height and set two independent invisible spacers — one above the
-// upvote/distance row, one above the badge row — see GenericListingCardHandle's
-// own doc for why this is two segments rather than one shared spacer: it's
-// what makes the popularity/distance LINE itself land at the same height
-// across a row of cards, not just the badges further down. An earlier
-// heuristic (reserving 2-line name height category-wide) reserved a visible
-// gap between the NAME and ADDRESS on every card in a category, not just the
-// row that actually needed it — that's gone.
-describe('GenericListingCard — row-alignment handle', () => {
-  it('measureUpvoteRowOffset reads the real gap between the card root and the upvote/distance row', () => {
-    const ref = createRef<GenericListingCardHandle>()
-    const category = makeCategory({ upvotesEnabled: true })
-    const item = makeListing({ name: 'Acme' })
-    renderWithProviders(
-      <GenericListingCard ref={ref} item={item} category={category} upvotes count={0} {...requiredHandlers} />,
-    )
-
-    // jsdom lays out everything at 0×0 (no real geometry engine), so the
-    // meaningful assertion here isn't a specific pixel value — it's that
-    // the handle actually returns a number instead of null, i.e. it found
-    // both the card root and a real upvote/distance row to measure between.
-    // A category with nothing there (see the next test) is what null is for.
-    expect(ref.current?.measureUpvoteRowOffset()).not.toBeNull()
-  })
-
-  it('measureUpvoteRowOffset is null when there is no upvote/distance row', () => {
-    const ref = createRef<GenericListingCardHandle>()
-    const category = makeCategory({ upvotesEnabled: false })
-    const item = makeListing({ name: 'Acme' })
-    renderWithProviders(
-      <GenericListingCard ref={ref} item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />,
-    )
-
-    expect(ref.current?.measureUpvoteRowOffset()).toBeNull()
-  })
-
-  it('measureBadgeGap reads the gap to the badge row, falling back to the card root when there is no upvote row', () => {
-    const ref = createRef<GenericListingCardHandle>()
-    const category = makeCategory({
-      detailFields: [{ key: 'isKosher', label: 'Kosher', type: 'boolean', filterable: true }],
-      upvotesEnabled: false,
-    })
-    const item = makeListing({ name: 'Acme', isKosher: true })
-    renderWithProviders(
-      <GenericListingCard ref={ref} item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />,
-    )
-
-    expect(ref.current?.measureBadgeGap()).not.toBeNull()
-  })
-
-  it('measureBadgeGap is null when there is no badge row to align', () => {
-    const ref = createRef<GenericListingCardHandle>()
-    // No hours/filterable fields and upvotes off — nothing to put in the
-    // badge row (see badgeRow's own gating further up this file).
-    const category = makeCategory({ detailFields: [], upvotesEnabled: false })
-    const item = makeListing({ name: 'Acme' })
-    renderWithProviders(
-      <GenericListingCard ref={ref} item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />,
-    )
-
-    expect(ref.current?.measureBadgeGap()).toBeNull()
-  })
-
-  it("setUpvoteSpacerHeight sets the spacer directly above the upvote/distance row, clamped at 0", () => {
-    const ref = createRef<GenericListingCardHandle>()
-    const category = makeCategory({ upvotesEnabled: true })
-    const item = makeListing({ name: 'Acme' })
-    renderWithProviders(
-      <GenericListingCard ref={ref} item={item} category={category} upvotes count={0} {...requiredHandlers} />,
-    )
-
-    // The spacer is the aria-hidden div immediately before the upvote row's
-    // own container — there's nothing else in the card carrying that exact
-    // pairing to identify it by.
-    const upvoteRow = document.querySelector('[class*="pl-[52px]"]')
-    const spacer = upvoteRow?.previousElementSibling
-
-    act(() => ref.current?.setUpvoteSpacerHeight(24))
-    expect(spacer).toHaveStyle({ height: '24px' })
-
-    act(() => ref.current?.setUpvoteSpacerHeight(-5))
-    expect(spacer).toHaveStyle({ height: '0px' })
-  })
-
-  it("setBadgeSpacerHeight sets the spacer directly above the badge row, clamped at 0", () => {
-    const ref = createRef<GenericListingCardHandle>()
-    const category = makeCategory({
-      detailFields: [{ key: 'isKosher', label: 'Kosher', type: 'boolean', filterable: true }],
-    })
-    const item = makeListing({ name: 'Acme', isKosher: true })
-    renderWithProviders(
-      <GenericListingCard ref={ref} item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />,
-    )
-
-    // The spacer is the aria-hidden div immediately before the badge row's
-    // own border-t container — there's nothing else in the card carrying
-    // that exact pairing to identify it by.
-    const badgeContainer = document.querySelector('.border-t.border-slate-100')
-    const spacer = badgeContainer?.previousElementSibling
-
-    act(() => ref.current?.setBadgeSpacerHeight(24))
-    expect(spacer).toHaveStyle({ height: '24px' })
-
-    act(() => ref.current?.setBadgeSpacerHeight(-5))
-    expect(spacer).toHaveStyle({ height: '0px' })
+    expect(screen.getByText('Sit-down glatt kosher steakhouse').closest('p')).not.toHaveClass('hidden')
   })
 })
 
@@ -591,20 +460,9 @@ describe('GenericListingCard — the field a search matched, when no item did', 
   })
 })
 
-describe('GenericListingCard — count badge', () => {
-  // The count itself is bold (see GenericListingCard's own comment on why —
-  // a slate chip is deliberately quiet, but the number needs to stand out as
-  // an invitation to expand, not just another static-fact badge), which
-  // splits the badge's text across more than one DOM text node. getByText's
-  // default exact-string match only ever matches a single node, so it can't
-  // find "3 kosher items" as such even though that's what the badge reads —
-  // a function matcher against the whole chip's textContent is what Testing
-  // Library itself recommends for exactly this "text split across markup"
-  // case, rather than reaching for a brittle partial/regex match instead.
-  function chipText(text: string) {
-    return (_: string, element: Element | null) => element?.tagName === 'SPAN' && element.textContent === text
-  }
-
+describe('GenericListingCard — item count', () => {
+  // The count is one of the row's facts (see lib/listingRow.ts): plain text
+  // on the second line, not a chip.
   it('shows "N {countLabel}s" on the collapsed card for a showCountInHeader tags field', () => {
     const category = makeCategory({
       detailFields: [
@@ -616,7 +474,7 @@ describe('GenericListingCard — count badge', () => {
       <GenericListingCard item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />,
     )
 
-    expect(screen.getByText(chipText('3 kosher items'))).toBeInTheDocument()
+    expect(screen.getByText('3 kosher items')).toBeInTheDocument()
   })
 
   it('uses the singular with exactly one item', () => {
@@ -630,8 +488,8 @@ describe('GenericListingCard — count badge', () => {
       <GenericListingCard item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />,
     )
 
-    expect(screen.getByText(chipText('1 kosher item'))).toBeInTheDocument()
-    expect(screen.queryByText(chipText('1 kosher items'))).not.toBeInTheDocument()
+    expect(screen.getByText('1 kosher item')).toBeInTheDocument()
+    expect(screen.queryByText('1 kosher items')).not.toBeInTheDocument()
   })
 
   // Tags fields store a second array alongside the plain key — the `_sometimes`
@@ -650,7 +508,7 @@ describe('GenericListingCard — count badge', () => {
       <GenericListingCard item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />,
     )
 
-    expect(screen.getByText(chipText('3 kosher items'))).toBeInTheDocument()
+    expect(screen.getByText('3 kosher items')).toBeInTheDocument()
   })
 
   it('falls back to the field\'s own label, lowercased, when countLabel is unset', () => {
@@ -662,7 +520,7 @@ describe('GenericListingCard — count badge', () => {
       <GenericListingCard item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />,
     )
 
-    expect(screen.getByText(chipText('2 kosher items'))).toBeInTheDocument()
+    expect(screen.getByText('2 kosher items')).toBeInTheDocument()
   })
 
   it('shows nothing extra when the tags field has no items, but keeps the replaced badge', () => {
@@ -710,7 +568,7 @@ describe('GenericListingCard — count badge', () => {
       <GenericListingCard item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />,
     )
 
-    expect(screen.getByText(chipText('2 kosher items'))).toBeInTheDocument()
+    expect(screen.getByText('2 kosher items')).toBeInTheDocument()
     expect(screen.queryByText('Kosher')).not.toBeInTheDocument()
   })
 
@@ -1156,109 +1014,67 @@ describe('GenericListingCard — expanded', () => {
 // Holding the slot open puts the hint in the row, where the eye already is,
 // repeated down the whole list — without interrupting anything.
 
-describe('GenericListingCard — distance slot', () => {
-  const slotLabel = /set your location to see distances/i
-
-  it('holds the slot open when there is no location set', () => {
+// ── The row: name, a facts line, where it is ─────────────────────────────
+// What goes on the facts line, and in what order, is lib/listingRow.ts's
+// (tested there). These check the row shows it: as text, not chips.
+describe('GenericListingCard — the row', () => {
+  it('puts the facts on one line under the name, as plain text', () => {
+    const category = makeCategory({
+      detailFields: [{ key: 'type', label: 'Type', type: 'select', renderAs: 'badge', filterable: true, options: [{ value: 'Parve', label: 'Parve' }] }],
+    })
     renderWithProviders(
-      <GenericListingCard
-        item={makeListing()}
-        category={makeCategory()}
-        upvotes={false}
-        count={0}
-        showDistanceSlot
-        {...requiredHandlers}
-      />,
+      <GenericListingCard item={makeListing({ milesFromAddress: 0.42, type: 'Parve' })} category={category} upvotes={false} count={0} {...requiredHandlers} />,
     )
-    // One copy — mobile and desktop now share the same row (see
-    // renderUpvoteDistanceContent's own doc on why the mobile-only stacked
-    // corner version was removed: it needed to make room for the kebab menu).
-    expect(screen.getByRole('button', { name: slotLabel })).toBeInTheDocument()
+
+    const line = screen.getByTestId('row-facts')
+    expect(line).toHaveTextContent('0.4 mi·Parve')
+    // Not a filter chip any more: the row itself is what you tap.
+    expect(within(line).queryByRole('button')).not.toBeInTheDocument()
   })
 
-  it('shows the real distance instead once there is one', () => {
+  it('marks a hechsher caveat in the caution colour, with its note on hover', () => {
+    const category = makeCategory({
+      detailFields: [
+        { key: 'cert', label: 'Hechsher', type: 'select', renderAs: 'badge', filterable: true, caveat: { flagField: 'partial', noteField: 'note' } },
+      ],
+    })
     renderWithProviders(
-      <GenericListingCard
-        item={makeListing({ milesFromAddress: 0.42 })}
-        category={makeCategory()}
-        upvotes={false}
-        count={0}
-        showDistanceSlot
-        {...requiredHandlers}
-      />,
+      <GenericListingCard item={makeListing({ cert: 'IKC', partial: true, note: 'Only the bakery case' })} category={category} upvotes={false} count={0} {...requiredHandlers} />,
     )
-    expect(screen.getByText(/0\.4 mi/)).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: slotLabel })).not.toBeInTheDocument()
+
+    const cert = within(screen.getByTestId('row-facts')).getByText('IKC')
+    expect(cert).toHaveClass('text-caution')
+    expect(cert).toHaveAttribute('title', 'Only the bakery case')
   })
 
-  // Search results and the home screen's cross-category lists render the same
-  // card without a directory around it, and have nowhere to send the tap.
-  it('stays out of the way when the caller does not ask for it', () => {
+  it('shows a shul’s next minyan when the directory gives one', () => {
     renderWithProviders(
-      <GenericListingCard
-        item={makeListing()}
-        category={makeCategory()}
-        upvotes={false}
-        count={0}
-        {...requiredHandlers}
-      />,
+      <GenericListingCard item={makeListing()} category={makeCategory()} upvotes={false} count={0} nextMinyan="Mincha 6:34 PM" {...requiredHandlers} />,
     )
-    expect(screen.queryByRole('button', { name: slotLabel })).not.toBeInTheDocument()
+
+    expect(within(screen.getByTestId('row-facts')).getByText('Mincha 6:34 PM')).toBeInTheDocument()
   })
 
-  it('opens the location picker without expanding the card', async () => {
+  it('shows initials for a place with no photo of its own, not the category’s icon', () => {
+    const category = makeCategory({ iconImageUrl: 'https://example.com/category.png' })
+    renderWithProviders(
+      <GenericListingCard item={makeListing({ name: "Shlomo's Fish Market" })} category={category} upvotes={false} count={0} {...requiredHandlers} />,
+    )
+
+    expect(screen.getByText('SF')).toBeInTheDocument()
+    // The category's own picture stays off the row (the dialog still has it).
+    expect(document.querySelector('img[src*="category.png"]')).toBeNull()
+  })
+
+  it('keeps upvotes off the row, and puts them in the opened listing', async () => {
     const user = userEvent.setup()
-    const opened = vi.fn()
-    document.addEventListener('jpc:open-location', opened)
-
     renderWithProviders(
-      <GenericListingCard
-        item={makeListing()}
-        category={makeCategory()}
-        upvotes={false}
-        count={0}
-        showDistanceSlot
-        {...requiredHandlers}
-      />,
+      <GenericListingCard item={makeListing({ name: 'Acme' })} category={makeCategory({ upvotesEnabled: true })} upvotes count={7} {...requiredHandlers} />,
     )
 
-    await user.click(screen.getByRole('button', { name: slotLabel }))
-
-    expect(opened).toHaveBeenCalledTimes(1)
-    // The row's own click handler expands the card. A tap meant for the slot
-    // must not also do that — the visitor asked for the location picker, not
-    // for this listing's details.
-    expect(screen.getByRole('button', { name: /show details for/i })).toBeInTheDocument()
-
-    document.removeEventListener('jpc:open-location', opened)
-  })
-
-  // The resolved distance is a chip too now, not plain text — see
-  // renderUpvoteDistanceContent's own comment on why: a row with one
-  // clickable pill next to one plain fact read as lopsided, and made the
-  // empty-state chip's own clickability less obvious by contrast.
-  it('also opens the location picker by tapping the resolved distance, once one is shown', async () => {
-    const user = userEvent.setup()
-    const opened = vi.fn()
-    document.addEventListener('jpc:open-location', opened)
-
-    renderWithProviders(
-      <GenericListingCard
-        item={makeListing({ milesFromAddress: 0.42 })}
-        category={makeCategory()}
-        upvotes={false}
-        count={0}
-        showDistanceSlot
-        {...requiredHandlers}
-      />,
-    )
-
-    await user.click(screen.getByRole('button', { name: /change your location/i }))
-
-    expect(opened).toHaveBeenCalledTimes(1)
-    expect(screen.getByRole('button', { name: /show details for/i })).toBeInTheDocument()
-
-    document.removeEventListener('jpc:open-location', opened)
+    expect(screen.queryByText('7')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /show details for acme/i }))
+    expect(within(screen.getByRole('dialog')).getByText('7')).toBeInTheDocument()
   })
 })
 
@@ -1521,6 +1337,15 @@ describe('GenericListingCard — mobile listing sheet', () => {
     expect(within(sheet).getByRole('button', { name: /^mark as current$/i })).toBeInTheDocument()
     expect(within(sheet).getByRole('button', { name: 'Suggest an edit' })).toBeInTheDocument()
     expect(onExpandedChange).toHaveBeenLastCalledWith(true)
+  })
+
+  it('has the upvote in the sheet, since the row no longer carries it', async () => {
+    const user = userEvent.setup()
+    renderMobile({ upvotes: true, count: 7, category: makeCategory({ upvotesEnabled: true }) })
+    expect(screen.queryByText('7')).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /show details for Goldi Market/i }))
+    expect(within(screen.getByRole('dialog', { name: 'Goldi Market' })).getByText('7')).toBeInTheDocument()
   })
 
   // No title row and no "Back to list": the name, at the top of the
