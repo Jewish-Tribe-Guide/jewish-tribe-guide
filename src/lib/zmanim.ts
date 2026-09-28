@@ -511,13 +511,36 @@ function hasEnded(ends: ZmanEntry | null | undefined, nowMs: number, graceMs = 0
  *  guards its far edge (`windowEnd`), not this one, and a query made from
  *  Saturday afternoon reaches forward far enough that a Yom Tov starting
  *  Sunday or Monday night already satisfies it — mid-Shabbos, before that
- *  week's own Havdalah. See `resolvePrimaryZmanimBlock`, which is the one
- *  place this actually gets consulted. */
+ *  week's own Havdalah. Consulted only through `holidayOverShabbos`, which
+ *  also lets a Yom Tov that has already begun win. */
 export function isShabbosCurrentlyInProgress(shabbos: ZmanimData['shabbos'], nowMs: number): boolean {
   const beginMs = entryMs(shabbos.candleLighting)
   const endMs = entryMs(shabbos.havdalah)
   if (beginMs === null || endMs === null) return false
   return beginMs <= nowMs && nowMs < endMs
+}
+
+/** Whether the Yom Tov block shows instead of the Shabbos one. It does,
+ *  except while a Shabbos is under way and the Yom Tov hasn't begun yet:
+ *  checked Saturday afternoon with Rosh Hashana starting Sunday night, the
+ *  page still says tonight's havdalah (isShabbosCurrentlyInProgress).
+ *
+ *  A Yom Tov that has begun always wins, including one that starts on or
+ *  runs through Shabbos. When Shabbos runs straight into Yom Tov, Hebcal
+ *  gives no havdalah on Saturday night (the next is the Yom Tov's own, at
+ *  its end), so "Shabbos in progress" lasts the whole Yom Tov. Without the
+ *  begun check, Shmini Atzeret on Shabbos (Oct 2, 2026) showed as plain
+ *  Shabbos from Friday's candles to Sunday night, hiding the Yom Tov's name
+ *  and Saturday night's candle lighting. */
+export function holidayOverShabbos(
+  shabbos: ZmanimData['shabbos'],
+  holidayPeriod: ZmanimData['holidayPeriod'],
+  nowMs: number,
+): boolean {
+  if (!holidayPeriod) return false
+  const beganMs = entryMs(holidayPeriod.begins)
+  if (beganMs !== null && beganMs <= nowMs) return true
+  return !isShabbosCurrentlyInProgress(shabbos, nowMs)
 }
 
 /** How long the fast block stays up after `fastPeriod.ends` before the card
@@ -542,9 +565,9 @@ const FAST_GRACE_PERIOD_MS = 90 * 60 * 1000
  *  isolation might not bother) rather than picking arbitrarily, since a
  *  same-day fast is virtually always the sooner of the two in practice. */
 export function resolvePrimaryZmanimBlock(data: ZmanimData, nowMs: number): 'fast' | 'holiday' | 'shabbos' {
-  // A holiday within the lookahead window never preempts a Shabbos that's
-  // still actually in progress — see isShabbosCurrentlyInProgress.
-  const primary = data.holidayPeriod && !isShabbosCurrentlyInProgress(data.shabbos, nowMs)
+  // An upcoming holiday never preempts a Shabbos that's still in progress;
+  // one that has begun always does — see holidayOverShabbos.
+  const primary = data.holidayPeriod && holidayOverShabbos(data.shabbos, data.holidayPeriod, nowMs)
     ? { kind: 'holiday' as const, begins: data.holidayPeriod.begins }
     : { kind: 'shabbos' as const, begins: data.shabbos.candleLighting }
 

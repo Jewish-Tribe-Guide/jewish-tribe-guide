@@ -187,6 +187,40 @@ describe('ZmanimBody — the "Prayer & Shabbat Times" page/strip content', () =>
       expect(screen.getByText('Rosh Hashana')).toBeInTheDocument()
       expect(screen.queryByText('Upcoming Shabbos')).not.toBeInTheDocument()
     })
+
+    // Shmini Atzeret on Shabbos, as Hebcal gives it (Oct 2-4 2026): the
+    // Shabbos's "havdalah" is Sunday night's, so Shabbos reads as in
+    // progress for the whole Yom Tov. The Yom Tov has begun, so it shows.
+    it('keeps showing a Yom Tov that has begun on Shabbos, not plain Shabbos', () => {
+      const at = (h: number) => new Date(NOW + h * HOUR_MS).toISOString()
+      render(
+        <ZmanimBody
+          data={{
+            ...readyData,
+            isShabbos: true,
+            shabbos: {
+              candleLighting: { label: 'Friday', time: '6:23 PM', iso: at(-18) },
+              havdalah: { label: 'Sunday', time: '7:18 PM', iso: at(31) },
+            },
+            holidayPeriod: {
+              name: 'Shmini Atzeret',
+              begins: { label: 'Fri, Oct 2', time: '6:23 PM', iso: at(-18) },
+              candleLightings: [
+                { label: 'Fri, Oct 2', time: '6:23 PM', iso: at(-18) },
+                { label: 'Sat, Oct 3', time: '7:20 PM', iso: at(7) },
+              ],
+              ends: { label: 'Sun, Oct 4', time: '7:18 PM', iso: at(31) },
+            },
+          }}
+          status="ready"
+          now={NOW}
+        />,
+      )
+
+      expect(screen.getByText('Shmini Atzeret')).toBeInTheDocument()
+      expect(screen.getByText('7:20 PM')).toBeInTheDocument()
+      expect(screen.queryByText('Upcoming Shabbos')).not.toBeInTheDocument()
+    })
   })
 
   // A fast is a separate section from the holiday block above, not a

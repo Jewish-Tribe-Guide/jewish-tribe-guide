@@ -2,7 +2,7 @@
 
 import type { ZmanimData, ZmanEntry } from '@/types'
 import type { ZmanimStatus } from '@/lib/useZmanim'
-import { isShabbosCurrentlyInProgress } from '@/lib/zmanim'
+import { holidayOverShabbos } from '@/lib/zmanim'
 
 // ── The zmanim content itself — Hebrew date, the daily zmanim grid, and
 // upcoming Shabbos — shared by the full Zmanim & Shabbos page (ZmanimCard)
@@ -56,12 +56,11 @@ function ErrorState() {
 function ReadyState({ data, now }: { data: ZmanimData; now: number }) {
   const { hebrewDate, dailyZmanim, shabbos, isFriday, isShabbos, holidays, holidayPeriod, fastPeriod } = data
 
-  // A holiday within the lookahead window never preempts a Shabbos that's
-  // still actually in progress — see isShabbosCurrentlyInProgress in
-  // lib/zmanim.ts for why this guard exists (candle lighting has fired but
-  // Havdalah hasn't, so this page keeps showing tonight's Havdalah instead
-  // of jumping ahead to the next holiday's own "Begins").
-  const showHolidayPeriod = holidayPeriod !== null && !isShabbosCurrentlyInProgress(shabbos, now)
+  // An upcoming holiday never preempts a Shabbos that's still in progress
+  // (this page keeps showing tonight's Havdalah instead of jumping ahead to
+  // the next holiday's "Begins"), but one that has begun always shows,
+  // including a Yom Tov on Shabbos — see holidayOverShabbos in lib/zmanim.ts.
+  const showHolidayPeriod = holidayOverShabbos(shabbos, holidayPeriod ?? null, now)
 
   // Today's own Jewish-calendar events (Rosh Chodesh, or a Yom Tov day
   // itself) — separate from `holidayPeriod` below, which is the NEXT

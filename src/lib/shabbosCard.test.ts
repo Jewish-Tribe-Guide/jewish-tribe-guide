@@ -74,6 +74,22 @@ describe('shabbosCardView — Yom Tov', () => {
     expect(view.next).toMatchObject({ label: 'Candles', when: 'Sat, Oct 3' })
   })
 
+  it('on Shabbos, with the Yom Tov begun: its name, and Saturday night’s candles', () => {
+    // As Hebcal gives Shmini Atzeret on Shabbos: this Shabbos's havdalah is
+    // the Yom Tov's own end, Sunday night.
+    const onShabbos: ZmanimData = {
+      ...yomTov,
+      isShabbos: true,
+      shabbos: {
+        candleLighting: { label: 'Friday', time: '6:23 PM', iso: iso(3.4) },
+        havdalah: { label: 'Sunday', time: '7:18 PM', iso: iso(52.3) },
+      },
+    }
+    const view = shabbosCardView(onShabbos, NOW + 20 * HOUR) // Saturday morning
+    expect(view).toMatchObject({ kind: 'holiday', name: 'Shmini Atzeret' })
+    expect(view.next).toMatchObject({ label: 'Candles', when: 'Sat, Oct 3', time: '7:21 PM' })
+  })
+
   it('leads with its end once every candle lighting has passed', () => {
     const view = shabbosCardView(yomTov, NOW + 30 * HOUR)
     expect(view.next).toMatchObject({ label: 'Ends', when: 'Sun, Oct 4', time: '7:18 PM' })

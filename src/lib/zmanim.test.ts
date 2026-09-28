@@ -797,6 +797,32 @@ describe('resolvePrimaryZmanimBlock', () => {
     }
     expect(resolvePrimaryZmanimBlock(data, NOW)).toBe('holiday')
   })
+
+  // Shmini Atzeret on Shabbos, Oct 2-4 2026, as Hebcal gives it: this
+  // Shabbos's "havdalah" is Sunday night's, the end of Simchat Torah, since
+  // Shabbos runs straight into Yom Tov. So Shabbos is "in progress" for the
+  // whole Yom Tov, and the in-progress guard alone showed plain Shabbos from
+  // Friday's candles to Sunday night.
+  it('picks a Yom Tov that has begun even while Shabbos is in progress (Yom Tov on Shabbos)', () => {
+    const data: ZmanimData = {
+      ...base,
+      isShabbos: true,
+      shabbos: {
+        candleLighting: { label: 'Friday', time: '6:23 PM', iso: iso(-18 * HOUR) },
+        havdalah: { label: 'Sunday', time: '7:18 PM', iso: iso(31 * HOUR) },
+      },
+      holidayPeriod: {
+        name: 'Shmini Atzeret',
+        begins: { label: 'Fri, Oct 2', time: '6:23 PM', iso: iso(-18 * HOUR) },
+        candleLightings: [
+          { label: 'Fri, Oct 2', time: '6:23 PM', iso: iso(-18 * HOUR) },
+          { label: 'Sat, Oct 3', time: '7:20 PM', iso: iso(7 * HOUR) },
+        ],
+        ends: { label: 'Sun, Oct 4', time: '7:18 PM', iso: iso(31 * HOUR) },
+      },
+    }
+    expect(resolvePrimaryZmanimBlock(data, NOW)).toBe('holiday')
+  })
 })
 
 describe('lookaheadDays', () => {
