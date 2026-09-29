@@ -17,6 +17,7 @@ import { groupListings, parseGroupBy, type ListGroup } from '@/lib/listGroups'
 import { candlesToday, isVouchedFor } from '@/lib/listingRow'
 import { useZmanim } from '@/lib/useZmanim'
 import { usePersistedState } from '@/lib/usePersistedState'
+import { useSharedPreference } from '@/lib/useSharedPreference'
 import { GenericListingCard, type GenericListingCardHandle } from './GenericListingCard'
 import DaveningTimesModal from '@/components/synagogues/DaveningTimesModal'
 import { PlusIcon } from '@/components/icons'
@@ -31,6 +32,7 @@ import CategoryAsk from './CategoryAsk'
 import NextMinyanCard from './NextMinyanCard'
 import CategoryMap, { createHighlight } from './CategoryMap'
 import RowLookSwitch, { useRowLook } from './RowLookSwitch'
+import { useListMapSplit } from './useListMapSplit'
 import { mapQueryString, routes } from '@/lib/routes'
 import QuestionCard from './QuestionCard'
 import { parseQuestionCard } from '@/lib/questionCards'
@@ -1064,25 +1066,12 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // lg it's simply not there; "Hide map" gives the list the whole width,
   // and this browser remembers it.
   const hasMapColumn = caps.map && category.hasAddress !== false
-  const [mapHidden, setMapHidden] = usePersistedState<boolean>(
-    false,
-    () => {
-      try {
-        return localStorage.getItem('jpc:map-hidden') === '1'
-      } catch {
-        return false
-      }
-    },
-    useCallback((hidden: boolean) => {
-      try {
-        if (hidden) localStorage.setItem('jpc:map-hidden', '1')
-        else localStorage.removeItem('jpc:map-hidden')
-      } catch {
-        // Blocked storage: the map just shows again next visit.
-      }
-    }, []),
-  )
+  // The same on every category page, including ones kept open for Back.
+  const [mapHidden, storeMapHidden] = useSharedPreference('jpc:map-hidden', (raw) => raw === '1')
+  const setMapHidden = (hidden: boolean) => storeMapHidden(hidden ? '1' : null)
   const mapBeside = hasMapColumn && !mapHidden
+  // How the width is shared between them: draggable (useListMapSplit).
+  const { gridRef: splitRef, gridStyle: splitStyle, handleProps: splitHandle } = useListMapSplit()
   // Cards or one flat list (RowLookSwitch): being tried on the preview.
   const [rowLook, setRowLook] = useRowLook()
   const flat = rowLook === 'list'
@@ -1283,7 +1272,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
         {!hasMapColumn && listHeading}
       </div>
 
-      <div className={mapBeside ? 'lg:grid lg:grid-cols-2 lg:items-start lg:gap-8' : undefined}>
+      <div ref={splitRef} className={mapBeside ? 'lg:grid lg:items-start' : undefined} style={mapBeside ? splitStyle : undefined}>
       <div className="min-w-0">
       {hasMapColumn && listHeading}
       {filtered.length === 0 ? (
@@ -1454,6 +1443,16 @@ export default function GenericDirectory({ category, items, anchorLabel, address
       {/* The map, beside the list from lg up and staying in view while the
           list scrolls. Not rendered at all below that (CategoryMap loads
           nothing until it's wide enough). */}
+      {/* The line between list and map: drag it to share the width
+          differently, double-click it for half and half. */}
+      {mapBeside && (
+        <div
+          {...splitHandle}
+          className="group hidden cursor-col-resize touch-none items-center justify-center outline-none lg:sticky lg:top-[4.5rem] lg:flex lg:h-[min(calc(100vh-6rem),720px)]"
+        >
+          <span className="h-12 w-1.5 rounded-full bg-slate-300 transition-colors group-hover:bg-slate-500 group-focus-visible:bg-primary group-focus-visible:ring-2 group-focus-visible:ring-primary/40" />
+        </div>
+      )}
       {mapBeside && (
         <div className="hidden lg:sticky lg:top-[4.5rem] lg:block lg:h-[min(calc(100vh-6rem),720px)]">
           <CategoryMap

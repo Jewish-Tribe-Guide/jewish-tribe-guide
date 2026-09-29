@@ -1,7 +1,6 @@
 'use client'
 
-import { useCallback } from 'react'
-import { usePersistedState } from '@/lib/usePersistedState'
+import { useSharedPreference } from '@/lib/useSharedPreference'
 import type { RowLook } from './GenericListingCard'
 
 // ── Cards or a flat list: trying both on the preview ────────────────────────
@@ -16,27 +15,13 @@ export const ROW_LOOK_SWITCH = process.env.NEXT_PUBLIC_VERCEL_ENV !== 'productio
 
 const KEY = 'jpc:row-look'
 
-/** The look chosen with the switch, remembered by this browser. */
+const parseLook = (raw: string | null): RowLook => (raw === 'list' ? 'list' : 'cards')
+
+/** The look chosen with the switch, remembered by this browser and the
+ *  same on every category page. */
 export function useRowLook(): [RowLook, (look: RowLook) => void] {
-  const [look, setLook] = usePersistedState<RowLook>(
-    'cards',
-    () => {
-      try {
-        return localStorage.getItem(KEY) === 'list' ? 'list' : 'cards'
-      } catch {
-        return 'cards'
-      }
-    },
-    useCallback((value: RowLook) => {
-      try {
-        if (value === 'list') localStorage.setItem(KEY, 'list')
-        else localStorage.removeItem(KEY)
-      } catch {
-        // Blocked storage: back to cards next visit.
-      }
-    }, []),
-  )
-  return [ROW_LOOK_SWITCH ? look : 'cards', setLook]
+  const [look, store] = useSharedPreference(KEY, parseLook)
+  return [ROW_LOOK_SWITCH ? look : 'cards', (value) => store(value === 'list' ? 'list' : null)]
 }
 
 export default function RowLookSwitch({ look, onChange }: { look: RowLook; onChange: (look: RowLook) => void }) {

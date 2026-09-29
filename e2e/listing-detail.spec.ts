@@ -218,13 +218,15 @@ test.describe('listing detail — desktop', () => {
     // The site header is ALSO `position: sticky` (see SiteHeader's own
     // className) — excluding it by tag name isolates GenericDirectory's
     // own controls bar, the second sticky element down. The map beside the
-    // list is sticky too, but beside the rows, not over them.
+    // list is sticky too, as is the line between them that resizes them,
+    // but both are beside the rows, not over them.
     const controlsBottom = await page.evaluate(() => {
       const stuck = [...document.querySelectorAll('*')].filter(
         (el) =>
           el.tagName !== 'HEADER' &&
           getComputedStyle(el).position === 'sticky' &&
-          !el.querySelector('[data-testid="category-map"]'),
+          !el.querySelector('[data-testid="category-map"]') &&
+          el.getAttribute('role') !== 'separator',
       )
       return stuck.length > 0 ? Math.max(...stuck.map((el) => el.getBoundingClientRect().bottom)) : 0
     })

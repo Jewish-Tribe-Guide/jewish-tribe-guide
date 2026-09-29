@@ -183,6 +183,9 @@ vi.mock('./CategoryMap', async () => {
 afterEach(() => {
   cleanup()
   resetMockIntersectionObserver()
+  // Hide map, the split and Cards/List are one browser-wide choice each
+  // (useSharedPreference): none carries into the next test.
+  localStorage.clear()
 })
 
 // Whether today is Yom Tov comes from the zmanim; nothing here needs it.
@@ -1703,7 +1706,34 @@ describe('GenericDirectory — the map beside the list', () => {
     const heading = screen.getByTestId('list-heading')
     expect(heading.compareDocumentPosition(screen.getByText('Alpha Grill')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(heading.closest('[class*="lg:sticky"]')).toBeNull()
-    expect(container.querySelector('[class*="lg:sticky"]')).toContainElement(screen.getByTestId('map-stand-in'))
+    expect(screen.getByTestId('map-stand-in').closest('[class*="lg:sticky"]')).not.toBeNull()
+    expect(container.querySelectorAll('[class*="lg:sticky"]')).toHaveLength(2) // the map, and the line beside it
+  })
+
+  it('has a line between list and map to resize them, only while the map is beside the list', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(<GenericDirectory category={food} items={rows} {...handlers} />)
+    const line = screen.getByRole('separator', { name: 'Resize the list and the map' })
+    expect(line.previousElementSibling).toContainElement(screen.getByText('Alpha Grill'))
+    expect(line.nextElementSibling).toContainElement(screen.getByTestId('map-stand-in'))
+    expect(line.parentElement!.style.gridTemplateColumns).toBe('minmax(420px, 0.5fr) 32px minmax(360px, 0.5fr)')
+    await user.click(screen.getByRole('button', { name: 'Hide map' }))
+    expect(screen.queryByRole('separator', { name: 'Resize the list and the map' })).not.toBeInTheDocument()
+  })
+
+  // Pages visited earlier stay alive for Back: one hidden on Food must be
+  // hidden on the Grocery page kept from before too.
+  it('hides the map on every category page at once, including ones kept for Back', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(
+      <>
+        <GenericDirectory category={food} items={rows} {...handlers} />
+        <GenericDirectory category={{ ...food, id: 'grocery' }} items={rows} {...handlers} />
+      </>,
+    )
+    expect(screen.getAllByTestId('map-stand-in')).toHaveLength(2)
+    await user.click(screen.getAllByRole('button', { name: 'Hide map' })[0])
+    expect(screen.queryByTestId('map-stand-in')).not.toBeInTheDocument()
   })
 
   it('isn’t there for a category without a map, which keeps its sticky bar', () => {
