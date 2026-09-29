@@ -3,6 +3,7 @@
 import type { ReactNode } from 'react'
 import { ClockIcon } from '@/components/icons'
 import { FilterChip } from './FiltersSheet'
+import SortMenu from './SortMenu'
 
 // ── The list's own heading: what it is, how many, and how it's arranged ─────
 // "57 listings   Filters  Sort Popularity ▾". Above the list is for asking
@@ -85,35 +86,7 @@ export default function ListHeading({ label, count, noun = !label, total, openNo
               </button>
             </TextAction>
           )}
-          {sort && (
-            <label className="flex shrink-0 items-center gap-1 text-[13.5px] text-slate-500">
-              Sort
-              {/* The choice is drawn as text the size of "Sort", with the real
-                  select laid over it invisibly. The select has to stay 16px on
-                  a phone (globals.css: iPhones zoom the page into any smaller
-                  field), and shown at 16px it stood out bigger than the word
-                  beside it. Invisible, it still gives the phone's own picker,
-                  and a keyboard that works without anything written for it.
-                  Choosing Distance with nowhere to measure from asks for a
-                  location instead (selectSort in GenericDirectory), and this
-                  stays on Popularity until one is set. */}
-              <span className="relative flex items-center gap-0.5 rounded py-1.5 font-bold text-primary has-[select:focus-visible]:ring-2 has-[select:focus-visible]:ring-primary/30">
-                <span aria-hidden="true" data-testid="sort-shown">{sort.byPopular ? 'Popularity' : 'Distance'}</span>
-                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" className="h-3.5 w-3.5">
-                  <path d="m6 9 6 6 6-6" />
-                </svg>
-                <select
-                  aria-label="Sort"
-                  value={sort.byPopular ? 'popular' : 'distance'}
-                  onChange={(e) => sort.onSelect(e.target.value === 'popular')}
-                  className="absolute inset-0 w-full cursor-pointer appearance-none opacity-0"
-                >
-                  <option value="popular">Popularity</option>
-                  <option value="distance">Distance</option>
-                </select>
-              </span>
-            </label>
-          )}
+          {sort && <SortMenu byPopular={sort.byPopular} onSelect={sort.onSelect} />}
           {onShowMap && (
             <span className="hidden lg:flex">
               <TextAction>

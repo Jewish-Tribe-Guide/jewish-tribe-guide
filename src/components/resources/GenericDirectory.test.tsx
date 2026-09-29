@@ -193,6 +193,12 @@ afterEach(() => {
 const zmanimMock = vi.hoisted(() => vi.fn<(coords?: unknown) => { data: null; status: 'loading' }>(() => ({ data: null, status: 'loading' })))
 vi.mock('@/lib/useZmanim', () => ({ useZmanim: zmanimMock }))
 
+/** Sort's menu: open it, pick a choice. */
+async function chooseSort(user: ReturnType<typeof userEvent.setup>, choice: 'Popularity' | 'Distance') {
+  await user.click(screen.getByRole('button', { name: /^Sort/ }))
+  await user.click(screen.getByRole('menuitemradio', { name: choice }))
+}
+
 const handlers = {
   onUp: vi.fn(),
   onAdd: vi.fn(),
@@ -614,6 +620,7 @@ describe('GenericDirectory', () => {
   })
 
   describe('Sort: Popularity or Distance', () => {
+    const sortShows = () => screen.getByTestId('sort-shown').textContent
     it('opens the location picker instead of switching to Distance when nothing is anchored yet', async () => {
       const user = userEvent.setup()
       const category = makeCategory({ upvotesEnabled: true })
@@ -621,10 +628,10 @@ describe('GenericDirectory', () => {
       document.addEventListener('jpc:open-location', openLocation)
       renderWithProviders(<GenericDirectory category={category} items={[makeListing()]} {...handlers} />)
 
-      await user.selectOptions(screen.getByRole('combobox', { name: 'Sort' }), 'Distance')
+      await chooseSort(user, 'Distance')
 
       expect(openLocation).toHaveBeenCalledTimes(1)
-      expect(screen.getByRole('combobox', { name: 'Sort' })).toHaveValue('popular')
+      expect(sortShows()).toBe('Popularity')
       document.removeEventListener('jpc:open-location', openLocation)
     })
 
@@ -635,17 +642,16 @@ describe('GenericDirectory', () => {
         <GenericDirectory category={category} items={[makeListing()]} anchorLabel="123 Main St" {...handlers} />,
       )
 
-      const sort = screen.getByRole('combobox', { name: 'Sort' })
-      expect(sort).toHaveValue('distance')
-      await user.selectOptions(sort, 'Popularity')
-      expect(sort).toHaveValue('popular')
-      await user.selectOptions(sort, 'Distance')
-      expect(sort).toHaveValue('distance')
+      expect(sortShows()).toBe('Distance')
+      await chooseSort(user, 'Popularity')
+      expect(sortShows()).toBe('Popularity')
+      await chooseSort(user, 'Distance')
+      expect(sortShows()).toBe('Distance')
     })
 
     it('has no Sort where there is only one way to sort (likes off)', () => {
       renderWithProviders(<GenericDirectory category={makeCategory()} items={[makeListing()]} {...handlers} />)
-      expect(screen.queryByRole('combobox', { name: 'Sort' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /^Sort/ })).not.toBeInTheDocument()
     })
   })
 
@@ -1108,20 +1114,7 @@ describe('GenericDirectory — the list heading', () => {
     const heading = within(screen.getByTestId('list-heading'))
     expect(heading.getByRole('heading', { name: '3 listings' })).toBeInTheDocument()
     expect(heading.getByRole('button', { name: /^Filters/ })).toBeInTheDocument()
-    expect(heading.getByRole('combobox', { name: 'Sort' })).toBeInTheDocument()
-  })
-
-  it('shows Sort’s choice as its own text, which follows the select, so the select itself can stay unseen', async () => {
-    // A phone draws every select at 16px (globals.css), bigger than the
-    // "Sort" beside it. The select is laid over the text invisibly; the
-    // text has to follow what it holds.
-    const user = userEvent.setup()
-    renderWithProviders(<GenericDirectory category={food} items={items} anchorLabel="123 Main St" {...handlers} />)
-    const sort = screen.getByRole('combobox', { name: 'Sort' })
-    expect(sort).toHaveClass('opacity-0')
-    expect(screen.getByTestId('sort-shown')).toHaveTextContent('Distance')
-    await user.selectOptions(sort, 'Popularity')
-    expect(screen.getByTestId('sort-shown')).toHaveTextContent('Popularity')
+    expect(heading.getByRole('button', { name: 'Sort Popularity' })).toBeInTheDocument()
   })
 
   it('puts the category’s own link (“Other Mikvahs”) after the last row, not in the heading', () => {
@@ -1387,7 +1380,7 @@ describe('GenericDirectory — what the rows are told', () => {
     )
     // With a location, the list starts sorted by distance.
     expect(screen.queryByText('Goldie shows 4 likes')).not.toBeInTheDocument()
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Sort' }), 'Popularity')
+    await chooseSort(user, 'Popularity')
     expect(screen.getByText('Goldie shows 4 likes')).toBeInTheDocument()
   })
 
