@@ -51,6 +51,7 @@ vi.mock('./GenericListingCard', async () => {
       omitKey,
       flagUnconfirmed,
       likes,
+      look,
     }: {
       item: DirectoryResource
       defaultExpanded?: boolean
@@ -64,6 +65,7 @@ vi.mock('./GenericListingCard', async () => {
       omitKey?: string | null
       flagUnconfirmed?: boolean
       likes?: number
+      look?: string
     },
     ref: Ref<{
       open: () => void
@@ -91,6 +93,7 @@ vi.mock('./GenericListingCard', async () => {
         {omitKey && <span>{item.name} leaves out {omitKey}</span>}
         {flagUnconfirmed && <span>{item.name} may say unconfirmed</span>}
         {likes !== undefined && <span>{item.name} shows {likes} likes</span>}
+        <span>{item.name} looks like {look}</span>
         {found && <span>found on {item.name}: {[...found.items.map((m) => m.tag), ...found.fields.map((f) => f.label)].join(', ')}</span>}
         <button onClick={onEdit}>Edit {item.name}</button>
         <button onClick={() => onTagClick('cheese')}>tag {item.name}</button>
@@ -1383,6 +1386,36 @@ describe('GenericDirectory — what the rows are told', () => {
     expect(screen.queryByText('Goldie shows 4 likes')).not.toBeInTheDocument()
     await user.selectOptions(screen.getByRole('combobox', { name: 'Sort' }), 'Popularity')
     expect(screen.getByText('Goldie shows 4 likes')).toBeInTheDocument()
+  })
+
+  // Cards or one flat list, tried on the preview (RowLookSwitch).
+  describe('the Cards / List switch', () => {
+    const items = [makeListing({ id: 'a', name: 'Goldie' }), makeListing({ id: 'b', name: 'Kosher Mart' })]
+    afterEach(() => localStorage.clear())
+
+    it('starts on cards, and List turns every row into one flat list, remembered', async () => {
+      const user = userEvent.setup()
+      renderWithProviders(<GenericDirectory category={makeCategory()} items={items} {...handlers} />)
+      const cards = screen.getByRole('button', { name: 'Cards' })
+      expect(cards).toHaveAttribute('aria-pressed', 'true')
+      expect(screen.getByText('Goldie looks like cards')).toBeInTheDocument()
+      expect(screen.queryByTestId('flat-list')).not.toBeInTheDocument()
+
+      await user.click(screen.getByRole('button', { name: 'List' }))
+      expect(screen.getByRole('button', { name: 'List' })).toHaveAttribute('aria-pressed', 'true')
+      expect(screen.getByText('Goldie looks like list')).toBeInTheDocument()
+      expect(screen.getByText('Kosher Mart looks like list')).toBeInTheDocument()
+      expect(within(screen.getByTestId('flat-list')).getByText('Goldie')).toBeInTheDocument()
+
+      cleanup()
+      renderWithProviders(<GenericDirectory category={makeCategory()} items={items} {...handlers} />)
+      expect(await screen.findByText('Goldie looks like list')).toBeInTheDocument()
+    })
+
+    it('isn’t there on an empty list', () => {
+      renderWithProviders(<GenericDirectory category={makeCategory()} items={[]} {...handlers} />)
+      expect(screen.queryByRole('group', { name: /Row look/ })).not.toBeInTheDocument()
+    })
   })
 
   // For "Until 4 PM, before candles" (see listingRowFacts): only where the

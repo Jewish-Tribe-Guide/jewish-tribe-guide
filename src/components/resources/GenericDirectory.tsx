@@ -30,6 +30,7 @@ import { useLogSearchMiss } from '@/lib/useLogSearchMiss'
 import CategoryAsk from './CategoryAsk'
 import NextMinyanCard from './NextMinyanCard'
 import CategoryMap, { createHighlight } from './CategoryMap'
+import RowLookSwitch, { useRowLook } from './RowLookSwitch'
 import { mapQueryString, routes } from '@/lib/routes'
 import QuestionCard from './QuestionCard'
 import { parseQuestionCard } from '@/lib/questionCards'
@@ -1082,6 +1083,9 @@ export default function GenericDirectory({ category, items, anchorLabel, address
     }, []),
   )
   const mapBeside = hasMapColumn && !mapHidden
+  // Cards or one flat list (RowLookSwitch): being tried on the preview.
+  const [rowLook, setRowLook] = useRowLook()
+  const flat = rowLook === 'list'
   const [highlight] = useState(createHighlight)
   // A pin's row, found: opened to (its group too), scrolled to, and
   // outlined for a moment so the eye lands on it.
@@ -1334,7 +1338,16 @@ export default function GenericDirectory({ category, items, anchorLabel, address
           <div key={section.key}>
           {section.above}
           <div id={section.rowsId} hidden={section.hidden} className={grouping?.closed ? 'pt-2 pb-2' : undefined}>
-        <div className="space-y-2 sm:space-y-0 sm:grid sm:gap-3 sm:grid-cols-[repeat(auto-fill,minmax(420px,1fr))]">
+        {/* The flat list is one white box with a line under each row; the
+            last row's line tucks under the box's own border (-mb-px). */}
+        <div className={flat ? 'overflow-hidden rounded-xl border border-slate-200 bg-white' : undefined} data-testid={flat ? 'flat-list' : undefined}>
+        <div
+          className={
+            flat
+              ? '-mb-px sm:grid sm:grid-cols-[repeat(auto-fill,minmax(420px,1fr))]'
+              : 'space-y-2 sm:space-y-0 sm:grid sm:gap-3 sm:grid-cols-[repeat(auto-fill,minmax(420px,1fr))]'
+          }
+        >
           {section.items.map((item) => (
             <Fragment key={item.id}>
             <div
@@ -1342,7 +1355,15 @@ export default function GenericDirectory({ category, items, anchorLabel, address
               // A row and its pin light up together (CategoryMap).
               onMouseEnter={mapBeside ? () => highlight.set(item.id) : undefined}
               onMouseLeave={mapBeside ? () => highlight.set(null) : undefined}
-              className={flashId === item.id ? 'rounded-xl ring-2 ring-primary/60 ring-offset-2 transition-shadow' : undefined}
+              className={
+                flat
+                  ? // An outline, drawn over the row: a ring outside it would
+                    // be cut off by the list's box.
+                    `border-b border-slate-100 ${flashId === item.id ? 'outline-2 -outline-offset-2 outline-primary/60' : ''}`
+                  : flashId === item.id
+                    ? 'rounded-xl ring-2 ring-primary/60 ring-offset-2 transition-shadow'
+                    : undefined
+              }
             >
             <GenericListingCard
               ref={setCardRef(item.id)}
@@ -1356,6 +1377,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
               omitKey={omitKey}
               flagUnconfirmed={flagUnconfirmed}
               likes={upvotes && sortByPopular ? liveCount(item) : undefined}
+              look={rowLook}
               candlesAt={candlesAt}
               upvotes={upvotes}
               count={liveCount(item)}
@@ -1401,10 +1423,11 @@ export default function GenericDirectory({ category, items, anchorLabel, address
             />
             </div>
             {questionSpot !== 'end' && questionSpot?.section === section.key && questionSpot.id === item.id && (
-              <div className="sm:col-span-full">{questionCard}</div>
+              <div className={flat ? 'border-b border-slate-100 p-3 sm:col-span-full' : 'sm:col-span-full'}>{questionCard}</div>
             )}
             </Fragment>
           ))}
+        </div>
         </div>
           </div>
           </div>
@@ -1475,6 +1498,8 @@ export default function GenericDirectory({ category, items, anchorLabel, address
           the label made visible instead, widening into a pill; mobile stays
           the plain circle, where the label would just be redundant with the
           reflex people already bring to the shape. */}
+      {filtered.length > 0 && !openDialogItemId && <RowLookSwitch look={rowLook} onChange={setRowLook} />}
+
       {canAdd && !openDialogItemId && (
         <button
           onClick={onAdd}

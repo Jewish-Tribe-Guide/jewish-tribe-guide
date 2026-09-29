@@ -1018,7 +1018,9 @@ describe('GenericListingCard — the row', () => {
       const { unmount } = renderWithProviders(
         <GenericListingCard item={item} category={category} upvotes count={3} {...requiredHandlers} place={null} likes={3} />,
       )
-      expect(screen.getByLabelText('3 likes')).toBeInTheDocument()
+      // The canvas's grey outline thumb, not the 👍 emoji.
+      expect(screen.getByLabelText('3 likes')).toContainElement(screen.getByTestId('row-likes-icon'))
+      expect(screen.getByLabelText('3 likes')).not.toHaveTextContent('👍')
       unmount()
       const { unmount: again } = renderWithProviders(
         <GenericListingCard item={item} category={category} upvotes count={0} {...requiredHandlers} place={null} likes={0} />,
@@ -1027,6 +1029,16 @@ describe('GenericListingCard — the row', () => {
       again()
       renderWithProviders(<GenericListingCard item={item} category={category} upvotes count={3} {...requiredHandlers} place={null} />)
       expect(screen.queryByLabelText('3 likes')).not.toBeInTheDocument()
+    })
+
+    it('is its own card, or a plain row of the page’s flat list', () => {
+      const { container, unmount } = renderWithProviders(<GenericListingCard item={item} category={category} upvotes={false} count={0} {...requiredHandlers} place={null} />)
+      expect(container.firstElementChild).toHaveClass('border', 'rounded-lg', 'shadow-sm')
+      unmount()
+      const flat = renderWithProviders(<GenericListingCard item={item} category={category} upvotes={false} count={0} {...requiredHandlers} place={null} look="list" />)
+      expect(flat.container.firstElementChild).not.toHaveClass('border')
+      expect(flat.container.firstElementChild).not.toHaveClass('shadow-sm')
+      expect(flat.container.querySelector('.rounded-lg')).toBeNull()
     })
 
     it('leaves out the field its group heading says', () => {

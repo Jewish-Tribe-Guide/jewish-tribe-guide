@@ -161,7 +161,13 @@ type Props = {
    *  order then needs its reason. Unset when sorted any other way, where a
    *  column of counts says nothing. */
   likes?: number
+  /** How the row is framed: its own card (today's), or a row of one flat
+   *  list, as the canvas draws it, where GenericDirectory draws the list's
+   *  box and the lines between rows. Being tried on the preview. */
+  look?: RowLook
 }
+
+export type RowLook = 'cards' | 'list'
 
 export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(function GenericListingCard({
   item,
@@ -187,6 +193,7 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
   flagUnconfirmed = false,
   likes,
   candlesAt = null,
+  look = 'cards',
 }, ref) {
   const [expanded, setExpanded] = useState(!!defaultExpanded)
   const cardRootRef = useRef<HTMLDivElement>(null)
@@ -504,7 +511,7 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
     // looking mismatched even though their invisible containers matched. A
     // no-op everywhere the card isn't a stretched grid item (mobile's single
     // column, the admin category preview).
-    <div className="h-full border border-slate-200 rounded-lg bg-white shadow-sm">
+    <div className={look === 'list' ? 'h-full bg-white' : 'h-full border border-slate-200 rounded-lg bg-white shadow-sm'}>
       {/* Not role="button"/tabIndex any more — the row also contains real
           interactive children (UpvoteButton, an external-link <a>, the
           Open/badge Chips), and an ARIA button role can't legally contain
@@ -522,7 +529,7 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
         // Mobile only: desktop reveals the same two actions by hovering the
         // row instead (see the hover-reveal in the corner below).
         enabled={isMobile}
-        className="rounded-lg"
+        className={look === 'list' ? undefined : 'rounded-lg'}
         contentRef={cardRootRef}
         // SwipeRow keeps this from firing for the click a swipe ends with,
         // and for a tap on a row whose actions are showing — that tap puts
@@ -563,7 +570,7 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
         // its own (group/tip on the cert badges).
         // relative + bg-white so this row paints OVER the swipe actions
         // behind it; without an opaque background they'd show through.
-        contentClassName="group/row relative h-full w-full rounded-lg bg-white px-4 py-3 hover:bg-slate-50 active:bg-slate-100 cursor-pointer transition-colors duration-200 ease-out"
+        contentClassName={`group/row relative h-full w-full ${look === 'list' ? '' : 'rounded-lg'} bg-white px-4 py-3 hover:bg-slate-50 active:bg-slate-100 cursor-pointer transition-colors duration-200 ease-out`}
       >
         {/* relative: the positioning context for the absolutely-placed
             toggle/hover-actions group below. */}
@@ -618,7 +625,12 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
                 Share buttons appear over this corner. */}
             {!!likes && likes > 0 && (
               <span className="flex shrink-0 items-center gap-1 text-[13px] font-semibold text-slate-500 transition-opacity desktop:group-hover/row:opacity-0" aria-label={`${likes} like${likes === 1 ? '' : 's'}`}>
-                <span aria-hidden="true">👍</span>
+                {/* The canvas's grey outline thumb, not the 👍 emoji: an
+                    emoji's own colours shouted over the row's facts. */}
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-[13px] w-[13px]" data-testid="row-likes-icon">
+                  <path d="M7 10v12" />
+                  <path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z" />
+                </svg>
                 <span aria-hidden="true">{likes}</span>
               </span>
             )}
