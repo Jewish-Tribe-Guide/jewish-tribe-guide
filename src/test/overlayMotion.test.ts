@@ -17,7 +17,7 @@ const OVERLAYS: Array<[string, string]> = [
   ['src/components/CommunitySwitcher.tsx', 'overlay-in'],
   ['src/components/home/LocationControl.tsx', 'menuIn'],
   ['src/components/CommunitySwitcher.tsx', 'menuIn'],
-  ['src/components/resources/GenericDirectory.tsx', 'backdropIn_150ms'],
+  ['src/components/resources/FiltersSheet.tsx', 'overlay-in'],
 ]
 
 describe('overlay enter motion', () => {

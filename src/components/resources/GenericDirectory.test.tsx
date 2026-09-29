@@ -373,7 +373,7 @@ describe('GenericDirectory', () => {
     expect(screen.getByRole('searchbox')).toHaveValue('cheese')
   })
 
-  it('a filterable boolean field narrows the list when its chip is toggled on', async () => {
+  it('a filterable boolean field narrows the list when switched on in the Filters sheet', async () => {
     const user = userEvent.setup()
     const category = makeCategory({
       detailFields: [{ key: 'isKosher', label: 'Kosher', type: 'boolean', filterable: true }],
@@ -384,7 +384,8 @@ describe('GenericDirectory', () => {
     ] as unknown as DirectoryResource[]
     renderWithProviders(<GenericDirectory category={category} items={items} {...handlers} />)
 
-    await user.click(screen.getByRole('button', { name: 'Kosher' }))
+    await user.click(screen.getByRole('button', { name: /^Filters/ }))
+    await user.click(screen.getByRole('switch', { name: 'Kosher' }))
 
     expect(screen.getByText('Kosher Mart')).toBeInTheDocument()
     expect(screen.queryByText('Regular Mart')).not.toBeInTheDocument()
@@ -412,8 +413,8 @@ describe('GenericDirectory', () => {
     ] as unknown as DirectoryResource[]
     renderWithProviders(<GenericDirectory category={category} items={items} {...handlers} />)
 
-    await user.click(screen.getByRole('button', { name: /All Cuisines/ }))
-    await user.click(screen.getByRole('checkbox', { name: 'italian' }))
+    await user.click(screen.getByRole('button', { name: /^Filters/ }))
+    await user.click(within(screen.getByRole('dialog', { name: 'Filters' })).getByRole('button', { name: 'italian' }))
 
     expect(screen.getByText('Italian Place')).toBeInTheDocument()
     expect(screen.queryByText('Deli Place')).not.toBeInTheDocument()
@@ -554,7 +555,7 @@ describe('GenericDirectory', () => {
     })
   })
 
-  describe('the Popularity/Distance sort toggle', () => {
+  describe('Sort: Popularity or Distance', () => {
     it('opens the location picker instead of switching to Distance when nothing is anchored yet', async () => {
       const user = userEvent.setup()
       const category = makeCategory({ upvotesEnabled: true })
@@ -562,9 +563,10 @@ describe('GenericDirectory', () => {
       document.addEventListener('jpc:open-location', openLocation)
       renderWithProviders(<GenericDirectory category={category} items={[makeListing()]} {...handlers} />)
 
-      await user.click(screen.getAllByRole('button', { name: 'Distance' })[0])
+      await user.selectOptions(screen.getByRole('combobox', { name: 'Sort' }), 'Distance')
 
       expect(openLocation).toHaveBeenCalledTimes(1)
+      expect(screen.getByRole('combobox', { name: 'Sort' })).toHaveValue('popular')
       document.removeEventListener('jpc:open-location', openLocation)
     })
 
@@ -575,10 +577,17 @@ describe('GenericDirectory', () => {
         <GenericDirectory category={category} items={[makeListing()]} anchorLabel="123 Main St" {...handlers} />,
       )
 
-      const distanceButtons = screen.getAllByRole('button', { name: 'Distance' })
-      await user.click(distanceButtons[0])
+      const sort = screen.getByRole('combobox', { name: 'Sort' })
+      expect(sort).toHaveValue('distance')
+      await user.selectOptions(sort, 'Popularity')
+      expect(sort).toHaveValue('popular')
+      await user.selectOptions(sort, 'Distance')
+      expect(sort).toHaveValue('distance')
+    })
 
-      expect(distanceButtons[0]).toHaveClass('bg-primary')
+    it('has no Sort where there is only one way to sort (likes off)', () => {
+      renderWithProviders(<GenericDirectory category={makeCategory()} items={[makeListing()]} {...handlers} />)
+      expect(screen.queryByRole('combobox', { name: 'Sort' })).not.toBeInTheDocument()
     })
   })
 
@@ -1004,51 +1013,133 @@ describe('GenericDirectory — scrolling filter controls into view after a card 
   })
 })
 
-// The filter chip row hides its native scrollbar for a cleaner look, which
-// also removed the only cue it scrolls at all. This flashes a thin custom
-// thumb — matching the fraction of the row actually visible — for a moment
-// whenever the row has overflow to show, then fades it out on its own,
-// borrowing the same "flash once, then get out of the way" behavior native
-// scroll views use.
-describe('GenericDirectory — filter row scroll thumb', () => {
-  // jsdom defines clientWidth/scrollWidth up on Element.prototype, not
-  // HTMLElement.prototype, so there's no own descriptor on HTMLElement to
-  // capture and restore — deleting the own property (added below) instead
-  // falls back to Element.prototype's real getter, same as never having
-  // mocked it.
-  function mockRowMetrics(clientWidth: number, scrollWidth: number) {
-    Object.defineProperty(HTMLElement.prototype, 'clientWidth', { configurable: true, value: clientWidth })
-    Object.defineProperty(HTMLElement.prototype, 'scrollWidth', { configurable: true, value: scrollWidth })
-  }
+// Above the list is for asking; the list's own heading is for arranging it:
+// how many, then Filters (one sheet holding every filter) and Sort, the same
+// place on every category page.
+describe('GenericDirectory — the list heading', () => {
+  const food = makeCategory({
+    upvotesEnabled: true,
+    detailFields: [
+      { key: 'hours', label: 'Hours', type: 'hours', filterable: true },
+      { key: 'shabbatFriendly', label: 'Shabbat friendly', type: 'boolean', filterable: true },
+      {
+        key: 't',
+        label: 'Food type',
+        type: 'select',
+        filterable: true,
+        options: [
+          { value: 'Meat', label: 'Meat' },
+          { value: 'Other', label: 'Other' },
+          { value: 'Dairy', label: 'Dairy' },
+        ],
+      },
+    ],
+  })
+  const items = [
+    { ...makeListing({ id: 'a', name: 'Grill' }), t: 'Meat', shabbatFriendly: true },
+    { ...makeListing({ id: 'b', name: 'Cafe' }), t: 'Dairy' },
+    { ...makeListing({ id: 'c', name: 'Truck' }), t: 'Other' },
+  ] as unknown as DirectoryResource[]
 
-  afterEach(() => {
-    delete (HTMLElement.prototype as { clientWidth?: number }).clientWidth
-    delete (HTMLElement.prototype as { scrollWidth?: number }).scrollWidth
-    vi.useRealTimers()
+  it('says how many, with Filters and Sort beside it', () => {
+    renderWithProviders(<GenericDirectory category={food} items={items} {...handlers} />)
+    const heading = within(screen.getByTestId('list-heading'))
+    expect(heading.getByRole('heading', { name: '3 listings' })).toBeInTheDocument()
+    expect(heading.getByRole('button', { name: /^Filters/ })).toBeInTheDocument()
+    expect(heading.getByRole('combobox', { name: 'Sort' })).toBeInTheDocument()
   })
 
-  it('shows a thumb sized to the visible fraction when the row overflows, then fades it out', () => {
-    vi.useFakeTimers()
-    mockRowMetrics(200, 400)
-    const category = makeCategory({ detailFields: [{ key: 'isKosher', label: 'Kosher', type: 'boolean', filterable: true }] })
-    renderWithProviders(<GenericDirectory category={category} items={[makeListing()]} {...handlers} />)
+  it('opens one sheet holding every filter: Open now, each yes/no, each pick-list', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(<GenericDirectory category={food} items={items} {...handlers} />)
+    await user.click(screen.getByRole('button', { name: /^Filters/ }))
 
-    const thumb = screen.getByTestId('filter-scroll-thumb')
-    expect(thumb.style.width).toBe('50%')
-    expect(thumb.className).toContain('opacity-100')
+    const sheet = within(screen.getByRole('dialog', { name: 'Filters' }))
+    expect(sheet.getByRole('switch', { name: 'Open now' })).toHaveAttribute('aria-checked', 'false')
+    expect(sheet.getByRole('switch', { name: 'Shabbat friendly' })).toBeInTheDocument()
+    // Alphabetical, "Other" last, whatever order the admin entered them in.
+    expect(within(sheet.getByRole('group', { name: 'Food type' })).getAllByRole('button').map((b) => b.textContent)).toEqual([
+      'Dairy',
+      'Meat',
+      'Other',
+    ])
 
-    act(() => {
-      vi.advanceTimersByTime(1300)
-    })
-    expect(screen.getByTestId('filter-scroll-thumb').className).toContain('opacity-0')
+    await user.click(sheet.getByRole('button', { name: 'Meat' }))
+    expect(sheet.getByRole('button', { name: 'Meat' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.queryByText('Cafe')).not.toBeInTheDocument()
+
+    await user.click(sheet.getByRole('button', { name: 'Show 1 listing' }))
+    expect(screen.queryByRole('dialog', { name: 'Filters' })).not.toBeInTheDocument()
   })
 
-  it('renders no thumb at all when the row does not overflow', () => {
-    mockRowMetrics(400, 400)
-    const category = makeCategory({ detailFields: [{ key: 'isKosher', label: 'Kosher', type: 'boolean', filterable: true }] })
-    renderWithProviders(<GenericDirectory category={category} items={[makeListing()]} {...handlers} />)
+  it('shows each filter that is on as a chip under the heading, and a tap switches it off', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(<GenericDirectory category={food} items={items} {...handlers} />)
+    await user.click(screen.getByRole('button', { name: /^Filters/ }))
+    await user.click(screen.getByRole('switch', { name: 'Shabbat friendly' }))
+    await user.click(screen.getByRole('button', { name: 'Show 1 listing' }))
 
-    expect(screen.queryByTestId('filter-scroll-thumb')).not.toBeInTheDocument()
+    const on = within(screen.getByTestId('active-filters'))
+    expect(screen.getByRole('button', { name: /^Filters\s*1/ })).toBeInTheDocument()
+    await user.click(on.getByRole('button', { name: 'Shabbat friendly', pressed: true }))
+
+    expect(screen.queryByTestId('active-filters')).not.toBeInTheDocument()
+    expect(screen.getByText('Cafe')).toBeInTheDocument()
+  })
+
+  it('shows a filter set from a listing badge under the heading, so it is never on unseen', async () => {
+    const user = userEvent.setup()
+    const category = makeCategory({ detailFields: [{ key: 'isKosher', label: 'Kosher', type: 'boolean', filterable: true }] })
+    renderWithProviders(<GenericDirectory category={category} items={[makeListing({ id: 'a', name: 'Kosher Mart' })]} {...handlers} />)
+
+    await user.click(screen.getByRole('button', { name: 'card-filter Kosher Mart' }))
+
+    expect(within(screen.getByTestId('active-filters')).getByRole('button', { name: 'Kosher', pressed: true })).toBeInTheDocument()
+  })
+
+  it('puts Open now under the heading as a switch once something is typed', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(<GenericDirectory category={food} items={items} {...handlers} />)
+    const heading = within(screen.getByTestId('list-heading'))
+    expect(heading.queryByRole('button', { name: 'Open now' })).not.toBeInTheDocument()
+
+    await user.type(screen.getByRole('searchbox'), 'grill')
+
+    expect(heading.getByRole('button', { name: 'Open now', pressed: false })).toBeInTheDocument()
+  })
+
+  it('says so when the filters hide everything the search found, and clears just the filters', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(<GenericDirectory category={food} items={items} {...handlers} />)
+    await user.click(screen.getByRole('button', { name: /^Filters/ }))
+    await user.click(screen.getByRole('button', { name: 'Dairy' }))
+    await user.click(screen.getByRole('button', { name: 'Show 1 listing' }))
+    await user.type(screen.getByRole('searchbox'), 'grill')
+
+    expect(screen.getByText('1 match your search, but none with these filters.')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Clear filters' }))
+
+    expect(screen.getByText('Grill')).toBeInTheDocument()
+    expect(screen.getByRole('searchbox')).toHaveValue('grill')
+  })
+
+  it('keeps the line Clear all sits on before anything is on, so switching one on moves nothing', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(<GenericDirectory category={food} items={items} {...handlers} />)
+    await user.click(screen.getByRole('button', { name: /^Filters/ }))
+    const clearAll = screen.getByRole('button', { name: 'Clear all' })
+    expect(clearAll.parentElement).toHaveClass('invisible')
+
+    await user.click(screen.getByRole('switch', { name: 'Open now' }))
+    expect(clearAll.parentElement).not.toHaveClass('invisible')
+    await user.click(clearAll)
+    expect(screen.getByRole('switch', { name: 'Open now' })).toHaveAttribute('aria-checked', 'false')
+  })
+
+  it('has no Filters where the category keeps nothing to filter on', () => {
+    renderWithProviders(<GenericDirectory category={makeCategory()} items={[makeListing()]} {...handlers} />)
+    expect(screen.queryByRole('button', { name: /^Filters/ })).not.toBeInTheDocument()
+    expect(within(screen.getByTestId('list-heading')).getByRole('heading', { name: '1 listing' })).toBeInTheDocument()
   })
 })
 

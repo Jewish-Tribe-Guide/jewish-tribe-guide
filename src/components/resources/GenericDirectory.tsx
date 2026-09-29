@@ -11,10 +11,11 @@ import DirectoryHeader from './DirectoryHeader'
 import DistanceNote from './DistanceNote'
 import { NextMinyans } from './nextMinyans'
 import { CategoryBandFrame, CategoryBandBadge } from './CategoryBandFrame'
-import CheckboxDropdown from './CheckboxDropdown'
+import FiltersSheet from './FiltersSheet'
+import ListHeading from './ListHeading'
 import { GenericListingCard, type GenericListingCardHandle } from './GenericListingCard'
 import DaveningTimesModal from '@/components/synagogues/DaveningTimesModal'
-import { PlusIcon, ClockIcon } from '@/components/icons'
+import { PlusIcon } from '@/components/icons'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { useScrollShowHide, useSetScreenHeader } from '@/lib/headerVisibility'
 import { foundFor, searchAsk } from '@/lib/askSearch'
@@ -132,7 +133,6 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // Mobile used to be exempt: its listing expanded inline, with no backdrop
   // over the Add button, which stayed usable. The sheet changed that.
   const [openDialogItemId, setOpenDialogItemId] = useState<string | null>(null)
-  const [openDropdown, setOpenDropdown] = useState<string | null>(null)
   const [openNow, setOpenNow] = useState(arrivedViaBackForward ? false : (initialOpenNow ?? false))
   // Drives the "Open now" filter below. Without it the filter answers for the
   // moment the page rendered, so a list narrowed to what's open at 4pm still
@@ -318,51 +318,8 @@ export default function GenericDirectory({ category, items, anchorLabel, address
     setSortByPopular(!anchorLabel)
   }, [anchorLabel])
   const [voteCounts, setVoteCounts] = useState<Record<string, number>>({})
+  // The Filters sheet (see ListHeading and FiltersSheet).
   const [filtersOpen, setFiltersOpen] = useState(false)
-  // A momentary scroll-position indicator for the filter chip row below —
-  // the row hides its native scrollbar for a cleaner look (see its own
-  // className), which also removed the only cue it scrolls at all. A tried
-  // fade at the trailing edge (see git history) turned out too subtle to
-  // read as a cue, since the chips and the page background are too close
-  // in tone for a gradient between them to show. This instead borrows the
-  // pattern native scroll views already use to hint scrollability up
-  // front: flash a thin thumb once, when the row first has anything to
-  // scroll to, then fade it out. Deliberately NOT re-shown while actually
-  // scrolling (no onScroll handler here) — that's a different, showier
-  // pattern (a scrollbar that tracks your finger) and isn't what this is;
-  // this is a one-time hint, not a scroll aid the row actually needs.
-  const filterRowRef = useRef<HTMLDivElement>(null)
-  const [filterScrollThumb, setFilterScrollThumb] = useState<{ widthPct: number; leftPct: number } | null>(null)
-  const [filterScrollThumbVisible, setFilterScrollThumbVisible] = useState(false)
-  const filterScrollHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const updateFilterScrollThumb = () => {
-    const el = filterRowRef.current
-    if (!el || el.scrollWidth <= el.clientWidth + 1) {
-      setFilterScrollThumb(null)
-      setFilterScrollThumbVisible(false)
-      return
-    }
-    setFilterScrollThumb({
-      widthPct: (el.clientWidth / el.scrollWidth) * 100,
-      leftPct: (el.scrollLeft / el.scrollWidth) * 100,
-    })
-    setFilterScrollThumbVisible(true)
-    if (filterScrollHideTimerRef.current) clearTimeout(filterScrollHideTimerRef.current)
-    filterScrollHideTimerRef.current = setTimeout(() => setFilterScrollThumbVisible(false), 1200)
-  }
-  // Measures on mount (desktop, where the row is always laid out) and again
-  // whenever the mobile Filters toggle actually reveals it — a `display:
-  // none` row (mobile, collapsed) measures 0 either way, so there's nothing
-  // real to flash until it's visible. Also on resize: whether the row
-  // overflows depends on viewport width, and that can flip either way.
-  useEffect(() => {
-    updateFilterScrollThumb()
-    window.addEventListener('resize', updateFilterScrollThumb)
-    return () => {
-      window.removeEventListener('resize', updateFilterScrollThumb)
-      if (filterScrollHideTimerRef.current) clearTimeout(filterScrollHideTimerRef.current)
-    }
-  }, [filtersOpen])
   // A plain lazy initializer here would only ever see the FIRST render:
   // SlugScreen's Suspense fallback renders this tree once with the query
   // string not yet read (openDaveningModal is undefined then, same as
@@ -874,26 +831,17 @@ export default function GenericDirectory({ category, items, anchorLabel, address
     setSortByPopular(byPopular)
   }
 
-  // The toolbar row (filters + sort) only renders when there's something in it;
-  // a select needs ≥2 distinct values before it's worth showing.
-  const hasRenderedSelects = filterableSelects.some(
-    (f) => new Set(items.flatMap((item) => selectValues(item[f.key]))).size >= 2,
-  )
-  // Whether there's an actual filter control to show — as opposed to
-  // `hasFilterRow` below, which also covers the sort toggle/davening button
-  // that can appear in this same row without any filter existing at all. Gates
-  // the "Filters" toggle button itself so it doesn't show (opening onto an
-  // empty panel) for a category with upvotes/minyanim but no filterable field.
-  const hasActualFilters = filterableBooleans.length > 0 || hasRenderedSelects || hasFilterableHours
-  // Used to also cover canAdd, back when mobile's Add button lived inside
-  // this row (a category with neither filters, upvotes, nor minyanim — e.g.
-  // WhatsApp Groups, Networking — otherwise lost its mobile Add button
-  // entirely). Mobile Add moved out to its own floating button below (see
-  // that button's own comment), unconditional on this flag, so canAdd no
-  // longer belongs in it — this is purely "is there real filter/sort
-  // content" again. externalLink stays: the desktop version of that button
-  // still lives in the block this flag gates.
-  const hasFilterRow = hasActualFilters || !!upvotes || hasMinyanim || !!category.externalLink
+  // The pick-lists worth offering in the Filters sheet: a list needs two
+  // values among this category's listings before choosing between them
+  // means anything.
+  const selectsToShow = filterableSelects.flatMap((f) => {
+    const values = Array.from(new Set(items.flatMap((item) => selectValues(item[f.key]))))
+    return values.length < 2 ? [] : [{ key: f.key, label: f.filterLabel ?? f.label, values, chosen: selectFilters[f.key] ?? [] }]
+  })
+  // Whether there's any filter at all, so a category with none (WhatsApp
+  // Groups) has no Filters button opening onto an empty sheet.
+  const hasActualFilters = filterableBooleans.length > 0 || selectsToShow.length > 0 || hasFilterableHours
+  const typed = search.trim() !== ''
 
   const hasActiveFilters =
     search.trim() !== '' ||
@@ -905,12 +853,40 @@ export default function GenericDirectory({ category, items, anchorLabel, address
     Object.values(boolFilters).filter(Boolean).length +
     Object.values(selectFilters).filter((v) => v.length > 0).length +
     (openNow ? 1 : 0)
-  const clearAll = () => {
-    setSearch('')
+  // The search found places, and the filters hid every one of them: the
+  // answer above the list says "2 places have pizza", so an empty list has
+  // to say why, and clearing the filters alone keeps what was asked.
+  const searchMatches = typed ? items.filter(matchesSearch).length : 0
+  const hiddenByFilters = activeFilterCount > 0 && (typed ? searchMatches > 0 : items.length > 0)
+
+  const clearFilters = () => {
     setBoolFilters({})
     setSelectFilters({})
     setOpenNow(false)
   }
+  const clearAll = () => {
+    setSearch('')
+    clearFilters()
+  }
+  const toggleBool = (key: string) => setBoolFilters((prev) => ({ ...prev, [key]: !prev[key] }))
+  // Adds or removes one value from a pick-list's chosen set.
+  const toggleSelect = (key: string, value: string) =>
+    setSelectFilters((prev) => {
+      const cur = prev[key] ?? []
+      return { ...prev, [key]: cur.includes(value) ? cur.filter((x) => x !== value) : [...cur, value] }
+    })
+  // Whatever is switched on, as chips under the list heading. Open now is
+  // left out once something is typed: it leads that line as its own switch
+  // then, on or off.
+  const activeChips = [
+    ...(openNow && hasFilterableHours && !typed ? [{ id: 'openNow', label: 'Open now', onOff: () => setOpenNow(false) }] : []),
+    ...filterableBooleans
+      .filter((f) => boolFilters[f.key])
+      .map((f) => ({ id: `f_${f.key}`, label: f.filterLabel ?? f.label, onOff: () => toggleBool(f.key) })),
+    ...filterableSelects.flatMap((f) =>
+      (selectFilters[f.key] ?? []).map((v) => ({ id: `sel_${f.key}_${v}`, label: v, onOff: () => toggleSelect(f.key, v) })),
+    ),
+  ]
 
   // Desktop-only shared-element morph target for the same icon badge
   // CompactCard shows next to this category on the home screen — that's
@@ -967,7 +943,6 @@ export default function GenericDirectory({ category, items, anchorLabel, address
 
           <DirectoryHeader
             title={category.pluralLabel}
-            count={filtered.length}
             anchorLabel={anchorLabel}
             addressPrompt={addressPrompt}
             titleInHeader
@@ -1054,279 +1029,37 @@ export default function GenericDirectory({ category, items, anchorLabel, address
         {showSearch && (
           <CategoryAsk category={category} items={items} search={search} onSearch={setSearch} hasMinyanim={hasMinyanim} />
         )}
-        {hasFilterRow && (
-          <>
-            {/* ── Mobile: Filters + Map buttons, then sort toggle — all one line ──
-                    Every button in this row (and the Open now/boolean/
-                    dropdown filters below it) is back to py-2/text-sm/
-                    slate-300 (matching ordinary buttons, and matching their
-                    own desktop versions further down) after a stint at a
-                    shrunk py-1.5/text-xs/slate-200 utility-toolbar weight —
-                    reverted piecemeal, at the user's request, as each one
-                    turned out to still look small rather than in one pass;
-                    not a reversal of the reasoning behind the original
-                    shrink. ── */}
-            <div className="flex items-center gap-1.5 desktop:hidden">
-              {/* Mobile's Add used to live here — moved to its own floating
-                  button (see below), Gmail-compose-style, so it stopped
-                  competing with the location label for attention up in
-                  DirectoryHeader's own row and stopped depending on this
-                  row existing at all (a category with no filters/upvotes/
-                  minyanim/externalLink rendered nothing here, which used to
-                  mean no mobile Add either — see hasFilterRow's own note). */}
-              {hasActualFilters && (
-                <button
-                  onClick={() => setFiltersOpen((v) => !v)}
-                  className={[
-                    'inline-flex items-center gap-1.5 px-2.5 py-2 text-sm font-medium rounded-md border transition-colors cursor-pointer whitespace-nowrap',
-                    activeFilterCount > 0
-                      ? 'bg-primary text-white border-primary'
-                      : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50',
-                  ].join(' ')}
-                >
-                  <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                    <path d="M3 4a1 1 0 000 2h14a1 1 0 000-2H3zm3 5a1 1 0 000 2h8a1 1 0 000-2H6zm2 5a1 1 0 000 2h4a1 1 0 000-2H8z" />
-                  </svg>
-                  Filters
-                  {activeFilterCount > 0 && (
-                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white/30 text-xs font-bold">
-                      {activeFilterCount}
-                    </span>
-                  )}
-                </button>
-              )}
-              {/* No mobile Map button here (desktop keeps its own, further
-                  down) — mobile already has a persistent, always-visible way
-                  to reach the map via the bottom tab bar, so this was a
-                  second copy of the same destination. Removed rather than
-                  made "smarter" (e.g. carrying the category along
-                  automatically): a global nav element quietly behaving
-                  differently depending on where you tapped it from breaks
-                  the one thing it's supposed to guarantee — that it always
-                  means the same thing. */}
-              {category.externalLink && (
-                <a
-                  href={category.externalLink.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="ml-auto inline-flex items-center gap-1 px-3 py-2 text-sm font-medium rounded-md border bg-white text-slate-600 border-slate-300 hover:bg-slate-50 transition-colors whitespace-nowrap"
-                >
-                  {category.externalLink.label} ↗
-                </a>
-              )}
-              {hasMinyanim && (
-                <button
-                  onClick={() => setDaveningModalOpen(true)}
-                  aria-label="All davening times"
-                  title="All davening times"
-                  className={[
-                    'inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-md border bg-white text-slate-600 border-slate-300 hover:bg-slate-50 transition-colors cursor-pointer whitespace-nowrap',
-                    !upvotes && !category.externalLink ? 'ml-auto' : '',
-                  ].join(' ')}
-                >
-                  <ClockIcon className="h-4 w-4" />
-                  {/* Full label once the row has room — hidden below this so it
-                      never crowds Filters/Map on the narrowest phones. */}
-                  <span className="hidden min-[390px]:inline">All davening times</span>
-                </button>
-              )}
-              {upvotes && (
-                <div
-                  className={[
-                    'flex rounded-md border border-slate-300 overflow-hidden',
-                    !hasMinyanim && !category.externalLink ? 'ml-auto' : '',
-                  ].join(' ')}
-                >
-                  {[{ v: true, label: 'Popularity' }, { v: false, label: 'Distance' }].map((opt) => (
-                    <button
-                      key={opt.label}
-                      onClick={() => selectSort(opt.v)}
-                      className={[
-                        'px-2.5 py-2 text-sm font-medium transition-colors cursor-pointer whitespace-nowrap',
-                        sortByPopular === opt.v ? 'bg-primary text-white' : 'bg-white text-slate-600 hover:bg-slate-50',
-                      ].join(' ')}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* ── Filter controls: collapsible on mobile, always visible on desktop —
-                    one horizontally-scrolling line on both, never wrapping to a
-                    second row (a wrapped row read as broken/cut-off layout). This
-                    same row also carries the desktop versions of external
-                    link/davening/sort (their mobile versions are in the row above),
-                    so it still renders even with no actual filter — just without a
-                    mobile Filters button to open it (that's gated separately). ──
-                    `relative` on this OUTER wrapper, not the scrolling row itself —
-                    the thumb below needs to stay put while the row's own content
-                    scrolls under it; positioned relative to the scrolling element
-                    it would scroll away with everything else instead of acting as
-                    a fixed overlay on top of it. */}
-            <div className="relative">
-            <div
-              ref={filterRowRef}
-              className={[
-                'gap-2 flex-nowrap overflow-x-auto pb-1',
-                filtersOpen ? 'flex animate-[backdropIn_150ms_ease-out] desktop:animate-none' : 'hidden',
-                'desktop:flex',
-              ].join(' ')}
-              style={{ scrollbarWidth: 'none' }}
-            >
-              {/* Open now / boolean chips / select dropdowns below are the
-                  three controls in this row that actually show on mobile
-                  (revealed by the Filters toggle) as well as desktop — the
-                  external-link/davening/sort ones further down are
-                  desktop-only, their mobile copies live in the row above.
-                  Same px-3/py-2/text-sm weight on both viewports now — these
-                  used to be shrunk on mobile (px-2.5/py-1.5/text-xs) with a
-                  `desktop:` override restoring the bigger size, matching a
-                  stint the Filters/sort row above went through too; reverted
-                  on both at the user's request. */}
-              {hasFilterableHours && (
-                <button
-                  onClick={() => setOpenNow((v) => !v)}
-                  className={[
-                    'inline-flex shrink-0 items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-md border transition-colors cursor-pointer whitespace-nowrap',
-                    openNow
-                      ? 'bg-green-600 text-white border-green-600'
-                      : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50',
-                  ].join(' ')}
-                >
-                  <span className={['inline-block h-2 w-2 rounded-full', openNow ? 'bg-white' : 'bg-green-500'].join(' ')} aria-hidden="true" />
-                  Open now
-                </button>
-              )}
-              {filterableBooleans.map((f) => {
-                const active = !!boolFilters[f.key]
-                return (
-                  <button
-                    key={f.key}
-                    onClick={() => setBoolFilters((prev) => ({ ...prev, [f.key]: !prev[f.key] }))}
-                    className={[
-                      'shrink-0 px-3 py-2 text-sm font-medium rounded-md border transition-colors cursor-pointer whitespace-nowrap',
-                      active ? 'bg-primary text-white border-primary' : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50',
-                    ].join(' ')}
-                  >
-                    {f.filterLabel ?? f.label}
-                  </button>
-                )
-              })}
-              {filterableSelects.map((f) => {
-                const presentValues = Array.from(new Set(items.flatMap((item) => selectValues(item[f.key])))).sort()
-                if (presentValues.length < 2) return null
-                const chosen = selectFilters[f.key] ?? []
-                const toggle = (v: string) =>
-                  setSelectFilters((prev) => {
-                    const cur = prev[f.key] ?? []
-                    return { ...prev, [f.key]: cur.includes(v) ? cur.filter((x) => x !== v) : [...cur, v] }
-                  })
-                // The filter always lets a visitor pick more than one value to
-                // filter by, regardless of whether a single listing can hold more
-                // than one value (that's `f.multiSelect`, a separate, per-listing
-                // setting — see CategoryField.multiSelect).
-                const isOpen = openDropdown === f.key
-                const label = chosen.length === 0
-                  ? `All ${f.filterLabel ?? f.label}s`
-                  : chosen.length === 1
-                  ? chosen[0]
-                  : `${chosen.length} selected`
-                return (
-                  <CheckboxDropdown
-                    key={f.key}
-                    label={label}
-                    active={chosen.length > 0}
-                    isOpen={isOpen}
-                    onToggleOpen={() => setOpenDropdown(isOpen ? null : f.key)}
-                    onClose={() => setOpenDropdown(null)}
-                    values={presentValues}
-                    chosen={chosen}
-                    onToggle={toggle}
-                  />
-                )
-              })}
-              {/* No desktop Map button either now — same reasoning as
-                  mobile's removal above: the header's own "Map" nav link
-                  (HeaderNav.tsx) is already a persistent, always-visible way
-                  to reach the map from any screen. One generic Map entry
-                  point per platform (the header link on desktop, the bottom
-                  tab on mobile), not a second copy scoped to whichever
-                  category you happen to be on. */}
-              {category.externalLink && (
-                <a
-                  href={category.externalLink.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="hidden desktop:inline-flex desktop:ml-auto shrink-0 items-center gap-1 px-3 py-2 text-sm font-medium rounded-md border bg-white text-slate-600 border-slate-300 hover:bg-slate-50 transition-colors whitespace-nowrap"
-                >
-                  {category.externalLink.label} ↗
-                </a>
-              )}
-              {hasMinyanim && (
-                <button
-                  onClick={() => setDaveningModalOpen(true)}
-                  className={[
-                    'hidden desktop:inline-flex shrink-0 items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-md border bg-white text-slate-600 border-slate-300 hover:bg-slate-50 transition-colors cursor-pointer whitespace-nowrap',
-                    !upvotes && !category.externalLink ? 'desktop:ml-auto' : '',
-                  ].join(' ')}
-                >
-                  <ClockIcon className="h-4 w-4" />
-                  All davening times
-                </button>
-              )}
-              {upvotes && (
-                <div
-                  className={[
-                    'hidden desktop:flex rounded-md border border-slate-300 overflow-hidden shrink-0',
-                    !hasMinyanim && !category.externalLink ? 'desktop:ml-auto' : '',
-                  ].join(' ')}
-                >
-                  {[{ v: true, label: 'Popularity' }, { v: false, label: 'Distance' }].map((opt) => (
-                    <button
-                      key={opt.label}
-                      onClick={() => selectSort(opt.v)}
-                      className={[
-                        'px-3 py-2 text-sm font-medium transition-colors cursor-pointer whitespace-nowrap',
-                        sortByPopular === opt.v ? 'bg-primary text-white' : 'bg-white text-slate-600 hover:bg-slate-50',
-                      ].join(' ')}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-            {filterScrollThumb && (
-              <div
-                aria-hidden="true"
-                data-testid="filter-scroll-thumb"
-                className={`pointer-events-none absolute bottom-0 h-0.5 rounded-full bg-slate-400 transition-opacity duration-500 ${
-                  filterScrollThumbVisible ? 'opacity-100' : 'opacity-0'
-                }`}
-                style={{ width: `${filterScrollThumb.widthPct}%`, left: `${filterScrollThumb.leftPct}%` }}
-              />
-            )}
-            </div>
-          </>
-        )}
+        {/* The list's own heading: how many, and Filters and Sort, the
+            same place on every category page (see ListHeading). */}
+        <ListHeading
+          count={filtered.length}
+          openNow={typed && hasFilterableHours ? { on: openNow, onToggle: () => setOpenNow((v) => !v) } : undefined}
+          filters={hasActualFilters ? { active: activeFilterCount, onOpen: () => setFiltersOpen(true) } : undefined}
+          sort={upvotes ? { byPopular: sortByPopular, onSelect: selectSort } : undefined}
+          onDaveningTimes={hasMinyanim ? () => setDaveningModalOpen(true) : undefined}
+          externalLink={category.externalLink ?? undefined}
+          activeChips={activeChips}
+        />
       </div>
 
       {filtered.length === 0 ? (
         <div className="text-center py-12">
           <p className="text-sm text-muted">
-            {hasActiveFilters
-              ? `No ${category.pluralLabel.toLowerCase()} match your search.`
-              : `No ${category.pluralLabel.toLowerCase()} listed yet.`}
+            {hiddenByFilters
+              ? typed
+                ? `${searchMatches} match your search, but none with these filters.`
+                : 'None with these filters.'
+              : hasActiveFilters
+                ? `No ${category.pluralLabel.toLowerCase()} match your search.`
+                : `No ${category.pluralLabel.toLowerCase()} listed yet.`}
           </p>
           <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
             {hasActiveFilters && (
               <button
-                onClick={clearAll}
+                onClick={hiddenByFilters ? clearFilters : clearAll}
                 className="text-sm font-medium text-slate-600 border border-slate-300 rounded-md px-3 py-1.5 hover:bg-slate-50 transition-colors cursor-pointer"
               >
-                Clear search &amp; filters
+                {hiddenByFilters ? 'Clear filters' : 'Clear search & filters'}
               </button>
             )}
             {canAdd && (
@@ -1396,16 +1129,11 @@ export default function GenericDirectory({ category, items, anchorLabel, address
                 scrollControlsIntoViewIfNeeded()
               }}
               onFilterBool={(key) => {
-                setBoolFilters((prev) => ({ ...prev, [key]: !prev[key] }))
+                toggleBool(key)
                 scrollControlsIntoViewIfNeeded()
               }}
               onFilterSelect={(key, value) => {
-                setSelectFilters((prev) => {
-                  const cur = prev[key] ?? []
-                  // Add/remove this value from the filter's chosen set. Clicking
-                  // the badge again undoes it.
-                  return { ...prev, [key]: cur.includes(value) ? cur.filter((x) => x !== value) : [...cur, value] }
-                })
+                toggleSelect(key, value)
                 scrollControlsIntoViewIfNeeded()
               }}
               onEdit={() => onEdit(item)}
@@ -1464,6 +1192,22 @@ export default function GenericDirectory({ category, items, anchorLabel, address
           <PlusIcon className="h-6 w-6 shrink-0" />
           <span className="hidden desktop:inline font-medium whitespace-nowrap">Add a listing</span>
         </button>
+      )}
+
+      {hasActualFilters && (
+        <FiltersSheet
+          isOpen={filtersOpen}
+          onClose={() => setFiltersOpen(false)}
+          hasOpenNow={hasFilterableHours}
+          openNow={openNow}
+          onOpenNow={() => setOpenNow((v) => !v)}
+          booleans={filterableBooleans.map((f) => ({ key: f.key, label: f.filterLabel ?? f.label, on: !!boolFilters[f.key] }))}
+          onBoolean={toggleBool}
+          selects={selectsToShow}
+          onSelect={toggleSelect}
+          onClearAll={clearFilters}
+          count={filtered.length}
+        />
       )}
 
       {hasMinyanim && (

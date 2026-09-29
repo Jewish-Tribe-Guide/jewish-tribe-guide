@@ -169,10 +169,14 @@ test.describe('content is server-rendered', () => {
       return
     }
 
-    // The header states the count; it should match what the API returns.
-    // "places" or "listings" depending on the category's own `hasAddress`
-    // (see DirectoryHeader's own doc) — this test doesn't care which noun,
-    // only that the number itself is right.
-    await expect(page.getByText(new RegExp(`${count}\\s+(?:listings?|places?)`))).toBeVisible()
+    // The list's heading states the count (ListHeading); it should match
+    // what the API returns. The visible one only: until React swaps in
+    // the streamed content, its hidden `display: none` segments (S:0, S:1)
+    // hold copies of the same heading, and matching every copy failed this
+    // on strict mode: 4 runs in 8 when the count first moved into the
+    // heading, and about one in four with the old count under the title.
+    await expect(page.getByTestId('list-heading').getByRole('heading').filter({ visible: true })).toHaveText(
+      new RegExp(`^${count}\\s+listings?$`),
+    )
   })
 })
