@@ -9,6 +9,7 @@ import {
   type FieldType,
 } from '@/lib/categories'
 import { slugRejectionReason } from '@/lib/routes'
+import { groupByKey, parseGroupBy } from '@/lib/listGroups'
 
 // ── Pure logic behind CategoryEditor — draft shape, template/field
 // normalization, and the two destructive-change detectors (option rename,
@@ -65,6 +66,9 @@ export type Draft = {
    *  per-row toggle instead, so this is read here but never re-shown/re-sent
    *  on an edit save (see useCategorySaveWorkflow). */
   active: boolean
+  /** How the category page groups its list, as groupByKey writes it ('' for
+   *  one list). Saved only when changed — see useCategorySaveWorkflow. */
+  groupBy: string
 }
 
 export const CAPABILITY_LABELS: Record<keyof CategoryCapabilities, string> = {
@@ -139,6 +143,7 @@ export function toDraft(c: CategoryConfig | null): Draft {
     cardBandImageUrl: c?.cardBandImageUrl ?? '',
     pinColor: c?.pinColor || '',
     active: c?.active ?? true,
+    groupBy: groupByKey(parseGroupBy(c?.groupBy)),
   }
 }
 

@@ -390,3 +390,56 @@ describe('CategoryEditor — pin colour clashes', () => {
     expect(screen.getByRole('button', { name: '#2657bf' })).toBeInTheDocument()
   })
 })
+
+// How the category page groups its list (listGroups.ts). Sent only when
+// changed, so every other save keeps working on a database that doesn't
+// have migration 059's column yet.
+describe('CategoryEditor — grouping the list', () => {
+  const shuls = baseCategory({
+    id: 'synagogue',
+    pluralLabel: 'Synagogues',
+    detailFields: [
+      { key: 'hours', label: 'Hours', type: 'hours' },
+      { key: 'denomination', label: 'Denomination', type: 'select', options: [{ value: 'Reform', label: 'Reform' }] },
+    ],
+  })
+  const payload = () => (vi.mocked(fetchJson).mock.calls.at(-1)![1] as { body: string }).body
+
+  it('offers the groupings the category’s fields allow, and none for a new category', () => {
+    renderWithProviders(<CategoryEditor token="t" initial={shuls} siblings={null} hasMapCategory={false} onSaved={vi.fn()} onCancel={vi.fn()} />)
+    const select = screen.getByRole('combobox', { name: 'Group the list' })
+    expect([...(select as HTMLSelectElement).options].map((o) => o.value)).toEqual(['', 'open', 'distance', 'field:denomination'])
+    cleanup()
+    renderWithProviders(<CategoryEditor token="t" initial={null} siblings={null} hasMapCategory={false} onSaved={vi.fn()} onCancel={vi.fn()} />)
+    expect(screen.queryByRole('combobox', { name: 'Group the list' })).not.toBeInTheDocument()
+  })
+
+  it('sends the grouping when it changed, and leaves it out when it didn’t', async () => {
+    const onSaved = vi.fn()
+    const user = userEvent.setup()
+    renderWithProviders(<CategoryEditor token="t" initial={shuls} siblings={null} hasMapCategory={false} onSaved={onSaved} onCancel={vi.fn()} />)
+
+    await user.click(screen.getByRole('button', { name: /save changes/i }))
+    await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1))
+    expect(JSON.parse(payload())).not.toHaveProperty('groupBy')
+
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Group the list' }), 'field:denomination')
+    await user.click(screen.getByRole('button', { name: /save changes/i }))
+    await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(2))
+    expect(JSON.parse(payload()).groupBy).toEqual({ kind: 'field', key: 'denomination' })
+  })
+
+  it('shows the saved grouping, and clearing it sends null', async () => {
+    const onSaved = vi.fn()
+    const user = userEvent.setup()
+    renderWithProviders(
+      <CategoryEditor token="t" initial={{ ...shuls, groupBy: { kind: 'open' } }} siblings={null} hasMapCategory={false} onSaved={onSaved} onCancel={vi.fn()} />,
+    )
+    const select = screen.getByRole('combobox', { name: 'Group the list' })
+    expect(select).toHaveValue('open')
+    await user.selectOptions(select, '')
+    await user.click(screen.getByRole('button', { name: /save changes/i }))
+    await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1))
+    expect(JSON.parse(payload()).groupBy).toBeNull()
+  })
+})

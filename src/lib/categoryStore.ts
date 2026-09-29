@@ -4,6 +4,7 @@ import { getAdminClient } from './supabase/admin'
 import { assertUsableSlug, slugify } from './routes'
 import { listCampaignBanners } from './campaignBannerStore'
 import { activeCampaignCategoryIds } from './campaignBanner'
+import { parseGroupBy, type GroupBy } from './listGroups'
 
 export { slugify }
 import {
@@ -42,6 +43,9 @@ type CategoryRow = {
   // "not migrated yet" convention as the other nullable columns above),
   // null once migrated but never set, either way meaning "no sections".
   form_sections?: CategoryFormSection[] | null
+  // Optional the same way: undefined before migration 059, null once
+  // migrated but never set. Either way, one ungrouped list.
+  group_by?: unknown
 }
 
 function toConfig(row: CategoryRow): CategoryConfig {
@@ -73,6 +77,7 @@ function toConfig(row: CategoryRow): CategoryConfig {
     mapZoomRadiusMiles: row.map_zoom_radius_miles ?? null,
     active: row.active !== false,
     formSections: row.form_sections ?? undefined,
+    groupBy: parseGroupBy(row.group_by) ?? undefined,
   }
 }
 
@@ -274,6 +279,7 @@ export async function updateCategory(
     mapZoomRadiusMiles?: number | null
     active?: boolean
     formSections?: CategoryFormSection[] | null
+    groupBy?: GroupBy | null
   },
 ): Promise<CategoryConfig | null> {
   const supabase = getAdminClient()
@@ -301,6 +307,9 @@ export async function updateCategory(
   if (patch.iconImageUrl !== undefined) row.icon_image_url = patch.iconImageUrl?.trim() || null
   if (patch.mapZoomRadiusMiles !== undefined) row.map_zoom_radius_miles = patch.mapZoomRadiusMiles
   if (patch.formSections !== undefined) row.form_sections = patch.formSections
+  // Only sent when the admin changed it, so every other save keeps working
+  // on a database that doesn't have the column yet (migration 059).
+  if (patch.groupBy !== undefined) row.group_by = patch.groupBy
 
   // Scoped by community as well as id — the composite primary key means a
   // second community's identically-slugged category is a different row, and

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { CATEGORY_CAPABILITY_KEYS, DEFAULT_CATEGORY_ICON, type CategoryConfig } from '@/lib/categories'
 import { CATEGORY_TEMPLATES } from '@/lib/categoryTemplates'
 import { getCategoryColor } from '@/lib/categoryColor'
+import { groupByFromKey, groupByKey, groupByOptions } from '@/lib/listGroups'
 import CategoryPreview from './CategoryPreview'
 import { CardBackgroundField, CardBandImageField, IconField, PinColorField, inputClass } from './CategoryFormFields'
 import { FieldEditor } from './CategoryFieldEditor'
@@ -117,6 +118,7 @@ export function CategoryEditor({
       hasPhone: draft.hasPhone,
       upvotesEnabled: draft.upvotesEnabled,
       capabilities: draft.capabilities,
+      groupBy: groupByFromKey(draft.groupBy),
       externalLink:
         draft.externalLinkEnabled && draft.externalLinkLabel.trim() && draft.externalLinkUrl.trim()
           ? { label: draft.externalLinkLabel.trim(), url: draft.externalLinkUrl.trim() }
@@ -321,6 +323,39 @@ export function CategoryEditor({
             </div>
           )}
         </section>
+
+        {/* How the list is grouped. Only on an existing category: the
+            choices come from its fields, and a new one has none saved yet. */}
+        {!isNew && (
+          <section className="bg-white border border-slate-200 rounded-lg p-4">
+            <label htmlFor="category-group-by" className="block text-sm font-semibold text-slate-800 mb-1">
+              Group the list
+            </label>
+            <select
+              id="category-group-by"
+              aria-describedby="category-group-by-help"
+              value={draft.groupBy}
+              onChange={(e) => set('groupBy', e.target.value)}
+              className={inputClass}
+            >
+              <option value="">One list, no groups</option>
+              {groupByOptions({
+                ...initial!,
+                hasAddress: draft.hasAddress,
+                detailFields: draft.fields.map(normalizeField),
+              }).map((o) => (
+                <option key={groupByKey(o.value)} value={groupByKey(o.value)}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+            <span id="category-group-by-help" className="block text-[11px] text-muted mt-1">
+              How this category&rsquo;s page splits its list, e.g. what&rsquo;s open now first, or
+              shuls by denomination. A choice list makes one closed group per choice, in
+              alphabetical order with &ldquo;Other&rdquo; last. Search results are never grouped.
+            </span>
+          </section>
+        )}
 
         {/* Details */}
         <section className="bg-white border border-slate-200 rounded-lg p-4">

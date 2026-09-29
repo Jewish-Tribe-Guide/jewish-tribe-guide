@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState, ViewTransition } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, ViewTransition, type ReactNode } from 'react'
 import type { DirectoryResource } from '@/types'
 import { resolveCapabilities, selectValues, bandImageFor, type CategoryConfig } from '@/lib/categories'
 import { hoursOpenNow, businessClosure } from '@/lib/hours'
@@ -12,7 +12,9 @@ import DistanceNote from './DistanceNote'
 import { NextMinyans } from './nextMinyans'
 import { CategoryBandFrame, CategoryBandBadge } from './CategoryBandFrame'
 import FiltersSheet from './FiltersSheet'
-import ListHeading from './ListHeading'
+import ListHeading, { ClosedGroupLine, GroupHeading } from './ListHeading'
+import { groupListings, type ListGroup } from '@/lib/listGroups'
+import { usePersistedState } from '@/lib/usePersistedState'
 import { GenericListingCard, type GenericListingCardHandle } from './GenericListingCard'
 import DaveningTimesModal from '@/components/synagogues/DaveningTimesModal'
 import { PlusIcon } from '@/components/icons'
@@ -781,8 +783,8 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // doing something unrelated to what was just on screen, not as "there's
   // more."
   const navigateFromCard = (fromId: string, direction: 1 | -1) => {
-    const index = filtered.findIndex((i) => i.id === fromId)
-    const target = filtered[index + direction]
+    const index = shownItems.findIndex((i) => i.id === fromId)
+    const target = shownItems[index + direction]
     if (index === -1 || !target) return
     cardRefs.current.get(fromId)?.close()
     cardRefs.current.get(target.id)?.open()
@@ -859,6 +861,56 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   const searchMatches = typed ? items.filter(matchesSearch).length : 0
   const hiddenByFilters = activeFilterCount > 0 && (typed ? searchMatches > 0 : items.length > 0)
 
+  // ── Groups (see listGroups.ts) ──
+  // Never a search's results: those are one list, best first.
+  const grouping = typed ? null : groupListings(filtered, category, now)
+  // Closed groups (a pick-list's, like denominations) start closed, and this
+  // browser remembers which ones were opened.
+  const openGroupsKey = `jpc:open-groups:${communitySlug ?? ''}:${category.id}`
+  const loadOpenGroups = () => {
+    try {
+      const stored: unknown = JSON.parse(localStorage.getItem(openGroupsKey) ?? '[]')
+      return Array.isArray(stored) ? stored.filter((v): v is string => typeof v === 'string') : []
+    } catch {
+      return []
+    }
+  }
+  const saveOpenGroups = useCallback(
+    (ids: string[]) => {
+      try {
+        localStorage.setItem(openGroupsKey, JSON.stringify(ids))
+      } catch {
+        // Private windows and blocked storage: the groups just start closed.
+      }
+    },
+    [openGroupsKey],
+  )
+  const [openGroupIds, setOpenGroupIds] = usePersistedState<string[]>([], loadOpenGroups, saveOpenGroups)
+  // While a filter is on, every group with a match opens (those without are
+  // gone), and one closed then is closed only for as long as those filters
+  // stay as they are; it isn't remembered.
+  const filtersKey = JSON.stringify([openNow, boolFilters, selectFilters])
+  const [closedWhileFiltered, setClosedWhileFiltered] = useState<{ key: string; ids: string[] }>({ key: '', ids: [] })
+  const closedNow = closedWhileFiltered.key === filtersKey ? closedWhileFiltered.ids : []
+  // A listing arriving open (?item=, a shared link or a reload) opens its
+  // group, until that listing is closed.
+  const [reopenClosedId, setReopenClosedId] = useState<string | null>(null)
+  const isGroupOpen = (g: ListGroup<DirectoryResource>) =>
+    (!!reopenItemId && reopenItemId !== reopenClosedId && g.items.some((i) => i.id === reopenItemId)) ||
+    (activeFilterCount > 0 ? !closedNow.includes(g.id) : openGroupIds.includes(g.id))
+  const toggleGroup = (id: string) => {
+    const flip = (ids: string[]) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id])
+    if (activeFilterCount > 0) setClosedWhileFiltered({ key: filtersKey, ids: flip(closedNow) })
+    else setOpenGroupIds(flip)
+  }
+  // The listings on screen, in order: what arrow-key next/previous walks.
+  const shownItems = grouping?.closed
+    ? grouping.groups.flatMap((g) => (isGroupOpen(g) ? g.items : []))
+    : grouping
+      ? grouping.groups.flatMap((g) => g.items)
+      : filtered
+  const shownIndex = new Map(shownItems.map((item, i) => [item.id, i]))
+
   const clearFilters = () => {
     setBoolFilters({})
     setSelectFilters({})
@@ -924,6 +976,38 @@ export default function GenericDirectory({ category, items, anchorLabel, address
       </CategoryBandBadge>
     </ViewTransition>
   ) : null
+
+  // What the list is drawn as: one section per group, each with what goes
+  // above its rows (a closed group's line, a later open group's heading)
+  // and whether its rows are showing. One section, no heading, when the
+  // list isn't grouped.
+  const sections: { key: string; above?: ReactNode; items: DirectoryResource[]; rowsId?: string; hidden?: boolean }[] = !grouping
+    ? [{ key: 'all', items: filtered }]
+    : grouping.groups.map((g, gi) => {
+        if (!grouping.closed) {
+          return { key: g.id, items: g.items, above: gi > 0 ? <GroupHeading label={g.label} count={g.items.length} /> : undefined }
+        }
+        const open = isGroupOpen(g)
+        const rowsId = `${category.id}-group-${gi}`
+        return {
+          key: g.id,
+          items: g.items,
+          rowsId,
+          // Rendered closed too, just hidden: a listing opened by a link
+          // needs its row in place to open from.
+          hidden: !open,
+          above: (
+            <ClosedGroupLine
+              label={g.label}
+              count={g.items.length}
+              nearest={g.nearest}
+              open={open}
+              onToggle={() => toggleGroup(g.id)}
+              controls={rowsId}
+            />
+          ),
+        }
+      })
 
   return (
     <div>
@@ -1032,7 +1116,13 @@ export default function GenericDirectory({ category, items, anchorLabel, address
         {/* The list's own heading: how many, and Filters and Sort, the
             same place on every category page (see ListHeading). */}
         <ListHeading
-          count={filtered.length}
+          // Open groups: the first group's heading is the list's own ("Open
+          // now · 57"), saving a line above the first place on a phone.
+          // Closed groups: what they're grouped by and the whole count.
+          label={grouping ? (grouping.closed ? grouping.title : grouping.groups[0]?.label) : undefined}
+          count={grouping && !grouping.closed ? (grouping.groups[0]?.items.length ?? 0) : filtered.length}
+          noun={!grouping || grouping.closed}
+          total={filtered.length}
           openNow={typed && hasFilterableHours ? { on: openNow, onToggle: () => setOpenNow((v) => !v) } : undefined}
           filters={hasActualFilters ? { active: activeFilterCount, onOpen: () => setFiltersOpen(true) } : undefined}
           sort={upvotes ? { byPopular: sortByPopular, onSelect: selectSort } : undefined}
@@ -1089,14 +1179,19 @@ export default function GenericDirectory({ category, items, anchorLabel, address
         // NextMinyans: each shul row's next minyan (shul categories only).
         <NextMinyans enabled={hasMinyanim} items={items}>
         <SwipeRowGroup>
+        <div className={grouping?.closed ? 'space-y-2' : undefined}>
+        {sections.map((section) => (
+          <div key={section.key}>
+          {section.above}
+          <div id={section.rowsId} hidden={section.hidden} className={grouping?.closed ? 'pt-2 pb-2' : undefined}>
         <div className="space-y-2 sm:space-y-0 sm:grid sm:gap-3 sm:grid-cols-[repeat(auto-fill,minmax(420px,1fr))]">
-          {filtered.map((item, index) => (
+          {section.items.map((item) => (
             <div key={item.id} ref={setItemRowRef(item.id)}>
             <GenericListingCard
               ref={setCardRef(item.id)}
               onNavigate={(direction) => navigateFromCard(item.id, direction)}
-              hasPrev={index > 0}
-              hasNext={index < filtered.length - 1}
+              hasPrev={(shownIndex.get(item.id) ?? 0) > 0}
+              hasNext={(shownIndex.get(item.id) ?? Infinity) < shownItems.length - 1}
               item={item}
               category={category}
               showCategoryLabel={false}
@@ -1114,7 +1209,10 @@ export default function GenericDirectory({ category, items, anchorLabel, address
               found={foundOn(item)}
               onExpandedChange={(expanded) => {
                 onParamsChange?.({ item: expanded ? item.id : null, ...(expanded ? {} : { match: null }) }, { replace: true })
-                if (!expanded && item.id === reopenItemId) setClosedMatchFor(reopenKey)
+                if (!expanded && item.id === reopenItemId) {
+                  setClosedMatchFor(reopenKey)
+                  setReopenClosedId(item.id)
+                }
                 // See openDialogItemId's own note. Cleared by id rather
                 // than unconditionally: arrow-key next/prev closes
                 // one card and opens a sibling in the same commit, and the
@@ -1140,6 +1238,10 @@ export default function GenericDirectory({ category, items, anchorLabel, address
             />
             </div>
           ))}
+        </div>
+          </div>
+          </div>
+        ))}
         </div>
         </SwipeRowGroup>
         </NextMinyans>

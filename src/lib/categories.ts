@@ -391,6 +391,12 @@ export type CategoryConfig = {
    *  field falls into one generic "More details" group in the form instead
    *  of being flatly listed. */
   formSections?: CategoryFormSection[]
+  /** How the category page splits its list into groups (open now / not,
+   *  within 2 mi / further, a yes/no, or one closed group per pick-list
+   *  value). Unset means one list. Stored as it came from the database and
+   *  read through parseGroupBy, so an unknown shape means no groups rather
+   *  than an error — see listGroups.ts. */
+  groupBy?: unknown
 }
 
 export const DEFAULT_CATEGORY_ICON = '📋'

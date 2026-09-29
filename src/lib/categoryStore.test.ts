@@ -144,6 +144,18 @@ describe('listCategoriesUncached', () => {
     const [config] = await listCategoriesUncached('philly')
     expect(config.active).toBe(false)
   })
+
+  // Migration 059. Before it, the column is simply absent from the row.
+  it('reads group_by as the list’s grouping, and no grouping when absent, null or unknown', async () => {
+    const read = async (group_by: unknown) => {
+      mockFrom.mockReturnValue(chainable({ data: [{ ...rawRow, group_by }], error: null }))
+      return (await listCategoriesUncached('philly'))[0].groupBy
+    }
+    expect(await read({ kind: 'field', key: 'denomination' })).toEqual({ kind: 'field', key: 'denomination' })
+    expect(await read(undefined)).toBeUndefined()
+    expect(await read(null)).toBeUndefined()
+    expect(await read({ kind: 'colour' })).toBeUndefined()
+  })
 })
 
 describe('listCategories', () => {
@@ -377,6 +389,18 @@ describe('updateCategory', () => {
     await updateCategory('philly', 'synagogue', { label: '  New Label  ' })
 
     expect(builder.update).toHaveBeenCalledWith({ label: 'New Label' })
+  })
+
+  it('writes group_by only when the patch has a grouping, so saves work before migration 059', async () => {
+    const builder = chainable({ data: rawRow, error: null })
+    mockFrom.mockReturnValue(builder)
+
+    await updateCategory('philly', 'synagogue', { label: 'Shuls' })
+    expect(builder.update).toHaveBeenLastCalledWith({ label: 'Shuls' })
+    await updateCategory('philly', 'synagogue', { groupBy: { kind: 'open' } })
+    expect(builder.update).toHaveBeenLastCalledWith({ group_by: { kind: 'open' } })
+    await updateCategory('philly', 'synagogue', { groupBy: null })
+    expect(builder.update).toHaveBeenLastCalledWith({ group_by: null })
   })
 
   it('writes active when present in the patch', async () => {

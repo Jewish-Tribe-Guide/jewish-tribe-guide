@@ -1143,6 +1143,124 @@ describe('GenericDirectory — the list heading', () => {
   })
 })
 
+// Each category can split its list one way, chosen in the admin's editor
+// (CategoryConfig.groupBy; the rules themselves are in listGroups.test.ts).
+describe('GenericDirectory — groups', () => {
+  afterEach(() => {
+    localStorage.clear()
+  })
+
+  const hotels = makeCategory({
+    id: 'hotel',
+    groupBy: { kind: 'field', key: 'shabbatFriendly' },
+    detailFields: [{ key: 'shabbatFriendly', label: 'Shabbat friendly', type: 'boolean', filterable: true }],
+  })
+  const hotelItems = [
+    makeListing({ id: 'a', category: 'hotel', name: 'Cambria', shabbatFriendly: true }),
+    makeListing({ id: 'b', category: 'hotel', name: 'Marriott' }),
+    makeListing({ id: 'c', category: 'hotel', name: 'Loews' }),
+  ]
+
+  it('makes the first group’s heading the list’s own, and heads each group after it', () => {
+    renderWithProviders(<GenericDirectory category={hotels} items={hotelItems} {...handlers} />)
+    const heading = within(screen.getByTestId('list-heading'))
+    expect(heading.getByRole('heading', { name: 'Shabbat friendly · 1' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Doesn’t say · 2' })).toBeInTheDocument()
+    expect(screen.getByTestId('list-heading')).toHaveAttribute('data-total', '3')
+  })
+
+  it('shows a search’s results as one list, not in groups', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(<GenericDirectory category={hotels} items={hotelItems} {...handlers} />)
+    await user.type(screen.getByRole('searchbox'), 'marriott')
+    expect(screen.queryByRole('heading', { name: /Doesn’t say/ })).not.toBeInTheDocument()
+    expect(within(screen.getByTestId('list-heading')).getByRole('heading', { name: '1 listing' })).toBeInTheDocument()
+  })
+
+  it('is one list when the category isn’t grouped', () => {
+    renderWithProviders(<GenericDirectory category={{ ...hotels, groupBy: undefined }} items={hotelItems} {...handlers} />)
+    expect(within(screen.getByTestId('list-heading')).getByRole('heading', { name: '3 listings' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: /Doesn’t say/ })).not.toBeInTheDocument()
+  })
+
+  describe('closed groups (a pick-list: shuls by denomination)', () => {
+    const shuls = makeCategory({
+      id: 'synagogue',
+      groupBy: { kind: 'field', key: 'denomination' },
+      detailFields: [
+        {
+          key: 'denomination',
+          label: 'Denomination',
+          type: 'select',
+          filterable: true,
+          options: [
+            { value: 'Orthodox', label: 'Orthodox' },
+            { value: 'Reform', label: 'Reform' },
+          ],
+        },
+      ],
+    })
+    const shulItems = [
+      makeListing({ id: 'a', name: 'Mekor', denomination: 'Orthodox', milesFromCenter: 0.2 }),
+      makeListing({ id: 'b', name: 'Vilna', denomination: 'Orthodox', milesFromCenter: 1 }),
+      makeListing({ id: 'c', name: 'Rodeph', denomination: 'Reform', milesFromCenter: 0.8 }),
+    ]
+    const line = (name: RegExp) => screen.getByRole('button', { name })
+
+    it('starts every group closed: one line each with its count and nearest place', () => {
+      renderWithProviders(<GenericDirectory category={shuls} items={shulItems} {...handlers} />)
+      expect(within(screen.getByTestId('list-heading')).getByRole('heading', { name: 'By denomination · 3 listings' })).toBeInTheDocument()
+      expect(line(/^Orthodox · 2/)).toHaveAttribute('aria-expanded', 'false')
+      expect(line(/^Orthodox · 2/)).toHaveTextContent('Nearest: Mekor · 0.2 mi')
+      expect(screen.getByText('Mekor')).not.toBeVisible()
+    })
+
+    it('opens a group on a tap, and this browser remembers it next time', async () => {
+      const user = userEvent.setup()
+      const { unmount } = renderWithProviders(<GenericDirectory category={shuls} items={shulItems} {...handlers} />)
+      await user.click(line(/^Reform · 1/))
+      expect(line(/^Reform · 1/)).toHaveAttribute('aria-expanded', 'true')
+      expect(screen.getByText('Rodeph')).toBeVisible()
+      expect(screen.getByText('Mekor')).not.toBeVisible()
+      unmount()
+
+      renderWithProviders(<GenericDirectory category={shuls} items={shulItems} {...handlers} />)
+      expect(line(/^Reform · 1/)).toHaveAttribute('aria-expanded', 'true')
+      expect(line(/^Orthodox · 2/)).toHaveAttribute('aria-expanded', 'false')
+    })
+
+    it('opens every group with a match while a filter is on, without remembering it', async () => {
+      const user = userEvent.setup()
+      renderWithProviders(<GenericDirectory category={shuls} items={shulItems} {...handlers} />)
+      await user.click(screen.getByRole('button', { name: /^Filters/ }))
+      await user.click(within(screen.getByRole('dialog', { name: 'Filters' })).getByRole('button', { name: 'Orthodox' }))
+      await user.click(screen.getByRole('button', { name: 'Show 2 listings' }))
+
+      expect(line(/^Orthodox · 2/)).toHaveAttribute('aria-expanded', 'true')
+      expect(screen.queryByRole('button', { name: /^Reform/ })).not.toBeInTheDocument()
+      expect(localStorage.getItem('jpc:open-groups:test-community:synagogue')).toBe('[]')
+    })
+
+    it('opens the group of a listing arriving open from a link', () => {
+      renderWithProviders(<GenericDirectory category={shuls} items={shulItems} {...handlers} reopenItemId="c" />)
+      expect(line(/^Reform · 1/)).toHaveAttribute('aria-expanded', 'true')
+      expect(line(/^Orthodox · 2/)).toHaveAttribute('aria-expanded', 'false')
+    })
+
+    it('steps next/previous through what’s on screen, skipping closed groups', async () => {
+      const user = userEvent.setup()
+      const many = [...shulItems, makeListing({ id: 'd', name: 'Kol Tzedek', denomination: 'Reform', milesFromCenter: 3 })]
+      renderWithProviders(<GenericDirectory category={shuls} items={many} {...handlers} reopenItemId="d" />)
+      // With no location the list is alphabetical: Kol Tzedek, Mekor,
+      // Rodeph, Vilna. Only Reform is open, so next from Kol Tzedek is
+      // Rodeph, skipping Mekor in the closed Orthodox group.
+      await user.click(screen.getByRole('button', { name: 'Next listing from Kol Tzedek' }))
+      expect(screen.getByText('Expanded Rodeph')).toBeInTheDocument()
+      expect(screen.queryByText('Expanded Mekor')).not.toBeInTheDocument()
+    })
+  })
+})
+
 // With no location set, a line says where the list's distances are from,
 // with "Use my location" — on phones at the very top of the page, on
 // desktop under the title (DirectoryHeader). jsdom applies no breakpoint

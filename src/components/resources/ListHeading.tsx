@@ -18,7 +18,15 @@ import { FilterChip } from './FiltersSheet'
 // and Sort because there isn't room for all three on a phone.
 
 type Props = {
+  /** The first group's name, or what closed groups are grouped by ("By
+   *  denomination"); none for one ungrouped list. */
+  label?: string
+  /** The number beside it: the first group's, or the whole list's. */
   count: number
+  /** "14 listings" rather than a bare "14": for the whole list, not a group. */
+  noun?: boolean
+  /** How many the whole list holds, whatever the heading shows. */
+  total: number
   /** Open now as a switch leading the chip line, for after a search. */
   openNow?: { on: boolean; onToggle: () => void }
   /** Filters, with how many are on; absent where the category keeps none. */
@@ -31,13 +39,20 @@ type Props = {
   activeChips: { id: string; label: string; onOff: () => void }[]
 }
 
-export default function ListHeading({ count, openNow, filters, sort, onDaveningTimes, externalLink, activeChips }: Props) {
+export default function ListHeading({ label, count, noun = !label, total, openNow, filters, sort, onDaveningTimes, externalLink, activeChips }: Props) {
+  const countText = noun ? `${count} listing${count === 1 ? '' : 's'}` : String(count)
   return (
-    <div data-testid="list-heading" className="space-y-2 pt-2">
+    <div data-testid="list-heading" data-total={total} className="space-y-2 pt-2">
       {/* Wraps rather than running off the side of a narrow phone. */}
       <div className="flex min-h-9 flex-wrap items-center justify-between gap-x-3">
         <h2 className="shrink-0 text-[15px] font-bold text-ink">
-          {count} listing{count === 1 ? '' : 's'}
+          {label ? (
+            <>
+              {label} <span className="font-medium text-slate-500">· {countText}</span>
+            </>
+          ) : (
+            countText
+          )}
         </h2>
         <div className="ml-auto flex items-center gap-3.5">
           {externalLink && (
@@ -110,6 +125,65 @@ export default function ListHeading({ count, openNow, filters, sort, onDaveningT
         </div>
       )}
     </div>
+  )
+}
+
+/** Each open group after the first, whose heading is the list's own:
+ *  "Not open now · 16". */
+export function GroupHeading({ label, count }: { label: string; count: number }) {
+  return (
+    <h2 className="pb-2 pt-6 text-[15px] font-bold text-ink">
+      {label} <span className="font-medium text-slate-500">· {count}</span>
+    </h2>
+  )
+}
+
+/** A closed group: one line, the same size for every group whatever it
+ *  holds, with its count and nearest place. A tap opens it. */
+export function ClosedGroupLine({
+  label,
+  count,
+  nearest,
+  open,
+  onToggle,
+  controls,
+}: {
+  label: string
+  count: number
+  nearest?: string
+  open: boolean
+  onToggle: () => void
+  /** The id of the rows it opens. */
+  controls: string
+}) {
+  return (
+    <button
+      type="button"
+      aria-expanded={open}
+      aria-controls={controls}
+      onClick={onToggle}
+      className="flex w-full cursor-pointer items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-left transition-colors hover:bg-slate-50"
+    >
+      <span className="min-w-0 flex-1">
+        <span className={`block text-[15.5px] font-bold ${open ? 'text-primary' : 'text-ink'}`}>
+          {label} <span className="font-medium text-slate-500">· {count}</span>
+        </span>
+        {/* Open, its rows say it themselves. */}
+        {nearest && !open && <span className="mt-0.5 block truncate text-[13px] text-slate-500">Nearest: {nearest}</span>}
+      </span>
+      <svg
+        aria-hidden="true"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className={`h-[18px] w-[18px] shrink-0 transition-transform ${open ? 'rotate-90 text-primary' : 'text-slate-500'}`}
+      >
+        <path d="m9 18 6-6-6-6" />
+      </svg>
+    </button>
   )
 }
 

@@ -8,9 +8,11 @@ import {
   mergeFieldsWithHidden,
   normalizeField,
   removedFieldKeys,
+  toDraft,
   validateDraft,
   type Draft,
 } from './categoryEditorLogic'
+import { groupByFromKey } from '@/lib/listGroups'
 
 // ── The save workflow: validation, the two destructive-change confirmation
 // gates (option-rename migration, field-removal cleanup), and the actual
@@ -224,6 +226,9 @@ export function useCategorySaveWorkflow({
             })),
           }),
         ...(pendingIdRename && { newId: pendingIdRename.newId }),
+        // Only when changed: a database without migration 059 then still
+        // saves every other edit.
+        ...(!isNew && draft.groupBy !== toDraft(initial).groupBy && { groupBy: groupByFromKey(draft.groupBy) }),
       }
       await fetchJson(
         withCommunity(isNew ? '/api/admin/categories' : `/api/admin/categories/${initial!.id}`, community),

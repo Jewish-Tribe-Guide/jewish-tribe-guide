@@ -4,6 +4,9 @@ import { useEffect } from 'react'
 import { useBodyScrollLock } from '@/lib/useBodyScrollLock'
 import { useIsMobile } from '@/lib/useIsMobile'
 import MobileSheet from './MobileSheet'
+// The same order as the list's own groups, so a denomination sits in the
+// same place in both.
+import { orderForPicking } from '@/lib/listGroups'
 
 // ── Every filter a category page has, in one place ───────────────────────────
 // Opened from Filters in the list heading (ListHeading), the same place on
@@ -88,15 +91,6 @@ function FiltersBody({ hasOpenNow, openNow, onOpenNow, booleans, onBoolean, sele
       </button>
     </div>
   )
-}
-
-/** A pick-list's values in the order the sheet offers them: alphabetical,
- *  with "Other…" last, whatever order the admin entered them in. Stable, so
- *  people find a value in the same place every time, and plainly not a
- *  ranking of one over another. */
-function orderForPicking(values: readonly string[]): string[] {
-  const isOther = (v: string) => /^other\b/i.test(v.trim())
-  return [...values].sort((a, b) => Number(isOther(a)) - Number(isOther(b)) || a.localeCompare(b))
 }
 
 function SwitchRow({ label, on, onToggle }: { label: string; on: boolean; onToggle: () => void }) {

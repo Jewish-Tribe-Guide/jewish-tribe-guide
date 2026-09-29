@@ -170,13 +170,18 @@ test.describe('content is server-rendered', () => {
     }
 
     // The list's heading states the count (ListHeading); it should match
-    // what the API returns. The visible one only: until React swaps in
-    // the streamed content, its hidden `display: none` segments (S:0, S:1)
-    // hold copies of the same heading, and matching every copy failed this
-    // on strict mode: 4 runs in 8 when the count first moved into the
-    // heading, and about one in four with the old count under the title.
-    await expect(page.getByTestId('list-heading').getByRole('heading').filter({ visible: true })).toHaveText(
-      new RegExp(`^${count}\\s+listings?$`),
-    )
+    // what the API returns. As "N listings" on an ungrouped list; a grouped
+    // one's heading names its first group ("Open now · 57"), so the whole
+    // list's count is read from data-total there instead.
+    //
+    // The visible heading only: until React swaps in the streamed content,
+    // its hidden `display: none` segments (S:0, S:1) hold copies of the same
+    // heading, and matching every copy failed this on strict mode: 4 runs in
+    // 8 when the count first moved into the heading, and about one in four
+    // with the old count under the title.
+    const heading = page.getByTestId('list-heading').filter({ visible: true })
+    await expect(heading).toHaveAttribute('data-total', String(count))
+    const text = await heading.getByRole('heading').innerText()
+    if (/listings?$/.test(text)) expect(text).toMatch(new RegExp(`(^|· )${count}\\s+listings?$`))
   })
 })
