@@ -43,10 +43,18 @@ export function clampShare(share: number, avail: number): number {
   return Math.min(hi, Math.max(lo, share))
 }
 
-/** The grid's columns for a share: list, handle, map. The px minimums hold
- *  on a screen narrower than the one the split was made on. */
+/** The grid's columns for a share: list, handle, map. The list is its
+ *  share of the width, kept between its narrowest and what leaves the map
+ *  its smallest, so the minimums hold on a screen narrower than the one the
+ *  split was made on; the map takes whatever is left.
+ *
+ *  Not two fr columns: a list held at its minimum stopped being flexible,
+ *  and a grid shares what's left by the remaining fractions when they add
+ *  up to less than one, so the map took 59% of the rest and left a gap on
+ *  the right (seen with the line dragged all the way left). */
 export function splitColumns(share: number): string {
-  return `minmax(${LIST_MIN_PX}px, ${share}fr) ${HANDLE_PX}px minmax(${MAP_MIN_PX}px, ${1 - share}fr)`
+  const list = `clamp(${LIST_MIN_PX}px, calc((100% - ${HANDLE_PX}px) * ${share}), calc(100% - ${HANDLE_PX + MAP_MIN_PX}px))`
+  return `${list} ${HANDLE_PX}px minmax(${MAP_MIN_PX}px, 1fr)`
 }
 
 /** A stored share, or half and half for nothing stored or nonsense. */

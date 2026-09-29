@@ -42,8 +42,8 @@ describe('clampShare', () => {
     expect(clampShare(0.9, 0)).toBe(0.75)
   })
 
-  it('writes the columns with those minimums, whatever the screen', () => {
-    expect(splitColumns(0.6)).toBe('minmax(420px, 0.6fr) 32px minmax(360px, 0.4fr)')
+  it('writes the columns with those limits, whatever the screen, the map taking the rest', () => {
+    expect(splitColumns(0.6)).toBe('clamp(420px, calc((100% - 32px) * 0.6), calc(100% - 392px)) 32px minmax(360px, 1fr)')
   })
 })
 

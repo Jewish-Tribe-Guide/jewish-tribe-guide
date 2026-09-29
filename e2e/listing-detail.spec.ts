@@ -95,6 +95,44 @@ test.describe('listing detail — desktop', () => {
   // 280px columns squeezed each one into a third of the page. The grid's
   // tracks are 420px at least, so a laptop gets two, and a narrow window
   // one — never three, however wide the screen (the page itself is capped).
+  // The line between list and map (useListMapSplit). Seen live: dragged all
+  // the way left, the list stopped at its narrowest and the map filled the
+  // rest, but on letting go the map shrank back to 365px and left a gap on
+  // the right. The saved share, rounded, put the list a fraction of a pixel
+  // under its minimum, and a grid then shares what's left by the map's own
+  // fraction (under 1) instead of giving it all of it.
+  test('the map fills the rest of the width wherever the line is left, even at the list’s narrowest', async ({ page, request }) => {
+    const community = await defaultCommunity(page)
+    const { category } = await largestCategory(request, community)
+    await page.setViewportSize({ width: 1100, height: 800 })
+    await page.goto(`/${community}/${category.id}`)
+    await dismissLocationPrompt(page)
+
+    const line = page.getByRole('separator', { name: 'Resize the list and the map' })
+    await expect(line).toBeVisible()
+    const edges = () =>
+      line.evaluate((el) => ({
+        grid: el.parentElement!.getBoundingClientRect().right,
+        map: el.nextElementSibling!.getBoundingClientRect().right,
+        list: el.previousElementSibling!.getBoundingClientRect().width,
+      }))
+    const box = (await line.boundingBox())!
+    await page.mouse.move(box.x + box.width / 2, box.y + 200)
+    await page.mouse.down()
+    await page.mouse.move(40, box.y + 200, { steps: 8 })
+    await page.mouse.up()
+
+    const after = await edges()
+    expect(after.list, 'the list stops at its narrowest').toBeCloseTo(420, 0)
+    expect(Math.abs(after.map - after.grid), 'the map reaches the right edge').toBeLessThan(1.5)
+
+    // And after a reload, from the saved split.
+    await page.reload()
+    await expect(line).toBeVisible()
+    const reloaded = await edges()
+    expect(Math.abs(reloaded.map - reloaded.grid), 'the map reaches the right edge after a reload').toBeLessThan(1.5)
+  })
+
   test('lays out two columns at most, and one on a narrow window, with the map hidden', async ({ page, request }) => {
     const community = await defaultCommunity(page)
     const { category } = await largestCategory(request, community)
