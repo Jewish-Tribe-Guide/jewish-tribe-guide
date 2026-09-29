@@ -36,9 +36,12 @@ type Props = {
   onDaveningTimes?: () => void
   /** The filters switched on, each switched off by a tap. */
   activeChips: { id: string; label: string; onOff: () => void }[]
+  /** "Show map", at the right end, once the map beside the list has been
+   *  hidden. Only on a screen wide enough to show it. */
+  onShowMap?: () => void
 }
 
-export default function ListHeading({ label, count, noun = !label, total, openNow, filters, sort, onDaveningTimes, activeChips }: Props) {
+export default function ListHeading({ label, count, noun = !label, total, openNow, filters, sort, onDaveningTimes, activeChips, onShowMap }: Props) {
   const countText = noun ? `${count} listing${count === 1 ? '' : 's'}` : String(count)
   return (
     <div data-testid="list-heading" data-total={total} className="space-y-2 pt-2">
@@ -110,6 +113,20 @@ export default function ListHeading({ label, count, noun = !label, total, openNo
                 </select>
               </span>
             </label>
+          )}
+          {onShowMap && (
+            <span className="hidden lg:flex">
+              <TextAction>
+                <button type="button" onClick={onShowMap} className="flex cursor-pointer items-center gap-1 whitespace-nowrap">
+                  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                    <path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2z" />
+                    <path d="M9 4v14" />
+                    <path d="M15 6v14" />
+                  </svg>
+                  Show map
+                </button>
+              </TextAction>
+            </span>
           )}
         </div>
       </div>

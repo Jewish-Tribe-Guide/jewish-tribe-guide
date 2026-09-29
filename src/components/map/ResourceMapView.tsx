@@ -21,7 +21,7 @@ import { hoursOpenNow, businessClosure } from '@/lib/hours'
 import { useNow } from '@/lib/useNow'
 import { ui } from '@/lib/uiConfig'
 import { ChevronLeftIcon, ExpandIcon, CollapseIcon, PinIcon } from '@/components/icons'
-import { categoryTint, getCategoryColor } from '@/lib/categoryColor'
+import { categoryTint, getCategoryColor, HOSPITAL_COLOR, HOSPITAL_ICON } from '@/lib/categoryColor'
 import LocationControl, { type LocationControls } from '@/components/home/LocationControl'
 import { usePinned } from '@/lib/pinnedContext'
 import { CURRENT_LOCATION_LABEL } from '@/lib/useLiveLocation'
@@ -45,17 +45,10 @@ function resolveInitialSelected(categories: string[] | undefined, category: stri
 }
 
 const HOSPITALS_ID = '__hospitals__'
-// red-600 pulled back the same way as the category palette (see
-// categoryColor.ts) — a hospital pin still needs to read as the urgent one,
-// but at full chroma it was the single loudest thing on a screen that already
-// has a hundred and fifty pins on it. DROPPED_PIN_COLOR below deliberately
-// stays as-is: there is only ever a handful of those, they're the visitor's
-// own transient marks, and standing out is the entire point of one.
-// Exported so HospitalsDirectory's own header band uses the identical color
-// and glyph — a hospital should read as the same "thing" on the map and on
-// its own directory page, not two independently-chosen reds.
-export const HOSPITAL_COLOR = '#b6302b'
-export const HOSPITAL_ICON = '🏥'
+// The hospital pin's colour and glyph live in categoryColor.ts, shared with
+// HospitalsDirectory's header band. Re-exported here for the map's own
+// callers.
+export { HOSPITAL_COLOR, HOSPITAL_ICON }
 // A dropped pin's marker id is prefixed with this so a click handler can
 // tell it apart from a real listing/hospital point without a separate prop
 // threaded through every consumer — see droppedMapPoints below.

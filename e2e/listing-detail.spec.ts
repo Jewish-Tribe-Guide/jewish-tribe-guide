@@ -48,12 +48,34 @@ test.describe('listing detail — desktop', () => {
     await expect(dialog).not.toBeVisible()
   })
 
-  test('the directory lays out listings in columns, not one long list', async ({ page, request }) => {
+  // Where the category has a map, the map sits beside the list at desktop
+  // width (CategoryMap), and the list is one column of rows. Hiding the map
+  // gives the list the whole width, in columns.
+  test('puts the map beside a one-column list, and the list in columns once the map is hidden', async ({ page, request }) => {
     const community = await defaultCommunity(page)
     const { category } = await largestCategory(request, community)
 
     await page.goto(`/${community}/${category.id}`)
     await dismissLocationPrompt(page)
+
+    const map = page.getByTestId('category-map')
+    await expect(map).toBeVisible()
+    const list = (await page.getByTestId('list-heading').boundingBox())!
+    const mapBox = (await map.boundingBox())!
+    expect(mapBox.x, 'the map sits to the right of the list').toBeGreaterThan(list.x + list.width - 1)
+    const tracks = () =>
+      page
+        .getByRole('button', { name: /^Show details for / })
+        .first()
+        .evaluate((el) => {
+          let node: Element | null = el
+          while (node && getComputedStyle(node).display !== 'grid') node = node.parentElement
+          return node ? getComputedStyle(node).gridTemplateColumns.split(' ').length : 1
+        })
+    expect(await tracks(), 'one column of rows beside the map').toBe(1)
+
+    await map.getByRole('button', { name: 'Hide map' }).click()
+    await expect(map).toHaveCount(0)
 
     // Walks up from a trigger button to the nearest ancestor CSS actually
     // lays out as a grid, rather than assuming a fixed number of DOM levels
@@ -73,7 +95,7 @@ test.describe('listing detail — desktop', () => {
   // 280px columns squeezed each one into a third of the page. The grid's
   // tracks are 420px at least, so a laptop gets two, and a narrow window
   // one — never three, however wide the screen (the page itself is capped).
-  test('lays out two columns at most, and one on a narrow window', async ({ page, request }) => {
+  test('lays out two columns at most, and one on a narrow window, with the map hidden', async ({ page, request }) => {
     const community = await defaultCommunity(page)
     const { category } = await largestCategory(request, community)
     const trigger = () => page.getByRole('button', { name: /^Show details for / }).first()
@@ -88,6 +110,7 @@ test.describe('listing detail — desktop', () => {
 
     await page.goto(`/${community}/${category.id}`)
     await dismissLocationPrompt(page)
+    await page.getByTestId('category-map').getByRole('button', { name: 'Hide map' }).click()
 
     expect(await columnsAt(1920)).toBe(2)
     expect(await columnsAt(1400)).toBe(2)
@@ -194,10 +217,14 @@ test.describe('listing detail — desktop', () => {
 
     // The site header is ALSO `position: sticky` (see SiteHeader's own
     // className) — excluding it by tag name isolates GenericDirectory's
-    // own controls bar, the second sticky element down.
+    // own controls bar, the second sticky element down. The map beside the
+    // list is sticky too, but beside the rows, not over them.
     const controlsBottom = await page.evaluate(() => {
       const stuck = [...document.querySelectorAll('*')].filter(
-        (el) => el.tagName !== 'HEADER' && getComputedStyle(el).position === 'sticky',
+        (el) =>
+          el.tagName !== 'HEADER' &&
+          getComputedStyle(el).position === 'sticky' &&
+          !el.querySelector('[data-testid="category-map"]'),
       )
       return stuck.length > 0 ? Math.max(...stuck.map((el) => el.getBoundingClientRect().bottom)) : 0
     })

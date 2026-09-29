@@ -7,7 +7,7 @@ import { haversineMiles, roundMiles } from '@/lib/geo'
 import { useActiveCommunity } from '@/lib/communityContext'
 import DirectoryHeader from './DirectoryHeader'
 import { CategoryBandFrame, CategoryBandBadge } from './CategoryBandFrame'
-import { HOSPITAL_COLOR } from '@/components/map/ResourceMapView'
+import { HOSPITAL_COLOR } from '@/lib/categoryColor'
 import { useLogSearchMiss } from '@/lib/useLogSearchMiss'
 import { useSetScreenHeader } from '@/lib/headerVisibility'
 import { useIsMobile } from '@/lib/useIsMobile'
@@ -79,7 +79,7 @@ export default function HospitalsDirectory({ anchor, onSelect, onUp, onViewMap }
   })
 
   // Same red as the map's own hospital pins (HOSPITAL_COLOR/HOSPITAL_ICON in
-  // ResourceMapView) — a hospital should read as the same thing here and
+  // categoryColor.ts) — a hospital should read as the same thing here and
   // there, not two independently-chosen colors. No cardImageUrl: this isn't
   // a CategoryConfig row, so there's nowhere a photo could be stored — the
   // band always falls back to the plain color wash, same as most real

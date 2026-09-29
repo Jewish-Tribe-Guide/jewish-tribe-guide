@@ -6,6 +6,7 @@ import userEvent from '@testing-library/user-event'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { mockRouter } from '@/test/nextNavigationMock'
 import { makeCategory, makeListing } from '@/test/providerFixtures'
+import { resolveCapabilities } from '@/lib/categories'
 import { resetMockIntersectionObserver, setAllIntersecting } from '@/test/intersectionObserverMock'
 import type { DirectoryResource } from '@/types'
 import { didArriveViaBackForward } from '@/lib/backForwardNavigation'
@@ -137,6 +138,44 @@ vi.mock('@/components/synagogues/DaveningTimesModal', () => ({
       </div>
     ) : null,
 }))
+
+// The map beside the list is real and separately tested (CategoryMap.test);
+// here, a stand-in showing what the page hands it, with its pins as
+// buttons.
+vi.mock('./CategoryMap', async () => {
+  const { useSyncExternalStore } = await import('react')
+  const actual = await vi.importActual<typeof import('./CategoryMap')>('./CategoryMap')
+  return {
+    createHighlight: actual.createHighlight,
+    default: function CategoryMap({
+      items,
+      highlight,
+      onSelect,
+      onHide,
+      fullMapHref,
+    }: {
+      items: DirectoryResource[]
+      highlight: import('./CategoryMap').Highlight
+      onSelect: (id: string) => void
+      onHide: () => void
+      fullMapHref: string
+    }) {
+      const lit = useSyncExternalStore(highlight.subscribe, highlight.get, () => null)
+      return (
+        <div data-testid="map-stand-in" data-href={fullMapHref}>
+          <span>map shows: {items.map((i) => i.name).join(', ')}</span>
+          <span>pin lit: {lit ?? 'none'}</span>
+          {items.map((i) => (
+            <button key={i.id} onClick={() => onSelect(i.id)}>
+              pin {i.name}
+            </button>
+          ))}
+          <button onClick={onHide}>Hide map</button>
+        </div>
+      )
+    },
+  }
+})
 
 afterEach(() => {
   cleanup()
@@ -765,7 +804,11 @@ describe('GenericDirectory', () => {
     // pulled the bar's own solid background up 12px regardless of scroll
     // position and overlapped whatever sat directly above it (the Add
     // button) even before any scrolling happened at all.
-    const category = makeCategory({ hasAddress: true })
+    //
+    // Only a category without a map has the sticky bar: where the map sits
+    // beside the list, the map stays in view instead (see "the map beside
+    // the list" below).
+    const category = makeCategory({ hasAddress: true, capabilities: { ...resolveCapabilities(), map: false } })
     const { container } = renderWithProviders(<GenericDirectory category={category} items={[makeListing()]} {...handlers} />)
 
     const controlsBar = container.querySelector('[class*="lg:sticky"]')
@@ -1605,6 +1648,101 @@ describe('GenericDirectory — the question card', () => {
     expect(lastLine.compareDocumentPosition(card) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     // Asked about the first place in the list's order, closed groups or not.
     expect(screen.getByText(/^Place 1( · [^:]+)?: is everything here still right\?$/)).toBeInTheDocument()
+  })
+})
+
+describe('GenericDirectory — the map beside the list', () => {
+  const food = makeCategory({
+    id: 'restaurant',
+    detailFields: [{ key: 'kosher', label: 'Kosher', type: 'boolean', filterable: true }],
+  })
+  const rows = [
+    { ...makeListing({ id: 'a', name: 'Alpha Grill', category: 'restaurant' }), kosher: true },
+    makeListing({ id: 'b', name: 'Beta Cafe', category: 'restaurant' }),
+  ] as DirectoryResource[]
+  afterEach(() => localStorage.clear())
+
+  it('sits beside the list where the category has a map, with the list’s heading atop the list, not in a sticky bar', () => {
+    const { container } = renderWithProviders(<GenericDirectory category={food} items={rows} {...handlers} />)
+    expect(screen.getByText('map shows: Alpha Grill, Beta Cafe')).toBeInTheDocument()
+    // The heading comes after the search and before the first row, and
+    // nothing above the list sticks: the map stays in view instead.
+    const heading = screen.getByTestId('list-heading')
+    expect(heading.compareDocumentPosition(screen.getByText('Alpha Grill')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(heading.closest('[class*="lg:sticky"]')).toBeNull()
+    expect(container.querySelector('[class*="lg:sticky"]')).toContainElement(screen.getByTestId('map-stand-in'))
+  })
+
+  it('isn’t there for a category without a map, which keeps its sticky bar', () => {
+    const noMap = { ...food, capabilities: { ...resolveCapabilities(), map: false } }
+    renderWithProviders(<GenericDirectory category={noMap} items={rows} {...handlers} />)
+    expect(screen.queryByTestId('map-stand-in')).not.toBeInTheDocument()
+    expect(screen.getByTestId('list-heading').closest('[class*="lg:sticky"]')).not.toBeNull()
+    cleanup()
+    renderWithProviders(<GenericDirectory category={{ ...food, hasAddress: false }} items={rows} {...handlers} />)
+    expect(screen.queryByTestId('map-stand-in')).not.toBeInTheDocument()
+  })
+
+  it('shows only what the list shows: the filters’ and the search’s places', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(<GenericDirectory category={food} items={rows} initialFilters={{ f_kosher: '1' }} {...handlers} />, {
+      content: { categories: [food] },
+    })
+    expect(screen.getByText('map shows: Alpha Grill')).toBeInTheDocument()
+    await user.click(within(screen.getByTestId('active-filters')).getByRole('button', { name: /Kosher/ }))
+    await user.type(screen.getByRole('searchbox'), 'beta')
+    expect(screen.getByText('map shows: Beta Cafe')).toBeInTheDocument()
+  })
+
+  it('opens the full Map page on the same category, search and filters', () => {
+    renderWithProviders(<GenericDirectory category={food} items={rows} initialFilters={{ f_kosher: '1' }} {...handlers} />)
+    const href = screen.getByTestId('map-stand-in').getAttribute('data-href')!
+    const url = new URL(href, 'http://x')
+    expect(url.pathname).toMatch(/\/map$/)
+    expect(url.searchParams.get('cat')).toBe('restaurant')
+    expect(url.searchParams.get('is')).toBe('kosher')
+  })
+
+  it('lights a row’s pin while the pointer is on the row', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(<GenericDirectory category={food} items={rows} {...handlers} />)
+    await user.hover(screen.getByText('Beta Cafe'))
+    expect(screen.getByText('pin lit: b')).toBeInTheDocument()
+    await user.unhover(screen.getByText('Beta Cafe'))
+    expect(screen.getByText('pin lit: none')).toBeInTheDocument()
+  })
+
+  it('finds a pin’s row: outlines it, and opens the closed group it’s in', async () => {
+    const user = userEvent.setup()
+    const grouped = makeCategory({
+      id: 'synagogue',
+      groupBy: { kind: 'field', key: 'd' },
+      detailFields: [{ key: 'd', label: 'Denomination', type: 'select', filterable: true, options: [] }],
+    })
+    const shuls = [
+      { ...makeListing({ id: 'a', name: 'Alpha Shul', category: 'synagogue' }), d: 'Orthodox' },
+      { ...makeListing({ id: 'b', name: 'Beta Shul', category: 'synagogue' }), d: 'Reform' },
+    ] as DirectoryResource[]
+    renderWithProviders(<GenericDirectory category={grouped} items={shuls} {...handlers} />)
+    const reform = screen.getByRole('button', { name: /^Reform/ })
+    expect(reform).toHaveAttribute('aria-expanded', 'false')
+
+    await user.click(screen.getByRole('button', { name: 'pin Beta Shul' }))
+    expect(reform).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByText('Beta Shul').closest('[class*="ring-2"]')).not.toBeNull()
+  })
+
+  it('hides when asked, remembers it, and comes back from "Show map" in the heading', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(<GenericDirectory category={food} items={rows} {...handlers} />)
+    await user.click(screen.getByRole('button', { name: 'Hide map' }))
+    expect(screen.queryByTestId('map-stand-in')).not.toBeInTheDocument()
+
+    cleanup()
+    renderWithProviders(<GenericDirectory category={food} items={rows} {...handlers} />)
+    expect(screen.queryByTestId('map-stand-in')).not.toBeInTheDocument()
+    await user.click(within(screen.getByTestId('list-heading')).getByRole('button', { name: /Show map/ }))
+    expect(screen.getByTestId('map-stand-in')).toBeInTheDocument()
   })
 })
 

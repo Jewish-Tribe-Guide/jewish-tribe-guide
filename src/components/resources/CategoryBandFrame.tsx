@@ -70,7 +70,9 @@ export function CategoryBandFrame({ color, imageUrl, children }: FrameProps) {
     // containing block.
     <div className="relative -mt-12 mx-[calc(50%-50vw)] border-t border-slate-200">
       <div
-        className="relative h-48 overflow-hidden sm:h-56"
+        // 132px, down from 224: short enough that the list and the map
+        // beside it start above the fold on a 1440x900 screen.
+        className="relative h-[132px] overflow-hidden"
         style={!bandImage ? { backgroundColor: categoryTint(color) } : undefined}
       >
         {bandImage && (

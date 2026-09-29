@@ -171,6 +171,24 @@ test.describe('category page weight', () => {
     expect(kb(doc!.bytes)).toBeLessThan(100)
   })
 
+  // The map beside the list is desktop only. A phone downloads neither its
+  // code nor Google's script: the component isn't drawn there, and React's
+  // lazy() only fetches it when it is (next/dynamic fetched it anyway). The
+  // desktop project is the positive control, so this can't pass because the
+  // map is simply broken.
+  test('a phone loads nothing from Google Maps on a category page; a desktop loads the map beside the list', async ({ page, request, isMobile }) => {
+    const community = await defaultCommunity(page)
+    const { category } = await largestCategory(request, community)
+
+    const hosts: string[] = []
+    page.on('request', (r) => void hosts.push(new URL(r.url()).host))
+    await load(page, `/${community}/${category.id}`)
+
+    const google = hosts.filter((h) => h === 'maps.googleapis.com' || h === 'maps.gstatic.com')
+    if (isMobile) expect(google, 'a phone browsing a category page').toHaveLength(0)
+    else expect(google.length, 'a desktop draws the map beside the list').toBeGreaterThan(0)
+  })
+
   test('browsing loads nothing from Turnstile, which only an Add/Edit form needs', async ({ page, request }) => {
     test.skip(
       !process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY,

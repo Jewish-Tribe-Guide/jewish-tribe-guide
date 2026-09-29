@@ -29,6 +29,8 @@ import { travelCompare } from '@/lib/listingTravel'
 import { useLogSearchMiss } from '@/lib/useLogSearchMiss'
 import CategoryAsk from './CategoryAsk'
 import NextMinyanCard from './NextMinyanCard'
+import CategoryMap, { createHighlight } from './CategoryMap'
+import { mapQueryString, routes } from '@/lib/routes'
 import QuestionCard from './QuestionCard'
 import { parseQuestionCard } from '@/lib/questionCards'
 import { ui } from '@/lib/uiConfig'
@@ -900,11 +902,12 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // A listing arriving open (?item=, a shared link or a reload) opens its
   // group, until that listing is closed.
   const [reopenClosedId, setReopenClosedId] = useState<string | null>(null)
-  // A shul opened from the Next minyan card opens its group the same way.
-  const [openedFromCard, setOpenedFromCard] = useState<string | null>(null)
+  // A shul opened from the Next minyan card, or a place whose pin was
+  // clicked, opens its group the same way.
+  const [revealedId, setRevealedId] = useState<string | null>(null)
   const isGroupOpen = (g: ListGroup<DirectoryResource>) =>
     (!!reopenItemId && reopenItemId !== reopenClosedId && g.items.some((i) => i.id === reopenItemId)) ||
-    (!!openedFromCard && g.items.some((i) => i.id === openedFromCard)) ||
+    (!!revealedId && g.items.some((i) => i.id === revealedId)) ||
     (activeFilterCount > 0 ? !closedNow.includes(g.id) : openGroupIds.includes(g.id))
   const toggleGroup = (id: string) => {
     const flip = (ids: string[]) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id])
@@ -936,7 +939,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // A line in that card opens its shul, as next/previous does, and opens
   // the closed group it sits in until it's closed again.
   const openListing = (id: string) => {
-    setOpenedFromCard(id)
+    setRevealedId(id)
     cardRefs.current.get(id)?.open()
     scrollItemIntoViewWhenSettled(id, 'instant')
   }
@@ -1055,6 +1058,53 @@ export default function GenericDirectory({ category, items, anchorLabel, address
         }
       })
 
+  // ── The map beside the list (see CategoryMap) ──
+  // Where the category has a map (an address and the Map capability). Below
+  // lg it's simply not there; "Hide map" gives the list the whole width,
+  // and this browser remembers it.
+  const hasMapColumn = caps.map && category.hasAddress !== false
+  const [mapHidden, setMapHidden] = usePersistedState<boolean>(
+    false,
+    () => {
+      try {
+        return localStorage.getItem('jpc:map-hidden') === '1'
+      } catch {
+        return false
+      }
+    },
+    useCallback((hidden: boolean) => {
+      try {
+        if (hidden) localStorage.setItem('jpc:map-hidden', '1')
+        else localStorage.removeItem('jpc:map-hidden')
+      } catch {
+        // Blocked storage: the map just shows again next visit.
+      }
+    }, []),
+  )
+  const mapBeside = hasMapColumn && !mapHidden
+  const [highlight] = useState(createHighlight)
+  // A pin's row, found: opened to (its group too), scrolled to, and
+  // outlined for a moment so the eye lands on it.
+  const [flashId, setFlashId] = useState<string | null>(null)
+  const flashTimer = useRef(0)
+  const findRow = (id: string) => {
+    setRevealedId(id)
+    setFlashId(id)
+    scrollItemIntoViewWhenSettled(id, 'smooth')
+    // A second click restarts the outline's time rather than ending it early.
+    window.clearTimeout(flashTimer.current)
+    flashTimer.current = window.setTimeout(() => setFlashId(null), 2500)
+  }
+  // The full Map page on the same places: this category, the search and
+  // the filters.
+  const fullMapHref = `${routes.map(activeCommunity.slug)}${mapQueryString({
+    categories: [category.id],
+    query: search.trim() || null,
+    openNow,
+    bool: Object.keys(boolFilters).filter((k) => boolFilters[k]),
+    select: Object.fromEntries(Object.entries(selectFilters).filter(([, v]) => v.length > 0)),
+  })}`
+
   // The category's one question card (see QuestionCard), after the fifth
   // place shown: below the first screen, where someone who has read that
   // far is looking through the list. After the last place on a shorter
@@ -1081,6 +1131,28 @@ export default function GenericDirectory({ category, items, anchorLabel, address
       place={(item) => rowPlaces.get(item.id) ?? null}
       onEdit={onEdit}
     />
+  )
+
+  // The list's own heading: how many, and Filters and Sort, the same place
+  // on every category page (see ListHeading). Under the search box, or at
+  // the top of the list's column where the map sits beside it.
+  const listHeading = (
+      <ListHeading
+        // Open groups: the first group's heading is the list's own ("Open
+        // now · 57"), saving a line above the first place on a phone.
+        // Closed groups: what they're grouped by and the whole count.
+        label={grouping ? (grouping.closed ? grouping.title : grouping.groups[0]?.label) : undefined}
+        count={grouping && !grouping.closed ? (grouping.groups[0]?.items.length ?? 0) : filtered.length}
+        noun={!grouping || grouping.closed}
+        total={filtered.length}
+        openNow={typed && hasFilterableHours ? { on: openNow, onToggle: () => setOpenNow((v) => !v) } : undefined}
+        filters={hasActualFilters ? { active: activeFilterCount, onOpen: () => setFiltersOpen(true) } : undefined}
+        sort={upvotes ? { byPopular: sortByPopular, onSelect: selectSort } : undefined}
+        // Only while the Next minyan card, which carries it, is gone.
+        onDaveningTimes={hasMinyanim && !showMinyanCard ? () => setDaveningModalOpen(true) : undefined}
+        activeChips={activeChips}
+        onShowMap={hasMapColumn && mapHidden ? () => setMapHidden(false) : undefined}
+      />
   )
 
   return (
@@ -1175,8 +1247,13 @@ export default function GenericDirectory({ category, items, anchorLabel, address
         // same frame, which reads as a stutter right at the moment it docks
         // rather than one clean motion. transition-all covers all of it with
         // the same duration, so it settles together.
-        className={`mb-4 space-y-2 lg:sticky lg:top-14 lg:z-30 lg:transition-all lg:duration-300 ${
-          controlsStuck
+        // Not sticky where the map sits beside the list: the map stays in
+        // view instead, and the list's heading moves to the top of its
+        // column (see hasMapColumn).
+        className={`mb-4 space-y-2 ${hasMapColumn ? '' : 'lg:sticky lg:top-14 lg:z-30 lg:transition-all lg:duration-300'} ${
+          hasMapColumn
+            ? ''
+            : controlsStuck
             ? `lg:border-x lg:border-slate-200 lg:bg-white lg:px-4 lg:pt-3 lg:pb-3 lg:-mt-3 lg:shadow-[0_6px_12px_-8px_rgba(15,23,42,0.35)] ${controlsVisible ? 'lg:translate-y-0' : 'lg:-translate-y-full'}`
             : 'lg:translate-y-0'
         }`}
@@ -1189,7 +1266,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
             the search's own answer says what's next (see NextMinyanCard). */}
         <div className={showMinyanCard ? 'space-y-3 lg:flex lg:items-start lg:gap-5 lg:space-y-0' : undefined}>
           {showSearch && (
-            <div className={showMinyanCard ? 'min-w-0 lg:flex-1' : undefined}>
+            <div className={showMinyanCard ? 'min-w-0 lg:flex-1' : hasMapColumn ? 'lg:max-w-[720px]' : undefined}>
               <CategoryAsk category={category} items={items} search={search} onSearch={setSearch} hasMinyanim={hasMinyanim} />
             </div>
           )}
@@ -1199,25 +1276,12 @@ export default function GenericDirectory({ category, items, anchorLabel, address
             </div>
           )}
         </div>
-        {/* The list's own heading: how many, and Filters and Sort, the
-            same place on every category page (see ListHeading). */}
-        <ListHeading
-          // Open groups: the first group's heading is the list's own ("Open
-          // now · 57"), saving a line above the first place on a phone.
-          // Closed groups: what they're grouped by and the whole count.
-          label={grouping ? (grouping.closed ? grouping.title : grouping.groups[0]?.label) : undefined}
-          count={grouping && !grouping.closed ? (grouping.groups[0]?.items.length ?? 0) : filtered.length}
-          noun={!grouping || grouping.closed}
-          total={filtered.length}
-          openNow={typed && hasFilterableHours ? { on: openNow, onToggle: () => setOpenNow((v) => !v) } : undefined}
-          filters={hasActualFilters ? { active: activeFilterCount, onOpen: () => setFiltersOpen(true) } : undefined}
-          sort={upvotes ? { byPopular: sortByPopular, onSelect: selectSort } : undefined}
-          // Only while the Next minyan card, which carries it, is gone.
-          onDaveningTimes={hasMinyanim && !showMinyanCard ? () => setDaveningModalOpen(true) : undefined}
-          activeChips={activeChips}
-        />
+        {!hasMapColumn && listHeading}
       </div>
 
+      <div className={mapBeside ? 'lg:grid lg:grid-cols-2 lg:items-start lg:gap-8' : undefined}>
+      <div className="min-w-0">
+      {hasMapColumn && listHeading}
       {filtered.length === 0 ? (
         <div className="text-center py-12">
           <p className="text-sm text-muted">
@@ -1273,7 +1337,13 @@ export default function GenericDirectory({ category, items, anchorLabel, address
         <div className="space-y-2 sm:space-y-0 sm:grid sm:gap-3 sm:grid-cols-[repeat(auto-fill,minmax(420px,1fr))]">
           {section.items.map((item) => (
             <Fragment key={item.id}>
-            <div ref={setItemRowRef(item.id)}>
+            <div
+              ref={setItemRowRef(item.id)}
+              // A row and its pin light up together (CategoryMap).
+              onMouseEnter={mapBeside ? () => highlight.set(item.id) : undefined}
+              onMouseLeave={mapBeside ? () => highlight.set(null) : undefined}
+              className={flashId === item.id ? 'rounded-xl ring-2 ring-primary/60 ring-offset-2 transition-shadow' : undefined}
+            >
             <GenericListingCard
               ref={setCardRef(item.id)}
               onNavigate={(direction) => navigateFromCard(item.id, direction)}
@@ -1301,7 +1371,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
               found={foundOn(item)}
               onExpandedChange={(expanded) => {
                 onParamsChange?.({ item: expanded ? item.id : null, ...(expanded ? {} : { match: null }) }, { replace: true })
-                if (!expanded && item.id === openedFromCard) setOpenedFromCard(null)
+                if (!expanded && item.id === revealedId) setRevealedId(null)
                 if (!expanded && item.id === reopenItemId) {
                   setClosedMatchFor(reopenKey)
                   setReopenClosedId(item.id)
@@ -1357,6 +1427,24 @@ export default function GenericDirectory({ category, items, anchorLabel, address
           </a>
         </p>
       )}
+      </div>
+      {/* The map, beside the list from lg up and staying in view while the
+          list scrolls. Not rendered at all below that (CategoryMap loads
+          nothing until it's wide enough). */}
+      {mapBeside && (
+        <div className="hidden lg:sticky lg:top-[4.5rem] lg:block lg:h-[min(calc(100vh-6rem),720px)]">
+          <CategoryMap
+            category={category}
+            items={filtered}
+            searchActive={typed || activeFilterCount > 0}
+            highlight={highlight}
+            onSelect={findRow}
+            onHide={() => setMapHidden(true)}
+            fullMapHref={fullMapHref}
+          />
+        </div>
+      )}
+      </div>
       </CategoryBandFrame>
 
       {/* The category page's Add — a floating circular button,
