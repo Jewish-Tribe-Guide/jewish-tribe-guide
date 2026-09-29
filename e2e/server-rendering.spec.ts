@@ -220,10 +220,11 @@ test.describe('the time is the browser’s, not the build’s', () => {
     const markup = serverMarkup(await (await request.get(`/${community}/${category.id}`)).text())
     expect(markup).not.toMatch(/Opens \w|Open until|Closes soon|No hours listed/)
 
-    // The browser says it, once it knows the time.
+    // The browser says it, once it knows the time. The visible <main> only:
+    // until React swaps in the streamed content, a hidden copy is there too.
     await page.goto(`/${community}/${category.id}`)
     await ready(page)
-    await expect(page.locator('main')).toContainText(/Opens \w|Open until|Closes soon|Open\b|No hours listed/)
+    await expect(page.locator('main').filter({ visible: true })).toContainText(/Opens \w|Open until|Closes soon|Open\b|No hours listed/)
   })
 
   test('a shul list’s HTML says nothing about the next minyan', async ({ page, request }) => {
