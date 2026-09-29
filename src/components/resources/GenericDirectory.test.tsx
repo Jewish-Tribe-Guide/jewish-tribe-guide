@@ -1062,6 +1062,35 @@ describe('GenericDirectory — the list heading', () => {
     expect(heading.getByRole('combobox', { name: 'Sort' })).toBeInTheDocument()
   })
 
+  it('shows Sort’s choice as its own text, which follows the select, so the select itself can stay unseen', async () => {
+    // A phone draws every select at 16px (globals.css), bigger than the
+    // "Sort" beside it. The select is laid over the text invisibly; the
+    // text has to follow what it holds.
+    const user = userEvent.setup()
+    renderWithProviders(<GenericDirectory category={food} items={items} anchorLabel="123 Main St" {...handlers} />)
+    const sort = screen.getByRole('combobox', { name: 'Sort' })
+    expect(sort).toHaveClass('opacity-0')
+    expect(screen.getByTestId('sort-shown')).toHaveTextContent('Distance')
+    await user.selectOptions(sort, 'Popularity')
+    expect(screen.getByTestId('sort-shown')).toHaveTextContent('Popularity')
+  })
+
+  it('puts the category’s own link (“Other Mikvahs”) after the last row, not in the heading', () => {
+    const mikvahs = { ...food, externalLink: { label: 'Other Mikvahs', url: 'https://mikvah.org/directory' } }
+    renderWithProviders(<GenericDirectory category={mikvahs} items={items} {...handlers} />)
+    const link = screen.getByRole('link', { name: /Other Mikvahs/ })
+    expect(within(screen.getByTestId('list-heading')).queryByRole('link')).not.toBeInTheDocument()
+    const lastRow = screen.getByText('Truck')
+    expect(lastRow.compareDocumentPosition(link) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(link).toHaveAttribute('href', 'https://mikvah.org/directory')
+  })
+
+  it('keeps that link under an empty list, where it’s most wanted', () => {
+    const mikvahs = { ...food, externalLink: { label: 'Other Mikvahs', url: 'https://mikvah.org/directory' } }
+    renderWithProviders(<GenericDirectory category={mikvahs} items={[]} {...handlers} />)
+    expect(screen.getByRole('link', { name: /Other Mikvahs/ })).toBeInTheDocument()
+  })
+
   it('opens one sheet holding every filter: Open now, each yes/no, each pick-list', async () => {
     const user = userEvent.setup()
     renderWithProviders(<GenericDirectory category={food} items={items} {...handlers} />)

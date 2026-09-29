@@ -1154,7 +1154,6 @@ export default function GenericDirectory({ category, items, anchorLabel, address
           filters={hasActualFilters ? { active: activeFilterCount, onOpen: () => setFiltersOpen(true) } : undefined}
           sort={upvotes ? { byPopular: sortByPopular, onSelect: selectSort } : undefined}
           onDaveningTimes={hasMinyanim ? () => setDaveningModalOpen(true) : undefined}
-          externalLink={category.externalLink ?? undefined}
           activeChips={activeChips}
         />
       </div>
@@ -1277,6 +1276,19 @@ export default function GenericDirectory({ category, items, anchorLabel, address
         </div>
         </SwipeRowGroup>
         </NextMinyans>
+      )}
+      {/* A link an admin set for what this guide doesn't list ("Other
+          Mikvahs" → mikvah.org's directory). After the last row, where
+          someone who hasn't found it here has just finished looking, and
+          under an empty list too; not in the list heading, which is for
+          arranging the list. */}
+      {category.externalLink && (
+        <p data-testid="external-link" className="mt-5 text-center text-[13.5px] text-slate-500">
+          Not listed here?{' '}
+          <a href={category.externalLink.url} target="_blank" rel="noopener noreferrer" className="font-bold text-primary hover:underline">
+            {category.externalLink.label} ↗
+          </a>
+        </p>
       )}
       </CategoryBandFrame>
 
