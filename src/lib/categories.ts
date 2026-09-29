@@ -397,6 +397,11 @@ export type CategoryConfig = {
    *  read through parseGroupBy, so an unknown shape means no groups rather
    *  than an error — see listGroups.ts. */
   groupBy?: unknown
+  /** The one question the category page asks in its list: a place's
+   *  missing yes/no or pick-list value, or whether a place nobody has
+   *  confirmed is still right. Unset means none. Read through
+   *  parseQuestionCard, like groupBy — see questionCards.ts. */
+  questionCard?: unknown
 }
 
 export const DEFAULT_CATEGORY_ICON = '📋'

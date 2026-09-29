@@ -5,6 +5,7 @@ import { assertUsableSlug, slugify } from './routes'
 import { listCampaignBanners } from './campaignBannerStore'
 import { activeCampaignCategoryIds } from './campaignBanner'
 import { parseGroupBy, type GroupBy } from './listGroups'
+import { parseQuestionCard, type QuestionCard } from './questionCards'
 
 export { slugify }
 import {
@@ -46,6 +47,7 @@ type CategoryRow = {
   // Optional the same way: undefined before migration 059, null once
   // migrated but never set. Either way, one ungrouped list.
   group_by?: unknown
+  question_card?: unknown
 }
 
 function toConfig(row: CategoryRow): CategoryConfig {
@@ -78,6 +80,7 @@ function toConfig(row: CategoryRow): CategoryConfig {
     active: row.active !== false,
     formSections: row.form_sections ?? undefined,
     groupBy: parseGroupBy(row.group_by) ?? undefined,
+    questionCard: parseQuestionCard(row.question_card) ?? undefined,
   }
 }
 
@@ -280,6 +283,7 @@ export async function updateCategory(
     active?: boolean
     formSections?: CategoryFormSection[] | null
     groupBy?: GroupBy | null
+    questionCard?: QuestionCard | null
   },
 ): Promise<CategoryConfig | null> {
   const supabase = getAdminClient()
@@ -310,6 +314,8 @@ export async function updateCategory(
   // Only sent when the admin changed it, so every other save keeps working
   // on a database that doesn't have the column yet (migration 059).
   if (patch.groupBy !== undefined) row.group_by = patch.groupBy
+  // The same, for migration 060.
+  if (patch.questionCard !== undefined) row.question_card = patch.questionCard
 
   // Scoped by community as well as id — the composite primary key means a
   // second community's identically-slugged category is a different row, and

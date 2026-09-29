@@ -13,6 +13,7 @@ import {
   type Draft,
 } from './categoryEditorLogic'
 import { groupByFromKey } from '@/lib/listGroups'
+import { questionCardFromKey } from '@/lib/questionCards'
 
 // ── The save workflow: validation, the two destructive-change confirmation
 // gates (option-rename migration, field-removal cleanup), and the actual
@@ -229,6 +230,8 @@ export function useCategorySaveWorkflow({
         // Only when changed: a database without migration 059 then still
         // saves every other edit.
         ...(!isNew && draft.groupBy !== toDraft(initial).groupBy && { groupBy: groupByFromKey(draft.groupBy) }),
+        // The same, for migration 060.
+        ...(!isNew && draft.questionCard !== toDraft(initial).questionCard && { questionCard: questionCardFromKey(draft.questionCard) }),
       }
       await fetchJson(
         withCommunity(isNew ? '/api/admin/categories' : `/api/admin/categories/${initial!.id}`, community),

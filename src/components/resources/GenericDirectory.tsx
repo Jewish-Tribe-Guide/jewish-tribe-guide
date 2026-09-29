@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState, ViewTransition, type ReactNode } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, ViewTransition, type ReactNode } from 'react'
 import type { DirectoryResource } from '@/types'
 import { resolveCapabilities, selectValues, bandImageFor, type CategoryConfig } from '@/lib/categories'
 import { hoursOpenNow, businessClosure } from '@/lib/hours'
@@ -29,6 +29,8 @@ import { travelCompare } from '@/lib/listingTravel'
 import { useLogSearchMiss } from '@/lib/useLogSearchMiss'
 import CategoryAsk from './CategoryAsk'
 import NextMinyanCard from './NextMinyanCard'
+import QuestionCard from './QuestionCard'
+import { parseQuestionCard } from '@/lib/questionCards'
 import { ui } from '@/lib/uiConfig'
 import { useOptionalLocation } from '@/lib/locationContext'
 import { usePinned } from '@/lib/pinnedContext'
@@ -1053,6 +1055,34 @@ export default function GenericDirectory({ category, items, anchorLabel, address
         }
       })
 
+  // The category's one question card (see QuestionCard), after the fifth
+  // place shown: below the first screen, where someone who has read that
+  // far is looking through the list. After the last place on a shorter
+  // list, and after the group lines when every closed group is shut. Not
+  // among a search's results, which are an answer.
+  const questionSpot: { section: string; id: string } | 'end' | null = (() => {
+    if (typed || !parseQuestionCard(category.questionCard)) return null
+    let seen = 0
+    let last: { section: string; id: string } | null = null
+    for (const section of sections) {
+      if (section.hidden) continue
+      for (const item of section.items) {
+        last = { section: section.key, id: item.id }
+        if (++seen === 5) return last
+      }
+    }
+    return last ?? 'end'
+  })()
+  const questionCard = questionSpot && (
+    <QuestionCard
+      category={category}
+      shown={shownItems.length > 0 ? shownItems : filtered}
+      all={items}
+      place={(item) => rowPlaces.get(item.id) ?? null}
+      onEdit={onEdit}
+    />
+  )
+
   return (
     <div>
       {/* Phones: where the distances on each row are measured from, when
@@ -1242,7 +1272,8 @@ export default function GenericDirectory({ category, items, anchorLabel, address
           <div id={section.rowsId} hidden={section.hidden} className={grouping?.closed ? 'pt-2 pb-2' : undefined}>
         <div className="space-y-2 sm:space-y-0 sm:grid sm:gap-3 sm:grid-cols-[repeat(auto-fill,minmax(420px,1fr))]">
           {section.items.map((item) => (
-            <div key={item.id} ref={setItemRowRef(item.id)}>
+            <Fragment key={item.id}>
+            <div ref={setItemRowRef(item.id)}>
             <GenericListingCard
               ref={setCardRef(item.id)}
               onNavigate={(direction) => navigateFromCard(item.id, direction)}
@@ -1299,11 +1330,16 @@ export default function GenericDirectory({ category, items, anchorLabel, address
               onEdit={() => onEdit(item)}
             />
             </div>
+            {questionSpot !== 'end' && questionSpot?.section === section.key && questionSpot.id === item.id && (
+              <div className="sm:col-span-full">{questionCard}</div>
+            )}
+            </Fragment>
           ))}
         </div>
           </div>
           </div>
         ))}
+        {questionSpot === 'end' && <div className="pt-2">{questionCard}</div>}
         </div>
         </SwipeRowGroup>
         </NextMinyans>

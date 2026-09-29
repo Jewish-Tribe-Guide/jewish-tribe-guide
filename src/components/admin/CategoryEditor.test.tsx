@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, screen, waitFor } from '@testing-library/react'
+import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { CategoryEditor } from './CategoryEditor'
 import { renderWithProviders } from '@/test/renderWithProviders'
@@ -441,5 +441,68 @@ describe('CategoryEditor — grouping the list', () => {
     await user.click(screen.getByRole('button', { name: /save changes/i }))
     await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1))
     expect(JSON.parse(payload()).groupBy).toBeNull()
+  })
+})
+
+// The one question the category page asks (questionCards.ts). Sent only when
+// changed, like the grouping, for migration 060.
+describe('CategoryEditor — the question card', () => {
+  const food = baseCategory({
+    id: 'restaurant',
+    pluralLabel: 'Food',
+    detailFields: [
+      {
+        key: 't',
+        label: 'Food Type',
+        type: 'select',
+        options: [
+          { value: 'Meat', label: 'Meat' },
+          { value: 'Dairy', label: 'Dairy' },
+          { value: 'Parve', label: 'Parve' },
+        ],
+      },
+      { key: 'shabbatFriendly', label: 'Shabbat friendly', type: 'boolean' },
+      { key: 'notes', label: 'Notes', type: 'text' },
+    ],
+  })
+  const payload = () => (vi.mocked(fetchJson).mock.calls.at(-1)![1] as { body: string }).body
+
+  it('offers "Been there lately?" and each yes/no or short pick-list, worded as the page asks it', () => {
+    renderWithProviders(<CategoryEditor token="t" initial={food} siblings={null} hasMapCategory={false} onSaved={vi.fn()} onCancel={vi.fn()} />)
+    const select = screen.getByRole('combobox', { name: 'Question card' }) as HTMLSelectElement
+    expect([...select.options].map((o) => o.value)).toEqual(['', 'confirm', 'field:t', 'field:shabbatFriendly'])
+    expect(within(select).getByRole('option', { name: /meat, dairy or parve\?/ })).toBeInTheDocument()
+    cleanup()
+    renderWithProviders(<CategoryEditor token="t" initial={null} siblings={null} hasMapCategory={false} onSaved={vi.fn()} onCancel={vi.fn()} />)
+    expect(screen.queryByRole('combobox', { name: 'Question card' })).not.toBeInTheDocument()
+  })
+
+  it('sends the question when it changed, and leaves it out when it didn’t', async () => {
+    const onSaved = vi.fn()
+    const user = userEvent.setup()
+    renderWithProviders(<CategoryEditor token="t" initial={food} siblings={null} hasMapCategory={false} onSaved={onSaved} onCancel={vi.fn()} />)
+
+    await user.click(screen.getByRole('button', { name: /save changes/i }))
+    await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1))
+    expect(JSON.parse(payload())).not.toHaveProperty('questionCard')
+
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Question card' }), 'field:t')
+    await user.click(screen.getByRole('button', { name: /save changes/i }))
+    await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(2))
+    expect(JSON.parse(payload()).questionCard).toEqual({ kind: 'field', key: 't' })
+  })
+
+  it('shows the saved question, and clearing it sends null', async () => {
+    const onSaved = vi.fn()
+    const user = userEvent.setup()
+    renderWithProviders(
+      <CategoryEditor token="t" initial={{ ...food, questionCard: { kind: 'confirm' } }} siblings={null} hasMapCategory={false} onSaved={onSaved} onCancel={vi.fn()} />,
+    )
+    const select = screen.getByRole('combobox', { name: 'Question card' })
+    expect(select).toHaveValue('confirm')
+    await user.selectOptions(select, '')
+    await user.click(screen.getByRole('button', { name: /save changes/i }))
+    await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1))
+    expect(JSON.parse(payload()).questionCard).toBeNull()
   })
 })

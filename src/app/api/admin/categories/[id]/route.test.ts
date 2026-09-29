@@ -59,3 +59,27 @@ describe('PATCH /api/admin/categories/:id — grouping the list', () => {
     expect((await res.json()).errors[0]).toMatch(/migration 059/)
   })
 })
+
+// The one question the list asks (questionCards.ts).
+describe('PATCH /api/admin/categories/:id — the question card', () => {
+  it('saves a question it knows, and clearing it back to none', async () => {
+    expect((await patch({ questionCard: { kind: 'field', key: 't' } })).status).toBe(200)
+    expect(m.updateCategory).toHaveBeenLastCalledWith('philly', 'synagogue', expect.objectContaining({ questionCard: { kind: 'field', key: 't' } }))
+    expect((await patch({ questionCard: null })).status).toBe(200)
+    expect(m.updateCategory).toHaveBeenLastCalledWith('philly', 'synagogue', expect.objectContaining({ questionCard: null }))
+  })
+
+  it('refuses one it doesn’t know, and saves only the parts it knows of one it does', async () => {
+    expect((await patch({ questionCard: { kind: 'poll' } })).status).toBe(400)
+    expect(m.updateCategory).not.toHaveBeenCalled()
+    await patch({ questionCard: { kind: 'confirm', extra: '<script>' } })
+    expect(m.updateCategory).toHaveBeenLastCalledWith('philly', 'synagogue', expect.objectContaining({ questionCard: { kind: 'confirm' } }))
+  })
+
+  it('says the migration is missing when the database has no question_card column yet', async () => {
+    m.updateCategory.mockRejectedValue(new Error("Failed to update category: Could not find the 'question_card' column of 'category' in the schema cache"))
+    const res = await patch({ questionCard: { kind: 'confirm' } })
+    expect(res.status).toBe(502)
+    expect((await res.json()).errors[0]).toMatch(/migration 060/)
+  })
+})

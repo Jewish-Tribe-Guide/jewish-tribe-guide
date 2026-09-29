@@ -5,6 +5,7 @@ import { CATEGORY_CAPABILITY_KEYS, DEFAULT_CATEGORY_ICON, type CategoryConfig } 
 import { CATEGORY_TEMPLATES } from '@/lib/categoryTemplates'
 import { getCategoryColor } from '@/lib/categoryColor'
 import { groupByFromKey, groupByKey, groupByOptions } from '@/lib/listGroups'
+import { questionCardFromKey, questionCardKey, questionCardOptions } from '@/lib/questionCards'
 import CategoryPreview from './CategoryPreview'
 import { CardBackgroundField, CardBandImageField, IconField, PinColorField, inputClass } from './CategoryFormFields'
 import { FieldEditor } from './CategoryFieldEditor'
@@ -119,6 +120,7 @@ export function CategoryEditor({
       upvotesEnabled: draft.upvotesEnabled,
       capabilities: draft.capabilities,
       groupBy: groupByFromKey(draft.groupBy),
+      questionCard: questionCardFromKey(draft.questionCard),
       externalLink:
         draft.externalLinkEnabled && draft.externalLinkLabel.trim() && draft.externalLinkUrl.trim()
           ? { label: draft.externalLinkLabel.trim(), url: draft.externalLinkUrl.trim() }
@@ -353,6 +355,36 @@ export function CategoryEditor({
               How this category&rsquo;s page splits its list, e.g. what&rsquo;s open now first, or
               shuls by denomination. A choice list makes one closed group per choice, in
               alphabetical order with &ldquo;Other&rdquo; last. Search results are never grouped.
+            </span>
+          </section>
+        )}
+
+        {/* The one question the list asks. Only on an existing category,
+            like the grouping: the choices come from its fields. */}
+        {!isNew && (
+          <section className="bg-white border border-slate-200 rounded-lg p-4">
+            <label htmlFor="category-question-card" className="block text-sm font-semibold text-slate-800 mb-1">
+              Question card
+            </label>
+            <select
+              id="category-question-card"
+              aria-describedby="category-question-card-help"
+              value={draft.questionCard}
+              onChange={(e) => set('questionCard', e.target.value)}
+              className={inputClass}
+            >
+              <option value="">No question card</option>
+              {questionCardOptions({ ...initial!, detailFields: draft.fields.map(normalizeField) }).map((o) => (
+                <option key={questionCardKey(o.value)} value={questionCardKey(o.value)}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+            <span id="category-question-card-help" className="block text-[11px] text-muted mt-1">
+              One card in this category&rsquo;s list, after its first few places, asking about one
+              place at a time. Answers to a question arrive in the moderation queue as edits for
+              you to check; &ldquo;Been there lately?&rdquo; marks a place as current, like the
+              listing&rsquo;s own button. A yes/no or a choice with up to six options can be asked.
             </span>
           </section>
         )}

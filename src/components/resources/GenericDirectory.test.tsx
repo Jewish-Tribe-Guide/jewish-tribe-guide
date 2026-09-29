@@ -1545,6 +1545,69 @@ describe('GenericDirectory — neighborhoods', () => {
 // Each shul row says its next minyan. Worked out once for the list by
 // NextMinyans (see nextMinyanByShul's own tests for the rules); this checks
 // the directory hands it to the right rows, and only on a shul page.
+describe('GenericDirectory — the question card', () => {
+  const food = makeCategory({
+    id: 'restaurant',
+    questionCard: { kind: 'field', key: 't' },
+    detailFields: [
+      {
+        key: 't',
+        label: 'Food Type',
+        type: 'select',
+        filterable: true,
+        options: [
+          { value: 'Meat', label: 'Meat' },
+          { value: 'Dairy', label: 'Dairy' },
+        ],
+      },
+    ],
+  })
+  const places = (n: number) => Array.from({ length: n }, (_, i) => makeListing({ id: `p${i + 1}`, name: `Place ${i + 1}`, category: 'restaurant' }))
+  // What comes just before the card, in the page's order.
+  const before = () => {
+    const card = screen.getByTestId('question-card')
+    const names = screen.getAllByText(/^Place \d+$/)
+    return names.filter((n) => n.compareDocumentPosition(card) & Node.DOCUMENT_POSITION_FOLLOWING).map((n) => n.textContent)
+  }
+  afterEach(() => localStorage.clear())
+
+  it('sits after the fifth place, below the first screen', () => {
+    renderWithProviders(<GenericDirectory category={food} items={places(8)} {...handlers} />)
+    expect(before()).toEqual(['Place 1', 'Place 2', 'Place 3', 'Place 4', 'Place 5'])
+  })
+
+  it('sits after the last place on a shorter list', () => {
+    renderWithProviders(<GenericDirectory category={food} items={places(3)} {...handlers} />)
+    expect(before()).toEqual(['Place 1', 'Place 2', 'Place 3'])
+  })
+
+  it('isn’t among a search’s results', async () => {
+    const user = userEvent.setup()
+    const zebra = places(8).map((p) => ({ ...p, name: `${p.name} Zebra` }))
+    renderWithProviders(<GenericDirectory category={food} items={zebra} {...handlers} />, { content: { categories: [food] } })
+    await user.type(screen.getByRole('searchbox'), 'zebra')
+    // The search found them all: the card is left out, not the list.
+    expect(screen.getByText('Place 8 Zebra')).toBeInTheDocument()
+    expect(screen.queryByTestId('question-card')).not.toBeInTheDocument()
+  })
+
+  it('isn’t there when the category asks nothing', () => {
+    renderWithProviders(<GenericDirectory category={{ ...food, questionCard: undefined }} items={places(8)} {...handlers} />)
+    expect(screen.queryByTestId('question-card')).not.toBeInTheDocument()
+  })
+
+  it('comes after the group lines while every closed group is shut', () => {
+    const byType = { ...food, questionCard: { kind: 'confirm' }, groupBy: { kind: 'field', key: 't' } }
+    const rows = places(3).map((p, i) => ({ ...p, t: i === 0 ? 'Meat' : 'Dairy' }))
+    renderWithProviders(<GenericDirectory category={byType} items={rows} {...handlers} />)
+    const card = screen.getByTestId('question-card')
+    const lastLine = screen.getByRole('button', { name: /^Meat/ })
+    expect(lastLine.compareDocumentPosition(card) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    // Asked about the first place in the list's order, closed groups or not.
+    expect(screen.getByText(/^Place 1( · [^:]+)?: is everything here still right\?$/)).toBeInTheDocument()
+  })
+})
+
 describe('GenericDirectory — each shul’s next minyan', () => {
   const shulCategory = makeCategory({ id: 'synagogue', detailFields: [{ key: 'minyanim', label: 'Minyanim', type: 'minyanim' }] })
   const shul = (id: string, name: string, time: string) =>

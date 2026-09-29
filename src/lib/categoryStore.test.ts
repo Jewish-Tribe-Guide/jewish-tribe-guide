@@ -156,6 +156,19 @@ describe('listCategoriesUncached', () => {
     expect(await read(null)).toBeUndefined()
     expect(await read({ kind: 'colour' })).toBeUndefined()
   })
+
+  // Migration 060, the same way.
+  it('reads question_card as the list’s question, and none when absent, null or unknown', async () => {
+    const read = async (question_card: unknown) => {
+      mockFrom.mockReturnValue(chainable({ data: [{ ...rawRow, question_card }], error: null }))
+      return (await listCategoriesUncached('philly'))[0].questionCard
+    }
+    expect(await read({ kind: 'field', key: 't' })).toEqual({ kind: 'field', key: 't' })
+    expect(await read({ kind: 'confirm' })).toEqual({ kind: 'confirm' })
+    expect(await read(undefined)).toBeUndefined()
+    expect(await read(null)).toBeUndefined()
+    expect(await read({ kind: 'poll' })).toBeUndefined()
+  })
 })
 
 describe('listCategories', () => {
@@ -401,6 +414,18 @@ describe('updateCategory', () => {
     expect(builder.update).toHaveBeenLastCalledWith({ group_by: { kind: 'open' } })
     await updateCategory('philly', 'synagogue', { groupBy: null })
     expect(builder.update).toHaveBeenLastCalledWith({ group_by: null })
+  })
+
+  it('writes question_card only when the patch has a question, so saves work before migration 060', async () => {
+    const builder = chainable({ data: rawRow, error: null })
+    mockFrom.mockReturnValue(builder)
+
+    await updateCategory('philly', 'synagogue', { label: 'Shuls' })
+    expect(builder.update).toHaveBeenLastCalledWith({ label: 'Shuls' })
+    await updateCategory('philly', 'synagogue', { questionCard: { kind: 'confirm' } })
+    expect(builder.update).toHaveBeenLastCalledWith({ question_card: { kind: 'confirm' } })
+    await updateCategory('philly', 'synagogue', { questionCard: null })
+    expect(builder.update).toHaveBeenLastCalledWith({ question_card: null })
   })
 
   it('writes active when present in the patch', async () => {

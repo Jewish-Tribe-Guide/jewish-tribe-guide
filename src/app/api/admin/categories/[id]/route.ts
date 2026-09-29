@@ -6,6 +6,7 @@ import { clearCategoryFieldData, applyFieldOptionRenames } from '@/lib/resourceS
 import { isHttpUrl } from '@/lib/validation'
 import type { CategoryCapabilities, CategoryField, CategoryFormSection } from '@/lib/categories'
 import { parseGroupBy, type GroupBy } from '@/lib/listGroups'
+import { parseQuestionCard, type QuestionCard } from '@/lib/questionCards'
 import { isValidPinColor } from '@/lib/categoryColor'
 import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
 
@@ -37,6 +38,9 @@ type PatchBody = {
   /** How the category page groups its list, or null for one list — see
    *  listGroups.ts. Only sent when the admin changed it. */
   groupBy?: GroupBy | null
+  /** The one question the list asks, or null for none — see
+   *  questionCards.ts. Only sent when the admin changed it. */
+  questionCard?: QuestionCard | null
   /** When address/phone is being turned off or a field removed on a category
    *  that already has listings, the editor confirms with the admin (via
    *  field-usage) before including this — it wipes that data from every
@@ -98,6 +102,10 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/
     return Response.json({ ok: false, errors: ['That way of grouping the list isn’t one the site knows.'] }, { status: 400 })
   }
   if (body.groupBy != null) body.groupBy = parseGroupBy(body.groupBy)
+  if (body.questionCard != null && !parseQuestionCard(body.questionCard)) {
+    return Response.json({ ok: false, errors: ['That question isn’t one the site knows.'] }, { status: 400 })
+  }
+  if (body.questionCard != null) body.questionCard = parseQuestionCard(body.questionCard)
 
   // Applied before everything else, and using its own error path (400, not
   // the catch-all 502 below) — an invalid/taken slug is a plain validation
@@ -139,10 +147,16 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/
     return Response.json({ ok: true, category, cleared, renamed, idRenamed })
   } catch (err) {
     console.error('[admin/categories/:id] PATCH failed:', err)
-    // The one column a save can reach before the database has it.
+    // The columns a save can reach before the database has them.
     if (body.groupBy !== undefined && err instanceof Error && /group_by/.test(err.message)) {
       return Response.json(
         { ok: false, errors: ['Could not save the grouping: database migration 059 (category group_by) isn’t applied yet.'] },
+        { status: 502 },
+      )
+    }
+    if (body.questionCard !== undefined && err instanceof Error && /question_card/.test(err.message)) {
+      return Response.json(
+        { ok: false, errors: ['Could not save the question: database migration 060 (category question_card) isn’t applied yet.'] },
         { status: 502 },
       )
     }
