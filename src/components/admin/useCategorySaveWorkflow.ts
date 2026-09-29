@@ -14,6 +14,7 @@ import {
 } from './categoryEditorLogic'
 import { groupByFromKey } from '@/lib/listGroups'
 import { questionCardFromKey } from '@/lib/questionCards'
+import { walkListFromKey } from '@/lib/walkList'
 
 // ── The save workflow: validation, the two destructive-change confirmation
 // gates (option-rename migration, field-removal cleanup), and the actual
@@ -232,6 +233,8 @@ export function useCategorySaveWorkflow({
         ...(!isNew && draft.groupBy !== toDraft(initial).groupBy && { groupBy: groupByFromKey(draft.groupBy) }),
         // The same, for migration 060.
         ...(!isNew && draft.questionCard !== toDraft(initial).questionCard && { questionCard: questionCardFromKey(draft.questionCard) }),
+        // And for migration 061.
+        ...(!isNew && draft.walkList !== toDraft(initial).walkList && { walkList: walkListFromKey(draft.walkList) }),
       }
       await fetchJson(
         withCommunity(isNew ? '/api/admin/categories' : `/api/admin/categories/${initial!.id}`, community),

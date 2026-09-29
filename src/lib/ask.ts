@@ -1,5 +1,6 @@
 import type { CategoryConfig } from '@/lib/categories'
 import type { Tefillah } from '@/lib/davening'
+import { MILES_PER_MINUTE } from '@/lib/geo'
 
 // ── Understanding a question typed into search ───────────────────────────────
 // Search used to need every typed word to appear in a listing. That worked for
@@ -362,13 +363,6 @@ export type Within = {
   asked: { minutes: number; by: 'drive' | 'walk' } | null
 }
 
-// Minutes of travel to straight-line miles. The guide measures distance as
-// the crow flies, not by road (drive and walk times would be a paid Google
-// lookup per place), so these are deliberately rough: walking at about 3 mph
-// over roughly a quarter more path than the straight line, and driving at an
-// average of about 24 mph once lights, turns and parking are in. Answers say
-// "about", never a promise.
-const MILES_PER_MINUTE = { walk: 1 / 25, drive: 0.4 }
 
 const WITHIN =
   /\b(?:within|under|less than|no more than|up to)\s+(?:a\s+|an\s+)?(\d+(?:\.\d+)?)\s*(?:-\s*)?(miles?|mi|minutes?|mins?)\b(?:\s+(drive|driving|walk|walking|by car|on foot))?|\b(\d+)\s*(?:-\s*)?(?:minutes?|mins?)\s+(drive|driving|walk|walking)\b/i

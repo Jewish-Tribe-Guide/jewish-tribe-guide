@@ -402,6 +402,10 @@ export type CategoryConfig = {
    *  confirmed is still right. Unset means none. Read through
    *  parseQuestionCard, like groupBy — see questionCards.ts. */
   questionCard?: unknown
+  /** Another category's places within a walk, listed on each of this
+   *  category's listings (a hotel's shuls). Unset means none. Read through
+   *  parseWalkList — see walkList.ts. */
+  walkList?: unknown
 }
 
 export const DEFAULT_CATEGORY_ICON = '📋'

@@ -83,3 +83,28 @@ describe('PATCH /api/admin/categories/:id — the question card', () => {
     expect((await res.json()).errors[0]).toMatch(/migration 060/)
   })
 })
+
+// Another category's places within a walk (walkList.ts).
+describe('PATCH /api/admin/categories/:id — places within a walk', () => {
+  it('saves a list it knows, and clearing it back to none', async () => {
+    expect((await patch({ walkList: { categoryId: 'synagogue', maxMinutes: 30 } })).status).toBe(200)
+    expect(m.updateCategory).toHaveBeenLastCalledWith('philly', 'synagogue', expect.objectContaining({ walkList: { categoryId: 'synagogue', maxMinutes: 30 } }))
+    expect((await patch({ walkList: null })).status).toBe(200)
+    expect(m.updateCategory).toHaveBeenLastCalledWith('philly', 'synagogue', expect.objectContaining({ walkList: null }))
+  })
+
+  it('refuses one it doesn’t know, and saves only the parts it knows of one it does', async () => {
+    expect((await patch({ walkList: { categoryId: 'synagogue', maxMinutes: 240 } })).status).toBe(400)
+    expect((await patch({ walkList: { maxMinutes: 30 } })).status).toBe(400)
+    expect(m.updateCategory).not.toHaveBeenCalled()
+    await patch({ walkList: { categoryId: 'synagogue', maxMinutes: 15, extra: '<script>' } })
+    expect(m.updateCategory).toHaveBeenLastCalledWith('philly', 'synagogue', expect.objectContaining({ walkList: { categoryId: 'synagogue', maxMinutes: 15 } }))
+  })
+
+  it('says the migration is missing when the database has no walk_list column yet', async () => {
+    m.updateCategory.mockRejectedValue(new Error("Failed to update category: Could not find the 'walk_list' column of 'category' in the schema cache"))
+    const res = await patch({ walkList: { categoryId: 'synagogue', maxMinutes: 30 } })
+    expect(res.status).toBe(502)
+    expect((await res.json()).errors[0]).toMatch(/migration 061/)
+  })
+})

@@ -506,3 +506,58 @@ describe('CategoryEditor — the question card', () => {
     expect(JSON.parse(payload()).questionCard).toBeNull()
   })
 })
+
+// Another category's places within a walk (walkList.ts). Sent only when
+// changed, for migration 061.
+describe('CategoryEditor — places within a walk', () => {
+  const hotels = baseCategory({ id: 'hotel', label: 'Hotel', pluralLabel: 'Hotels', detailFields: [] })
+  const shuls = baseCategory({ id: 'synagogue', label: 'Synagogue', pluralLabel: 'Synagogues', detailFields: [] })
+  const groups = baseCategory({ id: 'whatsapp', pluralLabel: 'WhatsApp Groups', hasAddress: false, detailFields: [] })
+  const siblings = [hotels, shuls, groups]
+  const payload = () => (vi.mocked(fetchJson).mock.calls.at(-1)![1] as { body: string }).body
+  const editor = (initial: typeof hotels | null, onSaved = vi.fn()) =>
+    renderWithProviders(<CategoryEditor token="t" initial={initial} siblings={siblings} hasMapCategory={false} onSaved={onSaved} onCancel={vi.fn()} />)
+
+  it('offers the other categories whose places have an address, and only on an existing category', () => {
+    editor(hotels)
+    const select = screen.getByRole('combobox', { name: 'Places within a walk' }) as HTMLSelectElement
+    expect([...select.options].map((o) => o.textContent)).toEqual(['None', 'Synagogues'])
+    expect(screen.queryByRole('combobox', { name: 'How far a walk' })).not.toBeInTheDocument()
+    cleanup()
+    editor(null)
+    expect(screen.queryByRole('combobox', { name: 'Places within a walk' })).not.toBeInTheDocument()
+  })
+
+  it('sends the list when it changed, 30 minutes unless another is chosen, and leaves it out when it didn’t', async () => {
+    const onSaved = vi.fn()
+    const user = userEvent.setup()
+    editor(hotels, onSaved)
+
+    await user.click(screen.getByRole('button', { name: /save changes/i }))
+    await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1))
+    expect(JSON.parse(payload())).not.toHaveProperty('walkList')
+
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Places within a walk' }), 'synagogue')
+    expect(screen.getByRole('combobox', { name: 'How far a walk' })).toHaveValue('30')
+    await user.click(screen.getByRole('button', { name: /save changes/i }))
+    await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(2))
+    expect(JSON.parse(payload()).walkList).toEqual({ categoryId: 'synagogue', maxMinutes: 30 })
+
+    await user.selectOptions(screen.getByRole('combobox', { name: 'How far a walk' }), '15')
+    await user.click(screen.getByRole('button', { name: /save changes/i }))
+    await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(3))
+    expect(JSON.parse(payload()).walkList).toEqual({ categoryId: 'synagogue', maxMinutes: 15 })
+  })
+
+  it('shows the saved list, and "None" sends null', async () => {
+    const onSaved = vi.fn()
+    const user = userEvent.setup()
+    editor({ ...hotels, walkList: { categoryId: 'synagogue', maxMinutes: 45 } }, onSaved)
+    expect(screen.getByRole('combobox', { name: 'Places within a walk' })).toHaveValue('synagogue')
+    expect(screen.getByRole('combobox', { name: 'How far a walk' })).toHaveValue('45')
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Places within a walk' }), '')
+    await user.click(screen.getByRole('button', { name: /save changes/i }))
+    await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1))
+    expect(JSON.parse(payload()).walkList).toBeNull()
+  })
+})

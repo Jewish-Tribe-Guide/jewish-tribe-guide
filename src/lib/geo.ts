@@ -30,6 +30,15 @@ export function distanceMiles(a: LatLng, b: LatLng): number {
   return roundMiles(haversineMiles(a, b))
 }
 
+// Minutes of travel to straight-line miles. The guide measures distance as
+// the crow flies, not by road (drive and walk times would be a paid Google
+// lookup per place), so these are deliberately rough: walking at about 3 mph
+// over roughly a quarter more path than the straight line, and driving at an
+// average of about 24 mph once lights, turns and parking are in. Whatever
+// uses them says "about" or "rough", never a promise. Shared by search's
+// "within a 10-minute walk" and a hotel's shuls within a walk (walkList.ts).
+export const MILES_PER_MINUTE = { walk: 1 / 25, drive: 0.4 }
+
 // Geocodes a free-text address to coordinates. Tries Google first (best
 // accuracy, when the Geocoding API is enabled on the project) and falls back to
 // OpenStreetMap/Nominatim (free, no key). Returns null if neither resolves it.

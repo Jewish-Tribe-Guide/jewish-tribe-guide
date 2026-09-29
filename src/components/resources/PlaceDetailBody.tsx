@@ -8,6 +8,8 @@ import { getOpenStatus, syncedLabel, CLOSURE_LABELS } from '@/lib/hours'
 import { useNow } from '@/lib/useNow'
 import HoursDisplay from './HoursDisplay'
 import DaveningTimes, { hasDaveningTimes } from './DaveningTimes'
+import WalkList from './WalkList'
+import { parseWalkList } from '@/lib/walkList'
 import Chip from './Chip'
 import Highlight from './Highlight'
 import type { SearchFound } from '@/lib/askSearch'
@@ -609,6 +611,12 @@ export default function PlaceDetailBody({ item, category, onTagClick, onFilterOp
     </div>
   )
 
+  // ── Another category's places within a walk (walkList.ts) ─────────────
+  // A hotel's shuls. Last, after everything about the place itself, and
+  // only from a place with a location: the walk starts there. It brings its
+  // own divider, since it can come to nothing (its category since hidden).
+  const walk = parseWalkList(category.walkList)
+
   const sections = [foundSection, statusSection, actionsSection, addressSection, daveningSection, detailBadgesSection, rowFieldsSection, ...tagsSections, caveatSection]
     .filter((s): s is Exclude<typeof s, false | null | undefined> => !!s)
 
@@ -620,6 +628,7 @@ export default function PlaceDetailBody({ item, category, onTagClick, onFilterOp
           {section}
         </Fragment>
       ))}
+      {walk && item.geo && <WalkList walk={walk} from={item.geo} fromLabel={category.label} />}
     </div>
   )
 }
