@@ -59,7 +59,9 @@ export default function CampaignBannerCard() {
   const now = useNow()
   const { isDismissed, dismiss } = useDismissedCampaignBanners()
 
-  const banner = activeCampaignBanner(banners, now, community.timezone)
+  // Which campaign is on is a question of today's date, so it waits for the
+  // page to hydrate (see useNow).
+  const banner = now === null ? null : activeCampaignBanner(banners, now, community.timezone)
   if (!banner) return null
 
   const category = categories?.find((c) => c.id === banner.categoryId)

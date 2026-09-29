@@ -28,8 +28,11 @@ type Props = {
 export default function HoursDisplay({ value }: Props) {
   const [open, setOpen] = useState(false)
   // Which day "today" is, so a tab open across midnight moves the highlight
-  // and today's line with it instead of showing yesterday's.
-  const now = new Date(useNow())
+  // and today's line with it instead of showing yesterday's. Which day that
+  // is waits for the page to hydrate (see useNow).
+  const clock = useNow()
+  if (clock === null) return null
+  const now = new Date(clock)
 
   const today = formatTodayHours(value, now)
   if (!today) return null

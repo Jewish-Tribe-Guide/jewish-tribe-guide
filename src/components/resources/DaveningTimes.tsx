@@ -68,7 +68,10 @@ function StructuredDaveningTimes({ minyanim, geo }: { minyanim: Minyan[]; geo?: 
   // where a missing one is not. See season.ts for why the boundary is derived
   // rather than configured, and why being occasionally wrong is affordable
   // precisely because this is the only thing done with the answer.
-  const season = currentSeason(useNow(), community.timezone)
+  // Nothing is dimmed until the page has hydrated (see useNow), as for an
+  // unknown season.
+  const clock = useNow()
+  const season = clock === null ? null : currentSeason(clock, community.timezone)
 
   if (groups.length === 0) return null
 

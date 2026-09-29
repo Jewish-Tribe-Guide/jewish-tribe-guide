@@ -388,7 +388,10 @@ export default function ListingEditor({
   const removalControlled = removalOpenProp !== undefined
   const removalOpen = removalOpenProp ?? removalOpenState
   const [sent, setSent] = useState<ListingChange[]>([])
-  const now = new Date(useNow())
+  // Null before the page has hydrated (see useNow): no open status or
+  // today's hours until then.
+  const clock = useNow()
+  const now = clock === null ? null : new Date(clock)
 
   const setRemovalOpen = (open: boolean) => {
     setRemovalOpenState(open)
@@ -940,7 +943,7 @@ export default function ListingEditor({
         const open = !!openHours[f.key]
         const change = changeFor(f.key)
         const days = changedHoursDays(item[f.key], value)
-        const today = formatTodayHours(value, now)
+        const today = now && formatTodayHours(value, now)
         const toggle = () => setOpenHours((h) => ({ ...h, [f.key]: !h[f.key] }))
         return (
           <div key={f.key} className="flex items-start gap-3">

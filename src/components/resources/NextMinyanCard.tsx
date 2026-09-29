@@ -26,13 +26,21 @@ type Props = {
 }
 
 export default function NextMinyanCard({ items, onOpenListing, onDaveningTimes }: Props) {
-  const { shuls, anchors, todayDayKeys, tomorrowKey, nowMinutes, season } = useMinyanSchedule(null, items)
+  // Null until the page has hydrated (see useNow): the card waits, keeping
+  // its size, as for sunset-based times.
+  const schedule = useMinyanSchedule(null, items)
   const byId = new Map(items.map((i) => [i.id, i]))
   const milesOf = (id: string) => {
     const item = byId.get(id)
     return item ? (item.milesFromAddress ?? item.milesFromCenter ?? null) : null
   }
-  const lines = nextMinyansAcross(shuls, { today: todayDayKeys, tomorrow: [tomorrowKey], nowMinutes, season, anchors }, milesOf)
+  const lines = schedule
+    ? nextMinyansAcross(
+        schedule.shuls,
+        { today: schedule.todayDayKeys, tomorrow: [schedule.tomorrowKey], nowMinutes: schedule.nowMinutes, season: schedule.season, anchors: schedule.anchors },
+        milesOf,
+      )
+    : null
 
   return (
     <section
@@ -50,8 +58,8 @@ export default function NextMinyanCard({ items, onOpenListing, onDaveningTimes }
         </button>
       </div>
       {lines === null ? (
-        // Sunset-based times still arriving: the card keeps its size, so
-        // the list doesn't jump when they land.
+        // Sunset-based times (or the time itself) still arriving: the card
+        // keeps its size, so the list doesn't jump when they land.
         <div aria-hidden="true" className="space-y-2">
           {[0, 1].map((i) => (
             <div key={i} className="flex h-[38px] items-center gap-2">

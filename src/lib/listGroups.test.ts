@@ -37,6 +37,10 @@ describe('groupListings: open now, then not open now', () => {
     expect(summary(groupListings(items, food, NOON_MONDAY))).toEqual([['Not open now', ['Paused']]])
   })
 
+  it('waits, ungrouped, until the time is known (before the page has hydrated)', () => {
+    expect(groupListings([makeListing({ hours: MON_9_TO_5 })], food, null)).toBeNull()
+  })
+
   it('leaves out a group with nothing in it', () => {
     const items = [makeListing({ id: 'a', name: 'Grill', hours: MON_9_TO_5 })]
     expect(summary(groupListings(items, food, NOON_MONDAY))).toEqual([['Open now', ['Grill']]])

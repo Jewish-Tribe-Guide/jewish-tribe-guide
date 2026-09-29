@@ -205,7 +205,9 @@ export default function PlaceDetailBody({ item, category, onTagClick, onFilterOp
   const legacyDavening = item.davening as string | undefined
   const showDavening = hasDaveningTimes(minyanimValue, legacyDavening)
 
-  const { isOpen, closing, closure } = getOpenStatus(item, hoursFields.map((f) => f.key), new Date(useNow()))
+  // Open or not waits for the page to hydrate (see useNow).
+  const clock = useNow()
+  const { isOpen, closing, closure } = getOpenStatus(item, hoursFields.map((f) => f.key), clock === null ? null : new Date(clock))
 
   const signalBadges = badgeFields.filter((f) =>
     f.type === 'boolean' ? !!item[f.key] : f.type === 'select' ? selectValues(item[f.key]).length > 0 : false,

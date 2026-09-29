@@ -25,12 +25,18 @@ export function NextMinyans({ enabled, items, children }: { enabled: boolean; it
 }
 
 function Worked({ items, children }: { items: readonly DirectoryResource[]; children: ReactNode }) {
-  const { shuls, anchors, todayDayKeys, tomorrowKey, nowMinutes, season } = useMinyanSchedule(null, items)
-  const next = shulRowByShul(shuls, { today: todayDayKeys, tomorrow: [tomorrowKey], nowMinutes, season, anchors })
-  // A shul with no times at all isn't among `shuls`, which only holds shuls
-  // with minyanim to schedule, but its row still says so.
-  for (const item of items) {
-    if (!(item.id in next) && !shuls.some((s) => s.id === item.id)) next[item.id] = { text: 'No davening times listed', tone: 'quiet' }
+  // Null until the page has hydrated (see useNow): the rows say nothing
+  // about davening until then.
+  const schedule = useMinyanSchedule(null, items)
+  const next: Record<string, ShulRowStatus> = {}
+  if (schedule) {
+    const { shuls, anchors, todayDayKeys, tomorrowKey, nowMinutes, season } = schedule
+    Object.assign(next, shulRowByShul(shuls, { today: todayDayKeys, tomorrow: [tomorrowKey], nowMinutes, season, anchors }))
+    // A shul with no times at all isn't among `shuls`, which only holds shuls
+    // with minyanim to schedule, but its row still says so.
+    for (const item of items) {
+      if (!(item.id in next) && !shuls.some((s) => s.id === item.id)) next[item.id] = { text: 'No davening times listed', tone: 'quiet' }
+    }
   }
   return <NextMinyansContext.Provider value={next}>{children}</NextMinyansContext.Provider>
 }

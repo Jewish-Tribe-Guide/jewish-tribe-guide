@@ -169,11 +169,15 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
   const zmanimPage = categories?.some((c) => c.kind === 'zmanim') ?? false
   // The same request the minyan schedule makes (same place, so one fetch).
   const zmanim = useZmanim(coords ?? community.mapCenter)
+  // The schedule, and with it the time, is null until the page has hydrated
+  // (see useNow): no question is answered before then, and only the
+  // suggestions that don't depend on the time are tried, where the 0 below
+  // changes nothing.
   const ask = (text: string) => {
-    const result = searchAsk(listings ?? [], categories ?? [], text, { coords, now: new Date(schedule.now), places })
+    const result = searchAsk(listings ?? [], categories ?? [], text, { coords, now: new Date(schedule?.now ?? 0), places })
     const answer = answerFor(result, {
       coords,
-      schedule: result.query.minyan
+      schedule: result.query.minyan && schedule
         ? {
             ...listMinyanim(schedule.shuls, {
               today: schedule.todayDayKeys,
@@ -201,7 +205,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
       return {
         result,
         answer: timesAnswer(result.query.times, zmanim.data, {
-          nowMs: schedule.now,
+          nowMs: schedule?.now ?? 0,
           pageHref: zmanimPage ? routes.slug(communitySlug, 'zmanim') : null,
           failed: zmanim.status === 'error',
         }),
@@ -212,7 +216,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
     if (result.query.eruv && eruvPage) return { result, answer: eruvAnswer(eruvim, routes.slug(communitySlug, 'eruv')) }
     return { result, answer }
   }
-  const asked = q && listings ? ask(q) : null
+  const asked = q && listings && schedule ? ask(q) : null
   const askResult = asked?.result ?? null
   // A question about the guide itself has no places to list ("how do I add
   // a restaurant" isn't asking for every restaurant).
@@ -222,7 +226,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
   // that works (see searchPrompts.ts).
   const prompts =
     !q && listings
-      ? pickPrompts(candidatePrompts({ day: schedule.todayKey, minutes: schedule.nowMinutes }), (p) => {
+      ? pickPrompts(candidatePrompts(schedule && { day: schedule.todayKey, minutes: schedule.nowMinutes }), (p) => {
           const tried = ask(p)
           return answersWell(tried.answer, tried.result.hits.length)
         })
@@ -234,7 +238,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
   // as such, never as a hit — and the search-miss log below still counts the
   // question as a miss, since it is one.
   const foundNothing = !!askResult && askResult.hits.length === 0 && askResult.noHours.length === 0 && strictAnswer === null
-  const miss = foundNothing && listings ? nearMiss(listings, categories ?? [], q, { coords, now: new Date(schedule.now), places }) : null
+  const miss = foundNothing && listings && schedule ? nearMiss(listings, categories ?? [], q, { coords, now: new Date(schedule.now), places }) : null
   const placeHits = miss ? listingHitsFrom(miss.result, coords) : strictHits
   const answer = miss ? nearMissAnswer(miss, q, { coords }) : strictAnswer
   // The answer's own link, for the Share button (which AskAnswer leaves off

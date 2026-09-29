@@ -254,8 +254,10 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
   // Against useNow rather than the render's own clock: open/closed is the
   // most time-sensitive thing on the row, and it ships inside HTML that can
   // be served from the CDN or the service worker's cache long after it was
-  // built.
-  const now = new Date(useNow())
+  // built. Before the page has hydrated there's no time (see useNow), so no
+  // Open badge and no opening or closing time yet.
+  const clock = useNow()
+  const now = clock === null ? null : new Date(clock)
   const { isOpen, closing, closure } = getOpenStatus(item, hoursFields.map((f) => f.key), now)
   // The row's second line: open status, next minyan, distance, what kind of
   // place, how many items. See lib/listingRow.ts.

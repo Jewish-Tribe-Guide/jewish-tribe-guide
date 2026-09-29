@@ -929,7 +929,9 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   const clock = useNow()
   const openNowIds = useMemo(() => {
     if (!openNowActive) return ''
-    const now = new Date(clock)
+    // Before the page has hydrated there's no time (see useNow): only closed
+    // businesses are left out until there is.
+    const now = clock === null ? null : new Date(clock)
     return allPoints
       .filter((p) => {
         if (!p.raw) return true
@@ -937,7 +939,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
         // whatever hours it still has saved.
         if (businessClosure(p.raw as unknown as Record<string, unknown>)) return false
         const keys = hoursKeysByCat.get(p.raw.category)
-        return !keys?.length || keys.some((k) => hoursOpenNow(p.raw![k], now) === true)
+        return !keys?.length || now === null || keys.some((k) => hoursOpenNow(p.raw![k], now) === true)
       })
       .map((p) => p.id)
       .join('|')
@@ -1429,7 +1431,10 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // notices it's not an ordinary category. Absent entirely outside the
   // campaign's date range (activeCampaignBanner), and also when its
   // category currently has no points to show (nothing to filter to).
-  const activeCampaign = activeCampaignBanner(useCampaignBanners(), useNow(), community.timezone)
+  // Which campaign is on waits for today's date, as the home card's does.
+  const campaignBanners = useCampaignBanners()
+  const campaignClock = useNow()
+  const activeCampaign = campaignClock === null ? null : activeCampaignBanner(campaignBanners, campaignClock, community.timezone)
   const campaignOption = activeCampaign ? options.find((o) => o.id === activeCampaign.categoryId) : undefined
   const campaignHighlighted = !!campaignOption && effectiveSelected.has(campaignOption.id) && !allChipsOn
   const campaignChip = campaignOption && (

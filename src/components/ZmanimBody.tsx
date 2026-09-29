@@ -10,11 +10,13 @@ import { holidayOverShabbos } from '@/lib/zmanim'
 // wrap this in the same bordered card. Keeping the rendering in one place
 // means the two can never drift on what a "ready" zmanim view actually shows.
 
-export default function ZmanimBody({ data, status, now }: { data: ZmanimData | null; status: ZmanimStatus; now: number }) {
-  if (status === 'loading') return <LoadingState />
+/** `now` is useNow's: null until the page has hydrated, which a ready
+ *  view waits for as it would for the zmanim. */
+export default function ZmanimBody({ data, status, now }: { data: ZmanimData | null; status: ZmanimStatus; now: number | null }) {
+  if (status === 'loading' || (status === 'ready' && now === null)) return <LoadingState />
   if (status === 'no-location') return <NoLocationState />
   if (status === 'error') return <ErrorState />
-  if (status === 'ready' && data) return <ReadyState data={data} now={now} />
+  if (status === 'ready' && data && now !== null) return <ReadyState data={data} now={now} />
   return null
 }
 

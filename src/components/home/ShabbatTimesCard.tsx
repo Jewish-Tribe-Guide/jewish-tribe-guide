@@ -75,8 +75,9 @@ export default function ShabbatTimesCard({
   const communitySlug = useCommunitySlug()
   const categories = useCategories()
   const now = useNow()
-  const view = data ? shabbosCardView(data, now) : null
-  const soon = view?.next ? countdown(view.next.iso, now) : null
+  // Waits for the time as for the zmanim (see useNow).
+  const view = data && now !== null ? shabbosCardView(data, now) : null
+  const soon = view?.next && now !== null ? countdown(view.next.iso, now) : null
 
   const minyanCategory = categories?.find((c) => c.detailFields.some((f) => f.type === 'minyanim'))
   const eruvCategory = categories?.find((c) => c.kind === 'eruv')
@@ -98,7 +99,7 @@ export default function ShabbatTimesCard({
         {heading}
       </h3>
 
-      {status === 'loading' ? (
+      {status === 'loading' || (status === 'ready' && now === null) ? (
         <div className="mt-4 space-y-2" aria-live="polite" aria-busy="true">
           <div className="h-8 w-1/2 animate-pulse rounded bg-white/10" />
           <div className="h-4 w-2/3 animate-pulse rounded bg-white/10" />

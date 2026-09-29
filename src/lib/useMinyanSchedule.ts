@@ -38,8 +38,11 @@ export type MinyanSchedule = {
  * the search's minyan answers, so the two can never disagree about what
  * "today" or "the next Maariv" means. Lifted out of DaveningTimesCard, whose
  * comments explain each rule below.
+ *
+ * Null until the page has hydrated: what's next depends on the time, which
+ * isn't known before then (see useNow).
  */
-export function useMinyanSchedule(coords: LatLng | null, only?: readonly DirectoryResource[]): MinyanSchedule {
+export function useMinyanSchedule(coords: LatLng | null, only?: readonly DirectoryResource[]): MinyanSchedule | null {
   const categories = useCategories()
   // A category page passes its own listings (`only`): it has no provider of
   // every listing on the site, which only the home screen and the map load.
@@ -72,13 +75,16 @@ export function useMinyanSchedule(coords: LatLng | null, only?: readonly Directo
   // In the community's own timezone, not the visitor's device — see
   // dayAndMinutesInTimezone's own doc for the "jumped to tomorrow" report a
   // plain `new Date(now).getDay()` produced whenever the two disagreed.
-  const { day: todayKey, minutes: nowMinutes } = dayAndMinutesInTimezone(now, community.timezone)
-  const tomorrowKey = DAY_KEYS[(DAY_KEYS.indexOf(todayKey) + 1) % 7]
-  const season = currentSeason(now, community.timezone)
-
   // Falls back to the community's own default location: whether today is
   // Yom Tov doesn't depend on which address a visitor set.
   const { data: zmanimData } = useZmanim(coords ?? community.mapCenter)
+
+  // Nothing is scheduled before the page has hydrated, when there's no time
+  // yet (see useNow).
+  if (now === null) return null
+  const { day: todayKey, minutes: nowMinutes } = dayAndMinutesInTimezone(now, community.timezone)
+  const tomorrowKey = DAY_KEYS[(DAY_KEYS.indexOf(todayKey) + 1) % 7]
+  const season = currentSeason(now, community.timezone)
   const todayDayKeys: MinyanDayKey[] = zmanimData?.isYomTov ? [todayKey, 'yom_tov'] : [todayKey]
 
   return { linkCategoryId, shuls, anchors, now, todayKey, tomorrowKey, todayDayKeys, nowMinutes, season }

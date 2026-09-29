@@ -281,8 +281,11 @@ export default function DaveningTimesModal({ items, isOpen, onClose, initialDeno
     }
   }
   // Live clock, so the Today pill still means today on a tab left open across
-  // midnight rather than whatever day the modal was first mounted on.
-  const now = useNow()
+  // midnight rather than whatever day the modal was first mounted on. Null
+  // only before the page has hydrated (see useNow), when this is closed and
+  // shows nothing: the 0 is never on screen.
+  const clock = useNow()
+  const now = clock ?? 0
 
   // Hebrew date + parsha for the header's context line. Keyed to the community
   // centre rather than the visitor's own location: this is a calendar fact,
@@ -438,7 +441,7 @@ export default function DaveningTimesModal({ items, isOpen, onClose, initialDeno
   }
   const hasCalculatedRows = visibleByDay.some((g) => g.rows.some((r) => calcFor(r)))
 
-  if (!isOpen) return null
+  if (!isOpen || clock === null) return null
 
   return (
     <div

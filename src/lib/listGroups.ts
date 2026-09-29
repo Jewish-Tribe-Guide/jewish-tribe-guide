@@ -102,14 +102,16 @@ export function parseGroupBy(raw: unknown): GroupBy | null {
 export function groupListings<T extends DirectoryResource>(
   items: readonly T[],
   category: CategoryConfig,
-  now: Date,
+  now: Date | null,
 ): Grouping<T> | null {
   const groupBy = parseGroupBy(category.groupBy)
   if (!groupBy) return null
 
   if (groupBy.kind === 'open') {
     const hours = category.detailFields.filter((f) => f.type === 'hours')
-    if (hours.length === 0) return null
+    // Not before the page has hydrated: what's open is the visitor's clock's
+    // to say (see useNow), so the list waits ungrouped for it.
+    if (hours.length === 0 || !now) return null
     const isOpen = (item: T) =>
       !businessClosure(item as unknown as Record<string, unknown>) && hours.some((f) => hoursOpenNow(item[f.key], now) === true)
     return {

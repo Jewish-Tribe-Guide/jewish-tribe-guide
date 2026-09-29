@@ -21,6 +21,10 @@ describe('candidatePrompts — questions for the moment', () => {
     expect(candidatePrompts({ day: 'mon', minutes: at(12) })).toContain('Food open now')
     expect(candidatePrompts({ day: 'mon', minutes: at(23, 30) })).not.toContain('Food open now')
   })
+
+  it('offers only questions whose answer doesn’t depend on the time, before it’s known', () => {
+    expect(candidatePrompts(null)).toEqual(['Where can I get chalav yisroel milk?', 'Kosher wine', 'Shul near me'])
+  })
 })
 
 describe('answersWell', () => {

@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import type { DirectoryResource } from '@/types'
 import type { CategoryConfig } from '@/lib/categories'
-import { searchAsk } from '@/lib/askSearch'
+import { searchAsk, type AskResult } from '@/lib/askSearch'
 import { answerFor } from '@/lib/askAnswer'
 import { answersWell, pickPrompts } from '@/lib/searchPrompts'
 import { categoryExamples } from '@/lib/categoryExamples'
@@ -60,8 +60,13 @@ function Ask({ category, items, search, onSearch, schedule }: Props & { schedule
   // visitor's location, or from the community's centre like the rows' own
   // (the line under the box says so) — except for "within 3 miles", which
   // means nothing measured from anywhere but where the visitor is.
+  //
+  // Not before the page has hydrated, when there's no time yet (see useNow):
+  // every answer says what's open, so none is given, and an example asking
+  // when something is ("open now", "next mincha") isn't offered yet. The
+  // rest are picked by what they find, which the time doesn't change.
   const ask = (text: string) => {
-    const result = searchAsk(items, [category], text, { categoryId: category.id, coords, now: new Date(now), places })
+    const result = searchAsk(items, [category], text, { categoryId: category.id, coords, now: new Date(now ?? 0), places })
     const answer = answerFor(result, {
       coords: coords ?? (result.query.within ? null : community.mapCenter),
       schedule:
@@ -80,15 +85,16 @@ function Ask({ category, items, search, onSearch, schedule }: Props & { schedule
     return { result, answer }
   }
 
+  const asksWhen = (r: AskResult) => r.query.openNow || r.query.openToday || r.query.openAt !== null || r.query.minyan !== null
   const q = search.trim()
-  const answer = q ? ask(q).answer : null
+  const answer = q && now !== null ? ask(q).answer : null
   const examples = q
     ? []
     : pickPrompts(
         categoryExamples(category, items, categories, places),
         (p) => {
           const tried = ask(p)
-          return answersWell(tried.answer, tried.result.hits.length)
+          return (now !== null || !asksWhen(tried.result)) && answersWell(tried.answer, tried.result.hits.length)
         },
         5,
       )

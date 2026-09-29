@@ -95,6 +95,18 @@ describe('listingRowFacts', () => {
     expect(listingRowFacts(makeListing(), makeCategory({ detailFields: [] }), FRIDAY_2PM)).toEqual([])
   })
 
+  // Before the page has hydrated there's no time (see useNow): a row built
+  // on the server, days before it's read, used to say "Opens Wed 9 AM".
+  it('says nothing about open or closed before the time is known, but still says a closure', () => {
+    const category = makeCategory({ detailFields: [hours, type] })
+    const open = makeListing({ hours: openFriday('09:00', '19:00'), type: 'meat' })
+    expect(texts(listingRowFacts(open, category, null))).toEqual(['Meat'])
+    expect(texts(listingRowFacts(makeListing(), category, null))).toEqual([])
+    expect(texts(listingRowFacts(makeListing({ businessStatus: 'CLOSED_PERMANENTLY' }), category, null))).toEqual(['Permanently closed'])
+    expect(listingRowNote(makeListing(), category, null, { flagUnconfirmed: true })).toBeNull()
+    expect(candlesToday(null, null)).toBeNull()
+  })
+
   it('puts a closure first, over any hours, red only when it’s permanent', () => {
     const category = makeCategory({ detailFields: [hours] })
     const open = { hours: openFriday('09:00', '19:00') }

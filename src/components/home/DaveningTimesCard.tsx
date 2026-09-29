@@ -6,6 +6,7 @@ import { useCommunitySlug } from '@/lib/communityContext'
 import { nextUpcomingDavening } from '@/lib/upcomingDavening'
 import { secularHolidayTomorrow } from '@/lib/secularHolidays'
 import { useMinyanSchedule } from '@/lib/useMinyanSchedule'
+import { useCategories } from '@/lib/useCategories'
 import type { LatLng } from '@/lib/geo'
 import { routes } from '@/lib/routes'
 import { community } from '@/community.config'
@@ -44,15 +45,22 @@ export default function DaveningTimesCard({ coords }: { coords: LatLng | null })
   const communitySlug = useCommunitySlug()
   // Every shul's minyanim, today's day keys and the resolved sunset times —
   // shared with the search's minyan answers (see useMinyanSchedule).
-  const { linkCategoryId, shuls, anchors, now, tomorrowKey, todayDayKeys, nowMinutes, season } = useMinyanSchedule(coords)
+  // Null until the page has hydrated (see useNow), when the card links to
+  // today's times without saying which day.
+  const schedule = useMinyanSchedule(coords)
+  const categories = useCategories()
+  // Where "All davening times" lives, as useMinyanSchedule picks it.
+  const linkCategoryId = categories?.find((c) => c.detailFields.some((f) => f.type === 'minyanim'))?.id
 
-  const result = nextUpcomingDavening(shuls, {
-    today: todayDayKeys,
-    tomorrow: [tomorrowKey],
-    nowMinutes,
-    season,
-    anchors,
-  })
+  const result = schedule
+    ? nextUpcomingDavening(schedule.shuls, {
+        today: schedule.todayDayKeys,
+        tomorrow: [schedule.tomorrowKey],
+        nowMinutes: schedule.nowMinutes,
+        season: schedule.season,
+        anchors: schedule.anchors,
+      })
+    : null
 
   // No category configured with a minyanim field at all — not a loading
   // state, a real "this community hasn't set this up" — so the card
@@ -74,8 +82,8 @@ export default function DaveningTimesCard({ coords }: { coords: LatLng | null })
   // that pseudo-day in the filter too, or it's invisible on a view that's
   // otherwise correctly showing tomorrow. Rosh Chodesh isn't included here
   // for the same reason — see secularHolidayTomorrow's own doc.
-  const tomorrowHoliday = result?.isTomorrow ? secularHolidayTomorrow(now, community.timezone) : null
-  const tomorrowDayParam = [tomorrowKey, ...(tomorrowHoliday ? ['holiday'] : [])].join(',')
+  const tomorrowHoliday = result?.isTomorrow && schedule ? secularHolidayTomorrow(schedule.now, community.timezone) : null
+  const tomorrowDayParam = [schedule?.tomorrowKey, ...(tomorrowHoliday ? ['holiday'] : [])].join(',')
   const seeAllHref = `${routes.slug(communitySlug, linkCategoryId)}?davening=1${result?.isTomorrow ? `&day=${tomorrowDayParam}` : ''}`
 
   return (

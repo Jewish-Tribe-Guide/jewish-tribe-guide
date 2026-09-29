@@ -1,7 +1,10 @@
 import { expect, test } from '@playwright/test'
 import {
   apiCallsForThisDocument,
+  categories,
+  categoryWithHoursField,
   categoryWithListings,
+  type Category,
   defaultCommunity,
   dismissLocationPrompt,
   ready,
@@ -189,5 +192,69 @@ test.describe('content is server-rendered', () => {
     await expect(heading).toHaveAttribute('data-total', String(count))
     const text = await heading.getByRole('heading').innerText()
     if (/listings?$/.test(text)) expect(text).toMatch(new RegExp(`(^|· )${count}\\s+listings?$`))
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// A page's HTML is built ahead of time and cached for days, on a server in
+// its own timezone; the visitor opens it whenever they like. Anything on it
+// that depends on the time (a row's "Closes soon · 6 PM", the next Mincha,
+// the Try asking questions) used to be worked out on the server too, from
+// its own clock. Now the time waits for the browser (see useNow), and these
+// hold it to that.
+//
+// Two ways it went wrong. A category page's list, and an opened listing, are
+// rendered again in the browser whatever the HTML says (they read the
+// address, which a prebuilt page can't), so their HTML was only ever wrong,
+// never an error: "Opens Wed 9 AM" until the page loaded, then "Opens 9 AM".
+// Those are checked in the HTML itself. The home screen is hydrated, taken
+// over as it is, so there the two clocks disagreeing made React throw the
+// server's page away (error #418). That's checked in a browser whose clock
+// is half a day from now, so whatever was true when the page was built isn't
+// when it's opened.
+// ─────────────────────────────────────────────────────────────────────────────
+test.describe('the time is the browser’s, not the build’s', () => {
+  test('a category page’s HTML says nothing about what’s open', async ({ page, request }) => {
+    const community = await defaultCommunity(page)
+    const { category } = await categoryWithHoursField(request, community)
+    const markup = serverMarkup(await (await request.get(`/${community}/${category.id}`)).text())
+    expect(markup).not.toMatch(/Opens \w|Open until|Closes soon|No hours listed/)
+
+    // The browser says it, once it knows the time.
+    await page.goto(`/${community}/${category.id}`)
+    await ready(page)
+    await expect(page.locator('main')).toContainText(/Opens \w|Open until|Closes soon|Open\b|No hours listed/)
+  })
+
+  test('a shul list’s HTML says nothing about the next minyan', async ({ page, request }) => {
+    const community = await defaultCommunity(page)
+    const all = (await categories(request, community)) as (Category & { detailFields?: { type: string }[] })[]
+    const shuls = all.find((c) => c.detailFields?.some((f) => f.type === 'minyanim'))
+    test.skip(!shuls, 'This community keeps no minyan times')
+    const markup = serverMarkup(await (await request.get(`/${community}/${shuls!.id}`)).text())
+    expect(markup).not.toMatch(/(Shacharis|Mincha|Maariv) \d|No davening times listed|Nothing today or tomorrow|Shabbos only/)
+  })
+
+  test('the home screen opened half a day later hydrates without React redoing it', async ({ page }) => {
+    const community = await defaultCommunity(page)
+    const errors: string[] = []
+    page.on('pageerror', (e) => errors.push(e.message))
+    page.on('console', (m) => {
+      if (m.type() === 'error') errors.push(m.text())
+    })
+    await page.clock.setFixedTime(Date.now() + 12 * 60 * 60 * 1000)
+    await page.goto(`/${community}`)
+    await ready(page)
+    // Until React has taken the page over, a mismatch hasn't been found yet.
+    // It marks each element it hydrates, or renders over a mismatch; the
+    // last one in <main> is among the last it reaches.
+    await page.waitForFunction(() => {
+      const last = document.querySelector('main')?.querySelector(':scope *:last-child')
+      return !!last && Object.keys(last).some((k) => k.startsWith('__reactFiber$'))
+    })
+    // A moment for React to report what it found, after it commits.
+    await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => setTimeout(r, 0))))
+    // Minified in a production build: #418 is text that didn't match.
+    expect(errors.filter((e) => /Minified React error #4(18|19|21|22|23|25)|hydrat/i.test(e))).toEqual([])
   })
 })

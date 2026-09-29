@@ -148,8 +148,10 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   const [openNow, setOpenNow] = useState(arrivedViaBackForward ? false : (initialOpenNow ?? false))
   // Drives the "Open now" filter below. Without it the filter answers for the
   // moment the page rendered, so a list narrowed to what's open at 4pm still
-  // shows those places at 10pm.
-  const now = new Date(useNow())
+  // shows those places at 10pm. Null until the page has hydrated (see
+  // useNow): nothing here guesses the time.
+  const clock = useNow()
+  const now = clock === null ? null : new Date(clock)
 
   // ── Apply a shared link's search/openNow/filters once they actually arrive ──
   // The lazy initializers above already cover the common case (this component
@@ -754,8 +756,9 @@ export default function GenericDirectory({ category, items, anchorLabel, address
         // saved — a temporarily-closed shop kept passing this filter on last
         // season's hours.
         if (businessClosure(item as unknown as Record<string, unknown>)) return false
-        // Item must be open right now according to at least one filterable hours field.
-        const isOpen = hoursFields
+        // Item must be open right now according to at least one filterable
+        // hours field; that waits for the time, as the rows do.
+        const isOpen = !now || hoursFields
           .filter((f) => f.filterable)
           .some((f) => hoursOpenNow(item[f.key], now) === true)
         if (!isOpen) return false
@@ -932,7 +935,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   const omitKey = groupedBy?.kind === 'field' ? groupedBy.key : null
   // "Not confirmed by anyone yet" only where most of the list is vouched for
   // (see listingRowNote).
-  const flagUnconfirmed = items.length > 0 && items.filter((i) => isVouchedFor(i, now)).length * 2 >= items.length
+  const flagUnconfirmed = !!now && items.length > 0 && items.filter((i) => isVouchedFor(i, now)).length * 2 >= items.length
 
   // Synagogues' Next minyan card, until something is typed, while some shul
   // the list holds keeps times. Wherever it isn't, All davening times is

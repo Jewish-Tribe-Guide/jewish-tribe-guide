@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, render, screen } from '@testing-library/react'
+import { renderToString } from 'react-dom/server'
 import { useNow, useToday } from './useNow'
 
 // Nothing in the app used to recompute time: there was no setInterval anywhere
@@ -39,6 +40,18 @@ afterEach(() => {
 })
 
 describe('useNow', () => {
+  // A page is built, and cached, long before it's read, on a server in its
+  // own timezone: its time is never the visitor's. Row facts worked out from
+  // it said "Opens Wed 9 AM" in the HTML until the page loaded, and on the
+  // home screen React found the two disagreeing and redid the page.
+  it('is null on the server, so nothing there is worked out from the time', () => {
+    function Shows() {
+      const now = useNow()
+      return <span>{now === null ? 'no time yet' : now}</span>
+    }
+    expect(renderToString(<Shows />)).toContain('no time yet')
+  })
+
   it('advances once a minute while the tab is visible', () => {
     render(<Clock />)
     const first = Number(screen.getByTestId('now').textContent)

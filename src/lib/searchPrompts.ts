@@ -11,8 +11,13 @@ import type { DayKey } from '@/lib/hours'
 
 /** Every question worth offering at this moment, most fitting first. Plain
  *  wording people would type, no community-specific names, so any community
- *  can offer them; which actually show depends on what its guide answers. */
-export function candidatePrompts({ day, minutes }: { day: DayKey; minutes: number }): string[] {
+ *  can offer them; which actually show depends on what its guide answers.
+ *
+ *  Null for no time yet (before the page has hydrated, see useNow): only
+ *  the questions whose answer doesn't depend on it. */
+export function candidatePrompts(at: { day: DayKey; minutes: number } | null): string[] {
+  if (!at) return [...TIMELESS]
+  const { day, minutes } = at
   const out: string[] = []
   // The next davening, by the time of day.
   if (minutes >= 4 * 60 && minutes < 10 * 60 + 30) out.push('Next Shacharis')
@@ -23,9 +28,11 @@ export function candidatePrompts({ day, minutes }: { day: DayKey; minutes: numbe
   if (day === 'fri' && minutes < 15 * 60) out.push('Where can I get challah?')
   // Something to eat, while there is.
   if (minutes >= 7 * 60 && minutes < 22 * 60) out.push('Food open now')
-  out.push('Where can I get chalav yisroel milk?', 'Kosher wine', 'Mikvah open today', 'Shul near me')
+  out.push(TIMELESS[0], TIMELESS[1], 'Mikvah open today', TIMELESS[2])
   return out
 }
+
+const TIMELESS = ['Where can I get chalav yisroel milk?', 'Kosher wine', 'Shul near me'] as const
 
 /** Whether an answer is one worth showing off: a real one, and a yes.
  *  "Nothing open right now" and "No more Maariv today" are true, but a first

@@ -221,18 +221,21 @@ export const CLOSURE_LABELS: Record<Closure, string> = {
  * never disagree about whether a place is open.
  *
  * A closed business is never open, whatever its saved hours say.
+ *
+ * With `now` null (useNow before the page has hydrated) only a closure is
+ * known: whether it's open waits for the time.
  */
 export function getOpenStatus(
   item: Record<string, unknown>,
   hoursFieldKeys: string[],
-  now: Date = new Date(),
+  now: Date | null = new Date(),
 ): {
   isOpen: boolean
   closing: { closesSoon: boolean; closeLabel: string } | null
   closure: Closure | null
 } {
   const closure = businessClosure(item)
-  if (closure) return { isOpen: false, closing: null, closure }
+  if (closure || !now) return { isOpen: false, closing: null, closure }
   const openVal = hoursFieldKeys
     .map((k) => item[k])
     .find((v) => v !== undefined && hoursOpenNow(v, now) === true && isStructuredHours(v))
