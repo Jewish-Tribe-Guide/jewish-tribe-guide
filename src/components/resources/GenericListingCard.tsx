@@ -13,7 +13,6 @@ import { routes } from '@/lib/routes'
 import { listingSlug } from '@/lib/listingSlug'
 import CategoryIcon from '@/components/CategoryIcon'
 import PinnedBadge from '@/components/PinnedBadge'
-import { CheckIcon, ExternalIcon, PinIcon, ThumbtackIcon } from '@/components/icons'
 import UpvoteButton from './UpvoteButton'
 import ListingDetailModal from './ListingDetailModal'
 import MobileSheet from './MobileSheet'
@@ -35,21 +34,12 @@ import { countEvent } from '@/lib/countEvent'
  *  not here: it re-sorts the entire directory, which is a deliberate act
  *  rather than something you do in passing, and two actions is the practical
  *  ceiling for a swipe on a phone. It lives in the fan below an opened
- *  listing instead. */
+ *  listing instead.
+ *
+ *  A phone's swipe only. A desktop row used to show the two on hover, over
+ *  its likes; hovering a row now lights its pin on the map beside the list,
+ *  and an opened listing has both one click away. */
 const CARD_ACTION_IDS: ListingAction['id'][] = ['pin', 'share']
-
-function CardActionIcon({ action }: { action: ListingAction }) {
-  const cls = 'h-4 w-4 shrink-0'
-  // Always the outline thumbtack, never ThumbtackIcon's filled variant.
-  // Filled renders the literal 📌 glyph, and PinnedBadge already puts one of
-  // those on this very card's avatar when a listing is pinned — two on one
-  // card is redundant to look at and genuinely ambiguous to query. The state
-  // still reaches everyone: the label these buttons carry is "Pin" or
-  // "Pinned" straight from useListingActions.
-  if (action.id === 'pin') return <ThumbtackIcon className={cls} />
-  if (action.id === 'share') return action.active ? <CheckIcon className={cls} /> : <ExternalIcon className={cls} />
-  return <PinIcon className={cls} />
-}
 
 // Colour only where it means something: see lib/listingRow.ts.
 const FACT_TONE: Record<RowFactTone, string> = {
@@ -222,11 +212,10 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
   const { isPinned } = usePinned()
   const pinned = isPinned(item.id)
 
-  // Pin/Share for the collapsed row: revealed by a swipe on mobile, by
-  // hovering the row on desktop. Both are shortcuts — ListingActionsFan
-  // below an opened listing is where these are reachable by every visitor,
-  // which is what makes it safe for the card's own copies to be invisible
-  // until asked for.
+  // Pin/Share for the collapsed row, revealed by a swipe on mobile. A
+  // shortcut: ListingActionsFan below an opened listing is where these are
+  // reachable by every visitor, which is what makes it safe for the card's
+  // own copies to be invisible until asked for.
   const cardActions = useListingActions(item, category, listingPath).filter((a) =>
     CARD_ACTION_IDS.includes(a.id),
   )
@@ -528,8 +517,7 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
       <SwipeRow
         rowId={item.id}
         actions={rowSwipeActions}
-        // Mobile only: desktop reveals the same two actions by hovering the
-        // row instead (see the hover-reveal in the corner below).
+        // Mobile only (see CARD_ACTION_IDS).
         enabled={isMobile}
         className={look === 'list' ? undefined : 'rounded-lg'}
         contentRef={cardRootRef}
@@ -575,7 +563,7 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
         contentClassName={`group/row relative h-full w-full ${look === 'list' ? '' : 'rounded-lg'} bg-white px-4 py-3 hover:bg-slate-50 active:bg-slate-100 cursor-pointer transition-colors duration-200 ease-out`}
       >
         {/* relative: the positioning context for the absolutely-placed
-            toggle/hover-actions group below. */}
+            toggle below. */}
         <div className="relative">
         <div className="flex items-start gap-3">
           {/* The place's own photo, or its initials in a rounded square in
@@ -623,10 +611,8 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
                 item.name
               )}
             </p>
-            {/* Faded out while the row is hovered on desktop: its Pin and
-                Share buttons appear over this corner. */}
             {!!likes && likes > 0 && (
-              <span className="flex shrink-0 items-center gap-1 text-[13px] font-semibold text-slate-500 transition-opacity desktop:group-hover/row:opacity-0" aria-label={`${likes} like${likes === 1 ? '' : 's'}`}>
+              <span className="flex shrink-0 items-center gap-1 text-[13px] font-semibold text-slate-500" aria-label={`${likes} like${likes === 1 ? '' : 's'}`}>
                 {/* The canvas's grey outline thumb, not the 👍 emoji: an
                     emoji's own colours shouted over the row's facts. */}
                 <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-[13px] w-[13px]" data-testid="row-likes-icon">
@@ -824,40 +810,6 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
                 visual purpose. */}
             <span className="block h-4 w-4" aria-hidden="true" />
           </button>
-          {/* Desktop's replacement for the kebab that used to sit here,
-              revealed on row hover. Deliberately a POINTER-ONLY shortcut:
-              aria-hidden and tabIndex={-1}, exactly like the mobile swipe is
-              a touch-only one. Both have the same real route behind them —
-              the fan below an opened listing — which is what makes it
-              legitimate for either to be unreachable on its own.
-              The first version of this did the opposite: focusable, revealed
-              on focus-within, on the theory that keyboard parity was the
-              accessible choice. In a directory it is the reverse. `opacity-0`
-              removes nothing from the tab order or the accessibility tree, so
-              a twenty-card list grew forty extra tab stops and forty
-              announcements of controls nobody can see — measured on a real
-              page, not theorised. Declining to duplicate a control is not the
-              same as denying access to it.
-              Desktop only: mobile has no hover to reveal anything with. */}
-          {!isMobile && cardActions.length > 0 && (
-            <span aria-hidden="true" className="hidden desktop:flex items-center gap-1 opacity-0 transition-opacity group-hover/row:opacity-100">
-              {cardActions.map((action) => (
-                <button
-                  key={action.id}
-                  type="button"
-                  tabIndex={-1}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    action.onSelect()
-                  }}
-                  aria-label={`${action.label} ${item.name}`}
-                  className="flex h-8 w-8 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 cursor-pointer"
-                >
-                  <CardActionIcon action={action} />
-                </button>
-              ))}
-            </span>
-          )}
         </div>
 
         </div>

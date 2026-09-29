@@ -141,8 +141,8 @@ describe('GenericListingCard — collapsed', () => {
   // row's own short height, and still pinned the group near the top of a
   // taller card once a header text field or an upvote/distance row added
   // real height below it. That reasoning outlived the kebab: the group still
-  // holds the invisible toggle and, on desktop, the hover-revealed Pin and
-  // Share, and it still has to sit at the card's true vertical middle.
+  // holds the invisible toggle, and it still has to sit at the card's true
+  // vertical middle.
   // What DID change is the wrapper's `pr-8` — the reserve existed to keep
   // the name clear of the kebab, and with the kebab gone the name takes
   // those 32px back (346px -> 378px on a real card at phone width).
@@ -1108,11 +1108,12 @@ describe('GenericListingCard — the row', () => {
 // These used to live in a kebab in the card's corner. The kebab is gone:
 // people open a ⋯ expecting Share and Save, never expecting to author
 // anything, which is exactly why Edit spent so long invisible in there.
-// Pin and Share are reached by swiping the row on mobile and by hovering it
-// on desktop; Edit and Set-as-location live below an opened listing (the
-// edit bar and its fan). Both card routes are SHORTCUTS — the fan is where
-// every visitor can reach these, which is what makes it safe for the card's
-// own copies to be invisible until asked for.
+// Pin and Share are reached by swiping the row on mobile; Edit and
+// Set-as-location live below an opened listing (the edit bar and its fan).
+// The swipe is a SHORTCUT — the fan is where every visitor can reach these,
+// which is what makes it safe for the card's own copies to be invisible
+// until asked for. A desktop row showed the two on hover too, until hovering
+// a row came to light its pin on the map beside the list.
 describe('GenericListingCard — collapsed row actions', () => {
   it('no longer renders a kebab on either viewport', () => {
     renderWithProviders(
@@ -1129,32 +1130,19 @@ describe('GenericListingCard — collapsed row actions', () => {
     expect(screen.queryByRole('button', { name: /more actions for/i })).not.toBeInTheDocument()
   })
 
-  // Hover can't be simulated meaningfully in jsdom (no layout, no real
-  // pointer), so this asserts the mechanism and, more importantly, the
-  // decision underneath it: these are a POINTER-ONLY shortcut.
-  //
-  // The first version made them focusable and revealed them on focus-within,
-  // reasoning that keyboard parity was the accessible choice. Measured on a
-  // real directory page it was the opposite — `opacity-0` removes an element
-  // from neither the tab order nor the accessibility tree, so a twenty-card
-  // list gained forty extra tab stops and forty announcements for controls
-  // nobody can see. Pin and Share stay reachable for everyone in the fan
-  // below an opened listing (ListingActionsFan), which is the same route
-  // that makes the touch-only swipe acceptable.
-  it('keeps the desktop hover actions out of the tab order and the a11y tree', () => {
+  // They used to appear over the row's corner on hover, hiding its likes.
+  // Now a desktop row's hover lights its pin on the map, and the likes stay.
+  it('has no Pin or Share on a desktop row, and never hides its likes', () => {
     renderWithProviders(
-      <GenericListingCard item={makeListing({ name: 'Goldi Market' })} category={makeCategory()} upvotes={false} count={0} {...requiredHandlers} />,
+      <ForcedViewport isMobile={false}>
+        <GenericListingCard item={makeListing({ name: 'Goldi Market' })} category={makeCategory()} upvotes={false} count={0} likes={3} {...requiredHandlers} />
+      </ForcedViewport>,
     )
-
-    // Not queryable by role at all — that IS the assertion.
-    expect(screen.queryByRole('button', { name: 'Pin Goldi Market' })).not.toBeInTheDocument()
-
-    const reveal = document.querySelector('[aria-hidden="true"][class*="group-hover/row:opacity-100"]')
-    expect(reveal).not.toBeNull()
-    const buttons = reveal!.querySelectorAll('button')
-    expect(buttons).toHaveLength(2)
-    buttons.forEach((b) => expect(b).toHaveAttribute('tabindex', '-1'))
-    expect([...buttons].map((b) => b.getAttribute('aria-label'))).toEqual(['Pin Goldi Market', 'Share Goldi Market'])
+    for (const name of ['Pin Goldi Market', 'Share Goldi Market']) {
+      expect(screen.queryByRole('button', { name, hidden: true })).not.toBeInTheDocument()
+    }
+    const likes = screen.getByLabelText('3 likes')
+    expect(likes.className).not.toMatch(/opacity-0/)
   })
 
   // Set-as-location re-sorts the whole directory — a deliberate act, not a
@@ -1312,8 +1300,7 @@ describe('GenericListingCard — swipe actions', () => {
     expect(screen.getByRole('button', { name: /show details for Goldi Market/i })).toHaveAttribute('aria-expanded', 'false')
   })
 
-  // Desktop reveals the same two actions by hovering the row instead.
-  it('has no swipe on desktop, which has the hover row instead', () => {
+  it('has no swipe on desktop', () => {
     renderWithProviders(
       <ForcedViewport isMobile={false}>
         <GenericListingCard item={makeListing({ name: 'Goldi Market' })} category={makeCategory()} upvotes={false} count={0} {...requiredHandlers} />
