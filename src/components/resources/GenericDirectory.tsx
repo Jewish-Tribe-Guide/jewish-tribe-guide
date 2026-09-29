@@ -1069,9 +1069,10 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // The same on every category page, including ones kept open for Back.
   const [mapHidden, storeMapHidden] = useSharedPreference('jpc:map-hidden', (raw) => raw === '1')
   const setMapHidden = (hidden: boolean) => storeMapHidden(hidden ? '1' : null)
+  // How the width is shared between them: draggable, and dragged far
+  // enough the map's way, hidden (useListMapSplit).
+  const { gridRef: splitRef, gridStyle: splitStyle, handleProps: splitHandle } = useListMapSplit({ onHideMap: () => setMapHidden(true) })
   const mapBeside = hasMapColumn && !mapHidden
-  // How the width is shared between them: draggable (useListMapSplit).
-  const { gridRef: splitRef, gridStyle: splitStyle, handleProps: splitHandle } = useListMapSplit()
   // Cards or one flat list (RowLookSwitch): being tried on the preview.
   const [rowLook, setRowLook] = useRowLook()
   const flat = rowLook === 'list'
@@ -1272,7 +1273,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
         {!hasMapColumn && listHeading}
       </div>
 
-      <div ref={splitRef} className={mapBeside ? 'lg:grid lg:items-start' : undefined} style={mapBeside ? splitStyle : undefined}>
+      <div ref={splitRef} className={mapBeside ? 'group/split lg:grid lg:items-start' : undefined} style={mapBeside ? splitStyle : undefined}>
       <div className="min-w-0">
       {hasMapColumn && listHeading}
       {filtered.length === 0 ? (
@@ -1454,7 +1455,8 @@ export default function GenericDirectory({ category, items, anchorLabel, address
         </div>
       )}
       {mapBeside && (
-        <div className="hidden lg:sticky lg:top-[4.5rem] lg:block lg:h-[min(calc(100vh-6rem),720px)]">
+        <div className="relative hidden lg:sticky lg:top-[4.5rem] lg:block lg:h-[min(calc(100vh-6rem),720px)]">
+          <div className="h-full transition-opacity group-data-[snap=map]/split:opacity-30">
           <CategoryMap
             category={category}
             items={filtered}
@@ -1464,6 +1466,11 @@ export default function GenericDirectory({ category, items, anchorLabel, address
             onHide={() => setMapHidden(true)}
             fullMapHref={fullMapHref}
           />
+          </div>
+          {/* While the line is dragged far enough to hide the map. */}
+          <div aria-hidden="true" className="pointer-events-none absolute inset-0 hidden items-center justify-center group-data-[snap=map]/split:flex">
+            <span className="rounded-full bg-slate-900/85 px-4 py-2 text-[14px] font-semibold text-white shadow-lg">Let go to hide the map</span>
+          </div>
         </div>
       )}
       </div>

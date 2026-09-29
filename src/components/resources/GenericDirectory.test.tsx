@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { Activity, forwardRef, useImperativeHandle, useState, type Ref } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { act, cleanup, screen, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { mockRouter } from '@/test/nextNavigationMock'
@@ -1717,6 +1717,14 @@ describe('GenericDirectory — the map beside the list', () => {
     expect(line.previousElementSibling).toContainElement(screen.getByText('Alpha Grill'))
     expect(line.nextElementSibling).toContainElement(screen.getByTestId('map-stand-in'))
     expect(line.parentElement!.style.gridTemplateColumns).toBe('minmax(420px, 0.5fr) 32px minmax(360px, 0.5fr)')
+    // Dragged all the way over, the map hides, as Hide map does.
+    line.parentElement!.getBoundingClientRect = () => ({ left: 0, width: 1120, top: 0, height: 700, right: 1120, bottom: 700, x: 0, y: 0, toJSON: () => ({}) })
+    fireEvent.pointerDown(line, { button: 0, clientX: 560, pointerId: 1 })
+    fireEvent.pointerMove(line, { clientX: 1100, pointerId: 1 })
+    fireEvent.pointerUp(line, { pointerId: 1 })
+    expect(screen.queryByTestId('map-stand-in')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Show map' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Show map' }))
     await user.click(screen.getByRole('button', { name: 'Hide map' }))
     expect(screen.queryByRole('separator', { name: 'Resize the list and the map' })).not.toBeInTheDocument()
   })

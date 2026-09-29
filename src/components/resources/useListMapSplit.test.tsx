@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { clampShare, splitColumns, useListMapSplit } from './useListMapSplit'
 
@@ -9,8 +9,8 @@ afterEach(() => {
 })
 
 /** List, line, map, as GenericDirectory lays them out, `width` px wide. */
-function Split({ width = 1120 }: { width?: number }) {
-  const { gridRef, gridStyle, handleProps } = useListMapSplit()
+function Split({ width = 1120, onHideMap }: { width?: number; onHideMap?: () => void }) {
+  const { gridRef, gridStyle, handleProps } = useListMapSplit({ onHideMap })
   return (
     <div
       ref={(el) => {
@@ -99,6 +99,52 @@ describe('useListMapSplit', () => {
     fireEvent.doubleClick(handle())
     expect(handle()).toHaveAttribute('aria-valuenow', '50')
     expect(columns()).toBe(splitColumns(0.5))
+  })
+
+  // The grid starts at 100px and is 1120 wide: the map is at its smallest
+  // (360px) with the line's middle at 100 + 1088 - 360 + 16 = 844px, and
+  // hides once the line is 120px past that.
+  describe('dragged far enough the map’s way', () => {
+    const grid = () => screen.getByTestId('grid')
+    const dragTo = (x: number) => {
+      fireEvent.pointerDown(handle(), { button: 0, clientX: 660, pointerId: 1 })
+      fireEvent.pointerMove(handle(), { clientX: x, pointerId: 1 })
+    }
+
+    it('dims the map while there, and letting go hides it, keeping the split for when it’s back', () => {
+      const onHideMap = vi.fn()
+      localStorage.setItem('jpc:list-share', '0.55')
+      render(<Split onHideMap={onHideMap} />)
+      dragTo(1000)
+      expect(grid()).toHaveAttribute('data-snap', 'map')
+      fireEvent.pointerUp(handle(), { pointerId: 1 })
+      expect(onHideMap).toHaveBeenCalledTimes(1)
+      expect(grid()).not.toHaveAttribute('data-snap')
+      expect(localStorage.getItem('jpc:list-share')).toBe('0.55')
+      expect(columns()).toBe(splitColumns(0.55))
+    })
+
+    it('takes a clear push: just past the map’s smallest only resizes', () => {
+      const onHideMap = vi.fn()
+      render(<Split onHideMap={onHideMap} />)
+      dragTo(940)
+      expect(grid()).not.toHaveAttribute('data-snap')
+      fireEvent.pointerUp(handle(), { pointerId: 1 })
+      expect(onHideMap).not.toHaveBeenCalled()
+      expect(Number(localStorage.getItem('jpc:list-share'))).toBeCloseTo(1 - 360 / 1088, 3)
+    })
+
+    it('changes its mind when dragged back, and a cancelled drag leaves nothing behind', () => {
+      const onHideMap = vi.fn()
+      render(<Split onHideMap={onHideMap} />)
+      dragTo(1000)
+      fireEvent.pointerMove(handle(), { clientX: 700, pointerId: 1 })
+      expect(grid()).not.toHaveAttribute('data-snap')
+      fireEvent.pointerMove(handle(), { clientX: 1000, pointerId: 1 })
+      fireEvent.pointerCancel(handle(), { pointerId: 1 })
+      expect(grid()).not.toHaveAttribute('data-snap')
+      expect(onHideMap).not.toHaveBeenCalled()
+    })
   })
 
   it('is the same on every page showing it', () => {

@@ -14,6 +14,11 @@ import { useSharedPreference } from '@/lib/useSharedPreference'
 //
 // A list wide enough for two 420px columns of rows gets them on its own:
 // the rows' grid is auto-fill (see GenericDirectory).
+//
+// Dragged well past the map's smallest, the map dims and says "Let go to
+// hide the map"; letting go there hides it, as Hide map does, and the split
+// stays as it was for when Show map brings it back. The grid carries
+// data-snap="map" meanwhile, for the map's column to show it.
 
 /** The line between list and map, and the room around it. */
 export const HANDLE_PX = 32
@@ -22,6 +27,9 @@ export const LIST_MIN_PX = 420
 /** Smaller than this and the map shows too little to be worth having. */
 export const MAP_MIN_PX = 360
 export const DEFAULT_SHARE = 0.5
+/** How far past the map's smallest the line has to go to hide the map: a
+ *  clear push, not a drag that overshot a little. */
+export const SNAP_PX = 120
 /** One arrow-key press. */
 const STEP = 0.03
 const KEY = 'jpc:list-share'
@@ -47,17 +55,22 @@ function parseShare(raw: string | null): number {
   return Number.isFinite(n) ? clampShare(n, 0) : DEFAULT_SHARE
 }
 
-export function useListMapSplit() {
+export function useListMapSplit({ onHideMap }: { onHideMap?: () => void } = {}) {
   const [share, store] = useSharedPreference(KEY, parseShare)
   const setShare = (value: number) => store(value === DEFAULT_SHARE ? null : String(value))
   const gridRef = useRef<HTMLDivElement>(null)
-  const drag = useRef<{ share: number } | null>(null)
+  const drag = useRef<{ share: number; hide: boolean } | null>(null)
 
   const avail = () => (gridRef.current ? gridRef.current.getBoundingClientRect().width - HANDLE_PX : 0)
   // While dragging, the columns move directly, without re-rendering the
   // list under them (a Food page is 70 rows); the share is kept on release.
   const show = (value: number) => {
     if (gridRef.current) gridRef.current.style.gridTemplateColumns = splitColumns(value)
+  }
+  const snapping = (on: boolean) => {
+    if (!gridRef.current) return
+    if (on) gridRef.current.dataset.snap = 'map'
+    else delete gridRef.current.dataset.snap
   }
   const settle = (value: number) => {
     const rounded = Math.round(value * 1000) / 1000
@@ -72,7 +85,7 @@ export function useListMapSplit() {
     'aria-valuemin': 0,
     'aria-valuemax': 100,
     'aria-valuenow': Math.round(share * 100),
-    title: 'Drag to resize. Double-click for half and half.',
+    title: 'Drag to resize, or all the way over to hide the map. Double-click for half and half.',
     tabIndex: 0,
     onPointerDown: (e: PointerEvent<HTMLDivElement>) => {
       if (e.button !== 0) return
@@ -84,25 +97,35 @@ export function useListMapSplit() {
         // A pointer the browser no longer knows: dragging still works while
         // it stays over the line.
       }
-      drag.current = { share }
+      drag.current = { share, hide: false }
       document.body.style.userSelect = 'none'
     },
     onPointerMove: (e: PointerEvent<HTMLDivElement>) => {
       if (!drag.current || !gridRef.current) return
       const box = gridRef.current.getBoundingClientRect()
       const room = box.width - HANDLE_PX
-      drag.current.share = clampShare((e.clientX - box.left - HANDLE_PX / 2) / room, room)
+      const wanted = (e.clientX - box.left - HANDLE_PX / 2) / room
+      drag.current.share = clampShare(wanted, room)
+      drag.current.hide = !!onHideMap && room * (1 - wanted) < MAP_MIN_PX - SNAP_PX
+      snapping(drag.current.hide)
       show(drag.current.share)
     },
     onPointerUp: () => {
       if (!drag.current) return
       document.body.style.userSelect = ''
-      settle(drag.current.share)
+      snapping(false)
+      if (drag.current.hide) {
+        show(share)
+        onHideMap?.()
+      } else {
+        settle(drag.current.share)
+      }
       drag.current = null
     },
     // The browser took the gesture over: back to where it started.
     onPointerCancel: () => {
       document.body.style.userSelect = ''
+      snapping(false)
       drag.current = null
       show(share)
     },
