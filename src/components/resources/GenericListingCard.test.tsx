@@ -398,6 +398,22 @@ describe('GenericListingCard — showInHeader text/textarea fields', () => {
 // card behind it is hidden under the backdrop), so a showInHeader url field
 // has to be restated somewhere in the dialog too — this is the "somewhere":
 // the same pill, next to the name, the collapsed row already used.
+// Drawn into <body>, like the phone's sheet (see BodyPortal): inside the
+// page's content, which rises into place with a transform as it appears,
+// the dialog's backdrop sat under the site header for that moment.
+describe('GenericListingCard — the opened listing sits above the page', () => {
+  it('draws the desktop dialog straight into the page body, outside the row', async () => {
+    const user = userEvent.setup()
+    const { container } = renderWithProviders(
+      <GenericListingCard item={makeListing()} category={makeCategory()} upvotes={false} count={0} {...requiredHandlers} />,
+    )
+    await user.click(screen.getByRole('button', { name: /show details for/i }))
+    const backdrop = screen.getByRole('dialog').closest('[role="presentation"]')!
+    expect(backdrop.parentElement).toBe(document.body)
+    expect(container).not.toContainElement(backdrop as HTMLElement)
+  })
+})
+
 describe('GenericListingCard — desktop modal header url field', () => {
   it('shows a showInHeader url field as a pill next to the name in the dialog, not duplicated in the actions row', async () => {
     const user = userEvent.setup()

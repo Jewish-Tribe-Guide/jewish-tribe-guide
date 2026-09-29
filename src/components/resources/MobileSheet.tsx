@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useBodyScrollLock } from '@/lib/useBodyScrollLock'
+import BodyPortal from '@/components/BodyPortal'
 
 type Props = {
   isOpen: boolean
@@ -450,91 +451,93 @@ export default function MobileSheet({ isOpen, onClose, title, children, draggabl
     : { transform: isClosing ? 'translateY(100%)' : 'translateY(0)', transition: `transform ${SNAP_DURATION_MS}ms cubic-bezier(0.32, 0.72, 0, 1)` }
 
   return (
-    <div
-      className={`fixed inset-0 z-50 flex items-end bg-slate-900/40 transition-opacity duration-[280ms] ${isClosing ? 'opacity-0' : 'opacity-100'}`}
-      onClick={(e) => { if (e.target === e.currentTarget) close() }}
-      role="presentation"
-    >
+    <BodyPortal>
       <div
-        className={`flex w-full flex-col rounded-t-2xl bg-white shadow-xl ${isClosing ? '' : 'animate-[sheetUp_220ms_ease-out]'} ${draggable ? '' : 'max-h-[85vh]'}`}
-        style={style}
-        role="dialog"
-        aria-modal="true"
-        aria-label={title}
+        className={`fixed inset-0 z-50 flex items-end bg-slate-900/40 transition-opacity duration-[280ms] ${isClosing ? 'opacity-0' : 'opacity-100'}`}
+        onClick={(e) => { if (e.target === e.currentTarget) close() }}
+        role="presentation"
       >
-        {draggable && (
+        <div
+          className={`flex w-full flex-col rounded-t-2xl bg-white shadow-xl ${isClosing ? '' : 'animate-[sheetUp_220ms_ease-out]'} ${draggable ? '' : 'max-h-[85vh]'}`}
+          style={style}
+          role="dialog"
+          aria-modal="true"
+          aria-label={title}
+        >
+          {draggable && (
+            <div
+              onPointerDown={onHandlePointerDown}
+              onPointerMove={onHandlePointerMove}
+              onPointerUp={onHandlePointerUp}
+              onPointerCancel={onHandlePointerCancel}
+              className="flex shrink-0 touch-none cursor-grab justify-center py-2 active:cursor-grabbing"
+              role="button"
+              aria-label="Drag to resize"
+            >
+              <span className="h-1 w-9 rounded-full bg-slate-300" aria-hidden="true" />
+            </div>
+          )}
+          {/* draggable: the whole header is a drag surface too, not just the
+              handle above it — see onHandlePointerDown's own doc for why.
+              touch-none here (not just on the handle) is load-bearing: without
+              it, a touch starting on the title text tries to scroll/select
+              first and the drag reads as sluggish to start, exactly the
+              "not smooth" gap this exists to close. No close button of its
+              own — a backdrop tap, Escape, or the drag-to-dismiss this whole
+              surface already offers cover it, and a redundant X read as
+              visual noise once every caller here had the drag (see close()'s
+              own callers for the non-pointer paths). Non-draggable (a plain
+              header WITH a real close button, same affordance
+              ListingDetailModal and ActionDialog give desktop — it has no
+              drag to fall back on) gets none of this — nothing here to
+              grab, and it keeps its own X below. */}
+          {!(draggable && titleHidden) && (
+            <div
+              {...(draggable
+                ? {
+                    onPointerDown: onHandlePointerDown,
+                    onPointerMove: onHandlePointerMove,
+                    onPointerUp: onHandlePointerUp,
+                    onPointerCancel: onHandlePointerCancel,
+                  }
+                : {})}
+              className={`flex items-center justify-between px-5 py-4 border-b border-slate-200 shrink-0 ${draggable ? 'touch-none select-none cursor-grab active:cursor-grabbing' : ''}`}
+            >
+              <h2 className="text-base font-semibold text-slate-900">{title}</h2>
+              {!draggable && (
+                <button
+                  type="button"
+                  onClick={close}
+                  aria-label="Close"
+                  className="-m-2 flex cursor-pointer items-center justify-center rounded-full p-2 text-muted hover:text-slate-700"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              )}
+            </div>
+          )}
           <div
-            onPointerDown={onHandlePointerDown}
-            onPointerMove={onHandlePointerMove}
-            onPointerUp={onHandlePointerUp}
-            onPointerCancel={onHandlePointerCancel}
-            className="flex shrink-0 touch-none cursor-grab justify-center py-2 active:cursor-grabbing"
-            role="button"
-            aria-label="Drag to resize"
-          >
-            <span className="h-1 w-9 rounded-full bg-slate-300" aria-hidden="true" />
-          </div>
-        )}
-        {/* draggable: the whole header is a drag surface too, not just the
-            handle above it — see onHandlePointerDown's own doc for why.
-            touch-none here (not just on the handle) is load-bearing: without
-            it, a touch starting on the title text tries to scroll/select
-            first and the drag reads as sluggish to start, exactly the
-            "not smooth" gap this exists to close. No close button of its
-            own — a backdrop tap, Escape, or the drag-to-dismiss this whole
-            surface already offers cover it, and a redundant X read as
-            visual noise once every caller here had the drag (see close()'s
-            own callers for the non-pointer paths). Non-draggable (a plain
-            header WITH a real close button, same affordance
-            ListingDetailModal and ActionDialog give desktop — it has no
-            drag to fall back on) gets none of this — nothing here to
-            grab, and it keeps its own X below. */}
-        {!(draggable && titleHidden) && (
-          <div
+            ref={contentRef}
             {...(draggable
               ? {
-                  onPointerDown: onHandlePointerDown,
-                  onPointerMove: onHandlePointerMove,
-                  onPointerUp: onHandlePointerUp,
-                  onPointerCancel: onHandlePointerCancel,
+                  onPointerDown: onContentPointerDown,
+                  onPointerMove: onContentPointerMove,
+                  onPointerUp: onContentPointerUp,
+                  onPointerCancel: onContentPointerCancel,
                 }
               : {})}
-            className={`flex items-center justify-between px-5 py-4 border-b border-slate-200 shrink-0 ${draggable ? 'touch-none select-none cursor-grab active:cursor-grabbing' : ''}`}
+            // The bottom padding clears the phone's home indicator, the way the
+            // map's sheet already does: this panel runs to the screen's bottom
+            // edge, and whatever ends its content (a form's Submit, a
+            // listing's "Suggest an edit") would otherwise sit under it.
+            className={`overflow-y-auto overscroll-contain px-5 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))] ${draggable ? 'touch-none' : ''}`}
           >
-            <h2 className="text-base font-semibold text-slate-900">{title}</h2>
-            {!draggable && (
-              <button
-                type="button"
-                onClick={close}
-                aria-label="Close"
-                className="-m-2 flex cursor-pointer items-center justify-center rounded-full p-2 text-muted hover:text-slate-700"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            )}
+            {children}
           </div>
-        )}
-        <div
-          ref={contentRef}
-          {...(draggable
-            ? {
-                onPointerDown: onContentPointerDown,
-                onPointerMove: onContentPointerMove,
-                onPointerUp: onContentPointerUp,
-                onPointerCancel: onContentPointerCancel,
-              }
-            : {})}
-          // The bottom padding clears the phone's home indicator, the way the
-          // map's sheet already does: this panel runs to the screen's bottom
-          // edge, and whatever ends its content (a form's Submit, a
-          // listing's "Suggest an edit") would otherwise sit under it.
-          className={`overflow-y-auto overscroll-contain px-5 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))] ${draggable ? 'touch-none' : ''}`}
-        >
-          {children}
         </div>
       </div>
-    </div>
+    </BodyPortal>
   )
 }

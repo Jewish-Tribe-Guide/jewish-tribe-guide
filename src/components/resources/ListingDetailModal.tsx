@@ -16,6 +16,7 @@ import ListingEditor from './ListingEditor'
 import { ChevronLeftIcon, ChevronRightIcon } from '@/components/icons'
 import { useBodyScrollLock } from '@/lib/useBodyScrollLock'
 import BackIconButton from '@/components/BackIconButton'
+import BodyPortal from '@/components/BodyPortal'
 
 type Props = {
   isOpen: boolean
@@ -233,264 +234,266 @@ export default function ListingDetailModal({
   const showEditBar = !formOpen
 
   return (
-    <div
-      className="overlay-in fixed inset-0 z-50 flex items-center justify-center gap-3 p-4 bg-slate-900/40"
-      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
-      role="presentation"
-    >
-      {/* Anchored right next to the card as flex siblings, not fixed to the
-          viewport's own edges — this dialog tops out at max-w-md (448px)
-          and sits centered in the full window, so pinning the arrows to
-          left-4/right-4 (Google Photos' pattern, for a photo that usually
-          fills most of the screen) left them stranded near the screen
-          edges, often hundreds of pixels from the card itself on a wide
-          monitor. */}
-      {showNav && (
-        <button
-          type="button"
-          onClick={(e) => { e.stopPropagation(); onNavigate!(-1) }}
-          disabled={!hasPrev}
-          aria-label="Previous listing"
-          // active:bg-slate-100 — one step past hover's slate-50, Material's
-          // state-layer escalation for an icon-only button, so this circular
-          // icon button darkens visibly for the
-          // instant it's actually pressed rather than only on hover.
-          // transition-[opacity,background-color], not the original plain
-          // transition-opacity: the disabled fade still needs its own
-          // transition, but background-color now needs one too, or the
-          // hover→active darkening above would snap instead of easing.
-          className="shrink-0 flex h-11 w-11 items-center justify-center rounded-full bg-white text-slate-600 shadow-lg ring-1 ring-slate-900/10 transition-[opacity,background-color] hover:bg-slate-50 active:bg-slate-100 disabled:opacity-30 disabled:pointer-events-none cursor-pointer disabled:cursor-default"
+    <BodyPortal>
+      <div
+        className="overlay-in fixed inset-0 z-50 flex items-center justify-center gap-3 p-4 bg-slate-900/40"
+        onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
+        role="presentation"
+      >
+        {/* Anchored right next to the card as flex siblings, not fixed to the
+            viewport's own edges — this dialog tops out at max-w-md (448px)
+            and sits centered in the full window, so pinning the arrows to
+            left-4/right-4 (Google Photos' pattern, for a photo that usually
+            fills most of the screen) left them stranded near the screen
+            edges, often hundreds of pixels from the card itself on a wide
+            monitor. */}
+        {showNav && (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onNavigate!(-1) }}
+            disabled={!hasPrev}
+            aria-label="Previous listing"
+            // active:bg-slate-100 — one step past hover's slate-50, Material's
+            // state-layer escalation for an icon-only button, so this circular
+            // icon button darkens visibly for the
+            // instant it's actually pressed rather than only on hover.
+            // transition-[opacity,background-color], not the original plain
+            // transition-opacity: the disabled fade still needs its own
+            // transition, but background-color now needs one too, or the
+            // hover→active darkening above would snap instead of easing.
+            className="shrink-0 flex h-11 w-11 items-center justify-center rounded-full bg-white text-slate-600 shadow-lg ring-1 ring-slate-900/10 transition-[opacity,background-color] hover:bg-slate-50 active:bg-slate-100 disabled:opacity-30 disabled:pointer-events-none cursor-pointer disabled:cursor-default"
+          >
+            <ChevronLeftIcon className="h-5 w-5" />
+          </button>
+        )}
+        {/* The dialog and the edit bar as one positioned unit. The bar is
+            hung off this wrapper with `absolute top-full` rather than being a
+            third flex child of the overlay, and that is load-bearing: the
+            overlay is `items-center`, so any element stacked below the dialog
+            re-centres the whole column and drags the ‹ › arrows down with it —
+            they'd sit on the midline of "dialog + bar" instead of the dialog's
+            own, roughly half a bar-height too low. Out of flow, the dialog
+            stays exactly where it was and the arrows never move.
+            The width classes (and their transition) live here rather than on
+            the dialog so the bar grows with it when the form opens. */}
+        <div
+          className="relative flex w-full max-w-md"
+          // The dialog ROLE lives on this wrapper, not on the white card
+          // inside it, so that the edit bar hanging below is inside the
+          // dialog's own boundary. aria-modal="true" tells assistive tech to
+          // ignore everything outside the element carrying it — a bar left on
+          // the far side of that line would be invisible to a screen reader
+          // while being the most prominent control on screen for everyone
+          // else. The card keeps its own visual styling and nothing else.
+          role="dialog"
+          aria-modal="true"
+          aria-label={formOpen ? (removalOpen ? `Request removal of ${name}` : 'Suggest an edit') : name}
         >
-          <ChevronLeftIcon className="h-5 w-5" />
-        </button>
-      )}
-      {/* The dialog and the edit bar as one positioned unit. The bar is
-          hung off this wrapper with `absolute top-full` rather than being a
-          third flex child of the overlay, and that is load-bearing: the
-          overlay is `items-center`, so any element stacked below the dialog
-          re-centres the whole column and drags the ‹ › arrows down with it —
-          they'd sit on the midline of "dialog + bar" instead of the dialog's
-          own, roughly half a bar-height too low. Out of flow, the dialog
-          stays exactly where it was and the arrows never move.
-          The width classes (and their transition) live here rather than on
-          the dialog so the bar grows with it when the form opens. */}
-      <div
-        className="relative flex w-full max-w-md"
-        // The dialog ROLE lives on this wrapper, not on the white card
-        // inside it, so that the edit bar hanging below is inside the
-        // dialog's own boundary. aria-modal="true" tells assistive tech to
-        // ignore everything outside the element carrying it — a bar left on
-        // the far side of that line would be invisible to a screen reader
-        // while being the most prominent control on screen for everyone
-        // else. The card keeps its own visual styling and nothing else.
-        role="dialog"
-        aria-modal="true"
-        aria-label={formOpen ? (removalOpen ? `Request removal of ${name}` : 'Suggest an edit') : name}
-      >
-      <div
-        // max-w-md (448px) — this went 512 (cramped, page had room to
-        // spare) → 672 (fixed that, but read too wide/short the other way)
-        // → 576 → here. The narrower widths above all sized the dialog for
-        // its widest-content listing; a sparse one (an address, a phone, no
-        // description) then rendered short *and* wide at that same fixed
-        // width — proportioned like a business card lying on its side, not
-        // like a focused dialog. 448px is narrow enough that even a sparse
-        // listing reads as a normal vertical card shape, and was checked
-        // against the busiest real case (4 action buttons + a cert badge)
-        // to confirm nothing wraps awkwardly at this width.
-        //
-        // The same width while editing: the editor is the listing itself,
-        // made editable (ListingEditor), so nothing about the dialog should
-        // move when you start — it used to widen to 576px for a form.
-        // max-h leaves room for what hangs below the dialog in both modes:
-        // the edit bar while reading, the Send button while editing (44px
-        // pill + 12px gap + breathing room), so a long listing can't push
-        // either off the bottom of the window.
-        className="dialog-in flex w-full flex-col max-h-[calc(85vh-4.5rem)] bg-white border border-slate-200 rounded-xl shadow-xl"
-      >
-        {/* Badges live inside this same block, under the subtitle — not as
-            their own section below a divider. They're facts about this
-            place (Open, Restaurant, kosher cert), the same category of
-            information as the name and address right above them; putting a
-            hard rule between "who this is" and "what it is" read as if the
-            badges belonged with the action icons below instead. The divider
-            now marks the real boundary: identity above it, actions below. */}
-        <div className={`flex justify-between gap-3 px-6 py-5 border-b border-slate-200 shrink-0 ${formOpen ? 'items-center' : 'items-start'}`}>
-          {formOpen ? (
-            // Replaces the name/icon block while editing — the editor
-            // brings its own editable name and photo, and puts its title in
-            // the slot between Back and Close. Back is a chevron alone
-            // (BackIconButton), as in MapPlaceDetail: it returns to the
-            // listing you were just on, so there's no destination to name.
-            // Back and Close each take an equal share of what's left, so
-            // the title sits in the middle of the dialog, not of the gap.
-            <>
-            <div className="min-w-0 flex-1">
-              <BackIconButton onClick={stepBack} />
-            </div>
-            <div ref={setTitleSlot} className="min-w-0 text-center text-lg" />
-            </>
-          ) : (
-            <div className="flex items-start gap-3 min-w-0">
-              <CategoryIcon
-                icon={category.icon}
-                categoryId={category.id}
-                iconImageUrl={iconImageUrl}
-                color={color}
-                className="h-10 w-10 text-xl shrink-0"
-              />
-              <div className="min-w-0">
-                {/* Two columns, not one wrapping flex row — matching the
-                    collapsed card behind this dialog exactly (see that
-                    component's own headerUrlFields comment): the name gets its
-                    own flexible column and wraps onto a second line there if
-                    it needs to, while the pill stays put in a fixed column at
-                    the right, instead of the two crowding onto the same line
-                    and the pill getting pushed wherever there happened to be
-                    room. Was rendered as one of the actions-row icon buttons
-                    below instead (Directions/Call style) via
-                    includeHeaderUrlFields; moved back to sit with the name
-                    specifically because that row was the one place this
-                    dialog didn't otherwise match the card it opened from, and
-                    PlaceDetailBody's own default (excluding a showInHeader
-                    field from that row) already assumes there's a header spot
-                    like this one showing it instead. */}
-                <div className="flex items-start gap-2">
-                  <h2 className="min-w-0 flex-1 font-semibold text-slate-900 text-lg">{name}</h2>
-                  {headerUrlFields.length > 0 && (
-                    <div className="flex shrink-0 items-center gap-2">
-                      {headerUrlFields.map(({ f, href }) => (
-                        <a
-                          key={f.key}
-                          href={href}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          onClick={(e) => e.stopPropagation()}
-                          className="flex shrink-0 items-center rounded-full border border-primary px-2.5 py-1 text-xs font-medium text-primary hover:bg-primary hover:text-white transition-colors whitespace-nowrap"
-                        >
-                          {f.linkLabel ?? f.label}
-                        </a>
-                      ))}
+        <div
+          // max-w-md (448px) — this went 512 (cramped, page had room to
+          // spare) → 672 (fixed that, but read too wide/short the other way)
+          // → 576 → here. The narrower widths above all sized the dialog for
+          // its widest-content listing; a sparse one (an address, a phone, no
+          // description) then rendered short *and* wide at that same fixed
+          // width — proportioned like a business card lying on its side, not
+          // like a focused dialog. 448px is narrow enough that even a sparse
+          // listing reads as a normal vertical card shape, and was checked
+          // against the busiest real case (4 action buttons + a cert badge)
+          // to confirm nothing wraps awkwardly at this width.
+          //
+          // The same width while editing: the editor is the listing itself,
+          // made editable (ListingEditor), so nothing about the dialog should
+          // move when you start — it used to widen to 576px for a form.
+          // max-h leaves room for what hangs below the dialog in both modes:
+          // the edit bar while reading, the Send button while editing (44px
+          // pill + 12px gap + breathing room), so a long listing can't push
+          // either off the bottom of the window.
+          className="dialog-in flex w-full flex-col max-h-[calc(85vh-4.5rem)] bg-white border border-slate-200 rounded-xl shadow-xl"
+        >
+          {/* Badges live inside this same block, under the subtitle — not as
+              their own section below a divider. They're facts about this
+              place (Open, Restaurant, kosher cert), the same category of
+              information as the name and address right above them; putting a
+              hard rule between "who this is" and "what it is" read as if the
+              badges belonged with the action icons below instead. The divider
+              now marks the real boundary: identity above it, actions below. */}
+          <div className={`flex justify-between gap-3 px-6 py-5 border-b border-slate-200 shrink-0 ${formOpen ? 'items-center' : 'items-start'}`}>
+            {formOpen ? (
+              // Replaces the name/icon block while editing — the editor
+              // brings its own editable name and photo, and puts its title in
+              // the slot between Back and Close. Back is a chevron alone
+              // (BackIconButton), as in MapPlaceDetail: it returns to the
+              // listing you were just on, so there's no destination to name.
+              // Back and Close each take an equal share of what's left, so
+              // the title sits in the middle of the dialog, not of the gap.
+              <>
+              <div className="min-w-0 flex-1">
+                <BackIconButton onClick={stepBack} />
+              </div>
+              <div ref={setTitleSlot} className="min-w-0 text-center text-lg" />
+              </>
+            ) : (
+              <div className="flex items-start gap-3 min-w-0">
+                <CategoryIcon
+                  icon={category.icon}
+                  categoryId={category.id}
+                  iconImageUrl={iconImageUrl}
+                  color={color}
+                  className="h-10 w-10 text-xl shrink-0"
+                />
+                <div className="min-w-0">
+                  {/* Two columns, not one wrapping flex row — matching the
+                      collapsed card behind this dialog exactly (see that
+                      component's own headerUrlFields comment): the name gets its
+                      own flexible column and wraps onto a second line there if
+                      it needs to, while the pill stays put in a fixed column at
+                      the right, instead of the two crowding onto the same line
+                      and the pill getting pushed wherever there happened to be
+                      room. Was rendered as one of the actions-row icon buttons
+                      below instead (Directions/Call style) via
+                      includeHeaderUrlFields; moved back to sit with the name
+                      specifically because that row was the one place this
+                      dialog didn't otherwise match the card it opened from, and
+                      PlaceDetailBody's own default (excluding a showInHeader
+                      field from that row) already assumes there's a header spot
+                      like this one showing it instead. */}
+                  <div className="flex items-start gap-2">
+                    <h2 className="min-w-0 flex-1 font-semibold text-slate-900 text-lg">{name}</h2>
+                    {headerUrlFields.length > 0 && (
+                      <div className="flex shrink-0 items-center gap-2">
+                        {headerUrlFields.map(({ f, href }) => (
+                          <a
+                            key={f.key}
+                            href={href}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="flex shrink-0 items-center rounded-full border border-primary px-2.5 py-1 text-xs font-medium text-primary hover:bg-primary hover:text-white transition-colors whitespace-nowrap"
+                          >
+                            {f.linkLabel ?? f.label}
+                          </a>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  {subtitle && <p className="text-sm text-muted truncate">{subtitle}</p>}
+                  {badgeRow && (
+                    <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                      {badgeRow}
                     </div>
                   )}
+                  {upvote && <div className="mt-2">{upvote}</div>}
                 </div>
-                {subtitle && <p className="text-sm text-muted truncate">{subtitle}</p>}
-                {badgeRow && (
-                  <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                    {badgeRow}
-                  </div>
-                )}
-                {upvote && <div className="mt-2">{upvote}</div>}
               </div>
+            )}
+            {/* Pin/Share/Set as location used to live in a kebab here too, same
+                spot MapPlaceDetail gives it next to the name — removed: those
+                are all pre-opening actions, already one click away on the
+                card behind this dialog (dimmed but a click away once you
+                close this), so having them here too was pure duplication.
+                Edit then moved up here in their place, still as a kebab —
+                and that was the mistake this corner is now free of. A kebab
+                is where people look for Share and Save, never for "I can
+                change this," so the one action we most want found was the
+                one hidden behind a control that says "overflow." It lives
+                below the dialog now, as its own object (ListingEditBar), and
+                this corner is back to holding nothing but Close. */}
+            <div className={`flex shrink-0 items-center justify-end gap-1 ${formOpen ? 'flex-1' : ''}`}>
+              {/* Closes the WHOLE dialog regardless of formOpen — a second,
+                  faster way out beyond stepping back with Escape/the Back
+                  button above, not a second meaning for this one control. */}
+              <button
+                onClick={onClose}
+                // hover:bg-slate-100/active:bg-slate-200 — Material's state-layer
+                // treatment for an icon-only button: this had a text-color
+                // hover but nothing behind it, so a tap gave no visual
+                // acknowledgment at all before the whole dialog closed.
+                // rounded-full (was plain `rounded`) to match that same
+                // circular treatment now that there's a fill to round.
+                className="shrink-0 text-muted hover:bg-slate-100 hover:text-slate-700 active:bg-slate-200 transition-colors cursor-pointer p-1 rounded-full"
+                aria-label="Close"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
             </div>
-          )}
-          {/* Pin/Share/Set as location used to live in a kebab here too, same
-              spot MapPlaceDetail gives it next to the name — removed: those
-              are all pre-opening actions, already one click away on the
-              card behind this dialog (dimmed but a click away once you
-              close this), so having them here too was pure duplication.
-              Edit then moved up here in their place, still as a kebab —
-              and that was the mistake this corner is now free of. A kebab
-              is where people look for Share and Save, never for "I can
-              change this," so the one action we most want found was the
-              one hidden behind a control that says "overflow." It lives
-              below the dialog now, as its own object (ListingEditBar), and
-              this corner is back to holding nothing but Close. */}
-          <div className={`flex shrink-0 items-center justify-end gap-1 ${formOpen ? 'flex-1' : ''}`}>
-            {/* Closes the WHOLE dialog regardless of formOpen — a second,
-                faster way out beyond stepping back with Escape/the Back
-                button above, not a second meaning for this one control. */}
-            <button
-              onClick={onClose}
-              // hover:bg-slate-100/active:bg-slate-200 — Material's state-layer
-              // treatment for an icon-only button: this had a text-color
-              // hover but nothing behind it, so a tap gave no visual
-              // acknowledgment at all before the whole dialog closed.
-              // rounded-full (was plain `rounded`) to match that same
-              // circular treatment now that there's a fill to round.
-              className="shrink-0 text-muted hover:bg-slate-100 hover:text-slate-700 active:bg-slate-200 transition-colors cursor-pointer p-1 rounded-full"
-              aria-label="Close"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
+          </div>
+
+          <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
+            {formOpen === 'edit' ? (
+              <ListingEditor item={item} category={category} onClose={closeForm} sendSlot={sendSlot} titleSlot={titleSlot} removalOpen={removalOpen} onRemovalOpenChange={changeRemovalOpen} />
+            ) : (
+              <>
+                <PlaceDetailBody
+                  item={item}
+                  category={category}
+                  onTagClick={onTagClick}
+                  onFilterOpen={onFilterOpen}
+                  onFilterBool={onFilterBool}
+                  onFilterSelect={onFilterSelect}
+                  hideOpenStatus
+                  hiddenBadgeKeys={headerBadgeKeys}
+                  hideCountBadge
+                  found={found}
+                  // Not includeHeaderUrlFields here — that field now has a home in
+                  // this dialog's own header, next to the name (see above), the
+                  // same reason PlaceDetailBody's default excludes it from this
+                  // row for GenericListingCard's mobile accordion too.
+                />
+
+                <div className="pt-3 border-t border-slate-200 space-y-2.5">
+                  <FreshnessFooter resourceId={item.id} confirmedAt={item.confirmedAt} />
+                  {/* No "Suggest a correction" link here any more: that 12px grey link was
+                      the only visible way in to Edit while Edit itself sat in a
+                      kebab, and it carried that job badly — same weight as the
+                      timestamp beside it. ListingEditBar below the dialog is the
+                      visible way in now, so repeating it here would be the same
+                      duplication the header's kebab was removed for. The freshness
+                      STATUS stays: "Confirmed 3 days ago · Still right?" is a
+                      different, one-tap contribution, not a second door to the form.
+                      The map's panel was the link's last user; it has the same bar
+                      of its own now, and FreshnessFooter no longer has the link. */}
+                </div>
+              </>
+            )}
           </div>
         </div>
-
-        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
-          {formOpen === 'edit' ? (
-            <ListingEditor item={item} category={category} onClose={closeForm} sendSlot={sendSlot} titleSlot={titleSlot} removalOpen={removalOpen} onRemovalOpenChange={changeRemovalOpen} />
-          ) : (
-            <>
-              <PlaceDetailBody
-                item={item}
-                category={category}
-                onTagClick={onTagClick}
-                onFilterOpen={onFilterOpen}
-                onFilterBool={onFilterBool}
-                onFilterSelect={onFilterSelect}
-                hideOpenStatus
-                hiddenBadgeKeys={headerBadgeKeys}
-                hideCountBadge
-                found={found}
-                // Not includeHeaderUrlFields here — that field now has a home in
-                // this dialog's own header, next to the name (see above), the
-                // same reason PlaceDetailBody's default excludes it from this
-                // row for GenericListingCard's mobile accordion too.
-              />
-
-              <div className="pt-3 border-t border-slate-200 space-y-2.5">
-                <FreshnessFooter resourceId={item.id} confirmedAt={item.confirmedAt} />
-                {/* No "Suggest a correction" link here any more: that 12px grey link was
-                    the only visible way in to Edit while Edit itself sat in a
-                    kebab, and it carried that job badly — same weight as the
-                    timestamp beside it. ListingEditBar below the dialog is the
-                    visible way in now, so repeating it here would be the same
-                    duplication the header's kebab was removed for. The freshness
-                    STATUS stays: "Confirmed 3 days ago · Still right?" is a
-                    different, one-tap contribution, not a second door to the form.
-                    The map's panel was the link's last user; it has the same bar
-                    of its own now, and FreshnessFooter no longer has the link. */}
-              </div>
-            </>
-          )}
+        {/* While editing, the same spot holds the editor's Send button (see
+            ListingEditor's sendSlot): the pill you clicked to start editing
+            becomes the one you finish with. Same pointer-events rule as the
+            bar's strip below. */}
+        {formOpen && <div ref={setSendSlot} className="pointer-events-none absolute inset-x-0 top-full mt-3 flex [&>*]:pointer-events-auto" />}
+        {showEditBar && (
+          // pointer-events-none on the strip, auto on the button: the strip
+          // spans the dialog's full width, and a click on the empty part of it
+          // should still reach the backdrop and close the dialog the way a
+          // click anywhere else outside the card does.
+          <div className="pointer-events-none absolute inset-x-0 top-full mt-3 flex">
+            <ListingEditBar
+              onEdit={canEdit ? () => openForm('edit') : undefined}
+              item={item}
+              category={category}
+              path={listingPath}
+              className="pointer-events-auto"
+            />
+          </div>
+        )}
         </div>
+        {showNav && (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onNavigate!(1) }}
+            disabled={!hasNext}
+            aria-label="Next listing"
+            // See "Previous listing"'s own doc just above for active:bg-slate-100
+            // and the transition-[opacity,background-color] swap.
+            className="shrink-0 flex h-11 w-11 items-center justify-center rounded-full bg-white text-slate-600 shadow-lg ring-1 ring-slate-900/10 transition-[opacity,background-color] hover:bg-slate-50 active:bg-slate-100 disabled:opacity-30 disabled:pointer-events-none cursor-pointer disabled:cursor-default"
+          >
+            <ChevronRightIcon className="h-5 w-5" />
+          </button>
+        )}
       </div>
-      {/* While editing, the same spot holds the editor's Send button (see
-          ListingEditor's sendSlot): the pill you clicked to start editing
-          becomes the one you finish with. Same pointer-events rule as the
-          bar's strip below. */}
-      {formOpen && <div ref={setSendSlot} className="pointer-events-none absolute inset-x-0 top-full mt-3 flex [&>*]:pointer-events-auto" />}
-      {showEditBar && (
-        // pointer-events-none on the strip, auto on the button: the strip
-        // spans the dialog's full width, and a click on the empty part of it
-        // should still reach the backdrop and close the dialog the way a
-        // click anywhere else outside the card does.
-        <div className="pointer-events-none absolute inset-x-0 top-full mt-3 flex">
-          <ListingEditBar
-            onEdit={canEdit ? () => openForm('edit') : undefined}
-            item={item}
-            category={category}
-            path={listingPath}
-            className="pointer-events-auto"
-          />
-        </div>
-      )}
-      </div>
-      {showNav && (
-        <button
-          type="button"
-          onClick={(e) => { e.stopPropagation(); onNavigate!(1) }}
-          disabled={!hasNext}
-          aria-label="Next listing"
-          // See "Previous listing"'s own doc just above for active:bg-slate-100
-          // and the transition-[opacity,background-color] swap.
-          className="shrink-0 flex h-11 w-11 items-center justify-center rounded-full bg-white text-slate-600 shadow-lg ring-1 ring-slate-900/10 transition-[opacity,background-color] hover:bg-slate-50 active:bg-slate-100 disabled:opacity-30 disabled:pointer-events-none cursor-pointer disabled:cursor-default"
-        >
-          <ChevronRightIcon className="h-5 w-5" />
-        </button>
-      )}
-    </div>
+    </BodyPortal>
   )
 }

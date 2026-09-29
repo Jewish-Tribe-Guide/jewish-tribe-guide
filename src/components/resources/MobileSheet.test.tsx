@@ -87,15 +87,32 @@ describe('MobileSheet', () => {
   // still show `translateY(0)` after being clicked. It shouldn't — the exit
   // animation has to start from the click itself, not from a prop the
   // caller may take a while to come back around on.
+  // Drawn into <body>, not where it's rendered: a page's content rises into
+  // place with a transform as it appears, and a `fixed` sheet inside it was
+  // measured from that moving box and sat under the site header, so a tap
+  // at the top to close it hit the header's back button (BodyPortal).
+  it('is drawn straight into the page body, whatever it’s rendered inside', () => {
+    const { container } = render(
+      <div style={{ transform: 'translateY(6px)' }}>
+        <MobileSheet isOpen onClose={vi.fn()} title="Goldie">
+          <p>details</p>
+        </MobileSheet>
+      </div>,
+    )
+    const backdrop = screen.getByRole('dialog', { name: 'Goldie' }).parentElement!
+    expect(backdrop.parentElement).toBe(document.body)
+    expect(container).not.toContainElement(backdrop)
+  })
+
   it('starts sliding closed immediately when dismissed, without waiting for the caller to update the isOpen prop', async () => {
     const user = userEvent.setup()
     const onClose = vi.fn() // deliberately never flips `isOpen` — see doc above
-    const { container } = render(
+    render(
       <MobileSheet isOpen onClose={onClose} title="Suggest an edit">
         <p>form contents</p>
       </MobileSheet>,
     )
-    const sheet = container.querySelector('[role="dialog"]') as HTMLElement
+    const sheet = document.body.querySelector('[role="dialog"]') as HTMLElement
 
     await user.click(screen.getByRole('button', { name: 'Close' }))
 
@@ -117,12 +134,12 @@ describe('MobileSheet', () => {
     // waiting on a real timer that fake-timer mode was intercepting).
     vi.useFakeTimers()
     try {
-      const { container, rerender } = render(
+      const { rerender } = render(
         <MobileSheet isOpen onClose={vi.fn()} title="Suggest an edit">
           <p>form contents</p>
         </MobileSheet>,
       )
-      const sheet = () => container.querySelector('[role="dialog"]') as HTMLElement | null
+      const sheet = () => document.body.querySelector('[role="dialog"]') as HTMLElement | null
       expect(sheet()?.style.transform).toBe('translateY(0)')
 
       rerender(
@@ -161,22 +178,22 @@ describe('MobileSheet', () => {
     const FULL_PX = 692
 
     it('opens at the half snap point', () => {
-      const { container } = render(
+      render(
         <MobileSheet isOpen onClose={vi.fn()} title="Suggest an edit" draggable>
           <p>form contents</p>
         </MobileSheet>,
       )
-      const sheet = container.querySelector('[role="dialog"]') as HTMLElement
+      const sheet = document.body.querySelector('[role="dialog"]') as HTMLElement
       expect(sheet.style.height).toBe(`${HALF_PX}px`)
     })
 
     it('tapping the handle (no movement) toggles between half and full', () => {
-      const { container } = render(
+      render(
         <MobileSheet isOpen onClose={vi.fn()} title="Suggest an edit" draggable>
           <p>form contents</p>
         </MobileSheet>,
       )
-      const sheet = container.querySelector('[role="dialog"]') as HTMLElement
+      const sheet = document.body.querySelector('[role="dialog"]') as HTMLElement
       const handle = screen.getByRole('button', { name: 'Drag to resize' })
 
       fireEvent.pointerDown(handle, { clientY: 100 })
@@ -193,12 +210,12 @@ describe('MobileSheet', () => {
     // room for a long form short of scrolling within it. Dragging the
     // handle up should grow the sheet past `half`.
     it('dragging the handle up grows the sheet toward full', () => {
-      const { container } = render(
+      render(
         <MobileSheet isOpen onClose={vi.fn()} title="Suggest an edit" draggable>
           <p>form contents</p>
         </MobileSheet>,
       )
-      const sheet = container.querySelector('[role="dialog"]') as HTMLElement
+      const sheet = document.body.querySelector('[role="dialog"]') as HTMLElement
       const handle = screen.getByRole('button', { name: 'Drag to resize' })
 
       fireEvent.pointerDown(handle, { clientY: 500 })
@@ -218,12 +235,12 @@ describe('MobileSheet', () => {
     // from the title text itself — not the handle — should work exactly
     // the same way.
     it('dragging from the header title (not just the handle) also resizes the sheet', () => {
-      const { container } = render(
+      render(
         <MobileSheet isOpen onClose={vi.fn()} title="Suggest an edit" draggable>
           <p>form contents</p>
         </MobileSheet>,
       )
-      const sheet = container.querySelector('[role="dialog"]') as HTMLElement
+      const sheet = document.body.querySelector('[role="dialog"]') as HTMLElement
       const titleText = screen.getByText('Suggest an edit')
 
       fireEvent.pointerDown(titleText, { clientY: 500 })
@@ -260,12 +277,12 @@ describe('MobileSheet', () => {
     // scrolls. Opens at `half` by default, so this is the sheet's normal
     // resting state, not a special setup.
     it('at half, any drag over the content resizes the sheet instead of scrolling it', () => {
-      const { container } = render(
+      render(
         <MobileSheet isOpen onClose={vi.fn()} title="Suggest an edit" draggable>
           <p>form contents</p>
         </MobileSheet>,
       )
-      const sheet = container.querySelector('[role="dialog"]') as HTMLElement
+      const sheet = document.body.querySelector('[role="dialog"]') as HTMLElement
       const content = screen.getByText('form contents').parentElement as HTMLElement
 
       fireEvent.pointerDown(content, { clientY: 500 })
@@ -288,12 +305,12 @@ describe('MobileSheet', () => {
       let fakeNow = 0
       const nowSpy = vi.spyOn(performance, 'now').mockImplementation(() => fakeNow)
 
-      const { container } = render(
+      render(
         <MobileSheet isOpen onClose={vi.fn()} title="Suggest an edit" draggable>
           <p>form contents</p>
         </MobileSheet>,
       )
-      const sheet = container.querySelector('[role="dialog"]') as HTMLElement
+      const sheet = document.body.querySelector('[role="dialog"]') as HTMLElement
       const handle = screen.getByRole('button', { name: 'Drag to resize' })
       const content = screen.getByText('form contents').parentElement as HTMLElement
 
@@ -328,12 +345,12 @@ describe('MobileSheet', () => {
     // AT the top and continues pulling further down should ever reach the
     // sheet. Only reachable at `full`, same as the previous test.
     it('at full, scrolling the content away from the top does not resize the sheet', () => {
-      const { container } = render(
+      render(
         <MobileSheet isOpen onClose={vi.fn()} title="Suggest an edit" draggable>
           <p>form contents</p>
         </MobileSheet>,
       )
-      const sheet = container.querySelector('[role="dialog"]') as HTMLElement
+      const sheet = document.body.querySelector('[role="dialog"]') as HTMLElement
       const handle = screen.getByRole('button', { name: 'Drag to resize' })
       const content = screen.getByText('form contents').parentElement as HTMLElement
 
@@ -353,12 +370,12 @@ describe('MobileSheet', () => {
     // resizing the sheet just because the drag direction is downward. Only
     // reachable at `full`, same as the previous two tests.
     it('at full, pulling down while the content is scrolled away from the top scrolls it, rather than resizing the sheet', () => {
-      const { container } = render(
+      render(
         <MobileSheet isOpen onClose={vi.fn()} title="Suggest an edit" draggable>
           <p>form contents</p>
         </MobileSheet>,
       )
-      const sheet = container.querySelector('[role="dialog"]') as HTMLElement
+      const sheet = document.body.querySelector('[role="dialog"]') as HTMLElement
       const handle = screen.getByRole('button', { name: 'Drag to resize' })
       const content = screen.getByText('form contents').parentElement as HTMLElement
 
@@ -403,12 +420,12 @@ describe('MobileSheet', () => {
     // to 384 (half) first.
     it('dismissing mid-drag shrinks straight from wherever the drag left it, not back up to half height first', () => {
       const onClose = vi.fn()
-      const { container } = render(
+      render(
         <MobileSheet isOpen onClose={onClose} title="Suggest an edit" draggable>
           <p>form contents</p>
         </MobileSheet>,
       )
-      const sheet = container.querySelector('[role="dialog"]') as HTMLElement
+      const sheet = document.body.querySelector('[role="dialog"]') as HTMLElement
       const handle = screen.getByRole('button', { name: 'Drag to resize' })
 
       // half (384) down to 100px — well past the dismiss threshold (192).
@@ -443,12 +460,12 @@ describe('MobileSheet', () => {
       const nowSpy = vi.spyOn(performance, 'now').mockImplementation(() => fakeNow)
 
       const onClose = vi.fn()
-      const { container } = render(
+      render(
         <MobileSheet isOpen onClose={onClose} title="Suggest an edit" draggable>
           <p>form contents</p>
         </MobileSheet>,
       )
-      const sheet = container.querySelector('[role="dialog"]') as HTMLElement
+      const sheet = document.body.querySelector('[role="dialog"]') as HTMLElement
       const handle = screen.getByRole('button', { name: 'Drag to resize' })
 
       fireEvent.pointerDown(handle, { clientY: 500 })
@@ -468,12 +485,12 @@ describe('MobileSheet', () => {
     // completed.
     it('a pointer cancel drops the drag without dismissing or changing the snap point', () => {
       const onClose = vi.fn()
-      const { container } = render(
+      render(
         <MobileSheet isOpen onClose={onClose} title="Suggest an edit" draggable>
           <p>form contents</p>
         </MobileSheet>,
       )
-      const sheet = container.querySelector('[role="dialog"]') as HTMLElement
+      const sheet = document.body.querySelector('[role="dialog"]') as HTMLElement
       const handle = screen.getByRole('button', { name: 'Drag to resize' })
 
       fireEvent.pointerDown(handle, { clientY: 500 })
@@ -485,12 +502,12 @@ describe('MobileSheet', () => {
     })
 
     it('resets to the half snap point the next time it opens, not wherever a previous open left it', () => {
-      const { container, rerender } = render(
+      const { rerender } = render(
         <MobileSheet isOpen onClose={vi.fn()} title="Suggest an edit" draggable>
           <p>form contents</p>
         </MobileSheet>,
       )
-      const sheet = () => container.querySelector('[role="dialog"]') as HTMLElement
+      const sheet = () => document.body.querySelector('[role="dialog"]') as HTMLElement
       const handle = () => screen.getByRole('button', { name: 'Drag to resize' })
 
       fireEvent.pointerDown(handle(), { clientY: 100 })

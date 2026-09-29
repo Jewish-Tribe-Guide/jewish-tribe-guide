@@ -295,6 +295,36 @@ test.describe('listing detail — mobile', () => {
     await expect.poll(() => new URL(page.url()).searchParams.get('item')).toBeNull()
     await expect(page.getByRole('button', { name: `Show details for ${item.name}` }).first()).toBeVisible()
   })
+
+  // The page's content rises into place as it appears (fadeIn: a 6px
+  // transform, 180ms; Back slides it instead). An overlay drawn inside it
+  // was measured from that moving box, not the screen, for as long as it
+  // ran, and sat under the site header: the backdrop started below the
+  // header, so a tap at the top of the screen to close a listing hit the
+  // header's back button and went home instead. It failed this file's
+  // shared-link test under the full suite's load, where the page appeared
+  // late enough for the tap to land inside those 180ms. The transform is
+  // held here, so the moment can't be missed.
+  test('a tap at the top closes a listing even while the page is still sliding in', async ({ page, request }) => {
+    const community = await defaultCommunity(page)
+    const { category } = await categoryWithListings(request, community)
+    const res = await request.get(`/api/resources?category=${category.id}&community=${community}`)
+    const item = (await res.json()).resources[0] as { id: string; name: string }
+
+    await page.goto(`/${community}/${category.id}?item=${item.id}`)
+    await dismissLocationPrompt(page)
+    await expect(page.getByRole('dialog', { name: item.name })).toBeVisible()
+    await page.evaluate(() => window.scrollTo(0, 0))
+    await page.locator('main').evaluate((main) => {
+      main.style.animation = 'none'
+      main.style.transform = 'translateY(6px)'
+    })
+    await expect(page.locator('header')).toBeInViewport()
+
+    await page.mouse.click(page.viewportSize()!.width / 2, 40)
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+    expect(new URL(page.url()).pathname).toBe(`/${community}/${category.id}`)
+  })
 })
 
 // Requesting removal is a step of its own inside Suggest an edit, with no
