@@ -1014,6 +1014,21 @@ describe('GenericListingCard — the row', () => {
       expect(screen.getByText(/219 S Broad St/)).toBeInTheDocument()
     })
 
+    it('shows likes beside the name only when given, and never zero', () => {
+      const { unmount } = renderWithProviders(
+        <GenericListingCard item={item} category={category} upvotes count={3} {...requiredHandlers} place={null} likes={3} />,
+      )
+      expect(screen.getByLabelText('3 likes')).toBeInTheDocument()
+      unmount()
+      const { unmount: again } = renderWithProviders(
+        <GenericListingCard item={item} category={category} upvotes count={0} {...requiredHandlers} place={null} likes={0} />,
+      )
+      expect(screen.queryByLabelText(/likes?$/)).not.toBeInTheDocument()
+      again()
+      renderWithProviders(<GenericListingCard item={item} category={category} upvotes count={3} {...requiredHandlers} place={null} />)
+      expect(screen.queryByLabelText('3 likes')).not.toBeInTheDocument()
+    })
+
     it('leaves out the field its group heading says', () => {
       const shuls = makeCategory({
         detailFields: [{ key: 'denomination', label: 'Denomination', type: 'select', renderAs: 'badge', filterable: true }],
@@ -1030,7 +1045,7 @@ describe('GenericListingCard — the row', () => {
   it('shows a shul’s next minyan when the list works one out', () => {
     const item = makeListing({ id: 'shul-1' })
     renderWithProviders(
-      <NextMinyansContext.Provider value={{ 'shul-1': 'Mincha 6:34 PM' }}>
+      <NextMinyansContext.Provider value={{ 'shul-1': { text: 'Mincha 6:34 PM', tone: 'minyan' } }}>
         <GenericListingCard item={item} category={makeCategory()} upvotes={false} count={0} {...requiredHandlers} />
       </NextMinyansContext.Provider>,
     )

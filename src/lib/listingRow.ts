@@ -1,7 +1,9 @@
 import { selectValues, type CategoryConfig, type CategoryField } from './categories'
 import { CLOSURE_LABELS, getOpenStatus, hoursNextOpening } from './hours'
 import { travelParts } from './listingTravel'
-import type { DirectoryResource } from '@/types'
+import type { DirectoryResource, ZmanimData } from '@/types'
+import { parseTimeToMinutes } from './davening'
+import type { ShulRowStatus } from './upcomingDavening'
 
 // ── A listing row ────────────────────────────────────────────────────────────
 // A directory row is two lines, as in the redesign's mockups: the name and
@@ -54,10 +56,14 @@ export function listingRowFacts(
   category: CategoryConfig,
   now: Date,
   opts: {
-    nextMinyan?: string | null
+    /** A shul's davening (see shulRowByShul). */
+    shul?: ShulRowStatus | null
     /** A field the row's group heading already says ("Orthodox
      *  (Ashkenazi) · 7" above seven rows): left off the row. */
     omitKey?: string | null
+    /** Tonight's candle lighting, in minutes since midnight, on a Friday or
+     *  erev Yom Tov (see candlesToday); null any other day. */
+    candlesAt?: number | null
   } = {},
 ): RowFact[] {
   const facts: RowFact[] = []
@@ -71,7 +77,12 @@ export function listingRowFacts(
     // 11:59 PM is how "open till midnight" is stored; it isn't a time anyone
     // would say. Overnight hours give no closing label at all.
     const until = closing && closing.closeLabel !== '11:59 PM' ? shortTime(closing.closeLabel) : null
+    // On a Friday, a place that shuts before candle lighting says so: the
+    // afternoon's shopping has a deadline, and "Open until 4 PM" in green
+    // doesn't read as one.
+    const beforeCandles = until && opts.candlesAt != null && parseTimeToMinutes(closing!.closeLabel) < opts.candlesAt
     if (closing?.closesSoon && until) facts.push({ text: `Closes soon · ${until}`, tone: 'caution' })
+    else if (beforeCandles) facts.push({ text: `Until ${until}, before candles`, tone: 'caution' })
     else facts.push({ text: until ? `Open until ${until}` : 'Open', tone: 'open' })
   } else if (hoursKeys.length > 0) {
     // When it opens next, which is what someone deciding where to go wants
@@ -84,7 +95,7 @@ export function listingRowFacts(
     else if (!unreadable) facts.push({ text: 'No hours listed', tone: 'quiet' })
   }
 
-  if (opts.nextMinyan) facts.push({ text: opts.nextMinyan, tone: 'minyan' })
+  if (opts.shul) facts.push({ text: opts.shul.text, tone: opts.shul.tone })
 
   const travel = travelParts(item)
   if (travel.length > 0) facts.push({ text: travel[0].text, tone: 'plain' })
@@ -179,7 +190,11 @@ export function listingRowNote(
   item: DirectoryResource,
   category: CategoryConfig,
   now: Date,
-  opts: { flagUnconfirmed?: boolean } = {},
+  opts: {
+    flagUnconfirmed?: boolean
+    /** The shul's own note on its davening (see shulRowByShul). */
+    shulNote?: string
+  } = {},
 ): RowNote | null {
   const fields = category.detailFields
   for (const f of rowBadgeFields(category)) {
@@ -200,6 +215,9 @@ export function listingRowNote(
   const hasTimes = minyanKeys.some((k) => Array.isArray(item[k]) && (item[k] as unknown[]).length > 0)
   if (hasTimes && !item.confirmedAt) return { text: 'Times not confirmed by anyone yet', tone: 'quiet', kind: 'exception' }
   if (!hasTimes && opts.flagUnconfirmed && !isVouchedFor(item, now)) return { text: 'Not confirmed by anyone yet', tone: 'quiet', kind: 'exception' }
+  // The shul's own words about the minyan the row names: "Zoom", "call to
+  // confirm". An exception: it changes whether to go.
+  if (opts.shulNote) return { text: opts.shulNote, tone: 'quiet', kind: 'exception' }
 
   const noteField = fields.find(
     (f) => (f.type === 'text' || f.type === 'textarea') && f.showInHeader && String(item[f.key] ?? '').trim(),
@@ -209,6 +227,22 @@ export function listingRowNote(
     // A longer note is someone's report of the place, and quoted as one; a
     // short tagline ("Vegan pizzeria") is just said.
     return noteField.type === 'textarea' ? { text: `“${text}”`, tone: 'quote', kind: 'note' } : { text, tone: 'quiet', kind: 'note' }
+  }
+  return null
+}
+
+/** Tonight's candle lighting in minutes since midnight, when it's tonight:
+ *  a Friday's, or erev Yom Tov's. Null any other day, or before the day's
+ *  zmanim have arrived. */
+export function candlesToday(zmanim: ZmanimData | null | undefined, now: Date): number | null {
+  if (!zmanim) return null
+  const lightings = [zmanim.shabbos.candleLighting, ...(zmanim.holidayPeriod?.candleLightings ?? [])]
+  for (const entry of lightings) {
+    if (!entry?.iso) continue
+    const at = new Date(entry.iso)
+    if (at.getFullYear() === now.getFullYear() && at.getMonth() === now.getMonth() && at.getDate() === now.getDate()) {
+      return at.getHours() * 60 + at.getMinutes()
+    }
   }
   return null
 }

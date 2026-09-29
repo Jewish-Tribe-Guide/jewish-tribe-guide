@@ -109,7 +109,13 @@ test.describe('content is server-rendered', () => {
 
     // Was four (site-settings, categories, hospitals, resources) before the
     // content moved to the server.
-    expect(await apiCallsForThisDocument(page)).toEqual([])
+    //
+    // Except the zmanim: a page whose listings keep hours asks for tonight's
+    // candle lighting ("Until 4 PM, before candles" on a Friday), as a shul
+    // page asks for sunset. That's the day's times, not the page's content,
+    // and it's one CDN-cached response at the community's centre.
+    const calls = await apiCallsForThisDocument(page)
+    expect(calls.filter((url) => !url.startsWith('/api/zmanim?'))).toEqual([])
   })
 
   test('no loading skeletons on a settled page', async ({ page, request }) => {

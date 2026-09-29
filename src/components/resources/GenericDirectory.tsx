@@ -14,7 +14,8 @@ import { CategoryBandFrame, CategoryBandBadge } from './CategoryBandFrame'
 import FiltersSheet from './FiltersSheet'
 import ListHeading, { ClosedGroupLine, GroupHeading } from './ListHeading'
 import { groupListings, parseGroupBy, type ListGroup } from '@/lib/listGroups'
-import { isVouchedFor } from '@/lib/listingRow'
+import { candlesToday, isVouchedFor } from '@/lib/listingRow'
+import { useZmanim } from '@/lib/useZmanim'
 import { usePersistedState } from '@/lib/usePersistedState'
 import { GenericListingCard, type GenericListingCardHandle } from './GenericListingCard'
 import DaveningTimesModal from '@/components/synagogues/DaveningTimesModal'
@@ -23,7 +24,7 @@ import { useIsMobile } from '@/lib/useIsMobile'
 import { useScrollShowHide, useSetScreenHeader } from '@/lib/headerVisibility'
 import { foundFor, searchAsk } from '@/lib/askSearch'
 import { neighborhoodsFor, placeName, townsFrom } from '@/lib/places'
-import { useOptionalCommunitySlug } from '@/lib/communityContext'
+import { useActiveCommunity, useOptionalCommunitySlug } from '@/lib/communityContext'
 import { travelCompare } from '@/lib/listingTravel'
 import { useLogSearchMiss } from '@/lib/useLogSearchMiss'
 import CategoryAsk from './CategoryAsk'
@@ -921,6 +922,14 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // (see listingRowNote).
   const flagUnconfirmed = items.length > 0 && items.filter((i) => isVouchedFor(i, now)).length * 2 >= items.length
 
+  // Tonight's candle lighting, for places that shut before it on a Friday
+  // or erev Yom Tov. Fetched only where the category keeps hours, at the
+  // community's centre (candle lighting hardly moves across a city), so
+  // it's the same cached response for everyone.
+  const { community: activeCommunity } = useActiveCommunity()
+  const { data: zmanim } = useZmanim(hoursFields.length > 0 ? activeCommunity.mapCenter : null)
+  const candlesAt = candlesToday(zmanim, now)
+
   // The listings on screen, in order: what arrow-key next/previous walks.
   const shownItems = grouping?.closed
     ? grouping.groups.flatMap((g) => (isGroupOpen(g) ? g.items : []))
@@ -1216,6 +1225,8 @@ export default function GenericDirectory({ category, items, anchorLabel, address
               place={rowPlaces.get(item.id) ?? null}
               omitKey={omitKey}
               flagUnconfirmed={flagUnconfirmed}
+              likes={upvotes && sortByPopular ? liveCount(item) : undefined}
+              candlesAt={candlesAt}
               upvotes={upvotes}
               count={liveCount(item)}
               defaultExpanded={item.id === reopenItemId}

@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { makeCategory, makeListing } from '@/test/providerFixtures'
 import type { CategoryField } from './categories'
-import { initialsOf, isVouchedFor, listingRowFacts, listingRowNote, rowItems } from './listingRow'
+import { candlesToday, initialsOf, isVouchedFor, listingRowFacts, listingRowNote, rowItems } from './listingRow'
+import type { ZmanimData } from '@/types'
 
 const hours: CategoryField = { key: 'hours', label: 'Hours', type: 'hours', renderAs: 'row' }
 const type: CategoryField = {
@@ -57,6 +58,19 @@ describe('listingRowFacts', () => {
     expect(soon).toEqual([{ text: 'Closes soon · 2:45 PM', tone: 'caution' }])
   })
 
+  it('says a place shuts before candles on a Friday, in the caution colour', () => {
+    const category = makeCategory({ detailFields: [hours] })
+    const candles = 18 * 60 + 10
+    const at = (close: string) => listingRowFacts(makeListing({ hours: openFriday('09:00', close) }), category, FRIDAY_2PM, { candlesAt: candles })
+    expect(at('16:00')).toEqual([{ text: 'Until 4 PM, before candles', tone: 'caution' }])
+    // After candles: an ordinary afternoon.
+    expect(at('22:00')).toEqual([{ text: 'Open until 10 PM', tone: 'open' }])
+    // Within the hour, closing soon says more.
+    expect(texts(at('14:45'))).toEqual(['Closes soon · 2:45 PM'])
+    // Any other day there's no candle time to go by.
+    expect(texts(listingRowFacts(makeListing({ hours: openFriday('09:00', '16:00') }), category, FRIDAY_2PM))).toEqual(['Open until 4 PM'])
+  })
+
   it('says just "Open" for a place open till midnight, not "until 11:59 PM"', () => {
     const category = makeCategory({ detailFields: [hours] })
     expect(texts(listingRowFacts(makeListing({ hours: openFriday('09:00', '23:59') }), category, FRIDAY_2PM))).toEqual(['Open'])
@@ -93,10 +107,18 @@ describe('listingRowFacts', () => {
   })
 
   it('puts a shul’s next minyan after its status, before its distance', () => {
-    const facts = listingRowFacts(makeListing({ milesFromAddress: 0.4 }), makeCategory(), FRIDAY_2PM, { nextMinyan: 'Mincha 6:34 PM' })
+    const facts = listingRowFacts(makeListing({ milesFromAddress: 0.4 }), makeCategory(), FRIDAY_2PM, { shul: { text: 'Mincha 6:34 PM', tone: 'minyan' } })
     expect(facts).toEqual([
       { text: 'Mincha 6:34 PM', tone: 'minyan' },
       { text: '0.4 mi', tone: 'plain' },
+    ])
+  })
+
+  it('says quietly when a shul has nothing soon', () => {
+    const facts = listingRowFacts(makeListing({ milesFromAddress: 2.1 }), makeCategory(), FRIDAY_2PM, { shul: { text: 'Shabbos only', tone: 'quiet' } })
+    expect(facts).toEqual([
+      { text: 'Shabbos only', tone: 'quiet' },
+      { text: '2.1 mi', tone: 'plain' },
     ])
   })
 
@@ -212,6 +234,18 @@ describe('listingRowNote: a third line only for an exception', () => {
     expect(listingRowNote({ ...shul, ...confirmed }, category, FRIDAY_2PM)).toBeNull()
   })
 
+  it('gives a shul’s own note on its davening the line, after unconfirmed times', () => {
+    const category = makeCategory({ detailFields: [minyanim] })
+    const shul = makeListing({ ...confirmed, minyanim: [{ tefillah: 'mincha', time: 'Call to confirm', days: ['fri'] }] })
+    expect(listingRowNote(shul, category, FRIDAY_2PM, { shulNote: 'Mincha today: call to confirm' })).toEqual({
+      text: 'Mincha today: call to confirm',
+      tone: 'quiet',
+      kind: 'exception',
+    })
+    const unconfirmed = { ...shul, confirmedAt: undefined }
+    expect(listingRowNote(unconfirmed, category, FRIDAY_2PM, { shulNote: 'Zoom' })?.text).toBe('Times not confirmed by anyone yet')
+  })
+
   it('otherwise shows the admin’s note: a longer one quoted as someone’s report, a tagline as is', () => {
     const hotel = makeCategory({ detailFields: [notes] })
     expect(listingRowNote(makeListing({ ...confirmed, notes: 'Electronic keys, but reception will open the door' }), hotel, FRIDAY_2PM)).toEqual({
@@ -227,6 +261,37 @@ describe('listingRowNote: a third line only for an exception', () => {
     const category = makeCategory({ detailFields: [cert, partial, notes] })
     const item = makeListing({ ...confirmed, cert: 'IKC', partial: true, notes: 'Lovely' })
     expect(listingRowNote(item, category, FRIDAY_2PM)?.text).toBe('Not everything here is kosher')
+  })
+})
+
+describe('candlesToday', () => {
+  const zmanim = (over: Partial<ZmanimData>): ZmanimData =>
+    ({ shabbos: { candleLighting: null, havdalah: null }, holidayPeriod: null, ...over }) as unknown as ZmanimData
+  const friday = new Date(2026, 9, 2, 14, 0)
+  const local = (h: number, m: number, day = 2) => new Date(2026, 9, day, h, m).toISOString()
+
+  it('is tonight’s candle lighting on a Friday', () => {
+    expect(candlesToday(zmanim({ shabbos: { candleLighting: { label: 'Friday', time: '6:10 PM', iso: local(18, 10) }, havdalah: null } }), friday)).toBe(18 * 60 + 10)
+  })
+
+  it('is erev Yom Tov’s, from the holiday’s own candle lightings', () => {
+    const erev = new Date(2026, 9, 1, 14, 0)
+    const yt = zmanim({
+      shabbos: { candleLighting: { label: 'Friday', time: '6:10 PM', iso: local(18, 10) }, havdalah: null },
+      holidayPeriod: {
+        name: 'Sukkot',
+        begins: { label: 'Thursday', time: '6:12 PM', iso: local(18, 12, 1) },
+        candleLightings: [{ label: 'Thursday', time: '6:12 PM', iso: local(18, 12, 1) }],
+        ends: { label: 'Saturday', time: '7:10 PM', iso: local(19, 10, 3) },
+      },
+    })
+    expect(candlesToday(yt, erev)).toBe(18 * 60 + 12)
+  })
+
+  it('is nothing on another day, or before the zmanim arrive', () => {
+    const thursday = new Date(2026, 9, 1, 14, 0)
+    expect(candlesToday(zmanim({ shabbos: { candleLighting: { label: 'Friday', time: '6:10 PM', iso: local(18, 10) }, havdalah: null } }), thursday)).toBeNull()
+    expect(candlesToday(null, friday)).toBeNull()
   })
 })
 

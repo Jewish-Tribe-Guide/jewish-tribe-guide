@@ -49,6 +49,7 @@ vi.mock('./GenericListingCard', async () => {
       place,
       omitKey,
       flagUnconfirmed,
+      likes,
     }: {
       item: DirectoryResource
       defaultExpanded?: boolean
@@ -61,6 +62,7 @@ vi.mock('./GenericListingCard', async () => {
       place?: string | null
       omitKey?: string | null
       flagUnconfirmed?: boolean
+      likes?: number
     },
     ref: Ref<{
       open: () => void
@@ -87,6 +89,7 @@ vi.mock('./GenericListingCard', async () => {
         {place !== undefined && <span>{item.name} is in {place ?? 'nowhere'}</span>}
         {omitKey && <span>{item.name} leaves out {omitKey}</span>}
         {flagUnconfirmed && <span>{item.name} may say unconfirmed</span>}
+        {likes !== undefined && <span>{item.name} shows {likes} likes</span>}
         {found && <span>found on {item.name}: {[...found.items.map((m) => m.tag), ...found.fields.map((f) => f.label)].join(', ')}</span>}
         <button onClick={onEdit}>Edit {item.name}</button>
         <button onClick={() => onTagClick('cheese')}>tag {item.name}</button>
@@ -104,7 +107,7 @@ vi.mock('./GenericListingCard', async () => {
   }
   function NextMinyanNote({ id, name }: { id: string; name: string }) {
     const next = useNextMinyan(id)
-    return next ? <span>next minyan at {name}: {next}</span> : null
+    return next ? <span>next minyan at {name}: {next.text}</span> : null
   }
 })
 
@@ -142,7 +145,8 @@ afterEach(() => {
 
 // Whether today is Yom Tov comes from the zmanim; nothing here needs it.
 // Stubbed so a shul list doesn't reach for /api/zmanim.
-vi.mock('@/lib/useZmanim', () => ({ useZmanim: () => ({ data: null, status: 'loading' }) }))
+const zmanimMock = vi.hoisted(() => vi.fn<(coords?: unknown) => { data: null; status: 'loading' }>(() => ({ data: null, status: 'loading' })))
+vi.mock('@/lib/useZmanim', () => ({ useZmanim: zmanimMock }))
 
 const handlers = {
   onUp: vi.fn(),
@@ -1298,6 +1302,31 @@ describe('GenericDirectory — what the rows are told', () => {
     expect(screen.queryByText('Rodeph leaves out denomination')).not.toBeInTheDocument()
   })
 
+  it('shows likes on rows only while the list is sorted by them', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(
+      <GenericDirectory category={makeCategory({ upvotesEnabled: true })} items={[makeListing({ id: 'a', name: 'Goldie', upvotes: 4 })]} anchorLabel="HUP" {...handlers} />,
+    )
+    // With a location, the list starts sorted by distance.
+    expect(screen.queryByText('Goldie shows 4 likes')).not.toBeInTheDocument()
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Sort' }), 'Popularity')
+    expect(screen.getByText('Goldie shows 4 likes')).toBeInTheDocument()
+  })
+
+  // For "Until 4 PM, before candles" (see listingRowFacts): only where the
+  // category keeps hours, so a page of WhatsApp groups fetches nothing.
+  it('asks for tonight’s candle lighting only where the category keeps hours', () => {
+    zmanimMock.mockClear()
+    const { unmount } = renderWithProviders(<GenericDirectory category={makeCategory({ detailFields: [] })} items={[makeListing()]} {...handlers} />)
+    expect(zmanimMock.mock.calls.every(([coords]) => coords === null)).toBe(true)
+    unmount()
+
+    zmanimMock.mockClear()
+    const food = makeCategory({ detailFields: [{ key: 'hours', label: 'Hours', type: 'hours', filterable: true }] })
+    renderWithProviders(<GenericDirectory category={food} items={[makeListing()]} {...handlers} />)
+    expect(zmanimMock.mock.calls.some(([coords]) => coords && typeof coords === 'object' && 'lat' in coords)).toBe(true)
+  })
+
   it('lets rows say "not confirmed" only where most of the list is vouched for', () => {
     const recent = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
     const mostly = [
@@ -1504,6 +1533,17 @@ describe('GenericDirectory — each shul’s next minyan', () => {
 
     expect(screen.getByText('next minyan at Alpha Shul: Mincha 1:30 PM')).toBeInTheDocument()
     expect(screen.getByText('next minyan at Beta Shul: Mincha 6:45 PM')).toBeInTheDocument()
+  })
+
+  it('says a shul with no times at all has none listed', () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-09-28T11:00:00-04:00'))
+    const bare = makeListing({ id: 'c', name: 'Gamma Shul', category: 'synagogue' })
+    renderWithProviders(<GenericDirectory category={shulCategory} items={[shul('a', 'Alpha Shul', '1:30pm'), bare]} {...handlers} />, {
+      content: { categories: [shulCategory] },
+    })
+
+    expect(screen.getByText('next minyan at Gamma Shul: No davening times listed')).toBeInTheDocument()
   })
 
   it('works nothing out for a category without minyanim', () => {

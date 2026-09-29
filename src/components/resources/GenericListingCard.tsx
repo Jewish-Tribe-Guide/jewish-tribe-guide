@@ -154,6 +154,13 @@ type Props = {
   /** Whether this category's rows say "Not confirmed by anyone yet" — see
    *  listingRowNote. */
   flagUnconfirmed?: boolean
+  /** Tonight's candle lighting, on a Friday or erev Yom Tov — see
+   *  listingRowFacts. */
+  candlesAt?: number | null
+  /** Likes to show beside the name, when the list is sorted by them: the
+   *  order then needs its reason. Unset when sorted any other way, where a
+   *  column of counts says nothing. */
+  likes?: number
 }
 
 export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(function GenericListingCard({
@@ -178,6 +185,8 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
   place,
   omitKey = null,
   flagUnconfirmed = false,
+  likes,
+  candlesAt = null,
 }, ref) {
   const [expanded, setExpanded] = useState(!!defaultExpanded)
   const cardRootRef = useRef<HTMLDivElement>(null)
@@ -243,10 +252,11 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
   const { isOpen, closing, closure } = getOpenStatus(item, hoursFields.map((f) => f.key), now)
   // The row's second line: open status, next minyan, distance, what kind of
   // place, how many items. See lib/listingRow.ts.
-  const facts = listingRowFacts(item, category, now, { nextMinyan: useNextMinyan(item.id), omitKey })
+  const shul = useNextMinyan(item.id)
+  const facts = listingRowFacts(item, category, now, { shul, omitKey, candlesAt })
   // A category page's row: see the `place` prop.
   const pageRow = place !== undefined
-  const rowNote = listingRowNote(item, category, now, { flagUnconfirmed })
+  const rowNote = listingRowNote(item, category, now, { flagUnconfirmed, shulNote: shul?.note })
   const note = rowNote && (pageRow || rowNote.kind === 'exception') ? rowNote : null
   // Upvotes live in the opened listing now (the sheet on a phone, the dialog
   // on desktop), not on every row: a column of "👍 0" said nothing while a
@@ -582,7 +592,8 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
               a long name or address truncates rather than making one row
               twice as tall as the rest. */}
           <div className="min-w-0 flex-1">
-            <p className="truncate font-semibold text-slate-900">
+            <div className="flex items-baseline gap-2">
+            <p className="min-w-0 flex-1 truncate font-semibold text-slate-900">
               {pageRow ? (
                 <>
                   {item.name}
@@ -603,6 +614,15 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
                 item.name
               )}
             </p>
+            {/* Faded out while the row is hovered on desktop: its Pin and
+                Share buttons appear over this corner. */}
+            {!!likes && likes > 0 && (
+              <span className="flex shrink-0 items-center gap-1 text-[13px] font-semibold text-slate-500 transition-opacity desktop:group-hover/row:opacity-0" aria-label={`${likes} like${likes === 1 ? '' : 's'}`}>
+                <span aria-hidden="true">👍</span>
+                <span aria-hidden="true">{likes}</span>
+              </span>
+            )}
+            </div>
             {facts.length > 0 && (
               <p className="truncate text-[13.5px] text-slate-600" data-testid="row-facts">
                 {facts.map((fact, i) => (

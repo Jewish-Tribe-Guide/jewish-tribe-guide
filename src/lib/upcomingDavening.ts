@@ -50,6 +50,8 @@ type Candidate = {
   tefillah: Tefillah
   minutes: number
   time: string
+  /** The row's own note ("Zoom", "Followed by bagels"). */
+  notes?: string
 }
 
 /**
@@ -136,7 +138,7 @@ function collectCandidates(
       const minutes = parseTimeToMinutes(time)
       if (!Number.isFinite(minutes)) continue // free text ("Call to Confirm") — no number to sort by
 
-      out.push({ shulId: shul.id, shulName: shul.name, shulGeo: shul.geo, tefillah: row.tefillah, minutes, time })
+      out.push({ shulId: shul.id, shulName: shul.name, shulGeo: shul.geo, tefillah: row.tefillah, minutes, time, notes: row.notes?.trim() || undefined })
     }
   }
   return out
@@ -221,23 +223,84 @@ export function formatStartsIn(nowMinutes: number, target: number, isTomorrow: b
   return `In ${hours} hr ${minutes} min`
 }
 
-/** Each shul's own next minyan, for its row in a list of shuls: "Mincha
- *  6:34 PM", or "Shacharis 7 AM tomorrow" once today's are over. The same
+/** What a shul's row says about davening, its status and, when there is
+ *  one, the shul's own note for its third line. */
+export type ShulRowStatus = {
+  /** "Mincha 6:34 PM", "Shacharis 7 AM tomorrow"; or, with nothing today or
+   *  tomorrow, "Shabbos only", "Nothing today or tomorrow", "No davening
+   *  times listed". */
+  text: string
+  /** A time to go by, or a quiet "nothing soon". */
+  tone: 'minyan' | 'quiet'
+  /** The shul's own words: the note on the minyan the status names
+   *  ("Zoom"), or a minyan today with words for a time ("Mincha & Maariv
+   *  today: call to confirm", which the status skips, having no clock time
+   *  to sort by). */
+  note?: string
+}
+
+/** Each shul's row, keyed by listing id: its own next minyan by the same
  *  rules as nextUpcomingDavening (it runs once per shul), so a row and the
- *  home screen's davening card can't disagree about what's next. Keyed by
- *  listing id; a shul with nothing today or tomorrow is left out. */
-export function nextMinyanByShul(
+ *  home screen's davening card can't disagree about what's next. A shul
+ *  with no id is left out, and so is one whose sunset-based times haven't
+ *  arrived yet: until they do, "nothing today" might not be true. */
+export function shulRowByShul(
   shuls: ShulMinyanim[],
   opts: Parameters<typeof nextUpcomingDavening>[1],
-): Record<string, string> {
-  const out: Record<string, string> = {}
+): Record<string, ShulRowStatus> {
+  const out: Record<string, ShulRowStatus> = {}
   for (const shul of shuls) {
     if (!shul.id) continue
-    const next = nextUpcomingDavening([shul], opts)
-    if (next) out[shul.id] = `${next.label} ${clockTime(next.minutes)}${next.isTomorrow ? ' tomorrow' : ''}`
+    const status = shulRowStatus(shul, opts)
+    if (status) out[shul.id] = status
   }
   return out
 }
+
+function shulRowStatus(shul: ShulMinyanim, opts: Parameters<typeof nextUpcomingDavening>[1]): ShulRowStatus | null {
+  const rows = shul.minyanim
+  if (rows.length === 0) return { text: 'No davening times listed', tone: 'quiet' }
+
+  const today = (row: Minyan) => row.days.some((d) => opts.today.includes(d)) && !isOutOfSeason(row.season, opts.season)
+  // Words where a time goes ("Call to confirm"): never the next minyan, so
+  // said under it.
+  const worded = rows.find((row) => today(row) && !row.anchor && row.time.trim() && !Number.isFinite(parseTimeToMinutes(row.time)))
+  const wordedNote = worded ? `${TEFILLAH_LABELS[worded.tefillah]} today: ${lowerFirst(worded.time.trim())}` : undefined
+
+  const next = nextUpcomingDavening([shul], opts)
+  if (next) {
+    const day = next.isTomorrow ? opts.tomorrow : opts.today
+    const own = collectCandidates([shul], day, opts.season, opts.anchors).find((c) => c.minutes === next.minutes && c.notes)?.notes
+    return {
+      text: `${next.label} ${clockTime(next.minutes)}${next.isTomorrow ? ' tomorrow' : ''}`,
+      tone: 'minyan',
+      note: wordedNote ?? own,
+    }
+  }
+
+  const anchorsReady = !!opts.anchors[geoKey(geoOrCommunityDefault(shul.geo))]
+  const soon = (row: Minyan) => row.days.some((d) => opts.today.includes(d) || opts.tomorrow.includes(d))
+  if (!anchorsReady && rows.some((row) => row.anchor && soon(row))) return null
+
+  // Only Shabbos (and Yom Tov): Shabbos days, or Friday evening's davening
+  // (Mincha, Maariv, Kabbalas Shabbos). Friday Shacharis is a weekday's.
+  const shabbosOnly = rows.every(
+    (row) =>
+      row.days.length > 0 &&
+      row.days.every((d) => d === 'sat' || d === 'yom_tov' || (d === 'fri' && row.tefillah !== 'shacharis')),
+  )
+  if (shabbosOnly) {
+    // A note every minyan shares ("Meets the first weekend of every
+    // month") says something about the shul; two different ones ("Ends at
+    // 12:15", "Ends at 7:30") belong to their own minyanim.
+    const notes = [...new Set(rows.map((row) => row.notes?.trim()).filter((n): n is string => !!n))]
+    return { text: 'Shabbos only', tone: 'quiet', note: wordedNote ?? (notes.length === 1 ? notes[0] : undefined) }
+  }
+  return { text: 'Nothing today or tomorrow', tone: 'quiet', note: wordedNote }
+}
+
+// "Call to Confirm" reads mid-sentence as "call to confirm".
+const lowerFirst = (s: string) => s.toLowerCase()
 
 /** Minutes since midnight → "7 AM" / "6:34 PM". A fixed-time row stores its
  *  own text ("7:00am"), a sunset-based one a formatted time ("6:34 PM"); a
