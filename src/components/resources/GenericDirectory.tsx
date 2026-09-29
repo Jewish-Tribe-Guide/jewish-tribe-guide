@@ -28,6 +28,7 @@ import { useActiveCommunity, useOptionalCommunitySlug } from '@/lib/communityCon
 import { travelCompare } from '@/lib/listingTravel'
 import { useLogSearchMiss } from '@/lib/useLogSearchMiss'
 import CategoryAsk from './CategoryAsk'
+import NextMinyanCard from './NextMinyanCard'
 import { ui } from '@/lib/uiConfig'
 import { useOptionalLocation } from '@/lib/locationContext'
 import { usePinned } from '@/lib/pinnedContext'
@@ -897,8 +898,11 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // A listing arriving open (?item=, a shared link or a reload) opens its
   // group, until that listing is closed.
   const [reopenClosedId, setReopenClosedId] = useState<string | null>(null)
+  // A shul opened from the Next minyan card opens its group the same way.
+  const [openedFromCard, setOpenedFromCard] = useState<string | null>(null)
   const isGroupOpen = (g: ListGroup<DirectoryResource>) =>
     (!!reopenItemId && reopenItemId !== reopenClosedId && g.items.some((i) => i.id === reopenItemId)) ||
+    (!!openedFromCard && g.items.some((i) => i.id === openedFromCard)) ||
     (activeFilterCount > 0 ? !closedNow.includes(g.id) : openGroupIds.includes(g.id))
   const toggleGroup = (id: string) => {
     const flip = (ids: string[]) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id])
@@ -921,6 +925,19 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // "Not confirmed by anyone yet" only where most of the list is vouched for
   // (see listingRowNote).
   const flagUnconfirmed = items.length > 0 && items.filter((i) => isVouchedFor(i, now)).length * 2 >= items.length
+
+  // Synagogues' Next minyan card, until something is typed, while some shul
+  // the list holds keeps times. Wherever it isn't, All davening times is
+  // back in the list heading, so it's never gone.
+  const showMinyanCard =
+    hasMinyanim && !typed && filtered.some((item) => isMinyanim(item[minyanimField!.key]) && (item[minyanimField!.key] as Minyan[]).length > 0)
+  // A line in that card opens its shul, as next/previous does, and opens
+  // the closed group it sits in until it's closed again.
+  const openListing = (id: string) => {
+    setOpenedFromCard(id)
+    cardRefs.current.get(id)?.open()
+    scrollItemIntoViewWhenSettled(id, 'instant')
+  }
 
   // Tonight's candle lighting, for places that shut before it on a Friday
   // or erev Yom Tov. Fetched only where the category keeps hours, at the
@@ -1137,9 +1154,21 @@ export default function GenericDirectory({ category, items, anchorLabel, address
         {/* The page's one search box, limited to this category, with
             example searches under it and, once something is typed, the
             sentence answering it (see CategoryAsk). */}
-        {showSearch && (
-          <CategoryAsk category={category} items={items} search={search} onSearch={setSearch} hasMinyanim={hasMinyanim} />
-        )}
+        {/* Beside it from lg up, Synagogues' Next minyan card; under the
+            example searches on a phone. Gone once anything is typed: then
+            the search's own answer says what's next (see NextMinyanCard). */}
+        <div className={showMinyanCard ? 'space-y-3 lg:flex lg:items-start lg:gap-5 lg:space-y-0' : undefined}>
+          {showSearch && (
+            <div className={showMinyanCard ? 'min-w-0 lg:flex-1' : undefined}>
+              <CategoryAsk category={category} items={items} search={search} onSearch={setSearch} hasMinyanim={hasMinyanim} />
+            </div>
+          )}
+          {showMinyanCard && (
+            <div className="lg:w-[400px] lg:shrink-0">
+              <NextMinyanCard items={filtered} onOpenListing={openListing} onDaveningTimes={() => setDaveningModalOpen(true)} />
+            </div>
+          )}
+        </div>
         {/* The list's own heading: how many, and Filters and Sort, the
             same place on every category page (see ListHeading). */}
         <ListHeading
@@ -1153,7 +1182,8 @@ export default function GenericDirectory({ category, items, anchorLabel, address
           openNow={typed && hasFilterableHours ? { on: openNow, onToggle: () => setOpenNow((v) => !v) } : undefined}
           filters={hasActualFilters ? { active: activeFilterCount, onOpen: () => setFiltersOpen(true) } : undefined}
           sort={upvotes ? { byPopular: sortByPopular, onSelect: selectSort } : undefined}
-          onDaveningTimes={hasMinyanim ? () => setDaveningModalOpen(true) : undefined}
+          // Only while the Next minyan card, which carries it, is gone.
+          onDaveningTimes={hasMinyanim && !showMinyanCard ? () => setDaveningModalOpen(true) : undefined}
           activeChips={activeChips}
         />
       </div>
@@ -1240,6 +1270,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
               found={foundOn(item)}
               onExpandedChange={(expanded) => {
                 onParamsChange?.({ item: expanded ? item.id : null, ...(expanded ? {} : { match: null }) }, { replace: true })
+                if (!expanded && item.id === openedFromCard) setOpenedFromCard(null)
                 if (!expanded && item.id === reopenItemId) {
                   setClosedMatchFor(reopenKey)
                   setReopenClosedId(item.id)

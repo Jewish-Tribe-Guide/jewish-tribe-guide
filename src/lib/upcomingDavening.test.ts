@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatStartsIn, nextUpcomingDavening, shulRowByShul, type ShulMinyanim } from './upcomingDavening'
+import { formatStartsIn, nextMinyansAcross, nextUpcomingDavening, shulRowByShul, type ShulMinyanim } from './upcomingDavening'
 import type { Minyan } from './davening'
 import { geoKey } from './useZmanAnchors'
 
@@ -327,5 +327,66 @@ describe('shulRowByShul', () => {
     const { id: _id, ...noId } = kk
     void _id
     expect(shulRowByShul([noId], opts(7 * 60))).toEqual({})
+  })
+})
+
+describe('nextMinyansAcross: the Synagogues page’s Next minyan card', () => {
+  const m = (over: Partial<Minyan>): Minyan => ({ id: 'x', tefillah: 'mincha', days: ['mon'], time: '6:20pm', ...over })
+  const shul = (id: string, minyanim: Minyan[], geo?: { lat: number; lng: number }): ShulMinyanim => ({ id, name: id, minyanim, geo })
+  const opts = (nowMinutes: number, anchors = {}) => ({ today: ['mon' as const], tomorrow: ['tue' as const], nowMinutes, season: null, anchors })
+  const miles: Record<string, number> = { near: 0.2, far: 8.2, mid: 5.1 }
+  const milesOf = (id: string) => miles[id]
+
+  it('names the soonest two, one line per shul', () => {
+    const lines = nextMinyansAcross(
+      [
+        shul('mid', [m({ time: '6:25pm' })]),
+        shul('near', [m({ time: '6:20pm' }), m({ id: 'y', tefillah: 'maariv', time: '8:00pm' })]),
+        shul('far', [m({ time: '7:00pm' })]),
+      ],
+      opts(17 * 60),
+      milesOf,
+    )
+    expect(lines).toEqual([
+      { shulId: 'near', shulName: 'near', label: 'Mincha', time: '6:20 PM' },
+      { shulId: 'mid', shulName: 'mid', label: 'Mincha', time: '6:25 PM' },
+    ])
+  })
+
+  it('on the same minute, names the nearer shul, whatever the alphabet says', () => {
+    // "far" sorts first by name ("f" < "n"); the nearer one still wins.
+    const lines = nextMinyansAcross([shul('far', [m({})]), shul('near', [m({})])], opts(17 * 60), milesOf, 1)
+    expect(lines?.map((l) => l.shulName)).toEqual(['near'])
+  })
+
+  it('reads two tefillos at one shul on the same minute as one line', () => {
+    const lines = nextMinyansAcross(
+      [shul('near', [m({}), m({ id: 'y', tefillah: 'maariv' })])],
+      opts(17 * 60),
+      milesOf,
+    )
+    expect(lines?.[0].label).toBe('Mincha & Maariv')
+  })
+
+  it('goes on to tomorrow once today’s run out, and says so', () => {
+    const lines = nextMinyansAcross(
+      [shul('near', [m({ time: '9:00pm', tefillah: 'maariv' }), m({ id: 'y', tefillah: 'shacharis', days: ['tue'], time: '6:45am' })]), shul('mid', [m({ id: 'z', tefillah: 'shacharis', days: ['tue'], time: '7:00am' })])],
+      opts(20 * 60),
+      milesOf,
+    )
+    expect(lines?.map((l) => `${l.time} ${l.label} · ${l.shulName}`)).toEqual(['9 PM Maariv · near', '7 AM Shacharis tomorrow · mid'])
+  })
+
+  it('waits for sunset-based times rather than naming a later minyan first', () => {
+    const geo = { lat: 40, lng: -75.2 }
+    const sunsetShul = shul('near', [m({ anchor: 'sunset', offsetMinutes: -10, time: '10 min before Sunset' })], geo)
+    const fixed = shul('far', [m({ time: '7:30pm' })])
+    expect(nextMinyansAcross([sunsetShul, fixed], opts(17 * 60), milesOf)).toBeNull()
+    const ready = { [geoKey(geo)]: { sunsetIso: '2026-09-08T18:30:00-04:00' } }
+    expect(nextMinyansAcross([sunsetShul, fixed], opts(17 * 60, ready), milesOf)?.map((l) => l.time)).toEqual(['6:20 PM', '7:30 PM'])
+  })
+
+  it('is an empty list, not null, when nothing is left today or tomorrow', () => {
+    expect(nextMinyansAcross([shul('near', [m({ days: ['sat'] })])], opts(17 * 60), milesOf)).toEqual([])
   })
 })

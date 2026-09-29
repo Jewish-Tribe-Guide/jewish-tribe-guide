@@ -1575,6 +1575,120 @@ describe('GenericDirectory — each shul’s next minyan', () => {
     expect(screen.getByText('next minyan at Gamma Shul: No davening times listed')).toBeInTheDocument()
   })
 
+  describe('the Next minyan card', () => {
+    // A Monday at 5 PM in Philadelphia.
+    const fivePm = () => {
+      vi.useFakeTimers({ toFake: ['Date'] })
+      vi.setSystemTime(new Date('2026-09-28T17:00:00-04:00'))
+    }
+    const shuls = () => [
+      { ...shul('far', 'Aleph Shul', '6:20pm'), milesFromCenter: 8.2, confirmedAt: '2026-09-01' },
+      { ...shul('near', 'Mekor Habracha', '6:20pm'), milesFromCenter: 0.21 },
+      { ...shul('mid', 'Lower Merion Synagogue', '6:25pm'), milesFromCenter: 5.1, confirmedAt: '2026-09-01' },
+    ]
+    const card = () => within(screen.getByTestId('next-minyan'))
+
+    it('names the next two, the nearer first on the same minute, with distance and whether anyone confirmed the times', () => {
+      fivePm()
+      renderWithProviders(<GenericDirectory category={shulCategory} items={shuls()} {...handlers} />, { content: { categories: [shulCategory] } })
+
+      expect(card().getByRole('heading', { name: 'Next minyan' })).toBeInTheDocument()
+      const lines = card().getAllByRole('listitem').map((li) => li.textContent)
+      expect(lines).toEqual(['6:20 PMMincha · Mekor Habracha0.2 mi · times not confirmed', '6:20 PMMincha · Aleph Shul8.2 mi'])
+    })
+
+    it('carries All davening times, which leaves the list heading while it does', async () => {
+      fivePm()
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+      renderWithProviders(<GenericDirectory category={shulCategory} items={shuls()} {...handlers} />, { content: { categories: [shulCategory] } })
+
+      expect(within(screen.getByTestId('list-heading')).queryByRole('button', { name: /All davening times/ })).not.toBeInTheDocument()
+      await user.click(card().getByRole('button', { name: /All davening times/ }))
+      expect(screen.getByText('davening modal open')).toBeInTheDocument()
+    })
+
+    it('goes once anything is typed, and All davening times goes back to the heading', async () => {
+      fivePm()
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+      renderWithProviders(<GenericDirectory category={shulCategory} items={shuls()} {...handlers} />, { content: { categories: [shulCategory] } })
+
+      await user.type(screen.getByRole('searchbox'), 'mincha')
+      expect(screen.queryByTestId('next-minyan')).not.toBeInTheDocument()
+      expect(within(screen.getByTestId('list-heading')).getByRole('button', { name: /All davening times/ })).toBeInTheDocument()
+    })
+
+    it('follows the list’s filters', () => {
+      fivePm()
+      const withEruv = makeCategory({
+        id: 'synagogue',
+        detailFields: [
+          { key: 'minyanim', label: 'Minyanim', type: 'minyanim' },
+          { key: 'eruv', label: 'In the eruv', type: 'boolean', filterable: true },
+        ],
+      })
+      const items = shuls().map((s) => ({ ...s, eruv: s.id === 'mid' }))
+      renderWithProviders(<GenericDirectory category={withEruv} items={items} initialFilters={{ f_eruv: '1' }} {...handlers} />, {
+        content: { categories: [withEruv] },
+      })
+
+      expect(card().getAllByRole('listitem').map((li) => li.textContent)).toEqual(['6:25 PMMincha · Lower Merion Synagogue5.1 mi'])
+    })
+
+    it('opens a shul from its line', async () => {
+      fivePm()
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+      renderWithProviders(<GenericDirectory category={shulCategory} items={shuls()} {...handlers} />, {
+        content: { categories: [shulCategory] },
+      })
+
+      await user.click(card().getByRole('button', { name: /Mekor Habracha/ }))
+      expect(screen.getByText('Expanded Mekor Habracha')).toBeInTheDocument()
+    })
+
+    it('opens the closed group the shul is in', async () => {
+      fivePm()
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+      const byDenomination = makeCategory({
+        id: 'synagogue',
+        groupBy: { kind: 'field', key: 'denomination' },
+        detailFields: [
+          { key: 'minyanim', label: 'Minyanim', type: 'minyanim' },
+          { key: 'denomination', label: 'Denomination', type: 'select', filterable: true, options: [] },
+        ],
+      })
+      const items = shuls().map((s) => ({ ...s, denomination: s.id === 'near' ? 'Orthodox' : 'Conservative' }))
+      renderWithProviders(<GenericDirectory category={byDenomination} items={items} {...handlers} />, { content: { categories: [byDenomination] } })
+
+      const orthodox = screen.getByRole('button', { name: /^Orthodox/ })
+      expect(orthodox).toHaveAttribute('aria-expanded', 'false')
+      await user.click(card().getByRole('button', { name: /Mekor Habracha/ }))
+      expect(orthodox).toHaveAttribute('aria-expanded', 'true')
+    })
+
+    it('goes when no shul the filters leave keeps times, and All davening times goes back to the heading', () => {
+      fivePm()
+      const withEruv = makeCategory({
+        id: 'synagogue',
+        detailFields: [
+          { key: 'minyanim', label: 'Minyanim', type: 'minyanim' },
+          { key: 'eruv', label: 'In the eruv', type: 'boolean', filterable: true },
+        ],
+      })
+      const bare = { ...makeListing({ id: 'bare', name: 'No Times Shul', category: 'synagogue' }), eruv: true }
+      renderWithProviders(<GenericDirectory category={withEruv} items={[...shuls(), bare]} initialFilters={{ f_eruv: '1' }} {...handlers} />, {
+        content: { categories: [withEruv] },
+      })
+
+      expect(screen.queryByTestId('next-minyan')).not.toBeInTheDocument()
+      expect(within(screen.getByTestId('list-heading')).getByRole('button', { name: /All davening times/ })).toBeInTheDocument()
+    })
+
+    it('isn’t on a page without minyanim', () => {
+      renderWithProviders(<GenericDirectory category={makeCategory()} items={[makeListing({ name: 'Acme' })]} {...handlers} />)
+      expect(screen.queryByTestId('next-minyan')).not.toBeInTheDocument()
+    })
+  })
+
   it('works nothing out for a category without minyanim', () => {
     const minyanim = [{ id: 'm', tefillah: 'mincha', days: ['mon'], time: '1:30pm' }]
     renderWithProviders(<GenericDirectory category={makeCategory()} items={[makeListing({ name: 'Acme', minyanim })]} {...handlers} />)

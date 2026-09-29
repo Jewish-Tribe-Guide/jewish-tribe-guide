@@ -299,6 +299,61 @@ function shulRowStatus(shul: ShulMinyanim, opts: Parameters<typeof nextUpcomingD
   return { text: 'Nothing today or tomorrow', tone: 'quiet', note: wordedNote }
 }
 
+/** One line of a category page's Next minyan card. */
+export type NextMinyanLine = {
+  shulId: string
+  shulName: string
+  /** "Mincha & Maariv", or "Shacharis tomorrow". */
+  label: string
+  /** "6:20 PM", in the rows' one clock style. */
+  time: string
+}
+
+/**
+ * The next few minyanim across a list of shuls, one per shul, for the
+ * Synagogues page's Next minyan card: soonest first, and on the same minute
+ * the nearer shul first (then by name), never alphabetical alone, which
+ * named a shul 8 mi away over one at 0.2 mi. Today's still to come, then
+ * tomorrow's once today's run out. Two tefillos a shul holds on the same
+ * minute read as one ("Mincha & Maariv").
+ *
+ * Null while a sunset-based time the answer depends on is still arriving:
+ * until it does, a later minyan could be named as the next one.
+ */
+export function nextMinyansAcross(
+  shuls: ShulMinyanim[],
+  opts: Parameters<typeof nextUpcomingDavening>[1],
+  milesOf: (shulId: string) => number | null | undefined,
+  limit = 2,
+): NextMinyanLine[] | null {
+  const soon = (row: Minyan) => row.days.some((d) => opts.today.includes(d) || opts.tomorrow.includes(d))
+  const waiting = shuls.some(
+    (s) => !opts.anchors[geoKey(geoOrCommunityDefault(s.geo))] && s.minyanim.some((row) => row.anchor && soon(row)),
+  )
+  if (waiting) return null
+
+  const miles = (c: Candidate) => milesOf(c.shulId ?? '') ?? Infinity
+  // Infinity - Infinity is NaN, which falls through to the name.
+  const order = (a: Candidate, b: Candidate) => a.minutes - b.minutes || miles(a) - miles(b) || a.shulName.localeCompare(b.shulName)
+
+  const out: NextMinyanLine[] = []
+  const shown = new Set<string>()
+  const take = (candidates: Candidate[], isTomorrow: boolean) => {
+    const sorted = candidates.filter((c) => c.shulId).sort(order)
+    for (const c of sorted) {
+      if (out.length >= limit) return
+      if (shown.has(c.shulId!)) continue
+      shown.add(c.shulId!)
+      const together = [...new Set(sorted.filter((o) => o.shulId === c.shulId && o.minutes === c.minutes).map((o) => o.tefillah))]
+      const label = together.map((t) => TEFILLAH_LABELS[t]).join(' & ')
+      out.push({ shulId: c.shulId!, shulName: c.shulName, label: isTomorrow ? `${label} tomorrow` : label, time: clockTime(c.minutes) })
+    }
+  }
+  take(collectCandidates(shuls, opts.today, opts.season, opts.anchors).filter((c) => c.minutes >= opts.nowMinutes), false)
+  take(collectCandidates(shuls, opts.tomorrow, opts.season, opts.anchors), true)
+  return out
+}
+
 // "Call to Confirm" reads mid-sentence as "call to confirm".
 const lowerFirst = (s: string) => s.toLowerCase()
 
