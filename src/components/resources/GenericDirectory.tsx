@@ -22,7 +22,7 @@ import { neighborhoodsFor } from '@/lib/places'
 import { useOptionalCommunitySlug } from '@/lib/communityContext'
 import { travelCompare } from '@/lib/listingTravel'
 import { useLogSearchMiss } from '@/lib/useLogSearchMiss'
-import AskTip from './AskTip'
+import CategoryAsk from './CategoryAsk'
 import { ui } from '@/lib/uiConfig'
 import { useOptionalLocation } from '@/lib/locationContext'
 import { usePinned } from '@/lib/pinnedContext'
@@ -414,7 +414,6 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   const controlsVisible = useScrollShowHide(controlsCanStick)
 
   const fields = category.detailFields
-  const tagFields = fields.filter((f) => f.type === 'tags')
   const hoursFields = fields.filter((f) => f.type === 'hours')
   const hasFilterableHours = hoursFields.some((f) => f.filterable)
   const filterableBooleans = fields.filter((f) => f.filterable && f.type === 'boolean')
@@ -875,13 +874,6 @@ export default function GenericDirectory({ category, items, anchorLabel, address
     setSortByPopular(byPopular)
   }
 
-  const searchPlaceholder =
-    tagFields.length > 0
-      ? isMobile
-        ? `Search ${category.pluralLabel.toLowerCase()} or items…`
-        : `Search ${category.pluralLabel.toLowerCase()} or kosher items (e.g. cheese)…`
-      : 'Search…'
-
   // The toolbar row (filters + sort) only renders when there's something in it;
   // a select needs ≥2 distinct values before it's worth showing.
   const hasRenderedSelects = filterableSelects.some(
@@ -1056,40 +1048,11 @@ export default function GenericDirectory({ category, items, anchorLabel, address
             : 'lg:translate-y-0'
         }`}
       >
+        {/* The page's one search box, limited to this category, with
+            example searches under it and, once something is typed, the
+            sentence answering it (see CategoryAsk). */}
         {showSearch && (
-          <div className="relative">
-            <input
-              type="text"
-              placeholder={searchPlaceholder}
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 pr-9 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-            />
-            {search && (
-              <button
-                type="button"
-                onClick={() => setSearch('')}
-                aria-label="Clear search"
-                // active:text-slate-800 — no background to darken here (this
-                // sits flush inside the input's own right edge, where a
-                // filled circle would look like a second control rather than
-                // part of the field), so press feedback is a further step
-                // past hover's text-slate-600 instead. Single shared button
-                // (no isMobile/desktop split), so this covers both.
-                className="absolute inset-y-0 right-0 flex w-9 items-center justify-center text-slate-400 transition-colors hover:text-slate-600 active:text-slate-800 cursor-pointer"
-              >
-                <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24" aria-hidden="true">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            )}
-          </div>
-        )}
-        {/* One quiet line on the first couple of visits: the home search
-            answers questions (see AskTip / browsingTips.ts). */}
-        <AskTip category={category} items={items} />
-        {showSearch && q && tagFields.length > 0 && (
-          <p className="text-xs text-muted">Showing listings matching &ldquo;{search.trim()}&rdquo;</p>
+          <CategoryAsk category={category} items={items} search={search} onSearch={setSearch} hasMinyanim={hasMinyanim} />
         )}
         {hasFilterRow && (
           <>

@@ -164,7 +164,7 @@ describe('GenericDirectory', () => {
     const items = [makeListing({ id: 'a', name: 'Kosher Mart' }), makeListing({ id: 'b', name: 'Trader Joe' })]
     renderWithProviders(<GenericDirectory category={category} items={items} {...handlers} />)
 
-    await user.type(screen.getByPlaceholderText('Search…'), 'kosher')
+    await user.type(screen.getByRole('searchbox'), 'kosher')
 
     expect(screen.getByText('Kosher Mart')).toBeInTheDocument()
     expect(screen.queryByText('Trader Joe')).not.toBeInTheDocument()
@@ -181,7 +181,7 @@ describe('GenericDirectory', () => {
     ]
     renderWithProviders(<GenericDirectory category={category} items={items} {...handlers} />)
 
-    await user.type(screen.getByPlaceholderText(/^Search grocery stores or/), 'where can I buy cholov yisroel milk')
+    await user.type(screen.getByRole('searchbox', { name: 'Search Grocery Stores' }), 'where can I buy cholov yisroel milk')
 
     expect(screen.getByText('ShopRite')).toBeInTheDocument()
     expect(screen.queryByText('Trader Joe')).not.toBeInTheDocument()
@@ -193,13 +193,51 @@ describe('GenericDirectory', () => {
     const items = [makeListing({ id: 'a', name: 'Kosher Mart' })]
     renderWithProviders(<GenericDirectory category={category} items={items} {...handlers} />)
 
-    await user.type(screen.getByPlaceholderText('Search…'), 'nonexistent')
+    await user.type(screen.getByRole('searchbox'), 'nonexistent')
 
     expect(screen.getByText('No grocery stores match your search.')).toBeInTheDocument()
     const clear = screen.getByRole('button', { name: 'Clear search & filters' })
 
     await user.click(clear)
     expect(screen.getByText('Kosher Mart')).toBeInTheDocument()
+  })
+
+  describe('the search box: asking comes first', () => {
+    const grocery = makeCategory({ detailFields: [{ key: 'm', label: 'Kosher items', type: 'tags' }] })
+    const stores = [
+      makeListing({ id: 'a', name: 'ShopRite', m: ['Challah', 'Wine'] }),
+      makeListing({ id: 'b', name: 'Trader Joe', m: ['Challah', 'Wine'] }),
+      makeListing({ id: 'c', name: 'Acme', m: ['Challah'] }),
+    ]
+
+    it('says it searches this category, with example searches under it that answer', () => {
+      renderWithProviders(<GenericDirectory category={grocery} items={stores} {...handlers} />)
+      expect(screen.getByRole('searchbox', { name: 'Search Grocery Stores' })).toHaveAttribute('placeholder', 'Ask for any item or store')
+      expect(screen.getByText('in Grocery Stores')).toBeInTheDocument()
+      const examples = within(screen.getByTestId('category-examples'))
+      expect(examples.getByRole('button', { name: 'challah' })).toBeInTheDocument()
+      expect(examples.getByRole('button', { name: 'wine' })).toBeInTheDocument()
+    })
+
+    it('types an example into the box when tapped, and answers it', async () => {
+      const user = userEvent.setup()
+      renderWithProviders(<GenericDirectory category={grocery} items={stores} {...handlers} />)
+      await user.click(within(screen.getByTestId('category-examples')).getByRole('button', { name: 'challah' }))
+      expect(screen.getByRole('searchbox')).toHaveValue('challah')
+      // The examples go once something is asked; the answer takes their place.
+      expect(screen.queryByTestId('category-examples')).not.toBeInTheDocument()
+      expect(screen.getByRole('status')).toHaveTextContent(/challah/i)
+    })
+
+    it('shows an answer only after a search: nothing sits under the box unasked', () => {
+      renderWithProviders(<GenericDirectory category={grocery} items={stores} {...handlers} />)
+      expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    })
+
+    it('no longer shows the old "you can just ask" tip', () => {
+      renderWithProviders(<GenericDirectory category={grocery} items={stores} {...handlers} />)
+      expect(screen.queryByText(/you can just ask/i)).not.toBeInTheDocument()
+    })
   })
 
   it('shows a plain "none listed" empty state (no clear button) when there are simply no items', () => {
@@ -332,7 +370,7 @@ describe('GenericDirectory', () => {
     expect(onEdit).toHaveBeenCalledWith(item)
 
     await user.click(screen.getByRole('button', { name: 'tag Kosher Mart' }))
-    expect(screen.getByPlaceholderText(/Search/)).toHaveValue('cheese')
+    expect(screen.getByRole('searchbox')).toHaveValue('cheese')
   })
 
   it('a filterable boolean field narrows the list when its chip is toggled on', async () => {
@@ -420,7 +458,7 @@ describe('GenericDirectory', () => {
 
       // Blank slate: the search box is empty and BOTH listings show — the
       // URL's own `?q=kosher&f_isKosher=1` was never applied to state.
-      expect(screen.getByPlaceholderText('Search…')).toHaveValue('')
+      expect(screen.getByRole('searchbox')).toHaveValue('')
       expect(screen.getByText('Kosher Mart')).toBeInTheDocument()
       expect(screen.getByText('Regular Mart')).toBeInTheDocument()
 
@@ -455,7 +493,7 @@ describe('GenericDirectory', () => {
         />,
       )
 
-      expect(screen.getByPlaceholderText('Search…')).toHaveValue('kosher')
+      expect(screen.getByRole('searchbox')).toHaveValue('kosher')
       expect(screen.getByText('Kosher Mart')).toBeInTheDocument()
       expect(screen.queryByText('Regular Mart')).not.toBeInTheDocument()
     })
@@ -489,8 +527,8 @@ describe('GenericDirectory', () => {
         </Activity>,
       )
 
-      await user.type(screen.getByPlaceholderText('Search…'), 'kosher')
-      expect(screen.getByPlaceholderText('Search…')).toHaveValue('kosher')
+      await user.type(screen.getByRole('searchbox'), 'kosher')
+      expect(screen.getByRole('searchbox')).toHaveValue('kosher')
       onParamsChange.mockClear()
 
       // Away (hidden — the visitor is looking at Home) and back (visible
@@ -506,7 +544,7 @@ describe('GenericDirectory', () => {
         </Activity>,
       )
 
-      expect(screen.getByPlaceholderText('Search…')).toHaveValue('')
+      expect(screen.getByRole('searchbox')).toHaveValue('')
       expect(screen.getByText('Kosher Mart')).toBeInTheDocument()
       expect(screen.getByText('Regular Mart')).toBeInTheDocument()
       expect(onParamsChange).toHaveBeenCalledWith(

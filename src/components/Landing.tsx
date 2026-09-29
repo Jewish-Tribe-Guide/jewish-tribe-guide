@@ -25,7 +25,6 @@ import SubscribeSection from '@/components/home/SubscribeSection'
 import CampaignBannerCard from '@/components/home/CampaignBannerCard'
 import { useLogSearchMiss } from '@/lib/useLogSearchMiss'
 import { useHydrated } from '@/lib/useHydrated'
-import { markTipDone } from '@/lib/browsingTips'
 import { useCategories } from '@/lib/useCategories'
 import { useHomeSections } from '@/lib/useHomeSections'
 import { BUILT_IN_BLOCKS, type HomeBlockKind } from '@/lib/homeSections'
@@ -291,13 +290,6 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
       ...(action ? { findAction: action } : {}),
     })
   }
-
-  // Asking the home search anything retires the category pages' "you can
-  // just ask" tip: they know (see browsingTips.ts).
-  const askedSomething = q.length >= 3
-  useEffect(() => {
-    if (askedSomething) markTipDone()
-  }, [askedSomething])
 
   // Capture searches that come up empty — the most actionable signal for what
   // content to add next. Only counts once data has loaded, so a slow load never
