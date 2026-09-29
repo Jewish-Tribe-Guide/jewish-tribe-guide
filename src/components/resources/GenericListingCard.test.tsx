@@ -195,7 +195,7 @@ describe('GenericListingCard — collapsed', () => {
   // nothing in the app ticked, and nothing listened for the tab coming back.
   // A phone backgrounded in a hospital corridor at 4pm and looked at again at
   // 10pm still showed "Open" for a shop that had closed at 5.
-  it('says "Closed now" instead of open once the listing has closed, when the tab comes back', () => {
+  it('says when it opens next instead of open once the listing has closed, when the tab comes back', () => {
     vi.useFakeTimers()
     try {
       // A Friday, mid-afternoon, for a place open 09:00–17:00 that day.
@@ -219,7 +219,8 @@ describe('GenericListingCard — collapsed', () => {
       act(() => document.dispatchEvent(new Event('visibilitychange')))
 
       expect(screen.queryByText('Open until 5 PM')).not.toBeInTheDocument()
-      expect(screen.getByText('Closed now')).toBeInTheDocument()
+      // Friday's hours are the only ones, so next week's.
+      expect(screen.getByText('Opens Fri 9 AM')).toBeInTheDocument()
     } finally {
       Object.defineProperty(document, 'hidden', { value: false, configurable: true })
       vi.useRealTimers()
@@ -461,81 +462,25 @@ describe('GenericListingCard — the field a search matched, when no item did', 
   })
 })
 
-describe('GenericListingCard — item count', () => {
-  // The count is one of the row's facts (see lib/listingRow.ts): plain text
-  // on the second line, not a chip.
-  it('shows "N {countLabel}s" on the collapsed card for a showCountInHeader tags field', () => {
-    const category = makeCategory({
-      detailFields: [
-        { key: 'items', label: 'Kosher items available', type: 'tags', showCountInHeader: true, countLabel: 'kosher item' },
-      ],
-    })
-    const item = makeListing({ items: ['Milk', 'Bread', 'Cheese'] })
-    renderWithProviders(
-      <GenericListingCard item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />,
-    )
+describe('GenericListingCard — items on the row', () => {
+  // The items themselves, not a count (see rowItems in lib/listingRow.ts):
+  // "Challah, milk, chicken +5" says what "8 kosher items" didn't.
+  const itemsField = { key: 'items', label: 'Kosher items available', type: 'tags' as const, showCountInHeader: true, countLabel: 'kosher item' }
 
-    expect(screen.getByText('3 kosher items')).toBeInTheDocument()
-  })
-
-  it('uses the singular with exactly one item', () => {
-    const category = makeCategory({
-      detailFields: [
-        { key: 'items', label: 'Kosher items available', type: 'tags', showCountInHeader: true, countLabel: 'kosher item' },
-      ],
-    })
-    const item = makeListing({ items: ['Milk'] })
-    renderWithProviders(
-      <GenericListingCard item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />,
-    )
-
-    expect(screen.getByText('1 kosher item')).toBeInTheDocument()
-    expect(screen.queryByText('1 kosher items')).not.toBeInTheDocument()
-  })
-
-  // Tags fields store a second array alongside the plain key — the `_sometimes`
-  // companion (TagsInput's green/amber toggle) — and PlaceDetailBody already
-  // shows those as real items, in their own section, rather than hiding them.
-  // The count used to only read the plain key, so a listing with sometimes-
-  // kosher items undercounted them right out of the badge.
-  it('counts the "_sometimes" companion array too', () => {
-    const category = makeCategory({
-      detailFields: [
-        { key: 'items', label: 'Kosher items available', type: 'tags', showCountInHeader: true, countLabel: 'kosher item' },
-      ],
-    })
+  it('names the items, sometimes ones after, marked', () => {
+    const category = makeCategory({ detailFields: [itemsField] })
     const item = makeListing({ items: ['Milk', 'Bread'], items_sometimes: ['Cheese'] })
-    renderWithProviders(
-      <GenericListingCard item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />,
-    )
+    renderWithProviders(<GenericListingCard item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />)
 
-    expect(screen.getByText('3 kosher items')).toBeInTheDocument()
-  })
-
-  it('falls back to the field\'s own label, lowercased, when countLabel is unset', () => {
-    const category = makeCategory({
-      detailFields: [{ key: 'items', label: 'Kosher Items', type: 'tags', showCountInHeader: true }],
-    })
-    const item = makeListing({ items: ['Milk', 'Bread'] })
-    renderWithProviders(
-      <GenericListingCard item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />,
-    )
-
-    expect(screen.getByText('2 kosher items')).toBeInTheDocument()
+    expect(within(screen.getByTestId('row-facts')).getByText('Milk, bread, cheese (sometimes)')).toBeInTheDocument()
+    expect(screen.queryByText(/kosher items?$/)).not.toBeInTheDocument()
   })
 
   it('shows nothing extra when the tags field has no items, but keeps the replaced badge', () => {
     const category = makeCategory({
       detailFields: [
         { key: 'isKosher', label: 'Kosher', type: 'boolean', renderAs: 'badge', filterable: true },
-        {
-          key: 'items',
-          label: 'Kosher items available',
-          type: 'tags',
-          showCountInHeader: true,
-          countLabel: 'kosher item',
-          countReplacesKey: 'isKosher',
-        },
+        { ...itemsField, countReplacesKey: 'isKosher' },
       ],
     })
     const item = makeListing({ isKosher: true, items: [] })
@@ -547,21 +492,12 @@ describe('GenericListingCard — item count', () => {
     expect(screen.getByText('Kosher')).toBeInTheDocument()
   })
 
-  // A count already says "yes, kosher" — the badge countReplacesKey points
-  // at (e.g. a boolean "Kosher" toggle) would just repeat that in a less
-  // useful form once there's an actual count to show instead.
-  it('replaces the chosen badge with the count once there are items', () => {
+  // Beside a list of kosher items, a "Kosher" badge says nothing more.
+  it('drops the badge the items already say once there are items', () => {
     const category = makeCategory({
       detailFields: [
         { key: 'isKosher', label: 'Kosher', type: 'boolean', renderAs: 'badge', filterable: true },
-        {
-          key: 'items',
-          label: 'Kosher items available',
-          type: 'tags',
-          showCountInHeader: true,
-          countLabel: 'kosher item',
-          countReplacesKey: 'isKosher',
-        },
+        { ...itemsField, countReplacesKey: 'isKosher' },
       ],
     })
     const item = makeListing({ isKosher: true, items: ['Milk', 'Bread'] })
@@ -569,7 +505,7 @@ describe('GenericListingCard — item count', () => {
       <GenericListingCard item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />,
     )
 
-    expect(screen.getByText('2 kosher items')).toBeInTheDocument()
+    expect(screen.getByText('Milk, bread')).toBeInTheDocument()
     expect(screen.queryByText('Kosher')).not.toBeInTheDocument()
   })
 
@@ -1033,19 +969,62 @@ describe('GenericListingCard — the row', () => {
     expect(within(line).queryByRole('button')).not.toBeInTheDocument()
   })
 
-  it('marks a hechsher caveat in the caution colour, with its note on hover', () => {
+  it('says a hechsher doesn’t cover everything on a line of its own, with what isn’t on hover', () => {
     const category = makeCategory({
       detailFields: [
         { key: 'cert', label: 'Hechsher', type: 'select', renderAs: 'badge', filterable: true, caveat: { flagField: 'partial', noteField: 'note' } },
+        { key: 'partial', label: 'Not everything here is kosher', type: 'boolean', renderAs: 'hidden' },
       ],
     })
     renderWithProviders(
       <GenericListingCard item={makeListing({ cert: 'IKC', partial: true, note: 'Only the bakery case' })} category={category} upvotes={false} count={0} {...requiredHandlers} />,
     )
 
-    const cert = within(screen.getByTestId('row-facts')).getByText('IKC')
-    expect(cert).toHaveClass('text-caution')
-    expect(cert).toHaveAttribute('title', 'Only the bakery case')
+    // A phone can't hover, so a caveat carried only by a colour and a title
+    // was never seen there.
+    const note = screen.getByTestId('row-note')
+    expect(note).toHaveTextContent('Not everything here is kosher')
+    expect(note).toHaveClass('text-caution')
+    expect(note).toHaveAttribute('title', 'Only the bakery case')
+    expect(within(screen.getByTestId('row-facts')).getByText('IKC')).not.toHaveClass('text-caution')
+  })
+
+  describe('on a category page (place given)', () => {
+    const category = makeCategory({
+      detailFields: [{ key: 'notes', label: 'Notes', type: 'textarea', showInHeader: true }],
+    })
+    const item = makeListing({ name: 'Cambria', address: '219 S Broad St, Philadelphia, PA 19107, USA', notes: 'Reception will open the door', confirmedAt: '2026-09-01T00:00:00Z' })
+
+    it('says where it is beside the name, in place of the address line', () => {
+      renderWithProviders(<GenericListingCard item={item} category={category} upvotes={false} count={0} {...requiredHandlers} place="Center City" />)
+      expect(screen.getByText('· Center City', { exact: false })).toBeInTheDocument()
+      expect(screen.queryByText(/219 S Broad St/)).not.toBeInTheDocument()
+    })
+
+    it('quotes the admin’s note on the third line; elsewhere the note keeps its own place', () => {
+      const { unmount } = renderWithProviders(
+        <GenericListingCard item={item} category={category} upvotes={false} count={0} {...requiredHandlers} place="Center City" />,
+      )
+      expect(screen.getByTestId('row-note')).toHaveTextContent('“Reception will open the door”')
+      unmount()
+
+      renderWithProviders(<GenericListingCard item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />)
+      expect(screen.queryByTestId('row-note')).not.toBeInTheDocument()
+      expect(screen.getByText('Reception will open the door')).toBeInTheDocument()
+      expect(screen.getByText(/219 S Broad St/)).toBeInTheDocument()
+    })
+
+    it('leaves out the field its group heading says', () => {
+      const shuls = makeCategory({
+        detailFields: [{ key: 'denomination', label: 'Denomination', type: 'select', renderAs: 'badge', filterable: true }],
+      })
+      const shul = makeListing({ denomination: 'Reform', milesFromAddress: 1 })
+      renderWithProviders(
+        <GenericListingCard item={shul} category={shuls} upvotes={false} count={0} {...requiredHandlers} place={null} omitKey="denomination" />,
+      )
+      expect(screen.getByTestId('row-facts')).toHaveTextContent('1 mi')
+      expect(screen.getByTestId('row-facts')).not.toHaveTextContent('Reform')
+    })
   })
 
   it('shows a shul’s next minyan when the list works one out', () => {

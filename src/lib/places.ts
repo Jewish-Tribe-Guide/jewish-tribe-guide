@@ -60,6 +60,33 @@ export function neighborhoodsFor(communitySlug: string | null | undefined): Plac
 // "…, Cherry Hill Township, NJ 08034, USA": the town, before the state.
 const TOWN = /,\s*([^,]+?),\s*[A-Z]{2}\s*\d{5}/
 
+/** "…, Cherry Hill Township, NJ 08034" → "Cherry Hill": the town an address
+ *  names, as people say it. */
+export function townOf(address: string | null | undefined): string | null {
+  const town = address?.match(TOWN)?.[1]?.trim()
+  return town ? shortTown(town) : null
+}
+
+const shortTown = (town: string) => town.replace(/\s+(Township|Twp\.?|Borough|Boro)$/i, '')
+
+/** Where a listing is, in the words a row uses beside its name: the
+ *  tightest description that fits. A neighbourhood it sits in, or the town
+ *  its address names, whichever reaches less far: "Rittenhouse" rather than
+ *  "Philadelphia", but "Merion Station" rather than "the Main Line", and
+ *  "Northeast Philadelphia" rather than "Philadelphia". `towns` is
+ *  townsFrom() of the listings around it, which is how far each town
+ *  reaches. */
+export function placeName(listing: DirectoryResource, neighborhoods: readonly Place[], towns: readonly Place[]): string | null {
+  const town = townOf(listing.address)
+  const candidates = [
+    ...(listing.geo ? neighborhoods.filter((p) => haversineMiles(p.geo, listing.geo!) <= p.radius) : []),
+    ...towns.filter((t) => t.name === town),
+  ]
+  // A neighbourhood first on a tie: it was chosen by hand.
+  const best = candidates.reduce<Place | null>((b, p) => (!b || p.radius < b.radius ? p : b), null)
+  return best?.name ?? town
+}
+
 /** The towns the listings' addresses name, each placed at the middle of its
  *  own listings and reaching as far as they do. "Cherry Hill Township" is
  *  also just "Cherry Hill", which is what people say. */
@@ -73,7 +100,7 @@ export function townsFrom(listings: readonly DirectoryResource[]): Place[] {
   return [...byTown].map(([town, geos]) => {
     const geo = { lat: geos.reduce((s, g) => s + g.lat, 0) / geos.length, lng: geos.reduce((s, g) => s + g.lng, 0) / geos.length }
     const reach = Math.max(...geos.map((g) => haversineMiles(geo, g)))
-    const short = town.replace(/\s+(Township|Twp\.?|Borough|Boro)$/i, '')
+    const short = shortTown(town)
     return { name: short, aliases: short !== town ? [town] : undefined, geo, radius: Math.max(1.5, reach + 0.5) }
   })
 }

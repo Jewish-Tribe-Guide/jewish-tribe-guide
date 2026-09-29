@@ -23,7 +23,7 @@ import MapPlaceDetail from '@/components/map/MapPlaceDetail'
 import { useListingActions, type ListingAction } from './useListingActions'
 import SwipeRow, { type SwipeAction } from '@/components/SwipeRow'
 import Chip from './Chip'
-import { initialsOf, listingRowFacts, type RowFactTone } from '@/lib/listingRow'
+import { initialsOf, listingRowFacts, listingRowNote, type RowFactTone, type RowNote } from '@/lib/listingRow'
 import { useNextMinyan } from './nextMinyans'
 import { ui } from '@/lib/uiConfig'
 import { useIsMobile } from '@/lib/useIsMobile'
@@ -57,7 +57,15 @@ const FACT_TONE: Record<RowFactTone, string> = {
   caution: 'font-medium text-caution',
   closed: 'font-medium text-red-700',
   minyan: 'font-semibold text-ink',
+  opens: 'font-medium text-slate-700',
+  quiet: 'text-slate-500',
   plain: '',
+}
+
+const NOTE_TONE: Record<RowNote['tone'], string> = {
+  caution: 'font-medium text-caution',
+  quiet: 'text-slate-500',
+  quote: 'text-slate-500',
 }
 
 // ── Card field helpers ──────────────────────────────────────────────────────────
@@ -136,6 +144,16 @@ type Props = {
    *  items"; with no item, the field it matched ("Hechsher: OU"). Opened,
    *  the listing names them at the top and marks them in its item list. */
   found?: SearchFound | null
+  /** A category page's row (see listingRow.ts): where the place is, beside
+   *  its name ("Goldie · Rittenhouse"), in place of the address line, and a
+   *  third line only for an exception. Left unset (undefined), as the home
+   *  search's mixed results do, the row keeps its address line. */
+  place?: string | null
+  /** A field the row's group heading already says, left off the row. */
+  omitKey?: string | null
+  /** Whether this category's rows say "Not confirmed by anyone yet" — see
+   *  listingRowNote. */
+  flagUnconfirmed?: boolean
 }
 
 export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(function GenericListingCard({
@@ -157,6 +175,9 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
   hasNext,
   found = null,
   onExpandedChange,
+  place,
+  omitKey = null,
+  flagUnconfirmed = false,
 }, ref) {
   const [expanded, setExpanded] = useState(!!defaultExpanded)
   const cardRootRef = useRef<HTMLDivElement>(null)
@@ -222,7 +243,11 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
   const { isOpen, closing, closure } = getOpenStatus(item, hoursFields.map((f) => f.key), now)
   // The row's second line: open status, next minyan, distance, what kind of
   // place, how many items. See lib/listingRow.ts.
-  const facts = listingRowFacts(item, category, now, { nextMinyan: useNextMinyan(item.id) })
+  const facts = listingRowFacts(item, category, now, { nextMinyan: useNextMinyan(item.id), omitKey })
+  // A category page's row: see the `place` prop.
+  const pageRow = place !== undefined
+  const rowNote = listingRowNote(item, category, now, { flagUnconfirmed })
+  const note = rowNote && (pageRow || rowNote.kind === 'exception') ? rowNote : null
   // Upvotes live in the opened listing now (the sheet on a phone, the dialog
   // on desktop), not on every row: a column of "👍 0" said nothing while a
   // list was being scanned. Popularity still orders the list.
@@ -558,7 +583,12 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
               twice as tall as the rest. */}
           <div className="min-w-0 flex-1">
             <p className="truncate font-semibold text-slate-900">
-              {onNameClick ? (
+              {pageRow ? (
+                <>
+                  {item.name}
+                  {place && <span className="font-normal text-[13.5px] text-slate-500"> · {place}</span>}
+                </>
+              ) : onNameClick ? (
                 // A span, not the whole <p>, carries the click/hover — the <p>
                 // is block-level and stretches to fill the row, which would
                 // make clicking empty space to the right of a short name (e.g.
@@ -585,7 +615,19 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
                 ))}
               </p>
             )}
-            {subtitle && <p className="truncate text-[13px] text-muted">{subtitle}</p>}
+            {!pageRow && subtitle && <p className="truncate text-[13px] text-muted">{subtitle}</p>}
+            {note && (
+              <p className={`truncate text-[13px] ${NOTE_TONE[note.tone]}`} title={note.title} data-testid="row-note">
+                {note.tone === 'caution' && (
+                  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="mr-1 inline h-3.5 w-3.5 -translate-y-px">
+                    <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3" />
+                    <path d="M12 9v4" />
+                    <path d="M12 17h.01" />
+                  </svg>
+                )}
+                {note.text}
+              </p>
+            )}
             {/* A short note an admin opted into the row ("Sit-down glatt
                 kosher steakhouse"). Two lines at most. Left off phones for a
                 no-address category (WhatsApp groups, Networking), where it
@@ -593,7 +635,9 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
                 name, and one tall card buried the list. line-clamp needs
                 display:-webkit-box, which a `hidden desktop:block` on the
                 same element would override, so the clamp sits one level in. */}
-            {headerTextFields.map(({ f, text }) => (
+            {/* On a category page's row, the note is the third line above,
+                and only when there's no exception to say instead. */}
+            {!pageRow && headerTextFields.map(({ f, text }) => (
               <p
                 key={f.key}
                 className={`mt-1 text-sm text-slate-600 ${category.hasAddress === false ? 'hidden desktop:block' : ''}`}

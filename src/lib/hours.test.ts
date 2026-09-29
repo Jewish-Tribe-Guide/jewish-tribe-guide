@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { businessClosure, dayAndMinutesInTimezone, effectiveBusinessStatus, fmt12, formatHoursSummary, formatTodayHours, formatWeekHours, getOpenStatus, hoursClosing, hoursOpenNow, isStructuredHours, placesApiHoursToStructured, syncedLabel, type StructuredHours } from './hours'
+import { businessClosure, dayAndMinutesInTimezone, effectiveBusinessStatus, fmt12, formatHoursSummary, formatTodayHours, formatWeekHours, getOpenStatus, hoursClosing, hoursNextOpening, hoursOpenNow, isStructuredHours, placesApiHoursToStructured, syncedLabel, type StructuredHours } from './hours'
 
 // Everything here reads `new Date()`, so each test pins the clock. The local
 // timezone matters: hoursOpenNow uses getDay()/getHours(), i.e. the *viewer's*
@@ -452,5 +452,29 @@ describe('dayAndMinutesInTimezone', () => {
     const now = new Date('2026-09-07T04:00:00Z').getTime() // midnight in New York (EDT, UTC-4)
     const result = dayAndMinutesInTimezone(now, 'America/New_York')
     expect(result.minutes).toBe(0)
+  })
+})
+
+describe('hoursNextOpening', () => {
+  // Friday Oct 2 2026, 2 PM, local. Made in each test, not once here: a
+  // test above changes the machine's timezone, and a Date made before that
+  // is a different local time after it.
+  const friday2pm = () => new Date(2026, 9, 2, 14, 0)
+
+  it('says the time for later today, and the day for any other', () => {
+    expect(hoursNextOpening({ fri: { open: '16:00', close: '20:00' } }, friday2pm())).toBe('4 PM')
+    expect(hoursNextOpening({ sat: { open: '19:30', close: '23:00' } }, friday2pm())).toBe('Sat 7:30 PM')
+    expect(hoursNextOpening({ mon: { open: '09:00', close: '17:00' } }, friday2pm())).toBe('Mon 9 AM')
+  })
+
+  it('goes to next week when today’s opening has passed and no other day has hours', () => {
+    expect(hoursNextOpening({ fri: { open: '09:00', close: '12:00' } }, friday2pm())).toBe('Fri 9 AM')
+  })
+
+  it('is nothing for hours closed every day, or hours it can’t read', () => {
+    const closed = { sun: null, mon: null, tue: null, wed: null, thu: null, fri: null, sat: null }
+    expect(hoursNextOpening(closed, friday2pm())).toBeNull()
+    expect(hoursNextOpening('Mon–Fri 9–5', friday2pm())).toBeNull()
+    expect(hoursNextOpening(undefined, friday2pm())).toBeNull()
   })
 })

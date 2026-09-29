@@ -13,7 +13,8 @@ import { NextMinyans } from './nextMinyans'
 import { CategoryBandFrame, CategoryBandBadge } from './CategoryBandFrame'
 import FiltersSheet from './FiltersSheet'
 import ListHeading, { ClosedGroupLine, GroupHeading } from './ListHeading'
-import { groupListings, type ListGroup } from '@/lib/listGroups'
+import { groupListings, parseGroupBy, type ListGroup } from '@/lib/listGroups'
+import { isVouchedFor } from '@/lib/listingRow'
 import { usePersistedState } from '@/lib/usePersistedState'
 import { GenericListingCard, type GenericListingCardHandle } from './GenericListingCard'
 import DaveningTimesModal from '@/components/synagogues/DaveningTimesModal'
@@ -21,7 +22,7 @@ import { PlusIcon } from '@/components/icons'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { useScrollShowHide, useSetScreenHeader } from '@/lib/headerVisibility'
 import { foundFor, searchAsk } from '@/lib/askSearch'
-import { neighborhoodsFor } from '@/lib/places'
+import { neighborhoodsFor, placeName, townsFrom } from '@/lib/places'
 import { useOptionalCommunitySlug } from '@/lib/communityContext'
 import { travelCompare } from '@/lib/listingTravel'
 import { useLogSearchMiss } from '@/lib/useLogSearchMiss'
@@ -903,6 +904,23 @@ export default function GenericDirectory({ category, items, anchorLabel, address
     if (activeFilterCount > 0) setClosedWhileFiltered({ key: filtersKey, ids: flip(closedNow) })
     else setOpenGroupIds(flip)
   }
+  // ── What each row says (see listingRow.ts) ──
+  // Where each place is, beside its name: its neighbourhood or its town,
+  // whichever says it more tightly (placeName).
+  const rowPlaces = useMemo(() => {
+    const hoods = neighborhoodsFor(communitySlug)
+    const towns = townsFrom(items)
+    return new Map(items.map((i) => [i.id, category.hasAddress === false ? null : placeName(i, hoods, towns)]))
+  }, [items, communitySlug, category.hasAddress])
+  // A row leaves out what its group heading already says: seven rows under
+  // "Orthodox (Ashkenazi) · 7" needn't each say it. Search results aren't
+  // grouped, so there each row says it again.
+  const groupedBy = grouping ? parseGroupBy(category.groupBy) : null
+  const omitKey = groupedBy?.kind === 'field' ? groupedBy.key : null
+  // "Not confirmed by anyone yet" only where most of the list is vouched for
+  // (see listingRowNote).
+  const flagUnconfirmed = items.length > 0 && items.filter((i) => isVouchedFor(i, now)).length * 2 >= items.length
+
   // The listings on screen, in order: what arrow-key next/previous walks.
   const shownItems = grouping?.closed
     ? grouping.groups.flatMap((g) => (isGroupOpen(g) ? g.items : []))
@@ -1195,6 +1213,9 @@ export default function GenericDirectory({ category, items, anchorLabel, address
               item={item}
               category={category}
               showCategoryLabel={false}
+              place={rowPlaces.get(item.id) ?? null}
+              omitKey={omitKey}
+              flagUnconfirmed={flagUnconfirmed}
               upvotes={upvotes}
               count={liveCount(item)}
               defaultExpanded={item.id === reopenItemId}

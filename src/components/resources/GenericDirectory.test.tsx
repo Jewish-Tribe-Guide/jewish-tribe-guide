@@ -46,6 +46,9 @@ vi.mock('./GenericListingCard', async () => {
       onNavigate,
       onExpandedChange,
       found,
+      place,
+      omitKey,
+      flagUnconfirmed,
     }: {
       item: DirectoryResource
       defaultExpanded?: boolean
@@ -55,6 +58,9 @@ vi.mock('./GenericListingCard', async () => {
       onNavigate?: (direction: 1 | -1) => void
       onExpandedChange?: (expanded: boolean) => void
       found?: { items: { tag: string }[]; fields: { label: string }[] } | null
+      place?: string | null
+      omitKey?: string | null
+      flagUnconfirmed?: boolean
     },
     ref: Ref<{
       open: () => void
@@ -78,6 +84,9 @@ vi.mock('./GenericListingCard', async () => {
         <NextMinyanNote id={item.id} name={item.name} />
         {item.milesFromAddress != null && <span>{item.name} is {item.milesFromAddress} mi</span>}
         {expanded && <span>Expanded {item.name}</span>}
+        {place !== undefined && <span>{item.name} is in {place ?? 'nowhere'}</span>}
+        {omitKey && <span>{item.name} leaves out {omitKey}</span>}
+        {flagUnconfirmed && <span>{item.name} may say unconfirmed</span>}
         {found && <span>found on {item.name}: {[...found.items.map((m) => m.tag), ...found.fields.map((f) => f.label)].join(', ')}</span>}
         <button onClick={onEdit}>Edit {item.name}</button>
         <button onClick={() => onTagClick('cheese')}>tag {item.name}</button>
@@ -1258,6 +1267,51 @@ describe('GenericDirectory — groups', () => {
       expect(screen.getByText('Expanded Rodeph')).toBeInTheDocument()
       expect(screen.queryByText('Expanded Mekor')).not.toBeInTheDocument()
     })
+  })
+})
+
+// What each row says is listingRow.ts's (tested there); the page decides the
+// three things that need the whole list.
+describe('GenericDirectory — what the rows are told', () => {
+  it('gives each row where it is: the town its address names, measured against the whole list', () => {
+    const items = [
+      makeListing({ id: 'a', name: 'ShopRite', address: '1 Main St, Cherry Hill Township, NJ 08002, USA', geo: { lat: 39.93, lng: -75.01 } }),
+      makeListing({ id: 'b', name: 'Corner Store', address: '' }),
+    ]
+    renderWithProviders(<GenericDirectory category={makeCategory()} items={items} {...handlers} />)
+    expect(screen.getByText('ShopRite is in Cherry Hill')).toBeInTheDocument()
+    expect(screen.getByText('Corner Store is in nowhere')).toBeInTheDocument()
+  })
+
+  it('tells rows to leave out what their group heading says, but not in search results', async () => {
+    const user = userEvent.setup()
+    const shuls = makeCategory({
+      id: 'synagogue',
+      groupBy: { kind: 'field', key: 'denomination' },
+      detailFields: [{ key: 'denomination', label: 'Denomination', type: 'select', filterable: true, options: [] }],
+    })
+    const items = [makeListing({ id: 'a', category: 'synagogue', name: 'Rodeph', denomination: 'Reform' })]
+    renderWithProviders(<GenericDirectory category={shuls} items={items} {...handlers} />)
+    expect(screen.getByText('Rodeph leaves out denomination')).toBeInTheDocument()
+
+    await user.type(screen.getByRole('searchbox'), 'rodeph')
+    expect(screen.queryByText('Rodeph leaves out denomination')).not.toBeInTheDocument()
+  })
+
+  it('lets rows say "not confirmed" only where most of the list is vouched for', () => {
+    const recent = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+    const mostly = [
+      makeListing({ id: 'a', name: 'A', confirmedAt: recent }),
+      makeListing({ id: 'b', name: 'B', googleSyncedAt: recent }),
+      makeListing({ id: 'c', name: 'C' }),
+    ]
+    const { unmount } = renderWithProviders(<GenericDirectory category={makeCategory()} items={mostly} {...handlers} />)
+    expect(screen.getByText('C may say unconfirmed')).toBeInTheDocument()
+    unmount()
+
+    const hardly = [makeListing({ id: 'a', name: 'A', confirmedAt: recent }), makeListing({ id: 'b', name: 'B' }), makeListing({ id: 'c', name: 'C' })]
+    renderWithProviders(<GenericDirectory category={makeCategory()} items={hardly} {...handlers} />)
+    expect(screen.queryByText('C may say unconfirmed')).not.toBeInTheDocument()
   })
 })
 

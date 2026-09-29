@@ -141,6 +141,35 @@ export function hoursClosing(
   }
 }
 
+/**
+ * For a place that isn't open right now, when it next opens: "4 PM" later
+ * today, "Wed 7 PM" on another day (never "tomorrow", which is ambiguous
+ * after midnight). Looks a week ahead.
+ *
+ * Null when the value isn't structured hours, or no day in the week has
+ * hours: a place saved as closed every day has no hours anyone can use, and
+ * the row says "No hours listed" for it, the same as for no hours at all.
+ */
+export function hoursNextOpening(v: unknown, now: Date = new Date()): string | null {
+  if (!isStructuredHours(v)) return null
+  const hours = v as Record<string, DayHours>
+  const nowMins = now.getHours() * 60 + now.getMinutes()
+  for (let ahead = 0; ahead < 7; ahead++) {
+    const key = DAY_KEYS[(now.getDay() + ahead) % 7]
+    const day = hours[key]
+    if (!day || !day.open || !day.close) continue
+    const [oh, om] = day.open.split(':').map(Number)
+    if (ahead === 0 && oh * 60 + om <= nowMins) continue
+    const time = fmt12(day.open).replace(/:00(?= [AP]M$)/, '')
+    return ahead === 0 ? time : `${DAY_SHORT[key]} ${time}`
+  }
+  // Today's opening already passed and nothing else all week: it opens
+  // again a week from now, the same time.
+  const today = hours[DAY_KEYS[now.getDay()]]
+  if (today?.open && today.close) return `${DAY_SHORT[DAY_KEYS[now.getDay()]]} ${fmt12(today.open).replace(/:00(?= [AP]M$)/, '')}`
+  return null
+}
+
 /** Google's own verdict on whether the business is trading at all, which
  *  outranks its posted hours. A place marked temporarily closed usually still
  *  has last season's hours saved, so reading hours alone had every one of them
