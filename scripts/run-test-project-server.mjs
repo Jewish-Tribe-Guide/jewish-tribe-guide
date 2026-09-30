@@ -246,6 +246,9 @@ const adminEmails = Array.from(new Set([CACHE_TEST_ADMIN_EMAIL, testAdminEmail])
 
 const env = {
   ...process.env,
+  // Never the question reader: a test run mustn't spend on OpenAI or write
+  // readings (see src/app/api/ask/read/route.ts).
+  QUESTION_READER: 'off',
   NEXT_PUBLIC_SUPABASE_URL: url,
   NEXT_PUBLIC_SUPABASE_ANON_KEY: anonKey,
   SUPABASE_SERVICE_ROLE_KEY: serviceRoleKey,

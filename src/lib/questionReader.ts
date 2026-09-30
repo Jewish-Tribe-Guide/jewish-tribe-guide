@@ -1,5 +1,7 @@
 import { selectValues, type CategoryConfig } from './categories'
 import { filterFields, keepsHours, type MapFilterState } from './mapFilters'
+import { neighborhoodsFor } from './places'
+import type { LatLng } from './geo'
 import type { DirectoryResource } from '@/types'
 
 // ── Reading a question into filters (decided Sep 30) ────────────────────────
@@ -34,6 +36,37 @@ export type ReaderVocabulary = {
   }[]
   items: string[]
   places: string[]
+}
+
+/** A question as it's remembered: "Meat near me?" and "meat  near me" are
+ *  one question, read once. */
+export function questionKey(question: string): string {
+  return question.toLowerCase().replace(/[’']/g, "'").replace(/\s+/g, ' ').trim().replace(/[\s?!.,;:]+$/g, '').slice(0, 200)
+}
+
+export type ReaderPlace = { name: string; geo: LatLng }
+
+/** The places a question can name, by every name people use: the
+ *  community's towns and neighbourhoods (with their other names, "South
+ *  Philly"), and its hospitals, by name and by their initials ("HUP").
+ *  Keyed lowercase. */
+export function readerPlaces(listings: readonly DirectoryResource[], communitySlug: string): Map<string, ReaderPlace> {
+  const out = new Map<string, ReaderPlace>()
+  for (const p of neighborhoodsFor(communitySlug)) for (const n of [p.name, ...(p.aliases ?? [])]) out.set(n.toLowerCase(), { name: p.name, geo: p.geo })
+  for (const h of listings) {
+    if (h.category !== 'hospital' || !h.geo) continue
+    const place = { name: h.name, geo: h.geo as LatLng }
+    out.set(h.name.toLowerCase(), place)
+    // Initials, before any " - Main Building": the capitalised words' (HUP,
+    // Hospital of the University of Pennsylvania), and with "of" too (CHOP,
+    // Children's Hospital of Philadelphia). People say both kinds.
+    const words = h.name.split(' - ')[0].split(/\s+/)
+    for (const keep of [(w: string) => /^[A-Z]/.test(w), (w: string) => /^[A-Z]/.test(w) || w === 'of']) {
+      const initials = words.filter(keep).map((w) => w[0].toUpperCase()).join('')
+      if (initials.length >= 3 && !out.has(initials.toLowerCase())) out.set(initials.toLowerCase(), place)
+    }
+  }
+  return out
 }
 
 /** What the reader may choose from: each category with its filters and the

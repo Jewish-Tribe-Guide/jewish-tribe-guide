@@ -128,6 +128,15 @@ test.describe('the one-tap write endpoints refuse what they can’t use', () => 
   })
 })
 
+// The question reader calls OpenAI and writes what it read. A test run must
+// do neither: every test server sets QUESTION_READER=off, and this is what
+// holds it to that. If it ever answers anything else, the suite is spending.
+test('the question reader is off on a test server', async ({ request }) => {
+  const res = await request.post('/api/ask/read?community=philly', { data: { question: 'meat near me' } })
+  expect(res.status()).toBe(200)
+  expect(await res.json()).toEqual({ ok: false, reason: 'off' })
+})
+
 // /api/travel asked Google's Distance Matrix for drive and walk times, a paid
 // lookup per destination, and nothing in the app had called it for a long
 // time. It stayed reachable by anyone who found it. Removed; if it comes back

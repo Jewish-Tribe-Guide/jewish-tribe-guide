@@ -112,3 +112,19 @@ export async function enforceRateLimit(
     { status: 429, headers: { 'Retry-After': String(decision.retryAfter) } },
   )
 }
+
+/** One limit for everyone together, not per visitor: a ceiling on how often
+ *  something that costs money can happen at all (the question reader's
+ *  calls a day). Same limiter, one shared key. */
+export async function sharedLimit(name: string, opts: { limit: number; windowSec: number }): Promise<Decision> {
+  const key = `${name}:everyone`
+  if (redis) {
+    try {
+      const res = await upstashLimiter(opts.limit, opts.windowSec).limit(key)
+      return res.success ? { ok: true } : { ok: false, retryAfter: Math.max(1, Math.ceil((res.reset - Date.now()) / 1000)) }
+    } catch (err) {
+      console.error('[rateLimit] Upstash error, falling back to memory:', err)
+    }
+  }
+  return memoryDecision(key, opts.limit, opts.windowSec)
+}

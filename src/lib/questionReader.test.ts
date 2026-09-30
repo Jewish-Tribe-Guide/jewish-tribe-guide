@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { makeCategory, makeListing } from '@/test/providerFixtures'
-import { readerMessages, readerVocabulary, readingFilters, tidyReading } from './questionReader'
+import { questionKey, readerMessages, readerPlaces, readerVocabulary, readingFilters, tidyReading } from './questionReader'
 import { readQuestion } from './readQuestion'
 
 const hours = { key: 'hours', label: 'Hours', type: 'hours' as const, filterable: true }
@@ -95,5 +95,28 @@ describe('readQuestion — the call', () => {
   it('says what went wrong when the provider refuses', async () => {
     const fetchImpl = vi.fn(async () => Response.json({ error: { message: 'Incorrect API key' } }, { status: 401 }))
     await expect(readQuestion('meat', vocab, { apiKey: 'x', fetchImpl: fetchImpl as unknown as typeof fetch })).rejects.toThrow('401 Incorrect API key')
+  })
+})
+
+describe('questionKey — one question, however it’s typed', () => {
+  it('ignores case, spacing, curly quotes and a question mark', () => {
+    expect(questionKey('  Meat   near ME? ')).toBe('meat near me')
+    expect(questionKey('Where’s the mikvah')).toBe(questionKey("where's the mikvah"))
+  })
+})
+
+describe('readerPlaces — the places a question can name', () => {
+  const hospitals = [
+    makeListing({ id: 'h1', category: 'hospital', name: 'Hospital of the University of Pennsylvania', geo: { lat: 39.9496, lng: -75.1936 } }),
+    makeListing({ id: 'h2', category: 'hospital', name: "Children's Hospital of Philadelphia - Main Building", geo: { lat: 39.948, lng: -75.194 } }),
+  ]
+  const places = readerPlaces(hospitals, 'philly')
+  it('knows a hospital by its name and by the initials people use', () => {
+    expect(places.get('hup')?.name).toBe('Hospital of the University of Pennsylvania')
+    expect(places.get('chop')?.name).toBe("Children's Hospital of Philadelphia - Main Building")
+  })
+  it('knows the community’s neighbourhoods by their other names too', () => {
+    expect(places.get('south philly')?.name).toBe('South Philadelphia')
+    expect(places.get('center city')?.geo).toEqual({ lat: 39.9524, lng: -75.1636 })
   })
 })
