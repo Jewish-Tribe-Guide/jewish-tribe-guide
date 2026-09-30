@@ -305,8 +305,10 @@ export default function ListingView({ item, category, color, place = null, upvot
     ...buttons.flatMap((a) => (a.kind === 'link' || a.kind === 'email' ? [a.field.key] : [])),
     ...extra.flatMap((a) => (a.kind === 'link' || a.kind === 'email' ? [a.field.key] : [])),
   ])
+  // Not a hidden field: a hechsher's "what isn't kosher" is one, said with
+  // its caveat in the header, not a second time here.
   const aboutFields = category.detailFields.filter(
-    (f) => f.type === 'textarea' && !f.audienceKey && !shownElsewhere.has(f.key) && String(item[f.key] ?? '').trim(),
+    (f) => f.type === 'textarea' && f.renderAs !== 'hidden' && !f.audienceKey && !shownElsewhere.has(f.key) && String(item[f.key] ?? '').trim(),
   )
   const detailFields = category.detailFields.filter(
     (f) =>
@@ -397,10 +399,11 @@ export default function ListingView({ item, category, color, place = null, upvot
       {aboutFields.map((f) => (
         <div key={f.key}>
           <p className="whitespace-pre-line text-[15px] leading-relaxed text-slate-800">{String(item[f.key]).trim()}</p>
-          {f.key === 'googleDescription' && item.placeId && (
-            <p className="mt-1 text-[13px] text-muted">
-              {item.googleFields?.includes('description') ? 'Description from Google' : 'Description from the community'}
-            </p>
+          {/* Only when the sync is known to keep it. Descriptions fetched
+              before it recorded that aren't marked either way, so nothing
+              is said rather than guessing whose they are. */}
+          {f.key === 'googleDescription' && item.placeId && item.googleFields?.includes('description') && (
+            <p className="mt-1 text-[13px] text-muted">Description from Google</p>
           )}
         </div>
       ))}

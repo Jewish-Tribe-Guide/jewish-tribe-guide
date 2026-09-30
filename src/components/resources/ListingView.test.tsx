@@ -64,6 +64,14 @@ describe('ListingView — who and whether', () => {
     expect(screen.getByTestId('listing-caveat')).toHaveTextContent('Not everything here is kosher: The bar is not supervised')
   })
 
+  it('says what isn’t kosher once: not again in About', () => {
+    const note: CategoryField = { key: 'kosherNote', label: 'What isn’t kosher?', type: 'textarea', renderAs: 'hidden' }
+    const withNote = makeCategory({ ...food, detailFields: [...food.detailFields, note] })
+    view({ item: { ...judah, kosherPartial: true, kosherNote: 'The bar is not supervised' }, category: withNote })
+    expect(screen.getAllByText(/The bar is not supervised/)).toHaveLength(1)
+    expect(screen.getByTestId('listing-about')).not.toHaveTextContent('The bar is not supervised')
+  })
+
   it('has no caveat line without one', () => {
     view()
     expect(screen.queryByTestId('listing-caveat')).not.toBeInTheDocument()
@@ -149,9 +157,11 @@ describe('ListingView — about', () => {
     view({ item: { ...judah, placeId: 'p1', googleFields: ['description'] } })
     expect(screen.getByTestId('listing-about')).toHaveTextContent('Description from Google')
   })
-  it('says it’s the community’s when a person wrote it', () => {
+  it('says nothing about where it came from when the sync doesn’t record keeping it', () => {
+    // Every Google description fetched before the sync recorded ownership
+    // reads like this; calling them the community's was wrong on all 66.
     view({ item: { ...judah, placeId: 'p1', googleFields: ['hours'] } })
-    expect(screen.getByTestId('listing-about')).toHaveTextContent('Description from the community')
+    expect(screen.getByTestId('listing-about')).not.toHaveTextContent(/Description from/)
   })
   it('says nothing about where it came from on a listing never matched to Google', () => {
     view()
