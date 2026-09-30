@@ -122,8 +122,10 @@ vi.mock('./ListingColumn', () => ({
     alone,
     onShowMap,
     found,
+    phone,
   }: {
     item: DirectoryResource
+    phone?: boolean
     backLabel: string
     onBack: () => void
     position: { index: number; total: number }
@@ -135,7 +137,7 @@ vi.mock('./ListingColumn', () => ({
     <section data-testid="listing-column" aria-label={item.name}>
       <p>
         Column: {item.name}, {position.index + 1} of {position.total}
-        {alone ? ', alone' : ', map beside'}
+        {phone ? ', the page' : alone ? ', alone' : ', map beside'}
       </p>
       {found && <p>column found: {found.items.map((m) => m.tag).join(', ')}</p>}
       <button onClick={onBack}>{backLabel}</button>
@@ -2024,5 +2026,45 @@ describe('GenericDirectory — a listing opened on desktop', () => {
     await user.click(screen.getByRole('button', { name: 'Expand Beta Cafe' }))
     expect(screen.queryByTestId('listing-column')).not.toBeInTheDocument()
     expect(screen.getByText('Alpha Grill')).toBeVisible()
+  })
+})
+
+// A listing someone arrives at from its own link (/philly/food/judah-…) is,
+// on a phone, a page of its own, not a sheet over a list they never saw
+// (agreed Sep 30). Opened from the list, it's the sheet as always.
+describe('GenericDirectory — a listing’s own link, on a phone', () => {
+  const food = makeCategory({ id: 'restaurant', pluralLabel: 'Food' })
+  const rows = [
+    makeListing({ id: 'a', name: 'Alpha Grill', category: 'restaurant' }),
+    makeListing({ id: 'b', name: 'Beta Cafe', category: 'restaurant' }),
+  ] as DirectoryResource[]
+  const phone = (ui: React.ReactElement) => renderWithProviders(<ForcedViewport isMobile>{ui}</ForcedViewport>)
+
+  it('is the page, with the list out of the way', () => {
+    phone(<GenericDirectory category={food} items={rows} {...handlers} reopenItemId="b" linkedItemId="b" />)
+    expect(screen.getByText(/Column: Beta Cafe, 2 of 2, the page/)).toBeInTheDocument()
+    expect(screen.getByText('Alpha Grill')).not.toBeVisible()
+    expect(screen.getByRole('searchbox', { hidden: true })).not.toBeVisible()
+  })
+
+  it('a ?item= reopening is the sheet over the list, as before', () => {
+    phone(<GenericDirectory category={food} items={rows} {...handlers} reopenItemId="b" />)
+    expect(screen.queryByTestId('listing-column')).not.toBeInTheDocument()
+    expect(screen.getByText('Expanded Beta Cafe')).toBeInTheDocument()
+    expect(screen.getByText('Alpha Grill')).toBeVisible()
+  })
+
+  it('closing it goes to the list, at the category’s own address, and listings then open as sheets', async () => {
+    const user = userEvent.setup()
+    window.history.replaceState(null, '', '/test-community/restaurant/beta-cafe-b')
+    phone(<GenericDirectory category={food} items={rows} {...handlers} reopenItemId="b" linkedItemId="b" />)
+    await user.click(screen.getByRole('button', { name: 'Back to Food' }))
+
+    expect(screen.queryByTestId('listing-column')).not.toBeInTheDocument()
+    expect(screen.getByText('Alpha Grill')).toBeVisible()
+    expect(window.location.pathname).toBe('/test-community/restaurant')
+
+    await user.click(screen.getByRole('button', { name: 'Expand Alpha Grill' }))
+    expect(screen.queryByTestId('listing-column')).not.toBeInTheDocument()
   })
 })

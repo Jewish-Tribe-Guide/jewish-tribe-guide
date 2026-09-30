@@ -58,6 +58,11 @@ type Props = {
   addressPrompt?: boolean
   /** A listing to mount already expanded (restored after returning from a form). */
   reopenItemId?: string | null
+  /** The listing this page's own link names (/philly/food/judah-…), as
+   *  opposed to a `?item=` reopening one. On a phone it's a page of its own
+   *  until closed; on any screen, closing it takes the address back to the
+   *  category's, so a reload doesn't bring it back. */
+  linkedItemId?: string | null
   /** The search that found `reopenItemId` elsewhere (the home search, as
    *  `?match=`). Doesn't filter this list; only marks, in that listing,
    *  what the search matched. */
@@ -112,14 +117,14 @@ type Props = {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function GenericDirectory({ category, items, anchorLabel, addressPrompt, reopenItemId, reopenMatch = null, initialSearch, initialOpenNow, initialFilters, openDaveningModal, initialDaveningDay, onUp, onAdd, onEdit, onParamsChange }: Props) {
+export default function GenericDirectory({ category, items, anchorLabel, addressPrompt, reopenItemId, linkedItemId = null, reopenMatch = null, initialSearch, initialOpenNow, initialFilters, openDaveningModal, initialDaveningDay, onUp, onAdd, onEdit, onParamsChange }: Props) {
   // Hands the shared header this screen's own title + "up" handler — on
   // mobile, SiteHeader shows "‹ {category.pluralLabel}" in place of the site
   // name while this is mounted, and reverts automatically on unmount (see
   // useSetScreenHeader's own doc). Always active: every caller of this
   // component (categories, hospitals, synagogues) is a second-level screen a
-  // visitor drilled into, never the home grid itself.
-  useSetScreenHeader(true, category.pluralLabel, onUp)
+  // visitor drilled into, never the home grid itself. Called further down,
+  // once it's known whether a listing is this screen (a phone, from a link).
 
   const { isPinned } = usePinned()
   // Captured once, on this component's very first render — see
@@ -1112,7 +1117,14 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // ── A listing opened on desktop takes the list's column (ListingColumn) ──
   // The list stays mounted underneath, hidden, so its cards (and what's
   // open or scrolled) are where they were when Back brings it back.
-  const columnItem = !isMobile && openDialogItemId ? (items.find((i) => i.id === openDialogItemId) ?? null) : null
+  // A listing someone arrived at from a link is, on a phone, a page of its
+  // own rather than a sheet over a list they never saw: the listing this
+  // page was first opened with, until it's closed (agreed Sep 30). Opened
+  // from the list, a listing is the sheet as always.
+  const [pagedItemId, setPagedItemId] = useState<string | null>(linkedItemId)
+  const hostedId = openDialogItemId && (!isMobile || openDialogItemId === pagedItemId) ? openDialogItemId : null
+  const columnItem = hostedId ? (items.find((i) => i.id === hostedId) ?? null) : null
+  const phonePage = isMobile && !!columnItem
   const listingColumnRef = useRef<HTMLDivElement>(null)
   // Another listing in its place: the one being read closes, the other
   // opens (its closed group too), and the page comes back up to the top of
@@ -1123,11 +1135,21 @@ export default function GenericDirectory({ category, items, anchorLabel, address
     cardRefs.current.get(toId)?.open()
     scrollItemIntoViewWhenSettled(toId, 'instant')
   }
-  // Back to the list, at the row just read, outlined for a moment.
+  // Back to the list, at the row just read, outlined for a moment. On a
+  // phone that was the listing's own page, and from now on listings open
+  // as sheets over the list.
   const closeColumn = (id: string) => {
     cardRefs.current.get(id)?.close()
+    setPagedItemId(null)
+    // Closing the listing the address names: the address becomes the
+    // category's, as it would have been had it been opened from the list.
+    if (id === linkedItemId && window.location.pathname !== routes.slug(activeCommunity.slug, category.id)) {
+      window.history.replaceState(window.history.state, '', routes.slug(activeCommunity.slug, category.id) + window.location.search)
+    }
     findRow(id)
   }
+  // The header's back arrow: home, or from a listing's own page, the list.
+  useSetScreenHeader(true, category.pluralLabel, phonePage && columnItem ? () => closeColumn(columnItem.id) : onUp, { named: phonePage })
 
   // An opened listing's last part: the places near it in the list as it's
   // filtered now, and the way back to all of them (ListingView's onward).
@@ -1176,7 +1198,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
           the visitor hasn't set a location, with the way to set one. At the
           top, above the category band, as the old banner was; desktop has
           the same line under the title (DirectoryHeader). */}
-      {addressPrompt && !anchorLabel && <DistanceNote className="desktop:hidden pb-3" />}
+      {addressPrompt && !anchorLabel && !phonePage && <DistanceNote className="desktop:hidden pb-3" />}
       <CategoryBandFrame color={bandColor} imageUrl={bandImage}>
           {/* Mobile used to have its own "‹ {upLabel}" row here (UpButton,
               desktop:hidden). It's gone now that useSetScreenHeader (above)
@@ -1186,6 +1208,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
               since-removed Breadcrumb lived inside DirectoryHeader, not
               here) and still doesn't. */}
 
+          <div hidden={phonePage}>
           <DirectoryHeader
             title={category.pluralLabel}
             anchorLabel={anchorLabel}
@@ -1193,6 +1216,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
             titleInHeader
             banner={categoryBadge}
           />
+          </div>
 
       {/* Controls — sticky from lg up so search/filters/sort stay reachable
           on a long list instead of scrolling away above the fold. `top-14`
@@ -1224,6 +1248,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
       <div ref={controlsSentinelRef} aria-hidden className="h-px" />
       <div
         ref={controlsRef}
+        hidden={phonePage}
         // The "docked" look (white background, the padding it needs, the
         // negative margin that pulls it flush against the header above, the
         // shadow, and the hide-on-scroll transform) only ever applies once
@@ -1299,6 +1324,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
       {columnItem && (
         <div ref={listingColumnRef}>
           <ListingColumn
+            phone={phonePage}
             item={columnItem}
             category={category}
             color={bandColor}
@@ -1414,7 +1440,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
             >
             <GenericListingCard
               ref={setCardRef(item.id)}
-              inColumn
+              inColumn={!isMobile || item.id === pagedItemId}
               onNavigate={(direction) => navigateFromCard(item.id, direction)}
               hasPrev={(shownIndex.get(item.id) ?? 0) > 0}
               hasNext={(shownIndex.get(item.id) ?? Infinity) < shownItems.length - 1}

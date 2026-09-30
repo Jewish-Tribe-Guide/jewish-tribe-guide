@@ -400,6 +400,9 @@ export default function FindResources({
           items={listings}
           anchor={anchor}
           reopenItemId={cardReopenItemId}
+          // The listing's own link (/philly/food/judah-…), not ?item=: a
+          // phone shows it as a page of its own (see GenericDirectory).
+          linkedItemId={initialItemId && !searchItem ? initialItemId : null}
           reopenMatch={searchMatch}
           initialSearch={initialSearch ?? undefined}
           initialOpenNow={initialOpenNow}

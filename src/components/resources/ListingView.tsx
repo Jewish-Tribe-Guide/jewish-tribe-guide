@@ -96,6 +96,9 @@ type Props = {
   /** Where the places nearby also sit beside the listing (desktop, the map
    *  hidden), the classes that hide them here at that width. */
   onwardClassName?: string
+  /** The listing's own page names itself with the page's one h1; inside a
+   *  category page (the sheet, the column) the category holds that. */
+  titleAs?: 'h1' | 'h2'
 }
 
 const TONE: Record<RowFact['tone'], string> = {
@@ -108,7 +111,7 @@ const TONE: Record<RowFact['tone'], string> = {
   plain: 'text-slate-700',
 }
 
-export default function ListingView({ item, category, color, place = null, upvote, found = null, path, foot, onward, wide = false, onwardClassName = '' }: Props) {
+export default function ListingView({ item, category, color, place = null, upvote, found = null, path, foot, onward, wide = false, onwardClassName = '', titleAs: Title = 'h2' }: Props) {
   const { community } = useActiveCommunity()
   const clock = useNow()
   const now = clock === null ? null : new Date(clock)
@@ -157,11 +160,11 @@ export default function ListingView({ item, category, color, place = null, upvot
           <div className="flex items-start gap-2">
             {/* The name links to the listing's own page: the address to send
                 someone, and from the map, the way to its category. */}
-            <h2 className={`min-w-0 flex-1 font-extrabold leading-tight tracking-tight text-slate-900 ${wide ? 'text-[26px]' : 'text-[22px]'}`}>
+            <Title className={`min-w-0 flex-1 font-extrabold leading-tight tracking-tight text-slate-900 ${wide ? 'text-[26px]' : 'text-[22px]'}`}>
               <Link href={path} className="hover:underline">
                 {item.name}
               </Link>
-            </h2>
+            </Title>
             {upvote}
           </div>
           <p className="mt-1 text-[14.5px] leading-snug text-muted">

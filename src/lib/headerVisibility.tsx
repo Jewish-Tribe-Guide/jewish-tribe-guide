@@ -139,7 +139,10 @@ export function useCollapseHeader(collapse: boolean): void {
 // one — a category preview has no "up" screen to go back to anyway.
 // ─────────────────────────────────────────────────────────────────────────────
 
-type ScreenHeaderState = { title: string; onBack: () => void } | null
+/** `named`: the guide's own name goes over the title, small, for a page
+ *  someone may have arrived at from a link and not know whose it is (a
+ *  listing's own page). */
+type ScreenHeaderState = { title: string; onBack: () => void; named?: boolean } | null
 
 const ScreenHeaderContext = createContext<{
   screenHeader: ScreenHeaderState
@@ -173,7 +176,7 @@ export function useScreenHeader(): ScreenHeaderState {
  *  useSiteNavigation) every render, and depending on it directly would re-run
  *  the effect, and therefore re-render the header's context, on every render
  *  of the calling screen instead of only when the title actually changes. */
-export function useSetScreenHeader(active: boolean, title: string, onBack: () => void): void {
+export function useSetScreenHeader(active: boolean, title: string, onBack: () => void, { named = false }: { named?: boolean } = {}): void {
   const { setScreenHeader } = useContext(ScreenHeaderContext)
   const onBackRef = useRef(onBack)
   // Keeps the ref current without writing to it during render (React's
@@ -188,9 +191,9 @@ export function useSetScreenHeader(active: boolean, title: string, onBack: () =>
 
   useLayoutEffect(() => {
     if (!active) return
-    setScreenHeader({ title, onBack: () => onBackRef.current() })
+    setScreenHeader({ title, onBack: () => onBackRef.current(), named })
     return () => setScreenHeader(null)
-  }, [active, title, setScreenHeader])
+  }, [active, title, named, setScreenHeader])
 }
 
 /** Whether the header should be showing after a scroll to `y`, given the

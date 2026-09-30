@@ -147,8 +147,9 @@ type Props = {
    *  list, as the canvas draws it, where GenericDirectory draws the list's
    *  box and the lines between rows. Being tried on the preview. */
   look?: RowLook
-  /** A category page on desktop shows the opened listing in the list's own
-   *  column (ListingColumn), so the card opens no dialog of its own there. */
+  /** The page shows this listing itself (ListingColumn): in the list's
+   *  column on desktop, or as the page on a phone that arrived from a link.
+   *  The card then opens no dialog or sheet of its own. */
   inColumn?: boolean
 }
 
@@ -664,7 +665,7 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
           reader. No "Back to list" either — the list is the page behind.
           Always mounted on mobile rather than `expanded &&`, so the sheet
           stays on screen long enough to animate closed. */}
-      {isMobile && (
+      {isMobile && !inColumn && (
         <MobileSheet isOpen={expanded} onClose={close} title={item.name} draggable titleHidden>
           <MapPlaceDetail
             item={item}

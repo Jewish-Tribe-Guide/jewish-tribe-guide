@@ -249,6 +249,32 @@ test.describe('listing detail — mobile', () => {
     await expect(page.getByRole('button', { name: `Show details for ${item.name}` }).first()).toBeVisible()
   })
 
+  // A listing's own link (what Share copies) is, on a phone, a page of its
+  // own: the listing under a header naming the guide and the category, not a
+  // sheet over a list the visitor never saw. Back goes to that list, at the
+  // category's own address.
+  test('a listing’s own link is a page of its own, and Back goes to its category', async ({ page, request }) => {
+    const community = await defaultCommunity(page)
+    const { category } = await categoryWithListings(request, community)
+    const res = await request.get(`/api/resources?category=${category.id}&community=${community}`)
+    const item = (await res.json()).resources[0] as { id: string; name: string }
+
+    await page.goto(`/${community}/${category.id}/${item.id}`)
+    await dismissLocationPrompt(page)
+
+    const listing = page.getByTestId('listing-page')
+    await expect(listing).toBeVisible()
+    await expect(listing.getByRole('heading', { name: item.name, exact: true })).toBeVisible()
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+    const back = page.locator('header').getByRole('button', { name: category.pluralLabel })
+    await expect(back).toBeVisible()
+
+    await back.click()
+    await expect(listing).toHaveCount(0)
+    await expect(page.getByRole('button', { name: `Show details for ${item.name}` }).first()).toBeVisible()
+    expect(new URL(page.url()).pathname).toBe(`/${community}/${category.id}`)
+  })
+
   // The page's content rises into place as it appears (fadeIn: a 6px
   // transform, 180ms; Back slides it instead). An overlay drawn inside it
   // was measured from that moving box, not the screen, for as long as it

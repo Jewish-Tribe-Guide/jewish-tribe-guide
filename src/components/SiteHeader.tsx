@@ -167,8 +167,11 @@ export default function SiteHeader({ onGoHome, location, previewSettings, hideNa
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
               </svg>
             </span>
-            <span className="min-w-0 flex-1 truncate text-lg font-semibold tracking-tight text-slate-900">
-              {screenHeader.title}
+            <span className="min-w-0 flex-1">
+              {screenHeader.named && <span className="block truncate text-xs font-bold tracking-wide text-muted">{settings.name}</span>}
+              <span className={`block truncate font-semibold tracking-tight text-slate-900 ${screenHeader.named ? 'text-base leading-tight' : 'text-lg'}`}>
+                {screenHeader.title}
+              </span>
             </span>
           </button>
         ) : (() => {

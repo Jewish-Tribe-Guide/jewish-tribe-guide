@@ -36,9 +36,12 @@ type Props = {
   alone: boolean
   /** Brings a hidden map back; left out where there's no map to show. */
   onShowMap?: () => void
+  /** A phone that arrived from a link: the listing is the page, and the
+   *  site header's back arrow goes to the list, so no bar of its own. */
+  phone?: boolean
 }
 
-export default function ListingColumn({ item, category, color, place, found, upvote, onward, backLabel, onBack, position, onStep, alone, onShowMap }: Props) {
+export default function ListingColumn({ item, category, color, place, found, upvote, onward, backLabel, onBack, position, onStep, alone, onShowMap, phone = false }: Props) {
   const hasPrev = position.index > 0
   const hasNext = position.index < position.total - 1
 
@@ -46,6 +49,7 @@ export default function ListingColumn({ item, category, color, place, found, upv
   // the dialog. Not while editing (the form's own fields want the arrows),
   // and never from inside a text field.
   useEffect(() => {
+    if (phone) return
     const onKey = (e: KeyboardEvent) => {
       // While editing, Escape steps back one level (out of Request removal
       // into the edit, out of the edit to the listing), as Back does.
@@ -62,7 +66,7 @@ export default function ListingColumn({ item, category, color, place, found, upv
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [onBack, onStep, hasPrev, hasNext])
+  }, [onBack, onStep, hasPrev, hasNext, phone])
 
   const step = 'flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-50 disabled:cursor-default disabled:opacity-30'
 
@@ -105,6 +109,14 @@ export default function ListingColumn({ item, category, color, place, found, upv
       onwardClassName={alone ? 'lg:hidden' : ''}
     />
   )
+
+  if (phone) {
+    return (
+      <section aria-label={item.name} data-testid="listing-page" className="pt-1">
+        <MapPlaceDetail item={item} category={category} color={color} place={place} found={found} upvote={upvote} onward={onward} titleAs="h1" />
+      </section>
+    )
+  }
 
   return (
     <section aria-label={item.name} data-testid="listing-column">
