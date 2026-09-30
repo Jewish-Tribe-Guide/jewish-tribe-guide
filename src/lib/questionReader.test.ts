@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { makeCategory, makeListing } from '@/test/providerFixtures'
-import { questionKey, readerMessages, readerPlaces, readerVocabulary, readingFilters, tidyReading } from './questionReader'
+import { questionKey, reachLabel, readerMessages, readerPlaces, readerVocabulary, readingFilters, readingItemsOn, readingReach, tidyReading, widenReach } from './questionReader'
 import { readQuestion } from './readQuestion'
 
 const hours = { key: 'hours', label: 'Hours', type: 'hours' as const, filterable: true }
@@ -118,5 +118,59 @@ describe('readerPlaces — the places a question can name', () => {
   it('knows the community’s neighbourhoods by their other names too', () => {
     expect(places.get('south philly')?.name).toBe('South Philadelphia')
     expect(places.get('center city')?.geo).toEqual({ lat: 39.9524, lng: -75.1636 })
+  })
+})
+
+describe('answering from a reading — its items, and how far', () => {
+  it('finds the items asked for on a listing, as its own tags, whether always or sometimes', () => {
+    const tj = listings[2]
+    expect(readingItemsOn(tj, ['challah', 'Steak'])).toEqual([
+      { tag: 'Challah', sometimes: false },
+      { tag: 'Steak', sometimes: true },
+    ])
+    expect(readingItemsOn(tj, ['Wine'])).toEqual([])
+    expect(readingItemsOn(listings[0], [])).toEqual([])
+  })
+
+  const places = readerPlaces([makeListing({ id: 'h1', category: 'hospital', name: 'Hospital of the University of Pennsylvania', geo: { lat: 39.9496, lng: -75.1936 } })], 'philly')
+  const me = { lat: 39.95, lng: -75.17 }
+  const reach = (r: Partial<Parameters<typeof readingReach>[0]>, from: typeof me | null = me) => readingReach({ categories: [], ...r }, places, from)
+
+  it('"within 3 miles" is from you, and says so', () => {
+    expect(reach({ near: 'me', withinMiles: 3 })).toEqual({ from: me, label: 'you', miles: 3, inside: false, asked: true })
+    expect(reachLabel(reach({ near: 'me', withinMiles: 3 })!)).toBe('Within 3 mi of you')
+  })
+
+  it('"near me" with no distance only puts the nearest first: nothing to remove', () => {
+    expect(reachLabel(reach({ near: 'me' })!)).toBeNull()
+    expect(reach({ near: 'me' }, null)).toBeNull()
+  })
+
+  it('a hospital named is the mile around it, by the initials people say', () => {
+    expect(reachLabel(reach({ near: 'hup' })!)).toBe('Within 1 mi of HUP')
+    expect(reachLabel(reach({ near: 'hup', withinMiles: 2 })!)).toBe('Within 2 mi of HUP')
+    expect(reachLabel(reach({ near: 'hospital of the university of pennsylvania' })!)).toBe('Within 1 mi of HUP')
+  })
+
+  it('a neighbourhood named is the neighbourhood', () => {
+    expect(reach({ near: 'center city' })).toMatchObject({ label: 'Center City', miles: 1.3, inside: true })
+    expect(reachLabel(reach({ near: 'south philly' })!)).toBe('In South Philadelphia')
+  })
+
+  it('"near HUP" is the nearest that answers: our mile grows to reach it, and says so', () => {
+    const r = reach({ near: 'hup' })!
+    expect(widenReach(r, [0.4, 3])).toBe(r)
+    expect(reachLabel(widenReach(r, [2.1, 3]))).toBe('Within 2.5 mi of HUP')
+    expect(widenReach(r, [])).toBe(r)
+  })
+
+  it('a distance the question gave, or a neighbourhood, never grows', () => {
+    expect(widenReach(reach({ near: 'hup', withinMiles: 1 })!, [2.1]).miles).toBe(1)
+    expect(widenReach(reach({ near: 'me', withinMiles: 1 })!, [2.1]).miles).toBe(1)
+    expect(widenReach(reach({ near: 'center city' })!, [5]).miles).toBe(1.3)
+  })
+
+  it('a place it doesn’t know reaches nowhere', () => {
+    expect(reach({ near: 'brooklyn' })).toBeNull()
   })
 })

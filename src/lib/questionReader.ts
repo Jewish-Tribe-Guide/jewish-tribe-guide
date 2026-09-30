@@ -44,7 +44,12 @@ export function questionKey(question: string): string {
   return question.toLowerCase().replace(/[’']/g, "'").replace(/\s+/g, ' ').trim().replace(/[\s?!.,;:]+$/g, '').slice(0, 200)
 }
 
-export type ReaderPlace = { name: string; geo: LatLng }
+export type ReaderPlace = {
+  name: string
+  geo: LatLng
+  /** A neighbourhood's own size, in miles: "in Center City" is within it. */
+  radius?: number
+}
 
 /** The places a question can name, by every name people use: the
  *  community's towns and neighbourhoods (with their other names, "South
@@ -52,7 +57,7 @@ export type ReaderPlace = { name: string; geo: LatLng }
  *  Keyed lowercase. */
 export function readerPlaces(listings: readonly DirectoryResource[], communitySlug: string): Map<string, ReaderPlace> {
   const out = new Map<string, ReaderPlace>()
-  for (const p of neighborhoodsFor(communitySlug)) for (const n of [p.name, ...(p.aliases ?? [])]) out.set(n.toLowerCase(), { name: p.name, geo: p.geo })
+  for (const p of neighborhoodsFor(communitySlug)) for (const n of [p.name, ...(p.aliases ?? [])]) out.set(n.toLowerCase(), { name: p.name, geo: p.geo, radius: p.radius })
   for (const h of listings) {
     if (h.category !== 'hospital' || !h.geo) continue
     const place = { name: h.name, geo: h.geo as LatLng }
@@ -146,6 +151,78 @@ export function readingFilters(reading: Reading): { categories: string[]; filter
     if (Object.keys(f).length) filters[c.id] = f
   }
   return { categories: reading.categories.map((c) => c.id), filters }
+}
+
+// ── Answering from a reading ───────────────────────────────────────────────
+// The categories and filters are the Map page's own (above). What's left is
+// what a reading adds: items, and how far from where.
+
+/** The items asked for that a listing has, as its own tags, each with
+ *  whether it's only sometimes in stock. Empty when none were asked for. */
+export function readingItemsOn(listing: DirectoryResource, items: readonly string[]): { tag: string; sometimes: boolean }[] {
+  if (items.length === 0) return []
+  const wanted = new Set(items.map((i) => i.toLowerCase()))
+  const out = new Map<string, boolean>()
+  for (const [key, value] of Object.entries(listing)) {
+    if (!Array.isArray(value)) continue
+    const sometimes = key.endsWith('_sometimes')
+    for (const tag of value) if (typeof tag === 'string' && wanted.has(tag.toLowerCase())) out.set(tag, (out.get(tag) ?? true) && sometimes)
+  }
+  return [...out].map(([tag, sometimes]) => ({ tag, sometimes }))
+}
+
+/** A hospital or other place named with no distance given is within this
+ *  of it: on a map, "near HUP" is the few blocks around it. A neighbourhood
+ *  is its own size instead. Either way the chip says so and can be removed,
+ *  so it's never a hidden rule. */
+export const NEAR_PLACE_MILES = 1
+
+export type ReadingReach = {
+  from: LatLng
+  /** "you", "HUP", "Center City". */
+  label: string
+  /** How far it reaches; null for "near me" with no distance, which only
+   *  puts the nearest first. */
+  miles: number | null
+  /** A neighbourhood with no distance given: "in", not "within a mile of". */
+  inside: boolean
+  /** The distance was the question's own ("within 3 miles"), not ours. */
+  asked?: boolean
+}
+
+/** Where a reading measures from, what it's called, and how far it
+ *  reaches. Null when it says nowhere, or says "me" and the visitor hasn't
+ *  shared where they are. */
+export function readingReach(reading: Reading, places: ReadonlyMap<string, ReaderPlace>, me: LatLng | null): ReadingReach | null {
+  if (!reading.near) return null
+  const within = reading.withinMiles ?? null
+  if (reading.near === 'me') return me ? { from: me, label: 'you', miles: within, inside: false, asked: !!within } : null
+  const key = reading.near.toLowerCase()
+  const place = places.get(key)
+  if (!place) return null
+  // By its initials when it has them ("HUP"), however the question named
+  // it: a chip with the whole of "Hospital of the University of
+  // Pennsylvania" runs off the screen. Otherwise the place's own name.
+  const initials = [...places].find(([k, p]) => p.name === place.name && /^[a-z]{2,5}$/.test(k) && !p.name.toLowerCase().startsWith(k))?.[0]
+  const label = initials ? initials.toUpperCase() : place.name
+  if (within) return { from: place.geo, label, miles: within, inside: false, asked: true }
+  return place.radius ? { from: place.geo, label, miles: place.radius, inside: true } : { from: place.geo, label, miles: NEAR_PLACE_MILES, inside: false }
+}
+
+/** "Near HUP" asks for the nearest, not for a mile: when nothing that
+ *  answers is within our mile, the reach grows to the nearest that does,
+ *  to the next half mile, and the chip says how far that is. A distance
+ *  the question gave, or a neighbourhood, stays as it is. */
+export function widenReach(reach: ReadingReach, milesAway: readonly number[]): ReadingReach {
+  if (reach.asked || reach.inside || reach.miles === null || milesAway.length === 0) return reach
+  const nearest = Math.min(...milesAway)
+  return nearest <= reach.miles ? reach : { ...reach, miles: Math.ceil(nearest * 2) / 2 }
+}
+
+/** The chip for a reach: "Within 3 mi of you", "In Center City". */
+export function reachLabel(reach: ReadingReach): string | null {
+  if (reach.inside) return `In ${reach.label}`
+  return reach.miles === null ? null : `Within ${reach.miles} mi of ${reach.label}`
 }
 
 // ── What's sent ─────────────────────────────────────────────────────────────
