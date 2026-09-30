@@ -26,8 +26,8 @@ import { searchAsk } from '@/lib/askSearch'
 import { neighborhoodsFor } from '@/lib/places'
 import type { LatLng } from '@/lib/geo'
 import { keepsHours } from '@/lib/mapFilters'
-import { readerPlaces, readerVocabulary, type Reading } from '@/lib/questionReader'
-import { ownConditions, readingAnswers, readingLoses, searchReading, type Asked, type OwnConditions } from '@/lib/readingSearch'
+import { placeFor, readerPlaces, readerVocabulary, type ReaderPlace, type Reading } from '@/lib/questionReader'
+import { needsReading, ownFrom, readingAnswers, readingLoses, searchReading, type Asked, type OwnConditions } from '@/lib/readingSearch'
 import { DEFAULT_READER_MODEL, readQuestion } from '@/lib/readQuestion'
 import type { DirectoryResource } from '@/types'
 
@@ -45,8 +45,9 @@ const ME: LatLng = { lat: 39.9496, lng: -75.1718 }
 const HUP = 'Hospital of the University of Pennsylvania'
 const ORTHODOX = ['Orthodox (Ashkenazi)', 'Orthodox (Sephardic)']
 
-type Case = [question: string, gold: Reading | ((cats: CategoryConfig[]) => Reading), own?: Partial<OwnConditions>]
-const NONE: OwnConditions = { openNow: false, openToday: false, openAt: null, best: false, excluding: [], within: null }
+type Case = [question: string, gold: Reading | ((cats: CategoryConfig[]) => Reading), own?: Partial<OwnConditions> | ((places: ReadonlyMap<string, ReaderPlace>) => Partial<OwnConditions>)]
+const inTown = (name: string) => (places: ReadonlyMap<string, ReaderPlace>) => ({ place: placeFor(name, places) })
+const NONE: OwnConditions = { openNow: false, openToday: false, openAt: null, best: false, excluding: [], within: null, place: null }
 const food = (f: Omit<Reading['categories'][number], 'id'> = {}) => ({ id: 'restaurant', ...f })
 const one = (c: Reading['categories'][number], rest: Partial<Reading> = {}): Reading => ({ categories: [c], ...rest })
 const near = (where: string, rest: Partial<Reading> = {}) => ({ near: where, sortByDistance: true, ...rest })
@@ -113,6 +114,12 @@ const CASES: Case[] = [
   ['meat restaurants open late', one(food({ select: { t: ['Meat'] } })), { openNow: true }],
   ['best bakery', one(food({ select: { foodType: ['Bakery'] } })), { best: true }],
   ['kosher wine other than giant', { categories: [], items: ['Wine'] }, { excluding: ['giant'] }],
+  // Towns from the listings' addresses, which our own search knew and the
+  // reader didn't (Sep 30: "food in bala cynwyd" went back to all 72).
+  ['food in bala cynwyd', one(food()), inTown('bala cynwyd')],
+  ['meat in bala cynwyd', one(food({ select: { t: ['Meat'] } })), inTown('bala cynwyd')],
+  ['kosher food in cherry hill', one(food()), inTown('cherry hill')],
+  ['shul in merion station', one({ id: 'synagogue' }), inTown('merion station')],
 ]
 
 function score(got: string[], want: string[], ordered: boolean): 'right' | 'partly' | 'wrong' {
@@ -153,8 +160,8 @@ test('today’s search against the question reader', { timeout: 600_000 }, async
     ...r.details,
   }))
 
-  // Places the reader may name, as the route gives them: neighbourhoods by
-  // all their names, hospitals by name and initials.
+  // Places the reader may name, as the route gives them: everything our
+  // own search knows (see readerPlaces).
   const places = readerPlaces(listings, 'philly')
   const vocab = readerVocabulary(cats, listings, [...places.keys()])
   const answer = (asked: Asked, question: string) =>
@@ -165,27 +172,34 @@ test('today’s search against the question reader', { timeout: 600_000 }, async
   let cost = 0
   let msTotal = 0
   const fails: string[] = []
-  for (const [question, goldOf, goldOwn] of CASES) {
+  let asked = 0
+  for (const [question, goldOf, goldOwnOf] of CASES) {
     const gold = typeof goldOf === 'function' ? goldOf(cats) : goldOf
+    const goldOwn = typeof goldOwnOf === 'function' ? goldOwnOf(places) : goldOwnOf
     const want = answer({ reading: gold, own: { ...NONE, ...goldOwn } }, question)
     const ordered = !!gold.sortByDistance || !!goldOwn?.best
 
-    const today = searchAsk(listings, cats, question, { coords: ME, now: NOW, places: neighborhoodsFor('philly') }).hits.map((h) => h.item.id)
+    const todayResult = searchAsk(listings, cats, question, { coords: ME, now: NOW, places: neighborhoodsFor('philly') })
+    const today = todayResult.hits.map((h) => h.item.id)
     const todayScore = score(today, want, ordered)
 
-    let lunaScore: 'right' | 'partly' | 'wrong' = 'wrong'
-    let lunaGot: string[] = []
-    let readingText = ''
-    try {
+    // As the site does: the reader only when our own search left something
+    // it didn't understand; otherwise our search's answer is the site's.
+    let lunaScore: 'right' | 'partly' | 'wrong' = todayScore
+    let lunaGot: string[] = today
+    let readingText = 'not asked: our search understood it all'
+    if (needsReading(todayResult)) try {
+      asked++
       const r = await readQuestion(question, vocab, {
         apiKey: env.OPENAI_API_KEY,
         model: process.env.READER_MODEL || DEFAULT_READER_MODEL,
         effort: process.env.READER_EFFORT === 'default' ? null : process.env.READER_EFFORT || undefined,
       })
-      // As the site does: today's search where the reading has nothing, or
-      // lost the kind of place our parser heard and today's found something.
+      // Today's search where the reading has nothing, or lost the kind of
+      // place our parser heard and today's found something; otherwise the
+      // reading added to what our own search understood (ownFrom).
       const fallBack = !readingAnswers(r.reading) || (today.length > 0 && readingLoses(question, r.reading, cats))
-      lunaGot = fallBack ? today : answer({ reading: r.reading, own: ownConditions(question) }, question)
+      lunaGot = fallBack ? today : answer({ reading: r.reading, own: ownFrom(todayResult, places) }, question)
       lunaScore = score(lunaGot, want, ordered)
       readingText = JSON.stringify(r.reading)
       // GPT-6 Luna, per third-party price lists (Sep 2026): $0.10 per million
@@ -193,6 +207,7 @@ test('today’s search against the question reader', { timeout: 600_000 }, async
       cost += ((r.usage.input - r.usage.cachedInput) * 0.1 + r.usage.cachedInput * 0.01 + r.usage.output * 0.5) / 1e6
       msTotal += r.ms
     } catch (e) {
+      lunaScore = 'wrong'
       readingText = `ERROR ${(e as Error).message}`
     }
     tally.today[todayScore]++
@@ -208,8 +223,9 @@ test('today’s search against the question reader', { timeout: 600_000 }, async
     `${n} questions, live listings, Tue Oct 6 2026 12:30 PM from Rittenhouse Square.`,
     '',
     `- Today's search: ${tally.today.right} right, ${tally.today.partly} partly, ${tally.today.wrong} wrong`,
-    `- Reader: ${tally.luna.right} right, ${tally.luna.partly} partly, ${tally.luna.wrong} wrong`,
-    `- Reader cost for all ${n}: $${cost.toFixed(4)} (≈ $${((cost / n) * 1000).toFixed(2)} per 1,000 questions); average ${Math.round(msTotal / n)} ms each`,
+    `- The site with the reader: ${tally.luna.right} right, ${tally.luna.partly} partly, ${tally.luna.wrong} wrong`,
+    `- The reader was asked ${asked} of ${n}; the rest our own search understood entirely`,
+    `- Reader cost for those ${asked}: $${cost.toFixed(4)}; average ${Math.round(msTotal / Math.max(1, asked))} ms each`,
     '',
     '| Question | Places it should find | Today (found) | Site with the reader (found) |',
     '|---|---|---|---|',

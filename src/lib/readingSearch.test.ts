@@ -3,7 +3,8 @@ import type { DirectoryResource } from '@/types'
 import { makeCategory } from '@/test/providerFixtures'
 import { answerFor } from './askAnswer'
 import { readerPlaces, type Reading } from './questionReader'
-import { ownConditions, readingAnswers, readingChips, readingLoses, readingOffers, searchReading, type Asked } from './readingSearch'
+import { searchAsk } from './askSearch'
+import { needsReading, ownConditions, ownFrom, readingAnswers, readingChips, readingLoses, readingOffers, searchReading, type Asked } from './readingSearch'
 
 const allWeek = (open: string, close: string) => Object.fromEntries(['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'].map((d) => [d, { open, close }]))
 const hours = { key: 'hours', label: 'Hours', type: 'hours' as const, filterable: true }
@@ -229,5 +230,62 @@ describe('readingOffers — ask, don’t answer wrongly', () => {
   it('something found and nothing unsure: nothing offered', () => {
     const question = 'meat places'
     expect(offersFor(asked({ categories: [{ id: 'restaurant', select: { t: ['Meat'] } }] }, question), question).offers).toEqual([])
+  })
+})
+
+describe('the AI adds to what our own search understood, and is only asked when something’s left over', () => {
+  // A meat place in Bala Cynwyd, a town our own search knows from the
+  // listings' addresses, and the reader's places now too.
+  const balaGrill = place('restaurant', 'Bala Grill', 40.0, -75.23, { t: ['Meat'], address: '1 Belmont Ave, Bala Cynwyd, PA 19004' })
+  const more = [...listings, balaGrill]
+  const morePlaces = readerPlaces(more, 'philly')
+  const today = (q: string) => searchAsk(more, categories, q, { now: sixPm, places: [] })
+
+  it('the reader’s places are the ones our search knows: towns from addresses, and every listing', () => {
+    expect(morePlaces.get('bala cynwyd')?.name).toBe('Bala Cynwyd')
+    expect(morePlaces.get('late grill')?.geo).toEqual({ lat: 39.95, lng: -75.17 })
+  })
+
+  it('a question our search understood entirely isn’t read', () => {
+    expect(needsReading(today('food in bala cynwyd'))).toBe(false)
+    expect(needsReading(today('kosher food'))).toBe(false)
+    // An item every place found has as an item.
+    expect(needsReading(today('chalav yisroel milk'))).toBe(false)
+  })
+
+  it('one with words our search could only look for as text is, and so is one it found nothing for', () => {
+    // "Meat" is a food place's type, found as text in the field.
+    expect(needsReading(today('meat in bala cynwyd'))).toBe(true)
+    expect(needsReading(today('zqx nothing like this'))).toBe(true)
+    // Challah is GIANT's and ShopRite's item, and could be a restaurant's description.
+    expect(needsReading(searchAsk([...more, place('restaurant', 'Challah Cafe', 39.95, -75.17)], categories, 'challah', { now: sixPm }))).toBe(true)
+  })
+
+  it('"meat in bala cynwyd": the reading adds Meat, and our search’s town stays', () => {
+    const q = 'meat in bala cynwyd'
+    const own = ownFrom(today(q), morePlaces)
+    expect(own.place).toMatchObject({ name: 'Bala Cynwyd', label: 'Bala Cynwyd' })
+    // The reader said Food: Meat and nothing about where.
+    const r = searchReading(more, categories, { reading: { categories: [{ id: 'restaurant', select: { t: ['Meat'] } }] }, own }, q, { now: sixPm, places: morePlaces })
+    expect(names(r)).toEqual(['Bala Grill'])
+    expect(readingChips({ reading: { categories: [{ id: 'restaurant', select: { t: ['Meat'] } }] }, own }, categories, { reach: r.reach }).map((c) => c.label)).toEqual([
+      'Food',
+      'Meat',
+      'In Bala Cynwyd',
+    ])
+  })
+
+  it('removing the town chip takes our search’s town away too', () => {
+    const q = 'meat in bala cynwyd'
+    const asked: Asked = { reading: { categories: [{ id: 'restaurant', select: { t: ['Meat'] } }] }, own: ownFrom(today(q), morePlaces) }
+    const r = searchReading(more, categories, asked, q, { now: sixPm, places: morePlaces })
+    const town = readingChips(asked, categories, { reach: r.reach }).find((c) => c.key === 'reach')!
+    expect(town.without.own.place).toBeNull()
+    expect(names(searchReading(more, categories, town.without, q, { now: sixPm, places: morePlaces })).sort()).toEqual(['Bala Grill', 'Late Grill', 'Lunch Grill'])
+  })
+
+  it('questions our search has its own answers for are never read', () => {
+    expect(needsReading(today('next mincha'))).toBe(false)
+    expect(ownConditions('next mincha').place).toBeNull()
   })
 })

@@ -25,9 +25,8 @@ import { useIsMobile } from '@/lib/useIsMobile'
 import { useScrollShowHide, useSetScreenHeader } from '@/lib/headerVisibility'
 import { foundFor, searchAsk } from '@/lib/askSearch'
 import { neighborhoodsFor, placeName, townsFrom } from '@/lib/places'
-import { parseAsk } from '@/lib/ask'
 import { readerPlaces } from '@/lib/questionReader'
-import { readingAnswers, readingChips, readingLoses, readingOffers, searchReading } from '@/lib/readingSearch'
+import { needsReading, ownFrom, readingAnswers, readingChips, readingLoses, readingOffers, searchReading } from '@/lib/readingSearch'
 import { useReading } from '@/lib/useReading'
 import { ListingOnwardContext, type ListingOnwardSource } from './listingOnward'
 import ListingColumn from './ListingColumn'
@@ -717,28 +716,31 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // restaurant page means every restaurant rather than none.
   // Each match keeps what it matched on (see SearchFound), for the card to
   // say why it's here and the listing to mark it once opened.
-  const todayMatches = useMemo(() => {
-    if (!q) return null
-    const result = searchAsk(items, [category], search, { categoryId: category.id, places: neighborhoodsFor(communitySlug) })
-    return new Map(result.hits.map((h) => [h.item.id, foundFor(h, result)]))
-  }, [q, items, category, search, communitySlug])
+  const todayResult = useMemo(
+    () => (q ? searchAsk(items, [category], search, { categoryId: category.id, places: neighborhoodsFor(communitySlug) }) : null),
+    [q, items, category, search, communitySlug],
+  )
+  const todayMatches = useMemo(
+    () => (todayResult ? new Map(todayResult.hits.map((h) => [h.item.id, foundFor(h, todayResult)])) : null),
+    [todayResult],
+  )
 
   // ── The question reader (questionReader.ts), as on the home search ──────
-  // Read on Enter, and after a pause on a question of three words or more
-  // or one today's search finds nothing for; its own part of the reading
-  // (this category's filters, items, how far) answers, shown as "Read as"
-  // in CategoryAsk. Not questions about minyanim or the guide, nor a
-  // place's own name. When its part of the reading finds nothing here and
-  // today's search does ("challah" on Food, read as Grocery), today's
-  // search answers: this page is about this category.
+  // Only when our own search left something it didn't understand
+  // (needsReading), on Enter or after a pause; the reading can add to what
+  // our search understood, never take it away (ownFrom). Its own part of
+  // the reading (this category's filters, items, how far) answers, shown
+  // as "Read as" in CategoryAsk. Never a place's own name. When its part
+  // of the reading finds nothing here and today's search does ("challah"
+  // on Food, read as Grocery), today's search answers: this page is about
+  // this category.
   const reader = useReading(communitySlug)
   const coords = useOptionalLocation()?.coords ?? null
   // The neighbourhoods; a hospital named comes with where it is (see the route).
   const readerPlacesHere = useMemo(() => readerPlaces(items, communitySlug ?? ''), [items, communitySlug])
-  const parsed = q ? parseAsk(search) : null
   const typedName = q.replace(/['’]/g, '')
-  const readable =
-    !!parsed && !parsed.meta && !parsed.times && !parsed.eruv && !parsed.minyan && !items.some((i) => i.name.toLowerCase().replace(/['’]/g, '').includes(typedName))
+  const readable = !!todayResult && needsReading(todayResult) && !items.some((i) => i.name.toLowerCase().replace(/['’]/g, '').includes(typedName))
+  const own = todayResult ? ownFrom(todayResult, readerPlacesHere) : null
   const reading = readable ? reader.readingFor(search) : null
   const readResult = useMemo(() => {
     if (!reading || !readingAnswers(reading.reading, category.id) || ((todayMatches?.size ?? 0) > 0 && readingLoses(search, reading.reading, categories ?? [category]))) return null
@@ -746,13 +748,12 @@ export default function GenericDirectory({ category, items, anchorLabel, address
     const found = result.hits.length + result.noHours.length
     return found === 0 && (todayMatches?.size ?? 0) > 0 ? null : result
   }, [reading, items, categories, category, search, coords, readerPlacesHere, todayMatches, clock])
-  const wantsReading = readable && (search.trim().split(/\s+/).length >= 3 || todayMatches?.size === 0)
   useEffect(() => {
-    if (!wantsReading) return
-    const timer = setTimeout(() => reader.ask(search), 1000)
+    if (!readable || !own) return
+    const timer = setTimeout(() => reader.ask(search, own), 1000)
     return () => clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [wantsReading, search])
+  }, [readable, search])
   const readChips = readResult && reading ? readingChips(reading, categories ?? [category], { reach: readResult.reach, categoryId: category.id, excluded: readResult.excluded }) : []
   const readAs = {
     reading: reader.isReading(search) && !readResult,
@@ -770,7 +771,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
           })
         : [],
     onPick: (offer: { next: Parameters<typeof reader.edit>[0] }) => reader.edit(offer.next),
-    onSubmit: () => readable && reader.ask(search),
+    onSubmit: () => readable && own && reader.ask(search, own),
     result: readResult,
   }
   const askMatches = useMemo(

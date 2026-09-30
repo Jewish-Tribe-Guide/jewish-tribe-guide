@@ -1,6 +1,6 @@
 import { selectValues, type CategoryConfig } from './categories'
 import { filterFields, keepsHours, type MapFilterState } from './mapFilters'
-import { neighborhoodsFor } from './places'
+import { neighborhoodsFor, townsFrom } from './places'
 import type { LatLng } from './geo'
 import type { DirectoryResource } from '@/types'
 
@@ -59,10 +59,14 @@ export type ReaderPlace = {
   radius?: number
 }
 
-/** The places a question can name, by every name people use: the
- *  community's towns and neighbourhoods (with their other names, "South
- *  Philly"), and its hospitals, by name and by their initials ("HUP").
- *  Keyed lowercase. */
+/** The places a question can name, by every name people use: the same
+ *  places our own search knows (askSearch.ts), so the reader never knows
+ *  fewer than it does ("food in Bala Cynwyd" lost its town when the
+ *  reader's list had no towns, Sep 30). The community's neighbourhoods
+ *  (with their other names, "South Philly"), its hospitals by name and by
+ *  their initials ("HUP"), the towns in the listings' addresses, and every
+ *  listing with a location ("near Trader Joe's"). Keyed lowercase; the
+ *  first to claim a name keeps it. */
 export function readerPlaces(listings: readonly DirectoryResource[], communitySlug: string): Map<string, ReaderPlace> {
   const out = new Map<string, ReaderPlace>()
   for (const p of neighborhoodsFor(communitySlug)) for (const n of [p.name, ...(p.aliases ?? [])]) out.set(n.toLowerCase(), { name: p.name, geo: p.geo, radius: p.radius })
@@ -79,6 +83,11 @@ export function readerPlaces(listings: readonly DirectoryResource[], communitySl
       if (initials.length >= 3 && !out.has(initials.toLowerCase())) out.set(initials.toLowerCase(), place)
     }
   }
+  const claim = (name: string, place: ReaderPlace) => {
+    if (!out.has(name.toLowerCase())) out.set(name.toLowerCase(), place)
+  }
+  for (const t of townsFrom(listings)) for (const n of [t.name, ...(t.aliases ?? [])]) claim(n, { name: t.name, geo: t.geo, radius: t.radius })
+  for (const l of listings) if (l.geo) claim(l.name, { name: l.name, geo: l.geo as LatLng })
   return out
 }
 

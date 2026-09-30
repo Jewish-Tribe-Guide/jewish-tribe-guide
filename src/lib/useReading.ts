@@ -2,7 +2,7 @@
 
 import { useRef, useState } from 'react'
 import { askReader } from './askReader'
-import { ownConditions, type Asked } from './readingSearch'
+import type { Asked, OwnConditions } from './readingSearch'
 
 // A page's question reading (see questionReader.ts): the one asked for,
 // while it's being read, and once it's here, the reading with our own
@@ -18,14 +18,16 @@ export function useReading(community: string | null) {
   const [readingNow, setReadingNow] = useState<string | null>(null)
   const asked = useRef<string | null>(null)
 
-  function ask(question: string) {
+  /** Read `question`; `own` is what our own search understood of it,
+   *  which the reading can add to but never take away (readingSearch.ts). */
+  function ask(question: string, own: OwnConditions) {
     const q = question.trim()
     if (!q || asked.current === q) return
     asked.current = q
     setReadingNow(q)
     void askReader(q, community).then((answer) => {
       setReadingNow((now) => (now === q ? null : now))
-      if (answer.ok) setRead({ question: q, asked: { reading: answer.reading, own: ownConditions(q) } })
+      if (answer.ok) setRead({ question: q, asked: { reading: answer.reading, own } })
       // Not kept as asked when it couldn't be read: Enter tries again.
       else if (asked.current === q) asked.current = null
     })

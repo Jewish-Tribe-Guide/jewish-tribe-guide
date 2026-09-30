@@ -497,13 +497,13 @@ describe('searchAsk — towns and neighborhoods', () => {
 
   it('keeps only what is inside a town the listings name', () => {
     const result = searchAsk(all, cats, 'restaurants in cherry hill', { places })
-    expect(result.place).toEqual({ name: 'Cherry Hill', inside: true })
+    expect(result.place).toMatchObject({ name: 'Cherry Hill', inside: true })
     expect(result.hits.map((h) => h.item.name).sort()).toEqual(['Cherry Hill Cookies', 'The Bagel Spot'])
   })
 
   it('measures from a neighborhood, and does not search for its name', () => {
     const result = searchAsk(all, cats, 'shul near center city', { places })
-    expect(result.place).toEqual({ name: 'Center City', inside: false })
+    expect(result.place).toMatchObject({ name: 'Center City', inside: false })
     expect(result.terms).toEqual([])
     expect(result.hits[0].miles).toBeLessThan(0.5)
   })
@@ -511,7 +511,7 @@ describe('searchAsk — towns and neighborhoods', () => {
   it('is not a hotel with the neighborhood in its name, when a shul was asked for', () => {
     expect(searchAsk(all, cats, 'shul near center city', { places }).anchor).toBeNull()
     // Even without "near": no shul is called Center City, so it's the place.
-    expect(searchAsk(all, cats, 'center city shul', { places }).place).toEqual({ name: 'Center City', inside: false })
+    expect(searchAsk(all, cats, 'center city shul', { places }).place).toMatchObject({ name: 'Center City', inside: false })
   })
 
   it('is the listing itself when the question is a listing’s own name', () => {

@@ -1,7 +1,7 @@
 import type { DirectoryResource } from '@/types'
 import type { CategoryConfig } from '@/lib/categories'
 import { listingSearchText } from '@/lib/searchListing'
-import { haversineMiles } from '@/lib/geo'
+import { haversineMiles, type LatLng } from '@/lib/geo'
 import { findPlace, townsFrom, type Place } from '@/lib/places'
 import { DAY_KEYS, businessClosure, fmt12, getOpenStatus, isStructuredHours, type DayHours } from '@/lib/hours'
 import { conceptCategories, initialisms, parseAsk, termMatches, termsRequired, typedWords, wordMatches, words, type AskQuery, type OpenAt, withoutOpenAt } from '@/lib/ask'
@@ -91,7 +91,7 @@ export type AskResult = {
   /** The town or neighborhood the question was about, when it named one
    *  that isn't a listing: "food in Cherry Hill", "shul near Center City".
    *  Results are measured from it, and for "in" kept to within it. */
-  place: { name: string; inside: boolean } | null
+  place: { name: string; inside: boolean; geo: LatLng; radius: number } | null
   /** For an "open now" or "open today" question: how many places matched
    *  but are closed then, and so aren't in `hits`. Lets the page say "none
    *  open right now" instead of showing nothing, or showing closed places as
@@ -567,7 +567,7 @@ export function searchAsk(
     noHours,
     terms: searchTerms,
     excluded: [...excluded],
-    place: named ? { name: named.place.name, inside: !!inside } : null,
+    place: named ? { name: named.place.name, inside: !!inside, geo: named.place.geo, radius: named.place.radius } : null,
   }
 }
 

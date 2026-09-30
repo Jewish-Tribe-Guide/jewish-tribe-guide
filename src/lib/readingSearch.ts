@@ -1,10 +1,10 @@
 import type { DirectoryResource } from '@/types'
-import type { CategoryConfig } from './categories'
+import { selectValues, type CategoryConfig } from './categories'
 import { haversineMiles, type LatLng } from './geo'
 import { conceptCategories, formatOpenAtTime, parseAsk, termMatches, words, type AskQuery } from './ask'
 import { openState, type AskHit, type AskResult } from './askSearch'
 import { activeFilters, passesFields } from './mapFilters'
-import { reachLabel, readingFilters, readingItemsOn, readingReach, widenReach, type ReaderPlace, type Reading, type ReadingReach } from './questionReader'
+import { placeFor, reachLabel, readingFilters, readingItemsOn, readingReach, widenReach, type ReaderPlace, type Reading, type ReadingReach } from './questionReader'
 
 // ── Answering a question from its reading (see questionReader.ts) ───────────
 // The home and category searches' side of the reader. The work is split
@@ -18,14 +18,70 @@ import { reachLabel, readingFilters, readingItemsOn, readingReach, widenReach, t
 // same hours, the same distances), in the same shape (AskResult), so the
 // answer sentence and the results list are the ones the page already has.
 // Nothing here comes from the AI but the choice of filters.
+//
+// The rule, since "food in Bala Cynwyd" lost its town the same way (Sep
+// 30): the AI can add to what our own search understood, never take away.
+// And it's only asked at all when our search left something it didn't
+// understand (needsReading): a question our search fully understood is
+// answered by it alone, instantly, and nothing changes under the visitor.
 
-/** What our own parser is sure of in a question, kept whatever the reading
- *  says. */
-export type OwnConditions = Pick<AskQuery, 'openNow' | 'openToday' | 'openAt' | 'best' | 'excluding' | 'within'>
+/** A place our own search is sure the question named: a town or
+ *  neighbourhood ("in Bala Cynwyd"), or a listing ("near HUP"). */
+export type OwnPlace = ReaderPlace & { label: string }
 
+/** What our own search is sure of in a question, kept whatever the
+ *  reading says. */
+export type OwnConditions = Pick<AskQuery, 'openNow' | 'openToday' | 'openAt' | 'best' | 'excluding' | 'within'> & { place: OwnPlace | null }
+
+/** From the question alone: everything but a place, which takes the
+ *  listings and neighbourhoods to find (see ownFrom). */
 export function ownConditions(question: string): OwnConditions {
   const { openNow, openToday, openAt, best, excluding, within } = parseAsk(question)
-  return { openNow, openToday, openAt, best, excluding, within }
+  return { openNow, openToday, openAt, best, excluding, within, place: null }
+}
+
+/** From what our own search made of the question: its conditions and the
+ *  place it found, a listing ("near HUP") or a town ("in Bala Cynwyd"),
+ *  called what the reader's places call it ("HUP", not the whole name). */
+export function ownFrom(result: AskResult, places: ReadonlyMap<string, ReaderPlace> = new Map()): OwnConditions {
+  const { openNow, openToday, openAt, best, excluding, within } = result.query
+  const labelOf = (name: string) => placeFor(name, places)?.label ?? name
+  const place: OwnPlace | null = result.anchor?.geo
+    ? { name: result.anchor.name, label: labelOf(result.anchor.name), geo: result.anchor.geo }
+    : result.place
+      ? { name: result.place.name, label: labelOf(result.place.name), geo: result.place.geo, ...(result.place.inside ? { radius: result.place.radius } : {}) }
+      : null
+  return { openNow, openToday, openAt, best, excluding, within, place }
+}
+
+/** Whether our own search left anything it didn't understand, so the AI
+ *  is worth asking: it found nothing, or some words it could only look for
+ *  as text ("IKC dairy" found 27 places for its words, where the filters
+ *  find 2). Not when every word was understood: a kind of place ("kosher
+ *  food"), a place ("in Bala Cynwyd"), a time, or an item's own name
+ *  ("challah", "cholov yisroel milk", found as the item). Nor questions it
+ *  has its own answers for: the guide, zmanim, the eruv, minyanim. */
+export function needsReading(result: AskResult): boolean {
+  const q = result.query
+  if (q.meta || q.times || q.eruv || q.minyan) return false
+  if (result.hits.length === 0 && result.noHours.length === 0) return true
+  const left = result.terms
+  if (left.length === 0) return false
+  // An item's own name only when every place found has it as an item:
+  // "meat" is a store's item and a food place's type, and "sushi" a
+  // store's item and a restaurant's description, and those need reading.
+  // A real item, in one of the category's item lists: a food place's
+  // type is a list of values too ("Meat"), which our search also matches.
+  const asItem = (h: AskHit) => {
+    const tag = h.matched[0]?.tag
+    if (!tag) return false
+    const listed = h.category.detailFields.some(
+      (f) => f.type === 'tags' && [...selectValues(h.item[f.key]), ...selectValues(h.item[`${f.key}_sometimes`])].includes(tag),
+    )
+    const tagWords = words(tag)
+    return listed && tagWords.length === left.length && left.every((t) => termMatches(t, tagWords))
+  }
+  return ![...result.hits, ...result.noHours].every(asItem)
 }
 
 /** A question as the page answers it: the AI's reading, and our own
@@ -70,13 +126,16 @@ export function searchReading(
   { coords = null, now = new Date(), places, categoryId }: ReadingOptions,
 ): AskResult & { reach: ReadingReach | null } {
   const byId = new Map(categories.map((c) => [c.id, c]))
-  // "Within a 15-minute drive" is our parser's, measured from where the
-  // reading says, or from the visitor.
+  // Where: our own search's place when it found one ("in Bala Cynwyd"),
+  // whatever the reading says. "Within a 15-minute drive" is our parser's
+  // too, measured from there, or where the reading says, or the visitor.
+  const where: Partial<Reading> = own.place ? { near: own.place.name.toLowerCase(), place: own.place } : {}
   const withinMiles = reading.withinMiles ?? own.within?.miles ?? null
   const read: Reading = {
     ...reading,
+    ...where,
     categories: categoryId ? reading.categories.filter((c) => c.id === categoryId) : reading.categories,
-    ...(withinMiles ? { withinMiles, near: reading.near ?? 'me' } : {}),
+    ...(withinMiles ? { withinMiles, near: where.near ?? reading.near ?? 'me' } : {}),
   }
   const { filters } = readingFilters(read)
   const items = read.items ?? []
@@ -168,7 +227,7 @@ export function searchReading(
     hits: found.filter(inReach).sort(order),
     categoryIds: catIds.length ? catIds : null,
     anchor: null,
-    place: reach && reach.label !== 'you' ? { name: reach.label, inside: reach.inside } : null,
+    place: reach && reach.label !== 'you' ? { name: reach.label, inside: reach.inside, geo: reach.from, radius: reach.miles ?? 0 } : null,
     closedCount: closed.filter(inReach).length,
     noHours: noHours.filter(inReach).sort(order),
     terms: itemTerms,
@@ -233,7 +292,7 @@ export function readingChips(
   }
   const reachText = reach && reachLabel(reach)
   if (reachText) {
-    chips.push({ key: 'reach', label: reachText, without: { reading: { ...reading, near: null, withinMiles: null }, own: { ...own, within: null } }, widen: 'Anywhere' })
+    chips.push({ key: 'reach', label: reachText, without: { reading: { ...reading, near: null, withinMiles: null }, own: { ...own, within: null, place: null } }, widen: 'Anywhere' })
   }
   if (own.best) chips.push({ key: 'best', label: 'Most upvoted first', without: withOwn({ best: false }) })
   if (own.excluding.length) {

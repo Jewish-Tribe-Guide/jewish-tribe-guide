@@ -15,7 +15,7 @@ import { resolveCapabilities } from '@/lib/categories'
 import { routes } from '@/lib/routes'
 import { neighborhoodsFor } from '@/lib/places'
 import { readerPlaces } from '@/lib/questionReader'
-import { readingAnswers, readingChips, readingLoses, readingOffers, searchReading } from '@/lib/readingSearch'
+import { needsReading, ownFrom, readingAnswers, readingChips, readingLoses, readingOffers, searchReading } from '@/lib/readingSearch'
 import { useReading } from '@/lib/useReading'
 import { answersWell, candidatePrompts, pickPrompts } from '@/lib/searchPrompts'
 import { answerSchedule, useMinyanSchedule } from '@/lib/useMinyanSchedule'
@@ -212,19 +212,19 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
   const asked = q && listings && schedule ? ask(q) : null
 
   // ── The question reader (questionReader.ts) ──────────────────────────────
-  // A question is also read, by an AI, into the site's own categories,
-  // filters and items, and once it has been, the listings answer that
-  // reading (readingSearch.ts), shown as "Read as" and its chips above the
-  // answer. Read on Enter, on a shared question's arrival, and after a
-  // pause on a question of three words or more, or one today's search
-  // finds nothing for. Not the questions today's search has its own
-  // answers for (the guide, zmanim, the eruv, minyanim), nor a place's own
-  // name. Until a reading arrives, or with none, today's search answers.
+  // Only when our own search left something it didn't understand
+  // (needsReading): then the question is also read, by an AI, into the
+  // site's own categories, filters and items, which can add to what our
+  // search understood but never take it away (ownFrom), and the listings
+  // answer both (readingSearch.ts), shown as "Read as" and its chips above
+  // the answer. Read on Enter, on a shared question's arrival, and after a
+  // pause. Never a place's own name. Until a reading arrives, or with
+  // none, today's search answers.
   const reader = useReading(communitySlug)
   const readerPlacesHere = useMemo(() => readerPlaces(listings ?? [], communitySlug), [listings, communitySlug])
   const typedName = q.toLowerCase().replace(/['’]/g, '')
   const namesAPlace = !!q && (listings ?? []).some((l) => l.name.toLowerCase().replace(/['’]/g, '').includes(typedName))
-  const readable = !!asked && !asked.result.query.meta && !asked.result.query.times && !asked.result.query.eruv && !asked.result.query.minyan && !namesAPlace
+  const readable = !!asked && !namesAPlace && needsReading(asked.result)
   const reading = readable ? reader.readingFor(q) : null
   // Today's search answers instead when the reading lost the kind of place
   // our own parser is sure was named, and today's search found something
@@ -234,15 +234,14 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
     reading && listings && schedule && readingAnswers(reading.reading) && !(todayFound && readingLoses(q, reading.reading, categories ?? []))
       ? searchReading(listings, categories ?? [], reading, q, { coords, now: new Date(schedule.now), places: readerPlacesHere })
       : null
-  const todayFoundNothing = !!asked && asked.result.hits.length === 0 && asked.result.noHours.length === 0 && asked.answer === null
   const sharedQuestion = !!initialQuery && q === initialQuery.trim()
-  const wantsReading = readable && (sharedQuestion || q.split(/\s+/).length >= 3 || todayFoundNothing)
+  const own = asked ? ownFrom(asked.result, readerPlacesHere) : null
   useEffect(() => {
-    if (!wantsReading) return
-    const timer = setTimeout(() => reader.ask(q), sharedQuestion ? 0 : 1000)
+    if (!readable || !own) return
+    const timer = setTimeout(() => reader.ask(q, own), sharedQuestion ? 0 : 1000)
     return () => clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [wantsReading, q])
+  }, [readable, q])
   const readChips = readResult && reading ? readingChips(reading, categories ?? [], { reach: readResult.reach, excluded: readResult.excluded }) : []
   const readOffers =
     readResult && reading && listings && schedule
@@ -547,7 +546,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
           settings={settings}
           query={query}
           onQueryChange={changeQuery}
-          onSearchSubmit={() => readable && reader.ask(q)}
+          onSearchSubmit={() => readable && own && reader.ask(q, own)}
           searchReadAs={readAsNode || null}
           mapIcon={hasMap ? mapIcon : null}
           onViewMap={() => onNavigate(null, 'map')}
