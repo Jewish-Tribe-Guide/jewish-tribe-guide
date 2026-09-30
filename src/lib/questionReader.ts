@@ -25,6 +25,10 @@ export type Reading = {
   near?: string | null
   withinMiles?: number | null
   sortByDistance?: boolean
+  /** Where `near` is, when it's a place: filled in by the server from the
+   *  site's own places (placeFor), never by the AI, so a page can measure
+   *  from it without knowing every hospital and neighbourhood itself. */
+  place?: ReaderPlace & { label: string }
 }
 
 export type ReaderVocabulary = {
@@ -197,16 +201,22 @@ export function readingReach(reading: Reading, places: ReadonlyMap<string, Reade
   if (!reading.near) return null
   const within = reading.withinMiles ?? null
   if (reading.near === 'me') return me ? { from: me, label: 'you', miles: within, inside: false, asked: !!within } : null
-  const key = reading.near.toLowerCase()
-  const place = places.get(key)
+  const place = reading.place ?? placeFor(reading.near, places)
   if (!place) return null
-  // By its initials when it has them ("HUP"), however the question named
-  // it: a chip with the whole of "Hospital of the University of
-  // Pennsylvania" runs off the screen. Otherwise the place's own name.
-  const initials = [...places].find(([k, p]) => p.name === place.name && /^[a-z]{2,5}$/.test(k) && !p.name.toLowerCase().startsWith(k))?.[0]
-  const label = initials ? initials.toUpperCase() : place.name
+  const { label } = place
   if (within) return { from: place.geo, label, miles: within, inside: false, asked: true }
   return place.radius ? { from: place.geo, label, miles: place.radius, inside: true } : { from: place.geo, label, miles: NEAR_PLACE_MILES, inside: false }
+}
+
+/** A place named in a reading, with what to call it: by its initials when
+ *  it has them ("HUP"), however the question named it, since a chip with
+ *  the whole of "Hospital of the University of Pennsylvania" runs off the
+ *  screen; otherwise its own name. */
+export function placeFor(near: string, places: ReadonlyMap<string, ReaderPlace>): (ReaderPlace & { label: string }) | null {
+  const place = places.get(near.toLowerCase())
+  if (!place) return null
+  const initials = [...places].find(([k, p]) => p.name === place.name && /^[a-z]{2,5}$/.test(k) && !p.name.toLowerCase().startsWith(k))?.[0]
+  return { ...place, label: initials ? initials.toUpperCase() : place.name }
 }
 
 /** "Near HUP" asks for the nearest, not for a mile: when nothing that

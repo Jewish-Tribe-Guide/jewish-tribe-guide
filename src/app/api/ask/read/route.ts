@@ -2,7 +2,7 @@ import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore
 import { listCategories } from '@/lib/categoryStore'
 import { listApprovedResources } from '@/lib/resourceStore'
 import { enforceRateLimit, sharedLimit } from '@/lib/rateLimit'
-import { questionKey, readerPlaces, readerVocabulary } from '@/lib/questionReader'
+import { placeFor, questionKey, readerPlaces, readerVocabulary } from '@/lib/questionReader'
 import { findReading, saveReading } from '@/lib/questionReadingStore'
 import { DEFAULT_READER_MODEL, readQuestion } from '@/lib/readQuestion'
 
@@ -54,11 +54,15 @@ export async function POST(request: Request) {
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), TIMEOUT_MS)
     try {
-      const { reading } = await readQuestion(question, vocab, {
+      const { reading: read } = await readQuestion(question, vocab, {
         apiKey,
         model,
         fetchImpl: (url, init) => fetch(url, { ...init, signal: controller.signal }),
       })
+      // Where "near HUP" is, from the site's own places, so the page can
+      // measure from it without loading every hospital itself.
+      const place = read.near && read.near !== 'me' ? placeFor(read.near, places) : null
+      const reading = place ? { ...read, place } : read
       await saveReading(community.slug, key, question, reading, model)
       return Response.json({ ok: true, reading, remembered: false })
     } finally {

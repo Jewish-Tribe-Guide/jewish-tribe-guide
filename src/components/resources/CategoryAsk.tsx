@@ -16,6 +16,8 @@ import { useOptionalLocation } from '@/lib/locationContext'
 import { useActiveCommunity, useOptionalCommunitySlug } from '@/lib/communityContext'
 import { routes } from '@/lib/routes'
 import AskAnswer from '@/components/home/AskAnswer'
+import ReadAs from '@/components/home/ReadAs'
+import type { ReadingChip } from '@/lib/readingSearch'
 
 // ── A category page's search: asking comes first ─────────────────────────────
 // The one search box on the page, limited to this category and saying so
@@ -37,6 +39,15 @@ type Props = {
    *  page work out the minyan schedule (it fetches sunset times, which a food
    *  or grocery page has no use for). */
   hasMinyanim: boolean
+  /** The question reader's side (see GenericDirectory): whether it's
+   *  reading, how it read, and once read, the result that answers. */
+  readAs?: {
+    reading: boolean
+    chips: ReadingChip[]
+    onRemove: (chip: ReadingChip) => void
+    onSubmit: () => void
+    result: AskResult | null
+  }
 }
 
 export default function CategoryAsk(props: Props) {
@@ -48,7 +59,7 @@ function WithSchedule(props: Props) {
   return <Ask {...props} schedule={schedule} />
 }
 
-function Ask({ category, items, search, onSearch, schedule }: Props & { schedule: MinyanSchedule | null }) {
+function Ask({ category, items, search, onSearch, schedule, readAs }: Props & { schedule: MinyanSchedule | null }) {
   const now = useNow()
   const categories = useCategories() ?? [category]
   const communitySlug = useOptionalCommunitySlug()
@@ -87,7 +98,8 @@ function Ask({ category, items, search, onSearch, schedule }: Props & { schedule
 
   const asksWhen = (r: AskResult) => r.query.openNow || r.query.openToday || r.query.openAt !== null || r.query.minyan !== null
   const q = search.trim()
-  const answer = q && now !== null ? ask(q).answer : null
+  // Read by the reader, its result answers (see readingSearch.ts).
+  const answer = q && now !== null ? (readAs?.result ? answerFor(readAs.result, { coords: coords ?? community.mapCenter }) : ask(q).answer) : null
   const examples = q
     ? []
     : pickPrompts(
@@ -133,6 +145,10 @@ function Ask({ category, items, search, onSearch, schedule }: Props & { schedule
           placeholder={placeholder}
           value={search}
           onChange={(e) => onSearch(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') readAs?.onSubmit()
+          }}
+          enterKeyHint="search"
           className="min-w-0 flex-1 bg-transparent text-[15.5px] text-ink placeholder:text-slate-400 focus:outline-none [&::-webkit-search-cancel-button]:hidden"
         />
         {search && (
@@ -172,6 +188,7 @@ function Ask({ category, items, search, onSearch, schedule }: Props & { schedule
         </div>
       )}
 
+      {q && readAs && <ReadAs reading={readAs.reading} chips={readAs.chips} onRemove={readAs.onRemove} />}
       {answer && <AskAnswer answer={answer} />}
     </div>
   )

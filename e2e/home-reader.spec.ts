@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { categoryWithListings, defaultCommunity, dismissLocationPrompt } from './helpers'
+import { categoryWithHoursField, categoryWithListings, defaultCommunity, dismissLocationPrompt } from './helpers'
 
 // The home search reading a question (decided Sep 30): a question is read
 // into the site's own categories, shown as "Read as" and a chip for each,
@@ -49,4 +49,27 @@ test('a shared question is read as it arrives, without Enter', async ({ page, re
   await page.goto(`/${community}/ask/${encodeURIComponent(QUESTION)}`)
   await dismissLocationPrompt(page)
   await expect(page.getByTestId('read-as').filter({ visible: true })).toContainText(category.pluralLabel)
+})
+
+// A category page reads its own part of a question the same way: its
+// filters as chips (not its own name: the page is that), the list and the
+// sentence from the reading.
+test('a category page reads its own part of a question, and the list follows it', async ({ page, request }) => {
+  const community = await defaultCommunity(page)
+  const { category } = await categoryWithHoursField(request, community)
+  await page.route('**/api/ask/read**', (route) =>
+    route.fulfill({ json: { ok: true, reading: { categories: [{ id: category.id, openNow: true }, { id: 'no-such-category' }] }, remembered: true } }),
+  )
+
+  await page.goto(`/${community}/${category.id}`)
+  await dismissLocationPrompt(page)
+  const box = page.getByRole('searchbox', { name: `Search ${category.pluralLabel}` })
+  await box.fill(QUESTION)
+  await box.press('Enter')
+
+  const readAs = page.getByTestId('read-as')
+  await expect(readAs.getByRole('button', { name: 'Remove Open now' })).toBeVisible()
+  await expect(readAs.getByRole('button', { name: `Remove ${category.pluralLabel}` })).toHaveCount(0)
+  await readAs.getByRole('button', { name: 'Remove Open now' }).click()
+  await expect(page.getByTestId('read-as')).toHaveCount(0)
 })

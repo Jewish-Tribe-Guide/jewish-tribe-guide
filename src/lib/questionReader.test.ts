@@ -170,6 +170,11 @@ describe('answering from a reading — its items, and how far', () => {
     expect(widenReach(reach({ near: 'center city' })!, [5]).miles).toBe(1.3)
   })
 
+  it('where the server said a place is, when the page doesn’t know it', () => {
+    const place = { name: 'Hospital of the University of Pennsylvania', label: 'HUP', geo: { lat: 39.9496, lng: -75.1936 } }
+    expect(reachLabel(readingReach({ categories: [], near: 'hup', place }, new Map(), me)!)).toBe('Within 1 mi of HUP')
+  })
+
   it('a place it doesn’t know reaches nowhere', () => {
     expect(reach({ near: 'brooklyn' })).toBeNull()
   })

@@ -25,6 +25,10 @@ import { useIsMobile } from '@/lib/useIsMobile'
 import { useScrollShowHide, useSetScreenHeader } from '@/lib/headerVisibility'
 import { foundFor, searchAsk } from '@/lib/askSearch'
 import { neighborhoodsFor, placeName, townsFrom } from '@/lib/places'
+import { parseAsk } from '@/lib/ask'
+import { readerPlaces } from '@/lib/questionReader'
+import { readingAnswers, readingChips, searchReading } from '@/lib/readingSearch'
+import { useReading } from '@/lib/useReading'
 import { ListingOnwardContext, type ListingOnwardSource } from './listingOnward'
 import ListingColumn from './ListingColumn'
 import UpvoteButton from './UpvoteButton'
@@ -713,11 +717,53 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // restaurant page means every restaurant rather than none.
   // Each match keeps what it matched on (see SearchFound), for the card to
   // say why it's here and the listing to mark it once opened.
-  const askMatches = useMemo(() => {
+  const todayMatches = useMemo(() => {
     if (!q) return null
     const result = searchAsk(items, [category], search, { categoryId: category.id, places: neighborhoodsFor(communitySlug) })
     return new Map(result.hits.map((h) => [h.item.id, foundFor(h, result)]))
   }, [q, items, category, search, communitySlug])
+
+  // ── The question reader (questionReader.ts), as on the home search ──────
+  // Read on Enter, and after a pause on a question of three words or more
+  // or one today's search finds nothing for; its own part of the reading
+  // (this category's filters, items, how far) answers, shown as "Read as"
+  // in CategoryAsk. Not questions about minyanim or the guide, nor a
+  // place's own name. When its part of the reading finds nothing here and
+  // today's search does ("challah" on Food, read as Grocery), today's
+  // search answers: this page is about this category.
+  const reader = useReading(communitySlug)
+  const coords = useOptionalLocation()?.coords ?? null
+  // The neighbourhoods; a hospital named comes with where it is (see the route).
+  const readerPlacesHere = useMemo(() => readerPlaces(items, communitySlug ?? ''), [items, communitySlug])
+  const parsed = q ? parseAsk(search) : null
+  const typedName = q.replace(/['’]/g, '')
+  const readable =
+    !!parsed && !parsed.meta && !parsed.times && !parsed.eruv && !parsed.minyan && !items.some((i) => i.name.toLowerCase().replace(/['’]/g, '').includes(typedName))
+  const reading = readable ? reader.readingFor(search) : null
+  const readResult = useMemo(() => {
+    if (!reading || !readingAnswers(reading, category.id)) return null
+    const result = searchReading(items, categories ?? [category], reading, search, { coords, now: new Date(clock ?? 0), places: readerPlacesHere, categoryId: category.id })
+    const found = result.hits.length + result.noHours.length
+    return found === 0 && (todayMatches?.size ?? 0) > 0 ? null : result
+  }, [reading, items, categories, category, search, coords, readerPlacesHere, todayMatches, clock])
+  const wantsReading = readable && (search.trim().split(/\s+/).length >= 3 || todayMatches?.size === 0)
+  useEffect(() => {
+    if (!wantsReading) return
+    const timer = setTimeout(() => reader.ask(search), 1000)
+    return () => clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wantsReading, search])
+  const readAs = {
+    reading: reader.isReading(search) && !readResult,
+    chips: readResult && reading ? readingChips(reading, categories ?? [category], { reach: readResult.reach, categoryId: category.id }) : [],
+    onRemove: (chip: { without: Parameters<typeof reader.edit>[0] }) => reader.edit(chip.without),
+    onSubmit: () => readable && reader.ask(search),
+    result: readResult,
+  }
+  const askMatches = useMemo(
+    () => (readResult ? new Map([...readResult.hits, ...readResult.noHours].map((h) => [h.item.id, foundFor(h, readResult)])) : todayMatches),
+    [readResult, todayMatches],
+  )
   const matchesSearch = (item: DirectoryResource) => askMatches === null || askMatches.has(item.id)
   // A listing opened from the home search: what that search matched in it.
   // Until that listing is closed — reopened later, it's just the listing.
@@ -1307,7 +1353,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
         <div className={showMinyanCard ? 'space-y-3 lg:flex lg:items-start lg:gap-5 lg:space-y-0' : undefined}>
           {showSearch && (
             <div className={showMinyanCard ? 'min-w-0 lg:flex-1' : hasMapColumn ? 'lg:max-w-[720px]' : undefined}>
-              <CategoryAsk category={category} items={items} search={search} onSearch={setSearch} hasMinyanim={hasMinyanim} />
+              <CategoryAsk category={category} items={items} search={search} onSearch={setSearch} hasMinyanim={hasMinyanim} readAs={readAs} />
             </div>
           )}
           {showMinyanCard && (

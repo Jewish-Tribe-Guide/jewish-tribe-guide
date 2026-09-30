@@ -67,6 +67,13 @@ describe('POST /api/ask/read', () => {
     expect(m.saveReading).toHaveBeenCalledWith('philly', 'meat places', 'meat places', { categories: [{ id: 'restaurant', select: { t: ['Meat'] } }] }, 'gpt-6-luna')
   })
 
+  it('a place named comes back with where it is, from the site’s own places, not the AI', async () => {
+    m.fetch.mockResolvedValue(Response.json({ choices: [{ message: { content: JSON.stringify({ categories: [{ id: 'restaurant' }], near: 'center city' }) } }] }))
+    const body = await (await ask('food in center city')).json()
+    expect(body.reading.near).toBe('center city')
+    expect(body.reading.place).toEqual({ name: 'Center City', label: 'Center City', geo: { lat: 39.9524, lng: -75.1636 }, radius: 1.3 })
+  })
+
   it('is busy, not broken, once this visitor or everyone together has asked enough', async () => {
     m.enforceRateLimit.mockResolvedValue(new Response('slow', { status: 429 }))
     expect(await (await ask('meat')).json()).toEqual({ ok: false, reason: 'busy' })
