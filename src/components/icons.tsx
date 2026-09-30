@@ -355,3 +355,56 @@ export function CandleIcon({ className }: IconProps) {
     </svg>
   )
 }
+
+/** An outline thumbs-up: Recommend on an opened listing, and a row's likes. */
+export function ThumbIcon({ className }: IconProps) {
+  return (
+    <svg {...base} className={className}>
+      <path d="M7 10v12" />
+      <path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z" />
+    </svg>
+  )
+}
+
+/** A rosette with a tick: a kosher certificate link. */
+export function CertificateIcon({ className }: IconProps) {
+  return (
+    <svg {...base} className={className}>
+      <path d="M3.85 8.62a4 4 0 0 1 4.78-4.77 4 4 0 0 1 6.74 0 4 4 0 0 1 4.78 4.78 4 4 0 0 1 0 6.74 4 4 0 0 1-4.77 4.78 4 4 0 0 1-6.75 0 4 4 0 0 1-4.78-4.77 4 4 0 0 1 0-6.76Z" />
+      <path d="m9 12 2 2 4-4" />
+    </svg>
+  )
+}
+
+/** An envelope: Email. */
+export function MailIcon({ className }: IconProps) {
+  return (
+    <svg {...base} className={className}>
+      <rect width="20" height="16" x="2" y="4" rx="2" />
+      <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+    </svg>
+  )
+}
+
+/** A box with an arrow up out of it: Share. */
+export function ShareIcon({ className }: IconProps) {
+  return (
+    <svg {...base} className={className}>
+      <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+      <path d="m16 6-4-4-4 4" />
+      <path d="M12 2v13" />
+    </svg>
+  )
+}
+
+/** A person with a plus: Join a group. */
+export function JoinIcon({ className }: IconProps) {
+  return (
+    <svg {...base} className={className}>
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M19 8v6" />
+      <path d="M22 11h-6" />
+    </svg>
+  )
+}

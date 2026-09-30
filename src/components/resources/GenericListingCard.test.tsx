@@ -765,7 +765,8 @@ describe('GenericListingCard — expanded', () => {
       expect(screen.queryByRole('button', { name: 'Suggest an edit' })).not.toBeInTheDocument()
 
       await user.click(screen.getByRole('button', { name: 'Actions for Goldi Market' }))
-      expect(screen.getByRole('menuitem', { name: 'Share' })).toBeInTheDocument()
+      // Share has its own button on the phone's listing; the overflow keeps Pin.
+      expect(screen.getByRole('menuitem', { name: isMobile ? 'Pin' : 'Share' })).toBeInTheDocument()
     })
   }
 
@@ -1389,22 +1390,18 @@ describe('GenericListingCard — mobile listing sheet', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
-  // A tag narrows the list behind the sheet, so the sheet gets out of the
-  // way first — filtering out of sight would look like the tap did nothing.
-  it('closes itself before applying a tag filter to the list behind it', async () => {
-    const user = userEvent.setup()
+  // The items are a list to read now, not filter chips: the filters are
+  // above the list, and a chip in the listing looked like a control.
+  it('lists the items, as text, not as filter buttons', () => {
     const onTagClick = vi.fn()
-    const onExpandedChange = vi.fn()
     renderMobile({
       defaultExpanded: true,
       onTagClick,
-      onExpandedChange,
-      category: makeCategory({ detailFields: [{ key: 'items', label: 'Kosher items available', type: 'tags' }] }),
+      category: makeCategory({ detailFields: [{ key: 'items', label: 'Kosher items available', type: 'tags', showCountInHeader: true }] }),
       item: makeListing({ name: 'Goldi Market', items: ['Challah'] }),
     })
-    await user.click(within(screen.getByRole('dialog', { name: 'Goldi Market' })).getByRole('button', { name: 'Challah' }))
-
-    expect(onTagClick).toHaveBeenCalledWith('Challah')
-    expect(onExpandedChange).toHaveBeenLastCalledWith(false)
+    const sheet = screen.getByRole('dialog', { name: 'Goldi Market' })
+    expect(within(sheet).getByTestId('listing-items')).toHaveTextContent('Challah')
+    expect(within(sheet).queryByRole('button', { name: 'Challah' })).not.toBeInTheDocument()
   })
 })

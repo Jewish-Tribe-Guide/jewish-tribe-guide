@@ -4,6 +4,7 @@ import type { DirectoryResource } from '@/types'
 import type { CategoryConfig } from '@/lib/categories'
 import { PencilIcon } from '@/components/icons'
 import ListingActionsFan from './ListingActionsFan'
+import type { ListingAction } from './useListingActions'
 
 // ── The one visible way to edit an open listing ──────────────────────────
 // A full-width pill that sits BELOW the listing rather than inside it, in
@@ -50,6 +51,7 @@ export default function ListingEditBar({
   path,
   className = '',
   fanPlacement = 'auto',
+  omit,
 }: {
   /** Omitted when the listing can't be edited — the bar then renders the
    *  overflow on its own. See above for why it never disappears outright. */
@@ -63,6 +65,8 @@ export default function ListingEditBar({
   /** Passed through to the overflow — `stack` where there's no scrim behind
    *  the bar (the map). See ListingActionsFan's own `placement` prop. */
   fanPlacement?: 'auto' | 'stack'
+  /** Passed through to the overflow: see ListingActionsFan's `omit`. */
+  omit?: ListingAction['id'][]
 }) {
   return (
     // A wide primary plus a small round overflow, not two peers. The shape
@@ -91,7 +95,7 @@ export default function ListingEditBar({
           Suggest an edit
         </button>
       )}
-      <ListingActionsFan item={item} category={category} path={path} placement={fanPlacement} />
+      <ListingActionsFan item={item} category={category} path={path} placement={fanPlacement} omit={omit} />
     </div>
   )
 }

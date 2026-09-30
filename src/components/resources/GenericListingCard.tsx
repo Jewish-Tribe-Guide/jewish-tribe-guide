@@ -16,6 +16,8 @@ import PinnedBadge from '@/components/PinnedBadge'
 import UpvoteButton from './UpvoteButton'
 import ListingDetailModal from './ListingDetailModal'
 import MobileSheet from './MobileSheet'
+import { useListingOnward } from './listingOnward'
+import type { Onward } from './ListingView'
 import Highlight from './Highlight'
 import type { SearchFound } from '@/lib/askSearch'
 import MapPlaceDetail from '@/components/map/MapPlaceDetail'
@@ -259,7 +261,22 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
   // Upvotes live in the opened listing now (the sheet on a phone, the dialog
   // on desktop), not on every row: a column of "👍 0" said nothing while a
   // list was being scanned. Popularity still orders the list.
-  const upvote = upvotes ? <UpvoteButton variant="inline" resourceId={item.id} count={count} onCountChange={onVote} /> : null
+  const upvote = upvotes ? <UpvoteButton variant="recommend" name={item.name} resourceId={item.id} count={count} onCountChange={onVote} /> : null
+  // The opened listing's last part: the places near it in this list, then
+  // the whole list. Opening one closes this listing first.
+  const onwardSource = useListingOnward()
+  const onward: Onward | undefined = onwardSource
+    ? {
+        items: onwardSource.items,
+        place: onwardSource.place,
+        onOpen: (other) => {
+          setExpanded(false)
+          onExpandedChange?.(false)
+          onwardSource.open(other.id)
+        },
+        seeAll: { label: onwardSource.allLabel, onClick: () => { setExpanded(false); onExpandedChange?.(false) } },
+      }
+    : undefined
 
   // url fields explicitly opted into the collapsed row (showInHeader) — a
   // quick way to reach something like a WhatsApp "Join group" link without
@@ -836,14 +853,8 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
             color={color}
             found={found}
             upvote={upvote}
-            // A filter tap narrows the list behind the sheet, so the sheet
-            // gets out of the way first rather than filtering out of sight.
-            filters={{
-              onTagClick: (tag) => { close(); onTagClick(tag) },
-              onFilterOpen: () => { close(); onFilterOpen() },
-              onFilterBool: (key) => { close(); onFilterBool(key) },
-              onFilterSelect: (key, value) => { close(); onFilterSelect(key, value) },
-            }}
+            place={place ?? null}
+            onward={onward}
           />
         </MobileSheet>
       )}

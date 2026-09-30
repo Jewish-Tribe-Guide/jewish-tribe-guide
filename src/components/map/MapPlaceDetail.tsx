@@ -1,21 +1,18 @@
 'use client'
 
-import { useEffect, useLayoutEffect, useRef, useState, type ComponentProps, type ReactNode } from 'react'
-import Link from 'next/link'
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import type { DirectoryResource } from '@/types'
-import { PHOTO_FIELD_KEY, resolveCapabilities, type CategoryConfig } from '@/lib/categories'
-import PlaceDetailBody from '@/components/resources/PlaceDetailBody'
+import { resolveCapabilities, type CategoryConfig } from '@/lib/categories'
+import ListingView, { type Onward } from '@/components/resources/ListingView'
+import type { SearchFound } from '@/lib/askSearch'
 import FreshnessFooter from '@/components/resources/FreshnessFooter'
 import ListingEditBar from '@/components/resources/ListingEditBar'
 import ListingEditor from '@/components/resources/ListingEditor'
-import CategoryIcon from '@/components/CategoryIcon'
-import PinnedBadge from '@/components/PinnedBadge'
 import UpButton from '@/components/UpButton'
 import { ui } from '@/lib/uiConfig'
 import { routes } from '@/lib/routes'
 import { listingSlug } from '@/lib/listingSlug'
 import { useCommunitySlug } from '@/lib/communityContext'
-import { usePinned } from '@/lib/pinnedContext'
 import BackIconButton from '@/components/BackIconButton'
 
 type Props = {
@@ -26,16 +23,17 @@ type Props = {
    *  by the category listing sheet, where the list is the page behind the
    *  sheet and dragging down or tapping it away is the way back. */
   onBack?: () => void
-  /** The directory's filter taps: a tag, "Open", a filterable badge. The
-   *  map has no such filters, so it passes none and those chips are plain
-   *  labels. */
-  filters?: Pick<ComponentProps<typeof PlaceDetailBody>, 'onTagClick' | 'onFilterOpen' | 'onFilterBool' | 'onFilterSelect'>
   /** What the search that opened it matched — see PlaceDetailBody's `found`. */
-  found?: ComponentProps<typeof PlaceDetailBody>['found']
+  found?: SearchFound | null
   /** The directory's upvote control, under the name. Upvotes rank a
    *  category's list, so only the directory's sheet passes one; the map
    *  has no list order for it to change. */
   upvote?: ReactNode
+  /** Where it is, in the row's words ("Bustleton"). */
+  place?: string | null
+  /** The places nearby in the same category, after the listing: the
+   *  category's sheet passes them; the map has its own nearby list. */
+  onward?: Onward
 }
 
 /** The nearest ancestor that scrolls, i.e. the parent's scroll region. */
@@ -62,15 +60,9 @@ function scrollingAncestor(el: HTMLElement | null): HTMLElement | null {
  * directory. The upvote shows only when the directory's sheet passes one
  * (`upvote`): upvotes rank a category's list, which the map doesn't have.
  */
-export default function MapPlaceDetail({ item, category, color, onBack, filters, found, upvote }: Props) {
+export default function MapPlaceDetail({ item, category, color, onBack, found, upvote, place = null, onward }: Props) {
   const community = useCommunitySlug()
   const listingPath = routes.listing(community, category.id, listingSlug(item))
-  const { isPinned } = usePinned()
-  const pinned = isPinned(item.id)
-  const iconImageUrl =
-    (typeof item[PHOTO_FIELD_KEY] === 'string' && (item[PHOTO_FIELD_KEY] as string).trim()
-      ? (item[PHOTO_FIELD_KEY] as string)
-      : category.iconImageUrl) ?? undefined
   // Edit swaps this whole detail view for the listing-shaped editor
   // (ListingEditor), same as the desktop listing dialog —
   // scoped to this one component, since neither sheet it lives in has a
@@ -162,76 +154,33 @@ export default function MapPlaceDetail({ item, category, color, onBack, filters,
   return (
     <div ref={rootRef} className="space-y-4 pb-2">
       {onBack && <UpButton label="Back to list" onClick={onBack} className="" />}
-
-      {/* ── Header: icon, name, category, pin ────────────────────────────── */}
-      <div className="flex items-start gap-3">
-        {/* Same PinnedBadge GenericListingCard/NearbyList put on their own
-            avatars — self-start moved to this wrapper so the badge can
-            anchor to the same box without disturbing the icon's position. */}
-        <span className="relative shrink-0 self-start">
-          <CategoryIcon
-            icon={category.icon}
-            categoryId={category.id}
-            iconImageUrl={iconImageUrl}
-            color={color}
-            className="h-12 w-12 text-2xl"
-            sizePx={48}
-          />
-          {pinned && <PinnedBadge />}
-        </span>
-        {/* min-w-0 flex-1 so a long name wraps rather than pushing the row
-            wider. No top padding — self-start on the icon above already puts
-            its top edge flush with this block's, i.e. with the name's first
-            line; a pt would reintroduce the few-pixel gap that made the two
-            look unaligned. Nothing trails the name any more: Pin, Share and
-            Set as location moved from a kebab here into the edit bar's
-            overflow below, same as they did in the directory. */}
-        <div className="min-w-0 flex-1">
-          <h2 className="text-lg font-bold leading-tight text-slate-900">
-            <Link href={listingPath} className="hover:underline">
-              {item.name}
-            </Link>
-          </h2>
-          <p className="text-sm text-muted">{category.label}</p>
-          {upvote && <div className="mt-2">{upvote}</div>}
-        </div>
-      </div>
-
-      {/* This has never had a persistent collapsed-row header the way
-          GenericListingCard's mobile accordion does — a showInHeader url
-          field (e.g. Networking's Website link) had nowhere to show at all
-          here. See the prop's own comment. */}
-      <PlaceDetailBody item={item} category={category} includeHeaderUrlFields found={found} {...filters} />
-
-      <div className="pt-2 border-t border-slate-200 space-y-2">
-        {/* The freshness STATUS only. Its quiet "Suggest a correction" link
-            is gone — it was the map's one visible way in to Edit while Edit
-            lived in the kebab, and it sat at the same weight as the
-            timestamp beside it. The bar below is that way in now, as it is
-            on both directory surfaces. */}
-        <FreshnessFooter resourceId={item.id} confirmedAt={item.confirmedAt} />
-      </div>
-
-      {/* The last thing in the content, the way it closes the directory's
-          dropdown: part of the listing, seen whenever you've scrolled to the
-          end of it. Phase 3 docked it to the panel's bottom edge instead,
-          always on screen; that read as a toolbar bolted onto the map rather
-          than part of the place, and it was the one surface where the bar
-          wasn't where the directory puts it. A tap on it inside the mobile
-          sheet's content region is safe for the same reason Directions and
-          Call already are: a touch that doesn't move never becomes a sheet
-          drag, and the region doesn't capture the pointer.
-          Rendered even without edit: the overflow is the only home Pin,
-          Share and Set as location have here. `stack` for the overflow
-          because the captions need a dark ground, and there's no scrim here
-          to give them one — see ListingActionsFan's `placement`. */}
-      <ListingEditBar
-        onEdit={canEdit ? () => openForm('edit') : undefined}
+      <ListingView
         item={item}
         category={category}
+        color={color}
+        place={place}
+        found={found}
         path={listingPath}
-        fanPlacement="stack"
-        className="mt-1"
+        onward={onward}
+        upvote={upvote}
+        foot={
+          <div className="space-y-3 border-t border-slate-200 pt-3.5">
+            <FreshnessFooter resourceId={item.id} confirmedAt={item.confirmedAt} />
+            {/* The last thing before the places nearby: Suggest an edit, and
+                the ⋯ with Pin and Set as location (Share has its own button
+                up top). Rendered even without edit, for those two. `stack`
+                for the fan: there's no scrim behind it to give its captions
+                a dark ground. See ListingActionsFan's `placement`. */}
+            <ListingEditBar
+              onEdit={canEdit ? () => openForm('edit') : undefined}
+              item={item}
+              category={category}
+              path={listingPath}
+              fanPlacement="stack"
+              omit={['share']}
+            />
+          </div>
+        }
       />
     </div>
   )

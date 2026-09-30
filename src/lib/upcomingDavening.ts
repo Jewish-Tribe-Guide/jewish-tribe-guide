@@ -360,7 +360,7 @@ const lowerFirst = (s: string) => s.toLowerCase()
 /** Minutes since midnight → "7 AM" / "6:34 PM". A fixed-time row stores its
  *  own text ("7:00am"), a sunset-based one a formatted time ("6:34 PM"); a
  *  list of rows reads better in one style. */
-function clockTime(minutes: number): string {
+export function clockTime(minutes: number): string {
   const h = Math.floor(minutes / 60) % 24
   const m = minutes % 60
   const hour = h % 12 || 12

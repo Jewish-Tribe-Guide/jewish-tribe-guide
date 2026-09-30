@@ -93,10 +93,15 @@ export default function ListingActionsFan({
   category,
   path,
   placement: requested = 'auto',
+  omit = [],
 }: {
   item: DirectoryResource
   category: CategoryConfig
   path: string
+  /** Actions the listing already shows as buttons of their own: the opened
+   *  listing has Share among Directions and Call, so the fan holds only
+   *  Pin and Set as location there. */
+  omit?: ListingAction['id'][]
   /** `stack` for a surface with no scrim behind it — the map's panels,
    *  whose background is a live map. The captions are white with a text
    *  shadow, written for the dark ground of a scrim or of `stack`'s own
@@ -105,7 +110,7 @@ export default function ListingActionsFan({
    *  dialog's ‹ › arrows (NAV_CLEARANCE), which nothing else has. */
   placement?: 'auto' | 'stack'
 }) {
-  const actions = useListingActions(item, category, path)
+  const actions = useListingActions(item, category, path).filter((a) => !omit.includes(a.id))
   const isMobile = useIsMobile()
   const triggerRef = useRef<HTMLButtonElement>(null)
   const [placement, setPlacement] = useState<Placement | null>(null)

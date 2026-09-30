@@ -25,6 +25,7 @@ import { useIsMobile } from '@/lib/useIsMobile'
 import { useScrollShowHide, useSetScreenHeader } from '@/lib/headerVisibility'
 import { foundFor, searchAsk } from '@/lib/askSearch'
 import { neighborhoodsFor, placeName, townsFrom } from '@/lib/places'
+import { ListingOnwardContext, type ListingOnwardSource } from './listingOnward'
 import { useActiveCommunity, useOptionalCommunitySlug } from '@/lib/communityContext'
 import { travelCompare } from '@/lib/listingTravel'
 import { useLogSearchMiss } from '@/lib/useLogSearchMiss'
@@ -1120,6 +1121,15 @@ export default function GenericDirectory({ category, items, anchorLabel, address
     }
     return last ?? 'end'
   })()
+  // An opened listing's last part: the places near it in the list as it's
+  // filtered now, and the way back to all of them (ListingView's onward).
+  const onwardSource: ListingOnwardSource = {
+    items: filtered,
+    place: (item) => rowPlaces.get(item.id) ?? null,
+    open: openListing,
+    allLabel: `See all ${items.length} in ${category.pluralLabel}`,
+  }
+
   const questionCard = questionSpot && (
     <QuestionCard
       category={category}
@@ -1325,6 +1335,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
         // time, the same rule the map's nearby list follows.
         // NextMinyans: each shul row's next minyan (shul categories only).
         <NextMinyans enabled={hasMinyanim} items={items}>
+        <ListingOnwardContext.Provider value={onwardSource}>
         <SwipeRowGroup>
         <div className={grouping?.closed ? 'space-y-2' : undefined}>
         {sections.map((section) => (
@@ -1428,6 +1439,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
         {questionSpot === 'end' && <div className="pt-2">{questionCard}</div>}
         </div>
         </SwipeRowGroup>
+        </ListingOnwardContext.Provider>
         </NextMinyans>
       )}
       {/* A link an admin set for what this guide doesn't list ("Other

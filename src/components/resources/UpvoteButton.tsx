@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { getVoterToken, getMyVotedIds } from '@/lib/voteToken'
+import { ThumbIcon } from '@/components/icons'
 
 const VOTED_KEY = 'jpc_voted'
 const COUNT_KEY = 'jpc_vote_counts'
@@ -55,6 +56,7 @@ export default function UpvoteButton({
   count: initialCount,
   onCountChange,
   variant = 'box',
+  name,
 }: {
   resourceId: string
   count: number
@@ -62,7 +64,11 @@ export default function UpvoteButton({
   onCountChange?: (count: number) => void
   /** 'box' — the bordered 👍/count tile. 'inline' — a minimal "👍 count" that
    *  sits in a row (used in the collapsed listing header). */
-  variant?: 'box' | 'inline'
+  /** `recommend`: the small outline thumbs-up beside an opened listing's
+   *  name, with the count only once there is one. */
+  variant?: 'box' | 'inline' | 'recommend'
+  /** The listing's name, for a screen reader: "Recommend Judah". */
+  name?: string
 }) {
   const [count, setCount] = useState(initialCount)
   const [voted, setVoted] = useState(false) // set from localStorage after mount (hydration-safe)
@@ -145,6 +151,27 @@ export default function UpvoteButton({
   }
 
   const title = voted ? 'Remove your upvote' : 'Upvote this place'
+
+  if (variant === 'recommend') {
+    return (
+      <button
+        type="button"
+        onClick={handleClick}
+        disabled={busy}
+        aria-pressed={voted}
+        aria-label={`Recommend${name ? ` ${name}` : ''}${count > 0 ? `, ${count} recommend${count === 1 ? 's' : ''} it` : ''}`}
+        title={voted ? 'You recommend this' : 'Recommend'}
+        className={[
+          'inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-full border text-sm font-bold transition-colors cursor-pointer disabled:opacity-60',
+          count > 0 ? 'px-3' : 'w-9',
+          voted ? 'border-primary bg-primary/10 text-primary' : 'border-slate-300 bg-white text-slate-700 hover:border-slate-400',
+        ].join(' ')}
+      >
+        <ThumbIcon className="h-4 w-4" />
+        {count > 0 && <span aria-hidden="true">{count}</span>}
+      </button>
+    )
+  }
 
   if (variant === 'inline') {
     return (

@@ -183,28 +183,32 @@ describe('MapPlaceDetail', () => {
     // The freshness STATUS stays: it's a contribution of its own.
     expect(screen.getByText('Is this info current?')).toBeInTheDocument()
 
+    // Share is one of the listing's own buttons now, beside Directions and
+    // Call, so the overflow holds Pin (and Set as location) only.
+    expect(screen.getByRole('button', { name: 'Share' })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Actions for Goldi Market' }))
     expect(screen.getByRole('menuitem', { name: 'Pin' })).toBeInTheDocument()
-    expect(screen.getByRole('menuitem', { name: 'Share' })).toBeInTheDocument()
+    expect(screen.queryByRole('menuitem', { name: 'Share' })).not.toBeInTheDocument()
     // Removal is requested at the foot of the edit form, not from here.
     expect(screen.queryByRole('menuitem', { name: /report|remov/i })).not.toBeInTheDocument()
   })
 
-  // Part of the listing, the way it closes the directory's dropdown: the
-  // last thing in the content, after the freshness line, so it scrolls with
-  // the place rather than sitting docked over it (which phase 3 did).
+  // Part of the listing, not docked over it (which phase 3 did): the last
+  // thing about the place, after the freshness line. Only the places nearby
+  // come after it, and the map passes none.
   it('ends the content with the bar, after the freshness line', () => {
     const { container } = renderWithProviders(
       <PinnedProvider>
         <MapPlaceDetail item={makeListing({ name: 'Goldi Market' })} category={makeCategory()} color="#000" onBack={() => {}} />
       </PinnedProvider>,
     )
-    const content = container.firstElementChild as HTMLElement
-    const last = content.lastElementChild as HTMLElement
+    const view = container.querySelector('[data-testid="listing-view"]') as HTMLElement
+    const last = view.lastElementChild as HTMLElement
     expect(last).toContainElement(screen.getByRole('button', { name: 'Suggest an edit' }))
     expect(last).toContainElement(screen.getByRole('button', { name: 'Actions for Goldi Market' }))
     const freshness = screen.getByText('Is this info current?')
-    expect(freshness.compareDocumentPosition(last) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    const bar = screen.getByRole('button', { name: 'Suggest an edit' })
+    expect(freshness.compareDocumentPosition(bar) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
   // The bar is the last thing in the listing, so whoever taps it is usually
@@ -304,7 +308,7 @@ describe('MapPlaceDetail', () => {
     )
     expect(screen.queryByRole('button', { name: 'Suggest an edit' })).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Actions for Goldi Market' }))
-    expect(screen.getByRole('menuitem', { name: 'Share' })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: 'Pin' })).toBeInTheDocument()
   })
 
   // The overflow's captions are white with a text shadow, written for a dark
