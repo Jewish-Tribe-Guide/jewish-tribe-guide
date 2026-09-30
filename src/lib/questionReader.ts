@@ -1,0 +1,144 @@
+import { selectValues, type CategoryConfig } from './categories'
+import { filterFields, keepsHours, type MapFilterState } from './mapFilters'
+import type { DirectoryResource } from '@/types'
+
+// ── Reading a question into filters (decided Sep 30) ────────────────────────
+// An AI reads what someone typed and says which of the site's own filters
+// it means: "meat open now, all synagogues regardless, and the shabbos
+// friendly hotels" is Food with Meat and Open now, Synagogues, and Hotels
+// that are Shabbat friendly. It never writes the answer, and it can't
+// invent anything: it picks from what the site has (the vocabulary below),
+// and whatever it says that isn't there is dropped (tidyReading). The
+// site's own search then answers from the listings, with their sources
+// and dates, as it always does.
+//
+// A reading is the Map page's filters (mapFilters.ts), plus what those
+// can't hold: items to look for ("challah"), a place to be near, how far.
+
+export type Reading = {
+  categories: { id: string; openNow?: boolean; bool?: string[]; select?: Record<string, string[]> }[]
+  /** Items or dishes to look for, as the site names them ("Challah"). */
+  items?: string[]
+  /** "me" (the visitor), or a place the site knows (a hospital, a town). */
+  near?: string | null
+  withinMiles?: number | null
+  sortByDistance?: boolean
+}
+
+export type ReaderVocabulary = {
+  categories: {
+    id: string
+    name: string
+    openNow: boolean
+    filters: { key: string; label: string; kind: 'yes/no' | 'pick'; values?: string[] }[]
+  }[]
+  items: string[]
+  places: string[]
+}
+
+/** What the reader may choose from: each category with its filters and the
+ *  values its listings actually have, the items the site lists, and the
+ *  places it knows. Built from the live data, so a new hechsher or a new
+ *  category is readable the day it's added. */
+export function readerVocabulary(categories: readonly CategoryConfig[], listings: readonly DirectoryResource[], places: readonly string[]): ReaderVocabulary {
+  const items = new Set<string>()
+  const cats = categories.map((c) => {
+    const own = listings.filter((l) => l.category === c.id)
+    for (const f of c.detailFields.filter((x) => x.type === 'tags')) {
+      for (const l of own) for (const v of [...selectValues(l[f.key]), ...selectValues(l[`${f.key}_sometimes`])]) items.add(v)
+    }
+    return {
+      id: c.id,
+      name: c.pluralLabel,
+      openNow: keepsHours(c),
+      filters: filterFields(c).flatMap((f): ReaderVocabulary['categories'][number]['filters'] => {
+        if (f.type === 'boolean') return [{ key: f.key, label: f.filterLabel ?? f.label, kind: 'yes/no' as const }]
+        const values = [...new Set(own.flatMap((l) => selectValues(l[f.key])))].sort()
+        return values.length ? [{ key: f.key, label: f.filterLabel ?? f.label, kind: 'pick' as const, values }] : []
+      }),
+    }
+  })
+  return { categories: cats, items: [...items].sort(), places: [...places] }
+}
+
+/** Keeps only what the vocabulary has: known categories, their own filter
+ *  keys, values that exist, items the site lists, places it knows. A
+ *  reading the AI got partly wrong loses the wrong part; it never gains
+ *  something the site doesn't have. */
+export function tidyReading(raw: unknown, vocab: ReaderVocabulary): Reading {
+  const r = (raw ?? {}) as Partial<Reading>
+  const lower = (s: string) => s.toLowerCase().trim()
+  const byId = new Map(vocab.categories.map((c) => [c.id, c]))
+  const categories: Reading['categories'] = []
+  for (const c of Array.isArray(r.categories) ? r.categories : []) {
+    const known = c && typeof c.id === 'string' ? byId.get(c.id) : undefined
+    if (!known || categories.some((x) => x.id === known.id)) continue
+    const out: Reading['categories'][number] = { id: known.id }
+    if (c.openNow === true && known.openNow) out.openNow = true
+    const bool = (Array.isArray(c.bool) ? c.bool : []).filter((k) => known.filters.some((f) => f.kind === 'yes/no' && f.key === k))
+    if (bool.length) out.bool = [...new Set(bool)]
+    const select: Record<string, string[]> = {}
+    for (const [key, values] of Object.entries(c.select && typeof c.select === 'object' ? c.select : {})) {
+      const field = known.filters.find((f) => f.kind === 'pick' && f.key === key)
+      if (!field || !Array.isArray(values)) continue
+      // Matched without regard to case ("keystone-k"), kept as the site writes it.
+      const kept = values.flatMap((v) => (typeof v === 'string' ? (field.values ?? []).filter((x) => lower(x) === lower(v)) : []))
+      if (kept.length) select[key] = [...new Set(kept)]
+    }
+    if (Object.keys(select).length) out.select = select
+    categories.push(out)
+  }
+  const items = (Array.isArray(r.items) ? r.items : []).flatMap((v) => (typeof v === 'string' ? vocab.items.filter((x) => lower(x) === lower(v)) : []))
+  const near = typeof r.near === 'string' ? (lower(r.near) === 'me' ? 'me' : (vocab.places.find((p) => lower(p) === lower(r.near as string)) ?? null)) : null
+  const within = typeof r.withinMiles === 'number' && r.withinMiles > 0 && r.withinMiles <= 100 ? r.withinMiles : null
+  // "Within 3 miles" or "nearest first" with nowhere named is from here.
+  const from = near ?? (within || r.sortByDistance === true ? 'me' : null)
+  return {
+    categories,
+    ...(items.length ? { items: [...new Set(items)] } : {}),
+    ...(from ? { near: from } : {}),
+    ...(within ? { withinMiles: within } : {}),
+    ...(r.sortByDistance === true || from ? { sortByDistance: true } : {}),
+  }
+}
+
+/** The reading's categories and their filters, as the Map page holds them. */
+export function readingFilters(reading: Reading): { categories: string[]; filters: MapFilterState } {
+  const filters: MapFilterState = {}
+  for (const c of reading.categories) {
+    const f: MapFilterState[string] = {}
+    if (c.openNow) f.openNow = true
+    if (c.bool?.length) f.bool = c.bool
+    if (c.select && Object.keys(c.select).length) f.select = c.select
+    if (Object.keys(f).length) filters[c.id] = f
+  }
+  return { categories: reading.categories.map((c) => c.id), filters }
+}
+
+// ── What's sent ─────────────────────────────────────────────────────────────
+
+export const READER_INSTRUCTIONS = `You read questions typed into the search box of a community guide to kosher food, synagogues and Jewish services, and say which of the guide's own filters the question means. You never answer the question and never add places or facts.
+
+Reply with JSON only, in this shape:
+{"categories":[{"id":"<category id>","openNow":true|false,"bool":["<yes/no filter key>"],"select":{"<pick filter key>":["<value>"]}}],"items":["<item>"],"near":"me"|"<place>"|null,"withinMiles":<number>|null,"sortByDistance":true|false}
+
+Rules:
+- Use only category ids, filter keys, values, items and places from the vocabulary. Copy values exactly. If the question asks for something the vocabulary doesn't have, leave it out.
+- One entry per category the question is about. With several ("meat places, all synagogues and the hotels"), several entries, each with only its own filters.
+- openNow only where the question asks what's open now, and only for that category ("synagogues regardless of open now" means no openNow for synagogues). Only categories marked openNow can have it.
+- A word that is one of a category's filter values means that filter ("meat" is Food Type: Meat; "Keystone" is Kosher Cert: Keystone-K; "Orthodox" is every Orthodox denomination). "restaurant" or "restaurants" always means Type: Restaurant, also in "restaurant near me".
+- "open now" with no kind of place named means every category marked openNow, each with openNow.
+- items: things to buy or eat that a place stocks ("challah", "cholov yisroel milk" is "Chalav Yisroel Milk"), matched to the item list.
+- near: "me" for "near me", "nearby", "closest"; a place from the list for "near HUP", "in Cherry Hill". sortByDistance when asked for nearest first or "sort by distance".
+- withinMiles only when a distance is given ("within 3 miles").
+- Words with no meaning of their own ("only", "show me", "all the", "please") change nothing.`
+
+/** The instructions and vocabulary first, the same for every question, so
+ *  the provider's prompt caching charges them at a discount after the
+ *  first; the question last. */
+export function readerMessages(question: string, vocab: ReaderVocabulary) {
+  return [
+    { role: 'system' as const, content: `${READER_INSTRUCTIONS}\n\nVocabulary:\n${JSON.stringify(vocab)}` },
+    { role: 'user' as const, content: question },
+  ]
+}
