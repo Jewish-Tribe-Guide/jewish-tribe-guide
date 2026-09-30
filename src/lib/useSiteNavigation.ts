@@ -132,10 +132,12 @@ export function useSiteNavigation(): SiteNavigation {
 
   const viewMapForCategory = useCallback(
     (categoryId: string, query?: string, filters?: MapFilters) => {
+      // A category page's Open now is that category's, not every one's
+      // (the map's Open now is per category; see mapFilters.ts).
       const qs = mapQueryString({
         categories: [categoryId],
         query,
-        openNow: filters?.openNow,
+        openIn: filters?.openNow ? [categoryId] : null,
         bool: filters?.bool,
         select: filters?.select,
       })

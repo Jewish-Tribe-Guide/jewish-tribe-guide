@@ -408,3 +408,15 @@ export function JoinIcon({ className }: IconProps) {
     </svg>
   )
 }
+
+/** Filters: two sliders. The Map page's Filters button. */
+export function SlidersIcon({ className }: IconProps) {
+  return (
+    <svg className={className} fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M20 7h-9" />
+      <path d="M14 17H5" />
+      <circle cx="17" cy="17" r="3" />
+      <circle cx="7" cy="7" r="3" />
+    </svg>
+  )
+}

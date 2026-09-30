@@ -59,7 +59,7 @@ export default function SubscribeSection({
   // getBoundingClientRect and rendered through a portal at `position: fixed`
   // — an in-flow `absolute` tooltip got clipped by this grid's own
   // `overflow-y-auto` for any row near its scrolled edge (confirmed live);
-  // `fixed` escapes that the same way CheckboxDropdown/ListingActionsFan's
+  // `fixed` escapes that the same way ListingActionsFan's
   // own portaled popups already do elsewhere in this app, for the same
   // reason. `delayedHoverRef` is the pending "not hovered long enough yet"
   // timer; cleared on every enter/leave so a quick pass across several rows
@@ -95,7 +95,7 @@ export default function SubscribeSection({
   // flash immediately the next time the picker reopens, for a row that isn't
   // actually being hovered. Also closes it on the grid's own scroll — a
   // `fixed` tooltip has no way to follow its row once that row moves under
-  // it, the same reason CheckboxDropdown's own popup closes on scroll too.
+  // it.
   useEffect(() => {
     if (!pickerOpen) {
       if (delayedHoverRef.current != null) clearTimeout(delayedHoverRef.current)
@@ -348,7 +348,7 @@ export default function SubscribeSection({
                       its own row got visibly clipped by that for rows near the
                       scrolled edge. `fixed`, escaping to document.body, paints
                       in the root stacking context instead, the same fix
-                      CheckboxDropdown/ListingActionsFan already use for their
+                      ListingActionsFan already uses for its
                       own popups. `-4px` above the row's own top, not flush
                       against it, so the tooltip doesn't touch the text it's
                       naming. */}

@@ -93,7 +93,7 @@ function FiltersBody({ hasOpenNow, openNow, onOpenNow, booleans, onBoolean, sele
   )
 }
 
-function SwitchRow({ label, on, onToggle }: { label: string; on: boolean; onToggle: () => void }) {
+export function SwitchRow({ label, on, onToggle }: { label: string; on: boolean; onToggle: () => void }) {
   return (
     <div className="flex items-center justify-between gap-3 py-1">
       <span className="text-[15px] font-semibold text-ink">{label}</span>
@@ -155,7 +155,7 @@ export function FilterChip({
 
 /** The sheet on a wider screen: a dialog over the dimmed list, closed by its
  *  ✕, the backdrop or Escape, like the page's other dialogs. */
-function FiltersDialog({ isOpen, onClose, children }: { isOpen: boolean; onClose: () => void; children: React.ReactNode }) {
+export function FiltersDialog({ isOpen, onClose, children, wide = false }: { isOpen: boolean; onClose: () => void; children: React.ReactNode; wide?: boolean }) {
   useBodyScrollLock(isOpen)
   useEffect(() => {
     if (!isOpen) return
@@ -173,7 +173,7 @@ function FiltersDialog({ isOpen, onClose, children }: { isOpen: boolean; onClose
         if (e.target === e.currentTarget) onClose()
       }}
     >
-      <div role="dialog" aria-modal="true" aria-label="Filters" className="dialog-in flex max-h-[76vh] w-full max-w-md flex-col rounded-2xl bg-white shadow-xl">
+      <div role="dialog" aria-modal="true" aria-label="Filters" className={`dialog-in flex max-h-[76vh] w-full flex-col rounded-2xl bg-white shadow-xl ${wide ? 'max-w-xl' : 'max-w-md'}`}>
         <div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-5 py-4">
           <h2 className="text-lg font-extrabold text-ink">Filters</h2>
           <button

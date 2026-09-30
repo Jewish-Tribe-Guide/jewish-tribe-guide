@@ -5,12 +5,29 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import ResourceMap, { type MapPoint } from './ResourceMap'
 import CategoryFilter, { type FilterOption } from './CategoryFilter'
 import CategoryPickerList from './CategoryPickerList'
+import MapFiltersSheet, { type MapFilterSection } from './MapFiltersSheet'
+import { FilterChip } from '@/components/resources/FiltersSheet'
 import NearbyList from './NearbyList'
 import MapPlaceDetail from './MapPlaceDetail'
 import MobileNearbySheet, { type MobileNearbySheetHandle } from './MobileNearbySheet'
 import { useAllListings } from '@/lib/useAllListings'
 import { useCategories } from '@/lib/useCategories'
 import { DEFAULT_CATEGORY_ICON, resolveCapabilities, selectValues } from '@/lib/categories'
+import {
+  activeFilters,
+  filterCount,
+  filterFields,
+  keepsHours,
+  openNowAll,
+  passesFields,
+  readMapFilters,
+  setOpenNowFor,
+  toggleBool,
+  toggleOpenNow,
+  toggleSelect,
+  writeMapFilters,
+  type MapFilterState,
+} from '@/lib/mapFilters'
 import { haversineMiles } from '@/lib/geo'
 import { useHospitals } from '@/lib/useHospitals'
 import { useIsMobile } from '@/lib/useIsMobile'
@@ -20,7 +37,7 @@ import { foundFor, searchAsk, type SearchFound } from '@/lib/askSearch'
 import { hoursOpenNow, businessClosure } from '@/lib/hours'
 import { useNow } from '@/lib/useNow'
 import { ui } from '@/lib/uiConfig'
-import { ChevronLeftIcon, ExpandIcon, CollapseIcon, PinIcon } from '@/components/icons'
+import { ChevronLeftIcon, ExpandIcon, CollapseIcon, PinIcon, SlidersIcon } from '@/components/icons'
 import { categoryTint, getCategoryColor, HOSPITAL_COLOR, HOSPITAL_ICON } from '@/lib/categoryColor'
 import LocationControl, { type LocationControls } from '@/components/home/LocationControl'
 import { usePinned } from '@/lib/pinnedContext'
@@ -45,6 +62,29 @@ function resolveInitialSelected(categories: string[] | undefined, category: stri
 }
 
 const HOSPITALS_ID = '__hospitals__'
+
+/** The places open right now among the categories whose Open now is on.
+ *  Before the page has hydrated there's no time (see useNow): only closed
+ *  businesses are left out until there is. */
+function openNowIdsFor(
+  points: readonly { id: string; raw?: DirectoryResource | null }[],
+  filters: MapFilterState,
+  clock: number | null,
+  hoursKeysByCat: Map<string, string[]>,
+): string[] {
+  if (!Object.values(filters).some((f) => f.openNow)) return []
+  const now = clock === null ? null : new Date(clock)
+  return points
+    .filter((p) => {
+      if (!p.raw || !filters[p.raw.category]?.openNow) return false
+      // See GenericDirectory's copy of this: a closed business is never open,
+      // whatever hours it still has saved.
+      if (businessClosure(p.raw as unknown as Record<string, unknown>)) return false
+      const keys = hoursKeysByCat.get(p.raw.category)
+      return !keys?.length || now === null || keys.some((k) => hoursOpenNow(p.raw![k], now) === true)
+    })
+    .map((p) => p.id)
+}
 // The hospital pin's colour and glyph live in categoryColor.ts, shared with
 // HospitalsDirectory's header band. Re-exported here for the map's own
 // callers.
@@ -351,7 +391,9 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   useEffect(() => {
     if (!fullscreen) return
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') exitFullscreen()
+      // A dialog open over the map (the Filters sheet) closes on its own
+      // Escape; the same key mustn't also close the map behind it.
+      if (e.key === 'Escape' && !document.querySelector('[role="dialog"][aria-modal="true"]')) exitFullscreen()
     }
     document.addEventListener('keydown', onKeyDown)
     // Fullscreen is a fixed overlay covering the viewport — nothing behind
@@ -570,22 +612,25 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // activeTerms below); `input` (the box's live value) only drives the
   // autocomplete dropdown until then, and stays visible after a search,
   // same as the Google Maps app — it isn't cleared back to a blank box.
-  const initialQueryText = initialQuery ?? (initialFilters?.openNow ? 'open now' : '')
+  const initialQueryText = initialQuery ?? ''
   const [input, setInput] = useState(initialQueryText)
   const [committedQuery, setCommittedQuery] = useState(initialQueryText)
 
   const commitQuery = (raw: string) => {
     const v = raw.trim()
     if (!v) return
+    // "open now" typed is the Filters sheet's Open now for everything, not
+    // words to look for: it switches on, and the box empties.
+    if (isOpenNowWord(v)) {
+      openNowEverywhere()
+      return
+    }
     setCommittedQuery(v)
   }
   const clearQuery = () => {
     setInput('')
     setCommittedQuery('')
   }
-  // Whether the committed query is asking for "open now" rather than a
-  // literal text match — applied as its own predicate in visiblePoints below.
-  const openNowActive = isOpenNowWord(committedQuery)
 
   // ── Search autocomplete — Google-Maps-style dropdown of matching places
   // while typing, independent of the live text-filter above (which narrows
@@ -642,8 +687,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
     return q.length === 0 || 'open now'.startsWith(q)
   }, [input])
   const selectOpenNow = () => {
-    setInput('open now')
-    setCommittedQuery('open now')
+    openNowEverywhere()
     setSearchFocused(false)
     mobileSearchInputRef.current?.blur()
     desktopSearchInputRef.current?.blur()
@@ -722,14 +766,31 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   }, [activeTerms, allPoints, categories, committedQuery, countCommunity])
   const foundOnPoint = (id: string | undefined) => (id ? (askIds?.get(id) ?? null) : null)
 
-  // ── Field filters (kosher / type / … carried from the directory) ─────────
-  // Held as a serializable spec (also what's persisted to history). "Open
-  // now" isn't here — it's just the committed query text (see openNowActive
-  // above), so it behaves exactly like any other search instead of stacking
-  // as a separate persistent chip. Predicates below are derived once
-  // categories load.
-  const [boolFields, setBoolFields] = useState<string[]>(initialFilters?.bool ?? [])
-  const [selectFilters, setSelectFilters] = useState<Record<string, string[]>>(initialFilters?.select ?? {})
+  // ── Filters, per category (see mapFilters.ts) ────────────────────────────
+  // Read from the link (or a category page's own Map button) once the
+  // categories have loaded, since a filter belongs to one of them; the
+  // visitor's own changes replace that reading from then on. Open now is
+  // each category's own, where it keeps hours.
+  const initialFiltersQuery = {
+    open: initialFilters?.openNow ? '1' : initialFilters?.openIn?.join(',') || null,
+    is: initialFilters?.bool?.join(',') || null,
+    sel:
+      Object.entries(initialFilters?.select ?? {})
+        .filter(([, vs]) => vs.length)
+        .map(([k, vs]) => `${k}:${vs.join('|')}`)
+        .join(',') || null,
+  }
+  const filtersForCategory = initialCategory ?? (initialSelectedCategories && [...initialSelectedCategories].length === 1 ? [...initialSelectedCategories][0] : null)
+  const [ownFilters, setOwnFilters] = useState<MapFilterState | null>(null)
+  const filters = useMemo<MapFilterState>(
+    () => ownFilters ?? (categories ? readMapFilters(initialFiltersQuery, categories, filtersForCategory) : {}),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [ownFilters, categories, initialFiltersQuery.open, initialFiltersQuery.is, initialFiltersQuery.sel, filtersForCategory],
+  )
+  const hasFilters = Object.keys(filters).length > 0
+  const filtersKey = JSON.stringify(filters)
+  const updateFilters = (next: (f: MapFilterState) => MapFilterState) => setOwnFilters(next(filters))
+  const [filtersOpen, setFiltersOpen] = useState(false)
 
   // Re-applies the query-string-derived view (selected chips, search text,
   // bool/select filters) whenever a NEW navigation actually changes it — a
@@ -761,6 +822,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   const initialViewKey = [
     categoriesKey,
     initialQueryText,
+    initialFiltersQuery.open ?? '',
     [...(initialFilters?.bool ?? [])].sort().join(','),
     Object.entries(initialFilters?.select ?? {})
       .sort(([a], [b]) => a.localeCompare(b))
@@ -774,8 +836,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
     setSelected(resolveInitialSelected(initialSelectedCategories, initialCategory))
     setInput(initialQueryText)
     setCommittedQuery(initialQueryText)
-    setBoolFields(initialFilters?.bool ?? [])
-    setSelectFilters(initialFilters?.select ?? {})
+    setOwnFilters(null)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialViewKey])
 
@@ -788,89 +849,27 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
     return m
   }, [categories])
 
-  // A field's display label. Searches every category (not just the one the
-  // visitor arrived from) since a filter can now also be turned on directly
-  // from the map's own category picker, for any category shown there.
-  const labelForField = (key: string): string => {
-    for (const cat of categories ?? []) {
-      const f = cat.detailFields.find((x) => x.key === key)
-      if (f) return f.filterLabel ?? f.label
-    }
-    return key
-  }
+  // "Open now" has to re-answer as the clock moves: a pin that closed at 6pm
+  // should drop off a filtered map at 6pm, not when the visitor next reloads.
+  const clock = useNow()
 
-  // Whether `key` is actually one of `categoryId`'s own declared fields —
-  // distinguishes "this listing's category doesn't have this field at all"
-  // (a Synagogue has no `isKosher` — always let it pass, see below) from
-  // "this listing's category HAS this field, but this particular listing
-  // just never had it set" (a Mikvah with no `keilim` key at all, because
-  // it was never explicitly toggled — that means no, not "doesn't apply").
-  // Only the first case gets the lenient pass; a field a listing's own
-  // category declares is checked strictly, undefined included.
-  function categoryHasField(categoryId: string, key: string): boolean {
-    return (categories ?? []).some((c) => c.id === categoryId && c.detailFields.some((f) => f.key === key))
-  }
+  // Whether a listing passes its own category's filters, bar Open now (see
+  // openNowIds below, which has the clock).
+  const passesOwnFilters = useCallback((r: DirectoryResource) => passesFields(r as unknown as Record<string, unknown>, filters[r.category]), [filters])
 
-  // Active field-level filters (bool/select), each an AND predicate — but
-  // only for listings whose own category actually has the field; a listing
-  // from an unrelated category always passes (so "Kosher" ignores shuls,
-  // etc. — see categoryHasField above). Shown on-screen not as their own
-  // removable chips but folded into the owning category's own chip (see
-  // optionsWithFilters) — this array is now purely the filtering logic, no
-  // display data.
-  const filterChips = useMemo(() => {
-    const chips: { id: string; test: (r: DirectoryResource) => boolean }[] = []
-    for (const field of boolFields) {
-      chips.push({
-        id: `b:${field}`,
-        test: (r) => !categoryHasField(r.category, field) || r[field] === true,
-      })
-    }
-    for (const [field, values] of Object.entries(selectFilters)) {
-      if (!values.length) continue
-      chips.push({
-        id: `s:${field}`,
-        // A multiSelect field stores an array (e.g. foodType: ["Restaurant",
-        // "Catering"]), not a plain string — selectValues() normalizes both
-        // shapes, so a listing tagged with several values still matches on
-        // any one of them instead of only an exact single-value match.
-        test: (r) => {
-          if (!categoryHasField(r.category, field)) return true
-          return selectValues(r[field]).some((v) => values.includes(v))
-        },
-      })
-    }
-    return chips
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [boolFields, selectFilters, categories, initialCategory])
-
-  // `options`, with each category's own active bool/select filters (if any)
-  // folded in as a display suffix — e.g. Mikvah's chip reads "Mikvah 3 ·
-  // Keilim" instead of the count alone, so an active filter shows up right on
-  // the chip it belongs to rather than as a separate row of removable pills
-  // underneath (which read as a disconnected, generically-colored "extra
-  // thing" rather than part of the category it was actually scoped to). The
-  // count itself also switches from the category's raw total to however many
-  // of its points actually pass that filter — reusing filterChips' own tests
-  // (each already a no-op for a category that doesn't own the field) rather
-  // than re-deriving the same logic a second way.
+  // Each category's chip counts what its filters leave (73, or 5 with Meat,
+  // Keystone-K and Open now on); nothing else about the chip changes.
   const optionsWithFilters = useMemo(() => {
+    if (!hasFilters) return options
+    const open = new Set(openNowIdsFor(allPoints, filters, clock, hoursKeysByCat))
     return options.map((o) => {
-      const parts: string[] = []
-      for (const key of boolFields) {
-        if (categoryHasField(o.id, key)) parts.push(labelForField(key))
-      }
-      for (const [key, values] of Object.entries(selectFilters)) {
-        if (values.length && categoryHasField(o.id, key)) parts.push(values.join('/'))
-      }
-      if (parts.length === 0) return o
-      const count = allPoints.filter(
-        (p) => p.filterId === o.id && (!p.raw || filterChips.every((c) => c.test(p.raw as DirectoryResource))),
-      ).length
-      return { ...o, count, filterSuffix: parts.join(', ') }
+      const f = filters[o.id]
+      if (!f) return o
+      const count = allPoints.filter((p) => p.filterId === o.id && (!p.raw || (passesOwnFilters(p.raw) && (!f.openNow || open.has(p.id))))).length
+      return { ...o, count }
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [options, boolFields, selectFilters, categories, allPoints, filterChips])
+  }, [options, filtersKey, allPoints, passesOwnFilters, hoursKeysByCat, clock])
 
   // Keeps the standalone map screen's own address bar in sync with the
   // category chips, committed search/filters, and selected pin — so a
@@ -903,18 +902,21 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   const allSelected = !selected || (selected.size === options.length && options.every((o) => selected.has(o.id)))
   useEffect(() => {
     if (!standalone) return
+    const written = writeMapFilters(filters, categories ?? [])
     const qs = mapQueryString({
       categories: allSelected ? null : Array.from(selected ?? []),
-      query: openNowActive ? null : committedQuery || null,
-      openNow: openNowActive,
-      bool: boolFields,
-      select: selectFilters,
+      query: committedQuery || null,
+      openNow: written.open === '1',
+      openIn: written.open && written.open !== '1' ? written.open.split(',') : null,
+      bool: written.is ? written.is.split(',') : null,
+      select: written.sel ? Object.fromEntries(written.sel.split(',').map((pair) => [pair.slice(0, pair.indexOf(':')), pair.slice(pair.indexOf(':') + 1).split('|')])) : null,
       place: selectedPointId ?? null,
     })
     const url = `${window.location.pathname}${qs}`
     if (url === `${window.location.pathname}${window.location.search}`) return
     window.history.replaceState(window.history.state, '', url)
-  }, [standalone, committedQuery, selected, allSelected, openNowActive, boolFields, selectFilters, selectedPointId])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [standalone, committedQuery, selected, allSelected, filtersKey, categories, selectedPointId])
 
   // "Open now" has to re-answer as the clock moves — a pin that closed at 6pm
   // should drop off a filtered map at 6pm, not when the visitor next reloads.
@@ -926,27 +928,14 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // unchanged result is `===` to the last one and the memo below doesn't
   // recompute at all. When the chip is off this is the empty string forever
   // and the clock reaches nothing.
-  const clock = useNow()
-  const openNowIds = useMemo(() => {
-    if (!openNowActive) return ''
-    // Before the page has hydrated there's no time (see useNow): only closed
-    // businesses are left out until there is.
-    const now = clock === null ? null : new Date(clock)
-    return allPoints
-      .filter((p) => {
-        if (!p.raw) return true
-        // See GenericDirectory's copy of this: a closed business is never open,
-        // whatever hours it still has saved.
-        if (businessClosure(p.raw as unknown as Record<string, unknown>)) return false
-        const keys = hoursKeysByCat.get(p.raw.category)
-        return !keys?.length || now === null || keys.some((k) => hoursOpenNow(p.raw![k], now) === true)
-      })
-      .map((p) => p.id)
-      .join('|')
-  }, [openNowActive, clock, allPoints, hoursKeysByCat])
+  const openNowIds = useMemo(
+    () => openNowIdsFor(allPoints, filters, clock, hoursKeysByCat).join('|'),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [filtersKey, clock, allPoints, hoursKeysByCat],
+  )
 
   const visiblePoints = useMemo(() => {
-    const openNow = openNowActive ? new Set(openNowIds.split('|')) : null
+    const openNow = new Set(openNowIds.split('|'))
     return allPoints
       // Pinned is a UNION with the category chips, not a replacement — a
       // pinned place shows up whether or not its own category chip happens
@@ -956,9 +945,10 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
       .filter((p) =>
         askIds === null ? true : p.raw ? askIds.has(p.raw.id) : activeTerms.every((t) => stripApostrophes(p.searchText).includes(t)),
       )
-      .filter((p) => !p.raw || filterChips.every((c) => c.test(p.raw as DirectoryResource)))
-      .filter((p) => !openNow || openNow.has(p.id))
-  }, [allPoints, effectiveSelected, askIds, activeTerms, filterChips, openNowActive, openNowIds, pinnedSelected])
+      .filter((p) => !p.raw || passesOwnFilters(p.raw))
+      .filter((p) => !p.raw || !filters[p.raw.category]?.openNow || openNow.has(p.id))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allPoints, effectiveSelected, askIds, activeTerms, passesOwnFilters, openNowIds, pinnedSelected])
   // A plain `[...visiblePoints, ...droppedMapPoints]` spread inline in the
   // JSX below would build a fresh array on every ResourceMapView render —
   // including ones that don't touch either input, e.g. a background tap
@@ -976,7 +966,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // keystroke, and (b) tell ResourceMap it should refit the viewport to the
   // results even when a user location is set (which normally takes priority
   // over reframing — see ResourceMap's marker-sync effect).
-  const searchActive = !!committedQuery || filterChips.length > 0
+  const searchActive = !!committedQuery || hasFilters
 
   // Committing a search query or filter chip (not each keystroke —
   // committedQuery/filterChips only change at commit points, unlike
@@ -1012,7 +1002,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
       setSidebarCollapsed(false)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [committedQuery, filterChips, isMobile])
+  }, [committedQuery, filtersKey, isMobile])
 
   // Whether every chip in the row — the real categories AND the Pinned chip,
   // when it's showing — is currently on. Mirrors CategoryFilter's own `allOn`
@@ -1188,73 +1178,24 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
     setDraftSelected(draftAllOn ? new Set() : new Set(options.map((o) => o.id)))
   }
 
-  // Adds `id` to the current selection without touching anything else —
-  // including the `null` "everything shown" state, which stays `null` (not
-  // materialized into an explicit full Set) when `id` is already included,
-  // so this never turns an implicit "all" into a Set that then excludes a
-  // category added to the config later.
-  function ensureSelected(id: string) {
-    setSelected((prev) => {
-      const cur = prev ?? new Set(options.map((o) => o.id))
-      if (cur.has(id)) return prev
-      return new Set(cur).add(id)
-    })
+  // ── The Filters sheet's changes ───────────────────────────────────────────
+  // Every category showing that keeps hours: the sheet's top Open now,
+  // typing "open now", and the search's own "Open now" suggestion.
+  function openNowEverywhere() {
+    setInput('')
+    setCommittedQuery('')
+    updateFilters((f) => setOpenNowFor(f, categories ?? [], true))
   }
-
-  // Turning a category's OWN filter on implies wanting to see that category —
-  // same logic in both: pick a Kosher Cert for Food Establishments and it
-  // switches on even if you hadn't checked it yet, instead of silently doing
-  // nothing until you separately remember to also check the box.
-  function toggleBoolField(categoryId: string, key: string) {
-    const adding = !boolFields.includes(key)
-    setBoolFields((prev) => (prev.includes(key) ? prev.filter((f) => f !== key) : [...prev, key]))
-    if (adding) {
-      ensureSelected(categoryId)
-      track('field_filter_selected', { category: categoryId, field: key })
-    }
+  function onSheetOpenNow(categoryId: string) {
+    updateFilters((f) => toggleOpenNow(f, categoryId))
   }
-  function toggleSelectValue(categoryId: string, key: string, value: string) {
-    const adding = !(selectFilters[key] ?? []).includes(value)
-    setSelectFilters((prev) => {
-      const cur = prev[key] ?? []
-      return { ...prev, [key]: cur.includes(value) ? cur.filter((v) => v !== value) : [...cur, value] }
-    })
-    if (adding) {
-      ensureSelected(categoryId)
-      track('field_filter_selected', { category: categoryId, field: key, value })
-    }
+  function onSheetBoolean(categoryId: string, key: string) {
+    if (!filters[categoryId]?.bool?.includes(key)) track('field_filter_selected', { category: categoryId, field: key })
+    updateFilters((f) => toggleBool(f, categoryId, key))
   }
-
-  // Same idea as ensureSelected/toggleBoolField/toggleSelectValue above, but
-  // for the full-screen picker specifically — its checkboxes read from
-  // draftSelected, not the live selection (see openCategoriesPicker), so the
-  // "picking a filter implies wanting the category" side effect has to land
-  // on the draft too. Landing it on live `selected` instead left the
-  // checkbox unchecked (wrong state shown) and got silently overwritten the
-  // moment Apply committed the draft over it. The filter value itself
-  // (boolFields/selectFilters) still applies live either way — only which
-  // state the auto-select touches differs.
-  function ensureDraftSelected(id: string) {
-    setDraftSelected((prev) => (prev.has(id) ? prev : new Set(prev).add(id)))
-  }
-  function toggleBoolFieldInPicker(categoryId: string, key: string) {
-    const adding = !boolFields.includes(key)
-    setBoolFields((prev) => (prev.includes(key) ? prev.filter((f) => f !== key) : [...prev, key]))
-    if (adding) {
-      ensureDraftSelected(categoryId)
-      track('field_filter_selected', { category: categoryId, field: key })
-    }
-  }
-  function toggleSelectValueInPicker(categoryId: string, key: string, value: string) {
-    const adding = !(selectFilters[key] ?? []).includes(value)
-    setSelectFilters((prev) => {
-      const cur = prev[key] ?? []
-      return { ...prev, [key]: cur.includes(value) ? cur.filter((v) => v !== value) : [...cur, value] }
-    })
-    if (adding) {
-      ensureDraftSelected(categoryId)
-      track('field_filter_selected', { category: categoryId, field: key, value })
-    }
+  function onSheetSelect(categoryId: string, key: string, value: string) {
+    if (!filters[categoryId]?.select?.[key]?.includes(value)) track('field_filter_selected', { category: categoryId, field: key, value })
+    updateFilters((f) => toggleSelect(f, categoryId, key, value))
   }
 
   const loading = listings === null || categories === null
@@ -1270,7 +1211,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // sidebar starts bare (just the search box + quick chips), not with every
   // place already listed; the results list only appears once there's a
   // reason to show one.
-  const desktopNarrowed = selected !== null || committedQuery.length > 0 || filterChips.length > 0 || pinnedSelected
+  const desktopNarrowed = selected !== null || committedQuery.length > 0 || hasFilters || pinnedSelected
 
   // Whether the sidebar is actually on screen right now — either because
   // something narrowed the map down (a search, a category, a selected
@@ -1497,6 +1438,92 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
     </div>
   )
 
+  // ── Filters: one button, one sheet, the chips of what's on ───────────────
+  // The categories showing, in the chip row's order: the sheet's sections.
+  const showingCategories = useMemo(() => {
+    const byId = new Map((categories ?? []).map((c) => [c.id, c]))
+    return options.flatMap((o) => (effectiveSelected.has(o.id) && byId.has(o.id) ? [byId.get(o.id)!] : []))
+  }, [options, effectiveSelected, categories])
+  const topOpenNow = openNowAll(filters, showingCategories)
+  const filterSections = useMemo<MapFilterSection[]>(() => {
+    return showingCategories.flatMap((c) => {
+      const f = filters[c.id] ?? {}
+      const fields = filterFields(c)
+      const catPoints = allPoints.filter((p) => p.filterId === c.id)
+      const booleans = fields.filter((x) => x.type === 'boolean').map((x) => ({ key: x.key, label: x.filterLabel ?? x.label, on: !!f.bool?.includes(x.key) }))
+      const selects = fields
+        .filter((x) => x.type === 'select')
+        .map((x) => {
+          const chosen = f.select?.[x.key] ?? []
+          // The values its places actually have, and whatever's chosen.
+          const values = [...new Set([...catPoints.flatMap((p) => (p.raw ? selectValues(p.raw[x.key]) : [])), ...chosen])].filter(Boolean)
+          return { key: x.key, label: x.filterLabel ?? x.label, values, chosen }
+        })
+        .filter((sel) => sel.values.length > 0)
+      const openNow = keepsHours(c) ? !!f.openNow : null
+      if (openNow === null && booleans.length === 0 && selects.length === 0) return []
+      const shown = optionsWithFilters.find((o) => o.id === c.id)?.count ?? catPoints.length
+      return [
+        {
+          id: c.id,
+          label: c.pluralLabel,
+          icon: c.icon,
+          color: colorById.get(c.id) ?? '#64748b',
+          note: shown === catPoints.length ? `all ${catPoints.length}` : `${shown} of ${catPoints.length}`,
+          openNow,
+          booleans,
+          selects,
+        },
+      ]
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showingCategories, filtersKey, allPoints, optionsWithFilters, colorById])
+  const andNames = (names: string[]) => (names.length <= 1 ? names.join('') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`)
+  const topOpenNowNote = topOpenNow.on
+    ? `For ${andNames(topOpenNow.withHours.map((c) => c.pluralLabel))}.`
+    : topOpenNow.onFor.length > 0
+      ? `On for ${andNames(topOpenNow.onFor)} only.`
+      : null
+  const filtersOn = filterCount(filters, showingCategories)
+  const filtersButton = (
+    <button
+      type="button"
+      onClick={() => setFiltersOpen(true)}
+      aria-label={filtersOn > 0 ? `Filters, ${filtersOn} on` : 'Filters'}
+      data-testid="map-filters-button"
+      className="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-full border border-primary bg-white px-2.5 py-1 text-xs font-bold text-primary shadow-sm transition-colors hover:bg-primary/5 active:bg-primary/10"
+    >
+      <SlidersIcon className="h-3.5 w-3.5" />
+      Filters
+      {filtersOn > 0 && <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[11px] text-white">{filtersOn}</span>}
+    </button>
+  )
+  // What's on, under the category chips, as under a category page's
+  // heading: a tap switches that one off.
+  const onFilters = activeFilters(filters, showingCategories)
+  const activeFilterRow = onFilters.length > 0 && (
+    <div className="chip-scroll mt-1.5 flex gap-1.5 overflow-x-auto pb-1" data-testid="map-active-filters">
+      {onFilters.map((a) => (
+        <FilterChip key={a.key} label={a.label} on onToggle={() => updateFilters(a.remove)} />
+      ))}
+    </div>
+  )
+  const filtersSheet = (
+    <MapFiltersSheet
+      isOpen={filtersOpen}
+      onClose={() => setFiltersOpen(false)}
+      top={{ shown: topOpenNow.shown, on: topOpenNow.on, note: topOpenNowNote }}
+      onTopOpenNow={() => updateFilters((f) => setOpenNowFor(f, topOpenNow.withHours, !topOpenNow.on))}
+      sections={filterSections}
+      onOpenNow={onSheetOpenNow}
+      onBoolean={onSheetBoolean}
+      onSelect={onSheetSelect}
+      onClearAll={() => setOwnFilters({})}
+      anyOn={hasFilters}
+      count={visiblePoints.length}
+    />
+  )
+
   // The category chips — sit beside the search box (not below it), so they
   // stay put next to it even while the dropdown is open, same as Google
   // Maps' own chip row.
@@ -1506,12 +1533,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
       selected={effectiveSelected}
       onToggle={toggle}
       onAll={showAll}
-      categories={categories ?? []}
-      points={allPoints}
-      boolFields={boolFields}
-      onToggleBool={toggleBoolField}
-      selectFilters={selectFilters}
-      onToggleSelectValue={toggleSelectValue}
+      leadingChip={filtersButton}
       campaignChip={campaignChip}
       pinnedChip={pinnedChip}
       pinnedOn={pinnedSelected}
@@ -1813,6 +1835,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
               }}
             >
               {desktopCategoryChips}
+              {activeFilterRow}
             </div>
           )}
 
@@ -2040,16 +2063,12 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                         maxVisible={4}
                         resortToken={categoryResortToken}
                         onMore={openCategoriesPicker}
-                                    categories={categories ?? []}
-                        points={allPoints}
-                        boolFields={boolFields}
-                        onToggleBool={toggleBoolField}
-                        selectFilters={selectFilters}
-                        onToggleSelectValue={toggleSelectValue}
+                        leadingChip={filtersButton}
                         campaignChip={campaignChip}
                         pinnedChip={pinnedChip}
                         pinnedOn={pinnedSelected}
                       />
+                      {activeFilterRow}
                     </div>
                   )}
 
@@ -2187,11 +2206,13 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
               sidebar). ───────────────────────────────────────────────────── */}
       {!loading && !ui.map.nearbyList && visiblePoints.length === 0 && (
         <p className="mt-3 text-center text-sm text-slate-500">
-          {activeTerms.length > 0 || filterChips.length > 0
+          {activeTerms.length > 0 || hasFilters
             ? 'No places match every filter. Try removing one.'
             : 'No places shown. Turn on a category above to see locations.'}
         </p>
       )}
+
+      {filtersSheet}
 
       {/* ── Full-screen category picker (mobile) — the quick chip row's
               trailing "More" chip opens this, same as Google Maps expanding
@@ -2245,17 +2266,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
             </p>
           )}
           <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
-            <CategoryPickerList
-              options={options}
-              categories={categories ?? []}
-              points={allPoints}
-              selected={draftSelected}
-              onToggle={toggleCategoryCheckbox}
-              boolFields={boolFields}
-              onToggleBool={toggleBoolFieldInPicker}
-              selectFilters={selectFilters}
-              onToggleSelectValue={toggleSelectValueInPicker}
-            />
+            <CategoryPickerList options={optionsWithFilters} selected={draftSelected} onToggle={toggleCategoryCheckbox} />
           </div>
         </div>
       )}

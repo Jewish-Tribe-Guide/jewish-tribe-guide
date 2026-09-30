@@ -2,8 +2,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { makeCategory } from '@/test/providerFixtures'
-import type { CategoryField } from '@/lib/categories'
 import CategoryFilter, { type FilterOption } from './CategoryFilter'
 
 afterEach(() => {
@@ -30,12 +28,6 @@ function baseProps(overrides: Partial<React.ComponentProps<typeof CategoryFilter
     selected: new Set(['grocery']),
     onToggle: vi.fn(),
     onAll: vi.fn(),
-    categories: [],
-    points: [],
-    boolFields: [],
-    onToggleBool: vi.fn(),
-    selectFilters: {},
-    onToggleSelectValue: vi.fn(),
     ...overrides,
   }
 }
@@ -139,32 +131,20 @@ describe('CategoryFilter', () => {
     })
   })
 
-  describe('the desktop filter chevron', () => {
-    const filterableField: CategoryField = {
-      key: 'isKosher',
-      label: 'Kosher',
-      type: 'boolean',
-      filterable: true,
-    }
-
-    it('appears for a category with a filterable field', () => {
-      const cat = makeCategory({ id: 'grocery', detailFields: [filterableField] })
-      render(
-        <CategoryFilter
-          {...baseProps({ options: [option({ id: 'grocery' })], categories: [cat] })}
-        />,
-      )
-      expect(screen.getByRole('button', { name: 'Grocery filters' })).toBeInTheDocument()
+  // Filtering a category is the Filters sheet's job now (MapFiltersSheet,
+  // agreed Sep 30): the chips only choose categories, and the Filters
+  // button leads the row.
+  describe('filters', () => {
+    it('puts the leading chip (the Filters button) before All', () => {
+      render(<CategoryFilter {...baseProps({ leadingChip: <button type="button">Filters</button> })} />)
+      const buttons = screen.getAllByRole('button').map((b) => b.textContent)
+      expect(buttons.slice(0, 2)).toEqual(['Filters', 'All'])
     })
 
-    it('is absent for a category with no filterable fields', () => {
-      const cat = makeCategory({ id: 'grocery', detailFields: [] })
-      render(
-        <CategoryFilter
-          {...baseProps({ options: [option({ id: 'grocery' })], categories: [cat] })}
-        />,
-      )
-      expect(screen.queryByRole('button', { name: 'Grocery filters' })).not.toBeInTheDocument()
+    it('gives a category chip nothing to open: no filter chevron, no filter editor', () => {
+      render(<CategoryFilter {...baseProps({ options: [option({ id: 'grocery' })] })} />)
+      expect(screen.queryByRole('button', { name: /filters/i })).not.toBeInTheDocument()
+      expect(screen.getAllByRole('button')).toHaveLength(2)
     })
   })
 

@@ -64,6 +64,7 @@ export default function MapScreen() {
         initialPlaceId={view.place ?? undefined}
         initialFilters={{
           openNow: view.openNow,
+          openIn: view.openIn ?? undefined,
           bool: view.bool ?? undefined,
           select: view.select ?? undefined,
         }}

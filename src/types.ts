@@ -321,11 +321,16 @@ export type DirectoryAnchor = {
 /** Directory filters carried onto the map — applied to pins as predicates and
  *  shown as removable chips. Serializable so it survives in history state. */
 export type MapFilters = {
-  /** Show only listings open right now (by their filterable hours field). */
+  /** Show only listings open right now (by their filterable hours field),
+   *  in every category that keeps hours. */
   openNow?: boolean
-  /** Boolean field keys that must be true on the listing (e.g. `isKosher`). */
+  /** Open now in these categories only (the map's `open=food,grocery`). */
+  openIn?: string[]
+  /** Boolean field keys that must be true on the listing (e.g. `isKosher`).
+   *  On the map, `category.key` for one category's (see mapFilters.ts). */
   bool?: string[]
-  /** Select field key → allowed values; a listing matches if its value is one. */
+  /** Select field key → allowed values; a listing matches if its value is
+   *  one. On the map, keyed `category.key` the same way. */
   select?: Record<string, string[]>
 }
 

@@ -1032,9 +1032,9 @@ const OTHER_OPTION_VALUE = '__other__'
 // reads as a single boxed control with a summary of what's picked, exactly
 // like any other field here; open, it's a checklist popover (plus an
 // "Other…" row when the field allows it — see CategoryField.allowOther).
-// Only the form uses this: the map/directory's own multi-select FILTER
-// controls are a different component (CheckboxDropdown) for a different
-// purpose (narrowing a list, not entering a value) and aren't touched here.
+// Only the form uses this: filtering a list is the Filters sheet's job
+// (FiltersSheet, MapFiltersSheet), a different purpose (narrowing a list,
+// not entering a value).
 function MultiSelectField({
   field,
   label,

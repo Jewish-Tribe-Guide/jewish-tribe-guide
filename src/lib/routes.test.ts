@@ -113,9 +113,25 @@ describe('parseMapQuery', () => {
       categories: ['grocery', 'restaurant'],
       query: 'bagel',
       openNow: true,
+      openIn: null,
       bool: ['isKosher'],
       select: { hechsher: ['OU', 'Star-K'] },
       place: 'abc123',
+    }
+    expect(parse(mapQueryString(state))).toEqual(state)
+  })
+
+  // Open now per category (the map's Filters sheet, see mapFilters.ts), and
+  // switches and picks written category.key.
+  it('round-trips Open now for some categories, and filters with their category', () => {
+    const state = {
+      categories: null,
+      query: null,
+      openNow: false,
+      openIn: ['grocery', 'restaurant'],
+      bool: ['mikvah.keilim'],
+      select: { 'restaurant.t': ['Meat'] },
+      place: null,
     }
     expect(parse(mapQueryString(state))).toEqual(state)
   })
@@ -125,6 +141,7 @@ describe('parseMapQuery', () => {
       categories: null,
       query: null,
       openNow: false,
+      openIn: null,
       bool: null,
       select: null,
       place: null,

@@ -187,6 +187,8 @@ export function mapQueryString(state: {
   categories?: string[] | null
   query?: string | null
   openNow?: boolean
+  /** Open now in these categories only (see mapFilters.ts). */
+  openIn?: string[] | null
   bool?: string[] | null
   select?: Record<string, string[]> | null
   /** The point id of the pin currently shown in the detail panel/sheet, so
@@ -198,6 +200,7 @@ export function mapQueryString(state: {
   if (state.categories?.length) params.set('cat', state.categories.join(','))
   if (state.query) params.set('q', state.query)
   if (state.openNow) params.set('open', '1')
+  else if (state.openIn?.length) params.set('open', state.openIn.join(','))
   if (state.bool?.length) params.set('is', state.bool.join(','))
   if (state.place) params.set('place', state.place)
   if (state.select && Object.keys(state.select).length) {
@@ -220,6 +223,7 @@ export function parseMapQuery(params: URLSearchParams): {
   categories: string[] | null
   query: string | null
   openNow: boolean
+  openIn: string[] | null
   bool: string[] | null
   select: Record<string, string[]> | null
   place: string | null
@@ -245,6 +249,7 @@ export function parseMapQuery(params: URLSearchParams): {
     categories: list(params.get('cat')),
     query: params.get('q') || null,
     openNow: params.get('open') === '1',
+    openIn: params.get('open') === '1' ? null : list(params.get('open')),
     bool: list(params.get('is')),
     select,
     place: params.get('place') || null,

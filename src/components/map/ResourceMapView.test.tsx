@@ -126,6 +126,8 @@ function renderMobileMap(
   )
 }
 
+const HOURS = { key: 'hours', label: 'Hours', type: 'hours' as const, filterable: true }
+
 function listingWithGeo(overrides: Partial<DirectoryResource> = {}): DirectoryResource {
   return makeListing({ geo: { lat: 40, lng: -75 }, ...overrides })
 }
@@ -198,16 +200,19 @@ describe('ResourceMapView — search autocomplete', () => {
     expect(screen.queryByText('Open now')).not.toBeInTheDocument()
   })
 
-  it('clicking "Open now" commits it as the search, closing the dropdown', async () => {
+  // It's the Filters sheet's Open now, for everything that keeps hours
+  // (agreed Sep 30), not words in the box.
+  it('clicking "Open now" switches Open now on and empties the box, closing the dropdown', async () => {
     const user = userEvent.setup()
-    renderMap(<ResourceMapView onUp={vi.fn()} />, [listingWithGeo({ category: 'grocery', name: 'Acme Grocery' })])
+    renderMap(<ResourceMapView onUp={vi.fn()} />, [listingWithGeo({ category: 'grocery', name: 'Acme Grocery' })], [makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores', detailFields: [HOURS] })])
 
     const input = screen.getByPlaceholderText<HTMLInputElement>(/Search name, address/)
     await user.click(input)
     await user.click(screen.getByText('Open now'))
 
-    expect(input.value).toBe('open now')
+    expect(input.value).toBe('')
     expect(screen.queryByText('Show only listings open right now')).not.toBeInTheDocument()
+    expect(screen.getByTestId('map-active-filters')).toHaveTextContent('Open now')
   })
 })
 
@@ -1082,14 +1087,9 @@ describe('ResourceMapView — mobile full-screen category picker', () => {
     for (const box of allCheckboxes()) expect(box).toBeChecked()
   })
 
-  // Regression test: picking one of a category's own filters (Kosher,
-  // Denomination, …) inside the picker's expanded row is documented to imply
-  // wanting that category too (see ensureDraftSelected/toggleBoolFieldInPicker
-  // in ResourceMapView) — but that side effect used to land on the LIVE
-  // selection, not the draft the checkboxes actually display, so picking a
-  // filter for an unchecked category left its box looking unchecked (wrong)
-  // and Apply would then silently drop the live change the filter had made.
-  it('picking a category’s own filter in the picker checks that category’s box too', async () => {
+  // Choosing categories only: each one's filters are in the Filters sheet
+  // (agreed Sep 30). Its rows used to expand to hold them.
+  it('the picker only chooses categories: its rows hold no filters', async () => {
     const user = userEvent.setup()
     const withFilter = manyCategories.map((c) =>
       c.id === 'grocery'
@@ -1098,25 +1098,8 @@ describe('ResourceMapView — mobile full-screen category picker', () => {
     )
     renderMobileMap(<ResourceMapView onUp={vi.fn()} />, manyListings, withFilter)
     await user.click(screen.getByRole('button', { name: '⋯ More' }))
-    const groceryBox = screen.getByRole('checkbox', { name: 'Show Grocery' })
-    await user.click(groceryBox)
-    expect(groceryBox).not.toBeChecked()
-
-    // Expand Grocery's row (the chevron button sharing its row content) and
-    // pick its Kosher filter. Scoped with `expanded: false` — the compact
-    // chip row behind the picker also has a "Grocery" chip in the DOM.
-    await user.click(screen.getByRole('button', { name: /Grocery/, expanded: false }))
-    await user.click(screen.getByRole('button', { name: 'Kosher' }))
-
-    expect(groceryBox).toBeChecked()
-
-    // And Apply actually commits it to the live selection, not just the
-    // draft's own display — reopening the picker re-syncs from live state
-    // (see the "reopening after Back" test above), so Grocery staying
-    // checked there proves Apply carried the filter-triggered check through.
-    await user.click(screen.getByRole('button', { name: 'Apply' }))
-    await user.click(screen.getByRole('button', { name: '⋯ More' }))
-    expect(screen.getByRole('checkbox', { name: 'Show Grocery' })).toBeChecked()
+    expect(screen.getByRole('checkbox', { name: 'Show Grocery' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Kosher' })).not.toBeInTheDocument()
   })
 })
 
@@ -1309,7 +1292,7 @@ describe('ResourceMapView — the shareable URL (standalone)', () => {
   // (see allSelected's own comment below), so a single-category fixture
   // can't tell "wrote the chip" apart from "wrongly treated it as All".
   function renderStandaloneWithListings() {
-    const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
+    const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores', detailFields: [HOURS] })
     const synagogue = makeCategory({ id: 'synagogue', pluralLabel: 'Synagogues' })
     return renderMap(
       <HeaderCollapseProvider>
@@ -1357,9 +1340,8 @@ describe('ResourceMapView — the shareable URL (standalone)', () => {
     expect(new URLSearchParams(window.location.search).get('place')).toBe('g1')
   })
 
-  // openNowActive derives from the committed query text itself (see
-  // OPEN_NOW_WORDS) — the URL should carry that as `open=1`, not also
-  // duplicate it into `q=open+now`.
+  // Typing "open now" is Open now for everything that keeps hours (see
+  // mapFilters.ts): the URL carries it as `open=1`, not also `q=open+now`.
   it('writes a committed "open now" search to the URL as open=1, not a redundant q=', async () => {
     const user = userEvent.setup()
     const { container } = renderStandaloneWithListings()
@@ -1458,5 +1440,107 @@ describe('ResourceMapView — neighborhoods', () => {
     await user.keyboard('{Enter}')
     expect(screen.getByRole('button', { name: 'Select Mekor Habracha' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Select Far Shul' })).not.toBeInTheDocument()
+  })
+})
+
+// ── The Filters sheet (agreed Sep 30) ───────────────────────────────────────
+// The category pages' own sheet, with a section for each category showing;
+// Open now in each that keeps hours, and one for everything above them when
+// two or more do.
+describe('ResourceMapView — the Filters sheet', () => {
+  const ALWAYS = Object.fromEntries(['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'].map((d) => [d, { open: '00:00', close: '23:59' }]))
+  const food = makeCategory({
+    id: 'restaurant',
+    pluralLabel: 'Food',
+    detailFields: [HOURS, { key: 't', label: 'Food Type', type: 'select', filterable: true }],
+  })
+  const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery', detailFields: [HOURS] })
+  // Calls its Type "t" as well, as the live Cemetery category does.
+  const cemetery = makeCategory({ id: 'cemetery', pluralLabel: 'Cemeteries', detailFields: [{ key: 't', label: 'Type', type: 'select', filterable: true }] })
+  const listings = [
+    listingWithGeo({ id: 'f1', category: 'restaurant', name: 'Judah', t: ['Meat'], hours: ALWAYS }),
+    listingWithGeo({ id: 'f2', category: 'restaurant', name: 'Sweet Box', t: ['Dairy'], hours: ALWAYS }),
+    listingWithGeo({ id: 'g1', category: 'grocery', name: 'Acme', hours: ALWAYS }),
+    listingWithGeo({ id: 'c1', category: 'cemetery', name: 'Har Jehuda', t: ['Jewish'] }),
+  ]
+
+  it('opens one sheet with a section for each category showing, and a pick narrows only its own', async () => {
+    const user = userEvent.setup()
+    renderMap(<ResourceMapView onUp={vi.fn()} />, listings, [food, grocery, cemetery])
+    expect(screen.getByTestId('point-count')).toHaveTextContent('4')
+
+    await user.click(screen.getByTestId('map-filters-button'))
+    const sheet = screen.getByTestId('map-filters')
+    expect(within(sheet).getByTestId('map-filters-restaurant')).toHaveTextContent('Food')
+    expect(within(sheet).getByTestId('map-filters-cemetery')).toHaveTextContent('Cemeteries')
+    await user.click(within(screen.getByTestId('map-filters-restaurant')).getByRole('button', { name: 'Meat' }))
+
+    // Sweet Box goes; the cemetery, whose "t" is its own Type, stays.
+    expect(screen.getByTestId('point-count')).toHaveTextContent('3')
+    expect(screen.queryByRole('button', { name: 'Select Sweet Box' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Select Har Jehuda' })).toBeInTheDocument()
+    expect(screen.getByTestId('map-filters-button')).toHaveAccessibleName('Filters, 1 on')
+    expect(within(sheet).getByRole('button', { name: 'Show 3 places' })).toBeInTheDocument()
+  })
+
+  it('shows what’s on under the categories, and a tap there switches it off', async () => {
+    const user = userEvent.setup()
+    renderMap(<ResourceMapView onUp={vi.fn()} />, listings, [food, grocery, cemetery])
+    await user.click(screen.getByTestId('map-filters-button'))
+    await user.click(within(screen.getByTestId('map-filters-restaurant')).getByRole('button', { name: 'Meat' }))
+    await user.click(screen.getByRole('button', { name: 'Show 3 places' }))
+
+    await user.click(within(screen.getByTestId('map-active-filters')).getByRole('button', { name: 'Meat' }))
+    expect(screen.getByTestId('point-count')).toHaveTextContent('4')
+    expect(screen.queryByTestId('map-active-filters')).not.toBeInTheDocument()
+  })
+
+  it('Open now for everything: shown with two categories that keep hours, and it turns each one on', async () => {
+    const user = userEvent.setup()
+    renderMap(<ResourceMapView onUp={vi.fn()} />, listings, [food, grocery, cemetery])
+    await user.click(screen.getByTestId('map-filters-button'))
+    const top = within(screen.getByTestId('map-filters-open-all')).getByRole('switch', { name: 'Open now' })
+    const foodSwitch = within(screen.getByTestId('map-filters-restaurant')).getByRole('switch', { name: 'Open now' })
+    const grocerySwitch = within(screen.getByTestId('map-filters-grocery')).getByRole('switch', { name: 'Open now' })
+    // A cemetery keeps no hours: no Open now of its own.
+    expect(within(screen.getByTestId('map-filters-cemetery')).queryByRole('switch')).not.toBeInTheDocument()
+
+    await user.click(foodSwitch)
+    expect(top).not.toBeChecked()
+    expect(screen.getByTestId('map-filters-open-all')).toHaveTextContent('On for Food only.')
+
+    await user.click(top)
+    expect(top).toBeChecked()
+    expect(foodSwitch).toBeChecked()
+    expect(grocerySwitch).toBeChecked()
+
+    await user.click(top)
+    expect(foodSwitch).not.toBeChecked()
+    expect(grocerySwitch).not.toBeChecked()
+  })
+
+  it('Escape closes the Filters, not the full-screen map behind them', async () => {
+    const user = userEvent.setup()
+    const exit = vi.fn()
+    renderMap(
+      <HeaderCollapseProvider>
+        <ResourceMapView onUp={vi.fn()} standalone visible onExitFullscreenToListing={exit} />
+      </HeaderCollapseProvider>,
+      listings,
+      [food, grocery, cemetery],
+    )
+    await user.click(screen.getByTestId('map-filters-button'))
+    expect(screen.getByRole('dialog', { name: 'Filters' })).toBeInTheDocument()
+    await user.keyboard('{Escape}')
+    expect(screen.queryByRole('dialog', { name: 'Filters' })).not.toBeInTheDocument()
+    expect(exit).not.toHaveBeenCalled()
+  })
+
+  it('no Open now for everything with only one category that keeps hours', async () => {
+    const user = userEvent.setup()
+    renderMap(<ResourceMapView onUp={vi.fn()} />, listings.filter((l) => l.category !== 'grocery'), [food, cemetery])
+    await user.click(screen.getByTestId('map-filters-button'))
+    expect(screen.queryByTestId('map-filters-open-all')).not.toBeInTheDocument()
+    expect(within(screen.getByTestId('map-filters-restaurant')).getByRole('switch', { name: 'Open now' })).toBeInTheDocument()
   })
 })
