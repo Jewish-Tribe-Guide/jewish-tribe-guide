@@ -54,6 +54,18 @@ describe('tidyReading — it can never hold what the site doesn’t have', () =>
     ).toEqual({ categories: [{ id: 'restaurant' }], items: ['Challah'] })
   })
 
+  it('an unsure filter is kept apart, only on a kind of place it read, and never a time', () => {
+    expect(
+      tidyReading(
+        {
+          categories: [{ id: 'restaurant', select: { t: ['Meat'] } }],
+          maybe: [{ id: 'restaurant', openNow: true, select: { kosherCert: ['ikc'] } }, { id: 'hotel', bool: ['shabbatFriendly'] }, { id: 'restaurant', select: { t: ['Fleishig'] } }],
+        },
+        vocab,
+      ),
+    ).toEqual({ categories: [{ id: 'restaurant', select: { t: ['Meat'] } }], maybe: [{ id: 'restaurant', select: { kosherCert: ['IKC'] } }] })
+  })
+
   it('no Open now for a category that keeps no hours', () => {
     expect(tidyReading({ categories: [{ id: 'hotel', openNow: true }] }, vocab)).toEqual({ categories: [{ id: 'hotel' }] })
   })

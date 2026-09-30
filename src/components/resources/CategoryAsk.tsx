@@ -17,7 +17,7 @@ import { useActiveCommunity, useOptionalCommunitySlug } from '@/lib/communityCon
 import { routes } from '@/lib/routes'
 import AskAnswer from '@/components/home/AskAnswer'
 import ReadAs from '@/components/home/ReadAs'
-import type { ReadingChip } from '@/lib/readingSearch'
+import type { ReadingChip, ReadingOffer } from '@/lib/readingSearch'
 
 // ── A category page's search: asking comes first ─────────────────────────────
 // The one search box on the page, limited to this category and saying so
@@ -45,6 +45,8 @@ type Props = {
     reading: boolean
     chips: ReadingChip[]
     onRemove: (chip: ReadingChip) => void
+    offers: ReadingOffer[]
+    onPick: (offer: ReadingOffer) => void
     onSubmit: () => void
     result: AskResult | null
   }
@@ -188,7 +190,7 @@ function Ask({ category, items, search, onSearch, schedule, readAs }: Props & { 
         </div>
       )}
 
-      {q && readAs && <ReadAs reading={readAs.reading} chips={readAs.chips} onRemove={readAs.onRemove} />}
+      {q && readAs && <ReadAs reading={readAs.reading} chips={readAs.chips} onRemove={readAs.onRemove} offers={readAs.offers} onPick={readAs.onPick} />}
       {answer && <AskAnswer answer={answer} />}
     </div>
   )

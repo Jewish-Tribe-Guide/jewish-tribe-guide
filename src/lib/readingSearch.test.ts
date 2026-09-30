@@ -3,7 +3,7 @@ import type { DirectoryResource } from '@/types'
 import { makeCategory } from '@/test/providerFixtures'
 import { answerFor } from './askAnswer'
 import { readerPlaces, type Reading } from './questionReader'
-import { ownConditions, readingAnswers, readingChips, readingLoses, searchReading, type Asked } from './readingSearch'
+import { ownConditions, readingAnswers, readingChips, readingLoses, readingOffers, searchReading, type Asked } from './readingSearch'
 
 const allWeek = (open: string, close: string) => Object.fromEntries(['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'].map((d) => [d, { open, close }]))
 const hours = { key: 'hours', label: 'Hours', type: 'hours' as const, filterable: true }
@@ -11,7 +11,7 @@ const food = makeCategory({
   id: 'restaurant',
   label: 'Food',
   pluralLabel: 'Food',
-  detailFields: [hours, { key: 't', label: 'Food Type', type: 'select', filterable: true }],
+  detailFields: [hours, { key: 't', label: 'Food Type', type: 'select', filterable: true }, { key: 'kind', label: 'Type', type: 'select', filterable: true }],
 })
 const grocery = makeCategory({ id: 'grocery', label: 'Grocery', pluralLabel: 'Grocery', detailFields: [hours, { key: 'm', label: 'Kosher items', type: 'tags' }] })
 const hotels = makeCategory({ id: 'hotel', label: 'Hotel', pluralLabel: 'Hotels', detailFields: [{ key: 'shabbatFriendly', label: 'Shabbat friendly', type: 'boolean', filterable: true }] })
@@ -177,5 +177,57 @@ describe('readingChips — how it was read, each removable', () => {
   it('how far, as measured', () => {
     const r = ask({ categories: [{ id: 'grocery' }], items: ['Chalav Yisroel Milk'], near: 'hup' }, 'q', { coords: null })
     expect(readingChips(asked({ categories: [], near: 'hup' }), categories, { reach: r.reach }).map((c) => c.label)).toEqual(['Within 1.5 mi of HUP'])
+  })
+})
+
+describe('readingOffers — ask, don’t answer wrongly', () => {
+  // One sit-down meat restaurant among the takeout.
+  const steakHouse = place('restaurant', 'Steak House', 39.96, -75.16, { t: ['Meat'], kind: ['Restaurant'], hours: allWeek('17:00', '23:00') })
+  const more = [...listings, steakHouse]
+  const offersFor = (a: Asked, question: string) => {
+    const r = searchReading(more, categories, a, question, { now: sixPm, places, coords: me })
+    const chips = readingChips(a, categories, { reach: r.reach, excluded: r.excluded })
+    return { r, offers: readingOffers(a, more, categories, question, { now: sixPm, places, coords: me, found: r.hits.length + r.noHours.length, chips }) }
+  }
+
+  it('"restaurants" read loosely: every meat place, with "Only Restaurant" offered, not applied', () => {
+    const question = 'meat restaurants open until 10pm'
+    const a = asked({ categories: [{ id: 'restaurant', select: { t: ['Meat'] } }], maybe: [{ id: 'restaurant', select: { kind: ['Restaurant'] } }] }, question)
+    const { r, offers } = offersFor(a, question)
+    expect(names(r)).toEqual(['Late Grill', 'Steak House'])
+    expect(offers.map((o) => `${o.label} (${o.count})`)).toEqual(['Only Restaurant (1)'])
+    const narrowed = searchReading(more, categories, offers[0].next, question, { now: sixPm, places, coords: me })
+    expect(names(narrowed)).toEqual(['Steak House'])
+  })
+
+  it('an unsure filter that would find nothing isn’t offered', () => {
+    const question = 'dairy restaurants'
+    const a = asked({ categories: [{ id: 'restaurant', select: { t: ['Dairy'] } }], maybe: [{ id: 'restaurant', select: { kind: ['Restaurant'] } }] }, question)
+    expect(offersFor(a, question).offers).toEqual([])
+  })
+
+  it('found nothing: the one chip without which it finds something, the smallest step', () => {
+    const question = 'dairy restaurants'
+    const a = asked({ categories: [{ id: 'restaurant', select: { t: ['Dairy'], kind: ['Restaurant'] } }] }, question)
+    const { r, offers } = offersFor(a, question)
+    expect(r.hits).toEqual([])
+    // Without Dairy finds the one Restaurant; without Restaurant, the one
+    // dairy place; without Food, nothing. Either single step is offered.
+    expect(offers).toHaveLength(1)
+    expect(offers[0].label).toMatch(/^Without (Dairy|Restaurant)$/)
+    expect(offers[0].count).toBe(1)
+  })
+
+  it('found nothing there: "Anywhere", not "Without In Fishtown"', () => {
+    const question = 'sit-down restaurant in fishtown'
+    const a = asked({ categories: [{ id: 'restaurant', select: { kind: ['Restaurant'] } }], near: 'fishtown' }, question)
+    const { r, offers } = offersFor(a, question)
+    expect(r.hits).toEqual([])
+    expect(offers.map((o) => o.label)).toEqual(['Anywhere'])
+  })
+
+  it('something found and nothing unsure: nothing offered', () => {
+    const question = 'meat places'
+    expect(offersFor(asked({ categories: [{ id: 'restaurant', select: { t: ['Meat'] } }] }, question), question).offers).toEqual([])
   })
 })

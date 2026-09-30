@@ -25,6 +25,10 @@ export type Reading = {
   near?: string | null
   withinMiles?: number | null
   sortByDistance?: boolean
+  /** Narrower filters the question might mean but the reader wasn't sure
+   *  of ("restaurant": Type: Restaurant, or any food place). Not applied:
+   *  the page offers them, so an unsure reading asks rather than narrows. */
+  maybe?: Reading['categories']
   /** Where `near` is, when it's a place: filled in by the server from the
    *  site's own places (placeFor), never by the AI, so a page can measure
    *  from it without knowing every hospital and neighbourhood itself. */
@@ -111,10 +115,9 @@ export function tidyReading(raw: unknown, vocab: ReaderVocabulary): Reading {
   const r = (raw ?? {}) as Partial<Reading>
   const lower = (s: string) => s.toLowerCase().trim()
   const byId = new Map(vocab.categories.map((c) => [c.id, c]))
-  const categories: Reading['categories'] = []
-  for (const c of Array.isArray(r.categories) ? r.categories : []) {
+  const tidyCategory = (c: Reading['categories'][number]): Reading['categories'][number] | null => {
     const known = c && typeof c.id === 'string' ? byId.get(c.id) : undefined
-    if (!known || categories.some((x) => x.id === known.id)) continue
+    if (!known) return null
     const out: Reading['categories'][number] = { id: known.id }
     if (c.openNow === true && known.openNow) out.openNow = true
     const bool = (Array.isArray(c.bool) ? c.bool : []).filter((k) => known.filters.some((f) => f.kind === 'yes/no' && f.key === k))
@@ -128,7 +131,21 @@ export function tidyReading(raw: unknown, vocab: ReaderVocabulary): Reading {
       if (kept.length) select[key] = [...new Set(kept)]
     }
     if (Object.keys(select).length) out.select = select
-    categories.push(out)
+    return out
+  }
+  const categories: Reading['categories'] = []
+  for (const c of Array.isArray(r.categories) ? r.categories : []) {
+    const out = tidyCategory(c)
+    if (out && !categories.some((x) => x.id === out.id)) categories.push(out)
+  }
+  // An unsure filter, only on a kind of place the reading is about, and
+  // only a filter: when isn't the reader's, and a kind of place isn't unsure.
+  const maybe: Reading['categories'] = []
+  for (const c of Array.isArray(r.maybe) ? r.maybe : []) {
+    const out = tidyCategory(c)
+    if (!out || !categories.some((x) => x.id === out.id)) continue
+    delete out.openNow
+    if (out.bool || out.select) maybe.push(out)
   }
   const items = (Array.isArray(r.items) ? r.items : []).flatMap((v) => (typeof v === 'string' ? vocab.items.filter((x) => lower(x) === lower(v)) : []))
   const near = typeof r.near === 'string' ? (lower(r.near) === 'me' ? 'me' : (vocab.places.find((p) => lower(p) === lower(r.near as string)) ?? null)) : null
@@ -137,6 +154,7 @@ export function tidyReading(raw: unknown, vocab: ReaderVocabulary): Reading {
   const from = near ?? (within || r.sortByDistance === true ? 'me' : null)
   return {
     categories,
+    ...(maybe.length ? { maybe } : {}),
     ...(items.length ? { items: [...new Set(items)] } : {}),
     ...(from ? { near: from } : {}),
     ...(within ? { withinMiles: within } : {}),
@@ -240,13 +258,15 @@ export function reachLabel(reach: ReadingReach): string | null {
 export const READER_INSTRUCTIONS = `You read questions typed into the search box of a community guide to kosher food, synagogues and Jewish services, and say which of the guide's own filters the question means. You never answer the question and never add places or facts.
 
 Reply with JSON only, in this shape:
-{"categories":[{"id":"<category id>","openNow":true|false,"bool":["<yes/no filter key>"],"select":{"<pick filter key>":["<value>"]}}],"items":["<item>"],"near":"me"|"<place>"|null,"withinMiles":<number>|null,"sortByDistance":true|false}
+{"categories":[{"id":"<category id>","openNow":true|false,"bool":["<yes/no filter key>"],"select":{"<pick filter key>":["<value>"]}}],"maybe":[{"id":"<category id>","bool":["<yes/no filter key>"],"select":{"<pick filter key>":["<value>"]}}],"items":["<item>"],"near":"me"|"<place>"|null,"withinMiles":<number>|null,"sortByDistance":true|false}
 
 Rules:
 - Use only category ids, filter keys, values, items and places from the vocabulary. Copy values exactly. If the question asks for something the vocabulary doesn't have, leave it out.
 - One entry per category the question is about. With several ("meat places, all synagogues and the hotels"), several entries, each with only its own filters.
 - openNow only where the question asks what's open now, and only for that category ("synagogues regardless of open now" means no openNow for synagogues). Only categories marked openNow can have it.
-- A word that is one of a category's filter values means that filter ("meat" is Food Type: Meat; "Keystone" is Kosher Cert: Keystone-K; "Orthodox" is every Orthodox denomination). "restaurant" or "restaurants" always means Type: Restaurant, also in "restaurant near me".
+- A word that is one of a category's filter values means that filter ("meat" is Food Type: Meat; "Keystone" is Kosher Cert: Keystone-K; "Orthodox" is every Orthodox denomination).
+- Two words are loose, because people use them for any place of the kind: "restaurant"/"restaurants" means any food place, never Type: Restaurant, with Type: Restaurant in maybe; "kosher grocery"/"kosher groceries" means any grocery, with Type: Kosher Store in maybe. Only a question that insists ("a sit-down restaurant, not takeout") makes Type: Restaurant a filter. Every other value word is simply its filter, never maybe ("bakery" is Type: Bakery, "kosher store" is Type: Kosher Store). Leave maybe out unless one of the two loose words is used.
+- A question for items ("where can I get challah", "sushi") has no categories, unless it names a kind of place itself ("challah at a grocery"). "kosher food" and "where can I eat" are Food alone.
 - "open now" with no kind of place named means every category marked openNow, each with openNow.
 - Any other time ("open until 10", "open after 6pm", "open today", "open late") is worked out elsewhere: leave it out, and never turn it into openNow. Likewise "best" and "other than <a place>".
 - items: things to buy or eat that a place stocks ("challah", "cholov yisroel milk" is "Chalav Yisroel Milk"), matched to the item list.

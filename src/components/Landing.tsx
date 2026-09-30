@@ -15,7 +15,7 @@ import { resolveCapabilities } from '@/lib/categories'
 import { routes } from '@/lib/routes'
 import { neighborhoodsFor } from '@/lib/places'
 import { readerPlaces } from '@/lib/questionReader'
-import { readingAnswers, readingChips, readingLoses, searchReading } from '@/lib/readingSearch'
+import { readingAnswers, readingChips, readingLoses, readingOffers, searchReading } from '@/lib/readingSearch'
 import { useReading } from '@/lib/useReading'
 import { answersWell, candidatePrompts, pickPrompts } from '@/lib/searchPrompts'
 import { listMinyanim } from '@/lib/upcomingDavening'
@@ -254,11 +254,24 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
     return () => clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [wantsReading, q])
+  const readChips = readResult && reading ? readingChips(reading, categories ?? [], { reach: readResult.reach, excluded: readResult.excluded }) : []
+  const readOffers =
+    readResult && reading && listings && schedule
+      ? readingOffers(reading, listings, categories ?? [], q, {
+          coords,
+          now: new Date(schedule.now),
+          places: readerPlacesHere,
+          found: readResult.hits.length + readResult.noHours.length,
+          chips: readChips,
+        })
+      : []
   const readAsNode = q && (
     <ReadAs
       reading={reader.isReading(q) && !readResult}
-      chips={readResult ? readingChips(reading!, categories ?? [], { reach: readResult.reach, excluded: readResult.excluded }) : []}
+      chips={readChips}
       onRemove={(chip) => reader.edit(chip.without)}
+      offers={readOffers}
+      onPick={(offer) => reader.edit(offer.next)}
     />
   )
   const shown = readResult ? { result: readResult, answer: answerFor(readResult, { coords }) } : asked

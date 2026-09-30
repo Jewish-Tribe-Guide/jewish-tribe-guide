@@ -27,7 +27,7 @@ import { foundFor, searchAsk } from '@/lib/askSearch'
 import { neighborhoodsFor, placeName, townsFrom } from '@/lib/places'
 import { parseAsk } from '@/lib/ask'
 import { readerPlaces } from '@/lib/questionReader'
-import { readingAnswers, readingChips, readingLoses, searchReading } from '@/lib/readingSearch'
+import { readingAnswers, readingChips, readingLoses, readingOffers, searchReading } from '@/lib/readingSearch'
 import { useReading } from '@/lib/useReading'
 import { ListingOnwardContext, type ListingOnwardSource } from './listingOnward'
 import ListingColumn from './ListingColumn'
@@ -753,10 +753,23 @@ export default function GenericDirectory({ category, items, anchorLabel, address
     return () => clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [wantsReading, search])
+  const readChips = readResult && reading ? readingChips(reading, categories ?? [category], { reach: readResult.reach, categoryId: category.id, excluded: readResult.excluded }) : []
   const readAs = {
     reading: reader.isReading(search) && !readResult,
-    chips: readResult && reading ? readingChips(reading, categories ?? [category], { reach: readResult.reach, categoryId: category.id, excluded: readResult.excluded }) : [],
+    chips: readChips,
     onRemove: (chip: { without: Parameters<typeof reader.edit>[0] }) => reader.edit(chip.without),
+    offers:
+      readResult && reading
+        ? readingOffers(reading, items, categories ?? [category], search, {
+            coords,
+            now: new Date(clock ?? 0),
+            places: readerPlacesHere,
+            categoryId: category.id,
+            found: readResult.hits.length + readResult.noHours.length,
+            chips: readChips,
+          })
+        : [],
+    onPick: (offer: { next: Parameters<typeof reader.edit>[0] }) => reader.edit(offer.next),
     onSubmit: () => readable && reader.ask(search),
     result: readResult,
   }

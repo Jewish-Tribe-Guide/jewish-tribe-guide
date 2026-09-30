@@ -178,7 +178,14 @@ export function searchReading(
   }
 }
 
-export type ReadingChip = { key: string; label: string; without: Asked }
+export type ReadingChip = {
+  key: string
+  label: string
+  without: Asked
+  /** What taking it away is called when offered ("Anywhere", "Any time");
+   *  otherwise "Without <label>". */
+  widen?: string
+}
 
 /** How the question was read, as chips: each category, each filter on it,
  *  each item, when, how far (`reach`, as searchReading measured it), "best"
@@ -218,14 +225,16 @@ export function readingChips(
   // didn't say it of any kind of place (then it's said of all of them).
   if (own.openAt) {
     const how = { after: 'after', until: 'until', at: 'at', before: 'before' }[own.openAt.how]
-    chips.push({ key: 'when', label: `Open ${how} ${formatOpenAtTime(own.openAt.minutes)}`, without: withOwn({ openAt: null }) })
+    chips.push({ key: 'when', label: `Open ${how} ${formatOpenAtTime(own.openAt.minutes)}`, without: withOwn({ openAt: null }), widen: 'Any time' })
   } else if (own.openToday) {
-    chips.push({ key: 'when', label: 'Open today', without: withOwn({ openToday: false }) })
+    chips.push({ key: 'when', label: 'Open today', without: withOwn({ openToday: false }), widen: 'Any time' })
   } else if (own.openNow && !reading.categories.some((c) => c.openNow)) {
-    chips.push({ key: 'when', label: 'Open now', without: withOwn({ openNow: false }) })
+    chips.push({ key: 'when', label: 'Open now', without: withOwn({ openNow: false }), widen: 'Any time' })
   }
   const reachText = reach && reachLabel(reach)
-  if (reachText) chips.push({ key: 'reach', label: reachText, without: { reading: { ...reading, near: null, withinMiles: null }, own: { ...own, within: null } } })
+  if (reachText) {
+    chips.push({ key: 'reach', label: reachText, without: { reading: { ...reading, near: null, withinMiles: null }, own: { ...own, within: null } }, widen: 'Anywhere' })
+  }
   if (own.best) chips.push({ key: 'best', label: 'Most upvoted first', without: withOwn({ best: false }) })
   if (own.excluding.length) {
     chips.push({ key: 'excluding', label: `Besides ${excluded.length ? excluded[0] : own.excluding.join(' ')}`, without: withOwn({ excluding: [] }) })
@@ -240,4 +249,70 @@ function readingFromFilter(c: Reading['categories'][number], f: ReturnType<typeo
     ...(f?.bool?.length ? { bool: f.bool } : {}),
     ...(f?.select && Object.keys(f.select).length ? { select: f.select } : {}),
   }
+}
+
+export type ReadingOffer = { key: string; label: string; count: number; next: Asked }
+
+/** What to offer beside a reading instead of saying something it isn't
+ *  sure of (decided Sep 30: "we need to not confidently say something
+ *  that's wrong"). Two kinds, each with how many places it would find:
+ *  - the narrower filters the reader wasn't sure the question meant
+ *    ("Only Restaurant", when "restaurants" may have meant any food
+ *    place), never applied without a tap;
+ *  - when the reading finds nothing, the one chip without which it would
+ *    find something ("Without Restaurant"), rather than a bare "nothing".
+ *  Offers that would find nothing aren't made. */
+export function readingOffers(
+  asked: Asked,
+  listings: readonly DirectoryResource[],
+  categories: readonly CategoryConfig[],
+  question: string,
+  options: ReadingOptions & { found: number; chips: ReadingChip[] },
+): ReadingOffer[] {
+  const { reading } = asked
+  const count = (next: Asked) => {
+    const r = searchReading(listings, categories, next, question, options)
+    return r.hits.length + r.noHours.length
+  }
+  const offers: ReadingOffer[] = []
+  const shown = options.categoryId ? reading.categories.filter((c) => c.id === options.categoryId) : reading.categories
+  for (const m of reading.maybe ?? []) {
+    const category = categories.find((c) => c.id === m.id)
+    const applied = reading.categories.find((c) => c.id === m.id)
+    if (!category || !applied || !shown.includes(applied)) continue
+    // One offer per filter it was unsure of, each added alone to what the
+    // reading already has there.
+    const singles: Reading['categories'][number][] = [
+      ...(m.bool ?? []).map((k) => ({ id: m.id, bool: [k] })),
+      ...Object.entries(m.select ?? {}).flatMap(([k, vs]) => vs.map((v) => ({ id: m.id, select: { [k]: [v] } }))),
+    ]
+    for (const single of singles) {
+      const { filters } = readingFilters({ categories: [single] })
+      const label = activeFilters(filters, [category])[0]?.label
+      if (!label) continue
+      const merged: Reading['categories'][number] = {
+        ...applied,
+        ...(single.bool ? { bool: [...new Set([...(applied.bool ?? []), ...single.bool])] } : {}),
+        ...(single.select ? { select: mergeSelect(applied.select, single.select) } : {}),
+      }
+      if (JSON.stringify(merged) === JSON.stringify(applied)) continue
+      const next: Asked = { ...asked, reading: { ...reading, categories: reading.categories.map((c) => (c.id === m.id ? merged : c)) } }
+      const n = count(next)
+      if (n > 0) offers.push({ key: `maybe:${m.id}:${label}`, label: `Only ${label}`, count: n, next })
+    }
+  }
+  if (options.found === 0) {
+    const widened = options.chips.map((chip) => ({ chip, n: count(chip.without) })).filter((x) => x.n > 0)
+    widened.sort((a, b) => a.n - b.n)
+    // The smallest step that finds something: the least taken away.
+    const step = widened[0]
+    if (step) offers.push({ key: `without:${step.chip.key}`, label: step.chip.widen ?? `Without ${step.chip.label}`, count: step.n, next: step.chip.without })
+  }
+  return offers
+}
+
+function mergeSelect(a: Record<string, string[]> | undefined, b: Record<string, string[]>): Record<string, string[]> {
+  const out = { ...a }
+  for (const [k, vs] of Object.entries(b)) out[k] = [...new Set([...(out[k] ?? []), ...vs])]
+  return out
 }

@@ -66,16 +66,18 @@ const CASES: Case[] = [
   ['kosher food near HUP', one(food(), near(HUP))],
   ['shul near me', one({ id: 'synagogue' }, near('me'))],
   ['where can i daven', one({ id: 'synagogue' })],
-  ['meat restaurant', one(food({ select: { t: ['Meat'], foodType: ['Restaurant'] } }))],
-  ['dairy restaurant', one(food({ select: { t: ['Dairy'], foodType: ['Restaurant'] } }))],
+  ['meat restaurant', one(food({ select: { t: ['Meat'] } }))],
+  ['dairy restaurant', one(food({ select: { t: ['Dairy'] } }))],
   ['shabbos friendly hotel', one({ id: 'hotel', bool: ['shabbatFriendly'] })],
   ['hotels', one({ id: 'hotel' })],
   ['mikvah', one({ id: 'mikvah' })],
   ['daycare', one({ id: 'childcare' })],
-  // The search fixes (build plan, Sep 28–29).
+  // The search fixes (build plan, Sep 28–29). "Restaurant" is read loosely,
+  // as any food place, with Type: Restaurant offered (decided Sep 30: "we
+  // need to not confidently say something that's wrong").
   ['open meat keystone', one(food({ openNow: true, select: { t: ['Meat'], kosherCert: ['Keystone-K'] } }))],
   ['open meat within 3 miles only keystone', one(food({ openNow: true, select: { t: ['Meat'], kosherCert: ['Keystone-K'] } }), near('me', { withinMiles: 3 }))],
-  ['restaurant near me', one(food({ select: { foodType: ['Restaurant'] } }), near('me'))],
+  ['restaurant near me', one(food(), near('me'))],
   ['meat near me', one(food({ select: { t: ['Meat'] } }), near('me'))],
   ['where can I get a meat meal near center city', one(food({ select: { t: ['Meat'] } }), near('Center City'))],
   ['open meat near me within 3 miles', one(food({ openNow: true, select: { t: ['Meat'] } }), near('me', { withinMiles: 3 }))],
@@ -89,7 +91,7 @@ const CASES: Case[] = [
   ['catering', one(food({ select: { foodType: ['Catering'] } }))],
   ['parve open now', one(food({ openNow: true, select: { t: ['Parve'] } }))],
   ['IKC dairy', one(food({ select: { t: ['Dairy'], kosherCert: ['IKC'] } }))],
-  ['star-k restaurants', one(food({ select: { kosherCert: ['Star-K'], foodType: ['Restaurant'] } }))],
+  ['star-k restaurants', one(food({ select: { kosherCert: ['Star-K'] } }))],
   ['mikvah for men', one({ id: 'mikvah', bool: ['menTevillah'] })],
   ['keilim mikvah', one({ id: 'mikvah', bool: ['keilim'] })],
   ['shabbos friendly hotels near HUP', one({ id: 'hotel', bool: ['shabbatFriendly'] }, near(HUP))],
@@ -105,10 +107,10 @@ const CASES: Case[] = [
   ['dairy or parve places open now near HUP', one(food({ openNow: true, select: { t: ['Dairy', 'Parve'] } }), near(HUP))],
   // Times, "best" and "other than": our own parser's to keep (Sep 30, after
   // the first of these lost its hours to the reader).
-  ['can you show me meat restaurants that are open until 10pm or later', one(food({ select: { t: ['Meat'], foodType: ['Restaurant'] } })), { openAt: { how: 'until', minutes: 22 * 60 } }],
+  ['can you show me meat restaurants that are open until 10pm or later', one(food({ select: { t: ['Meat'] } })), { openAt: { how: 'until', minutes: 22 * 60 } }],
   ['dairy places open after 6', one(food({ select: { t: ['Dairy'] } })), { openAt: { how: 'after', minutes: 18 * 60 } }],
   ['is there a mikvah open today', one({ id: 'mikvah' }), { openToday: true }],
-  ['meat restaurants open late', one(food({ select: { t: ['Meat'], foodType: ['Restaurant'] } })), { openNow: true }],
+  ['meat restaurants open late', one(food({ select: { t: ['Meat'] } })), { openNow: true }],
   ['best bakery', one(food({ select: { foodType: ['Bakery'] } })), { best: true }],
   ['kosher wine other than giant', { categories: [], items: ['Wine'] }, { excluding: ['giant'] }],
 ]
