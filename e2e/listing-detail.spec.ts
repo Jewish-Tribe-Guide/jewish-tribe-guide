@@ -292,7 +292,9 @@ test.describe('listing detail — mobile', () => {
     await back.click()
     await expect(listing).toHaveCount(0)
     await expect(page.getByRole('button', { name: `Show details for ${item.name}` }).first()).toBeVisible()
-    expect(new URL(page.url()).pathname).toBe(`/${community}/${category.id}`)
+    // Waited for, not read once: the category's list can show a moment
+    // before the address updates (failed that way once in a full run, Sep 30).
+    await expect.poll(() => new URL(page.url()).pathname).toBe(`/${community}/${category.id}`)
   })
 
   // The page's content rises into place as it appears (fadeIn: a 6px
