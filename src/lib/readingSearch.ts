@@ -375,3 +375,21 @@ function mergeSelect(a: Record<string, string[]> | undefined, b: Record<string, 
   for (const [k, vs] of Object.entries(b)) out[k] = [...new Set([...(out[k] ?? []), ...vs])]
   return out
 }
+
+const NOTHING_OWN: OwnConditions = { openNow: false, openToday: false, openAt: null, best: false, excluding: [], within: null, place: null }
+
+/** A reading in words, for the admin's "Read questions" list: each
+ *  category, filter, item and where, as the chips say them, and what it
+ *  wasn't sure of ("maybe Restaurant"). */
+export function describeReading(reading: Reading, categories: readonly CategoryConfig[]): string[] {
+  const reach = readingReach(reading, new Map(), null)
+  const labels = readingChips({ reading, own: NOTHING_OWN }, categories, { reach }).map((c) => c.label)
+  if (reading.near === 'me' && !reach) labels.push(reading.withinMiles ? `Within ${reading.withinMiles} mi of you` : 'Near you')
+  else if (reading.near && !reach) labels.push(`Near ${reading.near}`)
+  for (const m of reading.maybe ?? []) {
+    const category = categories.find((c) => c.id === m.id)
+    if (!category) continue
+    for (const a of activeFilters(readingFilters({ categories: [m] }).filters, [category])) labels.push(`maybe ${a.label}`)
+  }
+  return labels
+}

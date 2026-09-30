@@ -9,6 +9,11 @@
 --
 -- Server-only, as 057 and 058: RLS on, no policies, service_role grants alone.
 -- `key` is the question normalised (see questionKey in questionReader.ts).
+--
+-- An admin approves a reading on the "Read questions" tab (approved_at,
+-- approved_by): a rule a person has checked, used with no AI at all, even
+-- when the reader is switched off or over its limits. An unapproved one is
+-- the AI's alone, and only reused while the reader is on.
 -- ─────────────────────────────────────────────────────────────────────────────
 
 create table if not exists question_reading (
@@ -20,6 +25,8 @@ create table if not exists question_reading (
   hits         integer not null default 1,
   created_at   timestamptz not null default now(),
   last_used_at timestamptz not null default now(),
+  approved_at  timestamptz,
+  approved_by  text,
   primary key (community_id, key)
 );
 

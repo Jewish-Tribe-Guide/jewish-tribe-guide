@@ -35,6 +35,7 @@ export type AdminTab =
   | 'campaigns'
   | 'metrics'
   | 'searches'
+  | 'questions'
   | 'team'
   | 'communities'
 
@@ -51,6 +52,8 @@ export function adminTabs(community: string, isSuperAdmin: boolean): { tab: Admi
     { tab: 'metrics', href: `${base}/metrics`, label: 'Metrics' },
     // What visitors searched for and didn't find: the seeding to-do list.
     { tab: 'searches', href: `${base}/searches`, label: 'Missed searches' },
+    // How the AI reader read what people asked, approvable as rules.
+    { tab: 'questions', href: `${base}/questions`, label: 'Read questions' },
     { tab: 'responses', href: `${base}/responses`, label: 'Responses' },
     { tab: 'archived', href: `${base}/archived`, label: 'Archived' },
     { tab: 'site', href: `${base}/site`, label: 'Site' },

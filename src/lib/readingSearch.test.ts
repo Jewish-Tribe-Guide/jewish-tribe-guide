@@ -4,7 +4,7 @@ import { makeCategory } from '@/test/providerFixtures'
 import { answerFor } from './askAnswer'
 import { readerPlaces, type Reading } from './questionReader'
 import { searchAsk } from './askSearch'
-import { needsReading, ownConditions, ownFrom, readingAnswers, readingChips, readingLoses, readingOffers, searchReading, type Asked } from './readingSearch'
+import { describeReading, needsReading, ownConditions, ownFrom, readingAnswers, readingChips, readingLoses, readingOffers, searchReading, type Asked } from './readingSearch'
 
 const allWeek = (open: string, close: string) => Object.fromEntries(['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'].map((d) => [d, { open, close }]))
 const hours = { key: 'hours', label: 'Hours', type: 'hours' as const, filterable: true }
@@ -287,5 +287,18 @@ describe('the AI adds to what our own search understood, and is only asked when 
   it('questions our search has its own answers for are never read', () => {
     expect(needsReading(today('next mincha'))).toBe(false)
     expect(ownConditions('next mincha').place).toBeNull()
+  })
+})
+
+describe('describeReading — a reading in words, for the admin', () => {
+  it('each category, filter, item and where, and what it wasn’t sure of', () => {
+    expect(
+      describeReading(
+        { categories: [{ id: 'restaurant', openNow: true, select: { t: ['Meat'] } }], maybe: [{ id: 'restaurant', select: { kind: ['Restaurant'] } }], items: ['Challah'], near: 'me', withinMiles: 3 },
+        categories,
+      ),
+    ).toEqual(['Food', 'Open now', 'Meat', 'Challah', 'Within 3 mi of you', 'maybe Restaurant'])
+    const place = { name: 'Hospital of the University of Pennsylvania', label: 'HUP', geo: { lat: 39.9496, lng: -75.1936 } }
+    expect(describeReading({ categories: [{ id: 'hotel' }], near: 'hup', place }, categories)).toEqual(['Hotels', 'Within 1 mi of HUP'])
   })
 })

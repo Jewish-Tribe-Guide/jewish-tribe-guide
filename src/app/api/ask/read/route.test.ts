@@ -53,9 +53,25 @@ describe('POST /api/ask/read', () => {
     expect(m.fetch).not.toHaveBeenCalled()
   })
 
+  it('switched off, as on every test server, it doesn’t even look: nothing is read or counted', async () => {
+    vi.stubEnv('QUESTION_READER', 'off')
+    m.findReading.mockResolvedValue({ reading: { categories: [] }, approved: true })
+    expect(await (await ask('meat near me')).json()).toEqual({ ok: false, reason: 'off' })
+    expect(m.findReading).not.toHaveBeenCalled()
+  })
+
+  it('an approved reading is a rule: answered with no key at all; an unapproved one only while the reader is on', async () => {
+    vi.stubEnv('OPENAI_API_KEY', '')
+    m.findReading.mockResolvedValue({ reading: { categories: [{ id: 'restaurant' }] }, approved: true })
+    expect(await (await ask('Kosher food?')).json()).toEqual({ ok: true, reading: { categories: [{ id: 'restaurant' }] }, remembered: true, approved: true })
+    m.findReading.mockResolvedValue({ reading: { categories: [{ id: 'restaurant' }] }, approved: false })
+    expect(await (await ask('Kosher food?')).json()).toEqual({ ok: false, reason: 'off' })
+    expect(m.fetch).not.toHaveBeenCalled()
+  })
+
   it('answers a question read before from memory, without calling the AI or spending a limit', async () => {
-    m.findReading.mockResolvedValue({ categories: [{ id: 'restaurant' }] })
-    expect(await (await ask('Kosher food?')).json()).toEqual({ ok: true, reading: { categories: [{ id: 'restaurant' }] }, remembered: true })
+    m.findReading.mockResolvedValue({ reading: { categories: [{ id: 'restaurant' }] }, approved: false })
+    expect(await (await ask('Kosher food?')).json()).toEqual({ ok: true, reading: { categories: [{ id: 'restaurant' }] }, remembered: true, approved: false })
     expect(m.findReading).toHaveBeenCalledWith('philly', 'kosher food')
     expect(m.fetch).not.toHaveBeenCalled()
     expect(m.enforceRateLimit).not.toHaveBeenCalled()

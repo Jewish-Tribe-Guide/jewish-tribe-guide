@@ -33,6 +33,8 @@ describe('questionReadingStore', () => {
   it('returns a remembered reading', async () => {
     m.maybeSingle.mockResolvedValue({ data: { reading: { categories: [{ id: 'restaurant' }] }, hits: 3 }, error: null })
     m.update.mockReturnValue({ eq: () => ({ eq: () => ({ then: () => undefined }) }) })
-    expect(await findReading('philly', 'kosher food')).toEqual({ categories: [{ id: 'restaurant' }] })
+    expect(await findReading('philly', 'kosher food')).toEqual({ reading: { categories: [{ id: 'restaurant' }] }, approved: false })
+    m.maybeSingle.mockResolvedValue({ data: { reading: { categories: [] }, hits: 3, approved_at: '2026-09-30T12:00:00Z' }, error: null })
+    expect((await findReading('philly', 'kosher food'))?.approved).toBe(true)
   })
 })

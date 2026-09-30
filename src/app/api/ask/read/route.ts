@@ -12,9 +12,16 @@ import { DEFAULT_READER_MODEL, readQuestion } from '@/lib/readQuestion'
 // into the site's own filters, and the site's search answers from them. A
 // question already read is answered from memory (question_reading), free.
 //
+// A reading an admin approved (the "Read questions" tab) is a rule a person
+// has checked: answered with no AI at all, even with no key, over the
+// limits, or the AI down. An unapproved one is the AI's alone, and reused
+// only while the reader is on.
+//
 // Every way this can't read a question is an ordinary answer, not an error
 // status: the page then answers with today's search alone, as it always has.
-//   off    no OPENAI_API_KEY here (every e2e run, a preview without it)
+//   off    no OPENAI_API_KEY here (a preview without it), or switched off
+//          (every test server: nothing read, nothing written, not even a
+//          remembered reading's count)
 //   busy   this visitor, or everyone together today, has asked enough
 //   failed the AI didn't answer in time, or at all
 //
@@ -31,16 +38,19 @@ export async function POST(request: Request) {
   if (question.length < 2 || question.length > MAX_QUESTION) {
     return Response.json({ ok: false, errors: ['A question between 2 and 200 characters.'] }, { status: 400 })
   }
-  const apiKey = process.env.OPENAI_API_KEY
   // QUESTION_READER=off: every test server sets it (playwright configs), so
-  // no test run spends on OpenAI or writes a reading.
-  if (!apiKey || process.env.QUESTION_READER === 'off') return Response.json({ ok: false, reason: 'off' })
+  // no test run spends on OpenAI or writes anything, a hit count included.
+  if (process.env.QUESTION_READER === 'off') return Response.json({ ok: false, reason: 'off' })
+  const apiKey = process.env.OPENAI_API_KEY
 
   try {
     const community = await resolveCommunity(communitySlugFromRequest(request))
     const key = questionKey(question)
     const remembered = await findReading(community.slug, key)
-    if (remembered) return Response.json({ ok: true, reading: remembered, remembered: true })
+    if (remembered && (remembered.approved || apiKey)) {
+      return Response.json({ ok: true, reading: remembered.reading, remembered: true, approved: remembered.approved })
+    }
+    if (!apiKey) return Response.json({ ok: false, reason: 'off' })
 
     const limited = await enforceRateLimit(request, 'question-reader', { limit: 20, windowSec: 600 })
     if (limited) return Response.json({ ok: false, reason: 'busy' })
