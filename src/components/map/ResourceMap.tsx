@@ -531,7 +531,14 @@ export default function ResourceMap({ points, userLocation, directionsOrigin, fo
     // still-live one, orphaning the existing markers on the discarded map.
     if (mapRef.current) return
     let cancelled = false
-    const unsubscribe = onMapsAuthFailure(() => setAuthFailed(true))
+    // Rejected (a key not allowed here, billing off): the map shows its
+    // fallback, and it's no longer ready, so no effect below calls into
+    // Google's broken map. Placing pins on it threw, which took the whole
+    // page down to the error screen the first time a filter changed them.
+    const unsubscribe = onMapsAuthFailure(() => {
+      setAuthFailed(true)
+      setReady(false)
+    })
 
     loadGoogleMaps()
       .then(() => Promise.all([google.maps.importLibrary('maps'), google.maps.importLibrary('marker')]))
@@ -1199,7 +1206,7 @@ export default function ResourceMap({ points, userLocation, directionsOrigin, fo
           {follow ? 'Following' : 'Re-center'}
         </button>
       )}
-      {/* Portaled to <body>, same reasoning as CheckboxDropdown's popup: this
+      {/* Portaled to <body>: this
           needs to sit above the map (a real DOM element with its own
           stacking, not something z-index inside this component can reliably
           out-rank) and be positioned by viewport coordinates, not wherever
