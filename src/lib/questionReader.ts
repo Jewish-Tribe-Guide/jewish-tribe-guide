@@ -248,6 +248,7 @@ Rules:
 - openNow only where the question asks what's open now, and only for that category ("synagogues regardless of open now" means no openNow for synagogues). Only categories marked openNow can have it.
 - A word that is one of a category's filter values means that filter ("meat" is Food Type: Meat; "Keystone" is Kosher Cert: Keystone-K; "Orthodox" is every Orthodox denomination). "restaurant" or "restaurants" always means Type: Restaurant, also in "restaurant near me".
 - "open now" with no kind of place named means every category marked openNow, each with openNow.
+- Any other time ("open until 10", "open after 6pm", "open today", "open late") is worked out elsewhere: leave it out, and never turn it into openNow. Likewise "best" and "other than <a place>".
 - items: things to buy or eat that a place stocks ("challah", "cholov yisroel milk" is "Chalav Yisroel Milk"), matched to the item list.
 - near: "me" for "near me", "nearby", "closest"; a place from the list for "near HUP", "in Cherry Hill". sortByDistance when asked for nearest first or "sort by distance".
 - withinMiles only when a distance is given ("within 3 miles").

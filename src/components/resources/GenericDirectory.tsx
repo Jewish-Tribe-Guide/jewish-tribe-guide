@@ -27,7 +27,7 @@ import { foundFor, searchAsk } from '@/lib/askSearch'
 import { neighborhoodsFor, placeName, townsFrom } from '@/lib/places'
 import { parseAsk } from '@/lib/ask'
 import { readerPlaces } from '@/lib/questionReader'
-import { readingAnswers, readingChips, searchReading } from '@/lib/readingSearch'
+import { readingAnswers, readingChips, readingLoses, searchReading } from '@/lib/readingSearch'
 import { useReading } from '@/lib/useReading'
 import { ListingOnwardContext, type ListingOnwardSource } from './listingOnward'
 import ListingColumn from './ListingColumn'
@@ -741,7 +741,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
     !!parsed && !parsed.meta && !parsed.times && !parsed.eruv && !parsed.minyan && !items.some((i) => i.name.toLowerCase().replace(/['’]/g, '').includes(typedName))
   const reading = readable ? reader.readingFor(search) : null
   const readResult = useMemo(() => {
-    if (!reading || !readingAnswers(reading, category.id)) return null
+    if (!reading || !readingAnswers(reading.reading, category.id) || ((todayMatches?.size ?? 0) > 0 && readingLoses(search, reading.reading, categories ?? [category]))) return null
     const result = searchReading(items, categories ?? [category], reading, search, { coords, now: new Date(clock ?? 0), places: readerPlacesHere, categoryId: category.id })
     const found = result.hits.length + result.noHours.length
     return found === 0 && (todayMatches?.size ?? 0) > 0 ? null : result
@@ -755,7 +755,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   }, [wantsReading, search])
   const readAs = {
     reading: reader.isReading(search) && !readResult,
-    chips: readResult && reading ? readingChips(reading, categories ?? [category], { reach: readResult.reach, categoryId: category.id }) : [],
+    chips: readResult && reading ? readingChips(reading, categories ?? [category], { reach: readResult.reach, categoryId: category.id, excluded: readResult.excluded }) : [],
     onRemove: (chip: { without: Parameters<typeof reader.edit>[0] }) => reader.edit(chip.without),
     onSubmit: () => readable && reader.ask(search),
     result: readResult,

@@ -54,6 +54,7 @@ import { useOptionalCommunitySlug } from '@/lib/communityContext'
 import { neighborhoodsFor } from '@/lib/places'
 import { reachLabel, readerPlaces, readingFilters, readingItemsOn, readingReach, widenReach, type Reading } from '@/lib/questionReader'
 import { askReader } from '@/lib/askReader'
+import { ownConditions, readingLoses } from '@/lib/readingSearch'
 import type { DirectoryResource, MapFilters } from '@/types'
 
 // Shared by the initial useState below and the resync effect further down
@@ -856,18 +857,35 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
     // A place's own name is looked up, not read: "giant" is every GIANT.
     const typed = stripApostrophes(q.toLowerCase())
     if (allPoints.some((p) => stripApostrophes(p.name.toLowerCase()).includes(typed))) return
+    // Our own parser keeps what it's sure of (see readingSearch.ts). The
+    // map's Filters can't hold "until 10", "today" or "other than GIANT",
+    // so for those today's search, which can, answers; nor is a reading
+    // used that lost the kind of place our parser heard, when today's
+    // search finds something.
+    const own = ownConditions(q)
+    if (own.openAt || own.openToday || own.excluding.length) return
     const before = { selected, filters: ownFilters }
     // eslint-disable-next-line react-hooks/set-state-in-effect -- the request starts here; "Reading your question…" shows while it runs
     setReadingNow(q)
     void askReader(q, countCommunity).then((answer) => {
       setReadingNow((now) => (now === q ? null : now))
       if (!answer.ok || committedQueryRef.current !== q) return
-      const { categories: ids, filters: read } = readingFilters(answer.reading)
+      const raws = allPoints.flatMap((p) => (p.raw ? [p.raw] : []))
+      if (readingLoses(q, answer.reading, categories) && searchAsk(raws, categories, q, { places: neighborhoodsFor(countCommunity) }).hits.length > 0) return
+      // "Open now" the reading didn't carry is kept, for every kind of
+      // place it read that keeps hours.
+      const saidNow = answer.reading.categories.some((c) => c.openNow)
+      const hasHours = (id: string) => categories.some((x) => x.id === id && keepsHours(x))
+      const withNow =
+        own.openNow && !saidNow
+          ? { ...answer.reading, categories: answer.reading.categories.map((c) => (hasHours(c.id) ? { ...c, openNow: true } : c)) }
+          : answer.reading
+      const { categories: ids, filters: read } = readingFilters(withNow)
       const onMap = ids.filter((id) => options.some((o) => o.id === id))
       if (onMap.length === 0 && !answer.reading.items?.length && !answer.reading.near) return
       if (onMap.length) setSelected(new Set(onMap))
       setOwnFilters(read)
-      setApplied({ question: q, reading: answer.reading, before })
+      setApplied({ question: q, reading: withNow, before })
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [committedQuery, categories, listings])

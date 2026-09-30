@@ -1,18 +1,36 @@
 import type { DirectoryResource } from '@/types'
 import type { CategoryConfig } from './categories'
 import { haversineMiles, type LatLng } from './geo'
-import { parseAsk } from './ask'
+import { conceptCategories, formatOpenAtTime, parseAsk, termMatches, words, type AskQuery } from './ask'
 import { openState, type AskHit, type AskResult } from './askSearch'
 import { activeFilters, passesFields } from './mapFilters'
 import { reachLabel, readingFilters, readingItemsOn, readingReach, widenReach, type ReaderPlace, type Reading, type ReadingReach } from './questionReader'
 
 // ── Answering a question from its reading (see questionReader.ts) ───────────
-// The home and category searches' side of the reader: the reading picks
-// the categories, their filters, the items and how far; the listings
-// answer, exactly as the site's own search would (the same open-now
-// reading, the same distances), in the same shape (AskResult), so the
+// The home and category searches' side of the reader. The work is split
+// (decided Sep 30, after "meat restaurants open until 10pm or later" lost
+// its hours): the AI's reading picks what our own parser is weak at, the
+// kinds of place, their filters, the items and where; our own parser
+// (ask.ts) keeps everything it's sure of, the times ("open until 10",
+// "after 6", "today", "now"), "best", "other than Giant" and "a 15-minute
+// drive", which the reading can't hold and mustn't overrule. The listings
+// then answer both together, exactly as the site's own search would (the
+// same hours, the same distances), in the same shape (AskResult), so the
 // answer sentence and the results list are the ones the page already has.
 // Nothing here comes from the AI but the choice of filters.
+
+/** What our own parser is sure of in a question, kept whatever the reading
+ *  says. */
+export type OwnConditions = Pick<AskQuery, 'openNow' | 'openToday' | 'openAt' | 'best' | 'excluding' | 'within'>
+
+export function ownConditions(question: string): OwnConditions {
+  const { openNow, openToday, openAt, best, excluding, within } = parseAsk(question)
+  return { openNow, openToday, openAt, best, excluding, within }
+}
+
+/** A question as the page answers it: the AI's reading, and our own
+ *  parser's conditions. The visitor can remove a chip from either. */
+export type Asked = { reading: Reading; own: OwnConditions }
 
 export type ReadingOptions = {
   coords?: LatLng | null
@@ -29,24 +47,54 @@ export function readingAnswers(reading: Reading, categoryId?: string): boolean {
   return cats.length > 0 || (reading.items?.length ?? 0) > 0 || (!!categoryId && !!reading.near)
 }
 
+/** Whether the reading lost the kind of place our own parser is sure the
+ *  question named: "shul near HUP" read as only Food. Then the site's own
+ *  search answers, not the reading, when it finds anything: never trade an
+ *  answer for none ("after school program" is Childcare's After School,
+ *  though our parser hears "school"). A reading of items is about the
+ *  items, whatever kind of place the question said ("challah at a
+ *  bakery"). */
+export function readingLoses(question: string, reading: Reading, categories: readonly CategoryConfig[]): boolean {
+  if (reading.items?.length) return false
+  const named = new Set(parseAsk(question).concepts.flatMap(({ concept }) => conceptCategories(concept, categories)))
+  return named.size > 0 && !reading.categories.some((c) => named.has(c.id))
+}
+
+const keepsAnyHours = (c: CategoryConfig) => c.detailFields.some((f) => f.type === 'hours')
+
 export function searchReading(
   listings: readonly DirectoryResource[],
   categories: readonly CategoryConfig[],
-  reading: Reading,
+  { reading, own }: Asked,
   question: string,
   { coords = null, now = new Date(), places, categoryId }: ReadingOptions,
 ): AskResult & { reach: ReadingReach | null } {
   const byId = new Map(categories.map((c) => [c.id, c]))
-  const read = categoryId ? { ...reading, categories: reading.categories.filter((c) => c.id === categoryId) } : reading
+  // "Within a 15-minute drive" is our parser's, measured from where the
+  // reading says, or from the visitor.
+  const withinMiles = reading.withinMiles ?? own.within?.miles ?? null
+  const read: Reading = {
+    ...reading,
+    categories: categoryId ? reading.categories.filter((c) => c.id === categoryId) : reading.categories,
+    ...(withinMiles ? { withinMiles, near: reading.near ?? 'me' } : {}),
+  }
   const { filters } = readingFilters(read)
   const items = read.items ?? []
   const itemTerms = [...new Set(items.flatMap((i) => i.toLowerCase().split(/\s+/)))]
   // On a category page, the page's category is asked about whether or not
   // the reading named it ("challah" on Grocery).
   const catIds = categoryId ? [categoryId] : read.categories.map((c) => c.id)
-  const wantsOpen = new Set(read.categories.filter((c) => c.openNow).map((c) => c.id))
+  // When: "until 10" or "today" from our parser, for every kind of place
+  // that keeps hours. "Now" is the reading's where it said it of some kinds
+  // and not others ("meat open now, and every synagogue"), and our parser's
+  // for every kind when the reading didn't say it at all.
+  const timed = own.openAt ?? (own.openToday ? 'today' : null)
+  const readOpen = read.categories.filter((c) => c.openNow).map((c) => c.id)
+  const nowFor = new Set(
+    timed ? [] : readOpen.length ? readOpen : own.openNow ? catIds.filter((id) => byId.get(id) && keepsAnyHours(byId.get(id)!)) : [],
+  )
 
-  const query = {
+  const query: AskQuery = {
     ...parseAsk(''),
     raw: question.trim(),
     terms: itemTerms,
@@ -55,8 +103,12 @@ export function searchReading(
     // kind of place it's about: that's what the answer sentence then says
     // ("5 food places open now"). "Meat open now and the hotels" isn't,
     // and the hotels aren't open now, only there.
-    openNow: wantsOpen.size > 0 && catIds.every((id) => wantsOpen.has(id)),
-    within: read.near === 'me' && read.withinMiles ? { miles: read.withinMiles, asked: null } : null,
+    openNow: nowFor.size > 0 && catIds.every((id) => nowFor.has(id)),
+    openToday: !own.openAt && own.openToday,
+    openAt: own.openAt,
+    best: own.best,
+    excluding: own.excluding,
+    within: read.near === 'me' && read.withinMiles ? (own.within ?? { miles: read.withinMiles, asked: null }) : null,
   }
 
   const baseReach = readingReach(read, places, coords)
@@ -64,6 +116,7 @@ export function searchReading(
   const found: AskHit[] = []
   const closed: AskHit[] = []
   const noHours: AskHit[] = []
+  const excluded = new Set<string>()
   for (const item of listings) {
     const category = byId.get(item.category)
     if (!category) continue
@@ -72,8 +125,12 @@ export function searchReading(
     const matched = readingItemsOn(item, items)
     if (items.length && matched.length === 0) continue
     if (!catIds.length && !items.length) continue
+    if (own.excluding.length && own.excluding.every((w) => termMatches(w, words(item.name), 3, false))) {
+      excluded.add(item.name)
+      continue
+    }
     const miles = origin && item.geo && category.hasAddress !== false ? haversineMiles(origin, item.geo) : null
-    const state = openState(item, category, now)
+    const state = openState(item, category, now, own.openAt)
     const hit: AskHit = {
       item,
       category,
@@ -85,10 +142,14 @@ export function searchReading(
       open: state.open,
       closesAt: state.closesAt,
       today: state.today,
-      atTime: null,
+      atTime: state.atTime,
     }
-    if (!wantsOpen.has(item.category) || hit.open === true) found.push(hit)
-    else if (hit.open === null) noHours.push(hit)
+    // Asked when of a kind of place that keeps hours: only what's open
+    // then answers; one with no hours saved isn't counted closed.
+    const when = timed && keepsAnyHours(category) ? timed : nowFor.has(item.category) ? 'now' : null
+    const fits = when === null || (when === 'now' ? hit.open === true : when === 'today' ? hit.today.length > 0 : !!hit.atTime?.length)
+    if (fits) found.push(hit)
+    else if (hit.open === null && !state.known) noHours.push(hit)
     else closed.push(hit)
   }
 
@@ -99,7 +160,8 @@ export function searchReading(
   const byNearest = (a: AskHit, b: AskHit) =>
     (a.miles ?? Infinity) - (b.miles ?? Infinity) || (b.item.upvotes ?? 0) - (a.item.upvotes ?? 0) || a.item.name.localeCompare(b.item.name)
   const byUpvotes = (a: AskHit, b: AskHit) => (b.item.upvotes ?? 0) - (a.item.upvotes ?? 0) || byNearest(a, b)
-  const order = origin ? byNearest : byUpvotes
+  // "Best": neighbours' upvotes first, the only ranking the guide has.
+  const order = own.best || !origin ? byUpvotes : byNearest
 
   return {
     query,
@@ -110,24 +172,27 @@ export function searchReading(
     closedCount: closed.filter(inReach).length,
     noHours: noHours.filter(inReach).sort(order),
     terms: itemTerms,
-    excluded: [],
-    openNowIn: [...wantsOpen],
+    excluded: [...excluded],
+    openNowIn: [...nowFor],
     reach,
   }
 }
 
-export type ReadingChip = { key: string; label: string; without: Reading }
+export type ReadingChip = { key: string; label: string; without: Asked }
 
 /** How the question was read, as chips: each category, each filter on it,
- *  each item, and how far (`reach`, as searchReading measured it), every
- *  one removable (`without` is the reading less that chip). A filter names
- *  its category when there's more than one ("Food: Meat"). */
+ *  each item, when, how far (`reach`, as searchReading measured it), "best"
+ *  and who's left out, every one removable (`without` is the question less
+ *  that chip). A filter names its category when there's more than one
+ *  ("Food: Meat"). */
 export function readingChips(
-  reading: Reading,
+  { reading, own }: Asked,
   categories: readonly CategoryConfig[],
-  { reach, categoryId }: { reach: ReadingReach | null; categoryId?: string },
+  { reach, categoryId, excluded = [] }: { reach: ReadingReach | null; categoryId?: string; excluded?: string[] },
 ): ReadingChip[] {
   const chips: ReadingChip[] = []
+  const withReading = (r: Reading): Asked => ({ reading: r, own })
+  const withOwn = (o: Partial<OwnConditions>): Asked => ({ reading, own: { ...own, ...o } })
   const shown = categoryId ? reading.categories.filter((c) => c.id === categoryId) : reading.categories
   const several = shown.length > 1
   for (const c of shown) {
@@ -135,22 +200,36 @@ export function readingChips(
     if (!category) continue
     const others = reading.categories.filter((x) => x.id !== c.id)
     // A category page's own category is the page, not a chip.
-    if (!categoryId) chips.push({ key: `cat:${c.id}`, label: category.pluralLabel, without: { ...reading, categories: others } })
+    if (!categoryId) chips.push({ key: `cat:${c.id}`, label: category.pluralLabel, without: withReading({ ...reading, categories: others }) })
     const { filters } = readingFilters({ categories: [c] })
     for (const a of activeFilters(filters, [category])) {
       const left = readingFromFilter(c, a.remove(filters)[c.id])
       chips.push({
         key: `${c.id}:${a.key}`,
         label: several ? `${category.pluralLabel}: ${a.label}` : a.label,
-        without: { ...reading, categories: reading.categories.map((x) => (x.id === c.id ? left : x)) },
+        without: withReading({ ...reading, categories: reading.categories.map((x) => (x.id === c.id ? left : x)) }),
       })
     }
   }
   for (const item of reading.items ?? []) {
-    chips.push({ key: `item:${item}`, label: item, without: { ...reading, items: (reading.items ?? []).filter((i) => i !== item) } })
+    chips.push({ key: `item:${item}`, label: item, without: withReading({ ...reading, items: (reading.items ?? []).filter((i) => i !== item) }) })
+  }
+  // When, from our own parser: a time, today, or now when the reading
+  // didn't say it of any kind of place (then it's said of all of them).
+  if (own.openAt) {
+    const how = { after: 'after', until: 'until', at: 'at', before: 'before' }[own.openAt.how]
+    chips.push({ key: 'when', label: `Open ${how} ${formatOpenAtTime(own.openAt.minutes)}`, without: withOwn({ openAt: null }) })
+  } else if (own.openToday) {
+    chips.push({ key: 'when', label: 'Open today', without: withOwn({ openToday: false }) })
+  } else if (own.openNow && !reading.categories.some((c) => c.openNow)) {
+    chips.push({ key: 'when', label: 'Open now', without: withOwn({ openNow: false }) })
   }
   const reachText = reach && reachLabel(reach)
-  if (reachText) chips.push({ key: 'reach', label: reachText, without: { ...reading, near: null, withinMiles: null } })
+  if (reachText) chips.push({ key: 'reach', label: reachText, without: { reading: { ...reading, near: null, withinMiles: null }, own: { ...own, within: null } } })
+  if (own.best) chips.push({ key: 'best', label: 'Most upvoted first', without: withOwn({ best: false }) })
+  if (own.excluding.length) {
+    chips.push({ key: 'excluding', label: `Besides ${excluded.length ? excluded[0] : own.excluding.join(' ')}`, without: withOwn({ excluding: [] }) })
+  }
   return chips
 }
 

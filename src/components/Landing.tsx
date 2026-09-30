@@ -15,7 +15,7 @@ import { resolveCapabilities } from '@/lib/categories'
 import { routes } from '@/lib/routes'
 import { neighborhoodsFor } from '@/lib/places'
 import { readerPlaces } from '@/lib/questionReader'
-import { readingAnswers, readingChips, searchReading } from '@/lib/readingSearch'
+import { readingAnswers, readingChips, readingLoses, searchReading } from '@/lib/readingSearch'
 import { useReading } from '@/lib/useReading'
 import { answersWell, candidatePrompts, pickPrompts } from '@/lib/searchPrompts'
 import { listMinyanim } from '@/lib/upcomingDavening'
@@ -237,8 +237,12 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
   const namesAPlace = !!q && (listings ?? []).some((l) => l.name.toLowerCase().replace(/['’]/g, '').includes(typedName))
   const readable = !!asked && !asked.result.query.meta && !asked.result.query.times && !asked.result.query.eruv && !asked.result.query.minyan && !namesAPlace
   const reading = readable ? reader.readingFor(q) : null
+  // Today's search answers instead when the reading lost the kind of place
+  // our own parser is sure was named, and today's search found something
+  // (see readingLoses).
+  const todayFound = !!asked && (asked.result.hits.length > 0 || asked.result.noHours.length > 0)
   const readResult =
-    reading && listings && schedule && readingAnswers(reading)
+    reading && listings && schedule && readingAnswers(reading.reading) && !(todayFound && readingLoses(q, reading.reading, categories ?? []))
       ? searchReading(listings, categories ?? [], reading, q, { coords, now: new Date(schedule.now), places: readerPlacesHere })
       : null
   const todayFoundNothing = !!asked && asked.result.hits.length === 0 && asked.result.noHours.length === 0 && asked.answer === null
@@ -253,7 +257,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
   const readAsNode = q && (
     <ReadAs
       reading={reader.isReading(q) && !readResult}
-      chips={readResult ? readingChips(reading!, categories ?? [], { reach: readResult.reach }) : []}
+      chips={readResult ? readingChips(reading!, categories ?? [], { reach: readResult.reach, excluded: readResult.excluded }) : []}
       onRemove={(chip) => reader.edit(chip.without)}
     />
   )

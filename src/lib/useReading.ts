@@ -2,15 +2,16 @@
 
 import { useRef, useState } from 'react'
 import { askReader } from './askReader'
-import type { Reading } from './questionReader'
+import { ownConditions, type Asked } from './readingSearch'
 
 // A page's question reading (see questionReader.ts): the one asked for,
-// while it's being read, and once it's here, the reading, which the
-// visitor can edit by removing its chips. The page decides when to ask
+// while it's being read, and once it's here, the reading with our own
+// parser's conditions beside it (see readingSearch.ts), which the visitor
+// can edit by removing its chips. The page decides when to ask
 // (Enter, a shared link, a pause on a question nothing answers) and uses
 // the reading only while it's still for the question in the box.
 
-export type PageReading = { question: string; reading: Reading }
+export type PageReading = { question: string; asked: Asked }
 
 export function useReading(community: string | null) {
   const [read, setRead] = useState<PageReading | null>(null)
@@ -24,19 +25,19 @@ export function useReading(community: string | null) {
     setReadingNow(q)
     void askReader(q, community).then((answer) => {
       setReadingNow((now) => (now === q ? null : now))
-      if (answer.ok) setRead({ question: q, reading: answer.reading })
+      if (answer.ok) setRead({ question: q, asked: { reading: answer.reading, own: ownConditions(q) } })
       // Not kept as asked when it couldn't be read: Enter tries again.
       else if (asked.current === q) asked.current = null
     })
   }
 
   return {
-    /** The reading for `question`, or null. */
-    readingFor: (question: string) => (read && read.question === question.trim() ? read.reading : null),
+    /** The question as read, for `question`, or null. */
+    readingFor: (question: string) => (read && read.question === question.trim() ? read.asked : null),
     /** Whether `question` is being read right now. */
     isReading: (question: string) => readingNow !== null && readingNow === question.trim(),
     ask,
     /** The visitor removed a chip. */
-    edit: (reading: Reading) => read && setRead({ ...read, reading }),
+    edit: (asked: Asked) => read && setRead({ ...read, asked }),
   }
 }

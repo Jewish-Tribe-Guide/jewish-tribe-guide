@@ -3,10 +3,14 @@
 // the reader, and let this decide how many of the search fixes it replaces).
 //
 // Each question has the reading it should get, written by hand in the
-// site's own words. Both answer every question; each answer is scored
-// against what that reading finds in the same listings at the same moment:
-// right (the same places, and the same nearest three when asked for
-// nearest), partly (at least half the same places), or wrong.
+// site's own words, and when it asks a time, "best" or "other than", what
+// our own parser should keep of it. Both answer every question; each answer
+// is scored against what that right answer finds in the same listings at
+// the same moment: right (the same places, and the same first three when
+// asked for nearest or best), partly (at least half the same places), or
+// wrong. The reader's side is scored as the site shows it: its reading and
+// our parser's conditions together (readingSearch.ts), and today's search
+// where the site falls back to it.
 //
 // Reads production (read-only) and calls OpenAI with OPENAI_API_KEY, so it's
 // not part of `npm test`:
@@ -18,13 +22,12 @@ import path from 'node:path'
 import { createClient } from '@supabase/supabase-js'
 import { expect, test } from 'vitest'
 import type { CategoryConfig } from '@/lib/categories'
-import { selectValues } from '@/lib/categories'
 import { searchAsk } from '@/lib/askSearch'
 import { neighborhoodsFor } from '@/lib/places'
-import { haversineMiles, type LatLng } from '@/lib/geo'
-import { businessClosure, hoursOpenNow } from '@/lib/hours'
-import { keepsHours, passesFields } from '@/lib/mapFilters'
-import { readerVocabulary, type Reading } from '@/lib/questionReader'
+import type { LatLng } from '@/lib/geo'
+import { keepsHours } from '@/lib/mapFilters'
+import { readerPlaces, readerVocabulary, type Reading } from '@/lib/questionReader'
+import { ownConditions, readingAnswers, readingLoses, searchReading, type Asked, type OwnConditions } from '@/lib/readingSearch'
 import { DEFAULT_READER_MODEL, readQuestion } from '@/lib/readQuestion'
 import type { DirectoryResource } from '@/types'
 
@@ -42,7 +45,8 @@ const ME: LatLng = { lat: 39.9496, lng: -75.1718 }
 const HUP = 'Hospital of the University of Pennsylvania'
 const ORTHODOX = ['Orthodox (Ashkenazi)', 'Orthodox (Sephardic)']
 
-type Case = [question: string, gold: Reading | ((cats: CategoryConfig[]) => Reading)]
+type Case = [question: string, gold: Reading | ((cats: CategoryConfig[]) => Reading), own?: Partial<OwnConditions>]
+const NONE: OwnConditions = { openNow: false, openToday: false, openAt: null, best: false, excluding: [], within: null }
 const food = (f: Omit<Reading['categories'][number], 'id'> = {}) => ({ id: 'restaurant', ...f })
 const one = (c: Reading['categories'][number], rest: Partial<Reading> = {}): Reading => ({ categories: [c], ...rest })
 const near = (where: string, rest: Partial<Reading> = {}) => ({ near: where, sortByDistance: true, ...rest })
@@ -99,43 +103,15 @@ const CASES: Case[] = [
     { categories: [food({ openNow: true, select: { t: ['Meat'] } }), { id: 'synagogue' }, { id: 'hotel', bool: ['shabbatFriendly'] }] },
   ],
   ['dairy or parve places open now near HUP', one(food({ openNow: true, select: { t: ['Dairy', 'Parve'] } }), near(HUP))],
+  // Times, "best" and "other than": our own parser's to keep (Sep 30, after
+  // the first of these lost its hours to the reader).
+  ['can you show me meat restaurants that are open until 10pm or later', one(food({ select: { t: ['Meat'], foodType: ['Restaurant'] } })), { openAt: { how: 'until', minutes: 22 * 60 } }],
+  ['dairy places open after 6', one(food({ select: { t: ['Dairy'] } })), { openAt: { how: 'after', minutes: 18 * 60 } }],
+  ['is there a mikvah open today', one({ id: 'mikvah' }), { openToday: true }],
+  ['meat restaurants open late', one(food({ select: { t: ['Meat'], foodType: ['Restaurant'] } })), { openNow: true }],
+  ['best bakery', one(food({ select: { foodType: ['Bakery'] } })), { best: true }],
+  ['kosher wine other than giant', { categories: [], items: ['Wine'] }, { excluding: ['giant'] }],
 ]
-
-// ── Doing what a reading says, on the listings ──────────────────────────────
-
-type Anchor = { name: string; geo: LatLng }
-
-function applyReading(reading: Reading, listings: DirectoryResource[], cats: CategoryConfig[], anchors: Map<string, Anchor>): string[] {
-  const byId = new Map(cats.map((c) => [c.id, c]))
-  const wanted = new Map(reading.categories.map((c) => [c.id, c]))
-  const items = new Set((reading.items ?? []).map((i) => i.toLowerCase()))
-  const from = reading.near === 'me' ? ME : reading.near ? anchors.get(reading.near.toLowerCase())?.geo : null
-  let hits = listings.filter((l) => {
-    const cat = byId.get(l.category)
-    if (!cat) return false
-    const c = wanted.get(l.category)
-    if (wanted.size && !c) return false
-    if (!wanted.size && !items.size) return false
-    const raw = l as unknown as Record<string, unknown>
-    if (c && !passesFields(raw, { bool: c.bool, select: c.select })) return false
-    if (c?.openNow) {
-      if (businessClosure(raw)) return false
-      const keys = cat.detailFields.filter((f) => f.type === 'hours' && f.filterable).map((f) => f.key)
-      if (!keys.some((k) => hoursOpenNow(raw[k], NOW) === true)) return false
-    }
-    if (items.size) {
-      const tags = cat.detailFields.filter((f) => f.type === 'tags').flatMap((f) => [...selectValues(raw[f.key]), ...selectValues(raw[`${f.key}_sometimes`])])
-      if (!tags.some((t) => items.has(t.toLowerCase()))) return false
-    }
-    if (reading.withinMiles && from && l.geo && haversineMiles(from, l.geo as LatLng) > reading.withinMiles) return false
-    return true
-  })
-  if (reading.sortByDistance && from) {
-    const d = (l: DirectoryResource) => (l.geo ? haversineMiles(from, l.geo as LatLng) : Infinity)
-    hits = [...hits].sort((a, b) => d(a) - d(b))
-  }
-  return hits.map((l) => l.id)
-}
 
 function score(got: string[], want: string[], ordered: boolean): 'right' | 'partly' | 'wrong' {
   const g = new Set(got)
@@ -175,26 +151,22 @@ test('today’s search against the question reader', { timeout: 600_000 }, async
     ...r.details,
   }))
 
-  // Places the reader may name: towns and neighbourhoods, and the hospitals.
-  const anchors = new Map<string, Anchor>()
-  for (const p of neighborhoodsFor('philly')) for (const n of [p.name, ...(p.aliases ?? [])]) anchors.set(n.toLowerCase(), { name: p.name, geo: p.geo })
-  for (const h of listings.filter((l) => l.category === 'hospital' && l.geo)) {
-    anchors.set(h.name.toLowerCase(), { name: h.name, geo: h.geo as LatLng })
-    const initials = h.name.replace(/[^A-Za-z ]/g, '').split(/\s+/).filter((w) => /^[A-Z]/.test(w) && !/^(of|the)$/i.test(w)).map((w) => w[0]).join('')
-    if (initials.length >= 3) anchors.set(initials.toLowerCase(), { name: h.name, geo: h.geo as LatLng })
-  }
-  anchors.set('hup', { name: HUP, geo: anchors.get(HUP.toLowerCase())!.geo })
-  const vocab = readerVocabulary(cats, listings, [...new Set([...anchors.keys()].map((k) => anchors.get(k)!.name)), 'HUP'])
+  // Places the reader may name, as the route gives them: neighbourhoods by
+  // all their names, hospitals by name and initials.
+  const places = readerPlaces(listings, 'philly')
+  const vocab = readerVocabulary(cats, listings, [...places.keys()])
+  const answer = (asked: Asked, question: string) =>
+    searchReading(listings, cats, asked, question, { coords: ME, now: NOW, places }).hits.map((h) => h.item.id)
 
   const rowsOut: string[] = []
   const tally = { today: { right: 0, partly: 0, wrong: 0 }, luna: { right: 0, partly: 0, wrong: 0 } }
   let cost = 0
   let msTotal = 0
   const fails: string[] = []
-  for (const [question, goldOf] of CASES) {
+  for (const [question, goldOf, goldOwn] of CASES) {
     const gold = typeof goldOf === 'function' ? goldOf(cats) : goldOf
-    const want = applyReading(gold, listings, cats, anchors)
-    const ordered = !!gold.sortByDistance
+    const want = answer({ reading: gold, own: { ...NONE, ...goldOwn } }, question)
+    const ordered = !!gold.sortByDistance || !!goldOwn?.best
 
     const today = searchAsk(listings, cats, question, { coords: ME, now: NOW, places: neighborhoodsFor('philly') }).hits.map((h) => h.item.id)
     const todayScore = score(today, want, ordered)
@@ -208,8 +180,10 @@ test('today’s search against the question reader', { timeout: 600_000 }, async
         model: process.env.READER_MODEL || DEFAULT_READER_MODEL,
         effort: process.env.READER_EFFORT === 'default' ? null : process.env.READER_EFFORT || undefined,
       })
-      if (r.reading.near && r.reading.near !== 'me' && !anchors.has(r.reading.near.toLowerCase())) r.reading.near = null
-      lunaGot = applyReading(r.reading, listings, cats, anchors)
+      // As the site does: today's search where the reading has nothing, or
+      // lost the kind of place our parser heard and today's found something.
+      const fallBack = !readingAnswers(r.reading) || (today.length > 0 && readingLoses(question, r.reading, cats))
+      lunaGot = fallBack ? today : answer({ reading: r.reading, own: ownConditions(question) }, question)
       lunaScore = score(lunaGot, want, ordered)
       readingText = JSON.stringify(r.reading)
       // GPT-6 Luna, per third-party price lists (Sep 2026): $0.10 per million
@@ -235,7 +209,7 @@ test('today’s search against the question reader', { timeout: 600_000 }, async
     `- Reader: ${tally.luna.right} right, ${tally.luna.partly} partly, ${tally.luna.wrong} wrong`,
     `- Reader cost for all ${n}: $${cost.toFixed(4)} (≈ $${((cost / n) * 1000).toFixed(2)} per 1,000 questions); average ${Math.round(msTotal / n)} ms each`,
     '',
-    '| Question | Places it should find | Today (found) | Reader (found) |',
+    '| Question | Places it should find | Today (found) | Site with the reader (found) |',
     '|---|---|---|---|',
     ...rowsOut,
     '',

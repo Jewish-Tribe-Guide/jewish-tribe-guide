@@ -3,7 +3,7 @@ import type { DirectoryResource } from '@/types'
 import { makeCategory } from '@/test/providerFixtures'
 import { answerFor } from './askAnswer'
 import { readerPlaces, type Reading } from './questionReader'
-import { readingAnswers, readingChips, searchReading } from './readingSearch'
+import { ownConditions, readingAnswers, readingChips, readingLoses, searchReading, type Asked } from './readingSearch'
 
 const allWeek = (open: string, close: string) => Object.fromEntries(['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'].map((d) => [d, { open, close }]))
 const hours = { key: 'hours', label: 'Hours', type: 'hours' as const, filterable: true }
@@ -41,8 +41,14 @@ const listings = [lateGrill, lunchGrill, dairy, shoprite, giant, sheraton, motel
 const places = readerPlaces(listings, 'philly')
 const sixPm = new Date(2026, 8, 24, 18, 0)
 const me = { lat: 39.95, lng: -75.17 }
-const ask = (reading: Reading, question = 'q', opts: { categoryId?: string; coords?: typeof me | null } = {}) =>
-  searchReading(listings, categories, reading, question, { now: sixPm, places, coords: opts.coords === undefined ? me : opts.coords, categoryId: opts.categoryId })
+const asked = (reading: Reading, question = 'q'): Asked => ({ reading, own: ownConditions(question) })
+const ask = (reading: Reading, question = 'q', opts: { categoryId?: string; coords?: typeof me | null; now?: Date } = {}) =>
+  searchReading(listings, categories, asked(reading, question), question, {
+    now: opts.now ?? sixPm,
+    places,
+    coords: opts.coords === undefined ? me : opts.coords,
+    categoryId: opts.categoryId,
+  })
 const names = (r: ReturnType<typeof ask>) => r.hits.map((h) => h.item.name)
 
 describe('searchReading — the listings answer what the reader read', () => {
@@ -95,9 +101,62 @@ describe('searchReading — the listings answer what the reader read', () => {
   })
 })
 
+describe('our own parser keeps what it’s sure of, whatever the reading says', () => {
+  // The question that found this (Sep 30): the reader can't say "until
+  // 10", so it left it out, and the page listed every meat restaurant.
+  const question = 'can you show me meat restaurants that are open until 10pm or later'
+  const meat: Reading = { categories: [{ id: 'restaurant', select: { t: ['Meat'] } }] }
+
+  it('"open until 10pm or later": only the meat place still open at ten', () => {
+    const r = ask(meat, question)
+    expect(names(r)).toEqual(['Late Grill'])
+    expect(r.query.openAt).toEqual({ how: 'until', minutes: 22 * 60 })
+    expect(readingChips(asked(meat, question), categories, { reach: null }).map((c) => c.label)).toEqual(['Food', 'Meat', 'Open until 10:00 PM'])
+  })
+
+  it('"open now" the reading didn’t carry is kept, for every kind of place that keeps hours', () => {
+    expect(names(ask(meat, 'meat places open now'))).toEqual(['Late Grill'])
+    expect(readingChips(asked(meat, 'meat places open now'), categories, { reach: null }).map((c) => c.label)).toContain('Open now')
+  })
+
+  it('but where the reading said now of some kinds and not others, the reading’s is kept', () => {
+    const r = ask({ categories: [{ id: 'restaurant', openNow: true }, { id: 'synagogue' }] }, 'food open now and all the shuls regardless')
+    expect(names(r).sort()).toEqual(['Dairy Cafe', 'Late Grill', 'Mekor'])
+  })
+
+  it('"other than GIANT" and "best"', () => {
+    const r = ask({ categories: [], items: ['Challah'] }, 'best challah other than giant')
+    expect(names(r)).toEqual(['ShopRite Cherry Hill'])
+    expect(r.excluded).toEqual(['GIANT'])
+    expect(readingChips(asked({ categories: [], items: ['Challah'] }, 'best challah other than giant'), categories, { reach: null, excluded: r.excluded }).map((c) => c.label)).toEqual([
+      'Challah',
+      'Most upvoted first',
+      'Besides GIANT',
+    ])
+  })
+
+  it('removing the time chip removes our parser’s time, and the reading stays', () => {
+    const chip = readingChips(asked(meat, question), categories, { reach: null }).find((c) => c.key === 'when')!
+    expect(chip.without.own.openAt).toBeNull()
+    expect(chip.without.reading).toEqual(meat)
+    const r = searchReading(listings, categories, chip.without, question, { now: sixPm, places, coords: me })
+    expect(names(r)).toEqual(['Late Grill', 'Lunch Grill'])
+  })
+
+  it('a reading that lost the kind of place our parser is sure was named isn’t used', () => {
+    expect(readingLoses('shul near hup', { categories: [{ id: 'restaurant' }] }, categories)).toBe(true)
+    expect(readingLoses('shul near hup', { categories: [{ id: 'synagogue' }] }, categories)).toBe(false)
+    expect(readingLoses('challah at a bakery', { categories: [], items: ['Challah'] }, categories)).toBe(false)
+    // Our parser hears food in "eat": read as hotels, that's a disagreement.
+    expect(readingLoses('somewhere to eat', { categories: [{ id: 'hotel' }] }, categories)).toBe(true)
+    // With no kind of place our parser is sure of, the reading decides.
+    expect(readingLoses('somewhere good please', { categories: [{ id: 'hotel' }] }, categories)).toBe(false)
+  })
+})
+
 describe('readingChips — how it was read, each removable', () => {
   const reading: Reading = { categories: [{ id: 'restaurant', openNow: true, select: { t: ['Meat'] } }, { id: 'hotel', bool: ['shabbatFriendly'] }], items: ['Challah'] }
-  const chips = readingChips(reading, categories, { reach: null })
+  const chips = readingChips(asked(reading), categories, { reach: null })
 
   it('each category, each filter named with its category when there are several, each item', () => {
     expect(chips.map((c) => c.label)).toEqual(['Food', 'Food: Open now', 'Food: Meat', 'Hotels', 'Hotels: Shabbat friendly', 'Challah'])
@@ -105,18 +164,18 @@ describe('readingChips — how it was read, each removable', () => {
 
   it('removing one leaves the rest of the reading', () => {
     const meat = chips.find((c) => c.label === 'Food: Meat')!
-    expect(meat.without.categories[0]).toEqual({ id: 'restaurant', openNow: true })
-    expect(meat.without.categories[1]).toEqual(reading.categories[1])
-    expect(chips.find((c) => c.label === 'Hotels')!.without.categories.map((c) => c.id)).toEqual(['restaurant'])
-    expect(chips.find((c) => c.label === 'Challah')!.without.items).toEqual([])
+    expect(meat.without.reading.categories[0]).toEqual({ id: 'restaurant', openNow: true })
+    expect(meat.without.reading.categories[1]).toEqual(reading.categories[1])
+    expect(chips.find((c) => c.label === 'Hotels')!.without.reading.categories.map((c) => c.id)).toEqual(['restaurant'])
+    expect(chips.find((c) => c.label === 'Challah')!.without.reading.items).toEqual([])
   })
 
   it('on a category page, not its own category, and filters without the name', () => {
-    expect(readingChips(reading, categories, { reach: null, categoryId: 'restaurant' }).map((c) => c.label)).toEqual(['Open now', 'Meat', 'Challah'])
+    expect(readingChips(asked(reading), categories, { reach: null, categoryId: 'restaurant' }).map((c) => c.label)).toEqual(['Open now', 'Meat', 'Challah'])
   })
 
   it('how far, as measured', () => {
     const r = ask({ categories: [{ id: 'grocery' }], items: ['Chalav Yisroel Milk'], near: 'hup' }, 'q', { coords: null })
-    expect(readingChips({ categories: [], near: 'hup' }, categories, { reach: r.reach }).map((c) => c.label)).toEqual(['Within 1.5 mi of HUP'])
+    expect(readingChips(asked({ categories: [], near: 'hup' }), categories, { reach: r.reach }).map((c) => c.label)).toEqual(['Within 1.5 mi of HUP'])
   })
 })
