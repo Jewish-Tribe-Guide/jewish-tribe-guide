@@ -2,7 +2,7 @@ import { selectValues, type CategoryConfig, type CategoryField } from './categor
 import { fmt12, getOpenStatus, isStructuredHours, DAY_KEYS, dayLabel, type DayKey, type DayHours } from './hours'
 
 const short = (k: DayKey) => dayLabel(k).slice(0, 3)
-import { haversineMiles, roundMiles } from './geo'
+import { haversineMiles, milesText, roundMiles } from './geo'
 import { rowBadgeFields, saysTheSame } from './listingRow'
 import { isMinyanim } from './davening'
 import { parseWalkList } from './walkList'
@@ -79,7 +79,7 @@ export function listingFacts(item: DirectoryResource, category: CategoryConfig):
  *  from. Nothing for a place in the centre itself: "0.2 mi from central
  *  Philadelphia" is just noise. */
 export function listingDistance(item: DirectoryResource, region: string): string | null {
-  if (item.milesFromAddress != null) return `${roundMiles(item.milesFromAddress)} mi away`
+  if (item.milesFromAddress != null) return `${milesText(item.milesFromAddress)} away`
   if (item.milesFromCenter != null && item.milesFromCenter >= 0.5) return `${roundMiles(item.milesFromCenter)} mi from central ${region}`
   return null
 }

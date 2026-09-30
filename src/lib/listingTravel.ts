@@ -1,5 +1,5 @@
 import type { DirectoryResource } from '@/types'
-import { haversineMiles, roundMiles, type LatLng } from './geo'
+import { haversineMiles, milesText, type LatLng } from './geo'
 
 // Shared travel/distance helpers for directory listings. A listing carries
 // either straight-line miles from the visitor's typed address
@@ -69,6 +69,6 @@ export type TravelPart = { kind: 'distance'; text: string }
 
 export function travelParts(item: DirectoryResource): TravelPart[] {
   const miles = item.milesFromAddress ?? item.milesFromCenter
-  if (miles != null) return [{ kind: 'distance', text: `${roundMiles(miles)} mi` }]
+  if (miles != null) return [{ kind: 'distance', text: milesText(miles) }]
   return []
 }

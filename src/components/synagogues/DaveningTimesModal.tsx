@@ -20,7 +20,7 @@ import { calendarDaysFor } from '@/lib/calendarDays'
 import { currentSeason, isOutOfSeason } from '@/lib/season'
 import { community } from '@/community.config'
 import { directionsUrl, destinationQuery } from '@/lib/googleMapsLinks'
-import { roundMiles } from '@/lib/geo'
+import { milesText } from '@/lib/geo'
 import { useOptionalLocation } from '@/lib/locationContext'
 import { useBodyScrollLock } from '@/lib/useBodyScrollLock'
 import DenominationFilter from './DenominationFilter'
@@ -192,7 +192,7 @@ function DistanceDirections({
       {hasDistance ? (
         <span className="ml-auto text-xs text-slate-600">
           {milesFromAddress != null ? (
-            `📍 ${roundMiles(milesFromAddress)} mi away`
+            `📍 ${milesText(milesFromAddress)} away`
           ) : (
             <span className="flex items-center gap-2">
               {driveMinutes != null && <span>🚗 {driveMinutes} min</span>}

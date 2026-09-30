@@ -127,6 +127,9 @@ describe('listingDistance', () => {
   it('from the visitor when a location is set', () => {
     expect(listingDistance(makeListing({ milesFromAddress: 3.46 }), 'Philadelphia')).toBe('3.5 mi away')
   })
+  it('in feet from somewhere on the same block, not "0 mi away"', () => {
+    expect(listingDistance(makeListing({ milesFromAddress: 0.04 }), 'Philadelphia')).toBe('200 ft away')
+  })
   it('from the centre otherwise, saying so', () => {
     expect(listingDistance(makeListing({ milesFromCenter: 11.24 }), 'Philadelphia')).toBe('11.2 mi from central Philadelphia')
   })

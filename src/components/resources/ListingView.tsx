@@ -32,7 +32,7 @@ import {
 } from '@/lib/listingView'
 import { parseWalkList } from '@/lib/walkList'
 import { clockTime } from '@/lib/upcomingDavening'
-import { roundMiles } from '@/lib/geo'
+import { milesText, roundMiles } from '@/lib/geo'
 import type { SearchFound } from '@/lib/askSearch'
 import CategoryIcon from '@/components/CategoryIcon'
 import PinnedBadge from '@/components/PinnedBadge'
@@ -754,7 +754,7 @@ function NearbyRow({
   const shul = useNextMinyan(item.id)
   // The row's own facts, with the distance measured from the place above.
   const facts = listingRowFacts({ ...item, milesFromAddress: miles ?? undefined, milesFromCenter: undefined }, category, now, { shul, candlesAt }).map((f) =>
-    miles != null && f.text === `${roundMiles(miles)} mi` ? { ...f, text: `${f.text} away` } : f,
+    miles != null && f.text === milesText(miles) ? { ...f, text: `${f.text} away` } : f,
   )
   const description = category.hasAddress === false ? String(item.description ?? '').trim() : ''
   const photo = typeof item[PHOTO_FIELD_KEY] === 'string' && (item[PHOTO_FIELD_KEY] as string).trim() ? (item[PHOTO_FIELD_KEY] as string) : undefined

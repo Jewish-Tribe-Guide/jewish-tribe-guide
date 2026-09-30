@@ -1,7 +1,7 @@
 import type { DirectoryResource } from '@/types'
 import { selectValues, type CategoryConfig } from './categories'
 import { businessClosure, hoursOpenNow } from './hours'
-import { roundMiles } from './geo'
+import { milesText } from './geo'
 
 // ── A category page's list, in groups ────────────────────────────────────────
 // Each category can split its list one way, chosen in the admin's category
@@ -191,5 +191,5 @@ function nearestOf(items: readonly DirectoryResource[]): string | undefined {
     if (m != null && (b == null || m < b)) best = i
   }
   const m = milesOf(best)
-  return m != null ? `${best.name} · ${roundMiles(m)} mi` : best.name
+  return m != null ? `${best.name} · ${milesText(m)}` : best.name
 }

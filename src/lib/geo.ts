@@ -24,6 +24,17 @@ export function roundMiles(miles: number): number {
   return Math.round(miles * 10) / 10
 }
 
+/** A distance as it's written: "0.4 mi", or in feet, to the nearest hundred,
+ *  where a tenth of a mile would round to nothing ("200 ft"). Rounded to a
+ *  tenth, two places on the same block were "0 mi" apart. */
+export function milesText(miles: number): string {
+  if (miles < 0.05) {
+    const feet = Math.round((miles * 5280) / 100) * 100
+    return feet < 100 ? 'under 100 ft' : `${feet} ft`
+  }
+  return `${roundMiles(miles)} mi`
+}
+
 // Rounded to one decimal, the way distances are shown. For display only —
 // see roundMiles's own note on why sorting needs haversineMiles directly.
 export function distanceMiles(a: LatLng, b: LatLng): number {

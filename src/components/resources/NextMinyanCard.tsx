@@ -2,7 +2,7 @@
 
 import type { DirectoryResource } from '@/types'
 import { ClockIcon } from '@/components/icons'
-import { roundMiles } from '@/lib/geo'
+import { milesText } from '@/lib/geo'
 import { nextMinyansAcross } from '@/lib/upcomingDavening'
 import { useMinyanSchedule } from '@/lib/useMinyanSchedule'
 
@@ -77,7 +77,7 @@ export default function NextMinyanCard({ items, onOpenListing, onDaveningTimes }
             // Minyan times come from people, never Google: unconfirmed until
             // someone confirms them, as the shul's own row says.
             const unconfirmed = !byId.get(line.shulId)?.confirmedAt
-            const second = [miles != null ? `${roundMiles(miles)} mi` : null, unconfirmed ? 'times not confirmed' : null].filter(Boolean).join(' · ')
+            const second = [miles != null ? milesText(miles) : null, unconfirmed ? 'times not confirmed' : null].filter(Boolean).join(' · ')
             return (
               <li key={line.shulId}>
                 <button

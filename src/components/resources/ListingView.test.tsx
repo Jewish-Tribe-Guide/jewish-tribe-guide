@@ -192,6 +192,11 @@ describe('ListingView — onward', () => {
     expect(seeAll).toHaveBeenCalled()
   })
 
+  it('a place on the same block is feet away, not "0 mi away"', () => {
+    view({ onward: { items: [judah, near('door', 'Next Door', 40.0862)], place: () => null, onOpen: vi.fn() } })
+    expect(within(screen.getByTestId('listing-onward')).getByRole('button')).toHaveTextContent('200 ft away')
+  })
+
   it('nothing onward where there’s no list to go on to', () => {
     view()
     expect(screen.queryByTestId('listing-onward')).not.toBeInTheDocument()

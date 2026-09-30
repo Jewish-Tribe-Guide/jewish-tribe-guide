@@ -5,7 +5,7 @@ import { describedByItsText, type AskHit, type DayWindow, type AskResult, type H
 import { formatOpenAtTime, termMatches, termsAsTyped, words, type MetaAsk, type MinyanAsk, type TimesAsk } from '@/lib/ask'
 import { TEFILLAH_LABELS, type Tefillah } from '@/lib/davening'
 import type { MinyanSlot } from '@/lib/upcomingDavening'
-import { haversineMiles, roundMiles, type LatLng } from '@/lib/geo'
+import { haversineMiles, milesText, roundMiles, type LatLng } from '@/lib/geo'
 
 // ── The one-line answer above search results ─────────────────────────────────
 // A search that reads a question should answer it, not just list places:
@@ -260,7 +260,7 @@ function baseAnswer(
 
   if (hits.length === 0) return null
   const top = hits[0]
-  const milesOf = (h: AskHit) => (h.miles != null ? `, ${roundMiles(h.miles)} mi` : '')
+  const milesOf = (h: AskHit) => (h.miles != null ? `, ${milesText(h.miles)}` : '')
   const hoursOf = (h: AskHit) => {
     if (h.atTime) return h.atTime.length ? `, ${h.atTime.map(dayWindowText).join(', ')}` : ''
     return asksOpen && h.today.length ? `, ${hoursText(h, query.openNow)}` : ''

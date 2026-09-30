@@ -414,7 +414,7 @@ describe('answerFor — "open now" without a location', () => {
     const now = new Date(2026, 8, 28, 12, 0)
     expect(answerFor(searchAsk(places, [food], 'food open now', { now }))?.text).toBe('2 food places open now, such as A Cafe (open until 11:00 PM).')
     expect(answerFor(searchAsk(places, [food], 'food open now', { now, coords: here }), { coords: here })?.text).toBe(
-      '2 food places open now. Nearest: A Cafe, open until 11:00 PM, 0 mi.',
+      '2 food places open now. Nearest: A Cafe, open until 11:00 PM, under 100 ft.',
     )
   })
 })
