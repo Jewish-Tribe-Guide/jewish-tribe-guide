@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { categoryWithHoursField, categoryWithListings, largestCategory, defaultCommunity, dismissLocationPrompt } from './helpers'
+import { categoryWithHoursField, categoryWithListings, largestCategory, defaultCommunity, dismissLocationPrompt, listingWithFourActions } from './helpers'
 
 // Desktop opens a listing in the list's own column, the map staying beside
 // it (ListingColumn); a phone opens it in a bottom sheet, the one Add and
@@ -26,10 +26,30 @@ test.describe('listing detail — desktop', () => {
     // The list is under it, hidden, not gone.
     await expect(trigger).toBeHidden()
 
+
     // Escape goes back to the list.
     await page.keyboard.press('Escape')
     await expect(column).toHaveCount(0)
     await expect(page.getByRole('button', { name: `Show details for ${name}` }).first()).toBeVisible()
+  })
+
+  // The action buttons sit a set gap apart from the left. Spread across the
+  // column the way a phone's are, the gaps grew with its width: 40px with
+  // the map beside it, 100px with the map hidden.
+  test('keeps the action buttons a set gap apart, not spread across the column', async ({ page, request }) => {
+    const community = await defaultCommunity(page)
+    const { category, item } = await listingWithFourActions(request, community)
+
+    await page.goto(`/${community}/${category.id}/${item.id}`)
+    await dismissLocationPrompt(page)
+
+    const column = page.getByTestId('listing-column').filter({ visible: true })
+    const actions = column.getByTestId('listing-actions').locator(':scope > a, :scope > button')
+    await expect(actions).toHaveCount(5)
+    const boxes = await Promise.all((await actions.all()).map((a) => a.boundingBox()))
+    for (let i = 1; i < boxes.length; i++) {
+      expect(boxes[i]!.x - (boxes[i - 1]!.x + boxes[i - 1]!.width), `gap before action ${i + 1}`).toBeLessThanOrEqual(32)
+    }
   })
 
   // Where the category has a map, the map sits beside the list at desktop

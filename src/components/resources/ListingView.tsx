@@ -259,7 +259,11 @@ export default function ListingView({ item, category, color, place = null, upvot
       <ShareButton path={path} name={item.name} round />
     </div>
   ) : (
-    <div className={`flex ${buttons.length >= 4 ? 'justify-between' : 'gap-3'}`} data-testid="listing-actions">
+    // Spread across a phone's width, where they fill it; in the desktop
+    // column, a set gap from the left, or the gaps grow with the column
+    // (720px with the map hidden). The gap leaves room between the 84px
+    // labels, which hang past each 64px button.
+    <div className={`flex ${wide ? 'gap-8' : buttons.length >= 4 ? 'justify-between' : 'gap-3'}`} data-testid="listing-actions">
       {buttons.map((a) => (
         <ActionButton key={actionKey(a)} action={a} item={item} />
       ))}

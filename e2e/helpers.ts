@@ -82,6 +82,29 @@ export async function categoryWithListings(
   throw new Error('No listing category has any listings — cannot test a populated directory')
 }
 
+/** A listing whose opened view has four action buttons before Share:
+ *  Directions, Call and two links (listingActions in src/lib/listingView.ts,
+ *  which stops at four). For anything about how that row is laid out at its
+ *  fullest; a listing with fewer never spread across the width anyway. */
+export async function listingWithFourActions(
+  request: APIRequestContext,
+  community: string,
+): Promise<{ category: Category; item: { id: string; name: string } }> {
+  const all = await categories(request, community)
+  for (const category of all.filter((c) => c.kind === 'listing' && c.hasAddress !== false)) {
+    const fields = ((category as Category & { detailFields?: { key: string; type: string; audienceKey?: string }[] }).detailFields ?? []).filter(
+      (f) => f.type === 'url' && !f.audienceKey,
+    )
+    const body = await apiGet(request, `/api/resources?category=${category.id}&community=${community}`)
+    if (!body.ok) continue
+    for (const item of body.resources as Record<string, unknown>[]) {
+      const links = fields.filter((f) => String(item[f.key] ?? '').trim()).length
+      if (item.address && item.phone && links >= 2) return { category, item: { id: String(item.id), name: String(item.name) } }
+    }
+  }
+  throw new Error('No listing has an address, a phone and two links')
+}
+
 /** A listing-kind category that is actually distance-based — `hasAddress` is
  *  not false — and has listings. For anything asserting on distances or the
  *  location prompt, neither of which exists on a category that collects no
