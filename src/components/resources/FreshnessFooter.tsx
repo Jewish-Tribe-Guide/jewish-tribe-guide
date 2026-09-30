@@ -13,6 +13,9 @@ type Props = {
   lead?: string
   /** What's confirmed, where it isn't the whole listing: "Times". */
   subject?: string
+  /** False for what hardly changes: just when it was last checked, with no
+   *  "Still right?" and no button ("Kosher details last checked Aug 20"). */
+  ask?: boolean
 }
 
 // Shown at the end of every opened listing, and in a shul's times card: when
@@ -33,7 +36,7 @@ export default function FreshnessFooter(props: Props) {
   return <FreshnessStatus {...props} />
 }
 
-function FreshnessStatus({ resourceId, confirmedAt: initialConfirmedAt, lead, subject }: Props) {
+function FreshnessStatus({ resourceId, confirmedAt: initialConfirmedAt, lead, subject, ask = true }: Props) {
   const now = useNow()
   const [confirmedAt, setConfirmedAt] = useState(initialConfirmedAt)
   // What confirmedAt was right before the most recent confirm — lets a
@@ -102,6 +105,16 @@ function FreshnessStatus({ resourceId, confirmedAt: initialConfirmedAt, lead, su
       {loading ? 'Saving…' : label}
     </button>
   )
+
+  if (!ask) {
+    const what = subject ?? 'Listing'
+    return (
+      <p className="text-[13.5px] leading-snug text-slate-600" data-testid="freshness">
+        {leadText}
+        {confirmedAt ? `${what} last checked ${shortDate(confirmedAt, now)}.` : `${what} not checked by anyone yet.`}
+      </p>
+    )
+  }
 
   if (justConfirmedNow) {
     return (

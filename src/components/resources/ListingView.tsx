@@ -132,7 +132,7 @@ export default function ListingView({ item, category, color, place = null, upvot
   // Where "Still right?" is asked: beside the one thing that's the
   // community's to keep, not about the whole listing (confirmPlace).
   const confirmAt = confirmPlace(item, category)
-  const confirmLine = (subject: string) => <FreshnessFooter resourceId={item.id} confirmedAt={item.confirmedAt} subject={subject} />
+  const confirmLine = (subject: string, ask = true) => <FreshnessFooter resourceId={item.id} confirmedAt={item.confirmedAt} subject={subject} ask={ask} />
   const [joined, setJoined] = useState(false)
   const photo = typeof item[PHOTO_FIELD_KEY] === 'string' && (item[PHOTO_FIELD_KEY] as string).trim() ? (item[PHOTO_FIELD_KEY] as string) : undefined
 
@@ -202,16 +202,12 @@ export default function ListingView({ item, category, color, place = null, upvot
               {facts.join(' · ')}
             </p>
           )}
+          {/* The warning alone, on one line: it decides the visit. What
+              isn't kosher is said in full in the details. */}
           {caveat && (
             <p className="mt-1 text-sm font-semibold text-caution" data-testid="listing-caveat">
               {caveat.text}
-              {caveat.title ? `: ${caveat.title}` : ''}
             </p>
-          )}
-          {confirmAt?.at === 'facts' && (
-            <div className="mt-1" data-testid="facts-confirmed">
-              {confirmLine(confirmAt.subject)}
-            </div>
           )}
         </div>
       </div>
@@ -293,7 +289,7 @@ export default function ListingView({ item, category, color, place = null, upvot
     const f = category.detailFields.find((x) => x.type === 'minyanim')!
     mainSection = <DaveningCard item={item} minyanim={item[f.key]} />
   } else if (main === 'items' && itemsF) {
-    mainSection = <ItemsCard item={item} field={itemsF} found={found} footer={confirmAt?.at === 'card' ? confirmLine(confirmAt.subject) : undefined} />
+    mainSection = <ItemsCard item={item} field={itemsF} found={found} />
   } else if (main === 'groups') {
     mainSection = (
       <GroupsCard item={item} groups={audienceGroups(item, category)} now={now} candlesAt={candlesAt} footer={confirmAt?.at === 'card' ? confirmLine(confirmAt.subject) : undefined} />
@@ -351,8 +347,14 @@ export default function ListingView({ item, category, color, place = null, upvot
   const otherTags = category.detailFields.filter(
     (f) => f.type === 'tags' && f.key !== itemsF?.key && selectValues(item[f.key]).length + selectValues(item[`${f.key}_sometimes`]).length > 0,
   )
-  const details = (showAddress || showPhone || otherHours.length > 0 || detailFields.length > 0 || extra.length > 0 || quietBadges.length > 0 || otherTags.length > 0) && (
+  const details = (caveat?.title || showAddress || showPhone || otherHours.length > 0 || detailFields.length > 0 || extra.length > 0 || quietBadges.length > 0 || otherTags.length > 0) && (
     <div className="divide-y divide-slate-100 border-t border-slate-100" data-testid="listing-details">
+      {caveat?.title && (
+        <Row>
+          <span className="block text-[13px] font-semibold text-caution">What isn’t kosher</span>
+          <span className="text-caution" data-testid="listing-caveat-note">{caveat.title}</span>
+        </Row>
+      )}
       {showAddress && (
         <Row icon={<PinIcon className="h-[17px] w-[17px]" />}>
           {item.address}
@@ -451,6 +453,7 @@ export default function ListingView({ item, category, color, place = null, upvot
       {/* What's left of the dated line once "Still right?" is asked beside
           the thing it's about: which details Google keeps, and when. */}
       <div className="space-y-3 border-t border-slate-200 pt-3.5" data-testid="listing-trust">
+        {confirmAt?.at === 'quiet' && confirmLine(confirmAt.subject, false)}
         {googleLead && <p className="text-[13.5px] leading-snug text-slate-600">{googleLead}.</p>}
         {foot}
       </div>
@@ -667,7 +670,7 @@ function HoursCard({ item, value, now, candlesAt }: { item: DirectoryResource; v
 
 const ITEMS_SHOWN = 6
 
-function ItemsCard({ item, field, found, footer }: { item: DirectoryResource; field: CategoryField; found: SearchFound | null; footer?: ReactNode }) {
+function ItemsCard({ item, field, found }: { item: DirectoryResource; field: CategoryField; found: SearchFound | null }) {
   const [all, setAll] = useState(false)
   const matched = new Set(found?.items.map((m) => m.tag) ?? [])
   const rows = [
@@ -678,7 +681,7 @@ function ItemsCard({ item, field, found, footer }: { item: DirectoryResource; fi
   rows.sort((a, b) => Number(matched.has(b.name)) - Number(matched.has(a.name)))
   const shown = all ? rows : rows.slice(0, ITEMS_SHOWN)
   return (
-    <Card title={`${field.label} · ${rows.length}`} testId="listing-items" footer={footer}>
+    <Card title={`${field.label} · ${rows.length}`} testId="listing-items">
       <ul className="divide-y divide-slate-200/70">
         {shown.map((r) => (
           <li key={`${r.sometimes ? 's' : 'a'}:${r.name}`} className="flex items-baseline justify-between gap-3 py-1.5">

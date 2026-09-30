@@ -110,23 +110,31 @@ export function mainThing(item: DirectoryResource, category: CategoryConfig): Ma
   return null
 }
 
-/** Where an opened listing asks "Still right?" (agreed Sep 30): about the
- *  one thing the community keeps and Google doesn't, beside it, rather than
- *  about the whole listing at its foot. A shul's times, a grocery's items,
- *  a mikvah's hours in their cards; a group's join link under Join; the
- *  deciding facts in the header otherwise ("Meat and Keystone-K", "Shabbat
- *  friendly"). Null where there's nothing of the community's to confirm: no
- *  question at all, rather than a broad one. */
-export type ConfirmPlace = { at: 'card'; subject: string } | { at: 'join' } | { at: 'facts'; subject: string }
+/** How an opened listing says when someone last checked it (agreed Sep 30).
+ *
+ *  What changes often is asked about beside it, "Still right?": a shul's
+ *  times and a mikvah's hours in their cards, a group's join link under
+ *  Join. What hardly changes isn't asked about at all (meat stays meat, a
+ *  hechsher rarely moves, and when either does someone edits or reports
+ *  it): it gets a quiet date at the listing's foot, "Kosher details last
+ *  checked Aug 20". A grocery's items do change, but nobody can vouch for
+ *  nine at once; each item gets its own "Still here" in step 3, and until
+ *  then they're dated quietly too. Nothing in the header is ever dated.
+ *  Null where there's nothing of the community's to date: nothing said,
+ *  rather than a broad "is all of this right". */
+export type ConfirmPlace = { at: 'card'; subject: string } | { at: 'join' } | { at: 'quiet'; subject: string }
 
 export function confirmPlace(item: DirectoryResource, category: CategoryConfig): ConfirmPlace | null {
   const main = mainThing(item, category)
   if (main === 'davening') return { at: 'card', subject: 'Times' }
-  if (main === 'items') return { at: 'card', subject: 'Items' }
   if (main === 'groups') return { at: 'card', subject: 'Hours' }
   if (main === 'join') return { at: 'join' }
+  if (main === 'items') return { at: 'quiet', subject: 'Items' }
   const facts = listingFacts(item, category)
-  return facts.length > 0 ? { at: 'facts', subject: andList(facts) } : null
+  if (facts.length === 0) return null
+  // A hechsher (the badge that carries a caveat) makes them kosher details.
+  const kosher = rowBadgeFields(category).some((f) => f.caveat)
+  return { at: 'quiet', subject: kosher ? 'Kosher details' : andList(facts) }
 }
 
 /** "Meat", "Meat and Keystone-K", "Meat, Keystone-K and Restaurant". */

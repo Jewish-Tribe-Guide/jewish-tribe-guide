@@ -31,6 +31,19 @@ describe('FreshnessFooter', () => {
     expect(screen.getByRole('button', { name: 'Yes' })).toBeTruthy()
   })
 
+  // What hardly changes (a hechsher, meat or dairy) is only dated, never
+  // asked about, however old (agreed Sep 30).
+  it('only says when it was last checked, however old, where it isn’t to be asked about', () => {
+    vi.useFakeTimers({ now: new Date('2026-09-24T12:00:00.000Z') })
+    render(<FreshnessFooter resourceId="r1" confirmedAt="2026-03-01T12:00:00.000Z" subject="Kosher details" ask={false} />)
+    expect(screen.getByTestId('freshness')).toHaveTextContent('Kosher details last checked Mar 1.')
+    expect(screen.queryByRole('button')).toBeNull()
+    cleanup()
+    render(<FreshnessFooter resourceId="r1" subject="Kosher details" ask={false} />)
+    expect(screen.getByTestId('freshness')).toHaveTextContent('Kosher details not checked by anyone yet.')
+    expect(screen.queryByRole('button')).toBeNull()
+  })
+
   it('a day short of 90, still quiet', () => {
     vi.useFakeTimers({ now: new Date('2026-09-24T12:00:00.000Z') })
     render(<FreshnessFooter resourceId="r1" confirmedAt="2026-06-27T12:00:00.000Z" />)

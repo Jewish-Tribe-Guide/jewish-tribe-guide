@@ -59,9 +59,10 @@ describe('ListingView — who and whether', () => {
     expect(screen.getByTestId('listing-facts')).toHaveTextContent('Meat · Keystone-K')
   })
 
-  it('says a hechsher’s caveat under the facts, with what isn’t kosher', () => {
+  it('says a hechsher’s caveat under the facts, on its own; what isn’t kosher, in full, in the details', () => {
     view({ item: { ...judah, kosherPartial: true, kosherNote: 'The bar is not supervised' } })
-    expect(screen.getByTestId('listing-caveat')).toHaveTextContent('Not everything here is kosher: The bar is not supervised')
+    expect(screen.getByTestId('listing-caveat')).toHaveTextContent(/^Not everything here is kosher$/)
+    expect(within(screen.getByTestId('listing-details')).getByTestId('listing-caveat-note')).toHaveTextContent('The bar is not supervised')
   })
 
   it('says what isn’t kosher once: not again in About', () => {
@@ -206,12 +207,12 @@ describe('ListingView — onward', () => {
 describe('ListingView — how sure', () => {
   // "Still right?" is asked beside the one thing that's the community's to
   // keep (confirmPlace), not about the whole listing at its end.
-  it('Food: asks about its deciding facts, under them, and ends with Google’s part only', () => {
-    view({ item: { ...judah, placeId: 'p1', googleSyncedAt: '2026-09-30T06:59:09Z', googleFields: ['phone', 'website'], confirmedAt: '2026-08-20T16:30:00Z' } })
-    expect(screen.getByTestId('facts-confirmed')).toHaveTextContent('Meat and Keystone-K confirmed Aug 20.')
-    expect(screen.getByTestId('listing-trust')).toHaveTextContent(/^Phone and website from Google, Sep 30\./)
-    expect(screen.getByTestId('listing-trust')).not.toHaveTextContent(/confirmed/i)
-    expect(screen.getAllByTestId('freshness')).toHaveLength(1)
+  it('Food: no question, and nothing dated in the header; when its kosher details were last checked, at the end, then Google’s part', () => {
+    view({ item: { ...judah, placeId: 'p1', googleSyncedAt: '2026-09-30T06:59:09Z', googleFields: ['phone', 'website'], confirmedAt: '2026-06-01T16:30:00Z' } })
+    // Four months old, and still no "Still right?": meat stays meat.
+    expect(screen.getByTestId('listing-trust')).toHaveTextContent(/^Kosher details last checked Jun 1\.\s*Phone and website from Google, Sep 30\./)
+    expect(screen.queryByText(/Still right|Right\?/)).not.toBeInTheDocument()
+    expect(screen.getByTestId('listing-view').querySelector('h2')!.parentElement!.parentElement).not.toHaveTextContent(/checked|confirmed/i)
   })
 
   it('a shul says its confirmation with its times, not again at the end', () => {
@@ -222,11 +223,12 @@ describe('ListingView — how sure', () => {
     expect(screen.getByTestId('listing-trust')).not.toHaveTextContent(/confirmed/i)
   })
 
-  it('a grocery asks about its items, in their card', () => {
+  it('a grocery’s items are dated at the end, not asked about all at once', () => {
     const m: CategoryField = { key: 'm', label: 'Kosher items', type: 'tags', renderAs: 'badge', showCountInHeader: true }
     view({ item: makeListing({ m: ['Challah'] }), category: makeCategory({ detailFields: [hours, m] }) })
-    expect(screen.getByTestId('listing-items')).toHaveTextContent('Items not confirmed by anyone yet. Right? Yes')
-    expect(screen.getAllByTestId('freshness')).toHaveLength(1)
+    expect(screen.getByTestId('listing-items')).not.toHaveTextContent(/confirmed|checked/i)
+    expect(screen.getByTestId('listing-trust')).toHaveTextContent('Items not checked by anyone yet.')
+    expect(screen.queryByRole('button', { name: 'Yes' })).not.toBeInTheDocument()
   })
 
   it('a mikvah asks about its hours, in their card', () => {
@@ -244,10 +246,10 @@ describe('ListingView — how sure', () => {
     expect(screen.queryByTestId('freshness')).not.toBeInTheDocument()
   })
 
-  it('a Shabbat-friendly hotel asks whether it still is', () => {
+  it('a Shabbat-friendly hotel says when that was last checked, at the end, without asking', () => {
     const shabbat: CategoryField = { key: 'shabbatFriendly', label: 'Shabbat friendly', type: 'boolean', renderAs: 'badge', filterable: true }
-    view({ item: makeListing({ shabbatFriendly: true }), category: makeCategory({ id: 'hotel', detailFields: [shabbat] }) })
-    expect(screen.getByTestId('facts-confirmed')).toHaveTextContent('Shabbat friendly not confirmed by anyone yet. Right? Yes')
+    view({ item: makeListing({ shabbatFriendly: true, confirmedAt: '2026-09-10T12:00:00Z' }), category: makeCategory({ id: 'hotel', detailFields: [shabbat] }) })
+    expect(screen.getByTestId('listing-trust')).toHaveTextContent('Shabbat friendly last checked Sep 10.')
   })
 })
 

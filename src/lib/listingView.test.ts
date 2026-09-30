@@ -303,14 +303,17 @@ describe('googleKeeps', () => {
 })
 
 describe('confirmPlace', () => {
-  it('a shul’s times, a grocery’s items, a mikvah’s hours: in their cards', () => {
+  it('what changes often, asked about in its card: a shul’s times, a mikvah’s hours', () => {
     expect(confirmPlace(makeListing({ minyanim: [{ id: 'm1', tefillah: 'shacharis', days: ['sun'], time: '8:00am' }] }), shuls)).toEqual({ at: 'card', subject: 'Times' })
-    expect(confirmPlace(makeListing({ m: ['Challah'], isKosher: 'Kosher Items' }), grocery)).toEqual({ at: 'card', subject: 'Items' })
     expect(confirmPlace(makeListing({ womenTevillah: true, women_s_notes: 'By appointment' }), mikvah)).toEqual({ at: 'card', subject: 'Hours' })
   })
-  it('Food: the facts that decide it, in words', () => {
-    expect(confirmPlace(makeListing({ t: ['Meat'], kosherCert: 'Keystone-K', foodType: 'Restaurant' }), food)).toEqual({ at: 'facts', subject: 'Meat and Keystone-K' })
-    expect(confirmPlace(makeListing({ t: ['Parve'] }), food)).toEqual({ at: 'facts', subject: 'Parve' })
+  it('what hardly changes, or nobody can vouch for all at once, only dated: Food’s kosher details, a grocery’s items', () => {
+    expect(confirmPlace(makeListing({ t: ['Meat'], kosherCert: 'Keystone-K', foodType: 'Restaurant' }), food)).toEqual({ at: 'quiet', subject: 'Kosher details' })
+    expect(confirmPlace(makeListing({ m: ['Challah'], isKosher: 'Kosher Items' }), grocery)).toEqual({ at: 'quiet', subject: 'Items' })
+  })
+  it('facts with no hechsher among them, by name: a hotel’s "Shabbat friendly"', () => {
+    const shabbat: CategoryField = { key: 'shabbatFriendly', label: 'Shabbat friendly', type: 'boolean', renderAs: 'badge', filterable: true }
+    expect(confirmPlace(makeListing({ shabbatFriendly: true }), makeCategory({ detailFields: [shabbat] }))).toEqual({ at: 'quiet', subject: 'Shabbat friendly' })
   })
   it('a group with no address: its join link', () => {
     const link: CategoryField = { key: 'link', label: 'Join', type: 'url', renderAs: 'row', showInHeader: true }
