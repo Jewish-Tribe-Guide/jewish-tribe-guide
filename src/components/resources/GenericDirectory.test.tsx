@@ -11,6 +11,7 @@ import { resetMockIntersectionObserver, setAllIntersecting } from '@/test/inters
 import type { DirectoryResource } from '@/types'
 import { didArriveViaBackForward } from '@/lib/backForwardNavigation'
 import { ForcedViewport } from '@/lib/useIsMobile'
+import { useNextMinyan as useNextMinyanInColumn } from './nextMinyans'
 import GenericDirectory from './GenericDirectory'
 
 vi.mock('next/navigation', () => ({
@@ -109,6 +110,11 @@ vi.mock('./GenericListingCard', async () => {
   }
 })
 
+function ColumnMinyan({ id, name }: { id: string; name: string }) {
+  const next = useNextMinyanInColumn(id)
+  return next ? <p>column minyan at {name}: {next.text}</p> : null
+}
+
 // The listing a desktop visitor opens takes the list's column. What it shows
 // is ListingView's (tested there); here, only what it's told and what its
 // buttons do to the list.
@@ -140,6 +146,7 @@ vi.mock('./ListingColumn', () => ({
         {phone ? ', the page' : alone ? ', alone' : ', map beside'}
       </p>
       {found && <p>column found: {found.items.map((m) => m.tag).join(', ')}</p>}
+      <ColumnMinyan id={item.id} name={item.name} />
       <button onClick={onBack}>{backLabel}</button>
       <button onClick={() => onStep(-1)}>Previous listing</button>
       <button onClick={() => onStep(1)}>Next listing</button>
@@ -1807,6 +1814,19 @@ describe('GenericDirectory — each shul’s next minyan', () => {
 
     expect(screen.getByText('next minyan at Alpha Shul: Mincha 1:30 PM')).toBeInTheDocument()
     expect(screen.getByText('next minyan at Beta Shul: Mincha 6:45 PM')).toBeInTheDocument()
+  })
+
+  // The listing opened beside the list says its shul's next minyan too, and
+  // its nearby shuls theirs: the column sits inside the same provider.
+  it('gives the opened listing, in the column, its shul’s next minyan', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-09-28T11:00:00-04:00'))
+    renderWithProviders(
+      <GenericDirectory category={shulCategory} items={[shul('a', 'Alpha Shul', '1:30pm'), shul('b', 'Beta Shul', '6:45pm')]} {...handlers} />,
+      { content: { categories: [shulCategory] } },
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Expand Beta Shul' }))
+    expect(await screen.findByText('column minyan at Beta Shul: Mincha 6:45 PM')).toBeInTheDocument()
   })
 
   it('says a shul with no times at all has none listed', () => {

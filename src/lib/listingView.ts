@@ -266,3 +266,32 @@ export function listingActions(item: DirectoryResource, category: CategoryConfig
   }
   return { buttons: all.slice(0, 4), extra: all.slice(4) }
 }
+
+// ── How sure ─────────────────────────────────────────────────────────────────
+
+/** A confirmation stays a quiet date for this long, then asks "Still
+ *  right?" (agreed Sep 30). */
+export const ASK_AFTER_DAYS = 90
+
+/** Whether a confirmation made at `iso` has gone long enough to ask again.
+ *  False before the page knows the time (`now` null). */
+export function isStale(iso: string, now: number | null): boolean {
+  if (now === null) return false
+  const at = Date.parse(iso)
+  return Number.isFinite(at) && now - at >= ASK_AFTER_DAYS * 86_400_000
+}
+
+/** "Phone and website from Google": which of the listing's own details the
+ *  nightly Google sync keeps, among those it shows. Hours and the
+ *  description say so where they're shown; null for a listing Google
+ *  doesn't keep (no place ID any more), or keeps none of these. */
+export function googleKeeps(item: DirectoryResource): string | null {
+  if (!item.placeId || !item.googleSyncedAt) return null
+  const kept = item.googleFields ?? []
+  const parts = [
+    kept.includes('phone') && item.phone ? 'Phone' : null,
+    kept.includes('website') && String(item.website ?? '').trim() ? 'website' : null,
+  ].filter((p): p is string => !!p)
+  if (parts.length === 0) return null
+  return `${parts.join(' and ').replace(/^website/, 'Website')} from Google`
+}

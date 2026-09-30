@@ -1,46 +1,40 @@
 'use client'
 
 import { useState } from 'react'
+import { useNow } from '@/lib/useNow'
+import { isStale } from '@/lib/listingView'
+import { shortDate } from './listingParts'
 
-function timeAgo(iso: string): string {
-  const ms = Date.now() - new Date(iso).getTime()
-  const mins = Math.floor(ms / 60_000)
-  if (mins < 2) return 'just now'
-  if (mins < 60) return `${mins} minutes ago`
-  const hours = Math.floor(mins / 60)
-  if (hours < 24) return `${hours} hour${hours !== 1 ? 's' : ''} ago`
-  const days = Math.floor(hours / 24)
-  if (days < 7) return `${days} day${days !== 1 ? 's' : ''} ago`
-  const weeks = Math.floor(days / 7)
-  if (weeks < 5) return `${weeks} week${weeks !== 1 ? 's' : ''} ago`
-  const months = Math.floor(days / 30)
-  return `${months} month${months !== 1 ? 's' : ''} ago`
-}
 
 type Props = {
   resourceId: string
   confirmedAt?: string
+  /** Said first: "Phone and website from Google, Sep 30". */
+  lead?: string
+  /** What's confirmed, where it isn't the whole listing: "Times". */
+  subject?: string
 }
 
-// Shown in the footer of every expanded listing — the directory card, its
-// desktop dialog, and the map's place panel. Lets visitors signal that the
-// community-curated fields (kosher info, tags, hours) are still accurate —
-// separate from the Google-synced fields which don't need this.
-/** The "Confirmed 3 days ago · Still right?" line.
+// Shown at the end of every opened listing, and in a shul's times card: when
+// someone last confirmed the listing, and a one-tap way to confirm it again.
+/** The listing's dated line (agreed Sep 30): a quiet date while the last
+ *  confirmation is recent, "Still right?" once it's ASK_AFTER_DAYS old, and
+ *  a plain "not confirmed by anyone yet" with a way to confirm when nobody
+ *  has. `lead` goes first: which of its details Google keeps, and when.
+ *  `subject` names what's confirmed where that isn't the whole listing ("Times"
+ *  in a shul's times card).
  *
- *  It used to carry a quiet "Suggest a correction" link opposite it too, on
- *  the theory that a stale phone number gets noticed right where this line
- *  is read. In practice it sat at the same 12px grey weight as the timestamp
- *  and read as part of it, and it was the least findable of three routes to
- *  one form. Every surface that showed it now has the "Suggest an edit" bar
- *  instead (ListingEditBar), and the map was its last caller, so the prop
- *  went with it. What stays is the confirmation itself: a one-tap
- *  contribution of its own, not a second door to the edit form. */
+ *  It used to carry a quiet "Suggest a correction" link opposite it too. It
+ *  sat at the same weight as the date and read as part of it; every
+ *  surface has the "Suggest an edit" bar instead (ListingEditBar). What
+ *  stays is the confirmation itself: a one-tap contribution of its own, not
+ *  a second door to the edit form. */
 export default function FreshnessFooter(props: Props) {
   return <FreshnessStatus {...props} />
 }
 
-function FreshnessStatus({ resourceId, confirmedAt: initialConfirmedAt }: Props) {
+function FreshnessStatus({ resourceId, confirmedAt: initialConfirmedAt, lead, subject }: Props) {
+  const now = useNow()
   const [confirmedAt, setConfirmedAt] = useState(initialConfirmedAt)
   // What confirmedAt was right before the most recent confirm — lets a
   // misclick be undone back to the prior state instead of just cleared.
@@ -101,51 +95,45 @@ function FreshnessStatus({ resourceId, confirmedAt: initialConfirmedAt }: Props)
     }
   }
 
+  const failed = error && <span className="ml-1 text-red-600">Didn’t save. Try again.</span>
+  const leadText = lead ? `${lead}. ` : ''
+  const button = (label: string) => (
+    <button onClick={confirm} disabled={loading} className="cursor-pointer font-bold text-primary hover:underline disabled:opacity-50">
+      {loading ? 'Saving…' : label}
+    </button>
+  )
+
   if (justConfirmedNow) {
     return (
-      <span className="text-xs text-green-600 font-medium">
-        ✓ Confirmed — thanks!{' '}
+      <p className="text-[13.5px] leading-snug text-emerald-700" data-testid="freshness">
+        <span className="font-semibold">✓ Confirmed. Thanks!</span>{' '}
         {mine?.undoable !== false && (
-          <button
-            onClick={undo}
-            disabled={loading}
-            className="text-slate-400 hover:text-slate-600 hover:underline cursor-pointer disabled:opacity-50 font-normal"
-          >
+          <button onClick={undo} disabled={loading} className="cursor-pointer text-slate-500 hover:text-slate-700 hover:underline disabled:opacity-50">
             {loading ? 'Undoing…' : 'Undo'}
           </button>
         )}
-        {error && <span className="ml-1 text-red-500">Failed — try again</span>}
-      </span>
+        {failed}
+      </p>
     )
   }
 
   if (confirmedAt) {
+    const stale = isStale(confirmedAt, now)
     return (
-      <span className="text-xs text-muted">
-        Confirmed {timeAgo(confirmedAt)} ·{' '}
-        <button
-          onClick={confirm}
-          disabled={loading}
-          className="text-primary hover:underline cursor-pointer disabled:opacity-50"
-        >
-          {loading ? 'Saving…' : 'Still right?'}
-        </button>
-        {error && <span className="ml-1 text-red-500">Failed — try again</span>}
-      </span>
+      <p className="text-[13.5px] leading-snug text-slate-600" data-testid="freshness">
+        {leadText}
+        {subject ? `${subject} confirmed` : 'Confirmed'} {shortDate(confirmedAt, now)}.
+        {stale && <> Still right? {button('Yes')}</>}
+        {failed}
+      </p>
     )
   }
 
   return (
-    <span className="text-xs text-muted">
-      Is this info current?{' '}
-      <button
-        onClick={confirm}
-        disabled={loading}
-        className="text-primary hover:underline cursor-pointer disabled:opacity-50"
-      >
-        {loading ? 'Saving…' : 'Mark as current'}
-      </button>
-      {error && <span className="ml-1 text-red-500">Failed — try again</span>}
-    </span>
+    <p className="text-[13.5px] leading-snug text-slate-600" data-testid="freshness">
+      {leadText}
+      {subject ? `${subject} not confirmed by anyone yet.` : 'Not confirmed by anyone yet.'} Right? {button('Yes')}
+      {failed}
+    </p>
   )
 }

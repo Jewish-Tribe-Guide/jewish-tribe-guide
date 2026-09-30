@@ -8,7 +8,8 @@ import { useMinyanSchedule } from '@/lib/useMinyanSchedule'
 import { dayLabel, type DayKey } from '@/lib/hours'
 import { ChevronRightIcon } from '@/components/icons'
 import DaveningTimes from './DaveningTimes'
-import { Card, shortDate } from './listingParts'
+import { Card } from './listingParts'
+import FreshnessFooter from './FreshnessFooter'
 
 /** Friday night and Shabbos day are what a shul's times are asked about
  *  most, so a Saturday is "Shabbos", not "Saturday". */
@@ -30,10 +31,9 @@ export default function DaveningCard({ item, minyanim }: { item: DirectoryResour
       )
     : null
   const soon = slots && slots.today.length + slots.tomorrow.length > 0
-  const footer = item.confirmedAt ? `Confirmed ${shortDate(item.confirmedAt)}.` : 'Times not confirmed by anyone yet.'
 
   return (
-    <Card title="Davening times" testId="listing-davening" footer={footer}>
+    <Card title="Davening times" testId="listing-davening" footer={<FreshnessFooter resourceId={item.id} confirmedAt={item.confirmedAt} subject="Times" />}>
       {soon && !week && schedule && (
         <div>
           {(

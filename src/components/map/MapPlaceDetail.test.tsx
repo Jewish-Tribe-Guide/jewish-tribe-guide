@@ -136,7 +136,7 @@ describe('MapPlaceDetail', () => {
     })
 
     expect(screen.queryByText(/ListingEditor stub/)).not.toBeInTheDocument()
-    expect(screen.getByText('Is this info current?')).toBeInTheDocument()
+    expect(screen.getByTestId('freshness')).toBeInTheDocument()
   })
 
   it('closes the edit form via history.back(), not a direct state reset, so cancelling and swiping back behave identically', async () => {
@@ -181,7 +181,7 @@ describe('MapPlaceDetail', () => {
     expect(screen.queryByRole('button', { name: /more actions/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Suggest a correction' })).not.toBeInTheDocument()
     // The freshness STATUS stays: it's a contribution of its own.
-    expect(screen.getByText('Is this info current?')).toBeInTheDocument()
+    expect(screen.getByTestId('freshness')).toBeInTheDocument()
 
     // Share is one of the listing's own buttons now, beside Directions and
     // Call, so the overflow holds Pin (and Set as location) only.
@@ -206,7 +206,7 @@ describe('MapPlaceDetail', () => {
     const last = view.lastElementChild as HTMLElement
     expect(last).toContainElement(screen.getByRole('button', { name: 'Suggest an edit' }))
     expect(last).toContainElement(screen.getByRole('button', { name: 'Actions for Goldi Market' }))
-    const freshness = screen.getByText('Is this info current?')
+    const freshness = screen.getByTestId('freshness')
     const bar = screen.getByRole('button', { name: 'Suggest an edit' })
     expect(freshness.compareDocumentPosition(bar) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })

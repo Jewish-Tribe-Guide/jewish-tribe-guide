@@ -18,6 +18,7 @@ import {
   audienceGroups,
   audienceStatus,
   compactWeek,
+  googleKeeps,
   itemsField,
   listingActions,
   listingDistance,
@@ -56,6 +57,7 @@ import DaveningCard from './DaveningCard'
 import WalkList from './WalkList'
 import { useNextMinyan } from './nextMinyans'
 import { Card, shortDate } from './listingParts'
+import FreshnessFooter from './FreshnessFooter'
 
 // ── An opened listing: the seven parts (see lib/listingView.ts) ─────────────
 // The phone's sheet, the map's panel, the desktop column and a listing's own
@@ -282,12 +284,18 @@ export default function ListingView({ item, category, color, place = null, upvot
     mainSection = f ? <HoursCard item={item} value={item[f.key]} now={now} candlesAt={candlesAt} /> : null
   }
 
+  // Which of its details Google keeps, and when, said with the listing's
+  // dated line.
+  const kept = googleKeeps(item)
+  const googleLead = kept ? `${kept}, ${shortDate(item.googleSyncedAt!, clock)}` : null
+
   // ── 4 · Details ────────────────────────────────────────────────────────
   const showAddress = category.hasAddress !== false && !!item.address
   const showPhone = category.hasPhone !== false && !!item.phone
   const centreMiles = item.milesFromAddress == null && item.milesFromCenter != null ? item.milesFromCenter : null
   // Hours that aren't the main thing: a grocery's, under its items. One
   // line, opening to the week.
+  const hoursFromGoogle = !!item.placeId && !!item.googleSyncedAt && !!item.googleFields?.includes('hours')
   const otherHours = main === 'hours' || main === 'groups' ? [] : hoursFields.filter((f) => !f.audienceKey && hasAny(item[f.key]))
   const shownElsewhere = new Set<string>([
     ...(tagline ? [tagline.key] : []),
@@ -342,6 +350,7 @@ export default function ListingView({ item, category, color, place = null, upvot
         <Row key={f.key} icon={<ClockIcon className="h-[17px] w-[17px]" />}>
           {otherHours.length > 1 && <span className="block text-xs text-muted">{f.label}</span>}
           <HoursDisplay value={item[f.key]} />
+          {hoursFromGoogle && <span className="mt-0.5 block text-[13px] text-muted">From Google, {shortDate(item.googleSyncedAt!, clock)}</span>}
         </Row>
       ))}
       {extra.map((a) => (
@@ -410,7 +419,17 @@ export default function ListingView({ item, category, color, place = null, upvot
       {/* A hotel's walk list is its main thing; anywhere else it follows
           the place's own details, as it always has. */}
       {walk && item.geo && main !== 'walk' && <WalkList walk={walk} from={item.geo} fromLabel={category.label} />}
-      {foot}
+      {/* Part 6's dated line: how sure, and a tap to confirm. A shul's
+          confirmation is about its times, so it's said in their card; only
+          Google's part is said here then. */}
+      <div className="space-y-3 border-t border-slate-200 pt-3.5" data-testid="listing-trust">
+        {main === 'davening' ? (
+          googleLead && <p className="text-[13.5px] leading-snug text-slate-600">{googleLead}.</p>
+        ) : (
+          <FreshnessFooter resourceId={item.id} confirmedAt={item.confirmedAt} lead={googleLead ?? undefined} />
+        )}
+        {foot}
+      </div>
       {onward && <OnwardSection item={item} category={category} color={color} onward={onward} className={onwardClassName} />}
     </div>
   )
@@ -615,7 +634,7 @@ function HoursCard({ item, value, now, candlesAt }: { item: DirectoryResource; v
   if (!now) return null
   const fromGoogle = !!item.placeId && item.googleFields?.includes('hours') && item.googleSyncedAt
   return (
-    <Card title="Hours" testId="listing-hours" footer={fromGoogle ? `From Google, updated ${shortDate(item.googleSyncedAt!)}` : undefined}>
+    <Card title="Hours" testId="listing-hours" footer={fromGoogle ? `From Google, updated ${shortDate(item.googleSyncedAt!, now.getTime())}` : undefined}>
       <WeekLines value={value} now={now} candlesAt={candlesAt} />
     </Card>
   )

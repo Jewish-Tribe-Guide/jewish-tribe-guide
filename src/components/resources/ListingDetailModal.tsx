@@ -9,7 +9,6 @@ import { routes } from '@/lib/routes'
 import { listingSlug } from '@/lib/listingSlug'
 import ListingView from './ListingView'
 import type { SearchFound } from '@/lib/askSearch'
-import FreshnessFooter from './FreshnessFooter'
 import ListingEditBar from './ListingEditBar'
 import ListingEditor from './ListingEditor'
 import { ChevronLeftIcon, ChevronRightIcon } from '@/components/icons'
@@ -354,11 +353,7 @@ export default function ListingDetailModal({
                 found={found}
                 path={listingPath}
                 upvote={upvote}
-                foot={
-                  <div className="border-t border-slate-200 pt-3">
-                    <FreshnessFooter resourceId={item.id} confirmedAt={item.confirmedAt} />
-                  </div>
-                }
+                foot={null}
               />
             )}
           </div>

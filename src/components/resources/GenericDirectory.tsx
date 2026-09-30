@@ -1323,6 +1323,9 @@ export default function GenericDirectory({ category, items, anchorLabel, address
       <div className="min-w-0">
       {columnItem && (
         <div ref={listingColumnRef}>
+          {/* Each shul's next minyan, for the listing's status and the
+              shuls near it, as the list has. */}
+          <NextMinyans enabled={hasMinyanim} items={items}>
           <ListingColumn
             phone={phonePage}
             item={columnItem}
@@ -1354,6 +1357,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
             alone={!mapBeside}
             onShowMap={hasMapColumn && mapHidden ? () => setMapHidden(false) : undefined}
           />
+          </NextMinyans>
         </div>
       )}
       <div hidden={!!columnItem}>

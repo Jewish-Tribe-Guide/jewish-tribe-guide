@@ -187,3 +187,28 @@ describe('ListingView — onward', () => {
     expect(screen.queryByTestId('listing-onward')).not.toBeInTheDocument()
   })
 })
+
+describe('ListingView — how sure', () => {
+  it('ends with the dated line, Google’s part first', () => {
+    view({ item: { ...judah, placeId: 'p1', googleSyncedAt: '2026-09-30T06:59:09Z', googleFields: ['phone', 'website'], confirmedAt: '2026-08-20T16:30:00Z' } })
+    expect(screen.getByTestId('listing-trust')).toHaveTextContent(/^Phone and website from Google, Sep 30\. Confirmed Aug 20\./)
+  })
+
+  it('a shul says its confirmation with its times, not again at the end', () => {
+    const shuls = makeCategory({ id: 'synagogue', detailFields: [{ key: 'minyanim', label: 'Davening', type: 'minyanim', renderAs: 'row' }] })
+    const shul = makeListing({ confirmedAt: '2026-09-29T05:56:24Z', minyanim: [{ id: 'm1', tefillah: 'shacharis', days: ['sat'], time: '9:00am' }] })
+    view({ item: shul, category: shuls })
+    expect(screen.getByTestId('listing-davening')).toHaveTextContent('Times confirmed Sep 29.')
+    expect(screen.getByTestId('listing-trust')).not.toHaveTextContent(/confirmed/i)
+  })
+
+  it('hours that aren’t the main thing say they’re Google’s too', () => {
+    const m: CategoryField = { key: 'm', label: 'Kosher items', type: 'tags', renderAs: 'badge', showCountInHeader: true }
+    const grocery = makeCategory({ detailFields: [hours, m] })
+    view({
+      item: makeListing({ m: ['Challah'], hours: { fri: { open: '09:00', close: '21:00' } }, placeId: 'p1', googleSyncedAt: '2026-09-30T06:59:09Z', googleFields: ['hours'] }),
+      category: grocery,
+    })
+    expect(screen.getByTestId('listing-details')).toHaveTextContent('From Google, Sep 30')
+  })
+})

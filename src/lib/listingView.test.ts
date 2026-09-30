@@ -5,6 +5,8 @@ import {
   audienceGroups,
   audienceStatus,
   compactWeek,
+  googleKeeps,
+  isStale,
   listingActions,
   listingDistance,
   listingFacts,
@@ -268,5 +270,30 @@ describe('listingActions', () => {
   })
   it('a WhatsApp group’s Join is not a button: it’s the main thing', () => {
     expect(listingActions(makeListing({ address: '', link: 'https://chat.whatsapp.com/x' }), whatsapp).buttons).toEqual([])
+  })
+})
+
+describe('isStale: when a confirmation asks again', () => {
+  const now = Date.parse('2026-09-24T12:00:00Z')
+  it('at 90 days, not at 89', () => {
+    expect(isStale('2026-06-26T12:00:00Z', now)).toBe(true)
+    expect(isStale('2026-06-27T12:00:00Z', now)).toBe(false)
+  })
+  it('never before the page knows the time', () => {
+    expect(isStale('2020-01-01T00:00:00Z', null)).toBe(false)
+  })
+})
+
+describe('googleKeeps', () => {
+  const synced = { placeId: 'p1', googleSyncedAt: '2026-09-30T07:00:00Z' }
+  it('names what the listing shows and the sync keeps', () => {
+    expect(googleKeeps(makeListing({ ...synced, googleFields: ['name', 'hours', 'phone', 'website'], phone: '1', website: 'http://x' }))).toBe('Phone and website from Google')
+    expect(googleKeeps(makeListing({ ...synced, googleFields: ['website'], phone: '1', website: 'http://x' }))).toBe('Website from Google')
+  })
+  it('not what the listing doesn’t show', () => {
+    expect(googleKeeps(makeListing({ ...synced, googleFields: ['phone', 'website'], phone: undefined, website: 'http://x' }))).toBe('Website from Google')
+  })
+  it('nothing for a listing no longer matched to Google, whatever it once kept', () => {
+    expect(googleKeeps(makeListing({ googleSyncedAt: '2026-09-30T07:00:00Z', googleFields: ['phone'], phone: '1' }))).toBeNull()
   })
 })

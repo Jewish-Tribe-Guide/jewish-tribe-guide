@@ -5,7 +5,6 @@ import type { DirectoryResource } from '@/types'
 import { resolveCapabilities, type CategoryConfig } from '@/lib/categories'
 import ListingView, { type Onward } from '@/components/resources/ListingView'
 import type { SearchFound } from '@/lib/askSearch'
-import FreshnessFooter from '@/components/resources/FreshnessFooter'
 import ListingEditBar from '@/components/resources/ListingEditBar'
 import ListingEditor from '@/components/resources/ListingEditor'
 import UpButton from '@/components/UpButton'
@@ -173,22 +172,19 @@ export default function MapPlaceDetail({ item, category, color, onBack, found, u
         onwardClassName={onwardClassName}
         titleAs={titleAs}
         foot={
-          <div className="space-y-3 border-t border-slate-200 pt-3.5">
-            <FreshnessFooter resourceId={item.id} confirmedAt={item.confirmedAt} />
-            {/* The last thing before the places nearby: Suggest an edit, and
-                the ⋯ with Pin and Set as location (Share has its own button
-                up top). Rendered even without edit, for those two. `stack`
-                for the fan: there's no scrim behind it to give its captions
-                a dark ground. See ListingActionsFan's `placement`. */}
-            <ListingEditBar
-              onEdit={canEdit ? () => openForm('edit') : undefined}
-              item={item}
-              category={category}
-              path={listingPath}
-              fanPlacement="stack"
-              omit={['share']}
-            />
-          </div>
+          // Suggest an edit, and the ⋯ with Pin and Set as location (Share
+          // has its own button up top). Rendered even without edit, for
+          // those two. `stack` for the fan: there's no scrim behind it to
+          // give its captions a dark ground. See ListingActionsFan's
+          // `placement`.
+          <ListingEditBar
+            onEdit={canEdit ? () => openForm('edit') : undefined}
+            item={item}
+            category={category}
+            path={listingPath}
+            fanPlacement="stack"
+            omit={['share']}
+          />
         }
       />
     </div>

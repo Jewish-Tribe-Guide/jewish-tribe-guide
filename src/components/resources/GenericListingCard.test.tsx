@@ -727,7 +727,7 @@ describe('GenericListingCard — expanded', () => {
   // The quiet link is deliberately gone from both directory surfaces now
   // that the bar carries this job — two doors to the same form, one of them
   // near-invisible, is the duplication the bar was built to end. The
-  // freshness STATUS stays: "Still right?" is its own one-tap contribution.
+  // freshness STATUS stays: a tap to confirm is its own contribution.
   // (The map's place panel dropped it too once it got the bar, and
   // FreshnessFooter no longer has the link at all.)
   it('drops the quiet "Suggest a correction" link from both surfaces, keeping the freshness line', async () => {
@@ -735,7 +735,7 @@ describe('GenericListingCard — expanded', () => {
       <GenericListingCard item={makeListing()} category={makeCategory()} upvotes={false} count={0} defaultExpanded {...requiredHandlers} />,
     )
     expect(screen.queryByRole('button', { name: 'Suggest a correction' })).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /still right|mark as current/i })).toBeInTheDocument()
+    expect(screen.getByTestId('freshness')).toHaveTextContent('Not confirmed by anyone yet. Right? Yes')
   })
 
   // A category that can't be edited loses the pill and KEEPS the overflow.
@@ -1348,7 +1348,7 @@ describe('GenericListingCard — mobile listing sheet', () => {
     await user.click(screen.getByRole('button', { name: /show details for Goldi Market/i }))
     const sheet = screen.getByRole('dialog', { name: 'Goldi Market' })
     expect(sheet).toHaveAttribute('aria-modal', 'true')
-    expect(within(sheet).getByRole('button', { name: /^mark as current$/i })).toBeInTheDocument()
+    expect(within(sheet).getByTestId('freshness')).toBeInTheDocument()
     expect(within(sheet).getByRole('button', { name: 'Suggest an edit' })).toBeInTheDocument()
     expect(onExpandedChange).toHaveBeenLastCalledWith(true)
   })
