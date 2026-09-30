@@ -18,8 +18,7 @@ import { readerPlaces } from '@/lib/questionReader'
 import { readingAnswers, readingChips, readingLoses, readingOffers, searchReading } from '@/lib/readingSearch'
 import { useReading } from '@/lib/useReading'
 import { answersWell, candidatePrompts, pickPrompts } from '@/lib/searchPrompts'
-import { listMinyanim } from '@/lib/upcomingDavening'
-import { useMinyanSchedule } from '@/lib/useMinyanSchedule'
+import { answerSchedule, useMinyanSchedule } from '@/lib/useMinyanSchedule'
 import HeroHeading from '@/components/home/HeroHeading'
 import DaveningTimesCard from '@/components/home/DaveningTimesCard'
 import UpdateListingsCard from '@/components/home/UpdateListingsCard'
@@ -181,17 +180,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
     const result = searchAsk(listings ?? [], categories ?? [], text, { coords, now: new Date(schedule?.now ?? 0), places })
     const answer = answerFor(result, {
       coords,
-      schedule: result.query.minyan && schedule
-        ? {
-            ...listMinyanim(schedule.shuls, {
-              today: schedule.todayDayKeys,
-              tomorrow: [schedule.tomorrowKey],
-              season: schedule.season,
-              anchors: schedule.anchors,
-            }),
-            nowMinutes: schedule.nowMinutes,
-          }
-        : null,
+      schedule: result.query.minyan && schedule ? answerSchedule(schedule) : null,
     })
     // "What's on this site?", "how do I add a listing?" (see metaAnswer).
     if (result.query.meta) {

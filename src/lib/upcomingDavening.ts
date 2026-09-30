@@ -52,6 +52,8 @@ type Candidate = {
   time: string
   /** The row's own note ("Zoom", "Followed by bagels"). */
   notes?: string
+  /** Set by sunset or candle lighting, not a fixed clock time. */
+  anchored?: boolean
 }
 
 /**
@@ -138,7 +140,7 @@ function collectCandidates(
       const minutes = parseTimeToMinutes(time)
       if (!Number.isFinite(minutes)) continue // free text ("Call to Confirm") — no number to sort by
 
-      out.push({ shulId: shul.id, shulName: shul.name, shulGeo: shul.geo, tefillah: row.tefillah, minutes, time, notes: row.notes?.trim() || undefined })
+      out.push({ shulId: shul.id, shulName: shul.name, shulGeo: shul.geo, tefillah: row.tefillah, minutes, time, notes: row.notes?.trim() || undefined, anchored: !!row.anchor })
     }
   }
   return out
@@ -178,6 +180,8 @@ export type MinyanSlot = {
   time: string
   /** Minutes since local midnight of its own day. */
   minutes: number
+  /** Set by sunset or candle lighting (see Candidate). */
+  anchored?: boolean
 }
 
 /**
@@ -189,6 +193,14 @@ export type MinyanSlot = {
  * nextUpcomingDavening's own doc). Not filtered by the clock: the caller
  * decides whether a minyan earlier today still matters to the question.
  */
+/** Every minyan on one day, earliest first: for "Shacharis Sunday" and
+ *  "Friday night minyan". Times set by sunset are worked out from the
+ *  sunset `anchors` hold, which are today's: a day or two off, a minute or
+ *  two early or late, which the answer says (see askAnswer's minyanDays). */
+export function minyanimOn(shuls: ShulMinyanim[], day: MinyanDayKey[], season: Season | null, anchors: Record<string, AnchorTimes>): MinyanSlot[] {
+  return collectCandidates(shuls, day, season, anchors).sort((a, b) => a.minutes - b.minutes || a.shulName.localeCompare(b.shulName))
+}
+
 export function listMinyanim(
   shuls: ShulMinyanim[],
   opts: { today: MinyanDayKey[]; tomorrow: MinyanDayKey[]; season: Season | null; anchors: Record<string, AnchorTimes> },

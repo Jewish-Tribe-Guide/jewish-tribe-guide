@@ -1,5 +1,6 @@
 import type { CategoryConfig } from '@/lib/categories'
 import type { Tefillah } from '@/lib/davening'
+import type { DayKey } from '@/lib/hours'
 import { MILES_PER_MINUTE } from '@/lib/geo'
 
 // ── Understanding a question typed into search ───────────────────────────────
@@ -263,6 +264,52 @@ export type MinyanAsk = {
   /** A clock time asked about ("at 6:45"), with am/pm only when it was said;
    *  the answer resolves a bare "6:45" against the tefillah and the clock. */
   at: { hour: number; minute: number; meridiem: 'am' | 'pm' | null } | null
+  /** The day or days asked about ("Shacharis tomorrow", "Friday night
+   *  minyan", "Shabbos"), each with the tefillos its part of the day means
+   *  when none was named; null for the next ones from now. */
+  when: MinyanWhen[] | null
+}
+
+/** One day a minyan question is about: today, tomorrow or a weekday, how
+ *  the answer names it, and the tefillos that part of the day means
+ *  ("morning" is Shacharis) when the question named none. */
+export type MinyanWhen = { day: 'tomorrow' | DayKey; label: string; tefillos: Tefillah[] | null }
+
+const MORNING: Tefillah[] = ['shacharis', 'shabbos_mussaf']
+const AFTERNOON: Tefillah[] = ['mincha', 'mincha_maariv']
+const EVENING: Tefillah[] = ['mincha', 'mincha_maariv', 'maariv', 'kabbalas_shabbos']
+const PARTS: Record<string, { label: string; tefillos: Tefillah[] }> = {
+  morning: { label: 'morning', tefillos: MORNING },
+  afternoon: { label: 'afternoon', tefillos: AFTERNOON },
+  evening: { label: 'evening', tefillos: EVENING },
+  night: { label: 'night', tefillos: EVENING },
+}
+const WEEKDAYS: Record<string, DayKey> = { sunday: 'sun', monday: 'mon', tuesday: 'tue', wednesday: 'wed', thursday: 'thu', friday: 'fri', saturday: 'sat' }
+const capital = (w: string) => w[0].toUpperCase() + w.slice(1)
+
+/** The days in a minyan question, and the question without them. Only
+ *  read when the question is about minyanim: "open friday" is a store's
+ *  hours, not davening. Shabbos is its evening and its day, Friday night
+ *  its own evening, Motzei Shabbos Saturday's Maariv. */
+function readMinyanWhen(text: string): { when: MinyanWhen[] | null; rest: string } {
+  const part = '(?:\\s+(morning|afternoon|evening|night))?'
+  const rules: [RegExp, (m: RegExpMatchArray) => MinyanWhen[]][] = [
+    [/\b(?:friday night|erev (?:shabbos|shabbat)|leil (?:shabbos|shabbat))\b/, () => [{ day: 'fri', label: 'Friday night', tefillos: EVENING }]],
+    [/\bmotzei (?:shabbos|shabbat)\b/, () => [{ day: 'sat', label: 'Motzei Shabbos', tefillos: ['maariv', 'mincha_maariv'] }]],
+    [/\b(?:shabbos|shabbat|saturday) (?:morning|day)\b/, () => [{ day: 'sat', label: 'Shabbos morning', tefillos: MORNING }]],
+    [/\b(?:shabbos|shabbat) (afternoon|mincha)\b/, () => [{ day: 'sat', label: 'Shabbos afternoon', tefillos: AFTERNOON }]],
+    [/\b(?:shabbos|shabbat)\b/, () => [{ day: 'fri', label: 'Friday night', tefillos: ['kabbalas_shabbos', 'maariv', 'mincha_maariv'] }, { day: 'sat', label: 'Shabbos', tefillos: null }]],
+    [new RegExp(`\\b(sunday|monday|tuesday|wednesday|thursday|friday|saturday)${part}\\b`), (m) => [{ day: WEEKDAYS[m[1]], label: m[2] ? `${capital(m[1])} ${PARTS[m[2]].label}` : capital(m[1]), tefillos: m[2] ? PARTS[m[2]].tefillos : null }]],
+    [new RegExp(`\\btomorrow${part}\\b`), (m) => [{ day: 'tomorrow', label: m[1] ? `tomorrow ${PARTS[m[1]].label}` : 'tomorrow', tefillos: m[1] ? PARTS[m[1]].tefillos : null }]],
+  ]
+  // "Today" and "tonight" aren't read as a day: the next minyanim from now
+  // answer them already, and when tonight's are over, say when tomorrow's
+  // first is, which a day's list wouldn't.
+  for (const [re, when] of rules) {
+    const m = text.match(re)
+    if (m) return { when: when(m), rest: text.replace(m[0], ' ').replace(/\s+/g, ' ').trim() }
+  }
+  return { when: null, rest: text }
 }
 
 const TEFILLAH_WORDS: Record<string, Tefillah[] | null> = {
@@ -272,8 +319,14 @@ const TEFILLAH_WORDS: Record<string, Tefillah[] | null> = {
   mussaf: ['shabbos_mussaf'],
   musaf: ['shabbos_mussaf'],
   minyan: null,
+  minyanim: null,
   daven: null,
+  davening: null,
   service: null,
+  // "kabbalas" and "kabbalat" as fold() leaves them.
+  kabbala: ['kabbalas_shabbos'],
+  kabbalat: ['kabbalas_shabbos'],
+  kabbolas: ['kabbalas_shabbos'],
 }
 
 // A time someone typed: "6:45", "6:45pm", "7 pm", "at 7". A bare number
@@ -496,7 +549,12 @@ export function parseAsk(input: string): AskQuery {
   const { excluding, rest: excludedOut } = readExcluding(withoutOpen.replace(/\s+/g, ' ').trim())
   // "A date restaurant", "for a date", "date night": a kind of outing, not
   // the fruit, and nothing a listing says — "date" alone is still dates.
-  const plain = excludedOut.replace(DATE_OUT, ' ')
+  const outing = excludedOut.replace(DATE_OUT, ' ')
+  // A minyan question's days ("Friday night", "tomorrow") are when, not
+  // words for a shul's listing to have.
+  const aboutMinyanim = outing.split(' ').some((w) => w && TEFILLAH_WORDS[fold(w)] !== undefined)
+  const minyanWhen = aboutMinyanim ? readMinyanWhen(outing) : { when: null, rest: outing }
+  const plain = minyanWhen.rest
 
   const terms: string[] = []
   const concepts: AskQuery['concepts'] = []
@@ -507,6 +565,11 @@ export function parseAsk(input: string): AskQuery {
     if (tefillah !== undefined) {
       asksMinyan = true
       if (tefillah) tefillos = [...new Set([...(tefillos ?? []), ...tefillah])]
+      // Every tefillah word means shuls, whether or not it's also one of
+      // their everyday words: "kabbalas" isn't, and as a word to look for
+      // it found no shul at all.
+      if (!concepts.some((c) => c.concept === 'synagogue')) concepts.push({ concept: 'synagogue', word: fold(w) })
+      continue
     }
     const abbreviation = ABBREVIATIONS[w]
     if (abbreviation) {
@@ -525,7 +588,7 @@ export function parseAsk(input: string): AskQuery {
 
   const meta = META.find(([, re]) => re.test(plain))?.[0] ?? null
   if (meta) terms.length = 0
-  const times = concepts.length === 0 ? readTimes(terms, plain) : null
+  const times = concepts.length === 0 && !asksMinyan ? readTimes(terms, plain) : null
   if (times) terms.length = 0
 
   // "Is the eruv up", "can I carry this Shabbos": nothing asked but the
@@ -537,7 +600,7 @@ export function parseAsk(input: string): AskQuery {
     mentionsEruv && concepts.length === 0 && terms.every((t) => ERUV_WORDS.has(t) || ERUV_CONTEXT.has(t))
   if (eruv) terms.length = 0
 
-  const minyan: MinyanAsk | null = asksMinyan && !times ? { tefillos, at: clock.at } : null
+  const minyan: MinyanAsk | null = asksMinyan && !times ? { tefillos, at: clock.at, when: minyanWhen.when } : null
   const withinAsked = within.within
   // Read before "better than Giant" is taken out: that's still asking
   // for a better one.

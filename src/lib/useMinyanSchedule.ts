@@ -6,7 +6,8 @@ import { useNow } from '@/lib/useNow'
 import { currentSeason, type Season } from '@/lib/season'
 import { DAY_KEYS, dayAndMinutesInTimezone, type DayKey } from '@/lib/hours'
 import { isMinyanim, type Minyan, type MinyanDayKey } from '@/lib/davening'
-import type { ShulMinyanim } from '@/lib/upcomingDavening'
+import { listMinyanim, minyanimOn, type ShulMinyanim } from '@/lib/upcomingDavening'
+import type { AnswerSchedule } from '@/lib/askAnswer'
 import { useZmanim } from '@/lib/useZmanim'
 import { useZmanAnchors, geoOrCommunityDefault } from '@/lib/useZmanAnchors'
 import type { AnchorTimes } from '@/lib/useZmanAnchors'
@@ -88,4 +89,22 @@ export function useMinyanSchedule(coords: LatLng | null, only?: readonly Directo
   const todayDayKeys: MinyanDayKey[] = zmanimData?.isYomTov ? [todayKey, 'yom_tov'] : [todayKey]
 
   return { linkCategoryId, shuls, anchors, now, todayKey, tomorrowKey, todayDayKeys, nowMinutes, season }
+}
+
+/** The schedule as a search answer needs it (see askAnswer's
+ *  AnswerSchedule): today's and tomorrow's minyanim, and any other day's
+ *  on asking. Shared by the home search and a category page's. */
+export function answerSchedule(schedule: MinyanSchedule): AnswerSchedule {
+  return {
+    ...listMinyanim(schedule.shuls, {
+      today: schedule.todayDayKeys,
+      tomorrow: [schedule.tomorrowKey],
+      season: schedule.season,
+      anchors: schedule.anchors,
+    }),
+    nowMinutes: schedule.nowMinutes,
+    todayKey: schedule.todayKey,
+    tomorrowKey: schedule.tomorrowKey,
+    onDay: (day) => minyanimOn(schedule.shuls, [day], schedule.season, schedule.anchors),
+  }
 }

@@ -8,8 +8,7 @@ import { answerFor } from '@/lib/askAnswer'
 import { answersWell, pickPrompts } from '@/lib/searchPrompts'
 import { categoryExamples } from '@/lib/categoryExamples'
 import { neighborhoodsFor } from '@/lib/places'
-import { listMinyanim } from '@/lib/upcomingDavening'
-import { useMinyanSchedule, type MinyanSchedule } from '@/lib/useMinyanSchedule'
+import { answerSchedule, useMinyanSchedule, type MinyanSchedule } from '@/lib/useMinyanSchedule'
 import { useNow } from '@/lib/useNow'
 import { useCategories } from '@/lib/useCategories'
 import { useOptionalLocation } from '@/lib/locationContext'
@@ -82,18 +81,7 @@ function Ask({ category, items, search, onSearch, schedule, readAs }: Props & { 
     const result = searchAsk(items, [category], text, { categoryId: category.id, coords, now: new Date(now ?? 0), places })
     const answer = answerFor(result, {
       coords: coords ?? (result.query.within ? null : community.mapCenter),
-      schedule:
-        result.query.minyan && schedule
-          ? {
-              ...listMinyanim(schedule.shuls, {
-                today: schedule.todayDayKeys,
-                tomorrow: [schedule.tomorrowKey],
-                season: schedule.season,
-                anchors: schedule.anchors,
-              }),
-              nowMinutes: schedule.nowMinutes,
-            }
-          : null,
+      schedule: result.query.minyan && schedule ? answerSchedule(schedule) : null,
     })
     return { result, answer }
   }

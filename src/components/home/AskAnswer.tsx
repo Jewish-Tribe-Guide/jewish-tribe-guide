@@ -75,6 +75,7 @@ export default function AskAnswer({
                   <span className="text-slate-500"> · {r.shulName}</span>
                 </span>
                 {r.tomorrow && <span className="shrink-0 text-[11.5px] font-medium text-amber-700">Tomorrow</span>}
+                {r.day && <span className="shrink-0 text-[11.5px] font-medium text-slate-500">{r.day}</span>}
                 {r.miles != null && <span className="shrink-0 tabular-nums text-slate-500">{r.miles} mi</span>}
               </>
             )
@@ -121,7 +122,7 @@ export default function AskAnswer({
           aria-expanded={expanded}
           className="mt-1 cursor-pointer text-[13px] font-semibold text-primary transition-colors hover:text-primary-dark"
         >
-          {expanded ? 'Show fewer' : `Show all ${answer.rows.length}${allTomorrow ? ' tomorrow' : ' today'}`}
+          {expanded ? 'Show fewer' : `Show all ${answer.rows.length}${answer.when ? '' : allTomorrow ? ' tomorrow' : ' today'}`}
         </button>
       )}
       {share && !answer.closest && <div><ShareAnswer path={share.path} title={share.title} /></div>}

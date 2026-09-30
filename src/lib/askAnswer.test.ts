@@ -619,3 +619,42 @@ describe('metaAnswer', () => {
     expect(metaAnswer('add', ctx).text).toMatch(/^Open the kind of place it is and tap "Add a listing"/)
   })
 })
+
+describe('answerFor — a minyan question about a day (Sep 30)', () => {
+  // Today is Wednesday. Friday's Mincha is set by candle lighting, which
+  // the guide only knows today's sunset for.
+  const days: Record<string, MinyanSlot[]> = {
+    fri: [slot(mekor, 'shacharis', 7), { ...slot(mekor, 'mincha', 18, 10), anchored: true }, slot(shtiebel, 'kabbalas_shabbos', 18, 30), slot(mekor, 'maariv', 19, 30)],
+    sat: [slot(mekor, 'shacharis', 9), slot(mekor, 'shabbos_mussaf', 10, 30), slot(shtiebel, 'mincha', 18), slot(shtiebel, 'maariv', 19, 20)],
+    sun: [slot(mekor, 'shacharis', 8)],
+  }
+  const week = (h: number): AnswerSchedule => ({ ...at(h), todayKey: 'wed', tomorrowKey: 'thu', onDay: (d) => days[d] ?? [] })
+
+  it('"shacharis tomorrow": tomorrow’s, not the next one from now', () => {
+    expect(ask('shacharis tomorrow', week(6))?.text).toBe('Tomorrow: Shacharis 6:45 AM, South Philly Shtiebel, and 1 more.')
+  })
+
+  it('"friday night minyan": Friday’s evening, a sunset time marked as worked out, not stated', () => {
+    const answer = ask('friday night minyan', week(12))
+    expect(answer?.text).toBe(
+      'Friday night: Mincha ~6:10 PM, Mekor Habracha, and 2 more. Times set by sunset (~) are worked out from today’s and may be a minute or two off.',
+    )
+    expect(answer?.rows.map((r) => r.label)).toEqual(['Mincha', 'Kabbalas Shabbos', 'Maariv'])
+  })
+
+  it('"shabbos morning minyan" and "kabbalas shabbos"', () => {
+    expect(ask('shabbos morning minyan', week(12))?.text).toBe('Shabbos morning: Shacharis 9:00 AM, Mekor Habracha, and 1 more.')
+    const kabbalas = ask('kabbalas shabbos', week(12))
+    expect(kabbalas?.text).toBe('Friday night: Kabbalas Shabbos 6:30 PM, South Philly Shtiebel.')
+    expect(kabbalas?.rows.map((r) => r.day)).toEqual(['Friday night'])
+  })
+
+  it('"shacharis sunday at 8", and nothing listed said as nothing listed', () => {
+    expect(ask('shacharis sunday at 8', week(12))?.text).toBe('Yes: Shacharis at 8:00 AM Sunday, Mekor Habracha.')
+    expect(ask('maariv sunday', week(12))?.text).toBe('No Maariv listed for Sunday in the guide.')
+  })
+
+  it('"maariv tonight" is still the next one from now, with tomorrow’s when tonight’s are over', () => {
+    expect(ask('maariv tonight', week(22))?.text).toBe('No more Maariv today. First tomorrow: 7:15 PM, South Philly Shtiebel.')
+  })
+})

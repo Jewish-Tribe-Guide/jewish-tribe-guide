@@ -2,10 +2,11 @@ import type { DirectoryResource, EruvRecord, ZmanimData } from '@/types'
 import type { CategoryConfig } from '@/lib/categories'
 import { resolvePrimaryZmanimBlock } from '@/lib/zmanim'
 import { describedByItsText, type AskHit, type DayWindow, type AskResult, type HoursWindow, type NearMiss } from '@/lib/askSearch'
-import { formatOpenAtTime, termMatches, termsAsTyped, words, type MetaAsk, type MinyanAsk, type TimesAsk } from '@/lib/ask'
+import { formatOpenAtTime, termMatches, termsAsTyped, words, type MetaAsk, type MinyanAsk, type MinyanWhen, type TimesAsk } from '@/lib/ask'
 import { TEFILLAH_LABELS, type Tefillah } from '@/lib/davening'
 import type { MinyanSlot } from '@/lib/upcomingDavening'
 import { haversineMiles, milesText, roundMiles, type LatLng } from '@/lib/geo'
+import type { DayKey } from '@/lib/hours'
 
 // ── The one-line answer above search results ─────────────────────────────────
 // A search that reads a question should answer it, not just list places:
@@ -25,6 +26,9 @@ export type AnswerRow = {
   shulName: string
   miles: number | null
   tomorrow: boolean
+  /** Which day, when an answer covers more than one ("Friday night" and
+   *  "Shabbos" for "Shabbos minyanim"). */
+  day?: string
 }
 
 export type Answer = {
@@ -43,6 +47,9 @@ export type Answer = {
   /** How many of `rows` to show before a "Show all" — the answer is a
    *  glance, the full list is a tap away. Absent means show every row. */
   shown?: number
+  /** The day the rows are for, when the question named one: "Show all 8"
+   *  then says nothing of today or tomorrow. */
+  when?: string
 }
 
 export type AnswerLink = {
@@ -59,6 +66,12 @@ export type AnswerSchedule = {
   tomorrow: MinyanSlot[]
   /** Minutes since local midnight, in the community's timezone. */
   nowMinutes: number
+  /** For a question about a day ("Shacharis Sunday"): which days today and
+   *  tomorrow are, and any day's minyanim. Without them only the next ones
+   *  from now can be answered. */
+  todayKey?: DayKey
+  tomorrowKey?: DayKey
+  onDay?: (day: DayKey) => MinyanSlot[]
 }
 
 /** How close to a time someone asked about a minyan has to be to count as
@@ -125,13 +138,14 @@ function minyanAnswer(
   // named the farther of two 9:00 Shacharises.
   const away = (s: MinyanSlot) => (origin && s.shulGeo ? haversineMiles(origin, s.shulGeo) : Infinity)
   const byTime = (a: MinyanSlot, b: MinyanSlot) => a.minutes - b.minutes || away(a) - away(b)
+  const where = (r: AnswerRow) => `${r.shulName}${r.miles != null ? ` (${r.miles} mi)` : ''}`
+  if (ask.when) return minyanDaysAnswer(ask, ask.when, schedule, fits, toRow, byTime, where)
   const today = schedule.today.filter(fits).sort(byTime)
   const tomorrow = schedule.tomorrow.filter(fits).sort(byTime)
   if (today.length === 0 && tomorrow.length === 0) return null
   const what = tefillahWords(ask.tefillos)
   // "No more minyanim today", but "no more Maariv today".
   const whatAll = ask.tefillos ? what : 'minyanim'
-  const where = (r: AnswerRow) => `${r.shulName}${r.miles != null ? ` (${r.miles} mi)` : ''}`
 
   if (ask.at) {
     const target = resolveAt(ask.at, ask.tefillos, schedule.nowMinutes)
@@ -171,6 +185,73 @@ function minyanAnswer(
     rows: first,
     shown: 3,
   }
+}
+
+/** A minyan question about a day or days ("Shacharis tomorrow", "Friday
+ *  night minyan", "Shabbos"): that day's minyanim, of the tefillos asked
+ *  or that part of the day means, first named and the rest counted. A
+ *  weekday that's today is all of today's, earlier ones too. Nothing listed
+ *  is said as nothing listed in the guide, never as nothing happening.
+ *  A time set by sunset on a day after tomorrow is worked out from today's
+ *  sunset, so it's marked "~" and the answer says it may be a minute or two
+ *  off, rather than stating a time the guide doesn't have. */
+function minyanDaysAnswer(
+  ask: MinyanAsk,
+  when: MinyanWhen[],
+  schedule: AnswerSchedule,
+  fits: (s: MinyanSlot) => boolean,
+  toRow: (s: MinyanSlot, tomorrow: boolean) => AnswerRow,
+  byTime: (a: MinyanSlot, b: MinyanSlot) => number,
+  where: (r: AnswerRow) => string,
+): Answer | null {
+  const { todayKey, tomorrowKey, onDay } = schedule
+  if (!todayKey || !tomorrowKey || !onDay) return null
+  const several = when.length > 1
+  let approximate = false
+  const slices = when.map((w) => {
+    const key = w.day === 'tomorrow' ? tomorrowKey : w.day
+    const slots = key === todayKey ? schedule.today : key === tomorrowKey ? schedule.tomorrow : onDay(key)
+    const tefillos = ask.tefillos ?? w.tefillos
+    const far = key !== todayKey && key !== tomorrowKey
+    const found = slots
+      .filter((s) => fits(s) && (!tefillos || tefillos.includes(s.tefillah)))
+      .sort(byTime)
+      .map((slot) => {
+        const row = toRow(slot, false)
+        if (far && slot.anchored) {
+          approximate = true
+          row.time = `~${row.time}`
+        }
+        return { slot, row: several ? { ...row, day: w.label } : row }
+      })
+    return { w, found }
+  })
+  const rows = slices.flatMap((x) => x.found.map((f) => f.row))
+  const what = tefillahWords(ask.tefillos)
+  const whatAll = ask.tefillos ? what : 'minyanim'
+  const labels = when.map((w) => w.label).join(' or ')
+  if (rows.length === 0) return { text: `No ${whatAll} listed for ${labels} in the guide.`, rows: [] }
+  const note = approximate ? ' Times set by sunset (~) are worked out from today’s and may be a minute or two off.' : ''
+
+  // "Shacharis Sunday at 7": that day's closest to the time.
+  if (ask.at && !several) {
+    const { w, found } = slices[0]
+    const target = resolveAt(ask.at, ask.tefillos ?? w.tefillos, 0)
+    const near = found.filter((f) => Math.abs(f.slot.minutes - target) <= AT_WINDOW).sort((a, b) => Math.abs(a.slot.minutes - target) - Math.abs(b.slot.minutes - target))
+    if (near.length) {
+      const best = near[0].row
+      const more = near.length > 1 ? ` ${near.length - 1} more within ${AT_WINDOW} min.` : ''
+      return { text: `Yes: ${best.label} at ${best.time} ${w.label}, ${where(best)}.${more}${note}`, rows: near.map((f) => f.row), when: w.label }
+    }
+    return { text: `No ${what} at ${formatClock(target)} ${w.label} in the guide.${note}`, rows, shown: 5, when: w.label }
+  }
+
+  const upper = (t: string) => t[0].toUpperCase() + t.slice(1)
+  const text = slices
+    .filter((x) => x.found.length > 0)
+    .map(({ w, found }) => `${upper(w.label)}: ${found[0].row.label} ${found[0].row.time}, ${where(found[0].row)}${found.length > 1 ? `, and ${found.length - 1} more` : ''}.`)
+    .join(' ')
+  return { text: `${text}${note}`, rows, shown: several ? 6 : 5, when: labels }
 }
 
 /** For "best pizza": the most upvoted, when upvotes actually tell them

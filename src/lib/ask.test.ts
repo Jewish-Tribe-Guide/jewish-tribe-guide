@@ -103,13 +103,30 @@ describe('parseAsk', () => {
     expect(parseAsk('mikvah within a 15 minute drive').terms).toEqual([])
   })
 
+  it('reads the day a minyan question is about, and none of it is a word to look for', () => {
+    const when = (q: string) => parseAsk(q).minyan?.when
+    expect(when('shacharis tomorrow')).toEqual([{ day: 'tomorrow', label: 'tomorrow', tefillos: null }])
+    expect(when('friday night minyan')?.[0]).toMatchObject({ day: 'fri', label: 'Friday night' })
+    expect(when('where can i daven sunday morning')).toEqual([{ day: 'sun', label: 'Sunday morning', tefillos: ['shacharis', 'shabbos_mussaf'] }])
+    expect(when('shabbos morning minyan')?.[0]).toMatchObject({ day: 'sat', label: 'Shabbos morning' })
+    expect(when('motzei shabbos maariv')?.[0]).toMatchObject({ day: 'sat', label: 'Motzei Shabbos' })
+    expect(when('kabbalas shabbos')?.map((w) => w.label)).toEqual(['Friday night', 'Shabbos'])
+    expect(parseAsk('kabbalas shabbos').minyan?.tefillos).toEqual(['kabbalas_shabbos'])
+    expect(parseAsk('kabbalas shabbos').times).toBeNull()
+    for (const q of ['shacharis tomorrow', 'friday night minyan', 'shabbos morning minyan']) expect(parseAsk(q).terms, q).toEqual([])
+    // Not a minyan question: the day stays the store's.
+    expect(parseAsk('open friday').minyan).toBeNull()
+    expect(parseAsk('maariv tonight').minyan?.when).toBeNull()
+  })
+
   it('reads a minyan question: which tefillah, and a time if one was said', () => {
     expect(parseAsk('is there a maariv minyan at 6:45').minyan).toEqual({
       tefillos: ['maariv', 'mincha_maariv'],
       at: { hour: 6, minute: 45, meridiem: null },
+      when: null,
     })
     expect(parseAsk('mincha at 1:30pm').minyan?.at).toEqual({ hour: 1, minute: 30, meridiem: 'pm' })
-    expect(parseAsk('upcoming minyanim').minyan).toEqual({ tefillos: null, at: null })
+    expect(parseAsk('upcoming minyanim').minyan).toEqual({ tefillos: null, at: null, when: null })
     expect(parseAsk('can you pull up a list of upcoming minyanim').terms).toEqual([])
     // A number in an address is not a time, and not a minyan question.
     expect(parseAsk('1500 walnut').minyan).toBeNull()
