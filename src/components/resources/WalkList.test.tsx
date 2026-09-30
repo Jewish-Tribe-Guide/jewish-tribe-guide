@@ -5,7 +5,7 @@ import { renderWithProviders } from '@/test/renderWithProviders'
 import { makeCategory, makeListing } from '@/test/providerFixtures'
 import { mockRouter } from '@/test/nextNavigationMock'
 import type { DirectoryResource } from '@/types'
-import PlaceDetailBody from './PlaceDetailBody'
+import ListingView from './ListingView'
 import { forgetLoadedPlaces } from './WalkList'
 
 vi.mock('next/navigation', () => ({
@@ -68,7 +68,7 @@ afterEach(() => {
 })
 
 const open = (item = hotel, category = hotels) =>
-  renderWithProviders(<PlaceDetailBody item={item} category={category} />, { content: { categories: [hotels, shuls] } })
+  renderWithProviders(<ListingView item={item} category={category} color="#000" path="/test" foot={null} />, { content: { categories: [hotels, shuls] } })
 
 describe('A hotel’s synagogues within a walk', () => {
   it('lists every shul within the walk, nearest first, under and past 20 minutes', async () => {
@@ -124,7 +124,7 @@ describe('A hotel’s synagogues within a walk', () => {
   })
 
   it('leaves nothing behind, not even its divider, when the category it lists is gone', () => {
-    const { container } = renderWithProviders(<PlaceDetailBody item={hotel} category={hotels} />, { content: { categories: [hotels] } })
+    const { container } = renderWithProviders(<ListingView item={hotel} category={hotels} color="#000" path="/test" foot={null} />, { content: { categories: [hotels] } })
     expect(screen.queryByTestId('walk-list')).not.toBeInTheDocument()
     expect(container.querySelector('hr:last-child')).toBeNull()
   })

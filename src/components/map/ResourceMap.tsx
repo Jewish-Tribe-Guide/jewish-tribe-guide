@@ -886,7 +886,10 @@ export default function ResourceMap({ points, userLocation, directionsOrigin, fo
         prev.marker.zIndex = markerZIndex(prev.point, false)
       }
     }
-    if (selectedId && selectedId !== prevId) {
+    // A new selection, or the same one asked to be framed again: a row
+    // under the pointer lights a pin, and opening that same listing then
+    // asks for the map to come to it (CategoryMap's frameToken).
+    if (selectedId && (selectedId !== prevId || frameToken !== consumedFrameTokenRef.current)) {
       const current = markersByIdRef.current.get(selectedId)
       if (current) {
         current.marker.content = buildPin(current.point, true)

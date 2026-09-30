@@ -3,8 +3,7 @@
 import { forwardRef, useImperativeHandle, useRef, useState } from 'react'
 import { track } from '@vercel/analytics'
 import type { DirectoryResource } from '@/types'
-import { PHOTO_FIELD_KEY, resolveCapabilities, selectValues, type CategoryConfig, type CategoryField } from '@/lib/categories'
-import { getOpenStatus, CLOSURE_LABELS } from '@/lib/hours'
+import { PHOTO_FIELD_KEY, resolveCapabilities, type CategoryConfig, type CategoryField } from '@/lib/categories'
 import { useNow } from '@/lib/useNow'
 import { getCategoryColor } from '@/lib/categoryColor'
 import { useCategories } from '@/lib/useCategories'
@@ -92,7 +91,6 @@ type Props = {
    *  its header. Defaults on. */
   showCategoryLabel?: boolean
   onVote: (count: number) => void
-  onTagClick: (tag: string) => void
   /** When provided, clicking the listing's name navigates to that item's own
    *  category directory instead of expanding the card in place — used by
    *  cross-category lists (landing search) where "this row" and "its home
@@ -100,14 +98,6 @@ type Props = {
    *  unset so a name click still just expands, matching every other tap on
    *  the row. */
   onNameClick?: () => void
-  /** Click the "Open" badge → turn on the "Open now" filter. */
-  onFilterOpen: () => void
-  /** Click a boolean badge (e.g. "Kosher") → enable that boolean filter. */
-  onFilterBool: (key: string) => void
-  /** Click a select badge (e.g. cert "IKC", type "Restaurant") → add/remove it
-   *  from that field's filter (the filter always allows more than one value
-   *  chosen at once, regardless of the field's own `multiSelect` setting). */
-  onFilterSelect: (key: string, value: string) => void
   onEdit: () => void
   /** Fired synchronously alongside every `setExpanded` call (the row's own
    *  toggle, ListingDetailModal's onClose, and the imperative open()/
@@ -157,6 +147,9 @@ type Props = {
    *  list, as the canvas draws it, where GenericDirectory draws the list's
    *  box and the lines between rows. Being tried on the preview. */
   look?: RowLook
+  /** A category page on desktop shows the opened listing in the list's own
+   *  column (ListingColumn), so the card opens no dialog of its own there. */
+  inColumn?: boolean
 }
 
 export type RowLook = 'cards' | 'list'
@@ -168,10 +161,6 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
   count,
   defaultExpanded,
   onVote,
-  onTagClick,
-  onFilterOpen,
-  onFilterBool,
-  onFilterSelect,
   onEdit,
   showCategoryLabel = true,
   onNameClick,
@@ -186,6 +175,7 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
   likes,
   candlesAt = null,
   look = 'cards',
+  inColumn = false,
 }, ref) {
   const [expanded, setExpanded] = useState(!!defaultExpanded)
   const cardRootRef = useRef<HTMLDivElement>(null)
@@ -235,11 +225,6 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
   // Per-category capabilities layered under the global `ui.contributions` switches.
   const caps = resolveCapabilities(category.capabilities)
   const canEdit = ui.contributions.edit && caps.edit
-  const hoursFields = fields.filter((f) => f.type === 'hours')
-  const badgeFields = fields.filter((f) => {
-    if (f.type === 'tags' || f.type === 'url' || f.type === 'hours' || f.type === 'minyanim' || f.type === 'image') return false
-    return (f.renderAs ?? (f.type === 'boolean' ? 'badge' : 'row')) === 'badge'
-  })
 
   // A listing is "Open" if ANY of its hours fields say so — see getOpenStatus.
   // Against useNow rather than the render's own clock: open/closed is the
@@ -249,7 +234,6 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
   // Open badge and no opening or closing time yet.
   const clock = useNow()
   const now = clock === null ? null : new Date(clock)
-  const { isOpen, closing, closure } = getOpenStatus(item, hoursFields.map((f) => f.key), now)
   // The row's second line: open status, next minyan, distance, what kind of
   // place, how many items. See lib/listingRow.ts.
   const shul = useNextMinyan(item.id)
@@ -322,48 +306,6 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
   // display values are never fighting over the same element to begin with.
   const headerTextClampStyle = { display: '-webkit-box', WebkitBoxOrient: 'vertical', WebkitLineClamp: 2, overflow: 'hidden' } as const
 
-  // Collapsed-row signal badges — only the ones tied to a real filter control
-  // (boolean/select fields marked `filterable`). Everything else (cert
-  // badges without a filter, all tags) only shows once expanded, inside
-  // PlaceDetailBody.
-  const headerBadges = badgeFields.filter((f) => {
-    if (!f.filterable) return false
-    return f.type === 'boolean' ? !!item[f.key] : selectValues(item[f.key]).length > 0
-  })
-  const caveatNote = (f: CategoryField): string | null => {
-    if (!f.caveat || !item[f.caveat.flagField]) return null
-    return String(item[f.caveat.noteField] ?? '').trim()
-  }
-
-  // "N {items}" on the collapsed card for a tags field an admin has opted in
-  // via showCountInHeader — a grocery category's "which kosher items does
-  // this place carry" is the motivating case, but this isn't hardcoded to
-  // kosher: tags fields are excluded from badgeFields entirely (they're meant
-  // for the opened listing), and a field's key/label/tagGroup are all
-  // per-community admin text with nothing stable to match against — tagGroup
-  // in particular is auto-derived from the label (see categoryEditorLogic.ts)
-  // and drifts the moment someone edits it. showCountInHeader is the same
-  // explicit opt-in shape as showInHeader (text/url fields), just for tags.
-  const countHeaderField = fields.find((f) => f.type === 'tags' && f.showCountInHeader)
-  // Tags fields store two arrays — the plain key ("always") and a
-  // `_sometimes` companion (see TagsInput's green/amber toggle) — and both
-  // are real, user-authored items (PlaceDetailBody shows "sometimes" tags in
-  // their own section rather than hiding them). Missing the companion here
-  // undercounted any listing with sometimes-kosher items.
-  const countHeaderCount = countHeaderField
-    ? selectValues(item[countHeaderField.key]).length +
-      selectValues(item[countHeaderField.key + '_sometimes']).length
-    : 0
-  // An admin-chosen field (countReplacesKey — see its own doc) whose badge
-  // would otherwise repeat the same fact the count already says, e.g. a
-  // "Kosher Items" store-type badge next to a "12 kosher items" count.
-  // Suppressed from the generic badge loop below only when there's an actual
-  // count to replace it with; a listing that qualifies but has no items
-  // typed in yet still gets that other badge as before.
-  const suppressedBadgeKey = countHeaderCount > 0 ? countHeaderField?.countReplacesKey : undefined
-  const visibleHeaderBadges = suppressedBadgeKey
-    ? headerBadges.filter((f) => f.key !== suppressedBadgeKey)
-    : headerBadges
 
   const showAddress = category.hasAddress !== false && !!item.address
   const subtitleParts = [showCategoryLabel ? category.label : null, showAddress ? shortAddress(item.address!) : null].filter(Boolean)
@@ -376,136 +318,13 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
     setExpanded(false)
     onExpandedChange?.(false)
   }
-  // Shared with ListingDetailModal's own header avatar on desktop — computed
-  // once here rather than duplicated, since it's the same "which photo (if
-  // any) represents this listing" decision either way.
+  // The listing's own photo, for the row's picture.
   const ownPhoto =
     typeof item[PHOTO_FIELD_KEY] === 'string' && (item[PHOTO_FIELD_KEY] as string).trim() ? (item[PHOTO_FIELD_KEY] as string) : undefined
-  const iconImageUrl = ownPhoto ?? category.iconImageUrl ?? undefined
 
-  // The chips that survive collapsed (Open/closure + filterable badges) — see
-  // the badge row's own comment further down. Pulled into a variable, not
-  // just inline JSX, because ListingDetailModal needs the identical row
-  // restated in its own header on desktop (the card behind it is obscured by
-  // the modal's backdrop), and computing it twice would be two places a
-  // badge rule could drift out of sync.
+  // What a search matched here, named on the row (see `found`).
   const matchedChips = found?.items.length ? found.items : null
   const matchedFields = !matchedChips && found?.fields.length ? found.fields : null
-  const badgeRow = (isOpen || closure || visibleHeaderBadges.length > 0 || countHeaderCount > 0 || matchedChips || matchedFields) ? (
-    <>
-      {/* Closure outranks everything: it used to appear only once the card
-          was expanded, so a temporarily-closed shop was indistinguishable
-          from an open one in a directory list — worse, its saved hours still
-          earned it a green "Open" chip. Not a filter chip like the others;
-          there is nothing useful to filter to here. */}
-      {closure && (
-        <Chip tone={closure === 'permanent' ? 'red' : 'amber'}>{CLOSURE_LABELS[closure]}</Chip>
-      )}
-      {isOpen && (closing?.closesSoon ? (
-        <span className="relative group/tip">
-          <Chip tone="greenSolid" onClick={(e) => { e.stopPropagation(); onFilterOpen() }}>
-            Closes Soon
-          </Chip>
-          <span className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-1.5 w-max max-w-[220px] whitespace-normal rounded bg-slate-800 px-2 py-1.5 text-[11px] leading-snug text-white opacity-0 transition-opacity duration-150 group-hover/tip:opacity-100 hidden sm:block z-10">
-            Closes at {closing.closeLabel}
-          </span>
-        </span>
-      ) : (
-        <Chip tone="green" onClick={(e) => { e.stopPropagation(); onFilterOpen() }} title="Filter to listings open now">
-          Open
-        </Chip>
-      ))}
-      {/* What a search matched here — see `found`. Not clickable: the
-          card's own tap target opens the listing, which is where to go next. */}
-      {matchedChips?.map((m) => (
-        <Chip key={m.tag} tone={m.sometimes ? 'amber' : 'slate'}>
-          {m.tag}
-          {m.sometimes ? ' · sometimes' : ''}
-        </Chip>
-      ))}
-      {matchedFields?.map((f) =>
-        f.text ? (
-          <span key={f.label} className="basis-full text-xs text-slate-600">
-            <span className="text-muted">{f.label}: </span>
-            <Highlight text={f.text} terms={found!.terms} />
-          </span>
-        ) : (
-          <Chip key={f.label} tone="slate">
-            <Highlight text={f.label} terms={found!.terms} />
-          </Chip>
-        ),
-      )}
-      {countHeaderCount > 0 && countHeaderField && (() => {
-        // countLabel is meant to be a clean singular noun ("kosher item"),
-        // but the fallback — a field's own `label`, just lowercased — is
-        // often already phrased as a plural ("Kosher Items available").
-        // Blindly appending "s" to that doubled up ("kosher itemss"); only
-        // add it when the noun doesn't already end in one, which covers the
-        // fallback case without needing real pluralization logic this app
-        // has no other use for.
-        const noun = countHeaderField.countLabel ?? countHeaderField.label.toLowerCase()
-        const plural = countHeaderCount === 1 || noun.endsWith('s') ? noun : `${noun}s`
-        return (
-          // Not clickable — unlike the other badges here, which each map to
-          // one filter control, the field this one might be replacing
-          // (countReplacesKey) can be boolean or select depending on the
-          // category, and there's no single filter action that's correct
-          // for both. Purely informational: it's the "there's more here"
-          // signal that pulls a shopper into expanding the card. Slate, not
-          // a color already carrying meaning elsewhere on this card (green
-          // means "open"/a positive filter state) — this badge is a fact,
-          // not a status.
-          <Chip tone="slate" title={`See which ${plural} this place has`}>
-            {/* A slate chip is deliberately quiet — it shouldn't shout the
-                way "Open" does — but that risked reading as just another
-                static fact next to Restaurant/Parve instead of an invitation
-                to expand. Bolding only the number (not recoloring the whole
-                chip) borrows the same "128 reviews" convention other
-                directory apps use for exactly this signal, without undoing
-                the color choice that was made deliberately. */}
-            <span className="font-semibold">{countHeaderCount}</span> {plural}
-          </Chip>
-        )
-      })()}
-      {visibleHeaderBadges.flatMap((f) => {
-        const values = f.type === 'select' ? selectValues(item[f.key]) : [f.filterLabel ?? f.label]
-        // Resolve each stored value to the option's CURRENT label — a
-        // renamed option's label should show up on cards immediately,
-        // without needing every listing that had it selected re-saved.
-        // Falls back to the raw value for anything renamed via
-        // resourceStore's applyFieldOptionRenames (which stores the new
-        // value directly) or a value with no matching option at all.
-        const labelFor = (v: string) => f.options?.find((opt) => opt.value === v)?.label ?? v
-        const note = caveatNote(f)
-        const amber = note !== null
-        return values.map((value) => {
-          const text = labelFor(value)
-          const btn = (
-            <Chip
-              tone={amber ? 'amber' : 'slate'}
-              onClick={(e) => {
-                e.stopPropagation()
-                if (f.type === 'boolean') onFilterBool(f.key)
-                else onFilterSelect(f.key, value)
-              }}
-              title={amber ? undefined : `Filter by ${text}`}
-            >
-              {text}
-            </Chip>
-          )
-          if (!amber) return <span key={`${f.key}:${value}`}>{btn}</span>
-          return (
-            <span key={`${f.key}:${value}`} className="relative group/tip">
-              {btn}
-              <span className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-1.5 w-max max-w-[220px] whitespace-normal rounded bg-slate-800 px-2 py-1.5 text-[11px] leading-snug text-white opacity-0 transition-opacity duration-150 group-hover/tip:opacity-100 hidden sm:block z-10">
-                {note || 'Not everything here is kosher — please verify.'}
-              </span>
-            </span>
-          )
-        })
-      })}
-    </>
-  ) : null
 
   return (
     // No `overflow-hidden`: it would clip the cert badge's hover tooltip on a
@@ -859,24 +678,16 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
         </MobileSheet>
       )}
 
-      {/* Desktop: same content, centered dialog instead — see ListingDetailModal. */}
-      {!isMobile && (
+      {/* Desktop: a dialog, where nothing hosts the listing itself. A
+          category page does: it opens in the list's column (ListingColumn). */}
+      {!isMobile && !inColumn && (
         <ListingDetailModal
           isOpen={expanded}
           onClose={close}
           item={item}
           category={category}
           color={color}
-          iconImageUrl={iconImageUrl}
           name={item.name}
-          subtitle={subtitle}
-          badgeRow={badgeRow}
-          headerBadgeKeys={headerBadges.map((f) => f.key)}
-          headerUrlFields={headerUrlFields}
-          onTagClick={onTagClick}
-          onFilterOpen={onFilterOpen}
-          onFilterBool={onFilterBool}
-          onFilterSelect={onFilterSelect}
           canEdit={canEdit}
           onNavigate={onNavigate}
           hasPrev={hasPrev}

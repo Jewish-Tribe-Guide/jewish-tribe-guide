@@ -765,8 +765,8 @@ describe('GenericListingCard — expanded', () => {
       expect(screen.queryByRole('button', { name: 'Suggest an edit' })).not.toBeInTheDocument()
 
       await user.click(screen.getByRole('button', { name: 'Actions for Goldi Market' }))
-      // Share has its own button on the phone's listing; the overflow keeps Pin.
-      expect(screen.getByRole('menuitem', { name: isMobile ? 'Pin' : 'Share' })).toBeInTheDocument()
+      // Share has its own button in the listing now, so the overflow keeps Pin.
+      expect(screen.getByRole('menuitem', { name: 'Pin' })).toBeInTheDocument()
     })
   }
 
@@ -1393,10 +1393,8 @@ describe('GenericListingCard — mobile listing sheet', () => {
   // The items are a list to read now, not filter chips: the filters are
   // above the list, and a chip in the listing looked like a control.
   it('lists the items, as text, not as filter buttons', () => {
-    const onTagClick = vi.fn()
     renderMobile({
       defaultExpanded: true,
-      onTagClick,
       category: makeCategory({ detailFields: [{ key: 'items', label: 'Kosher items available', type: 'tags', showCountInHeader: true }] }),
       item: makeListing({ name: 'Goldi Market', items: ['Challah'] }),
     })

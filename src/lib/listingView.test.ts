@@ -97,10 +97,16 @@ describe('what kind of place, and the facts that decide it', () => {
     expect(listingKind(makeListing({ denomination: 'Orthodox (Ashkenazi)' }), shuls)).toBe('Orthodox (Ashkenazi)')
   })
 
-  it('a grocery: "Kosher Items" is a fact, not a kind, so the kind is the category', () => {
-    const tj = makeListing({ isKosher: 'Kosher Items', m: ['Challah'] })
-    expect(listingKind(tj, grocery)).toBe('Grocery Store')
-    expect(listingFacts(tj, grocery)).toEqual(['Kosher Items'])
+  it('a grocery: its kosher badge is a fact, not a kind, so the kind is the category', () => {
+    const store = makeListing({ isKosher: 'Kosher Store', m: ['Challah'] })
+    expect(listingKind(store, grocery)).toBe('Grocery Store')
+    expect(listingFacts(store, grocery)).toEqual(['Kosher Store'])
+  })
+
+  it('a grocery: as on the row, not "Kosher Items" over a list of kosher items', () => {
+    expect(listingFacts(makeListing({ isKosher: 'Kosher Items', m: ['Challah'] }), grocery)).toEqual([])
+    // With no items listed yet, it's the only thing saying so.
+    expect(listingFacts(makeListing({ isKosher: 'Kosher Items', m: [] }), grocery)).toEqual(['Kosher Items'])
   })
 
   it('a mikvah: yes/no badges are facts, in their filter words', () => {

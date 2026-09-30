@@ -3,7 +3,7 @@ import { fmt12, getOpenStatus, isStructuredHours, DAY_KEYS, dayLabel, type DayKe
 
 const short = (k: DayKey) => dayLabel(k).slice(0, 3)
 import { haversineMiles, roundMiles } from './geo'
-import { rowBadgeFields } from './listingRow'
+import { rowBadgeFields, saysTheSame } from './listingRow'
 import { isMinyanim } from './davening'
 import { parseWalkList } from './walkList'
 import type { DirectoryResource } from '@/types'
@@ -59,13 +59,18 @@ export function listingKind(item: DirectoryResource, category: CategoryConfig): 
 
 /** The facts that decide whether this is the place, as the row says them:
  *  "Meat", "Keystone-K"; a mikvah's "Women’s", "Men’s", "Keilim"; a
- *  grocery's "Kosher Items". Every filterable badge but the kind. */
+ *  grocery's "Kosher store". Every filterable badge but the kind, and, as on
+ *  the row, not a badge that only repeats what the items say ("Kosher
+ *  Items" over a list of kosher items). */
 export function listingFacts(item: DirectoryResource, category: CategoryConfig): string[] {
   const kind = kindField(category)?.key
+  const items = itemsField(category)
+  const hasItems = !!items && selectValues(item[items.key]).length + selectValues(item[`${items.key}_sometimes`]).length > 0
+  const repeats = (f: CategoryField, label: string) => hasItems && f.key === items!.countReplacesKey && saysTheSame(label, items!)
   return rowBadgeFields(category).flatMap((f) => {
     if (f.key === kind) return []
-    if (f.type === 'boolean') return item[f.key] ? [f.filterLabel ?? f.label] : []
-    return optionLabels(f, item[f.key])
+    const labels = f.type === 'boolean' ? (item[f.key] ? [f.filterLabel ?? f.label] : []) : optionLabels(f, item[f.key])
+    return labels.filter((l) => !repeats(f, l))
   })
 }
 

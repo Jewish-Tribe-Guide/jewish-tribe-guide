@@ -42,8 +42,6 @@ vi.mock('./GenericListingCard', async () => {
       item,
       defaultExpanded,
       onEdit,
-      onTagClick,
-      onFilterBool,
       onNavigate,
       onExpandedChange,
       found,
@@ -56,8 +54,6 @@ vi.mock('./GenericListingCard', async () => {
       item: DirectoryResource
       defaultExpanded?: boolean
       onEdit: () => void
-      onTagClick: (t: string) => void
-      onFilterBool: (key: string) => void
       onNavigate?: (direction: 1 | -1) => void
       onExpandedChange?: (expanded: boolean) => void
       found?: { items: { tag: string }[]; fields: { label: string }[] } | null
@@ -96,8 +92,6 @@ vi.mock('./GenericListingCard', async () => {
         <span>{item.name} looks like {look}</span>
         {found && <span>found on {item.name}: {[...found.items.map((m) => m.tag), ...found.fields.map((f) => f.label)].join(', ')}</span>}
         <button onClick={onEdit}>Edit {item.name}</button>
-        <button onClick={() => onTagClick('cheese')}>tag {item.name}</button>
-        <button onClick={() => onFilterBool('isKosher')}>card-filter {item.name}</button>
         {onNavigate && <button onClick={() => onNavigate(1)}>Next listing from {item.name}</button>}
         {onExpandedChange && (
           <>
@@ -114,6 +108,43 @@ vi.mock('./GenericListingCard', async () => {
     return next ? <span>next minyan at {name}: {next.text}</span> : null
   }
 })
+
+// The listing a desktop visitor opens takes the list's column. What it shows
+// is ListingView's (tested there); here, only what it's told and what its
+// buttons do to the list.
+vi.mock('./ListingColumn', () => ({
+  default: ({
+    item,
+    backLabel,
+    onBack,
+    position,
+    onStep,
+    alone,
+    onShowMap,
+    found,
+  }: {
+    item: DirectoryResource
+    backLabel: string
+    onBack: () => void
+    position: { index: number; total: number }
+    onStep: (d: 1 | -1) => void
+    alone: boolean
+    onShowMap?: () => void
+    found: { items: { tag: string }[] } | null
+  }) => (
+    <section data-testid="listing-column" aria-label={item.name}>
+      <p>
+        Column: {item.name}, {position.index + 1} of {position.total}
+        {alone ? ', alone' : ', map beside'}
+      </p>
+      {found && <p>column found: {found.items.map((m) => m.tag).join(', ')}</p>}
+      <button onClick={onBack}>{backLabel}</button>
+      <button onClick={() => onStep(-1)}>Previous listing</button>
+      <button onClick={() => onStep(1)}>Next listing</button>
+      {onShowMap && <button onClick={onShowMap}>Show map</button>}
+    </section>
+  ),
+}))
 
 // DaveningTimesModal pulls in its own heavy davening-time rendering — out of
 // scope here, GenericDirectory only cares whether it opens (and, for the
@@ -153,12 +184,14 @@ vi.mock('./CategoryMap', async () => {
     default: function CategoryMap({
       items,
       highlight,
+      selectedId,
       onSelect,
       onHide,
       fullMapHref,
     }: {
       items: DirectoryResource[]
       highlight: import('./CategoryMap').Highlight
+      selectedId?: string | null
       onSelect: (id: string) => void
       onHide: () => void
       fullMapHref: string
@@ -168,6 +201,7 @@ vi.mock('./CategoryMap', async () => {
         <div data-testid="map-stand-in" data-href={fullMapHref}>
           <span>map shows: {items.map((i) => i.name).join(', ')}</span>
           <span>pin lit: {lit ?? 'none'}</span>
+          <span>map on: {selectedId ?? 'nothing'}</span>
           {items.map((i) => (
             <button key={i.id} onClick={() => onSelect(i.id)}>
               pin {i.name}
@@ -423,7 +457,7 @@ describe('GenericDirectory', () => {
     expect(screen.queryByRole('button', { name: /^Add$/ })).not.toBeInTheDocument()
   })
 
-  it('wires a card\'s Edit/tag-click callbacks back to the directory\'s own props/state', async () => {
+  it('wires a card\'s Edit callback back to the directory\'s own props', async () => {
     const user = userEvent.setup()
     const onEdit = vi.fn()
     const category = makeCategory()
@@ -432,9 +466,6 @@ describe('GenericDirectory', () => {
 
     await user.click(screen.getByRole('button', { name: 'Edit Kosher Mart' }))
     expect(onEdit).toHaveBeenCalledWith(item)
-
-    await user.click(screen.getByRole('button', { name: 'tag Kosher Mart' }))
-    expect(screen.getByRole('searchbox')).toHaveValue('cheese')
   })
 
   it('a filterable boolean field narrows the list when switched on in the Filters sheet', async () => {
@@ -1026,61 +1057,6 @@ describe('GenericDirectory — scrolling to the next/previous card', () => {
   })
 })
 
-// A badge on a card (Open/boolean/select) sets the same filter state as the
-// equivalent control up in the search/filter/sort row — but that row isn't
-// sticky on mobile, so clicking a badge deep in a long list can change what's
-// filtered with nothing on screen to show it. Scrolling the row into view
-// answers that, but only when it isn't already visible: doing it
-// unconditionally would yank the page around every time, including on
-// desktop where the row is usually docked in view already.
-describe('GenericDirectory — scrolling filter controls into view after a card badge click', () => {
-  afterEach(() => {
-    vi.restoreAllMocks()
-  })
-
-  it('scrolls the controls row into view when a badge sets a filter and the row is off-screen', () => {
-    const scrollTo = vi.fn()
-    vi.stubGlobal('scrollTo', scrollTo)
-    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
-      top: -500, bottom: -450, left: 0, right: 0, width: 0, height: 50, x: 0, y: -500, toJSON: () => {},
-    } as DOMRect)
-    try {
-      const category = makeCategory()
-      const items = [makeListing({ id: 'a', name: 'Kosher Mart' })]
-      renderWithProviders(<GenericDirectory category={category} items={items} {...handlers} />)
-
-      screen.getByRole('button', { name: 'card-filter Kosher Mart' }).click()
-
-      // 'instant', not 'smooth' — confirmed live: setting the filter
-      // re-renders the list in the same moment this scroll would be
-      // animating, and Chrome cancels an in-flight smooth scrollTo outright
-      // when that happens, leaving the page stuck partway to the top.
-      expect(scrollTo).toHaveBeenCalledWith(expect.objectContaining({ behavior: 'instant' }))
-    } finally {
-      vi.unstubAllGlobals()
-    }
-  })
-
-  it('does not scroll when the controls row is already visible', () => {
-    const scrollTo = vi.fn()
-    vi.stubGlobal('scrollTo', scrollTo)
-    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
-      top: 100, bottom: 150, left: 0, right: 0, width: 0, height: 50, x: 0, y: 100, toJSON: () => {},
-    } as DOMRect)
-    try {
-      const category = makeCategory()
-      const items = [makeListing({ id: 'a', name: 'Kosher Mart' })]
-      renderWithProviders(<GenericDirectory category={category} items={items} {...handlers} />)
-
-      screen.getByRole('button', { name: 'card-filter Kosher Mart' }).click()
-
-      expect(scrollTo).not.toHaveBeenCalled()
-    } finally {
-      vi.unstubAllGlobals()
-    }
-  })
-})
-
 // Above the list is for asking; the list's own heading is for arranging it:
 // how many, then Filters (one sheet holding every filter) and Sort, the same
 // place on every category page.
@@ -1169,16 +1145,6 @@ describe('GenericDirectory — the list heading', () => {
 
     expect(screen.queryByTestId('active-filters')).not.toBeInTheDocument()
     expect(screen.getByText('Cafe')).toBeInTheDocument()
-  })
-
-  it('shows a filter set from a listing badge under the heading, so it is never on unseen', async () => {
-    const user = userEvent.setup()
-    const category = makeCategory({ detailFields: [{ key: 'isKosher', label: 'Kosher', type: 'boolean', filterable: true }] })
-    renderWithProviders(<GenericDirectory category={category} items={[makeListing({ id: 'a', name: 'Kosher Mart' })]} {...handlers} />)
-
-    await user.click(screen.getByRole('button', { name: 'card-filter Kosher Mart' }))
-
-    expect(within(screen.getByTestId('active-filters')).getByRole('button', { name: 'Kosher', pressed: true })).toBeInTheDocument()
   })
 
   it('puts Open now under the heading as a switch once something is typed', async () => {
@@ -1326,7 +1292,11 @@ describe('GenericDirectory — groups', () => {
     })
 
     it('opens the group of a listing arriving open from a link', () => {
-      renderWithProviders(<GenericDirectory category={shuls} items={shulItems} {...handlers} reopenItemId="c" />)
+      renderWithProviders(
+        <ForcedViewport isMobile>
+          <GenericDirectory category={shuls} items={shulItems} {...handlers} reopenItemId="c" />
+        </ForcedViewport>,
+      )
       expect(line(/^Reform · 1/)).toHaveAttribute('aria-expanded', 'true')
       expect(line(/^Orthodox · 2/)).toHaveAttribute('aria-expanded', 'false')
     })
@@ -1334,7 +1304,11 @@ describe('GenericDirectory — groups', () => {
     it('steps next/previous through what’s on screen, skipping closed groups', async () => {
       const user = userEvent.setup()
       const many = [...shulItems, makeListing({ id: 'd', name: 'Kol Tzedek', denomination: 'Reform', milesFromCenter: 3 })]
-      renderWithProviders(<GenericDirectory category={shuls} items={many} {...handlers} reopenItemId="d" />)
+      renderWithProviders(
+        <ForcedViewport isMobile>
+          <GenericDirectory category={shuls} items={many} {...handlers} reopenItemId="d" />
+        </ForcedViewport>,
+      )
       // With no location the list is alphabetical: Kol Tzedek, Mekor,
       // Rodeph, Vilna. Only Reform is open, so next from Kol Tzedek is
       // Rodeph, skipping Mekor in the closed Orthodox group.
@@ -1576,7 +1550,9 @@ describe('GenericDirectory — what a search matched', () => {
 
   it('marks what the home search matched in the listing it opened, without filtering the list', () => {
     renderWithProviders(
-      <GenericDirectory category={grocery} items={[cheesy, plain]} {...handlers} reopenItemId="tj" reopenMatch="cheese" />,
+      <ForcedViewport isMobile>
+        <GenericDirectory category={grocery} items={[cheesy, plain]} {...handlers} reopenItemId="tj" reopenMatch="cheese" />
+      </ForcedViewport>,
     )
     expect(screen.getByText("found on Trader Joe's: Cheddar Cheese")).toBeInTheDocument()
     expect(screen.getByText('ACME')).toBeInTheDocument()
@@ -1586,14 +1562,16 @@ describe('GenericDirectory — what a search matched', () => {
     const user = userEvent.setup()
     const onParamsChange = vi.fn()
     renderWithProviders(
-      <GenericDirectory
-        category={grocery}
-        items={[cheesy, plain]}
-        {...handlers}
-        reopenItemId="tj"
-        reopenMatch="cheese"
-        onParamsChange={onParamsChange}
-      />,
+      <ForcedViewport isMobile>
+        <GenericDirectory
+          category={grocery}
+          items={[cheesy, plain]}
+          {...handlers}
+          reopenItemId="tj"
+          reopenMatch="cheese"
+          onParamsChange={onParamsChange}
+        />
+      </ForcedViewport>,
     )
     await user.click(screen.getByRole('button', { name: "Collapse Trader Joe's" }))
     expect(screen.queryByText(/found on Trader Joe's/)).not.toBeInTheDocument()
@@ -1959,5 +1937,92 @@ describe('GenericDirectory — each shul’s next minyan', () => {
     renderWithProviders(<GenericDirectory category={makeCategory()} items={[makeListing({ name: 'Acme', minyanim })]} {...handlers} />)
 
     expect(screen.queryByText(/next minyan at/)).not.toBeInTheDocument()
+  })
+})
+
+// On desktop an opened listing takes the list's column, and the map stays
+// beside it on that place (agreed Sep 30; it was a dialog over both). The
+// list stays mounted underneath, hidden, so Back finds it as it was.
+describe('GenericDirectory — a listing opened on desktop', () => {
+  const food = makeCategory({ id: 'restaurant', pluralLabel: 'Food' })
+  const rows = [
+    makeListing({ id: 'a', name: 'Alpha Grill', category: 'restaurant' }),
+    makeListing({ id: 'b', name: 'Beta Cafe', category: 'restaurant' }),
+    makeListing({ id: 'c', name: 'Gamma Deli', category: 'restaurant' }),
+  ] as DirectoryResource[]
+  afterEach(() => localStorage.clear())
+
+  it('takes the list’s column, with the map beside it on that place', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(<GenericDirectory category={food} items={rows} {...handlers} />)
+    await user.click(screen.getByRole('button', { name: 'Expand Beta Cafe' }))
+
+    expect(screen.getByText('Column: Beta Cafe, 2 of 3, map beside')).toBeInTheDocument()
+    expect(screen.getByText('map on: b')).toBeInTheDocument()
+    // The list and its heading are hidden, not gone.
+    expect(screen.getByText('Alpha Grill')).not.toBeVisible()
+    expect(screen.getByTestId('list-heading')).not.toBeVisible()
+  })
+
+  it('steps through the list from the column, and Back brings the list back as it was', async () => {
+    const user = userEvent.setup()
+    const onParamsChange = vi.fn()
+    renderWithProviders(<GenericDirectory category={food} items={rows} {...handlers} onParamsChange={onParamsChange} />)
+    await user.click(screen.getByRole('button', { name: 'Expand Beta Cafe' }))
+    await user.click(screen.getByRole('button', { name: 'Next listing' }))
+    expect(screen.getByText('Column: Gamma Deli, 3 of 3, map beside')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Back to Food' }))
+    expect(screen.queryByTestId('listing-column')).not.toBeInTheDocument()
+    expect(screen.getByText('Alpha Grill')).toBeVisible()
+    expect(screen.getByText('map on: nothing')).toBeInTheDocument()
+    expect(onParamsChange).toHaveBeenLastCalledWith({ item: null, match: null }, { replace: true })
+  })
+
+  it('a pin on the map opens its listing in the column', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(<GenericDirectory category={food} items={rows} {...handlers} />)
+    await user.click(screen.getByRole('button', { name: 'Expand Alpha Grill' }))
+    await user.click(screen.getByRole('button', { name: 'pin Gamma Deli' }))
+    expect(screen.getByText('Column: Gamma Deli, 3 of 3, map beside')).toBeInTheDocument()
+  })
+
+  it('stands alone with the map hidden, and can bring it back', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(<GenericDirectory category={food} items={rows} {...handlers} />)
+    await user.click(screen.getByRole('button', { name: 'Hide map' }))
+    await user.click(screen.getByRole('button', { name: 'Expand Alpha Grill' }))
+    expect(screen.getByText('Column: Alpha Grill, 1 of 3, alone')).toBeInTheDocument()
+    await user.click(within(screen.getByTestId('listing-column')).getByRole('button', { name: 'Show map' }))
+    expect(screen.getByText('Column: Alpha Grill, 1 of 3, map beside')).toBeInTheDocument()
+  })
+
+  it('stands alone where the category has no map, with no Show map', async () => {
+    const user = userEvent.setup()
+    const groups = makeCategory({ id: 'whatsapp', pluralLabel: 'WhatsApp Groups', hasAddress: false })
+    renderWithProviders(<GenericDirectory category={groups} items={rows} {...handlers} />)
+    await user.click(screen.getByRole('button', { name: 'Expand Alpha Grill' }))
+    expect(screen.getByText('Column: Alpha Grill, 1 of 3, alone')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Show map' })).not.toBeInTheDocument()
+  })
+
+  it('opens there straight from a link, with what the home search matched', () => {
+    const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery', detailFields: [{ key: 'm', label: 'Kosher items', type: 'tags' }] })
+    const tj = makeListing({ id: 'tj', name: "Trader Joe's", category: 'grocery', m: ['Cheddar Cheese'] })
+    renderWithProviders(<GenericDirectory category={grocery} items={[tj]} {...handlers} reopenItemId="tj" reopenMatch="cheese" />)
+    expect(screen.getByText("Column: Trader Joe's, 1 of 1, map beside")).toBeInTheDocument()
+    expect(screen.getByText('column found: Cheddar Cheese')).toBeInTheDocument()
+  })
+
+  it('isn’t there on a phone: the listing opens in its sheet over the list', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(
+      <ForcedViewport isMobile>
+        <GenericDirectory category={food} items={rows} {...handlers} />
+      </ForcedViewport>,
+    )
+    await user.click(screen.getByRole('button', { name: 'Expand Beta Cafe' }))
+    expect(screen.queryByTestId('listing-column')).not.toBeInTheDocument()
+    expect(screen.getByText('Alpha Grill')).toBeVisible()
   })
 })

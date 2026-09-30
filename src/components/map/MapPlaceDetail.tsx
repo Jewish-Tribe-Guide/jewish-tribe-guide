@@ -34,6 +34,10 @@ type Props = {
   /** The places nearby in the same category, after the listing: the
    *  category's sheet passes them; the map has its own nearby list. */
   onward?: Onward
+  /** Drawn in the desktop column: see ListingView's `wide`. */
+  wide?: boolean
+  /** See ListingView's `onwardClassName`. */
+  onwardClassName?: string
 }
 
 /** The nearest ancestor that scrolls, i.e. the parent's scroll region. */
@@ -60,7 +64,7 @@ function scrollingAncestor(el: HTMLElement | null): HTMLElement | null {
  * directory. The upvote shows only when the directory's sheet passes one
  * (`upvote`): upvotes rank a category's list, which the map doesn't have.
  */
-export default function MapPlaceDetail({ item, category, color, onBack, found, upvote, place = null, onward }: Props) {
+export default function MapPlaceDetail({ item, category, color, onBack, found, upvote, place = null, onward, wide = false, onwardClassName }: Props) {
   const community = useCommunitySlug()
   const listingPath = routes.listing(community, category.id, listingSlug(item))
   // Edit swaps this whole detail view for the listing-shaped editor
@@ -163,6 +167,8 @@ export default function MapPlaceDetail({ item, category, color, onBack, found, u
         path={listingPath}
         onward={onward}
         upvote={upvote}
+        wide={wide}
+        onwardClassName={onwardClassName}
         foot={
           <div className="space-y-3 border-t border-slate-200 pt-3.5">
             <FreshnessFooter resourceId={item.id} confirmedAt={item.confirmedAt} />

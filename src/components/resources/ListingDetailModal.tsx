@@ -3,12 +3,11 @@
 import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { DirectoryResource } from '@/types'
-import type { CategoryConfig, CategoryField } from '@/lib/categories'
+import type { CategoryConfig } from '@/lib/categories'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { routes } from '@/lib/routes'
 import { listingSlug } from '@/lib/listingSlug'
-import CategoryIcon from '@/components/CategoryIcon'
-import PlaceDetailBody from './PlaceDetailBody'
+import ListingView from './ListingView'
 import type { SearchFound } from '@/lib/askSearch'
 import FreshnessFooter from './FreshnessFooter'
 import ListingEditBar from './ListingEditBar'
@@ -24,24 +23,7 @@ type Props = {
   item: DirectoryResource
   category: CategoryConfig
   color: string
-  iconImageUrl?: string
   name: string
-  subtitle: string | null
-  /** The card's own Open/closure/filterable-badge row, already built by
-   *  GenericListingCard — restated here since the card behind this dialog
-   *  sits under its dim backdrop. See that component's `badgeRow` comment
-   *  for why this is passed rather than recomputed. */
-  badgeRow: ReactNode
-  headerBadgeKeys: string[]
-  /** A showInHeader url field (e.g. "Join group") — same pill, same spot
-   *  next to the name, as GenericListingCard's own collapsed row. See the
-   *  render site's own comment for why this moved here instead of staying
-   *  in the actions row below. */
-  headerUrlFields: { f: CategoryField; href: string }[]
-  onTagClick: (tag: string) => void
-  onFilterOpen: () => void
-  onFilterBool: (key: string) => void
-  onFilterSelect: (key: string, value: string) => void
   canEdit: boolean
   /** Left/Right arrow while this dialog is focused moves to the previous/
    *  next card in whatever order is currently on screen — the lightbox
@@ -92,16 +74,7 @@ export default function ListingDetailModal({
   item,
   category,
   color,
-  iconImageUrl,
   name,
-  subtitle,
-  badgeRow,
-  headerBadgeKeys,
-  headerUrlFields,
-  onTagClick,
-  onFilterOpen,
-  onFilterBool,
-  onFilterSelect,
   canEdit,
   onNavigate,
   hasPrev,
@@ -317,7 +290,7 @@ export default function ListingDetailModal({
               hard rule between "who this is" and "what it is" read as if the
               badges belonged with the action icons below instead. The divider
               now marks the real boundary: identity above it, actions below. */}
-          <div className={`flex justify-between gap-3 px-6 py-5 border-b border-slate-200 shrink-0 ${formOpen ? 'items-center' : 'items-start'}`}>
+          <div className={`flex justify-between gap-3 shrink-0 ${formOpen ? 'items-center px-6 py-5 border-b border-slate-200' : 'items-start px-4 pt-3'}`}>
             {formOpen ? (
               // Replaces the name/icon block while editing — the editor
               // brings its own editable name and photo, and puts its title in
@@ -333,58 +306,8 @@ export default function ListingDetailModal({
               <div ref={setTitleSlot} className="min-w-0 text-center text-lg" />
               </>
             ) : (
-              <div className="flex items-start gap-3 min-w-0">
-                <CategoryIcon
-                  icon={category.icon}
-                  categoryId={category.id}
-                  iconImageUrl={iconImageUrl}
-                  color={color}
-                  className="h-10 w-10 text-xl shrink-0"
-                />
-                <div className="min-w-0">
-                  {/* Two columns, not one wrapping flex row — matching the
-                      collapsed card behind this dialog exactly (see that
-                      component's own headerUrlFields comment): the name gets its
-                      own flexible column and wraps onto a second line there if
-                      it needs to, while the pill stays put in a fixed column at
-                      the right, instead of the two crowding onto the same line
-                      and the pill getting pushed wherever there happened to be
-                      room. Was rendered as one of the actions-row icon buttons
-                      below instead (Directions/Call style) via
-                      includeHeaderUrlFields; moved back to sit with the name
-                      specifically because that row was the one place this
-                      dialog didn't otherwise match the card it opened from, and
-                      PlaceDetailBody's own default (excluding a showInHeader
-                      field from that row) already assumes there's a header spot
-                      like this one showing it instead. */}
-                  <div className="flex items-start gap-2">
-                    <h2 className="min-w-0 flex-1 font-semibold text-slate-900 text-lg">{name}</h2>
-                    {headerUrlFields.length > 0 && (
-                      <div className="flex shrink-0 items-center gap-2">
-                        {headerUrlFields.map(({ f, href }) => (
-                          <a
-                            key={f.key}
-                            href={href}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            onClick={(e) => e.stopPropagation()}
-                            className="flex shrink-0 items-center rounded-full border border-primary px-2.5 py-1 text-xs font-medium text-primary hover:bg-primary hover:text-white transition-colors whitespace-nowrap"
-                          >
-                            {f.linkLabel ?? f.label}
-                          </a>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  {subtitle && <p className="text-sm text-muted truncate">{subtitle}</p>}
-                  {badgeRow && (
-                    <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                      {badgeRow}
-                    </div>
-                  )}
-                  {upvote && <div className="mt-2">{upvote}</div>}
-                </div>
-              </div>
+              // The listing names itself, first thing in its own view.
+              <span />
             )}
             {/* Pin/Share/Set as location used to live in a kebab here too, same
                 spot MapPlaceDetail gives it next to the name — removed: those
@@ -420,42 +343,23 @@ export default function ListingDetailModal({
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
+          <div className={`flex-1 overflow-y-auto px-6 space-y-4 ${formOpen ? 'py-5' : 'pb-5'}`}>
             {formOpen === 'edit' ? (
               <ListingEditor item={item} category={category} onClose={closeForm} sendSlot={sendSlot} titleSlot={titleSlot} removalOpen={removalOpen} onRemovalOpenChange={changeRemovalOpen} />
             ) : (
-              <>
-                <PlaceDetailBody
-                  item={item}
-                  category={category}
-                  onTagClick={onTagClick}
-                  onFilterOpen={onFilterOpen}
-                  onFilterBool={onFilterBool}
-                  onFilterSelect={onFilterSelect}
-                  hideOpenStatus
-                  hiddenBadgeKeys={headerBadgeKeys}
-                  hideCountBadge
-                  found={found}
-                  // Not includeHeaderUrlFields here — that field now has a home in
-                  // this dialog's own header, next to the name (see above), the
-                  // same reason PlaceDetailBody's default excludes it from this
-                  // row for GenericListingCard's mobile accordion too.
-                />
-
-                <div className="pt-3 border-t border-slate-200 space-y-2.5">
-                  <FreshnessFooter resourceId={item.id} confirmedAt={item.confirmedAt} />
-                  {/* No "Suggest a correction" link here any more: that 12px grey link was
-                      the only visible way in to Edit while Edit itself sat in a
-                      kebab, and it carried that job badly — same weight as the
-                      timestamp beside it. ListingEditBar below the dialog is the
-                      visible way in now, so repeating it here would be the same
-                      duplication the header's kebab was removed for. The freshness
-                      STATUS stays: "Confirmed 3 days ago · Still right?" is a
-                      different, one-tap contribution, not a second door to the form.
-                      The map's panel was the link's last user; it has the same bar
-                      of its own now, and FreshnessFooter no longer has the link. */}
-                </div>
-              </>
+              <ListingView
+                item={item}
+                category={category}
+                color={color}
+                found={found}
+                path={listingPath}
+                upvote={upvote}
+                foot={
+                  <div className="border-t border-slate-200 pt-3">
+                    <FreshnessFooter resourceId={item.id} confirmedAt={item.confirmedAt} />
+                  </div>
+                }
+              />
             )}
           </div>
         </div>
@@ -475,6 +379,7 @@ export default function ListingDetailModal({
               item={item}
               category={category}
               path={listingPath}
+              omit={['share']}
               className="pointer-events-auto"
             />
           </div>

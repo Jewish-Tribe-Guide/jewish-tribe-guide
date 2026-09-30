@@ -1,14 +1,14 @@
 import { expect, test } from '@playwright/test'
 import { categoryWithHoursField, categoryWithListings, largestCategory, defaultCommunity, dismissLocationPrompt } from './helpers'
 
-// Desktop opens a listing in a centered dialog (ListingDetailModal); a phone
-// opens it in a bottom sheet, the one Add and Edit use (MobileSheet). Neither
-// expands inline. See GenericListingCard's `isMobile` branch.
+// Desktop opens a listing in the list's own column, the map staying beside
+// it (ListingColumn); a phone opens it in a bottom sheet, the one Add and
+// Edit use (MobileSheet). Neither expands inline.
 
 test.describe('listing detail — desktop', () => {
   test.skip(({ isMobile }) => isMobile, 'desktop viewport only')
 
-  test('clicking a listing opens a dialog, not an inline panel', async ({ page, request }) => {
+  test('clicking a listing opens it in the list’s column, not a dialog', async ({ page, request }) => {
     const community = await defaultCommunity(page)
     const { category } = await categoryWithListings(request, community)
 
@@ -19,33 +19,17 @@ test.describe('listing detail — desktop', () => {
     const name = (await trigger.getAttribute('aria-label'))!.replace(/^Show details for /, '')
     await trigger.click()
 
-    const dialog = page.getByRole('dialog', { name })
-    await expect(dialog).toBeVisible()
-    // The trigger's own label flips in step with the dialog — same `expanded`
-    // state drives both, just rendered differently. See GenericListingCard.
-    await expect(page.getByRole('button', { name: `Hide details for ${name}` })).toBeVisible()
+    const column = page.getByTestId('listing-column')
+    await expect(column).toBeVisible()
+    await expect(column.getByRole('heading', { name, exact: true })).toBeVisible()
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+    // The list is under it, hidden, not gone.
+    await expect(trigger).toBeHidden()
 
-    // Escape closes it and hands the trigger's label back.
+    // Escape goes back to the list.
     await page.keyboard.press('Escape')
-    await expect(dialog).not.toBeVisible()
-    await expect(page.getByRole('button', { name: `Show details for ${name}` })).toBeVisible()
-  })
-
-  test('clicking outside the dialog closes it', async ({ page, request }) => {
-    const community = await defaultCommunity(page)
-    const { category } = await categoryWithListings(request, community)
-
-    await page.goto(`/${community}/${category.id}`)
-    await dismissLocationPrompt(page)
-
-    await page.getByRole('button', { name: /^Show details for / }).first().click()
-    const dialog = page.getByRole('dialog')
-    await expect(dialog).toBeVisible()
-
-    // Top-left corner of the viewport — outside the centered dialog, but
-    // still inside its backdrop.
-    await page.mouse.click(5, 5)
-    await expect(dialog).not.toBeVisible()
+    await expect(column).toHaveCount(0)
+    await expect(page.getByRole('button', { name: `Show details for ${name}` }).first()).toBeVisible()
   })
 
   // Where the category has a map, the map sits beside the list at desktop
@@ -58,9 +42,10 @@ test.describe('listing detail — desktop', () => {
     await page.goto(`/${community}/${category.id}`)
     await dismissLocationPrompt(page)
 
-    const map = page.getByTestId('category-map')
+    // The visible one: a hidden streamed copy of the page can be in the DOM too.
+    const map = page.getByTestId('category-map').filter({ visible: true })
     await expect(map).toBeVisible()
-    const list = (await page.getByTestId('list-heading').boundingBox())!
+    const list = (await page.getByTestId('list-heading').filter({ visible: true }).boundingBox())!
     const mapBox = (await map.boundingBox())!
     expect(mapBox.x, 'the map sits to the right of the list').toBeGreaterThan(list.x + list.width - 1)
     const tracks = () =>
@@ -156,73 +141,10 @@ test.describe('listing detail — desktop', () => {
     expect(await columnsAt(600)).toBe(1)
   })
 
-  // CategoryBandFrame wraps this whole screen (header, filters, grid) in a
-  // full-bleed photo band, and used to break out to the viewport width with
-  // `left-1/2 -translate-x-1/2` — a CSS transform. A transform on an
-  // ancestor creates a new containing block for any `position: fixed`
-  // descendant, and this dialog is `fixed inset-0`, so it ended up
-  // positioned relative to that ancestor's own box instead of the viewport
-  // — which moves as the page scrolls. Scrolling down first is essential:
-  // at scrollY 0 the two containing blocks coincide and the bug is
-  // invisible. Fixed by swapping the transform for the calc(50% - 50vw)
-  // margin trick, which achieves the same full-bleed layout without ever
-  // setting a transform.
-  test('the dialog stays centered in the viewport when opened after scrolling down', async ({ page, request }) => {
-    const community = await defaultCommunity(page)
-    const { category } = await largestCategory(request, community)
-
-    await page.goto(`/${community}/${category.id}`)
-    await dismissLocationPrompt(page)
-
-    await page.mouse.wheel(0, 600)
-    await page.getByRole('button', { name: /^Show details for / }).first().click()
-
-    const dialog = page.getByRole('dialog')
-    await expect(dialog).toBeVisible()
-
-    // Two independent checks instead of one combined "is the dialog
-    // centered on some independently-computed viewport width" — the
-    // earlier version of this test tried exactly that against both
-    // page.viewportSize() and document.documentElement.clientWidth, and
-    // got an identical "off by 7.5px" result from both in CI (never
-    // reproduced locally), which means neither was actually the source of
-    // truth for whatever CI's real rendering area is — chasing the right
-    // "true viewport width" number was the wrong axis entirely.
-    //
-    // What this test actually needs to prove is narrower: the dialog's own
-    // flex wrapper (`fixed inset-0 ...` — see ListingDetailModal.tsx) is
-    // positioned relative to the real viewport, not some transformed
-    // ancestor's box that drifts with scroll (the original bug — see the
-    // comment above). `inset-0` guarantees that wrapper's top-left corner
-    // sits at the viewport's own (0, 0) — a scrollbar only ever narrows the
-    // RIGHT edge's available space, never moves the origin — so checking
-    // the wrapper's own position needs no viewport-width measurement at
-    // all. Once that holds, the dialog being centered WITHIN that wrapper
-    // is the browser's own flexbox (items-center/justify-center) doing its
-    // job, not something this test needs to re-verify against an
-    // independently-computed width.
-    const wrapper = page.locator('.fixed.inset-0.z-50').filter({ has: dialog })
-    const wrapperBox = (await wrapper.boundingBox())!
-    expect(Math.abs(wrapperBox.x), 'the dialog\'s fixed wrapper should sit at the viewport\'s own left edge').toBeLessThan(2)
-    expect(Math.abs(wrapperBox.y), 'the dialog\'s fixed wrapper should sit at the viewport\'s own top edge').toBeLessThan(2)
-
-    const box = (await dialog.boundingBox())!
-    const dialogCenterX = box.x + box.width / 2
-    const dialogCenterY = box.y + box.height / 2
-    const wrapperCenterX = wrapperBox.x + wrapperBox.width / 2
-    const wrapperCenterY = wrapperBox.y + wrapperBox.height / 2
-    expect(Math.abs(dialogCenterX - wrapperCenterX), 'dialog should be horizontally centered within its own fixed wrapper').toBeLessThan(5)
-    expect(Math.abs(dialogCenterY - wrapperCenterY), 'dialog should be vertically centered within its own fixed wrapper').toBeLessThan(5)
-  })
-
-  // Arrow navigation scrolls the next/previous card into view. That scroll
-  // used to only clear the site header's own height — not the SEPARATE
-  // sticky search/filter/sort bar directly under it (GenericDirectory's
-  // own `lg:sticky lg:top-14` controls row) — so the target's row landed
-  // tucked behind that second bar, above the visible content, often almost
-  // entirely. jsdom can't compute real layout or `position: sticky`'s
-  // actual stuck state, so this only has coverage here.
-  test('scrolling to the next card via the arrow clears BOTH sticky bars, not just the header', async ({ page, request }) => {
+  // Opened from far down the list, the page comes up to the listing, and
+  // Back goes down to the row it came from. Real scroll and a real sticky
+  // header: jsdom has neither.
+  test('opened from far down the list, the listing starts in view, and Back returns to its row', async ({ page, request }) => {
     const community = await defaultCommunity(page)
     const { category } = await largestCategory(request, community)
 
@@ -230,46 +152,39 @@ test.describe('listing detail — desktop', () => {
     await dismissLocationPrompt(page)
 
     const triggers = page.getByRole('button', { name: /^Show details for / })
+    const row = triggers.nth(8)
+    await row.scrollIntoViewIfNeeded()
+    await row.click()
+
+    const column = page.getByTestId('listing-column')
+    await expect(column).toBeVisible()
+    const headerBottom = (await page.locator('header').first().boundingBox())!
+    await expect(column.getByRole('heading', { level: 2 }).first()).toBeInViewport()
+    expect((await column.boundingBox())!.y, 'the listing starts below the site header').toBeGreaterThanOrEqual(headerBottom.y + headerBottom.height - 1)
+
+    await column.getByRole('button', { name: /^Back to / }).click()
+    await expect(column).toHaveCount(0)
+    await expect(row).toBeInViewport()
+  })
+
+  // ← → and the column's own ‹ › step through the list as it's shown, and
+  // the listing each lands on starts in view.
+  test('steps through the list from the column, each listing starting in view', async ({ page, request }) => {
+    const community = await defaultCommunity(page)
+    const { category } = await largestCategory(request, community)
+
+    await page.goto(`/${community}/${category.id}`)
+    await dismissLocationPrompt(page)
+
+    const triggers = page.getByRole('button', { name: /^Show details for / })
+    const names = await triggers.evaluateAll((els) => els.slice(0, 7).map((el) => el.getAttribute('aria-label')!.replace(/^Show details for /, '')))
     await triggers.first().click()
-    // Several clicks, not one — the first "next" from item 1 is often still
-    // in the SAME grid row (no scroll needed at all), which wouldn't have
-    // exposed this bug either. Enough clicks to guarantee at least one
-    // genuine row-to-row scroll happens.
-    for (let i = 0; i < 5; i++) {
-      await page.getByRole('button', { name: 'Next listing' }).click()
-    }
-
-    const dialog = page.getByRole('dialog')
-    await expect(dialog).toBeVisible()
-    await dialog.getByRole('button', { name: 'Close', exact: true }).click()
-
-    // Tracked by position (5 "Next" clicks from the first item lands on the
-    // 6th, index 5), not by re-matching the dialog's own aria-label against
-    // the trigger buttons' names — two real listings sharing an exact name
-    // (a legitimate case: two branches of the same business) made that a
-    // strict-mode violation, reported live in CI against real test-project
-    // data. The list itself doesn't reorder between these clicks, so the
-    // index is stable.
-    const nextTrigger = triggers.nth(5)
-    await expect(nextTrigger).toBeVisible()
-
-    // The site header is ALSO `position: sticky` (see SiteHeader's own
-    // className) — excluding it by tag name isolates GenericDirectory's
-    // own controls bar, the second sticky element down. The map beside the
-    // list is sticky too, as is the line between them that resizes them,
-    // but both are beside the rows, not over them.
-    const controlsBottom = await page.evaluate(() => {
-      const stuck = [...document.querySelectorAll('*')].filter(
-        (el) =>
-          el.tagName !== 'HEADER' &&
-          getComputedStyle(el).position === 'sticky' &&
-          !el.querySelector('[data-testid="category-map"]') &&
-          el.getAttribute('role') !== 'separator',
-      )
-      return stuck.length > 0 ? Math.max(...stuck.map((el) => el.getBoundingClientRect().bottom)) : 0
-    })
-    const rowTop = (await nextTrigger.boundingBox())!.y
-    expect(rowTop, 'the next card should sit below both sticky bars, not behind them').toBeGreaterThanOrEqual(controlsBottom - 1)
+    const column = page.getByTestId('listing-column')
+    for (let i = 0; i < 5; i++) await column.getByRole('button', { name: 'Next listing' }).click()
+    await page.keyboard.press('ArrowRight')
+    await expect(column.getByRole('heading', { level: 2 }).first()).toHaveText(names[6])
+    await expect(column.getByRole('heading', { level: 2 }).first()).toBeInViewport()
+    await expect(column.getByTestId('listing-column-bar')).toContainText('7 of')
   })
 })
 
@@ -378,7 +293,8 @@ test('Back steps out of Request removal into the edit, not out of editing', asyn
   await page.goto(`/${community}/${category.id}`)
   await dismissLocationPrompt(page)
   await page.getByRole('button', { name: `Show details for ${item.name}` }).first().click()
-  const listing = page.getByRole('dialog', { name: item.name })
+  // A sheet on a phone; the list's column on desktop.
+  const listing = isMobile ? page.getByRole('dialog', { name: item.name }) : page.getByTestId('listing-column')
   await expect(listing).toBeVisible()
 
   const suggest = listing.getByRole('button', { name: 'Suggest an edit' })
@@ -412,6 +328,6 @@ test('Back steps out of Request removal into the edit, not out of editing', asyn
 
   // And one more Back leaves the edit for the listing it came from.
   await page.getByRole('button', { name: 'Back', exact: true }).click()
-  await expect(page.getByRole('dialog', { name: item.name })).toBeVisible()
+  await expect(listing.getByRole('heading', { name: item.name, exact: true })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Suggest an edit' })).toHaveCount(0)
 })

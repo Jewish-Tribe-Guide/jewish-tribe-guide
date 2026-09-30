@@ -93,6 +93,9 @@ type Props = {
   onward?: Onward
   /** Drawn in a wide column: a bigger picture. */
   wide?: boolean
+  /** Where the places nearby also sit beside the listing (desktop, the map
+   *  hidden), the classes that hide them here at that width. */
+  onwardClassName?: string
 }
 
 const TONE: Record<RowFact['tone'], string> = {
@@ -105,7 +108,7 @@ const TONE: Record<RowFact['tone'], string> = {
   plain: 'text-slate-700',
 }
 
-export default function ListingView({ item, category, color, place = null, upvote, found = null, path, foot, onward, wide = false }: Props) {
+export default function ListingView({ item, category, color, place = null, upvote, found = null, path, foot, onward, wide = false, onwardClassName = '' }: Props) {
   const { community } = useActiveCommunity()
   const clock = useNow()
   const now = clock === null ? null : new Date(clock)
@@ -392,7 +395,6 @@ export default function ListingView({ item, category, color, place = null, upvot
   )
 
   const walk = parseWalkList(category.walkList)
-  const nearby = onward ? nearbyListings(item, onward.items) : []
 
   return (
     <div className="space-y-5" data-testid="listing-view">
@@ -406,26 +408,59 @@ export default function ListingView({ item, category, color, place = null, upvot
           the place's own details, as it always has. */}
       {walk && item.geo && main !== 'walk' && <WalkList walk={walk} from={item.geo} fromLabel={category.label} />}
       {foot}
-      {onward && nearby.length > 0 && (
-        <section className="-mx-4 border-t-8 border-slate-100 px-4 pt-5 pb-2" data-testid="listing-onward">
-          <h2 className="text-[17px] font-extrabold text-slate-900">{category.hasAddress === false ? `Other ${category.pluralLabel}` : `More ${category.pluralLabel.toLowerCase()} near here`}</h2>
-          <div className="mt-2">
-            {nearby.map(({ item: other, miles }) => (
-              <NearbyRow key={other.id} item={other} category={category} color={color} miles={miles} place={onward.place(other)} now={now} candlesAt={candlesAt} onOpen={() => onward.onOpen(other)} />
-            ))}
-          </div>
-          {onward.seeAll && (
-            <button
-              type="button"
-              onClick={onward.seeAll.onClick}
-              className="mt-2 flex h-11 w-full cursor-pointer items-center justify-center rounded-xl border border-slate-300 text-[15px] font-bold text-primary hover:bg-slate-50"
-            >
-              {onward.seeAll.label}
-            </button>
-          )}
-        </section>
-      )}
+      {onward && <OnwardSection item={item} category={category} color={color} onward={onward} className={onwardClassName} />}
     </div>
+  )
+}
+
+// ── 7 · Onward ─────────────────────────────────────────────────────────────
+
+/** The three nearest in the same category, each saying how far it is from
+ *  this one, then the way back to all of them. At the end of the listing;
+ *  on desktop with the map hidden, beside it, where the map was (`aside`). */
+export function OnwardSection({
+  item,
+  category,
+  color,
+  onward,
+  aside = false,
+  className = '',
+}: {
+  item: DirectoryResource
+  category: CategoryConfig
+  color: string
+  onward: Onward
+  aside?: boolean
+  className?: string
+}) {
+  const { community } = useActiveCommunity()
+  const clock = useNow()
+  const now = clock === null ? null : new Date(clock)
+  const { data: zmanim } = useZmanim(category.detailFields.some((f) => f.type === 'hours') ? community.mapCenter : null)
+  const candlesAt = candlesToday(zmanim, now)
+  const nearby = nearbyListings(item, onward.items)
+  if (nearby.length === 0) return null
+  const frame = aside ? 'rounded-2xl border border-slate-200 px-4 pt-4 pb-4' : '-mx-4 border-t-8 border-slate-100 px-4 pt-5 pb-2'
+  return (
+    <section className={`${frame} ${className}`} data-testid={aside ? 'listing-onward-aside' : 'listing-onward'}>
+      <h2 className="text-[17px] font-extrabold text-slate-900">
+        {category.hasAddress === false ? `Other ${category.pluralLabel}` : `More ${category.pluralLabel.toLowerCase()} near here`}
+      </h2>
+      <div className="mt-2">
+        {nearby.map(({ item: other, miles }) => (
+          <NearbyRow key={other.id} item={other} category={category} color={color} miles={miles} place={onward.place(other)} now={now} candlesAt={candlesAt} onOpen={() => onward.onOpen(other)} />
+        ))}
+      </div>
+      {onward.seeAll && (
+        <button
+          type="button"
+          onClick={onward.seeAll.onClick}
+          className="mt-2 flex h-11 w-full cursor-pointer items-center justify-center rounded-xl border border-slate-300 text-[15px] font-bold text-primary hover:bg-slate-50"
+        >
+          {onward.seeAll.label}
+        </button>
+      )}
+    </section>
   )
 }
 
@@ -514,7 +549,7 @@ function ActionButton({ action, item }: { action: ActionSpec; item: DirectoryRes
       className="group flex w-16 flex-col items-center gap-1 text-primary"
     >
       <Circle>{icon}</Circle>
-      <span className="max-w-full text-center text-xs leading-tight font-semibold [overflow-wrap:anywhere]">{label}</span>
+      <span className="w-[84px] truncate text-center text-xs font-semibold">{label}</span>
     </a>
   )
 }
@@ -533,7 +568,7 @@ function ShareButton({ path, name, round = false }: { path: string; name: string
       <Circle>
         <ShareIcon className="h-5 w-5" />
       </Circle>
-      <span className="text-xs leading-tight font-semibold">{copied ? 'Copied!' : 'Share'}</span>
+      <span className="text-xs font-semibold">{copied ? 'Copied!' : 'Share'}</span>
     </button>
   )
 }

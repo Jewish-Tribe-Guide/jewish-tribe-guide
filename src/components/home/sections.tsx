@@ -696,11 +696,7 @@ export function PlacesResults({
               upvotes={!!hit.category.upvotesEnabled}
               count={voteCounts[hit.item.id] ?? hit.item.upvotes ?? 0}
               onVote={(c) => setVoteCounts((prev) => ({ ...prev, [hit.item.id]: c }))}
-              onTagClick={(tag) => onOpen({ ...hit, term: tag })}
               onNameClick={() => onOpen(hit)}
-              onFilterOpen={() => onOpen(hit)}
-              onFilterBool={() => onOpen(hit)}
-              onFilterSelect={() => onOpen(hit)}
               onEdit={() => onOpen(hit, 'edit')}
               found={hit.found}
             />

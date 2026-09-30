@@ -136,7 +136,7 @@ export function listingRowFacts(
 
 /** Whether a badge's value says what an items field already does: every
  *  word of "Kosher Items" is in "Kosher items available". */
-function saysTheSame(label: string, itemsField: CategoryField): boolean {
+export function saysTheSame(label: string, itemsField: CategoryField): boolean {
   const known = new Set(wordsOf(`${itemsField.label} ${itemsField.countLabel ?? ''}`))
   return wordsOf(label).every((w) => known.has(w))
 }

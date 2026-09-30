@@ -26,6 +26,8 @@ import { useScrollShowHide, useSetScreenHeader } from '@/lib/headerVisibility'
 import { foundFor, searchAsk } from '@/lib/askSearch'
 import { neighborhoodsFor, placeName, townsFrom } from '@/lib/places'
 import { ListingOnwardContext, type ListingOnwardSource } from './listingOnward'
+import ListingColumn from './ListingColumn'
+import UpvoteButton from './UpvoteButton'
 import { useActiveCommunity, useOptionalCommunitySlug } from '@/lib/communityContext'
 import { travelCompare } from '@/lib/listingTravel'
 import { useLogSearchMiss } from '@/lib/useLogSearchMiss'
@@ -570,38 +572,24 @@ export default function GenericDirectory({ category, items, anchorLabel, address
     }
   }, [])
   const scrollItemIntoView = (id: string, behavior: ScrollBehavior) => {
+    const headerH = (document.querySelector('header')?.getBoundingClientRect().height ?? 64) + 12
+    // A listing open in the list's column (desktop): its row is hidden, so
+    // bring the column's top back into view instead, and only if the page
+    // has scrolled past it.
+    const column = listingColumnRef.current
+    if (column) {
+      const top = column.getBoundingClientRect().top
+      if (top < headerH) window.scrollTo({ top: Math.max(0, window.scrollY + top - headerH), behavior })
+      return
+    }
     const el = itemRowRefs.current.get(id)
     if (!el) return
-    const headerH = (document.querySelector('header')?.getBoundingClientRect().height ?? 64) + 12
     const controls = controlsRef.current
     const controlsH = controls && getComputedStyle(controls).position === 'sticky' ? controls.offsetHeight : 0
     const top = el.getBoundingClientRect().top + window.scrollY - headerH - controlsH
     window.scrollTo({ top: Math.max(0, top), behavior })
   }
 
-  // Badges on a card (Open/boolean/select) each set a filter that lives in
-  // this component's own state, same as the equivalent control up in the
-  // search/filter/sort row — but that row isn't sticky on mobile (only
-  // `lg:sticky`, see its own className below), so a badge click deep in a
-  // long list changes what's filtered with nothing on screen to show it.
-  // Scrolling the row into view answers exactly that: only when it isn't
-  // already visible, so clicking a badge while the row IS on screen (or on
-  // desktop, where it's usually docked) doesn't move anything.
-  //
-  // `instant`, not `smooth` — confirmed live: setting the filter re-renders
-  // the (often much shorter) filtered list in the same moment this scroll is
-  // animating, and that DOM mutation is enough for Chrome to cancel an
-  // in-flight smooth scrollTo outright, leaving the page stuck partway
-  // instead of ever reaching the top. Same failure mode as the arrow-key
-  // next/prev scroll below, same fix.
-  const scrollControlsIntoViewIfNeeded = () => {
-    const controls = controlsRef.current
-    if (!controls) return
-    const headerH = (document.querySelector('header')?.getBoundingClientRect().height ?? 64) + 12
-    const rect = controls.getBoundingClientRect()
-    if (rect.top >= headerH && rect.bottom <= window.innerHeight) return
-    window.scrollTo({ top: window.scrollY + rect.top - headerH, behavior: 'instant' })
-  }
 
   // Same target, but waits for the row's own position to stop moving first —
   // for a scroll fired around the same moment something else can still
@@ -621,7 +609,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
     let lastTop: number | null = null
     let stableChecks = 0
     const waitForSettled = () => {
-      const el = itemRowRefs.current.get(id)
+      const el = listingColumnRef.current ?? itemRowRefs.current.get(id)
       if (!el) {
         timer = window.setTimeout(waitForSettled, 32)
         return
@@ -1121,6 +1109,26 @@ export default function GenericDirectory({ category, items, anchorLabel, address
     }
     return last ?? 'end'
   })()
+  // ── A listing opened on desktop takes the list's column (ListingColumn) ──
+  // The list stays mounted underneath, hidden, so its cards (and what's
+  // open or scrolled) are where they were when Back brings it back.
+  const columnItem = !isMobile && openDialogItemId ? (items.find((i) => i.id === openDialogItemId) ?? null) : null
+  const listingColumnRef = useRef<HTMLDivElement>(null)
+  // Another listing in its place: the one being read closes, the other
+  // opens (its closed group too), and the page comes back up to the top of
+  // the column if it had scrolled past it.
+  const switchListing = (fromId: string, toId: string) => {
+    setRevealedId(toId)
+    cardRefs.current.get(fromId)?.close()
+    cardRefs.current.get(toId)?.open()
+    scrollItemIntoViewWhenSettled(toId, 'instant')
+  }
+  // Back to the list, at the row just read, outlined for a moment.
+  const closeColumn = (id: string) => {
+    cardRefs.current.get(id)?.close()
+    findRow(id)
+  }
+
   // An opened listing's last part: the places near it in the list as it's
   // filtered now, and the way back to all of them (ListingView's onward).
   const onwardSource: ListingOnwardSource = {
@@ -1283,11 +1291,46 @@ export default function GenericDirectory({ category, items, anchorLabel, address
             </div>
           )}
         </div>
-        {!hasMapColumn && listHeading}
+        {!hasMapColumn && !columnItem && listHeading}
       </div>
 
       <div ref={splitRef} className={mapBeside ? 'group/split lg:grid lg:items-start' : undefined} style={mapBeside ? splitStyle : undefined}>
       <div className="min-w-0">
+      {columnItem && (
+        <div ref={listingColumnRef}>
+          <ListingColumn
+            item={columnItem}
+            category={category}
+            color={bandColor}
+            place={rowPlaces.get(columnItem.id) ?? null}
+            found={foundOn(columnItem)}
+            upvote={
+              upvotes ? (
+                <UpvoteButton
+                  variant="recommend"
+                  name={columnItem.name}
+                  resourceId={columnItem.id}
+                  count={liveCount(columnItem)}
+                  onCountChange={(c) => setVoteCounts((prev) => ({ ...prev, [columnItem.id]: c }))}
+                />
+              ) : undefined
+            }
+            onward={{
+              items: filtered,
+              place: (i) => rowPlaces.get(i.id) ?? null,
+              onOpen: (other) => switchListing(columnItem.id, other.id),
+              seeAll: { label: onwardSource.allLabel, onClick: () => closeColumn(columnItem.id) },
+            }}
+            backLabel={`Back to ${category.pluralLabel}`}
+            onBack={() => closeColumn(columnItem.id)}
+            position={{ index: Math.max(0, shownIndex.get(columnItem.id) ?? 0), total: shownItems.length }}
+            onStep={(direction) => navigateFromCard(columnItem.id, direction)}
+            alone={!mapBeside}
+            onShowMap={hasMapColumn && mapHidden ? () => setMapHidden(false) : undefined}
+          />
+        </div>
+      )}
+      <div hidden={!!columnItem}>
       {hasMapColumn && listHeading}
       {filtered.length === 0 ? (
         <div className="text-center py-12">
@@ -1371,6 +1414,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
             >
             <GenericListingCard
               ref={setCardRef(item.id)}
+              inColumn
               onNavigate={(direction) => navigateFromCard(item.id, direction)}
               hasPrev={(shownIndex.get(item.id) ?? 0) > 0}
               hasNext={(shownIndex.get(item.id) ?? Infinity) < shownItems.length - 1}
@@ -1410,19 +1454,6 @@ export default function GenericDirectory({ category, items, anchorLabel, address
                 setOpenDialogItemId((prev) => (expanded ? item.id : prev === item.id ? null : prev))
               }}
               onVote={(c) => setVoteCounts((prev) => ({ ...prev, [item.id]: c }))}
-              onTagClick={setSearch}
-              onFilterOpen={() => {
-                setOpenNow((v) => !v)
-                scrollControlsIntoViewIfNeeded()
-              }}
-              onFilterBool={(key) => {
-                toggleBool(key)
-                scrollControlsIntoViewIfNeeded()
-              }}
-              onFilterSelect={(key, value) => {
-                toggleSelect(key, value)
-                scrollControlsIntoViewIfNeeded()
-              }}
               onEdit={() => onEdit(item)}
             />
             </div>
@@ -1456,6 +1487,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
         </p>
       )}
       </div>
+      </div>
       {/* The map, beside the list from lg up and staying in view while the
           list scrolls. Not rendered at all below that (CategoryMap loads
           nothing until it's wide enough). */}
@@ -1477,7 +1509,8 @@ export default function GenericDirectory({ category, items, anchorLabel, address
             items={filtered}
             searchActive={typed || activeFilterCount > 0}
             highlight={highlight}
-            onSelect={findRow}
+            selectedId={columnItem?.id ?? null}
+            onSelect={columnItem ? (id) => switchListing(columnItem.id, id) : findRow}
             onHide={() => setMapHidden(true)}
             fullMapHref={fullMapHref}
           />

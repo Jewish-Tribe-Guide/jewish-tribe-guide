@@ -107,6 +107,8 @@ type Props = {
   searchActive: boolean
   /** The row the pointer is on, whose pin is drawn larger. */
   highlight: Highlight
+  /** The listing open beside the map (desktop's listing column). */
+  selectedId?: string | null
   /** A pin was clicked: find its row. */
   onSelect: (id: string) => void
   onHide: () => void
@@ -114,8 +116,14 @@ type Props = {
   fullMapHref: string
 }
 
-export default function CategoryMap({ category, items, searchActive, highlight, onSelect, onHide, fullMapHref }: Props) {
+export default function CategoryMap({ category, items, searchActive, highlight, selectedId = null, onSelect, onHide, fullMapHref }: Props) {
   const highlightedId = useSyncExternalStore(highlight.subscribe, highlight.get, () => null)
+  // Asks the map to come to each listing opened beside it: a new number
+  // each time one opens (worked out during render, React's way of
+  // following a prop, rather than an effect a frame late).
+  const [framed, setFramed] = useState<{ id: string | null; n: number }>({ id: null, n: 0 })
+  if ((selectedId ?? null) !== framed.id) setFramed({ id: selectedId ?? null, n: framed.n + 1 })
+  const frame = framed.n
   const wide = useWide()
   const categories = useCategories()
   const { pinned } = usePinned()
@@ -167,7 +175,12 @@ export default function CategoryMap({ category, items, searchActive, highlight, 
           points={points}
           userLocation={coords}
           searchActive={searchActive}
-          selectedId={highlightedId ?? undefined}
+          // The listing open beside the map: its pin lit, the map on it.
+          // Otherwise the row under the pointer.
+          selectedId={selectedId ?? highlightedId ?? undefined}
+          // A listing opened beside the map brings the map to it; a row
+          // under the pointer only lights its pin.
+          frameToken={selectedId ? frame : undefined}
           onSelectPoint={(p) => onSelect(p.id)}
           onDeselectPoint={() => undefined}
           zoomRadiusMiles={zoomRadiusMiles}
