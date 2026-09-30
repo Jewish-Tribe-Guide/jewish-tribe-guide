@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import type { CategoryConfig } from '@/lib/categories'
 import { getCategoryColor } from '@/lib/categoryColor'
@@ -45,6 +45,7 @@ export default function HeroSearchDropdown({
   askGroup = null,
   onOpenShul,
   share = null,
+  readAs = null,
 }: {
   /** The trimmed, non-empty query this panel is showing results for. */
   query: string
@@ -62,6 +63,8 @@ export default function HeroSearchDropdown({
   onOpenShul?: (shulId: string) => void
   /** See AskAnswer's `share`. */
   share?: { path: string; title: string } | null
+  /** How the question was read, above the answer (see ReadAs). */
+  readAs?: ReactNode
 }) {
   const [expanded, setExpanded] = useState(false)
   const totalCount = cards.length + placeHits.length
@@ -72,7 +75,12 @@ export default function HeroSearchDropdown({
   const panelClassName =
     'absolute left-0 right-0 top-[calc(100%+8px)] z-20 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_4px_10px_rgba(15,23,42,0.06),0_20px_40px_rgba(15,23,42,0.12)]'
 
-  const answerNode = answer && <AskAnswer answer={answer} onOpenShul={onOpenShul} share={share} className="mx-2 mt-2" />
+  const answerNode = (readAs || answer) && (
+    <>
+      {readAs && <div className="mx-3 mt-2.5">{readAs}</div>}
+      {answer && <AskAnswer answer={answer} onOpenShul={onOpenShul} share={share} className="mx-2 mt-2" />}
+    </>
+  )
   const askGroupNode = askGroup && <AskTheGroup query={query} {...askGroup} className="mx-2 mb-2" />
 
   if (totalCount === 0) {

@@ -656,7 +656,7 @@ export function listingHitsFrom(
     matchedTags: h.matchedTags,
     term: h.matchedTags[0] ?? query.trim(),
     matched: h.matched,
-    hours: hitHoursNote(h, asked),
+    hours: hitHoursNote(h, result.openNowIn?.includes(h.category.id) ? { ...asked, openNow: true } : asked),
     found: foundFor(h, result),
   }))
 }

@@ -2,7 +2,7 @@
 
 import Image, { getImageProps } from 'next/image'
 import { preload } from 'react-dom'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { ui } from '@/lib/uiConfig'
 import type { SiteSettings } from '@/lib/siteSettings'
 import type { CategoryConfig } from '@/lib/categories'
@@ -26,6 +26,10 @@ type Props = {
   >
   query: string
   onQueryChange: (query: string) => void
+  /** Enter in the search box: the question is read (see questionReader.ts). */
+  onSearchSubmit?: () => void
+  /** How the question was read, or that it's being read (see ReadAs). */
+  searchReadAs?: ReactNode
   /** Admin-preview only: renders the search box inert (nothing to filter in a
    *  preview) instead of driving Landing's card grid. */
   interactive?: boolean
@@ -134,6 +138,8 @@ export default function HeroHeading({
   settings,
   query,
   onQueryChange,
+  onSearchSubmit,
+  searchReadAs = null,
   interactive = true,
   mapIcon,
   onViewMap,
@@ -240,7 +246,7 @@ export default function HeroHeading({
         </p>
         {ui.search.landing && (
           <div className="mt-8 max-w-xl mx-auto">
-            <SearchBox query={query} onQueryChange={onQueryChange} interactive={interactive} placeholder={settings.searchPlaceholder} />
+            <SearchBox query={query} onQueryChange={onQueryChange} onSubmit={onSearchSubmit} interactive={interactive} placeholder={settings.searchPlaceholder} />
             <SearchPrompts prompts={prompts} onPick={pickPrompt} className="mt-3 justify-center" />
           </div>
         )}
@@ -390,6 +396,7 @@ export default function HeroHeading({
               <SearchBox
                 query={query}
                 onQueryChange={handleQueryChange}
+                onSubmit={onSearchSubmit}
                 interactive={interactive}
                 placeholder={settings.searchPlaceholder}
                 onFocus={() => setDismissed(false)}
@@ -403,6 +410,7 @@ export default function HeroHeading({
                   categories={categories}
                   onCardClick={(card) => onSearchCardClick?.(card)}
                   onOpenPlace={(hit) => onOpenSearchPlace?.(hit)}
+                  readAs={searchReadAs}
                   answer={searchAnswer}
                   share={searchShare}
                   askGroup={searchAskGroup}

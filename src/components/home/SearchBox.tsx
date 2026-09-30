@@ -9,6 +9,7 @@
 export default function SearchBox({
   query,
   onQueryChange,
+  onSubmit,
   interactive = true,
   placeholder,
   onFocus,
@@ -21,6 +22,8 @@ export default function SearchBox({
 }: {
   query: string
   onQueryChange: (query: string) => void
+  /** Enter (a phone keyboard's Search key): the page reads the question. */
+  onSubmit?: () => void
   /** Admin-preview only: renders the box inert (nothing to filter in a
    *  preview) instead of driving Landing's card grid. */
   interactive?: boolean
@@ -44,6 +47,10 @@ export default function SearchBox({
         type="text"
         value={query}
         onChange={(e) => interactive && onQueryChange(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && interactive) onSubmit?.()
+        }}
+        enterKeyHint="search"
         onFocus={onFocus}
         // Also on click, not just focus: Escape can close the dropdown
         // without blurring the input (focus never actually leaves it), so a

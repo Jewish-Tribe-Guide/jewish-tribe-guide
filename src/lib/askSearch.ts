@@ -108,6 +108,10 @@ export type AskResult = {
   /** The names of the places left out for "than Giant" (see AskQuery's
    *  `excluding`), each once, for the answer to say "besides GIANT". */
   excluded: string[]
+  /** A question read by the reader (readingSearch.ts) can ask "open now"
+   *  of some kinds of place and not others: those it asked it of, whose
+   *  results then say their hours. */
+  openNowIn?: string[]
 }
 
 type Prepared = {
@@ -358,6 +362,19 @@ function findAnchor(
   return null
 }
 
+/** Whether a place is open now by its saved hours, when it closes, and
+ *  what's still to come today: the same reading for every search, so a
+ *  place is never "open" in one answer and closed in another. `open` is
+ *  null when it has no hours saved (see AskHit). */
+export function openState(item: DirectoryResource, category: CategoryConfig, now: Date): Pick<AskHit, 'open' | 'closesAt' | 'today'> & { known: boolean } {
+  const keys = hoursKeys(category)
+  const status = keys.length > 0 ? getOpenStatus(item as Record<string, unknown>, keys, now) : null
+  const known = hasHours(item, category)
+  // A closed business is closed whether or not it has hours saved.
+  const open = status?.isOpen ? true : known || status?.closure ? false : null
+  return { open, closesAt: status?.closing?.closeLabel ?? null, today: known ? hoursToday(item, category, now) : [], known }
+}
+
 export type AskOptions = {
   /** The visitor's location, when they've given one. */
   coords?: { lat: number; lng: number } | null
@@ -493,11 +510,7 @@ export function searchAsk(
       : []
     const matchedTags = matchedItems.map((m) => m.tag)
     const miles = origin && p.item.geo && p.category.hasAddress !== false ? haversineMiles(origin, p.item.geo) : null
-    const keys = hoursKeys(p.category)
-    const status = keys.length > 0 ? getOpenStatus(p.item as Record<string, unknown>, keys, now) : null
-    const known = hasHours(p.item, p.category)
-    // A closed business is closed whether or not it has hours saved.
-    const open = status?.isOpen ? true : known || status?.closure ? false : null
+    const { open, closesAt, today, known } = openState(p.item, p.category, now)
     hits.push({
       item: p.item,
       category: p.category,
@@ -509,8 +522,8 @@ export function searchAsk(
       matchedFields: matchedItems.length ? [] : matchedFieldsOf(p.item, p.category, searchTerms),
       miles,
       open,
-      closesAt: status?.closing?.closeLabel ?? null,
-      today: known ? hoursToday(p.item, p.category, now) : [],
+      closesAt,
+      today,
       atTime: query.openAt ? (known ? hoursAt(p.item, p.category, now, query.openAt) : []) : null,
     })
   }
