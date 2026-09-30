@@ -32,7 +32,7 @@ const cert: CategoryField = {
   caveat: { flagField: 'kosherPartial', noteField: 'kosherNote' },
 }
 const certLink: CategoryField = { key: 'k', label: 'Certificate', type: 'url', renderAs: 'row' }
-const food = makeCategory({ id: 'restaurant', label: 'Food', pluralLabel: 'Food', detailFields: [hours, website, description, foodType, t, cert, certLink] })
+const food = makeCategory({ id: 'restaurant', label: 'Food', pluralLabel: 'Food', detailFields: [hours, website, description, t, cert, foodType, certLink] })
 
 const judah = makeListing({
   id: 'judah',
@@ -204,9 +204,14 @@ describe('ListingView — onward', () => {
 })
 
 describe('ListingView — how sure', () => {
-  it('ends with the dated line, Google’s part first', () => {
+  // "Still right?" is asked beside the one thing that's the community's to
+  // keep (confirmPlace), not about the whole listing at its end.
+  it('Food: asks about its deciding facts, under them, and ends with Google’s part only', () => {
     view({ item: { ...judah, placeId: 'p1', googleSyncedAt: '2026-09-30T06:59:09Z', googleFields: ['phone', 'website'], confirmedAt: '2026-08-20T16:30:00Z' } })
-    expect(screen.getByTestId('listing-trust')).toHaveTextContent(/^Phone and website from Google, Sep 30\. Confirmed Aug 20\./)
+    expect(screen.getByTestId('facts-confirmed')).toHaveTextContent('Meat and Keystone-K confirmed Aug 20.')
+    expect(screen.getByTestId('listing-trust')).toHaveTextContent(/^Phone and website from Google, Sep 30\./)
+    expect(screen.getByTestId('listing-trust')).not.toHaveTextContent(/confirmed/i)
+    expect(screen.getAllByTestId('freshness')).toHaveLength(1)
   })
 
   it('a shul says its confirmation with its times, not again at the end', () => {
@@ -217,6 +222,74 @@ describe('ListingView — how sure', () => {
     expect(screen.getByTestId('listing-trust')).not.toHaveTextContent(/confirmed/i)
   })
 
+  it('a grocery asks about its items, in their card', () => {
+    const m: CategoryField = { key: 'm', label: 'Kosher items', type: 'tags', renderAs: 'badge', showCountInHeader: true }
+    view({ item: makeListing({ m: ['Challah'] }), category: makeCategory({ detailFields: [hours, m] }) })
+    expect(screen.getByTestId('listing-items')).toHaveTextContent('Items not confirmed by anyone yet. Right? Yes')
+    expect(screen.getAllByTestId('freshness')).toHaveLength(1)
+  })
+
+  it('a mikvah asks about its hours, in their card', () => {
+    const flag: CategoryField = { key: 'womenTevillah', label: 'Women', filterLabel: 'Women’s', type: 'boolean', renderAs: 'badge', filterable: true }
+    const mikvah = makeCategory({ id: 'mikvah', detailFields: [flag, { key: 'women_s_notes', label: 'Notes', type: 'textarea', renderAs: 'row', audienceKey: 'womenTevillah' }] })
+    view({ item: makeListing({ womenTevillah: true, women_s_notes: 'By appointment', confirmedAt: '2026-09-02T12:00:00Z' }), category: mikvah })
+    expect(screen.getByTestId('listing-groups')).toHaveTextContent('Hours confirmed Sep 2.')
+    expect(screen.getAllByTestId('freshness')).toHaveLength(1)
+  })
+
+  it('asks nothing where nothing is the community’s to confirm', () => {
+    // A hotel that isn't Shabbat friendly: no facts, no times, no items.
+    const shabbat: CategoryField = { key: 'shabbatFriendly', label: 'Shabbat friendly', type: 'boolean', renderAs: 'badge', filterable: true }
+    view({ item: makeListing({ shabbatFriendly: false }), category: makeCategory({ id: 'hotel', detailFields: [shabbat] }) })
+    expect(screen.queryByTestId('freshness')).not.toBeInTheDocument()
+  })
+
+  it('a Shabbat-friendly hotel asks whether it still is', () => {
+    const shabbat: CategoryField = { key: 'shabbatFriendly', label: 'Shabbat friendly', type: 'boolean', renderAs: 'badge', filterable: true }
+    view({ item: makeListing({ shabbatFriendly: true }), category: makeCategory({ id: 'hotel', detailFields: [shabbat] }) })
+    expect(screen.getByTestId('facts-confirmed')).toHaveTextContent('Shabbat friendly not confirmed by anyone yet. Right? Yes')
+  })
+})
+
+describe('ListingView — a group’s join link', () => {
+  const link: CategoryField = { key: 'link', label: 'Join group', type: 'url', renderAs: 'row', linkLabel: 'Join group', showInHeader: true }
+  const groups = makeCategory({ id: 'whatsapp', label: 'WhatsApp Group', hasAddress: false, detailFields: [link] })
+  const group = makeListing({ id: 'kip', address: '', link: 'https://chat.whatsapp.com/x', confirmedAt: '2026-09-01T12:00:00Z' })
+
+  it('dates the link under Join', () => {
+    view({ item: group, category: groups })
+    expect(screen.getByTestId('freshness')).toHaveTextContent('Join link confirmed Sep 1.')
+  })
+
+  it('asks whoever tapped Join, on coming back, whether it opened the group; No reports it', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ ok: true }), { status: 200 }))
+    view({ item: group, category: groups })
+    expect(screen.queryByTestId('join-link-check')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('link', { name: /Join the group on WhatsApp/ }))
+    fireEvent.focus(window)
+    const check = screen.getByTestId('join-link-check')
+    expect(check).toHaveTextContent('Did the link work?')
+    fireEvent.click(within(check).getByRole('button', { name: 'No, it didn’t' }))
+    expect(await screen.findByText('Thanks for saying. An admin will check the link.')).toBeInTheDocument()
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(String(url)).toContain('/api/submissions')
+    expect(JSON.parse(String(init!.body))).toMatchObject({ operation: 'delete', targetId: 'kip', note: expect.stringMatching(/join link didn’t work/) })
+    fetchMock.mockRestore()
+  })
+
+  it('Yes confirms the listing', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ ok: true }), { status: 200 }))
+    view({ item: group, category: groups })
+    fireEvent.click(screen.getByRole('link', { name: /Join the group on WhatsApp/ }))
+    fireEvent.focus(window)
+    fireEvent.click(screen.getByRole('button', { name: 'Yes, it opened the group' }))
+    expect(await screen.findByText('Thanks! It’s marked as working.')).toBeInTheDocument()
+    expect(String(fetchMock.mock.calls[0][0])).toBe('/api/resource/kip/confirm')
+    fetchMock.mockRestore()
+  })
+})
+
+describe('ListingView — details from Google', () => {
   it('hours that aren’t the main thing say they’re Google’s too', () => {
     const m: CategoryField = { key: 'm', label: 'Kosher items', type: 'tags', renderAs: 'badge', showCountInHeader: true }
     const grocery = makeCategory({ detailFields: [hours, m] })

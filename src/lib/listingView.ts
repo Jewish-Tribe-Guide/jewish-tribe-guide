@@ -40,13 +40,18 @@ export function itemsField(category: CategoryConfig): CategoryField | null {
   return category.detailFields.find((f) => f.type === 'tags' && f.showCountInHeader) ?? null
 }
 
-/** The field that says what kind of place this is: the first select badge
+/** The field that says what kind of place this is: the LAST select badge
  *  that isn't a caveat-carrying one (a hechsher) or the one an items count
  *  replaces on the row (a grocery's "Kosher Items", which is a deciding fact
- *  here, not a kind). Food's "Restaurant", a shul's "Orthodox (Ashkenazi)". */
+ *  here, not a kind). Food's "Restaurant", a shul's "Orthodox (Ashkenazi)".
+ *
+ *  The last, because a category's fields put the facts that decide it first
+ *  and what kind of place it is after them (agreed Sep 28, and Food's fields
+ *  were reordered so on Sep 30: meat/dairy/parve, hechsher, then type). It
+ *  was the first until then, and the reorder made Food's kind "Parve". */
 export function kindField(category: CategoryConfig): CategoryField | null {
   const replaced = itemsField(category)?.countReplacesKey
-  return category.detailFields.find((f) => isBadge(f) && f.type === 'select' && !f.caveat && f.key !== replaced) ?? null
+  return category.detailFields.findLast((f) => isBadge(f) && f.type === 'select' && !f.caveat && f.key !== replaced) ?? null
 }
 
 /** "Restaurant", or the category's own name when nothing says more
@@ -103,6 +108,30 @@ export function mainThing(item: DirectoryResource, category: CategoryConfig): Ma
   if (primaryLink(item, category)) return 'join'
   if (fields.some((f) => f.type === 'hours' && !f.audienceKey && hasHours(item[f.key]))) return 'hours'
   return null
+}
+
+/** Where an opened listing asks "Still right?" (agreed Sep 30): about the
+ *  one thing the community keeps and Google doesn't, beside it, rather than
+ *  about the whole listing at its foot. A shul's times, a grocery's items,
+ *  a mikvah's hours in their cards; a group's join link under Join; the
+ *  deciding facts in the header otherwise ("Meat and Keystone-K", "Shabbat
+ *  friendly"). Null where there's nothing of the community's to confirm: no
+ *  question at all, rather than a broad one. */
+export type ConfirmPlace = { at: 'card'; subject: string } | { at: 'join' } | { at: 'facts'; subject: string }
+
+export function confirmPlace(item: DirectoryResource, category: CategoryConfig): ConfirmPlace | null {
+  const main = mainThing(item, category)
+  if (main === 'davening') return { at: 'card', subject: 'Times' }
+  if (main === 'items') return { at: 'card', subject: 'Items' }
+  if (main === 'groups') return { at: 'card', subject: 'Hours' }
+  if (main === 'join') return { at: 'join' }
+  const facts = listingFacts(item, category)
+  return facts.length > 0 ? { at: 'facts', subject: andList(facts) } : null
+}
+
+/** "Meat", "Meat and Keystone-K", "Meat, Keystone-K and Restaurant". */
+function andList(parts: string[]): string {
+  return parts.length <= 1 ? parts.join('') : `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`
 }
 
 function hasHours(v: unknown): boolean {

@@ -18,6 +18,7 @@ import {
   audienceGroups,
   audienceStatus,
   compactWeek,
+  confirmPlace,
   googleKeeps,
   itemsField,
   listingActions,
@@ -59,6 +60,7 @@ import { useNextMinyan } from './nextMinyans'
 import { Card, shortDate } from './listingParts'
 import FreshnessFooter from './FreshnessFooter'
 import QuestionCard from './QuestionCard'
+import JoinLinkCheck from './JoinLinkCheck'
 
 // ── An opened listing: the seven parts (see lib/listingView.ts) ─────────────
 // The phone's sheet, the map's panel, the desktop column and a listing's own
@@ -127,6 +129,11 @@ export default function ListingView({ item, category, color, place = null, upvot
   const { isPinned } = usePinned()
 
   const main = mainThing(item, category)
+  // Where "Still right?" is asked: beside the one thing that's the
+  // community's to keep, not about the whole listing (confirmPlace).
+  const confirmAt = confirmPlace(item, category)
+  const confirmLine = (subject: string) => <FreshnessFooter resourceId={item.id} confirmedAt={item.confirmedAt} subject={subject} />
+  const [joined, setJoined] = useState(false)
   const photo = typeof item[PHOTO_FIELD_KEY] === 'string' && (item[PHOTO_FIELD_KEY] as string).trim() ? (item[PHOTO_FIELD_KEY] as string) : undefined
 
   // ── 1 · Who and whether ────────────────────────────────────────────────
@@ -201,6 +208,11 @@ export default function ListingView({ item, category, color, place = null, upvot
               {caveat.title ? `: ${caveat.title}` : ''}
             </p>
           )}
+          {confirmAt?.at === 'facts' && (
+            <div className="mt-1" data-testid="facts-confirmed">
+              {confirmLine(confirmAt.subject)}
+            </div>
+          )}
         </div>
       </div>
       {tagline && <p className="mt-2.5 text-[15px] leading-snug text-slate-800">{String(item[tagline.key]).trim()}</p>}
@@ -250,7 +262,10 @@ export default function ListingView({ item, category, color, place = null, upvot
         href={join.href}
         target="_blank"
         rel="noopener noreferrer"
-        onClick={() => track('listing_action', { action: join.field.linkLabel ?? join.field.label })}
+        onClick={() => {
+          track('listing_action', { action: join.field.linkLabel ?? join.field.label })
+          setJoined(true)
+        }}
         className="flex h-12 flex-1 items-center justify-center gap-2 rounded-full bg-emerald-700 px-5 text-[15.5px] font-bold text-white transition-colors hover:bg-emerald-800 sm:max-w-sm"
       >
         <JoinIcon className="h-5 w-5" />
@@ -278,9 +293,11 @@ export default function ListingView({ item, category, color, place = null, upvot
     const f = category.detailFields.find((x) => x.type === 'minyanim')!
     mainSection = <DaveningCard item={item} minyanim={item[f.key]} />
   } else if (main === 'items' && itemsF) {
-    mainSection = <ItemsCard item={item} field={itemsF} found={found} />
+    mainSection = <ItemsCard item={item} field={itemsF} found={found} footer={confirmAt?.at === 'card' ? confirmLine(confirmAt.subject) : undefined} />
   } else if (main === 'groups') {
-    mainSection = <GroupsCard item={item} groups={audienceGroups(item, category)} now={now} candlesAt={candlesAt} />
+    mainSection = (
+      <GroupsCard item={item} groups={audienceGroups(item, category)} now={now} candlesAt={candlesAt} footer={confirmAt?.at === 'card' ? confirmLine(confirmAt.subject) : undefined} />
+    )
   } else if (main === 'walk') {
     const walk = parseWalkList(category.walkList)
     mainSection = walk && item.geo ? <WalkList walk={walk} from={item.geo} fromLabel={category.label} /> : null
@@ -421,24 +438,20 @@ export default function ListingView({ item, category, color, place = null, upvot
       {who}
       {foundBox}
       {actions}
+      {confirmAt?.at === 'join' && <JoinLinkCheck item={item} joined={joined} />}
       {mainSection}
       {details}
       {about}
       {/* A hotel's walk list is its main thing; anywhere else it follows
           the place's own details, as it always has. */}
       {walk && item.geo && main !== 'walk' && <WalkList walk={walk} from={item.geo} fromLabel={category.label} />}
-      {/* Part 6's dated line: how sure, and a tap to confirm. A shul's
-          confirmation is about its times, so it's said in their card; only
-          Google's part is said here then. */}
       {/* Part 6: the one thing this listing doesn't say yet that a tap can
           answer (pickListingQuestion); nothing when there's nothing. */}
       <QuestionCard category={category} listing={item} />
+      {/* What's left of the dated line once "Still right?" is asked beside
+          the thing it's about: which details Google keeps, and when. */}
       <div className="space-y-3 border-t border-slate-200 pt-3.5" data-testid="listing-trust">
-        {main === 'davening' ? (
-          googleLead && <p className="text-[13.5px] leading-snug text-slate-600">{googleLead}.</p>
-        ) : (
-          <FreshnessFooter resourceId={item.id} confirmedAt={item.confirmedAt} lead={googleLead ?? undefined} />
-        )}
+        {googleLead && <p className="text-[13.5px] leading-snug text-slate-600">{googleLead}.</p>}
         {foot}
       </div>
       {onward && <OnwardSection item={item} category={category} color={color} onward={onward} className={onwardClassName} />}
@@ -654,7 +667,7 @@ function HoursCard({ item, value, now, candlesAt }: { item: DirectoryResource; v
 
 const ITEMS_SHOWN = 6
 
-function ItemsCard({ item, field, found }: { item: DirectoryResource; field: CategoryField; found: SearchFound | null }) {
+function ItemsCard({ item, field, found, footer }: { item: DirectoryResource; field: CategoryField; found: SearchFound | null; footer?: ReactNode }) {
   const [all, setAll] = useState(false)
   const matched = new Set(found?.items.map((m) => m.tag) ?? [])
   const rows = [
@@ -665,7 +678,7 @@ function ItemsCard({ item, field, found }: { item: DirectoryResource; field: Cat
   rows.sort((a, b) => Number(matched.has(b.name)) - Number(matched.has(a.name)))
   const shown = all ? rows : rows.slice(0, ITEMS_SHOWN)
   return (
-    <Card title={`${field.label} · ${rows.length}`} testId="listing-items">
+    <Card title={`${field.label} · ${rows.length}`} testId="listing-items" footer={footer}>
       <ul className="divide-y divide-slate-200/70">
         {shown.map((r) => (
           <li key={`${r.sometimes ? 's' : 'a'}:${r.name}`} className="flex items-baseline justify-between gap-3 py-1.5">
@@ -686,9 +699,21 @@ function ItemsCard({ item, field, found }: { item: DirectoryResource; field: Cat
   )
 }
 
-function GroupsCard({ item, groups, now, candlesAt }: { item: DirectoryResource; groups: AudienceGroup[]; now: Date | null; candlesAt: number | null }) {
+function GroupsCard({
+  item,
+  groups,
+  now,
+  candlesAt,
+  footer,
+}: {
+  item: DirectoryResource
+  groups: AudienceGroup[]
+  now: Date | null
+  candlesAt: number | null
+  footer?: ReactNode
+}) {
   return (
-    <Card title="Hours and details, by mikvah" testId="listing-groups">
+    <Card title="Hours and details, by mikvah" testId="listing-groups" footer={footer}>
       <div className="divide-y divide-slate-200">
         {groups.map((g) => (
           <div key={g.key} className="py-2.5">

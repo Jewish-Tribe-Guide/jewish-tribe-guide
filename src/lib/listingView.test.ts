@@ -5,6 +5,7 @@ import {
   audienceGroups,
   audienceStatus,
   compactWeek,
+  confirmPlace,
   googleKeeps,
   isStale,
   listingActions,
@@ -44,7 +45,7 @@ const cert: CategoryField = {
   options: [{ value: 'Keystone-K', label: 'Keystone-K' }],
 }
 const certLink: CategoryField = { key: 'k', label: 'Certificate', type: 'url', renderAs: 'row' }
-const food = makeCategory({ id: 'restaurant', label: 'Food', detailFields: [hours, website, foodType, t, cert, certLink] })
+const food = makeCategory({ id: 'restaurant', label: 'Food', detailFields: [hours, website, t, cert, foodType, certLink] })
 
 const denomination: CategoryField = { key: 'denomination', label: 'Denomination', type: 'select', renderAs: 'badge', filterable: true }
 const minyanim: CategoryField = { key: 'minyanim', label: 'Davening Times', type: 'minyanim', renderAs: 'row' }
@@ -298,5 +299,24 @@ describe('googleKeeps', () => {
   })
   it('nothing for a listing no longer matched to Google, whatever it once kept', () => {
     expect(googleKeeps(makeListing({ googleSyncedAt: '2026-09-30T07:00:00Z', googleFields: ['phone'], phone: '1' }))).toBeNull()
+  })
+})
+
+describe('confirmPlace', () => {
+  it('a shul’s times, a grocery’s items, a mikvah’s hours: in their cards', () => {
+    expect(confirmPlace(makeListing({ minyanim: [{ id: 'm1', tefillah: 'shacharis', days: ['sun'], time: '8:00am' }] }), shuls)).toEqual({ at: 'card', subject: 'Times' })
+    expect(confirmPlace(makeListing({ m: ['Challah'], isKosher: 'Kosher Items' }), grocery)).toEqual({ at: 'card', subject: 'Items' })
+    expect(confirmPlace(makeListing({ womenTevillah: true, women_s_notes: 'By appointment' }), mikvah)).toEqual({ at: 'card', subject: 'Hours' })
+  })
+  it('Food: the facts that decide it, in words', () => {
+    expect(confirmPlace(makeListing({ t: ['Meat'], kosherCert: 'Keystone-K', foodType: 'Restaurant' }), food)).toEqual({ at: 'facts', subject: 'Meat and Keystone-K' })
+    expect(confirmPlace(makeListing({ t: ['Parve'] }), food)).toEqual({ at: 'facts', subject: 'Parve' })
+  })
+  it('a group with no address: its join link', () => {
+    const link: CategoryField = { key: 'link', label: 'Join', type: 'url', renderAs: 'row', showInHeader: true }
+    expect(confirmPlace(makeListing({ link: 'https://chat.whatsapp.com/x' }), makeCategory({ hasAddress: false, detailFields: [link] }))).toEqual({ at: 'join' })
+  })
+  it('nothing when nothing is the community’s to confirm: no broad question instead', () => {
+    expect(confirmPlace(makeListing({ hours: { mon: { open: '09:00', close: '17:00' } } }), food)).toBeNull()
   })
 })

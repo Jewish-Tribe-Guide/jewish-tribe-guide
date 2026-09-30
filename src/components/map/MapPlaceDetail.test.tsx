@@ -136,7 +136,7 @@ describe('MapPlaceDetail', () => {
     })
 
     expect(screen.queryByText(/ListingEditor stub/)).not.toBeInTheDocument()
-    expect(screen.getByTestId('freshness')).toBeInTheDocument()
+    expect(screen.getByTestId('listing-view')).toBeInTheDocument()
   })
 
   it('closes the edit form via history.back(), not a direct state reset, so cancelling and swiping back behave identically', async () => {
@@ -180,8 +180,6 @@ describe('MapPlaceDetail', () => {
     expect(screen.getByRole('button', { name: 'Suggest an edit' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /more actions/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Suggest a correction' })).not.toBeInTheDocument()
-    // The freshness STATUS stays: it's a contribution of its own.
-    expect(screen.getByTestId('freshness')).toBeInTheDocument()
 
     // Share is one of the listing's own buttons now, beside Directions and
     // Call, so the overflow holds Pin (and Set as location) only.
@@ -194,9 +192,9 @@ describe('MapPlaceDetail', () => {
   })
 
   // Part of the listing, not docked over it (which phase 3 did): the last
-  // thing about the place, after the freshness line. Only the places nearby
+  // thing about the place, after the dated line. Only the places nearby
   // come after it, and the map passes none.
-  it('ends the content with the bar, after the freshness line', () => {
+  it('ends the content with the bar, after the dated line', () => {
     const { container } = renderWithProviders(
       <PinnedProvider>
         <MapPlaceDetail item={makeListing({ name: 'Goldi Market' })} category={makeCategory()} color="#000" onBack={() => {}} />
@@ -206,9 +204,8 @@ describe('MapPlaceDetail', () => {
     const last = view.lastElementChild as HTMLElement
     expect(last).toContainElement(screen.getByRole('button', { name: 'Suggest an edit' }))
     expect(last).toContainElement(screen.getByRole('button', { name: 'Actions for Goldi Market' }))
-    const freshness = screen.getByTestId('freshness')
-    const bar = screen.getByRole('button', { name: 'Suggest an edit' })
-    expect(freshness.compareDocumentPosition(bar) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    // The dated line's own block; the bar is its last part.
+    expect(last).toHaveAttribute('data-testid', 'listing-trust')
   })
 
   // The bar is the last thing in the listing, so whoever taps it is usually
