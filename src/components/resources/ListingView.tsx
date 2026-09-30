@@ -58,6 +58,7 @@ import WalkList from './WalkList'
 import { useNextMinyan } from './nextMinyans'
 import { Card, shortDate } from './listingParts'
 import FreshnessFooter from './FreshnessFooter'
+import QuestionCard from './QuestionCard'
 
 // ── An opened listing: the seven parts (see lib/listingView.ts) ─────────────
 // The phone's sheet, the map's panel, the desktop column and a listing's own
@@ -422,6 +423,9 @@ export default function ListingView({ item, category, color, place = null, upvot
       {/* Part 6's dated line: how sure, and a tap to confirm. A shul's
           confirmation is about its times, so it's said in their card; only
           Google's part is said here then. */}
+      {/* Part 6: the one thing this listing doesn't say yet that a tap can
+          answer (pickListingQuestion); nothing when there's nothing. */}
+      <QuestionCard category={category} listing={item} />
       <div className="space-y-3 border-t border-slate-200 pt-3.5" data-testid="listing-trust">
         {main === 'davening' ? (
           googleLead && <p className="text-[13.5px] leading-snug text-slate-600">{googleLead}.</p>

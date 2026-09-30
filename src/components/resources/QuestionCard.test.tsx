@@ -96,6 +96,23 @@ describe('QuestionCard: a quick question', () => {
     expect(body.note).toBe('Answered the Food page’s question card: Food Type')
   })
 
+  // On an opened listing it asks about that listing alone, and says so to
+  // the moderator: it came from the listing, not the category's list.
+  it('on a listing, asks about it alone, sends that, and offers no next place', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(<QuestionCard category={food} listing={items[0]} />)
+    expect(screen.getByText('Meat, dairy or parve?')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Parve' }))
+    await user.click(screen.getByRole('button', { name: 'pass the bot check' }))
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
+    const body = JSON.parse((fetchMock.mock.calls[0] as [string, RequestInit])[1].body as string)
+    expect(body).toMatchObject({ operation: 'update', targetType: 'listing', targetId: items[0].id })
+    expect(body.payload.details.t).toBe('Parve')
+    expect(body.note).toBe('Answered the question on the listing itself: Food Type')
+    expect(await screen.findByText(/An admin will check it/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Next question' })).not.toBeInTheDocument()
+  })
+
   it('thanks, then asks about the next place, and doesn’t ask about the first again', async () => {
     const user = userEvent.setup()
     render()

@@ -222,3 +222,36 @@ export function answerSubmission(category: CategoryConfig, item: DirectoryResour
     geo: hasAddress ? ((item.geo as { lat: number; lng: number } | undefined) ?? null) : null,
   }
 }
+
+/**
+ * The one question an opened listing asks (its part 6, agreed Sep 30): the
+ * most useful thing it doesn't say yet, answerable with a tap. The
+ * category's own question card first, when it asks about a field this
+ * listing leaves empty; then any other fact a row shows and this one lacks,
+ * what decides it before what kind of place it is. Null when it says
+ * everything that can be asked this way, or this browser has been asked
+ * already. Whether it's still right is the dated line's question, not this.
+ */
+export function pickListingQuestion(category: CategoryConfig, item: DirectoryResource, asked: ReadonlySet<string>): PickedQuestion | null {
+  if (asked.has(item.id)) return null
+  const card = parseQuestionCard(category.questionCard)
+  const badges = category.detailFields.filter(
+    (f) => (f.type === 'boolean' || f.type === 'select') && (f.renderAs ?? (f.type === 'boolean' ? 'badge' : 'row')) === 'badge' && f.filterable,
+  )
+  const kind = badges.find((f) => f.type === 'select' && !f.caveat)
+  const order = [
+    ...(card?.kind === 'field' ? [card.key] : []),
+    ...badges.filter((f) => f !== kind).map((f) => f.key),
+    ...(kind ? [kind.key] : []),
+  ]
+  for (const key of order) {
+    const field = askableField(category, key)
+    if (!field || !fieldIsVisible(field, item as Record<string, unknown>) || says(item, field)) continue
+    const q = fieldQuestion(field)
+    // "Meat, dairy or parve?", "Which denomination?", "Shabbat friendly?":
+    // the listing's name is right above it.
+    const question = q.charAt(0).toUpperCase() + q.slice(1)
+    return { kind: 'field', item, field, question, answers: questionAnswers(field), footnote: 'An admin checks each answer before it shows.' }
+  }
+  return null
+}

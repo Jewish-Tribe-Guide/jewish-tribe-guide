@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { makeCategory, makeListing } from '@/test/providerFixtures'
 import type { DirectoryResource } from '@/types'
+import type { CategoryField } from './categories'
 import { listingChanges } from './listingDiff'
-import { answerSubmission, parseQuestionCard, pickQuestion, questionCardFromKey, questionCardKey, questionCardOptions } from './questionCards'
+import { answerSubmission, parseQuestionCard, pickListingQuestion, pickQuestion, questionCardFromKey, questionCardKey, questionCardOptions } from './questionCards'
 
 const foodType = {
   key: 't',
@@ -164,5 +165,45 @@ describe('what can be stored', () => {
 
   it('offers the admin only the questions the category’s fields make possible', () => {
     expect(questionCardOptions(food).map((o) => questionCardKey(o.value))).toEqual(['confirm', 'field:t'])
+  })
+})
+
+describe('pickListingQuestion: an opened listing’s one question', () => {
+  const t: CategoryField = { key: 't', label: 'Food Type', type: 'select', renderAs: 'badge', filterable: true, options: [{ value: 'Meat', label: 'Meat' }, { value: 'Dairy', label: 'Dairy' }, { value: 'Parve', label: 'Parve' }] }
+  const foodType: CategoryField = { key: 'foodType', label: 'Store Type', type: 'select', renderAs: 'badge', filterable: true, options: [{ value: 'Restaurant', label: 'Restaurant' }, { value: 'Bakery', label: 'Bakery' }] }
+  const shabbat: CategoryField = { key: 'shabbat', label: 'Shabbat friendly', type: 'boolean', renderAs: 'badge', filterable: true }
+  const food = makeCategory({ detailFields: [foodType, t] })
+
+  it('asks what decides it before what kind of place it is', () => {
+    const q = pickListingQuestion(food, makeListing({ name: 'Sweet Box' }), new Set())
+    expect(q?.kind === 'field' && q.field.key).toBe('t')
+    expect(q?.question).toBe('Meat, dairy or parve?')
+    expect(q?.kind === 'field' && q.answers.map((a) => a.label)).toEqual(['Meat', 'Dairy', 'Parve'])
+  })
+
+  it('then the kind, once the rest is said', () => {
+    const q = pickListingQuestion(food, makeListing({ t: ['Parve'] }), new Set())
+    expect(q?.question).toBe('Restaurant or bakery?')
+  })
+
+  it('the category’s own question card first', () => {
+    const category = makeCategory({ detailFields: [foodType, t], questionCard: { kind: 'field', key: 'foodType' } })
+    expect(pickListingQuestion(category, makeListing(), new Set())?.question).toBe('Restaurant or bakery?')
+  })
+
+  it('a yes/no as its own question; an unticked one has been answered', () => {
+    const hotels = makeCategory({ detailFields: [shabbat] })
+    expect(pickListingQuestion(hotels, makeListing(), new Set())?.question).toBe('Shabbat friendly?')
+    expect(pickListingQuestion(hotels, makeListing({ shabbat: false }), new Set())).toBeNull()
+  })
+
+  it('nothing when it says everything, or this browser was asked already', () => {
+    expect(pickListingQuestion(food, makeListing({ t: ['Meat'], foodType: 'Restaurant' }), new Set())).toBeNull()
+    expect(pickListingQuestion(food, makeListing({ id: 'x' }), new Set(['x']))).toBeNull()
+  })
+
+  it('never a choice too long to tap through (a hechsher’s eleven)', () => {
+    const cert: CategoryField = { key: 'cert', label: 'Hechsher', type: 'select', renderAs: 'badge', filterable: true, options: Array.from({ length: 11 }, (_, i) => ({ value: `c${i}`, label: `C${i}` })) }
+    expect(pickListingQuestion(makeCategory({ detailFields: [cert] }), makeListing(), new Set())).toBeNull()
   })
 })

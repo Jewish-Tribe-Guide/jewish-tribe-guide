@@ -212,3 +212,19 @@ describe('ListingView — how sure', () => {
     expect(screen.getByTestId('listing-details')).toHaveTextContent('From Google, Sep 30')
   })
 })
+
+describe('ListingView — the one question', () => {
+  it('asks what the listing doesn’t say yet, with a tap for each answer, before the dated line', () => {
+    const category = makeCategory({ detailFields: [{ ...t, options: [{ value: 'Meat', label: 'Meat' }, { value: 'Dairy', label: 'Dairy' }, { value: 'Parve', label: 'Parve' }] }] })
+    view({ item: makeListing({ id: 'sb', name: 'Sweet Box' }), category })
+    const question = screen.getByTestId('listing-question')
+    expect(question).toHaveTextContent('Meat, dairy or parve?')
+    expect(within(question).getAllByRole('button').map((b) => b.textContent)).toEqual(['Meat', 'Dairy', 'Parve', 'Not sure'])
+    expect(question.compareDocumentPosition(screen.getByTestId('listing-trust')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('asks nothing when there’s nothing to ask', () => {
+    view()
+    expect(screen.queryByTestId('listing-question')).not.toBeInTheDocument()
+  })
+})
