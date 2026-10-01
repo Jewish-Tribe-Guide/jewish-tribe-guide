@@ -720,6 +720,10 @@ export default function GenericDirectory({ category, items, anchorLabel, address
     () => (q ? searchAsk(items, [category], search, { categoryId: category.id, places: neighborhoodsFor(communitySlug) }) : null),
     [q, items, category, search, communitySlug],
   )
+  // A question asking for the nearest ("near me", "sort by distance") puts
+  // them first while it's in the box, whatever the Sort says: "restaurant
+  // near me" came back by popularity (fixes table, Sep 29).
+  const asksNearest = !!todayResult?.query.nearMe
   const todayMatches = useMemo(
     () => (todayResult ? new Map(todayResult.hits.map((h) => [h.item.id, foundFor(h, todayResult)])) : null),
     [todayResult],
@@ -837,7 +841,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
       // not every open one.
       const pinnedDiff = Number(isPinned(b.id)) - Number(isPinned(a.id))
       if (pinnedDiff !== 0) return pinnedDiff
-      return upvotes && sortByPopular
+      return upvotes && sortByPopular && !asksNearest
         ? liveCount(b) - liveCount(a) || travelCompare(a, b)
         : travelCompare(a, b)
     })

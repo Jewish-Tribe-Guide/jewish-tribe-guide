@@ -689,6 +689,23 @@ describe('GenericDirectory', () => {
       expect(sortShows()).toBe('Distance')
     })
 
+    it('a search asking for the nearest puts them first, whatever the Sort says', async () => {
+      // Reported Sep 29: "restaurant near me" came back by popularity.
+      const user = userEvent.setup()
+      const category = makeCategory({ upvotesEnabled: true })
+      const items = [
+        makeListing({ id: 'far', name: 'Kosher Far', upvotes: 9, milesFromAddress: 5 }),
+        makeListing({ id: 'near', name: 'Kosher Near', upvotes: 0, milesFromAddress: 0.5 }),
+      ]
+      renderWithProviders(<GenericDirectory category={category} items={items} anchorLabel="123 Main St" {...handlers} />)
+      await chooseSort(user, 'Popularity')
+      const order = () => screen.getAllByText(/^Kosher (Far|Near)$/).map((e) => e.textContent)
+      await user.type(screen.getByRole('searchbox'), 'kosher ')
+      expect(order()).toEqual(['Kosher Far', 'Kosher Near'])
+      await user.type(screen.getByRole('searchbox'), 'near me')
+      expect(order()).toEqual(['Kosher Near', 'Kosher Far'])
+    })
+
     it('has no Sort where there is only one way to sort (likes off)', () => {
       renderWithProviders(<GenericDirectory category={makeCategory()} items={[makeListing()]} {...handlers} />)
       expect(screen.queryByRole('button', { name: /^Sort/ })).not.toBeInTheDocument()

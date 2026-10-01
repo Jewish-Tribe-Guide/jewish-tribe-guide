@@ -153,3 +153,63 @@ describe('proposeWords — what a reading suggests teaching', () => {
     expect(proposeWords(['notes'], { categories: [{ id: 'restaurant', select: { notes: ['x'] } }] }, cats, null)).toEqual([])
   })
 })
+
+describe('a category page’s own filters, typed into its search box (decided Sep 29)', () => {
+  const denomination = { key: 'denomination', label: 'Denomination', type: 'select' as const, filterable: true }
+  const shuls = makeCategory({ id: 'synagogue', label: 'Synagogue', pluralLabel: 'Synagogues', detailFields: [denomination] })
+  const kind = { key: 'foodType', label: 'Type', type: 'select' as const, filterable: true }
+  const eats = makeCategory({ id: 'restaurant', label: 'Food', pluralLabel: 'Food', detailFields: [...fields, kind] })
+  const hotel = makeCategory({ id: 'hotel', label: 'Hotel', pluralLabel: 'Hotels', detailFields: [{ key: 'shabbatFriendly', label: 'Shabbat friendly', type: 'boolean', filterable: true }] })
+  const shul = (name: string, d: string) => place('synagogue', name, { denomination: d })
+  const all = [
+    shul('Mekor Habracha', 'Orthodox (Ashkenazi)'),
+    shul('Mikveh Israel', 'Orthodox (Sephardic)'),
+    shul('Rodeph Shalom', 'Reform'),
+    place('restaurant', 'Scoop Shop', { foodType: ['Ice Cream & Treats'], t: ['Dairy'], kosherCert: 'Keystone-K' }),
+    place('restaurant', 'Bagel Co', { foodType: ['Bakery'], t: ['Dairy'], notes: 'cream cheese bagels' }),
+    place('restaurant', 'Grill', { foodType: ['Restaurant'], t: ['Meat'], kosherCert: 'Keystone-K' }),
+    place('restaurant', 'Deli', { foodType: ['Restaurant'], t: ['Meat'], kosherCert: 'OU' }),
+    place('hotel', 'Cambria', { shabbatFriendly: true }),
+    place('hotel', 'Motel', {}),
+  ]
+  const cats = [shuls, eats, hotel]
+  const on = (page: string, q: string) => searchAsk(all, cats, q, { categoryId: page })
+
+  it('a word of a value is that filter, every value it’s in: "orthodox" is both Orthodox shuls', () => {
+    expect(names(on('synagogue', 'orthodox'))).toEqual(['Mekor Habracha', 'Mikveh Israel'])
+    expect(names(on('synagogue', 'sephardic'))).toEqual(['Mikveh Israel'])
+    // And the answer says so: these found the right places with no sentence.
+    expect(answerFor(on('synagogue', 'orthodox'))?.text).toMatch(/^2 synagogues: Orthodox\./)
+    expect(answerFor(on('synagogue', 'sephardic'))?.text).toBe('Mikveh Israel: Orthodox (Sephardic).')
+  })
+
+  it('a yes/no filter takes all of its name', () => {
+    expect(names(on('hotel', 'shabbat friendly'))).toEqual(['Cambria'])
+    expect(on('hotel', 'shabbos friendly').taught?.map((t) => t.field)).toEqual(['shabbatFriendly'])
+    expect(on('hotel', 'shabbat').taught).toBeUndefined()
+  })
+
+  it('a part of a value names it, never one word of a part: "cream cheese" isn’t ice cream', () => {
+    expect(names(on('restaurant', 'ice cream'))).toEqual(['Scoop Shop'])
+    expect(on('restaurant', 'cream cheese').taught).toBeUndefined()
+    expect(names(on('restaurant', 'treats'))).toEqual(['Scoop Shop'])
+  })
+
+  it('the long typed-out search from the fixes table: filters, and "only" means nothing', () => {
+    expect(names(on('restaurant', 'meat only keystone'))).toEqual(['Grill'])
+  })
+
+  it('a town’s words are where, never a filter: "cherry hill" isn’t the Cherry-K hechsher', () => {
+    const cherryK = { ...place('restaurant', 'Cherry Grill', { kosherCert: 'Cherry-K', t: ['Meat'] }), address: '1 Main St, Philadelphia, PA 19103, USA' }
+    const inTown = { ...place('restaurant', 'Bagels', { kosherCert: 'OU', t: ['Dairy'] }), address: '2 Kings Hwy, Cherry Hill, NJ 08034, USA', geo: { lat: 39.93, lng: -75.02 } }
+    const r = searchAsk([cherryK, inTown], cats, 'food in cherry hill', { categoryId: 'restaurant' })
+    expect(r.taught).toBeUndefined()
+    expect(r.place?.name).toBe('Cherry Hill')
+    expect(names(r)).toEqual(['Bagels'])
+    expect(names(searchAsk([cherryK, inTown], cats, 'cherry k meat', { categoryId: 'restaurant' }))).toEqual(['Cherry Grill'])
+  })
+
+  it('only on its own page: elsewhere the words are looked for as before', () => {
+    expect(searchAsk(all, cats, 'orthodox').taught).toBeUndefined()
+  })
+})

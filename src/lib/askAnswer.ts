@@ -490,8 +490,15 @@ function baseAnswer(
  *  ("IKC, Dairy", "Shabbat Friendly"), or null when none were used. A
  *  word taught as a kind of place says nothing here: the kind is said. */
 function taughtText(result: AskResult): string | null {
-  const said = (result.taught ?? []).flatMap((t) => {
+  const taught = result.taught ?? []
+  const said = taught.flatMap((t) => {
     if (!t.field) return []
+    // One word read as several picks ("orthodox": both Orthodox
+    // denominations) is said as it was typed.
+    if (taught.filter((x) => x.word === t.word && x.field).length > 1) {
+      const typed = termsAsTyped(result.query.raw, t.word.split(' '))
+      return typed ? [typed[0].toUpperCase() + typed.slice(1)] : []
+    }
     const field = result.hits.find((h) => h.category.id === t.categoryId)?.category.detailFields.find((f) => f.key === t.field)
     if (!field) return []
     if (t.value === undefined) return [field.filterLabel ?? field.label]

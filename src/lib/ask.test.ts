@@ -139,6 +139,20 @@ describe('parseAsk', () => {
   })
 })
 
+describe('parseAsk — the order, and words that say nothing (fixes table, Sep 28)', () => {
+  it('"sort by distance" and "nearest first" are the order, not words to find', () => {
+    for (const q of ['meat sort by distance', 'meat sorted by distance', 'meat by distance', 'meat nearest first', 'meat, closest first']) {
+      const p = parseAsk(`${q} `)
+      expect(p.terms, q).toEqual(['meat'])
+      expect(p.nearMe, q).toBe(true)
+    }
+  })
+
+  it('"only" means nothing on its own', () => {
+    expect(parseAsk('open meat within 3 miles only keystone ').terms).toEqual(['meat', 'keystone'])
+  })
+})
+
 describe('conceptCategories', () => {
   const categories = [
     makeCategory({ id: 'restaurant', label: 'Food Establishment', pluralLabel: 'Food Establishments' }),

@@ -89,6 +89,9 @@ const STOPWORDS = new Set([
   // Every listing here is kosher, so asking for "a good hechsher" narrows
   // nothing; a named one ("OU") is still searched for.
   'hechsher', 'hechsherim', 'hashgacha', 'certified', 'certification',
+  // "Only keystone" means keystone (fixes table, Sep 28: "only" was looked
+  // for in the listings, and found nothing).
+  'only', 'exactly', 'specifically', 'particular',
   'please', 'pls', 'thanks', 'thank', 'hi', 'hey', 'hello', 'help',
   'place', 'places', 'spot', 'spots', 'option', 'options', 'somewhere', 'anywhere', 'location', 'locations',
   'store', 'stores', 'shop', 'shops',
@@ -191,6 +194,20 @@ export function termsAsTyped(raw: string, terms: readonly string[], beside: read
   return ws
     .filter((w, i) => kept[i] || (beside.includes(fold(w)) && (kept[i - 1] || kept[i + 1])))
     .join(' ')
+}
+
+/** The words of a text a question would search for: folded, with filler
+ *  ("kosher", "store"), kinds of place ("food") and tefillos left out, as
+ *  parseAsk leaves them out of a question's terms. Used for a filter's
+ *  value read as words ("Food Truck" is "truck"; see askWords.ts). */
+export function meaningfulWords(text: string): string[] {
+  const out: string[] = []
+  for (const w of plainWords(text)) {
+    const folded = fold(w)
+    if (TEFILLAH_WORDS[folded] !== undefined || CONCEPT_BY_WORD.has(folded) || STOPWORDS.has(w) || STOPWORDS.has(folded)) continue
+    out.push(...(ABBREVIATIONS[w] ?? [folded]))
+  }
+  return out
 }
 
 /** Text as the list of folded words it's matched on. Used for listing text. */
@@ -518,6 +535,7 @@ const ERUV_CONTEXT = new Set([
   'shabbos', 'shabbat', 'today', 'tonight', 'week', 'weekend', 'this', 'still', 'check',
 ])
 
+const SORT_NEAREST = /\b(?:(?:sort(?:ed)?|order(?:ed)?|list(?:ed)?) )?by (?:distance|closest|nearest)\b|\b(?:nearest|closest) (?:first|ones first|on top)\b/g
 export const NEAR_ME = /\b(?:(?:near|close to|closest to|nearest to|around|by|next to) (?:me|here|us)|nearby|near by|close by)\b/g
 const OPEN_TODAY = /\b(?:open (?:today|tonight|later(?: today| tonight)?|this (?:evening|afternoon))|still open (?:today|tonight))\b/g
 const OPEN_NOW = /\b(?:open (?:right now|now|late|on sunday|on friday)|(?:whats|what is|anything|something|who is|whos) open|open)\b/g
@@ -545,7 +563,10 @@ export function parseAsk(input: string): AskQuery {
   // patterns are global, and a global regex's `.test()` keeps its position
   // between calls, so the next query would be checked from the wrong place.
   const typed = plainWords(clock.rest).join(' ')
-  const withoutNear = typed.replace(NEAR_ME, ' ')
+  // "Sort by distance", "nearest first": the order, not words to find, and
+  // the same order as "near me" (fixes table, Sep 28: it found nothing).
+  const unsorted = typed.replace(SORT_NEAREST, ' ')
+  const withoutNear = unsorted.replace(NEAR_ME, ' ')
   const nearMe = withoutNear !== typed
   const withoutToday = withoutNear.replace(OPEN_TODAY, ' ')
   const openToday = !openAt && withoutToday !== withoutNear

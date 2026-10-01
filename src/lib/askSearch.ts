@@ -1,10 +1,10 @@
 import type { DirectoryResource } from '@/types'
-import type { CategoryConfig } from '@/lib/categories'
+import { selectValues, type CategoryConfig } from '@/lib/categories'
 import { listingSearchText } from '@/lib/searchListing'
 import { haversineMiles, type LatLng } from '@/lib/geo'
 import { findPlace, townsFrom, type Place } from '@/lib/places'
 import { DAY_KEYS, businessClosure, fmt12, getOpenStatus, isStructuredHours, type DayHours } from '@/lib/hours'
-import { readTaught, type TaughtWord } from '@/lib/askWords'
+import { filterWords, readTaught, type AskWord, type TaughtWord } from '@/lib/askWords'
 import { NEAR_ME, conceptCategories, initialisms, parseAsk, termMatches, termsRequired, typedWords, wordMatches, words, type AskQuery, type OpenAt, withoutOpenAt } from '@/lib/ask'
 
 // Runs an `ask` query (see ask.ts) against the listings a page already holds.
@@ -341,6 +341,22 @@ function hoursAt(item: DirectoryResource, category: CategoryConfig, now: Date, a
  *  for that listing. A match is a listing outside the categories asked for
  *  whose initials are one of the leftover words, or whose name has all of
  *  them. Returns the words it used up so they aren't searched for again. */
+/** A category page's own filter values as words (askWords.ts's
+ *  filterWords), from the values its listings have. Worked out once per
+ *  set of listings. */
+const pageWordsCache = new WeakMap<readonly DirectoryResource[], WeakMap<CategoryConfig, AskWord[]>>()
+function pageWords(listings: readonly DirectoryResource[], category: CategoryConfig): AskWord[] {
+  let byCategory = pageWordsCache.get(listings)
+  if (!byCategory) pageWordsCache.set(listings, (byCategory = new WeakMap()))
+  let out = byCategory.get(category)
+  if (!out) {
+    const own = listings.filter((l) => l.category === category.id)
+    out = filterWords(category, (key) => [...new Set(own.flatMap((l) => selectValues(l[key])))])
+    byCategory.set(category, out)
+  }
+  return out
+}
+
 /** Every word that describes listings rather than names one: their items,
  *  types and other picks ("meat", "dairy", "challah"). Worked out once per
  *  set of listings. */
@@ -457,21 +473,27 @@ export function searchAsk(
   // looking up the Cambria Hotel … Center City.
   const namesListing = (ws: string[], ids: string[] | null) =>
     ws.length > 0 && all.some((p) => (!ids || ids.includes(p.category.id)) && ws.every((t) => p.nameWords.includes(t)))
-  // Words an admin taught the search ("ikc" is Kosher Cert: IKC): filters,
-  // not text to look for (see askWords.ts). Not in a name looked up, when
-  // they're most of it: "dairy queen", but not "dairy" for a Dairy Barn.
-  const looksUp = all.some(
-    (p) => (!categoryIds || categoryIds.includes(p.category.id)) && terms.every((t) => p.nameWords.includes(t)) && terms.length * 2 > p.nameWords.length,
-  )
-  const taught = readTaught(terms, categories, { categoryIds, categoryId, lookingUp: terms.length > 0 && looksUp })
-  terms.splice(0, terms.length, ...taught.terms)
-  categoryIds = taught.categoryIds
   const lookingUp = namesListing(terms, categoryIds)
   // Where is read without "open at 8am": that "at" names a time, not a place.
   const whereText = query.openAt ? withoutOpenAt(query.raw) : query.raw
   const placeSaid = findPlace(whereText, [...places, ...townsOf(listings)])
   const named = placeSaid && (placeSaid.introduced || !lookingUp) ? placeSaid : null
-  const unplaced = named ? terms.filter((t) => !named.used.includes(t)) : terms
+  const placeless = named ? terms.filter((t) => !named.used.includes(t)) : terms
+
+  // Words an admin taught the search ("ikc" is Kosher Cert: IKC): filters,
+  // not text to look for (see askWords.ts). After the place, so "cherry
+  // hill" stays a town and never becomes the Cherry-K hechsher. Not in a
+  // name looked up, when they're most of it: "dairy queen", but not
+  // "dairy" for a Dairy Barn.
+  const looksUp = all.some(
+    (p) => (!categoryIds || categoryIds.includes(p.category.id)) && placeless.every((t) => p.nameWords.includes(t)) && placeless.length * 2 > p.nameWords.length,
+  )
+  // On a category page, its own filters' values work the same way:
+  // "orthodox" on Synagogues is the Denomination filter (see filterWords).
+  const withPageWords = categoryId ? categories.map((c) => (c.id === categoryId ? { ...c, askWords: [...(c.askWords ?? []), ...pageWords(listings, c)] } : c)) : categories
+  const taught = readTaught(placeless, withPageWords, { categoryIds, categoryId, lookingUp: placeless.length > 0 && looksUp })
+  categoryIds = taught.categoryIds
+  const unplaced = taught.terms
 
   // Somewhere named with "near"/"at" counts without a kind of place too:
   // "sushi near HUP" is measured from HUP.

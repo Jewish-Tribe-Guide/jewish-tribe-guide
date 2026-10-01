@@ -1,5 +1,5 @@
 import type { CategoryConfig } from './categories'
-import { termMatches, words } from './ask'
+import { meaningfulWords, termMatches, words } from './ask'
 import { filterFields, passesFields, type CategoryFilters } from './mapFilters'
 import type { Reading } from './questionReader'
 import type { DirectoryResource } from '@/types'
@@ -91,15 +91,21 @@ export function readTaught(
   const inScope = categories.filter((c) => (categoryId ? c.id === categoryId : !categoryIds || categoryIds.includes(c.id)))
   const rules = inScope.flatMap((c) => (c.askWords ?? []).map((w) => ({ ...w, categoryId: c.id })))
   if (rules.length === 0) return none
-  // The longest first, so "chalav yisroel" wins over a "yisroel" of its own.
-  rules.sort((a, b) => b.word.split(' ').length - a.word.split(' ').length)
-  const left = [...terms]
+  // The longest first, so "chalav yisroel" wins over a "yisroel" of its
+  // own. Rules as long as each other all apply to the same words: one word
+  // can pick several values ("orthodox": both Orthodox denominations).
+  const lengths = [...new Set(rules.map((r) => r.word.split(' ').length))].sort((a, b) => b - a)
+  let left = [...terms]
   const used: TaughtWord[] = []
-  for (const rule of rules) {
-    const ws = rule.word.split(' ')
-    if (!ws.every((w) => left.includes(w))) continue
-    for (const w of ws) left.splice(left.indexOf(w), 1)
-    used.push(rule)
+  for (const n of lengths) {
+    const taken = new Set<string>()
+    for (const rule of rules.filter((r) => r.word.split(' ').length === n)) {
+      const ws = rule.word.split(' ')
+      if (!ws.every((w) => left.includes(w))) continue
+      for (const w of ws) taken.add(w)
+      if (!used.some((u) => u.categoryId === rule.categoryId && u.field === rule.field && u.value === rule.value)) used.push(rule)
+    }
+    left = left.filter((w) => !taken.has(w))
   }
   if (used.length === 0) return none
   const filters = filtersOf(used)
@@ -114,6 +120,41 @@ export function readTaught(
     },
   }
 }
+
+/** On a category page, its own filters' values as words: "orthodox" on
+ *  Synagogues is Denomination: Orthodox (Ashkenazi) and Orthodox
+ *  (Sephardic), "sephardic" the one, "shabbat friendly" Hotels' yes/no.
+ *  Typed into the page's own search box they work like a taught word
+ *  (decided Sep 29: a word that names a filter turns it on). A value's
+ *  words are read as a question's are, so "Food Truck" is "truck"; each
+ *  part of it names it, never one word of a part. `values` gives the
+ *  values the category's listings actually have. */
+export function filterWords(category: CategoryConfig, values: (key: string) => string[]): AskWord[] {
+  const out: AskWord[] = []
+  const add = (text: string, rule: Omit<AskWord, 'word'>) => {
+    // "Keystone-K" is "keystone": a letter alone is never typed apart.
+    const ws = meaningfulWords(text).filter((w) => w.length > 1 && !NOT_A_FILTER_WORD.has(w))
+    if (ws.length) out.push({ word: ws.join(' '), ...rule })
+  }
+  for (const f of filterFields(category)) {
+    if (f.type === 'boolean') {
+      add(f.filterLabel ?? f.label, { field: f.key })
+      continue
+    }
+    for (const value of values(f.key)) {
+      const label = f.options?.find((o) => o.value === value)?.label ?? value
+      // "Orthodox (Sephardic)" is "orthodox" and "sephardic"; "Ice Cream &
+      // Treats" is "ice cream" and "treats", but "cream" alone isn't it
+      // ("cream cheese").
+      for (const part of label.split(/[()&/,]|\band\b/)) add(part, { field: f.key, value })
+    }
+  }
+  return out
+}
+
+/** Words a filter's value has that say nothing on their own: "Kosher
+ *  Items" doesn't make "items" a filter. */
+const NOT_A_FILTER_WORD = new Set(['item', 'items', 'other', 'non'])
 
 /** A word a reading suggests teaching: what the AI read a word the search
  *  didn't understand as. */
