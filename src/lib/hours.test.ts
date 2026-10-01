@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { businessClosure, dayAndMinutesInTimezone, effectiveBusinessStatus, fmt12, formatHoursSummary, formatTodayHours, formatWeekHours, getOpenStatus, hoursClosing, hoursNextOpening, hoursOpenNow, isStructuredHours, placesApiHoursToStructured, syncedLabel, type StructuredHours } from './hours'
+import { businessClosure, dayAndMinutesInTimezone, effectiveBusinessStatus, fmt12, formatHoursSummary, formatTodayHours, formatWeekHours, getOpenStatus, hasAnyHours, hoursClosing, hoursNextOpening, hoursOpenNow, isStructuredHours, placesApiHoursToStructured, syncedLabel, type StructuredHours } from './hours'
 
 // Everything here reads `new Date()`, so each test pins the clock. The local
 // timezone matters: hoursOpenNow uses getDay()/getHours(), i.e. the *viewer's*
@@ -476,5 +476,27 @@ describe('hoursNextOpening', () => {
     expect(hoursNextOpening(closed, friday2pm())).toBeNull()
     expect(hoursNextOpening('Mon–Fri 9–5', friday2pm())).toBeNull()
     expect(hoursNextOpening(undefined, friday2pm())).toBeNull()
+  })
+})
+
+describe('a place saved as closed every day (fixes table, Sep 29)', () => {
+  // Chalavita, The Brazilian BBQ and four more: almost always a form saved
+  // empty. It said "Closed today", and Closed for every day of the week.
+  const allClosed = { sun: null, mon: null, tue: null, wed: null, thu: null, fri: null, sat: null }
+  const tuesdayNoon = new Date(2026, 8, 29, 12, 0)
+
+  it('has no hours, the same as none saved, wherever hours are read', () => {
+    expect(hasAnyHours(allClosed)).toBe(false)
+    expect(hoursOpenNow(allClosed, tuesdayNoon)).toBeNull()
+    expect(formatTodayHours(allClosed, tuesdayNoon)).toBeNull()
+    expect(formatWeekHours(allClosed, tuesdayNoon)).toBeNull()
+    expect(hoursClosing(allClosed, 60, tuesdayNoon)).toBeNull()
+  })
+
+  it('one day with hours is hours, and the closed days say Closed', () => {
+    const oneDay = { ...allClosed, sun: { open: '09:00', close: '13:00' } }
+    expect(hasAnyHours(oneDay)).toBe(true)
+    expect(hoursOpenNow(oneDay, tuesdayNoon)).toBe(false)
+    expect(formatTodayHours(oneDay, tuesdayNoon)).toBe('Closed today')
   })
 })

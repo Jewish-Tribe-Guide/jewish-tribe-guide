@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { track } from '@vercel/analytics'
 import type { DirectoryResource } from '@/types'
 import { PHOTO_FIELD_KEY, selectValues, type CategoryConfig, type CategoryField } from '@/lib/categories'
-import { formatTodayHours, isStructuredHours } from '@/lib/hours'
+import { formatTodayHours, hasAnyHours } from '@/lib/hours'
 import { useNow } from '@/lib/useNow'
 import { useZmanim } from '@/lib/useZmanim'
 import { useActiveCommunity } from '@/lib/communityContext'
@@ -540,7 +540,7 @@ function statusLine(
 
 function hasAny(v: unknown): boolean {
   if (typeof v === 'string') return v.trim() !== ''
-  return isStructuredHours(v) && Object.values(v).some((d) => d != null)
+  return hasAnyHours(v)
 }
 
 function joinLabel(field: CategoryField, category: CategoryConfig): string {

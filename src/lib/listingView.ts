@@ -1,5 +1,5 @@
 import { selectValues, type CategoryConfig, type CategoryField } from './categories'
-import { fmt12, getOpenStatus, isStructuredHours, DAY_KEYS, dayLabel, type DayKey, type DayHours } from './hours'
+import { fmt12, getOpenStatus, hasAnyHours, isStructuredHours, DAY_KEYS, dayLabel, type DayKey, type DayHours } from './hours'
 
 const short = (k: DayKey) => dayLabel(k).slice(0, 3)
 import { haversineMiles, milesText, roundMiles } from './geo'
@@ -144,7 +144,7 @@ function andList(parts: string[]): string {
 
 function hasHours(v: unknown): boolean {
   if (typeof v === 'string') return v.trim() !== ''
-  return isStructuredHours(v) && Object.values(v).some((d) => d != null)
+  return hasAnyHours(v)
 }
 
 /** A place with no address has one link that is the point of it: a

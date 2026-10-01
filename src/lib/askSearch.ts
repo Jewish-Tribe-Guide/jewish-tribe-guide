@@ -3,7 +3,7 @@ import { selectValues, type CategoryConfig } from '@/lib/categories'
 import { listingSearchText } from '@/lib/searchListing'
 import { haversineMiles, type LatLng } from '@/lib/geo'
 import { findPlace, townsFrom, type Place } from '@/lib/places'
-import { DAY_KEYS, businessClosure, fmt12, getOpenStatus, isStructuredHours, type DayHours } from '@/lib/hours'
+import { DAY_KEYS, businessClosure, fmt12, getOpenStatus, hasAnyHours, isStructuredHours, type DayHours } from '@/lib/hours'
 import { filterWords, readTaught, type AskWord, type TaughtWord } from '@/lib/askWords'
 import { NEAR_ME, conceptCategories, initialisms, parseAsk, termMatches, termsRequired, typedWords, wordMatches, words, type AskQuery, type OpenAt, withoutOpenAt } from '@/lib/ask'
 
@@ -286,7 +286,7 @@ const toMinutes = (hhmm: string) => {
 function hasHours(item: DirectoryResource, category: CategoryConfig): boolean {
   return hoursKeys(category).some((k) => {
     const v = item[k]
-    return isStructuredHours(v) && Object.values(v).some((d) => !!d?.open && !!d?.close)
+    return hasAnyHours(v)
   })
 }
 
