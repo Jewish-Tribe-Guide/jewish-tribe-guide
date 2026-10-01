@@ -1,0 +1,102 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { makeCategory } from '@/test/providerFixtures'
+
+// "Know their Sukkos times? Add them": one special schedule, as an edit
+// suggestion built on the server from the stored listing.
+const m = vi.hoisted(() => ({
+  enforceRateLimit: vi.fn(),
+  verifyTurnstile: vi.fn(),
+  row: vi.fn(),
+  getResourceById: vi.fn(),
+  getCategoryById: vi.fn(),
+  submitListingUpdate: vi.fn(),
+  notify: vi.fn(),
+  ui: { contributions: { add: true, edit: true, report: true } },
+}))
+vi.mock('@/lib/rateLimit', () => ({ enforceRateLimit: m.enforceRateLimit, clientIp: () => '1.2.3.4' }))
+vi.mock('next/server', () => ({ after: (fn: () => unknown) => fn() }))
+vi.mock('@/lib/supabase/admin', () => ({
+  getAdminClient: () => ({
+    from: () => {
+      const filters: unknown[][] = []
+      const chain = { select: () => chain, eq: (...a: unknown[]) => (filters.push(['eq', ...a]), chain), maybeSingle: () => m.row(filters) }
+      return chain
+    },
+  }),
+}))
+vi.mock('@/lib/turnstile', () => ({ verifyTurnstile: m.verifyTurnstile }))
+vi.mock('@/lib/uiConfig', () => ({ ui: m.ui }))
+vi.mock('@/lib/resourceStore', () => ({ getResourceById: m.getResourceById }))
+vi.mock('@/lib/categoryStore', () => ({ getCategoryById: m.getCategoryById }))
+vi.mock('@/lib/submissionStore', () => ({ submitListingUpdate: m.submitListingUpdate }))
+vi.mock('@/lib/email', () => ({ sendSubmissionNotification: m.notify }))
+
+const { POST } = await import('./route')
+const ID = '0b6c4c1e-2f55-4a8e-9d57-3b7f0d6f4a21'
+const ctx = () => ({ params: Promise.resolve({ id: ID }) }) as never
+const req = (body: unknown) => new Request(`http://x/api/resource/${ID}/schedule`, { method: 'POST', body: JSON.stringify(body) })
+const shuls = makeCategory({ id: 'synagogue', label: 'Synagogue', detailFields: [{ key: 'minyanim', label: 'Davening Times', type: 'minyanim' }] })
+const regular = [{ id: 'r', tefillah: 'maariv', days: ['thu'], time: '7:45pm' }]
+const older = { id: 'o', name: 'Rosh Hashanah 5787', from: '2026-09-12', to: '2026-09-13', mode: 'replace', minyanim: [{ id: 'x', tefillah: 'shacharis', on: ['yom_tov'], time: '8:00am' }] }
+const listing = { id: ID, category: 'synagogue', name: 'Kesher Israel', anchorId: 'all', distance: 0, address: '412 Lombard St', minyanim: regular, minyanim_schedules: [older] }
+const sukkos = {
+  id: 's1',
+  name: 'Sukkos 5787',
+  from: '2026-09-26',
+  to: '2026-10-04',
+  mode: 'replace',
+  minyanim: [{ id: 'a', tefillah: 'mincha_maariv', on: ['chol_hamoed'], time: '6:30pm' }],
+}
+
+beforeEach(() => {
+  vi.resetAllMocks()
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date('2026-10-01T12:00:00Z'))
+  m.ui.contributions.edit = true
+  m.enforceRateLimit.mockResolvedValue(null)
+  m.verifyTurnstile.mockResolvedValue(true)
+  m.row.mockResolvedValue({ data: { community_id: 'philly' }, error: null })
+  m.getResourceById.mockResolvedValue(listing)
+  m.getCategoryById.mockResolvedValue(shuls)
+  m.submitListingUpdate.mockResolvedValue({ id: 'sub' })
+  m.notify.mockResolvedValue(undefined)
+})
+
+describe('POST /api/resource/:id/schedule', () => {
+  it('files the shul as stored, with this schedule beside its others, and its times in the note', async () => {
+    const res = await POST(req({ schedule: sukkos, source: 'Mincha/Maariv 6:30', turnstileToken: 't' }), ctx())
+    expect(await res.json()).toEqual({ ok: true })
+    const [community, target, payload, note] = m.submitListingUpdate.mock.calls[0]
+    expect([community, target]).toEqual(['philly', ID])
+    expect(payload.details.minyanim).toEqual(regular)
+    expect(payload.details.minyanim_schedules).toEqual([older, sukkos])
+    expect(note).toContain('Sukkos 5787 · Sep 26 – Oct 4 · in place of the regular times')
+    expect(note).toContain('Mincha & Maariv · Chol HaMoed · 6:30pm')
+    expect(note).toContain('Read from what they pasted:\nMincha/Maariv 6:30')
+    expect(m.notify).toHaveBeenCalled()
+  })
+
+  it('puts a schedule in place of one of the same name', async () => {
+    m.getResourceById.mockResolvedValue({ ...listing, minyanim_schedules: [{ ...sukkos, id: 'old', minyanim: [] }] })
+    await POST(req({ schedule: sukkos, turnstileToken: 't' }), ctx())
+    expect(m.submitListingUpdate.mock.calls[0][2].details.minyanim_schedules).toEqual([sukkos])
+  })
+
+  it('refuses one with no times, dates far off, or a month and more long; and nothing without the bot check', async () => {
+    for (const bad of [{ ...sukkos, minyanim: [] }, { ...sukkos, from: '2029-09-26', to: '2029-10-04' }, { ...sukkos, to: '2026-11-30' }, { ...sukkos, name: 'x' }]) {
+      expect((await POST(req({ schedule: bad, turnstileToken: 't' }), ctx())).status, JSON.stringify(bad).slice(0, 60)).toBe(400)
+    }
+    m.verifyTurnstile.mockResolvedValue(false)
+    expect((await POST(req({ schedule: sukkos, turnstileToken: 'x' }), ctx())).status).toBe(403)
+    expect(m.submitListingUpdate).not.toHaveBeenCalled()
+  })
+
+  it('not where edits are off, and not for a listing with no davening times field', async () => {
+    m.ui.contributions.edit = false
+    expect((await POST(req({ schedule: sukkos, turnstileToken: 't' }), ctx())).status).toBe(403)
+    m.ui.contributions.edit = true
+    m.getCategoryById.mockResolvedValue(makeCategory({ id: 'grocery', detailFields: [] }))
+    expect((await POST(req({ schedule: sukkos, turnstileToken: 't' }), ctx())).status).toBe(404)
+    expect(m.submitListingUpdate).not.toHaveBeenCalled()
+  })
+})

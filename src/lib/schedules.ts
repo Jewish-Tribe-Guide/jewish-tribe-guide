@@ -208,3 +208,35 @@ export function formatSchedulesSummary(schedules: readonly SpecialSchedule[]): s
     })
     .join('\n')
 }
+
+// ── One schedule sent from a visitor ────────────────────────────────────────
+
+const DAY = 86_400_000
+
+/** One schedule as sent, held to sizes a real one never exceeds. */
+export function cleanSchedule(raw: unknown, now = Date.now()): SpecialSchedule | null {
+  const [s] = readSchedules([raw])
+  if (!s) return null
+  const minyanim = s.minyanim.filter((m) => m.time.trim()).slice(0, 60)
+  if (minyanim.length === 0) return null
+  if (s.name.trim().length < 2 || s.name.length > 60) return null
+  const from = Date.parse(`${s.from}T12:00:00Z`)
+  const to = Date.parse(`${s.to}T12:00:00Z`)
+  // A festival's dates: not long past, not years off, not months long.
+  if (from < now - 30 * DAY || from > now + 400 * DAY || to - from > 31 * DAY) return null
+  if (minyanim.some((m) => m.time.length > 40 || (m.notes?.length ?? 0) > 120 || m.on.length > 40)) return null
+  return {
+    id: s.id.slice(0, 64),
+    name: s.name.trim(),
+    from: s.from,
+    to: s.to,
+    mode: s.mode,
+    minyanim: minyanim.map((m) => ({
+      id: String(m.id).slice(0, 64),
+      tefillah: m.tefillah,
+      on: m.on,
+      time: m.time.trim(),
+      ...(m.notes?.trim() ? { notes: m.notes.trim() } : {}),
+    })),
+  }
+}

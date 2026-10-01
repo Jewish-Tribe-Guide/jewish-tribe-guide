@@ -57,6 +57,7 @@ import Chip from './Chip'
 import Highlight from './Highlight'
 import HoursDisplay from './HoursDisplay'
 import DaveningCard from './DaveningCard'
+import { schedulesKey } from '@/lib/schedules'
 import WalkList from './WalkList'
 import { useNextMinyan } from './nextMinyans'
 import { Card, shortDate } from './listingParts'
@@ -296,7 +297,7 @@ export default function ListingView({ item, category, color, place = null, upvot
   let mainSection: ReactNode = null
   if (main === 'davening') {
     const f = category.detailFields.find((x) => x.type === 'minyanim')!
-    mainSection = <DaveningCard item={item} minyanim={item[f.key]} />
+    mainSection = <DaveningCard item={item} minyanim={item[f.key]} schedules={item[schedulesKey(f.key)]} category={category} />
   } else if (main === 'items' && itemsF) {
     mainSection = <ItemsCard field={itemsF} found={found} api={itemApi} menuUrl={menuUrlOf(item)} />
   } else if (main === 'groups') {

@@ -19,6 +19,9 @@ import type { Festival } from '@/lib/festivals'
 type Props = {
   value: unknown
   onChange: (value: SpecialSchedule[]) => void
+  /** Start straight on this festival's schedule ("Sukkos"), as "Know
+   *  their Sukkos times? Add them" does. */
+  startWith?: string
 }
 
 const genId = () => crypto.randomUUID()
@@ -45,6 +48,20 @@ function useFestivals(wanted: boolean): Festival[] | null {
   return festivals
 }
 
+/** A new schedule for a festival (its name and dates), or for dates to
+ *  fill in, with a first time to fill in. */
+function newSchedule(f: Festival | null): SpecialSchedule {
+  const today = new Date().toISOString().slice(0, 10)
+  return {
+    id: genId(),
+    name: f?.name ?? '',
+    from: f?.from ?? today,
+    to: f?.to ?? today,
+    mode: 'replace',
+    minyanim: [{ id: genId(), tefillah: 'shacharis', on: f?.days.some((d) => d.yomTov) ? ['yom_tov'] : [], time: '' }],
+  }
+}
+
 /** Every date from `from` to `to`, at most three weeks of them. */
 function datesBetween(from: string, to: string): string[] {
   const out: string[] = []
@@ -54,11 +71,23 @@ function datesBetween(from: string, to: string): string[] {
   return out
 }
 
-export default function SchedulesInput({ value, onChange }: Props) {
+export default function SchedulesInput({ value, onChange, startWith }: Props) {
   const [schedules, setSchedules] = useState<SpecialSchedule[]>(() => readSchedules(value))
   const [open, setOpen] = useState<string | null>(null)
-  const [choosing, setChoosing] = useState(false)
+  const [choosing, setChoosing] = useState(!!startWith)
   const festivals = useFestivals(choosing || open !== null)
+  // Started on a festival: its schedule, once the calendar says its dates.
+  const [started, setStarted] = useState(false)
+  if (startWith && !started && festivals) {
+    setStarted(true)
+    const f = festivals.find((x) => x.festival === startWith)
+    if (f && schedules.length === 0) {
+      const s = newSchedule(f)
+      setSchedules([s])
+      setOpen(s.id)
+      setChoosing(false)
+    }
+  }
 
   // What's saved is only what's complete: a named schedule with its dates
   // in order, and times with a day and a time. A row still being filled in
@@ -73,15 +102,7 @@ export default function SchedulesInput({ value, onChange }: Props) {
   }
   const patch = (id: string, p: Partial<SpecialSchedule>) => update(schedules.map((s) => (s.id === id ? { ...s, ...p } : s)))
   const add = (f: Festival | null) => {
-    const today = new Date().toISOString().slice(0, 10)
-    const s: SpecialSchedule = {
-      id: genId(),
-      name: f?.name ?? '',
-      from: f?.from ?? today,
-      to: f?.to ?? today,
-      mode: 'replace',
-      minyanim: [{ id: genId(), tefillah: 'shacharis', on: f?.days.some((d) => d.yomTov) ? ['yom_tov'] : [], time: '' }],
-    }
+    const s = newSchedule(f)
     update([...schedules, s])
     setOpen(s.id)
     setChoosing(false)

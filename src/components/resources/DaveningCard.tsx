@@ -2,11 +2,15 @@
 
 import { useState } from 'react'
 import type { DirectoryResource } from '@/types'
-import { TEFILLAH_LABELS } from '@/lib/davening'
+import { TEFILLAH_LABELS, TEFILLAH_ORDER, parseTimeToMinutes } from '@/lib/davening'
 import { clockTime, listMinyanim } from '@/lib/upcomingDavening'
 import { useMinyanSchedule } from '@/lib/useMinyanSchedule'
 import { dayLabel, type DayKey } from '@/lib/hours'
+import { dateText, readSchedules, scheduleDayText, type DayPosting, type SpecialSchedule } from '@/lib/schedules'
+import { resolveCapabilities, type CategoryConfig } from '@/lib/categories'
+import { ui } from '@/lib/uiConfig'
 import { ChevronRightIcon } from '@/components/icons'
+import AddScheduleBox from './AddScheduleBox'
 import DaveningTimes from './DaveningTimes'
 import { Card } from './listingParts'
 import FreshnessFooter from './FreshnessFooter'
@@ -20,9 +24,28 @@ function dayName(key: DayKey): string {
 /** A shul's main thing: today's and tomorrow's minyanim, each at its real
  *  time (a candle-lighting Kabbalas Shabbos worked out for today), the ones
  *  already past dimmed; the whole week one tap away. With nothing today or
- *  tomorrow ("Shabbos only" on a Tuesday), the week straight away. */
-export default function DaveningCard({ item, minyanim }: { item: DirectoryResource; minyanim: unknown }) {
+ *  tomorrow ("Shabbos only" on a Tuesday), the week straight away.
+ *
+ *  Over a Yom Tov (step 4, agreed Oct 1): the shul's special schedule while
+ *  it applies, saying so ("Sukkos schedule · in place of the regular times
+ *  until Sun Oct 4"), or, where it hasn't posted one, its regular times
+ *  marked "may not apply", with "Know their Sukkos times? Add them". */
+export default function DaveningCard({
+  item,
+  minyanim,
+  schedules: rawSchedules,
+  category,
+}: {
+  item: DirectoryResource
+  minyanim: unknown
+  /** The shul's special schedules, stored beside its times. */
+  schedules?: unknown
+  category?: CategoryConfig
+}) {
   const [week, setWeek] = useState(false)
+  const [allSpecial, setAllSpecial] = useState(false)
+  const [adding, setAdding] = useState(false)
+  const [sent, setSent] = useState(false)
   const schedule = useMinyanSchedule(null, [item])
   const slots = schedule
     ? listMinyanim(
@@ -32,8 +55,43 @@ export default function DaveningCard({ item, minyanim }: { item: DirectoryResour
     : null
   const soon = slots && slots.today.length + slots.tomorrow.length > 0
 
+  // Whose times today's and tomorrow's are: a special schedule's, or the
+  // regular ones on a festival day with none posted.
+  const posting: DayPosting[] = schedule ? [schedule.today, schedule.tomorrow].map((d) => schedule.posting[item.id]?.[d.date] ?? { kind: 'regular' }) : []
+  const special = posting.find((p): p is Extract<DayPosting, { kind: 'schedule' }> => p.kind === 'schedule')
+  const specialSchedule = special ? readSchedules(rawSchedules).find((s) => s.name === special.name) : undefined
+  const notPosted = posting.find((p): p is Extract<DayPosting, { kind: 'not-posted' }> => p.kind === 'not-posted')
+  const canAdd = ui.contributions.edit && (!category || resolveCapabilities(category.capabilities).edit)
+
   return (
     <Card title="Davening times" testId="listing-davening" footer={<FreshnessFooter resourceId={item.id} confirmedAt={item.confirmedAt} subject="Times" />}>
+      {specialSchedule && (
+        <p className="mt-1 text-[13.5px] font-semibold text-green-700" data-testid="davening-special">
+          {specialSchedule.name} · {specialSchedule.mode === 'replace' ? 'in place of the regular times' : 'as well as the regular times'} until {dateText(specialSchedule.to, { weekday: true })}
+        </p>
+      )}
+      {notPosted && !specialSchedule && (
+        <div className="mt-1.5 rounded-[10px] border border-amber-300 bg-amber-50 px-3 py-2.5" data-testid="davening-not-posted">
+          <p className="text-[14px] font-bold text-caution">{notPosted.festival} times not posted</p>
+          <p className="mt-0.5 text-[13px] leading-snug text-amber-900">These are the regular times. They may not apply during {notPosted.festival}.</p>
+          {canAdd &&
+            (sent ? (
+              <p role="status" className="mt-2 text-[13.5px] font-semibold text-emerald-700">
+                ✓ Thanks! An admin checks them before everyone sees them.
+              </p>
+            ) : adding ? (
+              <AddScheduleBox item={item} festival={notPosted.festival} onSent={() => setSent(true)} onClose={() => setAdding(false)} />
+            ) : (
+              <button
+                type="button"
+                onClick={() => setAdding(true)}
+                className="mt-2 h-10 w-full cursor-pointer rounded-[10px] border-[1.5px] border-primary bg-white text-[14.5px] font-bold text-primary hover:bg-primary/5"
+              >
+                Know their {notPosted.festival} times? Add them
+              </button>
+            ))}
+        </div>
+      )}
       {soon && !week && schedule && (
         <div>
           {(
@@ -72,6 +130,44 @@ export default function DaveningCard({ item, minyanim }: { item: DirectoryResour
           <ChevronRightIcon className="h-4 w-4" />
         </button>
       )}
+      {specialSchedule && (
+        <div className="mt-1">
+          <button type="button" onClick={() => setAllSpecial((v) => !v)} aria-expanded={allSpecial} className="inline-flex cursor-pointer items-center gap-1 text-[14.5px] font-bold text-primary">
+            All {specialSchedule.name.replace(/\s+\d{4}$/, '')} times
+            <ChevronRightIcon className={`h-4 w-4 transition-transform ${allSpecial ? '-rotate-90' : ''}`} />
+          </button>
+          {allSpecial && <SpecialTimes schedule={specialSchedule} />}
+        </div>
+      )}
     </Card>
+  )
+}
+
+/** Every time in a special schedule, by the days it's held on. */
+function SpecialTimes({ schedule }: { schedule: SpecialSchedule }) {
+  const groups = new Map<string, SpecialSchedule['minyanim']>()
+  for (const m of schedule.minyanim) {
+    const label = m.on.map(scheduleDayText).join(', ')
+    groups.set(label, [...(groups.get(label) ?? []), m])
+  }
+  return (
+    <div className="mt-1" data-testid="davening-special-all">
+      {[...groups].map(([label, rows]) => (
+        <div key={label} className="border-t border-slate-200 py-1.5">
+          <p className="text-[12.5px] font-bold uppercase tracking-wide text-muted">{label}</p>
+          {[...rows]
+            .sort((a, b) => TEFILLAH_ORDER.indexOf(a.tefillah) - TEFILLAH_ORDER.indexOf(b.tefillah) || parseTimeToMinutes(a.time) - parseTimeToMinutes(b.time))
+            .map((m) => (
+              <div key={m.id} className="grid grid-cols-[9.5rem_1fr] gap-2.5 py-0.5 text-[15px]">
+                <span className="font-semibold text-slate-900">{TEFILLAH_LABELS[m.tefillah]}</span>
+                <span className="text-slate-900">
+                  <b>{m.time}</b>
+                  {m.notes ? <span className="text-muted"> · {m.notes}</span> : null}
+                </span>
+              </div>
+            ))}
+        </div>
+      ))}
+    </div>
   )
 }
