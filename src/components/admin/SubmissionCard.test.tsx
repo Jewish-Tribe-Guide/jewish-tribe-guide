@@ -6,7 +6,7 @@ import { formatAnchorRule, type Minyan } from '@/lib/davening'
 import type { EnrichedSubmission, ResourceRow } from '@/types'
 import { SubmissionCard } from './SubmissionCard'
 import { makeCategory } from '@/test/providerFixtures'
-import { SYNC_INTERNAL_FIELDS, SHOWN_WHEN_CONFIGURED } from '@/lib/syncFields'
+import { SYNC_INTERNAL_FIELDS, SHOWN_WHEN_CONFIGURED, SHOWN_WHEN_PROPOSED } from '@/lib/syncFields'
 
 afterEach(() => cleanup())
 
@@ -245,7 +245,7 @@ describe('read-only history card — who reviewed it', () => {
 // bookkeeping key added there must never need a second edit here to stay
 // hidden, because the second edit is the one that gets forgotten.
 describe('the diff hides sync bookkeeping, all of it', () => {
-  for (const key of SYNC_INTERNAL_FIELDS.filter((k) => k !== SHOWN_WHEN_CONFIGURED)) {
+  for (const key of SYNC_INTERNAL_FIELDS.filter((k) => k !== SHOWN_WHEN_CONFIGURED && k !== SHOWN_WHEN_PROPOSED)) {
     it(`never shows ${key}`, () => {
       renderDiff({ key, type: 'text' }, 'INTERNAL_BEFORE', 'INTERNAL_AFTER')
       expect(screen.queryByText('INTERNAL_BEFORE')).not.toBeInTheDocument()
@@ -258,6 +258,43 @@ describe('the diff hides sync bookkeeping, all of it', () => {
   it('still shows googleDescription, which some categories offer as real content', () => {
     renderDiff({ key: SHOWN_WHEN_CONFIGURED, type: 'text' }, 'Old blurb', 'New blurb')
     expect(screen.getByText('New blurb')).toBeInTheDocument()
+  })
+})
+
+// The one internal a submission can still set — read off the Google place
+// picked in the form — so the one a forged request would reach for to mark a
+// listing closed. Hidden, a moderator approved it blind.
+describe('the diff shows a proposed businessStatus', () => {
+  function renderStatusDiff(before: Record<string, unknown>, after: Record<string, unknown>) {
+    const category = makeCategory({ id: 'grocery', detailFields: [{ key: 'note', type: 'text', label: 'Note' }] })
+    const submission = {
+      id: 's1',
+      operation: 'update',
+      target_type: 'listing',
+      target_id: 'r1',
+      payload: { category: 'grocery', name: 'Place', details: { note: 'new', ...after } },
+      note: null,
+      status: 'pending',
+      submitted_by: null,
+      created_at: new Date().toISOString(),
+      reviewed_at: null,
+      current: { id: 'r1', category: 'grocery', name: 'Place', details: { note: 'old', ...before } },
+    } as unknown as EnrichedSubmission
+    return render(<SubmissionCard submission={submission} categoriesById={new Map([['grocery', category]])} />)
+  }
+
+  it('as a change, in words, when an edit carries one', () => {
+    renderStatusDiff({ businessStatus: 'OPERATIONAL' }, { businessStatus: 'CLOSED_PERMANENTLY' })
+    expect(screen.getByText('Business status (from Google)')).toBeInTheDocument()
+    expect(screen.getByText('Open')).toHaveClass('line-through')
+    expect(screen.getByText('Permanently closed')).toHaveClass('text-green-700')
+  })
+
+  // Approval keeps the stored status when an edit doesn't carry one, so
+  // "Open → —" would report a change that never happens.
+  it('not at all when the edit leaves it out', () => {
+    renderStatusDiff({ businessStatus: 'OPERATIONAL' }, {})
+    expect(screen.queryByText('Business status (from Google)')).not.toBeInTheDocument()
   })
 })
 

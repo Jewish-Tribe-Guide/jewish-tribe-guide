@@ -629,7 +629,9 @@ function withPreservedInternals(
   const next = { ...details }
   for (const key of SUBMITTER_CANNOT_TOUCH) {
     // `in`, not a truthiness check: an edit that legitimately supplies one of
-    // these (the intake now captures businessStatus) must still win.
+    // these must still win. Only two can arrive that way — businessStatus
+    // with a newly picked place, and a configured googleDescription — since
+    // the submissions route strips the rest (syncFields' submitterDetails).
     if (!(key in next) && key in before) next[key] = before[key]
   }
   return next

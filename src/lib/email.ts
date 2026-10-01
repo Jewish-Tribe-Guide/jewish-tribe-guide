@@ -3,7 +3,15 @@ import type { SubmissionPayload } from './requests'
 import { PREFERRED_CONTACT_LABELS } from './requests'
 import { getCategoryById } from './categoryStore'
 import { getResourceRowById } from './resourceStore'
-import { diffLines, diffListing, isMultiline } from './submissionDiff'
+import {
+  diffLines,
+  diffListing,
+  isMultiline,
+  HIDDEN_FROM_DIFF,
+  BUSINESS_STATUS_LABEL,
+  formatBusinessStatus,
+} from './submissionDiff'
+import { SHOWN_WHEN_PROPOSED } from './syncFields'
 import { getCommunityNotifyRecipients, getReviewActionRecipients } from './communityStore'
 import { adminBase } from './adminNav'
 import { formatHoursSummary } from './hours'
@@ -372,7 +380,9 @@ export async function sendSubmissionNotification(submission: SubmissionRow): Pro
   let title: string
   let proposedRows: string
 
-  const DETAIL_SKIP = new Set(['geo', 'legacyId', 'placeId', 'googleSyncedAt', 'businessStatus', 'googleFields'])
+  // The queue's own set, so the two can't drift. This one used to be its own
+  // copy, and fell behind: a create's email listed googleAutofill as raw JSON.
+  const DETAIL_SKIP = HIDDEN_FROM_DIFF
 
   if (submission.target_type === 'category') {
     const payload = submission.payload as CategorySubmissionPayload
@@ -421,6 +431,7 @@ export async function sendSubmissionNotification(submission: SubmissionRow): Pro
         // yet loaded), but it's never preferred over the field's real,
         // admin-configured label and option text.
         const field = category?.detailFields.find((f) => f.key === k)
+        if (!field && k === SHOWN_WHEN_PROPOSED) return row(BUSINESS_STATUS_LABEL, formatBusinessStatus(v))
         return row(field?.label ?? k, formatDetailValue(v, field))
       })
       .join('')

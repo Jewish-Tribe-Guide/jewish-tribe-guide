@@ -39,6 +39,8 @@ vi.mock('@/lib/confirmationEmail', () => ({ sendSubmissionConfirmation: m.sendSu
 vi.mock('next/server', () => ({ after: m.after }))
 vi.mock('@/lib/uiConfig', () => ({ ui: { contributions: m.contributions } }))
 
+import { SYNC_INTERNAL_FIELDS } from '@/lib/syncFields'
+
 const { POST } = await import('./route')
 
 const post = (body: unknown, query = '') =>
@@ -216,5 +218,77 @@ describe('POST /api/submissions — accepted submissions', () => {
     const res = await post({ operation: 'create', payload: listing })
     expect(res.status).toBe(502)
     expect(m.after).not.toHaveBeenCalled()
+  })
+})
+
+// A hand-made POST could set the app's own keys on a listing — an admin's
+// status override, the sync's timestamps, a Directions place id, item dates —
+// and the admin approving it saw none of it: the validator ignores keys it
+// doesn't know, approval keeps a stored internal only when the edit didn't
+// supply one, and the diff hides every one of them. So they come off here.
+describe('POST /api/submissions — the app’s own keys never come from a submitter', () => {
+  // Every key in the list, so one added there is covered here without an edit.
+  const forged = Object.fromEntries(SYNC_INTERNAL_FIELDS.map((k) => [k, 'CLOSED_PERMANENTLY']))
+  const createdDetails = () => m.submitListingCreate.mock.calls[0][1].details as Record<string, unknown>
+  const updatedDetails = () => m.submitListingUpdate.mock.calls[0][2].details as Record<string, unknown>
+
+  it('strips every one of them from a create, keeping the submitter’s own fields', async () => {
+    await post({ operation: 'create', payload: { ...listing, details: { note: 'hi', ...forged } } })
+    expect(createdDetails()).toEqual({ note: 'hi' })
+  })
+
+  it('strips every one of them from an edit', async () => {
+    await post({ operation: 'update', targetId: 'r1', payload: { ...listing, details: { note: 'hi', ...forged } } })
+    expect(updatedDetails()).toEqual({ note: 'hi' })
+  })
+
+  it('strips them before validating, so nothing downstream ever sees them', async () => {
+    await post({ operation: 'create', payload: { ...listing, details: forged } })
+    expect(m.validateSubmission.mock.calls[0][0].details).toEqual({})
+  })
+
+  it('keeps googleDescription where the category offers it as a real Description field', async () => {
+    m.getCategoryById.mockResolvedValue({ id: 'synagogue', detailFields: [{ key: 'googleDescription', type: 'text' }] })
+    await post({ operation: 'create', payload: { ...listing, details: { googleDescription: 'A shul.', googleSyncedAt: 'x' } } })
+    expect(createdDetails()).toEqual({ googleDescription: 'A shul.' })
+  })
+
+  // The intake reads the status off the Google place someone picks, so a new
+  // listing isn't published with none. The moderation diff shows it.
+  describe('businessStatus, read off a place picked in the form', () => {
+    const picked = { placeId: 'place-new', businessStatus: 'CLOSED_PERMANENTLY' }
+
+    it('is kept on a create that picked a place', async () => {
+      await post({ operation: 'create', payload: { ...listing, details: picked } })
+      expect(createdDetails()).toEqual(picked)
+    })
+
+    it('is kept on an edit that picked a different place', async () => {
+      m.getResourceById.mockResolvedValue({ id: 'r1', category: 'synagogue', placeId: 'place-old' })
+      await post({ operation: 'update', targetId: 'r1', payload: { ...listing, details: picked } })
+      expect(updatedDetails()).toEqual(picked)
+    })
+
+    it('is dropped on an edit that kept its place, so approval keeps the stored status', async () => {
+      m.getResourceById.mockResolvedValue({ id: 'r1', category: 'synagogue', placeId: 'place-new' })
+      await post({ operation: 'update', targetId: 'r1', payload: { ...listing, details: picked } })
+      expect(updatedDetails()).toEqual({ placeId: 'place-new' })
+    })
+
+    it('is dropped without a place to have come from', async () => {
+      await post({ operation: 'create', payload: { ...listing, details: { businessStatus: 'CLOSED_PERMANENTLY' } } })
+      expect(createdDetails()).toEqual({})
+    })
+
+    it('is dropped when it isn’t one of Google’s statuses', async () => {
+      await post({ operation: 'create', payload: { ...listing, details: { ...picked, businessStatus: 'CLOSED_FOREVER' } } })
+      expect(createdDetails()).toEqual({ placeId: 'place-new' })
+    })
+
+    it('is dropped in a category the sync doesn’t cover (no address)', async () => {
+      m.getCategoryById.mockResolvedValue({ id: 'synagogue', detailFields: [], hasAddress: false })
+      await post({ operation: 'create', payload: { ...listing, details: picked } })
+      expect(createdDetails()).toEqual({ placeId: 'place-new' })
+    })
   })
 })

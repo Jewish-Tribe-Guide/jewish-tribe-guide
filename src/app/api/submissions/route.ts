@@ -1,6 +1,7 @@
 import { validateSubmission, getResourceById } from '@/lib/resourceStore'
 import { getCategoryById } from '@/lib/categoryStore'
-import { resolveCapabilities } from '@/lib/categories'
+import { resolveCapabilities, isCategorySyncEligible } from '@/lib/categories'
+import { submitterDetails } from '@/lib/syncFields'
 import {
   submitListingCreate,
   submitListingUpdate,
@@ -138,6 +139,17 @@ export async function POST(request: Request) {
 
   if (payload) {
     const category = await getCategoryById(community.slug, payload.category)
+    // The app's own keys (sync state, an admin's status override, item dates)
+    // come off before anything else looks at the payload: nothing downstream
+    // would refuse them, and the moderation diff hides them.
+    if (payload.details && typeof payload.details === 'object') {
+      payload.details = submitterDetails(payload.details, {
+        operation: operation === 'create' ? 'create' : 'update',
+        fieldKeys: category?.detailFields.map((f) => f.key) ?? [],
+        syncEligible: category ? isCategorySyncEligible(category) : false,
+        storedPlaceId: existingResource?.placeId,
+      })
+    }
     // Nobody types the "https://" scheme by hand for a website field — add it
     // before validating (so a bare "example.com" isn't rejected) and before
     // storing (so the saved value is still a real, working link — the card
