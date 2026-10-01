@@ -456,6 +456,31 @@ describe('GenericListingCard — items a search matched', () => {
     expect(screen.getByText('Wine')).toBeInTheDocument()
     expect(screen.getByText('Challah · sometimes')).toBeInTheDocument()
   })
+
+  it('says when each matched item was last seen there, amber once it’s 90 days old (agreed Oct 1)', () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-10-09T17:30:00Z'))
+    try {
+      const category = makeCategory({ detailFields: [{ key: 'items', label: 'Kosher items available', type: 'tags', showCountInHeader: true }] })
+      const item = makeListing({ items: ['Wine', 'Challah', 'Bread'], itemSeen: { items: { Wine: '2026-10-09T14:00:00Z', Challah: '2026-07-02T14:00:00Z' } } })
+      renderWithProviders(
+        <GenericListingCard
+          item={item}
+          category={category}
+          upvotes={false}
+          count={0}
+          {...requiredHandlers}
+          found={{ terms: ['x'], items: [{ tag: 'Wine', sometimes: false }, { tag: 'Challah', sometimes: false }, { tag: 'Bread', sometimes: false }], fields: [] }}
+        />,
+      )
+      expect(screen.getByText('Wine · seen today')).toBeInTheDocument()
+      expect(screen.getByText('Challah · seen Jul 2')).toHaveClass('text-caution')
+      expect(screen.getByText('Wine · seen today')).not.toHaveClass('text-caution')
+      expect(screen.getByText('Bread')).toBeInTheDocument()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
 })
 
 describe('GenericListingCard — the field a search matched, when no item did', () => {

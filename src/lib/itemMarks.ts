@@ -40,6 +40,19 @@ function dates(item: DirectoryResource, map: 'itemSeen' | 'itemGone', key: strin
   return out
 }
 
+/** When someone last saw one item there, by its name as the listing has
+ *  it, whichever list it's in. Null with no date. */
+export function seenAtFor(item: DirectoryResource, name: string): string | null {
+  const all = item.itemSeen
+  if (!all || typeof all !== 'object') return null
+  const lower = name.toLowerCase()
+  for (const key of Object.keys(all as Record<string, unknown>)) {
+    const at = dates(item, 'itemSeen', key)[lower]
+    if (at) return at
+  }
+  return null
+}
+
 /** A listing's items with their dates, the always-there ones first. */
 export function itemMarks(item: DirectoryResource, field: CategoryField): ItemMark[] {
   const out: ItemMark[] = []

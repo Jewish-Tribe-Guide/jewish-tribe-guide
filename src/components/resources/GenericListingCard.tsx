@@ -5,6 +5,9 @@ import { track } from '@vercel/analytics'
 import type { DirectoryResource } from '@/types'
 import { PHOTO_FIELD_KEY, resolveCapabilities, type CategoryConfig, type CategoryField } from '@/lib/categories'
 import { useNow } from '@/lib/useNow'
+import { dayText, seenAtFor } from '@/lib/itemMarks'
+import { isStale } from '@/lib/listingView'
+import { community as communityConfig } from '@/community.config'
 import { getCategoryColor } from '@/lib/categoryColor'
 import { useCategories } from '@/lib/useCategories'
 import { useCommunitySlug } from '@/lib/communityContext'
@@ -510,12 +513,18 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
                 the listing, which is where to go next. */}
             {(matchedChips || matchedFields) && (
               <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                {matchedChips?.map((m) => (
-                  <Chip key={m.tag} tone={m.sometimes ? 'amber' : 'slate'}>
-                    {m.tag}
-                    {m.sometimes ? ' · sometimes' : ''}
-                  </Chip>
-                ))}
+                {matchedChips?.map((m) => {
+                  // When someone last saw it there (agreed Oct 1), once
+                  // the page knows the time.
+                  const seenAt = clock === null ? null : seenAtFor(item, m.tag)
+                  return (
+                    <Chip key={m.tag} tone={m.sometimes || (seenAt && isStale(seenAt, clock)) ? 'amber' : 'slate'}>
+                      {m.tag}
+                      {m.sometimes ? ' · sometimes' : ''}
+                      {seenAt ? ` · seen ${dayText(seenAt, clock, communityConfig.timezone)}` : ''}
+                    </Chip>
+                  )
+                })}
                 {matchedFields?.map((f) =>
                   f.text ? (
                     <span key={f.label} className="basis-full text-xs text-slate-600">

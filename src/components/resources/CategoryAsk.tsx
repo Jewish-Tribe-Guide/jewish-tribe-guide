@@ -82,6 +82,7 @@ function Ask({ category, items, search, onSearch, schedule, readAs }: Props & { 
     const answer = answerFor(result, {
       coords: coords ?? (result.query.within ? null : community.mapCenter),
       schedule: result.query.minyan && schedule ? answerSchedule(schedule) : null,
+      now,
     })
     return { result, answer }
   }
@@ -89,7 +90,7 @@ function Ask({ category, items, search, onSearch, schedule, readAs }: Props & { 
   const asksWhen = (r: AskResult) => r.query.openNow || r.query.openToday || r.query.openAt !== null || r.query.minyan !== null
   const q = search.trim()
   // Read by the reader, its result answers (see readingSearch.ts).
-  const answer = q && now !== null ? (readAs?.result ? answerFor(readAs.result, { coords: coords ?? community.mapCenter }) : ask(q).answer) : null
+  const answer = q && now !== null ? (readAs?.result ? answerFor(readAs.result, { coords: coords ?? community.mapCenter, now }) : ask(q).answer) : null
   const examples = q
     ? []
     : pickPrompts(

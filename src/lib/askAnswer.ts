@@ -3,6 +3,8 @@ import type { CategoryConfig } from '@/lib/categories'
 import { resolvePrimaryZmanimBlock } from '@/lib/zmanim'
 import { describedByItsText, type AskHit, type DayWindow, type AskResult, type HoursWindow, type NearMiss } from '@/lib/askSearch'
 import { itemWords } from '@/lib/itemNames'
+import { dayText, seenAtFor } from '@/lib/itemMarks'
+import { community } from '@/community.config'
 import { formatOpenAtTime, termMatches, termsAsTyped, words, type MetaAsk, type MinyanAsk, type MinyanWhen, type TimesAsk } from '@/lib/ask'
 import { TEFILLAH_LABELS, type Tefillah } from '@/lib/davening'
 import type { MinyanSlot } from '@/lib/upcomingDavening'
@@ -317,6 +319,9 @@ export function answerFor(
      *  time go to the shul nearer it, as the rows' own distances do. Only
      *  for that order; no distance is said from it. */
     center?: LatLng | null
+    /** The time, once the page knows it: an item's "seen today" is said
+     *  with it. Without it, no date is said. */
+    now?: number | null
   } = {},
 ): Answer | null {
   const answer = withBest(result, baseAnswer(result, options))
@@ -334,7 +339,7 @@ export function answerFor(
 
 function baseAnswer(
   result: AskResult,
-  { schedule = null, coords = null, center = null }: { schedule?: AnswerSchedule | null; coords?: LatLng | null; center?: LatLng | null },
+  { schedule = null, coords = null, center = null, now = null }: { schedule?: AnswerSchedule | null; coords?: LatLng | null; center?: LatLng | null; now?: number | null },
 ): Answer | null {
   const { query, hits } = result
   if (!query.raw) return null
@@ -455,20 +460,31 @@ function baseAnswer(
     const sometimes = having.filter((h) => h.matched.length > 0 && h.matched.every((m) => m.sometimes)).length
     const note = sometimes === having.length ? ' (only sometimes in stock)' : sometimes > 0 ? ` (${sometimes} only sometimes)` : ''
     const near = nearest(having)
+    // When someone last saw it there (agreed Oct 1): "Nearest: Trader
+    // Joe's, 0.2 mi, seen today", and how many have been this week.
+    const seenOf = (h: AskHit) => {
+      const at = now === null ? null : itemSeenAt(h)
+      return at ? `, seen ${dayText(at, now, community.timezone)}` : ''
+    }
+    const thisWeek = now === null ? 0 : having.filter((h) => {
+      const at = itemSeenAt(h)
+      return at !== null && now - Date.parse(at) < 7 * 86_400_000
+    }).length
+    const weekNote = thisWeek > 0 && having.length > 1 ? ` Seen this week at ${thisWeek}.` : ''
     const closedNote = !asksOpen || !closed ? ''
       : query.openAt ? ` ${closed} more ${closed === 1 ? "isn't" : "aren't"} open then.`
       : ` ${closed} more ${closed === 1 ? 'is' : 'are'} closed ${later}.`
     // Measured from the place asked about, it says so: "8.1 mi from HUP".
     const fromAnchor = where && near.miles != null ? ` from ${where}` : ''
-    if (having.length === 1) return { text: `${near.item.name} has ${thing}${note}${milesOf(near)}${fromAnchor}${hoursOf(near)}.${closedNote}`, rows: [] }
+    if (having.length === 1) return { text: `${near.item.name} has ${thing}${note}${milesOf(near)}${fromAnchor}${hoursOf(near)}${seenOf(near)}.${closedNote}`, rows: [] }
     const nearestLabel = where ? `Nearest to ${where}` : 'Nearest'
-    const nearText = near.miles != null ? ` ${nearestLabel}: ${near.item.name}${milesOf(near)}${hoursOf(near)}.` : ''
+    const nearText = near.miles != null ? ` ${nearestLabel}: ${near.item.name}${milesOf(near)}${hoursOf(near)}${seenOf(near)}.` : ''
     const open = query.openNow ? ' open' : query.openToday ? ' open today' : ''
     // "Than Giant": the places that aren't it.
     const besides = result.excluded.length ? ` besides ${[...new Set(result.excluded)].join(' or ')}` : ''
     // "Open after 6:00 PM today" is too long to go before "places".
     const openAt = query.openAt ? `, open ${later}` : ''
-    return { text: `${having.length}${open} places${besides} have ${thing}${note}${openAt}.${nearText}${closedNote}`, rows: [] }
+    return { text: `${having.length}${open} places${besides} have ${thing}${note}${openAt}.${weekNote}${nearText}${closedNote}`, rows: [] }
   }
 
   // Asked only what's open ("is there a mikvah open today"): what is, and
@@ -530,6 +546,12 @@ function kindOf(hits: AskHit[], count = hits.length): string {
 }
 
 /** The nearest of some hits, or the best match when there's no distance. */
+/** When someone last saw the item a search matched at this place, its
+ *  best match (see seenAtFor). */
+function itemSeenAt(h: Pick<AskHit, 'item' | 'matched'>): string | null {
+  return h.matched[0] ? seenAtFor(h.item, h.matched[0].tag) : null
+}
+
 function nearest(hits: AskHit[]): AskHit {
   return hits.reduce((best, h) => (h.miles != null && (best.miles == null || h.miles < best.miles) ? h : best), hits[0])
 }

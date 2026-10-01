@@ -97,3 +97,23 @@ describe('the reader reads into one name per item', () => {
     expect(readingItemsOn(stores[2], ['Sliced Cheese'])).toEqual([{ tag: 'Some Sliced Cheese', sometimes: false }])
   })
 })
+
+describe('the answer says when the item was last seen (agreed Oct 1)', () => {
+  const now = Date.parse('2026-10-09T17:30:00Z')
+  const dated = [
+    { ...store('Acme', ['Challah'], 39.951), itemSeen: { m: { Challah: '2026-10-09T14:00:00Z' } } },
+    { ...store('ShopRite', ['Challah'], 39.96), itemSeen: { m: { Challah: '2026-07-02T14:00:00Z' } } },
+    store('GIANT', ['Challah'], 39.97),
+  ]
+  const ask = (q: string, list = dated, n: number | null = now) => answerFor(searchAsk(list, [grocery], q, { coords: here }), { coords: here, now: n })?.text
+
+  it('the nearest’s date, and how many were seen this week', () => {
+    expect(ask('challah')).toBe('3 places have Challah. Seen this week at 1. Nearest: Acme, 0.1 mi, seen today.')
+  })
+
+  it('nothing said where nobody has seen it, nor before the page knows the time', () => {
+    expect(ask('challah', [dated[2], dated[1]])).toBe('2 places have Challah. Nearest: ShopRite, 0.7 mi, seen Jul 2.')
+    expect(ask('challah', [dated[2]])).toBe('GIANT has Challah, 1.4 mi.')
+    expect(ask('challah', dated, null)).toBe('3 places have Challah. Nearest: Acme, 0.1 mi.')
+  })
+})

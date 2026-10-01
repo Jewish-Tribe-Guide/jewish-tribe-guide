@@ -182,6 +182,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
       coords,
       center: community.mapCenter,
       schedule: result.query.minyan && schedule ? answerSchedule(schedule) : null,
+      now: schedule?.now ?? null,
     })
     // "What's on this site?", "how do I add a listing?" (see metaAnswer).
     if (result.query.meta) {
@@ -263,7 +264,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
       onPick={(offer) => reader.edit(offer.next)}
     />
   )
-  const shown = readResult ? { result: readResult, answer: answerFor(readResult, { coords }) } : asked
+  const shown = readResult ? { result: readResult, answer: answerFor(readResult, { coords, now: schedule?.now ?? null }) } : asked
 
   const askResult = shown?.result ?? null
   // A question about the guide itself has no places to list ("how do I add
