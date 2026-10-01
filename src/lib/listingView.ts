@@ -1,4 +1,5 @@
-import { selectValues, type CategoryConfig, type CategoryField } from './categories'
+import { resolveCapabilities, selectValues, type CategoryConfig, type CategoryField } from './categories'
+import { ui } from './uiConfig'
 import { fmt12, getOpenStatus, hasAnyHours, isStructuredHours, DAY_KEYS, dayLabel, type DayKey, type DayHours } from './hours'
 
 const short = (k: DayKey) => dayLabel(k).slice(0, 3)
@@ -96,13 +97,21 @@ export type MainThing = 'davening' | 'items' | 'groups' | 'walk' | 'join' | 'hou
 /** What the listing is mostly for, by what it holds. First that applies:
  *  davening times; items; one section per audience (a mikvah's women's,
  *  men's and keilim); the shuls within a walk (a hotel); the one link of a
- *  place with no address (Join a WhatsApp group); the week's hours. */
+ *  place with no address (Join a WhatsApp group); the week's hours.
+ *
+ *  A category that keeps an item list leads with it even while it's empty
+ *  ("Main dishes", "+ Add the first dish"), so every listing in it opens
+ *  the same way (agreed Oct 1, Food and Grocery). Its hours are then one
+ *  line: "Open until 8 PM" at the top already says whether to go now. Not
+ *  where nobody can add to it (edits off): an empty list would be a dead
+ *  end, and the hours lead as before. */
 export function mainThing(item: DirectoryResource, category: CategoryConfig): MainThing | null {
   const fields = category.detailFields
   const minyanim = fields.find((f) => f.type === 'minyanim')
   if (minyanim && isMinyanim(item[minyanim.key]) && (item[minyanim.key] as unknown[]).length > 0) return 'davening'
   const items = itemsField(category)
   if (items && selectValues(item[items.key]).length + selectValues(item[`${items.key}_sometimes`]).length > 0) return 'items'
+  if (items && ui.contributions.edit && resolveCapabilities(category.capabilities).edit) return 'items'
   if (audienceGroups(item, category).length > 0) return 'groups'
   if (parseWalkList(category.walkList) && item.geo) return 'walk'
   if (primaryLink(item, category)) return 'join'

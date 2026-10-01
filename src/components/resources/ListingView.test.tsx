@@ -510,9 +510,19 @@ describe('ListingView — add an item', () => {
     expect(JSON.parse(String((fetchMock.mock.calls[1][1] as RequestInit).body))).toEqual({ submissionId: SUB })
   })
 
-  it('a place with nothing on its list yet offers the first item, after what it leads with', () => {
+  it('a place with nothing on its list yet leads with it, offering the first item; its hours are one line (agreed Oct 1)', () => {
     view({ item: makeListing({ hours: { mon: { open: '09:00', close: '17:00' } } }), category: grocery })
     expect(card()).toHaveTextContent(/^Kosher items here\s*Add the first item$/)
+    expect(screen.queryByTestId('listing-hours')).not.toBeInTheDocument()
+    expect(screen.getByTestId('listing-details')).toHaveTextContent(/today/i)
+    // The list comes before the details, as any main thing does.
+    expect(card().compareDocumentPosition(screen.getByTestId('listing-details')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('where nobody can add to it, the hours lead as before', () => {
+    view({ item: makeListing({ hours: { mon: { open: '09:00', close: '17:00' } } }), category: { ...grocery, capabilities: { add: true, report: true, directorySearch: true, map: true, edit: false } } })
+    expect(screen.getByTestId('listing-hours')).toBeInTheDocument()
+    expect(screen.queryByTestId('listing-items')).not.toBeInTheDocument()
   })
 
   it('not offered where edits are off', () => {

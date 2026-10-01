@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { makeCategory, makeListing } from '@/test/providerFixtures'
-import type { CategoryField } from './categories'
+import { resolveCapabilities, type CategoryField } from './categories'
 import {
   audienceGroups,
   audienceStatus,
@@ -159,8 +159,18 @@ describe('mainThing', () => {
   it('a WhatsApp group: Join', () => {
     expect(mainThing(makeListing({ address: '', link: 'https://chat.whatsapp.com/x' }), whatsapp)).toBe('join')
   })
-  it('Food: the week, until dishes arrive', () => {
+  it('Food with no list of dishes: the week', () => {
     expect(mainThing(makeListing({ hours: { fri: { open: '11:00', close: '15:00' } } }), food)).toBe('hours')
+  })
+  it('a category with an item list leads with it while it’s empty too, over the hours (agreed Oct 1)', () => {
+    const open = makeListing({ m: [], hours: { fri: { open: '09:00', close: '21:00' } } })
+    expect(mainThing(open, grocery)).toBe('items')
+    const dishes: CategoryField = { key: 'dishes', label: 'Main dishes', type: 'tags', showCountInHeader: true, countLabel: 'dish' }
+    expect(mainThing(open, makeCategory({ ...food, detailFields: [...food.detailFields, dishes] }))).toBe('items')
+  })
+  it('but not where nobody can add to it: the hours lead', () => {
+    const closed = makeCategory({ ...grocery, capabilities: { ...resolveCapabilities(grocery.capabilities), edit: false } })
+    expect(mainThing(makeListing({ hours: { fri: { open: '09:00', close: '21:00' } } }), closed)).toBe('hours')
   })
   it('hours saved empty every day are no hours', () => {
     expect(mainThing(makeListing({ hours: { fri: null, sat: null } }), food)).toBeNull()
