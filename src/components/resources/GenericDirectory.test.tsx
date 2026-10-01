@@ -1878,6 +1878,30 @@ describe('GenericDirectory — each shul’s next minyan', () => {
     expect(await screen.findByText('column minyan at Beta Shul: Mincha 6:45 PM')).toBeInTheDocument()
   })
 
+  it('a shul’s special schedule replaces its regular times on the days it covers (step 4)', () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-09-28T11:00:00-04:00')) // Monday Sep 28, Chol HaMoed
+    const posted = {
+      ...shul('a', 'Alpha Shul', '1:30pm'),
+      minyanim_schedules: [
+        {
+          id: 's',
+          name: 'Sukkos 5787',
+          from: '2026-09-26',
+          to: '2026-10-04',
+          mode: 'replace',
+          minyanim: [{ id: 'x', tefillah: 'mincha', on: ['2026-09-28'], time: '6:05pm' }],
+        },
+      ],
+    }
+    renderWithProviders(<GenericDirectory category={shulCategory} items={[posted, shul('b', 'Beta Shul', '6:45pm')]} {...handlers} />, {
+      content: { categories: [shulCategory] },
+    })
+
+    expect(screen.getByText('next minyan at Alpha Shul: Mincha 6:05 PM')).toBeInTheDocument()
+    expect(within(screen.getByTestId('next-minyan')).getAllByRole('listitem')[0].textContent).toContain('6:05 PMMincha · Alpha Shul')
+  })
+
   it('says a shul with no times at all has none listed', () => {
     vi.useFakeTimers({ toFake: ['Date'] })
     vi.setSystemTime(new Date('2026-09-28T11:00:00-04:00'))

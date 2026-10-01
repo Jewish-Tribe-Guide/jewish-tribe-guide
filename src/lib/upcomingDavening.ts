@@ -2,6 +2,7 @@ import { isOutOfSeason, type Season } from './season'
 import { parseTimeToMinutes, TEFILLAH_LABELS, type Minyan, type MinyanDayKey, type Tefillah } from './davening'
 import { geoKey, geoOrCommunityDefault, resolveAnchorTime, type AnchorTimes } from './useZmanAnchors'
 import type { LatLng } from './geo'
+import type { ScheduledMinyan } from './schedules'
 
 /** One shul's structured minyanim, trimmed to what this needs — a real
  *  DirectoryResource carries far more than this, and this stays independent
@@ -12,7 +13,9 @@ export type ShulMinyanim = {
   id?: string
   name: string
   geo?: LatLng | null
-  minyanim: Minyan[]
+  /** Its regular minyanim, with any special schedule's for the dates in
+   *  question (see withSchedules in schedules.ts). */
+  minyanim: ScheduledMinyan[]
 }
 
 export type UpcomingDavening = {
@@ -54,6 +57,8 @@ type Candidate = {
   notes?: string
   /** Set by sunset or candle lighting, not a fixed clock time. */
   anchored?: boolean
+  /** The special schedule it's from ("Sukkos 5787"). */
+  schedule?: string
 }
 
 /**
@@ -126,6 +131,8 @@ function collectCandidates(
   for (const shul of shuls) {
     for (const row of shul.minyanim) {
       if (!row.days.some((d) => dayKeys.includes(d))) continue
+      // A regular minyan a special schedule replaces on this date.
+      if (row.skipDates?.some((date) => dayKeys.includes(`date:${date}` as MinyanDayKey))) continue
       if (isOutOfSeason(row.season, season)) continue
 
       let time: string | null = null
@@ -140,7 +147,17 @@ function collectCandidates(
       const minutes = parseTimeToMinutes(time)
       if (!Number.isFinite(minutes)) continue // free text ("Call to Confirm") — no number to sort by
 
-      out.push({ shulId: shul.id, shulName: shul.name, shulGeo: shul.geo, tefillah: row.tefillah, minutes, time, notes: row.notes?.trim() || undefined, anchored: !!row.anchor })
+      out.push({
+        shulId: shul.id,
+        shulName: shul.name,
+        shulGeo: shul.geo,
+        tefillah: row.tefillah,
+        minutes,
+        time,
+        notes: row.notes?.trim() || undefined,
+        anchored: !!row.anchor,
+        ...(row.schedule ? { schedule: row.schedule } : {}),
+      })
     }
   }
   return out
@@ -182,6 +199,10 @@ export type MinyanSlot = {
   minutes: number
   /** Set by sunset or candle lighting (see Candidate). */
   anchored?: boolean
+  /** The special schedule it's from ("Sukkos 5787"). */
+  schedule?: string
+  /** The row's own note. */
+  notes?: string
 }
 
 /**

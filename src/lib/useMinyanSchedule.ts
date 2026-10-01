@@ -5,7 +5,9 @@ import { useAllListings } from '@/lib/useAllListings'
 import { useNow } from '@/lib/useNow'
 import { currentSeason, type Season } from '@/lib/season'
 import { DAY_KEYS, dayAndMinutesInTimezone, type DayKey } from '@/lib/hours'
-import { isMinyanim, type Minyan, type MinyanDayKey } from '@/lib/davening'
+import type { MinyanDayKey } from '@/lib/davening'
+import { dateKey, factsFor, readSchedules, regularMinyanim, schedulesKey, withSchedules, type DateFacts, type DayPosting } from '@/lib/schedules'
+import { dayInTimezone } from '@/lib/activity'
 import { listMinyanim, minyanimOn, type ShulMinyanim } from '@/lib/upcomingDavening'
 import type { AnswerSchedule } from '@/lib/askAnswer'
 import { useZmanim } from '@/lib/useZmanim'
@@ -25,8 +27,20 @@ export type MinyanSchedule = {
   now: number
   todayKey: DayKey
   tomorrowKey: DayKey
-  /** Today's day keys: the weekday, plus 'yom_tov' once zmanim confirms it. */
+  /** Today's day keys: the weekday, its date (a special schedule's
+   *  minyanim), plus 'yom_tov' once the calendar confirms it. */
   todayDayKeys: MinyanDayKey[]
+  /** Tomorrow's, the same way. */
+  tomorrowDayKeys: MinyanDayKey[]
+  /** What the calendar says about today and tomorrow. */
+  today: DateFacts
+  tomorrow: DateFacts
+  /** Today and the six days after it. */
+  week: DateFacts[]
+  /** Whose times each shul has today and tomorrow, by listing id and date:
+   *  a special schedule's, or regular ones where a festival has none posted
+   *  (see schedules.ts). */
+  posting: Record<string, Record<string, DayPosting>>
   nowMinutes: number
   season: Season | null
 }
@@ -59,11 +73,31 @@ export function useMinyanSchedule(coords: LatLng | null, only?: readonly Directo
   const categoryFieldKey: Record<string, string> = {}
   for (const { category, field } of minyanimCategories) categoryFieldKey[category.id] = field.key
 
+  // In the community's own timezone, not the visitor's device — see
+  // dayAndMinutesInTimezone's own doc for the "jumped to tomorrow" report a
+  // plain `new Date(now).getDay()` produced whenever the two disagreed.
+  // Falls back to the community's own default location: whether today is
+  // Yom Tov doesn't depend on which address a visitor set.
+  const { data: zmanimData } = useZmanim(coords ?? community.mapCenter)
+  // Today and the six days after it: what "Shabbos" or "Sunday" means when
+  // asked this week, which a festival can change (Shemini Atzeres on
+  // Shabbos).
+  const dates =
+    now === null
+      ? []
+      : Array.from({ length: 7 }, (_, i) => factsFor(dayInTimezone(community.timezone, new Date(now + i * 86_400_000)), zmanimData?.days, zmanimData?.daysThrough))
+  // Today's Yom Tov answer is the converter's own (isYomTov); the days
+  // ahead only fill in what it doesn't say.
+  if (dates[0] && typeof zmanimData?.isYomTov === 'boolean') dates[0] = { ...dates[0], yomTov: zmanimData.isYomTov }
+
+  const posting: Record<string, Record<string, DayPosting>> = {}
   const shuls: ShulMinyanim[] = (listings ?? [])
     .filter((l) => l.category in categoryFieldKey)
     .map((l) => {
-      const raw = l[categoryFieldKey[l.category]]
-      return { id: l.id, name: l.name, geo: l.geo, minyanim: isMinyanim(raw) ? (raw as Minyan[]) : [] }
+      const key = categoryFieldKey[l.category]
+      const applied = withSchedules(regularMinyanim(l[key]), readSchedules(l[schedulesKey(key)]), dates)
+      posting[l.id] = applied.posting
+      return { id: l.id, name: l.name, geo: l.geo, minyanim: applied.minyanim }
     })
     .filter((s) => s.minyanim.length > 0)
 
@@ -73,22 +107,23 @@ export function useMinyanSchedule(coords: LatLng | null, only?: readonly Directo
   const anchorGeos = shuls.filter((s) => s.minyanim.some((m) => m.anchor)).map((s) => geoOrCommunityDefault(s.geo))
   const anchors = useZmanAnchors(anchorGeos)
 
-  // In the community's own timezone, not the visitor's device — see
-  // dayAndMinutesInTimezone's own doc for the "jumped to tomorrow" report a
-  // plain `new Date(now).getDay()` produced whenever the two disagreed.
-  // Falls back to the community's own default location: whether today is
-  // Yom Tov doesn't depend on which address a visitor set.
-  const { data: zmanimData } = useZmanim(coords ?? community.mapCenter)
-
   // Nothing is scheduled before the page has hydrated, when there's no time
   // yet (see useNow).
   if (now === null) return null
   const { day: todayKey, minutes: nowMinutes } = dayAndMinutesInTimezone(now, community.timezone)
   const tomorrowKey = DAY_KEYS[(DAY_KEYS.indexOf(todayKey) + 1) % 7]
   const season = currentSeason(now, community.timezone)
-  const todayDayKeys: MinyanDayKey[] = zmanimData?.isYomTov ? [todayKey, 'yom_tov'] : [todayKey]
+  const [today, tomorrow] = dates
+  const todayDayKeys = dayKeysFor(today)
+  const tomorrowDayKeys = dayKeysFor(tomorrow)
 
-  return { linkCategoryId, shuls, anchors, now, todayKey, tomorrowKey, todayDayKeys, nowMinutes, season }
+  return { linkCategoryId, shuls, anchors, now, todayKey, tomorrowKey, todayDayKeys, tomorrowDayKeys, today, tomorrow, week: dates, posting, nowMinutes, season }
+}
+
+/** The day keys a date's minyanim match: its weekday, its own date (a
+ *  special schedule's), and Yom Tov when the calendar says so. */
+export function dayKeysFor(d: DateFacts): MinyanDayKey[] {
+  return [d.weekday, dateKey(d.date), ...(d.yomTov ? (['yom_tov'] as const) : [])]
 }
 
 /** The schedule as a search answer needs it (see askAnswer's
@@ -98,13 +133,17 @@ export function answerSchedule(schedule: MinyanSchedule): AnswerSchedule {
   return {
     ...listMinyanim(schedule.shuls, {
       today: schedule.todayDayKeys,
-      tomorrow: [schedule.tomorrowKey],
+      tomorrow: schedule.tomorrowDayKeys,
       season: schedule.season,
       anchors: schedule.anchors,
     }),
     nowMinutes: schedule.nowMinutes,
     todayKey: schedule.todayKey,
     tomorrowKey: schedule.tomorrowKey,
-    onDay: (day) => minyanimOn(schedule.shuls, [day], schedule.season, schedule.anchors),
+    // The next such day this week, with whatever schedule it has.
+    onDay: (day) => {
+      const date = schedule.week.find((d) => d.weekday === day)
+      return minyanimOn(schedule.shuls, date ? dayKeysFor(date) : [day], schedule.season, schedule.anchors)
+    },
   }
 }

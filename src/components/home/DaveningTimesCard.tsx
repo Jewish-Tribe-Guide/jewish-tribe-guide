@@ -55,7 +55,7 @@ export default function DaveningTimesCard({ coords }: { coords: LatLng | null })
   const result = schedule
     ? nextUpcomingDavening(schedule.shuls, {
         today: schedule.todayDayKeys,
-        tomorrow: [schedule.tomorrowKey],
+        tomorrow: schedule.tomorrowDayKeys,
         nowMinutes: schedule.nowMinutes,
         season: schedule.season,
         anchors: schedule.anchors,

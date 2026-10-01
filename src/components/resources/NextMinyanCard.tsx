@@ -37,7 +37,7 @@ export default function NextMinyanCard({ items, onOpenListing, onDaveningTimes }
   const lines = schedule
     ? nextMinyansAcross(
         schedule.shuls,
-        { today: schedule.todayDayKeys, tomorrow: [schedule.tomorrowKey], nowMinutes: schedule.nowMinutes, season: schedule.season, anchors: schedule.anchors },
+        { today: schedule.todayDayKeys, tomorrow: schedule.tomorrowDayKeys, nowMinutes: schedule.nowMinutes, season: schedule.season, anchors: schedule.anchors },
         milesOf,
       )
     : null

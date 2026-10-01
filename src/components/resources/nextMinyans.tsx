@@ -30,8 +30,8 @@ function Worked({ items, children }: { items: readonly DirectoryResource[]; chil
   const schedule = useMinyanSchedule(null, items)
   const next: Record<string, ShulRowStatus> = {}
   if (schedule) {
-    const { shuls, anchors, todayDayKeys, tomorrowKey, nowMinutes, season } = schedule
-    Object.assign(next, shulRowByShul(shuls, { today: todayDayKeys, tomorrow: [tomorrowKey], nowMinutes, season, anchors }))
+    const { shuls, anchors, todayDayKeys, tomorrowDayKeys, nowMinutes, season } = schedule
+    Object.assign(next, shulRowByShul(shuls, { today: todayDayKeys, tomorrow: tomorrowDayKeys, nowMinutes, season, anchors }))
     // A shul with no times at all isn't among `shuls`, which only holds shuls
     // with minyanim to schedule, but its row still says so.
     for (const item of items) {

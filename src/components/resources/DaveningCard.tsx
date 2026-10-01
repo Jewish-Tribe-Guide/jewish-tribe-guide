@@ -27,7 +27,7 @@ export default function DaveningCard({ item, minyanim }: { item: DirectoryResour
   const slots = schedule
     ? listMinyanim(
         schedule.shuls.filter((s) => s.id === item.id),
-        { today: schedule.todayDayKeys, tomorrow: [schedule.tomorrowKey], season: schedule.season, anchors: schedule.anchors },
+        { today: schedule.todayDayKeys, tomorrow: schedule.tomorrowDayKeys, season: schedule.season, anchors: schedule.anchors },
       )
     : null
   const soon = slots && slots.today.length + slots.tomorrow.length > 0
