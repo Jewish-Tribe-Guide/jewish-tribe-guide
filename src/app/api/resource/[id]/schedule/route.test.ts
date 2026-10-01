@@ -76,6 +76,19 @@ describe('POST /api/resource/:id/schedule', () => {
     expect(m.notify).toHaveBeenCalled()
   })
 
+  it('names the photo it was read from for the admin, only from the guide’s own storage', async () => {
+    vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://abc.supabase.co')
+    const kept = 'https://abc.supabase.co/storage/v1/object/public/site-assets/schedule-source/1790-x7.jpeg'
+    await POST(req({ schedule: sukkos, sourceUrl: kept, turnstileToken: 't' }), ctx())
+    expect(m.submitListingUpdate.mock.calls[0][3]).toContain(`Read from their photo or PDF: ${kept}`)
+    for (const bad of ['https://evil.example/x.jpeg', `${kept}/../../other`, 'https://abc.supabase.co/storage/v1/object/public/site-assets/listing-photo/a.jpg']) {
+      m.submitListingUpdate.mockClear()
+      await POST(req({ schedule: sukkos, sourceUrl: bad, turnstileToken: 't' }), ctx())
+      expect(m.submitListingUpdate.mock.calls[0][3]).not.toContain('photo or PDF')
+    }
+    vi.unstubAllEnvs()
+  })
+
   it('puts a schedule in place of one of the same name', async () => {
     m.getResourceById.mockResolvedValue({ ...listing, minyanim_schedules: [{ ...sukkos, id: 'old', minyanim: [] }] })
     await POST(req({ schedule: sukkos, turnstileToken: 't' }), ctx())

@@ -40,6 +40,10 @@ export async function POST(request: Request, ctx: RouteContext<'/api/resource/[i
   }
   if (!ui.contributions.edit) return Response.json({ ok: false, error: 'This action is not available.' }, { status: 403 })
   const source = typeof body.source === 'string' ? body.source.trim().slice(0, 4000) : ''
+  // A photo or PDF it was read from: only one the reader kept, in the
+  // guide's own storage (/api/schedule/read), never any other address.
+  const kept = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/site-assets/schedule-source/`
+  const sourceUrl = typeof body.sourceUrl === 'string' && body.sourceUrl.startsWith(kept) && /^[\w.-]+$/.test(body.sourceUrl.slice(kept.length)) ? body.sourceUrl : null
 
   try {
     const { data: row } = await getAdminClient()
@@ -62,6 +66,7 @@ export async function POST(request: Request, ctx: RouteContext<'/api/resource/[i
       `Special times for ${schedule.name}, sent from the shul’s card.`,
       formatSchedulesSummary([schedule]),
       ...(source ? [`Read from what they pasted:\n${source}`] : []),
+      ...(sourceUrl ? [`Read from their photo or PDF: ${sourceUrl}`] : []),
     ].join('\n\n')
     const submission = await submitListingUpdate(row.community_id, id, editSubmission(category, listing, { [key]: [...kept, schedule] }), note, null)
     after(() => sendSubmissionNotification(submission).catch((err) => console.error('[schedule] Admin notification failed:', err)))

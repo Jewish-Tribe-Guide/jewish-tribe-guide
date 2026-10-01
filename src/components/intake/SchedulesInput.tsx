@@ -22,6 +22,10 @@ type Props = {
   /** Start straight on this festival's schedule ("Sukkos"), as "Know
    *  their Sukkos times? Add them" does. */
   startWith?: string
+  /** What each time was read from, by its id, when the AI read them from
+   *  the shul's message or photo (scheduleReader.ts): shown under the time,
+   *  with anything it wasn't sure of, for the person to check. */
+  readFrom?: Record<string, { quote: string; checked: boolean; unsure?: string }>
 }
 
 const genId = () => crypto.randomUUID()
@@ -71,9 +75,10 @@ function datesBetween(from: string, to: string): string[] {
   return out
 }
 
-export default function SchedulesInput({ value, onChange, startWith }: Props) {
+export default function SchedulesInput({ value, onChange, startWith, readFrom }: Props) {
   const [schedules, setSchedules] = useState<SpecialSchedule[]>(() => readSchedules(value))
-  const [open, setOpen] = useState<string | null>(null)
+  // A reading opens straight onto its times, to be checked.
+  const [open, setOpen] = useState<string | null>(() => (readFrom ? (readSchedules(value)[0]?.id ?? null) : null))
   const [choosing, setChoosing] = useState(!!startWith)
   const festivals = useFestivals(choosing || open !== null)
   // Started on a festival: its schedule, once the calendar says its dates.
@@ -120,6 +125,7 @@ export default function SchedulesInput({ value, onChange, startWith }: Props) {
             onChange={(p) => patch(s.id, p)}
             onRemove={() => update(schedules.filter((x) => x.id !== s.id))}
             onDone={() => setOpen(null)}
+            readFrom={readFrom}
           />
         ) : (
           <button
@@ -166,12 +172,14 @@ function ScheduleForm({
   onChange,
   onRemove,
   onDone,
+  readFrom,
 }: {
   schedule: SpecialSchedule
   festival: Festival | null
   onChange: (p: Partial<SpecialSchedule>) => void
   onRemove: () => void
   onDone: () => void
+  readFrom?: Props['readFrom']
 }) {
   // The days a time can be held on: Yom Tov days and Chol HaMoed where the
   // festival has them, then each date in the schedule, named when the
@@ -214,7 +222,11 @@ function ScheduleForm({
         ))}
       </div>
       {s.minyanim.map((m) => (
-        <div key={m.id} className="space-y-2 rounded-md border border-slate-200 bg-slate-50 p-2.5" data-testid="schedule-row">
+        <div
+          key={m.id}
+          className={`space-y-2 rounded-md border p-2.5 ${readFrom?.[m.id]?.unsure ? 'border-amber-300 bg-amber-50' : 'border-slate-200 bg-slate-50'}`}
+          data-testid="schedule-row"
+        >
           <div className="flex flex-wrap items-center gap-2">
             <select
               aria-label="Tefillah"
@@ -234,6 +246,12 @@ function ScheduleForm({
               ✕
             </button>
           </div>
+          {readFrom?.[m.id] && (
+            <p className="text-[12.5px] leading-snug text-slate-600" data-testid="schedule-row-source">
+              From “{readFrom[m.id].quote}”{!readFrom[m.id].checked && ' (from the photo: check it)'}
+              {readFrom[m.id].unsure && <span className="block font-semibold text-caution">Check: {readFrom[m.id].unsure}</span>}
+            </p>
+          )}
           <div className="flex flex-wrap gap-1.5" aria-label="Held on">
             {choices.map((c) => (
               <button key={c.on} type="button" aria-pressed={m.on.includes(c.on)} onClick={() => toggle(m, c.on)} className={chip(m.on.includes(c.on))}>
