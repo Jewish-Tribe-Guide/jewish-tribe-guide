@@ -195,6 +195,18 @@ describe('answerFor — other questions', () => {
     expect(answerFor(r, { coords: here })?.text).toBe('2 places have shabbos meals. Nearest: ShopRite, 0.1 mi.')
   })
 
+  it('"within 3 miles of HUP" with nothing there says so, and names the nearest outside it on its own', () => {
+    // Fixes table, Sep 29: from HUP no meat place is within 3 miles, and
+    // the list was just empty, with no sentence.
+    const grills = [listing('restaurant', 'g', 'Far Grill', 39.9, { t: ['Meat'] }), listing('restaurant', 'd', 'Dairy Cafe', 39.95, { t: ['Dairy'] }), hup]
+    const r = searchAsk(grills, categories, 'meat within 3 miles of hup')
+    expect(r.anchor?.name).toBe('Hospital of the University of Pennsylvania')
+    expect(r.hits).toEqual([])
+    expect(answerFor(r)?.text).toBe('Nothing within 3 miles of Hospital of the University of Pennsylvania. Nearest outside it: Far Grill, 3.4 mi.')
+    // Something within it: no "outside".
+    expect(searchAsk(grills, categories, 'meat within 5 miles of hup').outside).toBeUndefined()
+  })
+
   it('a phrase only some places have all of is not split', () => {
     const shops = [
       listing('grocery', 's', 'ShopRite', 39.951, { m: ['Prepared Shabbos Food'] }),

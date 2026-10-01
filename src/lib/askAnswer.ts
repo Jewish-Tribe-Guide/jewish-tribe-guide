@@ -361,6 +361,16 @@ function baseAnswer(
     return { text: `Nothing listed as open ${later}.${noHoursNote(false)}${closedNote}`, rows: [] }
   }
 
+  // "Within 3 miles of HUP" with nothing there says so, and names the
+  // nearest outside it on its own, not in the list (fixes table, Sep 29:
+  // the list was just empty).
+  if (hits.length === 0 && result.outside && query.within) {
+    const o = result.outside
+    const reach = query.within.asked ? `a ${query.within.asked.minutes}-minute ${query.within.asked.by}` : `${query.within.miles} ${query.within.miles === 1 ? 'mile' : 'miles'}`
+    const from = result.anchor?.name ?? result.place?.name
+    const open = query.openNow ? ' open now' : query.openToday ? ' open today' : query.openAt ? ` open ${later}` : ''
+    return { text: `Nothing${open} within ${reach}${from ? ` of ${from}` : ''}. Nearest outside it: ${o.item.name}${o.miles != null ? `, ${milesText(o.miles)}` : ''}.`, rows: [] }
+  }
   if (hits.length === 0) return null
   const top = hits[0]
   const milesOf = (h: AskHit) => (h.miles != null ? `, ${milesText(h.miles)}` : '')

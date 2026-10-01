@@ -116,6 +116,9 @@ export type AskResult = {
   /** The words an admin taught the search that the question used ("ikc":
    *  Kosher Cert: IKC), read as filters rather than looked for. */
   taught?: TaughtWord[]
+  /** "Within 3 miles" and nothing is: the nearest place that answers the
+   *  rest of the question, outside the distance. Never one of `hits`. */
+  outside?: AskHit
 }
 
 type Prepared = {
@@ -267,7 +270,7 @@ function townsOf(listings: readonly DirectoryResource[]): Place[] {
 
 /** A question naming a place to be near: "food near Jefferson", "shul by
  *  Penn", "kosher food at HUP". */
-const SAYS_WHERE = /\b(?:near|nearest|nearby|at|by|around|close to|closest to|next to|across from|walking distance)\b/i
+const SAYS_WHERE = /\b(?:near|nearest|nearby|at|by|around|close to|closest to|next to|across from|walking distance|(?:miles?|mi|minutes?|mins?|blocks?|walk|drive) (?:of|from))\b/i
 
 function hoursKeys(category: CategoryConfig): string[] {
   return category.detailFields.filter((f) => f.type === 'hours').map((f) => f.key)
@@ -618,6 +621,11 @@ export function searchAsk(
       a.item.name.localeCompare(b.item.name)
   answering.sort(byMatch)
   noHours.sort(byMatch)
+  // "Within 3 miles" with nothing in it: the nearest that answers all the
+  // rest, for the answer to name as outside it, never in the list.
+  const outside = query.within && origin && answering.length === 0
+    ? (hits.filter((h) => openEnough(h) && h.miles !== null && !inReach(h)).sort((a, b) => a.miles! - b.miles!)[0] ?? null)
+    : null
   return {
     query,
     hits: limit ? answering.slice(0, limit) : answering,
@@ -629,6 +637,7 @@ export function searchAsk(
     excluded: [...excluded],
     place: named ? { name: named.place.name, inside: !!inside, geo: named.place.geo, radius: named.place.radius } : null,
     ...(taught.used.length ? { taught: taught.used } : {}),
+    ...(outside ? { outside } : {}),
   }
 }
 
