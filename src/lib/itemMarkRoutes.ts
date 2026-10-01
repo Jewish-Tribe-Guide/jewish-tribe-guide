@@ -34,8 +34,9 @@ export function parseItemTap(body: unknown): { field: string; item: string } | n
   return { field, item: item.trim() }
 }
 
-/** How long a visitor can take back their own "Not anymore" or "Add an
- *  item": the removal or addition leaves the queue. */
+/** How long a visitor can take back their own "Not anymore": the removal
+ *  leaves the queue. ("Add an item" has no Undo: it only waits for a
+ *  check, agreed Oct 1.) */
 export const UNDO_WITHIN_MS = 60 * 60 * 1000
 
 /** Takes this browser's own suggestion back out of the moderation queue:

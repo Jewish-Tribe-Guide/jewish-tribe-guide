@@ -33,7 +33,7 @@ export type AnswerFrom = 'row' | 'question' | 'add'
 
 /** An item this visitor added, waiting for an admin's check. Shown to them
  *  alone, in the list, until they leave. */
-export type AddedItem = { name: string; sometimes: boolean; submissionId: string | null; busy: boolean; error: string | null }
+export type AddedItem = { name: string; sometimes: boolean }
 
 /** How an "Add an item" went: filed for a check, or the store has it
  *  already (counted as its "Still here"), or it failed. */
@@ -53,7 +53,6 @@ export type ItemMarksApi = {
   /** "+ Add an item": files it for a check, or, for an item the store
    *  already has under any name, counts as that item's "Still here". */
   add: (name: string, sometimes: boolean) => Promise<AddOutcome>
-  withdraw: (added: AddedItem) => void
   /** A "Not anymore" or an "Add an item" waiting on the bot check, and
    *  where it was tapped, so that place shows the check. */
   challenge: { from: AnswerFrom; attempt: number; onVerify: (token: string) => void } | null
@@ -156,8 +155,7 @@ export function useItemMarks(item: DirectoryResource, category: CategoryConfig, 
       return 'already'
     }
     const named = typeof json.item === 'string' ? json.item : name
-    const submissionId = typeof json.submissionId === 'string' ? json.submissionId : null
-    setAdded((prev) => [...prev.filter((a) => a.name.toLowerCase() !== named.toLowerCase()), { name: named, sometimes, submissionId, busy: false, error: null }])
+    setAdded((prev) => [...prev.filter((a) => a.name.toLowerCase() !== named.toLowerCase()), { name: named, sometimes }])
     return 'added'
   }
 
@@ -165,15 +163,6 @@ export function useItemMarks(item: DirectoryResource, category: CategoryConfig, 
   function add(name: string, sometimes: boolean): Promise<AddOutcome> {
     if (!TURNSTILE_ACTIVE) return sendAdd(name, sometimes, '')
     return new Promise((settle) => setPending((prev) => ({ kind: 'add', name, sometimes, from: 'add', attempt: (prev?.attempt ?? 0) + 1, settle })))
-  }
-
-  async function withdraw(a: AddedItem) {
-    if (!a.submissionId) return
-    const set = (s: Partial<AddedItem>) => setAdded((prev) => prev.map((x) => (x === a || x.name === a.name ? { ...x, ...s } : x)))
-    set({ busy: true, error: null })
-    const json = await call(`/api/resource/${item.id}/item/add`, 'DELETE', { submissionId: a.submissionId })
-    if (!json) return set({ busy: false, error: 'Couldn’t undo that. Please try again.' })
-    setAdded((prev) => prev.filter((x) => x.name !== a.name))
   }
 
   async function undo(m: ItemMark) {
@@ -214,7 +203,6 @@ export function useItemMarks(item: DirectoryResource, category: CategoryConfig, 
     undo: (m) => void undo(m),
     added,
     add,
-    withdraw: (a) => void withdraw(a),
     challenge: pending ? { from: pending.from, attempt: pending.attempt, onVerify: verified } : null,
   }
 }

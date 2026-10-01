@@ -455,7 +455,6 @@ describe('ListingView — add an item', () => {
   const m: CategoryField = { key: 'm', label: 'Kosher items here', type: 'tags', renderAs: 'badge', showCountInHeader: true }
   const grocery = makeCategory({ id: 'grocery', label: 'Grocery', detailFields: [hours, m] })
   const tj = makeListing({ id: '0b6c4c1e-2f55-4a8e-9d57-3b7f0d6f4a21', name: 'Trader Joe’s', m: ['Challah', 'Cheddar Cheese'] })
-  const SUB = '9a6c4c1e-2f55-4a8e-9d57-3b7f0d6f4a99'
   const json = (body: unknown) => new Response(JSON.stringify(body), { status: 200 })
   let fetchMock: ReturnType<typeof vi.spyOn>
   beforeEach(() => {
@@ -490,8 +489,9 @@ describe('ListingView — add an item', () => {
     expect(screen.queryByTestId('add-item')).not.toBeInTheDocument()
   })
 
-  it('adds one for a check: shown to whoever added it, waiting, with Undo', async () => {
-    fetchMock.mockResolvedValueOnce(json({ ok: true, item: 'Goat Cheese', sometimes: true, submissionId: SUB }))
+  it('adds one for a check: shown to whoever added it, waiting, with no Undo (agreed Oct 1)', async () => {
+    // Even given an id to withdraw with, as the route once sent.
+    fetchMock.mockResolvedValueOnce(json({ ok: true, item: 'Goat Cheese', sometimes: true, submissionId: '9a6c4c1e-2f55-4a8e-9d57-3b7f0d6f4a99' }))
     view({ item: tj, category: grocery })
     open()
     type('goat')
@@ -503,11 +503,7 @@ describe('ListingView — add an item', () => {
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit]
     expect(url).toBe(`/api/resource/${tj.id}/item/add`)
     expect(JSON.parse(String(init.body))).toMatchObject({ item: 'Goat Cheese', sometimes: true })
-
-    fetchMock.mockResolvedValueOnce(json({ ok: true, changed: true }))
-    fireEvent.click(within(added).getByRole('button', { name: 'Undo' }))
-    await vi.waitFor(() => expect(screen.queryByTestId('listing-item-added')).not.toBeInTheDocument())
-    expect(JSON.parse(String((fetchMock.mock.calls[1][1] as RequestInit).body))).toEqual({ submissionId: SUB })
+    expect(within(added).queryByRole('button', { name: 'Undo' })).not.toBeInTheDocument()
   })
 
   it('a place with nothing on its list yet leads with it, offering the first item; its hours are one line (agreed Oct 1)', () => {

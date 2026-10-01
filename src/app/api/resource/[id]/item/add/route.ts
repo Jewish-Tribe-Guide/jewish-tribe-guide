@@ -12,7 +12,7 @@ import { sendSubmissionNotification } from '@/lib/email'
 import { itemsField } from '@/lib/listingView'
 import { itemEntry } from '@/lib/itemNames'
 import { addedItemName, additionSubmission, alreadyListed, cleanItemName, itemMarks, itemWording } from '@/lib/itemMarks'
-import { UUID, withdrawPending } from '@/lib/itemMarkRoutes'
+import { UUID } from '@/lib/itemMarkRoutes'
 
 // POST /api/resource/:id/item/add   { item, sometimes?, from?, turnstileToken, company }
 // "+ Add an item" on an opened listing (agreed Oct 1). An item is a new
@@ -75,29 +75,9 @@ export async function POST(request: Request, ctx: RouteContext<'/api/resource/[i
     ].join(' ')
     const submission = await submitListingUpdate(row.community_id, id, additionSubmission(category, listing, field.key, name, sometimes), note, null)
     after(() => sendSubmissionNotification(submission).catch((err) => console.error('[item/add] Admin notification failed:', err)))
-    return Response.json({ ok: true, item: named, sometimes, submissionId: submission.id })
+    return Response.json({ ok: true, item: named, sometimes })
   } catch (err) {
     console.error('[item/add] could not file the addition:', err)
     return Response.json(FAILED, { status: 502 })
-  }
-}
-
-// DELETE /api/resource/:id/item/add   { submissionId }
-// Takes this browser's own addition back out of the queue, within the hour,
-// while nobody has decided on it yet (withdrawPending).
-export async function DELETE(request: Request, ctx: RouteContext<'/api/resource/[id]/item/add'>) {
-  const limited = await enforceRateLimit(request, 'confirm', { limit: 20, windowSec: 60 })
-  if (limited) return limited
-
-  const { id } = await ctx.params
-  if (!UUID.test(id)) return Response.json({ ok: false, error: 'Not found.' }, { status: 404 })
-  const body = (await request.json().catch(() => null)) as Record<string, unknown> | null
-  const submissionId = body?.submissionId
-  if (typeof submissionId !== 'string' || !UUID.test(submissionId)) return Response.json({ ok: false, error: 'Which item?' }, { status: 400 })
-  try {
-    return Response.json({ ok: true, changed: await withdrawPending(submissionId, id) })
-  } catch (err) {
-    console.error('[item/add] could not withdraw the addition:', err)
-    return Response.json({ ok: false, error: 'Could not undo that.' }, { status: 502 })
   }
 }

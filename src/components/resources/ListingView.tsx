@@ -763,19 +763,12 @@ function ItemsCard({ field, found, api, menuUrl }: { field: CategoryField; found
               {a.name}
               {a.sometimes && <span className="ml-1.5 text-[12.5px] font-semibold text-caution">{say.sometimes}</span>}
             </span>
+            {/* No Undo (agreed Oct 1): it only waits for a check, as the
+                "where did you see it?" box's does, and a wrong one is
+                simply rejected there. */}
             <p role="status" className="mt-0.5 text-[13px] leading-snug text-muted">
               Added by you · waiting for a check
-              {a.submissionId && (
-                <button type="button" disabled={a.busy} onClick={() => api.withdraw(a)} className="ml-1.5 cursor-pointer font-bold text-primary hover:underline disabled:opacity-50">
-                  {a.busy ? 'Undoing…' : 'Undo'}
-                </button>
-              )}
             </p>
-            {a.error && (
-              <p role="alert" className="mt-1 text-[13.5px] text-red-700">
-                {a.error}
-              </p>
-            )}
           </li>
         ))}
       </ul>

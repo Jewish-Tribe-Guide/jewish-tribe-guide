@@ -38,7 +38,7 @@ vi.mock('@/lib/categoryStore', () => ({ getCategoryById: m.getCategoryById }))
 vi.mock('@/lib/submissionStore', () => ({ submitListingUpdate: m.submitListingUpdate }))
 vi.mock('@/lib/email', () => ({ sendSubmissionNotification: m.notify }))
 
-const { POST, DELETE } = await import('./route')
+const { POST } = await import('./route')
 const ID = '0b6c4c1e-2f55-4a8e-9d57-3b7f0d6f4a21'
 const SUB = '9a6c4c1e-2f55-4a8e-9d57-3b7f0d6f4a99'
 const ctx = (id = ID) => ({ params: Promise.resolve({ id }) }) as never
@@ -69,7 +69,7 @@ describe('POST /api/resource/:id/item/add', () => {
     expect(payload.details.m_sometimes).toEqual(['Steak'])
     expect(note).toBe('Tapped “Add an item” on the listing: Hamburger Meat.')
     expect(m.notify).toHaveBeenCalledWith({ id: SUB })
-    expect(json).toEqual({ ok: true, item: 'Hamburger Meat', sometimes: false, submissionId: SUB })
+    expect(json).toEqual({ ok: true, item: 'Hamburger Meat', sometimes: false })
   })
 
   it('“not always in stock” goes in the sometimes list; a name not on the item list is flagged for the admin', async () => {
@@ -114,25 +114,5 @@ describe('POST /api/resource/:id/item/add', () => {
     m.row.mockResolvedValue({ data: { community_id: 'philly' }, error: null })
     m.getCategoryById.mockResolvedValue(makeCategory({ id: 'grocery', detailFields: [] }))
     expect((await POST(req('POST', { item: 'Rugelach' }), ctx())).status).toBe(404)
-  })
-})
-
-describe('DELETE /api/resource/:id/item/add (undo)', () => {
-  it('withdraws only that pending addition to this listing, from the last hour', async () => {
-    m.del.mockResolvedValue({ data: [{ id: SUB }], error: null })
-    expect(await (await DELETE(req('DELETE', { submissionId: SUB }), ctx())).json()).toEqual({ ok: true, changed: true })
-    const [table, filters] = m.del.mock.calls[0]
-    expect(table).toBe('submission')
-    expect(filters).toEqual(expect.arrayContaining([['eq', 'id', SUB], ['eq', 'target_id', ID], ['eq', 'status', 'pending'], ['eq', 'operation', 'update']]))
-  })
-
-  it('an admin already decided: it stands', async () => {
-    m.del.mockResolvedValue({ data: [], error: null })
-    expect(await (await DELETE(req('DELETE', { submissionId: SUB }), ctx())).json()).toEqual({ ok: true, changed: false })
-  })
-
-  it('refuses an id that isn’t one', async () => {
-    expect((await DELETE(req('DELETE', { submissionId: 'x' }), ctx())).status).toBe(400)
-    expect(m.del).not.toHaveBeenCalled()
   })
 })
