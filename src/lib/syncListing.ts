@@ -73,16 +73,25 @@ export async function loadSyncableListing(resourceId: string): Promise<SyncedRow
   return typeof row.details?.placeId === 'string' && row.details.placeId ? row : null
 }
 
+/** Which night of the week (0–6, counted in whole UTC days) a listing's
+ *  full refresh falls on: from its id, so it's the same night every week
+ *  and the listings spread evenly across the week. */
+export function refreshNight(id: string): number {
+  let h = 0
+  for (const c of id) h = (h * 31 + c.charCodeAt(0)) >>> 0
+  return h % 7
+}
+
 /**
  * Refreshes one listing from Google Places and writes the result.
  *
  * Does NOT revalidate cached content — the caller decides, since the nightly
  * run does it once for a whole batch rather than once per listing.
  */
-export async function syncOneListing(row: SyncedRow): Promise<SyncOneResult> {
+export async function syncOneListing(row: SyncedRow, { statusOnly = false }: { statusOnly?: boolean } = {}): Promise<SyncOneResult> {
   const supabase = getAdminClient()
   const placeId = String(row.details.placeId)
-  const sync = await fetchPlaceSync(placeId)
+  const sync = await fetchPlaceSync(placeId, { statusOnly })
 
   if (!sync) {
     // Persisted (not just counted) so admins can see which specific
@@ -102,9 +111,12 @@ export async function syncOneListing(row: SyncedRow): Promise<SyncOneResult> {
     return { outcome: 'failed' }
   }
 
+  // Only asked whether it's still open (the nightly run, most nights): its
+  // hours and the rest weren't refreshed, so "Synced from Google · updated"
+  // keeps the date they were.
   const details: Record<string, unknown> = {
     ...row.details,
-    googleSyncedAt: new Date().toISOString(),
+    ...(statusOnly ? { googleStatusCheckedAt: new Date().toISOString() } : { googleSyncedAt: new Date().toISOString() }),
   }
   delete details.lastSyncError
   delete details.lastSyncFailedAt

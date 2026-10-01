@@ -220,18 +220,27 @@ type GooglePlaceResult = {
   website?: string
 }
 
+/** Google's fields for a full refresh, and for only asking whether the
+ *  place is still open for business. Phone, hours and website are billed
+ *  as "Contact Data" and the description as "Atmosphere Data"; the status
+ *  is Basic Data, which costs nothing extra. Asking for the contact fields
+ *  every night for every listing cost about $8 a month (Sep 2026 billing
+ *  report); asking for them once a week is under the free allowance. */
+const FULL_FIELDS = 'name,business_status,formatted_phone_number,formatted_address,opening_hours,editorial_summary,website'
+const STATUS_FIELDS = 'business_status'
+
 /**
- * Fetches current hours/phone/address/website/status for a known place id.
- * Returns null on any failure (network, bad status, place id gone) so the
- * caller can skip the listing and leave its existing data untouched.
- * Server-side only.
+ * Fetches current hours/phone/address/website/status for a known place id,
+ * or with `statusOnly` only whether it's still open for business (every
+ * other field null). Returns null on any failure (network, bad status,
+ * place id gone) so the caller can skip the listing and leave its existing
+ * data untouched. Server-side only.
  */
-export async function fetchPlaceSync(placeId: string): Promise<PlaceSync | null> {
+export async function fetchPlaceSync(placeId: string, { statusOnly = false }: { statusOnly?: boolean } = {}): Promise<PlaceSync | null> {
   const key = serverKey()
   if (!key) return null
   try {
-    const fields =
-      'name,business_status,formatted_phone_number,formatted_address,opening_hours,editorial_summary,website'
+    const fields = statusOnly ? STATUS_FIELDS : FULL_FIELDS
     const url =
       `https://maps.googleapis.com/maps/api/place/details/json` +
       `?place_id=${encodeURIComponent(placeId)}&fields=${fields}&key=${key}`

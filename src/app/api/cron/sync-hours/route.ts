@@ -1,9 +1,11 @@
 // GET|POST /api/cron/sync-hours
 //
-// Refreshes hours / phone / website / business status from Google Places for
-// every listing that has a `details.placeId` (assigned by
-// scripts/backfill-place-ids.mjs). This is the hosted equivalent of
-// scripts/sync-google-hours.mjs — point any scheduler at it.
+// Asks Google Places whether every listing with a `details.placeId`
+// (assigned by scripts/backfill-place-ids.mjs) is still open for business,
+// and refreshes its hours / phone / website / description once a week (a
+// seventh of the listings each run; see runSync). Meant to run nightly. This
+// is the hosted equivalent of scripts/sync-google-hours.mjs — point any
+// scheduler at it.
 //
 // Host-agnostic scheduling: protect the route with a CRON_SECRET and have your
 // scheduler send it. Works from anything that can make an HTTP request —
@@ -22,7 +24,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAdminClient } from '@/lib/supabase/admin'
 import { sendStatusChangeDigest, type StatusChange } from '@/lib/email'
 import { revalidatePublicContent } from '@/lib/revalidateContent'
-import { syncOneListing, type SyncedRow } from '@/lib/syncListing'
+import { refreshNight, syncOneListing, type SyncedRow } from '@/lib/syncListing'
 
 // Does network + DB work, so it's never prerendered or cached — that follows
 // from the work itself now rather than from a `dynamic` export, which Cache
@@ -89,8 +91,18 @@ async function runSync(): Promise<NextResponse> {
   let flaggedClosed = 0
   const statusChanges: StatusChange[] = []
 
+  // Every night, every listing is asked whether it's still open for
+  // business, so a closure is caught overnight. Its hours, phone, website
+  // and description are refreshed once a week, a seventh of the listings
+  // each night, and on the first sync of one that has never had one
+  // (fixes table, Sep 29: the nightly full refresh was the whole Google
+  // bill). An hours change on Google reaches the guide within a week.
+  const tonight = Math.floor(Date.now() / 86_400_000) % 7
+  let refreshed = 0
   for (const row of rows) {
-    const result = await syncOneListing(row)
+    const full = !row.details.googleSyncedAt || refreshNight(row.id) === tonight
+    if (full) refreshed++
+    const result = await syncOneListing(row, { statusOnly: !full })
     if (result.outcome === 'failed') {
       failed++
       continue
@@ -117,6 +129,7 @@ async function runSync(): Promise<NextResponse> {
   return NextResponse.json({
     ok: true,
     total: rows.length,
+    refreshed,
     synced,
     failed,
     flaggedClosed,

@@ -268,6 +268,17 @@ describe('fetchPlaceSync', () => {
     expect(fetchSpy).not.toHaveBeenCalled()
   })
 
+  it('asks only for the business status when that’s all that’s wanted (no billed contact fields)', async () => {
+    const fetchSpy = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ status: 'OK', result: { business_status: 'CLOSED_TEMPORARILY' } }) })
+    vi.stubGlobal('fetch', fetchSpy)
+    const result = await fetchPlaceSync('place-123', { statusOnly: true })
+    const url = new URL(fetchSpy.mock.calls[0][0])
+    expect(url.searchParams.get('fields')).toBe('business_status')
+    expect(result).toEqual({ name: null, hours: null, phone: null, address: null, website: null, businessStatus: 'CLOSED_TEMPORARILY', description: null })
+    await fetchPlaceSync('place-123')
+    expect(new URL(fetchSpy.mock.calls[1][0]).searchParams.get('fields')).toContain('opening_hours')
+  })
+
   it('maps a full successful response', async () => {
     vi.stubGlobal(
       'fetch',

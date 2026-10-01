@@ -16,6 +16,7 @@
 // added here.
 export const SYNC_INTERNAL_FIELDS = [
   'googleSyncedAt',
+  'googleStatusCheckedAt',
   'lastSyncError',
   'lastSyncFailedAt',
   'businessStatus',
