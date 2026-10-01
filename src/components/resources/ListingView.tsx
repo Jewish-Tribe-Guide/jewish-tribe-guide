@@ -40,6 +40,7 @@ import PinnedBadge from '@/components/PinnedBadge'
 import { usePinned } from '@/lib/pinnedContext'
 import {
   CertificateIcon,
+  CheckIcon,
   ChevronRightIcon,
   ClockIcon,
   DirectionsIcon,
@@ -60,6 +61,10 @@ import { useNextMinyan } from './nextMinyans'
 import { Card, shortDate } from './listingParts'
 import FreshnessFooter from './FreshnessFooter'
 import QuestionCard from './QuestionCard'
+import TurnstileWidget from '@/components/TurnstileWidget'
+import { useItemMarks, type ItemMarksApi } from './useItemMarks'
+import { dayText, seenLabel, type ItemMark } from '@/lib/itemMarks'
+import { community } from '@/community.config'
 import JoinLinkCheck from './JoinLinkCheck'
 
 // ── An opened listing: the seven parts (see lib/listingView.ts) ─────────────
@@ -129,6 +134,10 @@ export default function ListingView({ item, category, color, place = null, upvot
   const { isPinned } = usePinned()
 
   const main = mainThing(item, category)
+  // A listing's items and this visitor's answers about them, shared by the
+  // items card and the one question below it.
+  const itemsF = itemsField(category)
+  const itemApi = useItemMarks(item, category, main === 'items' ? itemsF : null)
   // Where "Still right?" is asked: beside the one thing that's the
   // community's to keep, not about the whole listing (confirmPlace).
   const confirmAt = confirmPlace(item, category)
@@ -283,13 +292,12 @@ export default function ListingView({ item, category, color, place = null, upvot
   )
 
   // ── 3 · The main thing ─────────────────────────────────────────────────
-  const itemsF = itemsField(category)
   let mainSection: ReactNode = null
   if (main === 'davening') {
     const f = category.detailFields.find((x) => x.type === 'minyanim')!
     mainSection = <DaveningCard item={item} minyanim={item[f.key]} />
   } else if (main === 'items' && itemsF) {
-    mainSection = <ItemsCard item={item} field={itemsF} found={found} />
+    mainSection = <ItemsCard field={itemsF} found={found} api={itemApi} />
   } else if (main === 'groups') {
     mainSection = (
       <GroupsCard item={item} groups={audienceGroups(item, category)} now={now} candlesAt={candlesAt} footer={confirmAt?.at === 'card' ? confirmLine(confirmAt.subject) : undefined} />
@@ -449,7 +457,7 @@ export default function ListingView({ item, category, color, place = null, upvot
       {walk && item.geo && main !== 'walk' && <WalkList walk={walk} from={item.geo} fromLabel={category.label} />}
       {/* Part 6: the one thing this listing doesn't say yet that a tap can
           answer (pickListingQuestion); nothing when there's nothing. */}
-      <QuestionCard category={category} listing={item} />
+      <QuestionCard category={category} listing={item} items={main === 'items' && itemsF ? { field: itemsF, api: itemApi } : undefined} />
       {/* What's left of the dated line once "Still right?" is asked beside
           the thing it's about: which details Google keeps, and when. */}
       <div className="space-y-3 border-t border-slate-200 pt-3.5" data-testid="listing-trust">
@@ -670,27 +678,50 @@ function HoursCard({ item, value, now, candlesAt }: { item: DirectoryResource; v
 
 const ITEMS_SHOWN = 6
 
-function ItemsCard({ item, field, found }: { item: DirectoryResource; field: CategoryField; found: SearchFound | null }) {
+/** A listing's items, each with when someone last saw it there, and a tap
+ *  on one to say whether it still is (agreed Oct 1): "Still here" counts at
+ *  once, "Not anymore" warns at once and asks an admin to take it off. One
+ *  quiet line under the heading says the items can be tapped. */
+function ItemsCard({ field, found, api }: { field: CategoryField; found: SearchFound | null; api: ItemMarksApi }) {
+  const clock = useNow()
   const [all, setAll] = useState(false)
+  const [open, setOpen] = useState<string | null>(null)
   const matched = new Set(found?.items.map((m) => m.tag) ?? [])
-  const rows = [
-    ...selectValues(item[field.key]).map((name) => ({ name, sometimes: false })),
-    ...selectValues(item[`${field.key}_sometimes`]).map((name) => ({ name, sometimes: true })),
-  ]
+  const rows = [...api.marks]
   // What the search asked for first, so "See all" can't hide it.
   rows.sort((a, b) => Number(matched.has(b.name)) - Number(matched.has(a.name)))
   const shown = all ? rows : rows.slice(0, ITEMS_SHOWN)
   return (
     <Card title={`${field.label} · ${rows.length}`} testId="listing-items">
+      <p className="mb-1 text-[13.5px] leading-snug text-muted">Been there? Tap an item to say if it’s still there.</p>
       <ul className="divide-y divide-slate-200/70">
-        {shown.map((r) => (
-          <li key={`${r.sometimes ? 's' : 'a'}:${r.name}`} className="flex items-baseline justify-between gap-3 py-1.5">
-            <span className={`text-[15px] font-semibold ${matched.has(r.name) ? 'text-primary-dark' : 'text-slate-900'}`}>
-              {r.name}
-              {r.sometimes && <span className="ml-1.5 text-[12.5px] font-semibold text-caution">not always in stock</span>}
-            </span>
-          </li>
-        ))}
+        {shown.map((m) => {
+          const key = `${m.key}:${m.name}`
+          const isOpen = open === key
+          const seen = seenLabel(m, clock, community.timezone)
+          return (
+            <li key={key} data-testid="listing-item" className={isOpen ? '-mx-2 my-1 rounded-xl border border-slate-300 bg-white px-2' : ''}>
+              <button
+                type="button"
+                aria-expanded={isOpen}
+                onClick={() => setOpen(isOpen ? null : key)}
+                className="flex min-h-11 w-full cursor-pointer items-center justify-between gap-3 py-2 text-left"
+              >
+                <span className={`text-[15px] font-semibold ${matched.has(m.name) ? 'text-primary-dark' : 'text-slate-900'}`}>
+                  {m.name}
+                  {m.sometimes && <span className="ml-1.5 text-[12.5px] font-semibold text-caution">not always in stock</span>}
+                </span>
+                {isOpen ? (
+                  <ChevronRightIcon className="h-4 w-4 shrink-0 -rotate-90 text-slate-500" />
+                ) : (
+                  seen && <span className={`shrink-0 whitespace-nowrap text-[13px] ${seen.old ? 'text-caution' : 'text-muted'}`}>{seen.text}</span>
+                )}
+              </button>
+              {m.goneAt && !isOpen && <GoneNote at={m.goneAt} clock={clock} />}
+              {isOpen && <ItemAnswer mark={m} api={api} clock={clock} />}
+            </li>
+          )
+        })}
       </ul>
       {rows.length > ITEMS_SHOWN && (
         <button type="button" onClick={() => setAll((v) => !v)} className="mt-1.5 inline-flex cursor-pointer items-center gap-1 text-[14.5px] font-bold text-primary">
@@ -699,6 +730,65 @@ function ItemsCard({ item, field, found }: { item: DirectoryResource; field: Cat
         </button>
       )}
     </Card>
+  )
+}
+
+function GoneNote({ at, clock }: { at: string; clock: number | null }) {
+  return (
+    <p className="-mt-1 pb-2 text-[13px] font-semibold leading-snug text-caution">
+      Reported gone {dayText(at, clock, community.timezone)} · we’ll check before taking it off
+    </p>
+  )
+}
+
+/** An opened item: when it was last seen, and Still here or Not anymore;
+ *  once answered, thanks and Undo. */
+function ItemAnswer({ mark: m, api, clock }: { mark: ItemMark; api: ItemMarksApi; clock: number | null }) {
+  const { mine, busy, error } = api.stateOf(m)
+  const button =
+    'flex h-11 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-[10px] border border-slate-300 bg-white text-[14.5px] font-bold text-slate-900 transition-colors hover:bg-slate-50 disabled:cursor-default disabled:opacity-60'
+  const undo = mine?.undoable && (
+    <button type="button" disabled={busy} onClick={() => api.undo(m)} className="ml-1.5 cursor-pointer font-bold text-primary hover:underline disabled:opacity-50">
+      {busy ? 'Undoing…' : 'Undo'}
+    </button>
+  )
+  return (
+    <div className="pb-2.5">
+      {m.goneAt && !mine ? (
+        <GoneNote at={m.goneAt} clock={clock} />
+      ) : (
+        !mine && <p className="text-[13px] leading-snug text-muted">{m.seenAt ? `Last seen ${dayText(m.seenAt, clock, community.timezone)}.` : 'No one has said yet.'}</p>
+      )}
+      {mine ? (
+        <p role="status" className={`text-[14px] leading-snug ${mine.kind === 'seen' ? 'text-emerald-700' : 'text-caution'}`}>
+          {mine.kind === 'seen'
+            ? '✓ Thanks! Marked as seen today.'
+            : mine.undoable
+              ? 'Thanks. We’ll check before taking it off.'
+              : 'Someone said so already. We’ll check before taking it off.'}
+          {undo}
+        </p>
+      ) : (
+        <div className="mt-2 flex gap-2">
+          <button type="button" disabled={busy} onClick={() => api.seen(m, 'row')} className={button}>
+            <CheckIcon className="h-4 w-4 text-primary" />
+            Still here
+          </button>
+          {api.canReport && !m.goneAt && (
+            <button type="button" disabled={busy} onClick={() => api.gone(m, 'row')} className={button}>
+              Not anymore
+            </button>
+          )}
+        </div>
+      )}
+      {busy && !mine && <p className="mt-1.5 text-[13px] text-muted">Sending…</p>}
+      {error && (
+        <p role="alert" className="mt-1.5 text-[13.5px] text-red-700">
+          {error}
+        </p>
+      )}
+      {api.challenge?.from === 'row' && busy && <TurnstileWidget key={api.challenge.attempt} onVerify={api.challenge.onVerify} />}
+    </div>
   )
 }
 

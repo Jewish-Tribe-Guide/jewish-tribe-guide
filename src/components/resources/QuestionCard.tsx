@@ -8,7 +8,12 @@ import { useCommunitySlug } from '@/lib/communityContext'
 import { withCommunity } from '@/lib/useCommunityData'
 import { usePersistedState } from '@/lib/usePersistedState'
 import TurnstileWidget from '@/components/TurnstileWidget'
+import type { CategoryField } from '@/lib/categories'
+import { dayText, itemPhrase, pickItemToAsk, type ItemMark } from '@/lib/itemMarks'
+import { useNow } from '@/lib/useNow'
+import { community as communityConfig } from '@/community.config'
 import { TURNSTILE_ACTIVE } from './useListingSubmit'
+import type { ItemMarksApi } from './useItemMarks'
 
 // ── One question card in a category page's list ─────────────────────────────
 // See questionCards.ts for what's asked, of which place, and in what words.
@@ -34,6 +39,9 @@ type Props = {
   /** An opened listing's one question, about that listing alone
    *  (pickListingQuestion), in place of the list's. */
   listing?: DirectoryResource
+  /** The opened listing's items, when they're its main thing: with nothing
+   *  else to ask, it asks about one ("Kosher steak here today?"). */
+  items?: { field: CategoryField; api: ItemMarksApi }
 }
 
 type Phase =
@@ -42,7 +50,7 @@ type Phase =
   | { kind: 'thanks'; text: string }
   | { kind: 'failed'; text: string }
 
-export default function QuestionCard({ category, shown = [], all = [], place = () => null, onEdit, listing }: Props) {
+export default function QuestionCard({ category, shown = [], all = [], place = () => null, onEdit, listing, items }: Props) {
   const community = useCommunitySlug()
   // The places this browser has been asked about, so the card moves on.
   const askedKey = `jpc:asked:${community}:${category.id}`
@@ -126,7 +134,11 @@ export default function QuestionCard({ category, shown = [], all = [], place = (
     // eslint-disable-next-line react-hooks/exhaustive-deps -- sends once per answer, when the token arrives
   }, [sending, token])
 
-  if (!q) return null
+  if (!q) {
+    return listing && items ? (
+      <ItemQuestion listingId={listing.id} asked={asked.includes(listing.id)} markAsked={() => markAsked(listing.id)} field={items.field} api={items.api} />
+    ) : null
+  }
 
   const answer = (value: string | boolean) => {
     setHeld(q)
@@ -214,6 +226,93 @@ export default function QuestionCard({ category, shown = [], all = [], place = (
       )}
       {/* The bot check, only once an answer has been tapped. */}
       {phase.kind === 'sending' && q.kind === 'field' && <TurnstileWidget key={attempt} onVerify={setToken} />}
+    </section>
+  )
+}
+
+// ── An opened listing's question about one of its items (agreed Oct 1) ──────
+// Asked when the listing has nothing else to ask: an item that's only
+// sometimes there first, then the one gone longest unseen (pickItemToAsk).
+// "Yes" is the item's Still here and "No" its Not anymore, the same answers
+// the items card gives, so an answer here shows there too.
+
+function ItemQuestion({
+  listingId,
+  asked,
+  markAsked,
+  field,
+  api,
+}: {
+  listingId: string
+  asked: boolean
+  markAsked: () => void
+  field: CategoryField
+  api: ItemMarksApi
+}) {
+  const clock = useNow()
+  const titleId = useId()
+  // The item answered here stays the question while its thanks shows,
+  // rather than the card moving on to the next.
+  const [held, setHeld] = useState<string | null>(null)
+  const heldMark = held ? (api.marks.find((m) => `${m.key}:${m.name}` === held) ?? null) : null
+  // Picked once the page knows the time, so the server and browser agree.
+  const mark: ItemMark | null = heldMark ?? (asked || clock === null ? null : pickItemToAsk(api.marks, clock))
+  if (!mark) return null
+  const { mine, busy, error } = api.stateOf(mark)
+  const phrase = itemPhrase(field, mark.name)
+  const answer = (yes: boolean) => {
+    setHeld(`${mark.key}:${mark.name}`)
+    markAsked()
+    if (yes) api.seen(mark, 'question')
+    else api.gone(mark, 'question')
+  }
+  const notSure = () => markAsked()
+  const button = 'h-9 cursor-pointer rounded-full border border-slate-300 bg-white px-3.5 text-[14px] font-semibold text-ink transition-colors hover:bg-slate-50 disabled:cursor-default disabled:opacity-60'
+  const footnote = mark.sometimes
+    ? 'Listed as not always in stock.'
+    : mark.seenAt
+      ? `Last seen ${dayText(mark.seenAt, clock, communityConfig.timezone)}.`
+      : 'No one has said yet.'
+
+  return (
+    <section aria-labelledby={titleId} data-testid="listing-question" className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3.5">
+      <h2 id={titleId} className="text-xs font-bold uppercase tracking-[0.06em] text-slate-500">
+        Quick question
+      </h2>
+      <p className="mt-1 text-[15.5px] font-semibold text-ink">{`${phrase.charAt(0).toUpperCase()}${phrase.slice(1)} here today?`}</p>
+      {mine ? (
+        <p className="mt-2.5 text-[14px] text-green-700" role="status">
+          {mine.kind === 'seen' ? 'Thanks! Marked as seen today.' : mine.undoable ? 'Thanks. We’ll check before taking it off.' : 'Someone said so already. We’ll check before taking it off.'}
+          {mine.undoable && (
+            <button type="button" disabled={busy} onClick={() => api.undo(mark)} className="ml-2 cursor-pointer font-bold text-primary hover:underline disabled:opacity-50">
+              {busy ? 'Undoing…' : 'Undo'}
+            </button>
+          )}
+        </p>
+      ) : (
+        <>
+          <div className="mt-2.5 flex flex-wrap gap-2">
+            <button type="button" disabled={busy} onClick={() => answer(true)} className={button}>
+              Yes
+            </button>
+            {api.canReport && (
+              <button type="button" disabled={busy} onClick={() => answer(false)} className={button}>
+                No
+              </button>
+            )}
+            <button type="button" disabled={busy} onClick={notSure} className={`${button} border-transparent bg-transparent text-slate-600`}>
+              Not sure
+            </button>
+          </div>
+          {error && (
+            <p role="alert" className="mt-2 text-[13.5px] text-red-700">
+              {error}
+            </p>
+          )}
+          <p className="mt-2 text-[13px] text-slate-500">{busy ? 'Sending…' : footnote}</p>
+        </>
+      )}
+      {api.challenge?.from === 'question' && busy && <TurnstileWidget key={`${listingId}:${api.challenge.attempt}`} onVerify={api.challenge.onVerify} />}
     </section>
   )
 }

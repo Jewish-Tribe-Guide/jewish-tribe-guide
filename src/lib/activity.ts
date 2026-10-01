@@ -134,6 +134,31 @@ export function nextItemSeen(
   return next
 }
 
+/** The itemGone map after an approved edit: a "reported gone" stays on an
+ *  item still listed (its removal still waits on an admin) and goes with an
+ *  item taken off. Like itemSeen, only ever read from the stored row. */
+export function nextItemGone(previous: unknown, after: Record<string, unknown> | null | undefined, keys: string[]): ItemSeen {
+  return nextItemSeen(previous, after, keys, [], '')
+}
+
+/** The items an edit takes off that were reported gone: what rejecting it
+ *  keeps, so their warning can go. */
+export function goneItemsKept(
+  before: Record<string, unknown> | null | undefined,
+  proposed: Record<string, unknown> | null | undefined,
+  keys: string[],
+): { fieldKey: string; item: string }[] {
+  const gone = nextItemGone(before?.itemGone, before, keys)
+  const out: { fieldKey: string; item: string }[] = []
+  for (const key of keys) {
+    const still = new Set(itemsOf(proposed, key).map((i) => i.toLowerCase()))
+    for (const item of Object.keys(gone[key] ?? {})) {
+      if (!still.has(item.toLowerCase())) out.push({ fieldKey: key, item })
+    }
+  }
+  return out
+}
+
 // ── Search misses ────────────────────────────────────────────────────────────
 
 /** A search that found nothing, reduced to what's worth counting, or null

@@ -1392,7 +1392,7 @@ describe('GenericListingCard — mobile listing sheet', () => {
 
   // The items are a list to read now, not filter chips: the filters are
   // above the list, and a chip in the listing looked like a control.
-  it('lists the items, as text, not as filter buttons', () => {
+  it('lists the items, each opening to say if it’s still there, not as filter buttons', () => {
     renderMobile({
       defaultExpanded: true,
       category: makeCategory({ detailFields: [{ key: 'items', label: 'Kosher items available', type: 'tags', showCountInHeader: true }] }),
@@ -1400,6 +1400,13 @@ describe('GenericListingCard — mobile listing sheet', () => {
     })
     const sheet = screen.getByRole('dialog', { name: 'Goldi Market' })
     expect(within(sheet).getByTestId('listing-items')).toHaveTextContent('Challah')
-    expect(within(sheet).queryByRole('button', { name: 'Challah' })).not.toBeInTheDocument()
+    // A tap opens the item (Still here / Not anymore), never a filter.
+    const challah = within(sheet).getByRole('button', { name: 'Challah' })
+    expect(challah).toHaveAttribute('aria-expanded', 'false')
+    fireEvent.click(challah)
+    expect(challah).toHaveAttribute('aria-expanded', 'true')
+    expect(within(sheet).getByRole('button', { name: 'Still here' })).toBeInTheDocument()
+    expect(mockRouter.replace).not.toHaveBeenCalled()
+    expect(mockRouter.push).not.toHaveBeenCalled()
   })
 })

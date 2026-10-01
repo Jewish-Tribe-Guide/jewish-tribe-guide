@@ -4,6 +4,8 @@ import {
   dayInTimezone,
   itemFieldKeys,
   nextItemSeen,
+  nextItemGone,
+  goneItemsKept,
   normalizeEmail,
   normalizeSearchMiss,
   sourceOfSubmission,
@@ -111,5 +113,27 @@ describe('dayInTimezone', () => {
     const lateFriday = new Date('2026-09-26T03:30:00.000Z')
     expect(dayInTimezone('America/New_York', lateFriday)).toBe('2026-09-25')
     expect(dayInTimezone('UTC', lateFriday)).toBe('2026-09-26')
+  })
+})
+
+describe('a "reported gone" through approvals and rejections', () => {
+  const keys = ['m', 'm_sometimes']
+  const before = {
+    m: ['Challah', 'Chicken'],
+    m_sometimes: ['Steak'],
+    itemGone: { m: { Chicken: '2026-10-01T14:00:00.000Z' }, m_sometimes: { Steak: '2026-09-30T14:00:00.000Z' } },
+  }
+
+  it('an approved edit keeps the warning on an item still listed, and drops it with an item taken off', () => {
+    expect(nextItemGone(before.itemGone, { m: ['Challah'], m_sometimes: ['Steak'] }, keys)).toEqual({
+      m_sometimes: { Steak: '2026-09-30T14:00:00.000Z' },
+    })
+  })
+
+  it('rejecting a removal keeps the items it took off that were reported gone', () => {
+    expect(goneItemsKept(before, { m: ['Challah'], m_sometimes: ['Steak'] }, keys)).toEqual([{ fieldKey: 'm', item: 'Chicken' }])
+    // An unrelated edit, rejected, keeps nothing that was going anyway.
+    expect(goneItemsKept(before, { m: ['Challah', 'Chicken'], m_sometimes: ['Steak'] }, keys)).toEqual([])
+    expect(goneItemsKept({ m: ['Challah'] }, { m: [] }, keys)).toEqual([])
   })
 })

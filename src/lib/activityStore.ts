@@ -33,11 +33,15 @@ export async function recordActivity(rows: ActivityInput[]): Promise<number[]> {
   }
 }
 
-/** Removes a visitor's own confirmation from the log when they undo it. Only
- *  ever a `listing_confirmed` row from a visitor, on that listing, from the
- *  last day, so the id a browser sends back can't be used to delete anything
- *  else. */
-export async function removeVisitorConfirmation(activityId: number, resourceId: string): Promise<void> {
+/** Removes a visitor's own one-tap from the log when they undo it: a
+ *  "Mark as current", an item's "Still here" or "Not anymore". Only ever a
+ *  row of that kind from a visitor, on that listing, from the last day, so
+ *  the id a browser sends back can't be used to delete anything else. */
+export async function removeVisitorActivity(
+  activityId: number,
+  resourceId: string,
+  kind: 'listing_confirmed' | 'item_confirmed' | 'item_reported_gone',
+): Promise<void> {
   try {
     const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
     const { error } = await getAdminClient()
@@ -45,11 +49,16 @@ export async function removeVisitorConfirmation(activityId: number, resourceId: 
       .delete()
       .eq('id', activityId)
       .eq('resource_id', resourceId)
-      .eq('kind', 'listing_confirmed')
+      .eq('kind', kind)
       .eq('source', 'visitor')
       .gte('created_at', since)
     if (error) throw new Error(error.message)
   } catch (err) {
-    console.error('[activity] could not remove confirmation:', err)
+    console.error('[activity] could not remove a visitor’s tap:', err)
   }
+}
+
+/** The "Mark as current" undo (removeVisitorActivity). */
+export function removeVisitorConfirmation(activityId: number, resourceId: string): Promise<void> {
+  return removeVisitorActivity(activityId, resourceId, 'listing_confirmed')
 }

@@ -30,6 +30,10 @@ export const SYNC_INTERNAL_FIELDS = [
   // stored row (submissionStore's withItemDates), never taken from a
   // submission, and not something a moderator is approving.
   'itemSeen',
+  // Items a visitor has said are gone, while an admin decides (the
+  // removal is its own submission). Set by mark_item, cleared by
+  // rejecting that removal or a later "Still here".
+  'itemGone',
 ] as const
 
 /** Additionally hidden from the moderation diff, though a submitter MAY change

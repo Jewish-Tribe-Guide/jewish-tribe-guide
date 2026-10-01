@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, screen, within } from '@testing-library/react'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { makeCategory, makeListing } from '@/test/providerFixtures'
@@ -223,12 +223,10 @@ describe('ListingView — how sure', () => {
     expect(screen.getByTestId('listing-trust')).not.toHaveTextContent(/confirmed/i)
   })
 
-  it('a grocery’s items are dated at the end, not asked about all at once', () => {
+  it('a grocery’s items aren’t dated as a whole: each item carries its own date', () => {
     const m: CategoryField = { key: 'm', label: 'Kosher items', type: 'tags', renderAs: 'badge', showCountInHeader: true }
     view({ item: makeListing({ m: ['Challah'] }), category: makeCategory({ detailFields: [hours, m] }) })
-    expect(screen.getByTestId('listing-items')).not.toHaveTextContent(/confirmed|checked/i)
-    expect(screen.getByTestId('listing-trust')).toHaveTextContent('Items not checked by anyone yet.')
-    expect(screen.queryByRole('button', { name: 'Yes' })).not.toBeInTheDocument()
+    expect(screen.getByTestId('listing-trust')).not.toHaveTextContent(/Items|checked/i)
   })
 
   it('a mikvah asks about its hours, in their card', () => {
@@ -316,5 +314,90 @@ describe('ListingView — the one question', () => {
   it('asks nothing when there’s nothing to ask', () => {
     view()
     expect(screen.queryByTestId('listing-question')).not.toBeInTheDocument()
+  })
+})
+
+describe('ListingView — Still here and Not anymore, an item at a time', () => {
+  const m: CategoryField = { key: 'm', label: 'Kosher items here', type: 'tags', renderAs: 'badge', showCountInHeader: true }
+  const grocery = makeCategory({ id: 'grocery', label: 'Grocery', detailFields: [hours, m] })
+  const tj = makeListing({
+    id: '0b6c4c1e-2f55-4a8e-9d57-3b7f0d6f4a21',
+    name: 'Trader Joe’s',
+    m: ['Challah', 'Chicken', 'Wine'],
+    m_sometimes: ['Steak'],
+    itemSeen: { m: { Challah: '2026-10-09T14:00:00Z', Wine: '2026-06-01T14:00:00Z' } },
+    itemGone: { m: { Chicken: '2026-10-08T14:00:00Z' } },
+  })
+  const json = (body: unknown) => new Response(JSON.stringify(body), { status: 200 })
+  let fetchMock: ReturnType<typeof vi.spyOn>
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-10-09T17:30:00Z')) // Fri Oct 9, 1:30 PM
+    fetchMock = vi.spyOn(globalThis, 'fetch')
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+    fetchMock.mockRestore()
+  })
+  const row = (name: string) => screen.getAllByTestId('listing-item').find((li) => li.textContent?.startsWith(name))!
+
+  it('each item says when it was last seen; an old date turns amber; a reported one says so; one nobody saw says nothing', () => {
+    view({ item: tj, category: grocery })
+    expect(screen.getByTestId('listing-items')).toHaveTextContent('Been there? Tap an item to say if it’s still there.')
+    expect(within(row('Challah')).getByText('seen today')).toHaveClass('text-muted')
+    expect(within(row('Wine')).getByText('seen Jun 1')).toHaveClass('text-caution')
+    expect(row('Chicken')).toHaveTextContent('Reported gone yesterday · we’ll check before taking it off')
+    expect(row('Steak')).toHaveTextContent(/^Steaknot always in stock$/)
+  })
+
+  it('tapping an item opens it; "Still here" counts at once, thanks, and Undo takes it back', async () => {
+    fetchMock.mockResolvedValueOnce(json({ ok: true, item: 'Steak', seenAt: '2026-10-09T17:30:00.000Z', previous: null, clearedGone: null, changed: true, activityId: 3 }))
+    view({ item: tj, category: grocery })
+    fireEvent.click(within(row('Steak')).getByRole('button', { name: /Steak/ }))
+    expect(row('Steak')).toHaveTextContent('No one has said yet.')
+    fireEvent.click(within(row('Steak')).getByRole('button', { name: 'Still here' }))
+    expect(await within(row('Steak')).findByRole('status')).toHaveTextContent('Thanks! Marked as seen today.')
+    expect(fetchMock.mock.calls[0][0]).toBe(`/api/resource/${tj.id}/item`)
+    expect(JSON.parse(String((fetchMock.mock.calls[0][1] as RequestInit).body))).toEqual({ field: 'm_sometimes', item: 'Steak' })
+
+    fetchMock.mockResolvedValueOnce(json({ ok: true, changed: true }))
+    fireEvent.click(within(row('Steak')).getByRole('button', { name: 'Undo' }))
+    expect(await within(row('Steak')).findByRole('button', { name: 'Still here' })).toBeInTheDocument()
+    const [url, init] = fetchMock.mock.calls[1] as [string, RequestInit]
+    expect(url).toBe(`/api/resource/${tj.id}/item`)
+    expect(init.method).toBe('DELETE')
+    expect(JSON.parse(String(init.body))).toMatchObject({ field: 'm_sometimes', item: 'Steak', seenAt: '2026-10-09T17:30:00.000Z', previous: null, activityId: 3 })
+  })
+
+  it('"Not anymore" warns at once and says an admin will check', async () => {
+    fetchMock.mockResolvedValueOnce(json({ ok: true, item: 'Wine', goneAt: '2026-10-09T17:30:00.000Z', changed: true, submissionId: '9a6c4c1e-2f55-4a8e-9d57-3b7f0d6f4a99', activityId: 4 }))
+    view({ item: tj, category: grocery })
+    fireEvent.click(within(row('Wine')).getByRole('button', { name: /Wine/ }))
+    expect(row('Wine')).toHaveTextContent('Last seen Jun 1.')
+    fireEvent.click(within(row('Wine')).getByRole('button', { name: 'Not anymore' }))
+    expect(await within(row('Wine')).findByRole('status')).toHaveTextContent('Thanks. We’ll check before taking it off.')
+    expect(fetchMock.mock.calls[0][0]).toBe(`/api/resource/${tj.id}/item/gone`)
+    // Closed again, the row carries the warning.
+    fireEvent.click(within(row('Wine')).getByRole('button', { name: /Wine/ }))
+    expect(row('Wine')).toHaveTextContent('Reported gone today · we’ll check before taking it off')
+  })
+
+  it('an item already reported isn’t reported again, and "Not anymore" isn’t offered where edits are off', () => {
+    view({ item: tj, category: { ...grocery, capabilities: { add: true, report: true, directorySearch: true, map: true, edit: false } } })
+    fireEvent.click(within(row('Challah')).getByRole('button', { name: /Challah/ }))
+    expect(within(row('Challah')).getByRole('button', { name: 'Still here' })).toBeInTheDocument()
+    expect(within(row('Challah')).queryByRole('button', { name: 'Not anymore' })).not.toBeInTheDocument()
+  })
+
+  it('the listing’s one question asks about an item only sometimes there, in its own words', async () => {
+    fetchMock.mockResolvedValueOnce(json({ ok: true, item: 'Steak', seenAt: '2026-10-09T17:30:00.000Z', previous: null, clearedGone: null, changed: true, activityId: 5 }))
+    view({ item: tj, category: grocery })
+    const q = screen.getByTestId('listing-question')
+    expect(q).toHaveTextContent('Kosher steak here today?')
+    expect(q).toHaveTextContent('Listed as not always in stock.')
+    fireEvent.click(within(q).getByRole('button', { name: 'Yes' }))
+    expect(await within(q).findByRole('status')).toHaveTextContent('Thanks! Marked as seen today.')
+    // The same answer shows on the item.
+    expect(within(row('Steak')).getByText('seen today')).toBeInTheDocument()
   })
 })

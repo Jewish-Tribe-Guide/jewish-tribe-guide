@@ -5,7 +5,7 @@ import { isCategorySyncEligible } from './categories'
 import { fetchPlaceSync, namesOverlap, OWNABLE_SYNC_FIELDS, type OwnableSyncField } from './googlePlaces'
 import { upsertTags } from './tagStore'
 import { geocode } from './geo'
-import { addedItems, itemFieldKeys, nextItemSeen, normalizeEmail, sourceOfSubmission, type ActivityInput } from './activity'
+import { addedItems, goneItemsKept, itemFieldKeys, nextItemGone, nextItemSeen, normalizeEmail, sourceOfSubmission, type ActivityInput } from './activity'
 import { recordActivity } from './activityStore'
 import type {
   ResourceRow,
@@ -385,7 +385,35 @@ export async function rejectSubmission(id: string, community?: string, reviewedB
   if (community) query = query.eq('community_id', community)
   const { data, error } = await query.select('*').single()
   if (error) throw new Error(`Failed to reject submission: ${error.message}`)
+  await keepReportedItems(data as SubmissionRow)
   return data as SubmissionRow
+}
+
+/** Rejecting an edit that took off an item someone said was gone ("Not
+ *  anymore") keeps the item, so its warning goes. Best-effort: a failure
+ *  here leaves the warning up, never fails the rejection. */
+async function keepReportedItems(submission: SubmissionRow): Promise<void> {
+  if (submission.target_type !== 'listing' || submission.operation !== 'update' || !submission.target_id) return
+  try {
+    const { data: row } = await getAdminClient()
+      .from('resource')
+      .select('id, category, details')
+      .eq('community_id', submission.community_id)
+      .eq('id', submission.target_id)
+      .maybeSingle<{ id: string; category: string; details: Record<string, unknown> | null }>()
+    const before = row?.details ?? null
+    if (!row || !before?.itemGone) return
+    const category = await getCategoryById(submission.community_id, row.category)
+    const keys = itemFieldKeys(category?.detailFields ?? [])
+    const proposed = (submission.payload as { details?: Record<string, unknown> } | null)?.details ?? null
+    for (const { fieldKey, item } of goneItemsKept(before, proposed, keys)) {
+      const { error } = await getAdminClient().rpc('clear_item_gone', { p_id: row.id, p_field: fieldKey, p_label: item })
+      if (error) throw new Error(error.message)
+    }
+    // The admin route that called this revalidates the public content.
+  } catch (err) {
+    console.error('[submissions] could not clear a reported-gone item:', err)
+  }
 }
 
 // ── Google-sync field ownership, decided once at approval time ─────────────
@@ -688,13 +716,17 @@ async function withItemDates(
   const keys = itemFieldKeys(fields)
   const next = { ...details }
   delete next.itemSeen
+  delete next.itemGone
   if (keys.length === 0) {
     if (existing?.itemSeen !== undefined) next.itemSeen = existing.itemSeen
+    if (existing?.itemGone !== undefined) next.itemGone = existing.itemGone
     return { details: next, newItems: [] }
   }
   const newItems = addedItems(existing, details, keys)
   const seen = nextItemSeen(existing?.itemSeen, details, keys, newItems, now)
   if (Object.keys(seen).length > 0) next.itemSeen = seen
+  const gone = nextItemGone(existing?.itemGone, details, keys)
+  if (Object.keys(gone).length > 0) next.itemGone = gone
   return { details: next, newItems }
 }
 

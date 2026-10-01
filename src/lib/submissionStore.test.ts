@@ -27,8 +27,9 @@ function chainable(result: unknown) {
 }
 
 const mockFrom = vi.hoisted(() => vi.fn())
+const mockRpc = vi.hoisted(() => vi.fn())
 vi.mock('./supabase/admin', () => ({
-  getAdminClient: () => ({ from: mockFrom }),
+  getAdminClient: () => ({ from: mockFrom, rpc: mockRpc }),
 }))
 
 const mockListCategories = vi.hoisted(() => vi.fn())
@@ -119,6 +120,7 @@ afterEach(() => {
   mockGeocode.mockReset()
   mockFetchPlaceSync.mockReset()
   mockRecordActivity.mockReset()
+  mockRpc.mockReset()
 })
 
 // ── listPendingSubmissions: category-label resolution ───────────────────────
@@ -1220,6 +1222,44 @@ describe('rejectSubmission', () => {
   })
 })
 
+describe('rejectSubmission: an item reported gone', () => {
+  const removal = (m: string[]) =>
+    baseSubmission({
+      status: 'rejected',
+      operation: 'update',
+      target_id: 'res-1',
+      payload: listingPayload({ category: 'grocery', details: { m } }) as unknown as Record<string, unknown>,
+    })
+  function mockFlow(sub: SubmissionRow) {
+    mockFrom.mockImplementation((table: string) =>
+      table === 'submission'
+        ? chainable({ data: sub, error: null })
+        : chainable({ data: { id: 'res-1', category: 'grocery', details: { m: ['Challah', 'Chicken'], itemGone: { m: { Chicken: '2026-10-01T14:00:00.000Z' } } } }, error: null }),
+    )
+    mockGetCategoryById.mockResolvedValue({ id: 'grocery', detailFields: [{ key: 'm', label: 'Kosher items', type: 'tags' }] })
+    mockRpc.mockResolvedValue({ data: null, error: null })
+  }
+
+  it('rejecting the removal keeps the item, so its warning goes', async () => {
+    mockFlow(removal(['Challah']))
+    await rejectSubmission('sub-1')
+    expect(mockRpc).toHaveBeenCalledWith('clear_item_gone', { p_id: 'res-1', p_field: 'm', p_label: 'Chicken' })
+  })
+
+  it('rejecting some other edit leaves the warning up', async () => {
+    mockFlow(removal(['Challah', 'Chicken', 'Wine']))
+    await rejectSubmission('sub-1')
+    expect(mockRpc).not.toHaveBeenCalled()
+  })
+
+  it('a failure clearing it never fails the rejection', async () => {
+    mockFlow(removal(['Challah']))
+    mockRpc.mockResolvedValue({ data: null, error: { message: 'boom' } })
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    await expect(rejectSubmission('sub-1')).resolves.toMatchObject({ status: 'rejected' })
+  })
+})
+
 // ── submitGoogleClosure: idempotency guard ──────────────────────────────────
 
 describe('submitGoogleClosure', () => {
@@ -1542,6 +1582,25 @@ describe('approveSubmission: activity log and grocery item dates', () => {
     await approveSubmission('sub-1')
 
     expect(lastCallArg(resource.update).details.itemSeen).toBeUndefined()
+  })
+
+  it('keeps a "reported gone" on an item still listed, drops it with the item, and never takes one from a submission', async () => {
+    const sub = baseSubmission({
+      operation: 'update',
+      target_id: 'res-1',
+      payload: listingPayload({
+        category: 'grocery',
+        details: { m: ['Challah', 'Steak'], itemGone: { m: { Challah: '2099-01-01T00:00:00.000Z' } } },
+      }) as unknown as Record<string, unknown>,
+    })
+    const resource = mockFlow(sub, {
+      id: 'res-1',
+      details: { m: ['Challah', 'Chicken', 'Steak'], itemGone: { m: { Chicken: '2026-10-01T14:00:00.000Z', Steak: '2026-09-30T14:00:00.000Z' } } },
+    })
+
+    await approveSubmission('sub-1')
+
+    expect(lastCallArg(resource.update).details.itemGone).toEqual({ m: { Steak: '2026-09-30T14:00:00.000Z' } })
   })
 
   it('logs nothing when the approval itself fails to save', async () => {

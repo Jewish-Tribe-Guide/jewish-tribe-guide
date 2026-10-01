@@ -118,8 +118,9 @@ export function mainThing(item: DirectoryResource, category: CategoryConfig): Ma
  *  hechsher rarely moves, and when either does someone edits or reports
  *  it): it gets a quiet date at the listing's foot, "Kosher details last
  *  checked Aug 20". A grocery's items do change, but nobody can vouch for
- *  nine at once; each item gets its own "Still here" in step 3, and until
- *  then they're dated quietly too. Nothing in the header is ever dated.
+ *  nine at once: each item carries its own date and its own "Still here"
+ *  (itemMarks.ts, agreed Oct 1), so the listing says nothing more about
+ *  them. Nothing in the header is ever dated.
  *  Null where there's nothing of the community's to date: nothing said,
  *  rather than a broad "is all of this right". */
 export type ConfirmPlace = { at: 'card'; subject: string } | { at: 'join' } | { at: 'quiet'; subject: string }
@@ -129,7 +130,8 @@ export function confirmPlace(item: DirectoryResource, category: CategoryConfig):
   if (main === 'davening') return { at: 'card', subject: 'Times' }
   if (main === 'groups') return { at: 'card', subject: 'Hours' }
   if (main === 'join') return { at: 'join' }
-  if (main === 'items') return { at: 'quiet', subject: 'Items' }
+  // Each item is dated, and asked about, on its own.
+  if (main === 'items') return null
   const facts = listingFacts(item, category)
   if (facts.length === 0) return null
   // A hechsher (the badge that carries a caveat) makes them kosher details.

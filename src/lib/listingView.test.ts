@@ -309,7 +309,7 @@ describe('confirmPlace', () => {
   })
   it('what hardly changes, or nobody can vouch for all at once, only dated: Food’s kosher details, a grocery’s items', () => {
     expect(confirmPlace(makeListing({ t: ['Meat'], kosherCert: 'Keystone-K', foodType: 'Restaurant' }), food)).toEqual({ at: 'quiet', subject: 'Kosher details' })
-    expect(confirmPlace(makeListing({ m: ['Challah'], isKosher: 'Kosher Items' }), grocery)).toEqual({ at: 'quiet', subject: 'Items' })
+    expect(confirmPlace(makeListing({ m: ['Challah'], isKosher: 'Kosher Items' }), grocery)).toBeNull()
   })
   it('facts with no hechsher among them, by name: a hotel’s "Shabbat friendly"', () => {
     const shabbat: CategoryField = { key: 'shabbatFriendly', label: 'Shabbat friendly', type: 'boolean', renderAs: 'badge', filterable: true }
