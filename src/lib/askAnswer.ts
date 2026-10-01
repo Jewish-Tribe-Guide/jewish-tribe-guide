@@ -114,6 +114,7 @@ function minyanAnswer(
   result: AskResult,
   schedule: AnswerSchedule,
   origin: LatLng | null,
+  center: LatLng | null = null,
 ): Answer | null {
   const ask = result.query.minyan!
   // Anything the question said beyond "minyan" narrows the shuls — "an
@@ -135,11 +136,14 @@ function minyanAnswer(
   })
   // Two minyanim at the same time: the nearer shul first, since the first
   // is the one the sentence names. The schedule breaks ties by name, which
-  // named the farther of two 9:00 Shacharises.
-  const away = (s: MinyanSlot) => (origin && s.shulGeo ? haversineMiles(origin, s.shulGeo) : Infinity)
+  // named the farther of two 9:00 Shacharises. With no location, nearer the
+  // community's centre: by name, "next minyan" named a Cherry Hill shul
+  // 8.2 mi out over Mekor Habracha at the same 6:20 (Sep 28).
+  const from = origin ?? center
+  const away = (s: MinyanSlot) => (from && s.shulGeo ? haversineMiles(from, s.shulGeo) : Infinity)
   const byTime = (a: MinyanSlot, b: MinyanSlot) => a.minutes - b.minutes || away(a) - away(b)
   const where = (r: AnswerRow) => `${r.shulName}${r.miles != null ? ` (${r.miles} mi)` : ''}`
-  if (ask.when) return minyanDaysAnswer(ask, ask.when, schedule, fits, toRow, byTime, where)
+  if (ask.when) return minyanDaysAnswer(ask, ask.when, schedule, fits, toRow, byTime, where, !!origin)
   const today = schedule.today.filter(fits).sort(byTime)
   const tomorrow = schedule.tomorrow.filter(fits).sort(byTime)
   if (today.length === 0 && tomorrow.length === 0) return null
@@ -203,6 +207,7 @@ function minyanDaysAnswer(
   toRow: (s: MinyanSlot, tomorrow: boolean) => AnswerRow,
   byTime: (a: MinyanSlot, b: MinyanSlot) => number,
   where: (r: AnswerRow) => string,
+  located: boolean,
 ): Answer | null {
   const { todayKey, tomorrowKey, onDay } = schedule
   if (!todayKey || !tomorrowKey || !onDay) return null
@@ -247,9 +252,19 @@ function minyanDaysAnswer(
   }
 
   const upper = (t: string) => t[0].toUpperCase() + t.slice(1)
+  // The earliest is named; when another shul is nearer to where the visitor
+  // is, that too ("Shacharis tomorrow" named Chabad of the Main Line at
+  // 6:45, 6.1 mi, with Mekor Habracha 0.2 mi away at 6:55).
+  const nearest = (found: { row: AnswerRow }[]) =>
+    located && !several ? found.reduce((a, b) => ((b.row.miles ?? Infinity) < (a.row.miles ?? Infinity) ? b : a)) : found[0]
   const text = slices
     .filter((x) => x.found.length > 0)
-    .map(({ w, found }) => `${upper(w.label)}: ${found[0].row.label} ${found[0].row.time}, ${where(found[0].row)}${found.length > 1 ? `, and ${found.length - 1} more` : ''}.`)
+    .map(({ w, found }) => {
+      const first = found[0].row
+      const near = nearest(found).row
+      const nearText = near.shulName !== first.shulName ? ` Nearest: ${near.label} ${near.time}, ${where(near)}.` : ''
+      return `${upper(w.label)}: ${first.label} ${first.time}, ${where(first)}${found.length > 1 ? `, and ${found.length - 1} more` : ''}.${nearText}`
+    })
     .join(' ')
   return { text: `${text}${note}`, rows, shown: several ? 6 : 5, when: labels }
 }
@@ -294,7 +309,14 @@ function withBest(result: AskResult, answer: Answer | null): Answer | null {
  *  `limit`), so counts ("3 places carry it") are true. */
 export function answerFor(
   result: AskResult,
-  options: { schedule?: AnswerSchedule | null; coords?: LatLng | null } = {},
+  options: {
+    schedule?: AnswerSchedule | null
+    coords?: LatLng | null
+    /** The community's centre: with no location, two minyanim at the same
+     *  time go to the shul nearer it, as the rows' own distances do. Only
+     *  for that order; no distance is said from it. */
+    center?: LatLng | null
+  } = {},
 ): Answer | null {
   const answer = withBest(result, baseAnswer(result, options))
   // "Within a 15-minute drive" needs somewhere to measure from. Without the
@@ -311,13 +333,13 @@ export function answerFor(
 
 function baseAnswer(
   result: AskResult,
-  { schedule = null, coords = null }: { schedule?: AnswerSchedule | null; coords?: LatLng | null },
+  { schedule = null, coords = null, center = null }: { schedule?: AnswerSchedule | null; coords?: LatLng | null; center?: LatLng | null },
 ): Answer | null {
   const { query, hits } = result
   if (!query.raw) return null
 
   if (query.minyan && schedule) {
-    const answer = minyanAnswer(result, schedule, result.anchor?.geo ?? coords)
+    const answer = minyanAnswer(result, schedule, result.anchor?.geo ?? coords, center)
     if (answer) return answer
   }
 

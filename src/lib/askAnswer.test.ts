@@ -121,6 +121,16 @@ describe('answerFor — minyan questions', () => {
     expect(answer?.text).toMatch(/^Next minyan: 9:00 AM, South Philly Shtiebel \(/)
   })
 
+  it('with no location, the tie goes to the shul nearer the community’s centre, and says no distance', () => {
+    // Reported Sep 28: "next minyan" named a Cherry Hill shul 8.2 mi out,
+    // over Mekor Habracha at the same time, because ties went by name.
+    const nine = [slot(shtiebel, 'shacharis', 9), slot(mekor, 'shacharis', 9)]
+    const say = (center: { lat: number; lng: number }) =>
+      answerFor(searchAsk(listings, categories, 'next minyan'), { schedule: { today: nine, tomorrow: [], nowMinutes: 7 * 60 }, center })?.text
+    expect(say({ lat: 39.951, lng: -75.17 })).toMatch(/^Next minyan: 9:00 AM, Mekor Habracha\. /)
+    expect(say({ lat: 39.929, lng: -75.17 })).toMatch(/^Next minyan: 9:00 AM, South Philly Shtiebel\. /)
+  })
+
   it('keeps every minyan left today, showing the first few', () => {
     // "9 more today" was a count with nowhere to go: the list stopped at 5.
     const many = Array.from({ length: 8 }, (_, i) => slot(mekor, 'maariv', 18, i * 5))
@@ -660,6 +670,17 @@ describe('answerFor — a minyan question about a day (Sep 30)', () => {
 
   it('"shacharis tomorrow": tomorrow’s, not the next one from now', () => {
     expect(ask('shacharis tomorrow', week(6))?.text).toBe('Tomorrow: Shacharis 6:45 AM, South Philly Shtiebel, and 1 more.')
+  })
+
+  it('the earliest is named, and the nearest too when it’s another shul', () => {
+    // Reported Sep 28: Chabad of the Main Line at 6:45, 6.1 mi, named alone
+    // over Mekor Habracha at 6:55, 0.2 mi.
+    const nearMekor = { lat: 39.951, lng: -75.17 }
+    const answer = answerFor(searchAsk(listings, categories, 'shacharis tomorrow'), { schedule: week(6), coords: nearMekor })
+    expect(answer?.text).toBe('Tomorrow: Shacharis 6:45 AM, South Philly Shtiebel (1.5 mi), and 1 more. Nearest: Shacharis 7:00 AM, Mekor Habracha (0.1 mi).')
+    // Nearest and earliest the same shul: said once.
+    const nearShtiebel = { lat: 39.93, lng: -75.17 }
+    expect(answerFor(searchAsk(listings, categories, 'shacharis tomorrow'), { schedule: week(6), coords: nearShtiebel })?.text).not.toMatch(/Nearest/)
   })
 
   it('"friday night minyan": Friday’s evening, a sunset time marked as worked out, not stated', () => {

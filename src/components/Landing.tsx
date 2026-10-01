@@ -180,6 +180,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
     const result = searchAsk(listings ?? [], categories ?? [], text, { coords, now: new Date(schedule?.now ?? 0), places })
     const answer = answerFor(result, {
       coords,
+      center: community.mapCenter,
       schedule: result.query.minyan && schedule ? answerSchedule(schedule) : null,
     })
     // "What's on this site?", "how do I add a listing?" (see metaAnswer).
