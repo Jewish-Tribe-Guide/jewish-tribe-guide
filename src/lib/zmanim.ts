@@ -1,4 +1,5 @@
 import type { ZmanimData, ZmanEntry } from '@/types'
+import { calendarDaysFrom, readHebcalDay } from './jewishDays'
 
 // ── Hebcal data layer ─────────────────────────────────────────────────────────
 //
@@ -164,36 +165,19 @@ export function lookaheadDays(dayOfWeek: number): number {
  *  a title the caller has already decided is the one to show. */
 function normalizeHolidayName(title: string): string {
   return title
-    .replace(/\s*\(CH['’]M\)\s*$/i, '')
+    .replace(/\s*\(CH['’]{1,2}M\)\s*$/i, '')
     .replace(/\s+(I|II|III|IV|V|VI|VII|VIII)$/, '')
     .replace(/\s+\d{4}$/, '')
     .trim()
 }
 
-/** Full Yom Tov day names the Hebrew-calendar converter can report for
- *  today, matched by prefix the same way `isRoshChodesh` matches "Rosh
- *  Chodesh" — deliberately excludes fasts (Yom Kippur is its own prefix, not
- *  a fast-day one), Chanukah/Purim (minor holidays; work is permitted, so a
- *  shul's ordinary weekday minyan still applies), and Rosh Chodesh itself
- *  (already its own pseudo-day). */
-const YOM_TOV_PREFIXES = [
-  'Rosh Hashana',
-  'Yom Kippur',
-  'Sukkot',
-  'Shmini Atzeret',
-  'Simchat Torah',
-  'Pesach',
-  'Shavuot',
-]
-
-/** True for a full Yom Tov day event ("Sukkot I", "Pesach VIII"), false for
- *  the lead-up ("Erev Sukkot") and the intermediate days Hebcal marks
- *  "(CH'M)" — Chol HaMoed keeps a shul's regular weekday schedule (plus
- *  Hallel), not its Yom Tov one. */
+/** True for a full Yom Tov day ("Sukkot I", "Pesach VIII", "Shmini
+ *  Atzeret"), false for the lead-up ("Erev Sukkot"), Chol HaMoed and
+ *  Hoshana Rabbah (a shul's weekday times, plus Hallel), minor days, and
+ *  names that only begin like a festival's ("Yom Kippur Katan"). See
+ *  jewishDays.ts, which reads every title the same way. */
 function isYomTovEvent(event: string): boolean {
-  if (event.startsWith('Erev ')) return false
-  if (/\(CH['’]M\)/i.test(event)) return false
-  return YOM_TOV_PREFIXES.some((p) => event.startsWith(p))
+  return readHebcalDay(event)?.yomTov ?? false
 }
 
 /** Groups a date-ranged Hebcal response into the next complete Yom Tov
@@ -482,6 +466,11 @@ export async function getZmanimData(coords: ZmanimCoords): Promise<ZmanimData> {
     isRoshChodesh: (converter.events ?? []).some((e) => e.startsWith('Rosh Chodesh')),
     isYomTov: (converter.events ?? []).some(isYomTovEvent),
     holidayPeriod: findHolidayPeriod(holidayCalendar.items ?? [], timezone, windowEnd, nowMs),
+    // Each festival day from today to the end of what was asked for, so a
+    // page can name the days ahead ("Fri · Hoshana Rabbah") and a shul's
+    // Yom Tov times can apply tomorrow too, not only today.
+    days: calendarDaysFrom(holidayCalendar.items ?? [], dateStr, addDays(windowEnd, HOLIDAY_QUERY_PAD_DAYS)),
+    daysThrough: addDays(windowEnd, HOLIDAY_QUERY_PAD_DAYS),
     fastPeriod: findFastPeriod(holidayCalendar.items ?? [], timezone, windowEnd, nowMs, dateStr),
   }
 }

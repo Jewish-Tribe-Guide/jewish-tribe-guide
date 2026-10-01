@@ -1,6 +1,7 @@
 import type { ZmanimData } from '@/types'
 import { ALL_DAYS, type MinyanDayKey } from '@/lib/davening'
 import { secularHoliday } from '@/lib/secularHolidays'
+import { readHebcalDay } from '@/lib/jewishDays'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Which day keys apply to today — the thing that turns a minyan's
@@ -65,7 +66,9 @@ export function calendarDaysFor(now: number, zmanim: ZmanimData | null | undefin
   const yomTovKnown = typeof zmanim?.isYomTov === 'boolean'
   if (!yomTovKnown || zmanim?.isYomTov) dayKeys.push('yom_tov')
   if (yomTovKnown && zmanim?.isYomTov) {
-    labels.push(zmanim.holidays?.find((e) => !e.startsWith('Erev ') && !e.startsWith('Rosh Chodesh')) ?? 'Yom Tov')
+    // The guide's own name for it ("Shemini Atzeres"), not Hebcal's title.
+    const day = (zmanim.holidays ?? []).map(readHebcalDay).find((d) => d?.yomTov)
+    labels.push(day?.name ?? 'Yom Tov')
   }
 
   return { dayKeys, labels, roshChodeshKnown, yomTovKnown }

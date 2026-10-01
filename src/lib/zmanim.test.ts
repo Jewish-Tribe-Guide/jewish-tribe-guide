@@ -217,6 +217,28 @@ describe('getZmanimData', () => {
     await expect(getZmanimData(PHILADELPHIA)).rejects.toThrow(/Hebcal request failed \(503\)/)
   })
 
+  describe('days ahead (step 4)', () => {
+    it('names each festival day from today through the end of the query, and says how far that is', async () => {
+      // Wednesday 2026-06-24: the query reaches 2026-06-30.
+      mockHebcal({
+        holidayCalendar: {
+          items: [
+            { category: 'holiday', title: 'Sukkot VI (CH’’M)', date: '2026-06-23' },
+            { category: 'holiday', title: 'Sukkot VII (Hoshana Raba)', date: '2026-06-25' },
+            { category: 'holiday', title: 'Shmini Atzeret', date: '2026-06-26' },
+          ],
+        },
+      })
+      const data = await getZmanimData(PHILADELPHIA)
+      // Yesterday's is left out: the days start today.
+      expect(data.days?.map((d) => [d.date, d.name, d.yomTov])).toEqual([
+        ['2026-06-25', 'Hoshana Rabbah', false],
+        ['2026-06-26', 'Shemini Atzeres', true],
+      ])
+      expect(data.daysThrough).toBe('2026-06-30')
+    })
+  })
+
   describe('holidayPeriod', () => {
     it('asks /hebcal for an explicit date range, padded past the real lookahead window, not the /shabbat "next cycle" the regular candle/havdalah fields use', async () => {
       // Starts a day BEFORE today, so a period that began last night (Yom
@@ -642,9 +664,22 @@ describe('getZmanimData', () => {
     })
 
     it('is false on Chol HaMoed — a shul’s regular weekday schedule still applies', async () => {
-      mockHebcal({ converter: { ...converterResponse, events: ['Sukkot III (CH’M)'] } })
+      // As Hebcal really writes it: two apostrophes. The old check expected
+      // one, and called every Chol HaMoed day Yom Tov.
+      mockHebcal({ converter: { ...converterResponse, events: ['Sukkot VI (CH’’M)'] } })
       const data = await getZmanimData(PHILADELPHIA)
       expect(data.isYomTov).toBe(false)
+    })
+
+    it('is false on Hoshana Rabbah, the last day of Chol HaMoed', async () => {
+      mockHebcal({ converter: { ...converterResponse, events: ['Sukkot VII (Hoshana Raba)'] } })
+      const data = await getZmanimData(PHILADELPHIA)
+      expect(data.isYomTov).toBe(false)
+    })
+
+    it('is false on days that only begin like a festival', async () => {
+      mockHebcal({ converter: { ...converterResponse, events: ['Yom Kippur Katan'] } })
+      expect((await getZmanimData(PHILADELPHIA)).isYomTov).toBe(false)
     })
 
     it('is false on a minor holiday, where work is permitted', async () => {

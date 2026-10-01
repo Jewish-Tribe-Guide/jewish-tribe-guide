@@ -1,3 +1,4 @@
+import type { CalendarDay } from '@/lib/jewishDays'
 /** A named geographic point with a timezone. Hospitals are one kind of landmark
  *  (the patient module keeps a list of them); the type itself is generic. */
 export type Landmark = {
@@ -61,6 +62,13 @@ export type ZmanimData = {
    *  forbidden, not the lead-up or the intermediate days. Derived from
    *  `holidays` in lib/zmanim, same as `isRoshChodesh`. */
   isYomTov?: boolean
+  /** Each day from today through `daysThrough` that's part of a festival
+   *  (Yom Tov, Chol HaMoed, Erev), in order. A day in that range with no
+   *  entry is an ordinary day; past `daysThrough`, nothing is known. Absent
+   *  in an older cached payload, which callers read as "not known". */
+  days?: CalendarDay[]
+  /** The last date `days` speaks for, YYYY-MM-DD. */
+  daysThrough?: string
   /** The next Yom Tov period landing within the lookahead window (see
    *  lib/zmanim.ts's own `lookaheadDays` doc for how far ahead that is) —
    *  `null` when there isn't one, which is the common case most weeks. */
