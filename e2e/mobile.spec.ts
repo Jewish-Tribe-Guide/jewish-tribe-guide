@@ -200,8 +200,10 @@ test.describe('mobile', () => {
     await page.getByRole('button', { name: 'Suggest an edit' }).click()
 
     // The editor reads hours the way the listing does: today's line, tapped
-    // to open the week (see ListingEditor).
-    const hoursToggle = page.getByRole('button', { name: /^(Today:|Closed today)/ })
+    // to open the week (see ListingEditor), or "Add hours" for a listing
+    // with none anyone can use (saved as closed every day, as some test
+    // listings are; see hasAnyHours). Either opens the same week editor.
+    const hoursToggle = page.getByRole('button', { name: /^(Today:|Closed today|Add hours)/ })
     await expect(hoursToggle).toBeVisible()
     await hoursToggle.click()
 
