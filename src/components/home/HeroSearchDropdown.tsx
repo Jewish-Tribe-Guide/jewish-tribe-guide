@@ -9,7 +9,7 @@ import type { CardDef, ListingHit } from './sections'
 import type { Answer } from '@/lib/askAnswer'
 import Highlight from '@/components/resources/Highlight'
 import AskAnswer from './AskAnswer'
-import AskTheGroup from './AskTheGroup'
+import AskTheGroup, { type AskGroupProps } from './AskTheGroup'
 
 // How many of each to show before "See all" — matches the mockup this was
 // built from. Categories and listings are capped independently: a broad
@@ -59,7 +59,7 @@ export default function HeroSearchDropdown({
   answer?: Answer | null
   /** For a search that found nothing: where to ask and how to add the
    *  answer, last (see AskTheGroup). */
-  askGroup?: { nothingClose: boolean; askHref: string | null; addHref: string } | null
+  askGroup?: AskGroupProps | null
   onOpenShul?: (shulId: string) => void
   /** See AskAnswer's `share`. */
   share?: { path: string; title: string } | null

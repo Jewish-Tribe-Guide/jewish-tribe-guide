@@ -186,10 +186,19 @@ export function itemSuggestions(typed: string, marks: readonly ItemMark[], max =
     .map(({ name, listed }) => ({ name, listed }))
 }
 
+/** The name an added item goes in under: the list's name for it, or, for a
+ *  name not on the list typed all in lower case ("rugelach"), with capitals
+ *  as the guide's items have them ("Rugelach"). Anything else as typed. */
+export function addedItemName(name: string): string {
+  if (itemEntry(name)) return itemName(name)
+  const n = name.trim()
+  return n === n.toLowerCase() ? n.replace(/(^|\s)(\p{L})/gu, (_, sp: string, c: string) => sp + c.toUpperCase()) : n
+}
+
 /** The edit suggestion "Add an item" files: the listing as it stands with
  *  one item more, in its list's always or sometimes part. A name on the
  *  item list goes in under the list's name for it. */
 export function additionSubmission(category: CategoryConfig, item: DirectoryResource, fieldKey: string, name: string, sometimes: boolean): ResourceSubmission {
   const key = sometimes ? `${fieldKey}_sometimes` : fieldKey
-  return editSubmission(category, item, { [key]: [...selectValues(item[key]), itemName(name)] })
+  return editSubmission(category, item, { [key]: [...selectValues(item[key]), addedItemName(name)] })
 }

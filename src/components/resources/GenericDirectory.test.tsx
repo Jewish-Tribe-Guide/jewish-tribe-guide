@@ -336,6 +336,38 @@ describe('GenericDirectory', () => {
       expect(screen.getByRole('status')).toHaveTextContent(/challah/i)
     })
 
+    it('shares an answer as the question naming this category, with the answer in the message (agreed Oct 1)', async () => {
+      const shareFn = vi.fn().mockResolvedValue(undefined)
+      vi.stubGlobal('navigator', { ...navigator, share: shareFn })
+      try {
+        const user = userEvent.setup()
+        renderWithProviders(<GenericDirectory category={grocery} items={stores} {...handlers} />)
+        await user.type(screen.getByRole('searchbox'), 'challah')
+        await user.click(screen.getByRole('button', { name: 'Share this answer' }))
+        const asked = `${grocery.label.toLowerCase()} challah`
+        expect(shareFn).toHaveBeenCalledWith({
+          title: asked,
+          text: 'Where can I get challah? 3 places have Challah.',
+          url: `${window.location.origin}/test-community/ask/${asked.replace(/ /g, '-')}`,
+        })
+      } finally {
+        vi.unstubAllGlobals()
+      }
+    })
+
+    it('found nothing: asks the group, or where it’s sold, as the home search does', async () => {
+      const user = userEvent.setup()
+      // Its items are the listing's main list (showCountInHeader), as Grocery's are.
+      const withItems = makeCategory({ detailFields: [{ key: 'm', label: 'Kosher items', type: 'tags', showCountInHeader: true }] })
+      renderWithProviders(<GenericDirectory category={withItems} items={stores} {...handlers} />)
+      await user.type(screen.getByRole('searchbox'), 'rugelach')
+      const card = within(screen.getByTestId('ask-the-group'))
+      expect(card.getByText('Nothing in the guide for “rugelach” yet.')).toBeInTheDocument()
+      expect(card.getByRole('button', { name: 'Ask a WhatsApp group' })).toBeInTheDocument()
+      await user.click(card.getByRole('button', { name: /Know where to find it/ }))
+      expect(screen.getByTestId('where-seen')).toHaveTextContent('Seen rugelach somewhere?')
+    })
+
     it('shows an answer only after a search: nothing sits under the box unasked', () => {
       renderWithProviders(<GenericDirectory category={grocery} items={stores} {...handlers} />)
       expect(screen.queryByRole('status')).not.toBeInTheDocument()

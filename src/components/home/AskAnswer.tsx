@@ -9,8 +9,8 @@ import { useShareLink } from '@/lib/useShareLink'
 /** The answer's own link (see shareAnswer.ts), to send to whoever asked:
  *  the phone's share sheet, or a copied link. The analytics event carries
  *  no question text, same as the search events (see useLogSearchMiss). */
-function ShareAnswer({ path, title }: { path: string; title: string }) {
-  const { share, copied } = useShareLink(path, title)
+function ShareAnswer({ path, title, text }: { path: string; title: string; text?: () => string }) {
+  const { share, copied } = useShareLink(path, title, text)
   return (
     <button
       type="button"
@@ -23,7 +23,7 @@ function ShareAnswer({ path, title }: { path: string; title: string }) {
       <svg aria-hidden="true" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4">
         <path d="M10 3v10M6 7l4-4 4 4M4 12v3a2 2 0 002 2h8a2 2 0 002-2v-3" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
-      {copied ? 'Link copied' : 'Share this answer'}
+      {copied ? (text ? 'Answer copied' : 'Link copied') : 'Share this answer'}
     </button>
   )
 }
@@ -44,7 +44,7 @@ export default function AskAnswer({
   /** The answer's own page (see shareAnswer.ts) and the question as its
    *  title, when it's worth sending: not for a near miss, which answers a
    *  different question. */
-  share?: { path: string; title: string } | null
+  share?: { path: string; title: string; text?: () => string } | null
   className?: string
 }) {
   // Open for this answer only: a new question starts collapsed again,
@@ -125,7 +125,7 @@ export default function AskAnswer({
           {expanded ? 'Show fewer' : `Show all ${answer.rows.length}${answer.when ? '' : allTomorrow ? ' tomorrow' : ' today'}`}
         </button>
       )}
-      {share && !answer.closest && <div><ShareAnswer path={share.path} title={share.title} /></div>}
+      {share && !answer.closest && <div><ShareAnswer path={share.path} title={share.title} text={share.text} /></div>}
     </div>
   )
 }

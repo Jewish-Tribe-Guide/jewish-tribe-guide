@@ -10,11 +10,11 @@ import { getCategoryById } from '@/lib/categoryStore'
 import { submitListingUpdate } from '@/lib/submissionStore'
 import { sendSubmissionNotification } from '@/lib/email'
 import { itemsField } from '@/lib/listingView'
-import { itemEntry, itemName } from '@/lib/itemNames'
-import { additionSubmission, alreadyListed, cleanItemName, itemMarks } from '@/lib/itemMarks'
+import { itemEntry } from '@/lib/itemNames'
+import { addedItemName, additionSubmission, alreadyListed, cleanItemName, itemMarks } from '@/lib/itemMarks'
 import { UUID, withdrawPending } from '@/lib/itemMarkRoutes'
 
-// POST /api/resource/:id/item/add   { item, sometimes?, turnstileToken, company }
+// POST /api/resource/:id/item/add   { item, sometimes?, from?, turnstileToken, company }
 // "+ Add an item" on an opened listing (agreed Oct 1). An item is a new
 // claim about what a place carries, so unlike "Still here" it doesn't show
 // at once: it's an edit suggestion, the listing with one item more, for an
@@ -64,9 +64,12 @@ export async function POST(request: Request, ctx: RouteContext<'/api/resource/[i
     if (listed) return Response.json({ ok: true, already: { item: listed.name, field: listed.key } })
 
     const sometimes = body.sometimes === true
-    const named = itemName(name)
+    const named = addedItemName(name)
+    // Where it was said, for the admin: the listing's own "+ Add an item",
+    // or a question the guide had nothing for ("Know where to find it?").
+    const where = body.from === 'question' ? 'Said where to find it, from a question the guide had nothing for' : 'Tapped “Add an item” on the listing'
     const note = [
-      `Tapped “Add an item” on the listing: ${named}${sometimes ? ' (not always in stock)' : ''}.`,
+      `${where}: ${named}${sometimes ? ' (not always in stock)' : ''}.`,
       ...(itemEntry(name) ? [] : ['A name not on the item list yet.']),
     ].join(' ')
     const submission = await submitListingUpdate(row.community_id, id, additionSubmission(category, listing, field.key, name, sometimes), note, null)

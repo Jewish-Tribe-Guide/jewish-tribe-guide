@@ -79,6 +79,14 @@ describe('POST /api/resource/:id/item/add', () => {
     expect(note).toBe('Tapped “Add an item” on the listing: Rugelach (not always in stock). A name not on the item list yet.')
   })
 
+  it('a name typed in lower case goes in with capitals; one from a question says so to the admin', async () => {
+    const json = await (await POST(req('POST', { item: 'rugelach', from: 'question' }), ctx())).json()
+    const [, , payload, note] = m.submitListingUpdate.mock.calls[0]
+    expect(payload.details.m).toEqual(['Challah', 'Some Sliced Cheese', 'Rugelach'])
+    expect(note).toBe('Said where to find it, from a question the guide had nothing for: Rugelach. A name not on the item list yet.')
+    expect(json.item).toBe('Rugelach')
+  })
+
   it('an item the store already has, under any name, isn’t filed: the answer says which', async () => {
     expect(await (await POST(req('POST', { item: 'sliced cheeses' }), ctx())).json()).toEqual({ ok: true, already: { item: 'Some Sliced Cheese', field: 'm' } })
     expect(await (await POST(req('POST', { item: 'STEAK' }), ctx())).json()).toEqual({ ok: true, already: { item: 'Steak', field: 'm_sometimes' } })

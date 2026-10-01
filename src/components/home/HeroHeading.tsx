@@ -13,6 +13,7 @@ import HeroSearchDropdown from './HeroSearchDropdown'
 import SearchPrompts from './SearchPrompts'
 import type { Answer } from '@/lib/askAnswer'
 import type { CardDef, ListingHit } from './sections'
+import type { AskGroupProps } from './AskTheGroup'
 
 /** The `desktop:` variant's own media query (see globals.css) — the hero band is
  *  `hidden` outside it. Kept in sync by hand; it's a link `media` attribute, so
@@ -64,7 +65,7 @@ type Props = {
   /** The answer's share link — see AskAnswer's `share`. */
   searchShare?: { path: string; title: string } | null
   /** Where to ask and add, for a search that found nothing (see AskTheGroup). */
-  searchAskGroup?: { nothingClose: boolean; askHref: string | null; addHref: string } | null
+  searchAskGroup?: AskGroupProps | null
   onOpenAnswerShul?: (shulId: string) => void
   /** Questions to tap under the empty box, each known to answer well right
    *  now (see searchPrompts.ts). */

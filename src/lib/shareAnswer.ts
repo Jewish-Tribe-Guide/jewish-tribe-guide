@@ -1,5 +1,5 @@
 import { answerFor } from './askAnswer'
-import { formatOpenAtTime, parseAsk, withoutOpenWords } from './ask'
+import { formatOpenAtTime, parseAsk, termsAsTyped, withoutOpenWords } from './ask'
 import { searchAsk, type AskResult } from './askSearch'
 import type { CategoryConfig } from './categories'
 import type { Place } from './places'
@@ -90,4 +90,51 @@ export function shareSummary(
   const said = answerFor(result)?.text ?? `${result.hits.length} ${kindOf(result, categories)} in the guide.`
   if (!hoursAsked) return said
   return `${said} Open to see which are open ${when}.`
+}
+
+// ── What a shared answer and a question to the group say (agreed Oct 1) ──────
+
+const ASKS = /^(where|who|what|which|when|how|is|are|does|do|did|can|any|anyone|anybody)\b/i
+
+/** The question as a sentence ending in "?": "Where can I get challah?" for
+ *  a bare "challah", the asker's own words when they asked one. */
+export function asQuestion(question: string): string {
+  const q = question.trim().replace(/[?.!\s]+$/, '')
+  return ASKS.test(q) ? `${questionTitle(q)}?` : `Where can I get ${q}?`
+}
+
+/** What "Share this answer" sends with the link: the question and the
+ *  answer, so a preview that never loads still says something. The answer
+ *  is the preview's own (shareSummary): nothing tied to the hour, or to
+ *  where the sender is standing. */
+export function shareMessage(question: string, summary: string): string {
+  return `${asQuestion(question)} ${summary}`
+}
+
+/** What "Ask a WhatsApp group" writes for the visitor to send: the
+ *  question, and the question's own link (sent with it), which answers it
+ *  once someone adds it to the guide. */
+export function askMessage(question: string): string {
+  const q = asQuestion(question)
+  const asked = /^Where can I get /.test(q) ? q.replace(/^Where can I get /, 'Does anyone know where to get ') : q
+  return `${asked} It’s not in the guide yet. If you know, add it there and this link will answer it:`
+}
+
+/** The question a category page shares: its own words when they already
+ *  name the category ("kosher bakery"), otherwise with the category named
+ *  ("food open now" for "open now" asked on Food), so the link opens
+ *  answering the same thing. */
+export function categoryQuestion(question: string, category: CategoryConfig, categories: readonly CategoryConfig[]): string {
+  const named = searchAsk([], categories, question).categoryIds
+  return named?.length === 1 && named[0] === category.id ? question : `${category.label.toLowerCase()} ${question}`
+}
+
+/** What a question that found nothing asks for, as typed ("rugelach"), when
+ *  it's an item someone could have seen somewhere: not a question about
+ *  times, minyanim, the eruv or the guide itself. Null otherwise. */
+export function itemAskedFor(result: AskResult): string | null {
+  const { query } = result
+  if (query.minyan || query.meta || query.times || query.eruv || result.terms.length === 0) return null
+  const typed = termsAsTyped(query.raw, result.terms).trim()
+  return typed.length >= 2 && typed.length <= 60 ? typed : null
 }

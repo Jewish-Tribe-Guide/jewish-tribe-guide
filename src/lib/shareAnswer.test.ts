@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { makeCategory } from '@/test/providerFixtures'
 import type { DirectoryResource } from '@/types'
 import { routes, slugRejectionReason } from './routes'
-import { questionFromSlug, questionSlug, questionTitle, shareSummary } from './shareAnswer'
+import { askMessage, asQuestion, categoryQuestion, itemAskedFor, questionFromSlug, questionSlug, questionTitle, shareMessage, shareSummary } from './shareAnswer'
+import { searchAsk } from './askSearch'
 
 describe('a shared question’s link', () => {
   it('is readable, and reads back as the question', () => {
@@ -96,5 +97,39 @@ describe('shareSummary: the link preview', () => {
 
   it('says so when the guide doesn’t have it', () => {
     expect(say('peeled garlic')).toBe('Not in the guide yet. Know where to find it? Add it to the guide.')
+  })
+})
+
+describe('what a share and a question to the group say (agreed Oct 1)', () => {
+  const grocery = makeCategory({ id: 'grocery', label: 'Grocery', pluralLabel: 'Grocery', detailFields: [{ key: 'm', label: 'Kosher items', type: 'tags' }] })
+  const food = makeCategory({ id: 'restaurant', label: 'Food', pluralLabel: 'Food' })
+
+  it('the question as a sentence: the asker’s own, or "Where can I get …?" for a bare item', () => {
+    expect(asQuestion('challah')).toBe('Where can I get challah?')
+    expect(asQuestion('where can i get challah?')).toBe('Where can I get challah?')
+    expect(asQuestion('is there a kosher bakery open')).toBe('Is there a kosher bakery open?')
+  })
+
+  it('a shared answer sends the question and the answer, with the link', () => {
+    expect(shareMessage('challah', '13 places have Challah (3 only sometimes).')).toBe('Where can I get challah? 13 places have Challah (3 only sometimes).')
+  })
+
+  it('a question to the group says it isn’t in the guide yet, and that its link will answer it', () => {
+    expect(askMessage('rugelach')).toBe('Does anyone know where to get rugelach? It’s not in the guide yet. If you know, add it there and this link will answer it:')
+    expect(askMessage('who sells kosher rugelach')).toMatch(/^Who sells kosher rugelach\? It’s not in the guide yet/)
+  })
+
+  it('a category page’s question names the category when it doesn’t already', () => {
+    expect(categoryQuestion('open now', food, [grocery, food])).toBe('food open now')
+    expect(categoryQuestion('challah', grocery, [grocery, food])).toBe('grocery challah')
+    expect(categoryQuestion('food open now', food, [grocery, food])).toBe('food open now')
+  })
+
+  it('a question that found nothing asks for an item only when it’s about one', () => {
+    const ask = (q: string) => itemAskedFor(searchAsk([], [grocery], q))
+    expect(ask('rugelach')).toBe('rugelach')
+    expect(ask('where can I get kosher rugelach?')).toMatch(/rugelach/)
+    expect(ask('candle lighting')).toBeNull()
+    expect(ask('how do I add a listing')).toBeNull()
   })
 })

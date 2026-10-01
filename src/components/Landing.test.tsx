@@ -884,8 +884,9 @@ describe('Landing — when nothing matches', () => {
     // Headed as close, so the places aren't read as the answer.
     expect(screen.getAllByText('Closest matches').length).toBeGreaterThan(0)
     expect(screen.queryByRole('heading', { name: 'Places' })).toBeNull()
-    const ask = screen.getAllByRole('link', { name: /Ask in a community WhatsApp group/ })[0]
-    expect(ask).toHaveAttribute('href', '/test-community/whatsapp')
+    expect(screen.getAllByRole('button', { name: 'Ask a WhatsApp group' }).length).toBeGreaterThan(0)
+    const groups = screen.getAllByRole('link', { name: /See the community’s groups/ })[0]
+    expect(groups).toHaveAttribute('href', '/test-community/whatsapp')
     const lastCall = vi.mocked(useLogSearchMiss).mock.calls.at(-1)![0]
     expect(lastCall).toMatchObject({ query: 'packaged pretzels', hasResults: false })
   })
@@ -990,8 +991,11 @@ describe('Landing — sharing an answer', () => {
     renderLanding(undefined, { content: { categories: [grocery] } }, [store])
     await user.type(screen.getAllByLabelText('Search resources')[0]!, 'where can I get challah?')
     await user.click(screen.getAllByRole('button', { name: 'Share this answer' })[0]!)
+    // The answer goes with the link, so a preview that never loads still
+    // says something (agreed Oct 1).
     expect(shareFn).toHaveBeenCalledWith({
       title: 'where can I get challah?',
+      text: 'Where can I get challah? Test Grocery has Challah.',
       url: `${window.location.origin}/test-community/ask/where-can-i-get-challah`,
     })
   })

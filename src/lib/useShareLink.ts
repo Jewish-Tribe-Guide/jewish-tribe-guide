@@ -2,20 +2,25 @@
 
 import { useState } from 'react'
 
-/** Shares one listing's canonical URL — native share sheet where available
+/** Shares one page's URL, with a line of text when given — native share sheet where available
  *  (mobile Safari/Chrome), clipboard copy everywhere else. Used by
  *  ShareButton (the directory card / map detail panel) and the map's
  *  swipe-to-reveal row action, so a place can be sent to a friend from
  *  wherever it was found, with the same fallback behavior everywhere. */
-export function useShareLink(path: string, title: string) {
+export function useShareLink(path: string, title: string, textOf?: string | (() => string)) {
   const [copied, setCopied] = useState(false)
 
   const share = async (e?: React.MouseEvent) => {
     e?.stopPropagation()
     const url = `${window.location.origin}${path}`
+    // Worked out on the tap, not every render: an answer's text is a search.
+    const text = typeof textOf === 'function' ? textOf() : textOf
     if (typeof navigator !== 'undefined' && navigator.share) {
       try {
-        await navigator.share({ title, url })
+        // `text` goes with the link where there is one (an answer, a
+        // question to a group): what the chat shows even if its preview
+        // never loads.
+        await navigator.share(text ? { title, text, url } : { title, url })
         // The OS share sheet shows its own success feedback (and its own
         // "Copy" action, if the visitor picks that) — nothing more to do.
         return
@@ -32,7 +37,7 @@ export function useShareLink(path: string, title: string) {
       }
     }
     try {
-      await navigator.clipboard.writeText(url)
+      await navigator.clipboard.writeText(text ? `${text} ${url}` : url)
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     } catch {

@@ -13,6 +13,8 @@ import { useZmanim } from '@/lib/useZmanim'
 import { eruvim } from '@/data/resources'
 import { resolveCapabilities } from '@/lib/categories'
 import { routes } from '@/lib/routes'
+import { itemAskedFor, shareMessage, shareSummary } from '@/lib/shareAnswer'
+import { itemsField } from '@/lib/listingView'
 import { neighborhoodsFor } from '@/lib/places'
 import { readerPlaces } from '@/lib/questionReader'
 import { needsReading, ownFrom, readingAnswers, readingChips, readingLoses, readingOffers, searchReading } from '@/lib/readingSearch'
@@ -292,7 +294,10 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
   const answer = miss ? nearMissAnswer(miss, q, { coords }) : strictAnswer
   // The answer's own link, for the Share button (which AskAnswer leaves off
   // a near miss: that answers a different question).
-  const share = q && answer ? { path: routes.ask(communitySlug, q), title: q } : null
+  const share =
+    q && answer
+      ? { path: routes.ask(communitySlug, q), title: q, text: () => shareMessage(q, shareSummary(q, listings ?? [], categories ?? [], places)) }
+      : null
   // Where to ask: the community's WhatsApp groups page, when it has one.
   const whatsapp = categories?.find((c) => /whatsapp/i.test(`${c.id} ${c.label}`))
   // Where to add the answer: the Add form of the one kind of place asked
@@ -300,7 +305,16 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
   // Otherwise a note to the admins with the question already in it — an
   // item like "frozen gefilte fish" usually belongs on a store already
   // listed, which a new listing would be the wrong form for.
-  const askedKind = askResult?.categoryIds?.length === 1 ? categories?.find((c) => c.id === askResult.categoryIds![0]) : undefined
+  // An item ("rugelach") with no kind of place named: a new place for it is
+  // most likely the one kind that keeps item lists, when there's one.
+  const askedItem = foundNothing && askResult ? itemAskedFor(askResult) : null
+  const itemKinds = (categories ?? []).filter((c) => itemsField(c))
+  const askedKind =
+    askResult?.categoryIds?.length === 1
+      ? categories?.find((c) => c.id === askResult.categoryIds![0])
+      : askedItem && itemKinds.length === 1
+        ? itemKinds[0]
+        : undefined
   const addsTo = askedKind && ui.contributions.add && resolveCapabilities(askedKind.capabilities).add ? askedKind : undefined
   const askGroup = foundNothing
     ? {
@@ -309,6 +323,12 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
         addHref: addsTo
           ? `${routes.slug(communitySlug, addsTo.id)}?form=create`
           : `${routes.feedback(communitySlug)}?about=${encodeURIComponent(q)}`,
+        sharePath: routes.ask(communitySlug, q),
+        // "Know where to find it?" asks where, when it's an item and edits
+        // are open (see AskTheGroup).
+        item: ui.contributions.edit ? askedItem : null,
+        listings: listings ?? [],
+        categories: itemKinds.filter((c) => resolveCapabilities(c.capabilities).edit),
       }
     : null
   // A shul named in a minyan answer opens its listing, the same way a place

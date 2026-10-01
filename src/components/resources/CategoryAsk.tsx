@@ -2,7 +2,6 @@
 
 import Link from 'next/link'
 import type { DirectoryResource } from '@/types'
-import type { CategoryConfig } from '@/lib/categories'
 import { searchAsk, type AskResult } from '@/lib/askSearch'
 import { answerFor } from '@/lib/askAnswer'
 import { answersWell, pickPrompts } from '@/lib/searchPrompts'
@@ -15,6 +14,11 @@ import { useOptionalLocation } from '@/lib/locationContext'
 import { useActiveCommunity, useOptionalCommunitySlug } from '@/lib/communityContext'
 import { routes } from '@/lib/routes'
 import AskAnswer from '@/components/home/AskAnswer'
+import AskTheGroup from '@/components/home/AskTheGroup'
+import { categoryQuestion, itemAskedFor, shareMessage, shareSummary } from '@/lib/shareAnswer'
+import { itemsField } from '@/lib/listingView'
+import { resolveCapabilities, type CategoryConfig } from '@/lib/categories'
+import { ui } from '@/lib/uiConfig'
 import ReadAs from '@/components/home/ReadAs'
 import type { ReadingChip, ReadingOffer } from '@/lib/readingSearch'
 
@@ -90,7 +94,34 @@ function Ask({ category, items, search, onSearch, schedule, readAs }: Props & { 
   const asksWhen = (r: AskResult) => r.query.openNow || r.query.openToday || r.query.openAt !== null || r.query.minyan !== null
   const q = search.trim()
   // Read by the reader, its result answers (see readingSearch.ts).
-  const answer = q && now !== null ? (readAs?.result ? answerFor(readAs.result, { coords: coords ?? community.mapCenter, now }) : ask(q).answer) : null
+  const asked = q && now !== null ? (readAs?.result ? { result: readAs.result, answer: answerFor(readAs.result, { coords: coords ?? community.mapCenter, now }) } : ask(q)) : null
+  const answer = asked?.answer ?? null
+  // Shared, the link's question names this category when it doesn't
+  // already, so it opens answering the same thing (agreed Oct 1). The
+  // message says what was asked, in the asker's words.
+  const sharedQ = q ? categoryQuestion(q, category, categories) : ''
+  const share =
+    answer && communitySlug
+      ? { path: routes.ask(communitySlug, sharedQ), title: sharedQ, text: () => shareMessage(q, shareSummary(sharedQ, items, categories, places)) }
+      : null
+  // Found nothing, and the reader isn't still reading: where to ask, and
+  // how to add the answer (AskTheGroup), as on the home search.
+  const foundNothing = !!asked && !readAs?.reading && asked.result.hits.length === 0 && asked.result.noHours.length === 0 && !answer
+  const whatsapp = categories.find((c) => /whatsapp/i.test(`${c.id} ${c.label}`))
+  const canEdit = ui.contributions.edit && resolveCapabilities(category.capabilities).edit
+  const canAdd = ui.contributions.add && resolveCapabilities(category.capabilities).add
+  const askGroup =
+    foundNothing && communitySlug
+      ? {
+          nothingClose: true,
+          askHref: whatsapp ? routes.slug(communitySlug, whatsapp.id) : null,
+          addHref: canAdd ? `${routes.slug(communitySlug, category.id)}?form=create` : `${routes.feedback(communitySlug)}?about=${encodeURIComponent(q)}`,
+          sharePath: routes.ask(communitySlug, sharedQ),
+          item: canEdit && itemsField(category) ? itemAskedFor(asked!.result) : null,
+          listings: items,
+          categories: [category],
+        }
+      : null
   const examples = q
     ? []
     : pickPrompts(
@@ -180,7 +211,8 @@ function Ask({ category, items, search, onSearch, schedule, readAs }: Props & { 
       )}
 
       {q && readAs && <ReadAs reading={readAs.reading} chips={readAs.chips} onRemove={readAs.onRemove} offers={readAs.offers} onPick={readAs.onPick} />}
-      {answer && <AskAnswer answer={answer} />}
+      {answer && <AskAnswer answer={answer} share={share} />}
+      {askGroup && <AskTheGroup query={q} {...askGroup} />}
     </div>
   )
 }
