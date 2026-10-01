@@ -26,6 +26,13 @@ export type ItemName = {
   name: string
   aka?: string[]
   kinds?: string[]
+  /** A dish that's meat wherever meat is served (a burger, a hot dog): at
+   *  a dairy or parve place it's something else, and the answer says so. */
+  usuallyMeat?: boolean
+  /** A dish, suggested when someone adds to a list of dishes, where a
+   *  grocery item isn't (and the other way round). Either is found by
+   *  search wherever it's listed. */
+  dish?: boolean
 }
 
 export const ITEM_NAMES: ItemName[] = [
@@ -55,7 +62,7 @@ export const ITEM_NAMES: ItemName[] = [
   { name: 'Brisket', kinds: ['beef'] },
   { name: 'Chuck Roast', aka: ['Chuck'], kinds: ['beef', 'roast'] },
   { name: 'Stew Meat', aka: ['Stew Beef'], kinds: ['beef'] },
-  { name: 'Hamburger Meat', aka: ['Ground Beef', 'Ground Meat', 'Chopped Meat', 'Hamburger'], kinds: ['beef'] },
+  { name: 'Hamburger Meat', aka: ['Ground Beef', 'Ground Meat', 'Chopped Meat'], kinds: ['beef'] },
   { name: 'Deli', aka: ['Cold Cuts', 'Cold Cut'] },
   { name: 'Butcher', aka: ['Butcher Counter', 'Butcher Shop'] },
   { name: 'Chicken', kinds: ['poultry'] },
@@ -77,11 +84,37 @@ export const ITEM_NAMES: ItemName[] = [
   // Other
   { name: 'Wine', aka: ['Kosher Wine'], kinds: ['alcohol'] },
   { name: 'Marshmallows', aka: ['Marshmallow'] },
-  { name: 'Noodles', aka: ['Pasta'] },
+  { name: 'Noodles', kinds: ['pasta'] },
   { name: 'Oyster Sauce' },
   { name: 'Seitan' },
   { name: 'Tofu' },
   { name: 'Sushi' },
+  // Dishes: what a food place serves (Food's "Main dishes", agreed Oct 1).
+  // Named as a menu names them, the plural where people order "burgers".
+  // A "hamburger" is a burger: the meat for one is Hamburger Meat above.
+  { name: 'Burgers', aka: ['Burger', 'Hamburgers', 'Hamburger'], usuallyMeat: true, dish: true },
+  { name: 'Hot Dogs', aka: ['Hot Dog', 'Franks'], usuallyMeat: true, dish: true },
+  { name: 'Shawarma', aka: ['Shwarma', 'Schwarma', 'Shawerma', 'Shoarma'], usuallyMeat: true, dish: true },
+  { name: 'Schnitzel', aka: ['Shnitzel'], dish: true },
+  { name: 'Kebabs', aka: ['Kebab', 'Kabobs', 'Kabob', 'Kebobs', 'Kebob'], dish: true },
+  { name: 'Wings', aka: ['Chicken Wings'], dish: true },
+  { name: 'Falafel', aka: ['Felafel'], dish: true },
+  { name: 'Hummus', aka: ['Humus', 'Houmous'], dish: true },
+  { name: 'Pizza', aka: ['Pizzas'], dish: true },
+  { name: 'Pasta', aka: ['Pastas'], dish: true },
+  { name: 'Salads', aka: ['Salad'], dish: true },
+  { name: 'Soups', aka: ['Soup'], dish: true },
+  { name: 'Sandwiches', aka: ['Sandwich'], dish: true },
+  { name: 'Deli Sandwiches', aka: ['Deli Sandwich'], kinds: ['sandwiches'], dish: true },
+  { name: 'Wraps', aka: ['Wrap'], dish: true },
+  { name: 'Tacos', aka: ['Taco'], dish: true },
+  { name: 'Burritos', aka: ['Burrito'], dish: true },
+  { name: 'Bagels', aka: ['Bagel'], dish: true },
+  { name: 'Knishes', aka: ['Knish'], dish: true },
+  { name: 'Ramen', dish: true },
+  { name: 'Poke Bowls', aka: ['Poke', 'Poke Bowl'], dish: true },
+  { name: 'Ice Cream', dish: true },
+  { name: 'Fish and Chips', aka: ['Fish & Chips'], kinds: ['fish'], dish: true },
 ]
 
 const key = (text: string) => words(text).join(' ')

@@ -34,6 +34,11 @@ export const SYNC_INTERNAL_FIELDS = [
   // removal is its own submission). Set by mark_item, cleared by
   // rejecting that removal or a later "Still here".
   'itemGone',
+  // When an admin approved each dish from the place's own menu, and the
+  // menu it was read from (the admin's "Main dishes" tab, migration 065).
+  // An admin's, never a submitter's: an edit can't date a dish "on its menu".
+  'itemMenu',
+  'menuUrl',
 ] as const
 
 /** Additionally hidden from the moderation diff, though a submitter MAY change

@@ -117,3 +117,66 @@ describe('the answer says when the item was last seen (agreed Oct 1)', () => {
     expect(ask('challah', dated, null)).toBe('3 places have Challah. Nearest: Acme, 0.1 mi.')
   })
 })
+
+describe('main dishes on Food (agreed Oct 1)', () => {
+  const now = Date.parse('2026-10-09T17:30:00Z')
+  const food = makeCategory({
+    id: 'restaurant',
+    label: 'Food',
+    pluralLabel: 'Food',
+    detailFields: [
+      { key: 'googleDescription', label: 'Description', type: 'textarea' },
+      {
+        key: 't',
+        label: 'Food Type',
+        type: 'select',
+        renderAs: 'badge',
+        filterable: true,
+        multiSelect: true,
+        options: ['Meat', 'Dairy', 'Parve'].map((v) => ({ value: v, label: v })),
+      },
+      { key: 'dishes', label: 'Main dishes', type: 'tags', countLabel: 'dish', showCountInHeader: true, expandedOnly: true },
+    ],
+  })
+  const place = (name: string, t: string[], details: Record<string, unknown>, lat: number): DirectoryResource => ({
+    id: name,
+    category: 'restaurant',
+    name,
+    anchorId: 'c',
+    distance: 0,
+    address: '',
+    geo: { lat, lng: -75.17 },
+    t,
+    ...details,
+  })
+  const places = [
+    place('Cherry Grill', ['Meat'], { dishes: ['Burgers', 'Steak'], itemMenu: { dishes: { Burgers: '2026-10-02T15:00:00Z' } } }, 39.951),
+    place('PLNT', ['Parve'], { dishes: ['Burgers'] }, 39.96),
+    place('Cafe Dairy', ['Dairy'], { dishes: ['Burger', 'Pizza'] }, 39.97),
+    place('Bagel Place', [], { dishes: ['Burgers'] }, 39.98),
+    place('Pretzel Co.', ['Parve'], { googleDescription: 'Hand-rolled soft pretzels.' }, 39.99),
+  ]
+  const ask = (q: string, list = places) => answerFor(searchAsk(list, [food], q, { coords: here }), { coords: here, now })?.text
+
+  it('"burger" finds the burgers, however each menu names them, and says where they’re meatless', () => {
+    expect(ask('burger')).toBe(
+      '4 places have burgers. At PLNT (parve) and Cafe Dairy (dairy) they’re meatless. Nearest: Cherry Grill, 0.1 mi, on its menu Oct 2.',
+    )
+    expect(ask('hamburger')).toMatch(/^4 places have /)
+  })
+
+  it('says it of one place too, and nothing where the place is meat or says neither', () => {
+    expect(ask('burger', [places[1]])).toBe('PLNT has Burgers, 0.7 mi. It’s parve, so they’re meatless.')
+    expect(ask('burger', [places[0], places[3]])).toBe('2 places have Burgers. Nearest: Cherry Grill, 0.1 mi, on its menu Oct 2.')
+    // Meat and dairy both: not said.
+    expect(ask('burger', [place('Both', ['Meat', 'Dairy'], { dishes: ['Burgers'] }, 39.96)])).toBe('Both has Burgers, 0.7 mi.')
+  })
+
+  it('a dish that isn’t usually meat says nothing about it', () => {
+    expect(ask('pizza')).toBe('Cafe Dairy has Pizza, 1.4 mi.')
+  })
+
+  it('a food place is still found by its own description beside the dishes', () => {
+    expect(ask('pretzels')).toMatch(/^Pretzel Co\. has pretzels/)
+  })
+})

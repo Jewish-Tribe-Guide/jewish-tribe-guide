@@ -1603,6 +1603,27 @@ describe('approveSubmission: activity log and grocery item dates', () => {
     expect(lastCallArg(resource.update).details.itemGone).toEqual({ m: { Steak: '2026-09-30T14:00:00.000Z' } })
   })
 
+  it('keeps a dish\'s "on its menu" date while the dish stays, drops it with the dish, and never takes one from a submission', async () => {
+    const sub = baseSubmission({
+      operation: 'update',
+      target_id: 'res-1',
+      payload: listingPayload({
+        category: 'grocery',
+        details: { m: ['Challah', 'Steak'], itemMenu: { m: { Challah: '2099-01-01T00:00:00.000Z' } }, menuUrl: 'https://example.com/fake' },
+      }) as unknown as Record<string, unknown>,
+    })
+    const resource = mockFlow(sub, {
+      id: 'res-1',
+      details: { m: ['Challah', 'Chicken', 'Steak'], itemMenu: { m: { Chicken: '2026-10-01T14:00:00.000Z', Steak: '2026-09-30T14:00:00.000Z' } }, menuUrl: 'https://example.com/menu' },
+    })
+
+    await approveSubmission('sub-1')
+
+    const details = lastCallArg(resource.update).details
+    expect(details.itemMenu).toEqual({ m: { Steak: '2026-09-30T14:00:00.000Z' } })
+    expect(details.menuUrl).toBe('https://example.com/menu')
+  })
+
   it('logs nothing when the approval itself fails to save', async () => {
     const sub = baseSubmission({ operation: 'create', payload: listingPayload() as unknown as Record<string, unknown> })
     mockFlow(sub)

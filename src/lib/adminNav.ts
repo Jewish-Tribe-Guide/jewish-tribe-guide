@@ -36,6 +36,7 @@ export type AdminTab =
   | 'metrics'
   | 'searches'
   | 'questions'
+  | 'dishes'
   | 'team'
   | 'communities'
 
@@ -54,6 +55,9 @@ export function adminTabs(community: string, isSuperAdmin: boolean): { tab: Admi
     { tab: 'searches', href: `${base}/searches`, label: 'Missed searches' },
     // How the AI reader read what people asked, approvable as rules.
     { tab: 'questions', href: `${base}/questions`, label: 'Read questions' },
+    // Each food place's main dishes, read off its own menu by the AI, for
+    // an admin to approve (agreed Oct 1).
+    { tab: 'dishes', href: `${base}/dishes`, label: 'Main dishes' },
     { tab: 'responses', href: `${base}/responses`, label: 'Responses' },
     { tab: 'archived', href: `${base}/archived`, label: 'Archived' },
     { tab: 'site', href: `${base}/site`, label: 'Site' },

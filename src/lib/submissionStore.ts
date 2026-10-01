@@ -696,7 +696,8 @@ function withConfirmedNow(details: Record<string, unknown>, now: string): Record
 }
 
 /** Dates the grocery items this approval newly adds (details.itemSeen) and
- *  returns which ones they were. Everything else on the listing keeps its
+ *  returns which ones they were. A dish's menu date (itemMenu) stays with
+ *  the dish, and goes when it's taken off. Everything else on the listing keeps its
  *  date: approving a new phone number says nothing about the challah. */
 async function withItemDates(
   community: string,
@@ -717,9 +718,16 @@ async function withItemDates(
   const next = { ...details }
   delete next.itemSeen
   delete next.itemGone
+  delete next.itemMenu
+  // The menu a dish list was read from is the admin's Main dishes tab's to
+  // set, never an edit's: the queue doesn't show it, so a link sent with an
+  // edit would be approved unseen.
+  delete next.menuUrl
+  if (existing?.menuUrl !== undefined) next.menuUrl = existing.menuUrl
   if (keys.length === 0) {
     if (existing?.itemSeen !== undefined) next.itemSeen = existing.itemSeen
     if (existing?.itemGone !== undefined) next.itemGone = existing.itemGone
+    if (existing?.itemMenu !== undefined) next.itemMenu = existing.itemMenu
     return { details: next, newItems: [] }
   }
   const newItems = addedItems(existing, details, keys)
@@ -727,6 +735,9 @@ async function withItemDates(
   if (Object.keys(seen).length > 0) next.itemSeen = seen
   const gone = nextItemGone(existing?.itemGone, details, keys)
   if (Object.keys(gone).length > 0) next.itemGone = gone
+  // A dish's "on its menu" date stays while the dish does, as "gone" does.
+  const menu = nextItemGone(existing?.itemMenu, details, keys)
+  if (Object.keys(menu).length > 0) next.itemMenu = menu
   return { details: next, newItems }
 }
 

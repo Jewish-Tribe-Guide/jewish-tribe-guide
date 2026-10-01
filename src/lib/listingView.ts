@@ -120,7 +120,8 @@ export function mainThing(item: DirectoryResource, category: CategoryConfig): Ma
  *  checked Aug 20". A grocery's items do change, but nobody can vouch for
  *  nine at once: each item carries its own date and its own "Still here"
  *  (itemMarks.ts, agreed Oct 1), so the listing says nothing more about
- *  them. Nothing in the header is ever dated.
+ *  them; a restaurant's dishes likewise, though its hechsher keeps its
+ *  quiet date. Nothing in the header is ever dated.
  *  Null where there's nothing of the community's to date: nothing said,
  *  rather than a broad "is all of this right". */
 export type ConfirmPlace = { at: 'card'; subject: string } | { at: 'join' } | { at: 'quiet'; subject: string }
@@ -130,12 +131,14 @@ export function confirmPlace(item: DirectoryResource, category: CategoryConfig):
   if (main === 'davening') return { at: 'card', subject: 'Times' }
   if (main === 'groups') return { at: 'card', subject: 'Hours' }
   if (main === 'join') return { at: 'join' }
-  // Each item is dated, and asked about, on its own.
-  if (main === 'items') return null
-  const facts = listingFacts(item, category)
-  if (facts.length === 0) return null
   // A hechsher (the badge that carries a caveat) makes them kosher details.
   const kosher = rowBadgeFields(category).some((f) => f.caveat)
+  // Each item is dated, and asked about, on its own. A restaurant's dishes
+  // are too, but its kosher details are still its kosher details, and keep
+  // their quiet date.
+  if (main === 'items' && !kosher) return null
+  const facts = listingFacts(item, category)
+  if (facts.length === 0) return null
   return { at: 'quiet', subject: kosher ? 'Kosher details' : andList(facts) }
 }
 

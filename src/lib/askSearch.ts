@@ -160,14 +160,16 @@ function listingTags(item: DirectoryResource): { tag: string; sometimes: boolean
 // there. So where a category lists items, the description isn't searched.
 // A restaurant's is — everything a kosher restaurant serves is kosher, and
 // "pretzels" finding the pretzel bakery is the description doing its job.
-/** A food place with no item list says what it serves in its name and its
- *  own text — "Center City Pretzel Co.", "hand-rolled soft pretzels" — so
- *  those answer "who has pretzels" the way a store's items do. Only food
- *  places: a shul's name matching doesn't mean it "has" anything. And not
- *  where a category lists items: there the list is the answer, and a
- *  description is only a general one. */
+// That stays true once Food lists its main dishes too (agreed Oct 1): five
+// to ten dishes aren't the whole menu, and most places have none yet.
+/** A food place says what it serves in its name and its own text — "Center
+ *  City Pretzel Co.", "hand-rolled soft pretzels" — so those answer "who
+ *  has pretzels" the way a store's items do, beside any dishes it lists.
+ *  Only food places: a shul's name matching doesn't mean it "has" anything.
+ *  And not a store's: there the item list is the answer, and a description
+ *  is only a general one. */
 export function describedByItsText(category: CategoryConfig): boolean {
-  return !category.detailFields.some((f) => f.type === 'tags') && conceptCategories('food', [category]).length > 0
+  return conceptCategories('food', [category]).length > 0
 }
 
 function describingFields(category: CategoryConfig) {
@@ -176,7 +178,7 @@ function describingFields(category: CategoryConfig) {
 }
 
 function searchableFields(category: CategoryConfig): CategoryConfig {
-  if (!category.detailFields.some((f) => f.type === 'tags')) return category
+  if (!category.detailFields.some((f) => f.type === 'tags') || describedByItsText(category)) return category
   return { ...category, detailFields: category.detailFields.filter((f) => f.key !== 'googleDescription') }
 }
 

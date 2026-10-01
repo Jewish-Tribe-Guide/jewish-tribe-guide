@@ -311,6 +311,13 @@ describe('confirmPlace', () => {
     expect(confirmPlace(makeListing({ t: ['Meat'], kosherCert: 'Keystone-K', foodType: 'Restaurant' }), food)).toEqual({ at: 'quiet', subject: 'Kosher details' })
     expect(confirmPlace(makeListing({ m: ['Challah'], isKosher: 'Kosher Items' }), grocery)).toBeNull()
   })
+  it('a restaurant’s dishes are dated each on their own, and its kosher details keep their date', () => {
+    const dishes: CategoryField = { key: 'dishes', label: 'Main dishes', type: 'tags', showCountInHeader: true, countLabel: 'dish' }
+    const withDishes = makeCategory({ ...food, detailFields: [...food.detailFields, dishes] })
+    const listing = makeListing({ t: ['Meat'], kosherCert: 'Keystone-K', foodType: 'Restaurant', dishes: ['Shawarma'] })
+    expect(mainThing(listing, withDishes)).toBe('items')
+    expect(confirmPlace(listing, withDishes)).toEqual({ at: 'quiet', subject: 'Kosher details' })
+  })
   it('facts with no hechsher among them, by name: a hotel’s "Shabbat friendly"', () => {
     const shabbat: CategoryField = { key: 'shabbatFriendly', label: 'Shabbat friendly', type: 'boolean', renderAs: 'badge', filterable: true }
     expect(confirmPlace(makeListing({ shabbatFriendly: true }), makeCategory({ detailFields: [shabbat] }))).toEqual({ at: 'quiet', subject: 'Shabbat friendly' })

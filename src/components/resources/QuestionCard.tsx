@@ -9,7 +9,7 @@ import { withCommunity } from '@/lib/useCommunityData'
 import { usePersistedState } from '@/lib/usePersistedState'
 import TurnstileWidget from '@/components/TurnstileWidget'
 import type { CategoryField } from '@/lib/categories'
-import { dayText, itemPhrase, pickItemToAsk, type ItemMark } from '@/lib/itemMarks'
+import { itemPhrase, itemWording, lastSeenText, pickItemToAsk, type ItemMark } from '@/lib/itemMarks'
 import { useNow } from '@/lib/useNow'
 import { community as communityConfig } from '@/community.config'
 import { TURNSTILE_ACTIVE } from './useListingSubmit'
@@ -260,6 +260,7 @@ function ItemQuestion({
   if (!mark) return null
   const { mine, busy, error } = api.stateOf(mark)
   const phrase = itemPhrase(field, mark.name)
+  const say = itemWording(field)
   const answer = (yes: boolean) => {
     setHeld(`${mark.key}:${mark.name}`)
     markAsked()
@@ -268,18 +269,14 @@ function ItemQuestion({
   }
   const notSure = () => markAsked()
   const button = 'h-9 cursor-pointer rounded-full border border-slate-300 bg-white px-3.5 text-[14px] font-semibold text-ink transition-colors hover:bg-slate-50 disabled:cursor-default disabled:opacity-60'
-  const footnote = mark.sometimes
-    ? 'Listed as not always in stock.'
-    : mark.seenAt
-      ? `Last seen ${dayText(mark.seenAt, clock, communityConfig.timezone)}.`
-      : 'No one has said yet.'
+  const footnote = mark.sometimes ? `Listed as ${say.sometimes}.` : lastSeenText(mark, clock, communityConfig.timezone)
 
   return (
     <section aria-labelledby={titleId} data-testid="listing-question" className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3.5">
       <h2 id={titleId} className="text-xs font-bold uppercase tracking-[0.06em] text-slate-500">
         Quick question
       </h2>
-      <p className="mt-1 text-[15.5px] font-semibold text-ink">{`${phrase.charAt(0).toUpperCase()}${phrase.slice(1)} here today?`}</p>
+      <p className="mt-1 text-[15.5px] font-semibold text-ink">{say.question(phrase)}</p>
       {mine ? (
         <p className="mt-2.5 text-[14px] text-green-700" role="status">
           {mine.kind === 'seen' ? 'Thanks! Marked as seen today.' : mine.undoable ? 'Thanks. We’ll check before taking it off.' : 'Someone said so already. We’ll check before taking it off.'}

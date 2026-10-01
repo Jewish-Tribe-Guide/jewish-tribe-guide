@@ -1,7 +1,21 @@
 import { describe, expect, it } from 'vitest'
 import { makeCategory, makeListing } from '@/test/providerFixtures'
 import type { CategoryField } from './categories'
-import { additionSubmission, alreadyListed, cleanItemName, dayText, itemMarks, itemPhrase, itemSuggestions, pickItemToAsk, removalSubmission, seenLabel } from './itemMarks'
+import {
+  additionSubmission,
+  alreadyListed,
+  cleanItemName,
+  dayText,
+  itemDateFor,
+  itemMarks,
+  itemPhrase,
+  itemSuggestions,
+  itemWording,
+  lastSeenText,
+  pickItemToAsk,
+  removalSubmission,
+  seenLabel,
+} from './itemMarks'
 
 const TZ = 'America/New_York'
 const m: CategoryField = { key: 'm', label: 'Kosher items here', type: 'tags' }
@@ -15,12 +29,55 @@ describe('itemMarks', () => {
       m_sometimes: ['Steak'],
       itemSeen: { m: { challah: '2026-10-01T10:00:00Z', Wine: 'yesterday' } },
       itemGone: { m_sometimes: { Steak: '2026-10-08T10:00:00Z' } },
+      itemMenu: { m: { wine: '2026-10-02T10:00:00Z' } },
     })
     expect(itemMarks(item, m)).toEqual([
-      { name: 'Challah', key: 'm', sometimes: false, seenAt: '2026-10-01T10:00:00Z', goneAt: null },
-      { name: 'Wine', key: 'm', sometimes: false, seenAt: null, goneAt: null },
-      { name: 'Steak', key: 'm_sometimes', sometimes: true, seenAt: null, goneAt: '2026-10-08T10:00:00Z' },
+      { name: 'Challah', key: 'm', sometimes: false, seenAt: '2026-10-01T10:00:00Z', goneAt: null, menuAt: null },
+      { name: 'Wine', key: 'm', sometimes: false, seenAt: null, goneAt: null, menuAt: '2026-10-02T10:00:00Z' },
+      { name: 'Steak', key: 'm_sometimes', sometimes: true, seenAt: null, goneAt: '2026-10-08T10:00:00Z', menuAt: null },
     ])
+  })
+})
+
+describe('a dish read from its menu (agreed Oct 1)', () => {
+  const mark = { name: 'Shawarma', key: 'dishes', sometimes: false, goneAt: null }
+  const menuAt = '2026-10-02T15:00:00Z'
+
+  it('says "on its menu", never "seen", until someone has seen it since', () => {
+    expect(seenLabel({ ...mark, seenAt: null, menuAt }, now, TZ)?.text).toBe('on its menu Oct 2')
+    expect(lastSeenText({ ...mark, seenAt: null, menuAt }, now, TZ)).toBe('On its menu Oct 2.')
+    // Seen since: a person's word, newer.
+    expect(seenLabel({ ...mark, seenAt: new Date(now).toISOString(), menuAt }, now, TZ)?.text).toBe('seen today')
+    expect(lastSeenText({ ...mark, seenAt: new Date(now).toISOString(), menuAt }, now, TZ)).toBe('Last seen today.')
+    // Seen before the menu was read: the menu is the newer word.
+    expect(seenLabel({ ...mark, seenAt: '2026-09-01T15:00:00Z', menuAt }, now, TZ)?.text).toBe('on its menu Oct 2')
+    expect(lastSeenText({ ...mark, seenAt: null, menuAt: null }, now, TZ)).toBe('No one has said yet.')
+  })
+
+  it('finds the date by the dish’s name, without case', () => {
+    const item = makeListing({ dishes: ['Shawarma'], itemMenu: { dishes: { shawarma: menuAt } }, itemSeen: { dishes: {} } })
+    expect(itemDateFor(item, 'Shawarma')).toEqual({ kind: 'menu', at: menuAt })
+    expect(itemDateFor(item, 'Falafel')).toBeNull()
+  })
+})
+
+describe('a list’s words', () => {
+  it('a store’s items are still here; a place’s dishes still served', () => {
+    const items = itemWording({ countLabel: 'kosher item' })
+    expect([items.still, items.add, items.sometimes, items.nouns]).toEqual(['Still here', 'Add an item', 'not always in stock', 'items'])
+    expect(items.question('kosher steak')).toBe('Kosher steak here today?')
+    const dishes = itemWording({ countLabel: 'dish' })
+    expect([dishes.still, dishes.add, dishes.addFirst, dishes.sometimes, dishes.nouns]).toEqual([
+      'Still served',
+      'Add a dish',
+      'Add the first dish',
+      'not always on the menu',
+      'dishes',
+    ])
+    expect(dishes.hint).toBe('Been there? Tap a dish to say if it’s still served.')
+    expect(dishes.question('shawarma')).toBe('Still serving shawarma?')
+    // No count label: items.
+    expect(itemWording({}).still).toBe('Still here')
   })
 })
 
@@ -78,6 +135,14 @@ describe('the removal "Not anymore" files', () => {
     const sub = removalSubmission(grocery, item, 'm', 'chicken')
     expect(sub.details).toEqual({ m: ['Challah'], m_sometimes: ['Steak'] })
     expect(removalSubmission(grocery, item, 'm_sometimes', 'Steak').details).toEqual({ m: ['Challah', 'Chicken'], m_sometimes: [] })
+  })
+})
+
+describe('add a dish', () => {
+  it('suggests dishes for a list of dishes, and items for any other', () => {
+    expect(itemSuggestions('bur', [], 4, { dishes: true }).map((x) => x.name)).toEqual(['Burgers', 'Burritos'])
+    expect(itemSuggestions('bur', []).map((x) => x.name)).toEqual([])
+    expect(itemSuggestions('chal', [], 4, { dishes: true }).map((x) => x.name)).toEqual([])
   })
 })
 

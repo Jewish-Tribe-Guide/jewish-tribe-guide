@@ -64,7 +64,7 @@ import FreshnessFooter from './FreshnessFooter'
 import QuestionCard from './QuestionCard'
 import TurnstileWidget from '@/components/TurnstileWidget'
 import { useItemMarks, type ItemMarksApi } from './useItemMarks'
-import { alreadyListed, dayText, itemSuggestions, seenLabel, type ItemMark } from '@/lib/itemMarks'
+import { alreadyListed, dayText, itemSuggestions, itemWording, lastSeenText, seenLabel, type ItemMark, type ItemWording } from '@/lib/itemMarks'
 import { community } from '@/community.config'
 import JoinLinkCheck from './JoinLinkCheck'
 
@@ -239,7 +239,7 @@ export default function ListingView({ item, category, color, place = null, upvot
           {found.items.map((m) => (
             <Chip key={m.tag} tone="match" size="expanded">
               <Highlight text={m.tag} terms={found.terms} allowTypos />
-              {m.sometimes ? ' · not always in stock' : ''}
+              {m.sometimes ? ` · ${itemsF ? itemWording(itemsF).sometimes : 'not always in stock'}` : ''}
             </Chip>
           ))}
         </div>
@@ -298,7 +298,7 @@ export default function ListingView({ item, category, color, place = null, upvot
     const f = category.detailFields.find((x) => x.type === 'minyanim')!
     mainSection = <DaveningCard item={item} minyanim={item[f.key]} />
   } else if (main === 'items' && itemsF) {
-    mainSection = <ItemsCard field={itemsF} found={found} api={itemApi} />
+    mainSection = <ItemsCard field={itemsF} found={found} api={itemApi} menuUrl={menuUrlOf(item)} />
   } else if (main === 'groups') {
     mainSection = (
       <GroupsCard item={item} groups={audienceGroups(item, category)} now={now} candlesAt={candlesAt} footer={confirmAt?.at === 'card' ? confirmLine(confirmAt.subject) : undefined} />
@@ -453,7 +453,7 @@ export default function ListingView({ item, category, color, place = null, upvot
       {mainSection}
       {/* A place whose list has nothing on it yet: just "+ Add the first
           item", after whatever it leads with. */}
-      {main !== 'items' && itemsF && itemApi.marks.length === 0 && itemApi.canReport && <ItemsCard field={itemsF} found={null} api={itemApi} />}
+      {main !== 'items' && itemsF && itemApi.marks.length === 0 && itemApi.canReport && <ItemsCard field={itemsF} found={null} api={itemApi} menuUrl={menuUrlOf(item)} />}
       {details}
       {about}
       {/* A hotel's walk list is its main thing; anywhere else it follows
@@ -682,12 +682,26 @@ function HoursCard({ item, value, now, candlesAt }: { item: DirectoryResource; v
 
 const ITEMS_SHOWN = 6
 
+/** The menu a place's dishes were read from (the admin's Main dishes tab),
+ *  when it's a web address. */
+function menuUrlOf(item: DirectoryResource): string | null {
+  const url = item.menuUrl
+  return typeof url === 'string' && /^https?:\/\//i.test(url) ? url : null
+}
+
 /** A listing's items, each with when someone last saw it there, and a tap
  *  on one to say whether it still is (agreed Oct 1): "Still here" counts at
  *  once, "Not anymore" warns at once and asks an admin to take it off. One
- *  quiet line under the heading says the items can be tapped. */
-function ItemsCard({ field, found, api }: { field: CategoryField; found: SearchFound | null; api: ItemMarksApi }) {
+ *  quiet line under the heading says the items can be tapped.
+ *
+ *  A restaurant's main dishes the same way, in a dish's words ("Still
+ *  served", "+ Add a dish"), with "Full menu ↗" for the rest of the menu,
+ *  and a line saying where dishes read from the menu came from. */
+function ItemsCard({ field, found, api, menuUrl }: { field: CategoryField; found: SearchFound | null; api: ItemMarksApi; menuUrl: string | null }) {
   const clock = useNow()
+  const say = itemWording(field)
+  // The latest a dish was approved from the menu, for the line under them.
+  const menuAt = api.marks.reduce<string | null>((latest, m) => (m.menuAt && (!latest || m.menuAt > latest) ? m.menuAt : latest), null)
   const [all, setAll] = useState(false)
   const [open, setOpen] = useState<string | null>(null)
   const [adding, setAdding] = useState(false)
@@ -697,8 +711,23 @@ function ItemsCard({ field, found, api }: { field: CategoryField; found: SearchF
   rows.sort((a, b) => Number(matched.has(b.name)) - Number(matched.has(a.name)))
   const shown = all ? rows : rows.slice(0, ITEMS_SHOWN)
   return (
-    <Card title={rows.length ? `${field.label} · ${rows.length}` : field.label} testId="listing-items">
-      {rows.length > 0 && <p className="mb-1 text-[13.5px] leading-snug text-muted">Been there? Tap an item to say if it’s still there.</p>}
+    <Card
+      title={rows.length ? `${field.label} · ${rows.length}` : field.label}
+      testId="listing-items"
+      action={
+        menuUrl && (
+          <a href={menuUrl} target="_blank" rel="noopener noreferrer" className="shrink-0 text-[14px] font-bold text-primary hover:underline" data-testid="full-menu">
+            Full menu ↗
+          </a>
+        )
+      }
+      footer={
+        menuAt
+          ? `${say.nouns.charAt(0).toUpperCase()}${say.nouns.slice(1)} read from its own menu by the guide’s AI, ${dayText(menuAt, clock, community.timezone)}, and checked by an admin. “Seen” means someone has said so since.`
+          : undefined
+      }
+    >
+      {rows.length > 0 && <p className="mb-1 text-[13.5px] leading-snug text-muted">{say.hint}</p>}
       <ul className="divide-y divide-slate-200/70">
         {shown.map((m) => {
           const key = `${m.key}:${m.name}`
@@ -714,7 +743,7 @@ function ItemsCard({ field, found, api }: { field: CategoryField; found: SearchF
               >
                 <span className={`text-[15px] font-semibold ${matched.has(m.name) ? 'text-primary-dark' : 'text-slate-900'}`}>
                   {m.name}
-                  {m.sometimes && <span className="ml-1.5 text-[12.5px] font-semibold text-caution">not always in stock</span>}
+                  {m.sometimes && <span className="ml-1.5 text-[12.5px] font-semibold text-caution">{say.sometimes}</span>}
                 </span>
                 {isOpen ? (
                   <ChevronRightIcon className="h-4 w-4 shrink-0 -rotate-90 text-slate-500" />
@@ -723,7 +752,7 @@ function ItemsCard({ field, found, api }: { field: CategoryField; found: SearchF
                 )}
               </button>
               {m.goneAt && !isOpen && <GoneNote at={m.goneAt} clock={clock} />}
-              {isOpen && <ItemAnswer mark={m} api={api} clock={clock} />}
+              {isOpen && <ItemAnswer mark={m} api={api} clock={clock} say={say} />}
             </li>
           )
         })}
@@ -732,7 +761,7 @@ function ItemsCard({ field, found, api }: { field: CategoryField; found: SearchF
           <li key={`added:${a.name}`} data-testid="listing-item-added" className="py-2">
             <span className="text-[15px] font-semibold text-slate-900">
               {a.name}
-              {a.sometimes && <span className="ml-1.5 text-[12.5px] font-semibold text-caution">not always in stock</span>}
+              {a.sometimes && <span className="ml-1.5 text-[12.5px] font-semibold text-caution">{say.sometimes}</span>}
             </span>
             <p role="status" className="mt-0.5 text-[13px] leading-snug text-muted">
               Added by you · waiting for a check
@@ -752,7 +781,7 @@ function ItemsCard({ field, found, api }: { field: CategoryField; found: SearchF
       </ul>
       {rows.length > ITEMS_SHOWN && (
         <button type="button" onClick={() => setAll((v) => !v)} className="mt-1.5 inline-flex min-h-9 cursor-pointer items-center gap-1 text-[14.5px] font-bold text-primary">
-          {all ? 'Fewer' : `All ${rows.length} items`}
+          {all ? 'Fewer' : `All ${rows.length} ${say.nouns}`}
           <ChevronRightIcon className={`h-4 w-4 transition-transform ${all ? '-rotate-90' : ''}`} />
         </button>
       )}
@@ -762,6 +791,7 @@ function ItemsCard({ field, found, api }: { field: CategoryField; found: SearchF
         (adding ? (
           <AddItemBox
             api={api}
+            say={say}
             onClose={() => setAdding(false)}
             onListed={(m) => {
               setAdding(false)
@@ -776,7 +806,7 @@ function ItemsCard({ field, found, api }: { field: CategoryField; found: SearchF
             className={`flex min-h-11 w-full cursor-pointer items-center gap-2 py-2.5 text-left text-[15px] font-bold text-primary ${rows.length + api.added.length > 0 ? 'mt-0.5 border-t border-slate-200' : ''}`}
           >
             <PlusIcon className="h-4 w-4" />
-            {rows.length ? 'Add an item' : 'Add the first item'}
+            {rows.length ? say.add : say.addFirst}
           </button>
         ))}
     </Card>
@@ -786,14 +816,14 @@ function ItemsCard({ field, found, api }: { field: CategoryField; found: SearchF
 /** "What did you see here?": suggestions from the item names as it's typed,
  *  the store's own items marked (picking one is its "Still here"), a name
  *  not on the list as typed, "Not always in stock", then Add. */
-function AddItemBox({ api, onClose, onListed }: { api: ItemMarksApi; onClose: () => void; onListed: (m: ItemMark) => void }) {
+function AddItemBox({ api, say, onClose, onListed }: { api: ItemMarksApi; say: ItemWording; onClose: () => void; onListed: (m: ItemMark) => void }) {
   const [text, setText] = useState('')
   const [sometimes, setSometimes] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const inputId = useId()
   const name = text.trim().replace(/\s+/g, ' ')
-  const suggestions = itemSuggestions(name, api.marks).filter((x) => x.name.toLowerCase() !== name.toLowerCase())
+  const suggestions = itemSuggestions(name, api.marks, 4, { dishes: say.noun === 'dish' }).filter((x) => x.name.toLowerCase() !== name.toLowerCase())
   const send = async (what: string) => {
     const listed = alreadyListed(api.marks, what)
     if (listed) {
@@ -821,7 +851,7 @@ function AddItemBox({ api, onClose, onListed }: { api: ItemMarksApi; onClose: ()
   return (
     <div className="-mx-2 mt-2 rounded-xl border border-slate-300 bg-white px-2 pt-3 pb-2.5" data-testid="add-item">
       <label htmlFor={inputId} className="text-[14px] font-bold text-slate-900">
-        What did you see here?
+        {say.addPrompt}
       </label>
       <input
         id={inputId}
@@ -842,7 +872,7 @@ function AddItemBox({ api, onClose, onListed }: { api: ItemMarksApi; onClose: ()
             <button key={x.name} type="button" disabled={busy} onClick={() => (x.listed ? void send(x.name) : setText(x.name))} className={row}>
               <span className="py-2">
                 {bold(x.name)}
-                {x.listed && <span className="block text-[13px] text-muted">Already here · tap to say it’s still here</span>}
+                {x.listed && <span className="block text-[13px] text-muted">Already here · tap to say it’s {say.still.toLowerCase()}</span>}
               </span>
             </button>
           ))}
@@ -855,7 +885,7 @@ function AddItemBox({ api, onClose, onListed }: { api: ItemMarksApi; onClose: ()
       )}
       <label className="mt-2.5 flex min-h-11 cursor-pointer items-center gap-2.5 text-[15px] text-slate-900">
         <input type="checkbox" checked={sometimes} onChange={(e) => setSometimes(e.target.checked)} className="h-5 w-5 accent-primary" />
-        Not always in stock
+        {say.sometimesBox}
       </label>
       <div className="mt-1.5 flex items-center gap-2">
         <button
@@ -891,7 +921,7 @@ function GoneNote({ at, clock }: { at: string; clock: number | null }) {
 
 /** An opened item: when it was last seen, and Still here or Not anymore;
  *  once answered, thanks and Undo. */
-function ItemAnswer({ mark: m, api, clock }: { mark: ItemMark; api: ItemMarksApi; clock: number | null }) {
+function ItemAnswer({ mark: m, api, clock, say }: { mark: ItemMark; api: ItemMarksApi; clock: number | null; say: ItemWording }) {
   const { mine, busy, error } = api.stateOf(m)
   const button =
     'flex h-11 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-[10px] border border-slate-300 bg-white text-[14.5px] font-bold text-slate-900 transition-colors hover:bg-slate-50 disabled:cursor-default disabled:opacity-60'
@@ -905,7 +935,7 @@ function ItemAnswer({ mark: m, api, clock }: { mark: ItemMark; api: ItemMarksApi
       {m.goneAt && !mine ? (
         <GoneNote at={m.goneAt} clock={clock} />
       ) : (
-        !mine && <p className="text-[13px] leading-snug text-muted">{m.seenAt ? `Last seen ${dayText(m.seenAt, clock, community.timezone)}.` : 'No one has said yet.'}</p>
+        !mine && <p className="text-[13px] leading-snug text-muted">{lastSeenText(m, clock, community.timezone)}</p>
       )}
       {mine ? (
         <p role="status" className={`text-[14px] leading-snug ${mine.kind === 'seen' ? 'text-emerald-700' : 'text-caution'}`}>
@@ -920,7 +950,7 @@ function ItemAnswer({ mark: m, api, clock }: { mark: ItemMark; api: ItemMarksApi
         <div className="mt-2 flex gap-2">
           <button type="button" disabled={busy} onClick={() => api.seen(m, 'row')} className={button}>
             <CheckIcon className="h-4 w-4 text-primary" />
-            Still here
+            {say.still}
           </button>
           {api.canReport && !m.goneAt && (
             <button type="button" disabled={busy} onClick={() => api.gone(m, 'row')} className={button}>
@@ -1019,7 +1049,7 @@ function NearbyRow({
 }) {
   const shul = useNextMinyan(item.id)
   // The row's own facts, with the distance measured from the place above.
-  const facts = listingRowFacts({ ...item, milesFromAddress: miles ?? undefined, milesFromCenter: undefined }, category, now, { shul, candlesAt }).map((f) =>
+  const facts = listingRowFacts({ ...item, milesFromAddress: miles ?? undefined, milesFromCenter: undefined }, category, now, { shul, candlesAt }).filter((f) => !f.ownLine).map((f) =>
     miles != null && f.text === milesText(miles) ? { ...f, text: `${f.text} away` } : f,
   )
   const description = category.hasAddress === false ? String(item.description ?? '').trim() : ''

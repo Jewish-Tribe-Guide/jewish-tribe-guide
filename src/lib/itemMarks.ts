@@ -16,6 +16,11 @@ import { ITEM_NAMES, itemEntry, itemName } from './itemNames'
 // A date never says more than someone saw: "seen today", not "in stock". An
 // item nobody has answered for has no date, and nothing says it was never
 // seen.
+//
+// A dish can carry a second kind of date: when an admin approved it from the
+// place's own menu (details.itemMenu, see menuReader.ts). That's a menu
+// saying it exists, not someone eating there, so it says "on its menu Oct 2",
+// never "seen" (agreed Oct 1). Whichever is newer is the one said.
 
 export type ItemMark = {
   /** The item as the listing stores it: "Challah". */
@@ -27,9 +32,11 @@ export type ItemMark = {
   seenAt: string | null
   /** When someone said it's gone, while that waits on an admin. */
   goneAt: string | null
+  /** When an admin approved it from the place's own menu. */
+  menuAt?: string | null
 }
 
-function dates(item: DirectoryResource, map: 'itemSeen' | 'itemGone', key: string): Record<string, string> {
+function dates(item: DirectoryResource, map: 'itemSeen' | 'itemGone' | 'itemMenu', key: string): Record<string, string> {
   const all = item[map]
   if (!all || typeof all !== 'object') return {}
   const field = (all as Record<string, unknown>)[key]
@@ -41,17 +48,40 @@ function dates(item: DirectoryResource, map: 'itemSeen' | 'itemGone', key: strin
   return out
 }
 
-/** When someone last saw one item there, by its name as the listing has
- *  it, whichever list it's in. Null with no date. */
-export function seenAtFor(item: DirectoryResource, name: string): string | null {
-  const all = item.itemSeen
+function dateFor(item: DirectoryResource, map: 'itemSeen' | 'itemMenu', name: string): string | null {
+  const all = item[map]
   if (!all || typeof all !== 'object') return null
   const lower = name.toLowerCase()
   for (const key of Object.keys(all as Record<string, unknown>)) {
-    const at = dates(item, 'itemSeen', key)[lower]
+    const at = dates(item, map, key)[lower]
     if (at) return at
   }
   return null
+}
+
+/** When someone last saw one item there, by its name as the listing has
+ *  it, whichever list it's in. Null with no date. */
+export function seenAtFor(item: DirectoryResource, name: string): string | null {
+  return dateFor(item, 'itemSeen', name)
+}
+
+/** What one item's date says: someone saw it, or its menu had it (a dish
+ *  approved from the place's menu), whichever is newer. */
+export type ItemDate = { kind: 'seen' | 'menu'; at: string }
+
+function newer(seenAt: string | null | undefined, menuAt: string | null | undefined): ItemDate | null {
+  if (seenAt && (!menuAt || Date.parse(seenAt) >= Date.parse(menuAt))) return { kind: 'seen', at: seenAt }
+  return menuAt ? { kind: 'menu', at: menuAt } : null
+}
+
+/** One item's date by its name as the listing has it (see ItemDate). */
+export function itemDateFor(item: DirectoryResource, name: string): ItemDate | null {
+  return newer(seenAtFor(item, name), dateFor(item, 'itemMenu', name))
+}
+
+/** "seen today", "on its menu Oct 2". */
+export function itemDateText(date: ItemDate, now: number | null, timezone: string): string {
+  return `${date.kind === 'menu' ? 'on its menu' : 'seen'} ${dayText(date.at, now, timezone)}`
 }
 
 /** A listing's items with their dates, the always-there ones first. */
@@ -63,9 +93,10 @@ export function itemMarks(item: DirectoryResource, field: CategoryField): ItemMa
   ] as const) {
     const seen = dates(item, 'itemSeen', key)
     const gone = dates(item, 'itemGone', key)
+    const menu = dates(item, 'itemMenu', key)
     for (const name of selectValues(item[key])) {
       const lower = name.toLowerCase()
-      out.push({ name, key, sometimes, seenAt: seen[lower] ?? null, goneAt: gone[lower] ?? null })
+      out.push({ name, key, sometimes, seenAt: seen[lower] ?? null, goneAt: gone[lower] ?? null, menuAt: menu[lower] ?? null })
     }
   }
   return out
@@ -85,11 +116,84 @@ export function dayText(iso: string, now: number | null, timezone: string): stri
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', ...(old ? { year: 'numeric' } : {}), timeZone: timezone })
 }
 
-/** What a row says beside an item: "seen today", amber once nobody has
- *  said so for 90 days (as the listing's other dates). Null with no date. */
+/** An item's date (see ItemDate): when someone saw it, or its menu had it. */
+export function markDate(mark: ItemMark): ItemDate | null {
+  return newer(mark.seenAt, mark.menuAt)
+}
+
+/** What a row says beside an item: "seen today", or "on its menu Oct 2" for
+ *  a dish its menu had since, amber once 90 days old (as the listing's other
+ *  dates). Null with no date. */
 export function seenLabel(mark: ItemMark, now: number | null, timezone: string): { text: string; old: boolean } | null {
-  if (!mark.seenAt) return null
-  return { text: `seen ${dayText(mark.seenAt, now, timezone)}`, old: isStale(mark.seenAt, now) }
+  const date = markDate(mark)
+  if (!date) return null
+  return { text: itemDateText(date, now, timezone), old: isStale(date.at, now) }
+}
+
+/** The line under an opened item: "Last seen today.", "On its menu Oct 2.",
+ *  or "No one has said yet." */
+export function lastSeenText(mark: ItemMark, now: number | null, timezone: string): string {
+  const date = markDate(mark)
+  if (!date) return 'No one has said yet.'
+  return `${date.kind === 'menu' ? 'On its menu' : 'Last seen'} ${dayText(date.at, now, timezone)}.`
+}
+
+// ── Items and dishes ─────────────────────────────────────────────────────────
+// A list's own noun, from what its count says ("kosher item", "dish"): a
+// grocery's items are "still here", a restaurant's dishes "still served".
+// Ordinary English, worked out from the field, never from the category's
+// name, so another list of dishes reads the same way.
+
+export type ItemWording = {
+  noun: string
+  nouns: string
+  /** The answer that it's still there: "Still here", "Still served". */
+  still: string
+  /** The heading's hint. */
+  hint: string
+  /** Said of an item in the `_sometimes` part. */
+  sometimes: string
+  /** The Add box's checkbox. */
+  sometimesBox: string
+  add: string
+  addFirst: string
+  addPrompt: string
+  /** The listing's one question about it ("Kosher steak here today?"). */
+  question: (phrase: string) => string
+}
+
+const plural = (noun: string) => (/(s|sh|ch|x|z)$/.test(noun) ? `${noun}es` : `${noun}s`)
+const article = (noun: string) => (/^[aeiou]/i.test(noun) ? 'an' : 'a')
+const capital = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
+
+export function itemWording(field: Pick<CategoryField, 'countLabel'>): ItemWording {
+  const noun = (field.countLabel ?? '').trim().toLowerCase().split(/\s+/).at(-1) || 'item'
+  if (noun === 'dish') {
+    return {
+      noun,
+      nouns: 'dishes',
+      still: 'Still served',
+      hint: 'Been there? Tap a dish to say if it’s still served.',
+      sometimes: 'not always on the menu',
+      sometimesBox: 'Not always on the menu',
+      add: 'Add a dish',
+      addFirst: 'Add the first dish',
+      addPrompt: 'What dish did you see here?',
+      question: (phrase) => `Still serving ${phrase}?`,
+    }
+  }
+  return {
+    noun,
+    nouns: plural(noun),
+    still: 'Still here',
+    hint: `Been there? Tap ${article(noun)} ${noun} to say if it’s still there.`,
+    sometimes: 'not always in stock',
+    sometimesBox: 'Not always in stock',
+    add: `Add ${article(noun)} ${noun}`,
+    addFirst: `Add the first ${noun}`,
+    addPrompt: 'What did you see here?',
+    question: (phrase) => `${capital(phrase)} here today?`,
+  }
 }
 
 /** "Kosher" from "Kosher items here": what the items are, said before an
@@ -165,7 +269,7 @@ export type ItemSuggestion = { name: string; listed: ItemMark | null }
  *  copy; then names that start with it, then names with a word that does,
  *  then names only another of its names matches (Brie, as "Brie Cheese").
  *  A few at most. */
-export function itemSuggestions(typed: string, marks: readonly ItemMark[], max = 4): ItemSuggestion[] {
+export function itemSuggestions(typed: string, marks: readonly ItemMark[], max = 4, { dishes = false }: { dishes?: boolean } = {}): ItemSuggestion[] {
   const t = typed.trim().toLowerCase()
   if (t.length < 2) return []
   const wordStarts = (text: string) => text.toLowerCase().startsWith(t) || text.toLowerCase().split(/\s+/).some((w) => w.startsWith(t))
@@ -179,7 +283,7 @@ export function itemSuggestions(typed: string, marks: readonly ItemMark[], max =
     found.set(k, { name, listed, rank: listed ? -1 : r, order: found.size })
   }
   for (const m of marks) consider(m.name, itemEntry(m.name)?.aka ?? [], m)
-  for (const e of ITEM_NAMES) consider(e.name, e.aka ?? [], alreadyListed(marks, e.name))
+  for (const e of ITEM_NAMES) if (!!e.dish === dishes) consider(e.name, e.aka ?? [], alreadyListed(marks, e.name))
   return [...found.values()]
     .sort((a, b) => a.rank - b.rank || a.order - b.order)
     .slice(0, max)

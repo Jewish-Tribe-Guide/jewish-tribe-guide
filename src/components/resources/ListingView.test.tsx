@@ -402,6 +402,55 @@ describe('ListingView — Still here and Not anymore, an item at a time', () => 
   })
 })
 
+describe('ListingView — a restaurant’s main dishes (agreed Oct 1)', () => {
+  const dishes: CategoryField = { key: 'dishes', label: 'Main dishes', type: 'tags', renderAs: 'badge', showCountInHeader: true, countLabel: 'dish', expandedOnly: true }
+  const withDishes = makeCategory({ ...food, detailFields: [...food.detailFields, dishes] })
+  const served = makeListing({
+    ...judah,
+    hours: { mon: { open: '11:00', close: '21:00' } },
+    dishes: ['Shawarma', 'Falafel'],
+    itemMenu: { dishes: { Shawarma: '2026-10-02T15:00:00Z', Falafel: '2026-10-02T15:00:00Z' } },
+    itemSeen: { dishes: { Shawarma: '2026-10-09T14:00:00Z' } },
+    menuUrl: 'https://judahgrill.com/menu',
+  })
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-10-09T17:30:00Z')) // Fri Oct 9, 1:30 PM
+  })
+  afterEach(() => vi.useRealTimers())
+  const card = () => screen.getByTestId('listing-items')
+  const row = (name: string) => screen.getAllByTestId('listing-item').find((li) => li.textContent?.startsWith(name))!
+
+  it('lead the listing, in a dish’s words, each dated by its menu until someone has seen it since', () => {
+    view({ item: served, category: withDishes })
+    expect(card()).toHaveTextContent('Main dishes · 2')
+    expect(card()).toHaveTextContent('Been there? Tap a dish to say if it’s still served.')
+    expect(within(row('Shawarma')).getByText('seen today')).toBeInTheDocument()
+    expect(within(row('Falafel')).getByText('on its menu Oct 2')).toBeInTheDocument()
+    expect(within(card()).getByRole('button', { name: 'Add a dish' })).toBeInTheDocument()
+    fireEvent.click(within(row('Falafel')).getByRole('button', { name: /Falafel/ }))
+    expect(row('Falafel')).toHaveTextContent('On its menu Oct 2.')
+    expect(within(row('Falafel')).getByRole('button', { name: 'Still served' })).toBeInTheDocument()
+  })
+
+  it('link the full menu they were read from, and say who read them', () => {
+    view({ item: served, category: withDishes })
+    expect(within(card()).getByRole('link', { name: 'Full menu ↗' })).toHaveAttribute('href', 'https://judahgrill.com/menu')
+    expect(card()).toHaveTextContent('Dishes read from its own menu by the guide’s AI, Oct 2, and checked by an admin.')
+  })
+
+  it('no menu link that isn’t a web address, and no line about the AI for dishes a person added', () => {
+    view({ item: makeListing({ ...judah, dishes: ['Shawarma'], menuUrl: 'javascript:alert(1)' }), category: withDishes })
+    expect(within(card()).queryByRole('link', { name: 'Full menu ↗' })).not.toBeInTheDocument()
+    expect(card()).not.toHaveTextContent('guide’s AI')
+  })
+
+  it('keep the kosher details’ quiet date', () => {
+    view({ item: served, category: withDishes })
+    expect(screen.getByTestId('listing-trust')).toHaveTextContent('Kosher details')
+  })
+})
+
 describe('ListingView — add an item', () => {
   const m: CategoryField = { key: 'm', label: 'Kosher items here', type: 'tags', renderAs: 'badge', showCountInHeader: true }
   const grocery = makeCategory({ id: 'grocery', label: 'Grocery', detailFields: [hours, m] })

@@ -6,7 +6,7 @@ import { track } from '@vercel/analytics'
 import type { DirectoryResource } from '@/types'
 import type { CategoryConfig } from '@/lib/categories'
 import { itemsField } from '@/lib/listingView'
-import { cleanItemName } from '@/lib/itemMarks'
+import { cleanItemName, itemWording } from '@/lib/itemMarks'
 import { neighborhoodsFor, placeName, townsFrom } from '@/lib/places'
 import { askMessage } from '@/lib/shareAnswer'
 import { useShareLink } from '@/lib/useShareLink'
@@ -148,6 +148,9 @@ function WhereSeen({
     return here.map((l) => ({ listing: l, about: [kinds.get(l.category)!.label, placeName(l, hoods, towns)].filter(Boolean).join(' · ') }))
   }, [listings, categories, community])
   const typed = text.trim().toLowerCase()
+  // "Not always on the menu" for a place's dishes, "in stock" for a store's.
+  const pickedKind = picked ? categories.find((c) => c.id === picked.category) : undefined
+  const say = itemWording((pickedKind && itemsField(pickedKind)) || {})
   const matches =
     typed.length < 2 || picked
       ? []
@@ -231,7 +234,7 @@ function WhereSeen({
       {typed.length >= 2 && !picked && matches.length === 0 && <p className="mt-2 text-[13.5px] text-muted">No place in the guide by that name.</p>}
       <label className="mt-2 flex min-h-11 cursor-pointer items-center gap-2.5 text-[15px] text-ink">
         <input type="checkbox" checked={sometimes} onChange={(e) => setSometimes(e.target.checked)} className="h-5 w-5 accent-primary" />
-        Not always in stock
+        {say.sometimesBox}
       </label>
       <button
         type="button"

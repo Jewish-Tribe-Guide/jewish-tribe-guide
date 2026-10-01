@@ -5,7 +5,7 @@ import { track } from '@vercel/analytics'
 import type { DirectoryResource } from '@/types'
 import { PHOTO_FIELD_KEY, resolveCapabilities, type CategoryConfig, type CategoryField } from '@/lib/categories'
 import { useNow } from '@/lib/useNow'
-import { dayText, seenAtFor } from '@/lib/itemMarks'
+import { itemDateFor, itemDateText } from '@/lib/itemMarks'
 import { isStale } from '@/lib/listingView'
 import { community as communityConfig } from '@/community.config'
 import { getCategoryColor } from '@/lib/categoryColor'
@@ -241,7 +241,11 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
   // The row's second line: open status, next minyan, distance, what kind of
   // place, how many items. See lib/listingRow.ts.
   const shul = useNextMinyan(item.id)
-  const facts = listingRowFacts(item, category, now, { shul, omitKey, candlesAt })
+  const allFacts = listingRowFacts(item, category, now, { shul, omitKey, candlesAt })
+  const facts = allFacts.filter((f) => !f.ownLine)
+  // A restaurant's dishes, on their own line; not beside what a search
+  // matched here, which names the dish asked for.
+  const itemsLine = found?.items.length ? null : (allFacts.find((f) => f.ownLine)?.text ?? null)
   // A category page's row: see the `place` prop.
   const pageRow = place !== undefined
   const rowNote = listingRowNote(item, category, now, { flagUnconfirmed, shulNote: shul?.note })
@@ -475,6 +479,11 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
                 ))}
               </p>
             )}
+            {itemsLine && (
+              <p className="truncate text-[13.5px] text-slate-700" data-testid="row-items">
+                {itemsLine}
+              </p>
+            )}
             {!pageRow && subtitle && <p className="truncate text-[13px] text-muted">{subtitle}</p>}
             {note && (
               <p className={`truncate text-[13px] ${NOTE_TONE[note.tone]}`} title={note.title} data-testid="row-note">
@@ -516,12 +525,13 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
                 {matchedChips?.map((m) => {
                   // When someone last saw it there (agreed Oct 1), once
                   // the page knows the time.
-                  const seenAt = clock === null ? null : seenAtFor(item, m.tag)
+                  // A dish approved from its menu since: "on its menu Oct 2".
+                  const date = clock === null ? null : itemDateFor(item, m.tag)
                   return (
-                    <Chip key={m.tag} tone={m.sometimes || (seenAt && isStale(seenAt, clock)) ? 'amber' : 'slate'}>
+                    <Chip key={m.tag} tone={m.sometimes || (date && isStale(date.at, clock)) ? 'amber' : 'slate'}>
                       {m.tag}
                       {m.sometimes ? ' · sometimes' : ''}
-                      {seenAt ? ` · seen ${dayText(seenAt, clock, communityConfig.timezone)}` : ''}
+                      {date ? ` · ${itemDateText(date, clock, communityConfig.timezone)}` : ''}
                     </Chip>
                   )
                 })}

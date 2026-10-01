@@ -11,7 +11,7 @@ import { submitListingUpdate } from '@/lib/submissionStore'
 import { sendSubmissionNotification } from '@/lib/email'
 import { itemsField } from '@/lib/listingView'
 import { itemEntry } from '@/lib/itemNames'
-import { addedItemName, additionSubmission, alreadyListed, cleanItemName, itemMarks } from '@/lib/itemMarks'
+import { addedItemName, additionSubmission, alreadyListed, cleanItemName, itemMarks, itemWording } from '@/lib/itemMarks'
 import { UUID, withdrawPending } from '@/lib/itemMarkRoutes'
 
 // POST /api/resource/:id/item/add   { item, sometimes?, from?, turnstileToken, company }
@@ -65,11 +65,12 @@ export async function POST(request: Request, ctx: RouteContext<'/api/resource/[i
 
     const sometimes = body.sometimes === true
     const named = addedItemName(name)
+    const say = itemWording(field)
     // Where it was said, for the admin: the listing's own "+ Add an item",
     // or a question the guide had nothing for ("Know where to find it?").
-    const where = body.from === 'question' ? 'Said where to find it, from a question the guide had nothing for' : 'Tapped “Add an item” on the listing'
+    const where = body.from === 'question' ? 'Said where to find it, from a question the guide had nothing for' : `Tapped “${say.add}” on the listing`
     const note = [
-      `${where}: ${named}${sometimes ? ' (not always in stock)' : ''}.`,
+      `${where}: ${named}${sometimes ? ` (${say.sometimes})` : ''}.`,
       ...(itemEntry(name) ? [] : ['A name not on the item list yet.']),
     ].join(' ')
     const submission = await submitListingUpdate(row.community_id, id, additionSubmission(category, listing, field.key, name, sometimes), note, null)

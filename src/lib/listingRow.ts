@@ -33,6 +33,8 @@ export type RowFact = {
   tone: RowFactTone
   /** Shown on hover: a caveat's note, say. */
   title?: string
+  /** The items, said on a line of their own (see listingRowFacts). */
+  ownLine?: boolean
 }
 
 /** The badge fields a collapsed row shows: boolean/select fields rendered as
@@ -113,6 +115,7 @@ export function listingRowFacts(
   const repeats = (field: CategoryField, label: string) =>
     !!items && field.key === itemsField?.countReplacesKey && saysTheSame(label, itemsField)
 
+  let badges = 0
   for (const f of rowBadgeFields(category)) {
     if (f.key === opts.omitKey) continue
     const present = f.type === 'boolean' ? !!item[f.key] : selectValues(item[f.key]).length > 0
@@ -125,10 +128,15 @@ export function listingRowFacts(
       // A hechsher's caveat is the row's third line now (listingRowNote),
       // where a phone can read it; a hover title was all it had.
       facts.push({ text, tone: 'plain' })
+      badges++
     }
   }
 
-  if (items) facts.push({ text: items, tone: 'plain' })
+  // After two facts of its own (a restaurant's "Meat · Keystone-K ·
+  // Restaurant"), the line is full, and the items would be cut off: they
+  // get a line of their own, "Shawarma, falafel, schnitzel +3" (agreed
+  // Oct 1). A grocery's one "Kosher store" leaves room, as before.
+  if (items) facts.push({ text: items, tone: 'plain', ...(badges >= 2 ? { ownLine: true } : {}) })
 
   return facts
 }

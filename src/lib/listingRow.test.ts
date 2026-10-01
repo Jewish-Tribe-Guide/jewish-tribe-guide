@@ -183,6 +183,23 @@ describe('listingRowFacts', () => {
   })
 })
 
+describe('a restaurant’s dishes on the row (agreed Oct 1)', () => {
+  const dishes: CategoryField = { key: 'dishes', label: 'Main dishes', type: 'tags', showCountInHeader: true, countLabel: 'dish' }
+  const listing = makeListing({ type: 'meat', cert: 'OU', dishes: ['Shawarma', 'Falafel', 'Schnitzel', 'Kebabs', 'Hummus'] })
+
+  it('after two facts of its own, on a line of their own', () => {
+    const facts = listingRowFacts(listing, makeCategory({ detailFields: [type, cert, dishes] }), null)
+    expect(facts.filter((f) => !f.ownLine).map((f) => f.text)).toEqual(['Meat', 'OU'])
+    expect(facts.find((f) => f.ownLine)?.text).toBe('Shawarma, falafel, schnitzel +2')
+  })
+
+  it('with room on the line, beside the facts as a grocery’s are', () => {
+    const facts = listingRowFacts(listing, makeCategory({ detailFields: [type, dishes] }), null)
+    expect(facts.some((f) => f.ownLine)).toBe(false)
+    expect(texts(facts)).toEqual(['Meat', 'Shawarma, falafel, schnitzel +2'])
+  })
+})
+
 describe('rowItems', () => {
   it('names up to four, or three and how many more', () => {
     expect(rowItems(makeListing({ m: ['Wine', 'Challah', 'Deli', 'Cheese'] }), 'm')).toBe('Wine, challah, deli, cheese')

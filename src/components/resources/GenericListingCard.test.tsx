@@ -5,6 +5,7 @@ import { act, cleanup, fireEvent, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { makeCategory, makeListing } from '@/test/providerFixtures'
+import type { CategoryField } from '@/lib/categories'
 import { mockRouter } from '@/test/nextNavigationMock'
 import { ForcedViewport } from '@/lib/useIsMobile'
 import { GenericListingCard, type GenericListingCardHandle } from './GenericListingCard'
@@ -455,6 +456,27 @@ describe('GenericListingCard — items a search matched', () => {
 
     expect(screen.getByText('Wine')).toBeInTheDocument()
     expect(screen.getByText('Challah · sometimes')).toBeInTheDocument()
+  })
+
+  it('a restaurant’s dishes: their own line, and a matched one dated by its menu (agreed Oct 1)', () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-10-09T17:30:00Z'))
+    try {
+      const badge = (key: string): CategoryField => ({ key, label: key, type: 'select', renderAs: 'badge', filterable: true })
+      const category = makeCategory({ detailFields: [badge('t'), badge('cert'), { key: 'dishes', label: 'Main dishes', type: 'tags', showCountInHeader: true, countLabel: 'dish' }] })
+      const item = makeListing({ t: 'Meat', cert: 'OU', dishes: ['Burgers', 'Steak'], itemMenu: { dishes: { Burgers: '2026-10-02T15:00:00Z' } } })
+      const props = { item, category, upvotes: false, count: 0, ...requiredHandlers }
+      const { unmount } = renderWithProviders(<GenericListingCard {...props} />)
+      expect(screen.getByTestId('row-items')).toHaveTextContent('Burgers, steak')
+      expect(screen.getByTestId('row-facts')).not.toHaveTextContent('Burgers')
+      unmount()
+      // Asked for one: the chip names it, so the line doesn't repeat it.
+      renderWithProviders(<GenericListingCard {...props} found={{ terms: ['burger'], items: [{ tag: 'Burgers', sometimes: false }], fields: [] }} />)
+      expect(screen.getByText('Burgers · on its menu Oct 2')).toBeInTheDocument()
+      expect(screen.queryByTestId('row-items')).not.toBeInTheDocument()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('says when each matched item was last seen there, amber once it’s 90 days old (agreed Oct 1)', () => {

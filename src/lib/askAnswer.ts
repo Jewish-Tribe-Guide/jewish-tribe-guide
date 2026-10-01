@@ -1,9 +1,10 @@
 import type { DirectoryResource, EruvRecord, ZmanimData } from '@/types'
-import type { CategoryConfig } from '@/lib/categories'
+import { selectValues, type CategoryConfig } from '@/lib/categories'
 import { resolvePrimaryZmanimBlock } from '@/lib/zmanim'
 import { describedByItsText, type AskHit, type DayWindow, type AskResult, type HoursWindow, type NearMiss } from '@/lib/askSearch'
-import { itemWords } from '@/lib/itemNames'
-import { dayText, seenAtFor } from '@/lib/itemMarks'
+import { itemEntry, itemWords } from '@/lib/itemNames'
+import { itemDateFor, itemDateText, itemWording, seenAtFor } from '@/lib/itemMarks'
+import { itemsField } from '@/lib/listingView'
 import { community } from '@/community.config'
 import { formatOpenAtTime, termMatches, termsAsTyped, words, type MetaAsk, type MinyanAsk, type MinyanWhen, type TimesAsk } from '@/lib/ask'
 import { TEFILLAH_LABELS, type Tefillah } from '@/lib/davening'
@@ -458,14 +459,18 @@ function baseAnswer(
     // it can be part of what's asked for ("shabbos meals" on Groceries).
     const thing = itemName(having, query.raw, asked, result.categoryIds ? [] : query.concepts.map((c) => c.word))
     const sometimes = having.filter((h) => h.matched.length > 0 && h.matched.every((m) => m.sometimes)).length
-    const note = sometimes === having.length ? ' (only sometimes in stock)' : sometimes > 0 ? ` (${sometimes} only sometimes)` : ''
+    // "In stock" for a store's items, "on the menu" for a place's dishes.
+    const dishes = having.every((h) => isDishList(h.category))
+    const note = sometimes === having.length ? ` (only sometimes ${dishes ? 'on the menu' : 'in stock'})` : sometimes > 0 ? ` (${sometimes} only sometimes)` : ''
     const near = nearest(having)
     // When someone last saw it there (agreed Oct 1): "Nearest: Trader
-    // Joe's, 0.2 mi, seen today", and how many have been this week.
+    // Joe's, 0.2 mi, seen today", and how many have been this week. A dish
+    // approved from its menu since says so instead: "on its menu Oct 2".
     const seenOf = (h: AskHit) => {
-      const at = now === null ? null : itemSeenAt(h)
-      return at ? `, seen ${dayText(at, now, community.timezone)}` : ''
+      const date = now === null || !h.matched[0] ? null : itemDateFor(h.item, h.matched[0].tag)
+      return date ? `, ${itemDateText(date, now, community.timezone)}` : ''
     }
+    const meatless = meatlessNote(having)
     const thisWeek = now === null ? 0 : having.filter((h) => {
       const at = itemSeenAt(h)
       return at !== null && now - Date.parse(at) < 7 * 86_400_000
@@ -476,7 +481,7 @@ function baseAnswer(
       : ` ${closed} more ${closed === 1 ? 'is' : 'are'} closed ${later}.`
     // Measured from the place asked about, it says so: "8.1 mi from HUP".
     const fromAnchor = where && near.miles != null ? ` from ${where}` : ''
-    if (having.length === 1) return { text: `${near.item.name} has ${thing}${note}${milesOf(near)}${fromAnchor}${hoursOf(near)}${seenOf(near)}.${closedNote}`, rows: [] }
+    if (having.length === 1) return { text: `${near.item.name} has ${thing}${note}${milesOf(near)}${fromAnchor}${hoursOf(near)}${seenOf(near)}.${meatless}${closedNote}`, rows: [] }
     const nearestLabel = where ? `Nearest to ${where}` : 'Nearest'
     const nearText = near.miles != null ? ` ${nearestLabel}: ${near.item.name}${milesOf(near)}${hoursOf(near)}${seenOf(near)}.` : ''
     const open = query.openNow ? ' open' : query.openToday ? ' open today' : ''
@@ -484,7 +489,7 @@ function baseAnswer(
     const besides = result.excluded.length ? ` besides ${[...new Set(result.excluded)].join(' or ')}` : ''
     // "Open after 6:00 PM today" is too long to go before "places".
     const openAt = query.openAt ? `, open ${later}` : ''
-    return { text: `${having.length}${open} places${besides} have ${thing}${note}${openAt}.${weekNote}${nearText}${closedNote}`, rows: [] }
+    return { text: `${having.length}${open} places${besides} have ${thing}${note}${openAt}.${meatless}${weekNote}${nearText}${closedNote}`, rows: [] }
   }
 
   // Asked only what's open ("is there a mikvah open today"): what is, and
@@ -545,25 +550,79 @@ function kindOf(hits: AskHit[], count = hits.length): string {
   return pluralLabel !== label ? pluralLabel.toLowerCase() : `${label.toLowerCase()} places`
 }
 
-/** The nearest of some hits, or the best match when there's no distance. */
+/** Whether a category's item list is of dishes (see itemWording). */
+function isDishList(category: CategoryConfig): boolean {
+  const f = itemsField(category)
+  return !!f && itemWording(f).noun === 'dish'
+}
+
+/** Where a dish that's usually meat (a burger) is served at a place that's
+ *  dairy or parve and not meat, it's something else there, and the answer
+ *  says so (agreed Oct 1): "At PLNT Burger and HipCityVeg (parve) they’re
+ *  meatless." From the place's own Food type alone, never a guess about the
+ *  dish: a place with no type, or meat as well, says nothing. "Meatless",
+ *  not "plant-based": a dairy place's burger can have cheese on it, or be
+ *  fish. */
+function meatlessNote(having: AskHit[]): string {
+  const at = having.flatMap((h) => {
+    const tag = h.matched[0]?.tag
+    if (!tag || !itemEntry(tag)?.usuallyMeat) return []
+    const kinds = milkOrMeat(h)
+    if (kinds.length === 0 || kinds.includes('meat') || !kinds.every((k) => k === 'dairy' || k === 'parve')) return []
+    return [{ name: h.item.name, kinds }]
+  })
+  if (at.length === 0) return ''
+  const kindsOf = (k: string[]) => k.join(' and ')
+  if (having.length === 1) return ` It’s ${kindsOf(at[0].kinds)}, so they’re meatless.`
+  if (at.length > 3) return ` At ${at.length} of them (dairy or parve) they’re meatless.`
+  const same = new Set(at.map((a) => kindsOf(a.kinds))).size === 1
+  const names = at.map((a) => (same ? a.name : `${a.name} (${kindsOf(a.kinds)})`))
+  const list = names.length === 1 ? names[0] : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`
+  return ` At ${list}${same ? ` (${kindsOf(at[0].kinds)})` : ''} they’re meatless.`
+}
+
+/** A food place's meat, dairy or parve, from the select whose choices are
+ *  those words ("Food Type"), lowercased; empty when it has none. */
+function milkOrMeat(h: AskHit): string[] {
+  const label = (o: { label: string }) => o.label.trim().toLowerCase().replace(/^pareve$/, 'parve')
+  const field = h.category.detailFields.find(
+    (f) => f.type === 'select' && f.options?.some((o) => label(o) === 'meat') && f.options.some((o) => label(o) === 'dairy' || label(o) === 'parve'),
+  )
+  if (!field) return []
+  return selectValues(h.item[field.key]).flatMap((v) => {
+    const o = field.options!.find((x) => x.value === v)
+    return o ? [label(o)] : []
+  })
+}
+
 /** When someone last saw the item a search matched at this place, its
  *  best match (see seenAtFor). */
 function itemSeenAt(h: Pick<AskHit, 'item' | 'matched'>): string | null {
   return h.matched[0] ? seenAtFor(h.item, h.matched[0].tag) : null
 }
 
+/** The nearest of some hits, or the best match when there's no distance. */
 function nearest(hits: AskHit[]): AskHit {
   return hits.reduce((best, h) => (h.miles != null && (best.miles == null || h.miles < best.miles) ? h : best), hits[0])
 }
 
 /** What to call the item asked about: the listings' own word for it when
- *  they agree ("Chalav Yisroel Milk"), the asker's when they don't. */
+ *  they agree ("Chalav Yisroel Milk"), the asker's when they don't. Said
+ *  as the item list says it when that's only the asker's word in the
+ *  plural: asked "burger", "4 places have burgers". */
 function itemName(having: AskHit[], raw: string, terms: string[], beside: string[] = []): string {
   const tops = new Set(having.map((h) => h.matched[0]?.tag ?? ''))
   if (tops.size === 1 && !tops.has('')) return [...tops][0]
   tops.delete('')
   const typed = termsAsTyped(raw, terms, beside)
-  if (typed) return typed
+  if (typed) {
+    const entries = new Set([...tops].map((t) => itemEntry(t)))
+    const [entry] = entries
+    if (entries.size === 1 && entry && entry.name !== typed && words(entry.name).join(' ') === words(typed).join(' ')) {
+      return typed === typed.toLowerCase() ? entry.name.toLowerCase() : entry.name
+    }
+    return typed
+  }
   // Nothing typed survived as a term (an abbreviation, say): the shortest.
   return [...tops].sort((a, b) => a.length - b.length)[0] ?? raw
 }

@@ -406,12 +406,13 @@ describe('searchAsk — the place a question is about', () => {
 
 describe('searchAsk — why each result is there', () => {
   it('names the field a result matched on when no item explains it', () => {
-    // "keystone" is in the hechsher, not in any item.
+    // "keystone" is in the hechsher, not in any item. A food place's own
+    // text describes it, whatever lists it keeps (this one's a text field).
     const result = searchAsk(listings, categories, 'keystone restaurants')
     const hit = result.hits.find((h) => h.item.name === 'Chalavita')!
     expect(hit.matched).toEqual([])
-    expect(hit.matchedFields).toEqual([{ label: 'Hechsher', text: 'Keystone-K', describes: false }])
-    expect(foundFor(hit, result)).toEqual({ terms: ['keystone'], items: [], fields: [{ label: 'Hechsher', text: 'Keystone-K', describes: false }] })
+    expect(hit.matchedFields).toEqual([{ label: 'Hechsher', text: 'Keystone-K', describes: true }])
+    expect(foundFor(hit, result)).toEqual({ terms: ['keystone'], items: [], fields: [{ label: 'Hechsher', text: 'Keystone-K', describes: true }] })
   })
 
   it('names a yes/no field that is switched on', () => {
