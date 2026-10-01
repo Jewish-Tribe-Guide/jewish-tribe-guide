@@ -23,6 +23,7 @@ import { createClient } from '@supabase/supabase-js'
 import { expect, test } from 'vitest'
 import type { CategoryConfig } from '@/lib/categories'
 import { searchAsk } from '@/lib/askSearch'
+import { withTaught } from '@/lib/askWords'
 import { neighborhoodsFor } from '@/lib/places'
 import type { LatLng } from '@/lib/geo'
 import { keepsHours } from '@/lib/mapFilters'
@@ -199,7 +200,8 @@ test('today’s search against the question reader', { timeout: 600_000 }, async
       // place our parser heard and today's found something; otherwise the
       // reading added to what our own search understood (ownFrom).
       const fallBack = !readingAnswers(r.reading) || (today.length > 0 && readingLoses(question, r.reading, cats))
-      lunaGot = fallBack ? today : answer({ reading: r.reading, own: ownFrom(todayResult, places) }, question)
+      const own = ownFrom(todayResult, places)
+      lunaGot = fallBack ? today : answer({ reading: withTaught(r.reading, own.taught), own }, question)
       lunaScore = score(lunaGot, want, ordered)
       readingText = JSON.stringify(r.reading)
       // GPT-6 Luna, per third-party price lists (Sep 2026): $0.10 per million

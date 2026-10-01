@@ -351,14 +351,24 @@ function baseAnswer(
   // nearest one, measured from there. With something to look for too
   // ("sushi near HUP"), it's who has it, nearest to there first.
   const where = result.anchor?.name ?? result.place?.name ?? null
+  // Words an admin taught the search, said as what they were read as, so
+  // the filtering is never silent: "IKC dairy" is "2 food places: IKC,
+  // Dairy", not two places with nothing said about why.
+  const taught = taughtText(result)
   if (where && result.terms.length === 0) {
-    const kind = kindOf(hits, Math.max(2, hits.length))
+    const kind = `${kindOf(hits, Math.max(2, hits.length))}${taught ? ` (${taught})` : ''}`
     // "Food in Cherry Hill": how many there are; the list names them.
     if (result.place?.inside && !result.anchor) {
-      const count = `${hits.length} ${hits.length === 1 ? kindOf(hits, 1) : kind} in ${where}`
+      const count = `${hits.length} ${hits.length === 1 ? `${kindOf(hits, 1)}${taught ? ` (${taught})` : ''}` : kind} in ${where}`
       return { text: hits.length === 1 ? `${count}: ${top.item.name}.` : `${count}.`, rows: [] }
     }
     return { text: `Closest ${kind} to ${where}: ${top.item.name}${milesOf(top)}.`, rows: [] }
+  }
+  if (taught && result.terms.length === 0 && !asksOpen) {
+    const near = nearest(hits)
+    if (hits.length === 1) return { text: `${near.item.name}: ${taught}${milesOf(near)}.`, rows: [] }
+    const nearText = near.miles != null ? ` Nearest: ${near.item.name}${milesOf(near)}.` : ''
+    return { text: `${hits.length} ${kindOf(hits)}: ${taught}.${nearText}`, rows: [] }
   }
 
   // A question about an item ("cholov yisroel milk"): who has it. Every
@@ -453,6 +463,20 @@ function baseAnswer(
   }
 
   return null
+}
+
+/** The filters taught words were read as, in the listings' own words
+ *  ("IKC, Dairy", "Shabbat Friendly"), or null when none were used. A
+ *  word taught as a kind of place says nothing here: the kind is said. */
+function taughtText(result: AskResult): string | null {
+  const said = (result.taught ?? []).flatMap((t) => {
+    if (!t.field) return []
+    const field = result.hits.find((h) => h.category.id === t.categoryId)?.category.detailFields.find((f) => f.key === t.field)
+    if (!field) return []
+    if (t.value === undefined) return [field.filterLabel ?? field.label]
+    return [field.options?.find((o) => o.value === t.value)?.label ?? t.value]
+  })
+  return said.length ? [...new Set(said)].join(', ') : null
 }
 
 /** What to call some hits: their category's plural when they share one and

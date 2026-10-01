@@ -14,25 +14,32 @@ import CollapsibleSection from './CollapsibleSection'
 // person has checked: the site uses it with no AI at all, even when the
 // reader is off or over its limits (/api/ask/read). Forget throws a wrong
 // one away, and the question is read afresh the next time it's asked.
+//
+// And each reading suggests words to teach the search itself ("ikc" means
+// Kosher Cert: IKC, see askWords.ts): taught, the site's own search reads
+// that word that way in every question, and the AI isn't asked.
 
+type Word = { word: string; categoryId: string; field?: string; value?: string; label: string }
+type TaughtWord = Word & { fromQuestion: string | null; taughtBy: string; taughtAt: string }
 type ReadQuestion = {
   key: string
   question: string
   labels: string[]
+  proposals: Word[]
   hits: number
   model: string
   lastUsedAt: string
   approvedAt: string | null
   approvedBy: string | null
 }
-type Loaded = { readings: ReadQuestion[]; available: boolean }
+type Loaded = { readings: ReadQuestion[]; available: boolean; words: TaughtWord[]; wordsAvailable: boolean }
 type Action = 'approve' | 'unapprove' | 'forget'
 
 function formatDay(iso: string): string {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
-function QuestionRow({ q, busy, onAct }: { q: ReadQuestion; busy: boolean; onAct: (action: Action) => void }) {
+function QuestionRow({ q, busy, onAct, onTeach }: { q: ReadQuestion; busy: boolean; onAct: (action: Action) => void; onTeach: (word: Word) => void }) {
   return (
     <li className="px-4 py-3" data-testid="read-question">
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
@@ -53,6 +60,20 @@ function QuestionRow({ q, busy, onAct }: { q: ReadQuestion; busy: boolean; onAct
           <span className="text-xs text-muted">nothing the guide has</span>
         )}
       </p>
+      {q.proposals.length > 0 && (
+        <ul className="mt-2 space-y-1">
+          {q.proposals.map((w) => (
+            <li key={w.word} className="flex flex-wrap items-center gap-x-2 text-xs text-slate-600" data-testid="word-proposal">
+              <span>
+                Teach the search: “<span className="font-semibold text-slate-800">{w.word}</span>” means {w.label}
+              </span>
+              <button type="button" disabled={busy} onClick={() => onTeach(w)} className="font-semibold text-primary hover:underline disabled:opacity-50">
+                Teach
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
       <div className="mt-2 flex flex-wrap items-center gap-3 text-xs">
         {q.approvedAt ? (
           <>
@@ -122,6 +143,48 @@ export default function ReadQuestions({ token }: { token: string }) {
     }
   }
 
+  async function teach(key: string, question: string, w: Word) {
+    setSaveError(null)
+    setBusy(key)
+    try {
+      await fetchJson(
+        withCommunity('/api/admin/read-questions', community),
+        { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'teach', word: { word: w.word, categoryId: w.categoryId, field: w.field, value: w.value }, question }) },
+        'Could not save.',
+      )
+      const taught: TaughtWord = { ...w, fromQuestion: question, taughtBy: 'you', taughtAt: new Date().toISOString() }
+      setData(
+        (d) =>
+          d && {
+            ...d,
+            words: [taught, ...d.words.filter((x) => x.word !== w.word)],
+            readings: d.readings.map((r) => ({ ...r, proposals: r.proposals.filter((p) => p.word !== w.word) })),
+          },
+      )
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Could not save.')
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  async function unteach(word: string) {
+    setSaveError(null)
+    setBusy(`word:${word}`)
+    try {
+      await fetchJson(
+        withCommunity('/api/admin/read-questions', community),
+        { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'unteach', word }) },
+        'Could not save.',
+      )
+      setData((d) => d && { ...d, words: d.words.filter((x) => x.word !== word) })
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Could not save.')
+    } finally {
+      setBusy(null)
+    }
+  }
+
   if (error) return <p className="bg-red-50 border border-red-200 rounded-md p-3 text-sm text-red-700">{error}</p>
   if (!data) return <p className="text-sm text-muted">Loading read questions…</p>
 
@@ -130,7 +193,7 @@ export default function ReadQuestions({ token }: { token: string }) {
   const rows = (list: ReadQuestion[]) => (
     <ul className="divide-y divide-slate-100">
       {list.map((q) => (
-        <QuestionRow key={q.key} q={q} busy={busy === q.key} onAct={(a) => void act(q.key, a)} />
+        <QuestionRow key={q.key} q={q} busy={busy === q.key} onAct={(a) => void act(q.key, a)} onTeach={(w) => void teach(q.key, q.question, w)} />
       ))}
     </ul>
   )
@@ -142,6 +205,10 @@ export default function ReadQuestions({ token }: { token: string }) {
         filters, most asked first. The AI only ever picks filters; the listings give the answers. <strong>Approve</strong> a
         reading you&rsquo;ve checked and it becomes a rule, used with no AI at all. <strong>Forget</strong> a wrong one and the
         question is read afresh next time. Only the words and a count are kept, never who asked.
+      </p>
+      <p className="text-sm text-muted">
+        <strong>Teach</strong> a word and the site&rsquo;s own search reads it that way in every question, instantly and
+        with no AI. It means that everywhere someone types it, so teach only what it always means.
       </p>
       {!data.available && (
         <p className="bg-amber-50 border border-amber-200 rounded-md p-3 text-sm text-amber-800">
@@ -164,6 +231,36 @@ export default function ReadQuestions({ token }: { token: string }) {
             </CollapsibleSection>
           </>
         )
+      )}
+      {data.wordsAvailable ? (
+        <CollapsibleSection title="Taught words" description="Words the site's own search reads as a filter, in every question." count={data.words.length} contentClassName="">
+          {data.words.length === 0 ? (
+            <p className="px-4 py-3 text-sm text-slate-600">None yet.</p>
+          ) : (
+            <ul className="divide-y divide-slate-100">
+              {data.words.map((w) => (
+                <li key={w.word} className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 px-4 py-3" data-testid="taught-word">
+                  <p className="text-sm text-slate-800">
+                    “<span className="font-semibold">{w.word}</span>” means {w.label}
+                  </p>
+                  <p className="flex flex-wrap items-center gap-3 text-xs text-muted">
+                    <span>
+                      Taught {formatDay(w.taughtAt)} by {w.taughtBy}
+                      {w.fromQuestion ? `, from “${w.fromQuestion}”` : ''}
+                    </span>
+                    <button type="button" disabled={busy === `word:${w.word}`} onClick={() => void unteach(w.word)} className="font-medium text-muted hover:text-slate-800 disabled:opacity-50">
+                      Unteach
+                    </button>
+                  </p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </CollapsibleSection>
+      ) : (
+        <p className="bg-amber-50 border border-amber-200 rounded-md p-3 text-sm text-amber-800">
+          Teaching the search words needs database migration 063.
+        </p>
       )}
     </div>
   )

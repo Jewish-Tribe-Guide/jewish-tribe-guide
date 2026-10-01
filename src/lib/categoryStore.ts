@@ -1,6 +1,7 @@
 import { cacheLife, cacheTag } from 'next/cache'
 import { TAGS } from './cacheTags'
 import { getAdminClient } from './supabase/admin'
+import { withAskWords } from './askWordStore'
 import { assertUsableSlug, slugify } from './routes'
 import { listCampaignBanners } from './campaignBannerStore'
 import { activeCampaignCategoryIds } from './campaignBanner'
@@ -126,13 +127,20 @@ export async function listCategories(community: string): Promise<CategoryConfig[
   'use cache'
   cacheTag(TAGS.categories(community))
   cacheTag(TAGS.campaignBanners(community))
+  cacheTag(TAGS.askWords(community))
   cacheLife('days')
   const [categories, banners] = await Promise.all([
     listCategoriesUncached(community),
     listCampaignBanners(community),
   ])
   const promoted = activeCampaignCategoryIds(banners, Date.now())
-  return categories.filter((c) => c.active !== false || promoted.has(c.id))
+  // With the words taught to the search (askWords.ts), so every search box
+  // has them. Only here: the admin's editor reads the uncached categories,
+  // and never saves these back onto one.
+  return withAskWords(
+    community,
+    categories.filter((c) => c.active !== false || promoted.has(c.id)),
+  )
 }
 
 export async function getCategoryById(community: string, id: string): Promise<CategoryConfig | null> {

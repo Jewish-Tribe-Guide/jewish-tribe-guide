@@ -7,6 +7,8 @@
 // client code fetches them from `GET /api/categories`.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import type { AskWord } from './askWords'
+
 export type FieldType = 'text' | 'tel' | 'textarea' | 'number' | 'boolean' | 'select' | 'tags' | 'url' | 'hours' | 'minyanim' | 'image'
 
 /** The field types offered in the editor's Type picker, most-common first. */
@@ -406,6 +408,11 @@ export type CategoryConfig = {
    *  category's listings (a hotel's shuls). Unset means none. Read through
    *  parseWalkList — see walkList.ts. */
   walkList?: unknown
+  /** Words an admin has taught the search to read as this category or one
+   *  of its filters ("ikc" is Kosher Cert: IKC). Not stored on the
+   *  category: listCategories adds them from question_word, so every
+   *  search box has them. See askWords.ts. */
+  askWords?: AskWord[]
 }
 
 export const DEFAULT_CATEGORY_ICON = '📋'

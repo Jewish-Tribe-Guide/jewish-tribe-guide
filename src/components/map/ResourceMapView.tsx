@@ -55,6 +55,7 @@ import { neighborhoodsFor } from '@/lib/places'
 import { reachLabel, readerPlaces, readingFilters, readingItemsOn, readingReach, widenReach, type Reading } from '@/lib/questionReader'
 import { askReader } from '@/lib/askReader'
 import { needsReading, ownFrom, readingLoses } from '@/lib/readingSearch'
+import { withTaught } from '@/lib/askWords'
 import type { DirectoryResource, MapFilters } from '@/types'
 
 // Shared by the initial useState below and the resync effect further down
@@ -877,13 +878,15 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
       if (readingLoses(q, answer.reading, categories) && today.hits.length > 0) return
       // "Open now" the reading didn't carry is kept, for every kind of
       // place it read that keeps hours.
-      const saidNow = answer.reading.categories.some((c) => c.openNow)
+      // And the words an admin taught the search, as our own search read them.
+      const reading = withTaught(answer.reading, own.taught)
+      const saidNow = reading.categories.some((c) => c.openNow)
       const hasHours = (id: string) => categories.some((x) => x.id === id && keepsHours(x))
       // The place our own search found ("in Bala Cynwyd") is where, whatever
       // the reading says.
       const withNow = {
-        ...answer.reading,
-        ...(own.openNow && !saidNow ? { categories: answer.reading.categories.map((c) => (hasHours(c.id) ? { ...c, openNow: true } : c)) } : {}),
+        ...reading,
+        ...(own.openNow && !saidNow ? { categories: reading.categories.map((c) => (hasHours(c.id) ? { ...c, openNow: true } : c)) } : {}),
         ...(own.place ? { near: own.place.name.toLowerCase(), place: own.place } : {}),
       }
       const { categories: ids, filters: read } = readingFilters(withNow)

@@ -4,6 +4,7 @@ import { listingSearchText } from '@/lib/searchListing'
 import { haversineMiles, type LatLng } from '@/lib/geo'
 import { findPlace, townsFrom, type Place } from '@/lib/places'
 import { DAY_KEYS, businessClosure, fmt12, getOpenStatus, isStructuredHours, type DayHours } from '@/lib/hours'
+import { readTaught, type TaughtWord } from '@/lib/askWords'
 import { conceptCategories, initialisms, parseAsk, termMatches, termsRequired, typedWords, wordMatches, words, type AskQuery, type OpenAt, withoutOpenAt } from '@/lib/ask'
 
 // Runs an `ask` query (see ask.ts) against the listings a page already holds.
@@ -112,6 +113,9 @@ export type AskResult = {
    *  of some kinds of place and not others: those it asked it of, whose
    *  results then say their hours. */
   openNowIn?: string[]
+  /** The words an admin taught the search that the question used ("ikc":
+   *  Kosher Cert: IKC), read as filters rather than looked for. */
+  taught?: TaughtWord[]
 }
 
 type Prepared = {
@@ -431,9 +435,18 @@ export function searchAsk(
   // "center city pretzel" is the store, not pretzels near Center City.
   // Only a listing of the kind asked for: "shul near center city" isn't
   // looking up the Cambria Hotel … Center City.
-  const lookingUp =
-    terms.length > 0 &&
-    all.some((p) => (!categoryIds || categoryIds.includes(p.category.id)) && terms.every((t) => p.nameWords.includes(t)))
+  const namesListing = (ws: string[], ids: string[] | null) =>
+    ws.length > 0 && all.some((p) => (!ids || ids.includes(p.category.id)) && ws.every((t) => p.nameWords.includes(t)))
+  // Words an admin taught the search ("ikc" is Kosher Cert: IKC): filters,
+  // not text to look for (see askWords.ts). Not in a name looked up, when
+  // they're most of it: "dairy queen", but not "dairy" for a Dairy Barn.
+  const looksUp = all.some(
+    (p) => (!categoryIds || categoryIds.includes(p.category.id)) && terms.every((t) => p.nameWords.includes(t)) && terms.length * 2 > p.nameWords.length,
+  )
+  const taught = readTaught(terms, categories, { categoryIds, categoryId, lookingUp: terms.length > 0 && looksUp })
+  terms.splice(0, terms.length, ...taught.terms)
+  categoryIds = taught.categoryIds
+  const lookingUp = namesListing(terms, categoryIds)
   // Where is read without "open at 8am": that "at" names a time, not a place.
   const whereText = query.openAt ? withoutOpenAt(query.raw) : query.raw
   const placeSaid = findPlace(whereText, [...places, ...townsOf(listings)])
@@ -472,6 +485,7 @@ export function searchAsk(
     // hours. A WhatsApp group isn't a place with "no hours listed".
     if (asksHours && searchTerms.length === 0 && !categoryIds && !categoryId && hoursKeys(p.category).length === 0) continue
     if (anchor && p.item === anchor) continue
+    if (!taught.passes(p.item)) continue
     if (query.excluding.length && query.excluding.every((w) => termMatches(w, p.nameWords, 3, false))) {
       excluded.add(p.item.name)
       continue
@@ -568,6 +582,7 @@ export function searchAsk(
     terms: searchTerms,
     excluded: [...excluded],
     place: named ? { name: named.place.name, inside: !!inside, geo: named.place.geo, radius: named.place.radius } : null,
+    ...(taught.used.length ? { taught: taught.used } : {}),
   }
 }
 

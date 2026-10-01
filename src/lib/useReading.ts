@@ -2,6 +2,7 @@
 
 import { useRef, useState } from 'react'
 import { askReader } from './askReader'
+import { withTaught } from './askWords'
 import type { Asked, OwnConditions } from './readingSearch'
 
 // A page's question reading (see questionReader.ts): the one asked for,
@@ -27,7 +28,7 @@ export function useReading(community: string | null) {
     setReadingNow(q)
     void askReader(q, community).then((answer) => {
       setReadingNow((now) => (now === q ? null : now))
-      if (answer.ok) setRead({ question: q, asked: { reading: answer.reading, own } })
+      if (answer.ok) setRead({ question: q, asked: { reading: withTaught(answer.reading, own.taught), own } })
       // Not kept as asked when it couldn't be read: Enter tries again.
       else if (asked.current === q) asked.current = null
     })

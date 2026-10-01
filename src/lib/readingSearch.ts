@@ -4,6 +4,7 @@ import { haversineMiles, type LatLng } from './geo'
 import { conceptCategories, formatOpenAtTime, parseAsk, termMatches, words, type AskQuery } from './ask'
 import { openState, type AskHit, type AskResult } from './askSearch'
 import { activeFilters, passesFields } from './mapFilters'
+import type { TaughtWord } from './askWords'
 import { placeFor, reachLabel, readingFilters, readingItemsOn, readingReach, widenReach, type ReaderPlace, type Reading, type ReadingReach } from './questionReader'
 
 // ── Answering a question from its reading (see questionReader.ts) ───────────
@@ -31,7 +32,12 @@ export type OwnPlace = ReaderPlace & { label: string }
 
 /** What our own search is sure of in a question, kept whatever the
  *  reading says. */
-export type OwnConditions = Pick<AskQuery, 'openNow' | 'openToday' | 'openAt' | 'best' | 'excluding' | 'within'> & { place: OwnPlace | null }
+export type OwnConditions = Pick<AskQuery, 'openNow' | 'openToday' | 'openAt' | 'best' | 'excluding' | 'within'> & {
+  place: OwnPlace | null
+  /** Words an admin taught the search that the question used: put into
+   *  the reading when it comes (withTaught), so they show as its chips. */
+  taught?: TaughtWord[]
+}
 
 /** From the question alone: everything but a place, which takes the
  *  listings and neighbourhoods to find (see ownFrom). */
@@ -51,7 +57,7 @@ export function ownFrom(result: AskResult, places: ReadonlyMap<string, ReaderPla
     : result.place
       ? { name: result.place.name, label: labelOf(result.place.name), geo: result.place.geo, ...(result.place.inside ? { radius: result.place.radius } : {}) }
       : null
-  return { openNow, openToday, openAt, best, excluding, within, place }
+  return { openNow, openToday, openAt, best, excluding, within, place, ...(result.taught?.length ? { taught: result.taught } : {}) }
 }
 
 /** Whether our own search left anything it didn't understand, so the AI
