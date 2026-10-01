@@ -19,7 +19,7 @@ import { useZmanim } from '@/lib/useZmanim'
 import { usePersistedState } from '@/lib/usePersistedState'
 import { useSharedPreference } from '@/lib/useSharedPreference'
 import { GenericListingCard, type GenericListingCardHandle } from './GenericListingCard'
-import DaveningTimesModal from '@/components/synagogues/DaveningTimesModal'
+import MinyanimView from './MinyanimView'
 import { PlusIcon } from '@/components/icons'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { useScrollShowHide, useSetScreenHeader } from '@/lib/headerVisibility'
@@ -356,6 +356,10 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // the value arriving forces a fresh mount of this whole subtree instead
   // of an update to the existing one, and the lazy initializer below runs
   // again with the real value.
+  // Synagogues' Minyanim view (step 4, agreed Oct 1): every minyan by time,
+  // in place of the list of shuls. `?davening=1` (the home page's and the
+  // Next minyan card's "All davening times") arrives on it, as it used to
+  // open the week's davening times in a dialog, which this replaces here.
   const [daveningModalOpen, setDaveningModalOpen] = useState(!!openDaveningModal)
   // Same one-way-in problem `search`/`openNow` already solve above: without
   // this, closing the modal (X, Escape, overlay click — all funnel into
@@ -999,7 +1003,10 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // the list holds keeps times. Wherever it isn't, All davening times is
   // back in the list heading, so it's never gone.
   const showMinyanCard =
-    hasMinyanim && !typed && filtered.some((item) => isMinyanim(item[minyanimField!.key]) && (item[minyanimField!.key] as Minyan[]).length > 0)
+    hasMinyanim && !typed && !daveningModalOpen && filtered.some((item) => isMinyanim(item[minyanimField!.key]) && (item[minyanimField!.key] as Minyan[]).length > 0)
+  // The Minyanim view in place of the list, until something is typed: then
+  // the search's own results, as anywhere.
+  const minyanimView = hasMinyanim && daveningModalOpen && !typed
   // A line in that card opens its shul, as next/previous does, and opens
   // the closed group it sits in until it's closed again.
   const openListing = (id: string) => {
@@ -1368,6 +1375,27 @@ export default function GenericDirectory({ category, items, anchorLabel, address
         {/* Beside it from lg up, Synagogues' Next minyan card; under the
             example searches on a phone. Gone once anything is typed: then
             the search's own answer says what's next (see NextMinyanCard). */}
+        {hasMinyanim && (
+          <div className="flex w-max rounded-full border border-slate-300 bg-white p-0.5" role="radiogroup" aria-label="Show" data-testid="shuls-minyanim">
+            {(
+              [
+                [false, category.pluralLabel],
+                [true, 'Minyanim'],
+              ] as const
+            ).map(([on, label]) => (
+              <button
+                key={label}
+                type="button"
+                role="radio"
+                aria-checked={daveningModalOpen === on}
+                onClick={() => setDaveningModalOpen(on)}
+                className={`cursor-pointer rounded-full px-3.5 py-1.5 text-[14px] font-bold transition-colors ${daveningModalOpen === on ? 'bg-primary text-white' : 'text-slate-700 hover:bg-slate-100'}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
         <div className={showMinyanCard ? 'space-y-3 lg:flex lg:items-start lg:gap-5 lg:space-y-0' : undefined}>
           {showSearch && (
             <div className={showMinyanCard ? 'min-w-0 lg:flex-1' : hasMapColumn ? 'lg:max-w-[720px]' : undefined}>
@@ -1380,7 +1408,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
             </div>
           )}
         </div>
-        {!hasMapColumn && !columnItem && listHeading}
+        {!hasMapColumn && !columnItem && !minyanimView && listHeading}
       </div>
 
       <div ref={splitRef} className={mapBeside ? 'group/split lg:grid lg:items-start' : undefined} style={mapBeside ? splitStyle : undefined}>
@@ -1425,8 +1453,10 @@ export default function GenericDirectory({ category, items, anchorLabel, address
         </div>
       )}
       <div hidden={!!columnItem}>
-      {hasMapColumn && listHeading}
-      {filtered.length === 0 ? (
+      {hasMapColumn && !minyanimView && listHeading}
+      {minyanimView ? (
+        <MinyanimView items={filtered} categoryId={category.id} initialDay={initialDaveningDay} />
+      ) : filtered.length === 0 ? (
         <div className="text-center py-12">
           <p className="text-sm text-muted">
             {hiddenByFilters
@@ -1646,7 +1676,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
           the label made visible instead, widening into a pill; mobile stays
           the plain circle, where the label would just be redundant with the
           reflex people already bring to the shape. */}
-      {filtered.length > 0 && !openDialogItemId && <RowLookSwitch look={rowLook} onChange={setRowLook} />}
+      {filtered.length > 0 && !openDialogItemId && !minyanimView && <RowLookSwitch look={rowLook} onChange={setRowLook} />}
 
       {canAdd && !openDialogItemId && (
         <button
@@ -1684,27 +1714,6 @@ export default function GenericDirectory({ category, items, anchorLabel, address
         />
       )}
 
-      {hasMinyanim && (
-        <DaveningTimesModal
-          items={items}
-          isOpen={daveningModalOpen}
-          onClose={() => setDaveningModalOpen(false)}
-          initialDenomination={selectFilters['denomination']?.[0] ?? ''}
-          // Comma-separated (see this prop's own doc), each piece validated
-          // against the real day-key set rather than a bare cast — this
-          // came in through a URL query param, so it's untrusted input, and
-          // a garbage piece should just drop out rather than being handed
-          // to the modal as if it were a real MinyanDayKey. undefined (not
-          // an empty array) when nothing valid survives, so the modal falls
-          // back to its own "Today" default instead of an empty filter.
-          initialDayFilter={(() => {
-            const days = (initialDaveningDay ?? '')
-              .split(',')
-              .filter((d): d is MinyanDayKey => (ALL_MINYAN_DAYS as string[]).includes(d))
-            return days.length > 0 ? days : undefined
-          })()}
-        />
-      )}
     </div>
   )
 }

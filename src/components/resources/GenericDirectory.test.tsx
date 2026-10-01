@@ -155,32 +155,6 @@ vi.mock('./ListingColumn', () => ({
   ),
 }))
 
-// DaveningTimesModal pulls in its own heavy davening-time rendering — out of
-// scope here, GenericDirectory only cares whether it opens (and, for the
-// initialDayFilter parsing tests below, what it's told to open TO), not what's
-// in it.
-vi.mock('@/components/synagogues/DaveningTimesModal', () => ({
-  default: ({
-    isOpen,
-    initialDayFilter,
-    onClose,
-  }: {
-    isOpen: boolean
-    initialDayFilter?: string[]
-    onClose: () => void
-  }) =>
-    isOpen ? (
-      // The label stays in its own element (not a sibling text node next to
-      // the close button) so the existing exact-text assertions below —
-      // getByText('davening modal open...') — keep matching a single
-      // element's own text rather than that element's text plus the
-      // button's, now that this mock renders both.
-      <div>
-        <span>davening modal open{initialDayFilter ? `: ${initialDayFilter.join(',')}` : ''}</span>
-        <button onClick={onClose}>Close davening modal</button>
-      </div>
-    ) : null,
-}))
 
 // The map beside the list is real and separately tested (CategoryMap.test);
 // here, a stand-in showing what the page hands it, with its pins as
@@ -744,117 +718,64 @@ describe('GenericDirectory', () => {
     })
   })
 
-  it('opens the davening-times modal when "All davening times" is clicked', async () => {
+  // Step 4 (agreed Oct 1): "All davening times" and `?davening=1` (the
+  // home page's link) open the Minyanim view, every minyan by time, in place
+  // of the list, where they used to open the week's times in a dialog.
+  const shulCategory = () => makeCategory({ detailFields: [{ key: 'minyanim', label: 'Minyanim', type: 'minyanim' }] })
+  const shulItem = () =>
+    ({ ...makeListing(), minyanim: [{ id: 'm1', tefillah: 'shacharis', days: ['sun', 'mon', 'tue', 'wed', 'thu', 'fri'], time: '7:00 AM' }] }) as unknown as DirectoryResource
+
+  it('opens the Minyanim view when "All davening times" is clicked, in place of the list', async () => {
     const user = userEvent.setup()
-    const category = makeCategory({ detailFields: [{ key: 'minyanim', label: 'Minyanim', type: 'minyanim' }] })
-    const item = {
-      ...makeListing(),
-      minyanim: [{ id: 'm1', tefillah: 'shacharis', days: ['sunday'], time: '7:00 AM' }],
-    } as unknown as DirectoryResource
-    renderWithProviders(<GenericDirectory category={category} items={[item]} {...handlers} />)
+    renderWithProviders(<GenericDirectory category={shulCategory()} items={[shulItem()]} {...handlers} />)
 
     await user.click(screen.getAllByRole('button', { name: /All davening times/ })[0])
 
-    expect(screen.getByText('davening modal open')).toBeInTheDocument()
+    expect(await screen.findByTestId('minyanim-view')).toBeInTheDocument()
+    expect(screen.getByRole('radio', { name: 'Minyanim' })).toHaveAttribute('aria-checked', 'true')
   })
 
-  // The home screen's DaveningTimesCard links here with `?davening=1` so
-  // "See all" actually lands on the sheet it names — before this, the link
-  // opened a bare category page and the visitor had to find the same
-  // button on it a second time. `openDaveningModal` is how that arrives,
-  // once FindResourcesConnected has read the query string.
-  it('opens the davening-times modal on arrival when openDaveningModal is set', () => {
-    const category = makeCategory({ detailFields: [{ key: 'minyanim', label: 'Minyanim', type: 'minyanim' }] })
-    const item = {
-      ...makeListing(),
-      minyanim: [{ id: 'm1', tefillah: 'shacharis', days: ['sunday'], time: '7:00 AM' }],
-    } as unknown as DirectoryResource
-    renderWithProviders(<GenericDirectory category={category} items={[item]} openDaveningModal {...handlers} />)
+  it('opens on the Minyanim view on arrival when openDaveningModal is set (?davening=1)', async () => {
+    renderWithProviders(<GenericDirectory category={shulCategory()} items={[shulItem()]} openDaveningModal {...handlers} />)
 
-    expect(screen.getByText('davening modal open')).toBeInTheDocument()
+    expect(await screen.findByTestId('minyanim-view')).toBeInTheDocument()
   })
 
-  it('does not open the modal on arrival for an ordinary visit (no query param)', () => {
-    const category = makeCategory({ detailFields: [{ key: 'minyanim', label: 'Minyanim', type: 'minyanim' }] })
-    const item = {
-      ...makeListing(),
-      minyanim: [{ id: 'm1', tefillah: 'shacharis', days: ['sunday'], time: '7:00 AM' }],
-    } as unknown as DirectoryResource
-    renderWithProviders(<GenericDirectory category={category} items={[item]} {...handlers} />)
+  it('an ordinary visit opens on the shuls', () => {
+    renderWithProviders(<GenericDirectory category={shulCategory()} items={[shulItem()]} {...handlers} />)
 
-    expect(screen.queryByText('davening modal open')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('minyanim-view')).not.toBeInTheDocument()
+    expect(screen.getAllByRole('radio')[0]).toHaveAttribute('aria-checked', 'true')
   })
 
-  // Comma-separated: DaveningTimesCard appends `,holiday` to the day it
-  // links to when tomorrow is also a secular holiday, so a shul's
-  // holiday-specific minyan isn't invisible on a view that's otherwise
-  // correctly showing tomorrow. Each piece is validated independently
-  // against the real day-key set — this arrives through a URL query param.
-  it('splits initialDaveningDay on commas into the modal\'s day filter', () => {
-    const category = makeCategory({ detailFields: [{ key: 'minyanim', label: 'Minyanim', type: 'minyanim' }] })
-    const item = {
-      ...makeListing(),
-      minyanim: [{ id: 'm1', tefillah: 'shacharis', days: ['sunday'], time: '7:00 AM' }],
-    } as unknown as DirectoryResource
-    renderWithProviders(
-      <GenericDirectory category={category} items={[item]} openDaveningModal initialDaveningDay="tue,holiday" {...handlers} />,
-    )
-
-    expect(screen.getByText('davening modal open: tue,holiday')).toBeInTheDocument()
+  // `?day=` from the home page's link: that day's tab, when it's one of
+  // the days shown; a piece that isn't a weekday drops out.
+  it('arrives on the day the link names', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-10-05T09:00:00-04:00')) // a Monday
+    try {
+      renderWithProviders(<GenericDirectory category={shulCategory()} items={[shulItem()]} openDaveningModal initialDaveningDay="tue,holiday" {...handlers} />)
+      expect(await screen.findByRole('tab', { selected: true })).toHaveTextContent(/^Tue/)
+      cleanup()
+      renderWithProviders(<GenericDirectory category={shulCategory()} items={[shulItem()]} openDaveningModal initialDaveningDay="nonsense" {...handlers} />)
+      expect(await screen.findByRole('tab', { selected: true })).toHaveTextContent(/^Today/)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
-  it('drops an invalid piece rather than passing it through as if it were real', () => {
-    const category = makeCategory({ detailFields: [{ key: 'minyanim', label: 'Minyanim', type: 'minyanim' }] })
-    const item = {
-      ...makeListing(),
-      minyanim: [{ id: 'm1', tefillah: 'shacharis', days: ['sunday'], time: '7:00 AM' }],
-    } as unknown as DirectoryResource
-    renderWithProviders(
-      <GenericDirectory category={category} items={[item]} openDaveningModal initialDaveningDay="tue,nonsense" {...handlers} />,
-    )
-
-    expect(screen.getByText('davening modal open: tue')).toBeInTheDocument()
-  })
-
-  it('falls back to no filter (undefined, not an empty array) when nothing valid survives', () => {
-    const category = makeCategory({ detailFields: [{ key: 'minyanim', label: 'Minyanim', type: 'minyanim' }] })
-    const item = {
-      ...makeListing(),
-      minyanim: [{ id: 'm1', tefillah: 'shacharis', days: ['sunday'], time: '7:00 AM' }],
-    } as unknown as DirectoryResource
-    renderWithProviders(
-      <GenericDirectory category={category} items={[item]} openDaveningModal initialDaveningDay="nonsense" {...handlers} />,
-    )
-
-    expect(screen.getByText('davening modal open')).toBeInTheDocument()
-  })
-
-  // Reported live: closing the modal (X, Escape, overlay click — all funnel
-  // into the same onClose) left `?davening=1` sitting in the URL, so
-  // reloading the page after closing reopened a modal the visitor had
-  // already dismissed. `?day=` is meaningless without the modal it was
-  // filtering, so it clears alongside `davening`.
-  it('clears ?davening and ?day from the URL when the modal is closed', async () => {
+  // Reported live, of the dialog this replaces: leaving it left
+  // `?davening=1` in the URL, so a reload reopened it. Back to the shuls
+  // clears `?davening` and `?day`.
+  it('clears ?davening and ?day from the URL when going back to the shuls', async () => {
     const user = userEvent.setup()
     const onParamsChange = vi.fn()
-    const category = makeCategory({ detailFields: [{ key: 'minyanim', label: 'Minyanim', type: 'minyanim' }] })
-    const item = {
-      ...makeListing(),
-      minyanim: [{ id: 'm1', tefillah: 'shacharis', days: ['sunday'], time: '7:00 AM' }],
-    } as unknown as DirectoryResource
     renderWithProviders(
-      <GenericDirectory
-        category={category}
-        items={[item]}
-        openDaveningModal
-        initialDaveningDay="tue"
-        {...handlers}
-        onParamsChange={onParamsChange}
-      />,
+      <GenericDirectory category={shulCategory()} items={[shulItem()]} openDaveningModal initialDaveningDay="tue" {...handlers} onParamsChange={onParamsChange} />,
     )
     expect(onParamsChange).not.toHaveBeenCalled()
 
-    await user.click(screen.getByRole('button', { name: 'Close davening modal' }))
+    await user.click(screen.getAllByRole('radio')[0])
 
     expect(onParamsChange).toHaveBeenCalledWith({ davening: null, day: null }, { replace: true })
   })
@@ -1935,14 +1856,21 @@ describe('GenericDirectory — each shul’s next minyan', () => {
       expect(lines).toEqual(['6:20 PMMincha · Mekor Habracha0.2 mi · times not confirmed', '6:20 PMMincha · Aleph Shul8.2 mi'])
     })
 
-    it('carries All davening times, which leaves the list heading while it does', async () => {
+    it('carries All davening times, which leaves the list heading while it does, and opens every minyan by time', async () => {
       fivePm()
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
       renderWithProviders(<GenericDirectory category={shulCategory} items={shuls()} {...handlers} />, { content: { categories: [shulCategory] } })
 
       expect(within(screen.getByTestId('list-heading')).queryByRole('button', { name: /All davening times/ })).not.toBeInTheDocument()
       await user.click(card().getByRole('button', { name: /All davening times/ }))
-      expect(screen.getByText('davening modal open')).toBeInTheDocument()
+      expect(screen.getByTestId('minyanim-view')).toBeInTheDocument()
+      // The card goes: the view's own answer says what's next.
+      expect(screen.queryByTestId('next-minyan')).not.toBeInTheDocument()
+      expect(within(screen.getByTestId('minyanim-rows')).getAllByRole('link').map((a) => a.textContent)).toEqual([
+        '6:20 PMMekor HabrachaMincha · 0.2 mi',
+        '6:20 PMAleph ShulMincha · 8.2 mi',
+        '6:25 PMLower Merion SynagogueMincha · 5.1 mi',
+      ])
     })
 
     it('goes once anything is typed, and All davening times goes back to the heading', async () => {
