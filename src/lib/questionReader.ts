@@ -1,6 +1,7 @@
 import { selectValues, type CategoryConfig } from './categories'
 import { filterFields, keepsHours, type MapFilterState } from './mapFilters'
 import { neighborhoodsFor, townsFrom } from './places'
+import { itemName } from './itemNames'
 import type { LatLng } from './geo'
 import type { DirectoryResource } from '@/types'
 
@@ -100,7 +101,9 @@ export function readerVocabulary(categories: readonly CategoryConfig[], listings
   const cats = categories.map((c) => {
     const own = listings.filter((l) => l.category === c.id)
     for (const f of c.detailFields.filter((x) => x.type === 'tags')) {
-      for (const l of own) for (const v of [...selectValues(l[f.key]), ...selectValues(l[`${f.key}_sometimes`])]) items.add(v)
+      // By the name the guide uses for each (itemNames.ts): "Sliced
+      // Cheeses" and "Some Sliced Cheese" are one item to read into.
+      for (const l of own) for (const v of [...selectValues(l[f.key]), ...selectValues(l[`${f.key}_sometimes`])]) items.add(itemName(v))
     }
     return {
       id: c.id,
@@ -120,7 +123,17 @@ export function readerVocabulary(categories: readonly CategoryConfig[], listings
  *  keys, values that exist, items the site lists, places it knows. A
  *  reading the AI got partly wrong loses the wrong part; it never gains
  *  something the site doesn't have. */
-export function tidyReading(raw: unknown, vocab: ReaderVocabulary): Reading {
+/** The two loose words of the reader's instructions, held to in code: the
+ *  reader applied Type: Restaurant to "dairy restaurant" on two runs in a
+ *  row (Oct 1), and a filter applied wrongly is a confident wrong answer.
+ *  Said in the question, the value they name is only offered, unless the
+ *  question insists ("a sit-down restaurant"). */
+const LOOSE: { said: RegExp; value: string; insists?: RegExp }[] = [
+  { said: /\brestaurants?\b/i, value: 'restaurant', insists: /\bsit[- ]?down\b|\bnot take-?out\b/i },
+  { said: /\bkosher grocer(?:y|ies)\b/i, value: 'kosher store' },
+]
+
+export function tidyReading(raw: unknown, vocab: ReaderVocabulary, question = ''): Reading {
   const r = (raw ?? {}) as Partial<Reading>
   const lower = (s: string) => s.toLowerCase().trim()
   const byId = new Map(vocab.categories.map((c) => [c.id, c]))
@@ -155,6 +168,34 @@ export function tidyReading(raw: unknown, vocab: ReaderVocabulary): Reading {
     if (!out || !categories.some((x) => x.id === out.id)) continue
     delete out.openNow
     if (out.bool || out.select) maybe.push(out)
+  }
+  // A loose word's value, applied, is moved to maybe (see LOOSE).
+  for (const loose of LOOSE) {
+    if (!loose.said.test(question) || loose.insists?.test(question)) continue
+    for (const c of categories) {
+      for (const [key, values] of Object.entries(c.select ?? {})) {
+        const named = values.filter((v) => lower(v) === loose.value)
+        if (named.length === 0) continue
+        c.select![key] = values.filter((v) => !named.includes(v))
+        let m = maybe.find((x) => x.id === c.id)
+        if (!m) maybe.push((m = { id: c.id }))
+        m.select = { ...m.select, [key]: [...new Set([...(m.select?.[key] ?? []), ...named])] }
+      }
+    }
+  }
+  // Unsure of a filter means it isn't applied: one the reader put in both
+  // ("meat restaurant" read as Type: Restaurant and maybe Type: Restaurant,
+  // Oct 1) is only offered.
+  for (const m of maybe) {
+    const c = categories.find((x) => x.id === m.id)
+    if (!c) continue
+    if (m.bool && c.bool) c.bool = c.bool.filter((k) => !m.bool!.includes(k))
+    for (const [key, values] of Object.entries(m.select ?? {})) if (c.select?.[key]) c.select[key] = c.select[key].filter((v) => !values.includes(v))
+    if (c.bool && c.bool.length === 0) delete c.bool
+    if (c.select) {
+      for (const key of Object.keys(c.select)) if (c.select[key].length === 0) delete c.select[key]
+      if (Object.keys(c.select).length === 0) delete c.select
+    }
   }
   const items = (Array.isArray(r.items) ? r.items : []).flatMap((v) => (typeof v === 'string' ? vocab.items.filter((x) => lower(x) === lower(v)) : []))
   const near = typeof r.near === 'string' ? (lower(r.near) === 'me' ? 'me' : (vocab.places.find((p) => lower(p) === lower(r.near as string)) ?? null)) : null
@@ -192,12 +233,12 @@ export function readingFilters(reading: Reading): { categories: string[]; filter
  *  whether it's only sometimes in stock. Empty when none were asked for. */
 export function readingItemsOn(listing: DirectoryResource, items: readonly string[]): { tag: string; sometimes: boolean }[] {
   if (items.length === 0) return []
-  const wanted = new Set(items.map((i) => i.toLowerCase()))
+  const wanted = new Set(items.map((i) => itemName(i).toLowerCase()))
   const out = new Map<string, boolean>()
   for (const [key, value] of Object.entries(listing)) {
     if (!Array.isArray(value)) continue
     const sometimes = key.endsWith('_sometimes')
-    for (const tag of value) if (typeof tag === 'string' && wanted.has(tag.toLowerCase())) out.set(tag, (out.get(tag) ?? true) && sometimes)
+    for (const tag of value) if (typeof tag === 'string' && wanted.has(itemName(tag).toLowerCase())) out.set(tag, (out.get(tag) ?? true) && sometimes)
   }
   return [...out].map(([tag, sometimes]) => ({ tag, sometimes }))
 }

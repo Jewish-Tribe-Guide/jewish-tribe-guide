@@ -2,6 +2,7 @@ import type { DirectoryResource, EruvRecord, ZmanimData } from '@/types'
 import type { CategoryConfig } from '@/lib/categories'
 import { resolvePrimaryZmanimBlock } from '@/lib/zmanim'
 import { describedByItsText, type AskHit, type DayWindow, type AskResult, type HoursWindow, type NearMiss } from '@/lib/askSearch'
+import { itemWords } from '@/lib/itemNames'
 import { formatOpenAtTime, termMatches, termsAsTyped, words, type MetaAsk, type MinyanAsk, type MinyanWhen, type TimesAsk } from '@/lib/ask'
 import { TEFILLAH_LABELS, type Tefillah } from '@/lib/davening'
 import type { MinyanSlot } from '@/lib/upcomingDavening'
@@ -426,11 +427,11 @@ function baseAnswer(
   // most of the name, which is looking the place up.
   const covers = (h: AskHit) => {
     const has = new Set<string>()
-    const add = (text: string) => {
-      const ws = words(text)
+    const addWords = (ws: string[]) => {
       for (const t of asked) if (termMatches(t, ws)) has.add(t)
     }
-    if (h.matched.length) add(h.matched[0].tag)
+    const add = (text: string) => addWords(words(text))
+    if (h.matched.length) addWords(itemWords(h.matched[0].tag))
     for (const f of h.matchedFields) if (f.describes) add(f.text)
     const food = describedByItsText(h.category)
     if (has.size === 0 && !food) return 0
@@ -547,7 +548,7 @@ function itemName(having: AskHit[], raw: string, terms: string[], beside: string
 
 /** How many of the words asked an item has. */
 function coverage(tag: string, terms: string[]): number {
-  const tagWords = words(tag)
+  const tagWords = itemWords(tag)
   return terms.filter((t) => termMatches(t, tagWords)).length
 }
 

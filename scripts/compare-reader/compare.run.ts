@@ -48,6 +48,12 @@ const ORTHODOX = ['Orthodox (Ashkenazi)', 'Orthodox (Sephardic)']
 
 type Case = [question: string, gold: Reading | ((cats: CategoryConfig[]) => Reading), own?: Partial<OwnConditions> | ((places: ReadonlyMap<string, ReaderPlace>) => Partial<OwnConditions>)]
 const inTown = (name: string) => (places: ReadonlyMap<string, ReaderPlace>) => ({ place: placeFor(name, places) })
+// "Near" a neighbourhood is measured from it, nearest first, as our own
+// search reads it; "in" is inside it (decided Oct 1, with "near HUP").
+const nearTown = (name: string) => (places: ReadonlyMap<string, ReaderPlace>) => {
+  const p = placeFor(name, places)
+  return { place: p ? { name: p.name, label: p.label, geo: p.geo } : null }
+}
 const NONE: OwnConditions = { openNow: false, openToday: false, openAt: null, best: false, excluding: [], within: null, place: null }
 const food = (f: Omit<Reading['categories'][number], 'id'> = {}) => ({ id: 'restaurant', ...f })
 const one = (c: Reading['categories'][number], rest: Partial<Reading> = {}): Reading => ({ categories: [c], ...rest })
@@ -81,7 +87,7 @@ const CASES: Case[] = [
   ['open meat within 3 miles only keystone', one(food({ openNow: true, select: { t: ['Meat'], kosherCert: ['Keystone-K'] } }), near('me', { withinMiles: 3 }))],
   ['restaurant near me', one(food(), near('me'))],
   ['meat near me', one(food({ select: { t: ['Meat'] } }), near('me'))],
-  ['where can I get a meat meal near center city', one(food({ select: { t: ['Meat'] } }), near('Center City'))],
+  ['where can I get a meat meal near center city', one(food({ select: { t: ['Meat'] } }), near('Center City')), nearTown('center city')],
   ['open meat near me within 3 miles', one(food({ openNow: true, select: { t: ['Meat'] } }), near('me', { withinMiles: 3 }))],
   ['meat sort by distance', one(food({ select: { t: ['Meat'] } }), near('me'))],
   ['orthodox shul', one({ id: 'synagogue', select: { denomination: ORTHODOX } })],

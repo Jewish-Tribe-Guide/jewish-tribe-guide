@@ -5,6 +5,7 @@ import { haversineMiles, type LatLng } from '@/lib/geo'
 import { findPlace, townsFrom, type Place } from '@/lib/places'
 import { DAY_KEYS, businessClosure, fmt12, getOpenStatus, hasAnyHours, isStructuredHours, type DayHours } from '@/lib/hours'
 import { filterWords, readTaught, type AskWord, type TaughtWord } from '@/lib/askWords'
+import { itemWords } from '@/lib/itemNames'
 import { NEAR_ME, conceptCategories, initialisms, parseAsk, termMatches, termsRequired, typedWords, wordMatches, words, type AskQuery, type OpenAt, withoutOpenAt } from '@/lib/ask'
 
 // Runs an `ask` query (see ask.ts) against the listings a page already holds.
@@ -193,7 +194,9 @@ function prepare(item: DirectoryResource, category: CategoryConfig): Prepared {
   // ("Shabbat Friendly"), which listingSearchText leaves out.
   const flags = category.detailFields.filter((f) => f.type === 'boolean' && item[f.key] === true).map((f) => f.label)
   const nameWords = words(item.name)
-  const tags = listingTags(item).map(({ tag, sometimes }) => ({ tag, words: words(tag), sometimes }))
+  // An item's words include its other names and kinds ("fish" for
+  // Salmon; see itemNames.ts).
+  const tags = listingTags(item).map(({ tag, sometimes }) => ({ tag, words: itemWords(tag), sometimes }))
   const p: Prepared = {
     item,
     category,

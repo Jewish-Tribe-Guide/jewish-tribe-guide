@@ -66,6 +66,27 @@ describe('tidyReading — it can never hold what the site doesn’t have', () =>
     ).toEqual({ categories: [{ id: 'restaurant', select: { t: ['Meat'] } }], maybe: [{ id: 'restaurant', select: { kosherCert: ['IKC'] } }] })
   })
 
+  it('a filter it’s unsure of is only offered, even when it also applied it', () => {
+    // Oct 1: "meat restaurant" came back with Type: Restaurant in both.
+    expect(
+      tidyReading({ categories: [{ id: 'restaurant', select: { t: ['Meat'], kosherCert: ['IKC'] } }], maybe: [{ id: 'restaurant', select: { kosherCert: ['IKC'] } }] }, vocab),
+    ).toEqual({ categories: [{ id: 'restaurant', select: { t: ['Meat'] } }], maybe: [{ id: 'restaurant', select: { kosherCert: ['IKC'] } }] })
+    expect(tidyReading({ categories: [{ id: 'restaurant', select: { kosherCert: ['IKC'] } }], maybe: [{ id: 'restaurant', select: { kosherCert: ['IKC'] } }] }, vocab)).toEqual({
+      categories: [{ id: 'restaurant' }],
+      maybe: [{ id: 'restaurant', select: { kosherCert: ['IKC'] } }],
+    })
+  })
+
+  it('"restaurant" is loose whatever the reader says: Type: Restaurant is only offered', () => {
+    const typed = makeCategory({ id: 'restaurant', pluralLabel: 'Food', detailFields: [{ key: 't', label: 'Food Type', type: 'select', filterable: true }, { key: 'foodType', label: 'Type', type: 'select', filterable: true }] })
+    const v = readerVocabulary([typed], [makeListing({ category: 'restaurant', t: ['Dairy'], foodType: ['Restaurant'] })], [])
+    const read = { categories: [{ id: 'restaurant', select: { t: ['Dairy'], foodType: ['Restaurant'] } }] }
+    expect(tidyReading(read, v, 'dairy restaurant')).toEqual({ categories: [{ id: 'restaurant', select: { t: ['Dairy'] } }], maybe: [{ id: 'restaurant', select: { foodType: ['Restaurant'] } }] })
+    // Insisted on, it's a filter; and with no loose word, the reader's word stands.
+    expect(tidyReading(read, v, 'a sit-down dairy restaurant').categories).toEqual(read.categories)
+    expect(tidyReading(read, v, 'dairy places to sit and eat').categories).toEqual(read.categories)
+  })
+
   it('no Open now for a category that keeps no hours', () => {
     expect(tidyReading({ categories: [{ id: 'hotel', openNow: true }] }, vocab)).toEqual({ categories: [{ id: 'hotel' }] })
   })

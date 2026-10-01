@@ -5,6 +5,7 @@ import { conceptCategories, formatOpenAtTime, parseAsk, termMatches, words, type
 import { openState, type AskHit, type AskResult } from './askSearch'
 import { activeFilters, passesFields } from './mapFilters'
 import type { TaughtWord } from './askWords'
+import { namesItem } from './itemNames'
 import { placeFor, reachLabel, readingFilters, readingItemsOn, readingReach, type ReaderPlace, type Reading, type ReadingReach } from './questionReader'
 
 // ── Answering a question from its reading (see questionReader.ts) ───────────
@@ -84,8 +85,11 @@ export function needsReading(result: AskResult): boolean {
     const listed = h.category.detailFields.some(
       (f) => f.type === 'tags' && [...selectValues(h.item[f.key]), ...selectValues(h.item[`${f.key}_sometimes`])].includes(tag),
     )
-    const tagWords = words(tag)
-    return listed && tagWords.length === left.length && left.every((t) => termMatches(t, tagWords))
+    // The item said whole, by its name or another name for it ("ground
+    // beef" for Hamburger Meat; see itemNames.ts). Not by its kind: "meat"
+    // is Stew Meat's kind and also a food place's type, and "fish" may be
+    // a restaurant's too, so those are still read.
+    return listed && namesItem(left, tag, { kinds: false })
   }
   return ![...result.hits, ...result.noHours].every(asItem)
 }

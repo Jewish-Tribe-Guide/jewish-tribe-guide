@@ -54,7 +54,7 @@ export async function readQuestion(
     raw = null
   }
   return {
-    reading: tidyReading(raw, vocab),
+    reading: tidyReading(raw, vocab, question),
     raw,
     ms: Date.now() - started,
     usage: {
