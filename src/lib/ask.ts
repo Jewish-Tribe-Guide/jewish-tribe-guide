@@ -182,9 +182,14 @@ export function typedWords(raw: string, terms: readonly string[]): { word: strin
 /** The words of `raw` that became `terms`, as they were typed: "cheeses" for
  *  the term "cheese". For an answer to use the asker's own word for a thing
  *  when the listings each word it differently. */
-export function termsAsTyped(raw: string, terms: readonly string[]): string {
-  return plainWords(raw)
-    .filter((w) => terms.includes(fold(w)))
+export function termsAsTyped(raw: string, terms: readonly string[], beside: readonly string[] = []): string {
+  const ws = plainWords(raw)
+  const kept = ws.map((w) => terms.includes(fold(w)))
+  // A word of `beside` (a kind of place, on a category page where it
+  // doesn't narrow anything) stays when it's part of the phrase, next to a
+  // word kept: "shabbos meals", not "shabbos".
+  return ws
+    .filter((w, i) => kept[i] || (beside.includes(fold(w)) && (kept[i - 1] || kept[i + 1])))
     .join(' ')
 }
 

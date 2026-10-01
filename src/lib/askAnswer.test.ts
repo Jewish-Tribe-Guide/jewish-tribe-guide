@@ -159,15 +159,43 @@ describe('answerFor — other questions', () => {
     expect(answer?.text).toBe('3 places have cheese. Nearest: Food & Friends, 0.1 mi.')
   })
 
-  it('names the nearest place, not the best-matching one', () => {
-    // Mid-word, "cheese st" ranks GIANT's Cheese Sticks first; ALDI is nearer.
+  it('says nothing about part of what’s in the box', () => {
+    // Mid-word, "cheese st" used to answer "2 places have cheese", the same
+    // way a finished "ice cream" answered "10 places have ice" and "shabbos
+    // meals" "2 places have shabbos" (Sep 28): the last word may be done,
+    // and a sentence about the words before it is then wrong.
     const cheeses = [
       listing('grocery', 'g', 'GIANT', 39.99, { m: ['Cheese Sticks'] }),
       listing('grocery', 'a', 'ALDI', 39.951, { m: ['Goat Cheese'] }),
     ]
     const result = searchAsk(cheeses, categories, 'cheese st', { coords: here })
     expect(result.hits[0].item.name).toBe('GIANT')
-    expect(answerFor(result, { coords: here })?.text).toBe('2 places have cheese. Nearest: ALDI, 0.1 mi.')
+    expect(answerFor(result, { coords: here })).toBeNull()
+    expect(answerFor(searchAsk(cheeses, categories, 'cheese sti', { coords: here }), { coords: here })?.text).toBe('GIANT has Cheese Sticks, 2.8 mi.')
+    expect(answerFor(searchAsk(cheeses, categories, 'cheese', { coords: here }), { coords: here })?.text).toBe('2 places have cheese. Nearest: ALDI, 0.1 mi.')
+  })
+
+  it('on a category page, the phrase as typed, with its kind-of-place word', () => {
+    // "meals" means Food elsewhere; on Groceries it's part of the item.
+    const shops = [
+      listing('grocery', 's', 'ShopRite', 39.951, { m: ['Prepared Shabbos Food'] }),
+      listing('grocery', 'h', 'House of Kosher', 39.954, { m: ['Shabbos Takeout'] }),
+    ]
+    const r = searchAsk(shops, categories, 'shabbos meals', { coords: here, categoryId: 'grocery' })
+    expect(answerFor(r, { coords: here })?.text).toBe('2 places have shabbos meals. Nearest: ShopRite, 0.1 mi.')
+  })
+
+  it('a phrase only some places have all of is not split', () => {
+    const shops = [
+      listing('grocery', 's', 'ShopRite', 39.951, { m: ['Prepared Shabbos Food'] }),
+      listing('grocery', 'a', 'Acme', 39.954, { m: ['Shabbos Candles'] }),
+      listing('restaurant', 'r', "Rita's Italian Ice", 39.952, {}),
+      listing('restaurant', 'w', 'Water Ice Co', 39.955, {}),
+      listing('restaurant', 'b', 'Scoop Shop', 39.953, { d: 'Kosher ice cream and shakes' }),
+    ]
+    // Nobody lists ice cream here: the two named Ice don't have it.
+    expect(answerFor(searchAsk(shops, categories, 'ice cream', { coords: here }), { coords: here })).toBeNull()
+    expect(answerFor(searchAsk(shops, categories, 'shabbos meals', { coords: here }), { coords: here })).toBeNull()
   })
 
   it('counts only places with as good a match as the best', () => {

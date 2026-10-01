@@ -378,13 +378,15 @@ function baseAnswer(
   // no item list counts by its own description: asked for pretzels, the
   // pretzel bakery has them as surely as the store with pretzel buns. But
   // only as good a match as the best: for "sliced goat cheese", a store with
-  // plain "Goat Cheese" doesn't have it. The word still being typed doesn't
-  // count…
+  // plain "Goat Cheese" doesn't have it. Every word in the box counts, the
+  // last one too, though it may still be being typed: "ice cream" looks
+  // the same either way, and answered "10 places have ice" (Sep 28). A
+  // word half typed then has no sentence for a moment, rather than one
+  // about the words before it.
   // The words searched for, not the ones that said where ("pizza in center
   // city" asks about pizza) — see AskResult's `terms`.
   const searched = result.terms
-  const typed = searched.filter((t) => t !== query.partial)
-  let asked = typed
+  const asked = searched
   // How many of the words asked a place has: in its best-matching item, its
   // own description if it's a food place, and its name — "giant wine" is
   // GIANT's name and its Wine. A name alone counts only for a food place
@@ -403,12 +405,7 @@ function baseAnswer(
     if (!food || coverage(h.item.name, asked) < words(h.item.name).length) add(h.item.name)
     return has.size
   }
-  let best = Math.max(0, ...hits.map(covers))
-  // …unless it's the item itself: "giant wine", before the space.
-  if (best === 0 && typed.length < searched.length) {
-    asked = searched
-    best = Math.max(0, ...hits.map(covers))
-  }
+  const best = Math.max(0, ...hits.map(covers))
   // Every word asked is in the top result's name, and they make up most of
   // it: that's looking the place up ("20th street pizza"), not asking who
   // has something. One word of "Center City Pretzel Co." isn't.
@@ -419,7 +416,9 @@ function baseAnswer(
   // gefilte fish" by a fish market's frozen meat.
   const having = best > 0 && best === asked.length && !namesTop ? hits.filter((h) => covers(h) === best) : []
   if (having.length) {
-    const thing = itemName(having, query.raw, asked)
+    // On a category page the kind of place asked isn't a search word, but
+    // it can be part of what's asked for ("shabbos meals" on Groceries).
+    const thing = itemName(having, query.raw, asked, result.categoryIds ? [] : query.concepts.map((c) => c.word))
     const sometimes = having.filter((h) => h.matched.length > 0 && h.matched.every((m) => m.sometimes)).length
     const note = sometimes === having.length ? ' (only sometimes in stock)' : sometimes > 0 ? ` (${sometimes} only sometimes)` : ''
     const near = nearest(having)
@@ -497,11 +496,11 @@ function nearest(hits: AskHit[]): AskHit {
 
 /** What to call the item asked about: the listings' own word for it when
  *  they agree ("Chalav Yisroel Milk"), the asker's when they don't. */
-function itemName(having: AskHit[], raw: string, terms: string[]): string {
+function itemName(having: AskHit[], raw: string, terms: string[], beside: string[] = []): string {
   const tops = new Set(having.map((h) => h.matched[0]?.tag ?? ''))
   if (tops.size === 1 && !tops.has('')) return [...tops][0]
   tops.delete('')
-  const typed = termsAsTyped(raw, terms)
+  const typed = termsAsTyped(raw, terms, beside)
   if (typed) return typed
   // Nothing typed survived as a term (an abbreviation, say): the shortest.
   return [...tops].sort((a, b) => a.length - b.length)[0] ?? raw
