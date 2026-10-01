@@ -5,7 +5,7 @@ import { haversineMiles, type LatLng } from '@/lib/geo'
 import { findPlace, townsFrom, type Place } from '@/lib/places'
 import { DAY_KEYS, businessClosure, fmt12, getOpenStatus, isStructuredHours, type DayHours } from '@/lib/hours'
 import { readTaught, type TaughtWord } from '@/lib/askWords'
-import { conceptCategories, initialisms, parseAsk, termMatches, termsRequired, typedWords, wordMatches, words, type AskQuery, type OpenAt, withoutOpenAt } from '@/lib/ask'
+import { NEAR_ME, conceptCategories, initialisms, parseAsk, termMatches, termsRequired, typedWords, wordMatches, words, type AskQuery, type OpenAt, withoutOpenAt } from '@/lib/ask'
 
 // Runs an `ask` query (see ask.ts) against the listings a page already holds.
 // Shared by the home search, every category page's own search box and the
@@ -341,11 +341,25 @@ function hoursAt(item: DirectoryResource, category: CategoryConfig, now: Date, a
  *  for that listing. A match is a listing outside the categories asked for
  *  whose initials are one of the leftover words, or whose name has all of
  *  them. Returns the words it used up so they aren't searched for again. */
+/** Every word that describes listings rather than names one: their items,
+ *  types and other picks ("meat", "dairy", "challah"). Worked out once per
+ *  set of listings. */
+const describingCache = new WeakMap<readonly DirectoryResource[], Set<string>>()
+function describingWords(listings: readonly DirectoryResource[], all: Prepared[]): Set<string> {
+  let out = describingCache.get(listings)
+  if (!out) {
+    out = new Set(all.flatMap((p) => p.tags.flatMap((t) => t.words)))
+    describingCache.set(listings, out)
+  }
+  return out
+}
+
 function findAnchor(
   terms: string[],
   all: Prepared[],
   categoryIds: string[],
   saysWhere: boolean,
+  describing: ReadonlySet<string>,
 ): { anchor: DirectoryResource; used: string[] } | null {
   if (terms.length === 0) return null
   const candidates = all.filter((p) => !categoryIds.includes(p.category.id) && p.item.geo)
@@ -360,8 +374,14 @@ function findAnchor(
   // food called Jefferson, so it's about the hospital.
   const foundAsAsked = all.some((p) => categoryIds.includes(p.category.id) && terms.every((t) => termMatches(t, p.hay, 3, false)))
   if (!saysWhere && foundAsAsked) return null
+  // Words that only describe places ("meat") name one only as most of its
+  // name: "Shlomo's Kosher Meat & Fish Market" isn't "near meat". A word
+  // that describes nothing ("jefferson", "shlomos") is the place it's in
+  // the name of.
   for (const p of candidates) {
-    if (terms.every((t) => p.nameWords.includes(t))) return { anchor: p.item, used: terms }
+    if (!terms.every((t) => p.nameWords.includes(t))) continue
+    if (terms.every((t) => describing.has(t)) && terms.length * 2 <= p.nameWords.length) continue
+    return { anchor: p.item, used: terms }
   }
   return null
 }
@@ -455,8 +475,12 @@ export function searchAsk(
 
   // Somewhere named with "near"/"at" counts without a kind of place too:
   // "sushi near HUP" is measured from HUP.
-  const saysWhere = SAYS_WHERE.test(whereText)
-  const found = categoryIds || saysWhere ? findAnchor(unplaced, all, categoryIds ?? [], saysWhere) : null
+  // "Near me" is the visitor, not a place to find among the words: it
+  // made "meat near me" the closest to Shlomo's Kosher Meat in Baltimore.
+  const saysWhere = SAYS_WHERE.test(whereText.replace(NEAR_ME, ' '))
+  // And once a town or neighbourhood is found, that's where: "meat near
+  // rittenhouse" isn't also near a listing with Meat in its name.
+  const found = !named && (categoryIds || saysWhere) ? findAnchor(unplaced, all, categoryIds ?? [], saysWhere, describingWords(listings, all)) : null
   const anchor = found?.anchor ?? null
   const searchTerms = found ? unplaced.filter((t) => !found.used.includes(t)) : unplaced
   const origin = anchor?.geo ?? named?.place.geo ?? coords ?? null

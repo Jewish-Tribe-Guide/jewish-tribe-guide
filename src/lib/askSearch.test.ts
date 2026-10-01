@@ -371,6 +371,37 @@ describe('searchAsk — the place a question is about', () => {
     // No food place is called Jefferson, so "food jefferson" is about the hospital.
     expect(searchAsk(places, categories, 'food jefferson').anchor?.name).toBe('Thomas Jefferson University Hospital')
   })
+
+  // Found Sep 28–Oct 1: one word of a listing's name was enough to make it
+  // the place. "meat near me" became the closest to Shlomo's Kosher Meat &
+  // Fish Market, in Baltimore, 91 mi away, and so did "meat near
+  // rittenhouse", which our search then thought it fully understood.
+  const shlomos = listing('grocery', "Shlomo's Kosher Meat & Fish Market", 39.36, -76.71, { m: ['Glatt Kosher Meat'] })
+  const meatPlaces = [shlomos, cherryGrill, chalavita, shoprite]
+  const me = { lat: 39.95, lng: -75.17 }
+
+  it('"near me" is the visitor, never a listing with the word in its name', () => {
+    for (const q of ['meat near me', 'open meat near me within 3 miles', 'meat nearby']) {
+      const r = searchAsk(meatPlaces, categories, q, { coords: me })
+      expect(r.anchor, q).toBeNull()
+    }
+    const r = searchAsk(meatPlaces, categories, 'meat near me', { coords: me })
+    expect(r.hits.map((h) => h.item.name)).toEqual(['ShopRite of Garden State Pavilion', 'Cherry Grill', "Shlomo's Kosher Meat & Fish Market"])
+  })
+
+  it('a neighbourhood named is where, and no listing is looked for in what’s left', () => {
+    const r = searchAsk(meatPlaces, categories, 'meat near rittenhouse', { places: [{ name: 'Rittenhouse', geo: { lat: 39.9496, lng: -75.1718 }, radius: 0.6 }] })
+    expect(r.anchor).toBeNull()
+    expect(r.place?.name).toBe('Rittenhouse')
+    expect(r.terms).toEqual(['meat'])
+  })
+
+  it('words that only describe places name one only as most of its name', () => {
+    expect(searchAsk(meatPlaces, categories, 'chicken near meat').anchor).toBeNull()
+    // A word of its own in the name is still the place.
+    expect(searchAsk(meatPlaces, categories, 'food near shlomos kosher meat').anchor?.name).toBe("Shlomo's Kosher Meat & Fish Market")
+    expect(searchAsk(meatPlaces, categories, 'food near shlomos').anchor?.name).toBe("Shlomo's Kosher Meat & Fish Market")
+  })
 })
 
 describe('searchAsk — why each result is there', () => {
