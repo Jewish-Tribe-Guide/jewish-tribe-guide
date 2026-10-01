@@ -19,8 +19,10 @@ function getAdminClient() {
   return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
 }
 
-// Letters only, so it's nothing a visitor could have asked.
-const suffix = Date.now().toString(36).replace(/\d/g, (d) => 'ghijklmnop'[Number(d)])
+// Letters only, so it's nothing a visitor could have asked. Random too:
+// --repeat-each runs copies at once, in workers that can start in the
+// same millisecond, and two copies sharing a row fail each other.
+const suffix = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`.replace(/\d/g, (d) => 'ghijklmnop'[Number(d)])
 const key = `qqzv read ${suffix}`
 
 const word = `qqzv${suffix}`
