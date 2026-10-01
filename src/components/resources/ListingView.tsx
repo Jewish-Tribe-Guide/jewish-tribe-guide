@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, type ReactNode } from 'react'
+import { useId, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { track } from '@vercel/analytics'
 import type { DirectoryResource } from '@/types'
@@ -41,6 +41,7 @@ import { usePinned } from '@/lib/pinnedContext'
 import {
   CertificateIcon,
   CheckIcon,
+  PlusIcon,
   ChevronRightIcon,
   ClockIcon,
   DirectionsIcon,
@@ -63,7 +64,7 @@ import FreshnessFooter from './FreshnessFooter'
 import QuestionCard from './QuestionCard'
 import TurnstileWidget from '@/components/TurnstileWidget'
 import { useItemMarks, type ItemMarksApi } from './useItemMarks'
-import { dayText, seenLabel, type ItemMark } from '@/lib/itemMarks'
+import { alreadyListed, dayText, itemSuggestions, seenLabel, type ItemMark } from '@/lib/itemMarks'
 import { community } from '@/community.config'
 import JoinLinkCheck from './JoinLinkCheck'
 
@@ -137,7 +138,7 @@ export default function ListingView({ item, category, color, place = null, upvot
   // A listing's items and this visitor's answers about them, shared by the
   // items card and the one question below it.
   const itemsF = itemsField(category)
-  const itemApi = useItemMarks(item, category, main === 'items' ? itemsF : null)
+  const itemApi = useItemMarks(item, category, itemsF)
   // Where "Still right?" is asked: beside the one thing that's the
   // community's to keep, not about the whole listing (confirmPlace).
   const confirmAt = confirmPlace(item, category)
@@ -450,6 +451,9 @@ export default function ListingView({ item, category, color, place = null, upvot
       {actions}
       {confirmAt?.at === 'join' && <JoinLinkCheck item={item} joined={joined} />}
       {mainSection}
+      {/* A place whose list has nothing on it yet: just "+ Add the first
+          item", after whatever it leads with. */}
+      {main !== 'items' && itemsF && itemApi.marks.length === 0 && itemApi.canReport && <ItemsCard field={itemsF} found={null} api={itemApi} />}
       {details}
       {about}
       {/* A hotel's walk list is its main thing; anywhere else it follows
@@ -686,14 +690,15 @@ function ItemsCard({ field, found, api }: { field: CategoryField; found: SearchF
   const clock = useNow()
   const [all, setAll] = useState(false)
   const [open, setOpen] = useState<string | null>(null)
+  const [adding, setAdding] = useState(false)
   const matched = new Set(found?.items.map((m) => m.tag) ?? [])
   const rows = [...api.marks]
   // What the search asked for first, so "See all" can't hide it.
   rows.sort((a, b) => Number(matched.has(b.name)) - Number(matched.has(a.name)))
   const shown = all ? rows : rows.slice(0, ITEMS_SHOWN)
   return (
-    <Card title={`${field.label} · ${rows.length}`} testId="listing-items">
-      <p className="mb-1 text-[13.5px] leading-snug text-muted">Been there? Tap an item to say if it’s still there.</p>
+    <Card title={rows.length ? `${field.label} · ${rows.length}` : field.label} testId="listing-items">
+      {rows.length > 0 && <p className="mb-1 text-[13.5px] leading-snug text-muted">Been there? Tap an item to say if it’s still there.</p>}
       <ul className="divide-y divide-slate-200/70">
         {shown.map((m) => {
           const key = `${m.key}:${m.name}`
@@ -722,14 +727,157 @@ function ItemsCard({ field, found, api }: { field: CategoryField; found: SearchF
             </li>
           )
         })}
+        {/* What this visitor added: theirs alone until an admin checks it. */}
+        {api.added.map((a) => (
+          <li key={`added:${a.name}`} data-testid="listing-item-added" className="py-2">
+            <span className="text-[15px] font-semibold text-slate-900">
+              {a.name}
+              {a.sometimes && <span className="ml-1.5 text-[12.5px] font-semibold text-caution">not always in stock</span>}
+            </span>
+            <p role="status" className="mt-0.5 text-[13px] leading-snug text-muted">
+              Added by you · waiting for a check
+              {a.submissionId && (
+                <button type="button" disabled={a.busy} onClick={() => api.withdraw(a)} className="ml-1.5 cursor-pointer font-bold text-primary hover:underline disabled:opacity-50">
+                  {a.busy ? 'Undoing…' : 'Undo'}
+                </button>
+              )}
+            </p>
+            {a.error && (
+              <p role="alert" className="mt-1 text-[13.5px] text-red-700">
+                {a.error}
+              </p>
+            )}
+          </li>
+        ))}
       </ul>
       {rows.length > ITEMS_SHOWN && (
-        <button type="button" onClick={() => setAll((v) => !v)} className="mt-1.5 inline-flex cursor-pointer items-center gap-1 text-[14.5px] font-bold text-primary">
+        <button type="button" onClick={() => setAll((v) => !v)} className="mt-1.5 inline-flex min-h-9 cursor-pointer items-center gap-1 text-[14.5px] font-bold text-primary">
           {all ? 'Fewer' : `All ${rows.length} items`}
           <ChevronRightIcon className={`h-4 w-4 transition-transform ${all ? '-rotate-90' : ''}`} />
         </button>
       )}
+      {/* "+ Add an item": the list's own last row (agreed Oct 1), where
+          someone who's just seen something new finds it isn't listed. */}
+      {api.canReport &&
+        (adding ? (
+          <AddItemBox
+            api={api}
+            onClose={() => setAdding(false)}
+            onListed={(m) => {
+              setAdding(false)
+              setOpen(`${m.key}:${m.name}`)
+              setAll(true)
+            }}
+          />
+        ) : (
+          <button
+            type="button"
+            onClick={() => setAdding(true)}
+            className={`flex min-h-11 w-full cursor-pointer items-center gap-2 py-2.5 text-left text-[15px] font-bold text-primary ${rows.length + api.added.length > 0 ? 'mt-0.5 border-t border-slate-200' : ''}`}
+          >
+            <PlusIcon className="h-4 w-4" />
+            {rows.length ? 'Add an item' : 'Add the first item'}
+          </button>
+        ))}
     </Card>
+  )
+}
+
+/** "What did you see here?": suggestions from the item names as it's typed,
+ *  the store's own items marked (picking one is its "Still here"), a name
+ *  not on the list as typed, "Not always in stock", then Add. */
+function AddItemBox({ api, onClose, onListed }: { api: ItemMarksApi; onClose: () => void; onListed: (m: ItemMark) => void }) {
+  const [text, setText] = useState('')
+  const [sometimes, setSometimes] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const inputId = useId()
+  const name = text.trim().replace(/\s+/g, ' ')
+  const suggestions = itemSuggestions(name, api.marks).filter((x) => x.name.toLowerCase() !== name.toLowerCase())
+  const send = async (what: string) => {
+    const listed = alreadyListed(api.marks, what)
+    if (listed) {
+      api.seen(listed, 'row')
+      return onListed(listed)
+    }
+    setBusy(true)
+    setError(null)
+    const outcome = await api.add(what, sometimes)
+    setBusy(false)
+    if (outcome === 'failed') setError('That didn’t send. Please try again.')
+    else onClose()
+  }
+  const bold = (label: string) => {
+    const i = label.toLowerCase().indexOf(name.toLowerCase())
+    return i < 0 ? label : (
+      <>
+        {label.slice(0, i)}
+        <b>{label.slice(i, i + name.length)}</b>
+        {label.slice(i + name.length)}
+      </>
+    )
+  }
+  const row = 'flex min-h-11 w-full cursor-pointer items-center justify-between gap-2 border-t border-slate-100 px-3 text-left text-[15px] text-slate-900 first:border-t-0 hover:bg-slate-50'
+  return (
+    <div className="-mx-2 mt-2 rounded-xl border border-slate-300 bg-white px-2 pt-3 pb-2.5" data-testid="add-item">
+      <label htmlFor={inputId} className="text-[14px] font-bold text-slate-900">
+        What did you see here?
+      </label>
+      <input
+        id={inputId}
+        autoFocus
+        value={text}
+        maxLength={60}
+        autoComplete="off"
+        onChange={(e) => setText(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && name.length >= 2 && !busy) void send(name)
+          if (e.key === 'Escape') onClose()
+        }}
+        className="mt-2 h-11 w-full rounded-[10px] border-2 border-slate-300 px-3 text-base text-slate-900 outline-none focus:border-primary"
+      />
+      {name.length >= 2 && (suggestions.length > 0 || !alreadyListed(api.marks, name)) && (
+        <div className="mt-1.5 overflow-hidden rounded-[10px] border border-slate-200">
+          {suggestions.map((x) => (
+            <button key={x.name} type="button" disabled={busy} onClick={() => (x.listed ? void send(x.name) : setText(x.name))} className={row}>
+              <span className="py-2">
+                {bold(x.name)}
+                {x.listed && <span className="block text-[13px] text-muted">Already here · tap to say it’s still here</span>}
+              </span>
+            </button>
+          ))}
+          {!suggestions.some((x) => x.name.toLowerCase() === name.toLowerCase()) && (
+            <button type="button" disabled={busy} onClick={() => void send(name)} className={`${row} bg-slate-50 text-[14.5px] text-muted`}>
+              Add “{name}” as typed
+            </button>
+          )}
+        </div>
+      )}
+      <label className="mt-2.5 flex min-h-11 cursor-pointer items-center gap-2.5 text-[15px] text-slate-900">
+        <input type="checkbox" checked={sometimes} onChange={(e) => setSometimes(e.target.checked)} className="h-5 w-5 accent-primary" />
+        Not always in stock
+      </label>
+      <div className="mt-1.5 flex items-center gap-2">
+        <button
+          type="button"
+          disabled={busy || name.length < 2}
+          onClick={() => void send(name)}
+          className="h-11 flex-1 cursor-pointer rounded-[10px] bg-primary text-[15px] font-bold text-white transition-colors hover:bg-primary-dark disabled:cursor-default disabled:opacity-45"
+        >
+          {busy ? 'Sending…' : 'Add'}
+        </button>
+        <button type="button" onClick={onClose} className="h-11 cursor-pointer px-3 text-[15px] font-bold text-slate-500 hover:text-slate-700">
+          Cancel
+        </button>
+      </div>
+      {error && (
+        <p role="alert" className="mt-2 text-[13.5px] text-red-700">
+          {error}
+        </p>
+      )}
+      <p className="mt-2 text-[13px] leading-snug text-muted">An admin checks it before everyone sees it.</p>
+      {api.challenge?.from === 'add' && busy && <TurnstileWidget key={api.challenge.attempt} onVerify={api.challenge.onVerify} />}
+    </div>
   )
 }
 

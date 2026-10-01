@@ -3,6 +3,7 @@ import { selectValues, type CategoryConfig, type CategoryField } from './categor
 import { dayInTimezone } from './activity'
 import { isStale } from './listingView'
 import { editSubmission } from './editSubmission'
+import { ITEM_NAMES, itemEntry, itemName } from './itemNames'
 
 // ── "Still here" and "Not anymore", an item at a time (agreed Oct 1) ────────
 // A listing's items each carry their own date: when someone last saw it
@@ -131,4 +132,64 @@ export function removalSubmission(category: CategoryConfig, item: DirectoryResou
   const lower = name.toLowerCase()
   const kept = selectValues(item[key]).filter((v) => v.toLowerCase() !== lower)
   return editSubmission(category, item, { [key]: kept })
+}
+
+// ── Add an item (agreed Oct 1) ────────────────────────────────────────────────
+// "+ Add an item" as the list's last row: a box with suggestions from the
+// item names, then an edit suggestion adding it, which an admin checks
+// before everyone sees it.
+
+/** A name as typed, tidied, or null when it can't be an item: too short or
+ *  long, or looking like an email, a link or a phone number (the box is
+ *  public; the queue isn't a place for those). */
+export function cleanItemName(raw: unknown): string | null {
+  if (typeof raw !== 'string') return null
+  const name = raw.trim().replace(/\s+/g, ' ')
+  if (name.length < 2 || name.length > 60) return null
+  if (/@|https?:|www\./i.test(name) || /(?:\d[\s().-]*){7,}/.test(name)) return null
+  return name
+}
+
+/** The listed item this name already is, under any of its names ("Some
+ *  Sliced Cheese" for "sliced cheese"), or null. */
+export function alreadyListed(marks: readonly ItemMark[], name: string): ItemMark | null {
+  const want = itemName(name).toLowerCase()
+  return marks.find((m) => itemName(m.name).toLowerCase() === want) ?? null
+}
+
+export type ItemSuggestion = { name: string; listed: ItemMark | null }
+
+/** What the box suggests for what's been typed: names on the item list
+ *  whose words (or other names') start with it. The store's own items come
+ *  first, so picking one it has is that item's "Still here", not a second
+ *  copy; then names that start with it, then names with a word that does,
+ *  then names only another of its names matches (Brie, as "Brie Cheese").
+ *  A few at most. */
+export function itemSuggestions(typed: string, marks: readonly ItemMark[], max = 4): ItemSuggestion[] {
+  const t = typed.trim().toLowerCase()
+  if (t.length < 2) return []
+  const wordStarts = (text: string) => text.toLowerCase().startsWith(t) || text.toLowerCase().split(/\s+/).some((w) => w.startsWith(t))
+  // Lower is better: 0 starts with it, 1 a word does, 2 only another name.
+  const rank = (name: string, aka: readonly string[]) => (name.toLowerCase().startsWith(t) ? 0 : wordStarts(name) ? 1 : aka.some(wordStarts) ? 2 : -1)
+  const found = new Map<string, ItemSuggestion & { rank: number; order: number }>()
+  const consider = (name: string, aka: readonly string[], listed: ItemMark | null) => {
+    const r = rank(name, aka)
+    const k = itemName(name).toLowerCase()
+    if (r < 0 || found.has(k)) return
+    found.set(k, { name, listed, rank: listed ? -1 : r, order: found.size })
+  }
+  for (const m of marks) consider(m.name, itemEntry(m.name)?.aka ?? [], m)
+  for (const e of ITEM_NAMES) consider(e.name, e.aka ?? [], alreadyListed(marks, e.name))
+  return [...found.values()]
+    .sort((a, b) => a.rank - b.rank || a.order - b.order)
+    .slice(0, max)
+    .map(({ name, listed }) => ({ name, listed }))
+}
+
+/** The edit suggestion "Add an item" files: the listing as it stands with
+ *  one item more, in its list's always or sometimes part. A name on the
+ *  item list goes in under the list's name for it. */
+export function additionSubmission(category: CategoryConfig, item: DirectoryResource, fieldKey: string, name: string, sometimes: boolean): ResourceSubmission {
+  const key = sometimes ? `${fieldKey}_sometimes` : fieldKey
+  return editSubmission(category, item, { [key]: [...selectValues(item[key]), itemName(name)] })
 }

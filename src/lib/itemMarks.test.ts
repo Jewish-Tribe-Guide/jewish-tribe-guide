@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { makeCategory, makeListing } from '@/test/providerFixtures'
 import type { CategoryField } from './categories'
-import { dayText, itemMarks, itemPhrase, pickItemToAsk, removalSubmission, seenLabel } from './itemMarks'
+import { additionSubmission, alreadyListed, cleanItemName, dayText, itemMarks, itemPhrase, itemSuggestions, pickItemToAsk, removalSubmission, seenLabel } from './itemMarks'
 
 const TZ = 'America/New_York'
 const m: CategoryField = { key: 'm', label: 'Kosher items here', type: 'tags' }
@@ -78,5 +78,41 @@ describe('the removal "Not anymore" files', () => {
     const sub = removalSubmission(grocery, item, 'm', 'chicken')
     expect(sub.details).toEqual({ m: ['Challah'], m_sometimes: ['Steak'] })
     expect(removalSubmission(grocery, item, 'm_sometimes', 'Steak').details).toEqual({ m: ['Challah', 'Chicken'], m_sometimes: [] })
+  })
+})
+
+describe('add an item', () => {
+  const mark = (name: string, key = 'm') => ({ name, key, sometimes: key !== 'm', seenAt: null, goneAt: null })
+  const marks = [mark('Challah'), mark('Some Sliced Cheese'), mark('Steak', 'm_sometimes')]
+
+  it('tidies a typed name, and refuses what can’t be one', () => {
+    expect(cleanItemName('  goat   cheese ')).toBe('goat cheese')
+    for (const bad of ['x', 'me@example.com', 'www.spam.example', '215-555-0100', 'a'.repeat(61), null]) expect(cleanItemName(bad)).toBeNull()
+  })
+
+  it('knows an item the store has under another of its names', () => {
+    expect(alreadyListed(marks, 'sliced cheeses')?.name).toBe('Some Sliced Cheese')
+    expect(alreadyListed(marks, 'Goat Cheese')).toBeNull()
+  })
+
+  it('suggests from the item names as it’s typed, the store’s own first', () => {
+    const s = itemSuggestions('chee', marks)
+    // The store's own first, then names that start with it, then ones with a
+    // word that does; Brie (only as "Brie Cheese") doesn't make the four.
+    expect(s).toEqual([
+      { name: 'Some Sliced Cheese', listed: marks[1] },
+      { name: 'Cheese', listed: null },
+      { name: 'Cheese Sticks', listed: null },
+      { name: 'Cheddar Cheese', listed: null },
+    ])
+    expect(itemSuggestions('ground', marks).map((x) => x.name)).toEqual(['Ground Turkey', 'Hamburger Meat'])
+    expect(itemSuggestions('c', marks)).toEqual([])
+  })
+
+  it('files the listing with one item more, in the always or sometimes list, under the list’s name', () => {
+    const grocery = makeCategory({ id: 'grocery', detailFields: [m] })
+    const item = makeListing({ m: ['Challah'], m_sometimes: ['Steak'] })
+    expect(additionSubmission(grocery, item, 'm', 'ground beef', false).details).toEqual({ m: ['Challah', 'Hamburger Meat'], m_sometimes: ['Steak'] })
+    expect(additionSubmission(grocery, item, 'm', 'Rugelach', true).details).toEqual({ m: ['Challah'], m_sometimes: ['Steak', 'Rugelach'] })
   })
 })

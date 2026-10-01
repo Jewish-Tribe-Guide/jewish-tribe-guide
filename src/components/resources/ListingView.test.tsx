@@ -401,3 +401,73 @@ describe('ListingView — Still here and Not anymore, an item at a time', () => 
     expect(within(row('Steak')).getByText('seen today')).toBeInTheDocument()
   })
 })
+
+describe('ListingView — add an item', () => {
+  const m: CategoryField = { key: 'm', label: 'Kosher items here', type: 'tags', renderAs: 'badge', showCountInHeader: true }
+  const grocery = makeCategory({ id: 'grocery', label: 'Grocery', detailFields: [hours, m] })
+  const tj = makeListing({ id: '0b6c4c1e-2f55-4a8e-9d57-3b7f0d6f4a21', name: 'Trader Joe’s', m: ['Challah', 'Cheddar Cheese'] })
+  const SUB = '9a6c4c1e-2f55-4a8e-9d57-3b7f0d6f4a99'
+  const json = (body: unknown) => new Response(JSON.stringify(body), { status: 200 })
+  let fetchMock: ReturnType<typeof vi.spyOn>
+  beforeEach(() => {
+    fetchMock = vi.spyOn(globalThis, 'fetch')
+  })
+  afterEach(() => fetchMock.mockRestore())
+  const card = () => screen.getByTestId('listing-items')
+  const open = () => fireEvent.click(within(card()).getByRole('button', { name: 'Add an item' }))
+  const type = (text: string) => fireEvent.change(within(card()).getByLabelText('What did you see here?'), { target: { value: text } })
+
+  it('is the list’s last row, and opens a box that suggests from the item names', () => {
+    view({ item: tj, category: grocery })
+    const buttons = within(card()).getAllByRole('button')
+    expect(buttons[buttons.length - 1]).toHaveTextContent('Add an item')
+    open()
+    type('chee')
+    const box = screen.getByTestId('add-item')
+    expect(within(box).getByRole('button', { name: /Cheddar Cheese/ })).toHaveTextContent('Already here · tap to say it’s still here')
+    expect(within(box).getByRole('button', { name: 'Goat Cheese' })).toBeInTheDocument()
+    expect(within(box).getByRole('button', { name: 'Add “chee” as typed' })).toBeInTheDocument()
+    expect(box).toHaveTextContent('An admin checks it before everyone sees it.')
+  })
+
+  it('picking an item the store has is its "Still here", not a second copy', async () => {
+    fetchMock.mockResolvedValueOnce(json({ ok: true, item: 'Cheddar Cheese', seenAt: '2026-10-09T17:30:00.000Z', previous: null, clearedGone: null, changed: true, activityId: 1 }))
+    view({ item: tj, category: grocery })
+    open()
+    type('chee')
+    fireEvent.click(within(screen.getByTestId('add-item')).getByRole('button', { name: /Cheddar Cheese/ }))
+    expect(fetchMock.mock.calls[0][0]).toBe(`/api/resource/${tj.id}/item`)
+    expect(await within(card()).findByText(/Thanks! Marked as seen today/)).toBeInTheDocument()
+    expect(screen.queryByTestId('add-item')).not.toBeInTheDocument()
+  })
+
+  it('adds one for a check: shown to whoever added it, waiting, with Undo', async () => {
+    fetchMock.mockResolvedValueOnce(json({ ok: true, item: 'Goat Cheese', sometimes: true, submissionId: SUB }))
+    view({ item: tj, category: grocery })
+    open()
+    type('goat')
+    fireEvent.click(within(screen.getByTestId('add-item')).getByRole('button', { name: 'Goat Cheese' }))
+    fireEvent.click(within(card()).getByRole('checkbox', { name: 'Not always in stock' }))
+    fireEvent.click(within(card()).getByRole('button', { name: 'Add' }))
+    const added = await screen.findByTestId('listing-item-added')
+    expect(added).toHaveTextContent('Goat Cheesenot always in stockAdded by you · waiting for a check')
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+    expect(url).toBe(`/api/resource/${tj.id}/item/add`)
+    expect(JSON.parse(String(init.body))).toMatchObject({ item: 'Goat Cheese', sometimes: true })
+
+    fetchMock.mockResolvedValueOnce(json({ ok: true, changed: true }))
+    fireEvent.click(within(added).getByRole('button', { name: 'Undo' }))
+    await vi.waitFor(() => expect(screen.queryByTestId('listing-item-added')).not.toBeInTheDocument())
+    expect(JSON.parse(String((fetchMock.mock.calls[1][1] as RequestInit).body))).toEqual({ submissionId: SUB })
+  })
+
+  it('a place with nothing on its list yet offers the first item, after what it leads with', () => {
+    view({ item: makeListing({ hours: { mon: { open: '09:00', close: '17:00' } } }), category: grocery })
+    expect(card()).toHaveTextContent(/^Kosher items here\s*Add the first item$/)
+  })
+
+  it('not offered where edits are off', () => {
+    view({ item: tj, category: { ...grocery, capabilities: { add: true, report: true, directorySearch: true, map: true, edit: false } } })
+    expect(within(card()).queryByRole('button', { name: 'Add an item' })).not.toBeInTheDocument()
+  })
+})

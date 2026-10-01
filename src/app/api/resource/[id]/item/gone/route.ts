@@ -13,7 +13,7 @@ import { getCategoryById } from '@/lib/categoryStore'
 import { submitListingUpdate } from '@/lib/submissionStore'
 import { sendSubmissionNotification } from '@/lib/email'
 import { removalSubmission } from '@/lib/itemMarks'
-import { isIso, parseItemTap, UUID, type MarkRow } from '@/lib/itemMarkRoutes'
+import { isIso, parseItemTap, UUID, withdrawPending, type MarkRow } from '@/lib/itemMarkRoutes'
 
 // POST /api/resource/:id/item/gone   { field, item, turnstileToken, company }
 // "Not anymore": a visitor says this one item isn't there (agreed Oct 1).
@@ -114,7 +114,6 @@ export async function POST(request: Request, ctx: RouteContext<'/api/resource/[i
 // comes down (only while it's still the one this browser put up) and the
 // removal leaves the queue (only while it's pending, and only that one).
 // The submission's id is a random UUID that only the reporter was given.
-const UNDO_WITHIN_MS = 60 * 60 * 1000
 
 export async function DELETE(request: Request, ctx: RouteContext<'/api/resource/[id]/item/gone'>) {
   const limited = await enforceRateLimit(request, 'confirm', { limit: 20, windowSec: 60 })
@@ -130,23 +129,17 @@ export async function DELETE(request: Request, ctx: RouteContext<'/api/resource/
     return Response.json({ ok: false, error: 'Which report?' }, { status: 400 })
   }
 
-  const admin = getAdminClient()
-  const { data: removed, error: delErr } = await admin
-    .from('submission')
-    .delete()
-    .eq('id', submissionId)
-    .eq('target_id', id)
-    .eq('status', 'pending')
-    .eq('operation', 'update')
-    .gte('created_at', new Date(Date.now() - UNDO_WITHIN_MS).toISOString())
-    .select('id')
-  if (delErr) {
-    console.error('[item/gone] could not withdraw the removal:', delErr)
+  let withdrawn: boolean
+  try {
+    withdrawn = await withdrawPending(submissionId, id)
+  } catch (err) {
+    console.error('[item/gone] could not withdraw the removal:', err)
     return Response.json({ ok: false, error: 'Could not undo that.' }, { status: 502 })
   }
   // Already reviewed (or too late): the admin's decision stands.
-  if (!removed || removed.length === 0) return Response.json({ ok: true, changed: false })
+  if (!withdrawn) return Response.json({ ok: true, changed: false })
 
+  const admin = getAdminClient()
   const { data, error } = await admin.rpc('unmark_item', {
     p_id: id,
     p_field: tap.field,
