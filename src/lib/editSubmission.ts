@@ -1,5 +1,5 @@
 import type { DirectoryResource, ResourceSubmission } from '@/types'
-import { fieldIsVisible, isCategorySyncEligible, type CategoryConfig } from './categories'
+import { companionKeys, fieldIsVisible, isCategorySyncEligible, type CategoryConfig } from './categories'
 
 /**
  * An edit suggestion made for someone in one tap: the listing as it stands,
@@ -14,10 +14,7 @@ export function editSubmission(category: CategoryConfig, item: DirectoryResource
   const details: Record<string, unknown> = {}
   for (const f of category.detailFields) {
     if (f.key in item) details[f.key] = item[f.key]
-    if (f.type === 'tags') {
-      const sk = `${f.key}_sometimes`
-      if (sk in item) details[sk] = item[sk]
-    }
+    for (const k of companionKeys(f)) if (k in item) details[k] = item[k]
   }
   Object.assign(details, changes)
   const visible: Record<string, unknown> = {}
@@ -25,6 +22,8 @@ export function editSubmission(category: CategoryConfig, item: DirectoryResource
     if (!fieldIsVisible(f, details)) continue
     visible[f.key] = details[f.key]
     if (f.type === 'tags') visible[`${f.key}_sometimes`] = details[`${f.key}_sometimes`] ?? []
+    // A shul's special schedules go with its times, unchanged unless edited.
+    for (const k of companionKeys(f)) if (f.type !== 'tags' && k in details) visible[k] = details[k]
   }
   const sync = isCategorySyncEligible(category)
   return {

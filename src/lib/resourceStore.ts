@@ -296,7 +296,7 @@ export async function clearCategoryFieldData(
     let details: Record<string, unknown> | null = null
     const keysToStrip = [
       ...(opts.address ? ADDRESS_DERIVED_DETAIL_KEYS : []),
-      ...(opts.fieldKeys ?? []).flatMap((k) => [k, `${k}_sometimes`]),
+      ...(opts.fieldKeys ?? []).flatMap((k) => [k, `${k}_sometimes`, `${k}_schedules`]),
     ]
     for (const key of keysToStrip) {
       if (key in row.details) {

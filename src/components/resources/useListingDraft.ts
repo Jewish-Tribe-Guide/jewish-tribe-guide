@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import { fieldIsVisible, isCategorySyncEligible, type CategoryConfig } from '@/lib/categories'
+import { companionKeys, fieldIsVisible, isCategorySyncEligible, type CategoryConfig } from '@/lib/categories'
 import { formatPhone } from '@/lib/validation'
 import type { DirectoryResource, ResourceSubmission } from '@/types'
 import type { PlaceSelectResult } from '@/components/intake/AddressInput'
@@ -47,11 +47,9 @@ export function useListingDraft(category: CategoryConfig, existing?: DirectoryRe
     const init: Record<string, unknown> = {}
     for (const field of config?.detailFields ?? []) {
       if (existing && field.key in existing) init[field.key] = existing[field.key]
-      // Load companion "sometimes" array for tag fields.
-      if (field.type === 'tags' && existing) {
-        const sk = field.key + '_sometimes'
-        if (sk in existing) init[sk] = existing[sk]
-      }
+      // Load what's stored beside it: a tags field's "sometimes" items, a
+      // minyanim field's special schedules (companionKeys).
+      if (existing) for (const k of companionKeys(field)) if (k in existing) init[k] = existing[k]
     }
     return init
   })
@@ -122,6 +120,7 @@ export function useListingDraft(category: CategoryConfig, existing?: DirectoryRe
         if (field.type === 'tags') {
           visible[field.key + '_sometimes'] = details[field.key + '_sometimes'] ?? []
         }
+        for (const k of companionKeys(field)) if (field.type !== 'tags' && k in details) visible[k] = details[k]
       }
     }
     return visible

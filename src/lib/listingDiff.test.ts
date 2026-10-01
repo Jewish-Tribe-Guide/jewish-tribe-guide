@@ -199,3 +199,21 @@ describe('listingChanges', () => {
     expect(changes[0].summary).toBe('No → Yes')
   })
 })
+
+describe('a shul’s special schedules (step 4)', () => {
+  const minyanimField: CategoryField = { key: 'minyanim', label: 'Davening Times', type: 'minyanim' }
+  const minyanim = [{ id: 'r', tefillah: 'shacharis', days: ['mon'], time: '7:00am' }]
+  const existing = { id: 'x', name: 'Shul', category: 'synagogue', anchorId: 'c', distance: 0, address: '', minyanim } as unknown as DirectoryResource
+  const sukkos = { id: 's', name: 'Sukkos 5787', from: '2026-09-26', to: '2026-10-04', mode: 'replace', minyanim: [{ id: 'a', tefillah: 'shacharis', on: ['yom_tov'], time: '9:00am' }] }
+
+  it('adding one is an edit, though the regular times are the same', () => {
+    const proposed = { name: 'Shul', address: '', phone: '', details: { minyanim, minyanim_schedules: [sukkos] } }
+    expect(hasListingChanged(existing, proposed as never, [minyanimField])).toBe(true)
+    expect(listingChanges(existing, proposed as never, [minyanimField]).map((c) => [c.label, c.summary])).toEqual([['Davening Times: special schedules', '— → Sukkos 5787']])
+  })
+
+  it('the same schedule sent back is no change', () => {
+    const proposed = { name: 'Shul', address: '', phone: '', details: { minyanim, minyanim_schedules: [sukkos] } }
+    expect(hasListingChanged({ ...existing, minyanim_schedules: [sukkos] } as DirectoryResource, proposed as never, [minyanimField])).toBe(false)
+  })
+})

@@ -21,6 +21,7 @@
 import type { ResourceRow, ResourceSubmission } from '@/types'
 import { isStructuredHours, formatHoursSummary } from '@/lib/hours'
 import { isMinyanim, formatMinyanimSummary } from '@/lib/davening'
+import { formatSchedulesSummary, readSchedules, schedulesKey } from '@/lib/schedules'
 import type { CategoryField } from '@/lib/categories'
 import { SYNC_INTERNAL_FIELDS, DIFF_ONLY_HIDDEN_FIELDS, SHOWN_WHEN_CONFIGURED } from '@/lib/syncFields'
 
@@ -107,13 +108,26 @@ export function flatListing(src: ResourceRow | ResourceSubmission | undefined, f
   ]
   const seen = new Set<string>()
   for (const f of fields ?? []) {
-    if (SKIP.has(f.key) || !(f.key in details)) continue
-    seen.add(f.key)
-    out.push({ key: f.key, label: f.label, value: fmt(details[f.key], f) })
+    if (SKIP.has(f.key)) continue
+    if (f.key in details) {
+      seen.add(f.key)
+      out.push({ key: f.key, label: f.label, value: fmt(details[f.key], f) })
+    }
+    // A minyanim field's special schedules, under its own label, every time
+    // in them shown (formatSchedulesSummary): they're stored beside the
+    // field, not as one of the category's own, and would otherwise reach the
+    // raw-leftover loop below as "[object Object]".
+    const sk = schedulesKey(f.key)
+    if (f.type === 'minyanim' && sk in details) {
+      seen.add(sk)
+      out.push({ key: sk, label: `${f.label}: special schedules`, value: formatSchedulesSummary(readSchedules(details[sk])) })
+    }
   }
   for (const [k, v] of Object.entries(details)) {
     if (SKIP.has(k) || SKIP_WHEN_UNCONFIGURED.has(k) || seen.has(k)) continue
-    out.push({ key: k, label: k, value: fmt(v) })
+    // Schedules beside a field the category no longer has: still read out.
+    const schedules = k.endsWith('_schedules') ? readSchedules(v) : []
+    out.push({ key: k, label: k, value: schedules.length ? formatSchedulesSummary(schedules) : fmt(v) })
   }
   return out
 }

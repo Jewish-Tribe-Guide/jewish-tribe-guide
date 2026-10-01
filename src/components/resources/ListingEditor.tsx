@@ -4,7 +4,7 @@ import { useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import type { DirectoryResource } from '@/types'
-import { PHOTO_FIELD_KEY, fieldIsVisible, resolveCapabilities, selectValues, type CategoryConfig, type CategoryField, type FieldType } from '@/lib/categories'
+import { PHOTO_FIELD_KEY, companionKeys, fieldIsVisible, resolveCapabilities, selectValues, type CategoryConfig, type CategoryField, type FieldType } from '@/lib/categories'
 import { changedHoursDays, listingChanges, sameFieldValue, type ListingChange } from '@/lib/listingDiff'
 import { routes } from '@/lib/routes'
 import { listingSlug } from '@/lib/listingSlug'
@@ -18,6 +18,8 @@ import ImageUploadField from '@/components/ImageUploadField'
 import AddressInput from '@/components/intake/AddressInput'
 import HoursInput from '@/components/intake/HoursInput'
 import MinyanimInput from '@/components/intake/MinyanimInput'
+import SchedulesInput from '@/components/intake/SchedulesInput'
+import { schedulesKey } from '@/lib/schedules'
 import Honeypot from '@/components/Honeypot'
 import TurnstileWidget from '@/components/TurnstileWidget'
 import PrivacyNote from '@/components/PrivacyNote'
@@ -420,7 +422,7 @@ export default function ListingEditor({
     else {
       setDetail(key, item[key])
       const f = fields.find((x) => x.key === key)
-      if (f?.type === 'tags') setDetail(`${key}_sometimes`, item[`${key}_sometimes`])
+      if (f) for (const k of companionKeys(f)) setDetail(k, item[k])
     }
   }
 
@@ -995,6 +997,7 @@ export default function ListingEditor({
       {openPanel === 'minyanim' ? (
         <Changed change={changeFor(minyanimField.key)} before="Previous times" onUndo={() => undo(minyanimField.key)}>
           <MinyanimInput label="Davening times" value={minyanimValue} onChange={(v) => setDetail(minyanimField.key, v)} />
+          <SchedulesInput value={details[schedulesKey(minyanimField.key)]} onChange={(v) => setDetail(schedulesKey(minyanimField.key), v)} />
         </Changed>
       ) : hasDaveningTimes(minyanimValue, undefined) ? (
         <button type="button" onClick={() => togglePanel('minyanim')} aria-label="Edit davening times" className={`block w-full cursor-pointer rounded-md text-left ${TAPPABLE}`}>

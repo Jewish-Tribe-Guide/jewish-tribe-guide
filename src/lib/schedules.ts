@@ -1,5 +1,5 @@
-import { DAY_KEYS, type DayKey } from './hours'
-import { isMinyanim, TEFILLAH_ORDER, type Minyan, type MinyanDayKey } from './davening'
+import { DAY_KEYS, dayLabel, type DayKey } from './hours'
+import { isMinyanim, parseTimeToMinutes, SEASON_LABELS, TEFILLAH_LABELS, TEFILLAH_ORDER, type Minyan, type MinyanDayKey } from './davening'
 import type { CalendarDay } from './jewishDays'
 
 // ── Special schedules: a shul's Yom Tov times (step 4, agreed Oct 1) ────────
@@ -170,4 +170,41 @@ export function withSchedules(
  *  them. */
 export function regularMinyanim(raw: unknown): Minyan[] {
   return isMinyanim(raw) ? (raw as Minyan[]) : []
+}
+
+// ── How a schedule reads ─────────────────────────────────────────────────────
+
+/** "Fri Oct 2" for a date; "Sep 26" when the weekday doesn't matter. */
+export function dateText(date: string, { weekday = false }: { weekday?: boolean } = {}): string {
+  const d = new Date(`${date}T12:00:00Z`)
+  const md = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })
+  return weekday ? `${d.toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' })} ${md}` : md
+}
+
+/** "Yom Tov days", "Chol HaMoed", "Shabbos", "Fri Oct 2". */
+export function scheduleDayText(on: ScheduleDay): string {
+  if (on === 'yom_tov') return 'Yom Tov days'
+  if (on === 'chol_hamoed') return 'Chol HaMoed'
+  if ((DAY_KEYS as readonly string[]).includes(on)) return on === 'sat' ? 'Shabbos' : dayLabel(on as DayKey)
+  return dateText(on, { weekday: true })
+}
+
+/**
+ * Every schedule in full, for the moderation queue and its emails: its
+ * name, dates and whether it replaces the regular times, then one line per
+ * minyan with its days, time, season and note, as formatMinyanimSummary
+ * gives the regular times. Every property a person wrote is in it, so a
+ * changed time is a changed line (SubmissionCard.test's schedule guard).
+ */
+export function formatSchedulesSummary(schedules: readonly SpecialSchedule[]): string {
+  if (schedules.length === 0) return '—'
+  return schedules
+    .map((s) => {
+      const head = `${s.name} · ${dateText(s.from)} – ${dateText(s.to)} · ${s.mode === 'replace' ? 'in place of the regular times' : 'as well as the regular times'}`
+      const lines = [...s.minyanim]
+        .sort((a, b) => TEFILLAH_ORDER.indexOf(a.tefillah) - TEFILLAH_ORDER.indexOf(b.tefillah) || parseTimeToMinutes(a.time) - parseTimeToMinutes(b.time))
+        .map((m) => [TEFILLAH_LABELS[m.tefillah], m.on.map(scheduleDayText).join(', '), m.time, m.season && SEASON_LABELS[m.season], m.notes].filter(Boolean).join(' · '))
+      return [head, ...lines.map((l) => `  ${l}`)].join('\n')
+    })
+    .join('\n')
 }

@@ -1,6 +1,7 @@
 import { selectValues, type CategoryField, type FieldType } from './categories'
 import { DAY_KEYS, dayLabel, fmt12, formatHoursSummary, isStructuredHours, type DayKey, type DayHours } from './hours'
 import type { DirectoryResource, ResourceSubmission } from '@/types'
+import { readSchedules, schedulesKey } from './schedules'
 
 type Proposed = Pick<ResourceSubmission, 'name' | 'address' | 'phone' | 'details'>
 
@@ -212,6 +213,16 @@ export function listingChanges(existing: DirectoryResource | null | undefined, p
       const parts = [mainSame ? '' : tagsSummary(before, after), sometimesSame ? '' : tagsSummary(beforeS, afterS).replace(/(\+|−) /g, '$1 ~')]
       changes.push({ key: field.key, label: field.label, before, after, summary: parts.filter(Boolean).join(' · ') })
       continue
+    }
+    // A shul's special schedules, stored beside its times (schedules.ts):
+    // a schedule added or changed is an edit even when the regular times
+    // aren't.
+    if (field.type === 'minyanim') {
+      const sk = schedulesKey(field.key)
+      const [b, a] = [readSchedules(existing[sk]), readSchedules(proposed.details?.[sk])]
+      if (JSON.stringify(b) !== JSON.stringify(a)) {
+        changes.push({ key: sk, label: `${field.label}: special schedules`, before: b, after: a, summary: `${b.length ? b.map((x) => x.name).join(', ') : '—'} → ${a.length ? a.map((x) => x.name).join(', ') : '—'}` })
+      }
     }
     if (sameFieldValue(field.type, before, after)) continue
     const summary =

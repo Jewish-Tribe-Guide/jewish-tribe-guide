@@ -10,6 +10,8 @@ import ImageUploadField from '@/components/ImageUploadField'
 import AddressInput from '@/components/intake/AddressInput'
 import HoursInput from '@/components/intake/HoursInput'
 import MinyanimInput from '@/components/intake/MinyanimInput'
+import SchedulesInput from '@/components/intake/SchedulesInput'
+import { schedulesKey, type SpecialSchedule } from '@/lib/schedules'
 import UpButton from '@/components/UpButton'
 import Honeypot from '@/components/Honeypot'
 import TurnstileWidget from '@/components/TurnstileWidget'
@@ -384,6 +386,8 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
               onChange={(v) => setDetail(field.key, v)}
               sometimes={field.type === 'tags' ? ((details[field.key + '_sometimes'] as string[] | undefined) ?? []) : undefined}
               onChangeSometimes={field.type === 'tags' ? (v) => setDetail(field.key + '_sometimes', v) : undefined}
+              schedules={field.type === 'minyanim' ? details[schedulesKey(field.key)] : undefined}
+              onChangeSchedules={field.type === 'minyanim' ? (v) => setDetail(schedulesKey(field.key), v) : undefined}
             />
           )
 
@@ -432,6 +436,8 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
                     onChange={(v) => setDetail(field.key, v)}
                     sometimes={field.type === 'tags' ? ((details[field.key + '_sometimes'] as string[] | undefined) ?? []) : undefined}
                     onChangeSometimes={field.type === 'tags' ? (v) => setDetail(field.key + '_sometimes', v) : undefined}
+                    schedules={field.type === 'minyanim' ? details[schedulesKey(field.key)] : undefined}
+                    onChangeSchedules={field.type === 'minyanim' ? (v) => setDetail(schedulesKey(field.key), v) : undefined}
                   />
                 ))}
             </>
@@ -715,6 +721,8 @@ export function DetailFieldInput({
   onChange,
   sometimes,
   onChangeSometimes,
+  schedules,
+  onChangeSchedules,
 }: {
   field: CategoryField
   /** Shown instead of field.label — used inside an audience section so
@@ -724,6 +732,9 @@ export function DetailFieldInput({
   onChange: (value: unknown) => void
   sometimes?: string[]
   onChangeSometimes?: (v: string[]) => void
+  /** A minyanim field's special schedules (schedules.ts), edited with it. */
+  schedules?: unknown
+  onChangeSchedules?: (v: SpecialSchedule[]) => void
 }) {
   const label = `${labelOverride ?? field.label}${field.required ? ' *' : ''}`
 
@@ -877,7 +888,12 @@ export function DetailFieldInput({
   }
 
   if (field.type === 'minyanim') {
-    return <MinyanimInput label={label} value={value} onChange={onChange} />
+    return (
+      <>
+        <MinyanimInput label={label} value={value} onChange={onChange} />
+        {onChangeSchedules && <SchedulesInput value={schedules} onChange={onChangeSchedules} />}
+      </>
+    )
   }
 
   if (field.type === 'textarea') {

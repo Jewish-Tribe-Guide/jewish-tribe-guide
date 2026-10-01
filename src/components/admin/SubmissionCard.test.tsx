@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { cleanup, render, screen } from '@testing-library/react'
 import type { CategoryField, FieldType } from '@/lib/categories'
 import { formatAnchorRule, type Minyan } from '@/lib/davening'
+import type { ScheduleMinyan, SpecialSchedule } from '@/lib/schedules'
 import type { EnrichedSubmission, ResourceRow } from '@/types'
 import { SubmissionCard } from './SubmissionCard'
 import { makeCategory } from '@/test/providerFixtures'
@@ -303,5 +304,100 @@ describe('a multi-line field marks only the lines that changed', () => {
     // The old rendering repeated every line — once struck through, once in
     // green — which is what made a ten-minyan edit unreadable.
     expect(screen.getAllByText(/^Mincha.*12:20pm$/)).toHaveLength(1)
+  })
+})
+
+// ── A shul's special schedules (step 4) ──────────────────────────────────────
+// Stored beside its minyanim field ("<key>_schedules"), not as a field of
+// their own, so the FieldType guard above can't see them. Every property of
+// a schedule and of its times is classified here instead: adding one is a
+// compile error until someone decides how a moderator sees it.
+const SCHEDULE_FIELD_VISIBILITY: Record<keyof SpecialSchedule | keyof ScheduleMinyan, 'shown' | 'deliberately-hidden'> = {
+  name: 'shown',
+  from: 'shown',
+  to: 'shown',
+  mode: 'shown',
+  minyanim: 'shown',
+  tefillah: 'shown',
+  on: 'shown',
+  time: 'shown',
+  notes: 'shown',
+  season: 'shown',
+  // Bookkeeping, not content.
+  id: 'deliberately-hidden',
+  // As for regular minyanim: `time` carries the rule's text.
+  anchor: 'deliberately-hidden',
+  offsetMinutes: 'deliberately-hidden',
+  notBefore: 'deliberately-hidden',
+  notAfter: 'deliberately-hidden',
+}
+
+const baseSchedule: SpecialSchedule = {
+  id: 's1',
+  name: 'Sukkos 5787',
+  from: '2026-09-26',
+  to: '2026-10-04',
+  mode: 'replace',
+  minyanim: [{ id: 'm1', tefillah: 'shacharis', on: ['yom_tov'], time: '9:00am' }],
+}
+const row = baseSchedule.minyanim[0]
+const SCHEDULE_CHANGES: Record<string, [SpecialSchedule, SpecialSchedule]> = {
+  name: [baseSchedule, { ...baseSchedule, name: 'Sukkos (Yom Tov days)' }],
+  from: [baseSchedule, { ...baseSchedule, from: '2026-09-25' }],
+  to: [baseSchedule, { ...baseSchedule, to: '2026-10-05' }],
+  mode: [baseSchedule, { ...baseSchedule, mode: 'add' }],
+  minyanim: [baseSchedule, { ...baseSchedule, minyanim: [...baseSchedule.minyanim, { id: 'm2', tefillah: 'mincha', on: ['yom_tov'], time: '6:35pm' }] }],
+  tefillah: [baseSchedule, { ...baseSchedule, minyanim: [{ ...row, tefillah: 'mincha' }] }],
+  on: [baseSchedule, { ...baseSchedule, minyanim: [{ ...row, on: ['yom_tov', '2026-10-02'] }] }],
+  time: [baseSchedule, { ...baseSchedule, minyanim: [{ ...row, time: '9:30am' }] }],
+  notes: [baseSchedule, { ...baseSchedule, minyanim: [{ ...row, notes: 'Yizkor about 10:45' }] }],
+  season: [baseSchedule, { ...baseSchedule, minyanim: [{ ...row, season: 'winter' }] }],
+}
+
+function renderScheduleDiff(before: SpecialSchedule[] | undefined, after: SpecialSchedule[]) {
+  const category = makeCategory({ id: 'synagogue', detailFields: [{ key: 'minyanim', label: 'Davening Times', type: 'minyanim' }] })
+  const minyanim: Minyan[] = [{ id: 'r', tefillah: 'shacharis', days: ['mon'], time: '7:00am' }]
+  const current = { id: 'r1', category: 'synagogue', name: 'Shul', details: { minyanim, ...(before ? { minyanim_schedules: before } : {}) } } as unknown as ResourceRow
+  const submission = {
+    id: 's1',
+    operation: 'update',
+    target_type: 'listing',
+    target_id: 'r1',
+    payload: { category: 'synagogue', name: 'Shul', details: { minyanim, minyanim_schedules: after } },
+    note: null,
+    status: 'pending',
+    submitted_by: null,
+    created_at: new Date().toISOString(),
+    reviewed_at: null,
+    current,
+  } as unknown as EnrichedSubmission
+  render(<SubmissionCard submission={submission} categoriesById={new Map([['synagogue', category]])} />)
+  const el = screen.getByText('Davening Times: special schedules').parentElement!
+  // A schedule is several lines, shown as a line diff: what's gone struck
+  // through, what's new in green (see the minyanim line diff above).
+  return { text: el.textContent ?? '', marked: !!el.querySelector('.line-through, .text-green-700') || (el.textContent ?? '').includes('→') }
+}
+
+describe('moderation queue — a shul’s special schedules, every time shown', () => {
+  it('a new schedule reads in full, under the times’ own label, never as raw data', () => {
+    const { text } = renderScheduleDiff(undefined, [{ ...baseSchedule, minyanim: [...baseSchedule.minyanim, { id: 'm2', tefillah: 'mincha_maariv', on: ['chol_hamoed', '2026-10-02'], time: '6:30pm', notes: 'In the sukkah' }] }])
+    expect(text).toContain('Sukkos 5787 · Sep 26 – Oct 4 · in place of the regular times')
+    expect(text).toContain('Shacharis · Yom Tov days · 9:00am')
+    expect(text).toContain('Mincha & Maariv · Chol HaMoed, Fri Oct 2 · 6:30pm · In the sukkah')
+    expect(text).not.toContain('[object Object]')
+    expect(text).not.toContain('minyanim_schedules')
+  })
+
+  for (const [key, visibility] of Object.entries(SCHEDULE_FIELD_VISIBILITY)) {
+    if (visibility !== 'shown') continue
+    it(`surfaces a change to a schedule’s ${key}`, () => {
+      const pair = SCHEDULE_CHANGES[key]
+      expect(pair, `add a SCHEDULE_CHANGES entry for "${key}"`).toBeDefined()
+      expect(renderScheduleDiff([pair[0]], [pair[1]]).marked).toBe(true)
+    })
+  }
+
+  it('an untouched schedule is unchanged', () => {
+    expect(renderScheduleDiff([baseSchedule], [baseSchedule]).marked).toBe(false)
   })
 })

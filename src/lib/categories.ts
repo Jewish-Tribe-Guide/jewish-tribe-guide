@@ -11,6 +11,16 @@ import type { AskWord } from './askWords'
 
 export type FieldType = 'text' | 'tel' | 'textarea' | 'number' | 'boolean' | 'select' | 'tags' | 'url' | 'hours' | 'minyanim' | 'image'
 
+/** The detail keys stored beside a field and edited with it: a tags
+ *  field's items that are only sometimes there ("m_sometimes"), a minyanim
+ *  field's special schedules ("minyanim_schedules", see schedules.ts).
+ *  Carried wherever the field is: an edit, the no-op check, a strip. */
+export function companionKeys(field: Pick<CategoryField, 'key' | 'type'>): string[] {
+  if (field.type === 'tags') return [`${field.key}_sometimes`]
+  if (field.type === 'minyanim') return [`${field.key}_schedules`]
+  return []
+}
+
 /** The field types offered in the editor's Type picker, most-common first. */
 export const FIELD_TYPES: { value: FieldType; label: string }[] = [
   { value: 'text', label: 'Text' },
