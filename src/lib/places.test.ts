@@ -112,3 +112,38 @@ describe('placeName: where a row says a place is', () => {
     expect(name('e')).toBe('Philadelphia')
   })
 })
+
+describe('Philadelphia’s neighbourhoods, where listings got only "Philadelphia" (fixes table, Sep 29)', () => {
+  // Real listings' locations, as the guide has them on Oct 1.
+  const hoods = neighborhoodsFor('philly')
+  const at = (id: string, address: string, lat: number, lng: number) => makeListing({ id, address, geo: { lat, lng } })
+  const real = [
+    at('casa', '2557 Amber St, Philadelphia, PA 19125, USA', 39.9845, -75.1244),
+    at('pks', '8500 Essington Ave A-West, Philadelphia, PA 19153, USA', 39.8746, -75.2471),
+    at('shriners', '3551 N Broad St, Philadelphia, PA 19140, USA', 40.0072, -75.1513),
+    at('einstein', '5501 Old York Rd, Philadelphia, PA 19141, USA', 40.0367, -75.1424),
+    at('sheraton', '201 N 17th St, Philadelphia, PA 19103, USA', 39.9574, -75.1673),
+    // Zevi's has only "South Philadelphia" for an address, placed at its
+    // middle: it must not be given a precise neighbourhood it may not be in.
+    at('zevis', 'South Philadelphia, Philadelphia, PA, USA', 39.9256, -75.1695),
+  ]
+  const towns = townsFrom(real)
+  const name = (id: string) => placeName(real.find((l) => l.id === id)!, hoods, towns)
+
+  it('names them', () => {
+    expect(['casa', 'pks', 'shriners', 'einstein', 'sheraton', 'zevis'].map(name)).toEqual([
+      'Kensington',
+      'the airport',
+      'North Philadelphia',
+      'Logan',
+      'Logan Square',
+      'South Philadelphia',
+    ])
+  })
+
+  it('"near logan square" is Logan Square, not Logan five miles north', () => {
+    expect(findPlace('food near logan square', hoods)?.place.name).toBe('Logan Square')
+    expect(findPlace('kosher food at the airport', hoods)?.place.name).toBe('the airport')
+    expect(findPlace('shul in kensington', hoods)?.place.name).toBe('Kensington')
+  })
+})

@@ -50,6 +50,21 @@ const NEIGHBORHOODS: Record<string, Place[]> = {
     { name: 'Wynnefield', geo: { lat: 39.995, lng: -75.225 }, radius: 0.8 },
     { name: 'Lower Merion', geo: { lat: 40.015, lng: -75.27 }, radius: 2.5 },
     { name: 'the Main Line', aliases: ['Main Line'], geo: { lat: 40.01, lng: -75.28 }, radius: 4 },
+    // Added Oct 1 (fixes table, Sep 29: "neighbourhood names are rough"):
+    // where a listing got only "Philadelphia", and the areas the table
+    // named. Kept tight, so a place with only a rough location (Zevi's,
+    // placed at the middle of South Philly) isn't given a precise one.
+    { name: 'Kensington', geo: { lat: 39.99, lng: -75.125 }, radius: 0.8 },
+    { name: 'Port Richmond', geo: { lat: 39.979, lng: -75.103 }, radius: 0.7 },
+    { name: 'North Philadelphia', aliases: ['North Philly'], geo: { lat: 39.995, lng: -75.155 }, radius: 1.5 },
+    { name: 'Strawberry Mansion', geo: { lat: 39.9935, lng: -75.1815 }, radius: 0.6 },
+    { name: 'Logan', geo: { lat: 40.032, lng: -75.145 }, radius: 0.6 },
+    // Its own place, so "near logan square" is never Logan, 5 miles north.
+    { name: 'Logan Square', aliases: ['Logan Circle'], geo: { lat: 39.9575, lng: -75.1705 }, radius: 0.35 },
+    { name: 'Spring Garden', geo: { lat: 39.9635, lng: -75.1655 }, radius: 0.4 },
+    { name: 'Point Breeze', geo: { lat: 39.932, lng: -75.18 }, radius: 0.45 },
+    { name: 'Passyunk Square', aliases: ['Passyunk'], geo: { lat: 39.9345, lng: -75.1615 }, radius: 0.35 },
+    { name: 'the airport', aliases: ['PHL', 'Philadelphia International Airport', 'Philadelphia airport', 'airport'], geo: { lat: 39.8744, lng: -75.2424 }, radius: 1.2 },
   ],
 }
 
