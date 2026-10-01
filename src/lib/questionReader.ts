@@ -202,18 +202,12 @@ export function readingItemsOn(listing: DirectoryResource, items: readonly strin
   return [...out].map(([tag, sometimes]) => ({ tag, sometimes }))
 }
 
-/** A hospital or other place named with no distance given is within this
- *  of it: on a map, "near HUP" is the few blocks around it. A neighbourhood
- *  is its own size instead. Either way the chip says so and can be removed,
- *  so it's never a hidden rule. */
-export const NEAR_PLACE_MILES = 1
-
 export type ReadingReach = {
   from: LatLng
   /** "you", "HUP", "Center City". */
   label: string
-  /** How far it reaches; null for "near me" with no distance, which only
-   *  puts the nearest first. */
+  /** How far it reaches; null with no distance given ("near me", "near
+   *  HUP"), which only puts the nearest first. */
   miles: number | null
   /** A neighbourhood with no distance given: "in", not "within a mile of". */
   inside: boolean
@@ -223,7 +217,12 @@ export type ReadingReach = {
 
 /** Where a reading measures from, what it's called, and how far it
  *  reaches. Null when it says nowhere, or says "me" and the visitor hasn't
- *  shared where they are. */
+ *  shared where they are. A place named with no distance ("near HUP") is
+ *  where the nearest come first, as our own search measures from it, not
+ *  a limit: it used to be a mile, grown to the nearest that answered, and
+ *  so took places away that our own search showed (decided Sep 30). A
+ *  neighbourhood ("in Center City") is its own size, as it is for our own
+ *  search too. */
 export function readingReach(reading: Reading, places: ReadonlyMap<string, ReaderPlace>, me: LatLng | null): ReadingReach | null {
   if (!reading.near) return null
   const within = reading.withinMiles ?? null
@@ -232,7 +231,7 @@ export function readingReach(reading: Reading, places: ReadonlyMap<string, Reade
   if (!place) return null
   const { label } = place
   if (within) return { from: place.geo, label, miles: within, inside: false, asked: true }
-  return place.radius ? { from: place.geo, label, miles: place.radius, inside: true } : { from: place.geo, label, miles: NEAR_PLACE_MILES, inside: false }
+  return place.radius ? { from: place.geo, label, miles: place.radius, inside: true } : { from: place.geo, label, miles: null, inside: false }
 }
 
 /** A place named in a reading, with what to call it: by its initials when
@@ -246,20 +245,13 @@ export function placeFor(near: string, places: ReadonlyMap<string, ReaderPlace>)
   return { ...place, label: initials ? initials.toUpperCase() : place.name }
 }
 
-/** "Near HUP" asks for the nearest, not for a mile: when nothing that
- *  answers is within our mile, the reach grows to the nearest that does,
- *  to the next half mile, and the chip says how far that is. A distance
- *  the question gave, or a neighbourhood, stays as it is. */
-export function widenReach(reach: ReadingReach, milesAway: readonly number[]): ReadingReach {
-  if (reach.asked || reach.inside || reach.miles === null || milesAway.length === 0) return reach
-  const nearest = Math.min(...milesAway)
-  return nearest <= reach.miles ? reach : { ...reach, miles: Math.ceil(nearest * 2) / 2 }
-}
-
-/** The chip for a reach: "Within 3 mi of you", "In Center City". */
+/** The chip for a reach: "Within 3 mi of you", "In Center City",
+ *  "Nearest to HUP". None for "near me" alone: the list says how far each
+ *  place is from the visitor already. */
 export function reachLabel(reach: ReadingReach): string | null {
   if (reach.inside) return `In ${reach.label}`
-  return reach.miles === null ? null : `Within ${reach.miles} mi of ${reach.label}`
+  if (reach.miles !== null) return `Within ${reach.miles} mi of ${reach.label}`
+  return reach.label === 'you' ? null : `Nearest to ${reach.label}`
 }
 
 // ── What's sent ─────────────────────────────────────────────────────────────

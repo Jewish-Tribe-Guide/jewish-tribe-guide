@@ -52,7 +52,7 @@ import { mapQueryString } from '@/lib/routes'
 import { countEvent } from '@/lib/countEvent'
 import { useOptionalCommunitySlug } from '@/lib/communityContext'
 import { neighborhoodsFor } from '@/lib/places'
-import { reachLabel, readerPlaces, readingFilters, readingItemsOn, readingReach, widenReach, type Reading } from '@/lib/questionReader'
+import { reachLabel, readerPlaces, readingFilters, readingItemsOn, readingReach, type Reading } from '@/lib/questionReader'
 import { askReader } from '@/lib/askReader'
 import { needsReading, ownFrom, readingLoses } from '@/lib/readingSearch'
 import { withTaught } from '@/lib/askWords'
@@ -1057,10 +1057,10 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
       .filter((p) => !p.raw || !filters[p.raw.category]?.openNow || openNow.has(p.id))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allPoints, effectiveSelected, askIds, activeTerms, passesOwnFilters, openNowIds, pinnedSelected])
-  // Then how far a reading reaches: "near HUP" grown to the nearest that
-  // answers, when nothing does within the mile (see widenReach).
+  // Then how far a reading reaches: "within 3 miles", "in Center City".
+  // "Near HUP" alone limits nothing (see readingReach).
   const milesFrom = (from: LatLng, p: { lat: number; lng: number }) => haversineMiles(from, { lat: p.lat, lng: p.lng })
-  const shownReach = useMemo(() => (reach ? widenReach(reach, answeringPoints.map((p) => milesFrom(reach.from, p))) : null), [reach, answeringPoints])
+  const shownReach = reach
   const visiblePoints = useMemo(
     () => (shownReach && shownReach.miles !== null ? answeringPoints.filter((p) => milesFrom(shownReach.from, p) <= shownReach.miles!) : answeringPoints),
     [answeringPoints, shownReach],

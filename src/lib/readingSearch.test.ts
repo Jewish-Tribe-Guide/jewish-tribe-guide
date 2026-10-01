@@ -81,11 +81,13 @@ describe('searchReading — the listings answer what the reader read', () => {
     expect(answerFor(r, { coords: me })?.text).toMatch(/^2 places have Chalav Yisroel Milk \(1 only sometimes\)\. Nearest: GIANT/)
   })
 
-  it('"near HUP" is measured from HUP, grown to the nearest that answers, and the answer says from where', () => {
+  it('"near HUP" is measured from HUP: every place, the nearest to HUP first, as our own search does', () => {
+    // It used to be a mile around HUP, grown to the nearest that answered:
+    // ShopRite in Cherry Hill was taken away, which our own search showed.
     const r = ask({ categories: [{ id: 'grocery' }], items: ['Chalav Yisroel Milk'], near: 'hup' }, 'cy milk near hup', { coords: null })
-    expect(r.reach).toMatchObject({ label: 'HUP', miles: 1.5 })
-    expect(names(r)).toEqual(['GIANT'])
-    expect(answerFor(r)?.text).toMatch(/^GIANT has Chalav Yisroel Milk \(only sometimes in stock\), 1\.\d mi from HUP\./)
+    expect(r.reach).toMatchObject({ label: 'HUP', miles: null })
+    expect(names(r)).toEqual(['GIANT', 'ShopRite Cherry Hill'])
+    expect(answerFor(r)?.text).toMatch(/Nearest to HUP: GIANT, 1\.\d mi\./)
   })
 
   it('a category page answers only its own part, and names no other', () => {
@@ -177,7 +179,7 @@ describe('readingChips — how it was read, each removable', () => {
 
   it('how far, as measured', () => {
     const r = ask({ categories: [{ id: 'grocery' }], items: ['Chalav Yisroel Milk'], near: 'hup' }, 'q', { coords: null })
-    expect(readingChips(asked({ categories: [], near: 'hup' }), categories, { reach: r.reach }).map((c) => c.label)).toEqual(['Within 1.5 mi of HUP'])
+    expect(readingChips(asked({ categories: [], near: 'hup' }), categories, { reach: r.reach }).map((c) => c.label)).toEqual(['Nearest to HUP'])
   })
 })
 
@@ -299,6 +301,6 @@ describe('describeReading — a reading in words, for the admin', () => {
       ),
     ).toEqual(['Food', 'Open now', 'Meat', 'Challah', 'Within 3 mi of you', 'maybe Restaurant'])
     const place = { name: 'Hospital of the University of Pennsylvania', label: 'HUP', geo: { lat: 39.9496, lng: -75.1936 } }
-    expect(describeReading({ categories: [{ id: 'hotel' }], near: 'hup', place }, categories)).toEqual(['Hotels', 'Within 1 mi of HUP'])
+    expect(describeReading({ categories: [{ id: 'hotel' }], near: 'hup', place }, categories)).toEqual(['Hotels', 'Nearest to HUP'])
   })
 })

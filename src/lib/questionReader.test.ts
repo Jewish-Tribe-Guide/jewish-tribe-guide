@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { makeCategory, makeListing } from '@/test/providerFixtures'
-import { questionKey, reachLabel, readerMessages, readerPlaces, readerVocabulary, readingFilters, readingItemsOn, readingReach, tidyReading, widenReach } from './questionReader'
+import { questionKey, reachLabel, readerMessages, readerPlaces, readerVocabulary, readingFilters, readingItemsOn, readingReach, tidyReading } from './questionReader'
 import { readQuestion } from './readQuestion'
 
 const hours = { key: 'hours', label: 'Hours', type: 'hours' as const, filterable: true }
@@ -158,10 +158,13 @@ describe('answering from a reading — its items, and how far', () => {
     expect(reach({ near: 'me' }, null)).toBeNull()
   })
 
-  it('a hospital named is the mile around it, by the initials people say', () => {
-    expect(reachLabel(reach({ near: 'hup' })!)).toBe('Within 1 mi of HUP')
+  it('a hospital named, with no distance, is where the nearest come first, by the initials people say', () => {
+    // Not a limit: our own search shows every match, nearest to HUP first,
+    // and the reading only ever adds to what it shows (decided Sep 30).
+    expect(reach({ near: 'hup' })).toMatchObject({ label: 'HUP', miles: null, inside: false })
+    expect(reachLabel(reach({ near: 'hup' })!)).toBe('Nearest to HUP')
     expect(reachLabel(reach({ near: 'hup', withinMiles: 2 })!)).toBe('Within 2 mi of HUP')
-    expect(reachLabel(reach({ near: 'hospital of the university of pennsylvania' })!)).toBe('Within 1 mi of HUP')
+    expect(reachLabel(reach({ near: 'hospital of the university of pennsylvania' })!)).toBe('Nearest to HUP')
   })
 
   it('a neighbourhood named is the neighbourhood', () => {
@@ -169,22 +172,9 @@ describe('answering from a reading — its items, and how far', () => {
     expect(reachLabel(reach({ near: 'south philly' })!)).toBe('In South Philadelphia')
   })
 
-  it('"near HUP" is the nearest that answers: our mile grows to reach it, and says so', () => {
-    const r = reach({ near: 'hup' })!
-    expect(widenReach(r, [0.4, 3])).toBe(r)
-    expect(reachLabel(widenReach(r, [2.1, 3]))).toBe('Within 2.5 mi of HUP')
-    expect(widenReach(r, [])).toBe(r)
-  })
-
-  it('a distance the question gave, or a neighbourhood, never grows', () => {
-    expect(widenReach(reach({ near: 'hup', withinMiles: 1 })!, [2.1]).miles).toBe(1)
-    expect(widenReach(reach({ near: 'me', withinMiles: 1 })!, [2.1]).miles).toBe(1)
-    expect(widenReach(reach({ near: 'center city' })!, [5]).miles).toBe(1.3)
-  })
-
   it('where the server said a place is, when the page doesn’t know it', () => {
     const place = { name: 'Hospital of the University of Pennsylvania', label: 'HUP', geo: { lat: 39.9496, lng: -75.1936 } }
-    expect(reachLabel(readingReach({ categories: [], near: 'hup', place }, new Map(), me)!)).toBe('Within 1 mi of HUP')
+    expect(reachLabel(readingReach({ categories: [], near: 'hup', place }, new Map(), me)!)).toBe('Nearest to HUP')
   })
 
   it('a place it doesn’t know reaches nowhere', () => {

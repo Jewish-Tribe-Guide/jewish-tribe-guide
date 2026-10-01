@@ -5,7 +5,7 @@ import { conceptCategories, formatOpenAtTime, parseAsk, termMatches, words, type
 import { openState, type AskHit, type AskResult } from './askSearch'
 import { activeFilters, passesFields } from './mapFilters'
 import type { TaughtWord } from './askWords'
-import { placeFor, reachLabel, readingFilters, readingItemsOn, readingReach, widenReach, type ReaderPlace, type Reading, type ReadingReach } from './questionReader'
+import { placeFor, reachLabel, readingFilters, readingItemsOn, readingReach, type ReaderPlace, type Reading, type ReadingReach } from './questionReader'
 
 // ── Answering a question from its reading (see questionReader.ts) ───────────
 // The home and category searches' side of the reader. The work is split
@@ -218,9 +218,9 @@ export function searchReading(
     else closed.push(hit)
   }
 
-  // How far: "within 3 miles", or "near HUP" grown to the nearest that
-  // answers (see widenReach). Measured from where the reading says.
-  const reach = baseReach ? widenReach(baseReach, found.flatMap((h) => (h.miles === null ? [] : [h.miles]))) : null
+  // How far: "within 3 miles" or "in Center City"; "near HUP" only puts
+  // the nearest to HUP first (see readingReach).
+  const reach = baseReach
   const inReach = (h: AskHit) => !reach || reach.miles === null || (h.miles !== null && h.miles <= reach.miles)
   const byNearest = (a: AskHit, b: AskHit) =>
     (a.miles ?? Infinity) - (b.miles ?? Infinity) || (b.item.upvotes ?? 0) - (a.item.upvotes ?? 0) || a.item.name.localeCompare(b.item.name)
