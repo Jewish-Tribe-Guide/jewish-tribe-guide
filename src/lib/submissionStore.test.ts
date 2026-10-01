@@ -1138,6 +1138,28 @@ describe('approveSubmission: placeId vs verifiedPlaceId', () => {
     expect(mockFetchPlaceSync).not.toHaveBeenCalled()
   })
 
+  // The stadium's "Permanently closed" must not close the grill inside it.
+  it('drops the businessStatus read off that other business, too', async () => {
+    const sub = baseSubmission({
+      operation: 'create',
+      payload: listingPayload({
+        name: 'The Kosher Grill',
+        phone: '',
+        details: {
+          placeId: 'place-citizens-bank',
+          businessStatus: 'CLOSED_PERMANENTLY',
+          googleAutofill: { name: 'Citizens Bank Park' },
+        },
+      }) as unknown as Record<string, unknown>,
+    })
+    const resourceInsertBuilder = mockCreateFlow(sub)
+    mockGetCategoryById.mockResolvedValue(shulCategory)
+
+    await approveSubmission('sub-1')
+
+    expect(lastCallArg(resourceInsertBuilder.insert).details.businessStatus).toBeUndefined()
+  })
+
   it('keeps a placeId whose picked name overlaps the listing name', async () => {
     const sub = baseSubmission({
       operation: 'create',

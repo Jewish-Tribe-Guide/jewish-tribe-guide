@@ -599,6 +599,9 @@ function withResolvedPlaceId(details: Record<string, unknown>, payload: Resource
   if (!pickedName || namesOverlap(pickedName, payload.name)) return details
   const next: Record<string, unknown> = { ...details, verifiedPlaceId: placeId }
   delete next.placeId
+  // The status the form read off that place is the other business's too. An
+  // edit then keeps the listing's stored one (withPreservedInternals).
+  delete next.businessStatus
   return next
 }
 
