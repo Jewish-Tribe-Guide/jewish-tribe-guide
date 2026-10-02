@@ -60,6 +60,7 @@ export default function MapScreen() {
         onUp={goHome}
         userLocation={coords}
         initialSelectedCategories={view.categories ?? undefined}
+        initialPinned={view.pinned}
         initialQuery={view.query ?? undefined}
         initialPlaceId={view.place ?? undefined}
         initialFilters={{

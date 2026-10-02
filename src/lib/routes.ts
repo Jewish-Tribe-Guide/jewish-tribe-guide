@@ -53,6 +53,8 @@ export const RESERVED_SLUGS = new Set([
   'all',
   'map',
   'feedback',
+  // The visitor's pinned places (the Today home's "All N").
+  'pinned',
   // The fixed views above — a listing category named "Eruv" would otherwise
   // shadow the real Eruv Information screen at the same URL.
   ...Object.keys(FIXED_VIEW_KINDS),
@@ -163,6 +165,8 @@ export const routes = {
   home: (community: string) => `/${community}`,
   map: (community: string) => `/${community}/map`,
   feedback: (community: string) => `/${community}/feedback`,
+  /** The visitor's pinned places, grouped by category (see PinnedPlaces). */
+  pinned: (community: string) => `/${community}/pinned`,
   /** Community-agnostic content (one shared `page` row — see pagesStore.ts),
    *  but community-scoped chrome: living under `/[community]` is what gives
    *  these two the visiting community's own header/footer, rather than
@@ -198,9 +202,12 @@ export function mapQueryString(state: {
    *  the map reopens with the same place selected, not just the same pins
    *  and filters. */
   place?: string | null
+  /** The Pinned chip is on (the visitor's pinned places; see pinned.ts). */
+  pinned?: boolean
 }): string {
   const params = new URLSearchParams()
   if (state.categories?.length) params.set('cat', state.categories.join(','))
+  if (state.pinned) params.set('pinned', '1')
   if (state.query) params.set('q', state.query)
   if (state.openNow) params.set('open', '1')
   else if (state.openIn?.length) params.set('open', state.openIn.join(','))
@@ -230,6 +237,7 @@ export function parseMapQuery(params: URLSearchParams): {
   bool: string[] | null
   select: Record<string, string[]> | null
   place: string | null
+  pinned: boolean
 } {
   const list = (v: string | null) => {
     const items = (v ?? '').split(',').map((s) => s.trim()).filter(Boolean)
@@ -256,5 +264,6 @@ export function parseMapQuery(params: URLSearchParams): {
     bool: list(params.get('is')),
     select,
     place: params.get('place') || null,
+    pinned: params.get('pinned') === '1',
   }
 }

@@ -113,6 +113,18 @@ describe('mapQueryString', () => {
   it('writes the selected place', () => {
     expect(mapQueryString({ place: 'abc123' })).toBe('?place=abc123')
   })
+
+  // The Pinned page owns /[community]/pinned; a category can't take it.
+  it('reserves the Pinned page’s slug', () => {
+    expect(slugRejectionReason('pinned')).toMatch(/reserved/)
+  })
+
+  // "See them on the map", on the Pinned page: the map with only the pins.
+  it('writes the Pinned chip, and reads it back', () => {
+    expect(mapQueryString({ pinned: true })).toBe('?pinned=1')
+    expect(parseMapQuery(new URLSearchParams('pinned=1')).pinned).toBe(true)
+    expect(parseMapQuery(new URLSearchParams('')).pinned).toBe(false)
+  })
 })
 
 describe('parseMapQuery', () => {
@@ -127,6 +139,7 @@ describe('parseMapQuery', () => {
       bool: ['isKosher'],
       select: { hechsher: ['OU', 'Star-K'] },
       place: 'abc123',
+      pinned: false,
     }
     expect(parse(mapQueryString(state))).toEqual(state)
   })
@@ -142,6 +155,7 @@ describe('parseMapQuery', () => {
       bool: ['mikvah.keilim'],
       select: { 'restaurant.t': ['Meat'] },
       place: null,
+      pinned: false,
     }
     expect(parse(mapQueryString(state))).toEqual(state)
   })
@@ -155,6 +169,7 @@ describe('parseMapQuery', () => {
       bool: null,
       select: null,
       place: null,
+      pinned: false,
     })
   })
 

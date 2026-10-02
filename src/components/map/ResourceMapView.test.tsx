@@ -792,6 +792,33 @@ describe('ResourceMapView — pinning', () => {
   })
 })
 
+describe('ResourceMapView — arriving on the pins', () => {
+  // "See them on the map", on the Pinned page (?pinned=1): only the pins,
+  // with the Pinned chip on, not every place in the guide.
+  it('shows only the pinned places', () => {
+    localStorage.setItem('jpc:pinned-listings', JSON.stringify([{ id: 'g1', categoryId: 'grocery' }]))
+    const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
+    renderMap(
+      <ResourceMapView onUp={vi.fn()} initialPinned />,
+      [listingWithGeo({ id: 'g1', category: 'grocery', name: 'Acme Grocery' }), listingWithGeo({ id: 'g2', category: 'grocery', name: 'Other Grocery' })],
+      [grocery],
+    )
+    expect(screen.getByRole('button', { name: 'Long-press Acme Grocery' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Long-press Other Grocery' })).not.toBeInTheDocument()
+  })
+
+  it('without it, every place', () => {
+    localStorage.setItem('jpc:pinned-listings', JSON.stringify([{ id: 'g1', categoryId: 'grocery' }]))
+    const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
+    renderMap(
+      <ResourceMapView onUp={vi.fn()} />,
+      [listingWithGeo({ id: 'g1', category: 'grocery', name: 'Acme Grocery' }), listingWithGeo({ id: 'g2', category: 'grocery', name: 'Other Grocery' })],
+      [grocery],
+    )
+    expect(screen.getByRole('button', { name: 'Long-press Other Grocery' })).toBeInTheDocument()
+  })
+})
+
 describe('ResourceMapView — campaign chip', () => {
   // A wide, fixed date range rather than dates relative to "today" — this
   // only needs to always be currently active, not exercise

@@ -85,7 +85,14 @@ export default function TodayBlocks(props: Props) {
     <div data-testid="today-home" data-moment={moment.kind} className={`mt-6 desktop:mt-0 desktop:grid desktop:grid-cols-[minmax(0,1fr)_340px] desktop:items-start desktop:gap-6 ${searching ? 'hidden desktop:grid' : ''}`}>
       <div className="space-y-6 desktop:grid desktop:grid-cols-2 desktop:gap-5 desktop:space-y-0 desktop:[&>[data-wide]]:col-span-2">
         {answers}
-        {props.pinned}
+        {/* Beside Next minyan on desktop; across the row on a Friday, where
+            the two answers already fill it. Nothing until something's
+            pinned. */}
+        {props.pinned && (
+          <div data-wide={moment.kind === 'erev' || undefined} className="empty:hidden">
+            {props.pinned}
+          </div>
+        )}
       </div>
       <BrowseRow {...props} />
       <BrowseList {...props} />
@@ -97,9 +104,9 @@ export default function TodayBlocks(props: Props) {
 
 /** A block: a small uppercase title, a link on the right, its rows. A card of
  *  its own on desktop; on a phone the page is the card. */
-function Block({ title, icon, more, children, testId, wide }: { title: string; icon?: ReactNode; more?: { label: string; href: string } | null; children: ReactNode; testId: string; wide?: boolean }) {
+function Block({ title, icon, more, children, testId, wide, last }: { title: string; icon?: ReactNode; more?: { label: string; href: string } | null; children: ReactNode; testId: string; wide?: boolean; last?: boolean }) {
   return (
-    <section data-testid={testId} data-wide={wide || undefined} className="desktop:rounded-2xl desktop:border desktop:border-slate-200 desktop:bg-white desktop:px-5 desktop:py-4">
+    <section data-testid={testId} data-wide={wide || undefined} className={`${last ? 'desktop:order-last ' : ''}desktop:rounded-2xl desktop:border desktop:border-slate-200 desktop:bg-white desktop:px-5 desktop:py-4`}>
       <div className="flex items-baseline justify-between gap-3">
         <h2 className="flex items-center gap-1.5 text-[12.5px] font-extrabold uppercase tracking-[0.06em] text-slate-500">
           {icon}
@@ -328,7 +335,7 @@ function OpenNow({ openNow, categories, schedule, from, communitySlug, onOpenLis
   const now = new Date(schedule.now)
   const hits = [...result.hits].sort((a, b) => (milesFrom(from, a.item) ?? Infinity) - (milesFrom(from, b.item) ?? Infinity)).slice(0, 3)
   return (
-    <Block testId="today-open-now" wide title={openNowTitle(schedule.nowMinutes)} more={{ label: `All ${result.hits.length} ›`, href: routes.ask(communitySlug, question) }}>
+    <Block testId="today-open-now" wide last title={openNowTitle(schedule.nowMinutes)} more={{ label: `All ${result.hits.length} ›`, href: routes.ask(communitySlug, question) }}>
       <div className="desktop:grid desktop:grid-cols-3 desktop:gap-x-5 [&>*]:desktop:border-t-0">
         {hits.map((h) => {
           const facts = listingRowFacts(h.item, h.category, now)

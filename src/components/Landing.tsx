@@ -23,6 +23,7 @@ import { answersWell, candidatePrompts, pickPrompts } from '@/lib/searchPrompts'
 import { answerSchedule, useMinyanSchedule } from '@/lib/useMinyanSchedule'
 import HeroHeading from '@/components/home/HeroHeading'
 import TodayBlocks from '@/components/home/TodayBlocks'
+import { PinnedBlock } from '@/components/home/PinnedPlaces'
 import DaveningTimesCard from '@/components/home/DaveningTimesCard'
 import UpdateListingsCard from '@/components/home/UpdateListingsCard'
 import SuggestListingCard from '@/components/home/SuggestListingCard'
@@ -554,6 +555,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
       cards={todayCards}
       onOpenListing={openListing}
       searching={!!q}
+      pinned={<PinnedBlock communitySlug={communitySlug} from={coords ?? community.mapCenter} now={schedule?.now ?? null} />}
     />
   )
 

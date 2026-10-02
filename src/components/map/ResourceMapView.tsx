@@ -60,7 +60,10 @@ import type { DirectoryResource, MapFilters } from '@/types'
 // Shared by the initial useState below and the resync effect further down
 // (see its own comment) — one place for the initialSelectedCategories-vs-
 // initialCategory precedence so the two can't drift apart.
-function resolveInitialSelected(categories: string[] | undefined, category: string | undefined): Set<string> | null {
+function resolveInitialSelected(categories: string[] | undefined, category: string | undefined, pinned = false): Set<string> | null {
+  // Arriving on the Pinned chip alone ("See them on the map" on the Pinned
+  // page): no category chip on, only the pins.
+  if (pinned && categories === undefined && !category) return new Set()
   return categories !== undefined ? new Set(categories) : category ? new Set([category]) : null
 }
 
@@ -131,6 +134,8 @@ type Props = {
    *  the visitor toggled chips on the map itself). Takes precedence over
    *  initialCategory, which only covers the single-category arrival case. */
   initialSelectedCategories?: string[]
+  /** The Pinned chip on, from the URL's `pinned` (see mapQueryString). */
+  initialPinned?: boolean
   /** Field filters (open-now / kosher / type / …) carried from the directory the
    *  visitor came from, applied to pins and shown as removable chips. */
   initialFilters?: MapFilters
@@ -188,7 +193,7 @@ type Props = {
 
 const NOOP_LIVE_TRACKING = { tracking: false, error: null, start: () => {}, stop: () => {} }
 
-export default function ResourceMapView({ userLocation, initialCategory, initialQuery, initialSelectedCategories, initialFilters, initialPlaceId, onViewListing, standalone, visible, onExitFullscreenToListing, liveTracking, controls }: Props) {
+export default function ResourceMapView({ userLocation, initialCategory, initialQuery, initialSelectedCategories, initialPinned = false, initialFilters, initialPlaceId, onViewListing, standalone, visible, onExitFullscreenToListing, liveTracking, controls }: Props) {
   const timezone = useCommunityTimezone()
   const listings = useAllListings()
   const categories = useCategories()
@@ -600,8 +605,14 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // browser back) takes precedence over initialCategory (the single-category
   // arrival case from a directory's "Map" button).
   const [selected, setSelected] = useState<Set<string> | null>(
-    resolveInitialSelected(initialSelectedCategories, initialCategory),
+    resolveInitialSelected(initialSelectedCategories, initialCategory, initialPinned),
   )
+  // The Pinned chip lives in PinnedContext (it outlives this screen); a link
+  // that says to show the pins turns it on.
+  useEffect(() => {
+    if (initialPinned) setPinnedSelected(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialPinned])
   const effectiveSelected = useMemo(
     () => selected ?? new Set(options.map((o) => o.id)),
     [selected, options],
@@ -927,6 +938,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
         : 'all'
   const initialViewKey = [
     categoriesKey,
+    initialPinned ? 'pinned' : '',
     initialQueryText,
     initialFiltersQuery.open ?? '',
     [...(initialFilters?.bool ?? [])].sort().join(','),
@@ -939,7 +951,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   useEffect(() => {
     if (initialViewKey === appliedInitialViewKeyRef.current) return
     appliedInitialViewKeyRef.current = initialViewKey
-    setSelected(resolveInitialSelected(initialSelectedCategories, initialCategory))
+    setSelected(resolveInitialSelected(initialSelectedCategories, initialCategory, initialPinned))
     setInput(initialQueryText)
     setCommittedQuery(initialQueryText)
     setOwnFilters(null)
@@ -1018,12 +1030,13 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
       bool: written.is ? written.is.split(',') : null,
       select: written.sel ? Object.fromEntries(written.sel.split(',').map((pair) => [pair.slice(0, pair.indexOf(':')), pair.slice(pair.indexOf(':') + 1).split('|')])) : null,
       place: selectedPointId ?? null,
+      pinned: pinnedSelected,
     })
     const url = `${window.location.pathname}${qs}`
     if (url === `${window.location.pathname}${window.location.search}`) return
     window.history.replaceState(window.history.state, '', url)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [standalone, committedQuery, selected, allSelected, filtersKey, categories, selectedPointId])
+  }, [standalone, committedQuery, selected, allSelected, filtersKey, categories, selectedPointId, pinnedSelected])
 
   // "Open now" has to re-answer as the clock moves — a pin that closed at 6pm
   // should drop off a filtered map at 6pm, not when the visitor next reloads.
