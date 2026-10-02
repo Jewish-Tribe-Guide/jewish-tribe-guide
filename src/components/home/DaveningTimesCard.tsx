@@ -2,14 +2,13 @@
 
 import Link from 'next/link'
 import Image from 'next/image'
-import { useCommunitySlug } from '@/lib/communityContext'
+import { useCommunitySlug, useCommunityTimezone } from '@/lib/communityContext'
 import { nextUpcomingDavening } from '@/lib/upcomingDavening'
 import { secularHolidayTomorrow } from '@/lib/secularHolidays'
 import { useMinyanSchedule } from '@/lib/useMinyanSchedule'
 import { useCategories } from '@/lib/useCategories'
 import type { LatLng } from '@/lib/geo'
 import { routes } from '@/lib/routes'
-import { community } from '@/community.config'
 
 // ── The home screen's davening-times card — one line, deliberately. ────────
 //
@@ -42,6 +41,7 @@ import { community } from '@/community.config'
 // (settings.desktopDaveningEyebrow/Heading have no render site left) —
 // same call the user made for the Browse card's "Explore by Category".
 export default function DaveningTimesCard({ coords }: { coords: LatLng | null }) {
+  const timezone = useCommunityTimezone()
   const communitySlug = useCommunitySlug()
   // Every shul's minyanim, today's day keys and the resolved sunset times —
   // shared with the search's minyan answers (see useMinyanSchedule).
@@ -82,7 +82,7 @@ export default function DaveningTimesCard({ coords }: { coords: LatLng | null })
   // that pseudo-day in the filter too, or it's invisible on a view that's
   // otherwise correctly showing tomorrow. Rosh Chodesh isn't included here
   // for the same reason — see secularHolidayTomorrow's own doc.
-  const tomorrowHoliday = result?.isTomorrow && schedule ? secularHolidayTomorrow(schedule.now, community.timezone) : null
+  const tomorrowHoliday = result?.isTomorrow && schedule ? secularHolidayTomorrow(schedule.now, timezone) : null
   const tomorrowDayParam = [schedule?.tomorrowKey, ...(tomorrowHoliday ? ['holiday'] : [])].join(',')
   const seeAllHref = `${routes.slug(communitySlug, linkCategoryId)}?davening=1${result?.isTomorrow ? `&day=${tomorrowDayParam}` : ''}`
 

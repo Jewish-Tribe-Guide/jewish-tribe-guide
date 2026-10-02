@@ -90,7 +90,28 @@ export type SiteSettings = {
   /** Desktop only — the hero band's photo. Null shows the CSS gradient
    *  placeholder instead. */
   desktopHeroImage: { url: string; alt: string } | null
+  /** Which home page visitors get: the home as it was ('classic'), or the
+   *  one that changes with the day ('today', step 6). Previewed from the Site
+   *  tab before it's saved; one save switches back. */
+  homeStyle: HomeStyle
+  /** Today's "Before candles" answer, on a Friday or Erev Yom Tov: the items
+   *  it looks for, in order. The guide can't tell which items are for
+   *  Shabbos, so an admin names them. */
+  beforeCandleItems: string[]
 }
+
+export const HOME_STYLES = ['classic', 'today'] as const
+export type HomeStyle = (typeof HOME_STYLES)[number]
+
+export function isHomeStyle(value: unknown): value is HomeStyle {
+  return (HOME_STYLES as readonly unknown[]).includes(value)
+}
+
+/** Where Before candles starts until an admin changes it. */
+export const DEFAULT_BEFORE_CANDLE_ITEMS = ['Challah', 'Wine', 'Chicken']
+
+/** More than this and Before candles stops being one answer. */
+export const MAX_BEFORE_CANDLE_ITEMS = 6
 
 /** One entry in the desktop header's top nav, or in the "More" panel it can
  *  nest one level of. */
@@ -244,6 +265,8 @@ export const SITE_SETTINGS_DEFAULTS: SiteSettings = {
   desktopHeroHeadline: heroSplit.headline,
   desktopHeroSubhead: heroSplit.subhead,
   desktopHeroImage: community.heroImage,
+  homeStyle: 'classic',
+  beforeCandleItems: DEFAULT_BEFORE_CANDLE_ITEMS,
 }
 
 /** Bump when the icon RENDERING changes — the inset, the trim, the padding

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, screen, waitFor } from '@testing-library/react'
+import { cleanup, within, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { makeCategory, makeCommunity } from '@/test/providerFixtures'
@@ -8,6 +8,7 @@ import { mockRouter } from '@/test/nextNavigationMock'
 import { fetchJson, parseOkJson } from '@/lib/fetchJson'
 import { SITE_SETTINGS_DEFAULTS } from '@/lib/siteSettings'
 import type { HomeSection } from '@/lib/homeSections'
+import { writePreviewDraft } from '@/lib/previewDraft'
 import SiteSettingsEditor from './SiteSettingsEditor'
 
 // SiteSettingsEditor loads its own draft over the network (settings +
@@ -181,6 +182,28 @@ describe('SiteSettingsEditor — the Site tab', () => {
     )
     const body = JSON.parse((vi.mocked(fetchJson).mock.calls[0]![1] as RequestInit).body as string)
     expect(body.name).toBe('New Name')
+  })
+
+  // The Today home (step 6) is chosen here, tried in Preview first, and
+  // switched on or back with one save.
+  it('choosing the Today home and saving sends it; Preview shows it before then', async () => {
+    const user = userEvent.setup()
+    await renderEditor('site')
+    await openAllSections(user)
+
+    const choice = within(screen.getByTestId('home-style'))
+    expect(choice.getByRole('radio', { name: /^Classic/ })).toBeChecked()
+    await user.click(choice.getByRole('radio', { name: /^Today/ }))
+
+    await user.click(screen.getByRole('button', { name: 'Preview' }))
+    expect(vi.mocked(writePreviewDraft).mock.calls[0]![0].settings.homeStyle).toBe('today')
+    await user.click(screen.getByRole('button', { name: /close/i }))
+
+    vi.mocked(fetchJson).mockResolvedValue({ settings: { ...SITE_SETTINGS_DEFAULTS, homeStyle: 'today' } })
+    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+    await waitFor(() => expect(screen.getByText('Saved.')).toBeInTheDocument())
+    const body = JSON.parse((vi.mocked(fetchJson).mock.calls[0]![1] as RequestInit).body as string)
+    expect(body.homeStyle).toBe('today')
   })
 
   it('toggling feedback off hides the feedback sub-fields', async () => {

@@ -355,3 +355,34 @@ describe('HeroHeading — example questions', () => {
     expect(screen.queryByTestId('search-prompts')).not.toBeInTheDocument()
   })
 })
+
+// The Today home (step 6): the day as a small line over the title, the Ask
+// box the biggest thing after it, and nothing else in the hero.
+describe('HeroHeading — the Today home', () => {
+  const settings = {
+    heroTitle: 'Your Guide to Jewish Philadelphia',
+    mission: 'A guide to Jewish Philadelphia — community resources',
+    searchPlaceholder: 'Ask: challah, mincha tonight…',
+    desktopHeroHeadline: 'Your Guide to Jewish Philadelphia',
+    desktopHeroSubhead: 'kept current by you',
+    desktopHeroImage: null,
+  }
+  const dayLine = 'Tuesday, Oct 6 · 25 Tishrei · sunset 6:35 PM'
+
+  it('puts the day over the title on both devices, and drops the mission, the subhead and the Browse and Map buttons', () => {
+    render(<HeroHeading settings={settings} query="" onQueryChange={vi.fn()} mapIcon="🗺️" today={{ dayLine }} />)
+    expect(screen.getAllByText(dayLine)).toHaveLength(2)
+    expect(screen.getByTestId('today-hero')).toHaveTextContent(`${dayLine}${settings.heroTitle}`)
+    expect(screen.queryByText(settings.mission)).not.toBeInTheDocument()
+    expect(screen.queryByText(settings.desktopHeroSubhead)).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Browse Categories' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'View Map' })).not.toBeInTheDocument()
+  })
+
+  it('the classic home is unchanged', () => {
+    render(<HeroHeading settings={settings} query="" onQueryChange={vi.fn()} mapIcon="🗺️" />)
+    expect(screen.queryByTestId('today-hero')).not.toBeInTheDocument()
+    expect(screen.getByText(settings.mission)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Browse Categories' })).toBeInTheDocument()
+  })
+})

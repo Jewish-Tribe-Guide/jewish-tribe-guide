@@ -8,7 +8,7 @@ import { PHOTO_FIELD_KEY, selectValues, type CategoryConfig, type CategoryField 
 import { formatTodayHours, hasAnyHours } from '@/lib/hours'
 import { useNow } from '@/lib/useNow'
 import { useZmanim } from '@/lib/useZmanim'
-import { useActiveCommunity } from '@/lib/communityContext'
+import { useActiveCommunity, useCommunityTimezone } from '@/lib/communityContext'
 import { useOptionalLocation } from '@/lib/locationContext'
 import { useShareLink } from '@/lib/useShareLink'
 import { directionsUrl, destinationQuery } from '@/lib/googleMapsLinks'
@@ -69,7 +69,6 @@ import QuestionCard from './QuestionCard'
 import TurnstileWidget from '@/components/TurnstileWidget'
 import { useItemMarks, type ItemMarksApi } from './useItemMarks'
 import { alreadyListed, dayText, itemSuggestions, itemWording, lastSeenText, seenLabel, type ItemMark, type ItemWording } from '@/lib/itemMarks'
-import { community } from '@/community.config'
 import JoinLinkCheck from './JoinLinkCheck'
 
 // ── An opened listing: the seven parts (see lib/listingView.ts) ─────────────
@@ -744,6 +743,7 @@ function menuUrlOf(item: DirectoryResource): string | null {
  *  served", "+ Add a dish"), with "Full menu ↗" for the rest of the menu,
  *  and a line saying where dishes read from the menu came from. */
 function ItemsCard({ field, found, api, menuUrl }: { field: CategoryField; found: SearchFound | null; api: ItemMarksApi; menuUrl: string | null }) {
+  const timezone = useCommunityTimezone()
   const clock = useNow()
   const say = itemWording(field)
   // The latest a dish was approved from the menu, for the line under them.
@@ -769,7 +769,7 @@ function ItemsCard({ field, found, api, menuUrl }: { field: CategoryField; found
       }
       footer={
         menuAt
-          ? `${say.nouns.charAt(0).toUpperCase()}${say.nouns.slice(1)} read from its own menu by the guide’s AI, ${dayText(menuAt, clock, community.timezone)}, and checked by an admin. “Seen” means someone has said so since.`
+          ? `${say.nouns.charAt(0).toUpperCase()}${say.nouns.slice(1)} read from its own menu by the guide’s AI, ${dayText(menuAt, clock, timezone)}, and checked by an admin. “Seen” means someone has said so since.`
           : undefined
       }
     >
@@ -778,7 +778,7 @@ function ItemsCard({ field, found, api, menuUrl }: { field: CategoryField; found
         {shown.map((m) => {
           const key = `${m.key}:${m.name}`
           const isOpen = open === key
-          const seen = seenLabel(m, clock, community.timezone)
+          const seen = seenLabel(m, clock, timezone)
           return (
             <li key={key} data-testid="listing-item" className={isOpen ? '-mx-2 my-1 rounded-xl border border-slate-300 bg-white px-2' : ''}>
               <button
@@ -951,9 +951,10 @@ function AddItemBox({ api, say, onClose, onListed }: { api: ItemMarksApi; say: I
 }
 
 function GoneNote({ at, clock }: { at: string; clock: number | null }) {
+  const timezone = useCommunityTimezone()
   return (
     <p className="-mt-1 pb-2 text-[13px] font-semibold leading-snug text-caution">
-      Reported gone {dayText(at, clock, community.timezone)} · we’ll check before taking it off
+      Reported gone {dayText(at, clock, timezone)} · we’ll check before taking it off
     </p>
   )
 }
@@ -961,6 +962,7 @@ function GoneNote({ at, clock }: { at: string; clock: number | null }) {
 /** An opened item: when it was last seen, and Still here or Not anymore;
  *  once answered, thanks and Undo. */
 function ItemAnswer({ mark: m, api, clock, say }: { mark: ItemMark; api: ItemMarksApi; clock: number | null; say: ItemWording }) {
+  const timezone = useCommunityTimezone()
   const { mine, busy, error } = api.stateOf(m)
   const button =
     'flex h-11 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-[10px] border border-slate-300 bg-white text-[14.5px] font-bold text-slate-900 transition-colors hover:bg-slate-50 disabled:cursor-default disabled:opacity-60'
@@ -974,7 +976,7 @@ function ItemAnswer({ mark: m, api, clock, say }: { mark: ItemMark; api: ItemMar
       {m.goneAt && !mine ? (
         <GoneNote at={m.goneAt} clock={clock} />
       ) : (
-        !mine && <p className="text-[13px] leading-snug text-muted">{lastSeenText(m, clock, community.timezone)}</p>
+        !mine && <p className="text-[13px] leading-snug text-muted">{lastSeenText(m, clock, timezone)}</p>
       )}
       {mine ? (
         <p role="status" className={`text-[14px] leading-snug ${mine.kind === 'seen' ? 'text-emerald-700' : 'text-caution'}`}>

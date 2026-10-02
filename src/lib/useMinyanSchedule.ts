@@ -1,5 +1,6 @@
 'use client'
 
+import { useCommunityTimezone } from '@/lib/communityContext'
 import { useCategories } from '@/lib/useCategories'
 import { useAllListings } from '@/lib/useAllListings'
 import { useNow } from '@/lib/useNow'
@@ -58,6 +59,7 @@ export type MinyanSchedule = {
  * isn't known before then (see useNow).
  */
 export function useMinyanSchedule(coords: LatLng | null, only?: readonly DirectoryResource[]): MinyanSchedule | null {
+  const timezone = useCommunityTimezone()
   const categories = useCategories()
   // A category page passes its own listings (`only`): it has no provider of
   // every listing on the site, which only the home screen and the map load.
@@ -85,7 +87,7 @@ export function useMinyanSchedule(coords: LatLng | null, only?: readonly Directo
   const dates =
     now === null
       ? []
-      : Array.from({ length: 7 }, (_, i) => factsFor(dayInTimezone(community.timezone, new Date(now + i * 86_400_000)), zmanimData?.days, zmanimData?.daysThrough))
+      : Array.from({ length: 7 }, (_, i) => factsFor(dayInTimezone(timezone, new Date(now + i * 86_400_000)), zmanimData?.days, zmanimData?.daysThrough))
   // Today's Yom Tov answer is the converter's own (isYomTov); the days
   // ahead only fill in what it doesn't say.
   if (dates[0] && typeof zmanimData?.isYomTov === 'boolean') dates[0] = { ...dates[0], yomTov: zmanimData.isYomTov }
@@ -110,9 +112,9 @@ export function useMinyanSchedule(coords: LatLng | null, only?: readonly Directo
   // Nothing is scheduled before the page has hydrated, when there's no time
   // yet (see useNow).
   if (now === null) return null
-  const { day: todayKey, minutes: nowMinutes } = dayAndMinutesInTimezone(now, community.timezone)
+  const { day: todayKey, minutes: nowMinutes } = dayAndMinutesInTimezone(now, timezone)
   const tomorrowKey = DAY_KEYS[(DAY_KEYS.indexOf(todayKey) + 1) % 7]
-  const season = currentSeason(now, community.timezone)
+  const season = currentSeason(now, timezone)
   const [today, tomorrow] = dates
   const todayDayKeys = dayKeysFor(today)
   const tomorrowDayKeys = dayKeysFor(tomorrow)

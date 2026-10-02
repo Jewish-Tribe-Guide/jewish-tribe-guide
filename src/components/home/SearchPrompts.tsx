@@ -7,14 +7,21 @@ export default function SearchPrompts({
   prompts,
   onPick,
   className = '',
+  oneRow = false,
 }: {
   prompts: string[]
   onPick: (prompt: string) => void
   className?: string
+  /** One row that scrolls sideways (the Today home on a phone), rather than
+   *  wrapping onto as many rows as it takes. */
+  oneRow?: boolean
 }) {
   if (prompts.length === 0) return null
   return (
-    <div className={`flex flex-wrap items-center gap-2 ${className}`} data-testid="search-prompts">
+    <div
+      className={`flex items-center gap-2 ${oneRow ? '-mr-4 overflow-x-auto pr-4 [scrollbar-width:none] [&>*]:shrink-0 [&>*]:whitespace-nowrap' : 'flex-wrap'} ${className}`}
+      data-testid="search-prompts"
+    >
       <span className="text-[13px] font-medium text-slate-500">Try asking</span>
       {prompts.map((p) => (
         <button

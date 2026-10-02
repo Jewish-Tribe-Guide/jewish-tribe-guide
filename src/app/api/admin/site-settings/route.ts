@@ -1,7 +1,7 @@
 import { revalidatePublicContent } from '@/lib/revalidateContent'
 import { getAdminUserForCommunity } from '@/lib/adminAuth'
-import { getSiteSettingsUncached, updateSiteSettings } from '@/lib/siteSettingsStore'
-import { MAX_MOBILE_TABS, type DesktopNavItem, type SiteSettings } from '@/lib/siteSettings'
+import { MissingTodayColumnsError, getSiteSettingsUncached, toBeforeCandleItems, updateSiteSettings } from '@/lib/siteSettingsStore'
+import { MAX_BEFORE_CANDLE_ITEMS, MAX_MOBILE_TABS, isHomeStyle, type DesktopNavItem, type SiteSettings } from '@/lib/siteSettings'
 import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
 
 // Recursive shape check — a 'link' item needs a target, a 'more-menu' item
@@ -129,12 +129,29 @@ export async function PATCH(request: Request) {
     }
   }
 
+  if (body.homeStyle !== undefined && !isHomeStyle(body.homeStyle)) {
+    return Response.json({ ok: false, errors: ['The home page has to be Classic or Today.'] }, { status: 400 })
+  }
+  if (body.beforeCandleItems !== undefined) {
+    const items = body.beforeCandleItems
+    if (!Array.isArray(items) || items.some((i) => typeof i !== 'string')) {
+      return Response.json({ ok: false, errors: ['Before candles’ items have to be a list of names.'] }, { status: 400 })
+    }
+    if (new Set(items.map((i: string) => i.trim().toLowerCase()).filter(Boolean)).size > MAX_BEFORE_CANDLE_ITEMS) {
+      return Response.json({ ok: false, errors: [`Before candles can look for at most ${MAX_BEFORE_CANDLE_ITEMS} items.`] }, { status: 400 })
+    }
+    body.beforeCandleItems = toBeforeCandleItems(items)
+  }
+
   try {
     const settings = await updateSiteSettings(community.slug, body)
     // The public site caches this content; drop it so the edit shows up.
     await revalidatePublicContent()
     return Response.json({ ok: true, settings })
   } catch (err) {
+    if (err instanceof MissingTodayColumnsError) {
+      return Response.json({ ok: false, errors: [err.message] }, { status: 409 })
+    }
     console.error('[admin/site-settings] PATCH failed:', err)
     return Response.json({ ok: false, errors: ['Could not save site settings.'] }, { status: 502 })
   }

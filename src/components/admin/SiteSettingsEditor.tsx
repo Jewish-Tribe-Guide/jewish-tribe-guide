@@ -268,6 +268,40 @@ export default function SiteSettingsEditor({
       )}
 
       {isSite && (
+      <div className="mb-6 max-w-2xl">
+      <CollapsibleSection title="Home page" description="Which home page visitors get." contentClassName="p-4">
+        <fieldset data-testid="home-style">
+          <legend className="sr-only">Home page</legend>
+          {(
+            [
+              ['classic', 'Classic', 'The home page as it has been: the search, then every category.'],
+              ['today', 'Today', 'Changes with the day: the next minyan, before candles on Friday, what’s open now, your pinned places, then the categories.'],
+            ] as const
+          ).map(([value, label, help]) => (
+            <label key={value} className="flex items-start gap-2.5 py-1.5">
+              <input
+                type="radio"
+                name="home-style"
+                value={value}
+                checked={draft.homeStyle === value}
+                onChange={() => set('homeStyle', value)}
+                className="mt-1"
+              />
+              <span>
+                <span className="block text-sm font-medium text-slate-900">{label}</span>
+                <span className="block text-[12px] text-muted">{help}</span>
+              </span>
+            </label>
+          ))}
+        </fieldset>
+        <p className="mt-2 text-[12px] text-muted">
+          To try it first, pick it and press Preview: it opens the site with this choice, and nothing changes for visitors until you save. Saving Classic switches back.
+        </p>
+      </CollapsibleSection>
+      </div>
+      )}
+
+      {isSite && (
       <div className="max-w-2xl">
       <CollapsibleSection title="Branding" description="Site name, tagline, search placeholder, and logo." contentClassName="p-4 space-y-3">
         <label className="block">

@@ -4,12 +4,11 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { useCampaignBanners } from '@/lib/contentContext'
 import { useCategories } from '@/lib/useCategories'
-import { useCommunitySlug } from '@/lib/communityContext'
+import { useCommunitySlug, useCommunityTimezone } from '@/lib/communityContext'
 import { useNow } from '@/lib/useNow'
 import { useDismissedCampaignBanners } from '@/lib/dismissedCampaignBanners'
 import { activeCampaignBanner } from '@/lib/campaignBanner'
 import { routes, mapQueryString } from '@/lib/routes'
-import { community } from '@/community.config'
 import { LeafIcon } from '@/components/icons'
 
 // ── A seasonal promotion (see CampaignBannerManager's own doc) — renders
@@ -53,6 +52,7 @@ import { LeafIcon } from '@/components/icons'
 // `banner`/`primary`/`secondary` values above so the actual content/logic
 // only lives in one place.
 export default function CampaignBannerCard() {
+  const timezone = useCommunityTimezone()
   const banners = useCampaignBanners()
   const categories = useCategories()
   const communitySlug = useCommunitySlug()
@@ -61,7 +61,7 @@ export default function CampaignBannerCard() {
 
   // Which campaign is on is a question of today's date, so it waits for the
   // page to hydrate (see useNow).
-  const banner = now === null ? null : activeCampaignBanner(banners, now, community.timezone)
+  const banner = now === null ? null : activeCampaignBanner(banners, now, timezone)
   if (!banner) return null
 
   const category = categories?.find((c) => c.id === banner.categoryId)

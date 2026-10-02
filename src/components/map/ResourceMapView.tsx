@@ -47,10 +47,9 @@ import DroppedPinEditor from './DroppedPinEditor'
 import { useMapSidebar, SIDEBAR_MIN_WIDTH, SIDEBAR_MAX_WIDTH, SIDEBAR_SEARCH_INSET } from './useMapSidebar'
 import { useCampaignBanners } from '@/lib/contentContext'
 import { activeCampaignBanner } from '@/lib/campaignBanner'
-import { community } from '@/community.config'
 import { mapQueryString } from '@/lib/routes'
 import { countEvent } from '@/lib/countEvent'
-import { useOptionalCommunitySlug } from '@/lib/communityContext'
+import { useOptionalCommunitySlug, useCommunityTimezone } from '@/lib/communityContext'
 import { neighborhoodsFor } from '@/lib/places'
 import { reachLabel, readerPlaces, readingFilters, readingItemsOn, readingReach, type Reading } from '@/lib/questionReader'
 import { askReader } from '@/lib/askReader'
@@ -190,6 +189,7 @@ type Props = {
 const NOOP_LIVE_TRACKING = { tracking: false, error: null, start: () => {}, stop: () => {} }
 
 export default function ResourceMapView({ userLocation, initialCategory, initialQuery, initialSelectedCategories, initialFilters, initialPlaceId, onViewListing, standalone, visible, onExitFullscreenToListing, liveTracking, controls }: Props) {
+  const timezone = useCommunityTimezone()
   const listings = useAllListings()
   const categories = useCategories()
   // Admin-configured cap on how far a point can be from the anchor and still
@@ -1492,7 +1492,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // Which campaign is on waits for today's date, as the home card's does.
   const campaignBanners = useCampaignBanners()
   const campaignClock = useNow()
-  const activeCampaign = campaignClock === null ? null : activeCampaignBanner(campaignBanners, campaignClock, community.timezone)
+  const activeCampaign = campaignClock === null ? null : activeCampaignBanner(campaignBanners, campaignClock, timezone)
   const campaignOption = activeCampaign ? options.find((o) => o.id === activeCampaign.categoryId) : undefined
   const campaignHighlighted = !!campaignOption && effectiveSelected.has(campaignOption.id) && !allChipsOn
   const campaignChip = campaignOption && (

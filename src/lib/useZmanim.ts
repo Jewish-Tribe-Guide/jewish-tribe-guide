@@ -1,8 +1,8 @@
 'use client'
 
+import { useCommunityTimezone } from '@/lib/communityContext'
 import { useEffect, useState } from 'react'
 import type { ZmanimData } from '@/types'
-import { community } from '@/community.config'
 import { useToday } from '@/lib/useNow'
 import { zmanimPath } from '@/lib/zmanimRequest'
 
@@ -58,6 +58,7 @@ export function useZmanim(coords?: { lat: number; lng: number } | null): {
   data: ZmanimData | null
   status: ZmanimStatus
 } {
+  const timezone = useCommunityTimezone()
   // Bumped once the shared fetch this mount is waiting on resolves, so a
   // cache hit that landed via SOME OTHER caller's request is picked up on
   // the next render — the cache/inFlight maps themselves aren't state, so
@@ -73,7 +74,7 @@ export function useZmanim(coords?: { lat: number; lng: number } | null): {
   // sunset as today's.
   const day = useToday()
   const hasCoords = coords?.lat != null && coords?.lng != null
-  const key = hasCoords ? cacheKey(day, coords.lat, coords.lng, community.timezone) : null
+  const key = hasCoords ? cacheKey(day, coords.lat, coords.lng, timezone) : null
 
   useEffect(() => {
     if (!hasCoords || !key) return
@@ -82,7 +83,7 @@ export function useZmanim(coords?: { lat: number; lng: number } | null): {
 
     let promise = inFlight.get(key)
     if (!promise) {
-      const url = zmanimPath(coords.lat, coords.lng, community.timezone)
+      const url = zmanimPath(coords.lat, coords.lng, timezone)
       promise = loadOne(url).finally(() => inFlight.delete(key))
       inFlight.set(key, promise)
     }

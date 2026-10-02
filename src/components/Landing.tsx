@@ -46,6 +46,8 @@ import type { NavigateFn } from '@/types'
 import type { Flow } from '@/types'
 import { useSiteSettings } from '@/lib/useSiteSettings'
 import { ui } from '@/lib/uiConfig'
+import { useCommunityTimezone } from '@/lib/communityContext'
+import { dayLine } from '@/lib/todayHome'
 
 export type LandingProps = {
   onNavigate: NavigateFn
@@ -114,6 +116,9 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
   // The hero's "Browse Categories" button scrolls here.
   const browseCardRef = useRef<HTMLDivElement>(null)
   const settings = useSiteSettings()
+  // The Today home (step 6), when the admin has switched it on.
+  const today = settings.homeStyle === 'today'
+  const timezone = useCommunityTimezone()
   // Desktop only (see headerVisibility.tsx/SiteHeader): lets the header sit
   // transparent over this screen's photo hero until scrolled past it.
   useHeaderOverlay(true)
@@ -592,6 +597,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
           categories={categories}
           onSearchCardClick={(card) => track('category_opened', { category: card.id ?? card.title, source: 'hero-search' })}
           onOpenSearchPlace={(hit) => openPlace(hit)}
+          today={today ? { dayLine: dayLine(schedule?.now ?? null, timezone, zmanim.data) } : undefined}
         />
 
         {/* ── Seasonal campaign banner ─────────────────────────────────────────

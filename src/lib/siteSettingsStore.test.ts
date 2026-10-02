@@ -184,3 +184,62 @@ describe('updateSiteSettings', () => {
     )
   })
 })
+
+// The Today home's settings (migration 067): read the same whether or not the
+// columns exist, and written only when they change, so the rest of the
+// settings still save on a database without them.
+describe('the Today home settings', () => {
+  function saveWith(row: Record<string, unknown>, writeResult: unknown = { data: row, error: null }) {
+    const readBuilder = chainable({ data: row, error: null })
+    const writeBuilder = chainable(writeResult)
+    let call = 0
+    mockFrom.mockImplementation(() => {
+      call += 1
+      return call === 1 ? readBuilder : writeBuilder
+    })
+    return writeBuilder
+  }
+
+  it('reads as the classic home and the starting items on a row from before 067', async () => {
+    mockFrom.mockReturnValue(chainable({ data: rawRow, error: null }))
+    const settings = await getSiteSettingsUncached('philly')
+    expect(settings.homeStyle).toBe('classic')
+    expect(settings.beforeCandleItems).toEqual(['Challah', 'Wine', 'Chicken'])
+  })
+
+  it('reads what an admin saved, tidied: no blanks or repeats, at most six', async () => {
+    mockFrom.mockReturnValue(
+      chainable({
+        data: { ...rawRow, home_style: 'today', before_candle_items: [' Challah', 'challah', '', 'Wine', 'Grape juice', 'Fish', 'Chicken', 'Cake', 'Kugel'] },
+        error: null,
+      }),
+    )
+    const settings = await getSiteSettingsUncached('philly')
+    expect(settings.homeStyle).toBe('today')
+    expect(settings.beforeCandleItems).toEqual(['Challah', 'Wine', 'Grape juice', 'Fish', 'Chicken', 'Cake'])
+  })
+
+  it('an unknown style reads as classic', async () => {
+    mockFrom.mockReturnValue(chainable({ data: { ...rawRow, home_style: 'fancy' }, error: null }))
+    expect((await getSiteSettingsUncached('philly')).homeStyle).toBe('classic')
+  })
+
+  it('a save that doesn’t change them leaves both columns out', async () => {
+    const write = saveWith(rawRow)
+    await updateSiteSettings('philly', { tagline: 'New Tagline', homeStyle: 'classic' })
+    const written = (write.upsert as ReturnType<typeof vi.fn>).mock.calls[0][0]
+    expect(written).not.toHaveProperty('home_style')
+    expect(written).not.toHaveProperty('before_candle_items')
+  })
+
+  it('a save that changes them writes them', async () => {
+    const write = saveWith(rawRow)
+    await updateSiteSettings('philly', { homeStyle: 'today', beforeCandleItems: ['Challah'] })
+    expect(write.upsert).toHaveBeenCalledWith(expect.objectContaining({ home_style: 'today', before_candle_items: ['Challah'] }), { onConflict: 'community_id' })
+  })
+
+  it('changing them before 067 says what’s missing', async () => {
+    saveWith(rawRow, { data: null, error: { message: 'column "home_style" of relation "site_settings" does not exist' } })
+    await expect(updateSiteSettings('philly', { homeStyle: 'today' })).rejects.toThrow('migration 067')
+  })
+})

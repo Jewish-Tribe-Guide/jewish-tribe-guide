@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import type { Community } from './communityStore'
 import { COMMUNITY_COOKIE } from './configCommunity'
+import { community as configCommunity } from '@/community.config'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Which community the visitor is looking at — now decided by the URL.
@@ -117,6 +118,14 @@ export function useCommunitySlug(): string {
  *  their work there, like counting a view, rather than throw. */
 export function useOptionalCommunitySlug(): string | null {
   return useContext(CommunityContext)?.community.slug ?? null
+}
+
+/** The community's own time zone (its row in the communities table), for
+ *  "today" and "now": the day a Friday starts, when candles are, what's
+ *  open. The visitor's device can be anywhere. Outside a community route
+ *  (the admin console's previews) it's the config community's. */
+export function useCommunityTimezone(): string {
+  return useContext(CommunityContext)?.community.timezone ?? configCommunity.timezone
 }
 
 // ── The "/" redirect hint ────────────────────────────────────────────────────

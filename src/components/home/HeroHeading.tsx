@@ -71,6 +71,11 @@ type Props = {
    *  now (see searchPrompts.ts). */
   searchPrompts?: string[]
   onPickPrompt?: (prompt: string) => void
+  /** The Today home (SiteSettings.homeStyle): the day as a small line over
+   *  the title ("Tuesday, Oct 6 · 25 Tishrei · sunset 6:35 PM"), the Ask box
+   *  the biggest thing after it, and nothing else in the hero. Null until
+   *  the page knows what day it is. Undefined for the classic home. */
+  today?: { dayLine: string | null }
 }
 
 // The home screen's heading, mission, and the filter box + "View Map" button
@@ -156,6 +161,7 @@ export default function HeroHeading({
   onOpenAnswerShul,
   searchPrompts = [],
   onPickPrompt,
+  today,
 }: Props) {
   const { desktopHeroHeadline: headline, desktopHeroSubhead: subhead, desktopHeroImage: heroImage } = settings
 
@@ -230,7 +236,25 @@ export default function HeroHeading({
 
   return (
     <>
+      {/* Mobile, Today: the day, the title, the Ask box; no mission. Left
+          aligned, so the blocks under it read as one column. */}
+      {today && (
+        <section className="pt-5 desktop:hidden" data-testid="today-hero">
+          {/* Held open while the day isn't known yet, so the title doesn't
+              jump down when it arrives. */}
+          <p className="min-h-5 text-[13.5px] font-semibold text-slate-500">{today.dayLine}</p>
+          <h1 className="mt-0.5 text-[26px] font-extrabold leading-tight tracking-tight text-ink">{settings.heroTitle}</h1>
+          {ui.search.landing && (
+            <div className="mt-3">
+              <SearchBox query={query} onQueryChange={onQueryChange} onSubmit={onSearchSubmit} interactive={interactive} placeholder={settings.searchPlaceholder} />
+              <SearchPrompts prompts={prompts} onPick={pickPrompt} className="mt-2.5" oneRow />
+            </div>
+          )}
+        </section>
+      )}
+
       {/* Mobile — unchanged plain centered block. */}
+      {!today && (
       <section className="pt-12 sm:pt-16 text-center desktop:hidden">
         {/* leading-snug, not -tight — heroTitle is admin-editable text with
             no length limit, so it wraps to two lines depending on what an
@@ -252,6 +276,7 @@ export default function HeroHeading({
           </div>
         )}
       </section>
+      )}
 
       {/* Desktop — a full-bleed band, edge to edge under the header rather
           than a rounded card inside the page's usual max-w-6xl column.
@@ -384,10 +409,11 @@ export default function HeroHeading({
             above. */}
         <SkylineIcon className="pointer-events-none absolute bottom-0 left-0 -z-10 h-auto w-[360px] text-slate-400 opacity-15" />
         <div className="mx-auto flex min-h-[435px] max-w-6xl desktop:max-w-7xl flex-col justify-center px-4 pt-[calc(3.5rem+60px)] pb-14 sm:px-6">
+          {today && <p className="mb-2 min-h-6 text-[16px] font-semibold text-slate-600">{today.dayLine}</p>}
           <h1 className="max-w-2xl text-[60px] font-extrabold leading-[1.02] tracking-tight text-ink text-balance">
             {headline}
           </h1>
-          {subhead && (
+          {subhead && !today && (
             <p className="mt-3 max-w-[46ch] text-lg text-slate-600">
               {subhead}
             </p>
@@ -421,6 +447,8 @@ export default function HeroHeading({
               <SearchPrompts prompts={prompts} onPick={pickPrompt} className="mt-3" />
             </div>
           )}
+          {/* Today has Browse beside its answers, and Map in the header. */}
+          {!today && (
           <div className="mt-6 flex flex-wrap items-center gap-3">
             <button
               onClick={onBrowseCategories}
@@ -437,6 +465,7 @@ export default function HeroHeading({
               </button>
             )}
           </div>
+          )}
         </div>
       </section>
     </>

@@ -7,7 +7,10 @@ import {
   DEFAULT_MOBILE_TABS,
   MAX_MOBILE_TABS,
   SITE_SETTINGS_DEFAULTS,
+  DEFAULT_BEFORE_CANDLE_ITEMS,
+  MAX_BEFORE_CANDLE_ITEMS,
   defaultHeroSplit,
+  isHomeStyle,
   type DesktopNavItem,
   type MobileTabConfig,
   type SiteSettings,
@@ -47,6 +50,9 @@ type Row = {
    *  site, and the redesign's one look retired it. The column stays rather
    *  than dropping data with a migration. */
   desktop_accent_color: string | null
+  /** Migration 067. Absent on a row read before it's applied. */
+  home_style?: string | null
+  before_candle_items?: unknown
 }
 
 // jsonb comes back as whatever was written, and this column predates nothing —
@@ -95,6 +101,23 @@ function toHeroImage(raw: unknown): { url: string; alt: string } | null {
   return { url, alt: typeof alt === 'string' ? alt : '' }
 }
 
+/** The admin's item names: trimmed, no blanks or repeats, at most
+ *  MAX_BEFORE_CANDLE_ITEMS. Null (never set, or 067 not applied) is the
+ *  starting list; an empty list is the admin's own "none". */
+export function toBeforeCandleItems(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return DEFAULT_BEFORE_CANDLE_ITEMS
+  const seen = new Set<string>()
+  const items: string[] = []
+  for (const entry of raw) {
+    if (typeof entry !== 'string') continue
+    const name = entry.trim()
+    if (!name || seen.has(name.toLowerCase())) continue
+    seen.add(name.toLowerCase())
+    items.push(name)
+  }
+  return items.slice(0, MAX_BEFORE_CANDLE_ITEMS)
+}
+
 function toSettings(row: Row | null, fallback: SiteSettings = SITE_SETTINGS_DEFAULTS): SiteSettings {
   if (!row) return fallback
   const mission = row.mission
@@ -130,6 +153,8 @@ function toSettings(row: Row | null, fallback: SiteSettings = SITE_SETTINGS_DEFA
     desktopHeroHeadline: row.desktop_hero_headline || heroSplit.headline,
     desktopHeroSubhead: row.desktop_hero_subhead ?? heroSplit.subhead,
     desktopHeroImage: toHeroImage(row.desktop_hero_image) ?? fallback.desktopHeroImage,
+    homeStyle: isHomeStyle(row.home_style) ? row.home_style : 'classic',
+    beforeCandleItems: toBeforeCandleItems(row.before_candle_items),
   }
 }
 
@@ -187,6 +212,14 @@ export async function updateSiteSettings(
 ): Promise<SiteSettings> {
   const current = await getSiteSettingsUncached(community)
   const merged: SiteSettings = { ...current, ...patch }
+  // The Today home's two columns (migration 067) are written only when they
+  // change, so the rest of the settings still save on a database that
+  // doesn't have them yet. Changing either one there says what's missing.
+  const today: Record<string, unknown> = {}
+  if (merged.homeStyle !== current.homeStyle) today.home_style = merged.homeStyle
+  if (JSON.stringify(merged.beforeCandleItems) !== JSON.stringify(current.beforeCandleItems)) {
+    today.before_candle_items = merged.beforeCandleItems
+  }
 
   const { data, error } = await getAdminClient()
     .from('site_settings')
@@ -220,6 +253,7 @@ export async function updateSiteSettings(
         desktop_hero_headline: merged.desktopHeroHeadline,
         desktop_hero_subhead: merged.desktopHeroSubhead,
         desktop_hero_image: merged.desktopHeroImage,
+        ...today,
         updated_at: new Date().toISOString(),
       },
       { onConflict: 'community_id' },
@@ -227,6 +261,19 @@ export async function updateSiteSettings(
     .select('*')
     .single()
 
-  if (error) throw new Error(`Failed to update site settings: ${error.message}`)
+  if (error) {
+    if (Object.keys(today).length > 0 && /home_style|before_candle_items/.test(error.message)) {
+      throw new MissingTodayColumnsError()
+    }
+    throw new Error(`Failed to update site settings: ${error.message}`)
+  }
   return toSettings(data as Row)
+}
+
+/** The Today home's settings were changed on a database without migration
+ *  067 (supabase/migrations/20240101000067_today_home.sql). */
+export class MissingTodayColumnsError extends Error {
+  constructor() {
+    super('The home page style needs the database update in migration 067 (today_home) first.')
+  }
 }
