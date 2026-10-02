@@ -206,6 +206,23 @@ describe('SiteSettingsEditor — the Site tab', () => {
     expect(body.homeStyle).toBe('today')
   })
 
+  it('Before candles’ items are one line of names, saved as a list', async () => {
+    const user = userEvent.setup()
+    await renderEditor('site')
+    await openAllSections(user)
+    const input = screen.getByRole('textbox', { name: /^Before candles looks for/ })
+    expect(input).toHaveValue('Challah, Wine, Chicken')
+    await user.clear(input)
+    await user.type(input, 'Challah, Grape juice, ')
+    expect(input).toHaveValue('Challah, Grape juice, ')
+
+    vi.mocked(fetchJson).mockResolvedValue({ settings: { ...SITE_SETTINGS_DEFAULTS, beforeCandleItems: ['Challah', 'Grape juice'] } })
+    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+    await waitFor(() => expect(screen.getByText('Saved.')).toBeInTheDocument())
+    const body = JSON.parse((vi.mocked(fetchJson).mock.calls[0]![1] as RequestInit).body as string)
+    expect(body.beforeCandleItems).toEqual(['Challah', 'Grape juice'])
+  })
+
   it('toggling feedback off hides the feedback sub-fields', async () => {
     const user = userEvent.setup()
     await renderEditor('site', { ...SITE_SETTINGS_DEFAULTS, feedbackEnabled: true })

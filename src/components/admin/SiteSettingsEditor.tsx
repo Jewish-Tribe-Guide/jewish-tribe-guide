@@ -20,6 +20,7 @@ import ImageUploadField from '@/components/ImageUploadField'
 import {
   DEFAULT_MOBILE_TABS,
   DEFAULT_DESKTOP_NAV_ITEMS,
+  MAX_BEFORE_CANDLE_ITEMS,
 } from '@/lib/siteSettings'
 
 // ── One component, three tabs — Site (shared), Desktop, Mobile — sharing a
@@ -43,6 +44,25 @@ function sectionsEqual(a: DraftHomeSection[], b: DraftHomeSection[]): boolean {
   // disabled.
   const strip = (s: DraftHomeSection[]) => s.map(({ id, title, cardIds, width }) => ({ id, title, cardIds, width }))
   return JSON.stringify(strip(a)) === JSON.stringify(strip(b))
+}
+
+/** The items as one line, "Challah, Wine, Chicken". What was typed stays
+ *  while it still says the same list, so a comma or a space isn't swallowed
+ *  mid-word; after a Cancel or a save it's the list again. */
+function BeforeCandleItemsInput({ items, onChange }: { items: string[]; onChange: (items: string[]) => void }) {
+  const [typed, setTyped] = useState(items.join(', '))
+  const parsed = (t: string) => t.split(',').map((i) => i.trim()).filter(Boolean).slice(0, MAX_BEFORE_CANDLE_ITEMS)
+  const shown = JSON.stringify(parsed(typed)) === JSON.stringify(items) ? typed : items.join(', ')
+  return (
+    <input
+      value={shown}
+      onChange={(e) => {
+        setTyped(e.target.value)
+        onChange(parsed(e.target.value))
+      }}
+      className={inputClass}
+    />
+  )
 }
 
 export default function SiteSettingsEditor({
@@ -297,6 +317,13 @@ export default function SiteSettingsEditor({
         <p className="mt-2 text-[12px] text-muted">
           To try it first, pick it and press Preview: it opens the site with this choice, and nothing changes for visitors until you save. Saving Classic switches back.
         </p>
+        <label className="mt-4 block">
+          <span className="block text-xs font-medium text-slate-700 mb-1">Before candles looks for</span>
+          <BeforeCandleItemsInput items={draft.beforeCandleItems} onChange={(items) => set('beforeCandleItems', items)} />
+          <span className="block text-[11px] text-muted mt-1">
+            On the Today home, on Friday and Erev Yom Tov: the nearest store open now whose item list has these, separated by commas, at most {MAX_BEFORE_CANDLE_ITEMS}. Each is matched to a store&rsquo;s items by its exact name.
+          </span>
+        </label>
       </CollapsibleSection>
       </div>
       )}

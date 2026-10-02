@@ -22,6 +22,7 @@ import { useReading } from '@/lib/useReading'
 import { answersWell, candidatePrompts, pickPrompts } from '@/lib/searchPrompts'
 import { answerSchedule, useMinyanSchedule } from '@/lib/useMinyanSchedule'
 import HeroHeading from '@/components/home/HeroHeading'
+import TodayBlocks from '@/components/home/TodayBlocks'
 import DaveningTimesCard from '@/components/home/DaveningTimesCard'
 import UpdateListingsCard from '@/components/home/UpdateListingsCard'
 import SuggestListingCard from '@/components/home/SuggestListingCard'
@@ -407,7 +408,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
   const configuredBuiltIns = (homeSections ?? [])
     .filter((s): s is typeof s & { kind: Exclude<HomeBlockKind, 'section'> } => s.kind !== 'section')
     .map((s) => ({ kind: s.kind, title: s.title, width: s.width }))
-  const builtInOrder =
+  const allBuiltIns =
     configuredBuiltIns.length > 0
       ? configuredBuiltIns
       : (['browse', 'davening', 'listings', 'subscribe', 'jewishTimes'] as const).map((kind) => ({
@@ -415,6 +416,11 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
           title: BUILT_IN_BLOCKS[kind].title,
           width: 'full' as const,
         }))
+  // On the Today home its own blocks answer what Browse, Davening Times and
+  // Shabbat & Holiday Times did (TodayBlocks); Kept by the community,
+  // Suggest a listing and Stay in the loop stay below them, as the admin
+  // orders them.
+  const builtInOrder = today ? allBuiltIns.filter((b) => b.kind === 'listings' || b.kind === 'subscribe') : allBuiltIns
 
   // Shared between mobile's permanent grid and desktop's search results —
   // see below for why the two don't share one JSX node any more.
@@ -523,6 +529,34 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
   // only produces a false positive here if a real back-navigation also
   // happened to be pending at that exact instant, which is what the flag
   // means in the first place.
+  // ── The Today home's blocks (TodayBlocks) ──────────────────────────────
+  // Every category, in the admin's order, for its Browse.
+  const todayCards = today && allCards ? groupCardsIntoSections(allCards, homeSections ?? []).flatMap((s) => s.cards) : null
+  // "Food open now", asked of the site's own search, as if typed.
+  const openNowQuestion = 'Food open now'
+  const openNow = today && listings && schedule ? { question: openNowQuestion, result: ask(openNowQuestion).result } : null
+  const openListing = (item: { id: string; name: string; category: string }) => {
+    track('listing_opened', { listing: item.name, category: item.category, source: 'today' })
+    countEvent(communitySlug, 'listing_view', item.id)
+    onNavigate('patient', 'find', { findView: item.category, findItemId: item.id })
+  }
+  const todayBlocks = today && (
+    <TodayBlocks
+      listings={listings}
+      categories={categories ?? []}
+      communitySlug={communitySlug}
+      timezone={timezone}
+      from={coords ?? community.mapCenter}
+      schedule={schedule}
+      zmanim={zmanim.data}
+      items={settings.beforeCandleItems}
+      openNow={openNow}
+      cards={todayCards}
+      onOpenListing={openListing}
+      searching={!!q}
+    />
+  )
+
   const [backReveal, setBackReveal] = useState(false)
   const mainRef = useRef<HTMLElement>(null)
   useEffect(() => {
@@ -626,6 +660,8 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
             <CampaignBannerCard />
           </div>
         )}
+
+        {todayBlocks}
 
         {/* ── Browse everything (desktop), one card ──────────────────────────
                 `settings.heroTitle` titles the WHOLE card now, not just the
@@ -840,7 +876,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
             if (kind === 'davening' || kind === 'listings') {
               if (communityRowRendered) continue
               communityRowRendered = true
-              const hasDavening = builtInOrder.some((b) => b.kind === 'davening')
+              const hasDavening = !today && builtInOrder.some((b) => b.kind === 'davening')
               const hasListings = builtInOrder.some((b) => b.kind === 'listings')
               const communityCards: React.ReactElement[] = []
               if (hasDavening && !isMobile) {
@@ -936,7 +972,9 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
                 which only a CSS
                 media query (not a value React doesn't know for certain
                 until after hydration) can guarantee. ─────────────────────── */}
-        <section className="mt-12 sm:mt-14 space-y-10 desktop:hidden">{mobileResultsNode}</section>
+        {/* On the Today home the grid's place is taken by its blocks: a
+            phone sees search results here only once something is typed. */}
+        {(!today || q) && <section className="mt-12 sm:mt-14 space-y-10 desktop:hidden">{mobileResultsNode}</section>}
       </main>
       </ViewTransition>
     </>
