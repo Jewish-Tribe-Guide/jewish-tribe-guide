@@ -248,7 +248,7 @@ export default function AddressInput({ value, onChange, placeholder = 'Address o
           onClick={handleClear}
           aria-label="Clear"
           // active:text-slate-800 — same treatment as the other clear-inside-
-          // an-input buttons in this app (GenericDirectory, HospitalsDirectory).
+          // an-input buttons in this app (GenericDirectory).
           className="absolute inset-y-0 right-0 flex w-9 items-center justify-center text-slate-400 transition-colors hover:text-slate-600 active:text-slate-800 cursor-pointer"
         >
           <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24" aria-hidden="true">

@@ -1,9 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import AboutYourHospital from '@/components/tabs/AboutYourHospital'
 import { eruvim } from '@/data/resources'
-import HospitalsDirectory from '@/components/resources/HospitalsDirectory'
 import ResourceLoader from '@/components/resources/ResourceLoader'
 import ListingAdd from '@/components/resources/ListingAdd'
 import ListingForm from '@/components/resources/ListingForm'
@@ -13,9 +11,8 @@ import EruvInfo from '@/components/resources/EruvInfo'
 import ZmanimCard from '@/components/ZmanimCard'
 import UpButton from '@/components/UpButton'
 import TurnstileWidget, { type TurnstileHandle } from '@/components/TurnstileWidget'
-import type { DirectoryResource, DirectoryAnchor, MapFilters } from '@/types'
+import type { DirectoryResource, DirectoryAnchor } from '@/types'
 import { useCategories } from '@/lib/useCategories'
-import { useHospitals } from '@/lib/useHospitals'
 import { resolveCapabilities, bandImageFor } from '@/lib/categories'
 import { getCategoryColor } from '@/lib/categoryColor'
 import { community } from '@/community.config'
@@ -28,7 +25,7 @@ type ListingAction =
 
 export type FindResourcesProps = {
   /** Which resource view is open — a category id, or one of the curated pages
-   *  ('hospitals', 'eruv', 'zmanim'). This is the URL's slug segment, resolved
+   *  ('eruv', 'zmanim'). This is the URL's slug segment, resolved
    *  and validated by the route before this renders.
    *
    *  It used to be state seeded from history.state and kept in sync by this
@@ -51,9 +48,6 @@ export type FindResourcesProps = {
    *  desktop's "Browse everything" — see Landing.tsx), so there's no longer
    *  a separate "All resources" destination to distinguish from home. */
   onUp: () => void
-  /** Navigate to the map screen pre-filtered to this category, carrying the
-   *  directory's active search query and field filters. */
-  onViewMap?: (categoryId: string, query?: string, filters?: MapFilters) => void
   // ── Query-string state, read by the caller (see FindResourcesConnected) ────
   // Reading it here directly via useSearchParams() used to force this
   // component's entire render — the whole directory, not just these few
@@ -82,8 +76,6 @@ export type FindResourcesProps = {
    *  `URLSearchParams` FindResourcesConnected itself reads) so this file
    *  doesn't need `next/navigation` just to describe its own props. */
   searchFilters?: Record<string, string> | null
-  /** `?hospital=` */
-  searchHospital?: string | null
   /** `?form=` */
   searchForm?: string | null
   /** `?davening=` — "1" opens "All davening times" on arrival. See
@@ -103,21 +95,19 @@ export type FindResourcesProps = {
 }
 
 // A single resource detail view, opened by tapping a card on the home grid:
-// a category's listings (with add/edit), or a curated page (About Your
-// Hospital, Eruv, Zmanim), or the "suggest a category" form.
+// a category's listings (with add/edit), or a curated page (Eruv, Zmanim),
+// or the "suggest a category" form.
 export default function FindResources({
   view,
   listings,
   anchor,
   initialItemId,
   onUp,
-  onViewMap,
   searchItem = null,
   searchMatch = null,
   searchQuery = null,
   searchOpenNow = null,
   searchFilters = null,
-  searchHospital = null,
   searchForm = null,
   searchDavening = null,
   searchDaveningDay = null,
@@ -125,7 +115,7 @@ export default function FindResources({
 }: FindResourcesProps) {
   // Zmanim is a city-wide resource. It anchors on the visitor's typed address
   // when set, otherwise on the community's configured center + label — so it
-  // works for any community, with or without hospitals.
+  // works for any community.
   const zmanimCoords = anchor.coords ?? community.mapCenter
   const locationLabel = anchor.label || community.region
 
@@ -134,7 +124,6 @@ export default function FindResources({
   // desktop (see MobileSheet's and ActionDialog's own docs).
   const isMobile = useIsMobile()
   const categories = useCategories()
-  const hospitals = useHospitals() ?? []
 
   // Started when an Add/Edit form first opens (see `turnstileWanted` below),
   // not when the category page loads. It used to start on load, on the theory
@@ -159,7 +148,6 @@ export default function FindResources({
   //
   //   ?item=<id>      expand this listing on arrival
   //   ?q=<text>       pre-fill the category's search box
-  //   ?hospital=<id>  show that hospital's About page
   //   ?form=<mode>    an add/edit form is open over the list
   //   ?davening=1     the Minyanim view, in place of the list
   //   ?day=<key>      the day it opens on
@@ -168,7 +156,6 @@ export default function FindResources({
   const initialOpenNow = searchOpenNow === '1'
   const openMinyanimView = searchDavening === '1'
   const initialDaveningDay = searchDaveningDay ?? undefined
-  const hospitalDetailId = searchHospital
 
   const setParams = onParamsChange
 
@@ -265,16 +252,6 @@ export default function FindResources({
   const cardReopenItemId =
     action?.mode === 'edit' && action.listing.id === reopenItemId ? null : reopenItemId
 
-  // Open one hospital's About page (from the Hospitals list).
-  function openHospital(id: string) {
-    setParams({ hospital: id })
-  }
-
-  // Up from a hospital's About page → back to the Hospitals list.
-  const goToHospitals = () => {
-    setParams({ hospital: null })
-  }
-
   // Open a listing action (create/edit form). `replace: true` — see
   // actionSubject's own doc above for why: a plain setParams call goes
   // through router.push, which re-renders this whole route (including the
@@ -325,24 +302,6 @@ export default function FindResources({
   }
 
   // ── Special (non-category) detail views ─────────────────────────────────────
-  if (view === 'hospitals' && !hospitalDetailId) {
-    return <HospitalsDirectory anchor={anchor} onSelect={openHospital} onUp={onUp} onViewMap={onViewMap ? () => onViewMap('__hospitals__') : undefined} />
-  }
-  if (view === 'hospitals' && hospitalDetailId) {
-    // The hospital chosen from the list; its name (not the address) is the subtitle.
-    // (Patient feature — hospitals is non-empty whenever this view is reachable.)
-    const id = hospitalDetailId ?? hospitals[0]?.id ?? ''
-    const hospital = hospitals.find((h) => h.id === id)
-    const medical = categories?.find((c) => c.kind === 'medical')
-    return (
-      <AboutYourHospital
-        hospitalName={hospital?.name ?? ''}
-        info={hospital?.info}
-        onUp={goToHospitals}
-        upLabel={medical?.pluralLabel}
-      />
-    )
-  }
   if (view === 'eruv') {
     const eruv = categories?.find((c) => c.kind === 'eruv')
     return (

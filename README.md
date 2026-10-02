@@ -47,7 +47,7 @@ The single source of truth for branding. Edit:
   the Tailwind `primary` utilities track it automatically (the value in
   `globals.css` is only a fallback — no need to edit it).
 - `features` — turn off any hand-built module a community doesn't need
-  (`eruv`, `zmanim`, `medicalResources`, `patientSupport`, `volunteer`). The
+  (`eruv`, `zmanim`, `patientSupport`, `volunteer`). The
   card and its page/flow disappear when a flag is `false`.
 - `ui` — capability toggles for the app's affordances (all default on): public
   `contributions` (Add / Edit / Report — off = a curated, admin-only directory,
@@ -70,12 +70,12 @@ The single source of truth for branding. Edit:
 The directory anchors on the visitor's typed address, so **hospitals are
 optional**. For a general (non-patient) community, set `hospitals = []` in
 `src/data/hospitals.js` and turn off the patient-oriented `features`
-(`medicalResources`, `patientSupport`, `volunteer`) — those cards, the hospital
-map pins, and the "About Your Hospital" pages all disappear, and zmanim/eruv
+(`patientSupport`, `volunteer`) — those cards and the hospital map pins
+disappear, and zmanim/eruv
 anchor on `community.mapCenter` + `community.timezone` instead.
 
-- `hospitals` (+ `hospitalInfo`) — starter data for the patient module (map pins,
-  volunteer form, "About Your Hospital"). Seeded into the `hospital` DB table by
+- `hospitals` — starter data for the patient module (map pins, volunteer
+  form). Seeded into the `hospital` DB table by
   `npm run setup`; the app then reads it from the database, so edit these files
   for your initial set (or leave `hospitals` empty for a non-hospital community).
 - `resources.js → eruvim` — read directly at runtime; edit for your community's

@@ -89,9 +89,8 @@ function openNowIdsFor(
     })
     .map((p) => p.id)
 }
-// The hospital pin's colour and glyph live in categoryColor.ts, shared with
-// HospitalsDirectory's header band. Re-exported here for the map's own
-// callers.
+// The hospital pin's colour and glyph live in categoryColor.ts.
+// Re-exported here for the map's own callers.
 export { HOSPITAL_COLOR, HOSPITAL_ICON }
 // A dropped pin's marker id is prefixed with this so a click handler can
 // tell it apart from a real listing/hospital point without a separate prop

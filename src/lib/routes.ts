@@ -42,7 +42,6 @@ import type { CategoryKind } from './categories'
  *  was ever there to resolve it. This map is what makes `/eruv` resolve to the
  *  eruv-kind category regardless of what that category's own slug is. */
 export const FIXED_VIEW_KINDS: Record<string, CategoryKind> = {
-  hospitals: 'medical',
   eruv: 'eruv',
   zmanim: 'zmanim',
 }
@@ -57,6 +56,10 @@ export const RESERVED_SLUGS = new Set([
   // The fixed views above — a listing category named "Eruv" would otherwise
   // shadow the real Eruv Information screen at the same URL.
   ...Object.keys(FIXED_VIEW_KINDS),
+  // The old Jewish Medical Resources screen lived here. Its content was
+  // made-up placeholder details, so the screen is gone, but the URL stays
+  // reserved for the real hospital pages rather than going to a category.
+  'hospitals',
   // Top-level routes that would otherwise look like a community.
   'admin',
   'inbox',

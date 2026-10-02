@@ -5,14 +5,13 @@ import userEvent from '@testing-library/user-event'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { makeCategory } from '@/test/providerFixtures'
 import { ForcedViewport } from '@/lib/useIsMobile'
-import type { DirectoryResource, Hospital } from '@/types'
+import type { DirectoryResource } from '@/types'
 import FindResources from './FindResources'
 
 // FindResources is a router — which sub-screen renders for a given `view`,
-// and how the searchItem/searchQuery/searchHospital/searchForm props drive
+// and how the searchItem/searchQuery/searchForm props drive
 // it — not a renderer of any one of those screens itself. Every real
-// sub-screen (HospitalsDirectory, AboutYourHospital, EruvInfo, ZmanimCard,
-// ResourceLoader, ListingForm) is its own component with its
+// sub-screen (EruvInfo, ZmanimCard, ResourceLoader, ListingForm) is its own component with its
 // own concerns and gets mocked out to a stub that surfaces just enough props
 // to assert the routing decision was right — same approach as Landing.test.tsx.
 //
@@ -23,17 +22,6 @@ import FindResources from './FindResources'
 // render this component with zero Dynamic API calls, so it can actually be
 // prerendered — see the comment on FindResources' own searchItem prop.
 
-vi.mock('@/components/resources/HospitalsDirectory', () => ({
-  default: ({ onSelect }: { onSelect: (id: string) => void }) => (
-    <div>
-      <p>HospitalsDirectory</p>
-      <button onClick={() => onSelect('hosp-1')}>Select hosp-1</button>
-    </div>
-  ),
-}))
-vi.mock('@/components/tabs/AboutYourHospital', () => ({
-  default: ({ hospitalName }: { hospitalName: string }) => <p>AboutYourHospital: {hospitalName}</p>,
-}))
 vi.mock('@/components/resources/EruvInfo', () => ({ default: () => <p>EruvInfo</p> }))
 vi.mock('@/components/ZmanimCard', () => ({ default: () => <p>ZmanimCard</p> }))
 vi.mock('@/components/resources/ResourceLoader', () => ({
@@ -93,25 +81,6 @@ function listing(overrides: Partial<DirectoryResource> = {}): DirectoryResource 
 }
 
 describe('FindResources — curated (non-category) views', () => {
-  it('shows the hospitals list, and selecting one reports ?hospital=<id> via onParamsChange', async () => {
-    const user = userEvent.setup()
-    const onParamsChange = vi.fn()
-    renderWithProviders(<FindResources view="hospitals" listings={null} anchor={anchor} onUp={vi.fn()} onParamsChange={onParamsChange} />)
-
-    expect(screen.getByText('HospitalsDirectory')).toBeInTheDocument()
-    await user.click(screen.getByText('Select hosp-1'))
-
-    expect(onParamsChange).toHaveBeenCalledWith({ hospital: 'hosp-1' })
-  })
-
-  it('shows a hospital’s About page once searchHospital is set', () => {
-    renderWithProviders(<FindResources view="hospitals" listings={null} anchor={anchor} onUp={vi.fn()} searchHospital="hosp-1" />, {
-      content: { hospitals: [{ id: 'hosp-1', name: 'General Hospital' } as Hospital] },
-    })
-
-    expect(screen.getByText('AboutYourHospital: General Hospital')).toBeInTheDocument()
-  })
-
   it('shows the Eruv view for view="eruv"', () => {
     renderWithProviders(<FindResources view="eruv" listings={null} anchor={anchor} onUp={vi.fn()} />)
     expect(screen.getByText('EruvInfo')).toBeInTheDocument()

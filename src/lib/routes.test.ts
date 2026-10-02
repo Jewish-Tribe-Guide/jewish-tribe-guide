@@ -61,6 +61,16 @@ describe('slugRejectionReason', () => {
     }
   })
 
+  // /hospitals was the old Jewish Medical Resources screen, whose only content
+  // was made-up placeholder details (fake phone numbers, invented staff). It
+  // must not come back as a fixed view, and the URL stays kept for the real
+  // hospital pages.
+  it('has no hospitals fixed view, but keeps its URL reserved', () => {
+    expect(FIXED_VIEW_KINDS).not.toHaveProperty('hospitals')
+    expect(Object.values(FIXED_VIEW_KINDS)).not.toContain('medical')
+    expect(slugRejectionReason('hospitals')).toMatch(/reserved/i)
+  })
+
   it('is case- and whitespace-insensitive when matching reserved slugs', () => {
     expect(slugRejectionReason('  MAP  ')).toMatch(/reserved/i)
   })

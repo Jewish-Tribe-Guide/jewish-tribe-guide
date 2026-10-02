@@ -9,7 +9,6 @@ type HospitalRow = {
   latitude: number
   longitude: number
   timezone: string
-  info: Hospital['info']
 }
 
 /** Every hospital, ordered for display. Empty for a non-hospital community. */
@@ -19,7 +18,9 @@ export async function listHospitals(community: string): Promise<Hospital[]> {
   cacheLife('days')
   const { data, error } = await getAdminClient()
     .from('hospital')
-    .select('id, name, latitude, longitude, timezone, info')
+    // Deliberately not `info`: that column only ever held made-up placeholder
+    // details (see Hospital in types.ts), and every page ships this list.
+    .select('id, name, latitude, longitude, timezone')
     .eq('community_id', community)
     .order('sort_order', { ascending: true })
     .order('name', { ascending: true })
@@ -31,7 +32,6 @@ export async function listHospitals(community: string): Promise<Hospital[]> {
     latitude: h.latitude,
     longitude: h.longitude,
     timezone: h.timezone,
-    info: h.info ?? undefined,
   }))
 }
 

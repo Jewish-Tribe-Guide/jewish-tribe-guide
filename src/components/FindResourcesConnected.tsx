@@ -5,11 +5,11 @@ import FindResources, { type FindResourcesProps } from './FindResources'
 
 type Props = Omit<
   FindResourcesProps,
-  'searchItem' | 'searchMatch' | 'searchQuery' | 'searchOpenNow' | 'searchFilters' | 'searchHospital' | 'searchForm' | 'searchDavening' | 'searchDaveningDay' | 'onParamsChange'
+  'searchItem' | 'searchMatch' | 'searchQuery' | 'searchOpenNow' | 'searchFilters' | 'searchForm' | 'searchDavening' | 'searchDaveningDay' | 'onParamsChange'
 >
 
 // The query-string-aware half of FindResources, split out so the plain-URL
-// case (no ?item=/?q=/?hospital=/?form= at all — the common one: a fresh
+// case (no ?item=/?q=/?form= at all — the common one: a fresh
 // visit, a crawler, a card tap) never has to call useSearchParams() to
 // render. See FindResources' own searchItem/onParamsChange doc comments —
 // this is what actually supplies them once the page has hydrated. The
@@ -64,7 +64,7 @@ export default function FindResourcesConnected(props: Props) {
     // GenericDirectory already holds search/openNow/filter state locally
     // (this call exists purely so the URL is shareable and survives a
     // reload — see GenericDirectory's own hydration effects for the other
-    // half of that). router.push stays for the item/form/hospital
+    // half of that). router.push stays for the item/form
     // navigations below — those DO need Next's own history/back-button
     // integration, which this sync deliberately opts out of.
     if (opts?.replace) window.history.replaceState(window.history.state, '', url)
@@ -79,7 +79,6 @@ export default function FindResourcesConnected(props: Props) {
       searchQuery={params.get('q')}
       searchOpenNow={params.get('openNow')}
       searchFilters={Object.fromEntries(params.entries())}
-      searchHospital={params.get('hospital')}
       searchForm={params.get('form')}
       searchDavening={params.get('davening')}
       searchDaveningDay={params.get('day')}

@@ -1,6 +1,7 @@
-// Seeds the `hospital` table from the starter data in src/data/hospitals.js and
-// src/data/hospitalInfo.js (the per-hospital "Jewish life" details fold into the
-// `info` jsonb column). Idempotent: upserts by id. A non-hospital community
+// Seeds the `hospital` table from the starter data in src/data/hospitals.js.
+// Idempotent: upserts by id. It writes `info: null` on purpose: that column
+// used to be filled from a starter file of made-up "Jewish life" details
+// (fake phone numbers, invented staff), so re-running this clears them. A non-hospital community
 // leaves hospitals.js empty and this seeds nothing. Normally run via
 // `npm run setup`; on its own:
 //
@@ -8,7 +9,6 @@
 
 import { createClient } from '@supabase/supabase-js'
 import { hospitals } from '../src/data/hospitals.js'
-import { hospitalInfo } from '../src/data/hospitalInfo.js'
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -30,7 +30,7 @@ const rows = hospitals.map((h, i) => ({
   longitude: h.longitude,
   timezone: h.timezone,
   sort_order: i,
-  info: hospitalInfo[h.id] ?? null,
+  info: null,
 }))
 
 const { error } = await supabase.from('hospital').upsert(rows, { onConflict: 'id' })
