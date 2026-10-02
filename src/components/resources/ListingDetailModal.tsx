@@ -10,11 +10,14 @@ import { listingSlug } from '@/lib/listingSlug'
 import ListingView from './ListingView'
 import type { SearchFound } from '@/lib/askSearch'
 import ListingEditBar from './ListingEditBar'
-import ListingEditor from './ListingEditor'
+import dynamic from 'next/dynamic'
 import { ChevronLeftIcon, ChevronRightIcon } from '@/components/icons'
 import { useBodyScrollLock } from '@/lib/useBodyScrollLock'
 import BackIconButton from '@/components/BackIconButton'
 import BodyPortal from '@/components/BodyPortal'
+
+// Loaded when editing starts (see MapPlaceDetail).
+const ListingEditor = dynamic(() => import('./ListingEditor'))
 
 type Props = {
   isOpen: boolean

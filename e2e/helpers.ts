@@ -45,8 +45,8 @@ async function apiGet(request: APIRequestContext, url: string): Promise<Record<s
  *  it writes nothing; and a test of one home doesn't depend on which one the
  *  admin has chosen. Load the page with `?preview=1` after calling this. */
 export async function previewSettings(page: Page, community: string, overrides: Record<string, unknown>): Promise<void> {
-  const { settings } = (await (await page.request.get(`/api/site-settings?community=${community}`)).json()) as { settings: Record<string, unknown> }
-  const { sections } = (await (await page.request.get(`/api/home-sections?community=${community}`)).json()) as { sections: unknown[] }
+  const { settings } = (await apiGet(page.request, `/api/site-settings?community=${community}`)) as { settings: Record<string, unknown> }
+  const { sections } = (await apiGet(page.request, `/api/home-sections?community=${community}`)) as { sections: unknown[] }
   await page.addInitScript((value) => {
     try {
       sessionStorage.setItem('jpc:adminPreviewDraft', value)

@@ -9,7 +9,11 @@ import type { CardDef, ListingHit } from './sections'
 import type { Answer } from '@/lib/askAnswer'
 import Highlight from '@/components/resources/Highlight'
 import AskAnswer from './AskAnswer'
-import AskTheGroup, { type AskGroupProps } from './AskTheGroup'
+import dynamic from 'next/dynamic'
+import type { AskGroupProps } from './AskTheGroup'
+
+// Only after a search finds nothing (see Landing).
+const AskTheGroup = dynamic(() => import('./AskTheGroup'))
 
 // How many of each to show before "See all" — matches the mockup this was
 // built from. Categories and listings are capped independently: a broad

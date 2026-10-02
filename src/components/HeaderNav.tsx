@@ -4,7 +4,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { track } from '@vercel/analytics'
 import { resourceCards, groupCardsIntoSections, useEntryCards } from '@/components/home/sections'
-import FeedbackForm from '@/components/FeedbackForm'
+import dynamic from 'next/dynamic'
 import { CategoryGlyph } from '@/lib/categoryIcons'
 import { useCategories } from '@/lib/useCategories'
 import { useSiteSettings } from '@/lib/useSiteSettings'
@@ -13,6 +13,10 @@ import { useCommunitySlug } from '@/lib/communityContext'
 import { useHomeSections } from '@/lib/useHomeSections'
 import { routes } from '@/lib/routes'
 import { DEFAULT_DESKTOP_NAV_ITEMS, type DesktopNavItem } from '@/lib/siteSettings'
+
+// Loaded when Feedback is first opened (it carries the anti-spam check), not
+// with every page's header.
+const FeedbackForm = dynamic(() => import('@/components/FeedbackForm'))
 
 /** How long a mega-menu stays open after the pointer leaves — same value and
  *  same reason as SectionTabs used to use: without it, the gap between the

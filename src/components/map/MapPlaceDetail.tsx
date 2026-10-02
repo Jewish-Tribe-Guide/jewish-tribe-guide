@@ -6,13 +6,17 @@ import { resolveCapabilities, type CategoryConfig } from '@/lib/categories'
 import ListingView, { type Onward } from '@/components/resources/ListingView'
 import type { SearchFound } from '@/lib/askSearch'
 import ListingEditBar from '@/components/resources/ListingEditBar'
-import ListingEditor from '@/components/resources/ListingEditor'
+import dynamic from 'next/dynamic'
 import UpButton from '@/components/UpButton'
 import { ui } from '@/lib/uiConfig'
 import { routes } from '@/lib/routes'
 import { listingSlug } from '@/lib/listingSlug'
 import { useCommunitySlug } from '@/lib/communityContext'
 import BackIconButton from '@/components/BackIconButton'
+
+// The editor (address lookup, hours, photos) loads when editing starts, not
+// with the listing, so the Map page's code stays light.
+const ListingEditor = dynamic(() => import('@/components/resources/ListingEditor'))
 
 type Props = {
   item: DirectoryResource

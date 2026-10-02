@@ -1,6 +1,7 @@
 'use client'
 
 import { forwardRef, useImperativeHandle, useRef, useState } from 'react'
+import dynamic from 'next/dynamic'
 import { track } from '@vercel/analytics'
 import type { DirectoryResource } from '@/types'
 import { PHOTO_FIELD_KEY, resolveCapabilities, type CategoryConfig, type CategoryField } from '@/lib/categories'
@@ -16,13 +17,11 @@ import { listingSlug } from '@/lib/listingSlug'
 import CategoryIcon from '@/components/CategoryIcon'
 import PinnedBadge from '@/components/PinnedBadge'
 import UpvoteButton from './UpvoteButton'
-import ListingDetailModal from './ListingDetailModal'
 import MobileSheet from './MobileSheet'
 import { useListingOnward } from './listingOnward'
 import type { Onward } from './ListingView'
 import Highlight from './Highlight'
 import type { SearchFound } from '@/lib/askSearch'
-import MapPlaceDetail from '@/components/map/MapPlaceDetail'
 import { useListingActions, type ListingAction } from './useListingActions'
 import SwipeRow, { type SwipeAction } from '@/components/SwipeRow'
 import Chip from './Chip'
@@ -32,6 +31,13 @@ import { ui } from '@/lib/uiConfig'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { usePinned } from '@/lib/pinnedContext'
 import { countEvent } from '@/lib/countEvent'
+
+// The opened listing (its view, editor, Still right, the anti-spam check,
+// the map) loads when a listing is first opened, not with every list of
+// cards: the home draws these cards for its search answers, and loading all
+// that with the home put it over its 400 KB budget (Oct 2).
+const ListingDetailModal = dynamic(() => import('./ListingDetailModal'))
+const MapPlaceDetail = dynamic(() => import('@/components/map/MapPlaceDetail'))
 
 /** Pin and Share are the two that belong to SCANNING a list — shortlisting
  *  as you read, sending one to someone. "Set as location" is deliberately
@@ -182,6 +188,9 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
   inColumn = false,
 }, ref) {
   const [expanded, setExpanded] = useState(!!defaultExpanded)
+  // Once opened, the sheet keeps its content while it slides closed.
+  const [opened, setOpened] = useState(expanded)
+  if (expanded && !opened) setOpened(true)
   const cardRootRef = useRef<HTMLDivElement>(null)
   useImperativeHandle(ref, () => ({
     open: () => {
@@ -686,7 +695,7 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
           stays on screen long enough to animate closed. */}
       {isMobile && !inColumn && (
         <MobileSheet isOpen={expanded} onClose={close} title={item.name} draggable titleHidden>
-          <MapPlaceDetail
+          {opened && <MapPlaceDetail
             item={item}
             category={category}
             color={color}
@@ -694,13 +703,14 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
             upvote={upvote}
             place={place ?? null}
             onward={onward}
-          />
+          />}
         </MobileSheet>
       )}
 
       {/* Desktop: a dialog, where nothing hosts the listing itself. A
           category page does: it opens in the list's column (ListingColumn). */}
-      {!isMobile && !inColumn && (
+      {/* It draws nothing while closed, so it's only there once opened. */}
+      {!isMobile && !inColumn && opened && (
         <ListingDetailModal
           isOpen={expanded}
           onClose={close}

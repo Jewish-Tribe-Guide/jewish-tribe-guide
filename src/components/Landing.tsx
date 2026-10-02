@@ -5,7 +5,7 @@ import { track } from '@vercel/analytics'
 import { CardGrid, CategoryTileRow, PlacesResults, listingHitsFrom, groupCardsIntoSections, resourceCards, useEntryCards } from '@/components/home/sections'
 import { cardMatches } from '@/lib/cardSearch'
 import AskAnswer from '@/components/home/AskAnswer'
-import AskTheGroup from '@/components/home/AskTheGroup'
+import dynamic from 'next/dynamic'
 import ReadAs from '@/components/home/ReadAs'
 import { nearMiss, searchAsk } from '@/lib/askSearch'
 import { answerFor, eruvAnswer, metaAnswer, nearMissAnswer, timesAnswer } from '@/lib/askAnswer'
@@ -52,6 +52,10 @@ import { useSiteSettings } from '@/lib/useSiteSettings'
 import { ui } from '@/lib/uiConfig'
 import { useCommunityTimezone } from '@/lib/communityContext'
 import { dayLine } from '@/lib/todayHome'
+
+// Only after a search finds nothing; it carries the anti-spam check, which
+// the home shouldn't load for everyone (see GenericListingCard).
+const AskTheGroup = dynamic(() => import('@/components/home/AskTheGroup'))
 
 export type LandingProps = {
   onNavigate: NavigateFn
