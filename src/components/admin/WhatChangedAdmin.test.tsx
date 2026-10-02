@@ -23,6 +23,7 @@ const change = (id: string, name: string, kind: Change['kind'], hidden = false):
   kind,
   listing: { id: `${name}-0000`, name, category: 'grocery' },
   items: [],
+  parts: [],
   hidden,
 })
 

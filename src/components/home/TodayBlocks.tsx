@@ -387,7 +387,7 @@ function ThisWeek({ thisWeek, now, categories, communitySlug, timezone, region }
     <Block title={region ? `This week in ${region}` : 'This week'} more={more} testId="today-this-week" wide last>
       <ul>
         {thisWeek.shown.map((change) => (
-          <ChangeRow key={change.id} change={change} categories={categories} communitySlug={communitySlug} when={changeDay(change.at, now, timezone)} />
+          <ChangeRow key={change.id} change={change} categories={categories} communitySlug={communitySlug} when={changeDay(change.at, now, timezone)} fit />
         ))}
       </ul>
     </Block>

@@ -1539,6 +1539,43 @@ describe('approveSubmission: activity log and grocery item dates', () => {
     expect(rows[0]).toMatchObject({ community: 'philly', source: 'submission', actorEmail: 'rachel@example.com', submissionId: 'sub-1' })
   })
 
+  it('an edit logs what it changed, as visitors read it: new values only', async () => {
+    const sub = baseSubmission({
+      operation: 'update',
+      target_id: 'res-1',
+      payload: listingPayload({ category: 'grocery', phone: '215-555-0199', details: { m: ['Challah', 'Stew meat'] } }) as unknown as Record<string, unknown>,
+    })
+    mockFlow(sub, { id: 'res-1', category: 'grocery', name: 'Test Shul', anchor_id: 'community', address: '123 Main St', phone: '215-555-0100', details: { m: ['Challah'] } })
+
+    await approveSubmission('sub-1')
+
+    const [listing] = mockRecordActivity.mock.calls[0][0]
+    expect(listing.kind).toBe('listing_edited')
+    expect(listing.changes).toEqual([
+      { key: 'phone', label: 'Phone', value: '215-555-0199' },
+      { key: 'm', label: 'Kosher items', value: 'added Stew meat' },
+    ])
+  })
+
+  it('a new place logs its short facts', async () => {
+    const sub = baseSubmission({ operation: 'create', payload: listingPayload({ category: 'grocery', details: { m: ['Challah'] } }) as unknown as Record<string, unknown> })
+    mockFlow(sub)
+
+    await approveSubmission('sub-1')
+
+    expect(mockRecordActivity.mock.calls[0][0][0]).toMatchObject({ kind: 'listing_added', changes: [{ key: 'facts', label: '', value: 'Grocery', quiet: true }] })
+  })
+
+  it('not working out what changed never fails the approval: the change says "updated"', async () => {
+    const sub = baseSubmission({ operation: 'update', target_id: 'res-1', payload: listingPayload({ category: 'grocery', details: { m: ['Challah'] } }) as unknown as Record<string, unknown> })
+    mockFlow(sub, { id: 'res-1', category: 'grocery', name: 'Test Shul', anchor_id: 'community', address: '123 Main St', phone: '215-555-0100', details: { m: ['Wine'] } })
+    mockGetCategoryById.mockRejectedValue(new Error('categories unreachable'))
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    await expect(approveSubmission('sub-1')).resolves.toMatchObject({ status: 'approved' })
+    expect(mockRecordActivity.mock.calls[0][0][0]).not.toHaveProperty('changes')
+  })
+
   it('on an edit, dates only the items it adds, keeps the rest, and drops removed ones', async () => {
     const sub = baseSubmission({
       operation: 'update',
@@ -1649,6 +1686,13 @@ describe('activityForApproval', () => {
     expect(activityForApproval(sub, 'res-1', [])).toEqual([
       expect.objectContaining({ kind: 'listing_removed', source: 'google', actorEmail: null, resourceId: 'res-1' }),
     ])
+  })
+
+  it('puts what changed on the listing row, never on a removal or an item', () => {
+    const changes = [{ key: 'phone', label: 'Phone', value: '215-555-0199' }]
+    const edit = activityForApproval(baseSubmission({ operation: 'update', target_id: 'res-1' }), 'res-1', [{ fieldKey: 'm', item: 'Wine' }], changes)
+    expect(edit.map((r) => r.changes)).toEqual([changes, undefined])
+    expect(activityForApproval(baseSubmission({ operation: 'delete', target_id: 'res-1' }), 'res-1', [], changes)[0]).not.toHaveProperty('changes')
   })
 
   it('leaves an edit with no email as "a neighbor" (no actor)', () => {

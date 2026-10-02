@@ -48,7 +48,7 @@ const { data: cats } = await supabase.from('category').select('id, fields').eq('
 const itemKeys = new Map((cats ?? []).map((c) => [c.id, (c.fields ?? []).filter((f) => f.type === 'tags').map((f) => f.key)]))
 const { data: listings, error } = await supabase
   .from('resource')
-  .select('id, name, category, details')
+  .select('id, name, category, phone, details')
   .eq('community_id', community)
   .eq('status', 'approved')
   .order('name')
@@ -92,6 +92,34 @@ const plan = [
   [13, 21, 'listing_edited', 'submission', neighbor, pick(shuls, 5)],
 ]
 
+// What the recent edits changed (migration 069), said the way What changed
+// says it, from the listing's REAL current values: a seeded edit "changed"
+// nothing, so its new value is simply what the listing has now. Edits from
+// more than a week back get none, as edits from before 069 have none and
+// say "updated".
+const time12 = (hhmm) => {
+  const [h, m] = hhmm.split(':').map(Number)
+  return `${h % 12 || 12}${m ? `:${String(m).padStart(2, '0')}` : ''} ${h >= 12 ? 'PM' : 'AM'}`
+}
+const TEFILLAH = { shacharis: 'Shacharis', mincha: 'Mincha', maariv: 'Maariv', mincha_maariv: 'Mincha & Maariv', kabbalas_shabbos: 'Kabbalas Shabbos', shabbos_mussaf: 'Shabbos Mussaf' }
+const minyanTime = (t) => {
+  const m = /^(\d{1,2}):(\d{2})\s*([ap])m$/i.exec(t.trim())
+  return m ? time12(`${(Number(m[1]) % 12) + (m[3].toLowerCase() === 'p' ? 12 : 0)}:${m[2]}`) : t
+}
+function seededChanges(kind, l) {
+  const d = l.details ?? {}
+  if (kind === 'listing_added') {
+    const facts = [d.s, ...[d.foodType, d.t, d.kosherCert].flat()].filter((x) => typeof x === 'string' && x.trim())
+    return facts.length ? [{ key: 'facts', label: '', value: [...new Set(facts)].join(' · '), quiet: true }] : null
+  }
+  if (kind !== 'listing_edited') return null
+  const sun = d.hours?.sun
+  if (sun?.open) return [{ key: 'hours', label: 'Hours', value: `Sunday ${time12(sun.open)} – ${time12(sun.close)}` }]
+  const m = (d.minyanim ?? []).find((x) => x.days?.length === 1 && x.days[0] === 'sat' && TEFILLAH[x.tefillah])
+  if (m) return [{ key: 'minyanim', label: '', value: `Shabbos ${TEFILLAH[m.tefillah]} ${minyanTime(m.time)}` }]
+  return l.phone ? [{ key: 'phone', label: 'Phone', value: l.phone }] : null
+}
+
 // Nothing on Shabbos afternoon: the two Saturday rows are Motzei Shabbos.
 /** That many days ago at that hour in New York (EDT, UTC-4, in October). */
 const at = (daysAgo, hour) => {
@@ -115,19 +143,28 @@ const rows = plan
       actor_email: who,
       submission_id: null,
       created_at: at(daysAgo, hour),
+      changes: daysAgo <= 7 && !isItem ? seededChanges(kind, l) : null,
       _show: `${l.name} (${l.category})${isItem ? ` "${target.item}"` : ''}`,
     }
   })
 
-for (const r of rows) console.log(`  ${r.created_at.slice(0, 16).replace('T', ' ')}Z  ${r.source}/${r.kind}  ${r._show}  [${r.actor_email.split('@')[0]}]`)
+for (const r of rows) {
+  console.log(`  ${r.created_at.slice(0, 16).replace('T', ' ')}Z  ${r.source}/${r.kind}  ${r._show}  [${r.actor_email.split('@')[0]}]`)
+  for (const c of r.changes ?? []) console.log(`      ${c.label ? `${c.label} ` : ''}${c.value}`)
+}
 console.log(`${rows.length} rows (of ${plan.length} planned; a missing category or item drops its row).`)
 
 if (!APPLY) {
   console.log('Dry run: nothing written. Re-run with --apply.')
   process.exit(0)
 }
+// Before migration 069 the log has no `changes`: the rows go in without it.
+const { error: probe } = await supabase.from('activity').select('changes').limit(1)
+const hasChanges = !probe
 const removed = await removeSeed()
-// eslint-disable-next-line @typescript-eslint/no-unused-vars -- _show is the dry run's label, not a column
-const { error: insertError } = await supabase.from('activity').insert(rows.map(({ _show, ...r }) => r))
+const { error: insertError } = await supabase
+  .from('activity')
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- _show is the dry run's label, not a column
+  .insert(rows.map(({ _show, changes, ...r }) => (hasChanges ? { ...r, changes } : r)))
 if (insertError) throw new Error(insertError.message)
-console.log(`Removed ${removed} earlier seeded rows; wrote ${rows.length}.`)
+console.log(`Removed ${removed} earlier seeded rows; wrote ${rows.length}.${hasChanges ? '' : ' Without what each edit changed: migration 069 isn’t applied yet.'}`)

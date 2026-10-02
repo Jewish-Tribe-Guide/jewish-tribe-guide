@@ -3,6 +3,7 @@ import { TAGS } from './cacheTags'
 import { getAdminClient } from './supabase/admin'
 import { CHANGE_KINDS, type ChangeLogRow } from './whatChanged'
 import type { ActivityKind, ActivitySource } from './activity'
+import type { ChangePart } from './changeParts'
 
 // Reads the activity log for What changed (step 7a), and hides a change.
 // Never reads who made a change (actor_email): nothing here needs it.
@@ -19,18 +20,32 @@ type Row = {
   item: string | null
   submission_id: string | null
   resource_id: string | null
+  field_key: string | null
   hidden_at?: string | null
+  changes?: ChangePart[] | null
 }
 
-/** The newest change rows, each with its listing (any status). Before
- *  migration 068 the log has no hidden_at, and nothing is hidden. */
+/** Columns added after the log was (068, 069): read when they're there.
+ *  Before 068 nothing is hidden; before 069 every edit says "updated". */
+const LATER_COLUMNS = ['hidden_at', 'changes'] as const
+
+function missingLater(error: { message: string } | null, columns: readonly string[]): string | undefined {
+  return error ? LATER_COLUMNS.find((c) => columns.includes(c) && error.message.includes(c)) : undefined
+}
+
+/** The newest change rows, each with its listing (any status). */
 export async function listChangeLogUncached(community: string): Promise<ChangeLogRow[]> {
   const supabase = getAdminClient()
-  const read = (columns: string) =>
-    supabase.from('activity').select(columns).eq('community_id', community).in('kind', CHANGE_KINDS).order('created_at', { ascending: false }).limit(ROW_LIMIT)
-  const base = 'id, created_at, kind, source, item, submission_id, resource_id'
-  let { data, error } = await read(`${base}, hidden_at`)
-  if (error && /hidden_at/.test(error.message)) ({ data, error } = await read(base))
+  const read = (columns: readonly string[]) =>
+    supabase.from('activity').select(columns.join(', ')).eq('community_id', community).in('kind', CHANGE_KINDS).order('created_at', { ascending: false }).limit(ROW_LIMIT)
+  let columns: string[] = ['id', 'created_at', 'kind', 'source', 'item', 'field_key', 'submission_id', 'resource_id', ...LATER_COLUMNS]
+  let { data, error } = await read(columns)
+  // One missing column is reported at a time, in whatever order: drop each
+  // as it's named, until the read works or fails for another reason.
+  for (let later = missingLater(error, columns); later; later = missingLater(error, columns)) {
+    columns = columns.filter((c) => c !== later)
+    ;({ data, error } = await read(columns))
+  }
   if (error) throw new Error(`Could not read the activity log: ${error.message}`)
   const rows = (data ?? []) as unknown as Row[]
 
@@ -48,8 +63,10 @@ export async function listChangeLogUncached(community: string): Promise<ChangeLo
     kind: r.kind,
     source: r.source,
     item: r.item,
+    fieldKey: r.field_key,
     submissionId: r.submission_id,
     hidden: !!r.hidden_at,
+    changes: Array.isArray(r.changes) ? r.changes : null,
     listing: r.resource_id ? (listings.get(r.resource_id) ?? null) : null,
   }))
 }

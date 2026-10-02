@@ -7,6 +7,8 @@
 // they need a history that started before anyone asked for it.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import type { ChangePart } from './changeParts'
+
 export const ACTIVITY_KINDS = [
   'listing_added',
   'listing_edited',
@@ -31,6 +33,9 @@ export type ActivityInput = {
   item?: string
   actorEmail?: string | null
   submissionId?: string | null
+  /** What an approved edit changed, as visitors read it (changeParts.ts);
+   *  a new place's facts. Only on listing_edited / listing_added. */
+  changes?: ChangePart[]
 }
 
 /** The name submitGoogleClosure files its reports under. */

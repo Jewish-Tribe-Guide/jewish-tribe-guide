@@ -12,6 +12,7 @@ import TodayBlocks from './TodayBlocks'
 import type { CardDef } from './sections'
 import type { TodayBlockId } from '@/lib/siteSettings'
 import type { Change } from '@/lib/whatChanged'
+import type { ChangePart } from '@/lib/changeParts'
 
 vi.mock('next/navigation', () => ({
   useRouter: () => mockRouter,
@@ -200,13 +201,14 @@ describe('blocks the admin has turned off', () => {
 })
 
 describe('This week, on Today', () => {
-  const change = (name: string, kind: Change['kind'], at: string, items: string[] = []): Change => ({
+  const change = (name: string, kind: Change['kind'], at: string, items: string[] = [], parts: ChangePart[] = []): Change => ({
     id: name,
     rowIds: [1],
     at,
     kind,
     listing: { id: `${name}-0000`, name, category: 'grocery' },
     items,
+    parts,
     hidden: false,
   })
   const shown = [
@@ -228,6 +230,22 @@ describe('This week, on Today', () => {
       'New: Food & FriendsGrocery · Friday, Oct 2',
     ])
     expect(within(block).getByRole('link', { name: 'All 5 ›' })).toHaveAttribute('href', '/philly/changes')
+  })
+
+  it('each line says what changed, as much as fits; “and 2 more” opens the rest in place, and the line opens the listing', () => {
+    const parts = [
+      { key: 'hours', label: 'Hours', value: 'Sunday 11 AM – 10 PM' },
+      { key: 'phone', label: 'Phone', value: '(215) 382-5092' },
+      { key: 'website', label: 'Website', value: 'benjerry.com/upenn' },
+      { key: 't', label: 'Food Type', value: 'Dairy' },
+    ]
+    show(tuesday(), weekday, vi.fn(), null, [], { total: 1, shown: [change('Ben & Jerry’s', 'edited', '2026-10-04T22:00:00Z', [], parts)] })
+    const row = screen.getByTestId('change')
+    expect(within(row).getByTestId('change-parts')).toHaveTextContent('Hours Sunday 11 AM – 10 PM · Phone (215) 382-5092 · and 2 more')
+    expect(within(row).getByRole('link')).toHaveAttribute('href', expect.stringMatching(/^\/philly\/grocery\//))
+    fireEvent.click(within(row).getByRole('button', { name: 'and 2 more' }))
+    expect(within(row).getByTestId('change-parts').textContent).toBe('Hours Sunday 11 AM – 10 PMPhone (215) 382-5092Website benjerry.com/upennFood Type Dairy')
+    expect(within(row).queryByRole('button')).not.toBeInTheDocument()
   })
 
   it('no All when they’re all here; no block when nothing changed, or the admin turned it off', () => {

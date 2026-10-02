@@ -1,4 +1,5 @@
 import type { ActivityKind, ActivitySource } from './activity'
+import type { ChangePart } from './changeParts'
 
 // ── What changed (step 7a) ───────────────────────────────────────────────────
 // The activity log read back for visitors: the What changed page and Today's
@@ -26,8 +27,12 @@ export type ChangeLogRow = {
   kind: ActivityKind
   source: ActivitySource
   item: string | null
+  /** The item's field, on an item_added row. */
+  fieldKey?: string | null
   submissionId: string | null
   hidden: boolean
+  /** What it changed, as visitors read it (migration 069; null before). */
+  changes?: ChangePart[] | null
   listing: { id: string; name: string; category: string; status: string } | null
 }
 
@@ -42,6 +47,9 @@ export type Change = {
   kind: ChangeKind
   listing: { id: string; name: string; category: string }
   items: string[]
+  /** What it changed: "Hours" · "Sunday 11 AM – 10 PM", or a new place's
+   *  facts. Empty for an edit from before migration 069 ("updated"). */
+  parts: ChangePart[]
   hidden: boolean
 }
 
@@ -72,6 +80,10 @@ export function whatChanged(rows: readonly ChangeLogRow[], timezone: string, opt
             : 'edited'
     const newest = group.reduce((a, b) => (b.createdAt > a.createdAt ? b : a))
     const { id, name, category } = newest.listing!
+    // The items an edit added already head the line ("Challah added at
+    // ALDI"); their list isn't said again under it.
+    const itemFields = new Set(group.filter((r) => r.kind === 'item_added' && r.fieldKey).map((r) => r.fieldKey))
+    const parts = kind === 'removed' ? [] : group.flatMap((r) => (r.kind === 'item_added' ? [] : (r.changes ?? []))).filter((p) => !(kind === 'items' && itemFields.has(p.key)))
     return {
       id: group.map((r) => r.id).sort((a, b) => a - b).join('-'),
       rowIds: group.map((r) => r.id),
@@ -79,6 +91,7 @@ export function whatChanged(rows: readonly ChangeLogRow[], timezone: string, opt
       kind,
       listing: { id, name, category },
       items,
+      parts,
       hidden: group.every((r) => r.hidden),
     }
   })
@@ -111,6 +124,31 @@ export function thisWeek(changes: readonly Change[], now: number): { total: numb
   const places = new Set<string>()
   const shown = week.filter((c) => !places.has(c.listing.id) && places.add(c.listing.id)).slice(0, 3)
   return { total: week.length, shown }
+}
+
+/** About two lines on a phone's This week row: what's said there before
+ *  "and 2 more" (which opens the rest in place, agreed Oct 2). */
+export const FIT_CHARS = 64
+
+/** The parts that fit on Today's row, and how many more there are. At least
+ *  one is always said; a long one with more after it is cut short ("…") so
+ *  "and 2 more" stays on the row. Alone, a long one is left whole for the
+ *  row to clamp. */
+export function fitParts(parts: readonly ChangePart[]): { shown: ChangePart[]; more: number } {
+  const size = (p: ChangePart) => (p.label ? p.label.length + 1 : 0) + p.value.length
+  const shown: ChangePart[] = []
+  let used = 0
+  for (const p of parts) {
+    if (shown.length > 0 && used + size(p) > FIT_CHARS) break
+    shown.push(p)
+    used += size(p) + 3
+  }
+  const more = parts.length - shown.length
+  if (more > 0 && size(shown[0]) > FIT_CHARS) {
+    const room = Math.max(12, FIT_CHARS - (shown[0].label ? shown[0].label.length + 1 : 0))
+    shown[0] = { ...shown[0], value: `${shown[0].value.slice(0, room).trimEnd()}…` }
+  }
+  return { shown, more }
 }
 
 /** "Pretzel Buns", "Challah and Wine", "Challah, Wine and Chicken": as the

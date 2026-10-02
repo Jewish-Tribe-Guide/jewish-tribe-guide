@@ -38,6 +38,22 @@ describe('recordActivity', () => {
     ])
   })
 
+  it('writes what an edit changed; before migration 069 the row still goes in, without it', async () => {
+    const changes = [{ key: 'phone', label: 'Phone', value: '(215) 382-5092' }]
+    let inserts = 0
+    m.from.mockImplementation(() => {
+      const b = builder()
+      b.then = (resolve: (v: unknown) => void) =>
+        resolve(++inserts === 1 ? { data: null, error: { message: "Could not find the 'changes' column of 'activity' in the schema cache" } } : { data: [{ id: 9 }], error: null })
+      return b
+    })
+    const ids = await recordActivity([{ community: 'philly', resourceId: 'res-1', kind: 'listing_edited', source: 'submission', changes }])
+    expect(ids).toEqual([9])
+    const written = m.calls.filter(([n]) => n === 'insert').map(([, a]) => (a[0] as Record<string, unknown>[])[0])
+    expect(written[0].changes).toEqual(changes)
+    expect(written[1]).not.toHaveProperty('changes')
+  })
+
   it('never throws: a failed write is reported and returns no ids', async () => {
     m.result = { data: null, error: { message: 'relation "activity" does not exist' } }
     const err = vi.spyOn(console, 'error').mockImplementation(() => {})

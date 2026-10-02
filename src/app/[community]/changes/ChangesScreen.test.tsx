@@ -67,6 +67,22 @@ describe('the What changed page', () => {
     expect(screen.getByText(/^3 changes in the last 7 days/)).toBeInTheDocument()
   })
 
+  it('under each edit, everything it changed, one to a line, in full', () => {
+    const note = 'Alcoholic beverages are NOT under supervision; list of approved alcoholic beverages available at restaurant upon request.'
+    show([
+      row('2026-10-01T22:00:00Z', {
+        changes: [
+          { key: 'hours', label: 'Hours', value: 'Sunday 11 AM – 10 PM' },
+          { key: 'kosherNote', label: 'What isn’t kosher?', value: note },
+          { key: 'photo', label: '', value: 'New photo', quiet: true },
+        ],
+      }),
+    ])
+    const lines = [...screen.getByTestId('change-parts').children].map((c) => c.textContent)
+    expect(lines).toEqual(['Hours Sunday 11 AM – 10 PM', `What isn’t kosher? ${note}`, 'New photo'])
+    expect(screen.queryByRole('button', { name: /more/ })).not.toBeInTheDocument()
+  })
+
   it('a place taken out of the guide says so, and has no link (its page is gone)', () => {
     show([row('2026-10-01T22:00:00Z', { kind: 'listing_removed', listing: { id: '44444444-dddd', name: 'Closed Deli', category: 'grocery', status: 'archived' } })])
     const change = screen.getByTestId('change')

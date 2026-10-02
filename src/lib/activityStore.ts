@@ -10,21 +10,28 @@ import type { ActivityInput } from './activity'
 export async function recordActivity(rows: ActivityInput[]): Promise<number[]> {
   if (rows.length === 0) return []
   try {
-    const { data, error } = await getAdminClient()
-      .from('activity')
-      .insert(
-        rows.map((r) => ({
-          community_id: r.community,
-          resource_id: r.resourceId ?? null,
-          kind: r.kind,
-          source: r.source,
-          field_key: r.fieldKey ?? null,
-          item: r.item ?? null,
-          actor_email: r.actorEmail ?? null,
-          submission_id: r.submissionId ?? null,
-        })),
-      )
-      .select('id')
+    const insert = (withChanges: boolean) =>
+      getAdminClient()
+        .from('activity')
+        .insert(
+          rows.map((r) => ({
+            community_id: r.community,
+            resource_id: r.resourceId ?? null,
+            kind: r.kind,
+            source: r.source,
+            field_key: r.fieldKey ?? null,
+            item: r.item ?? null,
+            actor_email: r.actorEmail ?? null,
+            submission_id: r.submissionId ?? null,
+            ...(withChanges && r.changes ? { changes: r.changes } : {}),
+          })),
+        )
+        .select('id')
+    const withChanges = rows.some((r) => r.changes)
+    let { data, error } = await insert(withChanges)
+    // Before migration 069 the log has no `changes`: the row still goes in,
+    // and What changed says "updated" for it, as for any older edit.
+    if (error && withChanges && /changes/.test(error.message)) ({ data, error } = await insert(false))
     if (error) throw new Error(error.message)
     return ((data ?? []) as { id: number }[]).map((d) => d.id)
   } catch (err) {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { changeDay, changeSentence, changeTime, changesWithin, thisWeek, whatChanged, type ChangeLogRow } from './whatChanged'
+import { changeDay, changeSentence, changeTime, changesWithin, fitParts, FIT_CHARS, thisWeek, whatChanged, type ChangeLogRow } from './whatChanged'
 
 const NY = 'America/New_York'
 let nextId = 1
@@ -77,6 +77,57 @@ describe('what changed', () => {
       ['ALDI', true],
       ['Spruce Market', false],
     ])
+  })
+})
+
+describe('what each change changed', () => {
+  const phone = { key: 'phone', label: 'Phone', value: '(215) 382-5092' }
+  const hours = { key: 'hours', label: 'Hours', value: 'Sunday 11 AM – 10 PM' }
+
+  it('an edit carries what it changed; one from before migration 069 has nothing, and says “updated”', () => {
+    const [withParts, without] = whatChanged([row({ hoursAgo: 1, changes: [hours, phone] }), row({ hoursAgo: 2, listing: place('Old Edit') })], NY)
+    expect(withParts.parts).toEqual([hours, phone])
+    expect(without.parts).toEqual([])
+    expect(changeSentence(without)).toEqual({ before: '', name: 'Old Edit', after: ' updated' })
+  })
+
+  it('items an edit added head the line, so their list isn’t said again; the rest of the edit is', () => {
+    const items = { key: 'm', label: 'Kosher items', value: 'added Challah' }
+    const [change] = whatChanged(
+      [row({ hoursAgo: 1, submissionId: 's9', changes: [hours, items] }), row({ hoursAgo: 1, submissionId: 's9', kind: 'item_added', item: 'Challah', fieldKey: 'm' })],
+      NY,
+    )
+    expect(changeSentence(change).before).toBe('Challah added at ')
+    expect(change.parts).toEqual([hours])
+  })
+
+  it('a removal says nothing more', () => {
+    const [change] = whatChanged([row({ hoursAgo: 1, kind: 'listing_removed', changes: [phone], listing: place('Gone', 'archived') })], NY)
+    expect(change.parts).toEqual([])
+  })
+})
+
+describe('what fits on Today’s row', () => {
+  const part = (label: string, value: string) => ({ key: label, label, value })
+
+  it('as many as fit in about two lines, then how many more', () => {
+    const parts = [part('Hours', 'Sunday 11 AM – 10 PM'), part('Phone', '(215) 382-5092'), part('Website', 'benjerry.com/upenn'), part('Food Type', 'Dairy')]
+    const { shown, more } = fitParts(parts)
+    expect(shown.map((p) => p.label)).toEqual(['Hours', 'Phone'])
+    expect(more).toBe(2)
+  })
+
+  it('all of them when they fit', () => {
+    expect(fitParts([part('Hours', 'Sunday 11 AM – 10 PM')])).toEqual({ shown: [part('Hours', 'Sunday 11 AM – 10 PM')], more: 0 })
+  })
+
+  it('a long one alone is left whole (the row clamps it); with more after it, it’s cut so “and 1 more” stays', () => {
+    const note = part('What isn’t kosher?', 'Alcoholic beverages are NOT under supervision; list of approved alcoholic beverages available at restaurant upon request.')
+    expect(fitParts([note]).shown[0].value).toBe(note.value)
+    const { shown, more } = fitParts([note, part('Phone', '(215) 382-5092')])
+    expect(more).toBe(1)
+    expect(shown[0].value.endsWith('…')).toBe(true)
+    expect(shown[0].label.length + 1 + shown[0].value.length).toBeLessThanOrEqual(FIT_CHARS + 1)
   })
 })
 

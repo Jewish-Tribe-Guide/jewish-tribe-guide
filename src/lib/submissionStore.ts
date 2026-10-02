@@ -1,12 +1,14 @@
 import { SYNC_INTERNAL_FIELDS } from './syncFields'
 import { getAdminClient } from './supabase/admin'
 import { listCategories, createCategory, getCategoryById } from './categoryStore'
-import { isCategorySyncEligible } from './categories'
+import { isCategorySyncEligible, type CategoryConfig } from './categories'
 import { fetchPlaceSync, namesOverlap, OWNABLE_SYNC_FIELDS, type OwnableSyncField } from './googlePlaces'
 import { upsertTags } from './tagStore'
 import { geocode } from './geo'
 import { addedItems, goneItemsKept, itemFieldKeys, nextItemGone, nextItemSeen, normalizeEmail, sourceOfSubmission, type ActivityInput } from './activity'
 import { recordActivity } from './activityStore'
+import { newListingFacts, visitorChanges, type ChangePart } from './changeParts'
+import { normalizeRow } from './resourceStore'
 import type {
   ResourceRow,
   ResourceSubmission,
@@ -311,8 +313,9 @@ export async function approveSubmission(id: string, community?: string, reviewed
 
   let affectedResourceId: string | null = null
   let newItems: { fieldKey: string; item: string }[] = []
+  let changes: ChangePart[] | undefined
   if (submission.target_type === 'listing') {
-    ;({ id: affectedResourceId, newItems } = await applyListing(submission))
+    ;({ id: affectedResourceId, newItems, changes } = await applyListing(submission))
   } else if (submission.target_type === 'category') {
     await applyCategory(submission)
   } else {
@@ -340,7 +343,7 @@ export async function approveSubmission(id: string, community?: string, reviewed
   if (error) throw new Error(`Failed to mark submission approved: ${error.message}`)
 
   if (submission.target_type === 'listing') {
-    await recordActivity(activityForApproval(submission, affectedResourceId, newItems))
+    await recordActivity(activityForApproval(submission, affectedResourceId, newItems, changes))
   }
   return data as SubmissionRow
 }
@@ -356,6 +359,7 @@ export function activityForApproval(
   submission: SubmissionRow,
   resourceId: string | null,
   newItems: { fieldKey: string; item: string }[],
+  changes?: ChangePart[],
 ): ActivityInput[] {
   const base = {
     community: submission.community_id,
@@ -365,7 +369,7 @@ export function activityForApproval(
     submissionId: submission.id,
   }
   return [
-    { ...base, kind: APPROVAL_KIND[submission.operation] },
+    { ...base, kind: APPROVAL_KIND[submission.operation], ...(changes?.length && submission.operation !== 'delete' ? { changes } : {}) },
     ...newItems.map((i) => ({ ...base, kind: 'item_added' as const, fieldKey: i.fieldKey, item: i.item })),
   ]
 }
@@ -741,7 +745,7 @@ async function withItemDates(
   return { details: next, newItems }
 }
 
-type AppliedListing = { id: string | null; newItems: { fieldKey: string; item: string }[] }
+type AppliedListing = { id: string | null; newItems: { fieldKey: string; item: string }[]; changes?: ChangePart[] }
 
 async function applyListing(submission: SubmissionRow): Promise<AppliedListing> {
   const supabase = getAdminClient()
@@ -768,7 +772,11 @@ async function applyListing(submission: SubmissionRow): Promise<AppliedListing> 
       .single()
     if (error) throw new Error(`Failed to create listing: ${error.message}`)
     await growTagVocabulary(submission.community_id, payload)
-    return { id: (created as { id: string } | null)?.id ?? null, newItems: dated.newItems }
+    const id = (created as { id: string } | null)?.id ?? null
+    const changes = await saidForVisitors(submission.community_id, payload, (category) =>
+      newListingFacts({ id: id ?? '', category: payload.category, name: payload.name, anchorId: payload.anchorId, address: payload.address ?? '', distance: 0, phone: payload.phone ?? undefined, ...payload.details }, category),
+    )
+    return { id, newItems: dated.newItems, changes }
   }
 
   if (submission.operation === 'update') {
@@ -805,7 +813,9 @@ async function applyListing(submission: SubmissionRow): Promise<AppliedListing> 
       .eq('id', submission.target_id)
     if (error) throw new Error(`Failed to update listing: ${error.message}`)
     await growTagVocabulary(submission.community_id, payload)
-    return { id: submission.target_id, newItems: dated.newItems }
+    const existing = existingData ? normalizeRow(existingData as ResourceRow) : null
+    const changes = await saidForVisitors(submission.community_id, payload, (category) => visitorChanges(existing, payload, category.detailFields))
+    return { id: submission.target_id, newItems: dated.newItems, changes }
   }
 
   if (submission.operation === 'delete') {
@@ -821,6 +831,19 @@ async function applyListing(submission: SubmissionRow): Promise<AppliedListing> 
   }
 
   return { id: null, newItems: [] }
+}
+
+/** What an approval changed, as What changed says it (changeParts.ts).
+ *  Best-effort, like the log itself: a hiccup here leaves the change saying
+ *  "updated", never fails the approval. */
+async function saidForVisitors(community: string, payload: ResourceSubmission, say: (category: CategoryConfig) => ChangePart[]): Promise<ChangePart[] | undefined> {
+  try {
+    const category = await getCategoryById(community, payload.category)
+    return category ? say(category) : undefined
+  } catch (err) {
+    console.error('[activity] could not work out what changed:', err)
+    return undefined
+  }
 }
 
 // When a listing with tag fields is approved, add any newly-typed tags to the
