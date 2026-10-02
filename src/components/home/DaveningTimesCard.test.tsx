@@ -91,7 +91,7 @@ describe('DaveningTimesCard', () => {
     expect(screen.queryByRole('heading', { name: 'Davening Times' })).not.toBeInTheDocument()
   })
 
-  it('links "View Times" to the category page with the minyanim field, opening the modal on arrival', () => {
+  it('links "View Times" to the category page with the minyanim field, opening the Minyanim view on arrival', () => {
     vi.useFakeTimers()
     try {
       vi.setSystemTime(new Date('2026-09-08T13:00:00'))
@@ -109,10 +109,10 @@ describe('DaveningTimesCard', () => {
         { content: { categories: [synagogue] } },
       )
 
-      // `?davening=1` is what makes this actually land on the sheet the
+      // `?davening=1` is what makes this actually land on the view the
       // button names, rather than a bare category page the visitor then has
       // to find the same button on again — see GenericDirectory's own
-      // `openDaveningModal` doc.
+      // `openMinyanimView` doc.
       const link = screen.getByRole('link', { name: /View Times/ })
       expect(link).toHaveAttribute('href', '/test-community/synagogue?davening=1')
     } finally {
@@ -122,7 +122,7 @@ describe('DaveningTimesCard', () => {
 
   // When every minyan today has already passed, nextUpcomingDavening rolls
   // over to tomorrow's earliest — "View Times" needs `&day=` or it lands
-  // the visitor on the modal's default "Today" filter, showing nothing left
+  // the visitor on the Minyanim view's Today, showing nothing left
   // and no visible reason why. See this component's own `seeAllHref` doc.
   // The card face itself no longer shows which day that is, but the link
   // still has to route there correctly.

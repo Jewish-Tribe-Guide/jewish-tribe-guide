@@ -35,17 +35,6 @@ function cacheKey(day: string, lat: number, lng: number, tzid: string): string {
   return `${day}|${lat}|${lng}|${tzid}`
 }
 
-/** Test-only escape hatch. A consumer that re-stubs `fetch` between tests
- *  against the same fixed coordinates and system day — DaveningTimesModal's
- *  suite calls this hook with `community.mapCenter` on a pinned date — would
- *  otherwise keep serving whichever test happened to populate the cache
- *  first, since the module-level cache has no way to know a new test (rather
- *  than a new mount) has started. */
-export function __resetZmanimCacheForTests(): void {
-  cache.clear()
-  inFlight.clear()
-}
-
 async function loadOne(url: string): Promise<ZmanimData | null> {
   const res = await fetch(url)
   const json = (await res.json()) as { ok: boolean; data?: ZmanimData }

@@ -68,12 +68,12 @@ export default function DaveningTimesCard({ coords }: { coords: LatLng | null })
   if (!linkCategoryId) return null
 
   // `?davening=1` opens "All davening times" as soon as the category page
-  // mounts (see GenericDirectory's own `openDaveningModal` doc) — without it
+  // mounts (see GenericDirectory's own `openMinyanimView` doc) — without it
   // this landed on a bare category page and made the visitor find the same
   // button a second time to reach the thing this link's own label promised.
   // `&day=` additionally does the same for WHICH day it opens to: when this
   // card is showing tomorrow's earliest minyan (result.isTomorrow), the
-  // modal defaulting to its own "Today" filter would land the visitor on a
+  // Minyanim view opening on Today would land the visitor on a
   // day with nothing left to see and no visible reason why — see
   // GenericDirectory's own `initialDaveningDay` doc.
   //

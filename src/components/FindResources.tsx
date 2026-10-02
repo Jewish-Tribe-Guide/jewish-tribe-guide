@@ -87,9 +87,9 @@ export type FindResourcesProps = {
   /** `?form=` */
   searchForm?: string | null
   /** `?davening=` — "1" opens "All davening times" on arrival. See
-   *  GenericDirectory's own doc on `openDaveningModal`, which this becomes. */
+   *  GenericDirectory's own doc on `openMinyanimView`, which this becomes. */
   searchDavening?: string | null
-  /** `?day=` — filters that modal to one day on arrival. See
+  /** `?day=` — the day the Minyanim view opens on. See
    *  GenericDirectory's own doc on `initialDaveningDay`, which this becomes. */
   searchDaveningDay?: string | null
   /** Pushes a change to these query params, keeping the path — a no-op
@@ -161,12 +161,12 @@ export default function FindResources({
   //   ?q=<text>       pre-fill the category's search box
   //   ?hospital=<id>  show that hospital's About page
   //   ?form=<mode>    an add/edit form is open over the list
-  //   ?davening=1     "All davening times" is open over the list
-  //   ?day=<key>      that modal is filtered to one day
+  //   ?davening=1     the Minyanim view, in place of the list
+  //   ?day=<key>      the day it opens on
   const reopenItemId = searchItem ?? initialItemId ?? null
   const initialSearch = searchQuery
   const initialOpenNow = searchOpenNow === '1'
-  const openDaveningModal = searchDavening === '1'
+  const openMinyanimView = searchDavening === '1'
   const initialDaveningDay = searchDaveningDay ?? undefined
   const hospitalDetailId = searchHospital
 
@@ -395,7 +395,7 @@ export default function FindResources({
       <>
         {sharedTurnstileWidget}
         <ResourceLoader
-          key={category.id + (openDaveningModal ? `-davening${initialDaveningDay ?? ''}` : '')}
+          key={category.id + (openMinyanimView ? `-davening${initialDaveningDay ?? ''}` : '')}
           category={category}
           items={listings}
           anchor={anchor}
@@ -407,7 +407,7 @@ export default function FindResources({
           initialSearch={initialSearch ?? undefined}
           initialOpenNow={initialOpenNow}
           initialFilters={searchFilters}
-          openDaveningModal={openDaveningModal}
+          openMinyanimView={openMinyanimView}
           initialDaveningDay={initialDaveningDay}
           onUp={onUp}
           upLabel="Home"

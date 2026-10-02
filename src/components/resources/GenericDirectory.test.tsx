@@ -735,8 +735,8 @@ describe('GenericDirectory', () => {
     expect(screen.getByRole('radio', { name: 'Minyanim' })).toHaveAttribute('aria-checked', 'true')
   })
 
-  it('opens on the Minyanim view on arrival when openDaveningModal is set (?davening=1)', async () => {
-    renderWithProviders(<GenericDirectory category={shulCategory()} items={[shulItem()]} openDaveningModal {...handlers} />)
+  it('opens on the Minyanim view on arrival when openMinyanimView is set (?davening=1)', async () => {
+    renderWithProviders(<GenericDirectory category={shulCategory()} items={[shulItem()]} openMinyanimView {...handlers} />)
 
     expect(await screen.findByTestId('minyanim-view')).toBeInTheDocument()
   })
@@ -754,10 +754,10 @@ describe('GenericDirectory', () => {
     vi.useFakeTimers({ toFake: ['Date'] })
     vi.setSystemTime(new Date('2026-10-05T09:00:00-04:00')) // a Monday
     try {
-      renderWithProviders(<GenericDirectory category={shulCategory()} items={[shulItem()]} openDaveningModal initialDaveningDay="tue,holiday" {...handlers} />)
+      renderWithProviders(<GenericDirectory category={shulCategory()} items={[shulItem()]} openMinyanimView initialDaveningDay="tue,holiday" {...handlers} />)
       expect(await screen.findByRole('tab', { selected: true })).toHaveTextContent(/^Tue/)
       cleanup()
-      renderWithProviders(<GenericDirectory category={shulCategory()} items={[shulItem()]} openDaveningModal initialDaveningDay="nonsense" {...handlers} />)
+      renderWithProviders(<GenericDirectory category={shulCategory()} items={[shulItem()]} openMinyanimView initialDaveningDay="nonsense" {...handlers} />)
       expect(await screen.findByRole('tab', { selected: true })).toHaveTextContent(/^Today/)
     } finally {
       vi.useRealTimers()
@@ -771,7 +771,7 @@ describe('GenericDirectory', () => {
     const user = userEvent.setup()
     const onParamsChange = vi.fn()
     renderWithProviders(
-      <GenericDirectory category={shulCategory()} items={[shulItem()]} openDaveningModal initialDaveningDay="tue" {...handlers} onParamsChange={onParamsChange} />,
+      <GenericDirectory category={shulCategory()} items={[shulItem()]} openMinyanimView initialDaveningDay="tue" {...handlers} onParamsChange={onParamsChange} />,
     )
     expect(onParamsChange).not.toHaveBeenCalled()
 
@@ -780,7 +780,7 @@ describe('GenericDirectory', () => {
     expect(onParamsChange).toHaveBeenCalledWith({ davening: null, day: null }, { replace: true })
   })
 
-  it('adds ?davening=1 to the URL when the modal is opened from the page itself, not just on arrival', async () => {
+  it('adds ?davening=1 to the URL when the view is opened from the page itself, not just on arrival', async () => {
     const user = userEvent.setup()
     const onParamsChange = vi.fn()
     const category = makeCategory({ detailFields: [{ key: 'minyanim', label: 'Minyanim', type: 'minyanim' }] })
@@ -973,7 +973,7 @@ describe('GenericDirectory — scrolling a reopened listing into view', () => {
   })
 })
 
-// Same one-way-in problem the Davening modal's own `davening`/`day` sync
+// Same one-way-in problem the Minyanim view's own `davening`/`day` sync
 // solves above — GenericListingCard's onExpandedChange (fired on open,
 // close, and toggle) is wired here to keep ?item=<id> in the URL matching
 // whichever card is actually open, so a reload or a shared link lands back

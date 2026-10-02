@@ -5,7 +5,7 @@ import type { DirectoryResource } from '@/types'
 import { resolveCapabilities, selectValues, bandImageFor, type CategoryConfig } from '@/lib/categories'
 import { hoursOpenNow, businessClosure } from '@/lib/hours'
 import { useNow } from '@/lib/useNow'
-import { ALL_MINYAN_DAYS, isMinyanim, type MinyanDayKey } from '@/lib/davening'
+import { isMinyanim } from '@/lib/davening'
 import type { Minyan } from '@/lib/davening'
 import DirectoryHeader from './DirectoryHeader'
 import DistanceNote from './DistanceNote'
@@ -83,25 +83,20 @@ type Props = {
    *  category. Extra/unrecognized keys (params for a DIFFERENT category,
    *  or `q`/`openNow` themselves) are simply ignored when read. */
   initialFilters?: Record<string, string> | null
-  /** Mount with the "All davening times" modal already open — the home
-   *  screen's DaveningTimesCard links here with `?davening=1` (see
-   *  routes.ts's own daveningTimes helper) so "See all" actually lands on
-   *  the sheet it names, instead of a bare category page the visitor then
-   *  has to find the same button on again. No-op for a category with no
-   *  minyanim field to show a modal for. */
-  openDaveningModal?: boolean
-  /** Mount the modal already filtered to this day (or days) — DaveningTimesCard
-   *  sets it to tomorrow's key when ITS OWN result is tomorrow's earliest
+  /** Mount on the Minyanim view (every minyan by time) instead of the list
+   *  of shuls: the home screen's DaveningTimesCard and Shabbos card link
+   *  here with `?davening=1`, so "All davening times" lands on what it
+   *  names, not a bare category page with the same button to find again.
+   *  No-op for a category with no minyanim field. */
+  openMinyanimView?: boolean
+  /** Open the Minyanim view on this weekday (`?day=fri`) — DaveningTimesCard
+   *  sets it to tomorrow's when ITS OWN result is tomorrow's earliest
    *  minyan (result.isTomorrow), so a visitor who followed a "tomorrow"
-   *  time here doesn't land on the modal's own "Today" default, which would
-   *  show nothing left for today and no visible reason why. Comma-separated
-   *  when tomorrow is also a secular holiday (DaveningTimesCard appends
-   *  `,holiday`), so a shul's holiday-specific minyan isn't invisible on a
-   *  view that's otherwise correctly showing tomorrow. Only ever applied on
-   *  arrival (see the `key` this feeds in FindResources.tsx) — the modal's
-   *  own day filter otherwise persists across opens by design (see
-   *  DaveningTimesModal's own doc), which this doesn't touch for the
-   *  ordinary in-page "All davening times" button. */
+   *  time here doesn't land on Today, with nothing left and no visible
+   *  reason why. Comma-separated keys are allowed (",holiday" is appended
+   *  on a secular holiday); the first that's one of the view's days wins.
+   *  Only applied on arrival (see the `key` this feeds in
+   *  FindResources.tsx). */
   initialDaveningDay?: string
   onUp: () => void
   onAdd: () => void
@@ -120,7 +115,7 @@ type Props = {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function GenericDirectory({ category, items, anchorLabel, addressPrompt, reopenItemId, linkedItemId = null, reopenMatch = null, initialSearch, initialOpenNow, initialFilters, openDaveningModal, initialDaveningDay, onUp, onAdd, onEdit, onParamsChange }: Props) {
+export default function GenericDirectory({ category, items, anchorLabel, addressPrompt, reopenItemId, linkedItemId = null, reopenMatch = null, initialSearch, initialOpenNow, initialFilters, openMinyanimView, initialDaveningDay, onUp, onAdd, onEdit, onParamsChange }: Props) {
   // Hands the shared header this screen's own title + "up" handler — on
   // mobile, SiteHeader shows "‹ {category.pluralLabel}" in place of the site
   // name while this is mounted, and reverts automatically on unmount (see
@@ -171,7 +166,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // yet (see FindResources' own doc on searchQuery etc.) — too late for a
   // lazy initializer to catch. Each of these applies its prop's arrival
   // exactly once, guarded by its own ref, rather than forcing a remount of
-  // this whole component the way `openDaveningModal` below still does: once
+  // this whole component the way `openMinyanimView` below still does: once
   // this component started writing search-as-you-type / toggles / filter
   // picks BACK into these same props (see the sync effects further down), a
   // remount-on-prop-change would keep firing on every one of those self
@@ -347,38 +342,37 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   const [filtersOpen, setFiltersOpen] = useState(false)
   // A plain lazy initializer here would only ever see the FIRST render:
   // SlugScreen's Suspense fallback renders this tree once with the query
-  // string not yet read (openDaveningModal is undefined then, same as
+  // string not yet read (openMinyanimView is undefined then, same as
   // `initialSearch` is at that point — see FindResources' own doc), then
   // FindResourcesConnected hydrates and this same component instance
   // re-renders with the real value — too late for a lazy initializer to
   // catch. Solved the same way `initialSearch` already is: FindResources
-  // folds `openDaveningModal` into the `key` it gives ResourceLoader, so
+  // folds `openMinyanimView` into the `key` it gives ResourceLoader, so
   // the value arriving forces a fresh mount of this whole subtree instead
   // of an update to the existing one, and the lazy initializer below runs
   // again with the real value.
   // Synagogues' Minyanim view (step 4, agreed Oct 1): every minyan by time,
   // in place of the list of shuls. `?davening=1` (the home page's and the
-  // Next minyan card's "All davening times") arrives on it, as it used to
-  // open the week's davening times in a dialog, which this replaces here.
-  const [daveningModalOpen, setDaveningModalOpen] = useState(!!openDaveningModal)
+  // Next minyan card's "All davening times") arrives on it. It replaced
+  // the old week-of-times dialog, which knew nothing of Yom Tov.
+  const [minyanimViewOn, setMinyanimViewOn] = useState(!!openMinyanimView)
   // Same one-way-in problem `search`/`openNow` already solve above: without
-  // this, closing the modal (X, Escape, overlay click — all funnel into
-  // `setDaveningModalOpen(false)`) left `?davening=1` sitting in the URL,
-  // so a reload after closing reopened a modal the visitor had already
-  // dismissed. Clears `day` alongside `davening` on close — a stale
-  // `?day=` with no modal to filter is meaningless on its own. Skips the
+  // this, switching back to Synagogues left `?davening=1` sitting in the
+  // URL, so a reload reopened the view the visitor had already left.
+  // Clears `day` alongside `davening` — a stale `?day=` with no view to
+  // pick a day in is meaningless on its own. Skips the
   // first render for the same reason `openNowSyncedOnce` does: the initial
-  // value here is just `openDaveningModal` echoed back, and re-writing it
+  // value here is just `openMinyanimView` echoed back, and re-writing it
   // immediately would be a pointless replace on a URL that's already
   // correct.
-  const daveningModalSyncedOnce = useRef(false)
+  const minyanimViewSyncedOnce = useRef(false)
   useEffect(() => {
-    if (!daveningModalSyncedOnce.current) {
-      daveningModalSyncedOnce.current = true
+    if (!minyanimViewSyncedOnce.current) {
+      minyanimViewSyncedOnce.current = true
       return
     }
-    onParamsChange?.(daveningModalOpen ? { davening: '1' } : { davening: null, day: null }, { replace: true })
-  }, [daveningModalOpen, onParamsChange])
+    onParamsChange?.(minyanimViewOn ? { davening: '1' } : { davening: null, day: null }, { replace: true })
+  }, [minyanimViewOn, onParamsChange])
   const isMobile = useIsMobile()
   // For getCategoryColor below — same call CompactCard makes for this same
   // category's home-screen badge, so the morph target's color matches
@@ -1003,10 +997,10 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // the list holds keeps times. Wherever it isn't, All davening times is
   // back in the list heading, so it's never gone.
   const showMinyanCard =
-    hasMinyanim && !typed && !daveningModalOpen && filtered.some((item) => isMinyanim(item[minyanimField!.key]) && (item[minyanimField!.key] as Minyan[]).length > 0)
+    hasMinyanim && !typed && !minyanimViewOn && filtered.some((item) => isMinyanim(item[minyanimField!.key]) && (item[minyanimField!.key] as Minyan[]).length > 0)
   // The Minyanim view in place of the list, until something is typed: then
   // the search's own results, as anywhere.
-  const minyanimView = hasMinyanim && daveningModalOpen && !typed
+  const minyanimView = hasMinyanim && minyanimViewOn && !typed
   // A line in that card opens its shul, as next/previous does, and opens
   // the closed group it sits in until it's closed again.
   const openListing = (id: string) => {
@@ -1257,7 +1251,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
         filters={hasActualFilters ? { active: activeFilterCount, onOpen: () => setFiltersOpen(true) } : undefined}
         sort={upvotes ? { byPopular: sortByPopular, onSelect: selectSort } : undefined}
         // Only while the Next minyan card, which carries it, is gone.
-        onDaveningTimes={hasMinyanim && !showMinyanCard ? () => setDaveningModalOpen(true) : undefined}
+        onDaveningTimes={hasMinyanim && !showMinyanCard ? () => setMinyanimViewOn(true) : undefined}
         activeChips={activeChips}
         onShowMap={hasMapColumn && mapHidden ? () => setMapHidden(false) : undefined}
       />
@@ -1387,9 +1381,9 @@ export default function GenericDirectory({ category, items, anchorLabel, address
                 key={label}
                 type="button"
                 role="radio"
-                aria-checked={daveningModalOpen === on}
-                onClick={() => setDaveningModalOpen(on)}
-                className={`cursor-pointer rounded-full px-3.5 py-1.5 text-[14px] font-bold transition-colors ${daveningModalOpen === on ? 'bg-primary text-white' : 'text-slate-700 hover:bg-slate-100'}`}
+                aria-checked={minyanimViewOn === on}
+                onClick={() => setMinyanimViewOn(on)}
+                className={`cursor-pointer rounded-full px-3.5 py-1.5 text-[14px] font-bold transition-colors ${minyanimViewOn === on ? 'bg-primary text-white' : 'text-slate-700 hover:bg-slate-100'}`}
               >
                 {label}
               </button>
@@ -1404,7 +1398,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
           )}
           {showMinyanCard && (
             <div className="lg:w-[400px] lg:shrink-0">
-              <NextMinyanCard items={filtered} onOpenListing={openListing} onDaveningTimes={() => setDaveningModalOpen(true)} />
+              <NextMinyanCard items={filtered} onOpenListing={openListing} onDaveningTimes={() => setMinyanimViewOn(true)} />
             </div>
           )}
         </div>
@@ -1557,7 +1551,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
               // Keeps ?item=<id> in the URL in sync with whichever card is
               // actually open — a reload (or a shared link) lands back on
               // the same expanded listing, same as `davening`/`day` do for
-              // the Davening Times modal above. `replace`, not `push`: an
+              // the Minyanim view above. `replace`, not `push`: an
               // expand/collapse is a one-off, not something that should
               // pile up browser-back history entries the way opening an
               // Add/Edit/Report form (which does use push, see

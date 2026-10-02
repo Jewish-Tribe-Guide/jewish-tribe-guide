@@ -32,10 +32,10 @@ type Props = {
   /** Pre-set the category's own boolean/select field filters — see
    *  GenericDirectory's own doc. */
   initialFilters?: Record<string, string> | null
-  /** Mount with "All davening times" already open — see GenericDirectory's
-   *  own doc on this prop. */
-  openDaveningModal?: boolean
-  /** Mount that modal already filtered to this one day — see
+  /** Mount on the Minyanim view — see GenericDirectory's own doc on this
+   *  prop. */
+  openMinyanimView?: boolean
+  /** Open the Minyanim view on this day — see
    *  GenericDirectory's own doc on this prop. */
   initialDaveningDay?: string
   onUp: () => void
@@ -51,7 +51,7 @@ type Props = {
 
 // Every category renders via the generic, hint-driven card renderer (badges,
 // filters, kosher-item tags + search, and upvotes — all from category config).
-export default function ResourceLoader({ category, items, anchor, reopenItemId, linkedItemId, reopenMatch, initialSearch, initialOpenNow, initialFilters, openDaveningModal, initialDaveningDay, onUp, upLabel = 'All resources', onAdd, onEdit, onParamsChange }: Props) {
+export default function ResourceLoader({ category, items, anchor, reopenItemId, linkedItemId, reopenMatch, initialSearch, initialOpenNow, initialFilters, openMinyanimView, initialDaveningDay, onUp, upLabel = 'All resources', onAdd, onEdit, onParamsChange }: Props) {
   const title = category.pluralLabel
 
   // Extract a stable dep from the anchor object (anchor itself is re-created
@@ -115,6 +115,6 @@ export default function ResourceLoader({ category, items, anchor, reopenItemId, 
   const addressPrompt = !anchor.label && category.hasAddress !== false
 
   return (
-    <GenericDirectory category={category} items={withDistance} anchorLabel={anchorLabel} addressPrompt={addressPrompt} reopenItemId={reopenItemId} linkedItemId={linkedItemId} reopenMatch={reopenMatch} initialSearch={initialSearch} initialOpenNow={initialOpenNow} initialFilters={initialFilters} openDaveningModal={openDaveningModal} initialDaveningDay={initialDaveningDay} onUp={onUp} onAdd={onAdd} onEdit={onEdit} onParamsChange={onParamsChange} />
+    <GenericDirectory category={category} items={withDistance} anchorLabel={anchorLabel} addressPrompt={addressPrompt} reopenItemId={reopenItemId} linkedItemId={linkedItemId} reopenMatch={reopenMatch} initialSearch={initialSearch} initialOpenNow={initialOpenNow} initialFilters={initialFilters} openMinyanimView={openMinyanimView} initialDaveningDay={initialDaveningDay} onUp={onUp} onAdd={onAdd} onEdit={onEdit} onParamsChange={onParamsChange} />
   )
 }

@@ -3,7 +3,6 @@ import {
   clampTimeText,
   formatAnchorRule,
   formatDays,
-  groupByDay,
   groupByTefillah,
   isMinyanim,
   mergeSameDayTimes,
@@ -269,45 +268,6 @@ describe('mergeSameDayTimes', () => {
       },
     ])[0].rows
     expect(mergeSameDayTimes(rows)[0].anchor).toBe('sunset')
-  })
-})
-
-describe('groupByDay', () => {
-  const shuls: ShulInfo[] = [
-    {
-      name: 'Beth Israel',
-      minyanim: [
-        minyan({ tefillah: 'maariv', days: ['mon', 'tue'], time: '8:00pm' }),
-        minyan({ tefillah: 'shacharis', days: ['mon'], time: '7:00am' }),
-      ],
-    },
-  ]
-
-  it('fans a multi-day minyan out into one row per day', () => {
-    const groups = groupByDay(shuls)
-    expect(groups.map((g) => g.day)).toEqual(['mon', 'tue'])
-    expect(groups.find((g) => g.day === 'mon')?.rows).toHaveLength(2)
-    expect(groups.find((g) => g.day === 'tue')?.rows).toHaveLength(1)
-  })
-
-  it('sorts each day’s rows by tefillah order, then time', () => {
-    const monday = groupByDay(shuls).find((g) => g.day === 'mon')
-    expect(monday?.rows.map((r) => r.tefillah)).toEqual(['shacharis', 'maariv'])
-  })
-
-  it('orders the pseudo-days after the real weekdays', () => {
-    const groups = groupByDay([
-      {
-        name: 'Beth Israel',
-        minyanim: [minyan({ tefillah: 'shacharis', days: ['rosh_chodesh', 'mon'], time: '6:45am' })],
-      },
-    ])
-    expect(groups.map((g) => g.day)).toEqual(['mon', 'rosh_chodesh'])
-    expect(groups[1].label).toBe('Rosh Chodesh')
-  })
-
-  it('returns nothing when no minyan lists any day', () => {
-    expect(groupByDay([{ name: 'Beth Israel', minyanim: [minyan({ tefillah: 'mincha', days: [], time: '1:00pm' })] }])).toEqual([])
   })
 })
 

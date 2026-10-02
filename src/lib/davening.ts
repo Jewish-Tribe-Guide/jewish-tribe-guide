@@ -1,8 +1,8 @@
 // Shared types and helpers for structured minyanim data.
 //
 // Each synagogue stores `details.minyanim`: a Minyan[] array.
-// DaveningTimesModal and the shared DaveningTimes card component use the
-// grouping helpers here to render tefillah-grouped or day-grouped views.
+// The shared DaveningTimes card component uses the grouping helpers here
+// to render a shul's times by tefillah.
 //
 // Day key types are re-used from hours.ts to avoid duplication.
 
@@ -295,26 +295,6 @@ export type ByTefillahGroup = {
   }>
 }
 
-export type ByDayGroup = {
-  day: MinyanDayKey
-  label: string
-  rows: Array<{
-    shul: string
-    tefillah: Tefillah
-    tefillahLabel: string
-    time: string
-    notes?: string
-    denomination?: string
-    driveMinutes?: number | null
-    walkMinutes?: number | null
-    anchor?: ZmanAnchor
-    offsetMinutes?: number
-    notBefore?: string
-    notAfter?: string
-    season?: Season
-  }>
-}
-
 // ── Grouping helpers ───────────────────────────────────────────────────────────
 
 export function groupByTefillah(shuls: ShulInfo[]): ByTefillahGroup[] {
@@ -388,43 +368,6 @@ export function mergeSameDayTimes(rows: ByTefillahGroup['rows']): ByTefillahGrou
     }
   }
   return merged
-}
-
-export function groupByDay(shuls: ShulInfo[]): ByDayGroup[] {
-  const map = new Map<MinyanDayKey, ByDayGroup['rows']>()
-  for (const d of ALL_MINYAN_DAYS) map.set(d, [])
-
-  for (const shul of shuls) {
-    for (const m of shul.minyanim) {
-      for (const day of m.days) {
-        map.get(day)?.push({
-          shul: shul.name,
-          tefillah: m.tefillah,
-          tefillahLabel: TEFILLAH_LABELS[m.tefillah],
-          time: m.time,
-          notes: m.notes,
-          denomination: shul.denomination,
-          driveMinutes: shul.driveMinutes,
-          walkMinutes: shul.walkMinutes,
-          anchor: m.anchor,
-          offsetMinutes: m.offsetMinutes,
-          notBefore: m.notBefore,
-          notAfter: m.notAfter,
-          season: m.season,
-        })
-      }
-    }
-  }
-
-  return ALL_MINYAN_DAYS.filter((d) => (map.get(d)?.length ?? 0) > 0).map((d) => ({
-    day: d,
-    label: DAY_FULL[d],
-    rows: (map.get(d) ?? []).sort(
-      (a, b) =>
-        TEFILLAH_ORDER.indexOf(a.tefillah) - TEFILLAH_ORDER.indexOf(b.tefillah) ||
-        parseTimeToMinutes(a.time) - parseTimeToMinutes(b.time),
-    ),
-  }))
 }
 
 /**

@@ -53,8 +53,8 @@ type Props = {
  *  opens the same PlaceDetailBody content in a centered dialog instead. See
  *  GenericListingCard's `isMobile` branch for the split.
  *
- *  Follows DaveningTimesModal's own conventions: backdrop click and Escape
- *  both close it, body scroll locks while open.
+ *  Backdrop click and Escape both close it, and the body's scroll locks
+ *  while it's open.
  *
  *  Edit swaps THIS dialog's own content to the listing-shaped editor
  *  (ListingEditor; a removal request is at its foot, see RemovalRequest),
