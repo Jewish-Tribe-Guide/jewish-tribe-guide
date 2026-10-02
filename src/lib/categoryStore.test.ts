@@ -176,10 +176,23 @@ describe('listCategoriesUncached', () => {
       mockFrom.mockReturnValue(chainable({ data: [{ ...rawRow, walk_list }], error: null }))
       return (await listCategoriesUncached('philly'))[0].walkList
     }
-    expect(await read({ categoryId: 'synagogue', maxMinutes: 30 })).toEqual({ categoryId: 'synagogue', maxMinutes: 30 })
+    // The one list stored before there could be several reads as a list of one.
+    expect(await read({ categoryId: 'synagogue', maxMinutes: 30 })).toEqual([{ categoryId: 'synagogue', maxMinutes: 30 }])
+    expect(await read([{ categoryId: 'restaurant', maxMinutes: 30, groupBy: 'foodType' }])).toEqual([{ categoryId: 'restaurant', maxMinutes: 30, groupBy: 'foodType' }])
     expect(await read(undefined)).toBeUndefined()
     expect(await read(null)).toBeUndefined()
     expect(await read({ categoryId: 'synagogue', maxMinutes: 90 })).toBeUndefined()
+  })
+
+  it('reads listing_parts, and none when absent, null or unknown', async () => {
+    const read = async (listing_parts: unknown) => {
+      mockFrom.mockReturnValue(chainable({ data: [{ ...rawRow, listing_parts }], error: null }))
+      return (await listCategoriesUncached('philly'))[0].listingParts
+    }
+    expect(await read({ setLocation: true, shabbos: { fields: ['eruv'] } })).toEqual({ setLocation: true, shabbos: { fields: ['eruv'] } })
+    expect(await read(undefined)).toBeUndefined()
+    expect(await read(null)).toBeUndefined()
+    expect(await read({ setLocation: 'yes' })).toBeUndefined()
   })
 })
 
@@ -446,10 +459,25 @@ describe('updateCategory', () => {
 
     await updateCategory('philly', 'hotel', { label: 'Hotels' })
     expect(builder.update).toHaveBeenLastCalledWith({ label: 'Hotels' })
-    await updateCategory('philly', 'hotel', { walkList: { categoryId: 'synagogue', maxMinutes: 30 } })
-    expect(builder.update).toHaveBeenLastCalledWith({ walk_list: { categoryId: 'synagogue', maxMinutes: 30 } })
+    await updateCategory('philly', 'hotel', { walkList: [{ categoryId: 'synagogue', maxMinutes: 30 }] })
+    expect(builder.update).toHaveBeenLastCalledWith({ walk_list: [{ categoryId: 'synagogue', maxMinutes: 30 }] })
     await updateCategory('philly', 'hotel', { walkList: null })
     expect(builder.update).toHaveBeenLastCalledWith({ walk_list: null })
+    // No lists is none, not an empty array.
+    await updateCategory('philly', 'hotel', { walkList: [] })
+    expect(builder.update).toHaveBeenLastCalledWith({ walk_list: null })
+  })
+
+  it('writes listing_parts only when the patch has them, and none as null (migration 066)', async () => {
+    const builder = chainable({ data: rawRow, error: null })
+    mockFrom.mockReturnValue(builder)
+
+    await updateCategory('philly', 'hospital', { label: 'Hospitals' })
+    expect(builder.update).toHaveBeenLastCalledWith({ label: 'Hospitals' })
+    await updateCategory('philly', 'hospital', { listingParts: { setLocation: true } })
+    expect(builder.update).toHaveBeenLastCalledWith({ listing_parts: { setLocation: true } })
+    await updateCategory('philly', 'hospital', { listingParts: {} })
+    expect(builder.update).toHaveBeenLastCalledWith({ listing_parts: null })
   })
 
   it('writes active when present in the patch', async () => {

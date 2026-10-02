@@ -7,7 +7,8 @@ import { isHttpUrl } from '@/lib/validation'
 import type { CategoryCapabilities, CategoryField, CategoryFormSection } from '@/lib/categories'
 import { parseGroupBy, type GroupBy } from '@/lib/listGroups'
 import { parseQuestionCard, type QuestionCard } from '@/lib/questionCards'
-import { parseWalkList, type WalkList } from '@/lib/walkList'
+import { parseWalkLists, type WalkList } from '@/lib/walkList'
+import { parseListingParts, type ListingParts } from '@/lib/listingParts'
 import { isValidPinColor } from '@/lib/categoryColor'
 import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
 
@@ -42,9 +43,12 @@ type PatchBody = {
   /** The one question the list asks, or null for none — see
    *  questionCards.ts. Only sent when the admin changed it. */
   questionCard?: QuestionCard | null
-  /** Another category's places within a walk, or null for none — see
+  /** Other categories' places within a walk, or null for none — see
    *  walkList.ts. Only sent when the admin changed it. */
-  walkList?: WalkList | null
+  walkList?: WalkList[] | null
+  /** The named main thing, the Shabbos card and Set as location, or null
+   *  for none — see listingParts.ts. Only sent when the admin changed it. */
+  listingParts?: ListingParts | null
   /** When address/phone is being turned off or a field removed on a category
    *  that already has listings, the editor confirms with the admin (via
    *  field-usage) before including this — it wipes that data from every
@@ -110,10 +114,11 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/
     return Response.json({ ok: false, errors: ['That question isn’t one the site knows.'] }, { status: 400 })
   }
   if (body.questionCard != null) body.questionCard = parseQuestionCard(body.questionCard)
-  if (body.walkList != null && !parseWalkList(body.walkList)) {
+  if (body.walkList != null && (!Array.isArray(body.walkList) || parseWalkLists(body.walkList).length !== body.walkList.length)) {
     return Response.json({ ok: false, errors: ['That list of places within a walk isn’t one the site knows.'] }, { status: 400 })
   }
-  if (body.walkList != null) body.walkList = parseWalkList(body.walkList)
+  if (body.walkList != null) body.walkList = parseWalkLists(body.walkList)
+  if (body.listingParts != null) body.listingParts = parseListingParts(body.listingParts)
 
   // Applied before everything else, and using its own error path (400, not
   // the catch-all 502 below) — an invalid/taken slug is a plain validation
@@ -171,6 +176,12 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/
     if (body.walkList !== undefined && err instanceof Error && /walk_list/.test(err.message)) {
       return Response.json(
         { ok: false, errors: ['Could not save the places within a walk: database migration 061 (category walk_list) isn’t applied yet.'] },
+        { status: 502 },
+      )
+    }
+    if (body.listingParts !== undefined && err instanceof Error && /listing_parts/.test(err.message)) {
+      return Response.json(
+        { ok: false, errors: ['Could not save what each listing shows: database migration 066 (category listing_parts) isn’t applied yet.'] },
         { status: 502 },
       )
     }

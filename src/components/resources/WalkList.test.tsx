@@ -67,6 +67,9 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
+/** The places' own loads, not the sunset times the shuls' rows ask for. */
+const placeLoads = () => fetchMock.mock.calls.filter(([url]) => String(url).startsWith('/api/resources')).length
+
 const open = (item = hotel, category = hotels) =>
   renderWithProviders(<ListingView item={item} category={category} color="#000" path="/test" foot={null} />, { content: { categories: [hotels, shuls] } })
 
@@ -80,13 +83,16 @@ describe('A hotel’s synagogues within a walk', () => {
     const headings = within(section).getAllByRole('heading', { level: 4 }).map((h) => h.textContent)
     expect(headings).toEqual(['Under 20 minutes · 2', '20 to 30 minutes · 1'])
     const rows = within(section).getAllByRole('link').map((a) => a.textContent)
+    // Each says what the Synagogues page says: its denomination and its
+    // davening.
     expect(rows).toEqual([
-      '8 minSociety Hill SynagogueConservative · Philadelphia',
-      '15 minMikveh IsraelOrthodox (Ashkenazi) · Philadelphia',
-      '25 minBeth ZionOrthodox (Ashkenazi) · Philadelphia',
+      '8 minSociety Hill SynagogueConservative · No davening times listed',
+      '15 minMikveh IsraelOrthodox (Ashkenazi) · No davening times listed',
+      '25 minBeth ZionOrthodox (Ashkenazi) · No davening times listed',
     ])
     expect(within(section).queryByText('Far Away Shul')).not.toBeInTheDocument()
     expect(fetchMock).toHaveBeenCalledWith('/api/resources?category=synagogue&community=test-community')
+    expect(placeLoads()).toBe(1)
   })
 
   it('opens a shul on its own page, and says how rough the times are', async () => {
@@ -98,10 +104,12 @@ describe('A hotel’s synagogues within a walk', () => {
     )
   })
 
-  it('says when there are none within the walk', async () => {
+  it('says when there are none within the walk, and names the nearest', async () => {
     fetchMock.mockImplementation(async () => answer([nearby[3]]))
     open()
-    expect(await screen.findByText('No synagogues listed within a 30-minute walk.')).toBeInTheDocument()
+    const section = await screen.findByTestId('walk-list')
+    await vi.waitFor(() => expect(section).toHaveTextContent('No synagogues listed within a 30-minute walk. Nearest: Far Away Shul, 50 min.'))
+    expect(within(section).getByRole('link', { name: 'Far Away Shul' })).toBeInTheDocument()
   })
 
   it('says when they couldn’t load, and tries again the next time', async () => {
@@ -111,7 +119,7 @@ describe('A hotel’s synagogues within a walk', () => {
     cleanup()
     open()
     expect(await screen.findByText('Society Hill Synagogue')).toBeInTheDocument()
-    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(placeLoads()).toBe(2)
   })
 
   it('loads the shuls once for every hotel opened after', async () => {
@@ -120,7 +128,7 @@ describe('A hotel’s synagogues within a walk', () => {
     cleanup()
     open({ ...hotel, id: 'h2', name: 'Another Hotel' })
     await screen.findByText('Society Hill Synagogue')
-    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(placeLoads()).toBe(1)
   })
 
   it('leaves nothing behind, not even its divider, when the category it lists is gone', () => {
@@ -136,5 +144,89 @@ describe('A hotel’s synagogues within a walk', () => {
     open(hotel, { ...hotels, walkList: undefined })
     expect(screen.queryByTestId('walk-list')).not.toBeInTheDocument()
     expect(fetchMock).not.toHaveBeenCalled()
+  })
+})
+
+// A hospital's lists (step 5): food grouped by Store Type, shuls, hotels by
+// Shabbat friendly.
+describe('A hospital’s places within a walk', () => {
+  const food = makeCategory({
+    id: 'restaurant',
+    label: 'Food',
+    pluralLabel: 'Food',
+    detailFields: [
+      { key: 't', label: 'Food Type', type: 'select', renderAs: 'badge', filterable: true, options: [{ value: 'Parve', label: 'Parve' }] },
+      {
+        key: 'foodType',
+        label: 'Store Type',
+        type: 'select',
+        renderAs: 'badge',
+        filterable: true,
+        options: [
+          { value: 'Restaurant', label: 'Restaurant' },
+          { value: 'Bakery', label: 'Bakery' },
+        ],
+      },
+    ],
+  })
+  const hotelsCat = makeCategory({
+    id: 'hotel',
+    label: 'Hotel',
+    pluralLabel: 'Hotels',
+    detailFields: [{ key: 'shabbatFriendly', label: 'Shabbat friendly', type: 'boolean', renderAs: 'badge', filterable: true }],
+  })
+  const hospitals = makeCategory({
+    id: 'hospital',
+    label: 'Hospital',
+    pluralLabel: 'Hospitals',
+    walkList: [
+      { categoryId: 'restaurant', maxMinutes: 30, groupBy: 'foodType' },
+      { categoryId: 'synagogue', maxMinutes: 30 },
+      { categoryId: 'hotel', maxMinutes: 30, groupBy: 'shabbatFriendly' },
+    ],
+  })
+  const hup = makeListing({ id: 'hup', category: 'hospital', name: 'HUP', geo: at }) as DirectoryResource
+  const placeAt = (category: string, id: string, miles: number, details: Record<string, unknown>) =>
+    makeListing({ id, category, name: id, geo: milesNorth(miles), ...details }) as DirectoryResource
+  const byCategory: Record<string, DirectoryResource[]> = {
+    restaurant: [
+      placeAt('restaurant', '20th Street Pizza', 1.08, { t: 'Parve', foodType: 'Restaurant' }), // 27 min
+      placeAt('restaurant', 'Insomnia Cookies', 0.24, { foodType: 'Bakery' }), // 6 min
+    ],
+    synagogue: [shul('mekor', 'Mekor Habracha', 1.48, 'orthodox')], // 37 min: out
+    hotel: [placeAt('hotel', 'Marriott', 0.64, { shabbatFriendly: true }), placeAt('hotel', 'Morris House', 0.16, {})],
+  }
+  const openHospital = (lists = byCategory) => {
+    fetchMock.mockImplementation(async (url: string) => {
+      const id = new URL(String(url), 'http://x').searchParams.get('category')
+      return answer(id ? (lists[id] ?? []) : [])
+    })
+    return renderWithProviders(<ListingView item={hup} category={hospitals} color="#000" path="/test" foot={null} />, {
+      content: { categories: [hospitals, food, shuls, hotelsCat] },
+    })
+  }
+
+  it('lists each, grouped as chosen, food answering with the nearest restaurant and what’s nearer', async () => {
+    openHospital()
+    await screen.findByText('20th Street Pizza')
+    const [foodList, shulList, hotelList] = screen.getAllByTestId('walk-list')
+    expect(within(foodList).getByRole('heading', { name: 'Food within a walk' })).toBeInTheDocument()
+    expect(within(foodList).getByTestId('walk-answer')).toHaveTextContent('Nearest restaurant: 20th Street Pizza, 27 min. Nearer: Insomnia Cookies, a bakery, 6 min.')
+    expect(within(foodList).getAllByRole('heading', { level: 4 }).map((h) => h.textContent)).toEqual(['Restaurant · 1', 'Bakery · 1'])
+    // The row's facts, less the Store Type it's grouped by.
+    expect(within(foodList).getByRole('link', { name: /20th Street Pizza/ })).toHaveTextContent('27 min20th Street PizzaParve')
+
+    await vi.waitFor(() => expect(shulList).toHaveTextContent('No synagogues listed within a 30-minute walk. Nearest: Mekor Habracha, 37 min.'))
+
+    expect(within(hotelList).getAllByRole('heading', { level: 4 }).map((h) => h.textContent)).toEqual(['Shabbat friendly · 1', 'Doesn’t say · 1'])
+    expect(placeLoads()).toBe(3)
+  })
+
+  it('says so once when nothing on any list is within the walk, naming the nearest of each', async () => {
+    openHospital({ restaurant: [placeAt('restaurant', 'Rolings Bakery', 2.5, { foodType: 'Bakery' })], synagogue: [], hotel: [] })
+    const none = await screen.findByTestId('walk-list-none')
+    expect(screen.queryByTestId('walk-list')).not.toBeInTheDocument()
+    expect(none).toHaveTextContent('No food, synagogues or hotels listed within a 30-minute walk.')
+    expect(none).toHaveTextContent('Nearest food: Rolings Bakery, 2.5 mi')
   })
 })

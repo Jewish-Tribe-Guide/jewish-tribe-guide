@@ -84,27 +84,55 @@ describe('PATCH /api/admin/categories/:id — the question card', () => {
   })
 })
 
-// Another category's places within a walk (walkList.ts).
+// Other categories' places within a walk (walkList.ts).
 describe('PATCH /api/admin/categories/:id — places within a walk', () => {
-  it('saves a list it knows, and clearing it back to none', async () => {
-    expect((await patch({ walkList: { categoryId: 'synagogue', maxMinutes: 30 } })).status).toBe(200)
-    expect(m.updateCategory).toHaveBeenLastCalledWith('philly', 'synagogue', expect.objectContaining({ walkList: { categoryId: 'synagogue', maxMinutes: 30 } }))
+  const lists = [
+    { categoryId: 'restaurant', maxMinutes: 30, groupBy: 'foodType' },
+    { categoryId: 'synagogue', maxMinutes: 30 },
+  ]
+
+  it('saves the lists it knows, and clearing them back to none', async () => {
+    expect((await patch({ walkList: lists })).status).toBe(200)
+    expect(m.updateCategory).toHaveBeenLastCalledWith('philly', 'synagogue', expect.objectContaining({ walkList: lists }))
     expect((await patch({ walkList: null })).status).toBe(200)
     expect(m.updateCategory).toHaveBeenLastCalledWith('philly', 'synagogue', expect.objectContaining({ walkList: null }))
   })
 
-  it('refuses one it doesn’t know, and saves only the parts it knows of one it does', async () => {
-    expect((await patch({ walkList: { categoryId: 'synagogue', maxMinutes: 240 } })).status).toBe(400)
-    expect((await patch({ walkList: { maxMinutes: 30 } })).status).toBe(400)
+  it('refuses a list it doesn’t know, or two of the same places, and saves only the parts it knows of the rest', async () => {
+    expect((await patch({ walkList: [{ categoryId: 'synagogue', maxMinutes: 240 }] })).status).toBe(400)
+    expect((await patch({ walkList: [{ maxMinutes: 30 }] })).status).toBe(400)
+    expect((await patch({ walkList: [lists[1], lists[1]] })).status).toBe(400)
+    expect((await patch({ walkList: lists[1] })).status).toBe(400)
     expect(m.updateCategory).not.toHaveBeenCalled()
-    await patch({ walkList: { categoryId: 'synagogue', maxMinutes: 15, extra: '<script>' } })
-    expect(m.updateCategory).toHaveBeenLastCalledWith('philly', 'synagogue', expect.objectContaining({ walkList: { categoryId: 'synagogue', maxMinutes: 15 } }))
+    await patch({ walkList: [{ categoryId: 'synagogue', maxMinutes: 15, extra: '<script>' }] })
+    expect(m.updateCategory).toHaveBeenLastCalledWith('philly', 'synagogue', expect.objectContaining({ walkList: [{ categoryId: 'synagogue', maxMinutes: 15 }] }))
   })
 
   it('says the migration is missing when the database has no walk_list column yet', async () => {
     m.updateCategory.mockRejectedValue(new Error("Failed to update category: Could not find the 'walk_list' column of 'category' in the schema cache"))
-    const res = await patch({ walkList: { categoryId: 'synagogue', maxMinutes: 30 } })
+    const res = await patch({ walkList: lists })
     expect(res.status).toBe(502)
     expect((await res.json()).errors[0]).toMatch(/migration 061/)
+  })
+})
+
+// The main card, the Shabbos card and Set as location (listingParts.ts).
+describe('PATCH /api/admin/categories/:id — what each listing adds', () => {
+  it('saves only the parts it knows', async () => {
+    await patch({ listingParts: { main: { title: ' Who to call first ', fields: ['who', 'who', 7] }, setLocation: true, extra: 1 } })
+    expect(m.updateCategory).toHaveBeenLastCalledWith(
+      'philly',
+      'synagogue',
+      expect.objectContaining({ listingParts: { main: { title: 'Who to call first', fields: ['who'] }, setLocation: true } }),
+    )
+    expect((await patch({ listingParts: null })).status).toBe(200)
+    expect(m.updateCategory).toHaveBeenLastCalledWith('philly', 'synagogue', expect.objectContaining({ listingParts: null }))
+  })
+
+  it('says the migration is missing when the database has no listing_parts column yet', async () => {
+    m.updateCategory.mockRejectedValue(new Error("Failed to update category: Could not find the 'listing_parts' column of 'category' in the schema cache"))
+    const res = await patch({ listingParts: { setLocation: true } })
+    expect(res.status).toBe(502)
+    expect((await res.json()).errors[0]).toMatch(/migration 066/)
   })
 })

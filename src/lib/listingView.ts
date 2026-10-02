@@ -6,7 +6,8 @@ const short = (k: DayKey) => dayLabel(k).slice(0, 3)
 import { haversineMiles, milesText, roundMiles } from './geo'
 import { rowBadgeFields, saysTheSame } from './listingRow'
 import { isMinyanim } from './davening'
-import { parseWalkList } from './walkList'
+import { parseWalkLists } from './walkList'
+import { mainCardOf, parseListingParts } from './listingParts'
 import type { DirectoryResource } from '@/types'
 
 // ── An opened listing ────────────────────────────────────────────────────────
@@ -92,10 +93,12 @@ export function listingDistance(item: DirectoryResource, region: string): string
 
 // ── The main thing ───────────────────────────────────────────────────────────
 
-export type MainThing = 'davening' | 'items' | 'groups' | 'walk' | 'join' | 'hours'
+export type MainThing = 'section' | 'davening' | 'items' | 'groups' | 'walk' | 'join' | 'hours'
 
-/** What the listing is mostly for, by what it holds. First that applies:
- *  davening times; items; one section per audience (a mikvah's women's,
+/** What the listing is mostly for. The section an admin named as it comes
+ *  first (a hospital's "Who to call first", listingParts.ts), even while
+ *  it's empty, so every listing in the category opens the same way.
+ *  Otherwise by what it holds, first that applies: davening times; items; one section per audience (a mikvah's women's,
  *  men's and keilim); the shuls within a walk (a hotel); the one link of a
  *  place with no address (Join a WhatsApp group); the week's hours.
  *
@@ -107,13 +110,14 @@ export type MainThing = 'davening' | 'items' | 'groups' | 'walk' | 'join' | 'hou
  *  end, and the hours lead as before. */
 export function mainThing(item: DirectoryResource, category: CategoryConfig): MainThing | null {
   const fields = category.detailFields
+  if (mainCardOf(category)) return 'section'
   const minyanim = fields.find((f) => f.type === 'minyanim')
   if (minyanim && isMinyanim(item[minyanim.key]) && (item[minyanim.key] as unknown[]).length > 0) return 'davening'
   const items = itemsField(category)
   if (items && selectValues(item[items.key]).length + selectValues(item[`${items.key}_sometimes`]).length > 0) return 'items'
   if (items && ui.contributions.edit && resolveCapabilities(category.capabilities).edit) return 'items'
   if (audienceGroups(item, category).length > 0) return 'groups'
-  if (parseWalkList(category.walkList) && item.geo) return 'walk'
+  if (parseWalkLists(category.walkList).length > 0 && item.geo) return 'walk'
   if (primaryLink(item, category)) return 'join'
   if (fields.some((f) => f.type === 'hours' && !f.audienceKey && hasHours(item[f.key]))) return 'hours'
   return null
@@ -137,6 +141,7 @@ export type ConfirmPlace = { at: 'card'; subject: string } | { at: 'join' } | { 
 
 export function confirmPlace(item: DirectoryResource, category: CategoryConfig): ConfirmPlace | null {
   const main = mainThing(item, category)
+  if (main === 'section') return { at: 'card', subject: mainCardOf(category)!.label }
   if (main === 'davening') return { at: 'card', subject: 'Times' }
   if (main === 'groups') return { at: 'card', subject: 'Hours' }
   if (main === 'join') return { at: 'join' }
@@ -296,24 +301,32 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 export type ActionSpec =
   | { kind: 'directions' }
   | { kind: 'call' }
+  | { kind: 'location' }
   | { kind: 'link'; field: CategoryField; href: string }
   | { kind: 'email'; field: CategoryField; address: string }
 
 /** The buttons under the name, in order: Directions, Call, each link, an
  *  email. Share always comes last, so four of these at most; the rest are
  *  returned as `extra`, for the details. A place's one Join link isn't a
- *  button here: it's the main thing. */
+ *  button here: it's the main thing. A place people stay at and measure
+ *  from (a hospital: listingParts.setLocation) ends with Set as location,
+ *  which takes the fourth place. */
 export function listingActions(item: DirectoryResource, category: CategoryConfig): { buttons: ActionSpec[]; extra: ActionSpec[] } {
   const all: ActionSpec[] = []
   if (category.hasAddress !== false && item.address) all.push({ kind: 'directions' })
   if (category.hasPhone !== false && item.phone) all.push({ kind: 'call' })
   const primary = primaryLink(item, category)?.field.key
+  // A link on the admin's main card is said there, not twice.
+  const onCard = new Set(mainCardOf(category)?.fields.map((f) => f.key) ?? [])
   for (const f of category.detailFields) {
-    if (f.audienceKey || f.key === primary) continue
+    if (f.audienceKey || f.key === primary || onCard.has(f.key)) continue
     const v = String(item[f.key] ?? '').trim()
     if (!v) continue
     if (f.type === 'url') all.push({ kind: 'link', field: f, href: v })
     else if (f.type === 'text' && EMAIL.test(v)) all.push({ kind: 'email', field: f, address: v })
+  }
+  if (parseListingParts(category.listingParts).setLocation && category.hasAddress !== false && item.geo) {
+    return { buttons: [...all.slice(0, 3), { kind: 'location' }], extra: all.slice(3) }
   }
   return { buttons: all.slice(0, 4), extra: all.slice(4) }
 }

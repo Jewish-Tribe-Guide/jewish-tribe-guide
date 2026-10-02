@@ -11,7 +11,8 @@ import {
 import { slugRejectionReason } from '@/lib/routes'
 import { groupByKey, parseGroupBy } from '@/lib/listGroups'
 import { parseQuestionCard, questionCardKey } from '@/lib/questionCards'
-import { parseWalkList, walkListKey } from '@/lib/walkList'
+import { parseWalkLists, walkListKey } from '@/lib/walkList'
+import { listingPartsKey, parseListingParts } from '@/lib/listingParts'
 
 // ── Pure logic behind CategoryEditor — draft shape, template/field
 // normalization, and the two destructive-change detectors (option rename,
@@ -74,9 +75,12 @@ export type Draft = {
   /** The one question the list asks, as questionCardKey writes it ('' for
    *  none). Saved only when changed, like groupBy. */
   questionCard: string
-  /** Another category's places within a walk, as walkListKey writes it (''
+  /** Other categories' places within a walk, as walkListKey writes it (''
    *  for none). Saved only when changed, like groupBy. */
   walkList: string
+  /** The main card, the Shabbos card and Set as location, as
+   *  listingPartsKey writes them ('' for none). Saved only when changed. */
+  listingParts: string
 }
 
 export const CAPABILITY_LABELS: Record<keyof CategoryCapabilities, string> = {
@@ -153,7 +157,8 @@ export function toDraft(c: CategoryConfig | null): Draft {
     active: c?.active ?? true,
     groupBy: groupByKey(parseGroupBy(c?.groupBy)),
     questionCard: questionCardKey(parseQuestionCard(c?.questionCard)),
-    walkList: walkListKey(parseWalkList(c?.walkList)),
+    walkList: walkListKey(parseWalkLists(c?.walkList)),
+    listingParts: listingPartsKey(parseListingParts(c?.listingParts)),
   }
 }
 

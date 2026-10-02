@@ -340,3 +340,38 @@ describe('confirmPlace', () => {
     expect(confirmPlace(makeListing({ hours: { mon: { open: '09:00', close: '17:00' } } }), food)).toBeNull()
   })
 })
+
+// A hospital (step 5, Oct 2): a card the admin names comes first, and Set as
+// location is among its buttons (listingParts.ts).
+describe('a category’s own main card and Set as location', () => {
+  const who: CategoryField = { key: 'who', label: 'Who to call first', type: 'text' }
+  const whoPhone: CategoryField = { key: 'who_phone', label: 'Their phone', type: 'tel' }
+  const whoSite: CategoryField = { key: 'who_site', label: 'Their website', type: 'url' }
+  const refuah: CategoryField = { key: 'r', label: 'Refuah Link', type: 'url' }
+  const hospital = makeCategory({
+    id: 'hospital',
+    detailFields: [website, refuah, who, whoPhone, whoSite],
+    listingParts: { main: { title: 'Who to call first', fields: ['who', 'who_phone', 'who_site'] }, setLocation: true },
+  })
+  const hup = makeListing({ phone: '(215) 662-4000', website: 'https://pennmedicine.org', r: 'https://refuah.com/hup', geo: { lat: 39.95, lng: -75.19 } })
+
+  it('leads with the named card, even before anyone has filled it in', () => {
+    expect(mainThing(hup, hospital)).toBe('section')
+    expect(mainThing(makeListing({ who: 'Bikur Cholim' }), hospital)).toBe('section')
+  })
+  it('asks "Still right?" in that card', () => {
+    expect(confirmPlace(hup, hospital)).toEqual({ at: 'card', subject: 'Who to call first' })
+  })
+  it('isn’t the main thing once none of its fields exist', () => {
+    const gone = makeCategory({ ...hospital, detailFields: [website, refuah] })
+    expect(mainThing(hup, gone)).not.toBe('section')
+  })
+  it('ends the buttons with Set as location, taking the fourth place; a link on the card isn’t a button too', () => {
+    const { buttons, extra } = listingActions({ ...hup, who_site: 'https://bikurcholim.org' }, hospital)
+    expect(buttons.map((b) => (b.kind === 'link' ? b.field.label : b.kind))).toEqual(['directions', 'call', 'Website', 'location'])
+    expect(extra.map((b) => (b.kind === 'link' ? b.field.label : b.kind))).toEqual(['Refuah Link'])
+  })
+  it('no Set as location for a place the map can’t find', () => {
+    expect(listingActions({ ...hup, geo: undefined }, hospital).buttons.map((b) => b.kind)).not.toContain('location')
+  })
+})

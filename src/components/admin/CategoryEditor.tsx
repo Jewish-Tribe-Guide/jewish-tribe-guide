@@ -6,7 +6,9 @@ import { CATEGORY_TEMPLATES } from '@/lib/categoryTemplates'
 import { getCategoryColor } from '@/lib/categoryColor'
 import { groupByFromKey, groupByKey, groupByOptions } from '@/lib/listGroups'
 import { questionCardFromKey, questionCardKey, questionCardOptions } from '@/lib/questionCards'
-import { WALK_LIST_MINUTES, walkListFromKey, walkListKey, walkListTargets } from '@/lib/walkList'
+import { walkListFromKey } from '@/lib/walkList'
+import { listingPartsToSave } from '@/lib/listingParts'
+import { ListingPartsEditor, WalkListsEditor } from './ListingPartsEditor'
 import CategoryPreview from './CategoryPreview'
 import { CardBackgroundField, CardBandImageField, IconField, PinColorField, inputClass } from './CategoryFormFields'
 import { FieldEditor } from './CategoryFieldEditor'
@@ -123,6 +125,7 @@ export function CategoryEditor({
       groupBy: groupByFromKey(draft.groupBy),
       questionCard: questionCardFromKey(draft.questionCard),
       walkList: walkListFromKey(draft.walkList),
+      listingParts: listingPartsToSave(draft.listingParts) ?? undefined,
       externalLink:
         draft.externalLinkEnabled && draft.externalLinkLabel.trim() && draft.externalLinkUrl.trim()
           ? { label: draft.externalLinkLabel.trim(), url: draft.externalLinkUrl.trim() }
@@ -391,58 +394,22 @@ export function CategoryEditor({
           </section>
         )}
 
-        {/* Another category's places within a walk, on each listing. Only
+        {/* Other categories' places within a walk, on each listing. Only
             on an existing category with addresses: the walk starts at one. */}
-        {!isNew && draft.hasAddress && (() => {
-          const walk = walkListFromKey(draft.walkList)
-          const targets = walkListTargets(siblings ?? [], initial!)
-          if (targets.length === 0 && !walk) return null
-          return (
-            <section className="bg-white border border-slate-200 rounded-lg p-4">
-              <label htmlFor="category-walk-list" className="block text-sm font-semibold text-slate-800 mb-1">
-                Places within a walk
-              </label>
-              <div className="flex flex-col gap-2 sm:flex-row">
-                <select
-                  id="category-walk-list"
-                  aria-describedby="category-walk-list-help"
-                  value={walk?.categoryId ?? ''}
-                  onChange={(e) =>
-                    set('walkList', e.target.value ? walkListKey({ categoryId: e.target.value, maxMinutes: walk?.maxMinutes ?? 30 }) : '')
-                  }
-                  className={`${inputClass} sm:flex-1`}
-                >
-                  <option value="">None</option>
-                  {walk && !targets.some((t) => t.id === walk.categoryId) && <option value={walk.categoryId}>{walk.categoryId}</option>}
-                  {targets.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.pluralLabel}
-                    </option>
-                  ))}
-                </select>
-                {walk && (
-                  <select
-                    aria-label="How far a walk"
-                    value={walk.maxMinutes}
-                    onChange={(e) => set('walkList', walkListKey({ categoryId: walk.categoryId, maxMinutes: Number(e.target.value) }))}
-                    className={`${inputClass} sm:w-48 sm:shrink-0`}
-                  >
-                    {WALK_LIST_MINUTES.map((m) => (
-                      <option key={m} value={m}>
-                        Within {m} minutes
-                      </option>
-                    ))}
-                  </select>
-                )}
-              </div>
-              <span id="category-walk-list-help" className="block text-[11px] text-muted mt-1">
-                On each of this category&rsquo;s listings, every place in the chosen category within
-                that many minutes&rsquo; walk, nearest first, e.g. the synagogues near each hotel.
-                Times are rough: a straight line at 25 minutes a mile, and the list says so.
-              </span>
-            </section>
-          )
-        })()}
+        {!isNew && draft.hasAddress && (
+          <WalkListsEditor value={draft.walkList} onChange={(v) => set('walkList', v)} self={initial!} categories={siblings ?? []} />
+        )}
+
+        {/* What each opened listing adds: a main card, a Shabbos card, Set
+            as location. */}
+        {!isNew && (
+          <ListingPartsEditor
+            value={draft.listingParts}
+            onChange={(v) => set('listingParts', v)}
+            fields={draft.fields.map(normalizeField)}
+            hasAddress={draft.hasAddress}
+          />
+        )}
 
         {/* Details */}
         <section className="bg-white border border-slate-200 rounded-lg p-4">

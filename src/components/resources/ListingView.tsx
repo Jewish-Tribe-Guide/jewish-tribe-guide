@@ -31,7 +31,8 @@ import {
   type ActionSpec,
   type AudienceGroup,
 } from '@/lib/listingView'
-import { parseWalkList } from '@/lib/walkList'
+import { parseWalkLists } from '@/lib/walkList'
+import { mainCardOf, shabbosFieldsOf } from '@/lib/listingParts'
 import { clockTime } from '@/lib/upcomingDavening'
 import { milesText, roundMiles } from '@/lib/geo'
 import type { SearchFound } from '@/lib/askSearch'
@@ -44,6 +45,7 @@ import {
   PlusIcon,
   ChevronRightIcon,
   ClockIcon,
+  CrosshairIcon,
   DirectionsIcon,
   ExternalIcon,
   GlobeIcon,
@@ -58,7 +60,8 @@ import Highlight from './Highlight'
 import HoursDisplay from './HoursDisplay'
 import DaveningCard from './DaveningCard'
 import { schedulesKey } from '@/lib/schedules'
-import WalkList from './WalkList'
+import WalkLists from './WalkList'
+import { SectionCard, ShabbosCard } from './listingCards'
 import { useNextMinyan } from './nextMinyans'
 import { Card, shortDate } from './listingParts'
 import FreshnessFooter from './FreshnessFooter'
@@ -128,9 +131,11 @@ export default function ListingView({ item, category, color, place = null, upvot
   const clock = useNow()
   const now = clock === null ? null : new Date(clock)
   const hoursFields = category.detailFields.filter((f) => f.type === 'hours')
+  const shabbosFields = shabbosFieldsOf(category)
   // Tonight's candle lighting, on a Friday or erev Yom Tov: a place that
-  // shuts before it says so. The same cached request the list makes.
-  const { data: zmanim } = useZmanim(hoursFields.length > 0 ? community.mapCenter : null)
+  // shuts before it says so, and the Shabbos card's first line. The same
+  // cached request the list makes.
+  const { data: zmanim } = useZmanim(hoursFields.length > 0 || shabbosFields ? community.mapCenter : null)
   const candlesAt = candlesToday(zmanim, now)
   const shul = useNextMinyan(item.id)
   const { isPinned } = usePinned()
@@ -295,7 +300,10 @@ export default function ListingView({ item, category, color, place = null, upvot
 
   // ── 3 · The main thing ─────────────────────────────────────────────────
   let mainSection: ReactNode = null
-  if (main === 'davening') {
+  const named = main === 'section' ? mainCardOf(category) : null
+  if (named) {
+    mainSection = <SectionCard item={item} title={named.label} fields={named.fields} footer={confirmAt?.at === 'card' ? confirmLine(confirmAt.subject) : undefined} />
+  } else if (main === 'davening') {
     const f = category.detailFields.find((x) => x.type === 'minyanim')!
     mainSection = <DaveningCard item={item} minyanim={item[f.key]} schedules={item[schedulesKey(f.key)]} category={category} />
   } else if (main === 'items' && itemsF) {
@@ -305,8 +313,8 @@ export default function ListingView({ item, category, color, place = null, upvot
       <GroupsCard item={item} groups={audienceGroups(item, category)} now={now} candlesAt={candlesAt} footer={confirmAt?.at === 'card' ? confirmLine(confirmAt.subject) : undefined} />
     )
   } else if (main === 'walk') {
-    const walk = parseWalkList(category.walkList)
-    mainSection = walk && item.geo ? <WalkList walk={walk} from={item.geo} fromLabel={category.label} /> : null
+    const lists = parseWalkLists(category.walkList)
+    mainSection = lists.length > 0 && item.geo ? <WalkLists lists={lists} from={item.geo} fromLabel={category.label} /> : null
   } else if (main === 'hours') {
     const f = hoursFields.find((x) => !x.audienceKey && item[x.key] != null)
     mainSection = f ? <HoursCard item={item} value={item[f.key]} now={now} candlesAt={candlesAt} /> : null
@@ -327,6 +335,8 @@ export default function ListingView({ item, category, color, place = null, upvot
   const otherHours = main === 'hours' || main === 'groups' ? [] : hoursFields.filter((f) => !f.audienceKey && hasAny(item[f.key]))
   const shownElsewhere = new Set<string>([
     ...(tagline ? [tagline.key] : []),
+    ...(named ? named.fields.map((f) => f.key) : []),
+    ...(shabbosFields ?? []).map((f) => f.key),
     ...headerAbout.map((f) => f.key),
     ...(join ? [join.field.key] : []),
     ...buttons.flatMap((a) => (a.kind === 'link' || a.kind === 'email' ? [a.field.key] : [])),
@@ -443,7 +453,14 @@ export default function ListingView({ item, category, color, place = null, upvot
     </div>
   )
 
-  const walk = parseWalkList(category.walkList)
+  const walkLists = parseWalkLists(category.walkList)
+  const walks = walkLists.length > 0 && item.geo && main !== 'walk' ? <WalkLists lists={walkLists} from={item.geo} fromLabel={category.label} /> : null
+  // The Shabbos card comes right after the main thing on a Friday or Erev
+  // Yom Tov, until candle lighting; the rest of the week, after the places
+  // within a walk.
+  const nowMinutes = now ? now.getHours() * 60 + now.getMinutes() : null
+  const shabbosFirst = candlesAt !== null && nowMinutes !== null && nowMinutes < candlesAt
+  const shabbos = shabbosFields ? <ShabbosCard item={item} fields={shabbosFields} zmanim={zmanim} candlesAt={candlesAt} /> : null
 
   return (
     <div className="space-y-5" data-testid="listing-view">
@@ -452,14 +469,16 @@ export default function ListingView({ item, category, color, place = null, upvot
       {actions}
       {confirmAt?.at === 'join' && <JoinLinkCheck item={item} joined={joined} />}
       {mainSection}
+      {shabbosFirst && shabbos}
+      {/* A hotel's walk list is its main thing; anywhere else, the places
+          within a walk follow it (a hospital's food, shuls and hotels). */}
+      {walks}
+      {!shabbosFirst && shabbos}
       {/* A place whose list has nothing on it yet: just "+ Add the first
           item", after whatever it leads with. */}
       {main !== 'items' && itemsF && itemApi.marks.length === 0 && itemApi.canReport && <ItemsCard field={itemsF} found={null} api={itemApi} menuUrl={menuUrlOf(item)} />}
       {details}
       {about}
-      {/* A hotel's walk list is its main thing; anywhere else it follows
-          the place's own details, as it always has. */}
-      {walk && item.geo && main !== 'walk' && <WalkList walk={walk} from={item.geo} fromLabel={category.label} />}
       {/* Part 6: the one thing this listing doesn't say yet that a tap can
           answer (pickListingQuestion); nothing when there's nothing. */}
       <QuestionCard category={category} listing={item} items={main === 'items' && itemsF ? { field: itemsF, api: itemApi } : undefined} />
@@ -572,6 +591,7 @@ function Circle({ children }: { children: ReactNode }) {
 
 function ActionButton({ action, item }: { action: ActionSpec; item: DirectoryResource }) {
   const location = useOptionalLocation()
+  if (action.kind === 'location') return <SetLocationButton item={item} />
   let href: string
   let label: string
   let icon: ReactNode
@@ -613,6 +633,31 @@ function ActionButton({ action, item }: { action: ActionSpec; item: DirectoryRes
       <Circle>{icon}</Circle>
       <span className="w-[84px] truncate text-center text-xs font-semibold">{label}</span>
     </a>
+  )
+}
+
+/** Distances everywhere measured from this place: a hospital, for the
+ *  family staying near it. The same anchor as the overflow fan's Set as
+ *  location (useListingActions), here among the buttons. Not drawn where
+ *  there's no LocationProvider (the admin's preview). */
+function SetLocationButton({ item }: { item: DirectoryResource }) {
+  const location = useOptionalLocation()
+  if (!location || !item.geo) return null
+  const set = location.anchorListingId === item.id
+  return (
+    <button
+      type="button"
+      aria-pressed={set}
+      onClick={() => {
+        track('listing_action', { action: 'Set as location' })
+        if (set) location.unsetListingAnchor()
+        else location.setListingAnchor({ id: item.id, name: item.name, coords: item.geo! })
+      }}
+      className="group flex w-16 cursor-pointer flex-col items-center gap-1 text-primary"
+    >
+      <Circle>{set ? <CheckIcon className="h-5 w-5" /> : <CrosshairIcon className="h-5 w-5" />}</Circle>
+      <span className="w-[84px] truncate text-center text-xs font-semibold">{set ? 'Location set' : 'Set as location'}</span>
+    </button>
   )
 }
 

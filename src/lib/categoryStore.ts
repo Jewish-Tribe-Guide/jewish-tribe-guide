@@ -7,7 +7,8 @@ import { listCampaignBanners } from './campaignBannerStore'
 import { activeCampaignCategoryIds } from './campaignBanner'
 import { parseGroupBy, type GroupBy } from './listGroups'
 import { parseQuestionCard, type QuestionCard } from './questionCards'
-import { parseWalkList, type WalkList } from './walkList'
+import { parseWalkLists, type WalkList } from './walkList'
+import { hasListingParts, parseListingParts, type ListingParts } from './listingParts'
 
 export { slugify }
 import {
@@ -51,6 +52,7 @@ type CategoryRow = {
   group_by?: unknown
   question_card?: unknown
   walk_list?: unknown
+  listing_parts?: unknown
 }
 
 function toConfig(row: CategoryRow): CategoryConfig {
@@ -84,7 +86,8 @@ function toConfig(row: CategoryRow): CategoryConfig {
     formSections: row.form_sections ?? undefined,
     groupBy: parseGroupBy(row.group_by) ?? undefined,
     questionCard: parseQuestionCard(row.question_card) ?? undefined,
-    walkList: parseWalkList(row.walk_list) ?? undefined,
+    walkList: parseWalkLists(row.walk_list).length ? parseWalkLists(row.walk_list) : undefined,
+    listingParts: hasListingParts(parseListingParts(row.listing_parts)) ? parseListingParts(row.listing_parts) : undefined,
   }
 }
 
@@ -295,7 +298,8 @@ export async function updateCategory(
     formSections?: CategoryFormSection[] | null
     groupBy?: GroupBy | null
     questionCard?: QuestionCard | null
-    walkList?: WalkList | null
+    walkList?: WalkList[] | null
+    listingParts?: ListingParts | null
   },
 ): Promise<CategoryConfig | null> {
   const supabase = getAdminClient()
@@ -329,7 +333,9 @@ export async function updateCategory(
   // The same, for migration 060.
   if (patch.questionCard !== undefined) row.question_card = patch.questionCard
   // And for migration 061.
-  if (patch.walkList !== undefined) row.walk_list = patch.walkList
+  if (patch.walkList !== undefined) row.walk_list = patch.walkList?.length ? patch.walkList : null
+  // And for migration 066.
+  if (patch.listingParts !== undefined) row.listing_parts = patch.listingParts && hasListingParts(patch.listingParts) ? patch.listingParts : null
 
   // Scoped by community as well as id — the composite primary key means a
   // second community's identically-slugged category is a different row, and

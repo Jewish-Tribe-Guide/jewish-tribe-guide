@@ -15,6 +15,7 @@ import {
 import { groupByFromKey } from '@/lib/listGroups'
 import { questionCardFromKey } from '@/lib/questionCards'
 import { walkListFromKey } from '@/lib/walkList'
+import { listingPartsToSave } from '@/lib/listingParts'
 
 // ── The save workflow: validation, the two destructive-change confirmation
 // gates (option-rename migration, field-removal cleanup), and the actual
@@ -234,7 +235,9 @@ export function useCategorySaveWorkflow({
         // The same, for migration 060.
         ...(!isNew && draft.questionCard !== toDraft(initial).questionCard && { questionCard: questionCardFromKey(draft.questionCard) }),
         // And for migration 061.
-        ...(!isNew && draft.walkList !== toDraft(initial).walkList && { walkList: walkListFromKey(draft.walkList) }),
+        ...(!isNew && draft.walkList !== toDraft(initial).walkList && { walkList: walkListFromKey(draft.walkList).length ? walkListFromKey(draft.walkList) : null }),
+        // And for migration 066.
+        ...(!isNew && draft.listingParts !== toDraft(initial).listingParts && { listingParts: listingPartsToSave(draft.listingParts) }),
       }
       await fetchJson(
         withCommunity(isNew ? '/api/admin/categories' : `/api/admin/categories/${initial!.id}`, community),
