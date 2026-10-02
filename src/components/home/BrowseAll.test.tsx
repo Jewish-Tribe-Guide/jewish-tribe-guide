@@ -89,10 +89,11 @@ describe('the Browse tab', () => {
     expect(icon).not.toHaveTextContent('🧵')
   })
 
-  it('then Feedback, About and Privacy; Feedback only when it’s on', () => {
+  it('then What changed, Feedback, About and Privacy; Feedback only when it’s on', () => {
     show()
     const nav = screen.getByRole('navigation', { name: 'About the guide' })
     expect(within(nav).getAllByRole('link').map((a) => [a.textContent, a.getAttribute('href')])).toEqual([
+      ['What changed', '/philly/changes'],
       ['Feedback', '/philly/feedback'],
       ['About', '/philly/about'],
       ['Privacy', '/philly/privacy'],

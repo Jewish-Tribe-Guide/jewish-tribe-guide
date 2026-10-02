@@ -121,6 +121,7 @@ export const TODAY_BLOCKS = [
   { id: 'nextMinyan', label: 'Next minyan', when: 'Every day: the next one anywhere, and the nearest shul’s.' },
   { id: 'openNow', label: 'Open now', when: 'Weekdays: food open now, titled by the meal (“Lunch, open now”). Never on Shabbos or Yom Tov.' },
   { id: 'pinned', label: 'Pinned', when: 'Only when the visitor has pinned something, on their device.' },
+  { id: 'changes', label: 'This week', when: 'Places added, edited or taken out in the last 7 days: the newest three, and All to What changed. Only when something changed.' },
   { id: 'browse', label: 'Browse', when: 'The categories, in your sections; on a phone, a short row ending in All.' },
 ] as const
 export type TodayBlockId = (typeof TODAY_BLOCKS)[number]['id']

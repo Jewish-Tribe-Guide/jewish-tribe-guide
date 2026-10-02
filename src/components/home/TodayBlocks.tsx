@@ -16,6 +16,9 @@ import { routes } from '@/lib/routes'
 import { beforeCandles, itemList, openNowTitle, shabbosMoment, shoppingTitle, type ShabbosMoment } from '@/lib/todayHome'
 import type { TodayBlockId } from '@/lib/siteSettings'
 import type { CardDef } from './sections'
+import type { Change } from '@/lib/whatChanged'
+import { changeDay } from '@/lib/whatChanged'
+import ChangeRow from '@/components/changes/ChangeRow'
 
 // ── The Today home's blocks (step 6) ─────────────────────────────────────────
 // Under the Ask box, what this moment calls for, two answers at most:
@@ -52,6 +55,10 @@ type Props = {
   pinned?: ReactNode
   /** The blocks the admin has turned off (SiteSettings.todayHidden). */
   hidden?: readonly TodayBlockId[]
+  /** The last 7 days' changes (see whatChanged's thisWeek): null, no block. */
+  thisWeek?: { total: number; shown: Change[] } | null
+  /** "Philadelphia", for "This week in Philadelphia". */
+  region?: string
 }
 
 export default function TodayBlocks(props: Props) {
@@ -97,6 +104,7 @@ export default function TodayBlocks(props: Props) {
             {props.pinned}
           </div>
         )}
+        {props.thisWeek && now !== null && on('changes') && <ThisWeek {...props} thisWeek={props.thisWeek} now={now} />}
       </div>
       {on('browse') && (
         <>
@@ -364,6 +372,24 @@ function OpenNow({ openNow, categories, schedule, from, communitySlug, onOpenLis
           )
         })}
       </div>
+    </Block>
+  )
+}
+
+// ── This week ────────────────────────────────────────────────────────────────
+
+/** What changed in the guide in the last 7 days: the newest three, one per
+ *  place, and All to the page when there are more. Last on desktop, across
+ *  the answers' column. */
+function ThisWeek({ thisWeek, now, categories, communitySlug, timezone, region }: Props & { thisWeek: NonNullable<Props['thisWeek']>; now: number }) {
+  const more = thisWeek.total > thisWeek.shown.length ? { label: `All ${thisWeek.total} ›`, href: routes.changes(communitySlug) } : null
+  return (
+    <Block title={region ? `This week in ${region}` : 'This week'} more={more} testId="today-this-week" wide last>
+      <ul>
+        {thisWeek.shown.map((change) => (
+          <ChangeRow key={change.id} change={change} categories={categories} communitySlug={communitySlug} when={changeDay(change.at, now, timezone)} />
+        ))}
+      </ul>
     </Block>
   )
 }

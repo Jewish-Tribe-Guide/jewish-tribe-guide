@@ -36,6 +36,8 @@ import { useCategories } from '@/lib/useCategories'
 import { useHomeSections } from '@/lib/useHomeSections'
 import { BUILT_IN_BLOCKS, type HomeBlockKind } from '@/lib/homeSections'
 import { useAllListings } from '@/lib/useAllListings'
+import { useChangeLog } from '@/lib/changesContext'
+import { thisWeek, whatChanged } from '@/lib/whatChanged'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { useNavTransitionProps } from '@/lib/navTransitions'
 import { consumeHomeReveal } from '@/lib/homeRevealSignal'
@@ -541,6 +543,9 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
     countEvent(communitySlug, 'listing_view', item.id)
     onNavigate('patient', 'find', { findView: item.category, findItemId: item.id })
   }
+  // What changed in the last 7 days (step 7a), against the same clock.
+  const changeLog = useChangeLog()
+  const week = today && changeLog && schedule ? thisWeek(whatChanged(changeLog, timezone), schedule.now) : null
   const todayBlocks = today && (
     <TodayBlocks
       listings={listings}
@@ -557,6 +562,8 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
       searching={!!q}
       pinned={<PinnedBlock communitySlug={communitySlug} from={coords ?? community.mapCenter} now={schedule?.now ?? null} />}
       hidden={settings.todayHidden}
+      thisWeek={week}
+      region={community.region}
     />
   )
 

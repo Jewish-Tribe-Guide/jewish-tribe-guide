@@ -11,6 +11,7 @@ import type { ZmanimData } from '@/types'
 import TodayBlocks from './TodayBlocks'
 import type { CardDef } from './sections'
 import type { TodayBlockId } from '@/lib/siteSettings'
+import type { Change } from '@/lib/whatChanged'
 
 vi.mock('next/navigation', () => ({
   useRouter: () => mockRouter,
@@ -74,7 +75,7 @@ const openNow: { question: string; result: AskResult } = {
   result: { query: { raw: 'food open now' }, hits: [{ item: hip, category: food, score: 1, matchedTags: [], matched: [], matchedFields: [], miles: null, open: true }], categoryIds: ['restaurant'], anchor: null, place: null, closedCount: 0, noHours: [], terms: [], excluded: [] } as unknown as AskResult,
 }
 
-function show(schedule: MinyanSchedule, zmanim: ZmanimData | null, onOpenListing = vi.fn(), cards: CardDef[] | null = null, hidden: TodayBlockId[] = []) {
+function show(schedule: MinyanSchedule, zmanim: ZmanimData | null, onOpenListing = vi.fn(), cards: CardDef[] | null = null, hidden: TodayBlockId[] = [], week: { total: number; shown: Change[] } | null = null) {
   renderWithProviders(
     <TodayBlocks
       listings={listings}
@@ -90,6 +91,8 @@ function show(schedule: MinyanSchedule, zmanim: ZmanimData | null, onOpenListing
       onOpenListing={onOpenListing}
       searching={false}
       hidden={hidden}
+      thisWeek={week}
+      region="Philadelphia"
     />,
     { content: { categories } },
   )
@@ -193,5 +196,46 @@ describe('blocks the admin has turned off', () => {
     expect(screen.queryByTestId('today-candles')).not.toBeInTheDocument()
     expect(screen.queryByTestId('today-browse-row')).not.toBeInTheDocument()
     expect(screen.queryByTestId('today-browse')).not.toBeInTheDocument()
+  })
+})
+
+describe('This week, on Today', () => {
+  const change = (name: string, kind: Change['kind'], at: string, items: string[] = []): Change => ({
+    id: name,
+    rowIds: [1],
+    at,
+    kind,
+    listing: { id: `${name}-0000`, name, category: 'grocery' },
+    items,
+    hidden: false,
+  })
+  const shown = [
+    change('ALDI', 'items', '2026-10-05T16:00:00Z', ['Pretzel Buns']),
+    change('Ben & Jerry’s', 'edited', '2026-10-04T22:00:00Z'),
+    change('Food & Friends', 'added', '2026-10-02T18:00:00Z'),
+  ]
+  const tuesday = () => scheduleAt('2026-10-06T12:30:00-04:00', 'tue', { mikveh: '2:00pm' })
+  const weekday = { ...week, dayOfWeek: 2, isFriday: false } as ZmanimData
+
+  it('last, after the answers: the newest three, and All to What changed when there are more', () => {
+    const order = show(tuesday(), weekday, vi.fn(), null, [], { total: 5, shown })
+    expect(order.at(-1)).toBe('today-this-week')
+    const block = screen.getByTestId('today-this-week')
+    expect(within(block).getByRole('heading', { name: 'This week in Philadelphia' })).toBeInTheDocument()
+    expect(within(block).getAllByTestId('change').map((c) => c.textContent)).toEqual([
+      'Pretzel Buns added at ALDIGrocery · Yesterday',
+      'Ben & Jerry’s updatedGrocery · Sunday, Oct 4',
+      'New: Food & FriendsGrocery · Friday, Oct 2',
+    ])
+    expect(within(block).getByRole('link', { name: 'All 5 ›' })).toHaveAttribute('href', '/philly/changes')
+  })
+
+  it('no All when they’re all here; no block when nothing changed, or the admin turned it off', () => {
+    show(tuesday(), weekday, vi.fn(), null, [], { total: 1, shown: shown.slice(0, 1) })
+    expect(within(screen.getByTestId('today-this-week')).queryByRole('link', { name: /^All/ })).not.toBeInTheDocument()
+    cleanup()
+    expect(show(tuesday(), weekday)).not.toContain('today-this-week')
+    cleanup()
+    expect(show(tuesday(), weekday, vi.fn(), null, ['changes'], { total: 5, shown })).not.toContain('today-this-week')
   })
 })

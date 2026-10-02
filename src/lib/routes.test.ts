@@ -114,10 +114,12 @@ describe('mapQueryString', () => {
     expect(mapQueryString({ place: 'abc123' })).toBe('?place=abc123')
   })
 
-  // The Pinned and Browse pages own their paths; a category can't take them.
-  it('reserves the Pinned and Browse pages’ slugs', () => {
+  // The Pinned, Browse and What changed pages own their paths; a category
+  // can't take them.
+  it('reserves the Pinned, Browse and What changed pages’ slugs', () => {
     expect(slugRejectionReason('pinned')).toMatch(/reserved/)
     expect(slugRejectionReason('browse')).toMatch(/reserved/)
+    expect(slugRejectionReason('changes')).toMatch(/reserved/)
   })
 
   // "See them on the map", on the Pinned page: the map with only the pins.

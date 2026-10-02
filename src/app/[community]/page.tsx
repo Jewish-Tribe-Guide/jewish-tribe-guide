@@ -1,6 +1,8 @@
 import type { Metadata } from 'next'
 import HomeScreen from './HomeScreen'
 import { ListingsProvider } from '@/lib/listingsContext'
+import { ChangesProvider } from '@/lib/changesContext'
+import { listChangeLog } from '@/lib/changesStore'
 import { listApprovedResources } from '@/lib/resourceStore'
 import { listCommunities } from '@/lib/communityStore'
 import { getSiteSettings } from '@/lib/siteSettingsStore'
@@ -30,13 +32,18 @@ export default async function HomePage(props: PageProps<'/[community]'>) {
   // that genuinely needs the full set. Loaded here rather than fetched after
   // hydration, so the search works on first paint. null on failure — see
   // listingsContext.
-  const [listings, settings, communities] = await Promise.all([
+  const [listings, settings, communities, changes] = await Promise.all([
     listApprovedResources(community).catch((err) => {
       console.error('[home] listings failed to load:', err)
       return null
     }),
     getSiteSettings(community).catch(() => SITE_SETTINGS_DEFAULTS),
     listCommunities().catch(() => []),
+    // Today's "This week" block (step 7a). Without it, no block.
+    listChangeLog(community).catch((err) => {
+      console.error('[home] changes failed to load:', err)
+      return null
+    }),
   ])
   // Same admin-edited-wins-over-community-row fallback as
   // [community]/layout.tsx's generateMetadata, so this never disagrees with
@@ -62,8 +69,10 @@ export default async function HomePage(props: PageProps<'/[community]'>) {
 
   return (
     <ListingsProvider listings={listings}>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdScript }} />
-      <HomeScreen />
+      <ChangesProvider rows={changes}>
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdScript }} />
+        <HomeScreen />
+      </ChangesProvider>
     </ListingsProvider>
   )
 }

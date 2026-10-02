@@ -228,7 +228,7 @@ describe('SiteSettingsEditor — the Site tab', () => {
     await renderEditor('site')
     await openAllSections(user)
     const blocks = within(screen.getByTestId('today-blocks'))
-    expect(blocks.getAllByRole('checkbox').map((c) => (c as HTMLInputElement).checked)).toEqual([true, true, true, true, true, true])
+    expect(blocks.getAllByRole('checkbox').map((c) => (c as HTMLInputElement).checked)).toEqual([true, true, true, true, true, true, true])
     await user.click(blocks.getByRole('checkbox', { name: /^Open now/ }))
 
     vi.mocked(fetchJson).mockResolvedValue({ settings: { ...SITE_SETTINGS_DEFAULTS, todayHidden: ['openNow'] } })

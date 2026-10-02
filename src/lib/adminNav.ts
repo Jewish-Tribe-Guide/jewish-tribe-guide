@@ -26,6 +26,7 @@ export const INBOX_BASE = '/philly/inbox'
 // order didn't match the array AdminTabs actually rendered from.
 export type AdminTab =
   | 'queue'
+  | 'changes'
   | 'categories'
   | 'responses'
   | 'archived'
@@ -50,6 +51,7 @@ export function adminTabs(community: string, isSuperAdmin: boolean): { tab: Admi
   const base = adminBase(community)
   return [
     { tab: 'queue', href: base, label: 'Moderation queue' },
+    { tab: 'changes', href: `${base}/changes`, label: 'What changed' },
     { tab: 'metrics', href: `${base}/metrics`, label: 'Metrics' },
     // What visitors searched for and didn't find: the seeding to-do list.
     { tab: 'searches', href: `${base}/searches`, label: 'Missed searches' },

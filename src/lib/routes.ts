@@ -57,6 +57,8 @@ export const RESERVED_SLUGS = new Set([
   'pinned',
   // Every category, grouped (the Browse tab).
   'browse',
+  // What changed in the guide (step 7a).
+  'changes',
   // The fixed views above — a listing category named "Eruv" would otherwise
   // shadow the real Eruv Information screen at the same URL.
   ...Object.keys(FIXED_VIEW_KINDS),
@@ -171,6 +173,8 @@ export const routes = {
   pinned: (community: string) => `/${community}/pinned`,
   /** Every category in the admin's groups: the Browse tab (see BrowseList). */
   browse: (community: string) => `/${community}/browse`,
+  /** Places added, edited or taken out, by day (see whatChanged.ts). */
+  changes: (community: string) => `/${community}/changes`,
   /** Community-agnostic content (one shared `page` row — see pagesStore.ts),
    *  but community-scoped chrome: living under `/[community]` is what gives
    *  these two the visiting community's own header/footer, rather than

@@ -26,8 +26,8 @@ import { groupCardsIntoSections, resourceCards, useEntryCards } from './sections
 // icon in its colour, its name, how many places, and one live line, the
 // thing its own page says first ("59 open now", "3 Shabbat friendly",
 // "Next: Mincha 2 PM · Mikveh Israel"); nothing where its page has nothing to
-// say. Then Feedback, About and Privacy, which a phone has nowhere else once
-// the tabs are Today · Map · Browse.
+// say. Then What changed, Feedback, About and Privacy, which a phone has
+// nowhere else once the tabs are Today · Map · Browse.
 
 type Props = {
   communitySlug: string
@@ -115,7 +115,10 @@ export default function BrowseAll({ communitySlug, listings, schedule, zmanim, t
           ))}
         </div>
       )}
-      <nav aria-label="About the guide" className="mt-8 flex gap-5 border-t border-slate-200 pt-3 text-[15px] font-bold text-primary">
+      <nav aria-label="About the guide" className="mt-8 flex flex-wrap gap-x-5 gap-y-2 border-t border-slate-200 pt-3 text-[15px] font-bold text-primary">
+        {/* Always here, so a quiet week (no "This week" on Today) still has a
+            way to the page. */}
+        <Link href={routes.changes(communitySlug)}>What changed</Link>
         {settings.feedbackEnabled && <Link href={routes.feedback(communitySlug)}>Feedback</Link>}
         <Link href={routes.about(communitySlug)}>About</Link>
         <Link href={routes.privacy(communitySlug)}>Privacy</Link>
