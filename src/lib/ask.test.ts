@@ -119,6 +119,24 @@ describe('parseAsk', () => {
     expect(parseAsk('maariv tonight').minyan?.when).toBeNull()
   })
 
+  it('reads a day the calendar names, in any usual spelling, and its night', () => {
+    const when = (q: string) => parseAsk(q).minyan?.when
+    expect(when('mincha hoshana rabbah')).toEqual([{ day: { name: 'Hoshana Rabbah', festival: false, night: false }, label: 'Hoshana Rabbah', tefillos: null }])
+    expect(when('Hoshana Raba shacharis')?.[0].label).toBe('Hoshana Rabbah')
+    expect(when('shemini atzeret davening')?.[0].label).toBe('Shemini Atzeres')
+    expect(when("sh'mini atzeres minyan")?.[0].label).toBe('Shemini Atzeres')
+    expect(when('maariv simchat torah night')).toEqual([
+      { day: { name: 'Simchas Torah', festival: false, night: true }, label: 'Simchas Torah night', tefillos: ['mincha', 'mincha_maariv', 'maariv', 'kabbalas_shabbos'] },
+    ])
+    expect(when('shacharis sukkot')?.[0].day).toEqual({ name: 'Sukkos', festival: true, night: false })
+    expect(when('mincha erev yom kippur')?.[0].label).toBe('Erev Yom Kippur')
+    expect(when('mincha chol hamoed')?.[0].label).toBe('Chol HaMoed')
+    // None of it is a word for a shul to have.
+    for (const q of ['mincha hoshana rabbah', 'maariv simchat torah night', 'shacharis sukkot']) expect(parseAsk(q).terms, q).toEqual([])
+    // Not a minyan question: still a sukkah, not a day.
+    expect(parseAsk('sukkot').minyan).toBeNull()
+  })
+
   it('reads a minyan question: which tefillah, and a time if one was said', () => {
     expect(parseAsk('is there a maariv minyan at 6:45').minyan).toEqual({
       tefillos: ['maariv', 'mincha_maariv'],

@@ -10,7 +10,8 @@ import { formatOpenAtTime, termMatches, termsAsTyped, words, type MetaAsk, type 
 import { TEFILLAH_LABELS, type Tefillah } from '@/lib/davening'
 import type { MinyanSlot } from '@/lib/upcomingDavening'
 import { haversineMiles, milesText, roundMiles, type LatLng } from '@/lib/geo'
-import type { DayKey } from '@/lib/hours'
+import { dayLabel, type DayKey } from '@/lib/hours'
+import type { DateFacts, DayPosting } from '@/lib/schedules'
 
 // ── The one-line answer above search results ─────────────────────────────────
 // A search that reads a question should answer it, not just list places:
@@ -76,6 +77,13 @@ export type AnswerSchedule = {
   todayKey?: DayKey
   tomorrowKey?: DayKey
   onDay?: (day: DayKey) => MinyanSlot[]
+  /** Today and the six days after it, as the calendar has them: where
+   *  "Hoshana Rabbah" is, and which days are Yom Tov. */
+  week?: DateFacts[]
+  /** Whose times each shul has on each of those dates, by listing id and
+   *  date (schedules.ts): a shul's regular times on a Yom Tov it hasn't
+   *  posted for are not given as its Yom Tov ones. */
+  posting?: Record<string, Record<string, DayPosting>>
 }
 
 /** How close to a time someone asked about a minyan has to be to count as
@@ -213,17 +221,53 @@ function minyanDaysAnswer(
   where: (r: AnswerRow) => string,
   located: boolean,
 ): Answer | null {
-  const { todayKey, tomorrowKey, onDay } = schedule
+  const { todayKey, tomorrowKey, onDay, week } = schedule
   if (!todayKey || !tomorrowKey || !onDay) return null
-  const several = when.length > 1
+  const upper = (t: string) => t[0].toUpperCase() + t.slice(1)
+
+  // Each day asked about, as a weekday this week. A day the calendar names
+  // ("Hoshana Rabbah") is found in the week ahead; before the calendar has
+  // arrived it can't be, and no answer beats a wrong one.
+  type Day = { key: DayKey; label: string; tefillos: Tefillah[] | null }
+  const days: Day[] = []
+  const elsewhere: string[] = []
+  for (const w of when) {
+    if (typeof w.day !== 'object') {
+      days.push({ key: w.day === 'tomorrow' ? tomorrowKey : w.day, label: w.label, tefillos: w.tefillos })
+      continue
+    }
+    if (!week?.length || week.at(-1)!.yomTov === null) return null
+    const asked = w.day
+    // Chol HaMoed takes in Hoshana Rabbah, its last day.
+    const named = (d: DateFacts) => (asked.name === 'Chol HaMoed' ? d.cholHamoed === true : (asked.festival ? d.festival : d.name) === asked.name)
+    const found = week.flatMap((d, i) => (named(d) && (!asked.night || i > 0) ? [i] : []))
+    if (found.length === 0) elsewhere.push(w.label)
+    for (const i of found) {
+      const on = week[asked.night ? i - 1 : i]
+      const short = on.weekday === todayKey ? 'today' : on.weekday === tomorrowKey ? 'tomorrow' : dayLabel(on.weekday).slice(0, 3)
+      days.push({ key: on.weekday, label: `${week[i].name ?? asked.name}${asked.night ? ' night' : ''} (${short})`, tefillos: w.tefillos })
+    }
+  }
+  if (days.length === 0) return { text: `${upper(elsewhere.join(' or '))} isn’t in the coming week. The guide works out davening times a week ahead.`, rows: [] }
+
+  const several = days.length > 1
   let approximate = false
-  const slices = when.map((w) => {
-    const key = w.day === 'tomorrow' ? tomorrowKey : w.day
+  const slices = days.map((w) => {
+    const key = w.key
+    const facts = week?.find((d) => d.weekday === key)
     const slots = key === todayKey ? schedule.today : key === tomorrowKey ? schedule.tomorrow : onDay(key)
     const tefillos = ask.tefillos ?? w.tefillos
     const far = key !== todayKey && key !== tomorrowKey
-    const found = slots
-      .filter((s) => fits(s) && (!tefillos || tefillos.includes(s.tefillah)))
+    const asked = slots.filter((s) => fits(s) && (!tefillos || tefillos.includes(s.tefillah)))
+    // On a Yom Tov, a shul's regular times where it hasn't posted the
+    // festival's are too likely wrong to give as an answer (the Minyanim
+    // view folds them away too); on Chol HaMoed they're given, and said to
+    // be regular times.
+    const unposted = (s: MinyanSlot) => !!facts && !!s.shulId && schedule.posting?.[s.shulId]?.[facts.date]?.kind === 'not-posted'
+    const folded = facts?.yomTov ? asked.filter(unposted) : []
+    const regular = !facts?.yomTov && asked.some(unposted)
+    const found = asked
+      .filter((s) => !folded.includes(s))
       .sort(byTime)
       .map((slot) => {
         const row = toRow(slot, false)
@@ -233,17 +277,26 @@ function minyanDaysAnswer(
         }
         return { slot, row: several ? { ...row, day: w.label } : row }
       })
-    return { w, found }
+    const festival = facts?.festival ?? facts?.name ?? null
+    return { w, found, notPosted: new Set(folded.map((s) => s.shulId)).size, regular, festival, dayName: facts?.name ?? festival }
   })
   const rows = slices.flatMap((x) => x.found.map((f) => f.row))
   const what = tefillahWords(ask.tefillos)
   const whatAll = ask.tefillos ? what : 'minyanim'
-  const labels = when.map((w) => w.label).join(' or ')
-  if (rows.length === 0) return { text: `No ${whatAll} listed for ${labels} in the guide.`, rows: [] }
+  const labels = days.map((w) => w.label).join(' or ')
+  const notIn = elsewhere.length ? ` ${upper(elsewhere.join(' or '))} isn’t in the coming week.` : ''
+  if (rows.length === 0 && slices.every((x) => x.notPosted === 0)) return { text: `No ${whatAll} listed for ${labels} in the guide.${notIn}`, rows: [] }
   const note = approximate ? ' Times set by sunset (~) are worked out from today’s and may be a minute or two off.' : ''
+  // What a day's answer leaves out, or whose times it gives.
+  const posted = (x: (typeof slices)[number]) =>
+    x.notPosted
+      ? ` ${x.notPosted} ${x.found.length ? 'other ' : ''}${x.notPosted === 1 ? 'shul hasn’t' : 'shuls haven’t'} posted ${x.dayName} times; their regular ones may not apply.`
+      : x.regular
+        ? ` Shuls that haven’t posted ${x.festival} times show their regular ones.`
+        : ''
 
   // "Shacharis Sunday at 7": that day's closest to the time.
-  if (ask.at && !several) {
+  if (ask.at && !several && slices[0].found.length) {
     const { w, found } = slices[0]
     const target = resolveAt(ask.at, ask.tefillos ?? w.tefillos, 0)
     const near = found.filter((f) => Math.abs(f.slot.minutes - target) <= AT_WINDOW).sort((a, b) => Math.abs(a.slot.minutes - target) - Math.abs(b.slot.minutes - target))
@@ -252,25 +305,29 @@ function minyanDaysAnswer(
       const more = near.length > 1 ? ` ${near.length - 1} more within ${AT_WINDOW} min.` : ''
       return { text: `Yes: ${best.label} at ${best.time} ${w.label}, ${where(best)}.${more}${note}`, rows: near.map((f) => f.row), when: w.label }
     }
-    return { text: `No ${what} at ${formatClock(target)} ${w.label} in the guide.${note}`, rows, shown: 5, when: w.label }
+    return { text: `No ${what} at ${formatClock(target)} ${w.label} in the guide.${posted(slices[0])}${note}`, rows, shown: 5, when: w.label }
   }
 
-  const upper = (t: string) => t[0].toUpperCase() + t.slice(1)
   // The earliest is named; when another shul is nearer to where the visitor
   // is, that too ("Shacharis tomorrow" named Chabad of the Main Line at
   // 6:45, 6.1 mi, with Mekor Habracha 0.2 mi away at 6:55).
   const nearest = (found: { row: AnswerRow }[]) =>
     located && !several ? found.reduce((a, b) => ((b.row.miles ?? Infinity) < (a.row.miles ?? Infinity) ? b : a)) : found[0]
   const text = slices
-    .filter((x) => x.found.length > 0)
-    .map(({ w, found }) => {
+    .filter((x) => x.found.length > 0 || x.notPosted > 0)
+    .map((x) => {
+      const { w, found } = x
+      if (found.length === 0) {
+        const n = x.notPosted
+        return `${upper(w.label)}: no shul has posted ${x.dayName} times yet. The regular times of ${n} ${n === 1 ? 'shul' : 'shuls'} may not apply, so they aren’t given.`
+      }
       const first = found[0].row
       const near = nearest(found).row
       const nearText = near.shulName !== first.shulName ? ` Nearest: ${near.label} ${near.time}, ${where(near)}.` : ''
-      return `${upper(w.label)}: ${first.label} ${first.time}, ${where(first)}${found.length > 1 ? `, and ${found.length - 1} more` : ''}.${nearText}`
+      return `${upper(w.label)}: ${first.label} ${first.time}, ${where(first)}${found.length > 1 ? `, and ${found.length - 1} more` : ''}.${nearText}${posted(x)}`
     })
     .join(' ')
-  return { text: `${text}${note}`, rows, shown: several ? 6 : 5, when: labels }
+  return { text: `${text}${note}${notIn}`, rows, shown: several ? 6 : 5, when: labels }
 }
 
 /** For "best pizza": the most upvoted, when upvotes actually tell them

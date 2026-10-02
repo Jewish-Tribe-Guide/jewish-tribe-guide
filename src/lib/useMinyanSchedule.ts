@@ -140,6 +140,8 @@ export function answerSchedule(schedule: MinyanSchedule): AnswerSchedule {
     nowMinutes: schedule.nowMinutes,
     todayKey: schedule.todayKey,
     tomorrowKey: schedule.tomorrowKey,
+    week: schedule.week,
+    posting: schedule.posting,
     // The next such day this week, with whatever schedule it has.
     onDay: (day) => {
       const date = schedule.week.find((d) => d.weekday === day)

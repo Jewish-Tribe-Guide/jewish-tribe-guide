@@ -5,6 +5,7 @@ import { nearMiss, searchAsk } from './askSearch'
 import { answerFor, eruvAnswer, hitHoursNote, metaAnswer, nearMissAnswer, timesAnswer, type AnswerSchedule } from './askAnswer'
 import type { ZmanimData } from '@/types'
 import type { MinyanSlot } from './upcomingDavening'
+import type { DateFacts } from './schedules'
 
 const synagogue = makeCategory({
   id: 'synagogue',
@@ -717,5 +718,70 @@ describe('answerFor — a minyan question about a day (Sep 30)', () => {
 
   it('"maariv tonight" is still the next one from now, with tomorrow’s when tonight’s are over', () => {
     expect(ask('maariv tonight', week(22))?.text).toBe('No more Maariv today. First tomorrow: 7:15 PM, South Philly Shtiebel.')
+  })
+
+  // Step 4: the same week over Sukkos 5787. Wednesday Sep 30 is Chol
+  // HaMoed, Friday Hoshana Rabbah, Shabbos Shemini Atzeres, Sunday
+  // Simchas Torah. The Shtiebel has posted its Sukkos times; Mekor
+  // Habracha hasn't, so it has its regular ones.
+  const facts = (date: string, weekday: DateFacts['weekday'], name: string | null, yomTov = false): DateFacts => ({
+    date,
+    weekday,
+    yomTov,
+    cholHamoed: !!name && !yomTov,
+    festival: name ? 'Sukkos' : null,
+    name,
+  })
+  const sukkos: DateFacts[] = [
+    facts('2026-09-30', 'wed', 'Chol HaMoed'),
+    facts('2026-10-01', 'thu', 'Chol HaMoed'),
+    facts('2026-10-02', 'fri', 'Hoshana Rabbah'),
+    facts('2026-10-03', 'sat', 'Shemini Atzeres', true),
+    facts('2026-10-04', 'sun', 'Simchas Torah', true),
+    facts('2026-10-05', 'mon', null),
+    facts('2026-10-06', 'tue', null),
+  ]
+  const posting = Object.fromEntries(
+    [mekor, shtiebel].map((shul) => [
+      shul.id,
+      Object.fromEntries(
+        sukkos.map((d) => [d.date, !d.festival ? { kind: 'regular' } : shul === shtiebel ? { kind: 'schedule', name: 'Sukkos 5787' } : { kind: 'not-posted', festival: 'Sukkos' }]),
+      ),
+    ]),
+  ) as AnswerSchedule['posting']
+  const overSukkos = (h: number, week: DateFacts[] = sukkos): AnswerSchedule => ({ ...at(h), todayKey: 'wed', tomorrowKey: 'thu', onDay: (d) => days[d] ?? [], week, posting })
+
+  it('"mincha Hoshana Rabbah": the day the calendar names, found in the week ahead', () => {
+    const answer = ask('mincha hoshana rabbah', overSukkos(12))
+    expect(answer?.text).toBe('Hoshana Rabbah (Fri): Mincha ~6:10 PM, Mekor Habracha. Shuls that haven’t posted Sukkos times show their regular ones. Times set by sunset (~) are worked out from today’s and may be a minute or two off.')
+    expect(answer?.when).toBe('Hoshana Rabbah (Fri)')
+  })
+
+  it('on a Yom Tov, a shul’s regular times where it hasn’t posted are not given as an answer', () => {
+    // Mekor's regular Shabbos Shacharis would have been "the answer".
+    expect(ask('shacharis shemini atzeres', overSukkos(12))?.text).toBe(
+      'Shemini Atzeres (Sat): no shul has posted Shemini Atzeres times yet. The regular times of 1 shul may not apply, so they aren’t given.',
+    )
+    const mincha = ask('mincha shemini atzeres', overSukkos(12))
+    expect(mincha?.text).toBe('Shemini Atzeres (Sat): Mincha 6:00 PM, South Philly Shtiebel.')
+    expect(ask('minyan shemini atzeres', overSukkos(12))?.text).toBe(
+      'Shemini Atzeres (Sat): Mincha 6:00 PM, South Philly Shtiebel, and 1 more. 1 other shul hasn’t posted Shemini Atzeres times; their regular ones may not apply.',
+    )
+    // "Shabbos" on Shemini Atzeres is the same day, and gets the same care.
+    expect(ask('shabbos morning minyan', overSukkos(12))?.text).toBe(
+      'Shabbos morning: no shul has posted Shemini Atzeres times yet. The regular times of 1 shul may not apply, so they aren’t given.',
+    )
+  })
+
+  it('"Simchas Torah night" is the evening before; "Sukkos" every day of it this week', () => {
+    expect(ask('maariv simchat torah night', overSukkos(12))?.text).toBe('Simchas Torah night (Sat): Maariv 7:20 PM, South Philly Shtiebel.')
+    const all = ask('shacharis sukkot', overSukkos(12))
+    expect(all?.when).toBe('Chol HaMoed (today) or Chol HaMoed (tomorrow) or Hoshana Rabbah (Fri) or Shemini Atzeres (Sat) or Simchas Torah (Sun)')
+  })
+
+  it('a day not in the week ahead says so; before the calendar has arrived, no answer', () => {
+    expect(ask('mincha erev yom kippur', overSukkos(12))?.text).toBe('Erev Yom Kippur isn’t in the coming week. The guide works out davening times a week ahead.')
+    const unknown = sukkos.map((d) => ({ ...d, yomTov: null, cholHamoed: null, festival: null, name: null }))
+    expect(ask('mincha hoshana rabbah', overSukkos(12, unknown))).toBeNull()
   })
 })

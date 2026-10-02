@@ -292,10 +292,18 @@ export type MinyanAsk = {
   when: MinyanWhen[] | null
 }
 
-/** One day a minyan question is about: today, tomorrow or a weekday, how
- *  the answer names it, and the tefillos that part of the day means
- *  ("morning" is Shacharis) when the question named none. */
-export type MinyanWhen = { day: 'tomorrow' | DayKey; label: string; tefillos: Tefillah[] | null }
+/** One day a minyan question is about: today, tomorrow, a weekday or a
+ *  day the calendar names, how the answer names it, and the tefillos that
+ *  part of the day means ("morning" is Shacharis) when the question named
+ *  none. */
+export type MinyanWhen = { day: 'tomorrow' | DayKey | CalendarAsk; label: string; tefillos: Tefillah[] | null }
+
+/** A day asked for by the calendar's name for it ("mincha Hoshana
+ *  Rabbah"): found in the week ahead by the answer, which has the calendar.
+ *  `name` is the guide's own spelling, as the calendar names the day
+ *  (jewishDays.ts); `festival`, every day of that festival ("Sukkos");
+ *  `night`, the night it begins, the calendar day before. */
+export type CalendarAsk = { name: string; festival: boolean; night: boolean }
 
 const MORNING: Tefillah[] = ['shacharis', 'shabbos_mussaf']
 const AFTERNOON: Tefillah[] = ['mincha', 'mincha_maariv']
@@ -306,16 +314,49 @@ const PARTS: Record<string, { label: string; tefillos: Tefillah[] }> = {
   evening: { label: 'evening', tefillos: EVENING },
   night: { label: 'night', tefillos: EVENING },
 }
+/** The calendar's days, as people type them, with the name the calendar
+ *  gives them (jewishDays.ts). The longer names first: "erev yom kippur"
+ *  isn't Yom Kippur, nor "shemini atzeres" all of Sukkos. */
+const CALENDAR_DAYS: [string, Omit<CalendarAsk, 'night'>][] = [
+  ['erev (?:rosh hashana|rosh hashanah)', { name: 'Erev Rosh Hashanah', festival: false }],
+  ['erev (?:yom kippur|yom kipur)', { name: 'Erev Yom Kippur', festival: false }],
+  ['erev (?:sukkos|sukkot|succos|succot)', { name: 'Erev Sukkos', festival: false }],
+  ['erev (?:pesach|passover)', { name: 'Erev Pesach', festival: false }],
+  ['erev (?:shavuos|shavuot)', { name: 'Erev Shavuos', festival: false }],
+  ['hoshana(?:h)? rab(?:b)?a(?:h)?', { name: 'Hoshana Rabbah', festival: false }],
+  ['sh(?:e)?mini atzer(?:es|et|eth|is)', { name: 'Shemini Atzeres', festival: false }],
+  ['simcha(?:s|t) torah', { name: 'Simchas Torah', festival: false }],
+  ['chol ha ?moed', { name: 'Chol HaMoed', festival: false }],
+  ['rosh hashana(?:h)?', { name: 'Rosh Hashanah', festival: true }],
+  ['yom kip(?:p)?ur', { name: 'Yom Kippur', festival: true }],
+  ['(?:sukkos|sukkot|succos|succot)', { name: 'Sukkos', festival: true }],
+  ['(?:pesach|passover)', { name: 'Pesach', festival: true }],
+  ['(?:shavuos|shavuot)', { name: 'Shavuos', festival: true }],
+]
+const CALENDAR_DAY = new RegExp(`\\b(${CALENDAR_DAYS.map(([re]) => `(${re})`).join('|')})(?:\\s+(night|eve|evening))?\\b`)
+
 const WEEKDAYS: Record<string, DayKey> = { sunday: 'sun', monday: 'mon', tuesday: 'tue', wednesday: 'wed', thursday: 'thu', friday: 'fri', saturday: 'sat' }
 const capital = (w: string) => w[0].toUpperCase() + w.slice(1)
 
 /** The days in a minyan question, and the question without them. Only
  *  read when the question is about minyanim: "open friday" is a store's
  *  hours, not davening. Shabbos is its evening and its day, Friday night
- *  its own evening, Motzei Shabbos Saturday's Maariv. */
+ *  its own evening, Motzei Shabbos Saturday's Maariv, and a day the
+ *  calendar names ("Hoshana Rabbah") is left for the answer to find. */
 function readMinyanWhen(text: string): { when: MinyanWhen[] | null; rest: string } {
   const part = '(?:\\s+(morning|afternoon|evening|night))?'
   const rules: [RegExp, (m: RegExpMatchArray) => MinyanWhen[]][] = [
+    // A day the calendar names ("Hoshana Rabbah"). Its night is the
+    // evening before, as "Simchas Torah night" is.
+    [
+      CALENDAR_DAY,
+      (m) => {
+        const i = CALENDAR_DAYS.findIndex((_, n) => m[n + 2] !== undefined)
+        const day = CALENDAR_DAYS[i][1]
+        const night = m[CALENDAR_DAYS.length + 2] !== undefined
+        return [{ day: { ...day, night }, label: night ? `${day.name} night` : day.name, tefillos: night ? EVENING : null }]
+      },
+    ],
     [/\b(?:friday night|erev (?:shabbos|shabbat)|leil (?:shabbos|shabbat))\b/, () => [{ day: 'fri', label: 'Friday night', tefillos: EVENING }]],
     [/\bmotzei (?:shabbos|shabbat)\b/, () => [{ day: 'sat', label: 'Motzei Shabbos', tefillos: ['maariv', 'mincha_maariv'] }]],
     [/\b(?:shabbos|shabbat|saturday) (?:morning|day)\b/, () => [{ day: 'sat', label: 'Shabbos morning', tefillos: MORNING }]],
