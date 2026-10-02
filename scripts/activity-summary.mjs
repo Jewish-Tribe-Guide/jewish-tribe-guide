@@ -47,9 +47,11 @@ console.log(`Entries:   ${rows.length}${rows.length ? `, ${rows.at(-1).created_a
 
 // Weeks start on Sunday, in New York.
 const weekOf = (iso) => {
-  const d = new Date(new Date(iso).toLocaleString('en-US', { timeZone: 'America/New_York' }))
-  d.setDate(d.getDate() - d.getDay())
-  return d.toISOString().slice(0, 10)
+  // The New York calendar date, as plain numbers, then back to that Sunday.
+  const [y, m, d] = new Date(iso).toLocaleDateString('en-CA', { timeZone: 'America/New_York' }).split('-').map(Number)
+  const day = new Date(Date.UTC(y, m - 1, d))
+  day.setUTCDate(day.getUTCDate() - day.getUTCDay())
+  return day.toISOString().slice(0, 10)
 }
 const weeks = new Map()
 for (const r of rows) {
