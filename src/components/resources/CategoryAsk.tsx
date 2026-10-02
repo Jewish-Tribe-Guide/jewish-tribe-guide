@@ -6,6 +6,7 @@ import { searchAsk, type AskResult } from '@/lib/askSearch'
 import { answerFor } from '@/lib/askAnswer'
 import { answersWell, pickPrompts } from '@/lib/searchPrompts'
 import { categoryExamples } from '@/lib/categoryExamples'
+import { MINYANIM_EXAMPLES } from '@/lib/minyanimSearch'
 import { neighborhoodsFor } from '@/lib/places'
 import { answerSchedule, useMinyanSchedule, type MinyanSchedule } from '@/lib/useMinyanSchedule'
 import { useNow } from '@/lib/useNow'
@@ -42,6 +43,11 @@ type Props = {
    *  page work out the minyan schedule (it fetches sunset times, which a food
    *  or grocery page has no use for). */
   hasMinyanim: boolean
+  /** "minyanim" on the Synagogues page's Minyanim tab (the user's notes 4
+   *  and 6, agreed Oct 2): the box says "in Minyanim" and offers that tab's
+   *  own searches. What's typed narrows the minyanim below (MinyanimView),
+   *  which says what it found, so there's no answer here. */
+  scope?: 'minyanim'
   /** The question reader's side (see GenericDirectory): whether it's
    *  reading, how it read, and once read, the result that answers. */
   readAs?: {
@@ -64,7 +70,7 @@ function WithSchedule(props: Props) {
   return <Ask {...props} schedule={schedule} />
 }
 
-function Ask({ category, items, search, onSearch, schedule, readAs }: Props & { schedule: MinyanSchedule | null }) {
+function Ask({ category, items, search, onSearch, schedule, readAs, scope }: Props & { schedule: MinyanSchedule | null }) {
   const now = useNow()
   const categories = useCategories() ?? [category]
   const communitySlug = useOptionalCommunitySlug()
@@ -94,7 +100,8 @@ function Ask({ category, items, search, onSearch, schedule, readAs }: Props & { 
   const asksWhen = (r: AskResult) => r.query.openNow || r.query.openToday || r.query.openAt !== null || r.query.minyan !== null
   const q = search.trim()
   // Read by the reader, its result answers (see readingSearch.ts).
-  const asked = q && now !== null ? (readAs?.result ? { result: readAs.result, answer: answerFor(readAs.result, { coords: coords ?? community.mapCenter, now }) } : ask(q)) : null
+  const onMinyanim = scope === 'minyanim'
+  const asked = q && now !== null && !onMinyanim ? (readAs?.result ? { result: readAs.result, answer: answerFor(readAs.result, { coords: coords ?? community.mapCenter, now }) } : ask(q)) : null
   const answer = asked?.answer ?? null
   // Shared, the link's question names this category when it doesn't
   // already, so it opens answering the same thing (agreed Oct 1). The
@@ -124,17 +131,22 @@ function Ask({ category, items, search, onSearch, schedule, readAs }: Props & { 
       : null
   const examples = q
     ? []
-    : pickPrompts(
-        categoryExamples(category, items, categories, places),
-        (p) => {
-          const tried = ask(p)
-          return (now !== null || !asksWhen(tried.result)) && answersWell(tried.answer, tried.result.hits.length)
-        },
-        5,
-      )
+    : onMinyanim
+      ? MINYANIM_EXAMPLES
+      : pickPrompts(
+          categoryExamples(category, items, categories, places),
+          (p) => {
+            const tried = ask(p)
+            return (now !== null || !asksWhen(tried.result)) && answersWell(tried.answer, tried.result.hits.length)
+          },
+          5,
+        )
 
   const plural = category.pluralLabel.toLowerCase()
-  const placeholder = category.detailFields.some((f) => f.type === 'minyanim')
+  const scopeLabel = onMinyanim ? 'Minyanim' : category.pluralLabel
+  const placeholder = onMinyanim
+    ? 'Ask: mincha tonight'
+    : category.detailFields.some((f) => f.type === 'minyanim')
     ? `Ask about ${plural} or minyanim`
     : category.detailFields.some((f) => f.type === 'tags')
       ? 'Ask for any item or store'
@@ -150,7 +162,7 @@ function Ask({ category, items, search, onSearch, schedule, readAs }: Props & { 
         {/* The search is this category's, and says so. Its ✕ asks the whole
             guide instead, with whatever has been typed. */}
         <span className="flex h-7 shrink-0 items-center gap-1 rounded-lg bg-primary/10 pl-2.5 pr-1 text-[13px] font-semibold text-primary">
-          in {category.pluralLabel}
+          in {scopeLabel}
           <Link
             href={q && communitySlug ? routes.ask(communitySlug, q) : routes.home(communitySlug ?? '')}
             aria-label={`Search everything, not just ${category.pluralLabel}`}
@@ -163,7 +175,7 @@ function Ask({ category, items, search, onSearch, schedule, readAs }: Props & { 
         </span>
         <input
           type="search"
-          aria-label={`Search ${category.pluralLabel}`}
+          aria-label={`Search ${scopeLabel}`}
           placeholder={placeholder}
           value={search}
           onChange={(e) => onSearch(e.target.value)}

@@ -75,11 +75,9 @@ export function categoryExamples(
     if (items.some((i) => i[field.key] === true)) out.push(lower(field.filterLabel ?? field.label))
   }
 
-  // A shul page: the davening questions the Next minyan card doesn't answer.
-  const minyanKeys = category.detailFields.filter((f) => f.type === 'minyanim').map((f) => f.key)
-  if (items.some((i) => minyanKeys.some((k) => Array.isArray(i[k]) && (i[k] as unknown[]).length > 0))) {
-    out.push('shacharis tomorrow', 'Friday night', 'Shabbos morning')
-  }
+  // Davening questions aren't offered here: a shul page has a Minyanim tab
+  // with its own (minyanimSearch.ts MINYANIM_EXAMPLES; the user's note 6,
+  // agreed Oct 2), and these are the Synagogues tab's.
 
   // Where most of them are: "in Old City".
   const byPlace = common(

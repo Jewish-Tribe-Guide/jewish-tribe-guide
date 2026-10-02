@@ -3,7 +3,7 @@
 import type { DirectoryResource } from '@/types'
 import { ClockIcon } from '@/components/icons'
 import { milesText } from '@/lib/geo'
-import { nextMinyansAcross } from '@/lib/upcomingDavening'
+import { nextMinyansAcross, type NextMinyanLine } from '@/lib/upcomingDavening'
 import { useMinyanSchedule } from '@/lib/useMinyanSchedule'
 
 // ── Synagogues' Next minyan card ─────────────────────────────────────────────
@@ -23,9 +23,17 @@ type Props = {
   items: readonly DirectoryResource[]
   onOpenListing: (id: string) => void
   onDaveningTimes: () => void
+  /** Desktop's one line under the search (the user's note 5, agreed Oct 2):
+   *  beside the search box the card stood taller than it and left a gap
+   *  under the box. The next minyan, and the nearest shul's when that's
+   *  another shul (the earliest is often 6 miles away). */
+  variant?: 'card' | 'line'
 }
 
-export default function NextMinyanCard({ items, onOpenListing, onDaveningTimes }: Props) {
+/** "Shacharis 6:45 AM tomorrow". */
+const said = (l: NextMinyanLine) => (l.label.endsWith(' tomorrow') ? `${l.label.slice(0, -9)} ${l.time} tomorrow` : `${l.label} ${l.time}`)
+
+export default function NextMinyanCard({ items, onOpenListing, onDaveningTimes, variant = 'card' }: Props) {
   // Null until the page has hydrated (see useNow): the card waits, keeping
   // its size, as for sunset-based times.
   const schedule = useMinyanSchedule(null, items)
@@ -39,8 +47,51 @@ export default function NextMinyanCard({ items, onOpenListing, onDaveningTimes }
         schedule.shuls,
         { today: schedule.todayDayKeys, tomorrow: schedule.tomorrowDayKeys, nowMinutes: schedule.nowMinutes, season: schedule.season, anchors: schedule.anchors },
         milesOf,
+        variant === 'line' ? Infinity : 2,
       )
     : null
+
+  if (variant === 'line') {
+    const first = lines?.[0]
+    // Of every shul's next minyan, the nearest shul's.
+    const nearest = lines?.reduce<NextMinyanLine | undefined>((best, l) => ((milesOf(l.shulId) ?? Infinity) < (best ? (milesOf(best.shulId) ?? Infinity) : Infinity) ? l : best), undefined)
+    const far = (l: NextMinyanLine) => (milesOf(l.shulId) != null ? `, ${milesText(milesOf(l.shulId)!)}` : '')
+    const shul = (l: NextMinyanLine) => (
+      <button type="button" onClick={() => onOpenListing(l.shulId)} className="cursor-pointer hover:underline">
+        {l.shulName}
+      </button>
+    )
+    return (
+      <section aria-labelledby="next-minyan-line-title" data-testid="next-minyan-line" className="flex min-h-12 items-center gap-3.5 rounded-xl bg-primary/[0.07] px-4 py-2.5 text-[15px]">
+        <h2 id="next-minyan-line-title" className="flex shrink-0 items-center gap-1.5 text-xs font-extrabold uppercase tracking-[0.08em] text-slate-500">
+          <ClockIcon className="h-3.5 w-3.5" />
+          Next minyan
+        </h2>
+        <p className="min-w-0 flex-1 leading-snug text-ink">
+          {lines === null ? (
+            <span aria-hidden="true" className="inline-block h-4 w-72 animate-pulse rounded bg-slate-200 align-middle" />
+          ) : !first ? (
+            'Nothing listed for today or tomorrow.'
+          ) : (
+            <>
+              <b>{said(first)}</b> · {shul(first)}
+              {far(first)}
+              {nearest && nearest.shulId !== first.shulId && (
+                <span className="text-slate-600">
+                  {' · nearest: '}
+                  {said(nearest)}, {shul(nearest)}
+                  {far(nearest)}
+                </span>
+              )}
+            </>
+          )}
+        </p>
+        <button type="button" onClick={onDaveningTimes} className="shrink-0 cursor-pointer whitespace-nowrap font-bold text-primary hover:underline">
+          All by time ›
+        </button>
+      </section>
+    )
+  }
 
   return (
     <section

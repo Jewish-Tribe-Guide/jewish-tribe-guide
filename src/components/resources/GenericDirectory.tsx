@@ -466,6 +466,8 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // Per-category capabilities layered under the global `ui.*` master switches.
   const caps = resolveCapabilities(category.capabilities)
   const canAdd = ui.contributions.add && caps.add
+  // Adding to a shul's times is an edit to the shul ("+ Add a minyan").
+  const canEdit = ui.contributions.edit && caps.edit
   const showSearch = ui.search.directory && caps.directorySearch
   const liveCount = (item: DirectoryResource) => voteCounts[item.id] ?? item.upvotes ?? 0
 
@@ -706,7 +708,11 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // eslint-disable-next-line react-hooks/exhaustive-deps -- only anchorListingId should retrigger this; scrollItemIntoViewWhenSettled is a fresh closure every render
   }, [anchorListingId])
 
-  const q = search.trim().toLowerCase()
+  // On the Minyanim tab, what's typed narrows the minyanim (MinyanimView,
+  // the user's note 4): it isn't a search of the shuls, nor a question for
+  // the reader.
+  const searchingMinyanim = hasMinyanim && minyanimViewOn
+  const q = searchingMinyanim ? '' : search.trim().toLowerCase()
   const communitySlug = useOptionalCommunitySlug()
   // Read as a question, the same way as the home search (see askSearch.ts),
   // limited to this category — so a place tapped there ("where can I get
@@ -912,10 +918,10 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // Whether there's any filter at all, so a category with none (WhatsApp
   // Groups) has no Filters button opening onto an empty sheet.
   const hasActualFilters = filterableBooleans.length > 0 || selectsToShow.length > 0 || hasFilterableHours
-  const typed = search.trim() !== ''
+  const typed = !searchingMinyanim && search.trim() !== ''
 
   const hasActiveFilters =
-    search.trim() !== '' ||
+    typed ||
     Object.values(boolFilters).some(Boolean) ||
     Object.values(selectFilters).some((v) => v.length > 0) ||
     openNow
@@ -998,9 +1004,10 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // back in the list heading, so it's never gone.
   const showMinyanCard =
     hasMinyanim && !typed && !minyanimViewOn && filtered.some((item) => isMinyanim(item[minyanimField!.key]) && (item[minyanimField!.key] as Minyan[]).length > 0)
-  // The Minyanim view in place of the list, until something is typed: then
-  // the search's own results, as anywhere.
-  const minyanimView = hasMinyanim && minyanimViewOn && !typed
+  // The Minyanim view in place of the list, typing included: its search
+  // narrows the minyanim (the user's note 4, agreed Oct 2). It used to drop
+  // back to the list of shuls.
+  const minyanimView = hasMinyanim && minyanimViewOn
   // A line in that card opens its shul, as next/previous does, and opens
   // the closed group it sits in until it's closed again.
   const openListing = (id: string) => {
@@ -1203,14 +1210,22 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // Back to the list, at the row just read, outlined for a moment. On a
   // phone that was the listing's own page, and from now on listings open
   // as sheets over the list.
-  const closeColumn = (id: string) => {
+  // Closes the listing whether or not its row is on screen: on the
+  // Minyanim tab there are no shul rows, and closing through the row alone
+  // left the listing stuck open (found Oct 2).
+  const closeOpenListing = (id: string) => {
     cardRefs.current.get(id)?.close()
+    setOpenDialogItemId((prev) => (prev === id ? null : prev))
+    onParamsChange?.({ item: null, match: null }, { replace: true })
     setPagedItemId(null)
     // Closing the listing the address names: the address becomes the
     // category's, as it would have been had it been opened from the list.
     if (id === linkedItemId && window.location.pathname !== routes.slug(activeCommunity.slug, category.id)) {
       window.history.replaceState(window.history.state, '', routes.slug(activeCommunity.slug, category.id) + window.location.search)
     }
+  }
+  const closeColumn = (id: string) => {
+    closeOpenListing(id)
     findRow(id)
   }
   // The header's back arrow: home, or from a listing's own page, the list.
@@ -1382,7 +1397,12 @@ export default function GenericDirectory({ category, items, anchorLabel, address
                 type="button"
                 role="radio"
                 aria-checked={minyanimViewOn === on}
-                onClick={() => setMinyanimViewOn(on)}
+                onClick={() => {
+                  // Asking for the other tab: the listing open over the
+                  // list closes, or it stays in the way (found Oct 2).
+                  if (columnItem) closeOpenListing(columnItem.id)
+                  setMinyanimViewOn(on)
+                }}
                 className={`cursor-pointer rounded-full px-3.5 py-1.5 text-[14px] font-bold transition-colors ${minyanimViewOn === on ? 'bg-primary text-white' : 'text-slate-700 hover:bg-slate-100'}`}
               >
                 {label}
@@ -1390,16 +1410,32 @@ export default function GenericDirectory({ category, items, anchorLabel, address
             ))}
           </div>
         )}
-        <div className={showMinyanCard ? 'space-y-3 lg:flex lg:items-start lg:gap-5 lg:space-y-0' : undefined}>
+        <div className={showMinyanCard ? 'space-y-3' : undefined}>
           {showSearch && (
-            <div className={showMinyanCard ? 'min-w-0 lg:flex-1' : hasMapColumn ? 'lg:max-w-[720px]' : undefined}>
-              <CategoryAsk category={category} items={items} search={search} onSearch={setSearch} hasMinyanim={hasMinyanim} readAs={readAs} />
+            <div className={hasMapColumn ? 'lg:max-w-[720px]' : undefined}>
+              <CategoryAsk
+                category={category}
+                items={items}
+                search={search}
+                onSearch={setSearch}
+                hasMinyanim={hasMinyanim}
+                scope={minyanimView ? 'minyanim' : undefined}
+                readAs={minyanimView ? undefined : readAs}
+              />
             </div>
           )}
+          {/* The Next minyan: a card under the example searches on a phone;
+              on desktop one line under them, full width (the user's note 5:
+              beside the box, the card left a gap under it). */}
           {showMinyanCard && (
-            <div className="lg:w-[400px] lg:shrink-0">
-              <NextMinyanCard items={filtered} onOpenListing={openListing} onDaveningTimes={() => setMinyanimViewOn(true)} />
-            </div>
+            <>
+              <div className="lg:hidden">
+                <NextMinyanCard items={filtered} onOpenListing={openListing} onDaveningTimes={() => setMinyanimViewOn(true)} />
+              </div>
+              <div className="hidden lg:block">
+                <NextMinyanCard variant="line" items={filtered} onOpenListing={openListing} onDaveningTimes={() => setMinyanimViewOn(true)} />
+              </div>
+            </>
           )}
         </div>
         {!hasMapColumn && !columnItem && !minyanimView && listHeading}
@@ -1455,6 +1491,10 @@ export default function GenericDirectory({ category, items, anchorLabel, address
           initialDay={initialDaveningDay}
           // A minyan and its shul's pin light up together, as a shul's row does.
           onHoverShul={mapBeside ? highlight.set : undefined}
+          search={search}
+          canAdd={canEdit}
+          minyanimKey={minyanimField?.key}
+          shulText={(item) => filterableSelects.flatMap((f) => selectValues(item[f.key])).join(' · ')}
         />
       ) : filtered.length === 0 ? (
         <div className="text-center py-12">

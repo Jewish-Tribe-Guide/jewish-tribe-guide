@@ -125,4 +125,73 @@ describe('the Minyanim view (step 4)', () => {
     view()
     expect(within(screen.getByTestId('minyanim-rows')).getAllByRole('link')[0]).toHaveAttribute('href', expect.stringMatching(/^\/[^/]+\/synagogue\/mekor-habracha/))
   })
+
+  it('the days on one line: swiped on a phone, arrows on desktop, never wrapped', () => {
+    view()
+    expect(screen.getByRole('tablist').className).not.toContain('flex-wrap')
+  })
 })
+
+describe('the Minyanim tab’s search (the user’s note 4)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-10-01T17:30:00-04:00')) // Thu, Chol HaMoed, 5:30 PM
+  })
+  afterEach(() => vi.useRealTimers())
+  const searched = (search: string, more: object = {}) =>
+    renderWithProviders(<MinyanimView items={[mekor, kesher]} categoryId="synagogue" search={search} {...more} />, { content: { categories: [shuls] } })
+
+  it('a tefillah narrows the minyanim, and the answer says what was asked', () => {
+    searched('maariv')
+    expect(screen.getByTestId('minyanim-answer')).toHaveTextContent('Maariv today: first 6:30 PM at Mekor Habracha, 1.3 mi, its Sukkos times. 1 more.')
+    expect(within(screen.getByTestId('minyanim-rows')).getAllByRole('link')).toHaveLength(2)
+    cleanup()
+    searched('shacharis')
+    expect(screen.getByTestId('minyanim-answer')).toHaveTextContent('No more Shacharis today.')
+  })
+
+  it('a part of the day typed reads as typed; a Yom Tov nobody has posted for says so', () => {
+    searched('Shabbos morning')
+    expect(screen.getByTestId('minyanim-answer')).toHaveTextContent(/^Shabbos morning: first 9 AM at Mekor Habracha, 1\.3 mi, its Sukkos times\.$/)
+    cleanup()
+    renderWithProviders(<MinyanimView items={[kesher]} categoryId="synagogue" search="Shabbos morning" />, { content: { categories: [shuls] } })
+    expect(screen.getByTestId('minyanim-answer')).toHaveTextContent('No shul has posted Shemini Atzeres times yet.')
+  })
+
+  it('a day typed picks that day; a day tapped after wins', () => {
+    searched('shabbos')
+    expect(screen.getByRole('tab', { selected: true })).toHaveTextContent('Shabbos')
+    fireEvent.click(screen.getByRole('tab', { name: /Fri/ }))
+    expect(screen.getByRole('tab', { selected: true })).toHaveTextContent('Fri')
+    cleanup()
+    searched('hoshana rabbah')
+    expect(screen.getByRole('tab', { selected: true })).toHaveTextContent('Hoshana Rabbah')
+  })
+
+  it('a shul’s name shows its minyanim; a name nobody has says so', () => {
+    searched('kesher')
+    const rows = within(screen.getByTestId('minyanim-rows')).getAllByRole('link').map((a) => a.textContent)
+    expect(rows).toEqual([expect.stringContaining('Kesher Israel')])
+    cleanup()
+    searched('xyzzy')
+    expect(screen.getByTestId('minyanim-answer')).toHaveTextContent('No shul in the guide matches “xyzzy”.')
+  })
+
+  it('“+ Add a minyan” is the list’s last row, on the day looked at, and opens choosing a shul', () => {
+    searched('mincha', { canAdd: true })
+    const rows = within(screen.getByTestId('minyanim-rows')).getAllByRole('listitem')
+    expect(rows.at(-1)).toHaveTextContent('Add a Mincha on Thu · Chol HaMoed')
+    fireEvent.click(screen.getByTestId('add-minyan'))
+    expect(screen.getByTestId('add-minyan-shul')).toHaveTextContent('Which shul?')
+  })
+
+  it('on a Yom Tov, “Add their times” beside each shul that hasn’t posted', () => {
+    searched('', { canAdd: true })
+    fireEvent.click(screen.getByRole('tab', { name: /Shabbos/ }))
+    const list = screen.getByTestId('not-posted-shuls')
+    expect(list).toHaveTextContent('Kesher Israel · 2.4 mi')
+    fireEvent.click(within(list).getByRole('button', { name: 'Add their times' }))
+    expect(within(list).getByTestId('add-schedule')).toBeInTheDocument()
+  })
+})
+

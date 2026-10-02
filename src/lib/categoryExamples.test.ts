@@ -58,11 +58,9 @@ describe('categoryExamples', () => {
     expect(categoryExamples(hotel, [makeListing({ id: 'a' })], all)).toEqual([])
   })
 
-  it('never asks for the next minyan on a shul page: its card already answers that', () => {
+  it('leaves davening questions to the Minyanim tab, which has its own (the user’s note 6)', () => {
     const shul = makeListing({ id: 's', category: 'synagogue', minyanim: [{ tefillah: 'mincha', time: '1:30pm', days: ['sun'] }] })
-    const examples = categoryExamples(synagogue, [shul], all)
-    expect(examples).toEqual(['shacharis tomorrow', 'Friday night', 'Shabbos morning'])
-    expect(examples.some((e) => /next/i.test(e))).toBe(false)
+    expect(categoryExamples(synagogue, [shul], all)).toEqual([])
     expect(categoryExamples(synagogue, [makeListing({ id: 't', category: 'synagogue' })], all)).toEqual([])
   })
 

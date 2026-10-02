@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { Activity, forwardRef, useImperativeHandle, useState, type Ref } from 'react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { renderWithProviders } from '@/test/renderWithProviders'
@@ -1741,7 +1741,7 @@ describe('GenericDirectory — the map beside the list', () => {
       const mekor = makeListing({ id: 'mekor', name: 'Mekor Habracha', category: 'synagogue', minyanim: [{ id: 'm', tefillah: 'mincha', days: ['mon'], time: '1:30pm' }] })
       const user = userEvent.setup()
       renderWithProviders(<GenericDirectory category={shuls} items={[mekor]} openMinyanimView {...handlers} />, { content: { categories: [shuls] } })
-      const row = await within(await screen.findByTestId('minyanim-rows')).findByRole('listitem')
+      const [row] = await within(await screen.findByTestId('minyanim-rows')).findAllByRole('listitem')
       await user.hover(row)
       expect(screen.getByText('pin lit: mekor')).toBeInTheDocument()
       await user.unhover(row)
@@ -2107,3 +2107,58 @@ describe('GenericDirectory — a listing’s own link, on a phone', () => {
     expect(screen.queryByTestId('listing-column')).not.toBeInTheDocument()
   })
 })
+
+// The Minyanim tab (the user's notes 4 and 6, agreed Oct 2, and a bug found
+// the same day): its own search that stays on it, and switching tabs from
+// an open synagogue.
+describe('GenericDirectory — the Minyanim tab', () => {
+  const shulCat = makeCategory({ id: 'synagogue', pluralLabel: 'Synagogues', detailFields: [{ key: 'minyanim', label: 'Minyanim', type: 'minyanim' }] })
+  const mekor = makeListing({ id: 'mekor', name: 'Mekor Habracha', category: 'synagogue', minyanim: [{ id: 'm', tefillah: 'maariv', days: ['mon'], time: '7:45pm' }] })
+  const aleph = makeListing({ id: 'aleph', name: 'Aleph Shul', category: 'synagogue', minyanim: [{ id: 'a', tefillah: 'shacharis', days: ['mon'], time: '7:00am' }] })
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-09-28T11:00:00-04:00')) // a Monday morning
+  })
+  afterEach(() => vi.useRealTimers())
+
+  it('has its own search, “in Minyanim”, with its own suggestions, and typing stays on the minyanim', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    renderWithProviders(<GenericDirectory category={shulCat} items={[mekor, aleph]} openMinyanimView {...handlers} />, { content: { categories: [shulCat] } })
+    expect(screen.getByRole('searchbox', { name: 'Search Minyanim' })).toHaveAttribute('placeholder', 'Ask: mincha tonight')
+    expect(screen.getByTestId('category-examples')).toHaveTextContent('mincha tonight')
+    await user.type(screen.getByRole('searchbox'), 'maariv')
+    // It used to drop back to the list of shuls.
+    expect(screen.getByTestId('minyanim-view')).toBeInTheDocument()
+    expect(within(screen.getByTestId('minyanim-rows')).getAllByRole('link').map((a) => a.textContent)).toEqual([expect.stringContaining('Mekor Habracha')])
+  })
+
+  it('the Synagogues tab doesn’t offer the davening searches', () => {
+    renderWithProviders(<GenericDirectory category={shulCat} items={[mekor, aleph]} {...handlers} />, { content: { categories: [shulCat] } })
+    expect(screen.getByRole('searchbox', { name: 'Search Synagogues' })).toBeInTheDocument()
+    expect(screen.queryByText('shacharis tomorrow')).not.toBeInTheDocument()
+  })
+
+  it('switching tabs from an open synagogue closes it, rather than leaving it stuck', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    const onParamsChange = vi.fn()
+    renderWithProviders(<GenericDirectory category={shulCat} items={[mekor, aleph]} {...handlers} onParamsChange={onParamsChange} />, { content: { categories: [shulCat] } })
+    await user.click(screen.getByRole('button', { name: 'Expand Mekor Habracha' }))
+    expect(screen.getByTestId('listing-column')).toBeInTheDocument()
+    await user.click(screen.getByRole('radio', { name: 'Minyanim' }))
+    expect(screen.queryByTestId('listing-column')).not.toBeInTheDocument()
+    expect(screen.getByTestId('minyanim-view')).toBeVisible()
+    expect(onParamsChange).toHaveBeenCalledWith({ item: null, match: null }, { replace: true })
+    await user.click(screen.getByRole('radio', { name: 'Synagogues' }))
+    expect(screen.getByText('Aleph Shul')).toBeVisible()
+  })
+
+  it('desktop’s Next minyan is one line: the next, and the nearest when that’s another shul', () => {
+    const near = { ...mekor, milesFromCenter: 0.2 }
+    const away = makeListing({ id: 'away', name: 'Chabad of the Main Line', category: 'synagogue', milesFromCenter: 6.1, minyanim: [{ id: 'c', tefillah: 'mincha', days: ['mon'], time: '1:30pm' }] })
+    renderWithProviders(<GenericDirectory category={shulCat} items={[near, away]} {...handlers} />, { content: { categories: [shulCat] } })
+    expect(screen.getByTestId('next-minyan-line')).toHaveTextContent(
+      'Next minyanMincha 1:30 PM · Chabad of the Main Line, 6.1 mi · nearest: Maariv 7:45 PM, Mekor Habracha, 0.2 miAll by time ›',
+    )
+  })
+})
+
