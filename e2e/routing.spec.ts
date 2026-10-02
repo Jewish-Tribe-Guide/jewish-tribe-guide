@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { categories, categoryWithListings, categoryWithMapPoints, defaultCommunity, dismissLocationPrompt, serverMarkup } from './helpers'
+import { categories, categoryWithListings, categoryWithMapPoints, defaultCommunity, dismissLocationPrompt, previewSettings, serverMarkup } from './helpers'
 
 // hospitals/eruv/zmanim — see FIXED_VIEW_KINDS in src/lib/routes.ts. Kept in
 // sync by hand rather than imported: these are the literal strings the home
@@ -104,7 +104,9 @@ test.describe('URLs', () => {
     await page.goto(`/${community}/${category.id}`)
 
     // Shared links land in WhatsApp far more often than a browser address bar.
-    await expect(page).toHaveTitle(new RegExp(category.pluralLabel))
+    // As a literal: a label can hold "(" or "." (a test category renamed to
+    // "Seed (focus refresh 23157)" broke this once).
+    await expect(page).toHaveTitle(new RegExp(category.pluralLabel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))
   })
 
   test('an unknown slug 404s instead of rendering an empty page', async ({ page }) => {
@@ -228,10 +230,12 @@ test.describe('URLs', () => {
     test.skip(!eruv, `no eruv-kind category configured for ${community}`)
     if (!eruv) return
 
-    // The home screen has the full category index — desktop's "Browse
-    // everything" grid, mobile's own grid inline — so it's where this tile
-    // lives now that there's no separate All Categories page.
-    await page.goto(`/${community}`)
+    // The classic home screen has the full category index — desktop's
+    // "Browse everything" grid, mobile's own grid inline — so it's where this
+    // tile lives now that there's no separate All Categories page. Asked for
+    // as such: the Today home has no grid on a phone.
+    await previewSettings(page, community, { homeStyle: 'classic' })
+    await page.goto(`/${community}?preview=1`)
     await dismissLocationPrompt(page)
     // Desktop's grid caps at a handful of tiles behind a trailing "More"
     // tile (see CategoryTileRow) — a low-listing-count category like eruv

@@ -39,6 +39,23 @@ async function apiGet(request: APIRequestContext, url: string): Promise<Record<s
   return (await res.json()) as Record<string, unknown>
 }
 
+/** Opens later pages in this tab with the home set to `style` (and any other
+ *  settings given), the way the admin's Preview does: a draft in
+ *  sessionStorage, read only when the URL has ?preview=1. Never a save, so
+ *  it writes nothing; and a test of one home doesn't depend on which one the
+ *  admin has chosen. Load the page with `?preview=1` after calling this. */
+export async function previewSettings(page: Page, community: string, overrides: Record<string, unknown>): Promise<void> {
+  const { settings } = (await (await page.request.get(`/api/site-settings?community=${community}`)).json()) as { settings: Record<string, unknown> }
+  const { sections } = (await (await page.request.get(`/api/home-sections?community=${community}`)).json()) as { sections: unknown[] }
+  await page.addInitScript((value) => {
+    try {
+      sessionStorage.setItem('jpc:adminPreviewDraft', value)
+    } catch {
+      // about:blank has no storage; the page itself does.
+    }
+  }, JSON.stringify({ settings: { ...settings, ...overrides }, sections }))
+}
+
 /** The community slug the site redirects "/" to. */
 export async function defaultCommunity(page: Page): Promise<string> {
   const response = await page.goto('/')

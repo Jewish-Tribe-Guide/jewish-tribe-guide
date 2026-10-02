@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { expect, test } from '@playwright/test'
+import { previewSettings } from '../e2e/helpers'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // The other half of caching.spec.ts.
@@ -291,7 +292,11 @@ test('an already-open tab picks up an admin edit when it regains focus', async (
   // this used to navigate to the standalone All Categories page for the same
   // reason, which is gone now that "Browse everything" replaced it.
   await page.setViewportSize({ width: 390, height: 844 })
-  await page.goto(`/${community}`)
+  // The classic home, whose phone grid has every category: asked for the way
+  // the admin's Preview does it (writes nothing), so this doesn't depend on
+  // which home the admin has chosen. The Today home has no grid on a phone.
+  await previewSettings(page, community, { homeStyle: 'classic' })
+  await page.goto(`/${community}?preview=1`)
   // The location prompt overlays everything and swallows clicks (AGENTS.md
   // says the same about the mobile suite).
   const notNow = page.getByRole('button', { name: 'Not now' })

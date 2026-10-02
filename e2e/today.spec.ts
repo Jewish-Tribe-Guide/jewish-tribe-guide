@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import { defaultCommunity, dismissLocationPrompt } from './helpers'
+import { defaultCommunity, dismissLocationPrompt, previewSettings } from './helpers'
 
 // The Today home (step 6), on a real build, at a fixed moment for each kind
 // of day: which blocks show, in what order, and which never do.
@@ -35,28 +35,15 @@ const DAYS = {
  *  tabs it goes with, as the admin's Preview would hand them over. */
 async function openToday(page: Page, day: keyof typeof DAYS, path = '') {
   const community = await defaultCommunity(page)
-  const { settings } = (await (await page.request.get(`/api/site-settings?community=${community}`)).json()) as { settings: Record<string, unknown> }
-  const { sections } = (await (await page.request.get(`/api/home-sections?community=${community}`)).json()) as { sections: unknown[] }
-  const draft = {
-    settings: {
-      ...settings,
-      homeStyle: 'today',
-      todayHidden: [],
-      mobileTabs: [
-        { id: 'categories', label: 'Today', target: 'categories' },
-        { id: 'map', label: 'Map', target: 'map' },
-        { id: 'browse', label: 'Browse', target: 'browse' },
-      ],
-    },
-    sections,
-  }
-  await page.addInitScript((value) => {
-    try {
-      sessionStorage.setItem('jpc:adminPreviewDraft', value)
-    } catch {
-      // about:blank has no storage; the page itself does.
-    }
-  }, JSON.stringify(draft))
+  await previewSettings(page, community, {
+    homeStyle: 'today',
+    todayHidden: [],
+    mobileTabs: [
+      { id: 'categories', label: 'Today', target: 'categories' },
+      { id: 'map', label: 'Map', target: 'map' },
+      { id: 'browse', label: 'Browse', target: 'browse' },
+    ],
+  })
   await page.route('**/api/zmanim?**', (route) => route.fulfill({ json: { ok: true, data: DAYS[day].zmanim } }))
   await page.clock.setFixedTime(new Date(DAYS[day].at))
   await page.goto(`/${community}${path}?preview=1`)

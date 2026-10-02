@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { categories, defaultCommunity, dismissLocationPrompt, ready } from './helpers'
+import { categories, defaultCommunity, dismissLocationPrompt, previewSettings, ready } from './helpers'
 
 // "Browse everything" (CategoryTileRow, desktop only — see the desktop
 // mockup rework, docs/desktop-mockup-plan.md Phase 5, revised twice after
@@ -17,7 +17,9 @@ test.describe('home — Browse everything grid', () => {
   test('caps at 9 tiles with a trailing "More" tile; "More" expands to a wrapped grid with no cap', async ({ page, request }) => {
     const community = await defaultCommunity(page)
     const cats = await categories(request, community)
-    await page.goto(`/${community}`)
+    // The classic home's grid, whichever home the admin has chosen.
+    await previewSettings(page, community, { homeStyle: 'classic' })
+    await page.goto(`/${community}?preview=1`)
     await dismissLocationPrompt(page)
     await ready(page)
 
