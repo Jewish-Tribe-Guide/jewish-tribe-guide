@@ -535,7 +535,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
   const todayCards = today && allCards ? groupCardsIntoSections(allCards, homeSections ?? []).flatMap((s) => s.cards) : null
   // "Food open now", asked of the site's own search, as if typed.
   const openNowQuestion = 'Food open now'
-  const openNow = today && listings && schedule ? { question: openNowQuestion, result: ask(openNowQuestion).result } : null
+  const openNow = today && listings && schedule && !settings.todayHidden.includes('openNow') ? { question: openNowQuestion, result: ask(openNowQuestion).result } : null
   const openListing = (item: { id: string; name: string; category: string }) => {
     track('listing_opened', { listing: item.name, category: item.category, source: 'today' })
     countEvent(communitySlug, 'listing_view', item.id)
@@ -556,6 +556,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
       onOpenListing={openListing}
       searching={!!q}
       pinned={<PinnedBlock communitySlug={communitySlug} from={coords ?? community.mapCenter} now={schedule?.now ?? null} />}
+      hidden={settings.todayHidden}
     />
   )
 

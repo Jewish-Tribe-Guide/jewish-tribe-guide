@@ -21,6 +21,7 @@ import {
   DEFAULT_MOBILE_TABS,
   DEFAULT_DESKTOP_NAV_ITEMS,
   MAX_BEFORE_CANDLE_ITEMS,
+  TODAY_BLOCKS,
 } from '@/lib/siteSettings'
 
 // ── One component, three tabs — Site (shared), Desktop, Mobile — sharing a
@@ -324,6 +325,26 @@ export default function SiteSettingsEditor({
             On the Today home, on Friday and Erev Yom Tov: the nearest store open now whose item list has these, separated by commas, at most {MAX_BEFORE_CANDLE_ITEMS}. Each is matched to a store&rsquo;s items by its exact name.
           </span>
         </label>
+        <fieldset data-testid="today-blocks" className="mt-4">
+          <legend className="block text-xs font-medium text-slate-700 mb-1">On the Today home</legend>
+          <p className="text-[11px] text-muted mb-1">Under the search, each on the days it&rsquo;s for, in the order the day calls for. Untick one to leave it off.</p>
+          {TODAY_BLOCKS.map((block) => (
+            <label key={block.id} className="flex items-start gap-2.5 py-1">
+              <input
+                type="checkbox"
+                checked={!draft.todayHidden.includes(block.id)}
+                onChange={(e) =>
+                  set('todayHidden', e.target.checked ? draft.todayHidden.filter((id) => id !== block.id) : [...draft.todayHidden, block.id])
+                }
+                className="mt-1"
+              />
+              <span>
+                <span className="block text-sm font-medium text-slate-900">{block.label}</span>
+                <span className="block text-[12px] text-muted">{block.when}</span>
+              </span>
+            </label>
+          ))}
+        </fieldset>
       </CollapsibleSection>
       </div>
       )}

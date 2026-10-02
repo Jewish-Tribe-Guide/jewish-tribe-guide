@@ -11,7 +11,9 @@ import {
   MAX_BEFORE_CANDLE_ITEMS,
   defaultHeroSplit,
   isHomeStyle,
+  isTodayBlockId,
   type DesktopNavItem,
+  type TodayBlockId,
   type MobileTabConfig,
   type SiteSettings,
 } from './siteSettings'
@@ -53,6 +55,7 @@ type Row = {
   /** Migration 067. Absent on a row read before it's applied. */
   home_style?: string | null
   before_candle_items?: unknown
+  today_hidden?: unknown
 }
 
 // jsonb comes back as whatever was written, and this column predates nothing —
@@ -104,6 +107,13 @@ function toHeroImage(raw: unknown): { url: string; alt: string } | null {
 /** The admin's item names: trimmed, no blanks or repeats, at most
  *  MAX_BEFORE_CANDLE_ITEMS. Null (never set, or 067 not applied) is the
  *  starting list; an empty list is the admin's own "none". */
+/** The Today blocks turned off: known ids only, each once. Anything else
+ *  (null before migration 067, a hand-edited row) means none are. */
+export function toTodayHidden(raw: unknown): TodayBlockId[] {
+  if (!Array.isArray(raw)) return []
+  return [...new Set(raw.filter(isTodayBlockId))]
+}
+
 export function toBeforeCandleItems(raw: unknown): string[] {
   if (!Array.isArray(raw)) return DEFAULT_BEFORE_CANDLE_ITEMS
   const seen = new Set<string>()
@@ -155,6 +165,7 @@ function toSettings(row: Row | null, fallback: SiteSettings = SITE_SETTINGS_DEFA
     desktopHeroImage: toHeroImage(row.desktop_hero_image) ?? fallback.desktopHeroImage,
     homeStyle: isHomeStyle(row.home_style) ? row.home_style : 'classic',
     beforeCandleItems: toBeforeCandleItems(row.before_candle_items),
+    todayHidden: toTodayHidden(row.today_hidden),
   }
 }
 
@@ -212,14 +223,15 @@ export async function updateSiteSettings(
 ): Promise<SiteSettings> {
   const current = await getSiteSettingsUncached(community)
   const merged: SiteSettings = { ...current, ...patch }
-  // The Today home's two columns (migration 067) are written only when they
+  // The Today home's columns (migration 067) are written only when they
   // change, so the rest of the settings still save on a database that
-  // doesn't have them yet. Changing either one there says what's missing.
+  // doesn't have them yet. Changing one there says what's missing.
   const today: Record<string, unknown> = {}
   if (merged.homeStyle !== current.homeStyle) today.home_style = merged.homeStyle
   if (JSON.stringify(merged.beforeCandleItems) !== JSON.stringify(current.beforeCandleItems)) {
     today.before_candle_items = merged.beforeCandleItems
   }
+  if (JSON.stringify(merged.todayHidden) !== JSON.stringify(current.todayHidden)) today.today_hidden = merged.todayHidden
 
   const { data, error } = await getAdminClient()
     .from('site_settings')
@@ -262,7 +274,7 @@ export async function updateSiteSettings(
     .single()
 
   if (error) {
-    if (Object.keys(today).length > 0 && /home_style|before_candle_items/.test(error.message)) {
+    if (Object.keys(today).length > 0 && /home_style|before_candle_items|today_hidden/.test(error.message)) {
       throw new MissingTodayColumnsError()
     }
     throw new Error(`Failed to update site settings: ${error.message}`)

@@ -98,6 +98,9 @@ export type SiteSettings = {
    *  it looks for, in order. The guide can't tell which items are for
    *  Shabbos, so an admin names them. */
   beforeCandleItems: string[]
+  /** The Today home's blocks an admin has turned off. Each shows on the
+   *  days it's for unless it's here; their order follows the day. */
+  todayHidden: TodayBlockId[]
 }
 
 export const HOME_STYLES = ['classic', 'today'] as const
@@ -109,6 +112,22 @@ export function isHomeStyle(value: unknown): value is HomeStyle {
 
 /** Where Before candles starts until an admin changes it. */
 export const DEFAULT_BEFORE_CANDLE_ITEMS = ['Challah', 'Wine', 'Chicken']
+
+/** The Today home's blocks, in the order they come on a Friday, each with
+ *  when it shows, for the admin's on/off list. */
+export const TODAY_BLOCKS = [
+  { id: 'candles', label: 'Today card', when: 'Candles and the countdown on Friday and Erev Yom Tov; havdalah on Shabbos and Yom Tov.' },
+  { id: 'beforeCandles', label: 'Before candles', when: 'Friday and Erev Yom Tov, until candle lighting: the nearest store open now that has the items below.' },
+  { id: 'nextMinyan', label: 'Next minyan', when: 'Every day: the next one anywhere, and the nearest shul’s.' },
+  { id: 'openNow', label: 'Open now', when: 'Weekdays: food open now, titled by the meal (“Lunch, open now”). Never on Shabbos or Yom Tov.' },
+  { id: 'pinned', label: 'Pinned', when: 'Only when the visitor has pinned something, on their device.' },
+  { id: 'browse', label: 'Browse', when: 'The categories, in your sections; on a phone, a short row ending in All.' },
+] as const
+export type TodayBlockId = (typeof TODAY_BLOCKS)[number]['id']
+
+export function isTodayBlockId(value: unknown): value is TodayBlockId {
+  return TODAY_BLOCKS.some((b) => b.id === value)
+}
 
 /** More than this and Before candles stops being one answer. */
 export const MAX_BEFORE_CANDLE_ITEMS = 6
@@ -268,6 +287,7 @@ export const SITE_SETTINGS_DEFAULTS: SiteSettings = {
   desktopHeroImage: community.heroImage,
   homeStyle: 'classic',
   beforeCandleItems: DEFAULT_BEFORE_CANDLE_ITEMS,
+  todayHidden: [],
 }
 
 /** Bump when the icon RENDERING changes — the inset, the trim, the padding

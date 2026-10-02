@@ -10,6 +10,7 @@ import type { MinyanSchedule } from '@/lib/useMinyanSchedule'
 import type { ZmanimData } from '@/types'
 import TodayBlocks from './TodayBlocks'
 import type { CardDef } from './sections'
+import type { TodayBlockId } from '@/lib/siteSettings'
 
 vi.mock('next/navigation', () => ({
   useRouter: () => mockRouter,
@@ -73,7 +74,7 @@ const openNow: { question: string; result: AskResult } = {
   result: { query: { raw: 'food open now' }, hits: [{ item: hip, category: food, score: 1, matchedTags: [], matched: [], matchedFields: [], miles: null, open: true }], categoryIds: ['restaurant'], anchor: null, place: null, closedCount: 0, noHours: [], terms: [], excluded: [] } as unknown as AskResult,
 }
 
-function show(schedule: MinyanSchedule, zmanim: ZmanimData | null, onOpenListing = vi.fn(), cards: CardDef[] | null = null) {
+function show(schedule: MinyanSchedule, zmanim: ZmanimData | null, onOpenListing = vi.fn(), cards: CardDef[] | null = null, hidden: TodayBlockId[] = []) {
   renderWithProviders(
     <TodayBlocks
       listings={listings}
@@ -88,6 +89,7 @@ function show(schedule: MinyanSchedule, zmanim: ZmanimData | null, onOpenListing
       cards={cards}
       onOpenListing={onOpenListing}
       searching={false}
+      hidden={hidden}
     />,
     { content: { categories } },
   )
@@ -170,5 +172,26 @@ describe('Browse at the end', () => {
     const row = screen.getByTestId('today-browse-row')
     expect(within(row).getByRole('link', { name: 'All ›' })).toHaveAttribute('href', '/philly/browse')
     expect(within(row).getByRole('link', { name: 'Food' })).toHaveAttribute('href', '/philly/restaurant')
+  })
+})
+
+describe('blocks the admin has turned off', () => {
+  it('stay off, and the rest keep the day’s order', () => {
+    const order = show(scheduleAt('2026-10-09T13:30:00-04:00', 'fri', { mikveh: '5:30pm' }), week, vi.fn(), null, ['beforeCandles'])
+    expect(order).toEqual(['today-candles', 'today-next-minyan'])
+    const tuesday = (hidden: TodayBlockId[]) => {
+      cleanup()
+      return show(scheduleAt('2026-10-06T12:30:00-04:00', 'tue', { mikveh: '2:00pm' }), { ...week, dayOfWeek: 2, isFriday: false } as ZmanimData, vi.fn(), null, hidden)
+    }
+    expect(tuesday(['openNow'])).toEqual(['today-next-minyan'])
+    expect(tuesday(['nextMinyan'])).toEqual(['today-open-now'])
+  })
+
+  it('the Today card and Browse too', () => {
+    const card = (id: string, title: string): CardDef => ({ id, title, href: `/philly/${id}`, go: vi.fn() })
+    show(scheduleAt('2026-10-09T13:30:00-04:00', 'fri', {}), week, vi.fn(), [card('restaurant', 'Food')], ['candles', 'browse'])
+    expect(screen.queryByTestId('today-candles')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('today-browse-row')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('today-browse')).not.toBeInTheDocument()
   })
 })

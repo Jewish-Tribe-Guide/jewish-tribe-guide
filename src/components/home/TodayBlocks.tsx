@@ -14,6 +14,7 @@ import { candlesToday, initialsOf, listingRowFacts, type RowFact } from '@/lib/l
 import { formatStartsIn, nextMinyansAcross, type NextMinyanLine } from '@/lib/upcomingDavening'
 import { routes } from '@/lib/routes'
 import { beforeCandles, itemList, openNowTitle, shabbosMoment, shoppingTitle, type ShabbosMoment } from '@/lib/todayHome'
+import type { TodayBlockId } from '@/lib/siteSettings'
 import type { CardDef } from './sections'
 
 // ── The Today home's blocks (step 6) ─────────────────────────────────────────
@@ -49,10 +50,13 @@ type Props = {
   searching: boolean
   /** The pinned places, when there are any (part 3). */
   pinned?: ReactNode
+  /** The blocks the admin has turned off (SiteSettings.todayHidden). */
+  hidden?: readonly TodayBlockId[]
 }
 
 export default function TodayBlocks(props: Props) {
-  const { schedule, zmanim, timezone, categories, communitySlug, searching } = props
+  const { schedule, zmanim, timezone, categories, communitySlug, searching, hidden = [] } = props
+  const on = (id: TodayBlockId) => !hidden.includes(id)
   const now = schedule?.now ?? null
   const moment: ShabbosMoment = now === null ? { kind: 'weekday' } : shabbosMoment(zmanim, now, timezone)
   const kindLink = (kind: string) => {
@@ -62,7 +66,7 @@ export default function TodayBlocks(props: Props) {
   const shulsHref = schedule?.linkCategoryId ? `${routes.slug(communitySlug, schedule.linkCategoryId)}?davening=1` : null
 
   const answers: ReactNode[] = []
-  if (moment.kind !== 'weekday' && now !== null) {
+  if (moment.kind !== 'weekday' && now !== null && on('candles')) {
     answers.push(
       <CandlesCard
         key="candles"
@@ -77,25 +81,29 @@ export default function TodayBlocks(props: Props) {
       />,
     )
   }
-  if (moment.kind === 'erev') answers.push(<BeforeCandles key="shop" {...props} />)
-  answers.push(<NextMinyan key="minyan" {...props} shulsHref={shulsHref} />)
-  if (moment.kind === 'weekday' && props.openNow) answers.push(<OpenNow key="open" {...props} openNow={props.openNow} />)
+  if (moment.kind === 'erev' && on('beforeCandles')) answers.push(<BeforeCandles key="shop" {...props} />)
+  if (on('nextMinyan')) answers.push(<NextMinyan key="minyan" {...props} shulsHref={shulsHref} />)
+  if (moment.kind === 'weekday' && props.openNow && on('openNow')) answers.push(<OpenNow key="open" {...props} openNow={props.openNow} />)
 
   return (
-    <div data-testid="today-home" data-moment={moment.kind} className={`mt-6 desktop:mt-0 desktop:grid desktop:grid-cols-[minmax(0,1fr)_340px] desktop:items-start desktop:gap-6 ${searching ? 'hidden desktop:grid' : ''}`}>
+    <div data-testid="today-home" data-moment={moment.kind} className={`mt-6 desktop:mt-0 desktop:grid ${on('browse') ? 'desktop:grid-cols-[minmax(0,1fr)_340px]' : ''} desktop:items-start desktop:gap-6 ${searching ? 'hidden desktop:grid' : ''}`}>
       <div className="space-y-6 desktop:grid desktop:grid-cols-2 desktop:gap-5 desktop:space-y-0 desktop:[&>[data-wide]]:col-span-2">
         {answers}
         {/* Beside Next minyan on desktop; across the row on a Friday, where
             the two answers already fill it. Nothing until something's
             pinned. */}
-        {props.pinned && (
+        {props.pinned && on('pinned') && (
           <div data-wide={moment.kind === 'erev' || undefined} className="empty:hidden">
             {props.pinned}
           </div>
         )}
       </div>
-      <BrowseRow {...props} />
-      <BrowseList {...props} />
+      {on('browse') && (
+        <>
+          <BrowseRow {...props} />
+          <BrowseList {...props} />
+        </>
+      )}
     </div>
   )
 }

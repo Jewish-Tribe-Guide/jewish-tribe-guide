@@ -1,7 +1,7 @@
 import { revalidatePublicContent } from '@/lib/revalidateContent'
 import { getAdminUserForCommunity } from '@/lib/adminAuth'
 import { MissingTodayColumnsError, getSiteSettingsUncached, toBeforeCandleItems, updateSiteSettings } from '@/lib/siteSettingsStore'
-import { MAX_BEFORE_CANDLE_ITEMS, MAX_MOBILE_TABS, isHomeStyle, type DesktopNavItem, type SiteSettings } from '@/lib/siteSettings'
+import { MAX_BEFORE_CANDLE_ITEMS, MAX_MOBILE_TABS, isHomeStyle, isTodayBlockId, type DesktopNavItem, type SiteSettings } from '@/lib/siteSettings'
 import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
 
 // Recursive shape check — a 'link' item needs a target, a 'more-menu' item
@@ -141,6 +141,13 @@ export async function PATCH(request: Request) {
       return Response.json({ ok: false, errors: [`Before candles can look for at most ${MAX_BEFORE_CANDLE_ITEMS} items.`] }, { status: 400 })
     }
     body.beforeCandleItems = toBeforeCandleItems(items)
+  }
+  if (body.todayHidden !== undefined) {
+    const ids = body.todayHidden
+    if (!Array.isArray(ids) || !ids.every(isTodayBlockId)) {
+      return Response.json({ ok: false, errors: ['Only the Today home’s own blocks can be turned off.'] }, { status: 400 })
+    }
+    body.todayHidden = [...new Set(ids)]
   }
 
   try {

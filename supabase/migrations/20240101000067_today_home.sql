@@ -11,11 +11,16 @@
 -- The guide can't tell which items are for Shabbos, so an admin names them.
 -- Null means the built-in starting list.
 --
+-- today_hidden: the Today home's blocks an admin has turned off, by id, e.g.
+-- ["openNow"] (see TODAY_BLOCKS in src/lib/siteSettings.ts). Null or empty
+-- means every block shows on the days it's for.
+--
 -- The code reads a row the same way whether or not these columns exist yet;
--- only changing either setting needs them.
+-- only changing one of these settings needs them.
 -- ─────────────────────────────────────────────────────────────────────────────
 
 alter table site_settings add column if not exists home_style text not null default 'classic';
 alter table site_settings drop constraint if exists site_settings_home_style_check;
 alter table site_settings add constraint site_settings_home_style_check check (home_style in ('classic', 'today'));
 alter table site_settings add column if not exists before_candle_items jsonb;
+alter table site_settings add column if not exists today_hidden jsonb;

@@ -219,6 +219,13 @@ describe('the Today home settings', () => {
     expect(settings.beforeCandleItems).toEqual(['Challah', 'Wine', 'Grape juice', 'Fish', 'Chicken', 'Cake'])
   })
 
+  it('the Today blocks turned off: known ones only, once each; none before 067', async () => {
+    mockFrom.mockReturnValue(chainable({ data: { ...rawRow, today_hidden: ['openNow', 'openNow', 'weather', 7, 'pinned'] }, error: null }))
+    expect((await getSiteSettingsUncached('philly')).todayHidden).toEqual(['openNow', 'pinned'])
+    mockFrom.mockReturnValue(chainable({ data: rawRow, error: null }))
+    expect((await getSiteSettingsUncached('philly')).todayHidden).toEqual([])
+  })
+
   it('an unknown style reads as classic', async () => {
     mockFrom.mockReturnValue(chainable({ data: { ...rawRow, home_style: 'fancy' }, error: null }))
     expect((await getSiteSettingsUncached('philly')).homeStyle).toBe('classic')
@@ -230,16 +237,19 @@ describe('the Today home settings', () => {
     const written = (write.upsert as ReturnType<typeof vi.fn>).mock.calls[0][0]
     expect(written).not.toHaveProperty('home_style')
     expect(written).not.toHaveProperty('before_candle_items')
+    expect(written).not.toHaveProperty('today_hidden')
   })
 
   it('a save that changes them writes them', async () => {
     const write = saveWith(rawRow)
-    await updateSiteSettings('philly', { homeStyle: 'today', beforeCandleItems: ['Challah'] })
-    expect(write.upsert).toHaveBeenCalledWith(expect.objectContaining({ home_style: 'today', before_candle_items: ['Challah'] }), { onConflict: 'community_id' })
+    await updateSiteSettings('philly', { homeStyle: 'today', beforeCandleItems: ['Challah'], todayHidden: ['openNow'] })
+    expect(write.upsert).toHaveBeenCalledWith(expect.objectContaining({ home_style: 'today', before_candle_items: ['Challah'], today_hidden: ['openNow'] }), { onConflict: 'community_id' })
   })
 
   it('changing them before 067 says what’s missing', async () => {
     saveWith(rawRow, { data: null, error: { message: 'column "home_style" of relation "site_settings" does not exist' } })
     await expect(updateSiteSettings('philly', { homeStyle: 'today' })).rejects.toThrow('migration 067')
+    saveWith(rawRow, { data: null, error: { message: 'column "today_hidden" of relation "site_settings" does not exist' } })
+    await expect(updateSiteSettings('philly', { todayHidden: ['pinned'] })).rejects.toThrow('migration 067')
   })
 })
