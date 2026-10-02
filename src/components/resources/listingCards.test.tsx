@@ -111,7 +111,14 @@ describe('A hospital’s own main card', () => {
   it('says it isn’t in the guide yet, rather than leaving a gap', () => {
     vi.setSystemTime(new Date(2026, 9, 6, 13, 30))
     open({ ...hup, who: '', who_phone: '', who_helps: '' })
-    expect(screen.getByTestId('listing-section')).toHaveTextContent('Who to call firstNot in the guide yet.')
+    // And asks nobody to confirm that.
+    expect(screen.getByTestId('listing-section')).toHaveTextContent(/^Who to call firstNot in the guide yet\.$/)
+  })
+
+  it('asks "Still right?" about what it says once it says something', () => {
+    vi.setSystemTime(new Date(2026, 9, 6, 13, 30))
+    open()
+    expect(screen.getByTestId('listing-section')).toHaveTextContent('Who to call first not confirmed by anyone yet')
   })
 })
 

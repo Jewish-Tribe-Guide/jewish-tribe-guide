@@ -90,8 +90,9 @@ export function SectionCard({
       )
     }
   }
+  // Nothing to confirm on a card nobody has filled in.
   return (
-    <Card title={title} testId="listing-section" footer={footer}>
+    <Card title={title} testId="listing-section" footer={parts.length > 0 ? footer : undefined}>
       {parts.length > 0 ? parts : <p className="text-[15px] text-slate-600">{NOT_YET}</p>}
     </Card>
   )
