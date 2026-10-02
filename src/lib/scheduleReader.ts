@@ -1,4 +1,4 @@
-import { TEFILLAH_LABELS, TEFILLAH_ORDER, type Tefillah } from './davening'
+import { formatAnchorRule, parseTimeToMinutes, RELATIVE_ELIGIBLE, TEFILLAH_LABELS, TEFILLAH_ORDER, type Tefillah } from './davening'
 import { DEFAULT_READER_MODEL } from './readQuestion'
 import { dateText, type ScheduleDay, type ScheduleMinyan, type SpecialSchedule } from './schedules'
 import type { Festival } from './festivals'
@@ -57,7 +57,7 @@ Rules:
 - Dates are calendar days, midnight to midnight, not Jewish days that start at nightfall. A time on the night before a day ("Fri night", "erev", "eve of", "Leil") goes on the date it falls on, the earlier one: Mincha or Maariv the night Shemini Atzeres begins, when that night is Fri Oct 2, is on Fri Oct 2.
 - "time" exactly as written, with am/pm when you can tell it ("9:00am", "6:30pm", "10 min before sunset"). Never work a time out or move it.
 - "quote": a few words copied exactly from the schedule where you read this time.
-- "unsure": when you can't tell what a time is for or which day it's on, say why in a few words. A time after "after", "following" or "approx." is unsure: "Hakafos after Maariv 7:30" could be Maariv at 7:30 or Hakafos at 7:30. Otherwise leave it out.
+- "unsure": when you can't tell what a time is for or which day it's on, say why in a few words. A time after "after", "following" or "approx." is unsure: "Hakafos after Maariv 7:30" could be Maariv at 7:30 or Hakafos at 7:30. Minutes from sunset ("15 min after sunset") are exact, not unsure. Otherwise leave it out.
 - Only times the schedule gives. Never add one it doesn't. If it names no times for a day, leave that day out.
 - "missing": one short sentence on what it leaves out that a shul usually has (e.g. "No Mincha times for Shabbos."), or null.
 
@@ -79,6 +79,29 @@ Answer in JSON only: {"times": [{"tefillah": "...", "on": ["..."], "time": "..."
     { role: 'system', content: system },
     { role: 'user', content },
   ]
+}
+
+const SUNSET = "(?:sunset|sundown|sh(?:e|')?kiah?)"
+
+/** "10 min before sunset", "15 minutes after shkia", "at sunset", "sunset":
+ *  minutes from sunset (negative before), or null for anything else. */
+export function readSunsetTime(time: string): number | null {
+  const t = time.toLowerCase().replace(/\s+/g, ' ').trim()
+  const offset = t.match(new RegExp(`^(\\d{1,3}) ?(?:min(?:ute)?s?\\.?|m) (before|prior to|after|past) (?:the )?${SUNSET}$`))
+  if (offset) return Number(offset[1]) * (offset[2] === 'before' || offset[2] === 'prior to' ? -1 : 1)
+  return new RegExp(`^(?:at )?${SUNSET}$`).test(t) ? 0 : null
+}
+
+/** A time as the guide keeps it: a clock time as written, or a time from
+ *  sunset as a rule worked out each day. Anything else (candle lighting, a
+ *  time "after Maariv") is kept as written, and the editor says it can't
+ *  be shown until it's given as one or the other (SchedulesInput). Candle
+ *  lighting isn't turned into sunset: the guide only has the coming
+ *  Shabbos's. */
+function asGuideTime(tefillah: Tefillah, time: string): Pick<ReadTime, 'time' | 'anchor' | 'offsetMinutes'> {
+  if (Number.isFinite(parseTimeToMinutes(time))) return { time }
+  const fromSunset = RELATIVE_ELIGIBLE.includes(tefillah) ? readSunsetTime(time) : null
+  return fromSunset === null ? { time } : { time: formatAnchorRule('sunset', fromSunset), anchor: 'sunset', offsetMinutes: fromSunset }
 }
 
 const plain = (s: string) =>
@@ -116,7 +139,7 @@ export function tidyScheduleReading(raw: unknown, f: Festival, source: ScheduleS
     if (text !== null && !text.includes(` ${plain(quote)} `)) continue
     const notes = typeof x.notes === 'string' && x.notes.trim() ? x.notes.trim().slice(0, 120) : undefined
     const unsure = typeof x.unsure === 'string' && x.unsure.trim() ? x.unsure.trim().slice(0, 200) : undefined
-    times.push({ id: newId(), tefillah, on: [...new Set(on)], time, ...(notes ? { notes } : {}), quote, checked: text !== null, ...(unsure ? { unsure } : {}) })
+    times.push({ id: newId(), tefillah, on: [...new Set(on)], ...asGuideTime(tefillah, time), ...(notes ? { notes } : {}), quote, checked: text !== null, ...(unsure ? { unsure } : {}) })
   }
   const missing = typeof body.missing === 'string' && body.missing.trim() ? body.missing.trim().slice(0, 300) : null
   return {
@@ -126,7 +149,14 @@ export function tidyScheduleReading(raw: unknown, f: Festival, source: ScheduleS
       from: f.from,
       to: f.to,
       mode: 'replace',
-      minyanim: times.map(({ id, tefillah, on, time, notes }) => ({ id, tefillah, on, time, ...(notes ? { notes } : {}) })),
+      minyanim: times.map(({ id, tefillah, on, time, anchor, offsetMinutes, notes }) => ({
+        id,
+        tefillah,
+        on,
+        time,
+        ...(anchor ? { anchor, offsetMinutes } : {}),
+        ...(notes ? { notes } : {}),
+      })),
     },
     times,
     missing,

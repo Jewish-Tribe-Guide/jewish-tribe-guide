@@ -4,42 +4,15 @@ import { useState } from 'react'
 import {
   type Tefillah,
   type Minyan,
-  type ZmanAnchor,
   type MinyanDayKey,
   TEFILLAH_ORDER,
   TEFILLAH_LABELS,
-  ZMAN_ANCHOR_LABELS,
   ALL_MINYAN_DAYS,
   SEASON_LABELS,
-  formatAnchorRule,
   isMinyanim,
-  type MinyanBounds,
   type Season,
 } from '@/lib/davening'
-
-const ZMAN_ANCHOR_ORDER: ZmanAnchor[] = ['sunset', 'candle_lighting', 'havdalah']
-
-// The relative (sunset/candle-lighting/havdalah) mode only makes sense for
-// tefillos whose time actually moves with the zman day to day — Shacharis
-// etc. are always clock times in practice. Kabbalas Shabbos is the one
-// Friday-only exception: shuls commonly set it relative to candle-lighting
-// or sunset rather than a fixed clock time, same as Mincha/Maariv.
-const RELATIVE_ELIGIBLE: Tefillah[] = ['kabbalas_shabbos', 'mincha', 'maariv', 'mincha_maariv']
-
-type Direction = 'before' | 'after'
-
-/** What a row's OTHER mode last held, so switching Clock ↔ Relative and back
- *  restores it instead of losing it (a misclick shouldn't cost your data).
- *  `magnitudeText` is a raw string, not a number, so the offset input can be
- *  emptied out to type a fresh value instead of being stuck showing "0". */
-type Draft = {
-  clockTime?: string
-  anchor?: ZmanAnchor
-  direction?: Direction
-  magnitudeText?: string
-  notBefore?: string
-  notAfter?: string
-}
+import { RELATIVE_ELIGIBLE, ZMAN_ANCHOR_ORDER, RelativeTimeFields, TimeModeToggle, useTimeModes } from './ZmanTimeFields'
 
 const DAY_SHORT: Record<MinyanDayKey, string> = {
   sun: 'Sun',
@@ -60,12 +33,6 @@ const DAY_SHORT: Record<MinyanDayKey, string> = {
 // removeRow all match by id, a collision meant editing the new row silently
 // also edited whichever saved row shared its id (e.g. adding a second Mincha
 // for Sons of Israel overwrote its existing Shacharis entry to Mincha too).
-/** A row's bounds as a standalone MinyanBounds, for handing to
- *  formatAnchorRule without dragging the whole Minyan along. */
-function boundsOf(row: Minyan | undefined): MinyanBounds {
-  return { notBefore: row?.notBefore, notAfter: row?.notAfter }
-}
-
 function genId(): string {
   return crypto.randomUUID()
 }
@@ -101,8 +68,8 @@ type Props = {
  */
 export default function MinyanimInput({ label, value, onChange }: Props) {
   const [rows, setRows] = useState<Minyan[]>(() => initMinyanim(value))
-  // Keyed by row id — not part of Minyan, never saved. See Draft above.
-  const [drafts, setDrafts] = useState<Record<string, Draft>>({})
+  // The clock / zman rules, shared with SchedulesInput (ZmanTimeFields).
+  const modes = useTimeModes()
   // Which rows have the earliest/latest limits revealed. Collapsed by
   // default and deliberately so: almost every minyan wants the plain zman,
   // and a form that shows all five controls at once reads as five decisions
@@ -113,10 +80,6 @@ export default function MinyanimInput({ label, value, onChange }: Props) {
   function update(next: Minyan[]) {
     setRows(next)
     onChange(next)
-  }
-
-  function mergeDraft(id: string, patch: Draft) {
-    setDrafts((d) => ({ ...d, [id]: { ...d[id], ...patch } }))
   }
 
   function addRow() {
@@ -141,87 +104,9 @@ export default function MinyanimInput({ label, value, onChange }: Props) {
     updateRow(id, { days })
   }
 
-  // Relative rows keep `time` auto-generated from anchor + offsetMinutes (via
-  // formatAnchorRule) rather than hand-typed — see davening.ts for why: every
-  // existing display/sort call site reads `time` as plain text, so this is
-  // what lets a calculated clock time be layered on top without touching them.
-  function setRelative(id: string, anchor: ZmanAnchor, direction: Direction, magnitudeText: string) {
-    mergeDraft(id, { anchor, direction, magnitudeText })
-    const offsetMinutes = (direction === 'before' ? -1 : 1) * (Number(magnitudeText) || 0)
-    // Bounds carried through rather than re-derived: formatAnchorRule builds
-    // the whole `time` string, so omitting them here would silently strip the
-    // "(between 5:00 PM and 7:00 PM)" off the moment anyone nudged the offset.
-    const bounds = boundsOf(rows.find((r) => r.id === id))
-    updateRow(id, { anchor, offsetMinutes, time: formatAnchorRule(anchor, offsetMinutes, bounds) })
-  }
-
-  /** Applies one end of the window and regenerates `time` from it. An empty
-   *  input clears that bound rather than storing "", so "no limit" stays a
-   *  missing field everywhere downstream instead of a falsy string. */
-  function setBound(id: string, patch: MinyanBounds) {
-    const row = rows.find((r) => r.id === id)
-    if (!row?.anchor) return
-    const bounds: MinyanBounds = { ...boundsOf(row), ...patch }
-    if (!bounds.notBefore) bounds.notBefore = undefined
-    if (!bounds.notAfter) bounds.notAfter = undefined
-    mergeDraft(id, bounds)
-    updateRow(id, {
-      ...bounds,
-      time: formatAnchorRule(row.anchor, row.offsetMinutes ?? 0, bounds),
-    })
-  }
-
-  function setClockTime(id: string, time: string) {
-    mergeDraft(id, { clockTime: time })
-    updateRow(id, { time })
-  }
-
-  // Switching modes stashes the row's current values as that mode's draft
-  // first, then restores whatever the OTHER mode last held (or a sensible
-  // default for a row that's never been in it) — so toggling back and forth
-  // never loses what was typed.
-  function switchToRelative(row: Minyan) {
-    mergeDraft(row.id, { clockTime: row.time })
-    const draft = drafts[row.id]
-    const anchor = draft?.anchor ?? 'sunset'
-    const direction = draft?.direction ?? 'before'
-    const magnitudeText = draft?.magnitudeText ?? '0'
-    const offsetMinutes = (direction === 'before' ? -1 : 1) * (Number(magnitudeText) || 0)
-    const bounds: MinyanBounds = { notBefore: draft?.notBefore, notAfter: draft?.notAfter }
-    mergeDraft(row.id, { anchor, direction, magnitudeText })
-    updateRow(row.id, {
-      anchor,
-      offsetMinutes,
-      ...bounds,
-      time: formatAnchorRule(anchor, offsetMinutes, bounds),
-    })
-  }
-
-  // `extraPatch` lets a caller fold in another field change (e.g. a new
-  // tefillah) atomically with the mode switch — combining them into the one
-  // updateRow call below, rather than two separate calls in the same handler,
-  // which would each read the pre-update `rows` closure and the second would
-  // silently clobber the first's change.
-  function switchToClock(row: Minyan, extraPatch: Partial<Omit<Minyan, 'id'>> = {}) {
-    mergeDraft(row.id, {
-      anchor: row.anchor,
-      direction: (row.offsetMinutes ?? 0) < 0 ? 'before' : (row.offsetMinutes ?? 0) > 0 ? 'after' : drafts[row.id]?.direction,
-      magnitudeText: row.anchor ? String(Math.abs(row.offsetMinutes ?? 0)) : drafts[row.id]?.magnitudeText,
-      notBefore: row.notBefore,
-      notAfter: row.notAfter,
-    })
-    const clockTime = drafts[row.id]?.clockTime ?? ''
-    // Bounds cleared, not carried: they clamp a zman that moves, and a fixed
-    // clock time has nothing to clamp. Stashed in the draft just above, so
-    // toggling back restores them like everything else here.
-    updateRow(row.id, {
-      anchor: undefined,
-      offsetMinutes: undefined,
-      notBefore: undefined,
-      notAfter: undefined,
-      time: clockTime,
-      ...extraPatch,
-    })
+  // Each returns the row's change, applied here (see useTimeModes).
+  const apply = (id: string, patch: Partial<Omit<Minyan, 'id'>> | null) => {
+    if (patch) updateRow(id, patch)
   }
 
   const inputClass =
@@ -237,16 +122,7 @@ export default function MinyanimInput({ label, value, onChange }: Props) {
         {rows.map((row) => {
           const isRelative = !!row.anchor
           const canBeRelative = RELATIVE_ELIGIBLE.includes(row.tefillah)
-          const draft = drafts[row.id]
-          // The draft (once anything's been typed this session) is the raw
-          // source of truth for these three — NOT re-derived from the row's
-          // committed offsetMinutes, or clearing the offset input to type a
-          // fresh value would immediately snap back to "0" every render (see
-          // setRelative — it keeps the draft in sync with every keystroke,
-          // including a transient empty string, right alongside the row).
-          const direction: Direction = draft?.direction ?? ((row.offsetMinutes ?? 0) <= 0 ? 'before' : 'after')
-          const magnitudeText = draft?.magnitudeText ?? String(Math.abs(row.offsetMinutes ?? 0))
-          const anchor = draft?.anchor ?? row.anchor ?? 'sunset'
+          const { direction, magnitudeText, anchor } = modes.view(row)
           // Open when a bound is already stored, so an editor can never be
           // shown a row whose saved limits are hidden behind a collapsed link.
           const boundsOpen = expanded[row.id] || !!row.notBefore || !!row.notAfter
@@ -265,9 +141,12 @@ export default function MinyanimInput({ label, value, onChange }: Props) {
                   // Relative mode only makes sense for a handful of tefillos
                   // (see RELATIVE_ELIGIBLE) — picking one that isn't among
                   // them drops a currently-relative row back to clock mode,
-                  // atomically with the tefillah change (see switchToClock).
+                  // atomically with the tefillah change, in one updateRow:
+                  // two calls in the same handler would each read the
+                  // pre-update `rows` closure and the second would silently
+                  // clobber the first's change.
                   if (isRelative && !RELATIVE_ELIGIBLE.includes(tefillah)) {
-                    switchToClock(row, { tefillah })
+                    updateRow(row.id, { ...modes.switchToClock(row), tefillah })
                   } else {
                     updateRow(row.id, { tefillah })
                   }
@@ -282,21 +161,12 @@ export default function MinyanimInput({ label, value, onChange }: Props) {
               </select>
 
               {(canBeRelative || isRelative) && (
-                <div className="flex rounded-md border border-slate-300 overflow-hidden shrink-0">
-                  {([[false, 'Clock time'], [true, 'Sunset/Havdalah…']] as const).map(([relative, lbl]) => (
-                    <button
-                      key={lbl}
-                      type="button"
-                      onClick={() => (relative ? switchToRelative(row) : switchToClock(row))}
-                      className={[
-                        'px-2 py-1.5 text-xs font-medium transition-colors cursor-pointer whitespace-nowrap',
-                        isRelative === relative ? 'bg-primary text-white' : 'bg-white text-slate-600 hover:bg-slate-50',
-                      ].join(' ')}
-                    >
-                      {lbl}
-                    </button>
-                  ))}
-                </div>
+                <TimeModeToggle
+                  relative={isRelative}
+                  label="Sunset/Havdalah…"
+                  onClock={() => apply(row.id, modes.switchToClock(row))}
+                  onRelative={() => apply(row.id, modes.switchToRelative(row))}
+                />
               )}
 
               <button
@@ -320,42 +190,20 @@ export default function MinyanimInput({ label, value, onChange }: Props) {
                 <input
                   type="text"
                   value={row.time}
-                  onChange={(e) => setClockTime(row.id, e.target.value)}
+                  onChange={(e) => apply(row.id, modes.setClockTime(row, e.target.value))}
                   placeholder="e.g. 7:00am"
                   className={`${inputClass} w-28`}
                 />
               ) : (
-                <>
-                  <input
-                    type="number"
-                    min={0}
-                    value={magnitudeText}
-                    onChange={(e) => setRelative(row.id, anchor, direction, e.target.value)}
-                    className={`${inputClass} w-16`}
-                    aria-label="Offset in minutes"
-                  />
-                  <span className="text-xs text-muted">min</span>
-                  <select
-                    value={direction}
-                    onChange={(e) => setRelative(row.id, anchor, e.target.value as Direction, magnitudeText)}
-                    className={inputClass}
-                  >
-                    <option value="before">before</option>
-                    <option value="after">after</option>
-                  </select>
-                  <select
-                    value={anchor}
-                    onChange={(e) => setRelative(row.id, e.target.value as ZmanAnchor, direction, magnitudeText)}
-                    className={inputClass}
-                  >
-                    {ZMAN_ANCHOR_ORDER.map((a) => (
-                      <option key={a} value={a}>
-                        {ZMAN_ANCHOR_LABELS[a]}
-                      </option>
-                    ))}
-                  </select>
-                  <span className="text-xs text-muted italic">→ {row.time}</span>
-                </>
+                <RelativeTimeFields
+                  anchors={ZMAN_ANCHOR_ORDER}
+                  anchor={anchor}
+                  direction={direction}
+                  magnitudeText={magnitudeText}
+                  time={row.time}
+                  inputClass={inputClass}
+                  onChange={(a, d, m) => apply(row.id, modes.setRelative(row, a, d, m))}
+                />
               )}
 
               {/* Season as a field rather than something typed into Notes.
@@ -405,7 +253,7 @@ export default function MinyanimInput({ label, value, onChange }: Props) {
                   <input
                     type="time"
                     value={row.notBefore ?? ''}
-                    onChange={(e) => setBound(row.id, { notBefore: e.target.value })}
+                    onChange={(e) => apply(row.id, modes.setBound(row, { notBefore: e.target.value }))}
                     aria-label="Earliest time"
                     className={`${inputClass} w-32`}
                   />
@@ -413,14 +261,14 @@ export default function MinyanimInput({ label, value, onChange }: Props) {
                   <input
                     type="time"
                     value={row.notAfter ?? ''}
-                    onChange={(e) => setBound(row.id, { notAfter: e.target.value })}
+                    onChange={(e) => apply(row.id, modes.setBound(row, { notAfter: e.target.value }))}
                     aria-label="Latest time"
                     className={`${inputClass} w-32`}
                   />
                   <button
                     type="button"
                     onClick={() => {
-                      setBound(row.id, { notBefore: undefined, notAfter: undefined })
+                      apply(row.id, modes.setBound(row, { notBefore: undefined, notAfter: undefined }))
                       setExpanded((x) => ({ ...x, [row.id]: false }))
                     }}
                     className="text-xs text-muted hover:text-slate-700 underline cursor-pointer"

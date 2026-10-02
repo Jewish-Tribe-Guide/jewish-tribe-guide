@@ -1,5 +1,5 @@
 import { DAY_KEYS, dayLabel, type DayKey } from './hours'
-import { isMinyanim, parseTimeToMinutes, SEASON_LABELS, TEFILLAH_LABELS, TEFILLAH_ORDER, type Minyan, type MinyanDayKey } from './davening'
+import { formatAnchorRule, isMinyanim, parseTimeToMinutes, SEASON_LABELS, TEFILLAH_LABELS, TEFILLAH_ORDER, type Minyan, type MinyanDayKey } from './davening'
 import type { CalendarDay } from './jewishDays'
 
 // ── Special schedules: a shul's Yom Tov times (step 4, agreed Oct 1) ────────
@@ -213,7 +213,12 @@ export function formatSchedulesSummary(schedules: readonly SpecialSchedule[]): s
 
 const DAY = 86_400_000
 
-/** One schedule as sent, held to sizes a real one never exceeds. */
+/** One schedule as sent, held to sizes a real one never exceeds. A time
+ *  set from sunset keeps its rule ("10 min before Sunset"), worked out
+ *  again here from the minutes rather than taken as sent, so the words and
+ *  the minutes can't disagree. Sunset only: the candle-lighting and
+ *  havdalah times the guide has are the coming Shabbos's, not a Yom Tov
+ *  date's (see SchedulesInput). */
 export function cleanSchedule(raw: unknown, now = Date.now()): SpecialSchedule | null {
   const [s] = readSchedules([raw])
   if (!s) return null
@@ -225,6 +230,8 @@ export function cleanSchedule(raw: unknown, now = Date.now()): SpecialSchedule |
   // A festival's dates: not long past, not years off, not months long.
   if (from < now - 30 * DAY || from > now + 400 * DAY || to - from > 31 * DAY) return null
   if (minyanim.some((m) => m.time.length > 40 || (m.notes?.length ?? 0) > 120 || m.on.length > 40)) return null
+  const fromSunset = (m: ScheduleMinyan) =>
+    m.anchor === 'sunset' && Number.isInteger(m.offsetMinutes ?? 0) && Math.abs(m.offsetMinutes ?? 0) <= 240 ? (m.offsetMinutes ?? 0) : null
   return {
     id: s.id.slice(0, 64),
     name: s.name.trim(),
@@ -235,7 +242,9 @@ export function cleanSchedule(raw: unknown, now = Date.now()): SpecialSchedule |
       id: String(m.id).slice(0, 64),
       tefillah: m.tefillah,
       on: m.on,
-      time: m.time.trim(),
+      ...(fromSunset(m) !== null
+        ? { time: formatAnchorRule('sunset', fromSunset(m)!), anchor: 'sunset' as const, offsetMinutes: fromSunset(m)! }
+        : { time: m.time.trim() }),
       ...(m.notes?.trim() ? { notes: m.notes.trim() } : {}),
     })),
   }

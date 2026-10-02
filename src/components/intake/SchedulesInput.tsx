@@ -1,9 +1,10 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { TEFILLAH_LABELS, TEFILLAH_ORDER, type Tefillah } from '@/lib/davening'
+import { parseTimeToMinutes, TEFILLAH_LABELS, TEFILLAH_ORDER, type Tefillah } from '@/lib/davening'
 import { dateText, readSchedules, scheduleDayText, type ScheduleDay, type ScheduleMinyan, type SpecialSchedule } from '@/lib/schedules'
 import type { Festival } from '@/lib/festivals'
+import { RELATIVE_ELIGIBLE, RelativeTimeFields, TimeModeToggle, useTimeModes } from './ZmanTimeFields'
 
 // ── A shul's special schedules, typed in (step 4, agreed Oct 1) ─────────────
 // Under its regular davening times on the Edit screen: "+ Special times for
@@ -15,6 +16,15 @@ import type { Festival } from '@/lib/festivals'
 //
 // Saved with the listing's edit, so it goes through the moderation queue,
 // which shows every time in it (formatSchedulesSummary).
+//
+// A Mincha or Maariv can be set from sunset ("10 min before sunset"), as
+// the regular times can, with the same control (ZmanTimeFields). Sunset
+// only: the guide's candle-lighting and havdalah times are the coming
+// Shabbos's, which on a Yom Tov date would be another day's. A time it
+// can't read says so, rather than being saved and never shown.
+
+/** Only sunset, for the reason above. */
+const SCHEDULE_ANCHORS = ['sunset'] as const
 
 type Props = {
   value: unknown
@@ -29,7 +39,9 @@ type Props = {
 }
 
 const genId = () => crypto.randomUUID()
-const inputClass = 'w-full rounded-md border border-slate-300 px-2.5 py-1.5 text-sm text-slate-900 focus:border-primary focus:outline-none'
+// Full width for the name and dates; a row's own controls size themselves.
+const fieldClass = 'rounded-md border border-slate-300 px-2.5 py-1.5 text-sm text-slate-900 focus:border-primary focus:outline-none'
+const inputClass = `w-full ${fieldClass}`
 const chip = (on: boolean) =>
   `cursor-pointer rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors ${on ? 'border-primary bg-primary/10 text-primary' : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50'}`
 
@@ -191,6 +203,7 @@ function ScheduleForm({
     ...datesBetween(s.from, s.to).map((d) => ({ on: d, label: `${scheduleDayText(d)}${named.has(d) ? ` · ${named.get(d)}` : ''}` })),
   ]
   const setRow = (id: string, p: Partial<ScheduleMinyan>) => onChange({ minyanim: s.minyanim.map((m) => (m.id === id ? { ...m, ...p } : m)) })
+  const modes = useTimeModes()
   const toggle = (m: ScheduleMinyan, on: ScheduleDay) => setRow(m.id, { on: m.on.includes(on) ? m.on.filter((x) => x !== on) : [...m.on, on] })
 
   return (
@@ -221,46 +234,82 @@ function ScheduleForm({
           </button>
         ))}
       </div>
-      {s.minyanim.map((m) => (
-        <div
-          key={m.id}
-          className={`space-y-2 rounded-md border p-2.5 ${readFrom?.[m.id]?.unsure ? 'border-amber-300 bg-amber-50' : 'border-slate-200 bg-slate-50'}`}
-          data-testid="schedule-row"
-        >
-          <div className="flex flex-wrap items-center gap-2">
-            <select
-              aria-label="Tefillah"
-              value={m.tefillah}
-              onChange={(e) => setRow(m.id, { tefillah: e.target.value as Tefillah })}
-              className={`${inputClass} w-auto`}
-            >
-              {TEFILLAH_ORDER.map((t) => (
-                <option key={t} value={t}>
-                  {TEFILLAH_LABELS[t]}
-                </option>
-              ))}
-            </select>
-            <input aria-label="Time" value={m.time} onChange={(e) => setRow(m.id, { time: e.target.value })} placeholder="6:30pm" className={`${inputClass} w-28`} />
-            <input aria-label="Note" value={m.notes ?? ''} onChange={(e) => setRow(m.id, { notes: e.target.value || undefined })} placeholder="Note (optional)" className={`${inputClass} min-w-0 flex-1`} />
-            <button type="button" onClick={() => onChange({ minyanim: s.minyanim.filter((x) => x.id !== m.id) })} className="cursor-pointer text-sm text-red-500 hover:text-red-700" aria-label="Remove this time">
-              ✕
-            </button>
-          </div>
-          {readFrom?.[m.id] && (
-            <p className="text-[12.5px] leading-snug text-slate-600" data-testid="schedule-row-source">
-              From “{readFrom[m.id].quote}”{!readFrom[m.id].checked && ' (from the photo: check it)'}
-              {readFrom[m.id].unsure && <span className="block font-semibold text-caution">Check: {readFrom[m.id].unsure}</span>}
-            </p>
-          )}
-          <div className="flex flex-wrap gap-1.5" aria-label="Held on">
-            {choices.map((c) => (
-              <button key={c.on} type="button" aria-pressed={m.on.includes(c.on)} onClick={() => toggle(m, c.on)} className={chip(m.on.includes(c.on))}>
-                {c.label}
+      {s.minyanim.map((m) => {
+        // A time the guide can't work out ("at candle lighting") is saved
+        // but never shows: said here, for whoever's typing or checking it.
+        const unreadable = !m.anchor && !!m.time.trim() && !Number.isFinite(parseTimeToMinutes(m.time))
+        return (
+          <div
+            key={m.id}
+            className={`space-y-2 rounded-md border p-2.5 ${readFrom?.[m.id]?.unsure || unreadable ? 'border-amber-300 bg-amber-50' : 'border-slate-200 bg-slate-50'}`}
+            data-testid="schedule-row"
+          >
+            <div className="flex flex-wrap items-center gap-2">
+              <select
+                aria-label="Tefillah"
+                value={m.tefillah}
+                onChange={(e) => {
+                  const tefillah = e.target.value as Tefillah
+                  // Shacharis isn't set from sunset: back to a clock time, in
+                  // the same change.
+                  setRow(m.id, m.anchor && !RELATIVE_ELIGIBLE.includes(tefillah) ? { ...modes.switchToClock(m), tefillah } : { tefillah })
+                }}
+                className={fieldClass}
+              >
+                {TEFILLAH_ORDER.map((t) => (
+                  <option key={t} value={t}>
+                    {TEFILLAH_LABELS[t]}
+                  </option>
+                ))}
+              </select>
+              {(RELATIVE_ELIGIBLE.includes(m.tefillah) || m.anchor) && (
+                <TimeModeToggle
+                  relative={!!m.anchor}
+                  label="From sunset"
+                  onClock={() => setRow(m.id, modes.switchToClock(m))}
+                  onRelative={() => setRow(m.id, modes.switchToRelative(m))}
+                />
+              )}
+              <button type="button" onClick={() => onChange({ minyanim: s.minyanim.filter((x) => x.id !== m.id) })} className="ml-auto cursor-pointer text-sm text-red-500 hover:text-red-700" aria-label="Remove this time">
+                ✕
               </button>
-            ))}
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {m.anchor ? (
+                <RelativeTimeFields
+                  anchors={SCHEDULE_ANCHORS}
+                  {...modes.view(m)}
+                  anchor="sunset"
+                  time={m.time}
+                  inputClass={fieldClass}
+                  onChange={(_a, d, n) => setRow(m.id, modes.setRelative(m, 'sunset', d, n))}
+                />
+              ) : (
+                <input aria-label="Time" value={m.time} onChange={(e) => setRow(m.id, modes.setClockTime(m, e.target.value))} placeholder="6:30pm" className={`${fieldClass} w-28`} />
+              )}
+              <input aria-label="Note" value={m.notes ?? ''} onChange={(e) => setRow(m.id, { notes: e.target.value || undefined })} placeholder="Note (optional)" className={`${fieldClass} min-w-[8rem] flex-1`} />
+            </div>
+            {unreadable && (
+              <p className="text-[12.5px] font-semibold leading-snug text-caution" data-testid="schedule-row-unreadable">
+                The guide can’t read “{m.time.trim()}” as a time, so it wouldn’t show. Type it like 6:30pm{RELATIVE_ELIGIBLE.includes(m.tefillah) ? ', or choose From sunset' : ''}.
+              </p>
+            )}
+            {readFrom?.[m.id] && (
+              <p className="text-[12.5px] leading-snug text-slate-600" data-testid="schedule-row-source">
+                From “{readFrom[m.id].quote}”{!readFrom[m.id].checked && ' (from the photo: check it)'}
+                {readFrom[m.id].unsure && <span className="block font-semibold text-caution">Check: {readFrom[m.id].unsure}</span>}
+              </p>
+            )}
+            <div className="flex flex-wrap gap-1.5" aria-label="Held on">
+              {choices.map((c) => (
+                <button key={c.on} type="button" aria-pressed={m.on.includes(c.on)} onClick={() => toggle(m, c.on)} className={chip(m.on.includes(c.on))}>
+                  {c.label}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
-      ))}
+        )
+      })}
       <div className="flex flex-wrap items-center gap-4 text-sm">
         <button
           type="button"

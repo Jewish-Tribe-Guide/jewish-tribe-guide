@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { Festival } from './festivals'
-import { readSchedule, scheduleMessages, tidyScheduleReading } from './scheduleReader'
+import { readSchedule, readSunsetTime, scheduleMessages, tidyScheduleReading } from './scheduleReader'
 
 const sukkos: Festival = {
   festival: 'Sukkos',
@@ -65,6 +65,41 @@ describe('what the AI read, kept to what holds up', () => {
       id,
     )
     expect(r.times.map((t) => t.on)).toEqual([['2026-09-26']])
+  })
+
+  it('a time from sunset becomes one the guide works out each day; anything else is kept as written', () => {
+    // Before, "10 min before sunset" went in as words: never a time, so the
+    // row never showed, and nothing said so.
+    const msg = 'Mincha 10 min before sunset\nMaariv at shkia\nKabbalas Shabbos at candle lighting\nShacharis sunset'
+    const r = tidyScheduleReading(
+      {
+        times: [
+          { tefillah: 'mincha', on: ['chol_hamoed'], time: '10 min before sunset', quote: 'Mincha 10 min before sunset' },
+          { tefillah: 'maariv', on: ['chol_hamoed'], time: 'at shkia', quote: 'Maariv at shkia' },
+          { tefillah: 'kabbalas_shabbos', on: ['2026-10-02'], time: 'at candle lighting', quote: 'Kabbalas Shabbos at candle lighting' },
+          { tefillah: 'shacharis', on: ['2026-09-26'], time: 'sunset', quote: 'Shacharis sunset' },
+        ],
+      },
+      sukkos,
+      { text: msg },
+      id,
+    )
+    expect(r.schedule.minyanim.map((m) => [m.tefillah, m.time, m.anchor, m.offsetMinutes])).toEqual([
+      ['mincha', '10 min before Sunset', 'sunset', -10],
+      ['maariv', 'At Sunset', 'sunset', 0],
+      ['kabbalas_shabbos', 'at candle lighting', undefined, undefined],
+      ['shacharis', 'sunset', undefined, undefined],
+    ])
+    // The editor says the last two can't be shown (SchedulesInput's test).
+  })
+
+  it('reads minutes from sunset however they’re written', () => {
+    expect(readSunsetTime('15 minutes after Sunset')).toBe(15)
+    expect(readSunsetTime('20 min. prior to shkiah')).toBe(-20)
+    expect(readSunsetTime("5 min before sh'kia")).toBe(-5)
+    expect(readSunsetTime('Sundown')).toBe(0)
+    expect(readSunsetTime('6:30pm')).toBeNull()
+    expect(readSunsetTime('after sunset')).toBeNull()
   })
 
   it('from a photo, nothing to check the words against: kept, and marked so', () => {

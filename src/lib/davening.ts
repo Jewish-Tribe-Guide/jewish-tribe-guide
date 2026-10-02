@@ -86,6 +86,13 @@ const DAY_FULL: Record<MinyanDayKey, string> = {
   holiday: 'Holiday',
 }
 
+/** The relative (sunset/candle-lighting/havdalah) mode only makes sense for
+ *  tefillos whose time actually moves with the zman day to day — Shacharis
+ *  etc. are always clock times in practice. Kabbalas Shabbos is the one
+ *  Friday-only exception: shuls commonly set it relative to candle-lighting
+ *  or sunset rather than a fixed clock time, same as Mincha/Maariv. */
+export const RELATIVE_ELIGIBLE: Tefillah[] = ['kabbalas_shabbos', 'mincha', 'maariv', 'mincha_maariv']
+
 /** A zman a minyan can be defined relative to, instead of a fixed clock time. */
 export type ZmanAnchor = 'sunset' | 'candle_lighting' | 'havdalah'
 

@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import type { Minyan } from './davening'
 import type { CalendarDay } from './jewishDays'
-import { factsFor, readSchedules, resolveDay, withSchedules, dateKey, type SpecialSchedule } from './schedules'
+import { cleanSchedule, factsFor, readSchedules, resolveDay, withSchedules, dateKey, type SpecialSchedule } from './schedules'
 import { listMinyanim, nextUpcomingDavening } from './upcomingDavening'
+import { geoKey, geoOrCommunityDefault } from './useZmanAnchors'
 
 // This week, as the calendar has it (Hebcal, Oct 1 2026): Chol HaMoed
 // Thursday, Hoshana Rabbah Friday, Shemini Atzeres on Shabbos, Simchas
@@ -101,9 +102,44 @@ describe('the next minyan, with a schedule applied', () => {
     ])
   })
 
+  it('a time set from sunset is worked out from it, like a regular one', () => {
+    const fromSunset: SpecialSchedule = {
+      ...sukkos,
+      minyanim: [{ id: 'e', tefillah: 'mincha', on: ['chol_hamoed'], time: '10 min before Sunset', anchor: 'sunset', offsetMinutes: -10 }],
+    }
+    const anchors = { [geoKey(geoOrCommunityDefault(undefined))]: { sunsetIso: '2026-10-01T18:40:00-04:00' } }
+    const list = listMinyanim(shul([fromSunset]), { ...opts, today: [...opts.today], tomorrow: [...opts.tomorrow], anchors })
+    expect(list.today.map((s) => [s.tefillah, s.time, s.anchored])).toEqual([['mincha', '6:30 PM', true]])
+  })
+
   it('without one, the regular times', () => {
     const next = nextUpcomingDavening(shul([]), { ...opts, today: [...opts.today], tomorrow: [...opts.tomorrow], nowMinutes: 17 * 60 })
     expect(next).toMatchObject({ label: 'Maariv', time: '7:45pm' })
+  })
+})
+
+describe('a schedule sent from a visitor', () => {
+  const now = Date.parse('2026-10-01T12:00:00Z')
+  const sent = (row: Record<string, unknown>) => cleanSchedule({ ...sukkos, minyanim: [{ id: 'e', tefillah: 'mincha', on: ['chol_hamoed'], ...row }] }, now)?.minyanim[0]
+
+  it('keeps a time set from sunset, its words worked out again from the minutes', () => {
+    // Before this, the rule was stripped and only its words kept: a time
+    // nothing could work out, so it never showed.
+    expect(sent({ time: '10 min before Sunset', anchor: 'sunset', offsetMinutes: -10 })).toEqual({
+      id: 'e',
+      tefillah: 'mincha',
+      on: ['chol_hamoed'],
+      time: '10 min before Sunset',
+      anchor: 'sunset',
+      offsetMinutes: -10,
+    })
+    expect(sent({ time: '6:00pm', anchor: 'sunset', offsetMinutes: 15 })?.time).toBe('15 min after Sunset')
+  })
+
+  it('only sunset, and only a sensible number of minutes', () => {
+    // The guide's candle lighting is the coming Shabbos's, not a Yom Tov date's.
+    expect(sent({ time: 'At Candle Lighting', anchor: 'candle_lighting', offsetMinutes: 0 })).not.toHaveProperty('anchor')
+    expect(sent({ time: '6:30pm', anchor: 'sunset', offsetMinutes: 900 })).toEqual({ id: 'e', tefillah: 'mincha', on: ['chol_hamoed'], time: '6:30pm' })
   })
 })
 

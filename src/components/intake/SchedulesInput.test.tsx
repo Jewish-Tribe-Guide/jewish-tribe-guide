@@ -67,4 +67,39 @@ describe('special times for a Yom Tov, typed in (step 4)', () => {
     fireEvent.click(screen.getByRole('radio', { name: 'As well as them' }))
     expect(onChange).toHaveBeenLastCalledWith([expect.objectContaining({ mode: 'add' })])
   })
+
+  it('a Mincha can be set from sunset, as the regular times can; Shacharis can’t', async () => {
+    const onChange = vi.fn()
+    render(<SchedulesInput value={undefined} onChange={onChange} />)
+    fireEvent.click(screen.getByRole('button', { name: '+ Special times for a Yom Tov' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Sukkos 5787 · Sep 26 – Oct 4' }))
+    const row = screen.getByTestId('schedule-row')
+    expect(within(row).queryByRole('button', { name: 'From sunset' })).not.toBeInTheDocument()
+
+    fireEvent.change(within(row).getByLabelText('Tefillah'), { target: { value: 'mincha' } })
+    fireEvent.click(within(row).getByRole('button', { name: 'From sunset' }))
+    fireEvent.change(within(row).getByLabelText('Offset in minutes'), { target: { value: '10' } })
+    expect(onChange).toHaveBeenLastCalledWith([
+      expect.objectContaining({ minyanim: [expect.objectContaining({ tefillah: 'mincha', time: '10 min before Sunset', anchor: 'sunset', offsetMinutes: -10 })] }),
+    ])
+    // Sunset only: the guide's candle lighting is the coming Shabbos's.
+    expect(within(row).queryByLabelText('Zman')).not.toBeInTheDocument()
+
+    // Back to Shacharis: back to a clock time.
+    fireEvent.change(within(row).getByLabelText('Tefillah'), { target: { value: 'shacharis' } })
+    expect(onChange).toHaveBeenLastCalledWith([expect.objectContaining({ minyanim: [] })])
+    expect(within(row).getByLabelText('Time')).toBeInTheDocument()
+  })
+
+  it('says when it can’t read a time, rather than saving one that would never show', async () => {
+    render(<SchedulesInput value={undefined} onChange={vi.fn()} />)
+    fireEvent.click(screen.getByRole('button', { name: '+ Special times for a Yom Tov' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Sukkos 5787 · Sep 26 – Oct 4' }))
+    const row = screen.getByTestId('schedule-row')
+    fireEvent.change(within(row).getByLabelText('Tefillah'), { target: { value: 'mincha' } })
+    fireEvent.change(within(row).getByLabelText('Time'), { target: { value: 'at shkia' } })
+    expect(within(row).getByTestId('schedule-row-unreadable')).toHaveTextContent('The guide can’t read “at shkia” as a time, so it wouldn’t show. Type it like 6:30pm, or choose From sunset.')
+    fireEvent.change(within(row).getByLabelText('Time'), { target: { value: '6:30pm' } })
+    expect(within(row).queryByTestId('schedule-row-unreadable')).not.toBeInTheDocument()
+  })
 })
