@@ -16,7 +16,7 @@ import { ChevronRightIcon } from '@/components/icons'
 
 // ── The Synagogues page's Minyanim view (step 4, agreed Oct 1) ───────────────
 // The same page's shuls, as every minyan by time, for a day picked from the
-// next few: "Today · Chol HaMoed", "Fri · Hoshana Rabbah", "Shabbos ·
+// week ahead: "Today · Chol HaMoed", "Fri · Hoshana Rabbah", "Shabbos ·
 // Shemini Atzeres". An answer first ("Next: Mincha 6:15 PM at…"), then each
 // minyan with its shul, how far, and whose times they are: the shul's own
 // festival times, or its regular ones marked "Sukkos not posted". On a Yom
@@ -35,14 +35,30 @@ function howFar(item: DirectoryResource | undefined): string | null {
   return item.milesFromCenter != null ? milesText(item.milesFromCenter) : null
 }
 
-const DAYS_SHOWN = 4
+/** Today and the six days after it: a week, so next Shabbos is always
+ *  there, and no further. Past a week, times set by sunset (worked out from
+ *  today's) drift, and the calendar's days thin out; a shul's usual times
+ *  are on its own page. */
+const DAYS_SHOWN = 7
 
 function tabLabel(d: DateFacts, i: number): [string, string] {
   const day = i === 0 ? 'Today' : d.weekday === 'sat' ? 'Shabbos' : dayLabel(d.weekday).slice(0, 3)
   return [day, d.name ?? dateText(d.date)]
 }
 
-export default function MinyanimView({ items, categoryId, initialDay }: { items: readonly DirectoryResource[]; categoryId: string; initialDay?: string }) {
+export default function MinyanimView({
+  items,
+  categoryId,
+  initialDay,
+  onHoverShul,
+}: {
+  items: readonly DirectoryResource[]
+  categoryId: string
+  initialDay?: string
+  /** A row hovered (its shul's id) or left (null): lights the shul's pin on
+   *  the map beside the list, as a shul's own row does. */
+  onHoverShul?: (shulId: string | null) => void
+}) {
   const schedule = useMinyanSchedule(null, items)
   const { community } = useActiveCommunity()
   const [picked, setPicked] = useState<number | null>(null)
@@ -94,7 +110,10 @@ export default function MinyanimView({ items, categoryId, initialDay }: { items:
 
   return (
     <div data-testid="minyanim-view">
-      <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 desktop:mx-0 desktop:px-0" style={{ scrollbarWidth: 'none' }} role="tablist" aria-label="Day">
+      {/* A week of days: swiped on a phone; on desktop, beside the map,
+          they wrap, since a mouse can't swipe and a hidden scrollbar would
+          hide the last of them. */}
+      <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 desktop:mx-0 desktop:flex-wrap desktop:overflow-visible desktop:px-0" style={{ scrollbarWidth: 'none' }} role="tablist" aria-label="Day">
         {days.map((d, i) => {
           const [a, b] = tabLabel(d, i)
           const on = i === index
@@ -126,7 +145,7 @@ export default function MinyanimView({ items, categoryId, initialDay }: { items:
 
       <ul className="mt-2 divide-y divide-slate-100 border-t border-slate-100" data-testid="minyanim-rows">
         {upcoming.map((s, i) => (
-          <MinyanRow key={`${s.shulId}:${s.tefillah}:${s.minutes}:${i}`} slot={s} far={howFar(byId.get(s.shulId ?? ''))} posting={postingOf(s.shulId)} href={hrefOf(s.shulId)} />
+          <MinyanRow key={`${s.shulId}:${s.tefillah}:${s.minutes}:${i}`} slot={s} far={howFar(byId.get(s.shulId ?? ''))} posting={postingOf(s.shulId)} href={hrefOf(s.shulId)} onHover={onHoverShul} />
         ))}
       </ul>
       {past.length > 0 && (
@@ -138,7 +157,7 @@ export default function MinyanimView({ items, categoryId, initialDay }: { items:
           {earlier && (
             <ul className="divide-y divide-slate-100 opacity-60">
               {past.map((s, i) => (
-                <MinyanRow key={`p:${s.shulId}:${s.tefillah}:${s.minutes}:${i}`} slot={s} far={howFar(byId.get(s.shulId ?? ''))} posting={postingOf(s.shulId)} href={hrefOf(s.shulId)} />
+                <MinyanRow key={`p:${s.shulId}:${s.tefillah}:${s.minutes}:${i}`} slot={s} far={howFar(byId.get(s.shulId ?? ''))} posting={postingOf(s.shulId)} href={hrefOf(s.shulId)} onHover={onHoverShul} />
               ))}
             </ul>
           )}
@@ -159,7 +178,7 @@ export default function MinyanimView({ items, categoryId, initialDay }: { items:
           {notPostedOpen && (
             <ul className="mt-1 divide-y divide-amber-200">
               {folded.map((s, i) => (
-                <MinyanRow key={`n:${s.shulId}:${s.tefillah}:${s.minutes}:${i}`} slot={s} far={howFar(byId.get(s.shulId ?? ''))} posting={postingOf(s.shulId)} href={hrefOf(s.shulId)} />
+                <MinyanRow key={`n:${s.shulId}:${s.tefillah}:${s.minutes}:${i}`} slot={s} far={howFar(byId.get(s.shulId ?? ''))} posting={postingOf(s.shulId)} href={hrefOf(s.shulId)} onHover={onHoverShul} />
               ))}
             </ul>
           )}
@@ -176,7 +195,19 @@ function whose(p: DayPosting, inSentence = false): string {
   return ''
 }
 
-function MinyanRow({ slot, far, posting, href }: { slot: MinyanSlot; far: string | null; posting: DayPosting; href: string | null }) {
+function MinyanRow({
+  slot,
+  far,
+  posting,
+  href,
+  onHover,
+}: {
+  slot: MinyanSlot
+  far: string | null
+  posting: DayPosting
+  href: string | null
+  onHover?: (shulId: string | null) => void
+}) {
   const tag = whose(posting)
   const body = (
     <>
@@ -198,5 +229,15 @@ function MinyanRow({ slot, far, posting, href }: { slot: MinyanSlot; far: string
     </>
   )
   const row = 'flex w-full gap-3 py-2.5 text-left hover:bg-slate-50'
-  return <li>{href ? <Link href={href} className={row}>{body}</Link> : <div className={row}>{body}</div>}</li>
+  return (
+    <li onMouseEnter={onHover && slot.shulId ? () => onHover(slot.shulId!) : undefined} onMouseLeave={onHover ? () => onHover(null) : undefined}>
+      {href ? (
+        <Link href={href} className={row}>
+          {body}
+        </Link>
+      ) : (
+        <div className={row}>{body}</div>
+      )}
+    </li>
+  )
 }

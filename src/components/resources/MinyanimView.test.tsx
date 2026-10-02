@@ -59,9 +59,28 @@ describe('the Minyanim view (step 4)', () => {
   })
   afterEach(() => vi.useRealTimers())
 
-  it('names the days ahead for what they are', () => {
+  it('names the days ahead for what they are, a whole week of them', () => {
     view()
-    expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual(['TodayChol HaMoed', 'FriHoshana Rabbah', 'ShabbosShemini Atzeres', 'SunSimchas Torah'])
+    // A week, so next Shabbos is always there (it was four days, Oct 1).
+    expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual([
+      'TodayChol HaMoed',
+      'FriHoshana Rabbah',
+      'ShabbosShemini Atzeres',
+      'SunSimchas Torah',
+      'MonOct 5',
+      'TueOct 6',
+      'WedOct 7',
+    ])
+  })
+
+  it('a minyan hovered lights its shul on the map, as a shul’s own row does', () => {
+    const onHoverShul = vi.fn()
+    renderWithProviders(<MinyanimView items={[mekor, kesher]} categoryId="synagogue" onHoverShul={onHoverShul} />, { content: { categories: [shuls] } })
+    const [first] = within(screen.getByTestId('minyanim-rows')).getAllByRole('listitem')
+    fireEvent.mouseEnter(first)
+    expect(onHoverShul).toHaveBeenLastCalledWith('mekor')
+    fireEvent.mouseLeave(first)
+    expect(onHoverShul).toHaveBeenLastCalledWith(null)
   })
 
   it('today: the next minyan first, then each with whose times they are; earlier ones folded', () => {

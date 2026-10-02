@@ -1449,7 +1449,13 @@ export default function GenericDirectory({ category, items, anchorLabel, address
       <div hidden={!!columnItem}>
       {hasMapColumn && !minyanimView && listHeading}
       {minyanimView ? (
-        <MinyanimView items={filtered} categoryId={category.id} initialDay={initialDaveningDay} />
+        <MinyanimView
+          items={filtered}
+          categoryId={category.id}
+          initialDay={initialDaveningDay}
+          // A minyan and its shul's pin light up together, as a shul's row does.
+          onHoverShul={mapBeside ? highlight.set : undefined}
+        />
       ) : filtered.length === 0 ? (
         <div className="text-center py-12">
           <p className="text-sm text-muted">

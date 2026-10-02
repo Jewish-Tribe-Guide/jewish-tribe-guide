@@ -1733,6 +1733,24 @@ describe('GenericDirectory — the map beside the list', () => {
     expect(screen.getByText('pin lit: none')).toBeInTheDocument()
   })
 
+  it('on the Minyanim view, a minyan lights its shul’s pin the same way', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-09-28T11:00:00-04:00')) // a Monday morning
+    try {
+      const shuls = makeCategory({ id: 'synagogue', detailFields: [{ key: 'minyanim', label: 'Minyanim', type: 'minyanim' }] })
+      const mekor = makeListing({ id: 'mekor', name: 'Mekor Habracha', category: 'synagogue', minyanim: [{ id: 'm', tefillah: 'mincha', days: ['mon'], time: '1:30pm' }] })
+      const user = userEvent.setup()
+      renderWithProviders(<GenericDirectory category={shuls} items={[mekor]} openMinyanimView {...handlers} />, { content: { categories: [shuls] } })
+      const row = await within(await screen.findByTestId('minyanim-rows')).findByRole('listitem')
+      await user.hover(row)
+      expect(screen.getByText('pin lit: mekor')).toBeInTheDocument()
+      await user.unhover(row)
+      expect(screen.getByText('pin lit: none')).toBeInTheDocument()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('finds a pin’s row: outlines it, and opens the closed group it’s in', async () => {
     const user = userEvent.setup()
     const grouped = makeCategory({
