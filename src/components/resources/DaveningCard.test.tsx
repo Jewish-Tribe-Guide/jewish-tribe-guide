@@ -79,6 +79,21 @@ describe('a shul’s card over Yom Tov (step 4)', () => {
     expect(within(screen.getByTestId('davening-not-posted')).queryByRole('button')).not.toBeInTheDocument()
   })
 
+  it('any day: “Update their times” opens the paste / photo / one time choice, and isn’t there where edits are off', () => {
+    vi.setSystemTime(new Date('2026-10-06T09:00:00-04:00'))
+    const shul = makeListing({ id: 'k', name: 'Kesher Israel', category: 'synagogue', minyanim })
+    renderWithProviders(<DaveningCard item={shul} minyanim={minyanim} category={shuls} />, { content: { categories: [shuls] } })
+    fireEvent.click(screen.getByRole('button', { name: 'Update their times' }))
+    const box = screen.getByTestId('update-times')
+    expect(within(box).getByRole('button', { name: /Paste their message/ })).toBeInTheDocument()
+    expect(within(box).getByRole('button', { name: /Add a photo or PDF/ })).toBeInTheDocument()
+    expect(within(box).getByRole('button', { name: /Or add one time/ })).toBeInTheDocument()
+    cleanup()
+    const closed = makeCategory({ ...shuls, capabilities: { add: true, report: true, directorySearch: true, map: true, edit: false } })
+    renderWithProviders(<DaveningCard item={shul} minyanim={minyanim} category={closed} />, { content: { categories: [closed] } })
+    expect(screen.queryByRole('button', { name: 'Update their times' })).not.toBeInTheDocument()
+  })
+
   it('after the festival: plainly the regular times', () => {
     vi.setSystemTime(new Date('2026-10-06T09:00:00-04:00'))
     const shul = makeListing({ id: 'k', name: 'Kesher Israel', category: 'synagogue', minyanim, minyanim_schedules: [sukkos] })

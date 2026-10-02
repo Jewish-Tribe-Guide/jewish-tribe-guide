@@ -6,11 +6,12 @@ import { TEFILLAH_LABELS, TEFILLAH_ORDER, parseTimeToMinutes } from '@/lib/daven
 import { clockTime, listMinyanim } from '@/lib/upcomingDavening'
 import { useMinyanSchedule } from '@/lib/useMinyanSchedule'
 import { dayLabel, type DayKey } from '@/lib/hours'
-import { dateText, readSchedules, scheduleDayText, type DayPosting, type SpecialSchedule } from '@/lib/schedules'
+import { dateText, readSchedules, regularMinyanim, scheduleDayText, type DayPosting, type SpecialSchedule } from '@/lib/schedules'
 import { resolveCapabilities, type CategoryConfig } from '@/lib/categories'
 import { ui } from '@/lib/uiConfig'
 import { ChevronRightIcon } from '@/components/icons'
 import AddScheduleBox from './AddScheduleBox'
+import UpdateTimesBox from './UpdateTimesBox'
 import DaveningTimes from './DaveningTimes'
 import { Card } from './listingParts'
 import FreshnessFooter from './FreshnessFooter'
@@ -29,7 +30,11 @@ function dayName(key: DayKey): string {
  *  Over a Yom Tov (step 4, agreed Oct 1): the shul's special schedule while
  *  it applies, saying so ("Sukkos schedule · in place of the regular times
  *  until Sun Oct 4"), or, where it hasn't posted one, its regular times
- *  marked "may not apply", with "Know their Sukkos times? Add them". */
+ *  marked "may not apply", with "Know their Sukkos times? Add them".
+ *
+ *  "Update their times" (agreed Oct 1): paste the shul's new schedule or
+ *  this Shabbos's times, or add one time, and see the result to send
+ *  (UpdateTimesBox). */
 export default function DaveningCard({
   item,
   minyanim,
@@ -46,6 +51,8 @@ export default function DaveningCard({
   const [allSpecial, setAllSpecial] = useState(false)
   const [adding, setAdding] = useState(false)
   const [sent, setSent] = useState(false)
+  const [updating, setUpdating] = useState(false)
+  const [updated, setUpdated] = useState<'sent' | 'confirmed' | null>(null)
   const schedule = useMinyanSchedule(null, [item])
   const slots = schedule
     ? listMinyanim(
@@ -139,6 +146,32 @@ export default function DaveningCard({
           {allSpecial && <SpecialTimes schedule={specialSchedule} />}
         </div>
       )}
+      {canAdd &&
+        (updated ? (
+          <p role="status" className="mt-2 text-[13.5px] font-semibold text-emerald-700">
+            {updated === 'sent' ? '✓ Thanks! An admin checks them before everyone sees them.' : '✓ Thanks! Marked confirmed.'}
+          </p>
+        ) : updating ? (
+          <UpdateTimesBox
+            item={item}
+            minyanim={regularMinyanim(minyanim)}
+            onSent={(what) => {
+              setUpdated(what)
+              setUpdating(false)
+            }}
+            onClose={() => setUpdating(false)}
+          />
+        ) : (
+          !adding && (
+            <button
+              type="button"
+              onClick={() => setUpdating(true)}
+              className="mt-3 h-10 w-full cursor-pointer rounded-[10px] border-[1.5px] border-primary bg-white text-[14.5px] font-bold text-primary hover:bg-primary/5"
+            >
+              Update their times
+            </button>
+          )
+        ))}
     </Card>
   )
 }

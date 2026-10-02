@@ -11,6 +11,7 @@ const m = vi.hoisted(() => ({
   getCategoryById: vi.fn(),
   submitListingUpdate: vi.fn(),
   notify: vi.fn(),
+  festivals: vi.fn(),
   ui: { contributions: { add: true, edit: true, report: true } },
 }))
 vi.mock('@/lib/rateLimit', () => ({ enforceRateLimit: m.enforceRateLimit, clientIp: () => '1.2.3.4' }))
@@ -30,6 +31,7 @@ vi.mock('@/lib/resourceStore', () => ({ getResourceById: m.getResourceById }))
 vi.mock('@/lib/categoryStore', () => ({ getCategoryById: m.getCategoryById }))
 vi.mock('@/lib/submissionStore', () => ({ submitListingUpdate: m.submitListingUpdate }))
 vi.mock('@/lib/email', () => ({ sendSubmissionNotification: m.notify }))
+vi.mock('@/lib/festivals', () => ({ fetchFestivals: m.festivals }))
 
 const { POST } = await import('./route')
 const ID = '0b6c4c1e-2f55-4a8e-9d57-3b7f0d6f4a21'
@@ -48,6 +50,25 @@ const sukkos = {
   minyanim: [{ id: 'a', tefillah: 'mincha_maariv', on: ['chol_hamoed'], time: '6:30pm' }],
 }
 
+const chm = (date: string, name = 'Chol HaMoed') => ({ date, yomTov: false, cholHamoed: true, name, festival: 'Sukkos' })
+const SUKKOS_DAYS = {
+  festival: 'Sukkos',
+  name: 'Sukkos 5787',
+  from: '2026-09-26',
+  to: '2026-10-04',
+  days: [
+    { date: '2026-09-26', yomTov: true, cholHamoed: false, name: 'Sukkos', festival: 'Sukkos' },
+    { date: '2026-09-27', yomTov: true, cholHamoed: false, name: 'Sukkos', festival: 'Sukkos' },
+    chm('2026-09-28'),
+    chm('2026-09-29'),
+    chm('2026-09-30'),
+    chm('2026-10-01'),
+    chm('2026-10-02', 'Hoshana Rabbah'),
+    { date: '2026-10-03', yomTov: true, cholHamoed: false, name: 'Shemini Atzeres', festival: 'Sukkos' },
+    { date: '2026-10-04', yomTov: true, cholHamoed: false, name: 'Simchas Torah', festival: 'Sukkos' },
+  ],
+}
+
 beforeEach(() => {
   vi.resetAllMocks()
   vi.useFakeTimers({ toFake: ['Date'] })
@@ -60,6 +81,7 @@ beforeEach(() => {
   m.getCategoryById.mockResolvedValue(shuls)
   m.submitListingUpdate.mockResolvedValue({ id: 'sub' })
   m.notify.mockResolvedValue(undefined)
+  m.festivals.mockResolvedValue([SUKKOS_DAYS])
 })
 
 describe('POST /api/resource/:id/schedule', () => {
@@ -89,10 +111,25 @@ describe('POST /api/resource/:id/schedule', () => {
     vi.unstubAllEnvs()
   })
 
-  it('puts a schedule in place of one of the same name', async () => {
-    m.getResourceById.mockResolvedValue({ ...listing, minyanim_schedules: [{ ...sukkos, id: 'old', minyanim: [] }] })
-    await POST(req({ schedule: sukkos, turnstileToken: 't' }), ctx())
-    expect(m.submitListingUpdate.mock.calls[0][2].details.minyanim_schedules).toEqual([sukkos])
+  it('merges a schedule of the same name day by day, keeping the days it doesn’t give', async () => {
+    // Already there: Chol HaMoed and Shemini Atzeres. Sent now: Hoshana
+    // Rabbah's Mincha, a Chol HaMoed day. It used to replace the whole thing.
+    const there = {
+      ...sukkos,
+      id: 'old',
+      minyanim: [...sukkos.minyanim, { id: 'b', tefillah: 'shacharis', on: ['2026-10-03'], time: '9:00am' }],
+    }
+    m.getResourceById.mockResolvedValue({ ...listing, minyanim_schedules: [older, there] })
+    const hr = { ...sukkos, id: 'new', minyanim: [{ id: 'c', tefillah: 'mincha_maariv', on: ['2026-10-02'], time: '6:20pm' }] }
+    await POST(req({ schedule: hr, turnstileToken: 't' }), ctx())
+    const [rh, merged] = m.submitListingUpdate.mock.calls[0][2].details.minyanim_schedules
+    expect(rh).toEqual(older)
+    expect(merged.id).toBe('old')
+    expect(merged.minyanim.map((x: { on: string[]; time: string }) => `${x.on.join(',')} ${x.time}`)).toEqual([
+      '2026-09-28,2026-09-29,2026-09-30,2026-10-01 6:30pm',
+      '2026-10-03 9:00am',
+      '2026-10-02 6:20pm',
+    ])
   })
 
   it('refuses one with no times, dates far off, or a month and more long; and nothing without the bot check', async () => {

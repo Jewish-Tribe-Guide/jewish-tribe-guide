@@ -6,10 +6,20 @@ import { verifyTurnstile } from '@/lib/turnstile'
 import { ui } from '@/lib/uiConfig'
 import { getResourceById } from '@/lib/resourceStore'
 import { fetchFestivals } from '@/lib/festivals'
-import { readSchedule, type ScheduleSource } from '@/lib/scheduleReader'
+import { readRegular, readSchedule, type ScheduleSource } from '@/lib/scheduleReader'
+import { getCategoryById } from '@/lib/categoryStore'
+import { fetchDatesInfo } from '@/lib/dateZmanim'
+import { compareTimes } from '@/lib/scheduleUpdate'
+import { regularMinyanim } from '@/lib/schedules'
+import { currentSeason } from '@/lib/season'
+
+/** `n` dates from `today`, inclusive. */
+function datesFrom(today: string, n: number): string[] {
+  return Array.from({ length: n }, (_, i) => new Date(Date.parse(`${today}T12:00:00Z`) + i * 86_400_000).toISOString().slice(0, 10))
+}
 import { UUID } from '@/lib/itemMarkRoutes'
 
-// POST /api/schedule/read   multipart: listingId, festival, turnstileToken, company, and text or file
+// POST /api/schedule/read   multipart: listingId, festival | kind=regular, turnstileToken, company, and text or file
 // "Paste their message, or add a photo" (step 4, the user's idea, agreed
 // Oct 1): the AI reads a shul's Yom Tov schedule into times for the person
 // to check (scheduleReader.ts). Nothing is saved to the listing here: what
@@ -17,6 +27,11 @@ import { UUID } from '@/lib/itemMarkRoutes'
 // admin's check (/api/resource/:id/schedule). A photo or PDF is kept, so
 // the admin can check the times against it; its address comes back with
 // the reading.
+//
+// With kind=regular ("Update their times", agreed Oct 1): the shul's
+// regular times instead, read and then compared with what the listing has,
+// day by day (scheduleUpdate.ts). What comes back is the result to show:
+// the shul's times as the guide will show them, each marked.
 //
 // The festival's days are the calendar's, looked up here by name, never
 // the browser's. Each read costs a model call: the bot check, and a tight
@@ -71,10 +86,27 @@ export async function POST(request: Request) {
   }
 
   try {
-    const festivals = await fetchFestivals(community.timezone)
-    const festival = festivals.find((f) => f.name === field('festival')) ?? festivals.find((f) => f.festival === field('festival'))
-    if (!festival) return Response.json({ ok: false, error: 'That Yom Tov isn’t coming up.' }, { status: 400 })
-    const reading = await readSchedule(source, festival, listing.name, { apiKey })
+    let result: Record<string, unknown>
+    if (field('kind') === 'regular') {
+      // "Update their times": the shul's regular times, compared with what
+      // the guide has (scheduleUpdate.ts).
+      const category = await getCategoryById(row!.community_id, listing.category)
+      const minyanimField = category?.detailFields.find((f) => f.type === 'minyanim')
+      if (!minyanimField) return Response.json({ ok: false, error: 'Not found.' }, { status: 404 })
+      const now = Date.now()
+      const today = new Intl.DateTimeFormat('en-CA', { timeZone: community.timezone }).format(new Date(now))
+      const coords = listing.geo ?? community.mapCenter
+      const ahead = await fetchDatesInfo({ latitude: coords.lat, longitude: coords.lng, timezone: community.timezone }, today, datesFrom(today, 21).at(-1)!)
+      const days = { today, days: datesFrom(today, 21).map((date) => ({ date, names: ahead.names[date] ?? [] })) }
+      const reading = await readRegular(source, days, listing.name, { apiKey })
+      const update = compareTimes(regularMinyanim(listing[minyanimField.key]), reading, { season: currentSeason(now, community.timezone), zmanim: ahead.zmanim })
+      result = { update, model: reading.model }
+    } else {
+      const festivals = await fetchFestivals(community.timezone)
+      const festival = festivals.find((f) => f.name === field('festival')) ?? festivals.find((f) => f.festival === field('festival'))
+      if (!festival) return Response.json({ ok: false, error: 'That Yom Tov isn’t coming up.' }, { status: 400 })
+      result = await readSchedule(source, festival, listing.name, { apiKey })
+    }
 
     // Kept for the admin to check the times against.
     let sourceUrl: string | null = null
@@ -86,7 +118,7 @@ export async function POST(request: Request) {
       if (!error) sourceUrl = storage.getPublicUrl(path).data.publicUrl
       else console.error('[schedule/read] could not keep the file:', error.message)
     }
-    return Response.json({ ok: true, ...reading, sourceUrl })
+    return Response.json({ ok: true, ...result, sourceUrl })
   } catch (err) {
     console.error('[schedule/read] failed:', err instanceof Error ? err.message : err)
     return Response.json({ ok: false, error: 'Couldn’t read it right now. Type the times in instead, or try again.' }, { status: 502 })

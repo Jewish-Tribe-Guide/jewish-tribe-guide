@@ -9,6 +9,9 @@ const m = vi.hoisted(() => ({
   getResourceById: vi.fn(),
   fetchFestivals: vi.fn(),
   readSchedule: vi.fn(),
+  readRegular: vi.fn(),
+  getCategoryById: vi.fn(),
+  fetchDatesInfo: vi.fn(),
   upload: vi.fn(),
   ui: { contributions: { add: true, edit: true, report: true } },
 }))
@@ -26,7 +29,9 @@ vi.mock('@/lib/turnstile', () => ({ verifyTurnstile: m.verifyTurnstile }))
 vi.mock('@/lib/uiConfig', () => ({ ui: m.ui }))
 vi.mock('@/lib/resourceStore', () => ({ getResourceById: m.getResourceById }))
 vi.mock('@/lib/festivals', () => ({ fetchFestivals: m.fetchFestivals }))
-vi.mock('@/lib/scheduleReader', () => ({ readSchedule: m.readSchedule }))
+vi.mock('@/lib/scheduleReader', () => ({ readSchedule: m.readSchedule, readRegular: m.readRegular }))
+vi.mock('@/lib/categoryStore', () => ({ getCategoryById: m.getCategoryById }))
+vi.mock('@/lib/dateZmanim', () => ({ fetchDatesInfo: m.fetchDatesInfo }))
 
 const { POST } = await import('./route')
 const ID = '0b6c4c1e-2f55-4a8e-9d57-3b7f0d6f4a21'
@@ -83,5 +88,42 @@ describe('POST /api/schedule/read', () => {
     expect(res.status).toBe(503)
     expect((await res.json()).code).toBe('off')
     expect(m.verifyTurnstile).not.toHaveBeenCalled()
+  })
+})
+
+describe('POST /api/schedule/read, a shul’s regular times', () => {
+  it('reads the message with the days ahead named, and compares it with the shul’s times on those dates', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-10-08T16:00:00Z'))
+    m.getResourceById.mockResolvedValue({
+      id: ID,
+      name: 'Mekor Habracha',
+      category: 'synagogue',
+      minyanim: [{ id: 'm5', tefillah: 'mincha_maariv', days: ['fri'], time: 'At Candle Lighting', anchor: 'candle_lighting', offsetMinutes: 0, notes: 'Winter only' }],
+    })
+    m.getCategoryById.mockResolvedValue({ detailFields: [{ key: 'minyanim', type: 'minyanim' }] })
+    m.fetchDatesInfo.mockResolvedValue({ zmanim: { '2026-10-09': { sunset: 1110, candleLighting: 1092 } }, names: { '2026-10-10': ['Parashat Bereshit'] } })
+    m.readRegular.mockResolvedValue({
+      kind: 'week',
+      complete: true,
+      season: null,
+      title: 'Shabbos Bereishis',
+      startsOn: null,
+      from: '2026-10-09',
+      to: '2026-10-09',
+      times: [{ id: 't', tefillah: 'mincha_maariv', days: [], date: '2026-10-09', time: '6:12pm', quote: 'Mincha/Maariv 6:12', checked: true }],
+      model: 'm',
+    })
+    const res = await POST(req({ kind: 'regular', festival: '', text: 'Shabbos Bereishis\nMincha/Maariv 6:12' }))
+    const json = await res.json()
+    const [, days, name] = m.readRegular.mock.calls[0]
+    expect(name).toBe('Mekor Habracha')
+    expect(days.today).toBe('2026-10-08')
+    expect(days.days.find((d: { date: string }) => d.date === '2026-10-10').names).toEqual(['Parashat Bereshit'])
+    // 6:12 PM is candle lighting that Friday: the same, though the guide
+    // thinks it's still summer.
+    expect(json.update.rows).toMatchObject([{ day: '2026-10-09', status: 'same', time: '6:12pm', rowId: 'm5' }])
+    expect(m.readSchedule).not.toHaveBeenCalled()
+    vi.useRealTimers()
   })
 })

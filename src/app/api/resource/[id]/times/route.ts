@@ -10,25 +10,25 @@ import { getCategoryById } from '@/lib/categoryStore'
 import { submitListingUpdate } from '@/lib/submissionStore'
 import { sendSubmissionNotification } from '@/lib/email'
 import { editSubmission } from '@/lib/editSubmission'
-import { cleanSchedule, readSchedules, schedulesKey, formatSchedulesSummary } from '@/lib/schedules'
+import { readSchedules, regularMinyanim, schedulesKey } from '@/lib/schedules'
+import { applyUpdate, changesAnything, cleanUpdate } from '@/lib/scheduleUpdate'
 import { UUID } from '@/lib/itemMarkRoutes'
-import { community } from '@/community.config'
-import { fetchFestivals } from '@/lib/festivals'
-import { mergeSchedule, scheduleDayDates } from '@/lib/scheduleUpdate'
 
-// POST /api/resource/:id/schedule   { schedule, source?, turnstileToken, company }
-// "Know their Sukkos times? Add them" on a shul's card (step 4, agreed
-// Oct 1): one special schedule, sent as an edit suggestion for an admin to
-// check, like "+ Add an item". The listing is read here and the edit built
-// from it, never from the browser: the shul's times as stored, with this
-// schedule added, or merged day by day into one of the same name.
+// POST /api/resource/:id/times   { update, source?, sourceUrl?, turnstileToken, company }
+// "Update their times" on a shul's card (agreed Oct 1): the result the
+// person saw and sent (scheduleUpdate.ts), filed as an edit suggestion for
+// an admin to check, like "+ Add an item". The listing is read here and
+// the edit built from it, never from the browser: what the result says
+// about the shul's own minyanim (by id and day) is applied to the times as
+// stored. A week's times become a dated schedule beside them.
 //
-// `source` is what it was read from, when it was pasted (step 4's AI
-// reading): kept in the queue's note so the admin checks the times against
-// it.
+// `source` / `sourceUrl`: what it was read from, kept in the queue's note so
+// the admin checks the times against it. A result that changes nothing
+// isn't filed: the card confirms the times instead (/confirm).
 
 const FAILED = { ok: false, error: 'That didn’t send. Please try again.' }
-export async function POST(request: Request, ctx: RouteContext<'/api/resource/[id]/schedule'>) {
+
+export async function POST(request: Request, ctx: RouteContext<'/api/resource/[id]/times'>) {
   const limited = await enforceRateLimit(request, 'submissions', { limit: 10, windowSec: 60 })
   if (limited) return limited
 
@@ -36,8 +36,9 @@ export async function POST(request: Request, ctx: RouteContext<'/api/resource/[i
   if (!UUID.test(id)) return Response.json({ ok: false, error: 'Not found.' }, { status: 404 })
   const body = (await request.json().catch(() => null)) as Record<string, unknown> | null
   if (body && isHoneypotTripped(body)) return Response.json({ ok: true })
-  const schedule = cleanSchedule(body?.schedule)
-  if (!body || !schedule) return Response.json({ ok: false, error: 'Add at least one time, on a day of the Yom Tov.' }, { status: 400 })
+  const update = cleanUpdate(body?.update)
+  if (!body || !update) return Response.json({ ok: false, error: 'Those times couldn’t be read. Please try again.' }, { status: 400 })
+  if (!changesAnything(update)) return Response.json({ ok: false, error: 'Nothing to change: these are the times the guide has.' }, { status: 400 })
   if (!(await verifyTurnstile(typeof body.turnstileToken === 'string' ? body.turnstileToken : undefined, clientIp(request)))) {
     return Response.json({ ok: false, code: 'turnstile', error: 'Verification failed. Please try again.' }, { status: 403 })
   }
@@ -45,8 +46,8 @@ export async function POST(request: Request, ctx: RouteContext<'/api/resource/[i
   const source = typeof body.source === 'string' ? body.source.trim().slice(0, 4000) : ''
   // A photo or PDF it was read from: only one the reader kept, in the
   // guide's own storage (/api/schedule/read), never any other address.
-  const kept = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/site-assets/schedule-source/`
-  const sourceUrl = typeof body.sourceUrl === 'string' && body.sourceUrl.startsWith(kept) && /^[\w.-]+$/.test(body.sourceUrl.slice(kept.length)) ? body.sourceUrl : null
+  const keptAt = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/site-assets/schedule-source/`
+  const sourceUrl = typeof body.sourceUrl === 'string' && body.sourceUrl.startsWith(keptAt) && /^[\w.-]+$/.test(body.sourceUrl.slice(keptAt.length)) ? body.sourceUrl : null
 
   try {
     const { data: row } = await getAdminClient()
@@ -64,21 +65,24 @@ export async function POST(request: Request, ctx: RouteContext<'/api/resource/[i
     }
 
     const key = schedulesKey(field.key)
-    // One of the same name is merged day by day: Shemini Atzeres's times
-    // sent now keep the Chol HaMoed ones already there.
-    const festival = (await fetchFestivals(community.timezone)).find((f) => f.from <= schedule.to && schedule.from <= f.to)
-    const schedules = mergeSchedule(readSchedules(listing[key]), schedule, (d, s) => scheduleDayDates(d, s, festival?.days))
+    const applied = applyUpdate(regularMinyanim(listing[field.key]), readSchedules(listing[key]), update)
     const note = [
-      `Special times for ${schedule.name}, sent from the shul’s card.`,
-      formatSchedulesSummary([schedule]),
+      update.kind === 'week' ? 'Times for particular days, sent from the shul’s card.' : `${update.season ? `Their ${update.season} schedule` : 'Their schedule'}, sent from the shul’s card.`,
+      applied.changes.join('\n'),
       ...(source ? [`Read from what they pasted:\n${source}`] : []),
       ...(sourceUrl ? [`Read from their photo or PDF: ${sourceUrl}`] : []),
     ].join('\n\n')
-    const submission = await submitListingUpdate(row.community_id, id, editSubmission(category, listing, { [key]: schedules }), note, null)
-    after(() => sendSubmissionNotification(submission).catch((err) => console.error('[schedule] Admin notification failed:', err)))
+    const submission = await submitListingUpdate(
+      row.community_id,
+      id,
+      editSubmission(category, listing, { [field.key]: applied.minyanim, [key]: applied.schedules }),
+      note,
+      null,
+    )
+    after(() => sendSubmissionNotification(submission).catch((err) => console.error('[times] Admin notification failed:', err)))
     return Response.json({ ok: true })
   } catch (err) {
-    console.error('[schedule] could not file the schedule:', err)
+    console.error('[times] could not file the update:', err)
     return Response.json(FAILED, { status: 502 })
   }
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { Festival } from './festivals'
-import { readSchedule, readSunsetTime, scheduleMessages, tidyScheduleReading } from './scheduleReader'
+import { asRegularTime, readRegular, readSchedule, readSunsetTime, readZmanTime, regularMessages, scheduleMessages, tidyRegularReading, tidyScheduleReading } from './scheduleReader'
 
 const sukkos: Festival = {
   festival: 'Sukkos',
@@ -122,5 +122,97 @@ describe('what the AI read, kept to what holds up', () => {
     expect((await readSchedule({ text }, sukkos, 'K', { apiKey: 'k', fetchImpl: ok, newId: id })).times).toHaveLength(1)
     const bad = vi.fn().mockResolvedValue(new Response(JSON.stringify({ error: { message: 'Incorrect API key provided: sk-abc***' } }), { status: 401 }))
     await expect(readSchedule({ text }, sukkos, 'K', { apiKey: 'k', fetchImpl: bad })).rejects.toThrow(/^Schedule reader: 401$/)
+  })
+})
+
+// ── A shul's regular times ──────────────────────────────────────────────────
+
+const DAYS = {
+  today: '2026-10-08',
+  days: ['2026-10-08', '2026-10-09', '2026-10-10', '2026-10-11'].map((date) => ({ date, names: date === '2026-10-10' ? ['Parashat Bereshit'] : [] })),
+}
+const POST = 'Shabbos Bereishis\nCandle lighting 6:12\nMincha/Maariv 6:12\nShacharis 9:00\nMincha/Maariv 5:59\nShabbos ends 7:09'
+
+describe('reading a shul’s regular times', () => {
+  it('tells the AI the dates ahead and what they’re called', () => {
+    const [system] = regularMessages({ text: POST }, DAYS, 'Mekor Habracha') as { content: string }[]
+    expect(system.content).toContain('2026-10-10 (Sat Oct 10): Parashat Bereshit')
+    expect(system.content).toContain('Today is 2026-10-08')
+  })
+
+  it('reads a Shabbos post as that weekend, with bare times as the tefillah means them', () => {
+    const r = tidyRegularReading(
+      {
+        kind: 'week',
+        complete: true,
+        title: 'Shabbos Bereishis',
+        from: '2026-10-09',
+        to: '2026-10-10',
+        times: [
+          { tefillah: 'mincha_maariv', date: '2026-10-09', time: '6:12', quote: 'Mincha/Maariv 6:12' },
+          { tefillah: 'shacharis', date: '2026-10-10', time: '9:00', quote: 'Shacharis 9:00' },
+          { tefillah: 'mincha_maariv', date: '2026-10-10', time: '5:59', quote: 'Mincha/Maariv 5:59' },
+          // Not in the message: dropped.
+          { tefillah: 'maariv', date: '2026-10-10', time: '7:20', quote: 'Maariv 7:20' },
+        ],
+      },
+      { text: POST },
+      DAYS,
+      id,
+    )
+    expect(r).toMatchObject({ kind: 'week', complete: true, from: '2026-10-09', to: '2026-10-10', title: 'Shabbos Bereishis', season: null })
+    expect(r.times.map((t) => `${t.date} ${t.tefillah} ${t.time}`)).toEqual([
+      '2026-10-09 mincha_maariv 6:12pm',
+      '2026-10-10 shacharis 9:00am',
+      '2026-10-10 mincha_maariv 5:59pm',
+    ])
+  })
+
+  it('reads a winter schedule: weekdays, rules from a zman, a one-off on its date', () => {
+    const msg = 'Winter Schedule\nFriday: Mincha/Maariv at candle lighting\nShabbos: Shacharis 9:00am · Mincha/Maariv 30 min before shkiah\nThanksgiving, Thu Nov 26: Shacharis 8:00am'
+    const days = DAYS
+    const r = tidyRegularReading(
+      {
+        kind: 'schedule',
+        complete: true,
+        season: 'winter',
+        times: [
+          { tefillah: 'mincha_maariv', days: ['fri'], time: 'at candle lighting', quote: 'Mincha/Maariv at candle lighting' },
+          { tefillah: 'mincha_maariv', days: ['sat'], time: '30 min before shkiah', quote: 'Mincha/Maariv 30 min before shkiah' },
+          { tefillah: 'shacharis', days: ['thu'], date: '2026-11-26', occasion: 'Thanksgiving', time: '8:00am', quote: 'Thu Nov 26: Shacharis 8:00am' },
+          { tefillah: 'shacharis', days: ['funday'], time: '9:00am', quote: 'Shacharis 9:00am' },
+        ],
+      },
+      { text: msg },
+      days,
+      id,
+    )
+    expect(r).toMatchObject({ kind: 'schedule', season: 'winter', from: null, to: null })
+    expect(r.times.map((t) => [t.days, t.date, t.time, t.anchor, t.offsetMinutes, t.occasion])).toEqual([
+      [['fri'], undefined, 'At Candle Lighting', 'candle_lighting', 0, undefined],
+      [['sat'], undefined, '30 min before Sunset', 'sunset', -30, undefined],
+      [[], '2026-11-26', '8:00am', undefined, undefined, 'Thanksgiving'],
+    ])
+  })
+
+  it('a "week" with no dates it can place is read as a schedule', () => {
+    const r = tidyRegularReading({ kind: 'week', times: [{ tefillah: 'shacharis', days: ['sat'], time: '9:00am', quote: 'Shacharis 9:00' }] }, { text: POST }, DAYS, id)
+    expect(r.kind).toBe('schedule')
+  })
+
+  it('knows the zmanim a time can be set from', () => {
+    expect(readZmanTime('10 min after candle lighting')).toEqual({ anchor: 'candle_lighting', offsetMinutes: 10 })
+    expect(readZmanTime('At Havdalah')).toEqual({ anchor: 'havdalah', offsetMinutes: 0 })
+    expect(readZmanTime('15 minutes before shkia')).toEqual({ anchor: 'sunset', offsetMinutes: -15 })
+    expect(readZmanTime('after kiddush')).toBeNull()
+    // Only tefillos that move with a zman.
+    expect(asRegularTime('shacharis', 'at candle lighting')).toEqual({ time: 'at candle lighting' })
+    expect(asRegularTime('maariv', '12:30')).toEqual({ time: '12:30' })
+  })
+
+  it('asks the model and tidies its answer', async () => {
+    const fetchImpl = vi.fn(async () => Response.json({ choices: [{ message: { content: JSON.stringify({ kind: 'schedule', times: [{ tefillah: 'shacharis', days: ['sat'], time: '9:00', quote: 'Shacharis 9:00' }] }) } }] }))
+    const r = await readRegular({ text: POST }, DAYS, 'Mekor Habracha', { apiKey: 'k', fetchImpl: fetchImpl as unknown as typeof fetch, newId: id })
+    expect(r.times[0]).toMatchObject({ days: ['sat'], time: '9:00am' })
   })
 })
