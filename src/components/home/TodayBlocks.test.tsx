@@ -9,6 +9,7 @@ import type { AskResult } from '@/lib/askSearch'
 import type { MinyanSchedule } from '@/lib/useMinyanSchedule'
 import type { ZmanimData } from '@/types'
 import TodayBlocks from './TodayBlocks'
+import type { CardDef } from './sections'
 
 vi.mock('next/navigation', () => ({
   useRouter: () => mockRouter,
@@ -72,7 +73,7 @@ const openNow: { question: string; result: AskResult } = {
   result: { query: { raw: 'food open now' }, hits: [{ item: hip, category: food, score: 1, matchedTags: [], matched: [], matchedFields: [], miles: null, open: true }], categoryIds: ['restaurant'], anchor: null, place: null, closedCount: 0, noHours: [], terms: [], excluded: [] } as unknown as AskResult,
 }
 
-function show(schedule: MinyanSchedule, zmanim: ZmanimData | null, onOpenListing = vi.fn()) {
+function show(schedule: MinyanSchedule, zmanim: ZmanimData | null, onOpenListing = vi.fn(), cards: CardDef[] | null = null) {
   renderWithProviders(
     <TodayBlocks
       listings={listings}
@@ -84,7 +85,7 @@ function show(schedule: MinyanSchedule, zmanim: ZmanimData | null, onOpenListing
       zmanim={zmanim}
       items={['Challah', 'Wine', 'Chicken']}
       openNow={openNow}
-      cards={null}
+      cards={cards}
       onOpenListing={onOpenListing}
       searching={false}
     />,
@@ -159,5 +160,15 @@ describe('the Today home on a Tuesday at lunchtime', () => {
   it('before the zmanim arrive, an ordinary day: no candles card guessed at', () => {
     const order = show(scheduleAt('2026-10-09T13:30:00-04:00', 'fri', {}), null)
     expect(order).not.toContain('today-candles')
+  })
+})
+
+describe('Browse at the end', () => {
+  it('a phone’s short row ends in All, to the Browse page with every category', () => {
+    const card = (id: string, title: string): CardDef => ({ id, title, href: `/philly/${id}`, go: vi.fn() })
+    show(scheduleAt('2026-10-06T12:30:00-04:00', 'tue', {}), null, vi.fn(), [card('restaurant', 'Food'), card('grocery', 'Grocery')])
+    const row = screen.getByTestId('today-browse-row')
+    expect(within(row).getByRole('link', { name: 'All ›' })).toHaveAttribute('href', '/philly/browse')
+    expect(within(row).getByRole('link', { name: 'Food' })).toHaveAttribute('href', '/philly/restaurant')
   })
 })

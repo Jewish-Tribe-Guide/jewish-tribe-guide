@@ -30,6 +30,8 @@ function pathForMode(community: string, mode: AppMode, extra?: Record<string, un
       return routes.map(community)
     case 'feedback':
       return routes.feedback(community)
+    case 'browse':
+      return routes.browse(community)
     case 'find': {
       // 'find' means "open a category directory"; which one is in `extra`.
       const view = typeof extra?.findView === 'string' ? extra.findView : null

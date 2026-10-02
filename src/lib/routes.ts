@@ -55,6 +55,8 @@ export const RESERVED_SLUGS = new Set([
   'feedback',
   // The visitor's pinned places (the Today home's "All N").
   'pinned',
+  // Every category, grouped (the Browse tab).
+  'browse',
   // The fixed views above — a listing category named "Eruv" would otherwise
   // shadow the real Eruv Information screen at the same URL.
   ...Object.keys(FIXED_VIEW_KINDS),
@@ -167,6 +169,8 @@ export const routes = {
   feedback: (community: string) => `/${community}/feedback`,
   /** The visitor's pinned places, grouped by category (see PinnedPlaces). */
   pinned: (community: string) => `/${community}/pinned`,
+  /** Every category in the admin's groups: the Browse tab (see BrowseList). */
+  browse: (community: string) => `/${community}/browse`,
   /** Community-agnostic content (one shared `page` row — see pagesStore.ts),
    *  but community-scoped chrome: living under `/[community]` is what gives
    *  these two the visiting community's own header/footer, rather than

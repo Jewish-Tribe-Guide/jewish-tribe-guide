@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { ZmanimData } from '@/types'
-import { beforeCandles, dayLine, itemList, openNowTitle, shabbosMoment, shoppingTitle } from './todayHome'
+import { beforeCandles, browseLine, dayLine, itemList, openNowTitle, shabbosMoment, shoppingTitle } from './todayHome'
 import { makeCategory, makeListing } from '@/test/providerFixtures'
 import type { CategoryField } from './categories'
 
@@ -172,5 +172,47 @@ describe('open now', () => {
     expect(openNowTitle(12 * 60 + 30)).toBe('Lunch, open now')
     expect(openNowTitle(19 * 60)).toBe('Dinner, open now')
     expect(openNowTitle(23 * 60)).toBe('Open now')
+  })
+})
+
+describe('a Browse row’s live line: what the category’s own page says first', () => {
+  const hours: CategoryField = { key: 'hours', label: 'Hours', type: 'hours' }
+  const shabbat: CategoryField = { key: 'sf', label: 'Shabbat friendly', type: 'boolean' }
+  const denomination: CategoryField = { key: 'den', label: 'Denomination', type: 'select', options: [{ value: 'Orthodox', label: 'Orthodox' }] }
+  const open = Object.fromEntries(['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'].map((d) => [d, { open: '09:00', close: '21:00' }]))
+  const shut = { tue: { open: '15:00', close: '16:00' } }
+  // Local time, as every hours test here (see getOpenStatus).
+  const tuesday = new Date(2026, 9, 6, 12, 30)
+  const food = makeCategory({ id: 'restaurant', detailFields: [hours], groupBy: { kind: 'open' } })
+  const places = [makeListing({ id: 'a', category: 'restaurant', hours: open }), makeListing({ id: 'b', category: 'restaurant', hours: open }), makeListing({ id: 'c', category: 'restaurant', hours: shut })]
+
+  it('grouped by open now: how many are open', () => {
+    expect(browseLine(food, places, tuesday, false)).toBe('2 open now')
+  })
+
+  it('nothing open now on Shabbos or Yom Tov, as on the Today home', () => {
+    expect(browseLine(food, places, tuesday, true)).toBeNull()
+  })
+
+  it('none open: the page leads with "Not open now", so the row says nothing', () => {
+    expect(browseLine(food, [places[2]], tuesday, false)).toBeNull()
+  })
+
+  it('grouped by a yes/no: how many say yes, in the admin’s words', () => {
+    const hotels = makeCategory({ id: 'hotel', detailFields: [shabbat], groupBy: { kind: 'field', key: 'sf' } })
+    const rows = [makeListing({ id: 'h1', category: 'hotel', sf: true }), makeListing({ id: 'h2', category: 'hotel' })]
+    expect(browseLine(hotels, rows, tuesday, true)).toBe('1 Shabbat friendly')
+  })
+
+  it('grouped by distance: how many are within it', () => {
+    const grocery = makeCategory({ id: 'grocery', groupBy: { kind: 'distance', miles: 2 } })
+    const rows = [makeListing({ id: 'g1', category: 'grocery', milesFromAddress: 0.5 }), makeListing({ id: 'g2', category: 'grocery', milesFromAddress: 9 })]
+    expect(browseLine(grocery, rows, tuesday, false)).toBe('1 within 2 mi')
+  })
+
+  it('nothing for a pick-list (no group comes first), or a page with no groups', () => {
+    const shuls = makeCategory({ id: 'synagogue', detailFields: [denomination], groupBy: { kind: 'field', key: 'den' } })
+    expect(browseLine(shuls, [makeListing({ id: 's', category: 'synagogue', den: 'Orthodox' })], tuesday, false)).toBeNull()
+    expect(browseLine({ ...food, groupBy: null }, places, tuesday, false)).toBeNull()
   })
 })

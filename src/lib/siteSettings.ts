@@ -170,8 +170,9 @@ export type MobileTabConfig = {
   id: string
   /** The text under the icon. */
   label: string
-  /** Where the tab goes. The three built-in screens are 'categories', 'map',
-   *  and 'feedback'; any other value is a CardDef id (a category slug, or a
+  /** Where the tab goes. The built-in screens are 'categories' (the home),
+   *  'map', 'feedback' and 'browse' (every category, grouped; with the Today
+   *  home); any other value is a CardDef id (a category slug, or a
    *  form id like 'support') and opens exactly what tapping that card on the
    *  home screen opens. */
   target: string
@@ -180,7 +181,7 @@ export type MobileTabConfig = {
 /** The built-in targets, which behave differently from card targets: they're
  *  whole app screens rather than one category, and two of them are gated on
  *  site config (a Map category existing, feedback being enabled). */
-export const BUILT_IN_TAB_TARGETS = ['categories', 'map', 'feedback'] as const
+export const BUILT_IN_TAB_TARGETS = ['categories', 'map', 'feedback', 'browse'] as const
 export type BuiltInTabTarget = (typeof BUILT_IN_TAB_TARGETS)[number]
 
 export function isBuiltInTabTarget(target: string): target is BuiltInTabTarget {

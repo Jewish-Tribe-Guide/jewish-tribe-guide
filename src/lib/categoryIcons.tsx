@@ -59,6 +59,9 @@ const CATEGORY_ICON_MARKUP: Record<string, string> = {
   childcare: '<circle cx="12" cy="6" r="2.3"/><path d="M9.7 8.1v1"/><path d="M7 10.3h10a1 1 0 0 1 1 1v.7a6 6 0 0 1-12 0v-.7a1 1 0 0 1 1-1z"/>',
   school: '<path d="M12 4L4 8.5L12 13L20 8.5Z"/><path d="M20 8.5V14"/><path d="M7.5 10.2V14.5a4.5 3 0 0 0 9 0v-4.3"/>',
   'eruv-information': '<circle cx="8.5" cy="12" r="4"/><circle cx="15.5" cy="12" r="4"/>',
+  // The Eruv page's card (see cardSearch's categoryCards), whatever the
+  // eruv category's own id; without it the card fell back to its emoji.
+  eruv: '<circle cx="8.5" cy="12" r="4"/><circle cx="15.5" cy="12" r="4"/>',
   whatsapp:
     '<path d="M21 11.5A8.5 8.5 0 0 1 9.4 19.4L3 21l1.7-6.2A8.5 8.5 0 1 1 21 11.5Z"/>',
   'young-professional':

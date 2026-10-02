@@ -19,12 +19,13 @@ import { useCardOptions } from './HomeSectionManager'
 // section manager draw from — so a tab can point anywhere those can, and a
 // newly added category shows up here without touching this file.
 
-/** Labels for the three built-in destinations, which aren't in useCardOptions
+/** Labels for the built-in destinations, which aren't in useCardOptions
  *  (they're app screens, not cards). */
 const BUILT_IN_LABELS: Record<string, string> = {
   categories: 'Home / all categories',
   map: 'Map',
   feedback: 'Feedback form',
+  browse: 'Browse (every category, grouped)',
 }
 
 /** Ids must survive renames, so they're minted once and never derived from the

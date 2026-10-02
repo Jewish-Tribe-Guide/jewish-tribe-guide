@@ -156,6 +156,17 @@ export function GridIcon({ className }: IconProps) {
   )
 }
 
+// A house — the home tab, when the grid has moved to its own Browse tab.
+export function HomeIcon({ className }: IconProps) {
+  return (
+    <svg {...base} className={className}>
+      <path d="M4 10.5 12 4l8 6.5" />
+      <path d="M6 9v11h12V9" />
+      <path d="M10 20v-5h4v5" />
+    </svg>
+  )
+}
+
 // Folded map — the mobile tab bar's "Map" tab.
 export function MapFoldIcon({ className }: IconProps) {
   return (

@@ -362,12 +362,18 @@ function OpenNow({ openNow, categories, schedule, from, communitySlug, onOpenLis
 
 // ── Browse ───────────────────────────────────────────────────────────────────
 
-/** Phone: one short row of the admin's first six categories, scrolling. */
-function BrowseRow({ cards, categories }: Props) {
+/** Phone: one short row of the admin's first six categories, scrolling;
+ *  All goes to the Browse page, where every one is. */
+function BrowseRow({ cards, categories, communitySlug }: Props) {
   if (!cards || cards.length === 0) return null
   return (
     <section data-testid="today-browse-row" className="mt-6 desktop:hidden">
-      <h2 className="text-[12.5px] font-extrabold uppercase tracking-[0.06em] text-slate-500">Browse</h2>
+      <div className="flex items-baseline justify-between">
+        <h2 className="text-[12.5px] font-extrabold uppercase tracking-[0.06em] text-slate-500">Browse</h2>
+        <Link href={routes.browse(communitySlug)} prefetch={false} className="text-[14px] font-bold text-primary">
+          All ›
+        </Link>
+      </div>
       <div className="-mr-4 mt-2 flex gap-2 overflow-x-auto pr-4 [scrollbar-width:none]">
         {cards.slice(0, 6).map((card) => (
           <Link key={card.id ?? card.title} href={card.href} prefetch={false} className="flex w-[92px] shrink-0 flex-col items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-1 pb-2 pt-2.5 text-center">

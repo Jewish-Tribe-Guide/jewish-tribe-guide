@@ -2,7 +2,7 @@
 
 import type { AppMode } from '@/types'
 import { isBuiltInTabTarget, type MobileTabConfig } from '@/lib/siteSettings'
-import { GridIcon, MapFoldIcon, MessageIcon } from './icons'
+import { GridIcon, HomeIcon, MapFoldIcon, MessageIcon } from './icons'
 import { CategoryGlyph, hasCategoryIcon } from '@/lib/categoryIcons'
 
 /** Which app screens each built-in target counts as "current" for. Card tabs
@@ -12,12 +12,14 @@ const BUILT_IN_MODES: Record<string, AppMode[]> = {
   categories: ['home', 'community-home', 'find'],
   map: ['map'],
   feedback: ['feedback'],
+  browse: ['browse'],
 }
 
 const BUILT_IN_ICONS: Record<string, typeof GridIcon> = {
   categories: GridIcon,
   map: MapFoldIcon,
   feedback: MessageIcon,
+  browse: GridIcon,
 }
 
 type Props = {
@@ -44,6 +46,8 @@ type Props = {
 // the built-in targets below; anything else is a card id and opens that
 // category/form exactly as tapping its home-screen tile would.
 export default function MobileTabBar({ mode, tabs, onSelect, activeCardId, iconForTarget }: Props) {
+  // With a Browse tab, the grid is Browse's, and the home tab is a house.
+  const hasBrowse = tabs.some((t) => t.target === 'browse')
   return (
     <nav
       className="desktop:hidden fixed inset-x-0 bottom-0 z-40 flex border-t border-slate-200/80 bg-white/95 backdrop-blur pb-[env(safe-area-inset-bottom)]"
@@ -57,7 +61,7 @@ export default function MobileTabBar({ mode, tabs, onSelect, activeCardId, iconF
         const active = builtIn
           ? BUILT_IN_MODES[tab.target].includes(mode) && (tab.target !== 'categories' || !activeCardId)
           : mode === 'find' && activeCardId === tab.target
-        const Icon = builtIn ? BUILT_IN_ICONS[tab.target] : null
+        const Icon = builtIn ? (tab.target === 'categories' && hasBrowse ? HomeIcon : BUILT_IN_ICONS[tab.target]) : null
         const emoji = builtIn ? undefined : iconForTarget?.(tab.target)
         // Only the emoji fallback needs the grayscale/opacity dimming trick
         // below — a hand-built line icon already takes `currentColor`, so

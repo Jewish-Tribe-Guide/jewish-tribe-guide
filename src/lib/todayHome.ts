@@ -4,6 +4,7 @@ import { itemsField } from '@/lib/listingView'
 import { getOpenStatus } from '@/lib/hours'
 import { haversineMiles, milesText, type LatLng } from '@/lib/geo'
 import { dayInTimezone } from '@/lib/activity'
+import { groupListings } from '@/lib/listGroups'
 
 // ── The Today home (step 6) ─────────────────────────────────────────────────
 // The home page that changes with the day, behind SiteSettings.homeStyle.
@@ -162,4 +163,27 @@ export function openNowTitle(minutes: number): string {
   if (minutes >= 11 * 60 && minutes < 16 * 60) return 'Lunch, open now'
   if (minutes >= 16 * 60 && minutes < 22 * 60) return 'Dinner, open now'
   return 'Open now'
+}
+
+/** A Browse row's second line: what the category's own page says first, its
+ *  first group when it splits its list ("59 open now", "13 within 2 mi",
+ *  "3 Shabbat friendly"). Nothing for a category grouped by a pick-list (its
+ *  groups are equal, none comes first), nor when the first group is the
+ *  "not open now" or "doesn't say" kind. No "open now" on Shabbos or Yom Tov,
+ *  as on the Today home. */
+export function browseLine(
+  category: CategoryConfig,
+  items: readonly DirectoryResource[],
+  now: Date | null,
+  restDay: boolean,
+): string | null {
+  const grouping = groupListings(items, category, now)
+  if (!grouping || grouping.closed) return null
+  const first = grouping.groups[0]
+  if (!first) return null
+  const n = first.items.length
+  if (first.id === 'open') return restDay ? null : `${n} open now`
+  if (first.id === 'within') return `${n} ${first.label.toLowerCase()}`
+  if (first.id === 'yes') return `${n} ${first.label}`
+  return null
 }
