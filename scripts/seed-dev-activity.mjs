@@ -83,15 +83,16 @@ const plan = [
   [4, 13, 'listing_confirmed', 'visitor', ruth, pick(grocery, 1)],
   [5, 10, 'listing_edited', 'submission', ruth, pick(shuls, 3)],
   [5, 9, 'item_confirmed', 'visitor', dov, withItems[2]],
-  [6, 16, 'listing_confirmed', 'visitor', neighbor, pick(hotels, 0)],
+  [6, 21, 'listing_confirmed', 'visitor', neighbor, pick(hotels, 0)],
   // Last week: fewer.
   [8, 14, 'listing_added', 'submission', ruth, pick(grocery, 5)],
   [9, 11, 'listing_edited', 'google', google, pick(food, 11)],
   [10, 19, 'item_added', 'submission', dov, withItems[10]],
   [12, 10, 'listing_confirmed', 'visitor', ruth, pick(food, 1)],
-  [13, 17, 'listing_edited', 'submission', neighbor, pick(shuls, 5)],
+  [13, 21, 'listing_edited', 'submission', neighbor, pick(shuls, 5)],
 ]
 
+// Nothing on Shabbos afternoon: the two Saturday rows are Motzei Shabbos.
 /** That many days ago at that hour in New York (EDT, UTC-4, in October). */
 const at = (daysAgo, hour) => {
   const d = new Date()
