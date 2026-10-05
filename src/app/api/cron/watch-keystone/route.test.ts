@@ -25,9 +25,16 @@ const mockFrom = vi.hoisted(() => vi.fn())
 vi.mock('@/lib/supabase/admin', () => ({ getAdminClient: () => ({ from: mockFrom }) }))
 const mockCreate = vi.hoisted(() => vi.fn())
 const mockUpdate = vi.hoisted(() => vi.fn())
-vi.mock('@/lib/submissionStore', () => ({ submitListingCreate: mockCreate, submitListingUpdate: mockUpdate }))
+const mockDelete = vi.hoisted(() => vi.fn())
+vi.mock('@/lib/submissionStore', () => ({
+  submitListingCreate: mockCreate,
+  submitListingUpdate: mockUpdate,
+  submitListingDelete: mockDelete,
+}))
 const mockDigest = vi.hoisted(() => vi.fn())
 vi.mock('@/lib/email', () => ({ sendWatchDigest: mockDigest }))
+const mockGoogle = vi.hoisted(() => vi.fn())
+vi.mock('@/lib/googlePlaces', () => ({ findPlaceStatus: mockGoogle }))
 
 const { GET } = await import('./route')
 
@@ -65,6 +72,7 @@ beforeEach(() => {
   vi.stubEnv('NODE_ENV', 'test')
   delete process.env.CRON_SECRET
   mockDigest.mockResolvedValue(undefined)
+  mockGoogle.mockResolvedValue({ placeId: 'p', name: null, businessStatus: 'OPERATIONAL' })
   vi.stubGlobal('fetch', vi.fn(async () => new Response(fullPage(), { status: 200 })))
 })
 
@@ -74,7 +82,9 @@ afterEach(() => {
   mockFrom.mockReset()
   mockCreate.mockReset()
   mockUpdate.mockReset()
+  mockDelete.mockReset()
   mockDigest.mockReset()
+  mockGoogle.mockReset()
 })
 
 describe('/api/cron/watch-keystone', () => {
@@ -93,23 +103,55 @@ describe('/api/cron/watch-keystone', () => {
     expect(mockDigest.mock.calls[0][2]).toHaveLength(body.filed)
   })
 
+  it('files a removal for a place whose only hechsher was Keystone-K and is off the list', async () => {
+    const shtetl = { ...bagel, id: 'shtetl-1', name: 'Shtetl', details: { kosherCert: 'Keystone-K' } }
+    setDb([shtetl], [])
+    await GET(request())
+    expect(mockDelete).toHaveBeenCalledTimes(1)
+    const [community, id, note, by] = mockDelete.mock.calls[0]
+    expect([community, id, by]).toEqual(['philly', 'shtetl-1', { name: 'Keystone-K list (automated)' }])
+    expect(note).toContain('approving removes the listing')
+    expect(mockUpdate).not.toHaveBeenCalledWith('philly', 'shtetl-1', expect.anything(), expect.anything(), expect.anything())
+  })
+
   it('does not file again what it filed before, whatever the admin decided', async () => {
-    setDb([bagel], [])
+    const shtetl = { ...bagel, id: 'shtetl-1', name: 'Shtetl', details: { kosherCert: 'Keystone-K' } }
+    setDb([bagel, shtetl], [])
     await GET(request())
     const filed = [
       ...mockUpdate.mock.calls.map(([, id, payload, note]) => ({ operation: 'update', target_id: id, payload, note })),
       ...mockCreate.mock.calls.map(([, payload, note]) => ({ operation: 'create', target_id: null, payload, note })),
+      ...mockDelete.mock.calls.map(([, id, note]) => ({ operation: 'delete', target_id: id, payload: {}, note })),
     ]
+    expect(mockDelete).toHaveBeenCalledTimes(1)
     mockUpdate.mockReset()
     mockCreate.mockReset()
     mockDigest.mockReset()
     mockDigest.mockResolvedValue(undefined)
 
-    setDb([bagel], filed)
+    mockDelete.mockReset()
+    setDb([bagel, shtetl], filed)
     const body = await (await GET(request())).json()
     expect(body.filed).toBe(0)
+    expect(mockDelete).not.toHaveBeenCalled()
     expect(mockUpdate).not.toHaveBeenCalled()
     expect(mockCreate).not.toHaveBeenCalled()
+  })
+
+  // Keystone-K's list lags: Shalom Pizzeria was still on it, closed for
+  // good on Google. A place the guide lacks is asked about first.
+  it('does not suggest a new place Google says is permanently closed, and says Google\u2019s answer on the rest', async () => {
+    mockGoogle.mockImplementation(async (name: string) =>
+      name === 'Sababa Falafel'
+        ? { placeId: 'p1', name: 'Sababa', businessStatus: 'CLOSED_PERMANENTLY' }
+        : { placeId: 'p2', name: null, businessStatus: 'OPERATIONAL' },
+    )
+    setDb([], [])
+    const body = await (await GET(request())).json()
+    const names = mockCreate.mock.calls.map(([, payload]) => payload.name)
+    expect(names).not.toContain('Sababa Falafel')
+    expect(body.closedOnGoogle).toContain('Sababa Falafel')
+    expect(mockCreate.mock.calls[0][2]).toContain('Google: open.')
   })
 
   it('files nothing on a dry run', async () => {

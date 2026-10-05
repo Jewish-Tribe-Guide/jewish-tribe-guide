@@ -156,6 +156,24 @@ describe('compareKeystone', () => {
     expect(f.kind === 'gone' && f.details.t).toEqual(['Meat'])
   })
 
+  // A kosher guide doesn't list a place with no hechsher: when Keystone-K
+  // was its only one, the suggestion is to remove the listing, not to leave
+  // it showing with an empty certification.
+  it('proposes removing a place whose only hechsher was Keystone-K', () => {
+    const only = listing({ id: 'only', name: 'Shtetl', details: { kosherCert: 'Keystone-K' } })
+    const [f] = compareKeystone([], [only])
+    expect(f.kind === 'gone' && f.remove).toBe(true)
+    expect(findingNote(f)).toContain('approving removes the listing')
+  })
+
+  it('only takes Keystone-K off a place that has another hechsher', () => {
+    const two = listing({ id: 'two', name: 'Somewhere', details: { kosherCert: ['Keystone-K', 'OU'] } })
+    const [f] = compareKeystone([], [two])
+    expect(f.kind === 'gone' && f.remove).toBe(false)
+    expect(f.kind === 'gone' && f.details.kosherCert).toEqual(['OU'])
+    expect(findingNote(f)).toContain('its other certification stays')
+  })
+
   it('leaves alone a place certified by someone else', () => {
     const ikc = listing({ name: 'HipCityVeg', details: { kosherCert: 'IKC' } })
     expect(compareKeystone([], [ikc])).toEqual([])
@@ -191,7 +209,7 @@ describe('the note and the key', () => {
     const note = findingNote(update)
     expect(note).toContain('Certification: "Dairy – Cholov Stam, Pareve – Pas Yisroel"')
     expect(note).toContain('https://keystone-k.org/kosher/new-york-bagel/')
-    expect(findingNote(findings.find((f) => f.kind === 'gone')!)).toContain('Approving takes Keystone-K off this place')
+    expect(findingNote(findings.find((f) => f.kind === 'gone')!)).toContain('approving removes the listing')
   })
 
   it('reads the same key back from the suggestion it became, so a rejected one is not made again', () => {
@@ -201,7 +219,9 @@ describe('the note and the key', () => {
       const asSubmission =
         f.kind === 'new'
           ? { operation: 'create', target_id: null, payload: { details: f.details }, note }
-          : { operation: 'update', target_id: f.listing.id, payload: { details: f.details }, note }
+          : f.kind === 'gone' && f.remove
+            ? { operation: 'delete', target_id: f.listing.id, payload: { name: f.listing.name, category: f.listing.category }, note }
+            : { operation: 'update', target_id: f.listing.id, payload: { details: f.details }, note }
       expect(submissionKey(asSubmission)).toBe(findingKey(f))
     }
   })

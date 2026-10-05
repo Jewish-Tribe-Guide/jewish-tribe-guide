@@ -205,6 +205,36 @@ export async function findPlaceId(name: string, address: string): Promise<string
   }
 }
 
+/** What Google says about a place found by name and address: its own name
+ *  for it and whether it's still open. Business status is Basic Data on
+ *  Find Place, so this costs one Find Place call and nothing more. Null when
+ *  Google can't find it, or on any failure. Server-side only. */
+export async function findPlaceStatus(
+  name: string,
+  address: string,
+): Promise<{ placeId: string; name: string | null; businessStatus: BusinessStatus | null } | null> {
+  const key = serverKey()
+  if (!key) return null
+  const input = [name, address].filter(Boolean).join(', ').trim()
+  if (!input) return null
+  try {
+    const url =
+      `https://maps.googleapis.com/maps/api/place/findplacefromtext/json` +
+      `?input=${encodeURIComponent(input)}&inputtype=textquery&fields=place_id,name,business_status&key=${key}`
+    const res = await fetch(url)
+    if (!res.ok) return null
+    const data = (await res.json()) as {
+      status: string
+      candidates?: { place_id?: string; name?: string; business_status?: string }[]
+    }
+    const c = data.status === 'OK' ? data.candidates?.[0] : undefined
+    if (!c?.place_id) return null
+    return { placeId: c.place_id, name: c.name ?? null, businessStatus: normalizeBusinessStatus(c.business_status) }
+  } catch {
+    return null
+  }
+}
+
 // ── Place Details (the recurring sync) ──────────────────────────────────────
 
 type GooglePeriodEndpoint = { day: number; time: string } // time is "HHMM"

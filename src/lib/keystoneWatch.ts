@@ -15,7 +15,9 @@
 //   update  a place on both: the guide is missing Keystone-K, its link, or
 //           the Meat / Dairy / Parve the list gives
 //   gone    a place the guide says Keystone-K certifies that the list no
-//           longer has. Approving takes Keystone-K off it.
+//           longer has. Approving takes Keystone-K off it, or, when it was
+//           the place's only hechsher, removes the listing (archived, so it
+//           can be restored): a kosher guide doesn't list a place with none.
 //   new     a place on the list the guide doesn't have
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -58,7 +60,14 @@ export type WatchedListing = {
 
 export type WatchFinding =
   | { kind: 'update'; listing: WatchedListing; entry: KeystoneEntry; details: Record<string, unknown>; changes: string[] }
-  | { kind: 'gone'; listing: WatchedListing; details: Record<string, unknown>; related: KeystoneEntry | null }
+  | {
+      kind: 'gone'
+      listing: WatchedListing
+      details: Record<string, unknown>
+      related: KeystoneEntry | null
+      /** Keystone-K was its only certification: the suggestion is to remove the listing. */
+      remove: boolean
+    }
   | { kind: 'new'; entry: KeystoneEntry; category: 'restaurant' | 'grocery'; details: Record<string, unknown> }
 
 // ── Reading the page ─────────────────────────────────────────────────────────
@@ -253,7 +262,7 @@ export function compareKeystone(entries: KeystoneEntry[], listings: WatchedListi
       const certs = selectValues(details.kosherCert).filter((c) => c !== KEYSTONE_CERT)
       details.kosherCert = certs
       if (keystoneSlug(details) || /keystone-k\.org/.test(String(details.k ?? ''))) delete details.k
-      findings.push({ kind: 'gone', listing, details, related: relatedEntry(listing, entries) })
+      findings.push({ kind: 'gone', listing, details, related: relatedEntry(listing, entries), remove: certs.length === 0 })
       continue
     }
 
@@ -318,7 +327,9 @@ export function findingNote(f: WatchFinding): string {
   if (f.kind === 'gone') {
     const lines = [
       `Not on Keystone-K's list of the places it certifies today: ${KEYSTONE_LIST_URL}`,
-      'Approving takes Keystone-K off this place. Rejecting keeps it.',
+      f.remove
+        ? 'Keystone-K was its only certification, so approving removes the listing (archived, it can be restored). Rejecting keeps it.'
+        : 'Approving takes Keystone-K off this place; its other certification stays. Rejecting keeps it.',
     ]
     if (f.related) lines.push(`The list does have "${f.related.name}" (${f.related.url}). The same business under a new name?`)
     return lines.join('\n')
@@ -339,6 +350,7 @@ export function findingNote(f: WatchFinding): string {
  *  guide changes what it would propose. */
 export function findingKey(f: WatchFinding): string {
   if (f.kind === 'new') return `new:${f.entry.slug}`
+  if (f.kind === 'gone' && f.remove) return `remove:${f.listing.id}`
   const d = f.details
   return `${f.kind}:${f.listing.id}:${proposal(d)}`
 }
@@ -357,6 +369,7 @@ export function submissionKey(s: {
     return slug ? `new:${slug}` : null
   }
   if (!s.target_id) return null
+  if (s.operation === 'delete') return `remove:${s.target_id}`
   const kind = selectValues(details.kosherCert).includes(KEYSTONE_CERT) ? 'update' : 'gone'
   return `${kind}:${s.target_id}:${proposal(details)}`
 }
