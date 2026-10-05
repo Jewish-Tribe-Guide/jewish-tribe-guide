@@ -21,6 +21,7 @@ import MobileSheet from '@/components/resources/MobileSheet'
 import UpdateTimesBox from '@/components/resources/UpdateTimesBox'
 import ListingForm, { DetailFieldInput } from '@/components/resources/ListingForm'
 import ListingEditor from '@/components/resources/ListingEditor'
+import type { SendVia } from '@/components/resources/useListingSubmit'
 import FindPlace from '@/components/FindPlace'
 import type { PlaceSelectResult } from '@/components/intake/AddressInput'
 import { TURNSTILE_ACTIVE } from '@/components/resources/useListingSubmit'
@@ -45,7 +46,16 @@ type Lines = { lines: string[]; held: string[] }
 type Choice = { label: string; listingId: string; listing: Brief } & Lines
 
 type ItemsProposal = { kind: 'items'; listingId: string | null; listing: Brief | null; asWritten: string; chain: boolean; ask: { question: string; choices: Choice[] } | null; items: ReadItem[] } & Lines
-type PlaceProposal = { kind: 'new_place'; category: string | null; categoryLabel: string | null; place: PlaceRead; items: ReadItem[]; maybe: (Brief & Lines)[] }
+type PlaceProposal = {
+  kind: 'new_place'
+  category: string | null
+  categoryLabel: string | null
+  place: PlaceRead
+  items: ReadItem[]
+  maybe: (Brief & Lines)[]
+  /** What was read, as the add form's starting values. */
+  seed: Partial<DirectoryResource> | null
+}
 type FieldsReading = {
   values: Record<string, unknown>
   before: Record<string, unknown>
@@ -144,8 +154,14 @@ function TellUsBody({
   const addable = (categories ?? []).filter((c) => c.kind === 'listing' && c.active !== false && resolveCapabilities(c.capabilities).add)
   // `back`: returning to the search from what was found, keeping where the
   // search itself goes back to.
-  const openFind = (back = false) => {
-    if (!back) setFindFrom(step)
+  // What a place found is added as: the page's category, or the one the
+  // reader put a new place in.
+  const [findCategory, setFindCategory] = useState<CategoryConfig | undefined>(pageCategory)
+  const openFind = (back = false, category = pageCategory) => {
+    if (!back) {
+      setFindFrom(step)
+      setFindCategory(category)
+    }
     setStep('find', 'Find the place')
     if (listings) return
     fetch(withCommunity('/api/resources', community))
@@ -153,7 +169,7 @@ function TellUsBody({
       .then((j: { resources?: DirectoryResource[] }) => setListings(j.resources ?? []))
       .catch(() => setListings([]))
   }
-  const startAdding = (start: Omit<NonNullable<typeof adding>, 'category'>, category = pageCategory) => {
+  const startAdding = (start: Omit<NonNullable<typeof adding>, 'category'>, category = findCategory) => {
     if (category) {
       setAdding({ ...start, category })
       setStep('add', `Add a ${category.label}`)
@@ -170,7 +186,10 @@ function TellUsBody({
   const [attempt, setAttempt] = useState(0)
   const [left, setLeft] = useState<Set<number>>(new Set())
   const [picked, setPicked] = useState<Record<number, string | null>>({})
-  const [places, setPlaces] = useState<Record<number, { place: PlaceRead; category: string | null }>>({})
+  // A new place the reader found, being found on Google and filled in, and
+  // the ones already sent that way.
+  const [aiPlace, setAiPlace] = useState<{ card: number; query: string; values: Partial<DirectoryResource> } | null>(null)
+  const [sentCards, setSentCards] = useState<Set<number>>(new Set())
   // A fields card's own fixes, and its answer to "from now on, or just once?"
   const [fixes, setFixes] = useState<Record<number, Record<string, unknown>>>({})
   const [whens, setWhens] = useState<Record<number, 'always' | 'once'>>({})
@@ -215,7 +234,7 @@ function TellUsBody({
       const json = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string } & Partial<Reading>
       if (!res.ok || !json.ok || !json.proposals) throw new Error(json.error ?? 'failed')
       setReading({ proposals: json.proposals, photoUrls: json.photoUrls ?? [] })
-      setPlaces(Object.fromEntries(json.proposals.flatMap((p, i) => (p.kind === 'new_place' ? [[i, { place: p.place, category: p.category }]] : []))))
+      setSentCards(new Set())
       setLeft(new Set())
       setPicked({})
       setFixes({})
@@ -232,7 +251,6 @@ function TellUsBody({
   // each new place, unless left out.
   const proposals = reading?.proposals ?? []
   const stores: { listingId: string; items: ReadItem[] }[] = []
-  const newPlaces: { category: string; place: PlaceRead; items: ReadItem[] }[] = []
   const edits: { listingId: string; values: Record<string, unknown>; notes: string[] }[] = []
   proposals.forEach((p, i) => {
     if (left.has(i)) return
@@ -256,17 +274,24 @@ function TellUsBody({
       const same = picked[i]
       if (same) {
         if (p.maybe.find((m) => m.id === same)?.lines.length) stores.push({ listingId: same, items: p.items })
-      } else if (places[i]?.category) newPlaces.push({ category: places[i].category!, place: places[i].place, items: p.items })
+      }
     }
   })
-  const sendable = stores.length + edits.length + newPlaces.length
+  const sendable = stores.length + edits.length
+
+  const viaMessage: SendVia = ({ payload, submittedBy, company, turnstileToken }) =>
+    fetch(withCommunity('/api/message/send', community), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, photoUrls: reading?.photoUrls ?? [], forms: [{ submission: payload }], email: submittedBy?.email ?? '', turnstileToken, company }),
+    })
 
   const send = async (token: string) => {
     try {
       const res = await fetch(withCommunity('/api/message/send', community), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, photoUrls: reading?.photoUrls ?? [], stores, edits, places: newPlaces, email, turnstileToken: token, company: '' }),
+        body: JSON.stringify({ text, photoUrls: reading?.photoUrls ?? [], stores, edits, email, turnstileToken: token, company: '' }),
       })
       const json = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string; filed?: number }
       if (!res.ok || !json.ok) throw new Error(json.error ?? 'failed')
@@ -408,7 +433,13 @@ function TellUsBody({
           {!about && addable.length > 0 && (
             <p className="text-center text-[13.5px] text-slate-600">
               Rather fill it in yourself?{' '}
-              <button type="button" onClick={() => openFind()} className="cursor-pointer font-semibold text-primary hover:underline">
+              <button
+                type="button"
+                onClick={() => {
+                  setAiPlace(null)
+                  openFind()
+                }}
+                className="cursor-pointer font-semibold text-primary hover:underline">
                 Find the place
               </button>
             </p>
@@ -437,9 +468,12 @@ function TellUsBody({
               when={whens[i] ?? null}
               onWhen={(w) => setWhens((x) => ({ ...x, [i]: w }))}
               categoryOf={(id) => categories?.find((c) => c.id === id)}
-              place={places[i]}
-              onPlace={(v) => setPlaces((x) => ({ ...x, [i]: v }))}
-              categories={(categories ?? []).filter((c) => c.kind === 'listing' && resolveCapabilities(c.capabilities).add).map((c) => ({ id: c.id, label: c.label }))}
+              sent={sentCards.has(i)}
+              onFill={() => {
+                if (p.kind !== 'new_place') return
+                setAiPlace({ card: i, query: [p.place.name, p.place.address].filter(Boolean).join(', '), values: p.seed ?? { name: p.place.name } })
+                openFind(false, categories?.find((c) => c.id === p.category))
+              }}
               text={text}
               photoUrl={reading.photoUrls[0] ?? null}
               community={community}
@@ -480,7 +514,9 @@ function TellUsBody({
       )}
       {step === 'find' && (
         <FindPlace
+          key={aiPlace?.card ?? 'own'}
           listings={listings}
+          initialQuery={aiPlace?.query}
           onListing={(l) => {
             setEditing(l)
             // The editor says "Suggest an edit" itself.
@@ -515,11 +551,23 @@ function TellUsBody({
           key={`${adding.category.id}:${adding.place?.placeId ?? ''}`}
           category={adding.category}
           mode="create"
-          seed={{ place: adding.place, address: adding.address, coords: adding.coords }}
+          seed={{ place: adding.place, address: adding.address, coords: adding.coords, values: aiPlace?.values }}
           openAll
           embedded
           onUp={() => openFind(true)}
           onSubmitted={onClose}
+          // A place the reader found goes in labelled with what it was read
+          // from, and the box goes back to the rest of what it read.
+          via={aiPlace ? viaMessage : undefined}
+          onSent={
+            aiPlace
+              ? () => {
+                  setSentCards((s) => new Set(s).add(aiPlace.card))
+                  setAiPlace(null)
+                  setStep('result')
+                }
+              : undefined
+          }
         />
       )}
       {step === 'edit' && editing && categories?.find((c) => c.id === editing.category) && (
@@ -562,9 +610,8 @@ function ResultCard({
   onLeave,
   picked,
   onPick,
-  place,
-  onPlace,
-  categories,
+  sent,
+  onFill,
   text,
   photoUrl,
   community,
@@ -584,9 +631,10 @@ function ResultCard({
   onLeave: (out: boolean) => void
   picked: string | null
   onPick: (id: string | null) => void
-  place?: { place: PlaceRead; category: string | null }
-  onPlace: (v: { place: PlaceRead; category: string | null }) => void
-  categories: { id: string; label: string }[]
+  /** A new place: sent, with the add form. */
+  sent: boolean
+  /** A new place: find it on Google and fill it in. */
+  onFill: () => void
   text: string
   photoUrl: string | null
   community: string
@@ -741,9 +789,8 @@ function ResultCard({
   }
 
   if (p.kind === 'new_place') {
-    const v = place ?? { place: p.place, category: p.category }
     const same = picked ? p.maybe.find((m) => m.id === picked) : undefined
-    const set = (patch: Partial<PlaceRead>) => onPlace({ ...v, place: { ...v.place, ...patch } })
+    const carries = p.items.filter((i) => !i.doubt && i.availability !== 'stopped' && i.availability !== 'announced')
     return (
       <div className={`${card} ${left ? 'opacity-50' : ''}`} data-testid="tell-us-card">
         {same ? (
@@ -759,22 +806,14 @@ function ResultCard({
           </>
         ) : (
           <>
-            <p className="text-[12px] font-bold tracking-wide text-emerald-700 uppercase">New to the guide</p>
-            <div className="mt-1.5 space-y-2">
-              <input aria-label="Name" value={v.place.name} onChange={(e) => set({ name: e.target.value })} className={`${inputClass} font-bold`} />
-              <input aria-label="Address" placeholder="Address, if you know it" value={v.place.address ?? ''} onChange={(e) => set({ address: e.target.value })} className={inputClass} />
-              <select aria-label="Kind of place" value={v.category ?? ''} onChange={(e) => onPlace({ ...v, category: e.target.value || null })} className={inputClass}>
-                <option value="">Which kind of place?</option>
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            {p.items.length > 0 && (
-              <ul className="mt-2 text-[14px]">
-                {p.items.filter((i) => !i.doubt && i.availability !== 'stopped' && i.availability !== 'announced').map((i) => (
+            <p className="text-[12px] font-bold tracking-wide text-emerald-700 uppercase">New to the guide{p.categoryLabel ? ` · ${p.categoryLabel}` : ''}</p>
+            <p className="mt-0.5 text-[15px] font-extrabold text-slate-900">
+              {p.place.name}
+              {p.place.address && <span className="font-normal text-slate-500"> · {p.place.address}</span>}
+            </p>
+            {carries.length > 0 && (
+              <ul className="mt-1 text-[14px]">
+                {carries.map((i) => (
                   <li key={i.name} className="font-semibold text-emerald-700">
                     + {i.name}
                     {i.availability === 'sometimes' ? ', sometimes' : ''}
@@ -782,25 +821,41 @@ function ResultCard({
                 ))}
               </ul>
             )}
-            {[v.place.kosherCert && `Kosher symbol: ${v.place.kosherCert}`, v.place.phone, v.place.website, v.place.notes].filter(Boolean).map((t) => (
+            {[p.place.kosherCert && `Kosher symbol: ${p.place.kosherCert}`, p.place.meatDairy, p.place.phone, p.place.website, p.place.notes].filter(Boolean).map((t) => (
               <p key={t as string} className="mt-1 text-[13px] text-slate-600">
                 {t}
               </p>
             ))}
-            {p.maybe.length > 0 && (
-              <div className="mt-2 rounded-lg bg-amber-50 px-2.5 py-2">
-                <p className="text-[13.5px] font-semibold text-amber-900">Already in the guide?</p>
-                <div className="mt-1 flex flex-wrap gap-1.5">
-                  {p.maybe.map((m) => (
-                    <button key={m.id} type="button" onClick={() => onPick(m.id)} className="cursor-pointer rounded-full border border-amber-300 bg-white px-3 py-1 text-[13px] text-slate-800 hover:bg-amber-100">
-                      It’s {m.name}, {short(m.address)}
-                    </button>
-                  ))}
-                </div>
-              </div>
+            {sent ? (
+              <p className="mt-2 text-[13.5px] font-semibold text-emerald-700">Sent. An admin checks it before it shows in the guide.</p>
+            ) : (
+              <>
+                {p.maybe.length > 0 && (
+                  <div className="mt-2 rounded-lg bg-amber-50 px-2.5 py-2">
+                    <p className="text-[13.5px] font-semibold text-amber-900">Already in the guide?</p>
+                    <div className="mt-1 flex flex-wrap gap-1.5">
+                      {p.maybe.map((m) => (
+                        <button key={m.id} type="button" onClick={() => onPick(m.id)} className="cursor-pointer rounded-full border border-amber-300 bg-white px-3 py-1 text-[13px] text-slate-800 hover:bg-amber-100">
+                          It’s {m.name}, {short(m.address)}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {/* Adding a place is the form of questions, filled in from
+                    Google and from what was read (agreed Oct 5). */}
+                {!left && (
+                  <button
+                    type="button"
+                    onClick={onFill}
+                    className="mt-2.5 w-full cursor-pointer rounded-lg border-[1.5px] border-primary px-4 py-2 text-[14.5px] font-bold text-primary hover:bg-primary/5"
+                  >
+                    Find it and fill it in
+                  </button>
+                )}
+                <div className="mt-2">{leave}</div>
+              </>
             )}
-            {!v.category && <p className="mt-2 text-[13px] text-amber-800">Pick which kind of place it is to send it.</p>}
-            <div className="mt-2">{leave}</div>
           </>
         )}
       </div>

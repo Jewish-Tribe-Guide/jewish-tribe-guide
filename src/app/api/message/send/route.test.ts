@@ -20,7 +20,7 @@ vi.mock('@/lib/rateLimit', () => ({ enforceRateLimit: m.enforceRateLimit, client
 vi.mock('@/lib/turnstile', () => ({ verifyTurnstile: m.verifyTurnstile }))
 vi.mock('@/lib/uiConfig', () => ({ ui: m.ui }))
 vi.mock('@/lib/communityStore', () => ({ communitySlugFromRequest: () => 'philly', resolveCommunity: async () => ({ slug: 'philly', name: 'Philadelphia' }) }))
-vi.mock('@/lib/resourceStore', () => ({ listApprovedResources: m.listApprovedResources }))
+vi.mock('@/lib/resourceStore', async (original) => ({ ...(await original<object>()), listApprovedResources: m.listApprovedResources }))
 vi.mock('@/lib/categoryStore', () => ({ listCategories: m.listCategories }))
 vi.mock('@/lib/submissionStore', () => ({ submitListingUpdate: m.submitListingUpdate, submitListingCreate: m.submitListingCreate }))
 vi.mock('@/lib/email', () => ({ sendSubmissionNotification: m.sendSubmissionNotification }))
@@ -84,6 +84,19 @@ describe('POST /api/message/send', () => {
     await post({ text: 'x', edits: [{ listingId: ARCH, values: {}, notes: ['Hours: closes 4:00 PM, but which days isn’t said'] }, { listingId: ARCH, values: { name: 'Trader Joe’s' }, notes: [] }] })
     expect(m.submitListingUpdate).toHaveBeenCalledTimes(1)
     expect(m.submitListingUpdate.mock.calls[0][3]).toContain('which days isn’t said')
+  })
+
+  // A new place filled in with the add form: checked as the public route
+  // checks one, filed labelled with what it was read from.
+  it('files a new place from the add form, labelled with what it was read from, and refuses an invalid one', async () => {
+    const form = { category: 'grocery', name: 'South Square Market', address: '2201 South St', phone: '', anchorId: 'all', distance: null, geo: null, details: { m: ['Challah'] }, source: { readBy: 'person', from: 'faked' } }
+    expect(await (await post({ text: 'South Square Market has challah', forms: [{ submission: form }], email: 'me@x.co' })).json()).toEqual({ ok: true, filed: 1 })
+    const [, payload] = m.submitListingCreate.mock.calls[0]
+    expect(payload).toMatchObject({ name: 'South Square Market', submittedBy: { email: 'me@x.co' }, source: { readBy: 'ai', from: 'a message', original: 'South Square Market has challah' } })
+    const res = await post({ text: 'x', forms: [{ submission: { ...form, name: '' } }] })
+    expect(res.status).toBe(400)
+    expect((await res.json()).errors.length).toBeGreaterThan(0)
+    expect(m.submitListingCreate).toHaveBeenCalledTimes(1)
   })
 
   it('files a new place in its category, with what it carries', async () => {

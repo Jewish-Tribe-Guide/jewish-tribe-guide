@@ -13,9 +13,12 @@ import { normalizeEmail } from '@/lib/activity'
 import { payloadTooLarge } from '@/lib/limits'
 import { itemsChange, messageSource, newPlaceSubmission, sentItems, sentPlace } from '@/lib/messageReader'
 import { fieldsEdit } from '@/lib/fieldChanges'
-import type { SubmissionRow } from '@/types'
+import { validateSubmission } from '@/lib/resourceStore'
+import { SERVER_ONLY_PAYLOAD_KEYS } from '@/lib/submissionSource'
+import { normalizeUrl } from '@/lib/validation'
+import type { ResourceSubmission, SubmissionRow } from '@/types'
 
-// POST /api/message/send   { text, photoUrls, stores: [{ listingId, items }], edits: [{ listingId, values, notes }], places: [{ category, place, items }], email?, turnstileToken, company }
+// POST /api/message/send   { text, photoUrls, stores: [{ listingId, items }], edits: [{ listingId, values, notes }], places: [{ category, place, items }], forms: [{ submission }], email?, turnstileToken, company }
 // The "+ Add" box's Send (agreed Oct 5): what the person saw after the
 // reader (/api/message/read), filed as ordinary suggestions for an admin,
 // one per store or place, each labelled "Read by AI" with the message or
@@ -28,6 +31,11 @@ import type { SubmissionRow } from '@/types'
 // files nothing, unless there's a note the guide can't hold as a field
 // ("closes early this Wednesday only"), which goes to the admin as one.
 // A shul's times go through that card's own route.
+//
+// `forms`: a new place the reader found, filled in by the person with the
+// add form (Google's details and the category's questions). Taken as the
+// public submissions route takes a new listing, checked the same way, and
+// filed with what it was read from.
 
 const MAX_STORES = 10
 const MAX_NOTES = 10
@@ -65,7 +73,8 @@ export async function POST(request: Request) {
   const stores = (Array.isArray(body.stores) ? body.stores : []).slice(0, MAX_STORES) as Record<string, unknown>[]
   const places = (Array.isArray(body.places) ? body.places : []).slice(0, MAX_STORES) as Record<string, unknown>[]
   const edits = (Array.isArray(body.edits) ? body.edits : []).slice(0, MAX_STORES) as Record<string, unknown>[]
-  if (stores.length + places.length + edits.length === 0) return Response.json({ ok: false, error: 'Nothing to send.' }, { status: 400 })
+  const forms = (Array.isArray(body.forms) ? body.forms : []).slice(0, MAX_STORES) as Record<string, unknown>[]
+  if (stores.length + places.length + edits.length + forms.length === 0) return Response.json({ ok: false, error: 'Nothing to send.' }, { status: 400 })
 
   const community = await resolveCommunity(communitySlugFromRequest(request))
   try {
@@ -108,6 +117,29 @@ export async function POST(request: Request) {
           community.slug,
           Object.assign({}, submission, { submittedBy: submittedBy ?? undefined, source }),
           ['A new place, from a message sent with “Tell us”.', note].filter(Boolean).join('\n\n'),
+        ),
+      )
+    }
+
+    for (const f of forms) {
+      const submission = (f.submission && typeof f.submission === 'object' ? f.submission : null) as ResourceSubmission | null
+      if (!submission) continue
+      for (const k of SERVER_ONLY_PAYLOAD_KEYS) delete (submission as Record<string, unknown>)[k]
+      const category = catById.get(submission.category)
+      if (!category || !ui.contributions.add || !resolveCapabilities(category.capabilities).add) {
+        return Response.json({ ok: false, errors: ['This action is not available for this category.'] }, { status: 403 })
+      }
+      for (const field of category.detailFields) {
+        const raw = submission.details?.[field.key]
+        if (field.type === 'url' && typeof raw === 'string' && raw.trim()) submission.details[field.key] = normalizeUrl(raw)
+      }
+      const errors = validateSubmission(submission, category)
+      if (errors.length) return Response.json({ ok: false, errors }, { status: 400 })
+      filed.push(
+        await submitListingCreate(
+          community.slug,
+          Object.assign({}, submission, { submittedBy: submittedBy ?? undefined, source }),
+          'A new place, read from a message sent with “Tell us” and filled in by them.',
         ),
       )
     }

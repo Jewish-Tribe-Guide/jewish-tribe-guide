@@ -71,6 +71,10 @@ type Props = {
    *  listing editor's address row, which has a pin icon instead). */
   ariaLabel?: string
   autoFocus?: boolean
+  /** Look up what's already in the field as soon as it shows, as if just
+   *  typed: the "+ Add" box's Find the place, started from a name the
+   *  message reader found ("Paulie Gees"). */
+  searchOnMount?: boolean
 }
 
 // Renders our own input and dropdown over Google's Autocomplete DATA API
@@ -83,7 +87,7 @@ type Props = {
 // inline under the field like everywhere else in this app. This is that same
 // underlying API, just rendered with our own markup, so it's a normal inline
 // dropdown on every screen size.
-export default function AddressInput({ value, onChange, placeholder = 'Address or location', onCoords, onPlaceSelect, includedPrimaryTypes, disableAutocomplete, preferPlaceName, suggestionNote, inlineSuggestions, id, ariaLabel, autoFocus }: Props) {
+export default function AddressInput({ value, onChange, placeholder = 'Address or location', onCoords, onPlaceSelect, includedPrimaryTypes, disableAutocomplete, preferPlaceName, suggestionNote, inlineSuggestions, id, ariaLabel, autoFocus, searchOnMount }: Props) {
   const [authFailed, setAuthFailed] = useState(mapsAuthFailed())
   const [open, setOpen] = useState(false)
   const [suggestions, setSuggestions] = useState<AddressSuggestion[]>([])
@@ -102,6 +106,21 @@ export default function AddressInput({ value, onChange, placeholder = 'Address o
   useEffect(() => () => {
     if (debounceRef.current) clearTimeout(debounceRef.current)
   }, [])
+
+  // Once, on the first render: the value it opened with, looked up.
+  const [startQuery] = useState(() => (searchOnMount ? value.trim() : ''))
+  useEffect(() => {
+    if (!startQuery || !liveSuggestions) return
+    let live = true
+    fetchAddressSuggestions(startQuery, { includedPrimaryTypes }).then((results) => {
+      if (!live) return
+      setSuggestions(results)
+      setOpen(true)
+    })
+    return () => {
+      live = false
+    }
+  }, [startQuery, liveSuggestions, includedPrimaryTypes])
 
   // Close on any tap/click outside — same capture-phase pattern LocationControl
   // uses for its own popover, since this can render inside one.

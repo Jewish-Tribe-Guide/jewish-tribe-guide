@@ -25,18 +25,21 @@ export function guideMatches(listings: readonly DirectoryResource[], typed: stri
 
 export default function FindPlace({
   listings,
+  initialQuery = '',
   onListing,
   onPlace,
   onBlank,
 }: {
   /** The guide's listings, to find and mark; null while they load. */
   listings: DirectoryResource[] | null
+  /** Already searched for: the name the message reader found. */
+  initialQuery?: string
   onListing: (listing: DirectoryResource) => void
   onPlace: (place: PlaceSelectResult, address: string, coords: { lat: number; lng: number } | null) => void
   onBlank: () => void
 }) {
   const id = useId()
-  const [typed, setTyped] = useState('')
+  const [typed, setTyped] = useState(initialQuery)
   // A pick reports its address and map point just before the place itself.
   const picked = useRef<{ address: string; coords: { lat: number; lng: number } | null }>({ address: '', coords: null })
   const byPlace = new Map((listings ?? []).filter((l) => typeof l.placeId === 'string' && l.placeId).map((l) => [l.placeId as string, l]))
@@ -67,6 +70,7 @@ export default function FindPlace({
           placeholder="Search by name or address…"
           suggestionNote={(placeId) => (byPlace.has(placeId) ? 'Already in the guide' : null)}
           inlineSuggestions
+          searchOnMount
         />
       </div>
       {matches.length > 0 && (

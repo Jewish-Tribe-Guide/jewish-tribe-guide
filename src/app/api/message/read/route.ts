@@ -6,7 +6,7 @@ import { ui } from '@/lib/uiConfig'
 import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
 import { listCategories } from '@/lib/categoryStore'
 import { listApprovedResources } from '@/lib/resourceStore'
-import { buildCatalog, itemsChange, readMessage, type ReadImage } from '@/lib/messageReader'
+import { buildCatalog, itemsChange, newPlaceSubmission, readMessage, type ReadImage } from '@/lib/messageReader'
 import { readShulWeek } from '@/lib/shulWeekReading'
 import { readFieldChanges, type FieldRead } from '@/lib/fieldChanges'
 import { UUID } from '@/lib/itemMarkRoutes'
@@ -112,7 +112,17 @@ export async function POST(request: Request) {
         if (p.kind === 'new_place') {
           // "Already in the guide? It's this one": each with its own lines,
           // so picking one shows at once what changes there.
-          return { ...p, categoryLabel: p.category ? catById.get(p.category)?.label ?? null : null, maybe: p.maybe.map((id) => ({ ...brief(id), ...linesFor(id, p.items) })) }
+          // `seed`: what was read, as the add form's starting values
+          // (name, address, phone, a hechsher the category offers, what it
+          // carries), under Google's details once the place is found.
+          const cat = p.category ? catById.get(p.category) : undefined
+          const seed = cat ? newPlaceSubmission(cat, p.place, p.items).submission : null
+          return {
+            ...p,
+            categoryLabel: cat?.label ?? null,
+            seed: seed && { name: seed.name, address: seed.address, phone: seed.phone, ...seed.details },
+            maybe: p.maybe.map((id) => ({ ...brief(id), ...linesFor(id, p.items) })),
+          }
         }
         if (p.kind === 'ask_others') return { ...p, listing: p.listingId ? brief(p.listingId) : null }
         if (p.kind === 'times') {

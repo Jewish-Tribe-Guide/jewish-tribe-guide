@@ -22,7 +22,21 @@ type Options = {
   /** Admin mode only: the listing is already live, so there's no "Thank you,
    *  it's being reviewed" screen to show — this runs instead. */
   onAdminSubmitted?: () => void
+  /** Sends somewhere other than /api/submissions, with the same body and the
+   *  same `{ ok, code, errors }` answer: the "+ Add" box, filing a new place
+   *  read from a message with what it was read from. */
+  via?: SendVia
+  /** Runs instead of the "Thank you" screen once it's in (the box goes back
+   *  to the rest of what it read). */
+  onSent?: () => void
 }
+
+export type SendVia = (body: {
+  payload: ResourceSubmission
+  submittedBy: { email: string } | undefined
+  company: string
+  turnstileToken: string
+}) => Promise<Response>
 
 /**
  * Sending a listing: the anti-abuse layer (Turnstile, honeypot), the
@@ -31,7 +45,7 @@ type Options = {
  * ListingEditor (Edit) so both treat a refused or expired submission the
  * same way. What gets sent comes from useListingDraft.
  */
-export function useListingSubmit({ mode, existing, sharedTurnstile, adminSubmit, onAdminSubmitted }: Options) {
+export function useListingSubmit({ mode, existing, sharedTurnstile, adminSubmit, onAdminSubmitted, via, onSent }: Options) {
   const community = useCommunitySlug()
   const [submitterEmail, setSubmitterEmail] = useState('')
   // Honeypot — stays empty for humans; bots that auto-fill it get dropped server-side.
@@ -73,7 +87,9 @@ export function useListingSubmit({ mode, existing, sharedTurnstile, adminSubmit,
 
     setSubmitting(true)
     try {
-      const res = adminSubmit
+      const res = via
+        ? await via({ payload, submittedBy, company: honeypot, turnstileToken })
+        : adminSubmit
         ? await fetch(withCommunity('/api/admin/listings', community), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminSubmit.token}` },
@@ -135,6 +151,7 @@ export function useListingSubmit({ mode, existing, sharedTurnstile, adminSubmit,
       // Admin mode: the listing is already live — nothing to review, so skip
       // the "Thank you!" pending screen and just close back out.
       if (adminSubmit) onAdminSubmitted?.()
+      else if (onSent) onSent()
       else setDone(true)
     } catch {
       setRetriedVerification(false)

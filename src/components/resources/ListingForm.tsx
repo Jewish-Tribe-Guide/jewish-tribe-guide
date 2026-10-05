@@ -8,6 +8,7 @@ import type { DirectoryResource } from '@/types'
 import TagsInput from './TagsInput'
 import ImageUploadField from '@/components/ImageUploadField'
 import AddressInput, { type PlaceSelectResult } from '@/components/intake/AddressInput'
+import type { SendVia } from './useListingSubmit'
 import HoursInput from '@/components/intake/HoursInput'
 import MinyanimInput from '@/components/intake/MinyanimInput'
 import SchedulesInput from '@/components/intake/SchedulesInput'
@@ -63,7 +64,10 @@ type Props = {
   /** Adding, started from what's already known: a Google pick made before
    *  the form opened (the "+ Add" box's Find the place), with its address
    *  and map point. */
-  seed?: { place?: PlaceSelectResult; address?: string; coords?: { lat: number; lng: number } | null }
+  seed?: { place?: PlaceSelectResult; address?: string; coords?: { lat: number; lng: number } | null; values?: Partial<DirectoryResource> }
+  /** See useListingSubmit's options of the same names. */
+  via?: SendVia
+  onSent?: () => void
   /** Every section open from the start, so someone adding a place sees all
    *  it can hold (the "+ Add" box). Otherwise only Basics, and sections
    *  that already hold something. */
@@ -156,11 +160,11 @@ function groupNonCoreFields(fields: CategoryField[], config: CategoryConfig): Fi
   return blocks
 }
 
-export default function ListingForm({ category, mode, existing, onUp, onSubmitted, onPreviewSubmit, sharedTurnstile, adminSubmit, embedded, onRemovalOpenChange, seed, openAll }: Props) {
+export default function ListingForm({ category, mode, existing, onUp, onSubmitted, onPreviewSubmit, sharedTurnstile, adminSubmit, embedded, onRemovalOpenChange, seed, openAll, via, onSent }: Props) {
   const config = category
   const draft = useListingDraft(
     category,
-    existing ?? (seed ? ({ address: seed.address ?? '', ...(seed.coords ? { geo: seed.coords } : {}) } as DirectoryResource) : undefined),
+    existing ?? (seed ? ({ ...seed.values, address: seed.address || seed.values?.address || '', ...(seed.coords ? { geo: seed.coords } : {}) } as DirectoryResource) : undefined),
     seed?.place,
   )
   const { hasAddress, hasPhone, syncEligible, name, setName, address, setAddress, phone, setPhone, coords, setCoords, details, setDetail, handlePlaceSelect } = draft
@@ -181,7 +185,7 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
     doneKind,
     markRemovalDone,
     submit,
-  } = useListingSubmit({ mode, existing, sharedTurnstile, adminSubmit, onAdminSubmitted: onSubmitted })
+  } = useListingSubmit({ mode, existing, sharedTurnstile, adminSubmit, onAdminSubmitted: onSubmitted, via, onSent })
 
   // Whether Request removal has swapped out the edit fields for its own
   // panel — see the removalOpen block near the bottom of this component's

@@ -39,7 +39,18 @@ const reading = {
       quote: 'x',
       checked: true,
     },
-    { kind: 'new_place', category: 'grocery', categoryLabel: 'Grocery', place: { name: 'South Square Market', kind: null, address: '22nd & South', phone: null, website: null, kosherCert: null, meatDairy: null, notes: null }, items: [{ name: 'Challah', availability: 'always', doubt: null }], maybe: [], quote: 'x', checked: true, note: null },
+    {
+      kind: 'new_place',
+      category: 'grocery',
+      categoryLabel: 'Grocery',
+      place: { name: 'South Square Market', kind: null, address: '22nd & South', phone: null, website: null, kosherCert: null, meatDairy: null, notes: null },
+      items: [{ name: 'Challah', availability: 'always', doubt: null }],
+      maybe: [],
+      seed: { name: 'South Square Market', address: '22nd & South', phone: '', m: ['Challah'], m_sometimes: [] },
+      quote: 'x',
+      checked: true,
+      note: null,
+    },
   ],
 }
 
@@ -104,11 +115,11 @@ describe('Saw something? Tell us', () => {
     fireEvent.change(screen.getByLabelText('What did you see?'), { target: { value: 'trader joes sometimes has ground turkey' } })
     fireEvent.click(screen.getByRole('button', { name: 'See what changes' }))
     const cards = await screen.findAllByTestId('tell-us-card')
-    // Until a store is picked, only two of the three can go.
-    expect(screen.getByRole('button', { name: 'Send 2 updates' })).toBeInTheDocument()
+    // Until a store is picked, only one can go; the new place goes with its
+    // own form.
+    expect(screen.getByRole('button', { name: 'Send' })).toBeInTheDocument()
     fireEvent.click(within(cards[1]).getByRole('button', { name: 'Market St' }))
     expect(within(cards[1]).getByText('+ Ground Turkey, sometimes')).toBeInTheDocument()
-    fireEvent.click(within(cards[2]).getByRole('button', { name: 'Leave this out' }))
     fireEvent.change(screen.getByLabelText(/Email, to hear when it’s live/), { target: { value: 'me@x.co' } })
     fireEvent.click(screen.getByRole('button', { name: 'Send 2 updates' }))
 
@@ -119,22 +130,32 @@ describe('Saw something? Tell us', () => {
       text: 'trader joes sometimes has ground turkey',
       photoUrls: reading.photoUrls,
       stores: [{ listingId: 'arch', items: [ground] }, { listingId: 'market', items: [{ name: 'Ground Turkey', availability: 'sometimes', doubt: null }] }],
-      places: [],
       email: 'me@x.co',
     })
   })
 
-  it('sends a new place with the fixes they made to it', async () => {
+  // Agreed Oct 5: a new place is added with the form of questions, found on
+  // Google first, filled in from what was read, and labelled with it.
+  it('sends a new place with the add form, from what was read, then goes back to the rest', async () => {
     open()
-    fireEvent.change(screen.getByLabelText('What did you see?'), { target: { value: 'South Square Market has challah' } })
+    fireEvent.change(screen.getByLabelText('What did you see?'), { target: { value: 'South Square Market on 22nd has challah' } })
     fireEvent.click(screen.getByRole('button', { name: 'See what changes' }))
-    const cards = await screen.findAllByTestId('tell-us-card')
-    fireEvent.change(within(cards[2]).getByLabelText('Address'), { target: { value: '2201 South St' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Send 2 updates' }))
-    await waitFor(() => expect(calls).toHaveLength(2))
-    expect(JSON.parse(String(calls[1].init!.body)).places).toEqual([
-      { category: 'grocery', place: expect.objectContaining({ name: 'South Square Market', address: '2201 South St' }), items: [{ name: 'Challah', availability: 'always', doubt: null }] },
-    ])
+    let cards = await screen.findAllByTestId('tell-us-card')
+    fireEvent.click(within(cards[2]).getByRole('button', { name: 'Find it and fill it in' }))
+    // Searched for already, and added as the grocery it was read as.
+    expect(screen.getByPlaceholderText('Search by name or address…')).toHaveValue('South Square Market, 22nd & South')
+    fireEvent.click(screen.getByRole('button', { name: 'Not on Google? Fill it in yourself' }))
+    expect(screen.getByRole('dialog', { name: 'Add a Grocery' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Name *')).toHaveValue('South Square Market')
+    fireEvent.change(screen.getByLabelText('Name *'), { target: { value: 'South Square Market & Deli' } })
+    fireEvent.submit(screen.getByLabelText('Name *').closest('form')!)
+
+    cards = await screen.findAllByTestId('tell-us-card')
+    expect(within(cards[2]).getByText(/^Sent\./)).toBeInTheDocument()
+    const sent = calls.find((c) => c.url === '/api/message/send?community=philly')!
+    const body = JSON.parse(String(sent.init!.body))
+    expect(body).toMatchObject({ text: 'South Square Market on 22nd has challah', photoUrls: reading.photoUrls })
+    expect(body.forms[0].submission).toMatchObject({ category: 'grocery', name: 'South Square Market & Deli', address: '22nd & South', details: { m: ['Challah'] } })
   })
 
   // Oct 5: the hechsher and the hours came back "not a change" before the
