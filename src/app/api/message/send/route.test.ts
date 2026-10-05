@@ -53,7 +53,8 @@ beforeEach(() => {
 describe('POST /api/message/send', () => {
   it('files a store’s change, worked out from the listing as it is, labelled with what it came from', async () => {
     const res = await post({ text: 'TJ on Arch always has kosher ground beef', photoUrls: [photo], stores: [{ listingId: ARCH, items }], email: ' Me@X.co ' })
-    expect(await res.json()).toEqual({ ok: true, filed: 1 })
+    // The ids: for the email asked once at the end (/api/message/email).
+    expect(await res.json()).toEqual({ ok: true, filed: 1, ids: ['s1'] })
     const [community, id, payload, note, by] = m.submitListingUpdate.mock.calls[0]
     expect([community, id, by]).toEqual(['philly', ARCH, { email: 'me@x.co' }])
     expect(payload.details.m).toEqual(['Chicken', 'Hamburger Meat'])
@@ -71,7 +72,7 @@ describe('POST /api/message/send', () => {
       text: 'change the kosher certification for say she ate to keystone k',
       edits: [{ listingId: SAY, values: { kosherCert: 'keystone k', googleSyncedAt: 'x' }, notes: ['Hours, Friday, one day only: closes 2:00 PM.'] }],
     })
-    expect(await res.json()).toEqual({ ok: true, filed: 1 })
+    expect(await res.json()).toMatchObject({ ok: true, filed: 1 })
     const [, id, payload, note] = m.submitListingUpdate.mock.calls[0]
     expect(id).toBe(SAY)
     expect(payload.details).toEqual({ kosherCert: 'Keystone-K' })
@@ -90,7 +91,7 @@ describe('POST /api/message/send', () => {
   // checks one, filed labelled with what it was read from.
   it('files a new place from the add form, labelled with what it was read from, and refuses an invalid one', async () => {
     const form = { category: 'grocery', name: 'South Square Market', address: '2201 South St', phone: '', anchorId: 'all', distance: null, geo: null, details: { m: ['Challah'] }, source: { readBy: 'person', from: 'faked' } }
-    expect(await (await post({ text: 'South Square Market has challah', forms: [{ submission: form }], email: 'me@x.co' })).json()).toEqual({ ok: true, filed: 1 })
+    expect(await (await post({ text: 'South Square Market has challah', forms: [{ submission: form }], email: 'me@x.co' })).json()).toMatchObject({ ok: true, filed: 1 })
     const [, payload] = m.submitListingCreate.mock.calls[0]
     expect(payload).toMatchObject({ name: 'South Square Market', submittedBy: { email: 'me@x.co' }, source: { readBy: 'ai', from: 'a message', original: 'South Square Market has challah' } })
     const res = await post({ text: 'x', forms: [{ submission: { ...form, name: '' } }] })
@@ -116,7 +117,7 @@ describe('POST /api/message/send', () => {
       stores: [{ listingId: 'ffffffff-2f55-4a8e-9d57-3b7f0d6f4a21', items }, { listingId: ARCH, items: [{ name: 'Chicken', availability: 'always', doubt: null }] }],
       places: [{ category: 'grocery', place: { name: 'Somewhere' }, items: [] }, { category: 'spa', place: { name: 'Elsewhere' }, items: [] }],
     })
-    expect(await res.json()).toEqual({ ok: true, filed: 0 })
+    expect(await res.json()).toMatchObject({ ok: true, filed: 0 })
     expect(m.submitListingUpdate).not.toHaveBeenCalled()
     expect(m.submitListingCreate).not.toHaveBeenCalled()
   })

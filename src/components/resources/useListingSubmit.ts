@@ -27,8 +27,8 @@ type Options = {
    *  read from a message with what it was read from. */
   via?: SendVia
   /** Runs instead of the "Thank you" screen once it's in (the box goes back
-   *  to the rest of what it read). */
-  onSent?: () => void
+   *  to the rest of what it read), with the answer it got. */
+  onSent?: (body: unknown) => void
 }
 
 export type SendVia = (body: {
@@ -151,7 +151,7 @@ export function useListingSubmit({ mode, existing, sharedTurnstile, adminSubmit,
       // Admin mode: the listing is already live — nothing to review, so skip
       // the "Thank you!" pending screen and just close back out.
       if (adminSubmit) onAdminSubmitted?.()
-      else if (onSent) onSent()
+      else if (onSent) onSent(body)
       else setDone(true)
     } catch {
       setRetriedVerification(false)

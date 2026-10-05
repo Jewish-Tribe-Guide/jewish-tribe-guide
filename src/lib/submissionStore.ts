@@ -231,6 +231,28 @@ export async function submitListingDelete(
   })
 }
 
+/** The "+ Add" box asks for an email once, after its last Send (agreed
+ *  Oct 5), so it's added to what that box already filed. Only to
+ *  suggestions read by AI, still waiting, with no email yet, sent within the
+ *  hour: the ids are what the box was handed back, and this can't touch
+ *  anything else. Returns how many it reached. */
+export async function attachSubmitterEmail(community: string, ids: string[], email: string): Promise<number> {
+  if (ids.length === 0) return 0
+  const since = new Date(Date.now() - 60 * 60 * 1000).toISOString()
+  const { data, error } = await getAdminClient()
+    .from('submission')
+    .update({ submitted_by: { email } })
+    .eq('community_id', community)
+    .in('id', ids)
+    .eq('status', 'pending')
+    .is('submitted_by', null)
+    .gte('created_at', since)
+    .eq('payload->source->>readBy', 'ai')
+    .select('id')
+  if (error) throw new Error(`Failed to add the email: ${error.message}`)
+  return (data ?? []).length
+}
+
 async function insertSubmission(row: {
   community_id: string
   operation: SubmissionRow['operation']

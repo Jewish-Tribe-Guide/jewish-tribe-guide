@@ -67,7 +67,7 @@ type Props = {
   seed?: { place?: PlaceSelectResult; address?: string; coords?: { lat: number; lng: number } | null; values?: Partial<DirectoryResource> }
   /** See useListingSubmit's options of the same names. */
   via?: SendVia
-  onSent?: () => void
+  onSent?: (body: unknown) => void
   /** Every section open from the start, so someone adding a place sees all
    *  it can hold (the "+ Add" box). Otherwise only Basics, and sections
    *  that already hold something. */

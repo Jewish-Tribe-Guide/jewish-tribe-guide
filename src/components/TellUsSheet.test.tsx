@@ -110,28 +110,76 @@ describe('Saw something? Tell us', () => {
     expect(screen.getAllByAltText(/^Photo \d$/)).toHaveLength(3)
   })
 
-  it('asks which store, sends what they picked, leaves out what they took off, and thanks them', async () => {
+  // Agreed Oct 5: several places in one message, one at a time: "1 of 3",
+  // ‹ ›, Next and Send. A sent place leaves the count; sending the last
+  // shows the one before it.
+  it('shows several places one at a time, each sent on its own, asking “which one?” where it must', async () => {
+    respond = (url) => (url.includes('/read') ? reading : { ok: true, filed: 1, ids: [`id-${calls.length}`] })
     open()
     fireEvent.change(screen.getByLabelText('What did you see?'), { target: { value: 'trader joes sometimes has ground turkey' } })
     fireEvent.click(screen.getByRole('button', { name: 'See what changes' }))
-    const cards = await screen.findAllByTestId('tell-us-card')
-    // Until a store is picked, only one can go; the new place goes with its
-    // own form.
-    expect(screen.getByRole('button', { name: 'Send' })).toBeInTheDocument()
-    fireEvent.click(within(cards[1]).getByRole('button', { name: 'Market St' }))
-    expect(within(cards[1]).getByText('+ Ground Turkey, sometimes')).toBeInTheDocument()
-    fireEvent.change(screen.getByLabelText(/Email, to hear when it’s live/), { target: { value: 'me@x.co' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Send 2 updates' }))
+    await screen.findByTestId('tell-us-card')
+    expect(screen.getAllByTestId('tell-us-card')).toHaveLength(1)
+    expect(screen.getByTestId('tell-us-count')).toHaveTextContent('Trader Joe’s · 1 of 3')
 
-    await screen.findByTestId('tell-us-sent')
-    const body = JSON.parse(String(calls[1].init!.body))
-    expect(calls[1].url).toBe('/api/message/send?community=philly')
-    expect(body).toMatchObject({
-      text: 'trader joes sometimes has ground turkey',
-      photoUrls: reading.photoUrls,
-      stores: [{ listingId: 'arch', items: [ground] }, { listingId: 'market', items: [{ name: 'Ground Turkey', availability: 'sometimes', doubt: null }] }],
-      email: 'me@x.co',
-    })
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+    expect(await screen.findByText('Sent: Trader Joe’s')).toBeInTheDocument()
+    expect(JSON.parse(String(calls[1].init!.body))).toMatchObject({ text: 'trader joes sometimes has ground turkey', photoUrls: reading.photoUrls, stores: [{ listingId: 'arch', items: [ground] }] })
+    // The next one slides in: the chain, which waits for its branch.
+    expect(screen.getByTestId('tell-us-count')).toHaveTextContent('1 of 2')
+    expect(screen.getByRole('button', { name: 'Send' })).toBeDisabled()
+    fireEvent.click(screen.getByRole('button', { name: 'Market St' }))
+    expect(screen.getByText('+ Ground Turkey, sometimes')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+    await waitFor(() => expect(calls).toHaveLength(3))
+    expect(JSON.parse(String(calls[2].init!.body)).stores).toEqual([{ listingId: 'market', items: [{ name: 'Ground Turkey', availability: 'sometimes', doubt: null }] }])
+    // One left, the new place: no count, no Next, its own form to send it.
+    expect(await screen.findByRole('button', { name: 'Find it and fill it in' })).toBeInTheDocument()
+    expect(screen.queryByTestId('tell-us-count')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Next' })).not.toBeInTheDocument()
+  })
+
+  it('goes back and forth with ‹ › and Next, and sending the last shows the one before', async () => {
+    respond = (url) => (url.includes('/read') ? reading : { ok: true, filed: 1, ids: ['x'] })
+    open()
+    fireEvent.change(screen.getByLabelText('What did you see?'), { target: { value: 'trader joes sometimes has ground turkey' } })
+    fireEvent.click(screen.getByRole('button', { name: 'See what changes' }))
+    const count = await screen.findByTestId('tell-us-count')
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+    expect(count).toHaveTextContent('2 of 3')
+    fireEvent.click(screen.getByRole('button', { name: 'Previous place' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Previous place' }))
+    expect(count).toHaveTextContent('South Square Market · 3 of 3')
+    fireEvent.click(screen.getByRole('button', { name: 'Previous place' }))
+    expect(count).toHaveTextContent('2 of 3')
+    fireEvent.click(screen.getByRole('button', { name: 'Market St' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+    // 2 of 3 sent: the one after it is 2 of 2.
+    expect(await screen.findByText('Sent: Trader Joe’s')).toBeInTheDocument()
+    expect(screen.getByTestId('tell-us-count')).toHaveTextContent('South Square Market · 2 of 2')
+  })
+
+  it('thanks them with what went in, and asks for an email once, for all of it', async () => {
+    const two = { ...reading, proposals: [reading.proposals[0], { ...reading.proposals[0], listingId: 'market', listing: MARKET }] }
+    let n = 0
+    respond = (url) => (url.includes('/read') ? two : url.includes('/email') ? { ok: true, updated: 2 } : { ok: true, filed: 1, ids: [`s${++n}`] })
+    const onClose = vi.fn()
+    open({ onClose })
+    fireEvent.change(screen.getByLabelText('What did you see?'), { target: { value: 'both TJs have ground beef' } })
+    fireEvent.click(screen.getByRole('button', { name: 'See what changes' }))
+    await screen.findByTestId('tell-us-card')
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+    await screen.findByText('Sent: Trader Joe’s')
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+
+    const thanks = await screen.findByTestId('tell-us-sent')
+    expect(thanks).toHaveTextContent('Your 2 updates are with an admin.')
+    expect(within(thanks).getAllByText('Trader Joe’s')).toHaveLength(2)
+    fireEvent.change(screen.getByLabelText(/Email me when they’re on the guide/), { target: { value: 'me@x.co' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }))
+    await waitFor(() => expect(onClose).toHaveBeenCalled())
+    const email = calls.find((c) => c.url === '/api/message/email?community=philly')!
+    expect(JSON.parse(String(email.init!.body))).toEqual({ ids: ['s1', 's2'], email: 'me@x.co' })
   })
 
   // Agreed Oct 5: a new place is added with the form of questions, found on
@@ -140,8 +188,9 @@ describe('Saw something? Tell us', () => {
     open()
     fireEvent.change(screen.getByLabelText('What did you see?'), { target: { value: 'South Square Market on 22nd has challah' } })
     fireEvent.click(screen.getByRole('button', { name: 'See what changes' }))
-    let cards = await screen.findAllByTestId('tell-us-card')
-    fireEvent.click(within(cards[2]).getByRole('button', { name: 'Find it and fill it in' }))
+    await screen.findByTestId('tell-us-count')
+    fireEvent.click(screen.getByRole('button', { name: 'Previous place' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Find it and fill it in' }))
     // Searched for already, and added as the grocery it was read as.
     expect(screen.getByPlaceholderText('Search by name or address…')).toHaveValue('South Square Market, 22nd & South')
     fireEvent.click(screen.getByRole('button', { name: 'Not on Google? Fill it in yourself' }))
@@ -150,8 +199,9 @@ describe('Saw something? Tell us', () => {
     fireEvent.change(screen.getByLabelText('Name *'), { target: { value: 'South Square Market & Deli' } })
     fireEvent.submit(screen.getByLabelText('Name *').closest('form')!)
 
-    cards = await screen.findAllByTestId('tell-us-card')
-    expect(within(cards[2]).getByText(/^Sent\./)).toBeInTheDocument()
+    // Back to the rest, that one out of the count.
+    expect(await screen.findByText('Sent: South Square Market')).toBeInTheDocument()
+    expect(screen.getByTestId('tell-us-count')).toHaveTextContent('of 2')
     const sent = calls.find((c) => c.url === '/api/message/send?community=philly')!
     const body = JSON.parse(String(sent.init!.body))
     expect(body).toMatchObject({ text: 'South Square Market on 22nd has challah', photoUrls: reading.photoUrls })
@@ -207,7 +257,7 @@ describe('Saw something? Tell us', () => {
     expect(within(card).getByText('Hours, Wednesday: 11:00 AM–9:00 PM → 11:00 AM–3:00 PM')).toBeInTheDocument()
     expect(within(card).getByText('Was: IKC')).toBeInTheDocument()
     // Not until it's answered.
-    expect(screen.queryByRole('button', { name: /^Send/ })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Send' })).toBeDisabled()
     fireEvent.click(within(card).getByRole('button', { name: 'Just this once' }))
     expect(within(card).queryByText(/Hours, Wednesday: 11:00/)).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Send' }))

@@ -147,7 +147,8 @@ export async function POST(request: Request) {
     after(async () => {
       for (const s of filed) await sendSubmissionNotification(s).catch((err) => console.error('[message/send] Admin notification failed:', err))
     })
-    return Response.json({ ok: true, filed: filed.length })
+    // The ids, for the email asked once at the end (/api/message/email).
+    return Response.json({ ok: true, filed: filed.length, ids: filed.map((f) => f.id) })
   } catch (err) {
     console.error('[message/send] could not file:', err)
     return Response.json(FAILED, { status: 502 })

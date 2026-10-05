@@ -184,7 +184,6 @@ function TellUsBody({
   const [busy, setBusy] = useState<'read' | 'send' | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [attempt, setAttempt] = useState(0)
-  const [left, setLeft] = useState<Set<number>>(new Set())
   const [picked, setPicked] = useState<Record<number, string | null>>({})
   // A new place the reader found, being found on Google and filled in, and
   // the ones already sent that way.
@@ -194,7 +193,12 @@ function TellUsBody({
   const [fixes, setFixes] = useState<Record<number, Record<string, unknown>>>({})
   const [whens, setWhens] = useState<Record<number, 'always' | 'once'>>({})
   const [email, setEmail] = useState('')
-  const [filed, setFiled] = useState(0)
+  // One place at a time (agreed Oct 5): which one is showing, among those
+  // not sent yet; and what's been sent, for the thank-you and its email.
+  const [at, setAt] = useState(0)
+  const [sentList, setSentList] = useState<{ name: string; what: string }[]>([])
+  const [sentIds, setSentIds] = useState<string[]>([])
+  const [toast, setToast] = useState<string | null>(null)
   const fileInput = useRef<HTMLInputElement>(null)
   // A screenshot pasted, or photos dropped, anywhere in the box (asked for
   // Oct 5: on desktop, a photo could only be added with the button). The
@@ -235,7 +239,8 @@ function TellUsBody({
       if (!res.ok || !json.ok || !json.proposals) throw new Error(json.error ?? 'failed')
       setReading({ proposals: json.proposals, photoUrls: json.photoUrls ?? [] })
       setSentCards(new Set())
-      setLeft(new Set())
+      setAt(0)
+      setToast(null)
       setPicked({})
       setFixes({})
       setWhens({})
@@ -247,37 +252,64 @@ function TellUsBody({
     }
   }
 
-  // What Send files: each store (the one read, or the branch picked) and
-  // each new place, unless left out.
+  // What one card's Send files: its store (the one read, or the branch
+  // picked) with what it carries, or its other fields. A new place goes with
+  // the add form, and a shul's times with their own box.
   const proposals = reading?.proposals ?? []
-  const stores: { listingId: string; items: ReadItem[] }[] = []
-  const edits: { listingId: string; values: Record<string, unknown>; notes: string[] }[] = []
-  proposals.forEach((p, i) => {
-    if (left.has(i)) return
-    if (p.kind === 'items') {
+  const payloadOf = (i: number): { stores: { listingId: string; items: ReadItem[] }[]; edits: { listingId: string; values: Record<string, unknown>; notes: string[] }[] } | null => {
+    const p = proposals[i]
+    if (p?.kind === 'items') {
       const id = p.listingId ?? picked[i] ?? null
       const lines = p.listingId ? p.lines : p.ask?.choices.find((c) => c.listingId === id)?.lines ?? []
-      if (id && lines.length) stores.push({ listingId: id, items: p.items })
+      return id && lines.length ? { stores: [{ listingId: id, items: p.items }], edits: [] } : null
     }
-    if (p.kind === 'fields') {
+    if (p?.kind === 'new_place' && picked[i] && p.maybe.find((m) => m.id === picked[i])?.lines.length) {
+      return { stores: [{ listingId: picked[i]!, items: p.items }], edits: [] }
+    }
+    if (p?.kind === 'fields') {
       const r = fieldsReadingOf(p, picked[i] ?? null)
-      if (!r || (r.askWhen && !whens[i])) return
+      if (!r || (r.askWhen && !whens[i])) return null
       const values = { ...r.values, ...fixes[i] }
       const notes = [...r.notes]
       if (r.askWhen && whens[i] === 'once') {
         delete values[r.askWhen.key]
         notes.push(r.askWhen.oneDay)
       }
-      if (Object.keys(values).length || notes.length) edits.push({ listingId: r.listing.id, values, notes })
+      return Object.keys(values).length || notes.length ? { stores: [], edits: [{ listingId: r.listing.id, values, notes }] } : null
     }
-    if (p.kind === 'new_place') {
-      const same = picked[i]
-      if (same) {
-        if (p.maybe.find((m) => m.id === same)?.lines.length) stores.push({ listingId: same, items: p.items })
-      }
+    return null
+  }
+  /** A card's place and what it sent, for the counter and the thank-you. */
+  const describe = (i: number): { name: string; what: string } => {
+    const p = proposals[i]
+    if (p?.kind === 'items') {
+      const c = p.ask?.choices.find((x) => x.listingId === picked[i])
+      return { name: (p.listing ?? c?.listing)?.name ?? (p.asWritten || 'A store'), what: (p.listing ? p.lines : c?.lines ?? []).join(', ') }
     }
-  })
-  const sendable = stores.length + edits.length
+    if (p?.kind === 'fields') {
+      const r = fieldsReadingOf(p, picked[i] ?? null)
+      return { name: r?.listing.name ?? (p.asWritten || 'A place'), what: r ? r.lines.map((l) => l.split(':')[0]).join(', ') || 'A note' : '' }
+    }
+    if (p?.kind === 'new_place') {
+      const same = p.maybe.find((m) => m.id === picked[i])
+      return same ? { name: same.name, what: same.lines.join(', ') } : { name: p.place.name, what: 'New place' }
+    }
+    if (p?.kind === 'times') return { name: p.listing.name, what: 'Davening times' }
+    return { name: '', what: '' }
+  }
+  const PLACES = new Set(['items', 'fields', 'new_place', 'times'])
+  const queue = proposals.map((_, i) => i).filter((i) => PLACES.has(proposals[i].kind) && !sentCards.has(i))
+  // Sending the last one shows the one before it (agreed Oct 5: 3 of 3 sent
+  // is 2 of 2, the previous place).
+  const pos = Math.min(at, Math.max(0, queue.length - 1))
+  const cur = queue[pos]
+  const markSent = (i: number, ids: string[]) => {
+    setSentCards((s) => new Set(s).add(i))
+    setSentList((l) => [...l, describe(i)])
+    setSentIds((x) => [...x, ...ids])
+    setToast(`Sent: ${describe(i).name}`)
+    if (queue.every((q) => q === i)) setStep('sent')
+  }
 
   const viaMessage: SendVia = ({ payload, submittedBy, company, turnstileToken }) =>
     fetch(withCommunity('/api/message/send', community), {
@@ -286,17 +318,16 @@ function TellUsBody({
       body: JSON.stringify({ text, photoUrls: reading?.photoUrls ?? [], forms: [{ submission: payload }], email: submittedBy?.email ?? '', turnstileToken, company }),
     })
 
-  const send = async (token: string) => {
+  const send = async (token: string, i: number) => {
     try {
       const res = await fetch(withCommunity('/api/message/send', community), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, photoUrls: reading?.photoUrls ?? [], stores, edits, email, turnstileToken: token, company: '' }),
+        body: JSON.stringify({ text, photoUrls: reading?.photoUrls ?? [], ...payloadOf(i), turnstileToken: token, company: '' }),
       })
-      const json = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string; filed?: number }
+      const json = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string; ids?: string[] }
       if (!res.ok || !json.ok) throw new Error(json.error ?? 'failed')
-      setFiled(json.filed ?? 0)
-      setStep('sent')
+      markSent(i, json.ids ?? [])
     } catch (e) {
       setError(e instanceof Error && e.message !== 'failed' ? e.message : 'That didn’t send. Please try again.')
     } finally {
@@ -314,15 +345,52 @@ function TellUsBody({
 
   const canRead = text.trim().length >= 3 || photos.length > 0
 
+  // The email, asked once (agreed Oct 5): added to everything just sent.
+  const done = async () => {
+    if (email.trim() && sentIds.length) {
+      setBusy('send')
+      setError(null)
+      const res = await fetch(withCommunity('/api/message/email', community), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: sentIds, email }),
+      }).catch(() => null)
+      const json = ((await res?.json().catch(() => null)) ?? {}) as { ok?: boolean; error?: string }
+      setBusy(null)
+      if (!res?.ok || !json.ok) return setError(json.error ?? 'That didn’t save. Please try again.')
+    }
+    onClose()
+  }
+
   if (step === 'sent') {
     return (
       <div className="space-y-3 p-1" data-testid="tell-us-sent">
         <p className="text-[17px] font-extrabold text-slate-900">Thank you</p>
         <p className="text-[14.5px] leading-snug text-slate-700">
-          {filed === 1 ? 'Your update is with an admin.' : `Your ${filed} updates are with an admin.`} They check each one before it shows in the guide.
-          {email ? ' We’ll email you when it’s live.' : ''}
+          {sentList.length === 1 ? 'Your update is with an admin.' : `Your ${sentList.length} updates are with an admin.`} They check each one before it shows in the guide.
         </p>
-        <button type="button" onClick={onClose} className="w-full cursor-pointer rounded-lg bg-primary px-4 py-2.5 text-[15px] font-bold text-white">
+        <ul className="divide-y divide-slate-100 border-y border-slate-100">
+          {sentList.map((x, k) => (
+            <li key={k} className="flex justify-between gap-3 py-2 text-[14px]">
+              <span className="font-semibold text-slate-900">{x.name}</span>
+              <span className="text-right text-slate-500">{x.what}</span>
+            </li>
+          ))}
+        </ul>
+        {sentIds.length > 0 && (
+          <div>
+            <label htmlFor={emailId} className="block text-[13px] font-semibold text-slate-700">
+              Email me when {sentList.length === 1 ? 'it’s' : 'they’re'} on the guide <span className="font-normal text-slate-500">(optional)</span>
+            </label>
+            <input id={emailId} type="email" value={email} onChange={(e) => setEmail(e.target.value)} className={`${inputClass} mt-1`} autoComplete="email" />
+          </div>
+        )}
+        {error && (
+          <p role="alert" className="text-[13.5px] text-red-700">
+            {error}
+          </p>
+        )}
+        <button type="button" disabled={busy === 'send'} onClick={() => void done()} className="w-full cursor-pointer rounded-lg bg-primary px-4 py-2.5 text-[15px] font-bold text-white disabled:opacity-60">
           Done
         </button>
       </div>
@@ -449,53 +517,69 @@ function TellUsBody({
 
       {step === 'result' && reading && (
         <>
-          <p className="text-[13.5px] leading-snug text-slate-600">
-            Read by AI from what you sent. Check it, take off anything that’s wrong, then send it. An admin checks it too.
-          </p>
-          {proposals.map((p, i) => (
-            <ResultCard
-              key={i}
-              p={p}
-              left={left.has(i)}
-              onLeave={(out) => setLeft((s) => { const n = new Set(s); if (out) n.add(i); else n.delete(i); return n })}
-              picked={picked[i] ?? null}
-              onPick={(id) => {
-                setPicked((x) => ({ ...x, [i]: id }))
-                setFixes((x) => ({ ...x, [i]: {} }))
-              }}
-              fixes={fixes[i] ?? {}}
-              onFix={(key, v) => setFixes((x) => ({ ...x, [i]: { ...x[i], [key]: v } }))}
-              when={whens[i] ?? null}
-              onWhen={(w) => setWhens((x) => ({ ...x, [i]: w }))}
-              categoryOf={(id) => categories?.find((c) => c.id === id)}
-              sent={sentCards.has(i)}
-              onFill={() => {
-                if (p.kind !== 'new_place') return
-                setAiPlace({ card: i, query: [p.place.name, p.place.address].filter(Boolean).join(', '), values: p.seed ?? { name: p.place.name } })
-                openFind(false, categories?.find((c) => c.id === p.category))
-              }}
-              text={text}
-              photoUrl={reading.photoUrls[0] ?? null}
-              community={community}
-            />
-          ))}
-          {sendable > 0 && (
-            <>
-              <div>
-                <label htmlFor={emailId} className="block text-[13px] font-semibold text-slate-700">
-                  Email, to hear when it’s live <span className="font-normal text-slate-500">(optional)</span>
-                </label>
-                <input id={emailId} type="email" value={email} onChange={(e) => setEmail(e.target.value)} className={`${inputClass} mt-1`} autoComplete="email" />
-              </div>
-              <button
-                type="button"
-                disabled={busy === 'send'}
-                onClick={() => start('send', (token) => void send(token))}
-                className="w-full cursor-pointer rounded-lg bg-primary px-4 py-2.5 text-[15px] font-bold text-white disabled:opacity-60"
-              >
-                {busy === 'send' ? 'Sending…' : sendable === 1 ? 'Send' : `Send ${sendable} updates`}
+          {toast && <p className="text-center text-[13.5px] font-bold text-emerald-700">{toast}</p>}
+          {queue.length > 1 && cur !== undefined && (
+            <div className="flex items-center gap-2" data-testid="tell-us-count">
+              <button type="button" aria-label="Previous place" onClick={() => setAt((pos - 1 + queue.length) % queue.length)} className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-slate-200 text-slate-600 hover:bg-slate-50">
+                ‹
               </button>
-            </>
+              <p className="flex-1 text-center text-[14px] font-bold text-slate-600">
+                {describe(cur).name} · <span className="text-slate-900">{pos + 1} of {queue.length}</span>
+              </p>
+              <button type="button" aria-label="Next place" onClick={() => setAt((pos + 1) % queue.length)} className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-slate-200 text-slate-600 hover:bg-slate-50">
+                ›
+              </button>
+            </div>
+          )}
+          <p className="text-[13.5px] leading-snug text-slate-600">
+            Read by AI from what you sent. Check it, then send it. An admin checks it too.
+          </p>
+          {(cur === undefined ? proposals.map((_, i) => i).filter((i) => !PLACES.has(proposals[i].kind)) : [cur]).map((i) => {
+            const p = proposals[i]
+            return (
+              <ResultCard
+                key={i}
+                p={p}
+                picked={picked[i] ?? null}
+                onPick={(id) => {
+                  setPicked((x) => ({ ...x, [i]: id }))
+                  setFixes((x) => ({ ...x, [i]: {} }))
+                }}
+                fixes={fixes[i] ?? {}}
+                onFix={(key, v) => setFixes((x) => ({ ...x, [i]: { ...x[i], [key]: v } }))}
+                when={whens[i] ?? null}
+                onWhen={(w) => setWhens((x) => ({ ...x, [i]: w }))}
+                categoryOf={(id) => categories?.find((c) => c.id === id)}
+                onFill={() => {
+                  if (p.kind !== 'new_place') return
+                  setAiPlace({ card: i, query: [p.place.name, p.place.address].filter(Boolean).join(', '), values: p.seed ?? { name: p.place.name } })
+                  openFind(false, categories?.find((c) => c.id === p.category))
+                }}
+                onTimesSent={() => markSent(i, [])}
+                text={text}
+                photoUrl={reading.photoUrls[0] ?? null}
+                community={community}
+              />
+            )
+          })}
+          {cur !== undefined && (
+            <div className="flex gap-2">
+              {queue.length > 1 && (
+                <button type="button" onClick={() => setAt((pos + 1) % queue.length)} className="cursor-pointer rounded-lg border border-slate-300 px-5 py-2.5 text-[15px] font-bold text-slate-800 hover:bg-slate-50">
+                  Next
+                </button>
+              )}
+              {(proposals[cur].kind === 'items' || proposals[cur].kind === 'fields' || (proposals[cur].kind === 'new_place' && picked[cur])) && (
+                <button
+                  type="button"
+                  disabled={busy === 'send' || !payloadOf(cur)}
+                  onClick={() => start('send', (token) => void send(token, cur))}
+                  className="flex-1 cursor-pointer rounded-lg bg-primary px-4 py-2.5 text-[15px] font-bold text-white disabled:cursor-default disabled:opacity-50"
+                >
+                  {busy === 'send' ? 'Sending…' : 'Send'}
+                </button>
+              )}
+            </div>
           )}
           <button type="button" onClick={() => setStep('write')} className="cursor-pointer text-[14px] font-bold text-slate-500 hover:text-slate-700">
             ‹ Change what I wrote
@@ -561,10 +645,11 @@ function TellUsBody({
           via={aiPlace ? viaMessage : undefined}
           onSent={
             aiPlace
-              ? () => {
-                  setSentCards((s) => new Set(s).add(aiPlace.card))
+              ? (answer) => {
+                  const ids = (answer as { ids?: string[] } | null)?.ids ?? []
                   setAiPlace(null)
                   setStep('result')
+                  markSent(aiPlace.card, ids)
                 }
               : undefined
           }
@@ -606,12 +691,10 @@ function ChangeLines({ lines, held }: Lines) {
 
 function ResultCard({
   p,
-  left,
-  onLeave,
   picked,
   onPick,
-  sent,
   onFill,
+  onTimesSent,
   text,
   photoUrl,
   community,
@@ -627,14 +710,12 @@ function ResultCard({
   onWhen: (w: 'always' | 'once') => void
   categoryOf: (id: string) => CategoryConfig | undefined
   p: Proposal
-  left: boolean
-  onLeave: (out: boolean) => void
   picked: string | null
   onPick: (id: string | null) => void
-  /** A new place: sent, with the add form. */
-  sent: boolean
   /** A new place: find it on Google and fill it in. */
   onFill: () => void
+  /** A shul's times, sent with their own box. */
+  onTimesSent: () => void
   text: string
   photoUrl: string | null
   community: string
@@ -642,18 +723,13 @@ function ResultCard({
   const [timesOpen, setTimesOpen] = useState(true)
   const [timesSent, setTimesSent] = useState(false)
   const card = 'rounded-xl border border-slate-200 bg-white px-3.5 py-3'
-  const leave = (
-    <button type="button" onClick={() => onLeave(!left)} className="cursor-pointer text-[13px] font-semibold text-slate-500 hover:text-slate-800">
-      {left ? 'Put it back' : 'Leave this out'}
-    </button>
-  )
   const short = (a: string) => a.split(',')[0]
 
   if (p.kind === 'items') {
     const chosen = p.listing ?? p.ask?.choices.find((c) => c.listingId === picked)?.listing ?? null
     const lines = p.listing ? { lines: p.lines, held: p.held } : (p.ask?.choices.find((c) => c.listingId === picked) ?? null)
     return (
-      <div className={`${card} ${left ? 'opacity-50' : ''}`} data-testid="tell-us-card">
+      <div className={`${card}`} data-testid="tell-us-card">
         {chosen ? (
           <p className="text-[15px] font-extrabold text-slate-900">
             {chosen.name} <span className="font-normal text-slate-500">· {short(chosen.address)}</span>
@@ -686,7 +762,6 @@ function ResultCard({
             {p.chain ? 'About the whole chain, not one store, so nothing changes in the guide.' : 'Couldn’t tell which store this is.'} Items: {p.items.map((i) => i.name).join(', ')}
           </p>
         )}
-        {chosen && lines?.lines.length ? <div className="mt-2">{leave}</div> : null}
       </div>
     )
   }
@@ -700,7 +775,7 @@ function ResultCard({
     const lines = r ? changeLines(fields, r.before as DirectoryResource, shown) : []
     const notes = r ? [...r.notes, ...(r.askWhen && when === 'once' ? [r.askWhen.oneDay] : [])] : []
     return (
-      <div className={`${card} ${left ? 'opacity-50' : ''}`} data-testid="tell-us-card">
+      <div className={`${card}`} data-testid="tell-us-card">
         <p className="text-[15px] font-extrabold text-slate-900">
           {r ? r.listing.name : p.asWritten || 'A place'} {r && <span className="font-normal text-slate-500">· {short(r.listing.address)}</span>}
         </p>
@@ -783,7 +858,6 @@ function ResultCard({
           </div>
         )}
         {r?.askWhen && !when && <p className="mt-2 text-[13px] text-amber-800">Answer the question above to send it.</p>}
-        {r && (Object.keys(shown).length > 0 || notes.length > 0) && <div className="mt-2">{leave}</div>}
       </div>
     )
   }
@@ -792,7 +866,7 @@ function ResultCard({
     const same = picked ? p.maybe.find((m) => m.id === picked) : undefined
     const carries = p.items.filter((i) => !i.doubt && i.availability !== 'stopped' && i.availability !== 'announced')
     return (
-      <div className={`${card} ${left ? 'opacity-50' : ''}`} data-testid="tell-us-card">
+      <div className={`${card}`} data-testid="tell-us-card">
         {same ? (
           <>
             <p className="text-[15px] font-extrabold text-slate-900">
@@ -826,36 +900,27 @@ function ResultCard({
                 {t}
               </p>
             ))}
-            {sent ? (
-              <p className="mt-2 text-[13.5px] font-semibold text-emerald-700">Sent. An admin checks it before it shows in the guide.</p>
-            ) : (
-              <>
-                {p.maybe.length > 0 && (
-                  <div className="mt-2 rounded-lg bg-amber-50 px-2.5 py-2">
-                    <p className="text-[13.5px] font-semibold text-amber-900">Already in the guide?</p>
-                    <div className="mt-1 flex flex-wrap gap-1.5">
-                      {p.maybe.map((m) => (
-                        <button key={m.id} type="button" onClick={() => onPick(m.id)} className="cursor-pointer rounded-full border border-amber-300 bg-white px-3 py-1 text-[13px] text-slate-800 hover:bg-amber-100">
-                          It’s {m.name}, {short(m.address)}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {/* Adding a place is the form of questions, filled in from
-                    Google and from what was read (agreed Oct 5). */}
-                {!left && (
-                  <button
-                    type="button"
-                    onClick={onFill}
-                    className="mt-2.5 w-full cursor-pointer rounded-lg border-[1.5px] border-primary px-4 py-2 text-[14.5px] font-bold text-primary hover:bg-primary/5"
-                  >
-                    Find it and fill it in
-                  </button>
-                )}
-                <div className="mt-2">{leave}</div>
-              </>
+            {p.maybe.length > 0 && (
+              <div className="mt-2 rounded-lg bg-amber-50 px-2.5 py-2">
+                <p className="text-[13.5px] font-semibold text-amber-900">Already in the guide?</p>
+                <div className="mt-1 flex flex-wrap gap-1.5">
+                  {p.maybe.map((m) => (
+                    <button key={m.id} type="button" onClick={() => onPick(m.id)} className="cursor-pointer rounded-full border border-amber-300 bg-white px-3 py-1 text-[13px] text-slate-800 hover:bg-amber-100">
+                      It’s {m.name}, {short(m.address)}
+                    </button>
+                  ))}
+                </div>
+              </div>
             )}
+            {/* Adding a place is the form of questions, filled in from Google
+                and from what was read (agreed Oct 5). */}
+            <button
+              type="button"
+              onClick={onFill}
+              className="mt-2.5 w-full cursor-pointer rounded-lg border-[1.5px] border-primary px-4 py-2 text-[14.5px] font-bold text-primary hover:bg-primary/5"
+            >
+              Find it and fill it in
+            </button>
           </>
         )}
       </div>
@@ -876,7 +941,10 @@ function ResultCard({
             item={p.item}
             minyanim={minyanim}
             read={{ update: p.update, text, photoUrl }}
-            onSent={() => setTimesSent(true)}
+            onSent={() => {
+              setTimesSent(true)
+              onTimesSent()
+            }}
             onClose={() => setTimesOpen(false)}
           />
         ) : (

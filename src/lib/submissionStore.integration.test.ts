@@ -31,6 +31,7 @@ const {
   rejectSubmission,
   listPendingSubmissions,
   ReviewEditError,
+  attachSubmitterEmail,
 } = await import('./submissionStore')
 
 const pendingCategoryIds: string[] = []
@@ -132,6 +133,26 @@ describe('submissionStore (integration)', () => {
   // Approval is a moderator vouching for the listing, so it stamps confirmedAt
   // — the same field a visitor's "Mark as current" sets. Without it a listing
   // whose edit was just approved kept saying "Confirmed 8 months ago".
+  // The "+ Add" box's email, asked once after its last Send (Oct 5): added
+  // only to what it filed, read by AI, waiting, with no email yet.
+  it('adds an email to the box’s own suggestions, and to nothing else', async () => {
+    const category = await makeTestCategory()
+    const read = { ...listingPayload(category.id, `Read ${randomUUID()}`), source: { readBy: 'ai', from: 'a message' } } as ResourceSubmission
+    const fromBox = await submitListingCreate('philly', read)
+    const byHand = await submitListingCreate('philly', listingPayload(category.id, `Typed ${randomUUID()}`))
+    const hasEmail = await submitListingCreate('philly', { ...read, submittedBy: { email: 'first@x.co' } })
+    pendingSubmissionIds.push(fromBox.id, byHand.id, hasEmail.id)
+
+    expect(await attachSubmitterEmail('philly', [fromBox.id, byHand.id, hasEmail.id], 'me@x.co')).toBe(1)
+    const { data } = await getAdminClient().from('submission').select('id, submitted_by').in('id', [fromBox.id, byHand.id, hasEmail.id])
+    const by = Object.fromEntries((data ?? []).map((r) => [r.id, r.submitted_by]))
+    expect(by[fromBox.id]).toEqual({ email: 'me@x.co' })
+    expect(by[byHand.id]).toBeNull()
+    expect(by[hasEmail.id]).toEqual({ email: 'first@x.co' })
+    // Another community's id list reaches nothing.
+    expect(await attachSubmitterEmail('ues', [fromBox.id], 'other@x.co')).toBe(0)
+  })
+
   it('approving a create stamps the new listing as confirmed just now', async () => {
     const category = await makeTestCategory()
     const name = `Integration Listing ${randomUUID()}`
