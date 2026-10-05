@@ -42,7 +42,9 @@ function describe(f: WatchFinding): WatchDigestItem {
 
 async function run(dry: boolean): Promise<NextResponse> {
   const res = await fetch(KEYSTONE_LIST_URL, {
-    headers: { 'user-agent': 'Mozilla/5.0 (compatible; PhillyJewishGuide/1.0)' },
+    // Says who is asking. Keystone-K's firewall answers 403 to any agent
+    // containing "compatible;" (measured Oct 5), so not the usual bot form.
+    headers: { 'user-agent': 'PhillyJewishGuide/1.0' },
     cache: 'no-store',
   })
   if (!res.ok) return NextResponse.json({ ok: false, error: `Keystone-K's list answered ${res.status}` }, { status: 502 })
