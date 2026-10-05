@@ -17,11 +17,16 @@ const m = vi.hoisted(() => ({
   sendNewListingNotification: vi.fn(),
   sendClosureNotification: vi.fn(),
   afterCallbacks: [] as Array<() => unknown>,
+  ReviewEditError: class ReviewEditError extends Error {},
 }))
 vi.mock('@/lib/revalidateContent', () => ({ revalidatePublicContent: m.revalidatePublicContent }))
 vi.mock('next/server', () => ({ after: (fn: () => unknown) => void m.afterCallbacks.push(fn) }))
 vi.mock('@/lib/adminAuth', () => ({ getAdminUserForCommunity: m.getAdminUserForCommunity }))
-vi.mock('@/lib/submissionStore', () => ({ approveSubmission: m.approveSubmission, rejectSubmission: m.rejectSubmission }))
+vi.mock('@/lib/submissionStore', () => ({
+  approveSubmission: m.approveSubmission,
+  rejectSubmission: m.rejectSubmission,
+  ReviewEditError: m.ReviewEditError,
+}))
 vi.mock('@/lib/confirmationEmail', () => ({ sendDecisionEmail: m.sendDecisionEmail }))
 vi.mock('@/lib/email', () => ({
   sendReviewActionNotification: m.sendReviewActionNotification,
@@ -96,9 +101,32 @@ describe('PATCH /api/admin/submissions/:id — the decision', () => {
     const res = await patch({ status: 'approved' })
     expect(res.status).toBe(200)
     expect((await res.json()).submission.id).toBe('sub1')
-    expect(m.approveSubmission).toHaveBeenCalledWith('sub1', 'ues', 'admin@x.co')
+    expect(m.approveSubmission).toHaveBeenCalledWith('sub1', 'ues', 'admin@x.co', undefined)
     expect(m.rejectSubmission).not.toHaveBeenCalled()
     expect(m.revalidatePublicContent).toHaveBeenCalled()
+  })
+
+  // The opened card: a typo fixed instead of the suggestion rejected and
+  // redone. The admin's copy goes to the store, which decides what of it
+  // may change (reviewEdits.ts).
+  it('approves with the admin’s fixes when the opened card sends them', async () => {
+    const fixed = { name: 'Kosher Deli', address: '1 Main St', phone: '', details: { hours: 'x' } }
+    expect((await patch({ status: 'approved', payload: fixed })).status).toBe(200)
+    expect(m.approveSubmission).toHaveBeenCalledWith('sub1', 'ues', 'admin@x.co', fixed)
+  })
+
+  it('400s fixes that can’t go live, saying why, with nothing sent and nothing refreshed', async () => {
+    m.approveSubmission.mockRejectedValue(new m.ReviewEditError('Address is required.'))
+    const res = await patch({ status: 'approved', payload: { name: 'X', details: {} } })
+    expect(res.status).toBe(400)
+    expect((await res.json()).errors).toEqual(['Address is required.'])
+    expect(m.afterCallbacks).toHaveLength(0)
+    expect(m.revalidatePublicContent).not.toHaveBeenCalled()
+  })
+
+  it('400s fixes sent with a rejection: they’d be thrown away', async () => {
+    expect((await patch({ status: 'rejected', payload: { name: 'X', details: {} } })).status).toBe(400)
+    expect(m.rejectSubmission).not.toHaveBeenCalled()
   })
 
   it('rejects within the community, as the signed-in admin', async () => {

@@ -6,18 +6,20 @@ import type { CategoryConfig, CategoryField } from '@/lib/categories'
 // Flattening/formatting/diffing lives in lib/listingDiff so the notification
 // emails render the identical before/after — see that file's own note.
 import { diffLines, diffListing, flatListing, isMultiline } from '@/lib/submissionDiff'
+import { markTimes, submissionSource } from '@/lib/submissionSource'
 
 // One submission's card — the moderation queue (pending, with Approve/Reject
 // buttons) and the read-only history view (approved/rejected, past tense)
 // share this rendering, since a proposed-vs-current diff looks the same
 // either way; only the footer (live actions vs. a decided-when badge)
 // differs. Pass `onModerate` to get the queue's interactive footer, omit it
-// for a read-only card.
+// for a read-only card. Pass `onOpen` to make the card open
+// (SubmissionReview: the original beside a form the admin can fix).
 
 const OP_META: Record<EnrichedSubmission['operation'], { label: string; cls: string }> = {
-  create: { label: '➕ New listing', cls: 'bg-green-50 text-green-700 border border-green-200' },
-  update: { label: '✏️ Edit', cls: 'bg-blue-50 text-blue-700 border border-blue-200' },
-  delete: { label: '🗑️ Removal', cls: 'bg-red-50 text-red-700 border border-red-200' },
+  create: { label: 'New place', cls: 'bg-green-50 text-green-700 border border-green-200' },
+  update: { label: 'Edit', cls: 'bg-blue-50 text-blue-700 border border-blue-200' },
+  delete: { label: 'Removal', cls: 'bg-red-50 text-red-700 border border-red-200' },
 }
 
 const STATUS_META: Record<'approved' | 'rejected', { label: string; cls: string }> = {
@@ -33,19 +35,10 @@ const dateFormatter = new Intl.DateTimeFormat('en-US', { dateStyle: 'medium', ti
 // listing and edit so the admin checks the change against its source, not
 // just the diff. Links stay links, so the source is one tap away.
 function SourceNote({ text }: { text: string }) {
-  const parts = text.split(/(https?:\/\/[^\s"]+)/g)
   return (
     <div className="mt-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700 whitespace-pre-wrap break-words">
       <p className="mb-1 font-medium text-slate-500">Note</p>
-      {parts.map((part, i) =>
-        /^https?:\/\//.test(part) ? (
-          <a key={i} href={part} target="_blank" rel="noopener noreferrer" className="text-primary underline">
-            {part}
-          </a>
-        ) : (
-          part
-        ),
-      )}
+      {linkify(text)}
     </div>
   )
 }
@@ -55,18 +48,20 @@ export function SubmissionCard({
   busy,
   onModerate,
   categoriesById,
+  onOpen,
 }: {
   submission: EnrichedSubmission
   busy?: boolean
   onModerate?: (id: string, status: 'approved' | 'rejected', reason?: string) => void
   categoriesById: Map<string, CategoryConfig>
+  onOpen?: () => void
 }) {
   const [pendingReject, setPendingReject] = useState(false)
   const [rejectReason, setRejectReason] = useState('')
 
   const isCategory = s.target_type === 'category'
   const op = isCategory
-    ? { label: '🆕 New category', cls: 'bg-purple-50 text-purple-700 border border-purple-200' }
+    ? { label: 'New category', cls: 'bg-purple-50 text-purple-700 border border-purple-200' }
     : OP_META[s.operation]
   const categoryLabel = s.categoryLabel ?? ''
   const title = isCategory
@@ -80,6 +75,25 @@ export function SubmissionCard({
     : undefined
   const detailFields = categoryId ? categoriesById.get(categoryId)?.detailFields : undefined
   const statusMeta = s.status === 'approved' || s.status === 'rejected' ? STATUS_META[s.status] : undefined
+  const source = submissionSource(s)
+  // Only a listing that's new or edited has anything to fix; a removal or a
+  // new category is decided from the list.
+  const openable = Boolean(onOpen) && !isCategory && s.operation !== 'delete'
+  const unused =
+    !isCategory && source.readBy === 'ai' && source.original
+      ? markTimes(source.original, (s.payload as Partial<ResourceSubmission>).details ?? {}).unused
+      : 0
+  // A new place read from a message may not know where it is yet. It's
+  // opened, and found with the address lookup, before it can go live.
+  const needsAddress =
+    !isCategory &&
+    s.operation === 'create' &&
+    categoryId !== undefined &&
+    categoriesById.get(categoryId)?.hasAddress !== false &&
+    !(s.payload as Partial<ResourceSubmission>).address?.trim()
+  // What the list shows of the note: the person's own words, the reader's
+  // summary, or a watch's quote. A long original waits for the opened card.
+  const listNote = source.readBy === 'ai' ? source.note : source.readBy === 'automatic' ? source.original : source.note
 
   function handleRejectConfirm() {
     onModerate?.(s.id, 'rejected', rejectReason.trim() || undefined)
@@ -87,8 +101,19 @@ export function SubmissionCard({
     setRejectReason('')
   }
 
+  // The whole card opens it (canvas v80: no Open button), except where a
+  // click means something else: a button, a link, the reason box.
+  function openFromCard(e: React.MouseEvent) {
+    if (!openable || pendingReject) return
+    if ((e.target as HTMLElement).closest('button, a, textarea, input, select')) return
+    onOpen?.()
+  }
+
   return (
-    <div className="bg-white border border-slate-200 rounded-lg shadow-sm p-4">
+    <div
+      className={`bg-white border border-slate-200 rounded-lg shadow-sm p-4 ${openable && !pendingReject ? 'cursor-pointer hover:border-slate-300' : ''}`}
+      onClick={openFromCard}
+    >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap mb-2">
@@ -99,6 +124,9 @@ export function SubmissionCard({
               </span>
             )}
             <p className="font-semibold text-slate-900 text-sm">{title}</p>
+            {source.readBy === 'ai' && (
+              <span className="text-xs font-medium bg-blue-50 text-blue-800 border border-blue-200 rounded-full px-2 py-0.5">Read by AI</span>
+            )}
           </div>
 
           {isCategory && <CategoryDetails payload={s.payload as CategorySubmissionPayload} />}
@@ -108,7 +136,15 @@ export function SubmissionCard({
           {!isCategory && s.operation === 'update' && (
             <Diff current={s.current} proposed={s.payload as ResourceSubmission} fields={detailFields} />
           )}
-          {!isCategory && s.operation !== 'delete' && s.note && <SourceNote text={s.note} />}
+          {!isCategory && s.operation !== 'delete' && listNote && <SourceNote text={listNote} />}
+          {unused > 0 && (
+            <p className="mt-2 text-xs font-medium text-amber-800">
+              {unused === 1 ? '1 time in the original isn’t used.' : `${unused} times in the original aren’t used.`} Open it to check.
+            </p>
+          )}
+          {needsAddress && (
+            <p className="mt-2 text-xs font-medium text-amber-800">Not in the guide yet: needs its address. Open it to find it.</p>
+          )}
           {!isCategory && s.operation === 'delete' && (
             <div className="text-xs text-slate-600">
               {s.current && <p>{s.current.address}</p>}
@@ -124,6 +160,7 @@ export function SubmissionCard({
           <p className="text-xs text-muted mt-2 italic">
             Submitted {dateFormatter.format(new Date(s.created_at))}
             {(s.submitted_by?.name || s.submitted_by?.email) && ` by ${s.submitted_by.name || s.submitted_by.email}`}
+            {source.readBy !== 'person' && !isCategory && ` · from ${source.from}`}
           </p>
 
           {/* Two-step reject: reason input appears inline below the details */}
@@ -170,13 +207,26 @@ export function SubmissionCard({
 
         {onModerate && !pendingReject && (
           <div className="flex flex-col gap-2 shrink-0">
-            <button
-              onClick={() => onModerate(s.id, 'approved')}
-              disabled={busy}
-              className="text-xs font-medium bg-green-600 text-white rounded px-3 py-1.5 hover:bg-green-700 transition-colors disabled:opacity-60 cursor-pointer"
-            >
-              {busy ? '…' : 'Approve'}
-            </button>
+            {openable && (
+              // The keyboard's way in; a mouse can click anywhere on the card.
+              <button
+                type="button"
+                onClick={onOpen}
+                aria-label={`Open ${title}`}
+                className="self-end text-slate-400 hover:text-slate-700 px-1 text-lg leading-none cursor-pointer"
+              >
+                ›
+              </button>
+            )}
+            {!needsAddress && (
+              <button
+                onClick={() => onModerate(s.id, 'approved')}
+                disabled={busy}
+                className="text-xs font-medium bg-green-600 text-white rounded px-3 py-1.5 hover:bg-green-700 transition-colors disabled:opacity-60 cursor-pointer"
+              >
+                {busy ? '…' : 'Approve'}
+              </button>
+            )}
             <button
               onClick={() => setPendingReject(true)}
               disabled={busy}
@@ -282,5 +332,18 @@ function Diff({
         )
       })}
     </dl>
+  )
+}
+
+/** Text with its links clickable, so a source is one tap away. */
+export function linkify(text: string) {
+  return text.split(/(https?:\/\/[^\s"]+)/g).map((part, i) =>
+    /^https?:\/\//.test(part) ? (
+      <a key={i} href={part} target="_blank" rel="noopener noreferrer" className="text-primary underline break-all">
+        {part}
+      </a>
+    ) : (
+      <span key={i}>{part}</span>
+    ),
   )
 }

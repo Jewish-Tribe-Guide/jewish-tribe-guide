@@ -11,6 +11,7 @@ import { sendSubmissionNotification } from '@/lib/email'
 import { sendSubmissionConfirmation } from '@/lib/confirmationEmail'
 import { enforceRateLimit, clientIp } from '@/lib/rateLimit'
 import { payloadTooLarge } from '@/lib/limits'
+import { SERVER_ONLY_PAYLOAD_KEYS } from '@/lib/submissionSource'
 import { isHoneypotTripped } from '@/lib/honeypot'
 import { verifyTurnstile } from '@/lib/turnstile'
 import { normalizeUrl } from '@/lib/validation'
@@ -99,6 +100,11 @@ export async function POST(request: Request) {
   }
 
   const payload = body.payload as ResourceSubmission | undefined
+  // Where a suggestion came from ("Read by AI") and an admin's fixes are
+  // the site's own to say, never a visitor's (submissionSource.ts).
+  if (payload && typeof payload === 'object') {
+    for (const k of SERVER_ONLY_PAYLOAD_KEYS) delete (payload as Record<string, unknown>)[k]
+  }
   if ((operation === 'create' || operation === 'update') && !payload) {
     return Response.json({ ok: false, errors: ['Missing listing details.'] }, { status: 400 })
   }

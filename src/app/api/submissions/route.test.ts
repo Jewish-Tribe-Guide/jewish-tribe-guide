@@ -184,6 +184,21 @@ describe('POST /api/submissions — accepted submissions', () => {
     expect(m.submitListingUpdate).toHaveBeenCalledWith('philly', 'r1', listing, 'moved', { name: 'A' })
   })
 
+  // "Read by AI" and an admin's fixes are the site's to say. A visitor who
+  // posts them gets an ordinary suggestion, labelled as theirs.
+  it('drops a claimed source or admin fix from what a visitor posts', async () => {
+    const forged = {
+      ...listing,
+      source: { readBy: 'ai', from: 'their newsletter', original: 'Mincha 6:20pm' },
+      reviewEdit: { by: 'admin@x.co', at: 'now', fields: ['name'], asSent: {} },
+    }
+    await post({ operation: 'create', payload: forged })
+    await post({ operation: 'update', targetId: 'r1', payload: forged })
+    expect(m.submitListingCreate.mock.calls[0][1]).not.toHaveProperty('source')
+    expect(m.submitListingCreate.mock.calls[0][1]).not.toHaveProperty('reviewEdit')
+    expect(m.submitListingUpdate.mock.calls[0][2]).toEqual(listing)
+  })
+
   it('files a report (delete) with a null note when none is given', async () => {
     const res = await post({ operation: 'delete', targetId: 'r1' })
     expect(await res.json()).toEqual({ ok: true, id: 's3' })

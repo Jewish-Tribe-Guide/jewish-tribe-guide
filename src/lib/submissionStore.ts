@@ -8,7 +8,8 @@ import { geocode } from './geo'
 import { addedItems, goneItemsKept, itemFieldKeys, nextItemGone, nextItemSeen, normalizeEmail, sourceOfSubmission, type ActivityInput } from './activity'
 import { recordActivity } from './activityStore'
 import { newListingFacts, visitorChanges, type ChangePart } from './changeParts'
-import { normalizeRow } from './resourceStore'
+import { normalizeRow, validateSubmission } from './resourceStore'
+import { withReviewEdits } from './reviewEdits'
 import type {
   ResourceRow,
   ResourceSubmission,
@@ -300,7 +301,14 @@ export async function submitGoogleClosure(community: string, targetId: string): 
 // getAdminUserForCommunity at the call site), recorded alongside
 // reviewed_at so the moderation history can answer "who approved this" —
 // see the reviewed_by migration's own comment.
-export async function approveSubmission(id: string, community?: string, reviewedBy?: string): Promise<SubmissionRow> {
+/** An admin's fixes that can't be applied: not a listing, unreadable, or
+ *  leaving the listing invalid. The message is for the admin. */
+export class ReviewEditError extends Error {}
+
+// `edited`, when given: the admin's copy of the listing, fixed in the opened
+// card before approving (reviewEdits.ts). It's what goes live, and it's
+// saved on the submission with a record of what the admin changed.
+export async function approveSubmission(id: string, community?: string, reviewedBy?: string, edited?: unknown): Promise<SubmissionRow> {
   const supabase = getAdminClient()
 
   const { data: sub, error: subErr } = await supabase
@@ -313,6 +321,25 @@ export async function approveSubmission(id: string, community?: string, reviewed
   const submission = sub as SubmissionRow
   if (community && submission.community_id !== community) {
     throw new Error(`Submission not found: ${id}`)
+  }
+
+  let savedPayload: Record<string, unknown> | null = null
+  if (edited !== undefined) {
+    if (submission.target_type !== 'listing' || submission.operation === 'delete') {
+      throw new ReviewEditError('Only a new listing or an edit can be changed before approving.')
+    }
+    const sent = submission.payload as unknown as ResourceSubmission
+    const category = await getCategoryById(submission.community_id, sent.category)
+    const next = withReviewEdits(sent, edited, category?.detailFields ?? [], reviewedBy ?? 'an admin', new Date().toISOString())
+    if (!next) throw new ReviewEditError('Those changes couldn’t be read. Please try again.')
+    const errors = validateSubmission(next, category)
+    if (errors.length > 0) throw new ReviewEditError(errors.join(' '))
+    if (next !== sent) {
+      // Saved as the admin left it, before approval adds its own dates and
+      // Google bookkeeping to the copy it applies.
+      savedPayload = structuredClone(next) as unknown as Record<string, unknown>
+      submission.payload = next as unknown as Record<string, unknown>
+    }
   }
 
   let affectedResourceId: string | null = null
@@ -333,6 +360,7 @@ export async function approveSubmission(id: string, community?: string, reviewed
       status: 'approved',
       reviewed_at: new Date().toISOString(),
       ...(reviewedBy ? { reviewed_by: reviewedBy } : {}),
+      ...(savedPayload ? { payload: savedPayload } : {}),
       // A `create` arrives with no target_id — there was nothing to point at
       // yet. Recording it now makes the submission point at the listing it
       // produced, which is what lets the caller sync that listing against

@@ -41,6 +41,7 @@ function listingPayload(name: string): ResourceSubmission {
 
 const pendingSubmissionIds: string[] = []
 const pendingResourceIds: string[] = []
+const pendingCategoryIds: string[] = []
 
 test.afterEach(async () => {
   const supabase = getAdminClient()
@@ -49,6 +50,10 @@ test.afterEach(async () => {
   }
   for (const id of pendingResourceIds.splice(0)) {
     await supabase.from('resource').delete().eq('id', id)
+  }
+  for (const id of pendingCategoryIds.splice(0)) {
+    await supabase.from('resource').delete().eq('category', id).eq('community_id', 'philly')
+    await supabase.from('category').delete().eq('id', id).eq('community_id', 'philly')
   }
 })
 
@@ -188,6 +193,64 @@ test('clicking Approve on a pending listing makes it live', async ({ page }) => 
 
   const { data: reloaded } = await supabase.from('submission').select('status').eq('id', submission.id).single()
   expect(reloaded?.status).toBe('approved')
+})
+
+// The opened card (agreed Oct 5): a typo fixed and approved, instead of
+// rejected and sent again. What goes live is the admin's copy, and the
+// submission records what was sent.
+test('opening a card, fixing the name and approving puts the fix live', async ({ page }) => {
+  const supabase = getAdminClient()
+  const sent = `E2E Admin Write ${randomUUID()} Typo`
+  const fixed = sent.replace(' Typo', ' Fixed')
+  // Approving with a fix checks the listing against its category, so this
+  // one needs a real category: hidden, so no other test or page sees it.
+  const categoryId = `e2e-review-${randomUUID().slice(0, 8)}`
+  const { error: categoryError } = await supabase.from('category').insert({
+    id: categoryId,
+    community_id: 'philly',
+    label: categoryId,
+    plural_label: categoryId,
+    fields: [],
+    kind: 'listing',
+    active: false,
+  })
+  if (categoryError) throw new Error(`Could not seed the category: ${categoryError.message}`)
+  pendingCategoryIds.push(categoryId)
+
+  const { data: submission, error } = await supabase
+    .from('submission')
+    .insert({
+      operation: 'create',
+      target_type: 'listing',
+      target_id: null,
+      payload: { ...listingPayload(sent), category: categoryId },
+      note: null,
+      status: 'pending',
+      submitted_by: { name: 'e2e-admin-write suite' },
+    })
+    .select('id')
+    .single()
+  if (error || !submission) throw new Error(`Could not seed the pending submission: ${error?.message}`)
+  pendingSubmissionIds.push(submission.id)
+
+  await page.goto('/philly/admin')
+  await page.getByRole('button', { name: `Open ${sent}` }).click()
+  const review = page.getByTestId('submission-review')
+  await expect(review).toBeVisible()
+  await expect(page).toHaveURL(new RegExp(`open=${submission.id}`))
+
+  await review.getByLabel('Name').fill(fixed)
+  await review.getByRole('button', { name: 'Approve with your changes' }).click()
+  await expect(review).not.toBeVisible()
+
+  const { data: resource } = await supabase.from('resource').select('id, status').eq('name', fixed).maybeSingle()
+  expect(resource, 'the fixed name should be what went live').not.toBeNull()
+  pendingResourceIds.push(resource!.id)
+  expect(resource!.status).toBe('approved')
+
+  const { data: reloaded } = await supabase.from('submission').select('status, payload').eq('id', submission.id).single()
+  expect(reloaded?.status).toBe('approved')
+  expect(reloaded?.payload.reviewEdit).toMatchObject({ fields: ['name'], asSent: { name: sent } })
 })
 
 test('clicking Reject with a reason marks the submission rejected and creates no listing', async ({ page }) => {

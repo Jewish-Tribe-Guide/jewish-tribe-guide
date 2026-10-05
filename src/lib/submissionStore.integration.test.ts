@@ -30,6 +30,7 @@ const {
   approveSubmission,
   rejectSubmission,
   listPendingSubmissions,
+  ReviewEditError,
 } = await import('./submissionStore')
 
 const pendingCategoryIds: string[] = []
@@ -91,6 +92,41 @@ describe('submissionStore (integration)', () => {
 
     const pendingAfter = await listPendingSubmissions('philly')
     expect(pendingAfter.some((s) => s.id === submission.id)).toBe(false)
+  })
+
+  // The opened card: an admin fixes a typo instead of rejecting. What goes
+  // live is the fixed copy, and the submission keeps what was sent beside
+  // who changed it.
+  it('approving with an admin’s fix puts the fix live and records it on the submission', async () => {
+    const category = await makeTestCategory()
+    const sent = `Integration Listng ${randomUUID()}`
+    const fixed = sent.replace('Listng', 'Listing')
+    const submission = await submitListingCreate('philly', listingPayload(category.id, sent))
+    pendingSubmissionIds.push(submission.id)
+
+    await approveSubmission(submission.id, 'philly', 'admin@x.co', { ...listingPayload(category.id, fixed), category: 'someone-else' })
+
+    const { data: resource } = await getAdminClient().from('resource').select('name, category').eq('name', fixed).single()
+    expect(resource).toEqual({ name: fixed, category: category.id })
+    const { data: row } = await getAdminClient().from('submission').select('payload, status').eq('id', submission.id).single()
+    expect(row!.status).toBe('approved')
+    expect(row!.payload.name).toBe(fixed)
+    expect(row!.payload.reviewEdit).toMatchObject({ by: 'admin@x.co', fields: ['name'], asSent: { name: sent } })
+  })
+
+  it('refuses a fix that leaves the listing invalid, approving nothing', async () => {
+    const category = await makeTestCategory()
+    const name = `Integration Listing ${randomUUID()}`
+    const submission = await submitListingCreate('philly', listingPayload(category.id, name))
+    pendingSubmissionIds.push(submission.id)
+
+    await expect(approveSubmission(submission.id, 'philly', 'admin@x.co', { ...listingPayload(category.id, name), address: '' })).rejects.toThrow(ReviewEditError)
+
+    const { data: row } = await getAdminClient().from('submission').select('status, payload').eq('id', submission.id).single()
+    expect(row!.status).toBe('pending')
+    expect(row!.payload.address).toBe('123 Test St, Philadelphia, PA')
+    const { data: resource } = await getAdminClient().from('resource').select('id').eq('name', name).maybeSingle()
+    expect(resource).toBeNull()
   })
 
   // Approval is a moderator vouching for the listing, so it stamps confirmedAt
