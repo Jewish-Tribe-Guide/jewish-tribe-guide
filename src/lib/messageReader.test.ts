@@ -45,6 +45,13 @@ describe('buildCatalog and the prompt', () => {
     expect(system).not.toContain('sent this from the listing')
   })
 
+  it('tells the AI every field a message can change, by category, with each one’s choices', () => {
+    const system = (messageMessages(text('x'), catalog, { communityName: 'Philadelphia' })[0] as { content: string }).content
+    expect(system).toContain('restaurant: name "Name" (text); address "Address" (text); phone "Phone" (phone); website "Website" (link); cert "Kosher certification" (one of: Keystone-K | OU)')
+    // Items and davening times have their own kinds.
+    expect(system).toContain('grocery: name "Name" (text); address "Address" (text); phone "Phone" (phone)\n')
+  })
+
   it('tells the AI which listing it was sent from, when it was', () => {
     const system = (messageMessages(text('x'), catalog, { communityName: 'Philadelphia', about: ACME })[0] as { content: string }).content
     expect(system).toContain('sent this from the listing "ACME Markets" (33333333)')
@@ -129,6 +136,56 @@ describe('tidyMessageReading', () => {
       text(''),
     )
     expect(r.proposals).toEqual([{ kind: 'times', listingId: MEKOR, quote: 'photo', checked: false }])
+  })
+
+  // Oct 5: "change the kosher certification for say she ate to keystone k"
+  // and "trader joe's on arch now closes at 3pm on wednesday" came back as
+  // not updates.
+  it('reads a change to a listing’s other fields, only fields its category has', () => {
+    const r = tidyMessageReading(
+      {
+        proposals: [
+          {
+            kind: 'fields',
+            store: { listing_id: '11111111', listing_name: 'Trader Joe’s' },
+            changes: [
+              { field: 'hours', days: ['wed'], open: null, close: '3:00', closed: false, when: 'unclear' },
+              { field: 'phone', value: '215-555-0199', days: null },
+              { field: 'cert', value: 'OU' },
+              { field: 'm', value: 'Chicken' },
+            ],
+            quote: 'now closes at 3pm on wednesday',
+          },
+          { kind: 'fields', store: { listing_id: '11111111' }, changes: [{ field: 'nope', value: 'x' }], quote: 'x' },
+        ],
+      },
+      catalog,
+      text('trader joe’s on arch now closes at 3pm on wednesday'),
+    )
+    expect(r.proposals).toEqual([
+      {
+        kind: 'fields',
+        listingId: TJ_ARCH,
+        asWritten: '',
+        ask: null,
+        // Hours are the grocery's own field only when it has one: this one
+        // doesn't, and a restaurant's hechsher isn't a grocery's.
+        changes: [{ key: 'phone', value: '215-555-0199' }],
+        note: null,
+        quote: 'now closes at 3pm on wednesday',
+        checked: true,
+      },
+    ])
+  })
+
+  it('keeps a week’s hours as which days, the times and whether it’s from now on', () => {
+    const withHours = buildCatalog(listings, [{ ...grocery, detailFields: [...grocery.detailFields, { key: 'hours', label: 'Hours', type: 'hours' }] } as CategoryConfig, food, shuls])
+    const r = tidyMessageReading(
+      { proposals: [{ kind: 'fields', store: { listing_id: '11111111' }, changes: [{ field: 'hours', days: ['wed', 'someday'], open: null, close: '3:00', closed: false, when: 'sometime' }], quote: 'x' }] },
+      withHours,
+      text('x'),
+    )
+    expect(r.proposals[0]).toMatchObject({ changes: [{ key: 'hours', hours: { days: ['wed'], open: null, close: '03:00', closed: false, when: 'unclear' } }] })
   })
 
   it('keeps a new place’s category only when the guide has it', () => {

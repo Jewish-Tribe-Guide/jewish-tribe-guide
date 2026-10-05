@@ -4,6 +4,8 @@ import { editSubmission } from './editSubmission'
 import { addedItemName } from './itemMarks'
 import { itemName } from './itemNames'
 import { DEFAULT_READER_MODEL } from './readQuestion'
+import { changeableFields, DAYS, type FieldRead, type HoursRead } from './fieldChanges'
+import type { DayKey } from './hours'
 import type { SubmissionSource } from './submissionSource'
 
 // ── Reading what someone forwards: the "+ Add" box's reader ─────────────────
@@ -43,6 +45,8 @@ export type CatalogCategory = {
   itemsKey: string | null
   /** Whether its listings have davening times. */
   hasTimes: boolean
+  /** What else about its listings a message can change (fieldChanges.ts). */
+  fields: { key: string; label: string; says: string }[]
 }
 
 export type Catalog = { listings: CatalogListing[]; categories: CatalogCategory[]; itemNames: string[] }
@@ -73,6 +77,7 @@ export type Proposal =
        *  another name ("Spruce St Market" is Spruce Market, 1523 Spruce). */
       maybe: string[]
     } & Quoted)
+  | ({ kind: 'fields'; listingId: string | null; asWritten: string; ask: AskSender | null; changes: FieldRead[]; note: string | null } & Quoted)
   | ({ kind: 'times'; listingId: string } & Quoted)
   | ({ kind: 'ask_others'; listingId: string | null; question: string } & Quoted)
   | { kind: 'not_update'; note: string | null }
@@ -91,6 +96,7 @@ export function buildCatalog(listings: DirectoryResource[], categories: Category
     label: c.label,
     itemsKey: c.detailFields.find((f) => f.type === 'tags')?.key ?? null,
     hasTimes: c.detailFields.some((f) => f.type === 'minyanim'),
+    fields: changeableFields(c).map((f) => ({ key: f.key, label: f.label, says: fieldSays(f.type, f.field?.options?.map((o) => o.label), f.field?.multiSelect) })),
   }))
   const byId = new Map(cats.map((c) => [c.id, c]))
   const out: CatalogListing[] = []
@@ -108,6 +114,12 @@ export function buildCatalog(listings: DirectoryResource[], categories: Category
   }
   const itemNames = [...new Set(out.flatMap((l) => [...l.items, ...l.sometimes]))].sort()
   return { listings: out, categories: cats, itemNames }
+}
+
+/** A field's kind of value, as the prompt names it. */
+function fieldSays(type: string, choices?: string[], multi?: boolean): string {
+  if (type === 'select') return `${multi ? 'any of' : 'one of'}: ${(choices ?? []).join(' | ')}`
+  return { tel: 'phone', textarea: 'long text', url: 'link', boolean: 'yes/no', hours: 'weekly hours' }[type] ?? type
 }
 
 /** Listing ids are shortened for the AI (fewer tokens, fewer typos) and
@@ -138,6 +150,7 @@ export function messageMessages(source: MessageSource, catalog: Catalog, { about
   const categories = catalog.categories
     .map((c) => `${c.id} (${c.label}${c.itemsKey ? ', lists items it carries' : ''}${c.hasTimes ? ', has davening times' : ''})`)
     .join('; ')
+  const fieldLines = catalog.categories.map((c) => `${c.id}: ${c.fields.map((f) => `${f.key} "${f.label}" (${f.says})`).join('; ')}`)
   const aboutListing = about ? catalog.listings.find((l) => l.id === about) : undefined
 
   const system = `You read messages people forward to a community-kept guide for Jewish ${communityName}: WhatsApp posts, Instagram screenshots, flyers, product photos, shul emails. Turn each message into PROPOSED updates for a human admin to approve. Never invent facts: everything you propose must come from the message or its photos.
@@ -146,6 +159,9 @@ The guide's categories (id and name): ${categories}
 
 The guide's listings (id · name · category · address · items it always has · items it sometimes has):
 ${lines.join('\n')}
+
+What else each category's listings have that a message can change (field key "label" (kind of value)):
+${fieldLines.join('\n')}
 
 Item names already used in the guide (reuse one when it is the same thing a shopper would search for): ${catalog.itemNames.join(', ')}
 
@@ -175,14 +191,18 @@ Rules
   A plain K with no shape around it is not a certifier: say "a plain K". If you cannot tell which it is, say "unidentified symbol" and describe it; never guess a name.
 - A claim about OTHER stores that is only a guess ("surprised if any other X has it") is never a change: make it kind "ask_others" with a short question to ask shoppers about that store.
 - Food places (restaurants, ice cream, food trucks): give kosher certification only if shown or stated; meat/dairy/parve only if stated, else say what it is inferred from.
+- Any OTHER change to a listing in the guide (its hours, phone, website, address, name, hechsher or certification, meat/dairy, a yes/no, notes; a mikvah's women's hours; anything in its category's fields above): one proposal of kind "fields" for that listing, with "changes": one entry per field, using that category's field key. Pick the field whose label fits ("women's hours" is the women's hours field when the category has one). Change only what the message says; never fill in anything else. Items and davening times are never "fields". The same store rules apply (which branch; ask the sender when unsure).
+  Values: text, phone, link, long text: the new value as written. "one of" / "any of": one of the listed choices exactly (a list for "any of"); a value that is none of them goes in "note" instead. yes/no: true or false. number: a number.
+  Weekly hours: "days" (a list of sun, mon, tue, wed, thu, fri, sat, or "all" when no day is named), "open" and "close" as 24-hour "HH:MM" (null when not said), "closed": true when it's closed those days, and "when": "every_week" (from now on, "now", "new hours", "every Wednesday", "on Wednesdays"), "one_day" (one date: "this Wednesday", "tomorrow", "on the 12th", a holiday) or "unclear" (a day named with nothing saying which, like "closes at 3pm on Wednesday").
 - Something that is not an update (a question, a greeting, chat, a suggestion about the website): one proposal of kind "not_update", with what it is in "note".
 - With every listing_id give "listing_name": that listing's name exactly as in the list, so a mistyped id is caught.
 - For every proposal give "quote": the exact words from the message text it rests on, copied character for character, or "photo" if it comes from a photo.${aboutListing ? `\n- The person sent this from the listing "${aboutListing.name}" (${short.get(aboutListing.id)}). A message that names no store is about that one.` : ''}
 
 Reply with JSON only:
-{"proposals":[{"kind":"items"|"new_place"|"times"|"ask_others"|"not_update",
+{"proposals":[{"kind":"items"|"fields"|"new_place"|"times"|"ask_others"|"not_update",
  "store":{"listing_id":string|null,"listing_name":string|null,"as_written":string,"scope":"branch"|"chain","ask_sender":{"question":string,"choices":[{"label":string,"listing_id":string}]}|null},
  "items":[{"name":string,"availability":"always"|"sometimes"|"seen"|"stopped"|"announced","doubt":boolean,"doubt_words":string|null}],
+ "changes":[{"field":string,"value":string|boolean|number|string[]|null,"days":string[]|"all"|null,"open":string|null,"close":string|null,"closed":boolean,"when":"every_week"|"one_day"|"unclear"|null}],
  "category":string|null,
  "place":{"name":string,"kind":string,"address":string|null,"phone":string|null,"website":string|null,"kosher_cert":string|null,"meat_dairy":string|null,"notes":string|null}|null,
  "question":string|null,
@@ -318,18 +338,30 @@ export function tidyMessageReading(raw: unknown, catalog: Catalog, source: Messa
       })
       continue
     }
+    const askRaw = store.ask_sender && typeof store.ask_sender === 'object' ? (store.ask_sender as Record<string, unknown>) : null
+    const choices = Array.isArray(askRaw?.choices)
+      ? (askRaw!.choices as unknown[]).flatMap((c) => {
+          const o = (c && typeof c === 'object' ? c : {}) as Record<string, unknown>
+          const id = listingOf({ listing_id: o.listing_id, listing_name: o.listing_name })
+          const listing = id ? catalog.listings.find((l) => l.id === id) : undefined
+          return listing ? [{ label: str(o.label, 120) ?? listing.address, listingId: listing.id }] : []
+        })
+      : []
+    const askOf = (listingId: string | null): AskSender | null => (!listingId && choices.length > 1 ? { question: str(askRaw?.question, 200) ?? 'Which one?', choices } : null)
+    if (p.kind === 'fields') {
+      const listingId = listingOf(store)
+      const ask = askOf(listingId)
+      // The fields of the place it's about, or of the branches it asks between.
+      const category = catalog.listings.find((l) => l.id === (listingId ?? ask?.choices[0]?.listingId))?.category
+      const keys = new Set(catalog.categories.find((c) => c.id === category)?.fields.map((f) => f.key) ?? [])
+      const changes = fieldsOf(p.changes).filter((c) => keys.has(c.key))
+      if (changes.length === 0) continue
+      proposals.push({ kind: 'fields', listingId, asWritten: str(store.as_written, 120) ?? '', ask, changes, note, ...quoted(p.quote) })
+      continue
+    }
     if (p.kind === 'items') {
       const items = itemsOf(p.items)
       if (items.length === 0) continue
-      const askRaw = store.ask_sender && typeof store.ask_sender === 'object' ? (store.ask_sender as Record<string, unknown>) : null
-      const choices = Array.isArray(askRaw?.choices)
-        ? (askRaw!.choices as unknown[]).flatMap((c) => {
-            const o = (c && typeof c === 'object' ? c : {}) as Record<string, unknown>
-            const id = listingOf({ listing_id: o.listing_id, listing_name: o.listing_name })
-            const listing = id ? catalog.listings.find((l) => l.id === id) : undefined
-            return listing ? [{ label: str(o.label, 120) ?? listing.address, listingId: listing.id }] : []
-          })
-        : []
       const listingId = listingOf(store)
       const chain = store.scope === 'chain'
       proposals.push({
@@ -337,7 +369,7 @@ export function tidyMessageReading(raw: unknown, catalog: Catalog, source: Messa
         listingId,
         asWritten: str(store.as_written, 120) ?? '',
         chain,
-        ask: !listingId && choices.length > 1 ? { question: str(askRaw?.question, 200) ?? 'Which one?', choices } : null,
+        ask: askOf(listingId),
         items,
         note,
         ...quoted(p.quote),
@@ -345,6 +377,41 @@ export function tidyMessageReading(raw: unknown, catalog: Catalog, source: Messa
     }
   }
   return { proposals: proposals.length ? proposals : [{ kind: 'not_update', note: null }] }
+}
+
+const WHEN = new Set(['every_week', 'one_day', 'unclear'])
+const HHMM = /^([01]?\d|2[0-3]):[0-5]\d$/
+const hhmm = (v: unknown): string | null => (typeof v === 'string' && HHMM.test(v.trim()) ? v.trim().padStart(5, '0') : null)
+
+/** The changes a "fields" proposal reads, each in a checked shape: a value
+ *  as given (checked against the field when it's filed, fieldChanges.ts),
+ *  or for hours, which days, the times, and whether it's from now on. */
+function fieldsOf(v: unknown): FieldRead[] {
+  if (!Array.isArray(v)) return []
+  const out: FieldRead[] = []
+  for (const r of v.slice(0, 12)) {
+    if (!r || typeof r !== 'object') continue
+    const o = r as Record<string, unknown>
+    const key = str(o.field, 80)
+    if (!key) continue
+    // Both kept: which applies is the field's type (fieldChanges.ts), not
+    // which keys the model happened to fill.
+    const read: FieldRead = { key }
+    if (o.days != null) {
+      const days = o.days === 'all' ? 'all' : Array.isArray(o.days) ? o.days.filter((d): d is DayKey => DAYS.includes(d as DayKey)) : []
+      const hours: HoursRead = {
+        days,
+        open: hhmm(o.open),
+        close: hhmm(o.close),
+        closed: o.closed === true,
+        when: WHEN.has(o.when as string) ? (o.when as HoursRead['when']) : 'unclear',
+      }
+      if ((days === 'all' || days.length > 0) && (hours.closed || hours.open || hours.close)) read.hours = hours
+    }
+    if (o.value !== null && o.value !== undefined) read.value = typeof o.value === 'string' ? o.value.slice(0, 1000) : o.value
+    if (read.hours || 'value' in read) out.push(read)
+  }
+  return out
 }
 
 // A store's own name, without the words every store has. "Spruce St Market"

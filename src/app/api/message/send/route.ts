@@ -12,9 +12,10 @@ import { sendSubmissionNotification } from '@/lib/email'
 import { normalizeEmail } from '@/lib/activity'
 import { payloadTooLarge } from '@/lib/limits'
 import { itemsChange, messageSource, newPlaceSubmission, sentItems, sentPlace } from '@/lib/messageReader'
+import { fieldsEdit } from '@/lib/fieldChanges'
 import type { SubmissionRow } from '@/types'
 
-// POST /api/message/send   { text, photoUrls, stores: [{ listingId, items }], places: [{ category, place, items }], email?, turnstileToken, company }
+// POST /api/message/send   { text, photoUrls, stores: [{ listingId, items }], edits: [{ listingId, values, notes }], places: [{ category, place, items }], email?, turnstileToken, company }
 // The "+ Add" box's Send (agreed Oct 5): what the person saw after the
 // reader (/api/message/read), filed as ordinary suggestions for an admin,
 // one per store or place, each labelled "Read by AI" with the message or
@@ -22,11 +23,19 @@ import type { SubmissionRow } from '@/types'
 // shows it beside the change.
 //
 // Nothing is taken on trust from the browser: the listing is read here,
-// and the change worked out again from it (itemsChange), the way the shul
-// card's times route does. A store with nothing left to change files
-// nothing. A shul's times go through that card's own route.
+// and the change worked out again from it (itemsChange, fieldsEdit), the
+// way the shul card's times route does. A store with nothing left to change
+// files nothing, unless there's a note the guide can't hold as a field
+// ("closes early this Wednesday only"), which goes to the admin as one.
+// A shul's times go through that card's own route.
 
 const MAX_STORES = 10
+const MAX_NOTES = 10
+
+/** Notes for the admin beside an edit, as the box sent them: short text. */
+function sentNotes(v: unknown): string[] {
+  return (Array.isArray(v) ? v : []).filter((n): n is string => typeof n === 'string' && !!n.trim()).slice(0, MAX_NOTES).map((n) => n.trim().slice(0, 500))
+}
 const FAILED = { ok: false, error: 'That didn’t send. Please try again.' }
 
 /** A photo the reader kept, in the guide's own storage, never any other
@@ -55,7 +64,8 @@ export async function POST(request: Request) {
   const source = messageSource(text, photoUrls)
   const stores = (Array.isArray(body.stores) ? body.stores : []).slice(0, MAX_STORES) as Record<string, unknown>[]
   const places = (Array.isArray(body.places) ? body.places : []).slice(0, MAX_STORES) as Record<string, unknown>[]
-  if (stores.length + places.length === 0) return Response.json({ ok: false, error: 'Nothing to send.' }, { status: 400 })
+  const edits = (Array.isArray(body.edits) ? body.edits : []).slice(0, MAX_STORES) as Record<string, unknown>[]
+  if (stores.length + places.length + edits.length === 0) return Response.json({ ok: false, error: 'Nothing to send.' }, { status: 400 })
 
   const community = await resolveCommunity(communitySlugFromRequest(request))
   try {
@@ -73,6 +83,18 @@ export async function POST(request: Request) {
       if (!change || change.lines.length === 0) continue
       const note = ['From a message sent with “Tell us”.', change.lines.join('\n'), ...(change.held.length ? [`Not changed:\n${change.held.join('\n')}`] : [])].join('\n\n')
       filed.push(await submitListingUpdate(community.slug, listing.id, Object.assign({}, change.submission, { source }), note, submittedBy))
+    }
+
+    for (const e of edits) {
+      const listing = typeof e.listingId === 'string' ? byId.get(e.listingId) : undefined
+      const category = listing && catById.get(listing.category)
+      if (!listing || !category) continue
+      if (!ui.contributions.edit || !resolveCapabilities(category.capabilities).edit) continue
+      const { submission, lines } = fieldsEdit(category, listing, e.values)
+      const notes = sentNotes(e.notes)
+      if (lines.length === 0 && notes.length === 0) continue
+      const note = ['From a message sent with “Tell us”.', lines.join('\n'), notes.length ? `For the admin:\n${notes.join('\n')}` : ''].filter(Boolean).join('\n\n')
+      filed.push(await submitListingUpdate(community.slug, listing.id, Object.assign({}, submission, { source }), note, submittedBy))
     }
 
     for (const p of places) {

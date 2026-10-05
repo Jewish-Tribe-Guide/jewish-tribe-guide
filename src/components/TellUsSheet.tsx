@@ -3,7 +3,9 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import Link from 'next/link'
 import type { DirectoryResource } from '@/types'
-import { resolveCapabilities } from '@/lib/categories'
+import { resolveCapabilities, type CategoryConfig } from '@/lib/categories'
+import { changeableFields, changeLines } from '@/lib/fieldChanges'
+import { fmt } from '@/lib/submissionDiff'
 import { useCategories } from '@/lib/useCategories'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { withCommunity } from '@/lib/useCommunityData'
@@ -17,6 +19,7 @@ import { tellUsPlaceholder } from '@/lib/tellUs'
 import ActionDialog from '@/components/resources/ActionDialog'
 import MobileSheet from '@/components/resources/MobileSheet'
 import UpdateTimesBox from '@/components/resources/UpdateTimesBox'
+import { DetailFieldInput } from '@/components/resources/ListingForm'
 import { TURNSTILE_ACTIVE } from '@/components/resources/useListingSubmit'
 
 // "Saw something? Tell us" (agreed Oct 5, canvas TellSheet, TellAsk,
@@ -40,12 +43,29 @@ type Choice = { label: string; listingId: string; listing: Brief } & Lines
 
 type ItemsProposal = { kind: 'items'; listingId: string | null; listing: Brief | null; asWritten: string; chain: boolean; ask: { question: string; choices: Choice[] } | null; items: ReadItem[] } & Lines
 type PlaceProposal = { kind: 'new_place'; category: string | null; categoryLabel: string | null; place: PlaceRead; items: ReadItem[]; maybe: (Brief & Lines)[] }
+type FieldsReading = {
+  values: Record<string, unknown>
+  before: Record<string, unknown>
+  lines: string[]
+  held: string[]
+  notes: string[]
+  askWhen: { key: string; question: string; oneDay: string } | null
+}
+type FieldsChoice = { label: string; listingId: string; listing: Brief } & FieldsReading
+type FieldsProposal = { kind: 'fields'; listingId: string | null; listing: Brief | null; asWritten: string; ask: { question: string; choices: FieldsChoice[] } | null } & FieldsReading
 type TimesProposal = { kind: 'times'; listing: Brief; item: DirectoryResource; minyanimKey: string | null; update: TimesUpdate | null }
 type OtherProposal = { kind: 'ask_others' | 'not_update'; question?: string; note?: string | null }
-type Proposal = ItemsProposal | PlaceProposal | TimesProposal | OtherProposal
+type Proposal = ItemsProposal | FieldsProposal | PlaceProposal | TimesProposal | OtherProposal
 type Reading = { proposals: Proposal[]; photoUrls: string[] }
 
 const MAX_PHOTOS = 3
+
+/** A fields card's reading for the place it's about, or the branch picked. */
+function fieldsReadingOf(p: FieldsProposal, picked: string | null): (FieldsReading & { listing: Brief }) | null {
+  if (p.listing) return { ...p, listing: p.listing }
+  const c = p.ask?.choices.find((x) => x.listingId === picked)
+  return c ? { ...c, listing: c.listing } : null
+}
 const inputClass = 'w-full rounded-md border border-slate-300 px-2.5 py-1.5 text-sm text-slate-900 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30'
 
 export default function TellUsSheet({
@@ -105,6 +125,9 @@ function TellUsBody({
   const [left, setLeft] = useState<Set<number>>(new Set())
   const [picked, setPicked] = useState<Record<number, string | null>>({})
   const [places, setPlaces] = useState<Record<number, { place: PlaceRead; category: string | null }>>({})
+  // A fields card's own fixes, and its answer to "from now on, or just once?"
+  const [fixes, setFixes] = useState<Record<number, Record<string, unknown>>>({})
+  const [whens, setWhens] = useState<Record<number, 'always' | 'once'>>({})
   const [email, setEmail] = useState('')
   const [filed, setFiled] = useState(0)
   const fileInput = useRef<HTMLInputElement>(null)
@@ -143,6 +166,8 @@ function TellUsBody({
       setPlaces(Object.fromEntries(json.proposals.flatMap((p, i) => (p.kind === 'new_place' ? [[i, { place: p.place, category: p.category }]] : []))))
       setLeft(new Set())
       setPicked({})
+      setFixes({})
+      setWhens({})
       setStep('result')
     } catch (e) {
       setError(e instanceof Error && e.message !== 'failed' ? e.message : 'Couldn’t read it right now. Please try again.')
@@ -156,12 +181,24 @@ function TellUsBody({
   const proposals = reading?.proposals ?? []
   const stores: { listingId: string; items: ReadItem[] }[] = []
   const newPlaces: { category: string; place: PlaceRead; items: ReadItem[] }[] = []
+  const edits: { listingId: string; values: Record<string, unknown>; notes: string[] }[] = []
   proposals.forEach((p, i) => {
     if (left.has(i)) return
     if (p.kind === 'items') {
       const id = p.listingId ?? picked[i] ?? null
       const lines = p.listingId ? p.lines : p.ask?.choices.find((c) => c.listingId === id)?.lines ?? []
       if (id && lines.length) stores.push({ listingId: id, items: p.items })
+    }
+    if (p.kind === 'fields') {
+      const r = fieldsReadingOf(p, picked[i] ?? null)
+      if (!r || (r.askWhen && !whens[i])) return
+      const values = { ...r.values, ...fixes[i] }
+      const notes = [...r.notes]
+      if (r.askWhen && whens[i] === 'once') {
+        delete values[r.askWhen.key]
+        notes.push(r.askWhen.oneDay)
+      }
+      if (Object.keys(values).length || notes.length) edits.push({ listingId: r.listing.id, values, notes })
     }
     if (p.kind === 'new_place') {
       const same = picked[i]
@@ -170,14 +207,14 @@ function TellUsBody({
       } else if (places[i]?.category) newPlaces.push({ category: places[i].category!, place: places[i].place, items: p.items })
     }
   })
-  const sendable = stores.length + newPlaces.length
+  const sendable = stores.length + edits.length + newPlaces.length
 
   const send = async (token: string) => {
     try {
       const res = await fetch(withCommunity('/api/message/send', community), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, photoUrls: reading?.photoUrls ?? [], stores, places: newPlaces, email, turnstileToken: token, company: '' }),
+        body: JSON.stringify({ text, photoUrls: reading?.photoUrls ?? [], stores, edits, places: newPlaces, email, turnstileToken: token, company: '' }),
       })
       const json = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string; filed?: number }
       if (!res.ok || !json.ok) throw new Error(json.error ?? 'failed')
@@ -313,7 +350,15 @@ function TellUsBody({
               left={left.has(i)}
               onLeave={(out) => setLeft((s) => { const n = new Set(s); if (out) n.add(i); else n.delete(i); return n })}
               picked={picked[i] ?? null}
-              onPick={(id) => setPicked((x) => ({ ...x, [i]: id }))}
+              onPick={(id) => {
+                setPicked((x) => ({ ...x, [i]: id }))
+                setFixes((x) => ({ ...x, [i]: {} }))
+              }}
+              fixes={fixes[i] ?? {}}
+              onFix={(key, v) => setFixes((x) => ({ ...x, [i]: { ...x[i], [key]: v } }))}
+              when={whens[i] ?? null}
+              onWhen={(w) => setWhens((x) => ({ ...x, [i]: w }))}
+              categoryOf={(id) => categories?.find((c) => c.id === id)}
               place={places[i]}
               onPlace={(v) => setPlaces((x) => ({ ...x, [i]: v }))}
               categories={(categories ?? []).filter((c) => c.kind === 'listing' && resolveCapabilities(c.capabilities).add).map((c) => ({ id: c.id, label: c.label }))}
@@ -388,7 +433,17 @@ function ResultCard({
   text,
   photoUrl,
   community,
+  fixes,
+  onFix,
+  when,
+  onWhen,
+  categoryOf,
 }: {
+  fixes: Record<string, unknown>
+  onFix: (key: string, v: unknown) => void
+  when: 'always' | 'once' | null
+  onWhen: (w: 'always' | 'once') => void
+  categoryOf: (id: string) => CategoryConfig | undefined
   p: Proposal
   left: boolean
   onLeave: (out: boolean) => void
@@ -449,6 +504,103 @@ function ResultCard({
           </p>
         )}
         {chosen && lines?.lines.length ? <div className="mt-2">{leave}</div> : null}
+      </div>
+    )
+  }
+
+  if (p.kind === 'fields') {
+    const r = fieldsReadingOf(p, picked)
+    const category = r ? categoryOf(r.listing.category) : undefined
+    const fields = category ? changeableFields(category) : []
+    const values = r ? { ...r.values, ...fixes } : {}
+    const shown = r?.askWhen && when === 'once' ? Object.fromEntries(Object.entries(values).filter(([k]) => k !== r.askWhen!.key)) : values
+    const lines = r ? changeLines(fields, r.before as DirectoryResource, shown) : []
+    const notes = r ? [...r.notes, ...(r.askWhen && when === 'once' ? [r.askWhen.oneDay] : [])] : []
+    return (
+      <div className={`${card} ${left ? 'opacity-50' : ''}`} data-testid="tell-us-card">
+        <p className="text-[15px] font-extrabold text-slate-900">
+          {r ? r.listing.name : p.asWritten || 'A place'} {r && <span className="font-normal text-slate-500">· {short(r.listing.address)}</span>}
+        </p>
+        {p.ask && !p.listing && (
+          <div className="mt-2">
+            <p className="text-[14px] font-semibold text-slate-800">{p.ask.question}</p>
+            <div className="mt-1.5 flex flex-wrap gap-1.5">
+              {p.ask.choices.map((c) => (
+                <button
+                  key={c.listingId}
+                  type="button"
+                  aria-pressed={picked === c.listingId}
+                  onClick={() => onPick(picked === c.listingId ? null : c.listingId)}
+                  className={`cursor-pointer rounded-full border px-3 py-1 text-[13.5px] ${picked === c.listingId ? 'border-primary bg-primary text-white' : 'border-slate-300 text-slate-700 hover:bg-slate-50'}`}
+                >
+                  {c.label || short(c.listing.address)}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+        {r?.askWhen && (
+          <div className="mt-2 rounded-lg bg-amber-50 px-2.5 py-2">
+            <p className="text-[14px] font-semibold text-amber-900">{r.askWhen.question}</p>
+            <div className="mt-1.5 flex flex-wrap gap-1.5">
+              {(
+                [
+                  ['always', 'From now on'],
+                  ['once', 'Just this once'],
+                ] as const
+              ).map(([w, label]) => (
+                <button
+                  key={w}
+                  type="button"
+                  aria-pressed={when === w}
+                  onClick={() => onWhen(w)}
+                  className={`cursor-pointer rounded-full border px-3 py-1 text-[13.5px] ${when === w ? 'border-primary bg-primary text-white' : 'border-amber-300 bg-white text-slate-800 hover:bg-amber-100'}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+        {r && (lines.length > 0 || r.held.length > 0) && <ChangeLines lines={lines} held={r.held} />}
+        {r && (
+          <div className="mt-2 space-y-3">
+            {Object.keys(shown).map((key) => {
+              const f = fields.find((x) => x.key === key)
+              if (!f) return null
+              const was = fmt(r.before[key], f.field)
+              return (
+                <div key={key}>
+                  {f.field ? (
+                    f.type === 'hours' ? (
+                      <HoursFix label={f.label}>
+                        <DetailFieldInput field={f.field} value={shown[key]} onChange={(v) => onFix(key, v)} />
+                      </HoursFix>
+                    ) : (
+                      <DetailFieldInput field={f.field} value={shown[key]} onChange={(v) => onFix(key, v)} />
+                    )
+                  ) : (
+                    <label className="block text-sm font-medium text-slate-700">
+                      {f.label}
+                      <input value={String(shown[key] ?? '')} onChange={(e) => onFix(key, e.target.value)} className={`${inputClass} mt-1`} />
+                    </label>
+                  )}
+                  {f.type !== 'hours' && <p className="mt-0.5 text-[12.5px] text-slate-500">Was: {was}</p>}
+                </div>
+              )
+            })}
+          </div>
+        )}
+        {notes.length > 0 && (
+          <div className="mt-2 text-[13px] text-slate-600">
+            <p className="font-semibold text-slate-700">Goes to the admin as a note:</p>
+            {notes.map((n) => (
+              <p key={n}>{n}</p>
+            ))}
+          </div>
+        )}
+        {r?.askWhen && !when && <p className="mt-2 text-[13px] text-amber-800">Answer the question above to send it.</p>}
+        {r && (Object.keys(shown).length > 0 || notes.length > 0) && <div className="mt-2">{leave}</div>}
       </div>
     )
   }
@@ -558,4 +710,17 @@ function ResultCard({
     )
   }
   return null
+}
+
+/** The week's hours, shut until asked for: the lines above already say what
+ *  changes, and the whole week's editor is long. */
+function HoursFix({ label, children }: { label: string; children: React.ReactNode }) {
+  const [open, setOpen] = useState(false)
+  return open ? (
+    <>{children}</>
+  ) : (
+    <button type="button" onClick={() => setOpen(true)} className="cursor-pointer text-[13.5px] font-semibold text-primary hover:underline">
+      Change the {label.toLowerCase()}
+    </button>
+  )
 }

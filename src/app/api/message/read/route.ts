@@ -8,6 +8,7 @@ import { listCategories } from '@/lib/categoryStore'
 import { listApprovedResources } from '@/lib/resourceStore'
 import { buildCatalog, itemsChange, readMessage, type ReadImage } from '@/lib/messageReader'
 import { readShulWeek } from '@/lib/shulWeekReading'
+import { readFieldChanges, type FieldRead } from '@/lib/fieldChanges'
 import { UUID } from '@/lib/itemMarkRoutes'
 
 // POST /api/message/read   multipart: text, file (up to 3), listingId?, turnstileToken, company
@@ -18,8 +19,9 @@ import { UUID } from '@/lib/itemMarkRoutes'
 // every change.
 //
 // Each proposal comes back with what it would do to the listing as it is
-// now: the item lines ("+ Chicken, sometimes"), and for a shul's times, the
-// week as the guide will show it, read by the shul card's own week reader.
+// now: the item lines ("+ Chicken, sometimes"), any other field as it would
+// be (fieldChanges.ts), and for a shul's times, the week as the guide will
+// show it, read by the shul card's own week reader.
 // `listingId`: the listing the box was opened from, if any.
 
 export const maxDuration = 60
@@ -78,6 +80,16 @@ export async function POST(request: Request) {
       return change ? { lines: change.lines, held: change.held } : { lines: [], held: [] }
     }
 
+    // A change to other fields: each as it would be (the whole week's hours
+    // with one day changed), what it was, and the lines it makes.
+    const fieldsFor = (id: string, changes: FieldRead[]) => {
+      const l = byId.get(id)
+      const c = l && catById.get(l.category)
+      if (!l || !c) return { values: {}, before: {}, lines: [], held: [], notes: [], askWhen: null }
+      const read = readFieldChanges(c, l, changes)
+      return { ...read, before: Object.fromEntries(Object.keys(read.values).map((k) => [k, l[k] ?? null])) }
+    }
+
     let timesRead = 0
     const proposals = await Promise.all(
       reading.proposals.map(async (p) => {
@@ -87,6 +99,14 @@ export async function POST(request: Request) {
             listing: p.listingId ? brief(p.listingId) : null,
             ...(p.listingId ? linesFor(p.listingId, p.items) : { lines: [], held: [] }),
             ask: p.ask ? { ...p.ask, choices: p.ask.choices.map((c) => ({ ...c, listing: brief(c.listingId), ...linesFor(c.listingId, p.items) })) } : null,
+          }
+        }
+        if (p.kind === 'fields') {
+          return {
+            ...p,
+            listing: p.listingId ? brief(p.listingId) : null,
+            ...(p.listingId ? fieldsFor(p.listingId, p.changes) : fieldsFor('', [])),
+            ask: p.ask ? { ...p.ask, choices: p.ask.choices.map((c) => ({ ...c, listing: brief(c.listingId), ...fieldsFor(c.listingId, p.changes) })) } : null,
           }
         }
         if (p.kind === 'new_place') {

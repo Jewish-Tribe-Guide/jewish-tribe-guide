@@ -120,6 +120,63 @@ describe('Saw something? Tell us', () => {
     ])
   })
 
+  // Oct 5: the hechsher and the hours came back "not a change" before the
+  // box read any field.
+  it('shows a change to other fields with what it was, and asks “every Wednesday?” before sending hours', async () => {
+    const SAY = { id: 'say', name: 'Say She Ate', address: '1408 South St, Philadelphia', category: 'restaurant', categoryLabel: 'Food' }
+    const week = { wed: { open: '11:00', close: '21:00' } }
+    respond = (url) =>
+      url.includes('/read')
+        ? {
+            ok: true,
+            photoUrls: [],
+            proposals: [
+              {
+                kind: 'fields',
+                listingId: 'say',
+                listing: SAY,
+                asWritten: 'say she ate',
+                ask: null,
+                values: { kosherCert: 'Keystone-K', hours: { wed: { open: '11:00', close: '15:00' } } },
+                before: { kosherCert: 'IKC', hours: week },
+                lines: [],
+                held: [],
+                notes: [],
+                askWhen: { key: 'hours', question: 'Every Wednesday, or just this one?', oneDay: 'Hours, Wednesday, one day only: closes 3:00 PM.' },
+              },
+            ],
+          }
+        : { ok: true, filed: 1 }
+    renderWithProviders(<TellUsSheet isOpen onClose={() => {}} />, {
+      community: { slug: 'philly' },
+      content: {
+        categories: [
+          makeCategory({
+            id: 'restaurant',
+            label: 'Food',
+            detailFields: [
+              { key: 'hours', label: 'Hours', type: 'hours' },
+              { key: 'kosherCert', label: 'Kosher Certification', type: 'select', options: [{ value: 'IKC', label: 'IKC' }, { value: 'Keystone-K', label: 'Keystone-K' }] },
+            ],
+          }),
+        ],
+      },
+    })
+    fireEvent.change(screen.getByLabelText('What did you see?'), { target: { value: 'Say She Ate is Keystone K now and closes at 3 on Wednesday' } })
+    fireEvent.click(screen.getByRole('button', { name: 'See what changes' }))
+    const card = await screen.findByTestId('tell-us-card')
+    expect(within(card).getByText('Kosher Certification: IKC → Keystone-K')).toBeInTheDocument()
+    expect(within(card).getByText('Hours, Wednesday: 11:00 AM–9:00 PM → 11:00 AM–3:00 PM')).toBeInTheDocument()
+    expect(within(card).getByText('Was: IKC')).toBeInTheDocument()
+    // Not until it's answered.
+    expect(screen.queryByRole('button', { name: /^Send/ })).not.toBeInTheDocument()
+    fireEvent.click(within(card).getByRole('button', { name: 'Just this once' }))
+    expect(within(card).queryByText(/Hours, Wednesday: 11:00/)).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+    await screen.findByTestId('tell-us-sent')
+    expect(JSON.parse(String(calls[1].init!.body)).edits).toEqual([{ listingId: 'say', values: { kosherCert: 'Keystone-K' }, notes: ['Hours, Wednesday, one day only: closes 3:00 PM.'] }])
+  })
+
   it('says when it isn’t a change to the guide, pointing to Feedback, with nothing to send', async () => {
     respond = (url) => (url.includes('/read') ? { ok: true, photoUrls: [], proposals: [{ kind: 'not_update', note: 'A question' }] } : {})
     open()

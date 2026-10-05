@@ -62,6 +62,30 @@ describe('POST /api/message/send', () => {
     expect(note).toContain('Chicken: already listed')
   })
 
+  it('files a change to other fields, worked out again here, with what the guide can’t hold as a note', async () => {
+    const food = makeCategory({ id: 'restaurant', label: 'Food', detailFields: [{ key: 'kosherCert', label: 'Kosher Certification', type: 'select', options: [{ value: 'IKC', label: 'IKC' }, { value: 'Keystone-K', label: 'Keystone-K' }] }] })
+    const SAY = '1b6c4c1e-2f55-4a8e-9d57-3b7f0d6f4a21'
+    m.listCategories.mockResolvedValue([grocery, food])
+    m.listApprovedResources.mockResolvedValue([arch, makeListing({ id: SAY, name: 'Say She Ate', category: 'restaurant', kosherCert: 'IKC' })])
+    const res = await post({
+      text: 'change the kosher certification for say she ate to keystone k',
+      edits: [{ listingId: SAY, values: { kosherCert: 'keystone k', googleSyncedAt: 'x' }, notes: ['Hours, Friday, one day only: closes 2:00 PM.'] }],
+    })
+    expect(await res.json()).toEqual({ ok: true, filed: 1 })
+    const [, id, payload, note] = m.submitListingUpdate.mock.calls[0]
+    expect(id).toBe(SAY)
+    expect(payload.details).toEqual({ kosherCert: 'Keystone-K' })
+    expect(payload.source).toMatchObject({ readBy: 'ai', from: 'a message' })
+    expect(note).toContain('Kosher Certification: IKC → Keystone-K')
+    expect(note).toContain('For the admin:\nHours, Friday, one day only')
+  })
+
+  it('files a note alone when nothing else changes, and nothing at all when there’s neither', async () => {
+    await post({ text: 'x', edits: [{ listingId: ARCH, values: {}, notes: ['Hours: closes 4:00 PM, but which days isn’t said'] }, { listingId: ARCH, values: { name: 'Trader Joe’s' }, notes: [] }] })
+    expect(m.submitListingUpdate).toHaveBeenCalledTimes(1)
+    expect(m.submitListingUpdate.mock.calls[0][3]).toContain('which days isn’t said')
+  })
+
   it('files a new place in its category, with what it carries', async () => {
     await post({ text: 'South Square Market on 22nd has challah', places: [{ category: 'grocery', place: { name: 'South Square Market', address: '22nd & South' }, items: [{ name: 'Challah', availability: 'always', doubt: null }] }] })
     const [, payload, note] = m.submitListingCreate.mock.calls[0]
