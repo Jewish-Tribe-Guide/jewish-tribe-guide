@@ -1,5 +1,6 @@
 'use client'
 
+import SiteAddButton from '@/components/SiteAddButton'
 import { Suspense } from 'react'
 import { usePathname } from 'next/navigation'
 import type { AppMode } from '@/types'
@@ -100,6 +101,7 @@ function Chrome({ children, year }: { children: React.ReactNode; year: number })
           a fallback has to announce itself rather than pass as data. */}
       <ContentFailureNotice />
       {children}
+      <SiteAddButton />
       {/* Desktop only, deliberately — not an oversight, and tried the other
           way once. A phone here is an app shell with a fixed bottom tab bar,
           and a document footer under one reads as a website; none of the

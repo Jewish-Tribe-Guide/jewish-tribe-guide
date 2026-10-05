@@ -377,7 +377,9 @@ describe('GenericDirectory', () => {
   // to gate it to mobile only; asserting it out of the className is the
   // regression check for that, now that desktop shares this same button
   // instead of DirectoryHeader's old toolbar "Add".
-  it('has a floating Add button that clicks onAdd, visible on every viewport', async () => {
+  // Since Oct 5 the "+" opens "Saw something? Tell us"; today's Add form is
+  // one tap inside it ("Add a place").
+  it('has a floating Add button, visible on every viewport, that opens the box with Add a place inside', async () => {
     const user = userEvent.setup()
     const onAdd = vi.fn()
     const category = makeCategory({
@@ -387,9 +389,11 @@ describe('GenericDirectory', () => {
     })
     renderWithProviders(<GenericDirectory category={category} items={[makeListing()]} {...handlers} onAdd={onAdd} />)
 
-    const floatingAdd = screen.getByRole('button', { name: 'Add a listing' })
+    const floatingAdd = screen.getByRole('button', { name: 'Add' })
     expect(floatingAdd.className).not.toContain('desktop:hidden')
     await user.click(floatingAdd)
+    expect(onAdd).not.toHaveBeenCalled()
+    await user.click(await screen.findByRole('button', { name: 'Add a place' }))
     expect(onAdd).toHaveBeenCalledTimes(1)
   })
 
@@ -405,7 +409,7 @@ describe('GenericDirectory', () => {
     const category = makeCategory({ pluralLabel: 'WhatsApp Groups', hasAddress: false })
     renderWithProviders(<GenericDirectory category={category} items={[makeListing()]} {...handlers} />)
 
-    expect(screen.getByRole('button', { name: 'Add a listing' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Add' })).toBeInTheDocument()
   })
 
   // The floating Add button sits at z-40; ListingDetailModal's overlay is
@@ -424,12 +428,12 @@ describe('GenericDirectory', () => {
     renderWithProviders(
       <GenericDirectory category={makeCategory()} items={[item]} {...handlers} reopenItemId={item.id} />,
     )
-    expect(screen.queryByRole('button', { name: 'Add a listing' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Add' })).not.toBeInTheDocument()
   })
 
   it('shows the floating Add button when no dialog is open', () => {
     renderWithProviders(<GenericDirectory category={makeCategory()} items={[makeListing()]} {...handlers} />)
-    expect(screen.getByRole('button', { name: 'Add a listing' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Add' })).toBeInTheDocument()
   })
 
   // Mobile used to be the exception: the listing expanded inline, with no
@@ -443,7 +447,7 @@ describe('GenericDirectory', () => {
         <GenericDirectory category={makeCategory()} items={[item]} {...handlers} reopenItemId={item.id} />
       </ForcedViewport>,
     )
-    expect(screen.queryByRole('button', { name: 'Add a listing' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Add' })).not.toBeInTheDocument()
   })
 
   // A bare icon circle is a mobile convention people already have a
@@ -453,10 +457,10 @@ describe('GenericDirectory', () => {
   // CSS, so this is asserted out of the className, same as the
   // desktop:hidden check above) is what makes it show up there but not on
   // mobile, where it would just be redundant with the shape.
-  it('shows the "Add a listing" label visibly for desktop, not just as an aria-label', () => {
+  it('shows the "Add" label visibly for desktop, not just as an aria-label', () => {
     renderWithProviders(<GenericDirectory category={makeCategory()} items={[makeListing()]} {...handlers} />)
 
-    const label = screen.getByText('Add a listing', { selector: 'span' })
+    const label = screen.getByText('Add', { selector: 'span' })
     expect(label.className).toContain('desktop:inline')
     expect(label.className).toContain('hidden')
   })
@@ -469,7 +473,10 @@ describe('GenericDirectory', () => {
     const category = makeCategory({ label: 'Grocery Store' })
     renderWithProviders(<GenericDirectory category={category} items={[makeListing()]} {...handlers} />)
 
-    expect(screen.queryByRole('button', { name: /^Add$/ })).not.toBeInTheDocument()
+    // One "Add", and it's the floating one (named "Add" too since Oct 5).
+    const adds = screen.getAllByRole('button', { name: /^Add$/ })
+    expect(adds).toHaveLength(1)
+    expect(adds[0].className).toContain('fixed')
   })
 
   it('wires a card\'s Edit callback back to the directory\'s own props', async () => {

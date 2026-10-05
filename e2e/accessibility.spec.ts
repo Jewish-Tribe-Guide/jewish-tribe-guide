@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
-import { categories, categoryAddButton, categoryWithListings, defaultCommunity, dismissLocationPrompt, ready } from './helpers'
+import { categories, categoryAddButton, openAddForm, categoryWithListings, defaultCommunity, dismissLocationPrompt, ready } from './helpers'
 import { listingSlug } from '../src/lib/listingSlug'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -145,7 +145,7 @@ test.describe('accessibility', () => {
     expect(results.violations, JSON.stringify(results.violations, null, 2)).toEqual([])
   })
 
-  test('the Add form dialog, once open, has no automatically-detectable violations', async ({ page, request }) => {
+  test('the “Tell us” box, once open, has no automatically-detectable violations', async ({ page, request }) => {
     const community = await defaultCommunity(page)
     const { category } = await categoryWithListings(request, community)
     await page.goto(`/${community}/${category.id}`)
@@ -153,6 +153,19 @@ test.describe('accessibility', () => {
     await dismissLocationPrompt(page)
 
     await categoryAddButton(page).click()
+    await expect(page.getByRole('dialog').getByRole('button', { name: 'See what changes' })).toBeVisible()
+
+    await expectNoViolations(page)
+  })
+
+  test('the Add form dialog, once open, has no automatically-detectable violations', async ({ page, request }) => {
+    const community = await defaultCommunity(page)
+    const { category } = await categoryWithListings(request, community)
+    await page.goto(`/${community}/${category.id}`)
+    await ready(page)
+    await dismissLocationPrompt(page)
+
+    await openAddForm(page)
     await expect(page.getByRole('dialog')).toBeVisible()
 
     await expectNoViolations(page)

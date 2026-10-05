@@ -1,6 +1,6 @@
 import { gzipSync } from 'node:zlib'
 import { expect, test, type Page } from '@playwright/test'
-import { categoryAddButton, defaultCommunity, dismissLocationPrompt, largestCategory, ready } from './helpers'
+import { openAddForm, defaultCommunity, dismissLocationPrompt, largestCategory, ready } from './helpers'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // What a page actually downloads.
@@ -205,7 +205,7 @@ test.describe('category page weight', () => {
 
     // The positive control: opening the form does load it. Without this, the
     // assertion above passes just as happily when the widget is simply broken.
-    await categoryAddButton(page).click()
+    await openAddForm(page)
     await expect.poll(() => hosts.includes(TURNSTILE_HOST), { timeout: 15_000 }).toBe(true)
   })
 })

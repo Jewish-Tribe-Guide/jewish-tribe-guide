@@ -284,7 +284,15 @@ export function categoryAddButton(page: Page): Locator {
   // test that opens Add failed to find the button — and those failures were
   // written off as the standing local baseline (AGENTS.md), measured at
   // that same commit.
-  return page.getByRole('main').getByRole('button', { name: 'Add a listing', exact: true })
+  // "Add" since Oct 5: it opens "Saw something? Tell us" now, with today's
+  // Add form one tap inside it (openAddForm).
+  return page.getByRole('main').getByRole('button', { name: 'Add', exact: true })
+}
+
+/** Today's Add form: "+", then "Add a place" in the box it opens. */
+export async function openAddForm(page: Page): Promise<void> {
+  await categoryAddButton(page).click()
+  await page.getByRole('dialog').getByRole('button', { name: 'Add a place' }).click()
 }
 
 /** Waits for the page to be settled enough to assert on.

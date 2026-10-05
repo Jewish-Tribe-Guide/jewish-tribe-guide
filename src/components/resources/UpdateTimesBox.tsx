@@ -29,7 +29,7 @@ import { TURNSTILE_ACTIVE } from './useListingSubmit'
 // nothing differs, it says so and confirms the times instead.
 
 type Step = 'choose' | 'paste' | 'result'
-type Source = { text: string } | { file: File; url: string | null }
+type Source = { text: string } | { file: File | null; url: string | null }
 
 const inputClass = 'rounded-md border border-slate-300 px-2.5 py-1.5 text-sm text-slate-900 focus:border-primary focus:outline-none'
 
@@ -56,11 +56,27 @@ function asTheyAre(minyanim: Minyan[]): TimesUpdate {
   return compareTimes(minyanim, { kind: 'schedule', complete: false, season: null, title: null, startsOn: null, from: null, to: null, times: [] }, { season: null })
 }
 
-export default function UpdateTimesBox({ item, minyanim, onSent, onClose }: { item: DirectoryResource; minyanim: Minyan[]; onSent: (what: 'sent' | 'confirmed') => void; onClose: () => void }) {
-  const [step, setStep] = useState<Step>('choose')
+export default function UpdateTimesBox({
+  item,
+  minyanim,
+  onSent,
+  onClose,
+  read: alreadyRead,
+}: {
+  item: DirectoryResource
+  minyanim: Minyan[]
+  onSent: (what: 'sent' | 'confirmed') => void
+  onClose: () => void
+  /** Already read elsewhere (the "+ Add" box's reader): open on the result,
+   *  with what it was read from. */
+  read?: { update: TimesUpdate; text: string; photoUrl: string | null }
+}) {
+  const [step, setStep] = useState<Step>(alreadyRead ? 'result' : 'choose')
   const [text, setText] = useState('')
-  const [source, setSource] = useState<Source | null>(null)
-  const [update, setUpdate] = useState<TimesUpdate | null>(null)
+  const [source, setSource] = useState<Source | null>(() =>
+    alreadyRead ? (alreadyRead.text ? { text: alreadyRead.text } : alreadyRead.photoUrl ? { file: null, url: alreadyRead.photoUrl } : null) : null,
+  )
+  const [update, setUpdate] = useState<TimesUpdate | null>(alreadyRead?.update ?? null)
   const [addFirst, setAddFirst] = useState(false)
   const [busy, setBusy] = useState<'read' | 'send' | null>(null)
   const [attempt, setAttempt] = useState(0)
@@ -287,7 +303,7 @@ function TimesResult({
       )}
       {source && 'file' in source && source.url && (
         <a href={source.url} target="_blank" rel="noopener noreferrer" className="block text-[13px] font-semibold text-primary hover:underline">
-          From your {source.file.type === 'application/pdf' ? 'PDF' : 'photo'} ↗
+          From your {source.file?.type === 'application/pdf' ? 'PDF' : 'photo'} ↗
         </a>
       )}
 

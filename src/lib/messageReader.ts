@@ -543,3 +543,39 @@ export async function readMessage(
     },
   }
 }
+
+// ── What comes back from the browser on Send ────────────────────────────────
+// The person sends back what they saw, maybe with an item taken off or a
+// branch picked. It's checked again here: the same shapes and limits as a
+// reading, nothing more. The change itself is worked out again on the
+// server from the listing as it is now (itemsChange, newPlaceSubmission).
+
+export function sentItems(v: unknown): ReadItem[] {
+  if (!Array.isArray(v)) return []
+  const out: ReadItem[] = []
+  for (const r of v.slice(0, MAX_ITEMS)) {
+    if (!r || typeof r !== 'object') continue
+    const o = r as Record<string, unknown>
+    const name = str(o.name, 60)
+    if (!name || !AVAILABILITY.has(o.availability as Availability)) continue
+    out.push({ name: addedItemName(name), availability: o.availability as Availability, doubt: str(o.doubt, 200) })
+  }
+  return out
+}
+
+export function sentPlace(v: unknown): PlaceRead | null {
+  if (!v || typeof v !== 'object') return null
+  const o = v as Record<string, unknown>
+  const name = str(o.name, 120)
+  if (!name) return null
+  return {
+    name,
+    kind: str(o.kind, 80),
+    address: str(o.address, 200),
+    phone: str(o.phone, 40),
+    website: str(o.website, 300),
+    kosherCert: str(o.kosherCert, 80),
+    meatDairy: str(o.meatDairy, 120),
+    notes: str(o.notes, 600),
+  }
+}

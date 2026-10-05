@@ -1,0 +1,101 @@
+import { after } from 'next/server'
+import { enforceRateLimit, clientIp } from '@/lib/rateLimit'
+import { isHoneypotTripped } from '@/lib/honeypot'
+import { verifyTurnstile } from '@/lib/turnstile'
+import { ui } from '@/lib/uiConfig'
+import { resolveCapabilities } from '@/lib/categories'
+import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
+import { listCategories } from '@/lib/categoryStore'
+import { listApprovedResources } from '@/lib/resourceStore'
+import { submitListingCreate, submitListingUpdate } from '@/lib/submissionStore'
+import { sendSubmissionNotification } from '@/lib/email'
+import { normalizeEmail } from '@/lib/activity'
+import { payloadTooLarge } from '@/lib/limits'
+import { itemsChange, messageSource, newPlaceSubmission, sentItems, sentPlace } from '@/lib/messageReader'
+import type { SubmissionRow } from '@/types'
+
+// POST /api/message/send   { text, photoUrls, stores: [{ listingId, items }], places: [{ category, place, items }], email?, turnstileToken, company }
+// The "+ Add" box's Send (agreed Oct 5): what the person saw after the
+// reader (/api/message/read), filed as ordinary suggestions for an admin,
+// one per store or place, each labelled "Read by AI" with the message or
+// photo it came from (submissionSource.ts), so the queue's opened card
+// shows it beside the change.
+//
+// Nothing is taken on trust from the browser: the listing is read here,
+// and the change worked out again from it (itemsChange), the way the shul
+// card's times route does. A store with nothing left to change files
+// nothing. A shul's times go through that card's own route.
+
+const MAX_STORES = 10
+const FAILED = { ok: false, error: 'That didn’t send. Please try again.' }
+
+/** A photo the reader kept, in the guide's own storage, never any other
+ *  address. */
+function keptPhoto(url: unknown): url is string {
+  const kept = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/site-assets/message-source/`
+  return typeof url === 'string' && url.startsWith(kept) && /^[\w.-]+$/.test(url.slice(kept.length))
+}
+
+export async function POST(request: Request) {
+  const limited = await enforceRateLimit(request, 'submissions', { limit: 10, windowSec: 60 })
+  if (limited) return limited
+  const body = (await request.json().catch(() => null)) as Record<string, unknown> | null
+  if (!body || typeof body !== 'object') return Response.json({ ok: false, error: 'Invalid request.' }, { status: 400 })
+  const tooBig = payloadTooLarge(body)
+  if (tooBig) return Response.json({ ok: false, error: tooBig }, { status: 413 })
+  if (isHoneypotTripped(body)) return Response.json({ ok: true, filed: 0 })
+  if (!(await verifyTurnstile(typeof body.turnstileToken === 'string' ? body.turnstileToken : undefined, clientIp(request)))) {
+    return Response.json({ ok: false, code: 'turnstile', error: 'Verification failed. Please try again.' }, { status: 403 })
+  }
+
+  const text = typeof body.text === 'string' ? body.text.trim().slice(0, 8000) : ''
+  const photoUrls = (Array.isArray(body.photoUrls) ? body.photoUrls : []).filter(keptPhoto).slice(0, 3)
+  const email = normalizeEmail(body.email)
+  const submittedBy = email ? { email } : null
+  const source = messageSource(text, photoUrls)
+  const stores = (Array.isArray(body.stores) ? body.stores : []).slice(0, MAX_STORES) as Record<string, unknown>[]
+  const places = (Array.isArray(body.places) ? body.places : []).slice(0, MAX_STORES) as Record<string, unknown>[]
+  if (stores.length + places.length === 0) return Response.json({ ok: false, error: 'Nothing to send.' }, { status: 400 })
+
+  const community = await resolveCommunity(communitySlugFromRequest(request))
+  try {
+    const [listings, categories] = await Promise.all([listApprovedResources(community.slug), listCategories(community.slug)])
+    const byId = new Map(listings.map((l) => [l.id, l]))
+    const catById = new Map(categories.filter((c) => c.active !== false).map((c) => [c.id, c]))
+    const filed: SubmissionRow[] = []
+
+    for (const s of stores) {
+      const listing = typeof s.listingId === 'string' ? byId.get(s.listingId) : undefined
+      const category = listing && catById.get(listing.category)
+      if (!listing || !category) continue
+      if (!ui.contributions.edit || !resolveCapabilities(category.capabilities).edit) continue
+      const change = itemsChange(category, listing, sentItems(s.items))
+      if (!change || change.lines.length === 0) continue
+      const note = ['From a message sent with “Tell us”.', change.lines.join('\n'), ...(change.held.length ? [`Not changed:\n${change.held.join('\n')}`] : [])].join('\n\n')
+      filed.push(await submitListingUpdate(community.slug, listing.id, Object.assign({}, change.submission, { source }), note, submittedBy))
+    }
+
+    for (const p of places) {
+      const category = typeof p.category === 'string' ? catById.get(p.category) : undefined
+      const place = sentPlace(p.place)
+      if (!category || !place) continue
+      if (!ui.contributions.add || !resolveCapabilities(category.capabilities).add) continue
+      const { submission, note } = newPlaceSubmission(category, place, sentItems(p.items))
+      filed.push(
+        await submitListingCreate(
+          community.slug,
+          Object.assign({}, submission, { submittedBy: submittedBy ?? undefined, source }),
+          ['A new place, from a message sent with “Tell us”.', note].filter(Boolean).join('\n\n'),
+        ),
+      )
+    }
+
+    after(async () => {
+      for (const s of filed) await sendSubmissionNotification(s).catch((err) => console.error('[message/send] Admin notification failed:', err))
+    })
+    return Response.json({ ok: true, filed: filed.length })
+  } catch (err) {
+    console.error('[message/send] could not file:', err)
+    return Response.json(FAILED, { status: 502 })
+  }
+}

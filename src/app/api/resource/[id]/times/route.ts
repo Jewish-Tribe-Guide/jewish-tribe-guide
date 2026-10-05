@@ -44,10 +44,12 @@ export async function POST(request: Request, ctx: RouteContext<'/api/resource/[i
   }
   if (!ui.contributions.edit) return Response.json({ ok: false, error: 'This action is not available.' }, { status: 403 })
   const source = typeof body.source === 'string' ? body.source.trim().slice(0, 4000) : ''
-  // A photo or PDF it was read from: only one the reader kept, in the
-  // guide's own storage (/api/schedule/read), never any other address.
-  const keptAt = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/site-assets/schedule-source/`
-  const sourceUrl = typeof body.sourceUrl === 'string' && body.sourceUrl.startsWith(keptAt) && /^[\w.-]+$/.test(body.sourceUrl.slice(keptAt.length)) ? body.sourceUrl : null
+  // A photo or PDF it was read from: only one a reader kept, in the guide's
+  // own storage (/api/schedule/read, or the "+ Add" box's /api/message/read),
+  // never any other address.
+  const assets = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/site-assets/`
+  const keptAt = ['schedule-source/', 'message-source/'].map((d) => assets + d).find((p) => typeof body.sourceUrl === 'string' && body.sourceUrl.startsWith(p))
+  const sourceUrl = keptAt && /^[\w.-]+$/.test((body.sourceUrl as string).slice(keptAt.length)) ? (body.sourceUrl as string) : null
 
   try {
     const { data: row } = await getAdminClient()

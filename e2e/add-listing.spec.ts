@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { categoryAddButton, categoryWithDistances, defaultCommunity, dismissLocationPrompt, ready } from './helpers'
+import { openAddForm, categoryWithDistances, defaultCommunity, dismissLocationPrompt, ready } from './helpers'
 
 // Add is two steps: find the place on Google, then finish it in the
 // listing's own shape (ListingAdd → ListingEditor). The Google search itself
@@ -15,7 +15,7 @@ test('Add finds the place first, then finishes it as the listing', async ({ page
   await page.goto(`/${community}/${category.id}`)
   await ready(page)
   await dismissLocationPrompt(page)
-  await categoryAddButton(page).click()
+  await openAddForm(page)
 
   const add = page.getByRole('dialog', { name: `Add a ${category.label}` })
   await expect(add).toBeVisible()

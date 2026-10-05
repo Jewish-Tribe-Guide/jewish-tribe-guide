@@ -50,6 +50,11 @@ import { didArriveViaBackForward } from '@/lib/backForwardNavigation'
 import { getCategoryColor } from '@/lib/categoryColor'
 import { CategoryGlyph } from '@/lib/categoryIcons'
 import { SwipeRowGroup } from '@/components/SwipeRow'
+import dynamic from 'next/dynamic'
+import { tellUsPlaceholder } from '@/lib/tellUs'
+
+// Loaded on the first tap of "+": nobody browsing pays for the box.
+const TellUsSheet = dynamic(() => import('@/components/TellUsSheet'))
 
 type Props = {
   category: CategoryConfig
@@ -466,6 +471,9 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // Per-category capabilities layered under the global `ui.*` master switches.
   const caps = resolveCapabilities(category.capabilities)
   const canAdd = ui.contributions.add && caps.add
+  // "+" opens "Saw something? Tell us" (agreed Oct 5); today's Add form is
+  // one tap inside it, "Add a place".
+  const [tellOpen, setTellOpen] = useState(false)
   // Adding to a shul's times is an edit to the shul ("+ Add a minyan").
   const canEdit = ui.contributions.edit && caps.edit
   const showSearch = ui.search.directory && caps.directorySearch
@@ -1720,7 +1728,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
 
       {canAdd && !openDialogItemId && (
         <button
-          onClick={onAdd}
+          onClick={() => setTellOpen(true)}
           // Generic, not "Add {category label}" — the empty-state button
           // further up already uses that exact phrasing, and giving this
           // the same name would make the two indistinguishable to anything
@@ -1730,12 +1738,23 @@ export default function GenericDirectory({ category, items, anchorLabel, address
           // aria-label always wins for the accessible name regardless, so
           // this keeps mobile's icon-only button correctly named without
           // needing a second, viewport-conditional way of deriving it.
-          aria-label="Add a listing"
+          aria-label="Add"
           className="fixed right-4 bottom-[calc(3.75rem+env(safe-area-inset-bottom)+1rem)] desktop:bottom-6 z-40 flex h-14 w-14 desktop:w-auto items-center justify-center gap-2 rounded-full bg-primary px-0 desktop:px-5 text-white shadow-lg cursor-pointer active:scale-95 transition-transform"
         >
           <PlusIcon className="h-6 w-6 shrink-0" />
-          <span className="hidden desktop:inline font-medium whitespace-nowrap">Add a listing</span>
+          <span className="hidden desktop:inline font-medium whitespace-nowrap">Add</span>
         </button>
+      )}
+      {tellOpen && (
+        <TellUsSheet
+          isOpen
+          onClose={() => setTellOpen(false)}
+          placeholder={tellUsPlaceholder(category.detailFields.some((f) => f.type === 'tags') ? 'items' : category.detailFields.some((f) => f.type === 'minyanim') ? 'times' : 'any')}
+          onAddYourself={() => {
+            setTellOpen(false)
+            onAdd()
+          }}
+        />
       )}
 
       {hasActualFilters && (

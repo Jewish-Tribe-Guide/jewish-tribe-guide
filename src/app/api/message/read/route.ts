@@ -89,21 +89,25 @@ export async function POST(request: Request) {
             ask: p.ask ? { ...p.ask, choices: p.ask.choices.map((c) => ({ ...c, listing: brief(c.listingId), ...linesFor(c.listingId, p.items) })) } : null,
           }
         }
-        if (p.kind === 'new_place') return { ...p, categoryLabel: p.category ? catById.get(p.category)?.label ?? null : null, maybe: p.maybe.map(brief) }
+        if (p.kind === 'new_place') {
+          // "Already in the guide? It's this one": each with its own lines,
+          // so picking one shows at once what changes there.
+          return { ...p, categoryLabel: p.category ? catById.get(p.category)?.label ?? null : null, maybe: p.maybe.map((id) => ({ ...brief(id), ...linesFor(id, p.items) })) }
+        }
         if (p.kind === 'ask_others') return { ...p, listing: p.listingId ? brief(p.listingId) : null }
         if (p.kind === 'times') {
           const l = byId.get(p.listingId)!
           const key = catById.get(l.category)?.detailFields.find((f) => f.type === 'minyanim')?.key
           // A second reading, by the week reader, for at most two shuls: each
           // costs a model call.
-          if (!key || ++timesRead > MAX_TIMES) return { ...p, listing: brief(p.listingId), update: null }
+          if (!key || ++timesRead > MAX_TIMES) return { ...p, listing: brief(p.listingId), item: l, minyanimKey: key ?? null, update: null }
           const source = images[0] && !text ? { image: images[0].b64, mime: images[0].mime } : { text: text || '(see photo)' }
           try {
             const { update } = await readShulWeek(l, key, source, apiKey)
-            return { ...p, listing: brief(p.listingId), update }
+            return { ...p, listing: brief(p.listingId), item: l, minyanimKey: key, update }
           } catch (err) {
             console.error('[message/read] times not read:', err instanceof Error ? err.message : err)
-            return { ...p, listing: brief(p.listingId), update: null }
+            return { ...p, listing: brief(p.listingId), item: l, minyanimKey: key, update: null }
           }
         }
         return p
