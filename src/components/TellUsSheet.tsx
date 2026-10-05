@@ -59,6 +59,7 @@ type Proposal = ItemsProposal | FieldsProposal | PlaceProposal | TimesProposal |
 type Reading = { proposals: Proposal[]; photoUrls: string[] }
 
 const MAX_PHOTOS = 3
+const PHOTO_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif']
 
 /** A fields card's reading for the place it's about, or the branch picked. */
 function fieldsReadingOf(p: FieldsProposal, picked: string | null): (FieldsReading & { listing: Brief }) | null {
@@ -131,6 +132,12 @@ function TellUsBody({
   const [email, setEmail] = useState('')
   const [filed, setFiled] = useState(0)
   const fileInput = useRef<HTMLInputElement>(null)
+  // A screenshot pasted, or photos dropped, anywhere in the box (asked for
+  // Oct 5: on desktop, a photo could only be added with the button). The
+  // count, not a flag: dragging over the textarea inside fires a leave
+  // for the box itself.
+  const [dragging, setDragging] = useState(0)
+  const isMobile = useIsMobile()
   const textId = useId()
   const emailId = useId()
   const pending = useRef<(token: string) => void>(() => {})
@@ -227,10 +234,10 @@ function TellUsBody({
     }
   }
 
-  const addPhotos = (files: FileList | null) => {
+  const addPhotos = (files: FileList | File[] | null) => {
     if (!files) return
     const room = MAX_PHOTOS - photos.length
-    const added = [...files].filter((f) => f.type.startsWith('image/')).slice(0, room).map((file) => ({ file, preview: URL.createObjectURL(file) }))
+    const added = [...files].filter((f) => PHOTO_TYPES.includes(f.type)).slice(0, room).map((file) => ({ file, preview: URL.createObjectURL(file) }))
     for (const a of added) previews.current.add(a.preview)
     setPhotos((ps) => [...ps, ...added])
   }
@@ -252,8 +259,34 @@ function TellUsBody({
     )
   }
 
+  const hasFiles = (e: React.DragEvent) => [...e.dataTransfer.types].includes('Files')
+  const writing = step === 'write'
   return (
-    <div className="space-y-3 p-1" data-testid="tell-us">
+    <div
+      className="relative space-y-3 p-1"
+      data-testid="tell-us"
+      onPaste={(e) => {
+        if (!writing) return
+        const files = [...e.clipboardData.files].filter((f) => PHOTO_TYPES.includes(f.type))
+        if (files.length === 0) return
+        e.preventDefault()
+        addPhotos(files)
+      }}
+      onDragEnter={(e) => writing && hasFiles(e) && setDragging((n) => n + 1)}
+      onDragLeave={(e) => writing && hasFiles(e) && setDragging((n) => Math.max(0, n - 1))}
+      onDragOver={(e) => writing && hasFiles(e) && e.preventDefault()}
+      onDrop={(e) => {
+        if (!writing || !hasFiles(e)) return
+        e.preventDefault()
+        setDragging(0)
+        addPhotos(e.dataTransfer.files)
+      }}
+    >
+      {writing && dragging > 0 && (
+        <div className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center rounded-xl border-[3px] border-dashed border-primary bg-blue-50/90" data-testid="tell-us-drop">
+          <p className="text-[17px] font-extrabold text-primary">{photos.length >= MAX_PHOTOS ? `Up to ${MAX_PHOTOS} photos` : 'Drop to add the photo'}</p>
+        </div>
+      )}
       {step === 'write' && (
         <>
           <div className="rounded-xl border border-slate-300 bg-white focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20">
@@ -302,7 +335,7 @@ function TellUsBody({
               <input
                 ref={fileInput}
                 type="file"
-                accept="image/png,image/jpeg,image/webp,image/gif"
+                accept={PHOTO_TYPES.join(',')}
                 multiple
                 className="hidden"
                 aria-label="Add a photo"
@@ -311,7 +344,7 @@ function TellUsBody({
                   e.target.value = ''
                 }}
               />
-              <span className="text-[12px] text-slate-400">{photos.length ? `${photos.length} of ${MAX_PHOTOS} photos` : ''}</span>
+              <span className="text-[12px] text-slate-400">{photos.length ? `${photos.length} of ${MAX_PHOTOS} photos` : isMobile ? 'or paste one' : 'or paste or drop one'}</span>
             </div>
           </div>
           <button

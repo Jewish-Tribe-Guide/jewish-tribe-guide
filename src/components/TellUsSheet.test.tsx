@@ -82,6 +82,23 @@ describe('Saw something? Tell us', () => {
     expect(screen.getByText(/Read by AI from what you sent/)).toBeInTheDocument()
   })
 
+  // Oct 5: on desktop a photo could only be added with the button.
+  it('takes a pasted screenshot and dropped photos, up to three, ignoring anything that isn’t one', async () => {
+    open()
+    const box = screen.getByTestId('tell-us')
+    const png = (n: string) => new File(['x'], n, { type: 'image/png' })
+    fireEvent.paste(box, { clipboardData: { files: [png('shot.png')] } })
+    expect(screen.getByAltText('Photo 1')).toBeInTheDocument()
+    fireEvent.dragEnter(box, { dataTransfer: { types: ['Files'] } })
+    expect(screen.getByTestId('tell-us-drop')).toHaveTextContent('Drop to add the photo')
+    fireEvent.drop(box, { dataTransfer: { types: ['Files'], files: [png('a.png'), new File(['x'], 'notes.pdf', { type: 'application/pdf' }), png('b.png'), png('c.png')] } })
+    expect(screen.queryByTestId('tell-us-drop')).not.toBeInTheDocument()
+    expect(screen.getAllByAltText(/^Photo \d$/)).toHaveLength(3)
+    // Pasting text is still just typing.
+    fireEvent.paste(box, { clipboardData: { files: [] } })
+    expect(screen.getAllByAltText(/^Photo \d$/)).toHaveLength(3)
+  })
+
   it('asks which store, sends what they picked, leaves out what they took off, and thanks them', async () => {
     open()
     fireEvent.change(screen.getByLabelText('What did you see?'), { target: { value: 'trader joes sometimes has ground turkey' } })
