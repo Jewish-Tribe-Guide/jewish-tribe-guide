@@ -264,6 +264,8 @@ describe('ListingForm', () => {
 
       expect(await screen.findByText('Thank you!')).toBeInTheDocument()
       expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument()
+      // No emoji (Oct 5): it had a praying-hands one over "Thank you!".
+      expect(document.body.textContent).not.toMatch(/\p{Extended_Pictographic}/u)
     })
   })
 

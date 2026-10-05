@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useId, useRef, useState } from 'react'
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import type { DirectoryResource } from '@/types'
 import { resolveCapabilities, type CategoryConfig } from '@/lib/categories'
@@ -69,7 +69,7 @@ type FieldsReading = {
 type FieldsChoice = { label: string; listingId: string; listing: Brief } & FieldsReading
 type FieldsProposal = { kind: 'fields'; listingId: string | null; listing: Brief | null; asWritten: string; ask: { question: string; choices: FieldsChoice[] } | null } & FieldsReading
 type TimesProposal = { kind: 'times'; listing: Brief; item: DirectoryResource; minyanimKey: string | null; update: TimesUpdate | null }
-type OtherProposal = { kind: 'ask_others' | 'not_update'; question?: string; note?: string | null }
+type OtherProposal = { kind: 'ask_others' | 'not_update'; question?: string; note?: string | null; listing?: Brief | null }
 type Proposal = ItemsProposal | FieldsProposal | PlaceProposal | TimesProposal | OtherProposal
 type Reading = { proposals: Proposal[]; photoUrls: string[] }
 
@@ -106,18 +106,40 @@ export default function TellUsSheet({
   const isMobile = useIsMobile()
   // Each step names itself: "Find the place", "Add a Grocery".
   const [stepTitle, setStepTitle] = useState<string | null>(null)
+  // Back is the header's chevron, before the title, on every step that has
+  // somewhere to go back to (asked for Oct 5: it was text at the bottom,
+  // under a long form, and the listing's own edit already had the chevron).
+  // The step says where it goes; the header only shows it.
+  const [hasBack, setHasBack] = useState(false)
+  const back = useRef<() => void>(() => {})
   const close = () => {
     setStepTitle(null)
+    setHasBack(false)
     onClose()
   }
   const title = stepTitle ?? (about ? `Tell us about ${about.name}` : 'Saw something? Tell us')
-  const body = <TellUsBody key={isOpen ? 'open' : 'shut'} about={about} pageCategory={category} placeholder={placeholder} onEditYourself={onEditYourself} onClose={close} onTitle={setStepTitle} />
+  const onBack = hasBack ? () => back.current() : undefined
+  const body = (
+    <TellUsBody
+      key={isOpen ? 'open' : 'shut'}
+      about={about}
+      pageCategory={category}
+      placeholder={placeholder}
+      onEditYourself={onEditYourself}
+      onClose={close}
+      onTitle={setStepTitle}
+      onBack={(go) => {
+        back.current = go ?? (() => {})
+        setHasBack(!!go)
+      }}
+    />
+  )
   return isMobile ? (
-    <MobileSheet isOpen={isOpen} onClose={close} title={title} draggable>
+    <MobileSheet isOpen={isOpen} onClose={close} title={title} onBack={onBack} draggable>
       {body}
     </MobileSheet>
   ) : (
-    <ActionDialog isOpen={isOpen} onClose={close} title={title}>
+    <ActionDialog isOpen={isOpen} onClose={close} title={title} onBack={onBack}>
       {body}
     </ActionDialog>
   )
@@ -132,6 +154,7 @@ function TellUsBody({
   onEditYourself,
   onClose,
   onTitle,
+  onBack,
 }: {
   about?: { id: string; name: string }
   pageCategory?: CategoryConfig
@@ -139,6 +162,8 @@ function TellUsBody({
   onEditYourself?: () => void
   onClose: () => void
   onTitle: (title: string | null) => void
+  /** Where the header's Back goes from this step, or nothing. */
+  onBack: (go: (() => void) | null) => void
 }) {
   const community = useCommunitySlug()
   const categories = useCategories()
@@ -414,6 +439,25 @@ function TellUsBody({
     onClose()
   }
 
+  // Back from each step: what was read goes back to what was written, the
+  // search to wherever it was opened from, a listing's editor to what was
+  // read or to the search, and the form to the search. A layout effect, so
+  // the header has the step's own Back before anything can be clicked: a
+  // plain effect can run after a quick tap, which then went back from the
+  // step before (the test caught it, about one run in three).
+  useLayoutEffect(() => {
+    const go: Record<Step, (() => void) | null> = {
+      write: null,
+      sent: null,
+      result: () => setStep('write'),
+      find: () => setStep(findFrom),
+      kind: () => openFind(true),
+      add: () => openFind(true),
+      edit: () => (editFrom === 'result' ? setStep('result') : openFind(true)),
+    }
+    onBack(go[step])
+  })
+
   if (step === 'sent') {
     return (
       <div className="space-y-3 p-1" data-testid="tell-us-sent">
@@ -638,21 +682,9 @@ function TellUsBody({
               )}
             </div>
           )}
-          <button type="button" onClick={() => setStep('write')} className="cursor-pointer text-[14px] font-bold text-slate-500 hover:text-slate-700">
-            ‹ Change what I wrote
-          </button>
         </>
       )}
 
-      {['find', 'kind', 'add', 'edit'].includes(step) && (
-        <button
-          type="button"
-          onClick={() => (step === 'find' ? setStep(findFrom) : step === 'edit' && editFrom === 'result' ? setStep('result') : openFind(true))}
-          className="cursor-pointer text-[14px] font-bold text-slate-500 hover:text-slate-700"
-        >
-          ‹ Back
-        </button>
-      )}
       {step === 'find' && (
         <FindPlace
           key={aiPlace?.card ?? 'own'}
@@ -1029,6 +1061,23 @@ function ResultCard({
         ) : (
           <p className="mt-1 text-[13.5px] text-slate-600">{p.update ? 'Left out.' : 'Couldn’t read the times from it. You can update them on the shul’s own page.'}</p>
         )}
+      </div>
+    )
+  }
+
+  // A guess about other stores, or an announcement with nobody saying they
+  // saw it here: the reader would ask shoppers, which nothing does yet, so
+  // the box says plainly that nothing changes (agreed Oct 5) rather than
+  // showing nothing. An announcement's own store card says it too, so this
+  // shows only when nothing else was read.
+  if (p.kind === 'ask_others') {
+    return (
+      <div className={card} data-testid="tell-us-card">
+        <p className="text-[14.5px] text-slate-800">Nothing in the guide changes from this.</p>
+        <p className="mt-1 text-[13.5px] text-slate-600">
+          {p.listing ? `It sounds like a guess about ${p.listing.name}, not something seen there.` : 'It sounds like an announcement or a guess, not something seen at a store here.'}{' '}
+          If you’ve seen it yourself, go back and say where.
+        </p>
       </div>
     )
   }

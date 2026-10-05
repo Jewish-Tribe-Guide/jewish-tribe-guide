@@ -295,7 +295,6 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
             rather than a dead end. */}
         {!embedded && <UpButton label="Back" onClick={onSubmitted} className="mb-2" />}
         <div className="bg-green-50 border border-green-200 rounded-lg p-6 text-center">
-          <p className="text-2xl mb-2">🙏</p>
           {/* Not sr-only, unlike the other screens' bare title repeats: this
               text ("Thank you!") is never what the header says — the header
               keeps `heading` — so hiding it would remove the only place the

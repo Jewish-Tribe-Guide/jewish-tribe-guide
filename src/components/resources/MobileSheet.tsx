@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useBodyScrollLock } from '@/lib/useBodyScrollLock'
 import BodyPortal from '@/components/BodyPortal'
+import BackIconButton from '@/components/BackIconButton'
 
 type Props = {
   isOpen: boolean
@@ -30,6 +31,10 @@ type Props = {
    *  sheet with but the backdrop and Escape, since the header is where the
    *  non-draggable ✕ lives. */
   titleHidden?: boolean
+  /** Shows Back, a chevron before the title, for a step inside the sheet
+   *  (the "+ Add" box's own steps). The header's drag skips buttons, so a
+   *  tap on it is a tap. */
+  onBack?: () => void
 }
 
 type Snap = 'half' | 'full'
@@ -110,7 +115,7 @@ const MOMENTUM_MIN_VELOCITY = 0.02
  *  instead of resizing/dismissing the sheet the way the map's list already
  *  does — see onContentPointerDown's own doc for why the fix is the same
  *  hand-driven-scroll takeover MobileNearbySheet uses, not a smaller one. */
-export default function MobileSheet({ isOpen, onClose, title, children, draggable = false, titleHidden = false }: Props) {
+export default function MobileSheet({ isOpen, onClose, title, children, draggable = false, titleHidden = false, onBack }: Props) {
   const [phase, setPhase] = useState<Phase>(isOpen ? 'open' : 'closed')
   useBodyScrollLock(phase !== 'closed')
 
@@ -503,7 +508,10 @@ export default function MobileSheet({ isOpen, onClose, title, children, draggabl
                 : {})}
               className={`flex items-center justify-between px-5 py-4 border-b border-slate-200 shrink-0 ${draggable ? 'touch-none select-none cursor-grab active:cursor-grabbing' : ''}`}
             >
-              <h2 className="text-base font-semibold text-slate-900">{title}</h2>
+              <div className="flex min-w-0 items-center gap-3">
+                {onBack && <BackIconButton onClick={onBack} />}
+                <h2 className="truncate text-base font-semibold text-slate-900">{title}</h2>
+              </div>
               {!draggable && (
                 <button
                   type="button"

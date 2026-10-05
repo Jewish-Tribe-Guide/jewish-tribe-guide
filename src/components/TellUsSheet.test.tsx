@@ -103,6 +103,23 @@ describe('Saw something? Tell us', () => {
     expect(screen.getByText(/Read by AI from what you sent/)).toBeInTheDocument()
   })
 
+  // Oct 5: Back was text at the bottom ("‹ Change what I wrote", "‹ Back"),
+  // under whatever the step showed. Now it's the header's chevron, before
+  // the title, the same as a listing's own edit.
+  it('goes back from what it read to what was written with the header’s chevron', async () => {
+    open()
+    expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('What did you see?'), { target: { value: 'TJ on Arch always has ground beef' } })
+    fireEvent.click(screen.getByRole('button', { name: 'See what changes' }))
+    await screen.findAllByTestId('tell-us-card')
+    expect(screen.queryByRole('button', { name: /Change what I wrote/ })).not.toBeInTheDocument()
+    const back = screen.getByRole('button', { name: 'Back' })
+    expect(screen.getByRole('heading', { name: 'Saw something? Tell us' }).parentElement).toContainElement(back)
+    fireEvent.click(back)
+    expect(screen.getByLabelText('What did you see?')).toHaveValue('TJ on Arch always has ground beef')
+    expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument()
+  })
+
   // Oct 5: on desktop a photo could only be added with the button.
   it('takes a pasted screenshot and dropped photos, up to three, ignoring anything that isn’t one', async () => {
     open()
@@ -217,7 +234,7 @@ describe('Saw something? Tell us', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Change something else about Trader Joe’s ›' }))
     expect(await screen.findByText('Suggest an edit')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: '‹ Back' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }))
     expect(await screen.findByTestId('tell-us-items')).toHaveTextContent('Croutons')
 
     fireEvent.click(screen.getByRole('button', { name: 'Send' }))
@@ -360,6 +377,20 @@ describe('Saw something? Tell us', () => {
     expect(screen.queryByRole('button', { name: /^Send/ })).not.toBeInTheDocument()
   })
 
+  // Oct 5: a guess about other stores read as "ask others", which showed
+  // nothing at all.
+  it('says nothing changes when it only read a guess about another store, with nothing to send', async () => {
+    respond = (url) =>
+      url.includes('/read') ? { ok: true, photoUrls: [], proposals: [{ kind: 'ask_others', listingId: 'arch', listing: ARCH, question: 'Has anyone seen it at Trader Joe’s on Arch?', quote: 'x', checked: true }] } : {}
+    open()
+    fireEvent.change(screen.getByLabelText('What did you see?'), { target: { value: 'I’d be surprised if the TJ on Arch has it' } })
+    fireEvent.click(screen.getByRole('button', { name: 'See what changes' }))
+    const card = await screen.findByTestId('tell-us-card')
+    expect(card).toHaveTextContent('Nothing in the guide changes from this.')
+    expect(card).toHaveTextContent('It sounds like a guess about Trader Joe’s, not something seen there. If you’ve seen it yourself, go back and say where.')
+    expect(screen.queryByRole('button', { name: /^Send/ })).not.toBeInTheDocument()
+  })
+
   // Agreed Oct 5: one search for adding and editing, inside the box, with
   // Back at every step.
   describe('Find the place', () => {
@@ -379,10 +410,13 @@ describe('Saw something? Tell us', () => {
       fireEvent.click(await screen.findByRole('button', { name: /Trader Joe’s/ }))
       expect(screen.getByRole('dialog', { name: 'Trader Joe’s' })).toBeInTheDocument()
       expect(screen.getByText('Suggest an edit')).toBeInTheDocument()
-      fireEvent.click(screen.getByRole('button', { name: '‹ Back' }))
+      // The chevron before the title, in the header.
+      expect(screen.getByRole('heading', { name: 'Trader Joe’s' }).parentElement).toContainElement(screen.getByRole('button', { name: 'Back' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Back' }))
       expect(screen.getByTestId('find-place')).toBeInTheDocument()
-      fireEvent.click(screen.getByRole('button', { name: '‹ Back' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Back' }))
       expect(screen.getByLabelText('What did you see?')).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument()
       expect(calls.filter((c) => c.url.includes('/api/resources'))).toHaveLength(1)
     })
 

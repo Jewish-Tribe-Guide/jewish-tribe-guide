@@ -9,6 +9,9 @@ type Props = {
   onClose: () => void
   title: string
   children: ReactNode
+  /** Shows Back, a chevron before the title, for a step inside the dialog
+   *  (the "+ Add" box's own steps). */
+  onBack?: () => void
   /** The listing-shaped layout Add shares with the listing dialog
    *  (ListingDetailModal) in edit mode: that dialog's width, the title
    *  centred between Back and Close, and the send button floating under
@@ -31,7 +34,7 @@ type Props = {
  *
  *  Same conventions as ListingDetailModal otherwise: backdrop click and
  *  Escape both close it, body scroll locks while open. */
-export default function ActionDialog({ isOpen, onClose, title, children, listingShaped }: Props) {
+export default function ActionDialog({ isOpen, onClose, title, children, onBack: stepBack, listingShaped }: Props) {
   useBodyScrollLock(isOpen)
 
   useEffect(() => {
@@ -101,8 +104,11 @@ export default function ActionDialog({ isOpen, onClose, title, children, listing
         aria-modal="true"
         aria-label={title}
       >
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 shrink-0">
-          <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
+        <div className="flex items-center justify-between gap-3 px-6 py-4 border-b border-slate-200 shrink-0">
+          <div className="flex min-w-0 items-center gap-3">
+            {stepBack && <BackIconButton onClick={stepBack} />}
+            <h2 className="truncate text-lg font-semibold text-slate-900">{title}</h2>
+          </div>
           {closeButton}
         </div>
         <div className="overflow-y-auto px-6 py-5">{children}</div>

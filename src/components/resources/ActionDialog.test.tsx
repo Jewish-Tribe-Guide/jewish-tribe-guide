@@ -18,6 +18,27 @@ describe('ActionDialog', () => {
     expect(screen.getByText('form contents')).toBeInTheDocument()
   })
 
+  // The "+ Add" box's steps (Oct 5): Back as the chevron before the title.
+  it('shows Back before the title only when given one', async () => {
+    const user = userEvent.setup()
+    const onBack = vi.fn()
+    const { rerender } = render(
+      <ActionDialog isOpen onClose={() => {}} title="Find the place" onBack={onBack}>
+        x
+      </ActionDialog>,
+    )
+    const back = screen.getByRole('button', { name: 'Back' })
+    expect(screen.getByRole('heading', { name: 'Find the place' }).parentElement).toContainElement(back)
+    await user.click(back)
+    expect(onBack).toHaveBeenCalledTimes(1)
+    rerender(
+      <ActionDialog isOpen onClose={() => {}} title="Find the place">
+        x
+      </ActionDialog>,
+    )
+    expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument()
+  })
+
   it('closes on the header close button', async () => {
     const user = userEvent.setup()
     const onClose = vi.fn()
