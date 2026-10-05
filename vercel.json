@@ -5,7 +5,7 @@
       "schedule": "0 6 * * *"
     },
     {
-      "path": "/api/cron/watch-keystone",
+      "path": "/api/cron/watches",
       "schedule": "0 7 * * *"
     }
   ]

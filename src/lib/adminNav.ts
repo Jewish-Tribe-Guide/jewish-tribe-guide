@@ -38,6 +38,7 @@ export type AdminTab =
   | 'searches'
   | 'questions'
   | 'dishes'
+  | 'watches'
   | 'team'
   | 'communities'
 
@@ -60,6 +61,9 @@ export function adminTabs(community: string, isSuperAdmin: boolean): { tab: Admi
     // Each food place's main dishes, read off its own menu by the AI, for
     // an admin to approve (agreed Oct 1).
     { tab: 'dishes', href: `${base}/dishes`, label: 'Main dishes' },
+    // The pages the guide reads on its own every morning (Keystone-K's
+    // list, shul times pages), and whether each is still working.
+    { tab: 'watches', href: `${base}/watches`, label: 'Watches' },
     { tab: 'responses', href: `${base}/responses`, label: 'Responses' },
     { tab: 'archived', href: `${base}/archived`, label: 'Archived' },
     { tab: 'site', href: `${base}/site`, label: 'Site' },

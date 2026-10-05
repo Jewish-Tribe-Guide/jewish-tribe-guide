@@ -1,22 +1,18 @@
-// GET|POST /api/cron/watch-keystone
+// One run of the Keystone-K watch: read Keystone-K's list of the places it
+// certifies and put every difference from the guide in the moderation queue
+// (see keystoneWatch.ts). Writes no listing: an admin approves or rejects
+// each suggestion with the list's own words in front of them.
 //
-// Reads Keystone-K's list of the places it certifies and puts every
-// difference from the guide in the moderation queue (see keystoneWatch.ts).
-// Meant to run daily (vercel.json). Writes no listing: an admin approves or
-// rejects each suggestion with the list's own words in front of them.
-//
-// `?dry=1` returns what it would file and files nothing.
-//
-// Auth: as sync-hours (cronAuth.ts).
+// Run daily for every keystone_list watch by /api/cron/watches, and on
+// demand from the admin Watches tab. `dry` says what it would file and
+// files nothing.
 
-import { NextRequest, NextResponse } from 'next/server'
 import { getAdminClient } from '@/lib/supabase/admin'
-import { cronAuthorized } from '@/lib/cronAuth'
 import { sendWatchDigest, type WatchDigestItem } from '@/lib/email'
 import { submitListingCreate, submitListingDelete, submitListingUpdate } from '@/lib/submissionStore'
 import { findPlaceStatus } from '@/lib/googlePlaces'
+import { WATCH_FETCH_HEADERS } from '@/lib/websiteWatch'
 import {
-  KEYSTONE_LIST_URL,
   KEYSTONE_WATCH_NAME,
   compareKeystone,
   findingKey,
@@ -26,9 +22,6 @@ import {
   type WatchFinding,
   type WatchedListing,
 } from '@/lib/keystoneWatch'
-
-/** Keystone-K certifies in and around Philadelphia only. */
-const COMMUNITY = 'philly'
 
 /** Fewer entries than this means the page changed shape, not that Keystone-K
  *  stopped certifying half of Philadelphia: file nothing rather than a card
@@ -58,30 +51,43 @@ async function googleSays(f: Extract<WatchFinding, { kind: 'new' }>): Promise<{ 
   return { closed: false, line: `Google: open${as}.` }
 }
 
-async function run(dry: boolean): Promise<NextResponse> {
-  const res = await fetch(KEYSTONE_LIST_URL, {
-    // Says who is asking. Keystone-K's firewall answers 403 to any agent
-    // containing "compatible;" (measured Oct 5), so not the usual bot form.
-    headers: { 'user-agent': 'PhillyJewishGuide/1.0' },
-    cache: 'no-store',
-  })
-  if (!res.ok) return NextResponse.json({ ok: false, error: `Keystone-K's list answered ${res.status}` }, { status: 502 })
+export type KeystoneRun =
+  | { ok: false; error: string }
+  | {
+      ok: true
+      entries: number
+      findings: number
+      filed: number
+      closedOnGoogle: string[]
+      /** A dry run's suggestions, unfiled. */
+      wouldFile?: (WatchDigestItem & { kind: WatchFinding['kind']; note: string })[]
+    }
+
+export async function runKeystoneWatch(community: string, url: string, { dry = false }: { dry?: boolean } = {}): Promise<KeystoneRun> {
+  let res: Response
+  try {
+    res = await fetch(url, {
+      headers: WATCH_FETCH_HEADERS,
+      cache: 'no-store',
+      signal: AbortSignal.timeout(20_000),
+    })
+  } catch (err) {
+    return { ok: false, error: `Couldn\u2019t reach Keystone-K's list (${err instanceof Error ? err.message : String(err)})` }
+  }
+  if (!res.ok) return { ok: false, error: `Keystone-K's list answered ${res.status}` }
   const entries = parseKeystoneList(await res.text())
   if (entries.length < MIN_ENTRIES) {
-    return NextResponse.json(
-      { ok: false, error: `Read only ${entries.length} places from Keystone-K's list; its page may have changed. Nothing filed.` },
-      { status: 502 },
-    )
+    return { ok: false, error: `Read only ${entries.length} places from Keystone-K's list; its page may have changed. Nothing filed.` }
   }
 
   const supabase = getAdminClient()
   const { data: rows, error } = await supabase
     .from('resource')
     .select('id,category,name,address,phone,anchor_id,distance,details')
-    .eq('community_id', COMMUNITY)
+    .eq('community_id', community)
     .eq('status', 'approved')
     .in('category', ['restaurant', 'grocery'])
-  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
+  if (error) return { ok: false, error: `Couldn\u2019t read the guide's listings: ${error.message}` }
 
   const findings = compareKeystone(entries, (rows ?? []) as WatchedListing[])
 
@@ -90,9 +96,9 @@ async function run(dry: boolean): Promise<NextResponse> {
   const { data: earlier, error: earlierError } = await supabase
     .from('submission')
     .select('operation,target_id,payload,note')
-    .eq('community_id', COMMUNITY)
+    .eq('community_id', community)
     .eq('submitted_by->>name', KEYSTONE_WATCH_NAME)
-  if (earlierError) return NextResponse.json({ ok: false, error: earlierError.message }, { status: 500 })
+  if (earlierError) return { ok: false, error: `Couldn\u2019t read earlier suggestions: ${earlierError.message}` }
   const filed = new Set((earlier ?? []).map(submissionKey).filter(Boolean))
   const unfiled = findings.filter((f) => !filed.has(findingKey(f)))
 
@@ -114,14 +120,14 @@ async function run(dry: boolean): Promise<NextResponse> {
   }
 
   if (dry) {
-    return NextResponse.json({
+    return {
       ok: true,
-      dry: true,
       entries: entries.length,
       findings: findings.length,
+      filed: 0,
       closedOnGoogle: closed,
-      wouldFile: fresh.map((f) => ({ kind: f.kind, ...describe(f), note: notes.get(f) })),
-    })
+      wouldFile: fresh.map((f) => ({ kind: f.kind, ...describe(f), note: notes.get(f)! })),
+    }
   }
 
   const by = { name: KEYSTONE_WATCH_NAME }
@@ -130,7 +136,7 @@ async function run(dry: boolean): Promise<NextResponse> {
     const note = notes.get(f)!
     if (f.kind === 'new') {
       await submitListingCreate(
-        COMMUNITY,
+        community,
         {
           category: f.category,
           name: f.entry.name,
@@ -144,11 +150,11 @@ async function run(dry: boolean): Promise<NextResponse> {
         note,
       )
     } else if (f.kind === 'gone' && f.remove) {
-      await submitListingDelete(COMMUNITY, f.listing.id, note, by)
+      await submitListingDelete(community, f.listing.id, note, by)
     } else {
       const l = f.listing
       await submitListingUpdate(
-        COMMUNITY,
+        community,
         l.id,
         {
           category: l.category,
@@ -166,19 +172,9 @@ async function run(dry: boolean): Promise<NextResponse> {
     items.push(describe(f))
   }
 
-  await sendWatchDigest(COMMUNITY, "Keystone-K's list", items).catch((err) =>
+  await sendWatchDigest(community, "Keystone-K's list", items).catch((err) =>
     console.error('[watch-keystone] digest failed:', err),
   )
 
-  return NextResponse.json({ ok: true, entries: entries.length, findings: findings.length, filed: items.length, closedOnGoogle: closed })
-}
-
-export async function GET(req: NextRequest) {
-  if (!cronAuthorized(req)) return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
-  return await run(req.nextUrl.searchParams.get('dry') === '1')
-}
-
-export async function POST(req: NextRequest) {
-  if (!cronAuthorized(req)) return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
-  return await run(req.nextUrl.searchParams.get('dry') === '1')
+  return { ok: true, entries: entries.length, findings: findings.length, filed: items.length, closedOnGoogle: closed }
 }

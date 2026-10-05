@@ -1,13 +1,12 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { NextRequest } from 'next/server'
 
-// The route's own decisions: what it files, what it refuses to file again,
+// The run's own decisions: what it files, what it refuses to file again,
 // and when it files nothing at all. Reading and comparing the list is
 // covered in keystoneWatch.test.ts.
 
-const fixture = fs.readFileSync(path.join(__dirname, '../../../../lib/__fixtures__/keystone-establishments.html'), 'utf8')
+const fixture = fs.readFileSync(path.join(__dirname, '__fixtures__/keystone-establishments.html'), 'utf8')
 
 function chainable(result: unknown) {
   const builder: Record<string, unknown> = {}
@@ -36,7 +35,8 @@ vi.mock('@/lib/email', () => ({ sendWatchDigest: mockDigest }))
 const mockGoogle = vi.hoisted(() => vi.fn())
 vi.mock('@/lib/googlePlaces', () => ({ findPlaceStatus: mockGoogle }))
 
-const { GET } = await import('./route')
+const { runKeystoneWatch } = await import('./keystoneRun')
+const LIST = 'https://keystone-k.org/establishments/'
 
 // The fixture holds nine entries; the route refuses fewer than 30, so the
 // page is repeated with new links to stand in for the full list.
@@ -64,9 +64,7 @@ function setDb(listings: unknown[], earlier: unknown[]) {
   )
 }
 
-function request(query = '') {
-  return new NextRequest(`http://localhost/api/cron/watch-keystone${query}`)
-}
+const run = (dry = false) => runKeystoneWatch('philly', LIST, { dry })
 
 beforeEach(() => {
   vi.stubEnv('NODE_ENV', 'test')
@@ -87,12 +85,12 @@ afterEach(() => {
   mockGoogle.mockReset()
 })
 
-describe('/api/cron/watch-keystone', () => {
+describe('runKeystoneWatch', () => {
   it('files an edit for a place on both, with the list quoted in its note, and one digest', async () => {
     setDb([bagel], [])
-    const res = await GET(request())
-    const body = await res.json()
+    const body = await run()
     expect(body.ok).toBe(true)
+    if (!body.ok) return
     const [community, id, payload, note, by] = mockUpdate.mock.calls[0]
     expect([community, id]).toEqual(['philly', 'bagel-1'])
     expect(payload.details.t).toEqual(['Dairy', 'Parve'])
@@ -100,13 +98,13 @@ describe('/api/cron/watch-keystone', () => {
     expect(by).toEqual({ name: 'Keystone-K list (automated)' })
     expect(mockCreate).toHaveBeenCalled() // the places the guide lacks
     expect(mockDigest).toHaveBeenCalledTimes(1)
-    expect(mockDigest.mock.calls[0][2]).toHaveLength(body.filed)
+    expect(mockDigest.mock.calls[0][2]).toHaveLength(body.ok ? body.filed : -1)
   })
 
   it('files a removal for a place whose only hechsher was Keystone-K and is off the list', async () => {
     const shtetl = { ...bagel, id: 'shtetl-1', name: 'Shtetl', details: { kosherCert: 'Keystone-K' } }
     setDb([shtetl], [])
-    await GET(request())
+    await run()
     expect(mockDelete).toHaveBeenCalledTimes(1)
     const [community, id, note, by] = mockDelete.mock.calls[0]
     expect([community, id, by]).toEqual(['philly', 'shtetl-1', { name: 'Keystone-K list (automated)' }])
@@ -117,7 +115,7 @@ describe('/api/cron/watch-keystone', () => {
   it('does not file again what it filed before, whatever the admin decided', async () => {
     const shtetl = { ...bagel, id: 'shtetl-1', name: 'Shtetl', details: { kosherCert: 'Keystone-K' } }
     setDb([bagel, shtetl], [])
-    await GET(request())
+    await run()
     const filed = [
       ...mockUpdate.mock.calls.map(([, id, payload, note]) => ({ operation: 'update', target_id: id, payload, note })),
       ...mockCreate.mock.calls.map(([, payload, note]) => ({ operation: 'create', target_id: null, payload, note })),
@@ -131,8 +129,8 @@ describe('/api/cron/watch-keystone', () => {
 
     mockDelete.mockReset()
     setDb([bagel, shtetl], filed)
-    const body = await (await GET(request())).json()
-    expect(body.filed).toBe(0)
+    const body = await run()
+    expect(body.ok && body.filed).toBe(0)
     expect(mockDelete).not.toHaveBeenCalled()
     expect(mockUpdate).not.toHaveBeenCalled()
     expect(mockCreate).not.toHaveBeenCalled()
@@ -147,18 +145,17 @@ describe('/api/cron/watch-keystone', () => {
         : { placeId: 'p2', name: null, businessStatus: 'OPERATIONAL' },
     )
     setDb([], [])
-    const body = await (await GET(request())).json()
+    const body = await run()
     const names = mockCreate.mock.calls.map(([, payload]) => payload.name)
     expect(names).not.toContain('Sababa Falafel')
-    expect(body.closedOnGoogle).toContain('Sababa Falafel')
+    expect(body.ok && body.closedOnGoogle).toContain('Sababa Falafel')
     expect(mockCreate.mock.calls[0][2]).toContain('Google: open.')
   })
 
   it('files nothing on a dry run', async () => {
     setDb([bagel], [])
-    const body = await (await GET(request('?dry=1'))).json()
-    expect(body.dry).toBe(true)
-    expect(body.wouldFile.length).toBeGreaterThan(0)
+    const body = await run(true)
+    expect(body.ok && body.wouldFile!.length).toBeGreaterThan(0)
     expect(mockUpdate).not.toHaveBeenCalled()
     expect(mockCreate).not.toHaveBeenCalled()
     expect(mockDigest).not.toHaveBeenCalled()
@@ -167,15 +164,9 @@ describe('/api/cron/watch-keystone', () => {
   it('files nothing when it reads too few places, rather than calling every hechsher lost', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(fixture, { status: 200 })))
     setDb([bagel], [])
-    const res = await GET(request())
-    expect(res.status).toBe(502)
+    const body = await run()
+    expect(body).toMatchObject({ ok: false, error: expect.stringContaining("Read only 9 places") })
     expect(mockUpdate).not.toHaveBeenCalled()
     expect(mockCreate).not.toHaveBeenCalled()
-  })
-
-  it('refuses a production request without the cron secret', async () => {
-    vi.stubEnv('NODE_ENV', 'production')
-    const res = await GET(request())
-    expect(res.status).toBe(401)
   })
 })

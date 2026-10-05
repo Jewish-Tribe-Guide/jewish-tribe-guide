@@ -658,3 +658,42 @@ export async function sendWatchDigest(communitySlug: string, source: string, ite
     </div>`,
   })
 }
+
+/** A watch that just broke, or just started working again. */
+export type WatchHealthAlert = { label: string; url: string; alert: 'broke' | 'recovered'; error?: string | null }
+
+/**
+ * Tells the admins a watch stopped working, or works again. Sent on the
+ * change only, never daily while it stays broken: the Watches tab carries
+ * the state in between. A watch that breaks quietly leaves the guide stale
+ * with a calm-looking queue, which is why this exists.
+ */
+export async function sendWatchHealthAlert(communitySlug: string, alerts: WatchHealthAlert[]): Promise<void> {
+  if (alerts.length === 0) return
+  const to = await notificationRecipients(communitySlug)
+  const broke = alerts.filter((a) => a.alert === 'broke')
+  const rows = alerts
+    .map(
+      (a) => `<tr>
+        <td style="padding:6px 10px;border-bottom:1px solid #e2e8f0;"><a href="${escapeHtml(a.url)}" style="color:#1d4ed8;">${escapeHtml(a.label)}</a></td>
+        <td style="padding:6px 10px;border-bottom:1px solid #e2e8f0;color:${a.alert === 'broke' ? '#b91c1c' : '#15803d'};">${
+          a.alert === 'broke' ? `Stopped working: ${escapeHtml(a.error ?? 'unknown error')}` : 'Working again'
+        }</td>
+      </tr>`,
+    )
+    .join('')
+  const admin = adminAppUrl()
+  await sendEmail({
+    to,
+    subject:
+      broke.length > 0
+        ? `${broke.length === 1 ? broke[0].label : `${broke.length} watches`} stopped working`
+        : `${alerts.length === 1 ? alerts[0].label : `${alerts.length} watches`} working again`,
+    html: `<div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:640px;margin:0 auto;">
+      <h2 style="color:#1d4ed8;font-size:18px;">Watches</h2>
+      <p style="color:#334155;font-size:14px;">The pages the guide reads on its own to stay current. While a watch is broken, the guide isn't hearing from that page. You'll get one email when it works again.</p>
+      <table style="border-collapse:collapse;font-size:14px;width:100%;">${rows}</table>
+      ${admin ? `<p style="font-size:13px;"><a href="${admin}/${encodeURIComponent(communitySlug)}/admin/watches" style="color:#1d4ed8;">Open the Watches tab</a></p>` : ''}
+    </div>`,
+  })
+}
