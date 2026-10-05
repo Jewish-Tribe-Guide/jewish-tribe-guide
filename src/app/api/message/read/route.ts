@@ -10,6 +10,7 @@ import { buildCatalog, itemsChange, newPlaceSubmission, readMessage, type ReadIm
 import { readShulWeek } from '@/lib/shulWeekReading'
 import { readFieldChanges, type FieldRead } from '@/lib/fieldChanges'
 import { UUID } from '@/lib/itemMarkRoutes'
+import { selectValues } from '@/lib/categories'
 
 // POST /api/message/read   multipart: text, file (up to 3), listingId?, turnstileToken, company
 // The "+ Add" box's reader (agreed Oct 5): what someone pastes or
@@ -73,11 +74,15 @@ export async function POST(request: Request) {
       const l = byId.get(id)!
       return { id, name: l.name, address: l.address, category: l.category, categoryLabel: catById.get(l.category)?.label ?? '' }
     }
+    // With what the store lists now, so the box can show it as the listing
+    // does, the new ones marked, and know a repeat when someone adds one.
     const linesFor = (id: string, items: Parameters<typeof itemsChange>[2]) => {
       const l = byId.get(id)
       const c = l && catById.get(l.category)
       const change = l && c ? itemsChange(c, l, items) : null
-      return change ? { lines: change.lines, held: change.held } : { lines: [], held: [] }
+      const key = c?.detailFields.find((f) => f.type === 'tags')?.key
+      const current = { always: key && l ? selectValues(l[key]) : [], sometimes: key && l ? selectValues(l[`${key}_sometimes`]) : [] }
+      return change ? { lines: change.lines, held: change.held, current } : { lines: [], held: [], current }
     }
 
     // A change to other fields: each as it would be (the whole week's hours

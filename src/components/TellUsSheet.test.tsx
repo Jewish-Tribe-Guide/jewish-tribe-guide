@@ -25,14 +25,20 @@ const reading = {
   ok: true,
   photoUrls: ['https://x.supabase.co/storage/v1/object/public/site-assets/message-source/1-a.webp'],
   proposals: [
-    { kind: 'items', listingId: 'arch', listing: ARCH, asWritten: 'Trader Joe’s on Arch', chain: false, ask: null, items: [ground], lines: ['+ Hamburger Meat'], held: ['Chicken: already listed'], quote: 'x', checked: true },
+    { kind: 'items', listingId: 'arch', listing: ARCH, asWritten: 'Trader Joe’s on Arch', chain: false, ask: null, items: [ground], lines: ['+ Hamburger Meat'], held: ['Chicken: already listed'], current: { always: ['Chicken', 'Challah'], sometimes: [] }, quote: 'x', checked: true },
     {
       kind: 'items',
       listingId: null,
       listing: null,
       asWritten: 'trader joes',
       chain: false,
-      ask: { question: 'Which Trader Joe’s?', choices: [{ label: 'Arch St', listingId: 'arch', listing: ARCH, lines: ['+ Ground Turkey, sometimes'], held: [] }, { label: 'Market St', listingId: 'market', listing: MARKET, lines: ['+ Ground Turkey, sometimes'], held: [] }] },
+      ask: {
+        question: 'Which Trader Joe’s?',
+        choices: [
+          { label: 'Arch St', listingId: 'arch', listing: ARCH, lines: ['+ Ground Turkey, sometimes'], held: [], current: { always: ['Chicken'], sometimes: [] } },
+          { label: 'Market St', listingId: 'market', listing: MARKET, lines: ['+ Ground Turkey, sometimes'], held: [], current: { always: ['Chicken'], sometimes: [] } },
+        ],
+      },
       items: [{ name: 'Ground Turkey', availability: 'sometimes', doubt: null }],
       lines: [],
       held: [],
@@ -88,8 +94,12 @@ describe('Saw something? Tell us', () => {
     const sent = calls[0].init!.body as FormData
     expect(sent.get('text')).toBe('TJ on Arch always has ground beef')
     expect((sent.get('file') as File).name).toBe('a.webp')
-    expect(within(cards[0]).getByText('+ Hamburger Meat')).toBeInTheDocument()
-    expect(within(cards[0]).getByText('Not changed: Chicken: already listed')).toBeInTheDocument()
+    // As the listing shows it: the new item marked, what's there folded.
+    const items = within(cards[0]).getByTestId('tell-us-items')
+    expect(within(items).getByText('Hamburger Meat')).toBeInTheDocument()
+    expect(within(items).getByText('New · seen today')).toBeInTheDocument()
+    expect(within(items).getByText('Not changed: Chicken: already listed')).toBeInTheDocument()
+    expect(items).toHaveTextContent('Already listed · 2 Chicken, Challah')
     expect(screen.getByText(/Read by AI from what you sent/)).toBeInTheDocument()
   })
 
@@ -129,7 +139,8 @@ describe('Saw something? Tell us', () => {
     expect(screen.getByTestId('tell-us-count')).toHaveTextContent('1 of 2')
     expect(screen.getByRole('button', { name: 'Send' })).toBeDisabled()
     fireEvent.click(screen.getByRole('button', { name: 'Market St' }))
-    expect(screen.getByText('+ Ground Turkey, sometimes')).toBeInTheDocument()
+    expect(screen.getByText('Ground Turkey')).toBeInTheDocument()
+    expect(screen.getByText(/Not always in stock/)).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Send' }))
     await waitFor(() => expect(calls).toHaveLength(3))
     expect(JSON.parse(String(calls[2].init!.body)).stores).toEqual([{ listingId: 'market', items: [{ name: 'Ground Turkey', availability: 'sometimes', doubt: null }] }])
@@ -180,6 +191,77 @@ describe('Saw something? Tell us', () => {
     await waitFor(() => expect(onClose).toHaveBeenCalled())
     const email = calls.find((c) => c.url === '/api/message/email?community=philly')!
     expect(JSON.parse(String(email.init!.body))).toEqual({ ids: ['s1', 's2'], email: 'me@x.co' })
+  })
+
+  // Agreed Oct 5: once in, one tap to add more by hand. The items are the
+  // listing's own section: Remove, "Not always in stock", "+ Add another
+  // item" with the guide's names; the rest of the listing one tap away.
+  it('lets them fix the items, add another, and open the rest of the listing, sending what they left', async () => {
+    const one = { ...reading, proposals: [reading.proposals[0]] }
+    respond = (url) => (url.includes('/read') ? one : url.includes('/api/resources') ? { ok: true, resources: [makeListing({ id: 'arch', name: 'Trader Joe’s', category: 'grocery' })] } : { ok: true, filed: 1, ids: ['s1'] })
+    open()
+    fireEvent.change(screen.getByLabelText('What did you see?'), { target: { value: 'TJ on Arch has ground beef' } })
+    fireEvent.click(screen.getByRole('button', { name: 'See what changes' }))
+    const items = await screen.findByTestId('tell-us-items')
+    fireEvent.click(within(items).getByRole('button', { name: 'Change how often Hamburger Meat is in stock' }))
+    expect(items).toHaveTextContent('Not always in stock')
+    fireEvent.click(within(items).getByRole('button', { name: 'Add another item' }))
+    fireEvent.change(screen.getByLabelText('What else did you see?'), { target: { value: 'croutons' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Add “croutons” as typed' }))
+    expect(within(items).getByText('Croutons')).toBeInTheDocument()
+    // Something it already lists is marked, not added again.
+    fireEvent.click(within(items).getByRole('button', { name: 'Add another item' }))
+    fireEvent.change(screen.getByLabelText('What else did you see?'), { target: { value: 'chall' } })
+    expect(screen.getByRole('button', { name: /Challah\s*Already listed here/ })).toBeDisabled()
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Change something else about Trader Joe’s ›' }))
+    expect(await screen.findByText('Suggest an edit')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '‹ Back' }))
+    expect(await screen.findByTestId('tell-us-items')).toHaveTextContent('Croutons')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+    await screen.findByTestId('tell-us-sent')
+    const sent = calls.find((c) => c.url === '/api/message/send?community=philly')!
+    expect(JSON.parse(String(sent.init!.body)).stores).toEqual([
+      { listingId: 'arch', items: [{ name: 'Hamburger Meat', availability: 'sometimes', doubt: null }, { name: 'Croutons', availability: 'always', doubt: null }] },
+    ])
+  })
+
+  // Said Oct 5: several changes to one place stay in one card. "Croutons,
+  // and they close at 3 on Wednesdays now" is read as two proposals for the
+  // same Trader Joe's; it's one place to check, and one Send.
+  it('keeps a store’s items and its hours in one card, sent together', async () => {
+    const hours = {
+      kind: 'fields',
+      listingId: 'arch',
+      listing: ARCH,
+      asWritten: 'Trader Joe’s on arch',
+      ask: null,
+      values: { hours: { wed: { open: '09:00', close: '15:00' } } },
+      before: { hours: { wed: { open: '09:00', close: '21:00' } } },
+      lines: [],
+      held: [],
+      notes: [],
+      askWhen: null,
+    }
+    respond = (url) => (url.includes('/read') ? { ...reading, proposals: [reading.proposals[0], hours] } : { ok: true, filed: 2, ids: ['a', 'b'] })
+    renderWithProviders(<TellUsSheet isOpen onClose={() => {}} />, {
+      community: { slug: 'philly' },
+      content: { categories: [makeCategory({ id: 'grocery', label: 'Grocery', detailFields: [{ key: 'm', label: 'Kosher items', type: 'tags' }, { key: 'hours', label: 'Hours', type: 'hours' }] })] },
+    })
+    fireEvent.change(screen.getByLabelText('What did you see?'), { target: { value: 'TJ on Arch has croutons, and closes at 3 on Wednesdays now' } })
+    fireEvent.click(screen.getByRole('button', { name: 'See what changes' }))
+    await screen.findByTestId('tell-us-items')
+    expect(screen.queryByTestId('tell-us-count')).not.toBeInTheDocument()
+    expect(screen.getByTestId('tell-us-week')).toBeInTheDocument()
+    expect(screen.getAllByText('Trader Joe’s')).toHaveLength(1)
+    expect(screen.getAllByRole('button', { name: /Change something else/ })).toHaveLength(1)
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+    await screen.findByTestId('tell-us-sent')
+    const body = JSON.parse(String(calls.find((c) => c.url.includes('/send'))!.init!.body))
+    expect(body.stores).toEqual([{ listingId: 'arch', items: [ground] }])
+    expect(body.edits).toEqual([{ listingId: 'arch', values: { hours: { wed: { open: '09:00', close: '15:00' } } }, notes: [] }])
   })
 
   // Agreed Oct 5: a new place is added with the form of questions, found on
@@ -254,7 +336,10 @@ describe('Saw something? Tell us', () => {
     fireEvent.click(screen.getByRole('button', { name: 'See what changes' }))
     const card = await screen.findByTestId('tell-us-card')
     expect(within(card).getByText('Kosher Certification: IKC → Keystone-K')).toBeInTheDocument()
-    expect(within(card).getByText('Hours, Wednesday: 11:00 AM–9:00 PM → 11:00 AM–3:00 PM')).toBeInTheDocument()
+    // The week as the listing shows it, Wednesday marked, what it was struck.
+    const shownWeek = within(card).getByTestId('tell-us-week')
+    expect(within(shownWeek).getByText('Wednesday').parentElement).toHaveTextContent('Wednesday11:00 AM–9:00 PM11:00 AM–3:00 PM')
+    expect(within(shownWeek).getByText('11:00 AM–9:00 PM')).toHaveClass('line-through')
     expect(within(card).getByText('Was: IKC')).toBeInTheDocument()
     // Not until it's answered.
     expect(screen.getByRole('button', { name: 'Send' })).toBeDisabled()
