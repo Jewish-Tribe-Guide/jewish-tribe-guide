@@ -412,42 +412,39 @@ describe('GenericDirectory', () => {
     expect(screen.getByRole('button', { name: 'Add' })).toBeInTheDocument()
   })
 
-  // The floating Add button sits at z-40; ListingDetailModal's overlay is
-  // z-50 — so while a desktop listing dialog is open, this button is under
-  // the backdrop: dimmed, still unmistakably a button, and completely inert
-  // (a click lands on the overlay and closes the dialog instead). It was
-  // only ever mild visual noise until the dialog started hanging its own
-  // blue "Suggest an edit" pill beneath itself; two blue pills at the same
-  // height, one of which does nothing, is the kind of thing that makes the
-  // real one harder to trust. So it gets out of the way.
-  it('hides the floating Add button while a desktop listing dialog is open', () => {
-    const item = makeListing()
+  // Agreed Oct 5: Add stays over an open listing and opens the box about
+  // it, beside the listing's own "Suggest an edit". It used to hide there,
+  // because at z-40 it sat under the listing's z-50 backdrop, dimmed and
+  // inert; it rises above the backdrop instead.
+  it('keeps Add over an open listing, above its backdrop, opening the box about that listing', async () => {
+    const item = makeListing({ name: 'Trader Joe’s' })
     // reopenItemId drives GenericDirectory's own cardRefs.get(id).open(),
     // which fires onExpandedChange — the same path a real click takes,
     // without needing the stubbed card to grow a toggle of its own.
-    renderWithProviders(
-      <GenericDirectory category={makeCategory()} items={[item]} {...handlers} reopenItemId={item.id} />,
-    )
-    expect(screen.queryByRole('button', { name: 'Add' })).not.toBeInTheDocument()
+    renderWithProviders(<GenericDirectory category={makeCategory()} items={[item]} {...handlers} reopenItemId={item.id} />)
+    const add = screen.getByRole('button', { name: 'Add' })
+    expect(add.className).toContain('z-[55]')
+    fireEvent.click(add)
+    expect(await screen.findByRole('dialog', { name: 'Tell us about Trader Joe’s' })).toBeInTheDocument()
+    // From a listing, editing it yourself, not adding a place.
+    expect(screen.queryByRole('button', { name: 'Add a place' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Edit the details myself' }))
+    expect(handlers.onEdit).toHaveBeenCalledWith(item)
   })
 
-  it('shows the floating Add button when no dialog is open', () => {
+  it('shows the floating Add button when no listing is open, under the sheets', () => {
     renderWithProviders(<GenericDirectory category={makeCategory()} items={[makeListing()]} {...handlers} />)
-    expect(screen.getByRole('button', { name: 'Add' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Add' }).className).toContain('z-40')
   })
 
-  // Mobile used to be the exception: the listing expanded inline, with no
-  // backdrop over the Add button, so it stayed visible and working. The
-  // listing opens in a sheet now, whose backdrop covers the button the same
-  // way the desktop dialog's does, so it gets out of the way there too.
-  it('hides the floating Add button on mobile too, while a listing sheet is open', () => {
+  it('keeps Add on mobile too, while a listing sheet is open', () => {
     const item = makeListing()
     renderWithProviders(
       <ForcedViewport isMobile>
         <GenericDirectory category={makeCategory()} items={[item]} {...handlers} reopenItemId={item.id} />
       </ForcedViewport>,
     )
-    expect(screen.queryByRole('button', { name: 'Add' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Add' }).className).toContain('z-[55]')
   })
 
   // A bare icon circle is a mobile convention people already have a

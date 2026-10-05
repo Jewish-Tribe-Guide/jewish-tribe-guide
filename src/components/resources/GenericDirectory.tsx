@@ -145,16 +145,13 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // Multi-select: each key maps to the set of chosen values (empty = no filter).
   const [selectFilters, setSelectFilters] = useState<Record<string, string[]>>({})
 
-  // Which card currently has its listing open — the desktop dialog or the
-  // mobile sheet. Only used to get the floating Add button out of the way
-  // while it's up: both overlays are z-50 and the Add button z-40, so it
-  // sits under the backdrop — dimmed, still plainly a button, and
-  // completely inert (a tap lands on the overlay and closes the listing
-  // instead). Next to the listing's own blue "Suggest an edit" pill, the
-  // two read as peers competing for attention, and the one that does
-  // nothing is the more eye-catching of the two.
-  // Mobile used to be exempt: its listing expanded inline, with no backdrop
-  // over the Add button, which stayed usable. The sheet changed that.
+  // Which card currently has its listing open — the desktop column or the
+  // mobile sheet. The floating Add button stays while it's up (agreed Oct
+  // 5) and opens the box about that listing ("Tell us about Trader Joe's"),
+  // beside its own "Suggest an edit": telling and editing are two ways in
+  // now, not a working pill and a dead one. It used to hide here, because
+  // at z-40 it sat under the sheet's z-50 backdrop, dimmed and inert; it
+  // rises above the backdrop instead.
   const [openDialogItemId, setOpenDialogItemId] = useState<string | null>(null)
   const [openNow, setOpenNow] = useState(arrivedViaBackForward ? false : (initialOpenNow ?? false))
   // Drives the "Open now" filter below. Without it the filter answers for the
@@ -474,6 +471,8 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // "+" opens "Saw something? Tell us" (agreed Oct 5); today's Add form is
   // one tap inside it, "Add a place".
   const [tellOpen, setTellOpen] = useState(false)
+  // The listing the box is about, when it's opened over one.
+  const openItem = openDialogItemId ? (items.find((i) => i.id === openDialogItemId) ?? null) : null
   // Adding to a shul's times is an edit to the shul ("+ Add a minyan").
   const canEdit = ui.contributions.edit && caps.edit
   const showSearch = ui.search.directory && caps.directorySearch
@@ -1726,7 +1725,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
           reflex people already bring to the shape. */}
       {filtered.length > 0 && !openDialogItemId && !minyanimView && <RowLookSwitch look={rowLook} onChange={setRowLook} />}
 
-      {canAdd && !openDialogItemId && (
+      {canAdd && (
         <button
           onClick={() => setTellOpen(true)}
           // Generic, not "Add {category label}" — the empty-state button
@@ -1739,7 +1738,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
           // this keeps mobile's icon-only button correctly named without
           // needing a second, viewport-conditional way of deriving it.
           aria-label="Add"
-          className="fixed right-4 bottom-[calc(3.75rem+env(safe-area-inset-bottom)+1rem)] desktop:bottom-6 z-40 flex h-14 w-14 desktop:w-auto items-center justify-center gap-2 rounded-full bg-primary px-0 desktop:px-5 text-white shadow-lg cursor-pointer active:scale-95 transition-transform"
+          className={`fixed right-4 bottom-[calc(3.75rem+env(safe-area-inset-bottom)+1rem)] desktop:bottom-6 ${openDialogItemId ? 'z-[55]' : 'z-40'} flex h-14 w-14 desktop:w-auto items-center justify-center gap-2 rounded-full bg-primary px-0 desktop:px-5 text-white shadow-lg cursor-pointer active:scale-95 transition-transform`}
         >
           <PlusIcon className="h-6 w-6 shrink-0" />
           <span className="hidden desktop:inline font-medium whitespace-nowrap">Add</span>
@@ -1749,11 +1748,24 @@ export default function GenericDirectory({ category, items, anchorLabel, address
         <TellUsSheet
           isOpen
           onClose={() => setTellOpen(false)}
+          about={openItem ? { id: openItem.id, name: openItem.name } : undefined}
           placeholder={tellUsPlaceholder(category, { times: minyanimViewOn })}
-          onAddYourself={() => {
-            setTellOpen(false)
-            onAdd()
-          }}
+          onAddYourself={
+            openItem
+              ? undefined
+              : () => {
+                  setTellOpen(false)
+                  onAdd()
+                }
+          }
+          onEditYourself={
+            openItem
+              ? () => {
+                  setTellOpen(false)
+                  onEdit(openItem)
+                }
+              : undefined
+          }
         />
       )}
 
