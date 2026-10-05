@@ -168,14 +168,18 @@ async function listingColumnsWithGeo(payload: ResourceSubmission) {
 }
 
 // Records a proposed NEW listing (operation=create, target_type=listing).
-export async function submitListingCreate(community: string, payload: ResourceSubmission): Promise<SubmissionRow> {
+export async function submitListingCreate(
+  community: string,
+  payload: ResourceSubmission,
+  note: string | null = null,
+): Promise<SubmissionRow> {
   return insertSubmission({
     community_id: community,
     operation: 'create',
     target_type: 'listing',
     target_id: null,
     payload: payload as unknown as Record<string, unknown>,
-    note: null,
+    note,
     submitted_by: payload.submittedBy ?? null,
   })
 }

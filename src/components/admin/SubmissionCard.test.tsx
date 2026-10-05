@@ -236,6 +236,48 @@ describe('read-only history card — who reviewed it', () => {
   })
 })
 
+describe('the note a suggestion came with', () => {
+  function renderCard(overrides: Partial<EnrichedSubmission>) {
+    const submission = {
+      id: 's1',
+      operation: 'update',
+      target_type: 'listing',
+      target_id: 'r1',
+      payload: { category: 'restaurant', name: 'Place', address: '', phone: '', details: {} },
+      note: null,
+      status: 'pending',
+      submitted_by: null,
+      created_at: new Date().toISOString(),
+      reviewed_at: null,
+      reviewed_by: null,
+      current: null,
+      ...overrides,
+    } as unknown as EnrichedSubmission
+    return render(<SubmissionCard submission={submission} categoriesById={new Map()} onModerate={() => {}} />)
+  }
+
+  // The admin checks a change against what it was read from. A watch's
+  // edit carried the list's words in its note and the card dropped them.
+  it('shows an edit\u2019s note, with its link clickable', () => {
+    renderCard({ note: 'Certification: "Dairy"\nhttps://keystone-k.org/kosher/new-york-bagel/' })
+    expect(screen.getByText(/Certification: "Dairy"/)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'https://keystone-k.org/kosher/new-york-bagel/' })).toHaveAttribute(
+      'href',
+      'https://keystone-k.org/kosher/new-york-bagel/',
+    )
+  })
+
+  it('shows a new listing\u2019s note', () => {
+    renderCard({ operation: 'create', target_id: null, note: 'On Keystone-K\u2019s list, not in the guide.' })
+    expect(screen.getByText(/On Keystone-K\u2019s list, not in the guide\./)).toBeInTheDocument()
+  })
+
+  it('shows no empty note box', () => {
+    renderCard({ note: null })
+    expect(screen.queryByText('Note')).not.toBeInTheDocument()
+  })
+})
+
 // Real bug, seen by a moderator: a davening-times edit rendered
 // "businessStatusBefore UNKNOWN → —" and "businessStatusChangedAt
 // 2026-08-31T… → —" under the minyanim, as though the submitter had proposed

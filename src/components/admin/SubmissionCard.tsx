@@ -28,6 +28,28 @@ const STATUS_META: Record<'approved' | 'rejected', { label: string; cls: string 
 
 const dateFormatter = new Intl.DateTimeFormat('en-US', { dateStyle: 'medium', timeStyle: 'short' })
 
+// What a suggestion came with: the visitor's own words, the text a schedule
+// was read from, or a watch quoting the list it read. Shown on every new
+// listing and edit so the admin checks the change against its source, not
+// just the diff. Links stay links, so the source is one tap away.
+function SourceNote({ text }: { text: string }) {
+  const parts = text.split(/(https?:\/\/[^\s"]+)/g)
+  return (
+    <div className="mt-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700 whitespace-pre-wrap break-words">
+      <p className="mb-1 font-medium text-slate-500">Note</p>
+      {parts.map((part, i) =>
+        /^https?:\/\//.test(part) ? (
+          <a key={i} href={part} target="_blank" rel="noopener noreferrer" className="text-primary underline">
+            {part}
+          </a>
+        ) : (
+          part
+        ),
+      )}
+    </div>
+  )
+}
+
 export function SubmissionCard({
   submission: s,
   busy,
@@ -86,6 +108,7 @@ export function SubmissionCard({
           {!isCategory && s.operation === 'update' && (
             <Diff current={s.current} proposed={s.payload as ResourceSubmission} fields={detailFields} />
           )}
+          {!isCategory && s.operation !== 'delete' && s.note && <SourceNote text={s.note} />}
           {!isCategory && s.operation === 'delete' && (
             <div className="text-xs text-slate-600">
               {s.current && <p>{s.current.address}</p>}

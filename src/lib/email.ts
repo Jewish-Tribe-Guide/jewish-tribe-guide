@@ -626,3 +626,35 @@ async function sendCommunityStatusChangeDigest(communitySlug: string, changes: S
     </div>`,
   })
 }
+
+/** One suggestion a watch put in the queue, for its digest below. */
+export type WatchDigestItem = { name: string; what: string }
+
+/**
+ * One email per watch run listing the suggestions it put in the moderation
+ * queue, instead of one email per suggestion: a first run can file dozens.
+ * Sent only when the run filed something, so a quiet day is silent.
+ */
+export async function sendWatchDigest(communitySlug: string, source: string, items: WatchDigestItem[]): Promise<void> {
+  if (items.length === 0) return
+  const to = await notificationRecipients(communitySlug)
+  const rows = items
+    .map(
+      (i) => `<tr>
+        <td style="padding:6px 10px;border-bottom:1px solid #e2e8f0;">${escapeHtml(i.name)}</td>
+        <td style="padding:6px 10px;border-bottom:1px solid #e2e8f0;color:#334155;">${escapeHtml(i.what)}</td>
+      </tr>`,
+    )
+    .join('')
+  const admin = adminAppUrl()
+  await sendEmail({
+    to,
+    subject: items.length === 1 ? `${source}: ${items[0].name}` : `${source}: ${items.length} suggestions to check`,
+    html: `<div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:640px;margin:0 auto;">
+      <h2 style="color:#1d4ed8;font-size:18px;">${escapeHtml(source)}</h2>
+      <p style="color:#334155;font-size:14px;">These are waiting in the moderation queue. Each one quotes what it was read from. Nothing changes until you approve it.</p>
+      <table style="border-collapse:collapse;font-size:14px;width:100%;">${rows}</table>
+      ${admin ? `<p style="font-size:13px;"><a href="${admin}" style="color:#1d4ed8;">Open the moderation queue</a></p>` : ''}
+    </div>`,
+  })
+}

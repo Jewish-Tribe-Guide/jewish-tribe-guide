@@ -25,6 +25,7 @@ import { getAdminClient } from '@/lib/supabase/admin'
 import { sendStatusChangeDigest, type StatusChange } from '@/lib/email'
 import { revalidatePublicContent } from '@/lib/revalidateContent'
 import { refreshNight, syncOneListing, type SyncedRow } from '@/lib/syncListing'
+import { cronAuthorized as authorized } from '@/lib/cronAuth'
 
 // Does network + DB work, so it's never prerendered or cached — that follows
 // from the work itself now rather than from a `dynamic` export, which Cache
@@ -45,20 +46,6 @@ async function pingHealthcheck(ok: boolean): Promise<void> {
   } catch {
     // Best-effort.
   }
-}
-
-function authorized(req: NextRequest): boolean {
-  const secret = process.env.CRON_SECRET
-  if (!secret) {
-    // No secret configured. Open in dev for convenience, but FAIL CLOSED in
-    // production: an unauthenticated endpoint that fans out to paid Google
-    // Places calls per listing is a billing-runaway risk if anyone finds the
-    // URL. Set CRON_SECRET in the production environment (e.g. Vercel env vars)
-    // so the route — and Vercel's own cron — can authenticate.
-    return process.env.NODE_ENV !== 'production'
-  }
-  const bearer = req.headers.get('authorization')?.replace(/^Bearer\s+/i, '')
-  return bearer === secret || req.headers.get('x-cron-secret') === secret
 }
 
 // Safety ceiling: the largest number of listings one sync run will touch, i.e.
