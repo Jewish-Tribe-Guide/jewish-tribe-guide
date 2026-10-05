@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { Activity, forwardRef, useImperativeHandle, useState, type Ref } from 'react'
+import { Activity, forwardRef, useContext, useImperativeHandle, useState, type Ref } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -9,6 +9,7 @@ import { makeCategory, makeListing } from '@/test/providerFixtures'
 import { resolveCapabilities } from '@/lib/categories'
 import { resetMockIntersectionObserver, setAllIntersecting } from '@/test/intersectionObserverMock'
 import type { DirectoryResource } from '@/types'
+import { TellAboutContext } from './tellAbout'
 import { didArriveViaBackForward } from '@/lib/backForwardNavigation'
 import { ForcedViewport } from '@/lib/useIsMobile'
 import { useNextMinyan as useNextMinyanInColumn } from './nextMinyans'
@@ -110,6 +111,12 @@ vi.mock('./GenericListingCard', async () => {
   }
 })
 
+// The listing's own "+" (ListingEditBar), as the page offers it.
+function ColumnTell({ item }: { item: DirectoryResource }) {
+  const tell = useContext(TellAboutContext)
+  return tell ? <button onClick={() => tell(item)}>{`Add or update ${item.name}`}</button> : null
+}
+
 function ColumnMinyan({ id, name }: { id: string; name: string }) {
   const next = useNextMinyanInColumn(id)
   return next ? <p>column minyan at {name}: {next.text}</p> : null
@@ -147,6 +154,7 @@ vi.mock('./ListingColumn', () => ({
       </p>
       {found && <p>column found: {found.items.map((m) => m.tag).join(', ')}</p>}
       <ColumnMinyan id={item.id} name={item.name} />
+      <ColumnTell item={item} />
       <button onClick={onBack}>{backLabel}</button>
       <button onClick={() => onStep(-1)}>Previous listing</button>
       <button onClick={() => onStep(1)}>Next listing</button>
@@ -361,14 +369,15 @@ describe('GenericDirectory', () => {
     expect(screen.queryByRole('button', { name: 'Clear search & filters' })).not.toBeInTheDocument()
   })
 
-  it('calls onAdd when the Add button is clicked, from both the header and the empty state', async () => {
+  it('opens the same box as the “+” from the empty state', async () => {
     const user = userEvent.setup()
     const onAdd = vi.fn()
     const category = makeCategory({ label: 'Grocery Store' })
     renderWithProviders(<GenericDirectory category={category} items={[]} {...handlers} onAdd={onAdd} />)
 
     await user.click(screen.getByRole('button', { name: /Add grocery store/ }))
-    expect(onAdd).toHaveBeenCalledTimes(1)
+    expect(await screen.findByRole('dialog', { name: 'Saw something? Tell us' })).toBeInTheDocument()
+    expect(onAdd).not.toHaveBeenCalled()
   })
 
   // The floating Add button (Gmail-compose-style) — the category page's
@@ -377,9 +386,9 @@ describe('GenericDirectory', () => {
   // to gate it to mobile only; asserting it out of the className is the
   // regression check for that, now that desktop shares this same button
   // instead of DirectoryHeader's old toolbar "Add".
-  // Since Oct 5 the "+" opens "Saw something? Tell us"; today's Add form is
-  // one tap inside it ("Add a place").
-  it('has a floating Add button, visible on every viewport, that opens the box with Add a place inside', async () => {
+  // Since Oct 5 the "+" opens "Saw something? Tell us"; filling it in
+  // yourself is "Find the place" inside it, adding to this category.
+  it('has a floating Add button, visible on every viewport, that opens the box, adding to this category', async () => {
     const user = userEvent.setup()
     const onAdd = vi.fn()
     const category = makeCategory({
@@ -392,9 +401,10 @@ describe('GenericDirectory', () => {
     const floatingAdd = screen.getByRole('button', { name: 'Add' })
     expect(floatingAdd.className).not.toContain('desktop:hidden')
     await user.click(floatingAdd)
+    await user.click(await screen.findByRole('button', { name: 'Find the place' }))
+    await user.click(screen.getByRole('button', { name: 'Not on Google? Fill it in yourself' }))
+    expect(screen.getByRole('dialog', { name: 'Add a Grocery Store' })).toBeInTheDocument()
     expect(onAdd).not.toHaveBeenCalled()
-    await user.click(await screen.findByRole('button', { name: 'Add a place' }))
-    expect(onAdd).toHaveBeenCalledTimes(1)
   })
 
   // Regression coverage for the OLD mobile Filters/sort-row Add button,
@@ -412,39 +422,34 @@ describe('GenericDirectory', () => {
     expect(screen.getByRole('button', { name: 'Add' })).toBeInTheDocument()
   })
 
-  // Agreed Oct 5: Add stays over an open listing and opens the box about
-  // it, beside the listing's own "Suggest an edit". It used to hide there,
-  // because at z-40 it sat under the listing's z-50 backdrop, dimmed and
-  // inert; it rises above the backdrop instead.
-  it('keeps Add over an open listing, above its backdrop, opening the box about that listing', async () => {
+  // Agreed Oct 5: Add stays on a listing. The page's floating "+" steps
+  // aside while one is open (on a phone the listing's own row passes under
+  // it as the sheet scrolls, and it covered the listing's overflow); the
+  // listing's row has its own "+" instead, from the page (TellAboutContext).
+  it('steps the page’s Add aside over an open listing, whose own “+” opens the box about it', async () => {
     const item = makeListing({ name: 'Trader Joe’s' })
     // reopenItemId drives GenericDirectory's own cardRefs.get(id).open(),
     // which fires onExpandedChange — the same path a real click takes,
     // without needing the stubbed card to grow a toggle of its own.
     renderWithProviders(<GenericDirectory category={makeCategory()} items={[item]} {...handlers} reopenItemId={item.id} />)
-    const add = screen.getByRole('button', { name: 'Add' })
-    expect(add.className).toContain('z-[55]')
-    fireEvent.click(add)
+    expect(screen.queryByRole('button', { name: 'Add' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Add or update Trader Joe’s' }))
     expect(await screen.findByRole('dialog', { name: 'Tell us about Trader Joe’s' })).toBeInTheDocument()
     // From a listing, editing it yourself, not adding a place.
-    expect(screen.queryByRole('button', { name: 'Add a place' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Find the place' })).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Edit the details myself' }))
     expect(handlers.onEdit).toHaveBeenCalledWith(item)
   })
 
-  it('shows the floating Add button when no listing is open, under the sheets', () => {
+  it('shows the floating Add button when no listing is open', () => {
     renderWithProviders(<GenericDirectory category={makeCategory()} items={[makeListing()]} {...handlers} />)
-    expect(screen.getByRole('button', { name: 'Add' }).className).toContain('z-40')
+    expect(screen.getByRole('button', { name: 'Add' })).toBeInTheDocument()
   })
 
-  it('keeps Add on mobile too, while a listing sheet is open', () => {
-    const item = makeListing()
-    renderWithProviders(
-      <ForcedViewport isMobile>
-        <GenericDirectory category={makeCategory()} items={[item]} {...handlers} reopenItemId={item.id} />
-      </ForcedViewport>,
-    )
-    expect(screen.getByRole('button', { name: 'Add' }).className).toContain('z-[55]')
+  it('offers no “+” on a listing in a category that takes no additions', () => {
+    const item = makeListing({ name: 'Trader Joe’s' })
+    renderWithProviders(<GenericDirectory category={makeCategory({ capabilities: { ...resolveCapabilities(undefined), add: false } })} items={[item]} {...handlers} reopenItemId={item.id} />)
+    expect(screen.queryByRole('button', { name: 'Add or update Trader Joe’s' })).not.toBeInTheDocument()
   })
 
   // A bare icon circle is a mobile convention people already have a

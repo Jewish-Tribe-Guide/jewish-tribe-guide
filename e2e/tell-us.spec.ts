@@ -29,8 +29,8 @@ test('a category’s “+” opens the box, with filling it in yourself one link
   const box = page.getByRole('dialog', { name: 'Saw something? Tell us' })
   await box.getByLabel('What did you see?').fill('Acme on 5th has challah')
   await expect(box.getByRole('button', { name: 'See what changes' })).toBeEnabled()
-  await box.getByRole('button', { name: 'Add a place' }).click()
-  await expect(page.getByRole('dialog', { name: `Add a ${category.label}` })).toBeVisible()
+  await box.getByRole('button', { name: 'Find the place' }).click()
+  await expect(page.getByRole('dialog', { name: 'Find the place' })).toBeVisible()
 })
 
 test('the Map has no “+ Add”', async ({ page }) => {
@@ -42,10 +42,11 @@ test('the Map has no “+ Add”', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Add', exact: true })).toHaveCount(0)
 })
 
-// Agreed Oct 5: "+" stays over an open listing and opens the box about it.
-// It used to sit under the listing's backdrop, dimmed and inert; a click
-// here fails if anything still covers it.
-test('over an open listing, “+” opens the box about that listing', async ({ page, request }) => {
+// Agreed Oct 5: Add stays on a listing, as a "+" in the listing's own row
+// beside "Suggest an edit"; the page's floating "+" steps aside while a
+// listing is open (on a phone it covered the listing's overflow). A click
+// here fails if anything covers it.
+test('an open listing’s own “+” opens the box about that listing', async ({ page, request }) => {
   const community = await defaultCommunity(page)
   const { category } = await categoryWithListings(request, community)
   const body = await (await request.get(`/api/resources?category=${category.id}&community=${community}`)).json()
@@ -54,7 +55,8 @@ test('over an open listing, “+” opens the box about that listing', async ({ 
   await ready(page)
   await dismissLocationPrompt(page)
 
-  await categoryAddButton(page).click()
+  await expect(categoryAddButton(page)).toHaveCount(0)
+  await page.getByRole('button', { name: `Add or update ${listing.name}` }).click()
   const box = page.getByRole('dialog', { name: `Tell us about ${listing.name}` })
   await expect(box).toBeVisible()
   await expect(box.getByRole('button', { name: 'Edit the details myself' })).toBeVisible()

@@ -7,7 +7,7 @@ import { hasListingChanged } from '@/lib/listingDiff'
 import type { DirectoryResource } from '@/types'
 import TagsInput from './TagsInput'
 import ImageUploadField from '@/components/ImageUploadField'
-import AddressInput from '@/components/intake/AddressInput'
+import AddressInput, { type PlaceSelectResult } from '@/components/intake/AddressInput'
 import HoursInput from '@/components/intake/HoursInput'
 import MinyanimInput from '@/components/intake/MinyanimInput'
 import SchedulesInput from '@/components/intake/SchedulesInput'
@@ -60,6 +60,14 @@ type Props = {
    *  mobile), but not itself device-gated — the caller decides when to
    *  pass it. */
   embedded?: boolean
+  /** Adding, started from what's already known: a Google pick made before
+   *  the form opened (the "+ Add" box's Find the place), with its address
+   *  and map point. */
+  seed?: { place?: PlaceSelectResult; address?: string; coords?: { lat: number; lng: number } | null }
+  /** Every section open from the start, so someone adding a place sees all
+   *  it can hold (the "+ Add" box). Otherwise only Basics, and sections
+   *  that already hold something. */
+  openAll?: boolean
   /** Fires whenever this component swaps between its own fields and the
    *  Request removal panel — lets an embedding caller's OWN title (this
    *  component's own heading is suppressed while embedded) become "Request
@@ -148,9 +156,13 @@ function groupNonCoreFields(fields: CategoryField[], config: CategoryConfig): Fi
   return blocks
 }
 
-export default function ListingForm({ category, mode, existing, onUp, onSubmitted, onPreviewSubmit, sharedTurnstile, adminSubmit, embedded, onRemovalOpenChange }: Props) {
+export default function ListingForm({ category, mode, existing, onUp, onSubmitted, onPreviewSubmit, sharedTurnstile, adminSubmit, embedded, onRemovalOpenChange, seed, openAll }: Props) {
   const config = category
-  const draft = useListingDraft(category, existing)
+  const draft = useListingDraft(
+    category,
+    existing ?? (seed ? ({ address: seed.address ?? '', ...(seed.coords ? { geo: seed.coords } : {}) } as DirectoryResource) : undefined),
+    seed?.place,
+  )
   const { hasAddress, hasPhone, syncEligible, name, setName, address, setAddress, phone, setPhone, coords, setCoords, details, setDetail, handlePlaceSelect } = draft
   const {
     submitterEmail,
@@ -559,7 +571,7 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
                 // already holds a value (real in edit; never true in create)
                 // and collapsed otherwise — see groupIsOpen/hasValue.
                 const hasData = block.fields.some((f) => hasValue(details[f.key]))
-                const open = groupIsOpen(block.sectionKey, block.isAudience || hasData)
+                const open = groupIsOpen(block.sectionKey, !!openAll || block.isAudience || hasData)
                 return (
                   // No overflow-hidden — see Basics above for why (it clips
                   // a multi-select field's own dropdown to this box).

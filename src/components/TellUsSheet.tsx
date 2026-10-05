@@ -19,7 +19,10 @@ import { tellUsPlaceholder } from '@/lib/tellUs'
 import ActionDialog from '@/components/resources/ActionDialog'
 import MobileSheet from '@/components/resources/MobileSheet'
 import UpdateTimesBox from '@/components/resources/UpdateTimesBox'
-import { DetailFieldInput } from '@/components/resources/ListingForm'
+import ListingForm, { DetailFieldInput } from '@/components/resources/ListingForm'
+import ListingEditor from '@/components/resources/ListingEditor'
+import FindPlace from '@/components/FindPlace'
+import type { PlaceSelectResult } from '@/components/intake/AddressInput'
 import { TURNSTILE_ACTIVE } from '@/components/resources/useListingSubmit'
 
 // "Saw something? Tell us" (agreed Oct 5, canvas TellSheet, TellAsk,
@@ -73,50 +76,92 @@ export default function TellUsSheet({
   isOpen,
   onClose,
   about,
+  category,
   placeholder = tellUsPlaceholder(),
-  onAddYourself,
   onEditYourself,
 }: {
   isOpen: boolean
   onClose: () => void
   /** The listing it was opened from, if any. */
   about?: { id: string; name: string }
+  /** The category page it was opened from, if any: what a place found with
+   *  "Find the place" is added as, without asking. */
+  category?: CategoryConfig
   placeholder?: string
-  /** "Rather fill it in yourself? Add a place": today's Add form. */
-  onAddYourself?: () => void
-  /** From a listing: "Edit the details myself", today's Edit form. */
+  /** From a listing: "Edit the details myself", the listing's own editor. */
   onEditYourself?: () => void
 }) {
   const isMobile = useIsMobile()
-  const title = about ? `Tell us about ${about.name}` : 'Saw something? Tell us'
-  const body = <TellUsBody key={isOpen ? 'open' : 'shut'} about={about} placeholder={placeholder} onAddYourself={onAddYourself} onEditYourself={onEditYourself} onClose={onClose} />
+  // Each step names itself: "Find the place", "Add a Grocery".
+  const [stepTitle, setStepTitle] = useState<string | null>(null)
+  const close = () => {
+    setStepTitle(null)
+    onClose()
+  }
+  const title = stepTitle ?? (about ? `Tell us about ${about.name}` : 'Saw something? Tell us')
+  const body = <TellUsBody key={isOpen ? 'open' : 'shut'} about={about} pageCategory={category} placeholder={placeholder} onEditYourself={onEditYourself} onClose={close} onTitle={setStepTitle} />
   return isMobile ? (
-    <MobileSheet isOpen={isOpen} onClose={onClose} title={title} draggable>
+    <MobileSheet isOpen={isOpen} onClose={close} title={title} draggable>
       {body}
     </MobileSheet>
   ) : (
-    <ActionDialog isOpen={isOpen} onClose={onClose} title={title}>
+    <ActionDialog isOpen={isOpen} onClose={close} title={title}>
       {body}
     </ActionDialog>
   )
 }
 
+type Step = 'write' | 'result' | 'sent' | 'find' | 'kind' | 'add' | 'edit'
+
 function TellUsBody({
   about,
+  pageCategory,
   placeholder,
-  onAddYourself,
   onEditYourself,
   onClose,
+  onTitle,
 }: {
   about?: { id: string; name: string }
+  pageCategory?: CategoryConfig
   placeholder: string
-  onAddYourself?: () => void
   onEditYourself?: () => void
   onClose: () => void
+  onTitle: (title: string | null) => void
 }) {
   const community = useCommunitySlug()
   const categories = useCategories()
-  const [step, setStep] = useState<'write' | 'result' | 'sent'>('write')
+  const [step, setStepOnly] = useState<Step>('write')
+  // Filling it in yourself: the listing found, or the place to add, and
+  // where Back goes from there.
+  const [listings, setListings] = useState<DirectoryResource[] | null>(null)
+  const [editing, setEditing] = useState<DirectoryResource | null>(null)
+  const [adding, setAdding] = useState<{ category: CategoryConfig; place?: PlaceSelectResult; address?: string; coords?: { lat: number; lng: number } | null } | null>(null)
+  const [findFrom, setFindFrom] = useState<Step>('write')
+  const setStep = (next: Step, title: string | null = null) => {
+    setStepOnly(next)
+    onTitle(title)
+  }
+  const addable = (categories ?? []).filter((c) => c.kind === 'listing' && c.active !== false && resolveCapabilities(c.capabilities).add)
+  // `back`: returning to the search from what was found, keeping where the
+  // search itself goes back to.
+  const openFind = (back = false) => {
+    if (!back) setFindFrom(step)
+    setStep('find', 'Find the place')
+    if (listings) return
+    fetch(withCommunity('/api/resources', community))
+      .then((r) => r.json())
+      .then((j: { resources?: DirectoryResource[] }) => setListings(j.resources ?? []))
+      .catch(() => setListings([]))
+  }
+  const startAdding = (start: Omit<NonNullable<typeof adding>, 'category'>, category = pageCategory) => {
+    if (category) {
+      setAdding({ ...start, category })
+      setStep('add', `Add a ${category.label}`)
+    } else {
+      setAdding({ ...start, category: addable[0] })
+      setStep('kind', 'What kind of place?')
+    }
+  }
   const [text, setText] = useState('')
   const [photos, setPhotos] = useState<{ file: File; preview: string }[]>([])
   const [reading, setReading] = useState<Reading | null>(null)
@@ -360,11 +405,11 @@ function TellUsBody({
               Edit the details myself
             </button>
           )}
-          {onAddYourself && (
+          {!about && addable.length > 0 && (
             <p className="text-center text-[13.5px] text-slate-600">
               Rather fill it in yourself?{' '}
-              <button type="button" onClick={onAddYourself} className="cursor-pointer font-semibold text-primary hover:underline">
-                Add a place
+              <button type="button" onClick={() => openFind()} className="cursor-pointer font-semibold text-primary hover:underline">
+                Find the place
               </button>
             </p>
           )}
@@ -422,6 +467,63 @@ function TellUsBody({
             ‹ Change what I wrote
           </button>
         </>
+      )}
+
+      {['find', 'kind', 'add', 'edit'].includes(step) && (
+        <button
+          type="button"
+          onClick={() => (step === 'find' ? setStep(findFrom) : openFind(true))}
+          className="cursor-pointer text-[14px] font-bold text-slate-500 hover:text-slate-700"
+        >
+          ‹ Back
+        </button>
+      )}
+      {step === 'find' && (
+        <FindPlace
+          listings={listings}
+          onListing={(l) => {
+            setEditing(l)
+            // The editor says "Suggest an edit" itself.
+            setStep('edit', l.name)
+          }}
+          onPlace={(place, address, coords) => startAdding({ place, address, coords })}
+          onBlank={() => startAdding({})}
+        />
+      )}
+      {step === 'kind' && adding && (
+        <div className="space-y-2" data-testid="pick-kind">
+          <p className="text-[14.5px] text-slate-700">{adding.place?.name ? `What kind of place is ${adding.place.name}?` : 'What kind of place is it?'}</p>
+          <div className="flex flex-wrap gap-2">
+            {addable.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => {
+                  setAdding({ ...adding, category: c })
+                  setStep('add', `Add a ${c.label}`)
+                }}
+                className="cursor-pointer rounded-full border border-slate-300 px-3.5 py-1.5 text-[14px] font-semibold text-slate-800 hover:bg-slate-50"
+              >
+                {c.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+      {step === 'add' && adding && (
+        <ListingForm
+          key={`${adding.category.id}:${adding.place?.placeId ?? ''}`}
+          category={adding.category}
+          mode="create"
+          seed={{ place: adding.place, address: adding.address, coords: adding.coords }}
+          openAll
+          embedded
+          onUp={() => openFind(true)}
+          onSubmitted={onClose}
+        />
+      )}
+      {step === 'edit' && editing && categories?.find((c) => c.id === editing.category) && (
+        <ListingEditor item={editing} category={categories.find((c) => c.id === editing.category)!} onClose={onClose} />
       )}
 
       {error && (

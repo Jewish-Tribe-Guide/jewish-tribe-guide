@@ -16,8 +16,13 @@ import type { PlaceSelectResult } from '@/components/intake/AddressInput'
  *
  * Holds no UI and posts nothing; useListingSubmit does the sending.
  */
-export function useListingDraft(category: CategoryConfig, existing?: DirectoryResource) {
+export function useListingDraft(category: CategoryConfig, existingListing?: DirectoryResource, fromPlace?: PlaceSelectResult) {
   const config = category
+  // Started from a Google pick made before the form opened (the "+ Add"
+  // box's Find the place): the same values, and the same record of what
+  // Google filled in, that picking it inside the form gives.
+  const [seeded] = useState(() => (fromPlace ? placeSeed(category, fromPlace) : null))
+  const existing = seeded ? ({ ...existingListing, ...seeded.values } as DirectoryResource) : existingListing
   const hasAddress = category.hasAddress !== false
   const hasPhone = category.hasPhone !== false
   const syncEligible = isCategorySyncEligible(category)
@@ -39,7 +44,7 @@ export function useListingDraft(category: CategoryConfig, existing?: DirectoryRe
   // something different" without an extra Google API call for the common
   // case where autofill did run. Populated by handlePlaceSelect; a ref
   // because nothing renders from it.
-  const autofilled = useRef<{ name?: string; phone?: string; hours?: string; website?: string; description?: string }>({})
+  const autofilled = useRef<{ name?: string; phone?: string; hours?: string; website?: string; description?: string }>(seeded?.autofilled ?? {})
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(
     (existing?.geo as { lat: number; lng: number } | undefined) ?? null,
   )
@@ -179,3 +184,29 @@ export function useListingDraft(category: CategoryConfig, existing?: DirectoryRe
 }
 
 export type ListingDraft = ReturnType<typeof useListingDraft>
+
+/** What a Google pick fills in on a new listing, and the record of it the
+ *  server compares against (handlePlaceSelect does the same, picked in the
+ *  form). */
+function placeSeed(category: CategoryConfig, place: PlaceSelectResult) {
+  const sync = isCategorySyncEligible(category)
+  const hoursField = category.detailFields.find((f) => f.type === 'hours')
+  const websiteField = category.detailFields.find((f) => f.type === 'url' && f.label.trim().toLowerCase() === 'website')
+  const descriptionField = category.detailFields.find((f) => f.key === 'googleDescription')
+  const values: Record<string, unknown> = {
+    ...(place.name ? { name: place.name } : {}),
+    ...(place.phone ? { phone: formatPhone(place.phone) } : {}),
+    ...(sync ? { placeId: place.placeId, businessStatus: place.businessStatus } : {}),
+    ...(place.hours && hoursField ? { [hoursField.key]: place.hours } : {}),
+    ...(place.website && websiteField ? { [websiteField.key]: place.website } : {}),
+    ...(place.description && descriptionField ? { [descriptionField.key]: place.description } : {}),
+  }
+  const autofilled = {
+    name: place.name ?? undefined,
+    phone: place.phone ? formatPhone(place.phone) : undefined,
+    hours: place.hours ? JSON.stringify(place.hours) : undefined,
+    website: place.website && websiteField ? place.website : undefined,
+    description: place.description && descriptionField ? place.description : undefined,
+  }
+  return { values, autofilled }
+}

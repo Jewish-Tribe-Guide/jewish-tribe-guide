@@ -8,6 +8,7 @@ import { useNow } from '@/lib/useNow'
 import { isMinyanim } from '@/lib/davening'
 import type { Minyan } from '@/lib/davening'
 import DirectoryHeader from './DirectoryHeader'
+import { TellAboutContext } from './tellAbout'
 import DistanceNote from './DistanceNote'
 import { NextMinyans } from './nextMinyans'
 import { CategoryBandFrame, CategoryBandBadge } from './CategoryBandFrame'
@@ -104,7 +105,10 @@ type Props = {
    *  FindResources.tsx). */
   initialDaveningDay?: string
   onUp: () => void
-  onAdd: () => void
+  /** Unused since Oct 5: every Add on the page opens the "+ Add" box. Still
+   *  handed in by FindResources, whose `?form=create` links open the older
+   *  add (ListingAdd); both go when those links move to the box. */
+  onAdd?: () => void
   onEdit: (item: DirectoryResource) => void
   /** Pushes the search text / "Open now" toggle into the URL (`?q=`,
    *  `?openNow=`) as they change, so a search + filter combination is a
@@ -120,7 +124,7 @@ type Props = {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function GenericDirectory({ category, items, anchorLabel, addressPrompt, reopenItemId, linkedItemId = null, reopenMatch = null, initialSearch, initialOpenNow, initialFilters, openMinyanimView, initialDaveningDay, onUp, onAdd, onEdit, onParamsChange }: Props) {
+export default function GenericDirectory({ category, items, anchorLabel, addressPrompt, reopenItemId, linkedItemId = null, reopenMatch = null, initialSearch, initialOpenNow, initialFilters, openMinyanimView, initialDaveningDay, onUp, onEdit, onParamsChange }: Props) {
   // Hands the shared header this screen's own title + "up" handler — on
   // mobile, SiteHeader shows "‹ {category.pluralLabel}" in place of the site
   // name while this is mounted, and reverts automatically on unmount (see
@@ -146,12 +150,11 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   const [selectFilters, setSelectFilters] = useState<Record<string, string[]>>({})
 
   // Which card currently has its listing open — the desktop column or the
-  // mobile sheet. The floating Add button stays while it's up (agreed Oct
-  // 5) and opens the box about that listing ("Tell us about Trader Joe's"),
-  // beside its own "Suggest an edit": telling and editing are two ways in
-  // now, not a working pill and a dead one. It used to hide here, because
-  // at z-40 it sat under the sheet's z-50 backdrop, dimmed and inert; it
-  // rises above the backdrop instead.
+  // mobile sheet. The floating Add button steps aside while it's up: on a
+  // phone the listing's own row (Suggest an edit, its overflow) passes under
+  // it as the sheet scrolls. Add stays on the listing all the same (agreed
+  // Oct 5): that row has its own "+" (ListingEditBar, via TellAboutContext),
+  // opening the box about that listing.
   const [openDialogItemId, setOpenDialogItemId] = useState<string | null>(null)
   const [openNow, setOpenNow] = useState(arrivedViaBackForward ? false : (initialOpenNow ?? false))
   // Drives the "Open now" filter below. Without it the filter answers for the
@@ -471,8 +474,12 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // "+" opens "Saw something? Tell us" (agreed Oct 5); today's Add form is
   // one tap inside it, "Add a place".
   const [tellOpen, setTellOpen] = useState(false)
-  // The listing the box is about, when it's opened over one.
-  const openItem = openDialogItemId ? (items.find((i) => i.id === openDialogItemId) ?? null) : null
+  // The listing the box is about, when its own "+" opened it.
+  const [openItem, setOpenItem] = useState<DirectoryResource | null>(null)
+  const tellAbout = (item: DirectoryResource) => {
+    setOpenItem(item)
+    setTellOpen(true)
+  }
   // Adding to a shul's times is an edit to the shul ("+ Add a minyan").
   const canEdit = ui.contributions.edit && caps.edit
   const showSearch = ui.search.directory && caps.directorySearch
@@ -1280,6 +1287,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   )
 
   return (
+    <TellAboutContext.Provider value={canAdd ? tellAbout : null}>
     <div>
       {/* Phones: where the distances on each row are measured from, when
           the visitor hasn't set a location, with the way to set one. At the
@@ -1524,8 +1532,13 @@ export default function GenericDirectory({ category, items, anchorLabel, address
               </button>
             )}
             {canAdd && (
+              // The same box as the "+": adding looks the same however it
+              // starts (Oct 5).
               <button
-                onClick={onAdd}
+                onClick={() => {
+                  setOpenItem(null)
+                  setTellOpen(true)
+                }}
                 className="inline-flex items-center gap-1 text-sm font-medium text-primary border border-primary rounded-md px-3 py-1.5 hover:bg-primary hover:text-white transition-colors cursor-pointer"
               >
                 <PlusIcon className="h-4 w-4" /> Add {category.label.toLowerCase()}
@@ -1700,15 +1713,10 @@ export default function GenericDirectory({ category, items, anchorLabel, address
           mobile-only, with desktop instead carrying a toolbar button up in
           DirectoryHeader and a site-wide "Add a listing" picker in
           SiteHeader — both removed in favor of this one control everywhere).
-          Deliberately per-category rather than a site-wide entry point:
-          landing straight in this category's own Add form via `onAdd`, no
-          picker detour, is strictly less friction for someone already
-          browsing Grocery who wants to add a grocery. The cost is real too:
-          the site now has no general Add entry point outside a category
-          page at all (Home, Map) — accepted deliberately, on the theory
-          that someone who hasn't picked a category yet is better served by
-          picking one first (Browse Categories) than by a picker popping up
-          from Home.
+          Since Oct 5 it opens the "+ Add" box (TellUsSheet), which knows
+          this category: a place found with "Find the place" is added here
+          without asking which kind it is. Home and the other screens have
+          the site-wide "+" (SiteAddButton), which asks.
           `bottom-[calc(3.75rem+env(safe-area-inset-bottom)+1rem)]` clears
           MobileTabBar the same way ResourceMapView's own fixed mobile
           panels already do — 3.75rem is that bar's own height. MobileTabBar
@@ -1725,9 +1733,12 @@ export default function GenericDirectory({ category, items, anchorLabel, address
           reflex people already bring to the shape. */}
       {filtered.length > 0 && !openDialogItemId && !minyanimView && <RowLookSwitch look={rowLook} onChange={setRowLook} />}
 
-      {canAdd && (
+      {canAdd && !openDialogItemId && (
         <button
-          onClick={() => setTellOpen(true)}
+          onClick={() => {
+            setOpenItem(null)
+            setTellOpen(true)
+          }}
           // Generic, not "Add {category label}" — the empty-state button
           // further up already uses that exact phrasing, and giving this
           // the same name would make the two indistinguishable to anything
@@ -1738,7 +1749,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
           // this keeps mobile's icon-only button correctly named without
           // needing a second, viewport-conditional way of deriving it.
           aria-label="Add"
-          className={`fixed right-4 bottom-[calc(3.75rem+env(safe-area-inset-bottom)+1rem)] desktop:bottom-6 ${openDialogItemId ? 'z-[55]' : 'z-40'} flex h-14 w-14 desktop:w-auto items-center justify-center gap-2 rounded-full bg-primary px-0 desktop:px-5 text-white shadow-lg cursor-pointer active:scale-95 transition-transform`}
+          className={`fixed right-4 bottom-[calc(3.75rem+env(safe-area-inset-bottom)+1rem)] desktop:bottom-6 z-40 flex h-14 w-14 desktop:w-auto items-center justify-center gap-2 rounded-full bg-primary px-0 desktop:px-5 text-white shadow-lg cursor-pointer active:scale-95 transition-transform`}
         >
           <PlusIcon className="h-6 w-6 shrink-0" />
           <span className="hidden desktop:inline font-medium whitespace-nowrap">Add</span>
@@ -1749,15 +1760,8 @@ export default function GenericDirectory({ category, items, anchorLabel, address
           isOpen
           onClose={() => setTellOpen(false)}
           about={openItem ? { id: openItem.id, name: openItem.name } : undefined}
+          category={category}
           placeholder={tellUsPlaceholder(category, { times: minyanimViewOn })}
-          onAddYourself={
-            openItem
-              ? undefined
-              : () => {
-                  setTellOpen(false)
-                  onAdd()
-                }
-          }
           onEditYourself={
             openItem
               ? () => {
@@ -1786,5 +1790,6 @@ export default function GenericDirectory({ category, items, anchorLabel, address
       )}
 
     </div>
+    </TellAboutContext.Provider>
   )
 }

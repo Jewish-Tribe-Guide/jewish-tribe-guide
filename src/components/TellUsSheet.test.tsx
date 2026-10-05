@@ -1,13 +1,13 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react'
-import { makeCategory } from '@/test/providerFixtures'
+import { makeCategory, makeListing } from '@/test/providerFixtures'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { mockRouter } from '@/test/nextNavigationMock'
 import { showsSiteAdd } from './SiteAddButton'
 import TellUsSheet from './TellUsSheet'
 
-vi.mock('@/components/resources/useListingSubmit', () => ({ TURNSTILE_ACTIVE: false }))
+vi.mock('@/components/resources/useListingSubmit', async (original) => ({ ...(await original<object>()), TURNSTILE_ACTIVE: false }))
 vi.mock('@/lib/useIsMobile', () => ({ useIsMobile: () => true }))
 vi.mock('next/navigation', () => ({
   useRouter: () => mockRouter,
@@ -204,11 +204,50 @@ describe('Saw something? Tell us', () => {
     expect(screen.queryByRole('button', { name: /^Send/ })).not.toBeInTheDocument()
   })
 
-  it('keeps filling it in yourself one small link away', () => {
-    const onAddYourself = vi.fn()
-    open({ onAddYourself })
-    fireEvent.click(screen.getByRole('button', { name: 'Add a place' }))
-    expect(onAddYourself).toHaveBeenCalled()
+  // Agreed Oct 5: one search for adding and editing, inside the box, with
+  // Back at every step.
+  describe('Find the place', () => {
+    const grocery = makeCategory({ id: 'grocery', label: 'Grocery', detailFields: [{ key: 'm', label: 'Kosher items', type: 'tags' }] })
+    const shuls = makeCategory({ id: 'synagogue', label: 'Synagogue' })
+    const tj = makeListing({ id: 'tj', name: 'Trader Joe’s', category: 'grocery', address: '1324 Arch St, Philadelphia' })
+    const find = (props: Partial<Parameters<typeof TellUsSheet>[0]> = {}) => {
+      respond = (url) => (url.includes('/api/resources') ? { ok: true, resources: [tj] } : {})
+      renderWithProviders(<TellUsSheet isOpen onClose={() => {}} {...props} />, { community: { slug: 'philly' }, content: { categories: [grocery, shuls] } })
+      fireEvent.click(screen.getByRole('button', { name: 'Find the place' }))
+    }
+
+    it('finds a place the guide has and opens its edit, with Back to the search and back to the box', async () => {
+      find()
+      expect(screen.getByRole('dialog', { name: 'Find the place' })).toBeInTheDocument()
+      fireEvent.change(screen.getByPlaceholderText('Search by name or address…'), { target: { value: 'trader j' } })
+      fireEvent.click(await screen.findByRole('button', { name: /Trader Joe’s/ }))
+      expect(screen.getByRole('dialog', { name: 'Trader Joe’s' })).toBeInTheDocument()
+      expect(screen.getByText('Suggest an edit')).toBeInTheDocument()
+      fireEvent.click(screen.getByRole('button', { name: '‹ Back' }))
+      expect(screen.getByTestId('find-place')).toBeInTheDocument()
+      fireEvent.click(screen.getByRole('button', { name: '‹ Back' }))
+      expect(screen.getByLabelText('What did you see?')).toBeInTheDocument()
+      expect(calls.filter((c) => c.url.includes('/api/resources'))).toHaveLength(1)
+    })
+
+    it('adds a place as the form of questions, every section open, asking the kind only when it isn’t known', () => {
+      find()
+      fireEvent.click(screen.getByRole('button', { name: 'Not on Google? Fill it in yourself' }))
+      expect(screen.getByTestId('pick-kind')).toBeInTheDocument()
+      fireEvent.click(screen.getByRole('button', { name: 'Synagogue' }))
+      expect(screen.getByRole('dialog', { name: 'Add a Synagogue' })).toBeInTheDocument()
+      expect(screen.getByLabelText('Name *')).toBeInTheDocument()
+      cleanup()
+      find({ category: grocery })
+      fireEvent.click(screen.getByRole('button', { name: 'Not on Google? Fill it in yourself' }))
+      expect(screen.getByRole('dialog', { name: 'Add a Grocery' })).toBeInTheDocument()
+    })
+
+    it('isn’t offered over a listing, where it’s that listing’s edit', () => {
+      open({ about: { id: 'tj', name: 'Trader Joe’s' }, onEditYourself: () => {} })
+      expect(screen.queryByRole('button', { name: 'Find the place' })).not.toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Edit the details myself' })).toBeInTheDocument()
+    })
   })
 
   it('shows the reader’s refusal, and stays on what they wrote', async () => {

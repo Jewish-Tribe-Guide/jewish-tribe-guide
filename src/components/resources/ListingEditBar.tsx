@@ -2,8 +2,10 @@
 
 import type { DirectoryResource } from '@/types'
 import type { CategoryConfig } from '@/lib/categories'
-import { PencilIcon } from '@/components/icons'
+import { useContext } from 'react'
+import { PencilIcon, PlusIcon } from '@/components/icons'
 import ListingActionsFan from './ListingActionsFan'
+import { TellAboutContext } from './tellAbout'
 import type { ListingAction } from './useListingActions'
 
 // ── The one visible way to edit an open listing ──────────────────────────
@@ -68,6 +70,7 @@ export default function ListingEditBar({
   /** Passed through to the overflow: see ListingActionsFan's `omit`. */
   omit?: ListingAction['id'][]
 }) {
+  const tellAbout = useContext(TellAboutContext)
   return (
     // A wide primary plus a small round overflow, not two peers. The shape
     // is doing work: it gives the row an end-stop, so the bar sits on a base
@@ -93,6 +96,23 @@ export default function ListingEditBar({
         >
           <PencilIcon className="h-4 w-4 shrink-0" />
           Suggest an edit
+        </button>
+      )}
+      {/* The "+ Add" box about this listing, where a category page offers
+          it (TellAboutContext): the page's own floating "+" steps aside
+          while a listing is open, since on a phone this row passes under
+          it as the sheet scrolls. Same circle as the overflow beside it. */}
+      {tellAbout && (
+        <button
+          type="button"
+          aria-label={`Add or update ${item.name}`}
+          onClick={(e) => {
+            e.stopPropagation()
+            tellAbout(item)
+          }}
+          className="flex h-[46px] w-[46px] shrink-0 cursor-pointer items-center justify-center rounded-full bg-white text-primary shadow-lg transition-colors hover:bg-slate-50"
+        >
+          <PlusIcon className="h-5 w-5" />
         </button>
       )}
       <ListingActionsFan item={item} category={category} path={path} placement={fanPlacement} omit={omit} />
