@@ -1,4 +1,3 @@
-import { community } from '@/community.config'
 import { getAdminClient } from '@/lib/supabase/admin'
 import { enforceRateLimit, clientIp } from '@/lib/rateLimit'
 import { isHoneypotTripped } from '@/lib/honeypot'
@@ -6,17 +5,11 @@ import { verifyTurnstile } from '@/lib/turnstile'
 import { ui } from '@/lib/uiConfig'
 import { getResourceById } from '@/lib/resourceStore'
 import { fetchFestivals } from '@/lib/festivals'
-import { readRegular, readSchedule, type ScheduleSource } from '@/lib/scheduleReader'
+import { community } from '@/community.config'
+import { readSchedule, type ScheduleSource } from '@/lib/scheduleReader'
+import { readShulWeek } from '@/lib/shulWeekReading'
 import { getCategoryById } from '@/lib/categoryStore'
-import { fetchDatesInfo } from '@/lib/dateZmanim'
-import { compareTimes } from '@/lib/scheduleUpdate'
-import { regularMinyanim } from '@/lib/schedules'
-import { currentSeason } from '@/lib/season'
 
-/** `n` dates from `today`, inclusive. */
-function datesFrom(today: string, n: number): string[] {
-  return Array.from({ length: n }, (_, i) => new Date(Date.parse(`${today}T12:00:00Z`) + i * 86_400_000).toISOString().slice(0, 10))
-}
 import { UUID } from '@/lib/itemMarkRoutes'
 
 // POST /api/schedule/read   multipart: listingId, festival | kind=regular, turnstileToken, company, and text or file
@@ -93,14 +86,7 @@ export async function POST(request: Request) {
       const category = await getCategoryById(row!.community_id, listing.category)
       const minyanimField = category?.detailFields.find((f) => f.type === 'minyanim')
       if (!minyanimField) return Response.json({ ok: false, error: 'Not found.' }, { status: 404 })
-      const now = Date.now()
-      const today = new Intl.DateTimeFormat('en-CA', { timeZone: community.timezone }).format(new Date(now))
-      const coords = listing.geo ?? community.mapCenter
-      const ahead = await fetchDatesInfo({ latitude: coords.lat, longitude: coords.lng, timezone: community.timezone }, today, datesFrom(today, 21).at(-1)!)
-      const days = { today, days: datesFrom(today, 21).map((date) => ({ date, names: ahead.names[date] ?? [] })) }
-      const reading = await readRegular(source, days, listing.name, { apiKey })
-      const update = compareTimes(regularMinyanim(listing[minyanimField.key]), reading, { season: currentSeason(now, community.timezone), zmanim: ahead.zmanim })
-      result = { update, model: reading.model }
+      result = await readShulWeek(listing, minyanimField.key, source, apiKey)
     } else {
       const festivals = await fetchFestivals(community.timezone)
       const festival = festivals.find((f) => f.name === field('festival')) ?? festivals.find((f) => f.festival === field('festival'))
