@@ -63,6 +63,7 @@ export default function MapScreen() {
         initialPinned={view.pinned}
         initialQuery={view.query ?? undefined}
         initialPlaceId={view.place ?? undefined}
+        viewSearch={params.toString()}
         initialFilters={{
           openNow: view.openNow,
           openIn: view.openIn ?? undefined,

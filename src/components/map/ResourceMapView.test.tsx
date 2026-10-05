@@ -1382,6 +1382,63 @@ describe('ResourceMapView — the shareable URL (standalone)', () => {
   })
 })
 
+// Next feeds history.replaceState back into useSearchParams, so every
+// address this screen writes comes back a moment later as new initial*
+// props. Re-applied, a late one undid the visitor's next move: on phones,
+// "Clear search" right after a reading put the question, its category and
+// Open now straight back (e2e/map-reader.spec.ts). An echo is ignored; a
+// real navigation still applies.
+describe('ResourceMapView — its own address-bar writes coming back', () => {
+  afterEach(() => window.history.replaceState(null, '', '/test-community/map'))
+
+  function setup() {
+    const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
+    const synagogue = makeCategory({ id: 'synagogue', pluralLabel: 'Synagogues' })
+    const listings = [
+      listingWithGeo({ id: 'g1', category: 'grocery', name: 'Acme Grocery' }),
+      listingWithGeo({ id: 's1', category: 'synagogue', name: 'Beth Shalom' }),
+    ]
+    const community = makeCommunity()
+    const content = makeContent({ categories: [grocery, synagogue] })
+    const wrap = (ui: ReactElement) => (
+      <CommunityProvider community={community} communities={[community]}>
+        <ContentProvider content={content}>
+          <PinnedProvider>
+            <DroppedPinsProvider>
+              <ListingsProvider listings={listings}>
+                <HeaderCollapseProvider>{ui}</HeaderCollapseProvider>
+              </ListingsProvider>
+            </DroppedPinsProvider>
+          </PinnedProvider>
+        </ContentProvider>
+      </CommunityProvider>
+    )
+    return { wrap, ...render(wrap(<ResourceMapView onUp={vi.fn()} standalone visible viewSearch="" />)) }
+  }
+
+  it('ignores a late echo of an address it wrote itself', async () => {
+    const user = userEvent.setup()
+    const { wrap, rerender } = setup()
+    await user.click(screen.getByRole('button', { name: /Grocery Stores/ })) // writes ?cat=grocery
+    await user.click(screen.getByRole('button', { name: 'All' })) // and then moves on
+    expect(screen.getByTestId('point-count')).toHaveTextContent('2')
+
+    // The first write arrives back only now.
+    rerender(wrap(<ResourceMapView onUp={vi.fn()} standalone visible initialSelectedCategories={['grocery']} viewSearch="cat=grocery" />))
+    expect(screen.getByTestId('point-count')).toHaveTextContent('2')
+  })
+
+  it('still applies a real navigation to an address it never wrote', async () => {
+    const user = userEvent.setup()
+    const { wrap, rerender } = setup()
+    await user.click(screen.getByRole('button', { name: /Grocery Stores/ }))
+
+    rerender(wrap(<ResourceMapView onUp={vi.fn()} standalone visible initialSelectedCategories={['synagogue']} viewSearch="cat=synagogue" />))
+    expect(screen.getByTestId('point-count')).toHaveTextContent('1')
+    expect(screen.getByRole('button', { name: 'Select Beth Shalom' })).toBeInTheDocument()
+  })
+})
+
 // The map's search is the same question-reading search as the home and
 // category pages (see askSearch.ts). Word for word, this question matched
 // nothing: no listing says "where", "buy" or "cholov".

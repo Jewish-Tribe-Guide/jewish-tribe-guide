@@ -144,6 +144,11 @@ type Props = {
    *  Standalone only: this is what makes a map link shareable down to the
    *  specific pin someone had open, not just the pins and filters. */
   initialPlaceId?: string
+  /** The address bar's query string these initial* props were read from
+   *  (MapScreen's useSearchParams). Lets the map tell its own address-bar
+   *  writes, echoed back by Next, from a real navigation; see
+   *  ownWritesRef below. */
+  viewSearch?: string
   /** Open a specific listing's detail card in its category directory. */
   onViewListing?: (categoryId: string, listingId: string) => void
   /** True for the one page-level map screen (mode 'map' in page.tsx) — the
@@ -193,7 +198,12 @@ type Props = {
 
 const NOOP_LIVE_TRACKING = { tracking: false, error: null, start: () => {}, stop: () => {} }
 
-export default function ResourceMapView({ userLocation, initialCategory, initialQuery, initialSelectedCategories, initialPinned = false, initialFilters, initialPlaceId, onViewListing, standalone, visible, onExitFullscreenToListing, liveTracking, controls }: Props) {
+/** A query string in one canonical form, "?" or not. */
+function normalizeSearch(search: string): string {
+  return new URLSearchParams(search.startsWith('?') ? search.slice(1) : search).toString()
+}
+
+export default function ResourceMapView({ userLocation, initialCategory, initialQuery, initialSelectedCategories, initialPinned = false, initialFilters, initialPlaceId, viewSearch, onViewListing, standalone, visible, onExitFullscreenToListing, liveTracking, controls }: Props) {
   const timezone = useCommunityTimezone()
   const listings = useAllListings()
   const categories = useCategories()
@@ -842,10 +852,15 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   }
   const filtersForCategory = initialCategory ?? (initialSelectedCategories && [...initialSelectedCategories].length === 1 ? [...initialSelectedCategories][0] : null)
   const [ownFilters, setOwnFilters] = useState<MapFilterState | null>(null)
+  // What "no Filters of the visitor's own" falls back to: the Filters of the
+  // address this screen was opened or navigated to, kept as they were then.
+  // Not the live initial* props: those also carry this screen's own address
+  // writes echoed back (see ownWritesRef), so clearing a reading's Open now
+  // fell back to the Open now the reading had just written.
+  const [baseFilters, setBaseFilters] = useState(() => ({ query: initialFiltersQuery, forCategory: filtersForCategory }))
   const filters = useMemo<MapFilterState>(
-    () => ownFilters ?? (categories ? readMapFilters(initialFiltersQuery, categories, filtersForCategory) : {}),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [ownFilters, categories, initialFiltersQuery.open, initialFiltersQuery.is, initialFiltersQuery.sel, filtersForCategory],
+    () => ownFilters ?? (categories ? readMapFilters(baseFilters.query, categories, baseFilters.forCategory) : {}),
+    [ownFilters, categories, baseFilters],
   )
   const hasFilters = Object.keys(filters).length > 0
   const filtersKey = JSON.stringify(filters)
@@ -948,13 +963,31 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
       .join(';'),
   ].join('::')
   const appliedInitialViewKeyRef = useRef(initialViewKey)
+  // The query strings this screen wrote to its own address bar (the sync
+  // effect below), oldest first, until Next echoes each one back. Next does:
+  // history.replaceState feeds useSearchParams in this version (see
+  // node_modules/next/dist/docs, "Native History API"), so every write
+  // returns as new initial* props a moment later. Those are this screen's
+  // own state, not a navigation, and must not be re-applied: one that
+  // arrives after the visitor has moved on (tapped "Clear search" right
+  // after a reading set the categories and Open now) would put the old
+  // search back. A real navigation's address was never written here.
+  const ownWritesRef = useRef<string[]>([])
   useEffect(() => {
     if (initialViewKey === appliedInitialViewKeyRef.current) return
+    const echo = viewSearch === undefined ? -1 : ownWritesRef.current.indexOf(normalizeSearch(viewSearch))
+    if (echo >= 0) {
+      // Next may skip echoing a write that a later one replaced: those go too.
+      ownWritesRef.current = ownWritesRef.current.slice(echo + 1)
+      appliedInitialViewKeyRef.current = initialViewKey
+      return
+    }
     appliedInitialViewKeyRef.current = initialViewKey
     setSelected(resolveInitialSelected(initialSelectedCategories, initialCategory, initialPinned))
     setInput(initialQueryText)
     setCommittedQuery(initialQueryText)
     setOwnFilters(null)
+    setBaseFilters({ query: initialFiltersQuery, forCategory: filtersForCategory })
     setApplied(null)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialViewKey])
@@ -999,14 +1032,12 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // reads back identically via parseMapQuery.
   //
   // Plain history.replaceState, not next/navigation's router: router.replace
-  // re-subscribes every useSearchParams() caller (this component now among
-  // them) to the change, and this screen's marker layer already re-renders
-  // more often than its own state actually changes — feeding that back
-  // through the router turns a harmless extra render into a real navigation
-  // each time. A plain history write has no such feedback loop: nothing
-  // subscribes to it, so it only ever affects a future cold load
-  // (initialCategory/initialQuery/initialFilters/initialPlaceId) or a
-  // copy-pasted/shared address bar.
+  // turns every write into a real navigation, and this screen's marker layer
+  // already re-renders more often than its own state actually changes. A
+  // history write is lighter, but it is NOT unobserved: in this Next version
+  // it feeds useSearchParams, so MapScreen hands it straight back as new
+  // initial* props. The resync effect above ignores those echoes
+  // (ownWritesRef); without that, a late echo put a cleared search back.
   //
   // Persists committedQuery, not the live `input`, so this doesn't fire on
   // every keystroke — only once a search is actually committed.
@@ -1035,6 +1066,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
     const url = `${window.location.pathname}${qs}`
     if (url === `${window.location.pathname}${window.location.search}`) return
     window.history.replaceState(window.history.state, '', url)
+    ownWritesRef.current = [...ownWritesRef.current, normalizeSearch(qs)].slice(-20)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [standalone, committedQuery, selected, allSelected, filtersKey, categories, selectedPointId, pinnedSelected])
 
