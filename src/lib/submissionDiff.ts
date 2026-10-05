@@ -122,6 +122,13 @@ export function flatListing(src: ResourceRow | ResourceSubmission | undefined, f
       seen.add(sk)
       out.push({ key: sk, label: `${f.label}: special schedules`, value: formatSchedulesSummary(readSchedules(details[sk])) })
     }
+    // A tags field's items that are only sometimes there, stored beside it
+    // the same way ("m_sometimes").
+    const sometimes = `${f.key}_sometimes`
+    if (f.type === 'tags' && sometimes in details) {
+      seen.add(sometimes)
+      out.push({ key: sometimes, label: `${f.label}: sometimes`, value: fmt(details[sometimes], f) })
+    }
   }
   for (const [k, v] of Object.entries(details)) {
     if (SKIP.has(k) || SKIP_WHEN_UNCONFIGURED.has(k) || seen.has(k)) continue

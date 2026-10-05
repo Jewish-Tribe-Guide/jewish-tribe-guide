@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { diffLines, isMultiline } from './submissionDiff'
+import { diffLines, flatListing, isMultiline } from './submissionDiff'
 
 // The moderation card struck through all ten of a shul's minyanim in red and
 // repeated all ten in green because one Kabbalas Shabbos time gained a
@@ -64,5 +64,17 @@ describe('isMultiline', () => {
 
   it('is false for ordinary single-line values, which read better as before → after', () => {
     expect(isMultiline('(215) 555-0100', '(215) 555-0199')).toBe(false)
+  })
+})
+
+// A grocery's items that are only sometimes there are stored beside the
+// field ("m_sometimes"), not as one of the category's own fields, so the
+// queue printed the raw key as their label.
+describe('flatListing', () => {
+  it('labels a tags field’s “sometimes” items under the field’s own name', () => {
+    const fields = [{ key: 'm', label: 'Kosher items available', type: 'tags' as const }]
+    const rows = flatListing({ name: 'Trader Joe’s', details: { m: ['Chicken'], m_sometimes: ['Steak', 'Turkey'] } } as never, fields)
+    expect(rows.map((r) => [r.label, r.value])).toContainEqual(['Kosher items available: sometimes', 'Steak, Turkey'])
+    expect(rows.map((r) => r.label)).not.toContain('m_sometimes')
   })
 })
