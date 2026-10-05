@@ -73,7 +73,7 @@ export default function TellUsSheet({
   isOpen,
   onClose,
   about,
-  placeholder = tellUsPlaceholder('any'),
+  placeholder = tellUsPlaceholder(),
   onAddYourself,
   onEditYourself,
 }: {

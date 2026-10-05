@@ -1749,7 +1749,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
         <TellUsSheet
           isOpen
           onClose={() => setTellOpen(false)}
-          placeholder={tellUsPlaceholder(category.detailFields.some((f) => f.type === 'tags') ? 'items' : category.detailFields.some((f) => f.type === 'minyanim') ? 'times' : 'any')}
+          placeholder={tellUsPlaceholder(category, { times: minyanimViewOn })}
           onAddYourself={() => {
             setTellOpen(false)
             onAdd()
