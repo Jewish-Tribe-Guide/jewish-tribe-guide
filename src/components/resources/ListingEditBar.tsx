@@ -3,7 +3,7 @@
 import type { DirectoryResource } from '@/types'
 import type { CategoryConfig } from '@/lib/categories'
 import { useContext } from 'react'
-import { PencilIcon, PlusIcon } from '@/components/icons'
+import { PencilIcon } from '@/components/icons'
 import ListingActionsFan from './ListingActionsFan'
 import { TellAboutContext } from './tellAbout'
 import type { ListingAction } from './useListingActions'
@@ -31,6 +31,12 @@ import type { ListingAction } from './useListingActions'
 // home it already had: the last panel of the edit form itself (see
 // RemovalRequest in ListingForm), the same trail Google Maps uses for
 // "Close or remove."
+//
+// Where the page has the "+ Add" box (TellAboutContext: a category page),
+// Suggest an edit opens it about this listing, with "Edit the details
+// myself" there for the listing-shaped editor (Oct 6: one door, the box,
+// replacing the "+" that sat beside this pill and did the same). Elsewhere
+// (the Map) it opens the editor itself.
 //
 // The label is "Suggest an edit", not "Edit": the second implies authority
 // this visitor doesn't need to have, and the first is what people actually
@@ -90,29 +96,13 @@ export default function ListingEditBar({
           type="button"
           onClick={(e) => {
             e.stopPropagation()
-            onEdit()
+            if (tellAbout) tellAbout(item, onEdit)
+            else onEdit()
           }}
           className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-full bg-primary px-5 py-3 text-sm font-semibold text-white shadow-lg transition-transform active:scale-[0.98]"
         >
           <PencilIcon className="h-4 w-4 shrink-0" />
           Suggest an edit
-        </button>
-      )}
-      {/* The "+ Add" box about this listing, where a category page offers
-          it (TellAboutContext): the page's own floating "+" steps aside
-          while a listing is open, since on a phone this row passes under
-          it as the sheet scrolls. Same circle as the overflow beside it. */}
-      {tellAbout && (
-        <button
-          type="button"
-          aria-label={`Add or update ${item.name}`}
-          onClick={(e) => {
-            e.stopPropagation()
-            tellAbout(item)
-          }}
-          className="flex h-[46px] w-[46px] shrink-0 cursor-pointer items-center justify-center rounded-full bg-white text-primary shadow-lg transition-colors hover:bg-slate-50"
-        >
-          <PlusIcon className="h-5 w-5" />
         </button>
       )}
       <ListingActionsFan item={item} category={category} path={path} placement={fanPlacement} omit={omit} />

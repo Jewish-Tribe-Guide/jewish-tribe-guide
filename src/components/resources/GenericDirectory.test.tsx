@@ -111,10 +111,12 @@ vi.mock('./GenericListingCard', async () => {
   }
 })
 
-// The listing's own "+" (ListingEditBar), as the page offers it.
+// The listing's Suggest an edit (ListingEditBar), opening the box the page
+// offers, with its own editor for "Edit the details myself".
+const columnEdit = vi.fn()
 function ColumnTell({ item }: { item: DirectoryResource }) {
   const tell = useContext(TellAboutContext)
-  return tell ? <button onClick={() => tell(item)}>{`Add or update ${item.name}`}</button> : null
+  return tell ? <button onClick={() => tell(item, () => columnEdit(item.id))}>{`Suggest an edit to ${item.name}`}</button> : null
 }
 
 function ColumnMinyan({ id, name }: { id: string; name: string }) {
@@ -439,23 +441,30 @@ describe('GenericDirectory', () => {
     await waitFor(() => expect(screen.queryByRole('button', { name: 'Add' })).not.toBeInTheDocument())
   })
 
-  // Oct 6: on desktop the listing's own "+" is at the foot of a long
+  // Oct 6: on desktop the listing's own row is at the foot of a long
   // listing, out of sight, and the user couldn't find Add. Nothing passes
-  // under the floating one there, so it stays, about the open listing.
-  it('keeps the page’s Add over a listing open on desktop, and both open the box about that listing', async () => {
+  // under the floating one there, so it stays, for adding anything; the
+  // listing is Suggest an edit's, which opens the box about it.
+  it('keeps the page’s Add over a listing open on desktop; Suggest an edit opens the box about the listing', async () => {
+    handlers.onEdit.mockClear()
+    columnEdit.mockClear()
     const item = makeListing({ name: 'Trader Joe’s' })
     renderWithProviders(
       <ForcedViewport isMobile={false}>
         <GenericDirectory category={makeCategory()} items={[item]} {...handlers} reopenItemId={item.id} />
       </ForcedViewport>,
     )
-    expect(await screen.findByRole('button', { name: 'Add or update Trader Joe’s' })).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Add' }))
+    expect(await screen.findByRole('dialog', { name: 'Saw something? Tell us' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Suggest an edit to Trader Joe’s' }))
     expect(await screen.findByRole('dialog', { name: 'Tell us about Trader Joe’s' })).toBeInTheDocument()
-    // From a listing, editing it yourself, not adding a place.
+    // From a listing, editing it yourself, not adding a place: the
+    // listing's own editor, in place, never the page's form.
     expect(screen.queryByRole('button', { name: 'Find the place' })).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Edit the details myself' }))
-    expect(handlers.onEdit).toHaveBeenCalledWith(item)
+    expect(columnEdit).toHaveBeenCalledWith(item.id)
+    expect(handlers.onEdit).not.toHaveBeenCalled()
   })
 
   it('shows the floating Add button when no listing is open', () => {
@@ -463,10 +472,14 @@ describe('GenericDirectory', () => {
     expect(screen.getByRole('button', { name: 'Add' })).toBeInTheDocument()
   })
 
-  it('offers no “+” on a listing in a category that takes no additions', () => {
+  it('opens the box from Suggest an edit in a category that takes edits but no additions, and not in one that takes neither', () => {
     const item = makeListing({ name: 'Trader Joe’s' })
-    renderWithProviders(<GenericDirectory category={makeCategory({ capabilities: { ...resolveCapabilities(undefined), add: false } })} items={[item]} {...handlers} reopenItemId={item.id} />)
-    expect(screen.queryByRole('button', { name: 'Add or update Trader Joe’s' })).not.toBeInTheDocument()
+    const caps = (c: object) => makeCategory({ capabilities: { ...resolveCapabilities(undefined), ...c } })
+    renderWithProviders(<GenericDirectory category={caps({ add: false })} items={[item]} {...handlers} reopenItemId={item.id} />)
+    expect(screen.getByRole('button', { name: 'Suggest an edit to Trader Joe’s' })).toBeInTheDocument()
+    cleanup()
+    renderWithProviders(<GenericDirectory category={caps({ add: false, edit: false })} items={[item]} {...handlers} reopenItemId={item.id} />)
+    expect(screen.queryByRole('button', { name: 'Suggest an edit to Trader Joe’s' })).not.toBeInTheDocument()
   })
 
   // A bare icon circle is a mobile convention people already have a

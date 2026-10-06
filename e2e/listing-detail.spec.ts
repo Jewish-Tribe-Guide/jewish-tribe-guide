@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { categoryWithHoursField, categoryWithListings, largestCategory, defaultCommunity, dismissLocationPrompt, listingWithFourActions } from './helpers'
+import { categoryWithHoursField, categoryWithListings, largestCategory, defaultCommunity, dismissLocationPrompt, listingWithFourActions, openListingEditor } from './helpers'
 
 // Desktop opens a listing in the list's own column, the map staying beside
 // it (ListingColumn); a phone opens it in a bottom sheet, the one Add and
@@ -347,7 +347,7 @@ test('Back steps out of Request removal into the edit, not out of editing', asyn
 
   const suggest = listing.getByRole('button', { name: 'Suggest an edit' })
   test.skip((await suggest.count()) === 0, `${category.id} can't be edited`)
-  await suggest.click()
+  await openListingEditor(page, listing)
   const editTitle = page.getByRole('heading', { name: 'Suggest an edit' })
   await expect(editTitle).toBeVisible()
   const removalLink = page.getByRole('button', { name: 'Closed for good? Request removal' })

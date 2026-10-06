@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { categoryWithGeocodedListings, categoryWithHoursField, defaultCommunity, dismissLocationPrompt, largestCategory } from './helpers'
+import { categoryWithGeocodedListings, categoryWithHoursField, defaultCommunity, dismissLocationPrompt, largestCategory, openListingEditor } from './helpers'
 
 // The mobile tab bar and the inline card grid only exist below the `sm`
 // breakpoint, so the desktop project can't cover them at all. Mobile is also
@@ -197,7 +197,9 @@ test.describe('mobile', () => {
     // — it used to be a row inside the kebab menu, and before that a quiet
     // "Suggest a correction" link in the footer. Only the opened listing has
     // one, so no scoping by name is needed here.
-    await page.getByRole('button', { name: 'Suggest an edit' }).click()
+    // On a category page it opens the "+ Add" box first (Oct 6); "Edit the
+    // details myself" there is the editor.
+    await openListingEditor(page)
 
     // The editor reads hours the way the listing does: today's line, tapped
     // to open the week (see ListingEditor), or "Add hours" for a listing

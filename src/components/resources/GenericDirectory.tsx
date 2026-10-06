@@ -152,12 +152,10 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // Which card currently has its listing open — the desktop column or the
   // mobile sheet. On a phone the floating Add button steps aside while it's
   // up: the listing's own row (Suggest an edit, its overflow) passes under
-  // it as the sheet scrolls. Add stays on the listing all the same (agreed
-  // Oct 5): that row has its own "+" (ListingEditBar, via TellAboutContext),
-  // opening the box about that listing. On desktop that row is at the foot
-  // of a long listing, out of sight (Oct 6: "not seeing the add button"),
-  // and nothing passes under the floating one, so it stays, about the
-  // listing open beside it.
+  // it as the sheet scrolls. On desktop nothing passes under it, so it stays
+  // (Oct 6: "not seeing the add button"), for adding anything; the listing
+  // itself is Suggest an edit's, which opens the box about it
+  // (ListingEditBar, via TellAboutContext).
   const [openDialogItemId, setOpenDialogItemId] = useState<string | null>(null)
   const [openNow, setOpenNow] = useState(arrivedViaBackForward ? false : (initialOpenNow ?? false))
   // Drives the "Open now" filter below. Without it the filter answers for the
@@ -477,9 +475,14 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // "+" opens "Saw something? Tell us" (agreed Oct 5); today's Add form is
   // one tap inside it, "Add a place".
   const [tellOpen, setTellOpen] = useState(false)
-  // The listing the box is about, when its own "+" opened it.
+  // The listing the box is about, when its Suggest an edit opened it, and
+  // what that Suggest an edit opened before: the listing's own editor, in
+  // place, for the box's "Edit the details myself" (Oct 6). Without one,
+  // the page's own edit (onEdit).
   const [openItem, setOpenItem] = useState<DirectoryResource | null>(null)
-  const tellAbout = (item: DirectoryResource) => {
+  const editYourself = useRef<(() => void) | null>(null)
+  const tellAbout = (item: DirectoryResource, edit?: () => void) => {
+    editYourself.current = edit ?? null
     setOpenItem(item)
     setTellOpen(true)
   }
@@ -1290,7 +1293,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   )
 
   return (
-    <TellAboutContext.Provider value={canAdd ? tellAbout : null}>
+    <TellAboutContext.Provider value={canAdd || canEdit ? tellAbout : null}>
     <div>
       {/* Phones: where the distances on each row are measured from, when
           the visitor hasn't set a location, with the way to set one. At the
@@ -1739,7 +1742,6 @@ export default function GenericDirectory({ category, items, anchorLabel, address
       {canAdd && (!openDialogItemId || (!isMobile && columnItem)) && (
         <button
           onClick={() => {
-            if (openDialogItemId && columnItem && !isMobile) return tellAbout(columnItem)
             setOpenItem(null)
             setTellOpen(true)
           }}
@@ -1770,7 +1772,8 @@ export default function GenericDirectory({ category, items, anchorLabel, address
             openItem
               ? () => {
                   setTellOpen(false)
-                  onEdit(openItem)
+                  if (editYourself.current) editYourself.current()
+                  else onEdit(openItem)
                 }
               : undefined
           }

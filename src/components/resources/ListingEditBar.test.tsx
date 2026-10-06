@@ -8,28 +8,34 @@ import { TellAboutContext } from './tellAbout'
 
 afterEach(() => cleanup())
 
-// Agreed Oct 5: Add stays on a listing, as a "+" in its own row beside
-// "Suggest an edit", where a category page offers the box. The Map
-// doesn't, as it has no Add.
+// Oct 6: one door. Where a category page offers the "+ Add" box, Suggest
+// an edit opens it about the listing (its "Edit the details myself" is the
+// editor); the "+" that sat beside it, doing the same, is gone. Where the
+// page has no box (the Map), Suggest an edit opens the editor itself.
 describe('ListingEditBar', () => {
   const item = makeListing({ name: 'Trader Joe’s' })
-  const bar = (tell: ((i: typeof item) => void) | null) =>
+  const bar = (tell: ((i: typeof item) => void) | null, onEdit = vi.fn()) => {
     renderWithProviders(
       <TellAboutContext.Provider value={tell}>
-        <ListingEditBar onEdit={() => {}} item={item} category={makeCategory()} path="/philly/grocery/tj" />
+        <ListingEditBar onEdit={onEdit} item={item} category={makeCategory()} path="/philly/grocery/tj" />
       </TellAboutContext.Provider>,
     )
+    return onEdit
+  }
 
-  it('has a “+” for the box about the listing, where the page offers one', () => {
+  it('opens the box about the listing from Suggest an edit, where the page offers one, with no “+” beside it', () => {
     const tell = vi.fn()
-    bar(tell)
-    fireEvent.click(screen.getByRole('button', { name: 'Add or update Trader Joe’s' }))
-    expect(tell).toHaveBeenCalledWith(item)
-    expect(screen.getByRole('button', { name: /Suggest an edit/ })).toBeInTheDocument()
+    const onEdit = bar(tell)
+    fireEvent.click(screen.getByRole('button', { name: /Suggest an edit/ }))
+    // With its own editor, for the box's "Edit the details myself".
+    expect(tell).toHaveBeenCalledWith(item, onEdit)
+    expect(onEdit).not.toHaveBeenCalled()
+    expect(screen.queryByRole('button', { name: /Add or update/ })).not.toBeInTheDocument()
   })
 
-  it('has none where it isn’t offered (the Map)', () => {
-    bar(null)
-    expect(screen.queryByRole('button', { name: /Add or update/ })).not.toBeInTheDocument()
+  it('opens the editor itself where there’s no box (the Map)', () => {
+    const onEdit = bar(null)
+    fireEvent.click(screen.getByRole('button', { name: /Suggest an edit/ }))
+    expect(onEdit).toHaveBeenCalled()
   })
 })
