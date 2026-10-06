@@ -166,7 +166,9 @@ export function ClosedGroupLine({
         strokeWidth="2.2"
         strokeLinecap="round"
         strokeLinejoin="round"
-        className={`h-[18px] w-[18px] shrink-0 transition-transform ${open ? 'rotate-90 text-primary' : 'text-slate-500'}`}
+        // Down while closed, up once open: it opens in place. A chevron
+        // pointing right goes to another page (“Minyanim by time”, Oct 6).
+        className={`h-[18px] w-[18px] shrink-0 transition-transform ${open ? '-rotate-90 text-primary' : 'rotate-90 text-slate-500'}`}
       >
         <path d="m9 18 6-6-6-6" />
       </svg>

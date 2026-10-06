@@ -1286,6 +1286,17 @@ describe('GenericDirectory — groups', () => {
       expect(screen.getByText('Mekor')).not.toBeVisible()
     })
 
+    // Oct 6: a group opens in place, so its chevron points down, then up;
+    // pointing right is for a row that goes to another page.
+    it('points its chevron down while closed and up once open', async () => {
+      const user = userEvent.setup()
+      renderWithProviders(<GenericDirectory category={shuls} items={shulItems} {...handlers} />)
+      const chevron = () => line(/^Reform · 1/).querySelector('svg')!
+      expect(chevron()).toHaveClass('rotate-90')
+      await user.click(line(/^Reform · 1/))
+      expect(chevron()).toHaveClass('-rotate-90')
+    })
+
     it('opens a group on a tap, and this browser remembers it next time', async () => {
       const user = userEvent.setup()
       const { unmount } = renderWithProviders(<GenericDirectory category={shuls} items={shulItems} {...handlers} />)
