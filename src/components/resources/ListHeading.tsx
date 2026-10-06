@@ -60,11 +60,11 @@ export default function ListHeading({ label, count, noun = !label, total, openNo
         <div className="ml-auto flex items-center gap-3.5">
           {onDaveningTimes && (
             <TextAction>
-              <button type="button" onClick={onDaveningTimes} aria-label="All davening times" className="flex cursor-pointer items-center gap-1 whitespace-nowrap">
+              <button type="button" onClick={onDaveningTimes} aria-label="Minyanim by time" className="flex cursor-pointer items-center gap-1 whitespace-nowrap">
                 <ClockIcon className="h-4 w-4" />
                 {/* The words once there's room; the clock alone on the
                     narrowest phones, so Filters never gets crowded out. */}
-                <span className="hidden min-[390px]:inline">All davening times</span>
+                <span className="hidden min-[390px]:inline">Minyanim by time</span>
               </button>
             </TextAction>
           )}

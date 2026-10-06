@@ -348,8 +348,8 @@ describe('nextMinyansAcross: the Synagogues page’s Next minyan card', () => {
       milesOf,
     )
     expect(lines).toEqual([
-      { shulId: 'near', shulName: 'near', label: 'Mincha', time: '6:20 PM' },
-      { shulId: 'mid', shulName: 'mid', label: 'Mincha', time: '6:25 PM' },
+      { shulId: 'near', shulName: 'near', label: 'Mincha', time: '6:20 PM', minutes: 18 * 60 + 20, tomorrow: false },
+      { shulId: 'mid', shulName: 'mid', label: 'Mincha', time: '6:25 PM', minutes: 18 * 60 + 25, tomorrow: false },
     ])
   })
 

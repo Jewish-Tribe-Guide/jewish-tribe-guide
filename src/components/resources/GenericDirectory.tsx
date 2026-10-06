@@ -21,7 +21,7 @@ import { usePersistedState } from '@/lib/usePersistedState'
 import { useSharedPreference } from '@/lib/useSharedPreference'
 import { GenericListingCard, type GenericListingCardHandle } from './GenericListingCard'
 import MinyanimView from './MinyanimView'
-import { PlusIcon } from '@/components/icons'
+import { ChevronRightIcon, PlusIcon } from '@/components/icons'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { useScrollShowHide, useSetScreenHeader } from '@/lib/headerVisibility'
 import { foundFor, searchAsk } from '@/lib/askSearch'
@@ -1410,33 +1410,26 @@ export default function GenericDirectory({ category, items, anchorLabel, address
         {/* The page's one search box, limited to this category, with
             example searches under it and, once something is typed, the
             sentence answering it (see CategoryAsk). */}
-        {/* Beside it from lg up, Synagogues' Next minyan card; under the
-            example searches on a phone. Gone once anything is typed: then
-            the search's own answer says what's next (see NextMinyanCard). */}
-        {hasMinyanim && (
-          <div className="flex w-max rounded-full border border-slate-300 bg-white p-0.5" role="radiogroup" aria-label="Show" data-testid="shuls-minyanim">
-            {(
-              [
-                [false, category.pluralLabel],
-                [true, 'Minyanim'],
-              ] as const
-            ).map(([on, label]) => (
-              <button
-                key={label}
-                type="button"
-                role="radio"
-                aria-checked={minyanimViewOn === on}
-                onClick={() => {
-                  // Asking for the other tab: the listing open over the
-                  // list closes, or it stays in the way (found Oct 2).
-                  if (columnItem) closeOpenListing(columnItem.id)
-                  setMinyanimViewOn(on)
-                }}
-                className={`cursor-pointer rounded-full px-3.5 py-1.5 text-[14px] font-bold transition-colors ${minyanimViewOn === on ? 'bg-primary text-white' : 'text-slate-700 hover:bg-slate-100'}`}
-              >
-                {label}
-              </button>
-            ))}
+        {/* Under them, Synagogues' "Minyanim by time" row. Gone once
+            anything is typed: then the search's own answer says what's next
+            (see NextMinyanCard). */}
+        {/* The Minyanim view's way back (Oct 6): it's reached from the
+            "Minyanim by time" row, no longer a Synagogues / Minyanim toggle,
+            so it says where back goes and what it is. */}
+        {minyanimView && (
+          <div data-testid="minyanim-view-head">
+            <button
+              type="button"
+              onClick={() => {
+                if (columnItem) closeOpenListing(columnItem.id)
+                setMinyanimViewOn(false)
+              }}
+              className="flex cursor-pointer items-center gap-1 text-[15px] font-bold text-primary hover:underline"
+            >
+              <ChevronRightIcon className="h-4 w-4 rotate-180" />
+              {category.pluralLabel}
+            </button>
+            <h2 className="mt-1 text-2xl font-extrabold text-ink">Minyanim by time</h2>
           </div>
         )}
         <div className={showMinyanCard ? 'space-y-3' : undefined}>
@@ -1453,18 +1446,12 @@ export default function GenericDirectory({ category, items, anchorLabel, address
               />
             </div>
           )}
-          {/* The Next minyan: a card under the example searches on a phone;
-              on desktop one line under them, full width (the user's note 5:
-              beside the box, the card left a gap under it). */}
+          {/* "Minyanim by time", with the next minyan under it: the way in
+              to every minyan, on every screen size (Oct 6). */}
           {showMinyanCard && (
-            <>
-              <div className="lg:hidden">
-                <NextMinyanCard items={filtered} onOpenListing={openListing} onDaveningTimes={() => setMinyanimViewOn(true)} />
-              </div>
-              <div className="hidden lg:block">
-                <NextMinyanCard variant="line" items={filtered} onOpenListing={openListing} onDaveningTimes={() => setMinyanimViewOn(true)} />
-              </div>
-            </>
+            <div className={hasMapColumn ? 'lg:max-w-[720px]' : undefined}>
+              <NextMinyanCard items={filtered} onDaveningTimes={() => setMinyanimViewOn(true)} />
+            </div>
           )}
         </div>
         {!hasMapColumn && !columnItem && !minyanimView && listHeading}

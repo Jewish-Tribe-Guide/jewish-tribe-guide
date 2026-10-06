@@ -83,6 +83,30 @@ describe('categoryExamples', () => {
 })
 
 describe('categoryExamples: which kinds', () => {
+  // Oct 6: Synagogues grouped by denomination offered “orthodox (ashkenazi)”
+  // under its search. A grouped-by pick-list’s values are groups already,
+  // and one offered alone reads as favouring it (agreed Sep 28).
+  it('never offers the values of the pick-list the page is grouped by', () => {
+    const shuls = makeCategory({
+      id: 'synagogue',
+      label: 'Synagogue',
+      pluralLabel: 'Synagogues',
+      groupBy: { kind: 'field', key: 'denomination' },
+      detailFields: [
+        { key: 'denomination', label: 'Denomination', type: 'select', filterable: true, options: [] },
+        { key: 'minyanim', label: 'Minyanim', type: 'minyanim' },
+      ],
+    })
+    const items = [
+      makeListing({ id: 'a', denomination: 'Orthodox (Ashkenazi)' }),
+      makeListing({ id: 'b', denomination: 'Orthodox (Ashkenazi)' }),
+      makeListing({ id: 'c', denomination: 'Conservative' }),
+      makeListing({ id: 'd', denomination: 'Conservative' }),
+    ]
+    expect(categoryExamples(shuls, items, [shuls])).not.toContain('orthodox (ashkenazi)')
+    expect(categoryExamples({ ...shuls, groupBy: undefined }, items, [shuls])).toContain('orthodox (ashkenazi)')
+  })
+
   it('uses the pick-list with the fewest kinds: meat, dairy or parve before restaurant, bakery or caterer', () => {
     const cat = makeCategory({
       id: 'restaurant',

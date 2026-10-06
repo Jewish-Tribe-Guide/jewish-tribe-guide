@@ -1,6 +1,7 @@
 import { conceptCategories, type Concept } from './ask'
 import { selectValues, type CategoryConfig } from './categories'
 import { haversineMiles } from './geo'
+import { parseGroupBy } from './listGroups'
 import type { Place } from './places'
 import type { DirectoryResource } from '@/types'
 
@@ -37,8 +38,13 @@ export function categoryExamples(
   // pick-lists, the one with the fewest kinds is the most basic way to tell
   // its places apart (meat, dairy or parve, before restaurant, bakery or
   // caterer, before a list of hechshers).
+  // Not the pick-list the page is grouped by: each of its values is a group
+  // of its own already, and offering one alone reads as favouring it
+  // ("orthodox (ashkenazi)" on Synagogues; agreed Sep 28, again Oct 6).
+  const grouped = parseGroupBy(category.groupBy)
+  const groupKey = grouped?.kind === 'field' ? grouped.key : null
   const kinds = category.detailFields
-    .filter((f) => f.filterable && f.type === 'select')
+    .filter((f) => f.filterable && f.type === 'select' && f.key !== groupKey)
     .map((f) => common(items.flatMap((i) => [...new Set(selectValues(i[f.key]).map((v) => v.trim()))])))
     // One value, or nearly every place the same, tells nobody anything.
     .filter((values) => values.length >= 2)

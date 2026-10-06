@@ -765,14 +765,14 @@ describe('GenericDirectory', () => {
   const shulItem = () =>
     ({ ...makeListing(), minyanim: [{ id: 'm1', tefillah: 'shacharis', days: ['sun', 'mon', 'tue', 'wed', 'thu', 'fri'], time: '7:00 AM' }] }) as unknown as DirectoryResource
 
-  it('opens the Minyanim view when "All davening times" is clicked, in place of the list', async () => {
+  it('opens the Minyanim view from “Minyanim by time”, in place of the list, with its way back', async () => {
     const user = userEvent.setup()
     renderWithProviders(<GenericDirectory category={shulCategory()} items={[shulItem()]} {...handlers} />)
 
-    await user.click(screen.getAllByRole('button', { name: /All davening times/ })[0])
+    await user.click(screen.getAllByRole('button', { name: /Minyanim by time/ })[0])
 
     expect(await screen.findByTestId('minyanim-view')).toBeInTheDocument()
-    expect(screen.getByRole('radio', { name: 'Minyanim' })).toHaveAttribute('aria-checked', 'true')
+    expect(within(screen.getByTestId('minyanim-view-head')).getByRole('heading', { name: 'Minyanim by time' })).toBeInTheDocument()
   })
 
   it('opens on the Minyanim view on arrival when openMinyanimView is set (?davening=1)', async () => {
@@ -785,7 +785,9 @@ describe('GenericDirectory', () => {
     renderWithProviders(<GenericDirectory category={shulCategory()} items={[shulItem()]} {...handlers} />)
 
     expect(screen.queryByTestId('minyanim-view')).not.toBeInTheDocument()
-    expect(screen.getAllByRole('radio')[0]).toHaveAttribute('aria-checked', 'true')
+    // No Synagogues / Minyanim toggle any more (Oct 6): one row is the way in.
+    expect(screen.queryByRole('radio')).not.toBeInTheDocument()
+    expect(screen.getByTestId('next-minyan')).toHaveAccessibleName(/^Minyanim by time/)
   })
 
   // `?day=` from the home page's link: that day's tab, when it's one of
@@ -815,7 +817,7 @@ describe('GenericDirectory', () => {
     )
     expect(onParamsChange).not.toHaveBeenCalled()
 
-    await user.click(screen.getAllByRole('radio')[0])
+    await user.click(within(screen.getByTestId('minyanim-view-head')).getByRole('button'))
 
     expect(onParamsChange).toHaveBeenCalledWith({ davening: null, day: null }, { replace: true })
   })
@@ -832,7 +834,7 @@ describe('GenericDirectory', () => {
       <GenericDirectory category={category} items={[item]} {...handlers} onParamsChange={onParamsChange} />,
     )
 
-    await user.click(screen.getAllByRole('button', { name: /All davening times/ })[0])
+    await user.click(screen.getAllByRole('button', { name: /Minyanim by time/ })[0])
 
     expect(onParamsChange).toHaveBeenCalledWith({ davening: '1' }, { replace: true })
   })
@@ -1878,7 +1880,7 @@ describe('GenericDirectory — each shul’s next minyan', () => {
     })
 
     expect(screen.getByText('next minyan at Alpha Shul: Mincha 6:05 PM')).toBeInTheDocument()
-    expect(within(screen.getByTestId('next-minyan')).getAllByRole('listitem')[0].textContent).toContain('6:05 PMMincha · Alpha Shul')
+    expect(screen.getByTestId('next-minyan')).toHaveTextContent('Next 6:05 PM · Alpha Shul')
   })
 
   it('says a shul with no times at all has none listed', () => {
@@ -1903,26 +1905,26 @@ describe('GenericDirectory — each shul’s next minyan', () => {
       { ...shul('near', 'Mekor Habracha', '6:20pm'), milesFromCenter: 0.21 },
       { ...shul('mid', 'Lower Merion Synagogue', '6:25pm'), milesFromCenter: 5.1, confirmedAt: '2026-09-01' },
     ]
-    const card = () => within(screen.getByTestId('next-minyan'))
+    const row = () => screen.getByTestId('next-minyan')
 
-    it('names the next two, the nearer first on the same minute, with distance and whether anyone confirmed the times', () => {
+    // Oct 6: one row, “Minyanim by time”, the soonest under it; on the same
+    // minute the nearer shul.
+    it('says the soonest minyan, the nearer shul on the same minute, with its distance', () => {
       fivePm()
       renderWithProviders(<GenericDirectory category={shulCategory} items={shuls()} {...handlers} />, { content: { categories: [shulCategory] } })
 
-      expect(card().getByRole('heading', { name: 'Next minyan' })).toBeInTheDocument()
-      const lines = card().getAllByRole('listitem').map((li) => li.textContent)
-      expect(lines).toEqual(['6:20 PMMincha · Mekor Habracha0.2 mi · times not confirmed', '6:20 PMMincha · Aleph Shul8.2 mi'])
+      expect(row()).toHaveTextContent('Minyanim by timeNext 6:20 PM · Mekor Habracha, 0.2 mi')
     })
 
-    it('carries All davening times, which leaves the list heading while it does, and opens every minyan by time', async () => {
+    it('is one button that opens every minyan by time, and the list heading doesn’t repeat it', async () => {
       fivePm()
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
       renderWithProviders(<GenericDirectory category={shulCategory} items={shuls()} {...handlers} />, { content: { categories: [shulCategory] } })
 
-      expect(within(screen.getByTestId('list-heading')).queryByRole('button', { name: /All davening times/ })).not.toBeInTheDocument()
-      await user.click(card().getByRole('button', { name: /All davening times/ }))
+      expect(within(screen.getByTestId('list-heading')).queryByRole('button', { name: /Minyanim by time/ })).not.toBeInTheDocument()
+      await user.click(row())
       expect(screen.getByTestId('minyanim-view')).toBeInTheDocument()
-      // The card goes: the view's own answer says what's next.
+      // The row goes: the view's own answer says what's next.
       expect(screen.queryByTestId('next-minyan')).not.toBeInTheDocument()
       expect(within(screen.getByTestId('minyanim-rows')).getAllByRole('link').map((a) => a.textContent)).toEqual([
         '6:20 PMMekor HabrachaMincha · 0.2 mi',
@@ -1931,14 +1933,14 @@ describe('GenericDirectory — each shul’s next minyan', () => {
       ])
     })
 
-    it('goes once anything is typed, and All davening times goes back to the heading', async () => {
+    it('goes once anything is typed, and “Minyanim by time” goes to the list heading', async () => {
       fivePm()
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
       renderWithProviders(<GenericDirectory category={shulCategory} items={shuls()} {...handlers} />, { content: { categories: [shulCategory] } })
 
       await user.type(screen.getByRole('searchbox'), 'mincha')
       expect(screen.queryByTestId('next-minyan')).not.toBeInTheDocument()
-      expect(within(screen.getByTestId('list-heading')).getByRole('button', { name: /All davening times/ })).toBeInTheDocument()
+      expect(within(screen.getByTestId('list-heading')).getByRole('button', { name: /Minyanim by time/ })).toBeInTheDocument()
     })
 
     it('follows the list’s filters', () => {
@@ -1955,41 +1957,31 @@ describe('GenericDirectory — each shul’s next minyan', () => {
         content: { categories: [withEruv] },
       })
 
-      expect(card().getAllByRole('listitem').map((li) => li.textContent)).toEqual(['6:25 PMMincha · Lower Merion Synagogue5.1 mi'])
+      expect(row()).toHaveTextContent('Next 6:25 PM · Lower Merion Synagogue, 5.1 mi')
     })
 
-    it('opens a shul from its line', async () => {
+    it('names the nearest of the minyanim within 15 minutes of the soonest, not one a minute sooner 8 miles out', () => {
       fivePm()
-      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
-      renderWithProviders(<GenericDirectory category={shulCategory} items={shuls()} {...handlers} />, {
-        content: { categories: [shulCategory] },
-      })
+      const items = [
+        { ...shul('far', 'Congregation Sons of Israel', '6:19pm'), milesFromCenter: 8.2 },
+        { ...shul('near', 'Mekor Habracha', '6:20pm'), milesFromCenter: 0.2 },
+        { ...shul('later', 'Closest Shul', '6:40pm'), milesFromCenter: 0.1 },
+      ]
+      renderWithProviders(<GenericDirectory category={shulCategory} items={items} {...handlers} />, { content: { categories: [shulCategory] } })
 
-      await user.click(card().getByRole('button', { name: /Mekor Habracha/ }))
-      expect(screen.getByText('Expanded Mekor Habracha')).toBeInTheDocument()
+      expect(row()).toHaveTextContent('Next 6:20 PM · Mekor Habracha, 0.2 mi')
     })
 
-    it('opens the closed group the shul is in', async () => {
-      fivePm()
-      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
-      const byDenomination = makeCategory({
-        id: 'synagogue',
-        groupBy: { kind: 'field', key: 'denomination' },
-        detailFields: [
-          { key: 'minyanim', label: 'Minyanim', type: 'minyanim' },
-          { key: 'denomination', label: 'Denomination', type: 'select', filterable: true, options: [] },
-        ],
-      })
-      const items = shuls().map((s) => ({ ...s, denomination: s.id === 'near' ? 'Orthodox' : 'Conservative' }))
-      renderWithProviders(<GenericDirectory category={byDenomination} items={items} {...handlers} />, { content: { categories: [byDenomination] } })
+    it('on a Friday afternoon, says Friday night', () => {
+      vi.useFakeTimers({ toFake: ['Date'] })
+      vi.setSystemTime(new Date('2026-10-09T13:30:00-04:00')) // Fri Oct 9
+      const friday = [{ ...makeListing({ id: 'sh', name: 'Society Hill Synagogue', category: 'synagogue', minyanim: [{ id: 'k', tefillah: 'kabbalas_shabbos', days: ['fri'], time: '5:30pm' }] }), milesFromCenter: 1 }]
+      renderWithProviders(<GenericDirectory category={shulCategory} items={friday} {...handlers} />, { content: { categories: [shulCategory] } })
 
-      const orthodox = screen.getByRole('button', { name: /^Orthodox/ })
-      expect(orthodox).toHaveAttribute('aria-expanded', 'false')
-      await user.click(card().getByRole('button', { name: /Mekor Habracha/ }))
-      expect(orthodox).toHaveAttribute('aria-expanded', 'true')
+      expect(row()).toHaveTextContent('Friday night 5:30 PM · Society Hill Synagogue, 1 mi')
     })
 
-    it('goes when no shul the filters leave keeps times, and All davening times goes back to the heading', () => {
+    it('goes when no shul the filters leave keeps times, and “Minyanim by time” goes to the list heading', () => {
       fivePm()
       const withEruv = makeCategory({
         id: 'synagogue',
@@ -2004,7 +1996,7 @@ describe('GenericDirectory — each shul’s next minyan', () => {
       })
 
       expect(screen.queryByTestId('next-minyan')).not.toBeInTheDocument()
-      expect(within(screen.getByTestId('list-heading')).getByRole('button', { name: /All davening times/ })).toBeInTheDocument()
+      expect(within(screen.getByTestId('list-heading')).getByRole('button', { name: /Minyanim by time/ })).toBeInTheDocument()
     })
 
     it('isn’t on a page without minyanim', () => {
@@ -2178,27 +2170,14 @@ describe('GenericDirectory — the Minyanim tab', () => {
     expect(screen.queryByText('shacharis tomorrow')).not.toBeInTheDocument()
   })
 
-  it('switching tabs from an open synagogue closes it, rather than leaving it stuck', async () => {
+  it('“‹ Synagogues” goes back from the Minyanim view to the list of shuls', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
     const onParamsChange = vi.fn()
-    renderWithProviders(<GenericDirectory category={shulCat} items={[mekor, aleph]} {...handlers} onParamsChange={onParamsChange} />, { content: { categories: [shulCat] } })
-    await user.click(screen.getByRole('button', { name: 'Expand Mekor Habracha' }))
-    expect(screen.getByTestId('listing-column')).toBeInTheDocument()
-    await user.click(screen.getByRole('radio', { name: 'Minyanim' }))
-    expect(screen.queryByTestId('listing-column')).not.toBeInTheDocument()
+    renderWithProviders(<GenericDirectory category={shulCat} items={[mekor, aleph]} openMinyanimView {...handlers} onParamsChange={onParamsChange} />, { content: { categories: [shulCat] } })
     expect(screen.getByTestId('minyanim-view')).toBeVisible()
-    expect(onParamsChange).toHaveBeenCalledWith({ item: null, match: null }, { replace: true })
-    await user.click(screen.getByRole('radio', { name: 'Synagogues' }))
+    await user.click(within(screen.getByTestId('minyanim-view-head')).getByRole('button', { name: /Synagogues/ }))
+    expect(screen.queryByTestId('minyanim-view')).not.toBeInTheDocument()
     expect(screen.getByText('Aleph Shul')).toBeVisible()
-  })
-
-  it('desktop’s Next minyan is one line: the next, and the nearest when that’s another shul', () => {
-    const near = { ...mekor, milesFromCenter: 0.2 }
-    const away = makeListing({ id: 'away', name: 'Chabad of the Main Line', category: 'synagogue', milesFromCenter: 6.1, minyanim: [{ id: 'c', tefillah: 'mincha', days: ['mon'], time: '1:30pm' }] })
-    renderWithProviders(<GenericDirectory category={shulCat} items={[near, away]} {...handlers} />, { content: { categories: [shulCat] } })
-    expect(screen.getByTestId('next-minyan-line')).toHaveTextContent(
-      'Next minyanMincha 1:30 PM · Chabad of the Main Line, 6.1 mi · nearest: Maariv 7:45 PM, Mekor Habracha, 0.2 miAll by time ›',
-    )
   })
 })
 

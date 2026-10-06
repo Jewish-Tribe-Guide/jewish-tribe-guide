@@ -340,6 +340,9 @@ export type NextMinyanLine = {
   label: string
   /** "6:20 PM", in the rows' one clock style. */
   time: string
+  /** Minutes from midnight, for saying "Friday night". */
+  minutes: number
+  tomorrow: boolean
 }
 
 /**
@@ -379,7 +382,7 @@ export function nextMinyansAcross(
       shown.add(c.shulId!)
       const together = [...new Set(sorted.filter((o) => o.shulId === c.shulId && o.minutes === c.minutes).map((o) => o.tefillah))]
       const label = together.map((t) => TEFILLAH_LABELS[t]).join(' & ')
-      out.push({ shulId: c.shulId!, shulName: c.shulName, label: isTomorrow ? `${label} tomorrow` : label, time: clockTime(c.minutes) })
+      out.push({ shulId: c.shulId!, shulName: c.shulName, label: isTomorrow ? `${label} tomorrow` : label, time: clockTime(c.minutes), minutes: c.minutes, tomorrow: isTomorrow })
     }
   }
   take(collectCandidates(shuls, opts.today, opts.season, opts.anchors).filter((c) => c.minutes >= opts.nowMinutes), false)
