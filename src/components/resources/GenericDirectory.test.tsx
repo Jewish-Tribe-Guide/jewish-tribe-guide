@@ -12,6 +12,7 @@ import type { DirectoryResource } from '@/types'
 import { TellAboutContext } from './tellAbout'
 import { didArriveViaBackForward } from '@/lib/backForwardNavigation'
 import { ForcedViewport } from '@/lib/useIsMobile'
+import { ScreenHeaderProvider, useScreenHeader } from '@/lib/headerVisibility'
 import { useNextMinyan as useNextMinyanInColumn } from './nextMinyans'
 import GenericDirectory from './GenericDirectory'
 
@@ -772,7 +773,7 @@ describe('GenericDirectory', () => {
     await user.click(screen.getAllByRole('button', { name: /Minyanim by time/ })[0])
 
     expect(await screen.findByTestId('minyanim-view')).toBeInTheDocument()
-    expect(within(screen.getByTestId('minyanim-view-head')).getByRole('heading', { name: 'Minyanim by time' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 1, name: 'Minyanim by time' })).toBeInTheDocument()
   })
 
   it('opens on the Minyanim view on arrival when openMinyanimView is set (?davening=1)', async () => {
@@ -817,7 +818,7 @@ describe('GenericDirectory', () => {
     )
     expect(onParamsChange).not.toHaveBeenCalled()
 
-    await user.click(within(screen.getByTestId('minyanim-view-head')).getByRole('button'))
+    await user.click(within(screen.getByTestId('directory-up')).getByRole('button'))
 
     expect(onParamsChange).toHaveBeenCalledWith({ davening: null, day: null }, { replace: true })
   })
@@ -836,7 +837,8 @@ describe('GenericDirectory', () => {
 
     await user.click(screen.getAllByRole('button', { name: /Minyanim by time/ })[0])
 
-    expect(onParamsChange).toHaveBeenCalledWith({ davening: '1' }, { replace: true })
+    // A step Back undoes (Oct 6), not a replaced address.
+    expect(onParamsChange).toHaveBeenCalledWith({ davening: '1' }, { step: 'minyanim' })
   })
 
   it('never shows its own Map link, even when a Map pseudo-category exists', () => {
@@ -1032,7 +1034,9 @@ describe('GenericDirectory — syncing ?item with the expanded listing', () => {
 
     await user.click(screen.getByRole('button', { name: 'Expand Kosher Mart' }))
 
-    expect(onParamsChange).toHaveBeenCalledWith({ item: 'a' }, { replace: true })
+    // A step on a computer, where it has the page (Oct 6); see the desktop
+    // describe below.
+    expect(onParamsChange).toHaveBeenCalledWith({ item: 'a' }, { step: 'listing' })
   })
 
   it('clears ?item when the card is collapsed', async () => {
@@ -2056,11 +2060,62 @@ describe('GenericDirectory — a listing opened on desktop', () => {
     await user.click(screen.getByRole('button', { name: 'Next listing' }))
     expect(screen.getByText('Column: Gamma Deli, 3 of 3, map beside')).toBeInTheDocument()
 
-    await user.click(screen.getByRole('button', { name: 'Back to Food' }))
+    await user.click(screen.getByRole('button', { name: 'Food' }))
     expect(screen.queryByTestId('listing-column')).not.toBeInTheDocument()
     expect(screen.getByText('Alpha Grill')).toBeVisible()
     expect(screen.getByText('map on: nothing')).toBeInTheDocument()
     expect(onParamsChange).toHaveBeenLastCalledWith({ item: null, match: null }, { replace: true })
+  })
+
+  // Oct 6, B: the list's own top (the title, the search, its examples)
+  // stayed above the listing, and pushed it halfway down the screen.
+  it('has the top of the page: no search or examples above it, just its way back; they return with the list', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(<GenericDirectory category={food} items={rows} {...handlers} />)
+    expect(screen.getByRole('searchbox')).toBeVisible()
+    await user.click(screen.getByRole('button', { name: 'Expand Beta Cafe' }))
+
+    expect(screen.queryByRole('searchbox')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('category-examples')).not.toBeInTheDocument()
+    // The title stays for a screen reader only; the way back says where.
+    expect(screen.getByRole('heading', { level: 1, name: 'Food' })).toHaveAttribute('class', 'sr-only')
+    expect(screen.queryByRole('button', { name: /^Back to/ })).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Food' }))
+    expect(screen.getByRole('searchbox')).toBeVisible()
+    expect(screen.getByRole('heading', { level: 1, name: 'Food' })).toHaveClass('desktop:not-sr-only')
+  })
+
+  // Oct 6: it has the page, so it's a step the browser's Back undoes. It
+  // replaced the address, so Back left the category. Stepping ‹ › replaces,
+  // so Back doesn't walk back through every listing read.
+  it('opening one is a step Back undoes; stepping to the next isn’t; its own back takes the step', async () => {
+    const user = userEvent.setup()
+    const onParamsChange = vi.fn()
+    const back = vi.spyOn(window.history, 'back').mockImplementation(() => {})
+    try {
+      renderWithProviders(<GenericDirectory category={food} items={rows} {...handlers} onParamsChange={onParamsChange} />)
+      await user.click(screen.getByRole('button', { name: 'Expand Beta Cafe' }))
+      expect(onParamsChange).toHaveBeenLastCalledWith({ item: 'b' }, { step: 'listing' })
+      await user.click(screen.getByRole('button', { name: 'Next listing' }))
+      expect(onParamsChange).toHaveBeenLastCalledWith({ item: 'c' }, { replace: true })
+
+      // The browser's Back: the address no longer names a listing.
+      act(() => {
+        window.dispatchEvent(new PopStateEvent('popstate'))
+      })
+      expect(screen.queryByTestId('listing-column')).not.toBeInTheDocument()
+      expect(screen.getByText('Alpha Grill')).toBeVisible()
+
+      // Its own back, when the step is there to take, takes it.
+      await user.click(screen.getByRole('button', { name: 'Expand Alpha Grill' }))
+      window.history.replaceState({ step: 'listing' }, '')
+      await user.click(screen.getByRole('button', { name: 'Food' }))
+      expect(back).toHaveBeenCalledTimes(1)
+    } finally {
+      back.mockRestore()
+      window.history.replaceState(null, '')
+    }
   })
 
   it('a pin on the map opens its listing in the column', async () => {
@@ -2140,7 +2195,7 @@ describe('GenericDirectory — a listing’s own link, on a phone', () => {
     const user = userEvent.setup()
     window.history.replaceState(null, '', '/test-community/restaurant/beta-cafe-b')
     phone(<GenericDirectory category={food} items={rows} {...handlers} reopenItemId="b" linkedItemId="b" />)
-    await user.click(screen.getByRole('button', { name: 'Back to Food' }))
+    await user.click(screen.getByRole('button', { name: 'Food' }))
 
     expect(screen.queryByTestId('listing-column')).not.toBeInTheDocument()
     expect(screen.getByText('Alpha Grill')).toBeVisible()
@@ -2186,9 +2241,74 @@ describe('GenericDirectory — the Minyanim tab', () => {
     const onParamsChange = vi.fn()
     renderWithProviders(<GenericDirectory category={shulCat} items={[mekor, aleph]} openMinyanimView {...handlers} onParamsChange={onParamsChange} />, { content: { categories: [shulCat] } })
     expect(screen.getByTestId('minyanim-view')).toBeVisible()
-    await user.click(within(screen.getByTestId('minyanim-view-head')).getByRole('button', { name: /Synagogues/ }))
+    await user.click(within(screen.getByTestId('directory-up')).getByRole('button', { name: 'Synagogues' }))
     expect(screen.queryByTestId('minyanim-view')).not.toBeInTheDocument()
     expect(screen.getByText('Aleph Shul')).toBeVisible()
+  })
+
+  // Oct 6: the view said "Synagogues" three times on a computer (the page
+  // title, "‹ Synagogues", then a bigger "Minyanim by time"), and on a phone
+  // had a second back under the header's.
+  it('on a computer, Synagogues once: a small “‹ Synagogues” over the title, which is the view’s', () => {
+    renderWithProviders(<GenericDirectory category={shulCat} items={[mekor, aleph]} openMinyanimView {...handlers} />, { content: { categories: [shulCat] } })
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Minyanim by time')
+    expect(within(screen.getByTestId('directory-up')).getByRole('button')).toHaveTextContent('Synagogues')
+    expect(screen.getAllByRole('button', { name: /Synagogues/ })).toHaveLength(1)
+    expect(screen.queryAllByRole('heading', { name: 'Minyanim by time' })).toHaveLength(1)
+  })
+
+  function HeaderProbe() {
+    const header = useScreenHeader()
+    return header && <button data-testid="header-back" onClick={header.onBack}>‹ {header.title}</button>
+  }
+
+  it('on a phone, the header names it and its ‹ goes to Synagogues; no second back under it', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    renderWithProviders(
+      <ScreenHeaderProvider>
+        <ForcedViewport isMobile>
+          <GenericDirectory category={shulCat} items={[mekor, aleph]} {...handlers} />
+        </ForcedViewport>
+        <HeaderProbe />
+      </ScreenHeaderProvider>,
+      { content: { categories: [shulCat] } },
+    )
+    expect(screen.getByTestId('header-back')).toHaveTextContent('‹ Synagogues')
+    await user.click(screen.getByTestId('next-minyan'))
+    expect(screen.getByTestId('header-back')).toHaveTextContent('‹ Minyanim by time')
+    expect(screen.queryByRole('button', { name: /Synagogues/ })).not.toBeInTheDocument()
+
+    await user.click(screen.getByTestId('header-back'))
+    expect(screen.queryByTestId('minyanim-view')).not.toBeInTheDocument()
+    expect(screen.getByTestId('header-back')).toHaveTextContent('‹ Synagogues')
+  })
+
+  // It replaced the address, so Back (a phone's swipe) left Synagogues.
+  it('opened from the page, it’s a step Back undoes, and its own back takes that step', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    const onParamsChange = vi.fn()
+    const back = vi.spyOn(window.history, 'back').mockImplementation(() => {})
+    try {
+      renderWithProviders(<GenericDirectory category={shulCat} items={[mekor, aleph]} {...handlers} onParamsChange={onParamsChange} />, { content: { categories: [shulCat] } })
+      await user.click(screen.getByTestId('next-minyan'))
+      expect(onParamsChange).toHaveBeenLastCalledWith({ davening: '1' }, { step: 'minyanim' })
+
+      // The browser's Back: the address no longer has ?davening.
+      act(() => {
+        window.dispatchEvent(new PopStateEvent('popstate'))
+      })
+      expect(screen.queryByTestId('minyanim-view')).not.toBeInTheDocument()
+      expect(screen.getByText('Aleph Shul')).toBeVisible()
+
+      // Its own back, when the step is there to take, takes it.
+      await user.click(screen.getByTestId('next-minyan'))
+      window.history.replaceState({ step: 'minyanim' }, '')
+      await user.click(within(screen.getByTestId('directory-up')).getByRole('button'))
+      expect(back).toHaveBeenCalledTimes(1)
+    } finally {
+      back.mockRestore()
+      window.history.replaceState(null, '')
+    }
   })
 })
 

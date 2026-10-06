@@ -182,9 +182,34 @@ test.describe('listing detail — desktop', () => {
     await expect(column.getByRole('heading', { level: 2 }).first()).toBeInViewport()
     expect((await column.boundingBox())!.y, 'the listing starts below the site header').toBeGreaterThanOrEqual(headerBottom.y + headerBottom.height - 1)
 
-    await column.getByRole('button', { name: /^Back to / }).click()
+    await column.getByTestId('listing-column-bar').getByRole('button', { name: category.pluralLabel, exact: true }).click()
     await expect(column).toHaveCount(0)
     await expect(row).toBeInViewport()
+  })
+
+  // Oct 6, B: the listing has the top of the page. The list's search and
+  // examples stayed above it and pushed it halfway down the screen. And the
+  // browser's own Back closes it, as the column's "‹ {category}" does.
+  test('has the top of the page, and the browser’s Back closes it', async ({ page, request }) => {
+    const community = await defaultCommunity(page)
+    const { category } = await categoryWithListings(request, community)
+
+    await page.goto(`/${community}/${category.id}`)
+    await dismissLocationPrompt(page)
+    const search = page.getByRole('searchbox', { name: `Search ${category.pluralLabel}` })
+    await expect(search).toBeVisible()
+
+    await page.getByRole('button', { name: /^Show details for / }).first().click()
+    const column = page.getByTestId('listing-column')
+    await expect(column).toBeVisible()
+    await expect(search).toBeHidden()
+    const viewport = page.viewportSize()!
+    expect((await column.boundingBox())!.y, 'the listing starts in the top half of the screen').toBeLessThan(viewport.height / 2)
+
+    await page.goBack()
+    await expect(column).toHaveCount(0)
+    await expect(search).toBeVisible()
+    expect(new URL(page.url()).pathname).toBe(`/${community}/${category.id}`)
   })
 
   // ← → and the column's own ‹ › step through the list as it's shown, and

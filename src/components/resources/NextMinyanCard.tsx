@@ -73,12 +73,14 @@ export default function NextMinyanCard({ items, onDaveningTimes }: Props) {
   const friday = !!schedule?.todayDayKeys.includes('fri')
   const miles = next ? milesOf(next.shulId) : null
 
+  // Ringed in green (Oct 6): the one row on the page that goes somewhere,
+  // so it doesn't read as one more of the denomination dropdowns under it.
   return (
     <button
       type="button"
       onClick={onDaveningTimes}
       data-testid="next-minyan"
-      className="flex w-full cursor-pointer items-center gap-3 rounded-2xl border border-slate-200 bg-white px-3.5 py-3 text-left transition-colors hover:bg-slate-50"
+      className="flex w-full cursor-pointer items-center gap-3 rounded-2xl border-[1.5px] border-emerald-600 bg-white px-3.5 py-3 text-left transition-colors hover:bg-emerald-50"
     >
       <span aria-hidden="true" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-700">
         <ClockIcon className="h-5 w-5" />
@@ -98,7 +100,7 @@ export default function NextMinyanCard({ items, onDaveningTimes }: Props) {
           )}
         </span>
       </span>
-      <ChevronRightIcon className="h-5 w-5 shrink-0 text-slate-400" />
+      <ChevronRightIcon className="h-5 w-5 shrink-0 text-emerald-700" />
     </button>
   )
 }

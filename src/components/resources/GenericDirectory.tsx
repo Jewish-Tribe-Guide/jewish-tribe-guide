@@ -1,6 +1,6 @@
 'use client'
 
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState, ViewTransition, type ReactNode } from 'react'
+import { Fragment, useCallback, useEffect, useEffectEvent, useMemo, useRef, useState, ViewTransition, type ReactNode } from 'react'
 import type { DirectoryResource } from '@/types'
 import { resolveCapabilities, selectValues, bandImageFor, type CategoryConfig } from '@/lib/categories'
 import { hoursOpenNow, businessClosure } from '@/lib/hours'
@@ -21,7 +21,7 @@ import { usePersistedState } from '@/lib/usePersistedState'
 import { useSharedPreference } from '@/lib/useSharedPreference'
 import { GenericListingCard, type GenericListingCardHandle } from './GenericListingCard'
 import MinyanimView from './MinyanimView'
-import { ChevronRightIcon, PlusIcon } from '@/components/icons'
+import { PlusIcon } from '@/components/icons'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { useScrollShowHide, useSetScreenHeader } from '@/lib/headerVisibility'
 import { foundFor, searchAsk } from '@/lib/askSearch'
@@ -54,6 +54,14 @@ import { CategoryGlyph } from '@/lib/categoryIcons'
 import { SwipeRowGroup } from '@/components/SwipeRow'
 import dynamic from 'next/dynamic'
 import { tellUsPlaceholder } from '@/lib/tellUs'
+
+/** How a change to the address is recorded. `replace`: in place, no step.
+ *  `step`: a step the browser's Back undoes, named in history.state so the
+ *  page's own way back can take that same step (the Minyanim view, Oct 6).
+ *  Neither: a navigation of its own. */
+export type ParamsOpts = { replace?: boolean; step?: string }
+const MINYANIM_STEP = 'minyanim'
+const LISTING_STEP = 'listing'
 
 // Loaded on the first tap of "+": nobody browsing pays for the box.
 const TellUsSheet = dynamic(() => import('@/components/TellUsSheet'))
@@ -120,7 +128,7 @@ type Props = {
    *  item/form navigations elsewhere in this tree that deliberately push.
    *  Optional and a no-op by default, same reasoning as FindResources' own
    *  onParamsChange — nothing here is interactive before hydration anyway. */
-  onParamsChange?: (changes: Record<string, string | null>, opts?: { replace?: boolean }) => void
+  onParamsChange?: (changes: Record<string, string | null>, opts?: ParamsOpts) => void
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -372,14 +380,40 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // value here is just `openMinyanimView` echoed back, and re-writing it
   // immediately would be a pointless replace on a URL that's already
   // correct.
+  //
+  // Only when the view opens or closes, never because onParamsChange is a
+  // new function: on Back, Next re-renders with a new one before the
+  // popstate listener below has read the address, and re-writing the
+  // still-open view's `?davening=1` then undid the Back (found Oct 6).
   const minyanimViewSyncedOnce = useRef(false)
+  // Set when the page itself opens the view (showMinyanimView, below).
+  const openedHere = useRef(false)
+  const writeMinyanimView = useEffectEvent((on: boolean) => {
+    const step = on && openedHere.current
+    openedHere.current = false
+    onParamsChange?.(on ? { davening: '1' } : { davening: null, day: null }, step ? { step: MINYANIM_STEP } : { replace: true })
+  })
   useEffect(() => {
     if (!minyanimViewSyncedOnce.current) {
       minyanimViewSyncedOnce.current = true
       return
     }
-    onParamsChange?.(minyanimViewOn ? { davening: '1' } : { davening: null, day: null }, { replace: true })
-  }, [minyanimViewOn, onParamsChange])
+    writeMinyanimView(minyanimViewOn)
+  }, [minyanimViewOn])
+  // Opened from the page, the view is a step Back undoes (Oct 6): the
+  // browser's, and on a phone a swipe. It used to replace the address, so
+  // Back left Synagogues altogether. Its own ways back (the header's ‹ on a
+  // phone, "‹ Synagogues" on a computer) take that same step when there is
+  // one, so Forward doesn't reopen it; arriving on `?davening=1`, there's
+  // none, and they just close it.
+  const showMinyanimView = () => {
+    openedHere.current = true
+    setMinyanimViewOn(true)
+  }
+  const closeMinyanimView = () => {
+    if ((window.history.state as { step?: string } | null)?.step === MINYANIM_STEP) window.history.back()
+    else setMinyanimViewOn(false)
+  }
   const isMobile = useIsMobile()
   // For getCategoryColor below — same call CompactCard makes for this same
   // category's home-screen badge, so the morph target's color matches
@@ -1252,11 +1286,46 @@ export default function GenericDirectory({ category, items, anchorLabel, address
     }
   }
   const closeColumn = (id: string) => {
+    // Opened from the page, it's a step (below): take it back, and the
+    // popstate listener closes it, so Forward doesn't reopen it.
+    if ((window.history.state as { step?: string } | null)?.step === LISTING_STEP) {
+      window.history.back()
+      return
+    }
     closeOpenListing(id)
     findRow(id)
   }
-  // The header's back arrow: home, or from a listing's own page, the list.
-  useSetScreenHeader(true, category.pluralLabel, phonePage && columnItem ? () => closeColumn(columnItem.id) : onUp, { named: phonePage })
+  // Back and Forward: the address says whether the Minyanim view is open,
+  // and on a computer whether a listing is (Oct 6). Next re-renders on
+  // popstate before this runs, so it reads the address, not its props.
+  const onPop = useEffectEvent(() => {
+    const params = new URLSearchParams(window.location.search)
+    setMinyanimViewOn(params.get('davening') === '1')
+    if (hostedId && !isMobile && !params.get('item')) {
+      closeOpenListing(hostedId)
+      findRow(hostedId)
+    }
+  })
+  useEffect(() => {
+    const listener = () => onPop()
+    window.addEventListener('popstate', listener)
+    return () => window.removeEventListener('popstate', listener)
+  }, [])
+  // The header's back arrow: home, or from a listing's own page, the list;
+  // in the Minyanim view, which it names, Synagogues (Oct 6: it was a second
+  // "‹ Synagogues" under the header).
+  const minyanimTitle = 'Minyanim by time'
+  useSetScreenHeader(
+    true,
+    minyanimView && !phonePage ? minyanimTitle : category.pluralLabel,
+    phonePage && columnItem ? () => closeColumn(columnItem.id) : minyanimView ? closeMinyanimView : onUp,
+    { named: phonePage },
+  )
+  // A computer's opened listing has the top of the page (Oct 6, B): the
+  // search, its examples and the "Minyanim by time" row are the list's, and
+  // come back with it; above the listing only "‹ Synagogues", as a phone's
+  // opened listing has only the header's ‹. They pushed it halfway down.
+  const deskListing = !!columnItem && !phonePage
 
   // An opened listing's last part: the places near it in the list as it's
   // filtered now, and the way back to all of them (ListingView's onward).
@@ -1293,7 +1362,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
         filters={hasActualFilters ? { active: activeFilterCount, onOpen: () => setFiltersOpen(true) } : undefined}
         sort={upvotes ? { byPopular: sortByPopular, onSelect: selectSort } : undefined}
         // Only while the Next minyan card, which carries it, is gone.
-        onDaveningTimes={hasMinyanim && !showMinyanCard ? () => setMinyanimViewOn(true) : undefined}
+        onDaveningTimes={hasMinyanim && !showMinyanCard ? showMinyanimView : undefined}
         activeChips={activeChips}
         onShowMap={hasMapColumn && mapHidden ? () => setMapHidden(false) : undefined}
       />
@@ -1319,11 +1388,15 @@ export default function GenericDirectory({ category, items, anchorLabel, address
 
           <div hidden={phonePage}>
           <DirectoryHeader
-            title={category.pluralLabel}
+            title={minyanimView ? minyanimTitle : category.pluralLabel}
             anchorLabel={anchorLabel}
             addressPrompt={addressPrompt}
             titleInHeader
             banner={categoryBadge}
+            // A computer's way back from the Minyanim view: small, over the
+            // title it replaced. A phone's is the header's ‹.
+            up={minyanimView && !columnItem && !isMobile ? { label: category.pluralLabel, onClick: closeMinyanimView } : undefined}
+            titleOnly={deskListing}
           />
           </div>
 
@@ -1357,7 +1430,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
       <div ref={controlsSentinelRef} aria-hidden className="h-px" />
       <div
         ref={controlsRef}
-        hidden={phonePage}
+        hidden={phonePage || deskListing}
         // The "docked" look (white background, the padding it needs, the
         // negative margin that pulls it flush against the header above, the
         // shadow, and the hide-on-scroll transform) only ever applies once
@@ -1413,25 +1486,6 @@ export default function GenericDirectory({ category, items, anchorLabel, address
         {/* Under them, Synagogues' "Minyanim by time" row. Gone once
             anything is typed: then the search's own answer says what's next
             (see NextMinyanCard). */}
-        {/* The Minyanim view's way back (Oct 6): it's reached from the
-            "Minyanim by time" row, no longer a Synagogues / Minyanim toggle,
-            so it says where back goes and what it is. */}
-        {minyanimView && (
-          <div data-testid="minyanim-view-head">
-            <button
-              type="button"
-              onClick={() => {
-                if (columnItem) closeOpenListing(columnItem.id)
-                setMinyanimViewOn(false)
-              }}
-              className="flex cursor-pointer items-center gap-1 text-[15px] font-bold text-primary hover:underline"
-            >
-              <ChevronRightIcon className="h-4 w-4 rotate-180" />
-              {category.pluralLabel}
-            </button>
-            <h2 className="mt-1 text-2xl font-extrabold text-ink">Minyanim by time</h2>
-          </div>
-        )}
         <div className={showMinyanCard ? 'space-y-3' : undefined}>
           {showSearch && (
             <div className={hasMapColumn ? 'lg:max-w-[720px]' : undefined}>
@@ -1450,7 +1504,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
               to every minyan, on every screen size (Oct 6). */}
           {showMinyanCard && (
             <div className={hasMapColumn ? 'lg:max-w-[720px]' : undefined}>
-              <NextMinyanCard items={filtered} onDaveningTimes={() => setMinyanimViewOn(true)} />
+              <NextMinyanCard items={filtered} onDaveningTimes={showMinyanimView} />
             </div>
           )}
         </div>
@@ -1488,7 +1542,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
               onOpen: (other) => switchListing(columnItem.id, other.id),
               seeAll: { label: onwardSource.allLabel, onClick: () => closeColumn(columnItem.id) },
             }}
-            backLabel={`Back to ${category.pluralLabel}`}
+            backLabel={minyanimView ? minyanimTitle : category.pluralLabel}
             onBack={() => closeColumn(columnItem.id)}
             position={{ index: Math.max(0, shownIndex.get(columnItem.id) ?? 0), total: shownItems.length }}
             onStep={(direction) => navigateFromCard(columnItem.id, direction)}
@@ -1623,9 +1677,26 @@ export default function GenericDirectory({ category, items, anchorLabel, address
               // pile up browser-back history entries the way opening an
               // Add/Edit/Report form (which does use push, see
               // FindResources' openAction) reasonably does.
+              // Except on a computer, opening one from the list (Oct 6): it
+              // has the page now, so it's a step Back undoes. Stepping to
+              // the next one replaces it, so Back doesn't walk back through
+              // every listing read.
               found={foundOn(item)}
               onExpandedChange={(expanded) => {
-                onParamsChange?.({ item: expanded ? item.id : null, ...(expanded ? {} : { match: null }) }, { replace: true })
+                onParamsChange?.(
+                  { item: expanded ? item.id : null, ...(expanded ? {} : { match: null }) },
+                  // Not when the address already names it: a link, or
+                  // Forward, reopening it. (On a phone arriving from its
+                  // link, the first render still thinks it's a computer.)
+                  expanded &&
+                  !hostedId &&
+                  !isMobile &&
+                  item.id !== reopenItemId &&
+                  item.id !== linkedItemId &&
+                  new URLSearchParams(window.location.search).get('item') !== item.id
+                    ? { step: LISTING_STEP }
+                    : { replace: true },
+                )
                 if (!expanded && item.id === revealedId) setRevealedId(null)
                 if (!expanded && item.id === reopenItemId) {
                   setClosedMatchFor(reopenKey)

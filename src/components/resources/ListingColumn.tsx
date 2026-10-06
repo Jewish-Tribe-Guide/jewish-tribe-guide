@@ -26,7 +26,7 @@ type Props = {
   found: SearchFound | null
   upvote?: ReactNode
   onward: Onward
-  /** "All 73 Food places". */
+  /** Where back goes: "Synagogues", or "Minyanim by time". */
   backLabel: string
   onBack: () => void
   /** Where it is in the list as shown: "12 of 73". */
@@ -68,15 +68,19 @@ export default function ListingColumn({ item, category, color, place, found, upv
     return () => window.removeEventListener('keydown', onKey)
   }, [onBack, onStep, hasPrev, hasNext, phone])
 
-  const step = 'flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-50 disabled:cursor-default disabled:opacity-30'
+  // Quiet (Oct 6): the way back is "‹ Synagogues", where the page's title
+  // was, and ‹ › are the arrow keys' small mouse version. It was a bar,
+  // "‹ Back to Synagogues", ringed arrows, a rule under it, under the whole
+  // list's search box and examples.
+  const step = 'flex h-7 w-7 cursor-pointer items-center justify-center rounded-full text-muted transition-colors hover:bg-slate-200/60 hover:text-slate-700 disabled:cursor-default disabled:opacity-30 disabled:hover:bg-transparent'
 
   const bar = (
-    <div className="mb-5 flex items-center justify-between gap-3 border-b border-slate-200 pb-2.5" data-testid="listing-column-bar">
-      <button type="button" onClick={onBack} className="-ml-1 flex cursor-pointer items-center gap-1 rounded-md px-1 py-1 text-[15px] font-bold text-primary hover:underline">
+    <div className="mb-4 flex items-center justify-between gap-3" data-testid="listing-column-bar">
+      <button type="button" onClick={onBack} className="-ml-1 flex cursor-pointer items-center gap-0.5 rounded-md px-1 py-1 text-[15px] font-bold text-primary hover:underline">
         <ChevronLeftIcon className="h-[18px] w-[18px]" />
         {backLabel}
       </button>
-      <div className="flex items-center gap-2 text-sm text-muted">
+      <div className="flex items-center gap-0.5 text-[13px] text-muted">
         {onShowMap && (
           <button type="button" onClick={onShowMap} className="mr-2 h-9 cursor-pointer rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50">
             Show map

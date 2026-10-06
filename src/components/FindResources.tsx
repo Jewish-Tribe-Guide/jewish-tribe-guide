@@ -17,6 +17,7 @@ import { resolveCapabilities, bandImageFor } from '@/lib/categories'
 import { getCategoryColor } from '@/lib/categoryColor'
 import { community } from '@/community.config'
 import { useIsMobile } from '@/lib/useIsMobile'
+import type { ParamsOpts } from '@/components/resources/GenericDirectory'
 
 // A pending add/edit action on a listing within the current category.
 type ListingAction =
@@ -91,7 +92,7 @@ export type FindResourcesProps = {
    *  for `router.replace` — used by the directory's own search/"Open now"
    *  sync so every keystroke or toggle flip doesn't become its own history
    *  entry, unlike the item/form navigations below that deliberately push. */
-  onParamsChange?: (changes: Record<string, string | null>, opts?: { replace?: boolean }) => void
+  onParamsChange?: (changes: Record<string, string | null>, opts?: ParamsOpts) => void
 }
 
 // A single resource detail view, opened by tapping a card on the home grid:

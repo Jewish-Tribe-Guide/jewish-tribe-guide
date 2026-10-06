@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import DistanceNote from './DistanceNote'
-import { PinIcon } from '@/components/icons'
+import { ChevronLeftIcon, PinIcon } from '@/components/icons'
 
 type Props = {
   /** The category/section title (e.g. "Synagogues", "Which hospital?"). */
@@ -37,6 +37,12 @@ type Props = {
    *  category has no icon, or on mobile, where the home->category move
    *  already communicates hierarchy via its own directional slide instead. */
   banner?: ReactNode
+  /** A computer's way back, small, over the title: "‹ Synagogues" over
+   *  "Minyanim by time" (Oct 6). A phone's is the header's ‹. */
+  up?: { label: string; onClick: () => void }
+  /** Only the badge and, for a screen reader, the title: an opened listing
+   *  on a computer has the top of the page, with its own way back. */
+  titleOnly?: boolean
 }
 
 // Shared heading block for every directory: the title plus the location/count
@@ -56,7 +62,7 @@ type Props = {
 // instead (GenericDirectory), separated from the search bar it used to sit
 // right above here. Desktop is unchanged either way: there's room, and
 // desktop's compact `inline` variant stays right here next to the title.
-export default function DirectoryHeader({ title, count, anchorLabel, addressPrompt, actions, titleInHeader, banner }: Props) {
+export default function DirectoryHeader({ title, count, anchorLabel, addressPrompt, actions, titleInHeader, banner, up, titleOnly }: Props) {
   const countText = count != null ? `${count} listing${count !== 1 ? 's' : ''}` : null
 
   return (
@@ -72,7 +78,19 @@ export default function DirectoryHeader({ title, count, anchorLabel, addressProm
           same 8px margin, but a literal-value class so this element doesn't
           also match a `.mb-2` selector meant for the row below (see this
           component's own test). */}
-      <div className="hidden desktop:block h-5 mb-[0.5rem]" aria-hidden="true" />
+      {up ? (
+        <div className="hidden desktop:flex h-5 mb-[0.5rem] items-center" data-testid="directory-up">
+          <button type="button" onClick={up.onClick} className="-ml-1 flex cursor-pointer items-center gap-0.5 rounded-md px-1 text-sm font-bold text-primary hover:underline">
+            <ChevronLeftIcon className="h-4 w-4" />
+            {up.label}
+          </button>
+        </div>
+      ) : (
+        <div className="hidden desktop:block h-5 mb-[0.5rem]" aria-hidden="true" />
+      )}
+      {titleOnly ? (
+        <h1 className="sr-only">{title}</h1>
+      ) : (
       <div className="flex items-end justify-between gap-2 mb-2">
         {/* w-full desktop:w-auto: harmless leftover from when the unset
             the unset-location prompt below needed this column to stretch on mobile —
@@ -137,6 +155,7 @@ export default function DirectoryHeader({ title, count, anchorLabel, addressProm
         </div>
         {actions && <div className="flex items-center gap-2 shrink-0">{actions}</div>}
       </div>
+      )}
     </div>
   )
 }

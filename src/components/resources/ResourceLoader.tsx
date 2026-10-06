@@ -6,7 +6,7 @@ import type { CategoryConfig } from '@/lib/categories'
 import { withMilesFromAddress, withMilesFromCenter } from '@/lib/listingTravel'
 import { useActiveCommunity } from '@/lib/communityContext'
 import { useOptionalLocation } from '@/lib/locationContext'
-import GenericDirectory from './GenericDirectory'
+import GenericDirectory, { type ParamsOpts } from './GenericDirectory'
 import UpButton from '@/components/UpButton'
 
 type Props = {
@@ -46,7 +46,7 @@ type Props = {
   onAdd: () => void
   onEdit: (item: DirectoryResource) => void
   /** Pushes search/openNow changes into the URL — see GenericDirectory's own doc. */
-  onParamsChange?: (changes: Record<string, string | null>, opts?: { replace?: boolean }) => void
+  onParamsChange?: (changes: Record<string, string | null>, opts?: ParamsOpts) => void
 }
 
 // Every category renders via the generic, hint-driven card renderer (badges,

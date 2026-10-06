@@ -2,6 +2,7 @@
 
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import FindResources, { type FindResourcesProps } from './FindResources'
+import type { ParamsOpts } from './resources/GenericDirectory'
 
 type Props = Omit<
   FindResourcesProps,
@@ -22,7 +23,7 @@ export default function FindResourcesConnected(props: Props) {
   const pathname = usePathname()
   const router = useRouter()
 
-  const setParams = (changes: Record<string, string | null>, opts?: { replace?: boolean }) => {
+  const setParams = (changes: Record<string, string | null>, opts?: ParamsOpts) => {
     // window.location.search, not the closure-captured `params` above:
     // `params` is only as fresh as this component's LAST completed render,
     // and a `router.replace` navigation doesn't resolve synchronously — it's
@@ -68,6 +69,9 @@ export default function FindResourcesConnected(props: Props) {
     // navigations below — those DO need Next's own history/back-button
     // integration, which this sync deliberately opts out of.
     if (opts?.replace) window.history.replaceState(window.history.state, '', url)
+    // A step Back undoes, with no navigation either: the page already shows
+    // it. Named in the state so the page's own back can tell it took one.
+    else if (opts?.step) window.history.pushState({ ...window.history.state, step: opts.step }, '', url)
     else router.push(url)
   }
 
