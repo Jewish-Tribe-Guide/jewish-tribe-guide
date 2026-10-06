@@ -194,7 +194,7 @@ describe('MapPlaceDetail', () => {
   // Part of the listing, not docked over it (which phase 3 did): the last
   // thing about the place, after the dated line. Only the places nearby
   // come after it, and the map passes none.
-  it('ends the content with the bar, after the dated line', () => {
+  it('ends the content with the bar', () => {
     const { container } = renderWithProviders(
       <PinnedProvider>
         <MapPlaceDetail item={makeListing({ name: 'Goldi Market' })} category={makeCategory()} color="#000" onBack={() => {}} />
@@ -204,8 +204,8 @@ describe('MapPlaceDetail', () => {
     const last = view.lastElementChild as HTMLElement
     expect(last).toContainElement(screen.getByRole('button', { name: 'Suggest an edit' }))
     expect(last).toContainElement(screen.getByRole('button', { name: 'Actions for Goldi Market' }))
-    // The dated line's own block; the bar is its last part.
-    expect(last).toHaveAttribute('data-testid', 'listing-trust')
+    // Its own block now: the dated strip it used to end is gone (Oct 6).
+    expect(last).toHaveAttribute('data-testid', 'listing-foot')
   })
 
   // The bar is the last thing in the listing, so whoever taps it is usually

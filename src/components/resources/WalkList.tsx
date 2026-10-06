@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useContext, useEffect, useId, useState } from 'react'
+import { useContext, useEffect, useState, type ReactNode } from 'react'
 import type { DirectoryResource } from '@/types'
 import type { CategoryConfig, CategoryField } from '@/lib/categories'
 import { useCategories } from '@/lib/useCategories'
@@ -24,6 +24,7 @@ import {
 } from '@/lib/walkList'
 import type { LatLng } from '@/lib/geo'
 import { NextMinyans, NextMinyansContext, useNextMinyan } from './nextMinyans'
+import { Card } from './listingParts'
 
 // ── Other categories' places within a walk: a hotel's shuls, a hospital's
 // food, shuls, hotels and mikvah ─────────────────────────────────────────────
@@ -91,6 +92,9 @@ type Props = {
   fromLabel: string
 }
 
+/** One box, "Within a walk", a line a kind (Oct 6): how many, and the
+ *  nearest, with the whole list a tap away. Four full lists in a row was
+ *  most of a hospital's page. */
 export default function WalkLists({ lists, from, fromLabel }: Props) {
   const categories = useCategories()
   const shown = lists.flatMap((walk) => {
@@ -99,71 +103,97 @@ export default function WalkLists({ lists, from, fromLabel }: Props) {
   })
   const places = usePlaces(shown.map((s) => s.target.id))
   if (shown.length === 0) return null
-
-  // Every list loaded and nothing on any of them: said once, rather than
-  // one empty card after another.
-  const all = shown.map(({ walk, target }) => ({ walk, target, places: places[target.id] }))
-  if (all.length > 1 && all.every((x) => Array.isArray(x.places) && walkGroups(from, x.places, x.walk.maxMinutes).length === 0)) {
-    return <NothingNear lists={all as { walk: WalkListSetting; target: CategoryConfig; places: DirectoryResource[] }[]} from={from} />
-  }
-
   return (
-    <>
-      {shown.map(({ walk, target }) => (
-        <WalkList key={target.id} walk={walk} target={target} places={places[target.id]} from={from} fromLabel={fromLabel} />
-      ))}
-    </>
+    <Card
+      title="Within a walk"
+      testId="walk-lists"
+      footer={`Rough walking times from the ${fromLabel.toLowerCase()}, in a straight line at 25 minutes a mile; streets make most walks longer.`}
+    >
+      <ul className="divide-y divide-slate-100">
+        {shown.map(({ walk, target }) => (
+          <WalkList key={target.id} walk={walk} target={target} places={places[target.id]} from={from} />
+        ))}
+      </ul>
+    </Card>
   )
 }
 
+/** One kind: "Synagogues · 9", "Nearest: Mekor Habracha, 3 min", opening
+ *  to the list itself. */
 function WalkList({
   walk,
   target,
   places,
   from,
-  fromLabel,
 }: {
   walk: WalkListSetting
   target: CategoryConfig
   places: DirectoryResource[] | 'failed' | null
   from: LatLng
-  fromLabel: string
 }) {
-  const headingId = useId()
+  const community = useCommunitySlug()
+  const [open, setOpen] = useState(false)
   const noun = target.pluralLabel || target.label
   const shuls = isShuls(target)
+  const rows = Array.isArray(places) ? walkGroups(from, places, walk.maxMinutes).flatMap((g) => g.rows).sort((a, b) => a.miles - b.miles) : []
+  const nearest = rows[0]
+  const beyond = Array.isArray(places) && rows.length === 0 ? nearestBeyond(from, places, walk.maxMinutes) : null
 
-  let body
+  let summary: ReactNode
   if (places === null) {
-    body = (
-      <div aria-hidden="true" className="mt-3 space-y-2">
-        <div className="h-4 w-1/2 animate-pulse rounded bg-slate-100" />
-        <div className="h-4 w-2/3 animate-pulse rounded bg-slate-100" />
-      </div>
-    )
+    summary = <span aria-hidden="true" className="mt-1 block h-4 w-2/3 animate-pulse rounded bg-slate-100" />
   } else if (places === 'failed') {
-    body = <p className="mt-2 text-sm text-slate-600">The {noun.toLowerCase()} nearby couldn’t load.</p>
+    summary = `The ${noun.toLowerCase()} nearby couldn’t load.`
+  } else if (nearest) {
+    summary = `Nearest: ${nearest.item.name}, ${nearest.minutes} min`
   } else {
-    body = (
-      <NextMinyans enabled={shuls} items={places}>
-        <ListBody walk={walk} target={target} places={places} from={from} fromLabel={fromLabel} />
-      </NextMinyans>
+    summary = (
+      <>
+        None within a {walk.maxMinutes}-minute walk.
+        {beyond && (
+          <>
+            {' '}
+            Nearest:{' '}
+            <Link href={routes.listing(community, target.id, listingSlug(beyond.item))} className="font-semibold text-primary hover:underline">
+              {beyond.item.name}
+            </Link>
+            , {walkDistanceText(beyond)}.
+          </>
+        )}
+      </>
     )
   }
+  const title = (
+    <span className="block text-[15px] font-bold text-slate-900">{rows.length > 0 ? `${noun} · ${rows.length}` : noun}</span>
+  )
+  const sub = <span className="mt-0.5 block text-[13.5px] leading-snug text-slate-600">{summary}</span>
 
   return (
-    <>
-      <hr className="border-slate-200" />
-      <section data-testid="walk-list" aria-labelledby={headingId}>
-        <div className="flex items-center gap-2">
-          <WalkIcon />
-          <h3 id={headingId} className="text-base font-extrabold text-slate-900">
-            {noun} within a walk
-          </h3>
+    <li data-testid="walk-list">
+      {rows.length > 0 && Array.isArray(places) ? (
+        <>
+          <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} className="flex w-full cursor-pointer items-center gap-3 py-2.5 text-left">
+            <span className="min-w-0 flex-1">
+              {title}
+              {sub}
+            </span>
+            <ChevronIcon className={`transition-transform ${open ? '-rotate-90' : 'rotate-90'}`} />
+          </button>
+          {open && (
+            <div className="pb-2">
+              <NextMinyans enabled={shuls} items={places}>
+                <ListBody walk={walk} target={target} places={places} from={from} />
+              </NextMinyans>
+            </div>
+          )}
+        </>
+      ) : (
+        <div className="py-2.5">
+          {title}
+          {sub}
         </div>
-        {body}
-      </section>
-    </>
+      )}
+    </li>
   )
 }
 
@@ -172,13 +202,11 @@ function ListBody({
   target,
   places,
   from,
-  fromLabel,
 }: {
   walk: WalkListSetting
   target: CategoryConfig
   places: DirectoryResource[]
   from: LatLng
-  fromLabel: string
 }) {
   const community = useCommunitySlug()
   const minyans = useContext(NextMinyansContext)
@@ -235,10 +263,7 @@ function ListBody({
           </ul>
         </div>
       ))}
-      <p className="mt-2.5 text-[12.5px] leading-snug text-slate-500">
-        Rough walking times from the {fromLabel.toLowerCase()}, in a straight line at 25 minutes a mile; streets make most walks longer.{' '}
-        {shuls ? 'Tap one for its Shabbos times.' : 'Tap one to open it.'}
-      </p>
+      <p className="mt-2 text-[12.5px] leading-snug text-slate-500">{shuls ? 'Tap one for its Shabbos times.' : 'Tap one to open it.'}</p>
     </>
   )
 }
@@ -288,71 +313,7 @@ function groupLabels(field: CategoryField): string[] {
   return field.type === 'boolean' ? [field.filterLabel ?? field.label] : (field.options ?? []).map((o) => o.label)
 }
 
-/** Nothing on any list: one line naming them, then the nearest of each. */
-function NothingNear({ lists, from }: { lists: { walk: WalkListSetting; target: CategoryConfig; places: DirectoryResource[] }[]; from: LatLng }) {
-  const community = useCommunitySlug()
-  const headingId = useId()
-  const nouns = lists.map((l) => (l.target.pluralLabel || l.target.label).toLowerCase())
-  const max = Math.max(...lists.map((l) => l.walk.maxMinutes))
-  const nearest = lists.flatMap((l) => {
-    const r = nearestBeyond(from, l.places, l.walk.maxMinutes)
-    return r ? [{ ...r, target: l.target }] : []
-  })
-  return (
-    <>
-      <hr className="border-slate-200" />
-      <section data-testid="walk-list-none" aria-labelledby={headingId}>
-        <div className="flex items-center gap-2">
-          <WalkIcon />
-          <h3 id={headingId} className="text-base font-extrabold text-slate-900">
-            Within a walk
-          </h3>
-        </div>
-        <p className="mt-2 text-sm leading-snug text-slate-700">
-          No {andList(nouns)} listed within a {max}-minute walk.
-        </p>
-        {nearest.length > 0 && (
-          <ul className="mt-1.5 space-y-1 text-sm text-slate-700">
-            {nearest.map((n) => (
-              <li key={n.target.id}>
-                Nearest {(n.target.label || n.target.pluralLabel).toLowerCase()}:{' '}
-                <Link href={routes.listing(community, n.target.id, listingSlug(n.item))} className="font-semibold text-primary hover:underline">
-                  {n.item.name}
-                </Link>
-                , {walkDistanceText(n)}
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-    </>
-  )
-}
-
-function andList(parts: string[]): string {
-  return parts.length <= 1 ? parts.join('') : `${parts.slice(0, -1).join(', ')} or ${parts[parts.length - 1]}`
-}
-
-function WalkIcon() {
-  return (
-    <svg
-      aria-hidden="true"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className="h-4 w-4 text-slate-500"
-    >
-      <circle cx="13" cy="4" r="2" />
-      <path d="m9 20 3-6 3 3v4" />
-      <path d="m6 12 2-3 4-1 3 3 3 1" />
-    </svg>
-  )
-}
-
-function ChevronIcon() {
+function ChevronIcon({ className = '' }: { className?: string }) {
   return (
     <svg
       aria-hidden="true"
@@ -362,7 +323,7 @@ function ChevronIcon() {
       strokeWidth="2.2"
       strokeLinecap="round"
       strokeLinejoin="round"
-      className="h-4 w-4 shrink-0 text-slate-400"
+      className={`h-4 w-4 shrink-0 text-slate-400 ${className}`}
     >
       <path d="m9 18 6-6-6-6" />
     </svg>

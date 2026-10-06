@@ -4,6 +4,7 @@ import type { DirectoryResource } from '@/types'
 import type { CategoryConfig } from '@/lib/categories'
 import { useContext } from 'react'
 import { PencilIcon } from '@/components/icons'
+import { mainThing } from '@/lib/listingView'
 import ListingActionsFan from './ListingActionsFan'
 import { TellAboutContext } from './tellAbout'
 import type { ListingAction } from './useListingActions'
@@ -37,6 +38,11 @@ import type { ListingAction } from './useListingActions'
 // myself" there for the listing-shaped editor (Oct 6: one door, the box,
 // replacing the "+" that sat beside this pill and did the same). Elsewhere
 // (the Map) it opens the editor itself.
+//
+// On a listing that is one link (a WhatsApp group's Join, a network's
+// website), the pill is outlined rather than filled (Oct 6): the listing's
+// own big button is already right above it, and two filled pills stacked
+// read as two equal choices.
 //
 // The label is "Suggest an edit", not "Edit": the second implies authority
 // this visitor doesn't need to have, and the first is what people actually
@@ -77,6 +83,7 @@ export default function ListingEditBar({
   omit?: ListingAction['id'][]
 }) {
   const tellAbout = useContext(TellAboutContext)
+  const quiet = mainThing(item, category) === 'join'
   return (
     // A wide primary plus a small round overflow, not two peers. The shape
     // is doing work: it gives the row an end-stop, so the bar sits on a base
@@ -99,7 +106,10 @@ export default function ListingEditBar({
             if (tellAbout) tellAbout(item, onEdit)
             else onEdit()
           }}
-          className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-full bg-primary px-5 py-3 text-sm font-semibold text-white shadow-lg transition-transform active:scale-[0.98]"
+          className={`flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-full px-5 py-3 text-sm font-semibold transition-transform active:scale-[0.98] ${
+            quiet ? 'border border-slate-300 bg-white text-slate-900' : 'bg-primary text-white shadow-lg'
+          }`}
+          data-quiet={quiet || undefined}
         >
           <PencilIcon className="h-4 w-4 shrink-0" />
           Suggest an edit

@@ -38,4 +38,16 @@ describe('ListingEditBar', () => {
     fireEvent.click(screen.getByRole('button', { name: /Suggest an edit/ }))
     expect(onEdit).toHaveBeenCalled()
   })
+
+  // Oct 6: on a listing that is one link, its own big button (Join) is right
+  // above, so Suggest an edit is outlined rather than a second filled pill.
+  it('is outlined on a listing that is one link (a WhatsApp group), filled everywhere else', () => {
+    const link = { key: 'link', label: 'Join group', type: 'url' as const, renderAs: 'row' as const, showInHeader: true }
+    const groups = makeCategory({ id: 'whatsapp', hasAddress: false, detailFields: [link] })
+    renderWithProviders(<ListingEditBar onEdit={vi.fn()} item={makeListing({ address: '', link: 'https://chat.whatsapp.com/x' })} category={groups} path="/philly/whatsapp/x" />)
+    expect(screen.getByRole('button', { name: /Suggest an edit/ })).toHaveAttribute('data-quiet', 'true')
+    cleanup()
+    bar(null)
+    expect(screen.getByRole('button', { name: /Suggest an edit/ })).not.toHaveAttribute('data-quiet')
+  })
 })

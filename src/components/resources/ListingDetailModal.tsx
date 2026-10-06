@@ -283,7 +283,7 @@ export default function ListingDetailModal({
           // the edit bar while reading, the Send button while editing (44px
           // pill + 12px gap + breathing room), so a long listing can't push
           // either off the bottom of the window.
-          className="dialog-in flex w-full flex-col max-h-[calc(85vh-4.5rem)] bg-white border border-slate-200 rounded-xl shadow-xl"
+          className={`dialog-in flex w-full flex-col max-h-[calc(85vh-4.5rem)] ${formOpen ? 'bg-white' : 'bg-surface'} border border-slate-200 rounded-xl shadow-xl`}
         >
           {/* Badges live inside this same block, under the subtitle — not as
               their own section below a divider. They're facts about this

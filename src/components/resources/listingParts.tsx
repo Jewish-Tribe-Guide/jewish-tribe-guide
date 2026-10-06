@@ -3,20 +3,24 @@ import { community } from '@/community.config'
 
 // Small pieces an opened listing's sections share (ListingView, DaveningCard).
 
-/** A main-thing card: a title, its content, and a dated line under it. */
-export function Card({ title, children, footer, testId, action }: { title: string; children: ReactNode; footer?: ReactNode; testId?: string; action?: ReactNode }) {
+/** One of an opened listing's boxes (Oct 6): white on the listing's grey,
+ *  a title when what's in it needs naming ("Main dishes", "Women’s"), none
+ *  when its icons or its words say what it is (the contact box, the
+ *  description), and a dated line under it when it has one. */
+export function Card({ title, children, footer, testId, action }: { title?: string; children: ReactNode; footer?: ReactNode; testId?: string; action?: ReactNode }) {
   return (
-    <section className="rounded-2xl border border-slate-200 bg-slate-50 px-3.5 pt-3.5 pb-3" data-testid={testId}>
-      {action ? (
-        <div className="mb-1 flex items-baseline justify-between gap-3">
-          <h2 className="text-base font-extrabold text-slate-900">{title}</h2>
-          {action}
-        </div>
-      ) : (
-        <h2 className="mb-1 text-base font-extrabold text-slate-900">{title}</h2>
-      )}
+    <section className={`rounded-2xl border border-slate-200 bg-white px-4 pb-3 ${title ? 'pt-3.5' : 'pt-1'}`} data-testid={testId}>
+      {title &&
+        (action ? (
+          <div className="mb-1 flex items-baseline justify-between gap-3">
+            <h2 className="text-base font-extrabold text-slate-900">{title}</h2>
+            {action}
+          </div>
+        ) : (
+          <h2 className="mb-1 text-base font-extrabold text-slate-900">{title}</h2>
+        ))}
       {children}
-      {footer && <div className="mt-2.5 border-t border-slate-200 pt-2 text-[13px] leading-snug text-muted">{footer}</div>}
+      {footer && <div className="mt-2.5 border-t border-slate-100 pt-2 text-[13px] leading-snug text-muted">{footer}</div>}
     </section>
   )
 }

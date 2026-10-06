@@ -122,6 +122,26 @@ describe('A hospital’s own main card', () => {
   })
 })
 
+describe('A hotel’s own main card (Oct 6)', () => {
+  it('says a yes/no once, as a ticked line, then the note', () => {
+    vi.setSystemTime(new Date(2026, 9, 6, 13, 30))
+    const hotels = makeCategory({
+      id: 'hotel',
+      label: 'Hotel',
+      detailFields: [
+        { key: 'shabbatFriendly', label: 'Shabbat friendly', type: 'boolean', renderAs: 'badge', filterable: true },
+        { key: 'notes', label: 'Notes', type: 'textarea', renderAs: 'row' },
+      ],
+      listingParts: { main: { title: 'Shabbos here', fields: ['shabbatFriendly', 'notes'] } },
+    })
+    const cambria = makeListing({ id: 'cambria', shabbatFriendly: true, notes: 'Electronic keys, but reception will open door for you' }) as DirectoryResource
+    renderWithProviders(<ListingView item={cambria} category={hotels} color="#000" path="/test" foot={null} />, { content: { categories: [hotels] } })
+    const card = screen.getByTestId('listing-section')
+    expect(card).toHaveTextContent(/^Shabbos hereShabbat friendlyElectronic keys/)
+    expect(card).not.toHaveTextContent('Shabbat friendly:')
+  })
+})
+
 describe('This Shabbos', () => {
   it('on a Friday before candle lighting, comes right after the main card, with tonight’s time', () => {
     vi.setSystemTime(new Date(2026, 9, 9, 13, 30)) // Fri Oct 9, 1:30 PM

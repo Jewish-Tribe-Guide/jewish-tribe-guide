@@ -6,6 +6,7 @@ import {
   audienceStatus,
   compactWeek,
   confirmPlace,
+  firstSentence,
   googleKeeps,
   isStale,
   listingActions,
@@ -159,8 +160,8 @@ describe('mainThing', () => {
   it('a WhatsApp group: Join', () => {
     expect(mainThing(makeListing({ address: '', link: 'https://chat.whatsapp.com/x' }), whatsapp)).toBe('join')
   })
-  it('Food with no list of dishes: the week', () => {
-    expect(mainThing(makeListing({ hours: { fri: { open: '11:00', close: '15:00' } } }), food)).toBe('hours')
+  it('hours never lead on their own: they sit in the contact box (Oct 6), Food with no list of dishes included', () => {
+    expect(mainThing(makeListing({ hours: { fri: { open: '11:00', close: '15:00' } } }), food)).toBeNull()
   })
   it('a category with an item list leads with it while it’s empty too, over the hours (agreed Oct 1)', () => {
     const open = makeListing({ m: [], hours: { fri: { open: '09:00', close: '21:00' } } })
@@ -168,9 +169,9 @@ describe('mainThing', () => {
     const dishes: CategoryField = { key: 'dishes', label: 'Main dishes', type: 'tags', showCountInHeader: true, countLabel: 'dish' }
     expect(mainThing(open, makeCategory({ ...food, detailFields: [...food.detailFields, dishes] }))).toBe('items')
   })
-  it('but not where nobody can add to it: the hours lead', () => {
+  it('but not where nobody can add to it: nothing leads, the hours stay in the contact box', () => {
     const closed = makeCategory({ ...grocery, capabilities: { ...resolveCapabilities(grocery.capabilities), edit: false } })
-    expect(mainThing(makeListing({ hours: { fri: { open: '09:00', close: '21:00' } } }), closed)).toBe('hours')
+    expect(mainThing(makeListing({ hours: { fri: { open: '09:00', close: '21:00' } } }), closed)).toBeNull()
   })
   it('hours saved empty every day are no hours', () => {
     expect(mainThing(makeListing({ hours: { fri: null, sat: null } }), food)).toBeNull()
@@ -304,6 +305,12 @@ describe('googleKeeps', () => {
     expect(googleKeeps(makeListing({ ...synced, googleFields: ['name', 'hours', 'phone', 'website'], phone: '1', website: 'http://x' }))).toBe('Phone and website from Google')
     expect(googleKeeps(makeListing({ ...synced, googleFields: ['website'], phone: '1', website: 'http://x' }))).toBe('Website from Google')
   })
+  it('and the hours, when the contact box shows them (Oct 6: the line moves to that box’s foot)', () => {
+    const kept = makeListing({ ...synced, googleFields: ['hours', 'phone', 'website'], phone: '1', website: 'http://x' })
+    expect(googleKeeps(kept, { hours: true })).toBe('Phone, website and hours from Google')
+    expect(googleKeeps(kept, { hours: false })).toBe('Phone and website from Google')
+    expect(googleKeeps(makeListing({ ...synced, googleFields: ['hours'] }), { hours: true })).toBe('Hours from Google')
+  })
   it('not what the listing doesn’t show', () => {
     expect(googleKeeps(makeListing({ ...synced, googleFields: ['phone', 'website'], phone: undefined, website: 'http://x' }))).toBe('Website from Google')
   })
@@ -317,24 +324,28 @@ describe('confirmPlace', () => {
     expect(confirmPlace(makeListing({ minyanim: [{ id: 'm1', tefillah: 'shacharis', days: ['sun'], time: '8:00am' }] }), shuls)).toEqual({ at: 'card', subject: 'Times' })
     expect(confirmPlace(makeListing({ womenTevillah: true, women_s_notes: 'By appointment' }), mikvah)).toEqual({ at: 'card', subject: 'Hours' })
   })
-  it('what hardly changes, or nobody can vouch for all at once, only dated: Food’s kosher details, a grocery’s items', () => {
-    expect(confirmPlace(makeListing({ t: ['Meat'], kosherCert: 'Keystone-K', foodType: 'Restaurant' }), food)).toEqual({ at: 'quiet', subject: 'Kosher details' })
+  it('what hardly changes isn’t dated at all (Oct 6): the certificate proves a hechsher; a grocery’s items carry their own dates', () => {
+    expect(confirmPlace(makeListing({ t: ['Meat'], kosherCert: 'Keystone-K', foodType: 'Restaurant' }), food)).toBeNull()
     expect(confirmPlace(makeListing({ m: ['Challah'], isKosher: 'Kosher Items' }), grocery)).toBeNull()
   })
-  it('a restaurant’s dishes are dated each on their own, and its kosher details keep their date', () => {
+  it('a restaurant’s dishes are dated each on their own, and its kosher details aren’t dated either', () => {
     const dishes: CategoryField = { key: 'dishes', label: 'Main dishes', type: 'tags', showCountInHeader: true, countLabel: 'dish' }
     const withDishes = makeCategory({ ...food, detailFields: [...food.detailFields, dishes] })
     const listing = makeListing({ t: ['Meat'], kosherCert: 'Keystone-K', foodType: 'Restaurant', dishes: ['Shawarma'] })
     expect(mainThing(listing, withDishes)).toBe('items')
-    expect(confirmPlace(listing, withDishes)).toEqual({ at: 'quiet', subject: 'Kosher details' })
+    expect(confirmPlace(listing, withDishes)).toBeNull()
   })
-  it('facts with no hechsher among them, by name: a hotel’s "Shabbat friendly"', () => {
+  it('nor a hotel’s "Shabbat friendly"', () => {
     const shabbat: CategoryField = { key: 'shabbatFriendly', label: 'Shabbat friendly', type: 'boolean', renderAs: 'badge', filterable: true }
-    expect(confirmPlace(makeListing({ shabbatFriendly: true }), makeCategory({ detailFields: [shabbat] }))).toEqual({ at: 'quiet', subject: 'Shabbat friendly' })
+    expect(confirmPlace(makeListing({ shabbatFriendly: true }), makeCategory({ detailFields: [shabbat] }))).toBeNull()
   })
   it('a group with no address: its join link', () => {
     const link: CategoryField = { key: 'link', label: 'Join', type: 'url', renderAs: 'row', showInHeader: true }
     expect(confirmPlace(makeListing({ link: 'https://chat.whatsapp.com/x' }), makeCategory({ hasAddress: false, detailFields: [link] }))).toEqual({ at: 'join' })
+  })
+  it('but not a network’s website (Oct 6): only a link that joins something is asked about', () => {
+    const w: CategoryField = { key: 'w', label: 'Website', type: 'url', renderAs: 'row', showInHeader: true }
+    expect(confirmPlace(makeListing({ w: 'https://tribe12.org' }), makeCategory({ hasAddress: false, detailFields: [w] }))).toBeNull()
   })
   it('nothing when nothing is the community’s to confirm: no broad question instead', () => {
     expect(confirmPlace(makeListing({ hours: { mon: { open: '09:00', close: '17:00' } } }), food)).toBeNull()
@@ -373,5 +384,29 @@ describe('a category’s own main card and Set as location', () => {
   })
   it('no Set as location for a place the map can’t find', () => {
     expect(listingActions({ ...hup, geo: undefined }, hospital).buttons.map((b) => b.kind)).not.toContain('location')
+  })
+})
+
+describe('firstSentence', () => {
+  it('splits a note after its first sentence', () => {
+    expect(firstSentence('On Shabbos, by appointment only. On Motzei Shabbos, open 2 hours.')).toEqual({
+      first: 'On Shabbos, by appointment only.',
+      rest: 'On Motzei Shabbos, open 2 hours.',
+    })
+  })
+  it('a first line with no full stop is the first sentence', () => {
+    expect(firstSentence('Friday: 4:30 AM – 1 hours before Candle Lighting\n\nThe entrance is on the right side.')).toEqual({
+      first: 'Friday: 4:30 AM – 1 hours before Candle Lighting',
+      rest: 'The entrance is on the right side.',
+    })
+  })
+  it('one sentence leaves nothing to fold', () => {
+    expect(firstSentence('Schedule your appointment (48 hours advance notice would be appreciated)')).toEqual({
+      first: 'Schedule your appointment (48 hours advance notice would be appreciated)',
+      rest: '',
+    })
+  })
+  it('a decimal or a time isn’t the end of a sentence', () => {
+    expect(firstSentence('Open 8:30 PM. Call first.').first).toBe('Open 8:30 PM.')
   })
 })

@@ -694,7 +694,7 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
           Always mounted on mobile rather than `expanded &&`, so the sheet
           stays on screen long enough to animate closed. */}
       {isMobile && !inColumn && (
-        <MobileSheet isOpen={expanded} onClose={close} title={item.name} draggable titleHidden>
+        <MobileSheet isOpen={expanded} onClose={close} title={item.name} draggable titleHidden surface>
           {opened && <MapPlaceDetail
             item={item}
             category={category}

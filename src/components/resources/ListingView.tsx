@@ -19,6 +19,7 @@ import {
   audienceStatus,
   compactWeek,
   confirmPlace,
+  firstSentence,
   googleKeeps,
   itemsField,
   listingActions,
@@ -57,7 +58,6 @@ import {
 } from '@/components/icons'
 import Chip from './Chip'
 import Highlight from './Highlight'
-import HoursDisplay from './HoursDisplay'
 import DaveningCard from './DaveningCard'
 import { schedulesKey } from '@/lib/schedules'
 import WalkLists from './WalkList'
@@ -161,7 +161,9 @@ export default function ListingView({ item, category, color, place = null, upvot
   // steakhouse"): one line, under the header.
   const tagline = category.detailFields.find((f) => f.type === 'text' && f.showInHeader && f.headerMaxLength != null && String(item[f.key] ?? '').trim())
   const status = statusLine(item, category, now, shul, candlesAt)
-  const headerAbout =
+  // A place with no address is what it's for: its description, said in the
+  // Join box with Join (Oct 6), not down in About.
+  const joinAbout =
     main === 'join' ? category.detailFields.filter((f) => f.type === 'textarea' && !f.audienceKey && String(item[f.key] ?? '').trim()) : []
 
   const who = (
@@ -227,11 +229,6 @@ export default function ListingView({ item, category, color, place = null, upvot
         </div>
       </div>
       {tagline && <p className="mt-2.5 text-[15px] leading-snug text-slate-800">{String(item[tagline.key]).trim()}</p>}
-      {/* A place with no address is what it's for: its description, then
-          Join. Said here rather than down in About. */}
-      {headerAbout.map((f) => (
-        <p key={f.key} className="mt-3 whitespace-pre-line text-[15.5px] leading-snug text-slate-800">{String(item[f.key]).trim()}</p>
-      ))}
     </div>
   )
 
@@ -268,7 +265,14 @@ export default function ListingView({ item, category, color, place = null, upvot
   const { buttons, extra } = listingActions(item, category)
   const join = main === 'join' ? primaryLink(item, category) : null
   const actions = join ? (
-    <div className="flex items-center gap-2.5">
+    // One box (Oct 6): who it's for, then Join with Share beside it, so the
+    // listing isn't one big button over another (Suggest an edit is outlined
+    // under it on these listings, ListingEditBar).
+    <Card testId="listing-join-box" footer={confirmAt?.at === 'join' ? <JoinLinkCheck item={item} joined={joined} /> : undefined}>
+      {joinAbout.map((f) => (
+        <p key={f.key} className="whitespace-pre-line pt-2.5 text-[15.5px] leading-snug text-slate-800">{String(item[f.key]).trim()}</p>
+      ))}
+      <div className="flex items-center gap-2.5 pt-3.5 pb-1">
       <a
         href={join.href}
         target="_blank"
@@ -277,13 +281,16 @@ export default function ListingView({ item, category, color, place = null, upvot
           track('listing_action', { action: join.field.linkLabel ?? join.field.label })
           setJoined(true)
         }}
-        className="flex h-12 flex-1 items-center justify-center gap-2 rounded-full bg-emerald-700 px-5 text-[15.5px] font-bold text-white transition-colors hover:bg-emerald-800 sm:max-w-sm"
+        className={`flex h-12 flex-1 items-center justify-center gap-2 rounded-full px-5 text-[15.5px] font-bold text-white transition-colors sm:max-w-sm ${
+          isWhatsApp(category) ? 'bg-emerald-700 hover:bg-emerald-800' : 'bg-primary hover:bg-primary-dark'
+        }`}
       >
-        <JoinIcon className="h-5 w-5" />
-        {joinLabel(join.field, category)}
+        {isWhatsApp(category) ? <JoinIcon className="h-5 w-5" /> : <GlobeIcon className="h-5 w-5" />}
+        {joinLabel(join.field, category, join.href)}
       </a>
       <ShareButton path={path} name={item.name} round />
-    </div>
+      </div>
+    </Card>
   ) : (
     // Spread across a phone's width, where they fill it; in the desktop
     // column, a set gap from the left, or the gaps grow with the column
@@ -309,33 +316,28 @@ export default function ListingView({ item, category, color, place = null, upvot
     mainSection = <ItemsCard field={itemsF} found={found} api={itemApi} menuUrl={menuUrlOf(item)} />
   } else if (main === 'groups') {
     mainSection = (
-      <GroupsCard item={item} groups={audienceGroups(item, category)} now={now} candlesAt={candlesAt} footer={confirmAt?.at === 'card' ? confirmLine(confirmAt.subject) : undefined} />
+      <GroupBoxes item={item} groups={audienceGroups(item, category)} now={now} candlesAt={candlesAt} footer={confirmAt?.at === 'card' ? confirmLine(confirmAt.subject) : undefined} />
     )
   } else if (main === 'walk') {
     const lists = parseWalkLists(category.walkList)
     mainSection = lists.length > 0 && item.geo ? <WalkLists lists={lists} from={item.geo} fromLabel={category.label} /> : null
-  } else if (main === 'hours') {
-    const f = hoursFields.find((x) => !x.audienceKey && item[x.key] != null)
-    mainSection = f ? <HoursCard item={item} value={item[f.key]} now={now} candlesAt={candlesAt} /> : null
   }
-
-  // Which of its details Google keeps, and when, said with the listing's
-  // dated line.
-  const kept = googleKeeps(item)
-  const googleLead = kept ? `${kept}, ${shortDate(item.googleSyncedAt!, clock)}` : null
 
   // ── 4 · Details ────────────────────────────────────────────────────────
   const showAddress = category.hasAddress !== false && !!item.address
   const showPhone = category.hasPhone !== false && !!item.phone
-  // Hours that aren't the main thing: a grocery's, under its items. One
-  // line, opening to the week.
-  const hoursFromGoogle = !!item.placeId && !!item.googleSyncedAt && !!item.googleFields?.includes('hours')
-  const otherHours = main === 'hours' || main === 'groups' ? [] : hoursFields.filter((f) => !f.audienceKey && hasAny(item[f.key]))
+  // The place's hours, in the contact box: today, opening to the week. A
+  // mikvah's are in its own boxes, one per audience.
+  const otherHours = main === 'groups' ? [] : hoursFields.filter((f) => !f.audienceKey && hasAny(item[f.key]))
+  // Which of what the contact box shows Google keeps, and when: said once,
+  // at the box's foot (Oct 6), not at the end of the listing.
+  const kept = googleKeeps(item, { hours: otherHours.length > 0 })
+  const googleLead = kept ? `${kept}, ${shortDate(item.googleSyncedAt!, clock)}` : null
   const shownElsewhere = new Set<string>([
     ...(tagline ? [tagline.key] : []),
     ...(named ? named.fields.map((f) => f.key) : []),
     ...(shabbosFields ?? []).map((f) => f.key),
-    ...headerAbout.map((f) => f.key),
+    ...joinAbout.map((f) => f.key),
     ...(join ? [join.field.key] : []),
     ...buttons.flatMap((a) => (a.kind === 'link' || a.kind === 'email' ? [a.field.key] : [])),
     ...extra.flatMap((a) => (a.kind === 'link' || a.kind === 'email' ? [a.field.key] : [])),
@@ -365,8 +367,11 @@ export default function ListingView({ item, category, color, place = null, upvot
   const otherTags = category.detailFields.filter(
     (f) => f.type === 'tags' && f.key !== itemsF?.key && selectValues(item[f.key]).length + selectValues(item[`${f.key}_sometimes`]).length > 0,
   )
+  // The contact box: address, phone, hours, links. No heading: its icons
+  // say what each line is (Oct 6).
   const details = (caveat?.title || showAddress || showPhone || otherHours.length > 0 || detailFields.length > 0 || extra.length > 0 || quietBadges.length > 0 || otherTags.length > 0) && (
-    <div className="divide-y divide-slate-100 border-t border-slate-100" data-testid="listing-details">
+    <Card testId="listing-details" footer={googleLead && <span data-testid="listing-google">{googleLead}.</span>}>
+    <div className="divide-y divide-slate-100">
       {caveat?.title && (
         <Row>
           <span className="block text-[13px] font-semibold text-caution">What isn’t kosher</span>
@@ -387,9 +392,8 @@ export default function ListingView({ item, category, color, place = null, upvot
       )}
       {otherHours.map((f) => (
         <Row key={f.key} icon={<ClockIcon className="h-[17px] w-[17px]" />}>
-          {otherHours.length > 1 && <span className="block text-xs text-muted">{f.label}</span>}
-          <HoursDisplay value={item[f.key]} />
-          {hoursFromGoogle && <span className="mt-0.5 block text-[13px] text-muted">From Google, {shortDate(item.googleSyncedAt!, clock)}</span>}
+          {otherHours.length > 1 && <span className="block text-[13px] text-muted">{f.label}</span>}
+          <HoursRow value={item[f.key]} now={now} candlesAt={candlesAt} />
         </Row>
       ))}
       {extra.map((a) => (
@@ -425,25 +429,25 @@ export default function ListingView({ item, category, color, place = null, upvot
         </Row>
       ))}
     </div>
+    </Card>
   )
 
   // ── 5 · About ──────────────────────────────────────────────────────────
   // A place with no address is its description: it's said under the name,
   // with Join, rather than again down here.
+  // In a box with no heading (Oct 6). "From Google" only when the sync is
+  // known to keep it: descriptions fetched before it recorded that aren't
+  // marked either way, so nothing is said rather than guessing whose they
+  // are.
+  const fromGoogle = aboutFields.some((f) => f.key === 'googleDescription') && !!item.placeId && !!item.googleFields?.includes('description')
   const about = aboutFields.length > 0 && (
-    <div className="space-y-3" data-testid="listing-about">
-      {aboutFields.map((f) => (
-        <div key={f.key}>
-          <p className="whitespace-pre-line text-[15px] leading-relaxed text-slate-800">{String(item[f.key]).trim()}</p>
-          {/* Only when the sync is known to keep it. Descriptions fetched
-              before it recorded that aren't marked either way, so nothing
-              is said rather than guessing whose they are. */}
-          {f.key === 'googleDescription' && item.placeId && item.googleFields?.includes('description') && (
-            <p className="mt-1 text-[13px] text-muted">Description from Google</p>
-          )}
-        </div>
-      ))}
-    </div>
+    <Card testId="listing-about" footer={fromGoogle ? 'Description from Google' : undefined}>
+      <div className="space-y-3 pt-2.5">
+        {aboutFields.map((f) => (
+          <p key={f.key} className="whitespace-pre-line text-[15px] leading-relaxed text-slate-800">{String(item[f.key]).trim()}</p>
+        ))}
+      </div>
+    </Card>
   )
 
   const walkLists = parseWalkLists(category.walkList)
@@ -460,7 +464,6 @@ export default function ListingView({ item, category, color, place = null, upvot
       {who}
       {foundBox}
       {actions}
-      {confirmAt?.at === 'join' && <JoinLinkCheck item={item} joined={joined} />}
       {mainSection}
       {shabbosFirst && shabbos}
       {/* A hotel's walk list is its main thing; anywhere else, the places
@@ -475,13 +478,9 @@ export default function ListingView({ item, category, color, place = null, upvot
       {/* Part 6: the one thing this listing doesn't say yet that a tap can
           answer (pickListingQuestion); nothing when there's nothing. */}
       <QuestionCard category={category} listing={item} items={main === 'items' && itemsF ? { field: itemsF, api: itemApi } : undefined} />
-      {/* What's left of the dated line once "Still right?" is asked beside
-          the thing it's about: which details Google keeps, and when. */}
-      <div className="space-y-3 border-t border-slate-200 pt-3.5" data-testid="listing-trust">
-        {confirmAt?.at === 'quiet' && confirmLine(confirmAt.subject, false)}
-        {googleLead && <p className="text-[13.5px] leading-snug text-slate-600">{googleLead}.</p>}
-        {foot}
-      </div>
+      {/* No dated strip at the end any more (Oct 6): each date is in the
+          box it's about. Just Suggest an edit. */}
+      {foot && <div className="pt-1" data-testid="listing-foot">{foot}</div>}
       {onward && <OnwardSection item={item} category={category} color={color} onward={onward} className={onwardClassName} />}
     </div>
   )
@@ -514,7 +513,7 @@ export function OnwardSection({
   const candlesAt = candlesToday(zmanim, now)
   const nearby = nearbyListings(item, onward.items)
   if (nearby.length === 0) return null
-  const frame = aside ? 'rounded-2xl border border-slate-200 px-4 pt-4 pb-4' : '-mx-4 border-t-8 border-slate-100 px-4 pt-5 pb-2'
+  const frame = `rounded-2xl border border-slate-200 bg-white px-4 ${aside ? 'pt-4 pb-4' : 'pt-4 pb-3'}`
   return (
     <section className={`${frame} ${className}`} data-testid={aside ? 'listing-onward-aside' : 'listing-onward'}>
       <h2 className="text-[17px] font-extrabold text-slate-900">
@@ -568,10 +567,23 @@ function hasAny(v: unknown): boolean {
   return hasAnyHours(v)
 }
 
-function joinLabel(field: CategoryField, category: CategoryConfig): string {
+const isWhatsApp = (category: CategoryConfig) => /whatsapp/i.test(category.label)
+
+/** The one link's button: "Join the group" for a WhatsApp group (one line
+ *  on a phone, under "WhatsApp Group"); "Visit tribe12.org" for a website
+ *  (Oct 6: a network's listing is its site, and "Website" in WhatsApp green
+ *  read as a group); otherwise what the admin called it. */
+function joinLabel(field: CategoryField, category: CategoryConfig, href: string): string {
   const label = field.linkLabel ?? field.label
-  // "Join group" says less than where the group is.
-  return /whatsapp/i.test(category.label) && /^join/i.test(label) ? 'Join the group on WhatsApp' : label
+  if (isWhatsApp(category) && /^join/i.test(label)) return 'Join the group'
+  if (/website/i.test(label)) {
+    try {
+      return `Visit ${new URL(href).hostname.replace(/^www\./, '')}`
+    } catch {
+      return label
+    }
+  }
+  return label
 }
 
 function actionKey(a: ActionSpec): string {
@@ -708,13 +720,26 @@ function WeekLines({ value, now, candlesAt, compact = false }: { value: unknown;
   )
 }
 
-function HoursCard({ item, value, now, candlesAt }: { item: DirectoryResource; value: unknown; now: Date | null; candlesAt: number | null }) {
+/** A place's hours as one line of the contact box: today's, opening to the
+ *  week. Hours written as words are just said. */
+function HoursRow({ value, now, candlesAt }: { value: unknown; now: Date | null; candlesAt: number | null }) {
+  const [open, setOpen] = useState(false)
   if (!now) return null
-  const fromGoogle = !!item.placeId && item.googleFields?.includes('hours') && item.googleSyncedAt
+  const today = formatTodayHours(value, now)
+  if (!today) return null
+  if (typeof value === 'string') return <p>{today}</p>
   return (
-    <Card title="Hours" testId="listing-hours" footer={fromGoogle ? `From Google, updated ${shortDate(item.googleSyncedAt!, now.getTime())}` : undefined}>
-      <WeekLines value={value} now={now} candlesAt={candlesAt} />
-    </Card>
+    <div>
+      <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} className="flex w-full cursor-pointer items-center justify-between gap-3 text-left">
+        <span>{today}</span>
+        <ChevronRightIcon className={`h-4 w-4 shrink-0 text-slate-500 transition-transform ${open ? '-rotate-90' : 'rotate-90'}`} />
+      </button>
+      {open && (
+        <div className="mt-1.5">
+          <WeekLines value={value} now={now} candlesAt={candlesAt} />
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -1005,7 +1030,11 @@ function ItemAnswer({ mark: m, api, clock, say }: { mark: ItemMark; api: ItemMar
   )
 }
 
-function GroupsCard({
+/** A mikvah's sections, a box each (Oct 6): today's hours, its phone and
+ *  email, and the first sentence of its notes; the week and the rest of the
+ *  notes folded under one tap. "Still right?" about the hours under the
+ *  last. */
+function GroupBoxes({
   item,
   groups,
   now,
@@ -1019,47 +1048,69 @@ function GroupsCard({
   footer?: ReactNode
 }) {
   return (
-    <Card title="Hours and details, by mikvah" testId="listing-groups" footer={footer}>
-      <div className="divide-y divide-slate-200">
-        {groups.map((g) => (
-          <div key={g.key} className="py-2.5">
-            <h3 className="text-[15.5px] font-extrabold text-slate-900">{g.label}</h3>
-            {g.fields.map((f) => {
-              const v = item[f.key]
-              if (f.type === 'hours') return now ? <div key={f.key} className="mt-1"><WeekLines value={v} now={now} candlesAt={candlesAt} compact /></div> : null
-              if (f.type === 'tel')
-                return (
-                  <a key={f.key} href={`tel:${String(v).replace(/\D/g, '')}`} className="mt-1.5 block text-[14.5px] font-bold text-primary">
-                    {formatPhone(String(v))}
-                  </a>
-                )
-              if (f.type === 'text' && /@/.test(String(v)))
-                return (
-                  <a key={f.key} href={`mailto:${String(v).trim()}`} className="mt-1.5 block text-[14.5px] font-bold text-primary">
-                    {String(v).trim()}
-                  </a>
-                )
-              return <ClampedNote key={f.key} text={String(v).trim()} />
-            })}
-          </div>
-        ))}
-      </div>
-    </Card>
+    <div className="space-y-3" data-testid="listing-groups">
+      {groups.map((g, i) => (
+        <GroupBox key={g.key} item={item} group={g} now={now} candlesAt={candlesAt} footer={i === groups.length - 1 ? footer : undefined} />
+      ))}
+    </div>
   )
 }
 
-function ClampedNote({ text }: { text: string }) {
+function GroupBox({ item, group, now, candlesAt, footer }: { item: DirectoryResource; group: AudienceGroup; now: Date | null; candlesAt: number | null; footer?: ReactNode }) {
   const [open, setOpen] = useState(false)
-  const long = text.length > 160
+  const hoursF = group.fields.find((f) => f.type === 'hours')
+  const today = hoursF && now ? formatTodayHours(item[hoursF.key], now) : null
+  const hasWeek = !!hoursF && typeof item[hoursF.key] !== 'string' && hasAnyHours(item[hoursF.key])
+  const isEmail = (f: CategoryField) => f.type === 'text' && /@/.test(String(item[f.key]))
+  const contacts = group.fields.filter((f) => f.type === 'tel' || isEmail(f))
+  const texts = group.fields.filter((f) => (f.type === 'textarea' || f.type === 'text') && !isEmail(f)).map((f) => String(item[f.key]).trim())
+  const lead = texts.length > 0 ? firstSentence(texts[0]) : null
+  const more = [lead?.rest, ...texts.slice(1)].filter((t): t is string => !!t)
+  const foldable = (hasWeek && !!now) || more.length > 0
+  const foldLabel = hasWeek && more.length > 0 ? 'Week and notes' : hasWeek ? 'The week' : 'More'
   return (
-    <p className="mt-1.5 whitespace-pre-line text-[14px] leading-relaxed text-slate-700">
-      {long && !open ? `${text.slice(0, 150).trimEnd()}… ` : text}
-      {long && (
-        <button type="button" onClick={() => setOpen((v) => !v)} className="cursor-pointer font-bold text-primary">
-          {open ? ' Less' : 'More'}
+    <Card title={group.label} footer={footer}>
+      <div className="divide-y divide-slate-100">
+        {today && (
+          <Row icon={<ClockIcon className="h-[17px] w-[17px]" />}>
+            <span>{today}</span>
+          </Row>
+        )}
+        {contacts.map((f) => {
+          const v = String(item[f.key]).trim()
+          return f.type === 'tel' ? (
+            <Row key={f.key} icon={<PhoneIcon className="h-[17px] w-[17px]" />}>
+              <a href={`tel:${v.replace(/\D/g, '')}`} className="text-primary hover:underline">
+                {formatPhone(v)}
+              </a>
+            </Row>
+          ) : (
+            <Row key={f.key} icon={<MailIcon className="h-[17px] w-[17px]" />}>
+              <a href={`mailto:${v}`} className="text-primary hover:underline">
+                {v}
+              </a>
+            </Row>
+          )
+        })}
+        {lead && <p className="py-2.5 text-[15px] leading-relaxed whitespace-pre-line text-slate-700">{lead.first}</p>}
+        {open && (
+          <div className="space-y-2.5 py-2.5" data-testid="listing-group-more">
+            {hasWeek && now && <WeekLines value={item[hoursF!.key]} now={now} candlesAt={candlesAt} />}
+            {more.map((t, i) => (
+              <p key={i} className="text-[15px] leading-relaxed whitespace-pre-line text-slate-700">
+                {t}
+              </p>
+            ))}
+          </div>
+        )}
+      </div>
+      {foldable && (
+        <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} className="flex cursor-pointer items-center gap-1 py-1.5 text-[14.5px] font-bold text-primary">
+          {open ? 'Less' : foldLabel}
+          <ChevronRightIcon className={`h-4 w-4 transition-transform ${open ? '-rotate-90' : 'rotate-90'}`} />
         </button>
       )}
-    </p>
+    </Card>
   )
 }
 

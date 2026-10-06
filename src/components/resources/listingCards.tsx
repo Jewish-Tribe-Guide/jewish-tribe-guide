@@ -10,7 +10,7 @@ import { clockTime } from '@/lib/upcomingDavening'
 import { walkDistanceText, walkMinutes } from '@/lib/walkList'
 import { haversineMiles, type LatLng } from '@/lib/geo'
 import { eruvim } from '@/data/resources'
-import { PhoneIcon } from '@/components/icons'
+import { CheckIcon, PhoneIcon } from '@/components/icons'
 import { Card } from './listingParts'
 import { NextMinyans, NextMinyansContext } from './nextMinyans'
 import { usePlaces } from './WalkList'
@@ -74,6 +74,15 @@ export function SectionCard({
         <a key={f.key} href={text} target="_blank" rel="noopener noreferrer" className="mt-1.5 block text-[15px] font-semibold text-primary hover:underline">
           {f.linkLabel ?? f.label}
         </a>,
+      )
+    } else if (f.type === 'boolean') {
+      // Said once, ticked ("✓ Shabbat friendly"), not "Shabbat friendly:
+      // Shabbat friendly".
+      parts.push(
+        <p key={f.key} className="mt-1 flex items-center gap-2 text-[15px] font-semibold text-slate-900">
+          <CheckIcon className="h-4 w-4 shrink-0 text-emerald-700" />
+          {text}
+        </p>,
       )
     } else if (f.type === 'textarea') {
       parts.push(

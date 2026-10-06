@@ -35,6 +35,9 @@ type Props = {
    *  (the "+ Add" box's own steps). The header's drag skips buttons, so a
    *  tap on it is a tap. */
   onBack?: () => void
+  /** The page's soft grey instead of white, for an opened listing: its
+   *  boxes are white on it (Oct 6). */
+  surface?: boolean
 }
 
 type Snap = 'half' | 'full'
@@ -115,7 +118,7 @@ const MOMENTUM_MIN_VELOCITY = 0.02
  *  instead of resizing/dismissing the sheet the way the map's list already
  *  does — see onContentPointerDown's own doc for why the fix is the same
  *  hand-driven-scroll takeover MobileNearbySheet uses, not a smaller one. */
-export default function MobileSheet({ isOpen, onClose, title, children, draggable = false, titleHidden = false, onBack }: Props) {
+export default function MobileSheet({ isOpen, onClose, title, children, draggable = false, titleHidden = false, onBack, surface = false }: Props) {
   const [phase, setPhase] = useState<Phase>(isOpen ? 'open' : 'closed')
   useBodyScrollLock(phase !== 'closed')
 
@@ -463,7 +466,7 @@ export default function MobileSheet({ isOpen, onClose, title, children, draggabl
         role="presentation"
       >
         <div
-          className={`flex w-full flex-col rounded-t-2xl bg-white shadow-xl ${isClosing ? '' : 'animate-[sheetUp_220ms_ease-out]'} ${draggable ? '' : 'max-h-[85vh]'}`}
+          className={`flex w-full flex-col rounded-t-2xl ${surface ? 'bg-surface' : 'bg-white'} shadow-xl ${isClosing ? '' : 'animate-[sheetUp_220ms_ease-out]'} ${draggable ? '' : 'max-h-[85vh]'}`}
           style={style}
           role="dialog"
           aria-modal="true"

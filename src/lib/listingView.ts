@@ -93,21 +93,21 @@ export function listingDistance(item: DirectoryResource, region: string): string
 
 // ── The main thing ───────────────────────────────────────────────────────────
 
-export type MainThing = 'section' | 'davening' | 'items' | 'groups' | 'walk' | 'join' | 'hours'
+export type MainThing = 'section' | 'davening' | 'items' | 'groups' | 'walk' | 'join'
 
 /** What the listing is mostly for. The section an admin named as it comes
  *  first (a hospital's "Who to call first", listingParts.ts), even while
  *  it's empty, so every listing in the category opens the same way.
  *  Otherwise by what it holds, first that applies: davening times; items; one section per audience (a mikvah's women's,
  *  men's and keilim); the shuls within a walk (a hotel); the one link of a
- *  place with no address (Join a WhatsApp group); the week's hours.
+ *  place with no address (Join a WhatsApp group). Never the hours on their
+ *  own (Oct 6): they're one line of the contact box, the week a tap away,
+ *  so a school opens on its address, phone and today's hours together.
  *
  *  A category that keeps an item list leads with it even while it's empty
  *  ("Main dishes", "+ Add the first dish"), so every listing in it opens
- *  the same way (agreed Oct 1, Food and Grocery). Its hours are then one
- *  line: "Open until 8 PM" at the top already says whether to go now. Not
- *  where nobody can add to it (edits off): an empty list would be a dead
- *  end, and the hours lead as before. */
+ *  the same way (agreed Oct 1, Food and Grocery). Not where nobody can add
+ *  to it (edits off): an empty list would be a dead end. */
 export function mainThing(item: DirectoryResource, category: CategoryConfig): MainThing | null {
   const fields = category.detailFields
   if (mainCardOf(category)) return 'section'
@@ -119,46 +119,36 @@ export function mainThing(item: DirectoryResource, category: CategoryConfig): Ma
   if (audienceGroups(item, category).length > 0) return 'groups'
   if (parseWalkLists(category.walkList).length > 0 && item.geo) return 'walk'
   if (primaryLink(item, category)) return 'join'
-  if (fields.some((f) => f.type === 'hours' && !f.audienceKey && hasHours(item[f.key]))) return 'hours'
   return null
 }
 
-/** How an opened listing says when someone last checked it (agreed Sep 30).
+/** Where an opened listing asks "Still right?" (agreed Sep 30, trimmed
+ *  Oct 6): beside what changes often, in its own box. A shul's times and a
+ *  mikvah's hours in their cards, a named section ("Who to call first") in
+ *  its card, a group's join link in its Join box (not a website's).
  *
- *  What changes often is asked about beside it, "Still right?": a shul's
- *  times and a mikvah's hours in their cards, a group's join link under
- *  Join. What hardly changes isn't asked about at all (meat stays meat, a
- *  hechsher rarely moves, and when either does someone edits or reports
- *  it): it gets a quiet date at the listing's foot, "Kosher details last
- *  checked Aug 20". A grocery's items do change, but nobody can vouch for
- *  nine at once: each item carries its own date and its own "Still here"
- *  (itemMarks.ts, agreed Oct 1), so the listing says nothing more about
- *  them; a restaurant's dishes likewise, though its hechsher keeps its
- *  quiet date. Nothing in the header is ever dated.
- *  Null where there's nothing of the community's to date: nothing said,
- *  rather than a broad "is all of this right". */
-export type ConfirmPlace = { at: 'card'; subject: string } | { at: 'join' } | { at: 'quiet'; subject: string }
+ *  What hardly changes isn't dated at all any more. A hechsher's proof is
+ *  its certificate, one tap away among the buttons, and "Kosher details
+ *  last checked Aug 20" only said when someone last looked at it; meat
+ *  stays meat, and when any of it does change someone edits or reports
+ *  it. A grocery's items and a restaurant's dishes carry their own dates
+ *  and their own "Still here" (itemMarks.ts). Nothing in the header is
+ *  ever dated. Null where there's nothing to ask about: no broad "is all of
+ *  this right" instead. */
+export type ConfirmPlace = { at: 'card'; subject: string } | { at: 'join' }
 
 export function confirmPlace(item: DirectoryResource, category: CategoryConfig): ConfirmPlace | null {
   const main = mainThing(item, category)
   if (main === 'section') return { at: 'card', subject: mainCardOf(category)!.label }
   if (main === 'davening') return { at: 'card', subject: 'Times' }
   if (main === 'groups') return { at: 'card', subject: 'Hours' }
-  if (main === 'join') return { at: 'join' }
-  // A hechsher (the badge that carries a caveat) makes them kosher details.
-  const kosher = rowBadgeFields(category).some((f) => f.caveat)
-  // Each item is dated, and asked about, on its own. A restaurant's dishes
-  // are too, but its kosher details are still its kosher details, and keep
-  // their quiet date.
-  if (main === 'items' && !kosher) return null
-  const facts = listingFacts(item, category)
-  if (facts.length === 0) return null
-  return { at: 'quiet', subject: kosher ? 'Kosher details' : andList(facts) }
-}
-
-/** "Meat", "Meat and Keystone-K", "Meat, Keystone-K and Restaurant". */
-function andList(parts: string[]): string {
-  return parts.length <= 1 ? parts.join('') : `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`
+  // A group's Join, not a network's website: "did it open the group?" is
+  // a question only a joining link can be asked.
+  if (main === 'join') {
+    const link = primaryLink(item, category)!
+    return /join/i.test(link.field.linkLabel ?? link.field.label) ? { at: 'join' } : null
+  }
+  return null
 }
 
 function hasHours(v: unknown): boolean {
@@ -349,13 +339,27 @@ export function isStale(iso: string, now: number | null): boolean {
  *  nightly Google sync keeps, among those it shows. Hours and the
  *  description say so where they're shown; null for a listing Google
  *  doesn't keep (no place ID any more), or keeps none of these. */
-export function googleKeeps(item: DirectoryResource): string | null {
+export function googleKeeps(item: DirectoryResource, shown: { hours?: boolean } = {}): string | null {
   if (!item.placeId || !item.googleSyncedAt) return null
   const kept = item.googleFields ?? []
   const parts = [
-    kept.includes('phone') && item.phone ? 'Phone' : null,
+    kept.includes('phone') && item.phone ? 'phone' : null,
     kept.includes('website') && String(item.website ?? '').trim() ? 'website' : null,
+    kept.includes('hours') && shown.hours ? 'hours' : null,
   ].filter((p): p is string => !!p)
   if (parts.length === 0) return null
-  return `${parts.join(' and ').replace(/^website/, 'Website')} from Google`
+  const list = parts.length === 1 ? parts[0] : `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`
+  return `${list.charAt(0).toUpperCase()}${list.slice(1)} from Google`
+}
+
+/** A note's first sentence, and what's left after it: a mikvah section's
+ *  box shows the first and folds the rest (Oct 6). The first line, when it
+ *  ends before any full stop ("Friday: 4:30 AM – 1 hours before Candle
+ *  Lighting" over a paragraph). */
+export function firstSentence(text: string): { first: string; rest: string } {
+  const t = text.trim()
+  const line = t.split('\n')[0]
+  const sentence = /^[\s\S]*?[.!?](?=\s|$)/.exec(t)?.[0]
+  const first = (sentence && sentence.length <= line.length ? sentence : line).trim()
+  return { first, rest: t.slice(first.length).trim() }
 }
