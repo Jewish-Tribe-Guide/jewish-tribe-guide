@@ -99,7 +99,15 @@ describe('ListingView — the main thing', () => {
     fireEvent.click(today)
     expect(today).toHaveAttribute('aria-expanded', 'true')
     expect(box).toHaveTextContent('11 AM – 3 PM')
-    expect(within(box).getByTestId('listing-google')).toHaveTextContent('Phone and hours from Google, Sep 30.')
+    expect(within(box).getByTestId('listing-google')).toHaveTextContent('Last updated from Google, Sep 30.')
+  })
+
+  it('the website by name with the address and phone (Oct 6), its round button above as before', () => {
+    view()
+    const box = screen.getByTestId('listing-details')
+    const site = within(box).getByRole('link', { name: 'judahgrill.com' })
+    expect(site).toHaveAttribute('href', 'http://judahgrill.com')
+    expect(within(screen.getByTestId('listing-actions')).getByRole('link', { name: /Website/ })).toBeInTheDocument()
   })
 
   it('no Google line on a listing no longer matched to Google', () => {
@@ -279,7 +287,7 @@ describe('ListingView — how sure', () => {
   it('Food: no question and no date on its kosher details, the certificate is the proof (Oct 6); Google’s part at the contact box’s foot', () => {
     view({ item: { ...judah, placeId: 'p1', googleSyncedAt: '2026-09-30T06:59:09Z', googleFields: ['phone', 'website'], confirmedAt: '2026-06-01T16:30:00Z' } })
     expect(screen.queryByText(/last checked/)).not.toBeInTheDocument()
-    expect(within(screen.getByTestId('listing-details')).getByTestId('listing-google')).toHaveTextContent('Phone and website from Google, Sep 30.')
+    expect(within(screen.getByTestId('listing-details')).getByTestId('listing-google')).toHaveTextContent('Last updated from Google, Sep 30.')
     expect(screen.queryByText(/Still right|Right\?/)).not.toBeInTheDocument()
     expect(screen.getByTestId('listing-view').querySelector('h2')!.parentElement!.parentElement).not.toHaveTextContent(/checked|confirmed/i)
   })
@@ -325,8 +333,15 @@ describe('ListingView — how sure', () => {
       category: mikvah,
     })
     const [women, men, keilim] = [...screen.getByTestId('listing-groups').querySelectorAll('section')]
+    // Asked once a section's opened (Oct 6), not over every box at once.
+    expect(screen.queryByTestId('freshness')).not.toBeInTheDocument()
+    fireEvent.click(within(women).getByRole('button', { name: /The week/ }))
     expect(women).toHaveTextContent('Women’s hours confirmed Sep 2.')
+    expect(within(men).queryByTestId('freshness')).not.toBeInTheDocument()
+    fireEvent.click(within(men).getByRole('button', { name: /The week/ }))
     expect(men).toHaveTextContent('Men’s hours confirmed Oct 1.')
+    fireEvent.click(within(women).getByRole('button', { name: 'Less' }))
+    expect(within(women).queryByTestId('freshness')).not.toBeInTheDocument()
     // Notes and no hours: nothing to confirm.
     expect(within(keilim).queryByTestId('freshness')).not.toBeInTheDocument()
 
@@ -336,6 +351,7 @@ describe('ListingView — how sure', () => {
       item: makeListing({ id: '0b6c4c1e-2f55-4a8e-9d57-3b7f0d6f4a21', womenTevillah: true, womenTevillah_hours: week }),
       category: mikvah,
     })
+    fireEvent.click(within(screen.getByTestId('listing-groups')).getByRole('button', { name: /The week/ }))
     fireEvent.click(within(screen.getByTestId('listing-groups')).getByRole('button', { name: 'Yes' }))
     await vi.waitFor(() => expect(fetchMock).toHaveBeenCalled())
     const [url, init] = fetchMock.mock.calls[0]
@@ -404,7 +420,7 @@ describe('ListingView — details from Google', () => {
       item: makeListing({ m: ['Challah'], hours: { fri: { open: '09:00', close: '21:00' } }, placeId: 'p1', googleSyncedAt: '2026-09-30T06:59:09Z', googleFields: ['hours'] }),
       category: grocery,
     })
-    expect(within(screen.getByTestId('listing-details')).getByTestId('listing-google')).toHaveTextContent('Hours from Google, Sep 30.')
+    expect(within(screen.getByTestId('listing-details')).getByTestId('listing-google')).toHaveTextContent('Last updated from Google, Sep 30.')
   })
 })
 

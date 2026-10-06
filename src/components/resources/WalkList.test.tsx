@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { Activity } from 'react'
 import { cleanup, fireEvent, screen, within } from '@testing-library/react'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { makeCategory, makeListing } from '@/test/providerFixtures'
@@ -188,6 +189,35 @@ describe('Within a walk, on the map beside it', () => {
 
     fireEvent.click(within(section).getByRole('button', { name: /Synagogues · 3/ }))
     expect(show).toHaveBeenLastCalledWith(null)
+  })
+
+  // Oct 6: a shul in the list opened, then Back. The hotel comes back as it
+  // was left, kept while hidden, with Synagogues still open; its places
+  // must come back on the map with it, not just the open list.
+  it('puts the open kind’s places back on the map when the listing is shown again', async () => {
+    const show = vi.fn()
+    const highlight = createHighlight()
+    function Page({ mode }: { mode: 'visible' | 'hidden' }) {
+      return (
+        <WalkOnMapContext.Provider value={{ show, highlight }}>
+          <Activity mode={mode}>
+            <ListingView item={hotel} category={hotels} color="#000" path="/test" foot={null} />
+          </Activity>
+        </WalkOnMapContext.Provider>
+      )
+    }
+    const { rerenderWithProviders: rerender } = renderWithProviders(<Page mode="visible" />, { content: { categories: [hotels, shuls] } })
+    await openKind(/Synagogues · 3/)
+    expect(show).toHaveBeenLastCalledWith({ categoryId: 'synagogue', places: [nearby[0], nearby[1], nearby[2]] })
+
+    // Opened by a click: the pointer never leaves its row.
+    fireEvent.mouseEnter(screen.getByRole('link', { name: /Mikveh Israel/ }))
+    rerender(<Page mode="hidden" />)
+    expect(show).toHaveBeenLastCalledWith(null)
+    expect(highlight.get()).toBeNull()
+    rerender(<Page mode="visible" />)
+    expect(screen.getByRole('button', { name: /Synagogues · 3/ })).toHaveAttribute('aria-expanded', 'true')
+    expect(show).toHaveBeenLastCalledWith({ categoryId: 'synagogue', places: [nearby[0], nearby[1], nearby[2]] })
   })
 })
 

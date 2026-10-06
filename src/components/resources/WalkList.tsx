@@ -105,13 +105,37 @@ export default function WalkLists({ lists, from, fromLabel, fromItem }: Props) {
   const [openId, setOpenId] = useState<string | null>(null)
   const onMap = useContext(WalkOnMapContext)
   const show = onMap?.show
-  // Off the map when the listing closes or another opens.
-  useEffect(() => () => show?.(null), [show])
+  const highlight = onMap?.highlight
   const shown = lists.flatMap((walk) => {
     const target = categories.find((c) => c.id === walk.categoryId)
     return target ? [{ walk, target }] : []
   })
   const places = usePlaces(shown.map((s) => s.target.id))
+  // The open kind's places on the map, from what's open rather than from
+  // the tap that opened it: Back to a listing brings it back with the kind
+  // still open (its state is kept while hidden), and its places must come
+  // back with it (Oct 6). Off the map when the listing closes or hides.
+  const openWalk = shown.find((s) => s.target.id === openId)?.walk
+  const openPlaces = openId ? places[openId] : null
+  const maxMinutes = openWalk?.maxMinutes
+  const { lat, lng } = from
+  useEffect(() => {
+    if (!show) return
+    if (!openId || !Array.isArray(openPlaces) || maxMinutes === undefined) {
+      show(null)
+      return
+    }
+    const rows = walkGroups({ lat, lng }, openPlaces, maxMinutes)
+      .flatMap((g) => g.rows)
+      .sort((a, b) => a.miles - b.miles)
+    show({ categoryId: openId, places: rows.map((r) => r.item) })
+    return () => {
+      show(null)
+      // A row opened by a click never sees the pointer leave: its pin
+      // stays lit when Back brings the listing back.
+      if (highlight && rows.some((r) => r.item.id === highlight.get())) highlight.set(null)
+    }
+  }, [show, highlight, openId, openPlaces, maxMinutes, lat, lng])
   if (shown.length === 0) return null
   return (
     <Card
@@ -129,11 +153,7 @@ export default function WalkLists({ lists, from, fromLabel, fromItem }: Props) {
             from={from}
             fromItem={fromItem}
             open={openId === target.id}
-            onToggle={(rows) => {
-              const opening = openId !== target.id
-              setOpenId(opening ? target.id : null)
-              show?.(opening ? { categoryId: target.id, places: rows } : null)
-            }}
+            onToggle={() => setOpenId(openId === target.id ? null : target.id)}
           />
         ))}
       </ul>
@@ -158,8 +178,7 @@ function WalkList({
   from: LatLng
   fromItem?: Pick<DirectoryResource, 'id' | 'category'>
   open: boolean
-  /** With the places it lists, nearest first, for the map beside it. */
-  onToggle: (rows: DirectoryResource[]) => void
+  onToggle: () => void
 }) {
   const community = useCommunitySlug()
   const noun = target.pluralLabel || target.label
@@ -201,7 +220,7 @@ function WalkList({
     <li data-testid="walk-list">
       {rows.length > 0 && Array.isArray(places) ? (
         <>
-          <button type="button" aria-expanded={open} onClick={() => onToggle(rows.map((r) => r.item))} className="flex w-full cursor-pointer items-center gap-3 py-2.5 text-left">
+          <button type="button" aria-expanded={open} onClick={onToggle} className="flex w-full cursor-pointer items-center gap-3 py-2.5 text-left">
             <span className="min-w-0 flex-1">
               {title}
               {sub}

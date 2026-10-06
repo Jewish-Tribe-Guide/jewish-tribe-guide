@@ -7,7 +7,8 @@ import {
   compactWeek,
   confirmPlace,
   firstSentence,
-  googleKeeps,
+  googleKeepsBox,
+  siteName,
   isStale,
   listingActions,
   listingDistance,
@@ -299,23 +300,29 @@ describe('isStale: when a confirmation asks again', () => {
   })
 })
 
-describe('googleKeeps', () => {
+describe('googleKeepsBox', () => {
+  // Oct 6: the contact box says when Google last updated it, one date for
+  // the box, so all that matters is whether Google keeps any of it.
   const synced = { placeId: 'p1', googleSyncedAt: '2026-09-30T07:00:00Z' }
-  it('names what the listing shows and the sync keeps', () => {
-    expect(googleKeeps(makeListing({ ...synced, googleFields: ['name', 'hours', 'phone', 'website'], phone: '1', website: 'http://x' }))).toBe('Phone and website from Google')
-    expect(googleKeeps(makeListing({ ...synced, googleFields: ['website'], phone: '1', website: 'http://x' }))).toBe('Website from Google')
+  it('when the sync keeps something the box shows: its phone, website, or hours', () => {
+    expect(googleKeepsBox(makeListing({ ...synced, googleFields: ['phone'], phone: '1' }))).toBe(true)
+    expect(googleKeepsBox(makeListing({ ...synced, googleFields: ['website'], website: 'http://x' }))).toBe(true)
+    expect(googleKeepsBox(makeListing({ ...synced, googleFields: ['hours'] }), { hours: true })).toBe(true)
   })
-  it('and the hours, when the contact box shows them (Oct 6: the line moves to that box’s foot)', () => {
-    const kept = makeListing({ ...synced, googleFields: ['hours', 'phone', 'website'], phone: '1', website: 'http://x' })
-    expect(googleKeeps(kept, { hours: true })).toBe('Phone, website and hours from Google')
-    expect(googleKeeps(kept, { hours: false })).toBe('Phone and website from Google')
-    expect(googleKeeps(makeListing({ ...synced, googleFields: ['hours'] }), { hours: true })).toBe('Hours from Google')
-  })
-  it('not what the listing doesn’t show', () => {
-    expect(googleKeeps(makeListing({ ...synced, googleFields: ['phone', 'website'], phone: undefined, website: 'http://x' }))).toBe('Website from Google')
+  it('not for what the box doesn’t show', () => {
+    expect(googleKeepsBox(makeListing({ ...synced, googleFields: ['hours'] }), { hours: false })).toBe(false)
+    expect(googleKeepsBox(makeListing({ ...synced, googleFields: ['phone', 'name'], phone: undefined }))).toBe(false)
   })
   it('nothing for a listing no longer matched to Google, whatever it once kept', () => {
-    expect(googleKeeps(makeListing({ googleSyncedAt: '2026-09-30T07:00:00Z', googleFields: ['phone'], phone: '1' }))).toBeNull()
+    expect(googleKeepsBox(makeListing({ googleSyncedAt: '2026-09-30T07:00:00Z', googleFields: ['phone'], phone: '1' }))).toBe(false)
+  })
+})
+
+describe('siteName', () => {
+  it('a website as people say it', () => {
+    expect(siteName('https://www.judahkosher.com/menu?x=1')).toBe('judahkosher.com')
+    expect(siteName('http://tribe12.org')).toBe('tribe12.org')
+    expect(siteName('not a link')).toBeNull()
   })
 })
 

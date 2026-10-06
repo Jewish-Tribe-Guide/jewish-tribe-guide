@@ -337,21 +337,34 @@ export function isStale(iso: string, now: number | null): boolean {
   return Number.isFinite(at) && now - at >= ASK_AFTER_DAYS * 86_400_000
 }
 
-/** "Phone and website from Google": which of the listing's own details the
- *  nightly Google sync keeps, among those it shows. Hours and the
- *  description say so where they're shown; null for a listing Google
- *  doesn't keep (no place ID any more), or keeps none of these. */
-export function googleKeeps(item: DirectoryResource, shown: { hours?: boolean } = {}): string | null {
-  if (!item.placeId || !item.googleSyncedAt) return null
+/** Whether the nightly Google sync keeps any of what the contact box shows
+ *  (its phone, website, or hours when they're there), so the box can say
+ *  when it was last updated from Google: one date for the box, not a list
+ *  of which lines (Oct 6). The description says so in its own box. False
+ *  for a listing Google doesn't keep (no place ID any more). */
+export function googleKeepsBox(item: DirectoryResource, shown: { hours?: boolean } = {}): boolean {
+  if (!item.placeId || !item.googleSyncedAt) return false
   const kept = item.googleFields ?? []
-  const parts = [
-    kept.includes('phone') && item.phone ? 'phone' : null,
-    kept.includes('website') && String(item.website ?? '').trim() ? 'website' : null,
-    kept.includes('hours') && shown.hours ? 'hours' : null,
-  ].filter((p): p is string => !!p)
-  if (parts.length === 0) return null
-  const list = parts.length === 1 ? parts[0] : `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`
-  return `${list.charAt(0).toUpperCase()}${list.slice(1)} from Google`
+  return (
+    (kept.includes('phone') && !!item.phone) ||
+    (kept.includes('website') && !!String(item.website ?? '').trim()) ||
+    (kept.includes('hours') && !!shown.hours)
+  )
+}
+
+/** A website as people say it: "judahkosher.com", no scheme or "www.";
+ *  null for something that isn't a web address. */
+export function siteName(href: string): string | null {
+  try {
+    return new URL(href).hostname.replace(/^www\./, '') || null
+  } catch {
+    return null
+  }
+}
+
+/** A link that's the place's website, not a menu or a form. */
+export function isWebsite(field: CategoryField): boolean {
+  return field.key === 'website' || /website/i.test(field.linkLabel ?? field.label)
 }
 
 /** A note's first sentence, and what's left after it: a mikvah section's

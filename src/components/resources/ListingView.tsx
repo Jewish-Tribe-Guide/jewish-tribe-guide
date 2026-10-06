@@ -20,7 +20,9 @@ import {
   compactWeek,
   confirmPlace,
   firstSentence,
-  googleKeeps,
+  googleKeepsBox,
+  isWebsite,
+  siteName,
   itemsField,
   listingActions,
   listingDistance,
@@ -329,10 +331,13 @@ export default function ListingView({ item, category, color, place = null, upvot
   // The place's hours, in the contact box: today, opening to the week. A
   // mikvah's are in its own boxes, one per audience.
   const otherHours = main === 'groups' ? [] : hoursFields.filter((f) => !f.audienceKey && hasAny(item[f.key]))
-  // Which of what the contact box shows Google keeps, and when: said once,
-  // at the box's foot (Oct 6), not at the end of the listing.
-  const kept = googleKeeps(item, { hours: otherHours.length > 0 })
-  const googleLead = kept ? `${kept}, ${shortDate(item.googleSyncedAt!, clock)}` : null
+  // When Google last updated the box, at its foot (Oct 6): one date for
+  // the box, not a list of which of its lines are Google's.
+  const googleLead = googleKeepsBox(item, { hours: otherHours.length > 0 }) ? `Last updated from Google, ${shortDate(item.googleSyncedAt!, clock)}` : null
+  // The website, by name, with the address and phone (Oct 6): its round
+  // button above says only "Website".
+  const website = buttons.find((a): a is Extract<ActionSpec, { kind: 'link' }> => a.kind === 'link' && isWebsite(a.field))
+  const websiteName = website ? siteName(website.href) : null
   const shownElsewhere = new Set<string>([
     ...(tagline ? [tagline.key] : []),
     ...(named ? named.fields.map((f) => f.key) : []),
@@ -369,7 +374,7 @@ export default function ListingView({ item, category, color, place = null, upvot
   )
   // The contact box: address, phone, hours, links. No heading: its icons
   // say what each line is (Oct 6).
-  const details = (caveat?.title || showAddress || showPhone || otherHours.length > 0 || detailFields.length > 0 || extra.length > 0 || quietBadges.length > 0 || otherTags.length > 0) && (
+  const details = (caveat?.title || showAddress || showPhone || websiteName || otherHours.length > 0 || detailFields.length > 0 || extra.length > 0 || quietBadges.length > 0 || otherTags.length > 0) && (
     <Card testId="listing-details" footer={googleLead && <span data-testid="listing-google">{googleLead}.</span>}>
     <div className="divide-y divide-slate-100">
       {caveat?.title && (
@@ -390,6 +395,13 @@ export default function ListingView({ item, category, color, place = null, upvot
           </a>
         </Row>
       )}
+      {website && websiteName && (
+        <Row icon={<GlobeIcon className="h-[17px] w-[17px]" />}>
+          <a href={website.href} target="_blank" rel="noopener noreferrer" className="break-all text-primary hover:underline">
+            {websiteName}
+          </a>
+        </Row>
+      )}
       {otherHours.map((f) => (
         <Row key={f.key} icon={<ClockIcon className="h-[17px] w-[17px]" />}>
           {otherHours.length > 1 && <span className="block text-[13px] text-muted">{f.label}</span>}
@@ -401,7 +413,7 @@ export default function ListingView({ item, category, color, place = null, upvot
           {a.kind === 'email' ? (
             <a href={`mailto:${a.address}`} className="text-primary hover:underline">{a.address}</a>
           ) : a.kind === 'link' ? (
-            <a href={a.href} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">{a.field.linkLabel ?? a.field.label}</a>
+            <a href={a.href} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">{(isWebsite(a.field) && siteName(a.href)) || a.field.linkLabel || a.field.label}</a>
           ) : null}
         </Row>
       ))}
@@ -577,11 +589,8 @@ function joinLabel(field: CategoryField, category: CategoryConfig, href: string)
   const label = field.linkLabel ?? field.label
   if (isWhatsApp(category) && /^join/i.test(label)) return 'Join the group'
   if (/website/i.test(label)) {
-    try {
-      return `Visit ${new URL(href).hostname.replace(/^www\./, '')}`
-    } catch {
-      return label
-    }
+    const site = siteName(href)
+    return site ? `Visit ${site}` : label
   }
   return label
 }
@@ -1069,10 +1078,14 @@ function GroupBox({ item, group, now, candlesAt }: { item: DirectoryResource; gr
   const foldable = (hasWeek && !!now) || more.length > 0
   const shut = !open || !foldable
   const foldLabel = hasWeek && more.length > 0 ? 'Week and notes' : hasWeek ? 'The week' : 'More'
+  // "Still right?" once the section's opened (Oct 6): it's asked of whoever
+  // is reading its whole week, not over every box at once. A box with
+  // nothing to open asks it straight away.
+  const askable = !!hoursF && (open || !(hasWeek || more.length > 0))
   return (
     <Card
       title={group.label}
-      footer={hoursF && <FreshnessFooter resourceId={item.id} confirmedAt={sectionConfirmedAt(item, group.key)} subject={`${group.label} hours`} section={group.key} />}
+      footer={askable && <FreshnessFooter resourceId={item.id} confirmedAt={sectionConfirmedAt(item, group.key)} subject={`${group.label} hours`} section={group.key} />}
     >
       <div className="divide-y divide-slate-100">
         {today && shut && (
