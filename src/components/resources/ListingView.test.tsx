@@ -57,6 +57,8 @@ describe('ListingView — who and whether', () => {
     expect(screen.getByRole('heading', { name: 'Judah Mediterranean Grille' })).toBeInTheDocument()
     expect(screen.getByText(/Restaurant · Bustleton/)).toHaveTextContent('Restaurant · Bustleton · 11.2 mi from central')
     expect(screen.getByTestId('listing-facts')).toHaveTextContent('Meat · Keystone-K')
+    // Said once, under the name; the address row is just the address (Oct 6).
+    expect(screen.getAllByText(/mi from central/)).toHaveLength(1)
   })
 
   it('says a hechsher’s caveat under the facts, on its own; what isn’t kosher, in full, in the details', () => {

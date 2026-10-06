@@ -34,7 +34,7 @@ import {
 import { parseWalkLists } from '@/lib/walkList'
 import { mainCardOf, shabbosFieldsOf } from '@/lib/listingParts'
 import { clockTime } from '@/lib/upcomingDavening'
-import { milesText, roundMiles } from '@/lib/geo'
+import { milesText } from '@/lib/geo'
 import type { SearchFound } from '@/lib/askSearch'
 import CategoryIcon from '@/components/CategoryIcon'
 import PinnedBadge from '@/components/PinnedBadge'
@@ -327,7 +327,6 @@ export default function ListingView({ item, category, color, place = null, upvot
   // ── 4 · Details ────────────────────────────────────────────────────────
   const showAddress = category.hasAddress !== false && !!item.address
   const showPhone = category.hasPhone !== false && !!item.phone
-  const centreMiles = item.milesFromAddress == null && item.milesFromCenter != null ? item.milesFromCenter : null
   // Hours that aren't the main thing: a grocery's, under its items. One
   // line, opening to the week.
   const hoursFromGoogle = !!item.placeId && !!item.googleSyncedAt && !!item.googleFields?.includes('hours')
@@ -375,14 +374,9 @@ export default function ListingView({ item, category, color, place = null, upvot
         </Row>
       )}
       {showAddress && (
-        <Row icon={<PinIcon className="h-[17px] w-[17px]" />}>
-          {item.address}
-          {centreMiles != null && centreMiles >= 0.5 && (
-            <span className="mt-0.5 block text-[13.5px] text-muted">
-              {roundMiles(centreMiles)} mi from central {community.region}
-            </span>
-          )}
-        </Row>
+        // The address alone (Oct 6): how far is in the line under the name
+        // already, and here it read as a second, duller copy of it.
+        <Row icon={<PinIcon className="h-[17px] w-[17px]" />}>{item.address}</Row>
       )}
       {showPhone && (
         <Row icon={<PhoneIcon className="h-[17px] w-[17px]" />}>
