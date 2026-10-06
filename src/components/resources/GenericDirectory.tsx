@@ -150,11 +150,14 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   const [selectFilters, setSelectFilters] = useState<Record<string, string[]>>({})
 
   // Which card currently has its listing open — the desktop column or the
-  // mobile sheet. The floating Add button steps aside while it's up: on a
-  // phone the listing's own row (Suggest an edit, its overflow) passes under
+  // mobile sheet. On a phone the floating Add button steps aside while it's
+  // up: the listing's own row (Suggest an edit, its overflow) passes under
   // it as the sheet scrolls. Add stays on the listing all the same (agreed
   // Oct 5): that row has its own "+" (ListingEditBar, via TellAboutContext),
-  // opening the box about that listing.
+  // opening the box about that listing. On desktop that row is at the foot
+  // of a long listing, out of sight (Oct 6: "not seeing the add button"),
+  // and nothing passes under the floating one, so it stays, about the
+  // listing open beside it.
   const [openDialogItemId, setOpenDialogItemId] = useState<string | null>(null)
   const [openNow, setOpenNow] = useState(arrivedViaBackForward ? false : (initialOpenNow ?? false))
   // Drives the "Open now" filter below. Without it the filter answers for the
@@ -1733,9 +1736,10 @@ export default function GenericDirectory({ category, items, anchorLabel, address
           reflex people already bring to the shape. */}
       {filtered.length > 0 && !openDialogItemId && !minyanimView && <RowLookSwitch look={rowLook} onChange={setRowLook} />}
 
-      {canAdd && !openDialogItemId && (
+      {canAdd && (!openDialogItemId || (!isMobile && columnItem)) && (
         <button
           onClick={() => {
+            if (openDialogItemId && columnItem && !isMobile) return tellAbout(columnItem)
             setOpenItem(null)
             setTellOpen(true)
           }}

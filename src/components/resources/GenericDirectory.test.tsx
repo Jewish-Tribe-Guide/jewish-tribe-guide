@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { Activity, forwardRef, useContext, useImperativeHandle, useState, type Ref } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { act, cleanup, fireEvent, screen, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { mockRouter } from '@/test/nextNavigationMock'
@@ -426,14 +426,31 @@ describe('GenericDirectory', () => {
   // aside while one is open (on a phone the listing's own row passes under
   // it as the sheet scrolls, and it covered the listing's overflow); the
   // listing's row has its own "+" instead, from the page (TellAboutContext).
-  it('steps the page’s Add aside over an open listing, whose own “+” opens the box about it', async () => {
+  it('steps the page’s Add aside over a listing open on a phone, where its own row has the “+”', async () => {
     const item = makeListing({ name: 'Trader Joe’s' })
     // reopenItemId drives GenericDirectory's own cardRefs.get(id).open(),
     // which fires onExpandedChange — the same path a real click takes,
     // without needing the stubbed card to grow a toggle of its own.
-    renderWithProviders(<GenericDirectory category={makeCategory()} items={[item]} {...handlers} reopenItemId={item.id} />)
-    expect(screen.queryByRole('button', { name: 'Add' })).not.toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Add or update Trader Joe’s' }))
+    renderWithProviders(
+      <ForcedViewport isMobile>
+        <GenericDirectory category={makeCategory()} items={[item]} {...handlers} reopenItemId={item.id} />
+      </ForcedViewport>,
+    )
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Add' })).not.toBeInTheDocument())
+  })
+
+  // Oct 6: on desktop the listing's own "+" is at the foot of a long
+  // listing, out of sight, and the user couldn't find Add. Nothing passes
+  // under the floating one there, so it stays, about the open listing.
+  it('keeps the page’s Add over a listing open on desktop, and both open the box about that listing', async () => {
+    const item = makeListing({ name: 'Trader Joe’s' })
+    renderWithProviders(
+      <ForcedViewport isMobile={false}>
+        <GenericDirectory category={makeCategory()} items={[item]} {...handlers} reopenItemId={item.id} />
+      </ForcedViewport>,
+    )
+    expect(await screen.findByRole('button', { name: 'Add or update Trader Joe’s' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }))
     expect(await screen.findByRole('dialog', { name: 'Tell us about Trader Joe’s' })).toBeInTheDocument()
     // From a listing, editing it yourself, not adding a place.
     expect(screen.queryByRole('button', { name: 'Find the place' })).not.toBeInTheDocument()
