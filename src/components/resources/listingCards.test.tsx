@@ -123,22 +123,40 @@ describe('A hospital’s own main card', () => {
 })
 
 describe('A hotel’s own main card (Oct 6)', () => {
-  it('says a yes/no once, as a ticked line, then the note', () => {
+  // "Shabbos friendly" leads with the yes/no it's about: shown only for a
+  // yes with something more to say, and the yes isn't said again inside.
+  const hotels = makeCategory({
+    id: 'hotel',
+    label: 'Hotel',
+    detailFields: [
+      { key: 'shabbatFriendly', label: 'Shabbat friendly', type: 'boolean', renderAs: 'badge', filterable: true },
+      { key: 'notes', label: 'Notes', type: 'textarea', renderAs: 'row' },
+    ],
+    listingParts: { main: { title: 'Shabbos friendly', fields: ['shabbatFriendly', 'notes'] } },
+  })
+  const hotel = (details: Record<string, unknown>) => {
     vi.setSystemTime(new Date(2026, 9, 6, 13, 30))
-    const hotels = makeCategory({
-      id: 'hotel',
-      label: 'Hotel',
-      detailFields: [
-        { key: 'shabbatFriendly', label: 'Shabbat friendly', type: 'boolean', renderAs: 'badge', filterable: true },
-        { key: 'notes', label: 'Notes', type: 'textarea', renderAs: 'row' },
-      ],
-      listingParts: { main: { title: 'Shabbos here', fields: ['shabbatFriendly', 'notes'] } },
+    renderWithProviders(<ListingView item={makeListing({ id: 'cambria', ...details }) as DirectoryResource} category={hotels} color="#000" path="/test" foot={null} />, {
+      content: { categories: [hotels] },
     })
-    const cambria = makeListing({ id: 'cambria', shabbatFriendly: true, notes: 'Electronic keys, but reception will open door for you' }) as DirectoryResource
-    renderWithProviders(<ListingView item={cambria} category={hotels} color="#000" path="/test" foot={null} />, { content: { categories: [hotels] } })
-    const card = screen.getByTestId('listing-section')
-    expect(card).toHaveTextContent(/^Shabbos hereShabbat friendlyElectronic keys/)
-    expect(card).not.toHaveTextContent('Shabbat friendly:')
+  }
+
+  it('a Shabbos-friendly hotel: the title, then how it works there', () => {
+    hotel({ shabbatFriendly: true, notes: 'Electronic keys, but reception will open door for you' })
+    expect(screen.getByTestId('listing-section')).toHaveTextContent(/^Shabbos friendlyElectronic keys, but reception will open door for you/)
+  })
+
+  it('no box for a hotel that isn’t, or doesn’t say', () => {
+    hotel({ shabbatFriendly: false, notes: 'Electronic keys only' })
+    expect(screen.queryByTestId('listing-section')).not.toBeInTheDocument()
+    cleanup()
+    hotel({ notes: 'Electronic keys only' })
+    expect(screen.queryByTestId('listing-section')).not.toBeInTheDocument()
+  })
+
+  it('no box with nothing more to say than the yes the header already says', () => {
+    hotel({ shabbatFriendly: true })
+    expect(screen.queryByTestId('listing-section')).not.toBeInTheDocument()
   })
 })
 

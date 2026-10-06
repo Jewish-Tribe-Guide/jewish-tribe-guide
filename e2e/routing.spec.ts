@@ -146,6 +146,21 @@ test.describe('URLs', () => {
     await expect(page.locator('a[href="/not-a-real-community"]')).toHaveCount(0)
   })
 
+  // A map link that names a place opens on it, on a phone too: a hotel's
+  // "See them on the map" (Oct 6). It used to be lost on a phone, where the
+  // map learns it's a phone a render after it tried to open the place.
+  test('a map link naming a place opens on that place', async ({ page, request }) => {
+    const community = await defaultCommunity(page)
+    const { category } = await categoryWithMapPoints(request, community)
+    const res = await request.get(`/api/resources?category=${category.id}&community=${community}`)
+    const place = ((await res.json()).resources as { id: string; name: string; geo?: unknown }[]).find((r) => r.geo)!
+
+    await page.goto(`/${community}/map?cat=${category.id}&place=${place.id}`)
+    await dismissLocationPrompt(page)
+
+    await expect(page.getByTestId('listing-view').getByRole('heading', { name: place.name }).first()).toBeVisible({ timeout: 10_000 })
+  })
+
   test('the map carries its filters in the URL', async ({ page, request }) => {
     const community = await defaultCommunity(page)
     // Needs a category that actually plots pins (categoryWithListings would

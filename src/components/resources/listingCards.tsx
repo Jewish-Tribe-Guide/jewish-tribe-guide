@@ -38,7 +38,7 @@ const NOT_YET = 'Not in the guide yet.'
 export function SectionCard({
   item,
   title,
-  fields,
+  fields: all,
   footer,
 }: {
   item: DirectoryResource
@@ -46,6 +46,13 @@ export function SectionCard({
   fields: readonly CategoryField[]
   footer?: ReactNode
 }) {
+  // A card that leads with a yes/no is about it (a hotel's "Shabbos
+  // friendly", Oct 6): shown only for a yes with something more to say, and
+  // the yes isn't said again inside; the title and the header's facts say
+  // it. No card at all for a no, or a hotel that doesn't say.
+  const gate = all[0]?.type === 'boolean' ? all[0] : null
+  const fields = gate ? all.slice(1) : all
+  if (gate && (item[gate.key] !== true || !fields.some((f) => fieldText(f, item[f.key])))) return null
   const filled = fields.filter((f) => fieldText(f, item[f.key]))
   const lead = filled.find((f) => f.type === 'text')
   const leadText = lead ? fieldText(lead, item[lead.key]) : ''

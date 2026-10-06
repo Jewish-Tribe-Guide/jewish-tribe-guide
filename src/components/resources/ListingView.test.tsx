@@ -183,6 +183,11 @@ describe('ListingView — a mikvah’s boxes (Oct 6)', () => {
     fireEvent.click(within(box).getByRole('button', { name: /Week and notes/ }))
     expect(within(box).getByTestId('listing-group-more')).toHaveTextContent('On Motzei Shabbos, open for 2 hours.')
     expect(within(box).getByRole('button', { name: /Less/ })).toHaveAttribute('aria-expanded', 'true')
+    // Opened, the week replaces today's line and the notes are said whole,
+    // once: nothing twice (Oct 6).
+    expect(within(box).queryByText(/^Today:/)).not.toBeInTheDocument()
+    expect(within(box).getAllByText(/On Shabbos, by appointment only\./)).toHaveLength(1)
+    expect(within(box).getByText(notes)).toBeInTheDocument()
   })
 
   it('nothing to fold when one sentence is all it says', () => {
@@ -299,6 +304,9 @@ describe('ListingView — how sure', () => {
     view({ item: makeListing({ womenTevillah: true, women_s_notes: 'By appointment', confirmedAt: '2026-09-02T12:00:00Z' }), category: mikvah })
     expect(screen.getByTestId('listing-groups')).toHaveTextContent('Hours confirmed Sep 2.')
     expect(screen.getAllByTestId('freshness')).toHaveLength(1)
+    // Once, for every section's hours: under the boxes, not in the last
+    // one, where it read as the Keilim's (Oct 6).
+    expect(screen.getByTestId('freshness').closest('section')).toBeNull()
   })
 
   it('asks nothing where nothing is the community’s to confirm', () => {

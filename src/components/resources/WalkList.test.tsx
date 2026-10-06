@@ -93,7 +93,7 @@ describe('A hotel’s synagogues within a walk', () => {
     const section = await openKind(/Synagogues · 3/)
     const headings = within(section).getAllByRole('heading', { level: 4 }).map((h) => h.textContent)
     expect(headings).toEqual(['Under 20 minutes · 2', '20 to 30 minutes · 1'])
-    const rows = within(section).getAllByRole('link').map((a) => a.textContent)
+    const rows = within(section).getAllByRole('link', { name: /min/ }).map((a) => a.textContent)
     // Each says what the Synagogues page says: its denomination and its
     // davening.
     expect(rows).toEqual([
@@ -102,6 +102,10 @@ describe('A hotel’s synagogues within a walk', () => {
       '25 minBeth ZionOrthodox (Ashkenazi) · No davening times listed',
     ])
     expect(within(section).queryByText('Far Away Shul')).not.toBeInTheDocument()
+    // A place's row opens it; only the kind's line has a chevron (Oct 6).
+    expect(within(section).getAllByRole('link', { name: /min/ }).every((l) => !l.querySelector('svg'))).toBe(true)
+    // The same places on the Map, from the hotel.
+    expect(within(section).getByRole('link', { name: 'See them on the map' })).toHaveAttribute('href', '/test-community/map?cat=hotel%2Csynagogue&place=h1')
     expect(fetchMock).toHaveBeenCalledWith('/api/resources?category=synagogue&community=test-community')
     expect(placeLoads()).toBe(1)
   })

@@ -320,7 +320,7 @@ export default function ListingView({ item, category, color, place = null, upvot
     )
   } else if (main === 'walk') {
     const lists = parseWalkLists(category.walkList)
-    mainSection = lists.length > 0 && item.geo ? <WalkLists lists={lists} from={item.geo} fromLabel={category.label} /> : null
+    mainSection = lists.length > 0 && item.geo ? <WalkLists lists={lists} from={item.geo} fromLabel={category.label} fromItem={item} /> : null
   }
 
   // ── 4 · Details ────────────────────────────────────────────────────────
@@ -451,7 +451,7 @@ export default function ListingView({ item, category, color, place = null, upvot
   )
 
   const walkLists = parseWalkLists(category.walkList)
-  const walks = walkLists.length > 0 && item.geo && main !== 'walk' ? <WalkLists lists={walkLists} from={item.geo} fromLabel={category.label} /> : null
+  const walks = walkLists.length > 0 && item.geo && main !== 'walk' ? <WalkLists lists={walkLists} from={item.geo} fromLabel={category.label} fromItem={item} /> : null
   // The Shabbos card comes right after the main thing on a Friday or Erev
   // Yom Tov, until candle lighting; the rest of the week, after the places
   // within a walk.
@@ -1031,9 +1031,9 @@ function ItemAnswer({ mark: m, api, clock, say }: { mark: ItemMark; api: ItemMar
 }
 
 /** A mikvah's sections, a box each (Oct 6): today's hours, its phone and
- *  email, and the first sentence of its notes; the week and the rest of the
- *  notes folded under one tap. "Still right?" about the hours under the
- *  last. */
+ *  email, and the first sentence of its notes; opened, the week and the
+ *  notes whole instead, nothing said twice. "Still right?" about the hours
+ *  once, under them all. */
 function GroupBoxes({
   item,
   groups,
@@ -1049,14 +1049,17 @@ function GroupBoxes({
 }) {
   return (
     <div className="space-y-3" data-testid="listing-groups">
-      {groups.map((g, i) => (
-        <GroupBox key={g.key} item={item} group={g} now={now} candlesAt={candlesAt} footer={i === groups.length - 1 ? footer : undefined} />
+      {groups.map((g) => (
+        <GroupBox key={g.key} item={item} group={g} now={now} candlesAt={candlesAt} />
       ))}
+      {/* Once, for all of them: the listing has one date (Oct 6). In the
+          last box it read as that section's. */}
+      {footer && <div className="px-1 text-[13px] leading-snug text-muted">{footer}</div>}
     </div>
   )
 }
 
-function GroupBox({ item, group, now, candlesAt, footer }: { item: DirectoryResource; group: AudienceGroup; now: Date | null; candlesAt: number | null; footer?: ReactNode }) {
+function GroupBox({ item, group, now, candlesAt }: { item: DirectoryResource; group: AudienceGroup; now: Date | null; candlesAt: number | null }) {
   const [open, setOpen] = useState(false)
   const hoursF = group.fields.find((f) => f.type === 'hours')
   const today = hoursF && now ? formatTodayHours(item[hoursF.key], now) : null
@@ -1067,11 +1070,12 @@ function GroupBox({ item, group, now, candlesAt, footer }: { item: DirectoryReso
   const lead = texts.length > 0 ? firstSentence(texts[0]) : null
   const more = [lead?.rest, ...texts.slice(1)].filter((t): t is string => !!t)
   const foldable = (hasWeek && !!now) || more.length > 0
+  const shut = !open || !foldable
   const foldLabel = hasWeek && more.length > 0 ? 'Week and notes' : hasWeek ? 'The week' : 'More'
   return (
-    <Card title={group.label} footer={footer}>
+    <Card title={group.label}>
       <div className="divide-y divide-slate-100">
-        {today && (
+        {today && shut && (
           <Row icon={<ClockIcon className="h-[17px] w-[17px]" />}>
             <span>{today}</span>
           </Row>
@@ -1092,11 +1096,11 @@ function GroupBox({ item, group, now, candlesAt, footer }: { item: DirectoryReso
             </Row>
           )
         })}
-        {lead && <p className="py-2.5 text-[15px] leading-relaxed whitespace-pre-line text-slate-700">{lead.first}</p>}
-        {open && (
+        {lead && shut && <p className="py-2.5 text-[15px] leading-relaxed whitespace-pre-line text-slate-700">{lead.first}</p>}
+        {!shut && (
           <div className="space-y-2.5 py-2.5" data-testid="listing-group-more">
             {hasWeek && now && <WeekLines value={item[hoursF!.key]} now={now} candlesAt={candlesAt} />}
-            {more.map((t, i) => (
+            {texts.map((t, i) => (
               <p key={i} className="text-[15px] leading-relaxed whitespace-pre-line text-slate-700">
                 {t}
               </p>

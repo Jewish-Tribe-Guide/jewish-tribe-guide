@@ -12,7 +12,7 @@ import { listingRowNote } from '@/lib/listingRow'
 import { kindField, listingFacts, listingKind } from '@/lib/listingView'
 import { neighborhoodsFor, placeName, townsFrom } from '@/lib/places'
 import { listingSlug } from '@/lib/listingSlug'
-import { routes } from '@/lib/routes'
+import { mapQueryString, routes } from '@/lib/routes'
 import {
   nearestBeyond,
   walkAnswer,
@@ -90,12 +90,15 @@ type Props = {
   from: LatLng
   /** What it is, in the footnote: "from the hotel". */
   fromLabel: string
+  /** The listing it starts from, for "See them on the map": the Map with
+   *  it selected and the kind's places around it. */
+  fromItem?: Pick<DirectoryResource, 'id' | 'category'>
 }
 
 /** One box, "Within a walk", a line a kind (Oct 6): how many, and the
  *  nearest, with the whole list a tap away. Four full lists in a row was
  *  most of a hospital's page. */
-export default function WalkLists({ lists, from, fromLabel }: Props) {
+export default function WalkLists({ lists, from, fromLabel, fromItem }: Props) {
   const categories = useCategories()
   const shown = lists.flatMap((walk) => {
     const target = categories.find((c) => c.id === walk.categoryId)
@@ -111,7 +114,7 @@ export default function WalkLists({ lists, from, fromLabel }: Props) {
     >
       <ul className="divide-y divide-slate-100">
         {shown.map(({ walk, target }) => (
-          <WalkList key={target.id} walk={walk} target={target} places={places[target.id]} from={from} />
+          <WalkList key={target.id} walk={walk} target={target} places={places[target.id]} from={from} fromItem={fromItem} />
         ))}
       </ul>
     </Card>
@@ -125,11 +128,13 @@ function WalkList({
   target,
   places,
   from,
+  fromItem,
 }: {
   walk: WalkListSetting
   target: CategoryConfig
   places: DirectoryResource[] | 'failed' | null
   from: LatLng
+  fromItem?: Pick<DirectoryResource, 'id' | 'category'>
 }) {
   const community = useCommunitySlug()
   const [open, setOpen] = useState(false)
@@ -182,7 +187,7 @@ function WalkList({
           {open && (
             <div className="pb-2">
               <NextMinyans enabled={shuls} items={places}>
-                <ListBody walk={walk} target={target} places={places} from={from} />
+                <ListBody walk={walk} target={target} places={places} from={from} fromItem={fromItem} />
               </NextMinyans>
             </div>
           )}
@@ -202,11 +207,13 @@ function ListBody({
   target,
   places,
   from,
+  fromItem,
 }: {
   walk: WalkListSetting
   target: CategoryConfig
   places: DirectoryResource[]
   from: LatLng
+  fromItem?: Pick<DirectoryResource, 'id' | 'category'>
 }) {
   const community = useCommunitySlug()
   const minyans = useContext(NextMinyansContext)
@@ -264,6 +271,16 @@ function ListBody({
         </div>
       ))}
       <p className="mt-2 text-[12.5px] leading-snug text-slate-500">{shuls ? 'Tap one for its Shabbos times.' : 'Tap one to open it.'}</p>
+      {/* These places aren't on this page's map, which shows its own
+          category: the Map shows them around this one (Oct 6). */}
+      {fromItem && (
+        <Link
+          href={`${routes.map(community)}${mapQueryString({ categories: [fromItem.category, target.id], place: fromItem.id })}`}
+          className="mt-2 inline-block text-[14px] font-bold text-primary hover:underline"
+        >
+          See them on the map
+        </Link>
+      )}
     </>
   )
 }
@@ -301,7 +318,6 @@ function Row({ row, target, field, place }: { row: WalkRow; target: CategoryConf
           <span className="block truncate text-[15px] font-bold text-slate-900">{item.name}</span>
           {line && <span className="mt-0.5 block truncate text-[13px] text-slate-500">{line}</span>}
         </span>
-        <ChevronIcon />
       </Link>
     </li>
   )

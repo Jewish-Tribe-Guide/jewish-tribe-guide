@@ -493,7 +493,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // Restoring the selection from `initialPlaceId` needs allPoints, which
   // isn't computed yet at this point in the component — see below, right
   // after allPoints itself.
-  const restoredInitialPlace = useRef(false)
+  const restoredInitialPlace = useRef<'phone' | 'desktop' | null>(null)
 
   const colorById = useMemo(() => {
     const map = new Map<string, string>()
@@ -582,15 +582,24 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // above are the source of truth, and re-running this on every allPoints
   // change (e.g. a live-tracking location update touching a memoized array)
   // would re-open a pin the visitor had already closed.
+  //
+  // Once more on a phone: useIsMobile starts false on every mount and is
+  // corrected a render later, so the first try can land in the desktop
+  // panel a phone never shows, and the place was simply lost (a hotel's
+  // "See them on the map", Oct 6; the same trap the commit effect below
+  // describes). Retried only while that first selection still stands.
   useEffect(() => {
-    if (restoredInitialPlace.current || !standalone || !initialPlaceId) return
+    if (!standalone || !initialPlaceId) return
+    const retryOnPhone = restoredInitialPlace.current === 'desktop' && isMobile && desktopSelected?.id === initialPlaceId
+    if (restoredInitialPlace.current && !retryOnPhone) return
     const point = allPoints.find((p) => p.id === initialPlaceId)
     if (!point) return
-    restoredInitialPlace.current = true
+    restoredInitialPlace.current = isMobile ? 'phone' : 'desktop'
+    if (retryOnPhone) setDesktopSelected(null)
     // eslint-disable-next-line react-hooks/set-state-in-effect
     selectPlace(point)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allPoints, standalone, initialPlaceId])
+  }, [allPoints, standalone, initialPlaceId, isMobile])
 
   const options = useMemo<FilterOption[]>(() => {
     const counts = new Map<string, number>()
