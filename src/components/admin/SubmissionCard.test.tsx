@@ -367,6 +367,10 @@ const SCHEDULE_FIELD_VISIBILITY: Record<keyof SpecialSchedule | keyof ScheduleMi
   season: 'shown',
   // Bookkeeping, not content.
   id: 'deliberately-hidden',
+  // Set by the app when a week's times are applied, never typed by anyone:
+  // the schedule's name and dates already say which week it is (Oct 6).
+  kind: 'deliberately-hidden',
+  postedAt: 'deliberately-hidden',
   // As for regular minyanim: `time` carries the rule's text.
   anchor: 'deliberately-hidden',
   offsetMinutes: 'deliberately-hidden',

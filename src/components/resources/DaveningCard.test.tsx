@@ -185,3 +185,69 @@ describe('a shul’s usual times, two boxes (Oct 6)', () => {
     expect(screen.getByTestId('davening-no-weekday')).toHaveTextContent('No weekday minyan listed. Add one')
   })
 })
+
+// Oct 6: a shul that sends out its times each week gets “This week’s
+// schedule” on top: waiting, with Add, until this week's is in; then the
+// times it sent, the usual ones they replace folded under it.
+describe('this week’s schedule (Oct 6)', () => {
+  afterEach(() => vi.useRealTimers())
+  const usual = [
+    { id: 'a', tefillah: 'shacharis', days: ['sat'], time: '9:15am' },
+    { id: 'b', tefillah: 'mincha_maariv', days: ['fri'], time: 'At Candle Lighting', anchor: 'candle_lighting', offsetMinutes: 0 },
+    { id: 'c', tefillah: 'shacharis', days: ['mon', 'thu'], time: '6:45am' },
+  ]
+  const weekPost = (name: string, from: string, to: string, extra: object = {}) => ({
+    id: name,
+    name,
+    from,
+    to,
+    mode: 'replace',
+    kind: 'week',
+    minyanim: [
+      { id: `${name}1`, tefillah: 'mincha_maariv', on: [from], time: '6:10pm' },
+      { id: `${name}2`, tefillah: 'shacharis', on: [to], time: '9:00am', notes: 'Kiddush after davening' },
+    ],
+    ...extra,
+  })
+  const before = [weekPost('Shabbos Haazinu', '2026-09-25', '2026-09-26'), weekPost('Times for Oct 2 – Oct 3', '2026-10-02', '2026-10-03')]
+  const show = (schedules: unknown[]) => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-10-08T16:00:00-04:00')) // Thu Oct 8
+    const shul = makeListing({ id: 'k', name: 'Mekor Habracha', category: 'synagogue', minyanim: usual, minyanim_schedules: schedules })
+    renderWithProviders(<DaveningCard item={shul} minyanim={usual} schedules={schedules} category={shuls} />, { content: { categories: [shuls] } })
+  }
+
+  it('waits for this week’s from a shul that sends one out, with Add opening in the box', () => {
+    show(before)
+    const box = screen.getByTestId('davening-this-week-waiting')
+    expect(box).toHaveTextContent('This week’s scheduleThey send out a schedule each week; this week’s isn’t on the guide yet. Until it is, their usual times are below.')
+    expect(box).toHaveTextContent('Paste their email or add a photo; an admin checks it.')
+    fireEvent.click(within(box).getByRole('button', { name: 'Add this week’s schedule' }))
+    expect(within(box).getByTestId('update-times')).toBeInTheDocument()
+    // The usual times stay open below it.
+    expect(screen.getByTestId('davening-shabbos')).toHaveTextContent('Shacharis 9:15 AM')
+  })
+
+  it('once it’s in: its name and dates, its times in Shabbos order, and the usual Shabbos times folded', () => {
+    show([...before, weekPost('Shabbos Bereishis', '2026-10-09', '2026-10-10', { postedAt: '2026-10-07T15:00:00.000Z' })])
+    expect(screen.queryByTestId('davening-this-week-waiting')).not.toBeInTheDocument()
+    const box = screen.getByTestId('davening-this-week')
+    expect(within(box).getByTestId('davening-this-week-dates')).toHaveTextContent('Shabbos Bereishis, Oct 9–10')
+    expect(box).toHaveTextContent('In place of their usual times for these dates only.')
+    expect(within(box).getByTestId('davening-shabbos-lines')).toHaveTextContent('Friday nightMincha & Maariv 6:10 PMShabbos morningShacharis 9 AMKiddush after davening')
+    expect(box).toHaveTextContent('Posted Wed Oct 7')
+    expect(screen.getByTestId('davening-folded')).toHaveTextContent('Usual Shabbos timesNot this week: this week’s schedule replaces them')
+    // It only covers Shabbos: the weekday times stay as they are.
+    expect(screen.getByTestId('davening-weekday')).toHaveTextContent('6:45 AM')
+  })
+
+  it('a shul that has never sent one out just shows its usual times', () => {
+    show([])
+    expect(screen.queryByTestId('davening-this-week-waiting')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('davening-this-week')).not.toBeInTheDocument()
+    cleanup()
+    // One post isn't a habit.
+    show([before[1]])
+    expect(screen.queryByTestId('davening-this-week-waiting')).not.toBeInTheDocument()
+  })
+})

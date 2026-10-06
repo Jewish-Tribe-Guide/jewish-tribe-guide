@@ -416,7 +416,7 @@ export function applyUpdate(
   current: readonly Minyan[],
   schedules: readonly SpecialSchedule[],
   update: Omit<TimesUpdate, 'otherSeason'>,
-  { newId = () => crypto.randomUUID() }: { newId?: () => string } = {},
+  { newId = () => crypto.randomUUID(), now = Date.now() }: { newId?: () => string; now?: number } = {},
 ): { minyanim: Minyan[]; schedules: SpecialSchedule[]; changes: string[] } {
   const changes: string[] = []
   // The shul's times, one per day, each remembering which minyan it was.
@@ -484,7 +484,17 @@ export function applyUpdate(
     const minyanimOn = update.rows
       .filter((r) => r.status !== 'gone' || r.keep)
       .map((r) => ({ id: newId(), tefillah: r.tefillah, on: [r.day], ...pickTime(r), ...(r.notes ? { notes: r.notes } : {}) }))
-    nextSchedules = mergeSchedule(nextSchedules, { id: newId(), name: name.slice(0, 60), from: update.from, to: update.to, mode: 'replace', minyanim: minyanimOn })
+    nextSchedules = mergeSchedule(nextSchedules, {
+      id: newId(),
+      name: name.slice(0, 60),
+      from: update.from,
+      to: update.to,
+      mode: 'replace',
+      minyanim: minyanimOn,
+      // A week the shul sent out, and when: “This week's schedule” (Oct 6).
+      kind: 'week',
+      postedAt: new Date(now).toISOString(),
+    })
     for (const r of update.rows) {
       if (r.status === 'changed') changes.push(`${name}: ${rowText(r)}, usually ${r.was}`)
       if (r.status === 'new') changes.push(`${name}: new, ${rowText(r)}`)

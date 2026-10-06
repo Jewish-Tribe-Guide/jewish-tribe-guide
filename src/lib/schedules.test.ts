@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Minyan } from './davening'
 import type { CalendarDay } from './jewishDays'
-import { cleanSchedule, factsFor, readSchedules, resolveDay, withSchedules, dateKey, type SpecialSchedule } from './schedules'
+import { cleanSchedule, factsFor, readSchedules, resolveDay, sendsWeekly, thisWeeksPost, withSchedules, dateKey, type SpecialSchedule } from './schedules'
 import { listMinyanim, nextUpcomingDavening } from './upcomingDavening'
 import { geoKey, geoOrCommunityDefault } from './useZmanAnchors'
 
@@ -150,5 +150,28 @@ describe('reading stored schedules', () => {
     expect(readSchedules([{ ...sukkos, mode: 'sometimes' }])).toEqual([])
     expect(readSchedules([{ ...sukkos, minyanim: [{ id: 'z', tefillah: 'shacharis', on: ['someday'], time: '7' }] }])[0].minyanim).toEqual([])
     expect(readSchedules('nope')).toEqual([])
+  })
+})
+
+// Oct 6: a shul that sends out its times each week.
+describe('a shul’s weekly schedule', () => {
+  const post = (name: string, from: string, to: string, kind: 'week' | null = 'week'): SpecialSchedule => ({ id: name, name, from, to, mode: 'replace', minyanim: [], ...(kind ? { kind } : {}) })
+  it('keeps what kind of schedule it is, and when it was posted, through a read', () => {
+    expect(readSchedules([{ ...post('A', '2026-10-09', '2026-10-10'), postedAt: '2026-10-07T15:00:00Z' }])[0]).toMatchObject({ kind: 'week', postedAt: '2026-10-07T15:00:00Z' })
+    expect(readSchedules([{ ...post('B', '2026-10-09', '2026-10-10'), kind: 'nonsense', postedAt: 'whenever' }])[0]).not.toHaveProperty('kind')
+  })
+  it('sends one each week: two week posts in the last eight weeks; a Yom Tov schedule doesn’t count', () => {
+    const two = [post('Haazinu', '2026-09-25', '2026-09-26'), post('Oct 2', '2026-10-02', '2026-10-03')]
+    expect(sendsWeekly(two, '2026-10-08')).toBe(true)
+    expect(sendsWeekly(two.slice(1), '2026-10-08')).toBe(false)
+    expect(sendsWeekly([two[0], post('Sukkos 5787', '2026-09-26', '2026-10-04', null)], '2026-10-08')).toBe(false)
+    expect(sendsWeekly(two, '2026-12-01')).toBe(false)
+  })
+  it('this week’s post: the one for the week today is in, Sunday to Shabbos, not yet over', () => {
+    const bereishis = post('Bereishis', '2026-10-09', '2026-10-10')
+    expect(thisWeeksPost([bereishis], '2026-10-04')?.name).toBe('Bereishis') // the Sunday before
+    expect(thisWeeksPost([bereishis], '2026-10-10')?.name).toBe('Bereishis')
+    expect(thisWeeksPost([bereishis], '2026-10-11')).toBeUndefined() // the Sunday after
+    expect(thisWeeksPost([bereishis], '2026-10-03')).toBeUndefined() // the Shabbos before
   })
 })

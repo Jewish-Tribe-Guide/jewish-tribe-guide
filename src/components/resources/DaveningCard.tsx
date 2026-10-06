@@ -2,12 +2,12 @@
 
 import { useState, type ReactNode } from 'react'
 import type { DirectoryResource } from '@/types'
-import { TEFILLAH_LABELS, TEFILLAH_ORDER } from '@/lib/davening'
+import { TEFILLAH_LABELS, TEFILLAH_ORDER, type Minyan } from '@/lib/davening'
 import { useMinyanSchedule } from '@/lib/useMinyanSchedule'
 import { geoKey, geoOrCommunityDefault, resolveAnchorTime, type AnchorTimes } from '@/lib/useZmanAnchors'
-import { dateText, readSchedules, regularMinyanim, scheduleDayText, type DayPosting, type SpecialSchedule } from '@/lib/schedules'
+import { dateText, readSchedules, regularMinyanim, scheduleDayText, sendsWeekly, thisWeeksPost, type DayPosting, type SpecialSchedule } from '@/lib/schedules'
 import { clockMinutes, noteText, SHABBOS_PART_LABELS, shabbosList, timeText, weekdayTable, type ShabbosLine } from '@/lib/weekTable'
-import type { DayKey } from '@/lib/hours'
+import { DAY_KEYS, type DayKey } from '@/lib/hours'
 import { resolveCapabilities, type CategoryConfig } from '@/lib/categories'
 import { ui } from '@/lib/uiConfig'
 import { ChevronRightIcon, PlusIcon } from '@/components/icons'
@@ -45,17 +45,22 @@ export default function DaveningCard({
 }) {
   const [adding, setAdding] = useState(false)
   const [sent, setSent] = useState(false)
-  const [updating, setUpdating] = useState(false)
-  const [updated, setUpdated] = useState<'sent' | 'confirmed' | null>(null)
+  // Which box "Update their times" was opened from, and where it said
+  // thanks: it opens in place, in the box that asked.
+  const [updatingIn, setUpdatingIn] = useState<string | null>(null)
+  const [updated, setUpdated] = useState<{ in: string; what: 'sent' | 'confirmed' } | null>(null)
   const [unfolded, setUnfolded] = useState<Record<string, boolean>>({})
   const schedule = useMinyanSchedule(null, [item])
   const canAdd = ui.contributions.edit && (!category || resolveCapabilities(category.capabilities).edit)
 
   // Whose times today's and tomorrow's are: a special schedule's, or the
   // regular ones on a festival day with none posted.
+  const schedules = readSchedules(rawSchedules)
   const posting: DayPosting[] = schedule ? [schedule.today, schedule.tomorrow].map((d) => schedule.posting[item.id]?.[d.date] ?? { kind: 'regular' }) : []
   const special = posting.find((p): p is Extract<DayPosting, { kind: 'schedule' }> => p.kind === 'schedule')
-  const specialSchedule = special ? readSchedules(rawSchedules).find((s) => s.name === special.name) : undefined
+  const specialFound = special ? schedules.find((s) => s.name === special.name) : undefined
+  // A week the shul sent out has its own box, "This week's schedule".
+  const specialSchedule = specialFound?.kind === 'week' ? undefined : specialFound
   const notPosted = posting.find((p): p is Extract<DayPosting, { kind: 'not-posted' }> => p.kind === 'not-posted')
 
   // Older rows keep their times as one line of text.
@@ -74,43 +79,53 @@ export default function DaveningCard({
   const anchors = schedule?.anchors[geoKey(geoOrCommunityDefault(item.geo))]
   const today = schedule?.todayKey ?? null
   const shabbosFirst = !!schedule && (today === 'fri' || today === 'sat' || (today === 'thu' && schedule.nowMinutes >= 18 * 60))
-  // A schedule in place of the usual times folds them to one line.
-  const replaced = specialSchedule?.mode === 'replace'
 
-  const update = () => setUpdating(true)
-  const updateArea = canAdd && (
-    <div className="mt-2.5">
-      {updated ? (
-        <p role="status" className="text-[13.5px] font-semibold text-emerald-700">
-          {updated === 'sent' ? 'Thanks! An admin checks them before everyone sees them.' : 'Thanks! Marked confirmed.'}
+  // This week's schedule, when the shul sends one out (Oct 6): what it sent
+  // for this week, or a box waiting for it.
+  const todayDate = schedule?.today.date ?? null
+  const post = todayDate ? thisWeeksPost(schedules, todayDate) : undefined
+  const waiting = !post && !!todayDate && sendsWeekly(schedules, todayDate)
+  const postRows = post ? weekRows(post) : []
+  const postDays = new Set(postRows.flatMap((m) => m.days))
+
+  // The usual times a schedule replaces fold to one line under it.
+  const foldReason = (key: 'week' | 'shabbos') =>
+    specialSchedule?.mode === 'replace'
+      ? `Not now: the ${specialSchedule.name} times above replace them`
+      : post && (key === 'shabbos' ? postDays.has('fri') || postDays.has('sat') : ['sun', 'mon', 'tue', 'wed', 'thu'].some((d) => postDays.has(d as DayKey)))
+        ? 'Not this week: this week’s schedule replaces them'
+        : null
+
+  const open = (key: string) => setUpdatingIn(key)
+  /** "Update their times", opened in the box `key`, or its thanks. */
+  const updateIn = (key: string) => {
+    if (!canAdd) return null
+    if (updated?.in === key)
+      return (
+        <p role="status" className="mt-2 text-[13.5px] font-semibold text-emerald-700">
+          {updated.what === 'sent' ? 'Thanks! An admin checks them before everyone sees them.' : 'Thanks! Marked confirmed.'}
         </p>
-      ) : updating ? (
+      )
+    if (updatingIn !== key) return null
+    return (
+      <div className="mt-2">
         <UpdateTimesBox
           item={item}
           minyanim={rows}
           onSent={(what) => {
-            setUpdated(what)
-            setUpdating(false)
+            setUpdated({ in: key, what })
+            setUpdatingIn(null)
           }}
-          onClose={() => setUpdating(false)}
+          onClose={() => setUpdatingIn(null)}
         />
-      ) : (
-        !adding && (
-          <button
-            type="button"
-            onClick={update}
-            className="h-10 w-full cursor-pointer rounded-[10px] border-[1.5px] border-primary bg-white text-[14.5px] font-bold text-primary hover:bg-primary/5"
-          >
-            Update their times
-          </button>
-        )
-      )}
-    </div>
-  )
+      </div>
+    )
+  }
   const confirm = <FreshnessFooter resourceId={item.id} confirmedAt={item.confirmedAt} subject="Times" />
 
-  const folded = (key: string, title: string, body: ReactNode) =>
-    replaced && !unfolded[key] ? (
+  const folded = (key: 'week' | 'shabbos', title: string, body: ReactNode) => {
+    const reason = foldReason(key)
+    return reason && !unfolded[key] ? (
       <button
         key={key}
         type="button"
@@ -121,13 +136,14 @@ export default function DaveningCard({
       >
         <span>
           <span className="block text-base font-extrabold text-slate-900">{title}</span>
-          <span className="mt-0.5 block text-[13.5px] text-muted">Not now: the {specialSchedule!.name} times above replace them</span>
+          <span className="mt-0.5 block text-[13.5px] text-muted">{reason}</span>
         </span>
         <ChevronRightIcon className="h-5 w-5 shrink-0 rotate-90 text-slate-400" />
       </button>
     ) : (
       body
     )
+  }
 
   const weekBox = week
     ? folded(
@@ -148,14 +164,17 @@ export default function DaveningCard({
         </Card>,
       )
     : shab && (
-        <p key="week" className="px-1 text-[13.5px] text-muted" data-testid="davening-no-weekday">
-          No weekday minyan listed.{' '}
-          {canAdd && (
-            <button type="button" onClick={update} className="cursor-pointer font-bold text-primary hover:underline">
-              Add one
-            </button>
-          )}
-        </p>
+        <div key="week" className="px-1" data-testid="davening-no-weekday">
+          <p className="text-[13.5px] text-muted">
+            No weekday minyan listed.{' '}
+            {canAdd && updatingIn !== 'no-weekday' && (
+              <button type="button" onClick={() => open('no-weekday')} className="cursor-pointer font-bold text-primary hover:underline">
+                Add one
+              </button>
+            )}
+          </p>
+          {updateIn('no-weekday')}
+        </div>
       )
 
   const shabbosBox = shab
@@ -170,17 +189,47 @@ export default function DaveningCard({
     : week && (
         <Card key="shabbos" title="Usual Shabbos times" testId="davening-shabbos">
           <p className="pt-0.5 text-[14.5px] leading-relaxed text-slate-700">Their Shabbos times aren’t listed yet.{canAdd ? ' If you’ve davened there, add them.' : ''}</p>
-          {canAdd && (
-            <button type="button" onClick={update} className="mt-1.5 inline-flex cursor-pointer items-center gap-1.5 py-1 text-[14.5px] font-bold text-primary">
+          {canAdd && updatingIn !== 'shabbos' && (
+            <button type="button" onClick={() => open('shabbos')} className="mt-1.5 inline-flex cursor-pointer items-center gap-1.5 py-1 text-[14.5px] font-bold text-primary">
               <PlusIcon className="h-4 w-4" />
               Add their Shabbos times
             </button>
           )}
+          {updateIn('shabbos')}
         </Card>
       )
 
+  const postTable = post ? weekdayTable(postRows, null) : null
+  const postShabbos = post ? shabbosList(postRows, null) : null
+
   return (
     <div className="space-y-5" data-testid="listing-davening">
+      {post && (
+        <Card title="This week’s schedule" testId="davening-this-week" footer={post.postedAt ? `Posted ${dateText(post.postedAt.slice(0, 10), { weekday: true })}` : undefined}>
+          <p className="text-[14.5px] font-semibold text-slate-700" data-testid="davening-this-week-dates">
+            {postTitle(post)}
+          </p>
+          <p className="mt-1.5 rounded-lg bg-slate-100 px-2.5 py-1.5 text-[13px] leading-snug text-slate-700">In place of their usual times for these dates only.</p>
+          {postShabbos && <ShabbosLines lines={postShabbos.lines} anchors={anchors} today={today} />}
+          {postTable && <WeekTable table={postTable} today={today} />}
+        </Card>
+      )}
+      {waiting && (
+        <Card title="This week’s schedule" testId="davening-this-week-waiting" footer={canAdd ? 'Paste their email or add a photo; an admin checks it.' : undefined}>
+          <p className="pt-0.5 text-[14.5px] leading-relaxed text-slate-700">They send out a schedule each week; this week’s isn’t on the guide yet. Until it is, their usual times are below.</p>
+          {canAdd && updatingIn !== 'this-week' && !(updated?.in === 'this-week') && (
+            <button
+              type="button"
+              onClick={() => open('this-week')}
+              className="mt-2.5 flex h-11 w-full cursor-pointer items-center justify-center gap-1.5 rounded-full border border-slate-300 bg-white text-[15px] font-bold text-primary hover:bg-slate-50"
+            >
+              <PlusIcon className="h-4 w-4" />
+              Add this week’s schedule
+            </button>
+          )}
+          {updateIn('this-week')}
+        </Card>
+      )}
       {specialSchedule && (
         <Card title={specialSchedule.name} testId="davening-special-box">
           <p className="text-[13.5px] font-semibold text-green-700" data-testid="davening-special">
@@ -220,10 +269,41 @@ export default function DaveningCard({
       {/* One date and one Update for the shul's times, for now; each box
           gets its own with migration 072. */}
       <Card testId="davening-confirm" footer={confirm}>
-        {updateArea}
+        {canAdd && updatingIn !== 'end' && updated?.in !== 'end' && !adding && (
+          <button
+            type="button"
+            onClick={() => open('end')}
+            className="mt-2.5 h-10 w-full cursor-pointer rounded-[10px] border-[1.5px] border-primary bg-white text-[14.5px] font-bold text-primary hover:bg-primary/5"
+          >
+            Update their times
+          </button>
+        )}
+        {updateIn('end')}
       </Card>
     </div>
   )
+}
+
+/** A week post's times as regular rows, each on its date's weekday, for the
+ *  same table and Shabbos lines as the usual times. */
+function weekRows(post: SpecialSchedule): Minyan[] {
+  return post.minyanim.flatMap((m) => {
+    const days = m.on.flatMap((d) => (/^\d{4}-\d{2}-\d{2}$/.test(d) ? [DAY_KEYS[new Date(`${d}T12:00:00Z`).getUTCDay()]] : (DAY_KEYS as readonly string[]).includes(d) ? [d as DayKey] : []))
+    if (days.length === 0) return []
+    const { on: _on, ...rest } = m
+    void _on
+    return [{ ...rest, days: [...new Set(days)] }]
+  })
+}
+
+/** "Shabbos Bereishis, Oct 9–10"; just the dates for a name the guide made
+ *  up ("Times for Oct 9 – Oct 10"). */
+function postTitle(post: SpecialSchedule): string {
+  const from = dateText(post.from)
+  const to = dateText(post.to)
+  const sameMonth = from.split(' ')[0] === to.split(' ')[0]
+  const dates = post.from === post.to ? from : `${from}–${sameMonth ? to.split(' ')[1] : to}`
+  return /^times for /i.test(post.name) ? dates : `${post.name}, ${dates}`
 }
 
 const capital = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)

@@ -152,10 +152,12 @@ describe('one Shabbos’s times', () => {
   })
 
   it('this Shabbos only: a dated schedule for those two days, the regular times untouched', () => {
-    const { minyanim, schedules } = applyUpdate(MEKOR, [], u, { newId })
+    const { minyanim, schedules } = applyUpdate(MEKOR, [], u, { newId, now: Date.parse('2026-10-07T15:00:00Z') })
     expect(minyanim.map((m) => m.time).sort()).toEqual(MEKOR.map((m) => m.time).sort())
     expect(schedules).toHaveLength(1)
-    expect(schedules[0]).toMatchObject({ name: 'Shabbos Bereishis', from: '2026-10-09', to: '2026-10-10', mode: 'replace' })
+    // Marked as a week the shul sent out, and when (Oct 6): “This week's
+    // schedule”, and whether the shul sends one each week.
+    expect(schedules[0]).toMatchObject({ name: 'Shabbos Bereishis', from: '2026-10-09', to: '2026-10-10', mode: 'replace', kind: 'week', postedAt: '2026-10-07T15:00:00.000Z' })
     expect(schedules[0].minyanim.map((m) => `${m.on[0]} ${m.tefillah} ${m.time}`)).toEqual([
       '2026-10-09 mincha_maariv 6:12pm',
       '2026-10-10 shacharis 9:00am',

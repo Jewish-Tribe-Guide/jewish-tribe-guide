@@ -34,6 +34,11 @@ export type SpecialSchedule = {
   /** In place of the regular times, or as well as them. */
   mode: 'replace' | 'add'
   minyanim: ScheduleMinyan[]
+  /** 'week': one week's times the shul sent out (a Shabbos post), from
+   *  “Update their times”; absent for a Yom Tov schedule (Oct 6). */
+  kind?: 'week'
+  /** When a week's times were added, ISO. */
+  postedAt?: string
 }
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/
@@ -62,7 +67,18 @@ export function readSchedules(raw: unknown): SpecialSchedule[] {
             (m as ScheduleMinyan).on.every(isScheduleDay),
         )
       : []
-    return [{ id: x.id, name: x.name, from: x.from, to: x.to, mode: x.mode, minyanim }]
+    return [
+      {
+        id: x.id,
+        name: x.name,
+        from: x.from,
+        to: x.to,
+        mode: x.mode,
+        minyanim,
+        ...(x.kind === 'week' ? { kind: 'week' as const } : {}),
+        ...(typeof x.postedAt === 'string' && !Number.isNaN(Date.parse(x.postedAt)) ? { postedAt: x.postedAt } : {}),
+      },
+    ]
   })
 }
 
@@ -248,4 +264,24 @@ export function cleanSchedule(raw: unknown, now = Date.now()): SpecialSchedule |
       ...(m.notes?.trim() ? { notes: m.notes.trim() } : {}),
     })),
   }
+}
+
+// ── A shul's weekly schedule (Oct 6) ────────────────────────────────────────
+
+const DAY_MS = 86_400_000
+
+/** Whether a shul sends out its times each week: at least two week posts
+ *  ending in the last eight weeks. Worked out from what's stored, so nobody
+ *  enters it; a shul that has never posted one never shows a waiting box. */
+export function sendsWeekly(schedules: readonly SpecialSchedule[], today: string): boolean {
+  const since = new Date(Date.parse(`${today}T12:00:00Z`) - 56 * DAY_MS).toISOString().slice(0, 10)
+  return schedules.filter((s) => s.kind === 'week' && s.to >= since).length >= 2
+}
+
+/** The week post for the week `today` is in (Sunday to Shabbos) that hasn't
+ *  ended yet, if one was sent. */
+export function thisWeeksPost(schedules: readonly SpecialSchedule[], today: string): SpecialSchedule | undefined {
+  const d = new Date(`${today}T12:00:00Z`)
+  const saturday = new Date(d.getTime() + (6 - d.getUTCDay()) * DAY_MS).toISOString().slice(0, 10)
+  return schedules.filter((s) => s.kind === 'week' && s.to >= today && s.from <= saturday).sort((a, b) => a.from.localeCompare(b.from))[0]
 }
