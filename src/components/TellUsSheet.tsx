@@ -44,10 +44,15 @@ import { TURNSTILE_ACTIVE } from '@/components/resources/useListingSubmit'
 //     already filled in, with its own Send.
 
 type Brief = { id: string; name: string; address: string; category: string; categoryLabel: string }
-type Lines = { lines: string[]; held: string[]; current?: CurrentItems }
+type Lines = { lines: string[]; held: string[]; current?: CurrentItems; dishes?: boolean }
 type Choice = { label: string; listingId: string; listing: Brief } & Lines
 
-type ItemsProposal = { kind: 'items'; listingId: string | null; listing: Brief | null; asWritten: string; chain: boolean; ask: { question: string; choices: Choice[] } | null; items: ReadItem[] } & Lines
+/** Where a Food place's dishes were read: its menu's page, or photos of it
+ *  (url null). */
+type MenuRead = { url: string | null; dishes: { name: string; quote: string; checked: boolean }[] }
+type ItemsProposal = { kind: 'items'; listingId: string | null; listing: Brief | null; asWritten: string; chain: boolean; ask: { question: string; choices: Choice[] } | null; items: ReadItem[]; menu?: MenuRead } & Lines
+/** A menu that couldn't be read, and why. */
+type MenuFailed = { kind: 'menu'; listing: Brief | null; asWritten: string; failed: string }
 type PlaceProposal = {
   kind: 'new_place'
   category: string | null
@@ -70,7 +75,7 @@ type FieldsChoice = { label: string; listingId: string; listing: Brief } & Field
 type FieldsProposal = { kind: 'fields'; listingId: string | null; listing: Brief | null; asWritten: string; ask: { question: string; choices: FieldsChoice[] } | null } & FieldsReading
 type TimesProposal = { kind: 'times'; listing: Brief; item: DirectoryResource; minyanimKey: string | null; update: TimesUpdate | null }
 type OtherProposal = { kind: 'ask_others' | 'not_update'; question?: string; note?: string | null; listing?: Brief | null }
-type Proposal = ItemsProposal | FieldsProposal | PlaceProposal | TimesProposal | OtherProposal
+type Proposal = ItemsProposal | FieldsProposal | PlaceProposal | TimesProposal | MenuFailed | OtherProposal
 type Reading = { proposals: Proposal[]; photoUrls: string[] }
 
 const MAX_PHOTOS = 3
@@ -307,13 +312,15 @@ function TellUsBody({
   // picked) with what it carries, or its other fields. A new place goes with
   // the add form, and a shul's times with their own box.
   const proposals = reading?.proposals ?? []
-  const payloadOf = (i: number): { stores: { listingId: string; items: ReadItem[] }[]; edits: { listingId: string; values: Record<string, unknown>; notes: string[] }[] } | null => {
+  const payloadOf = (i: number): { stores: { listingId: string; items: ReadItem[]; menu?: { url: string | null } }[]; edits: { listingId: string; values: Record<string, unknown>; notes: string[] }[] } | null => {
     const p = proposals[i]
     if (p?.kind === 'items') {
       const id = p.listingId ?? picked[i] ?? null
       const read = p.listingId ? p : p.ask?.choices.find((c) => c.listingId === id)
       const items = itemEdits[i] ?? p.items
-      return id && read && changingItems(read.current ?? { always: [], sometimes: [] }, items).length ? { stores: [{ listingId: id, items }], edits: [] } : null
+      return id && read && changingItems(read.current ?? { always: [], sometimes: [] }, items).length
+        ? { stores: [{ listingId: id, items, ...(p.menu ? { menu: { url: p.menu.url } } : {}) }], edits: [] }
+        : null
     }
     if (p?.kind === 'new_place' && picked[i] && p.maybe.find((m) => m.id === picked[i])?.lines.length) {
       return { stores: [{ listingId: picked[i]!, items: p.items }], edits: [] }
@@ -349,9 +356,10 @@ function TellUsBody({
       return same ? { name: same.name, what: same.lines.join(', ') } : { name: p.place.name, what: 'New place' }
     }
     if (p?.kind === 'times') return { name: p.listing.name, what: 'Davening times' }
+    if (p?.kind === 'menu') return { name: p.listing?.name ?? (p.asWritten || 'A place'), what: '' }
     return { name: '', what: '' }
   }
-  const PLACES = new Set(['items', 'fields', 'new_place', 'times'])
+  const PLACES = new Set(['items', 'fields', 'new_place', 'times', 'menu'])
   // One card per place: a store's items and its hours, read as two
   // proposals, are one place to check and one Send (said Oct 5: several
   // changes to one listing stay together).
@@ -359,7 +367,7 @@ function TellUsBody({
   const byPlace = new Map<string, number[]>()
   proposals.forEach((p, i) => {
     if (!PLACES.has(p.kind)) return
-    const key = (p.kind === 'items' || p.kind === 'fields') && p.listingId ? p.listingId : `#${i}`
+    const key = (p.kind === 'items' || p.kind === 'fields') && p.listingId ? p.listingId : p.kind === 'menu' && p.listing ? p.listing.id : `#${i}`
     const g = byPlace.get(key)
     if (g) g.push(i)
     else {
@@ -867,7 +875,22 @@ function ResultCard({
         )}
         {/* The store's items as the listing shows them, with what changes
             marked and "+ Add another item" under it (agreed Oct 5). */}
-        {read && <TellUsItems current={read.current ?? { always: [], sometimes: [] }} items={items} held={read.held} onChange={onItems} />}
+        {/* A Food place's dishes read off its menu: where, so it can be
+            checked (agreed Oct 6). */}
+        {p.menu && (
+          <p className="mt-1.5 text-[13px] text-slate-600" data-testid="tell-us-menu">
+            Read from{' '}
+            {p.menu.url ? (
+              <a href={p.menu.url} target="_blank" rel="noopener noreferrer" className="font-semibold text-primary hover:underline">
+                its menu ↗
+              </a>
+            ) : (
+              'the photos of its menu'
+            )}
+            . Main dishes only, not the whole menu.
+          </p>
+        )}
+        {read && <TellUsItems current={read.current ?? { always: [], sometimes: [] }} items={items} held={read.held} onChange={onItems} dishes={!!read.dishes} fromMenu={!!p.menu} />}
         {chosen && more && <ChangeSomethingElse name={chosen.name} onClick={() => onEditListing(chosen.id)} />}
         {!chosen && !p.ask && (
           <p className="mt-1 text-[13.5px] text-slate-600">
@@ -1066,6 +1089,18 @@ function ResultCard({
         ) : (
           <p className="mt-1 text-[13.5px] text-slate-600">{p.update ? 'Left out.' : 'Couldn’t read the times from it. You can update them on the shul’s own page.'}</p>
         )}
+      </div>
+    )
+  }
+
+  // A menu it couldn't read: the link is a delivery app's, the page wouldn't
+  // open, or it named no dishes. What to send instead.
+  if (p.kind === 'menu') {
+    return (
+      <div className={card} data-testid="tell-us-card">
+        {head && (p.listing ? <PlaceHead name={p.listing.name} sub={`${p.listing.categoryLabel} · ${short(p.listing.address)}`} /> : <p className="text-[15px] font-extrabold text-slate-900">{p.asWritten || 'A place'}</p>)}
+        <p className="mt-1 text-[14px] text-slate-800">Couldn’t read the menu.</p>
+        <p className="mt-0.5 text-[13.5px] text-slate-600">{p.failed}</p>
       </div>
     )
   }

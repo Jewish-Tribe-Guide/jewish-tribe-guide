@@ -756,13 +756,19 @@ function withConfirmedNow(details: Record<string, unknown>, now: string): Record
 /** Dates the grocery items this approval newly adds (details.itemSeen) and
  *  returns which ones they were. A dish's menu date (itemMenu) stays with
  *  the dish, and goes when it's taken off. Everything else on the listing keeps its
- *  date: approving a new phone number says nothing about the challah. */
+ *  date: approving a new phone number says nothing about the challah.
+ *
+ *  `menu`: the dishes were read off the place's menu in the "+ Add" box
+ *  (the submission's server-set source, never the browser's word). Those
+ *  added are dated "on its menu" instead of "seen", and a menu link becomes
+ *  the listing's "Full menu", as the Main dishes tab's approval does. */
 async function withItemDates(
   community: string,
   details: Record<string, unknown>,
   categoryId: string,
   existing: Record<string, unknown> | null,
   now: string,
+  menu: { url: string | null } | null = null,
 ): Promise<{ details: Record<string, unknown>; newItems: { fieldKey: string; item: string }[] }> {
   // Best-effort like the rest of the approval's extras: a category that can't
   // be read just means no item dates this time, never a failed approval.
@@ -789,14 +795,25 @@ async function withItemDates(
     return { details: next, newItems: [] }
   }
   const newItems = addedItems(existing, details, keys)
-  const seen = nextItemSeen(existing?.itemSeen, details, keys, newItems, now)
+  const seen = nextItemSeen(existing?.itemSeen, details, keys, menu ? [] : newItems, now)
   if (Object.keys(seen).length > 0) next.itemSeen = seen
   const gone = nextItemGone(existing?.itemGone, details, keys)
   if (Object.keys(gone).length > 0) next.itemGone = gone
   // A dish's "on its menu" date stays while the dish does, as "gone" does.
-  const menu = nextItemGone(existing?.itemMenu, details, keys)
-  if (Object.keys(menu).length > 0) next.itemMenu = menu
+  const onMenu = nextItemSeen(existing?.itemMenu, details, keys, menu ? newItems : [], now)
+  if (Object.keys(onMenu).length > 0) next.itemMenu = onMenu
+  if (menu?.url) next.menuUrl = menu.url
   return { details: next, newItems }
+}
+
+/** The menu a submission's dishes were read off, from its server-set source
+ *  (the "+ Add" box's send route), in a checked shape. */
+function menuOf(payload: unknown): { url: string | null } | null {
+  const menu = (payload as { source?: { menu?: unknown } } | null)?.source?.menu
+  if (!menu || typeof menu !== 'object') return null
+  const url = (menu as Record<string, unknown>).url
+  if (url === null) return { url: null }
+  return typeof url === 'string' && /^https?:\/\/\S+$/i.test(url) ? { url } : null
 }
 
 type AppliedListing = { id: string | null; newItems: { fieldKey: string; item: string }[]; changes?: ChangePart[] }
@@ -858,6 +875,7 @@ async function applyListing(submission: SubmissionRow): Promise<AppliedListing> 
       payload.category,
       ((existingData as ResourceRow | null)?.details as Record<string, unknown> | undefined) ?? null,
       now,
+      menuOf(submission.payload),
     )
     payload.details = dated.details
     const { error } = await supabase

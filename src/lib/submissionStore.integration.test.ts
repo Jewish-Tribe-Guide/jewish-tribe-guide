@@ -191,6 +191,44 @@ describe('submissionStore (integration)', () => {
     expect(Date.parse(after!.details.confirmedAt)).toBeGreaterThanOrEqual(before - 1000)
   })
 
+  // Oct 6: dishes read off a Food place's menu in the "+ Add" box are dated
+  // "on its menu", with the link for "Full menu", as the Main dishes tab's
+  // approval does; dishes added any other way are "seen", and the link
+  // stays as it was.
+  it('approving dishes read off a menu dates them on its menu and keeps the link; others are seen', async () => {
+    const category = await makeTestCategory()
+    await getAdminClient()
+      .from('category')
+      .update({ fields: [{ key: 'dishes', label: 'Main dishes', type: 'tags', countLabel: 'main dish' }] })
+      .eq('community_id', 'philly')
+      .eq('id', category.id)
+    const name = `Integration Listing ${randomUUID()}`
+    const createSub = await submitListingCreate('philly', { ...listingPayload(category.id, name), details: { dishes: ['Salads'] } })
+    pendingSubmissionIds.push(createSub.id)
+    await approveSubmission(createSub.id)
+    const { data: created } = await getAdminClient().from('resource').select('id').eq('name', name).single()
+
+    const menu = { ...listingPayload(category.id, name), details: { dishes: ['Salads', 'Dosas'] }, source: { readBy: 'ai', from: 'a message', menu: { url: 'https://saysheate.co/menu/' } } }
+    const menuSub = await submitListingUpdate('philly', created!.id, menu as ResourceSubmission, null, null)
+    pendingSubmissionIds.push(menuSub.id)
+    const before = Date.now()
+    await approveSubmission(menuSub.id)
+    const { data: afterMenu } = await getAdminClient().from('resource').select('details').eq('id', created!.id).single()
+    expect(Date.parse(afterMenu!.details.itemMenu.dishes.Dosas)).toBeGreaterThanOrEqual(before - 1000)
+    expect(afterMenu!.details.itemSeen?.dishes?.Dosas).toBeUndefined()
+    expect(afterMenu!.details.menuUrl).toBe('https://saysheate.co/menu/')
+
+    const typed = { ...listingPayload(category.id, name), details: { dishes: ['Salads', 'Dosas', 'Kichari'], menuUrl: 'https://elsewhere.example/' } }
+    const typedSub = await submitListingUpdate('philly', created!.id, typed, null, null)
+    pendingSubmissionIds.push(typedSub.id)
+    await approveSubmission(typedSub.id)
+    const { data: afterTyped } = await getAdminClient().from('resource').select('details').eq('id', created!.id).single()
+    expect(afterTyped!.details.itemSeen.dishes.Kichari).toBeTruthy()
+    expect(afterTyped!.details.itemMenu.dishes.Kichari).toBeUndefined()
+    expect(afterTyped!.details.itemMenu.dishes.Dosas).toBe(afterMenu!.details.itemMenu.dishes.Dosas)
+    expect(afterTyped!.details.menuUrl).toBe('https://saysheate.co/menu/')
+  })
+
   it('archiving a listing (approved removal) does not stamp it confirmed', async () => {
     const category = await makeTestCategory()
     const name = `Integration Listing ${randomUUID()}`

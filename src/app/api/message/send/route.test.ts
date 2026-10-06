@@ -63,6 +63,34 @@ describe('POST /api/message/send', () => {
     expect(note).toContain('Chicken: already listed')
   })
 
+  // Oct 6: dishes read off a Food place's menu say so, for the approval to
+  // date them "on its menu" with the link; a store's items never do.
+  it('files dishes read off a menu saying where, and ignores a menu on anything that isn’t dishes', async () => {
+    const food = makeCategory({ id: 'restaurant', label: 'Food', detailFields: [{ key: 'dishes', label: 'Main dishes', type: 'tags', countLabel: 'main dish' }] })
+    const SAY = '1b6c4c1e-2f55-4a8e-9d57-3b7f0d6f4a21'
+    m.listCategories.mockResolvedValue([grocery, food])
+    m.listApprovedResources.mockResolvedValue([arch, makeListing({ id: SAY, name: 'Say She Ate', category: 'restaurant', dishes: ['Salads'] })])
+    const dosas = [{ name: 'Dosas', availability: 'always', doubt: null }]
+    await post({
+      text: 'say she ate https://saysheate.co/menu/',
+      stores: [
+        { listingId: SAY, items: dosas, menu: { url: 'https://saysheate.co/menu/' } },
+        { listingId: ARCH, items, menu: { url: 'https://traderjoes.com' } },
+      ],
+    })
+    const [, , payload, note] = m.submitListingUpdate.mock.calls[0]
+    expect(payload.details.dishes).toEqual(['Salads', 'Dosas'])
+    expect(payload.source).toMatchObject({ readBy: 'ai', menu: { url: 'https://saysheate.co/menu/' } })
+    expect(note).toContain('Read from its menu: https://saysheate.co/menu/')
+    expect(m.submitListingUpdate.mock.calls[1][2].source).not.toHaveProperty('menu')
+
+    m.submitListingUpdate.mockClear()
+    await post({ photoUrls: [photo], stores: [{ listingId: SAY, items: dosas, menu: { url: null } }, { listingId: SAY, items: dosas, menu: { url: 'javascript:alert(1)' } }] })
+    expect(m.submitListingUpdate.mock.calls[0][2].source.menu).toEqual({ url: null })
+    expect(m.submitListingUpdate.mock.calls[0][3]).toContain('Read from photos of its menu.')
+    expect(m.submitListingUpdate.mock.calls[1][2].source).not.toHaveProperty('menu')
+  })
+
   it('files a change to other fields, worked out again here, with what the guide can’t hold as a note', async () => {
     const food = makeCategory({ id: 'restaurant', label: 'Food', detailFields: [{ key: 'kosherCert', label: 'Kosher Certification', type: 'select', options: [{ value: 'IKC', label: 'IKC' }, { value: 'Keystone-K', label: 'Keystone-K' }] }] })
     const SAY = '1b6c4c1e-2f55-4a8e-9d57-3b7f0d6f4a21'

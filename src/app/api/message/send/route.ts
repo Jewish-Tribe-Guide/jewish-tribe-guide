@@ -11,6 +11,7 @@ import { submitListingCreate, submitListingUpdate } from '@/lib/submissionStore'
 import { sendSubmissionNotification } from '@/lib/email'
 import { normalizeEmail } from '@/lib/activity'
 import { payloadTooLarge } from '@/lib/limits'
+import { itemWording } from '@/lib/itemMarks'
 import { itemsChange, messageSource, newPlaceSubmission, sentItems, sentPlace } from '@/lib/messageReader'
 import { fieldsEdit } from '@/lib/fieldChanges'
 import { validateSubmission } from '@/lib/resourceStore'
@@ -18,7 +19,7 @@ import { SERVER_ONLY_PAYLOAD_KEYS } from '@/lib/submissionSource'
 import { normalizeUrl } from '@/lib/validation'
 import type { ResourceSubmission, SubmissionRow } from '@/types'
 
-// POST /api/message/send   { text, photoUrls, stores: [{ listingId, items }], edits: [{ listingId, values, notes }], places: [{ category, place, items }], forms: [{ submission }], email?, turnstileToken, company }
+// POST /api/message/send   { text, photoUrls, stores: [{ listingId, items, menu? }], edits: [{ listingId, values, notes }], places: [{ category, place, items }], forms: [{ submission }], email?, turnstileToken, company }
 // The "+ Add" box's Send (agreed Oct 5): what the person saw after the
 // reader (/api/message/read), filed as ordinary suggestions for an admin,
 // one per store or place, each labelled "Read by AI" with the message or
@@ -31,6 +32,11 @@ import type { ResourceSubmission, SubmissionRow } from '@/types'
 // files nothing, unless there's a note the guide can't hold as a field
 // ("closes early this Wednesday only"), which goes to the admin as one.
 // A shul's times go through that card's own route.
+//
+// A store's `menu` ({ url }, url null for photos): its dishes were read off
+// its menu. Filed saying so, and approved dated "on its menu" with the link
+// for "Full menu" (submissionStore.ts), as the Main dishes tab does. Only
+// for a category that lists dishes.
 //
 // `forms`: a new place the reader found, filled in by the person with the
 // add form (Google's details and the category's questions). Taken as the
@@ -45,6 +51,15 @@ function sentNotes(v: unknown): string[] {
   return (Array.isArray(v) ? v : []).filter((n): n is string => typeof n === 'string' && !!n.trim()).slice(0, MAX_NOTES).map((n) => n.trim().slice(0, 500))
 }
 const FAILED = { ok: false, error: 'That didn’t send. Please try again.' }
+
+/** Where a store's dishes were read: its menu's link (null for photos of
+ *  it), or nothing when they weren't read off a menu. */
+function sentMenu(v: unknown): { url: string | null } | null {
+  if (!v || typeof v !== 'object') return null
+  const url = (v as Record<string, unknown>).url
+  if (url === null) return { url: null }
+  return typeof url === 'string' && /^https?:\/\/\S+$/i.test(url) && url.length <= 500 ? { url } : null
+}
 
 /** A photo the reader kept, in the guide's own storage, never any other
  *  address. */
@@ -90,8 +105,11 @@ export async function POST(request: Request) {
       if (!ui.contributions.edit || !resolveCapabilities(category.capabilities).edit) continue
       const change = itemsChange(category, listing, sentItems(s.items))
       if (!change || change.lines.length === 0) continue
-      const note = ['From a message sent with “Tell us”.', change.lines.join('\n'), ...(change.held.length ? [`Not changed:\n${change.held.join('\n')}`] : [])].join('\n\n')
-      filed.push(await submitListingUpdate(community.slug, listing.id, Object.assign({}, change.submission, { source }), note, submittedBy))
+      const tags = category.detailFields.find((f) => f.type === 'tags')
+      const menu = tags && itemWording(tags).noun === 'dish' ? sentMenu(s.menu) : null
+      const from = menu ? (menu.url ? `Read from its menu: ${menu.url}` : 'Read from photos of its menu.') : null
+      const note = ['From a message sent with “Tell us”.', ...(from ? [from] : []), change.lines.join('\n'), ...(change.held.length ? [`Not changed:\n${change.held.join('\n')}`] : [])].join('\n\n')
+      filed.push(await submitListingUpdate(community.slug, listing.id, Object.assign({}, change.submission, { source: menu ? { ...source, menu } : source }), note, submittedBy))
     }
 
     for (const e of edits) {

@@ -236,6 +236,44 @@ describe('tidyMessageReading', () => {
   })
 })
 
+// Oct 6: "here's say she ate's main dishes … https://saysheate.co/menu/"
+// came back as a change to the website. A menu is its own kind, for a
+// category whose list is of dishes, read by the menu reader afterwards.
+describe('a food place’s menu', () => {
+  const SAY = '55555555-aaaa-4aaa-8aaa-000000000005'
+  const dishFood = { ...food, detailFields: [...food.detailFields, { key: 'dishes', label: 'Main dishes', type: 'tags', countLabel: 'main dish' }] } as unknown as CategoryConfig
+  const withSay = buildCatalog([...listings, listing(SAY, 'Say She Ate', 'restaurant', '1408 South St')], [grocery, dishFood, shuls])
+  const say = { listing_id: '55555555', listing_name: 'Say She Ate', as_written: 'say she ate' }
+
+  it('tells the AI which lists are dishes, and that a menu link is a menu, not a new website', () => {
+    const system = (messageMessages(text('x'), withSay, { communityName: 'Philadelphia' })[0] as { content: string }).content
+    expect(system).toContain('restaurant (Food, lists its main dishes, read from its menu)')
+    expect(system).toContain('grocery (Grocery, lists items it carries)')
+    expect(system).toContain('A link to a menu is never a change to "website"')
+    expect(system).toContain('"kind":"items"|"fields"|"menu"|')
+  })
+
+  it('keeps a menu for a place that lists dishes, with its link made whole, and drops one anywhere else', () => {
+    const r = tidyMessageReading(
+      {
+        proposals: [
+          { kind: 'menu', store: say, menu_url: 'https://saysheate.co/menu/', quote: 'here’s say she ate’s main dishes' },
+          { kind: 'menu', store: say, menu_url: 'saysheate.co/menu', quote: 'photo' },
+          { kind: 'menu', store: say, menu_url: 'javascript:alert(1)', quote: 'photo' },
+          { kind: 'menu', store: { listing_id: '11111111', listing_name: 'Trader Joe’s' }, menu_url: 'https://traderjoes.com', quote: 'x' },
+        ],
+      },
+      withSay,
+      text('here’s say she ate’s main dishes. https://saysheate.co/menu/'),
+    )
+    expect(r.proposals).toEqual([
+      { kind: 'menu', listingId: SAY, asWritten: 'say she ate', ask: null, url: 'https://saysheate.co/menu/', quote: 'here’s say she ate’s main dishes', checked: true },
+      { kind: 'menu', listingId: SAY, asWritten: 'say she ate', ask: null, url: 'https://saysheate.co/menu', quote: 'photo', checked: false },
+      { kind: 'menu', listingId: SAY, asWritten: 'say she ate', ask: null, url: null, quote: 'photo', checked: false },
+    ])
+  })
+})
+
 describe('itemsChange', () => {
   const tjMarket = listings[1]
 

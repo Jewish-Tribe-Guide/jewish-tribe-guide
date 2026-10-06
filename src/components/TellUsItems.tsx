@@ -15,6 +15,13 @@ import { PlusIcon } from '@/components/icons'
 
 export type CurrentItems = { always: string[]; sometimes: string[] }
 
+/** A store's items, or a Food place's main dishes: the same list, said the
+ *  way its listing says it. `fromMenu`: read off the place's menu just now. */
+const WORDS = {
+  items: { heading: 'Kosher items here', isNew: 'New · seen today', always: 'Always in stock', sometimes: 'Not always in stock', stock: 'is in stock', another: 'Add another item', prompt: 'What else did you see?' },
+  dishes: { heading: 'Main dishes here', isNew: 'New · seen today', always: 'Always on the menu', sometimes: 'Not always on the menu', stock: 'is on the menu', another: 'Add another dish', prompt: 'What else is on the menu?' },
+}
+
 const same = (a: string, b: string) => itemName(a).toLowerCase() === itemName(b).toLowerCase()
 
 /** What the items change on the listing as it is: added or moved, and
@@ -35,13 +42,20 @@ export default function TellUsItems({
   items,
   held,
   onChange,
+  dishes = false,
+  fromMenu = false,
 }: {
   current: CurrentItems
   items: ReadItem[]
   /** What was read but isn't changed, and why ("Chicken: already listed"). */
   held: string[]
   onChange: (items: ReadItem[]) => void
+  /** A Food place's main dishes, not a store's items. */
+  dishes?: boolean
+  /** The dishes were read off its menu just now. */
+  fromMenu?: boolean
 }) {
+  const w = { ...WORDS[dishes ? 'dishes' : 'items'], ...(fromMenu ? { isNew: 'New · on its menu' } : {}) }
   const [adding, setAdding] = useState(false)
   const [all, setAll] = useState(false)
   const listed = [...current.always, ...current.sometimes]
@@ -52,7 +66,7 @@ export default function TellUsItems({
 
   return (
     <section className="mt-2 rounded-xl border border-slate-200 bg-slate-50 px-3 pt-2.5 pb-2" data-testid="tell-us-items">
-      <h3 className="text-[15px] font-extrabold text-slate-900">Kosher items here · {rest.length + changing.filter((i) => i.availability !== 'stopped').length}</h3>
+      <h3 className="text-[15px] font-extrabold text-slate-900">{w.heading} · {rest.length + changing.filter((i) => i.availability !== 'stopped').length}</h3>
       <ul className="mt-1">
         {changing.map((i) =>
           i.availability === 'stopped' ? (
@@ -69,13 +83,13 @@ export default function TellUsItems({
             <li key={i.name} className="-mx-1.5 mt-1 rounded-lg bg-emerald-50 px-1.5 py-2">
               <div className="flex items-baseline justify-between gap-2">
                 <span className="text-[15px] font-bold text-slate-900">{i.name}</span>
-                <span className="text-[12.5px] font-bold text-emerald-700">New · seen today</span>
+                <span className="text-[12.5px] font-bold text-emerald-700">{w.isNew}</span>
               </div>
               <p className="mt-0.5 text-[13px] text-slate-700">
-                {i.availability === 'sometimes' ? 'Not always in stock' : 'Always in stock'}{' '}
+                {i.availability === 'sometimes' ? w.sometimes : w.always}{' '}
                 <button
                   type="button"
-                  aria-label={`Change how often ${i.name} is in stock`}
+                  aria-label={`Change how often ${i.name} ${w.stock}`}
                   onClick={() => set(i.name, { availability: i.availability === 'sometimes' ? 'always' : 'sometimes' })}
                   className="ml-1 cursor-pointer font-bold text-primary"
                 >
@@ -99,6 +113,7 @@ export default function TellUsItems({
       )}
       {adding ? (
         <AddAnother
+          words={w}
           listed={listed}
           taken={items.map((i) => i.name)}
           onAdd={(item) => {
@@ -110,7 +125,7 @@ export default function TellUsItems({
       ) : (
         <button type="button" onClick={() => setAdding(true)} className="mt-1 flex min-h-11 w-full cursor-pointer items-center gap-2 border-t border-slate-200 text-left text-[15px] font-bold text-primary">
           <PlusIcon className="h-4 w-4" />
-          Add another item
+          {w.another}
         </button>
       )}
       {rest.length > 0 && (
@@ -129,7 +144,7 @@ export default function TellUsItems({
 
 /** One more item: the guide's item names as it's typed (the listing's own
  *  "+ Add an item" box's suggestions), the store's own marked. */
-function AddAnother({ listed, taken, onAdd, onClose }: { listed: string[]; taken: string[]; onAdd: (item: ReadItem) => void; onClose: () => void }) {
+function AddAnother({ words, listed, taken, onAdd, onClose }: { words: { prompt: string; sometimes: string }; listed: string[]; taken: string[]; onAdd: (item: ReadItem) => void; onClose: () => void }) {
   const [text, setText] = useState('')
   const [sometimes, setSometimes] = useState(false)
   const inputId = useId()
@@ -141,7 +156,7 @@ function AddAnother({ listed, taken, onAdd, onClose }: { listed: string[]; taken
   return (
     <div className="-mx-1 mt-1.5 rounded-xl border border-slate-300 bg-white px-2 pt-2.5 pb-2" data-testid="tell-us-add-item">
       <label htmlFor={inputId} className="text-[14px] font-bold text-slate-900">
-        What else did you see?
+        {words.prompt}
       </label>
       <input
         id={inputId}
@@ -175,7 +190,7 @@ function AddAnother({ listed, taken, onAdd, onClose }: { listed: string[]; taken
       )}
       <label className="mt-2 flex min-h-10 cursor-pointer items-center gap-2.5 text-[14.5px] text-slate-900">
         <input type="checkbox" checked={sometimes} onChange={(e) => setSometimes(e.target.checked)} className="h-5 w-5 accent-primary" />
-        Not always in stock
+        {words.sometimes}
       </label>
       <button type="button" onClick={onClose} className="mt-0.5 cursor-pointer text-[14px] font-bold text-slate-500 hover:text-slate-700">
         Cancel

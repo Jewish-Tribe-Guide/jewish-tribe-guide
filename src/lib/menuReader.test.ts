@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { fetchPublic, findMenu, htmlToText, isPrivateAddress, menuLinks, menuMessages, readMenu, tidyMenuReading, type MenuSource } from './menuReader'
+import { fetchPublic, findMenu, htmlToText, isOrderingApp, isPrivateAddress, menuLinks, menuMessages, readMenu, tidyMenuReading, type MenuSource } from './menuReader'
 
 const publicDns = async () => ['93.184.216.34']
 const page = (body: string, type = 'text/html; charset=utf-8', status = 200, headers: Record<string, string> = {}) =>
@@ -133,5 +133,32 @@ describe('what the AI said, kept to what holds up', () => {
     expect(r.dishes.map((d) => d.name)).toEqual(['Falafel'])
     expect(r.model).toBe('m')
     expect(JSON.parse(fetchImpl.mock.calls[0][1].body).model).toBe('m')
+  })
+})
+
+// Oct 6: a menu can come from the "+ Add" box, as photos or as a link. A
+// delivery app's is never fetched (agreed: its terms forbid it, and it
+// blocks readers), and a photo has no words to check the dishes against.
+describe('a menu from the "+ Add" box', () => {
+  it('knows a delivery or ordering app’s link, and nothing else', () => {
+    expect(isOrderingApp('https://www.doordash.com/store/say-she-ate-123')).toBe(true)
+    expect(isOrderingApp('https://order.toasttab.com/online/x')).toBe(true)
+    expect(isOrderingApp('https://saysheate.co/menu/')).toBe(false)
+    expect(isOrderingApp('https://notdoordash.com/')).toBe(false)
+    expect(isOrderingApp('not a link')).toBe(false)
+  })
+
+  it('sends photos of a menu as images, saying there’s no page, and keeps the dishes unchecked', () => {
+    const source: MenuSource = { url: null, text: null, pdf: null, images: [{ mime: 'image/jpeg', b64: 'AAA' }] }
+    const user = menuMessages(source, 'Say She Ate')[1] as { content: unknown[] }
+    expect(user.content).toEqual([
+      { type: 'text', text: 'The place: Say She Ate. Its menu, in the photos:' },
+      { type: 'image_url', image_url: { url: 'data:image/jpeg;base64,AAA' } },
+    ])
+    expect(tidyMenuReading({ dishes: [{ name: 'Dosas', quote: 'Masala Dosa' }] }, source)).toEqual({
+      sourceUrl: null,
+      dishes: [{ name: 'Dosas', quote: 'Masala Dosa', checked: false, named: true }],
+      note: null,
+    })
   })
 })

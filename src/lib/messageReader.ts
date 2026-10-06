@@ -1,7 +1,7 @@
 import type { DirectoryResource, ResourceSubmission } from '@/types'
 import { selectValues, type CategoryConfig } from './categories'
 import { editSubmission } from './editSubmission'
-import { addedItemName } from './itemMarks'
+import { addedItemName, itemWording } from './itemMarks'
 import { itemName } from './itemNames'
 import { DEFAULT_READER_MODEL } from './readQuestion'
 import { changeableFields, DAYS, type FieldRead, type HoursRead } from './fieldChanges'
@@ -43,6 +43,8 @@ export type CatalogCategory = {
   label: string
   /** The field that lists what a place carries, when it has one. */
   itemsKey: string | null
+  /** Whether that list is of dishes (Food's main dishes), read off a menu. */
+  dishes?: boolean
   /** Whether its listings have davening times. */
   hasTimes: boolean
   /** What else about its listings a message can change (fieldChanges.ts). */
@@ -80,6 +82,9 @@ export type Proposal =
   | ({ kind: 'fields'; listingId: string | null; asWritten: string; ask: AskSender | null; changes: FieldRead[]; note: string | null } & Quoted)
   | ({ kind: 'times'; listingId: string } & Quoted)
   | ({ kind: 'ask_others'; listingId: string | null; question: string } & Quoted)
+  /** A food place's menu, as a link or in the photos: its main dishes are
+   *  read from it by the menu reader (menuReader.ts), not here. */
+  | ({ kind: 'menu'; listingId: string | null; asWritten: string; ask: AskSender | null; url: string | null } & Quoted)
   | { kind: 'not_update'; note: string | null }
 
 export type MessageReading = { proposals: Proposal[] }
@@ -95,6 +100,10 @@ export function buildCatalog(listings: DirectoryResource[], categories: Category
     id: c.id,
     label: c.label,
     itemsKey: c.detailFields.find((f) => f.type === 'tags')?.key ?? null,
+    dishes: (() => {
+      const f = c.detailFields.find((x) => x.type === 'tags')
+      return !!f && itemWording(f).noun === 'dish'
+    })(),
     hasTimes: c.detailFields.some((f) => f.type === 'minyanim'),
     fields: changeableFields(c).map((f) => ({ key: f.key, label: f.label, says: fieldSays(f.type, f.field?.options?.map((o) => o.label), f.field?.multiSelect) })),
   }))
@@ -148,7 +157,7 @@ export function messageMessages(source: MessageSource, catalog: Catalog, { about
     return parts.join(' · ')
   })
   const categories = catalog.categories
-    .map((c) => `${c.id} (${c.label}${c.itemsKey ? ', lists items it carries' : ''}${c.hasTimes ? ', has davening times' : ''})`)
+    .map((c) => `${c.id} (${c.label}${c.dishes ? ', lists its main dishes, read from its menu' : c.itemsKey ? ', lists items it carries' : ''}${c.hasTimes ? ', has davening times' : ''})`)
     .join('; ')
   const fieldLines = catalog.categories.map((c) => `${c.id}: ${c.fields.map((f) => `${f.key} "${f.label}" (${f.says})`).join('; ')}`)
   const aboutListing = about ? catalog.listings.find((l) => l.id === about) : undefined
@@ -190,6 +199,7 @@ Rules
   Also used here: IKC, Cherry-K, KCL, Tartikov (name them only when the name is written).
   A plain K with no shape around it is not a certifier: say "a plain K". If you cannot tell which it is, say "unidentified symbol" and describe it; never guess a name.
 - A claim about OTHER stores that is only a guess ("surprised if any other X has it") is never a change: make it kind "ask_others" with a short question to ask shoppers about that store.
+- A food place's MENU (a link to its menu, a photo or screenshot of a menu, a menu PDF), or a request to add its dishes from one: one proposal of kind "menu" for that place, with "menu_url": the link given, or null when the menu is in the photos. Do not list the dishes; another reader picks them from the menu. A link to a menu is never a change to "website": a link changes the website only when the message says the place's website itself is new or has moved. The same store rules apply (which branch; ask the sender when unsure).
 - Food places (restaurants, ice cream, food trucks): give kosher certification only if shown or stated; meat/dairy/parve only if stated, else say what it is inferred from.
 - Any OTHER change to a listing in the guide (its hours, phone, website, address, name, hechsher or certification, meat/dairy, a yes/no, notes; a mikvah's women's hours; anything in its category's fields above): one proposal of kind "fields" for that listing, with "changes": one entry per field, using that category's field key. Pick the field whose label fits ("women's hours" is the women's hours field when the category has one). Change only what the message says; never fill in anything else. Items and davening times are never "fields". The same store rules apply (which branch; ask the sender when unsure).
   Values: text, phone, link, long text: the new value as written. "one of" / "any of": one of the listed choices exactly (a list for "any of"); a value that is none of them goes in "note" instead. yes/no: true or false. number: a number.
@@ -199,13 +209,14 @@ Rules
 - For every proposal give "quote": the exact words from the message text it rests on, copied character for character, or "photo" if it comes from a photo.${aboutListing ? `\n- The person sent this from the listing "${aboutListing.name}" (${short.get(aboutListing.id)}). A message that names no store is about that one.` : ''}
 
 Reply with JSON only:
-{"proposals":[{"kind":"items"|"fields"|"new_place"|"times"|"ask_others"|"not_update",
+{"proposals":[{"kind":"items"|"fields"|"menu"|"new_place"|"times"|"ask_others"|"not_update",
  "store":{"listing_id":string|null,"listing_name":string|null,"as_written":string,"scope":"branch"|"chain","ask_sender":{"question":string,"choices":[{"label":string,"listing_id":string}]}|null},
  "items":[{"name":string,"availability":"always"|"sometimes"|"seen"|"stopped"|"announced","doubt":boolean,"doubt_words":string|null}],
  "changes":[{"field":string,"value":string|boolean|number|string[]|null,"days":string[]|"all"|null,"open":string|null,"close":string|null,"closed":boolean,"when":"every_week"|"one_day"|"unclear"|null}],
  "category":string|null,
  "place":{"name":string,"kind":string,"address":string|null,"phone":string|null,"website":string|null,"kosher_cert":string|null,"meat_dairy":string|null,"notes":string|null}|null,
  "question":string|null,
+ "menu_url":string|null,
  "quote":string,
  "note":string|null}]}`
 
@@ -348,6 +359,17 @@ export function tidyMessageReading(raw: unknown, catalog: Catalog, source: Messa
         })
       : []
     const askOf = (listingId: string | null): AskSender | null => (!listingId && choices.length > 1 ? { question: str(askRaw?.question, 200) ?? 'Which one?', choices } : null)
+    if (p.kind === 'menu') {
+      const listingId = listingOf(store)
+      const ask = askOf(listingId)
+      // Only a place whose category keeps a list of dishes has one to fill.
+      const category = catalog.listings.find((l) => l.id === (listingId ?? ask?.choices[0]?.listingId))?.category
+      if (!catalog.categories.find((c) => c.id === category)?.dishes) continue
+      const link = str(p.menu_url, 500)
+      const url = link && /^https?:\/\//i.test(link) ? link : link && /^[\w-]+(\.[\w-]+)+(\/\S*)?$/.test(link) ? `https://${link}` : null
+      proposals.push({ kind: 'menu', listingId, asWritten: str(store.as_written, 120) ?? '', ask, url, ...quoted(p.quote) })
+      continue
+    }
     if (p.kind === 'fields') {
       const listingId = listingOf(store)
       const ask = askOf(listingId)

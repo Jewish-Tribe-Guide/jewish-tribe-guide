@@ -211,7 +211,24 @@ export function menuLinks(html: string, base: string): string[] {
   return [...found].sort((a, b) => b[1] - a[1]).map(([url]) => url)
 }
 
-export type MenuSource = { url: string; text: string | null; pdf: string | null }
+/** A menu as read: a page's text, a PDF, or photos of it (a paper menu or
+ *  a screenshot, sent in the "+ Add" box), with where it's from. A photo's
+ *  `url` is null: there's no page to link to. */
+export type MenuSource = { url: string | null; text: string | null; pdf: string | null; images?: { mime: string; b64: string }[] }
+
+/** Delivery and ordering apps, whose menus the server never fetches: they
+ *  block readers and their terms forbid it (agreed Oct 6). A person can
+ *  still send a screenshot of one. */
+const ORDERING_APPS = ['doordash.com', 'ubereats.com', 'grubhub.com', 'seamless.com', 'postmates.com', 'caviar.com', 'toasttab.com', 'chownow.com', 'slicelife.com', 'menufy.com', 'clover.com', 'square.site', 'order.online']
+
+export function isOrderingApp(raw: string): boolean {
+  try {
+    const host = new URL(raw).hostname.toLowerCase().replace(/^www\./, '')
+    return ORDERING_APPS.some((h) => host === h || host.endsWith(`.${h}`))
+  } catch {
+    return false
+  }
+}
 
 /** Where a place's menu is: a page or PDF its own website links to as its
  *  menu, the best of the first few that can be read, or else the website
@@ -255,8 +272,10 @@ Answer in JSON only: {"dishes": [{"name": "...", "quote": "..."}], "note": "..."
 
 /** The messages sent: a page as its text, a PDF as the file itself. */
 export function menuMessages(source: MenuSource, placeName: string): unknown[] {
-  const intro = `The place: ${placeName}. Its menu, from ${source.url}:`
-  const content = source.pdf
+  const intro = `The place: ${placeName}. Its menu, ${source.url ? `from ${source.url}` : 'in the photos'}:`
+  const content = source.images?.length
+    ? [{ type: 'text', text: intro }, ...source.images.map((img) => ({ type: 'image_url', image_url: { url: `data:${img.mime};base64,${img.b64}` } }))]
+    : source.pdf
     ? [
         { type: 'text', text: intro },
         { type: 'file', file: { filename: 'menu.pdf', file_data: `data:application/pdf;base64,${source.pdf}` } },

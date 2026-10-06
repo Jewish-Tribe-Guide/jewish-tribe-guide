@@ -377,6 +377,40 @@ describe('Saw something? Tell us', () => {
     expect(screen.queryByRole('button', { name: /^Send/ })).not.toBeInTheDocument()
   })
 
+  // Oct 6: a Food place's menu, as a link or photos, comes back as its main
+  // dishes, said as dishes, with where they were read; Send says so.
+  it('shows dishes read off a menu as the place’s main dishes, with the menu, and sends where they came from', async () => {
+    const SAY = { id: 'say', name: 'Say She Ate', address: '1408 South St, Philadelphia', category: 'restaurant', categoryLabel: 'Food' }
+    const dishes = [{ name: 'Dosas', availability: 'always', doubt: null }, { name: 'Kofta Bowl', availability: 'always', doubt: null }]
+    respond = (url) =>
+      url.includes('/read')
+        ? {
+            ok: true,
+            photoUrls: [],
+            proposals: [
+              { kind: 'items', listingId: 'say', listing: SAY, asWritten: 'say she ate', chain: false, ask: null, items: dishes, lines: ['+ Dosas', '+ Kofta Bowl'], held: [], current: { always: ['Salads'], sometimes: [] }, dishes: true, quote: 'x', checked: true, menu: { url: 'https://saysheate.co/menu/', dishes: [] } },
+              { kind: 'menu', listing: { ...SAY, id: 'tj', name: 'Taffets' }, asWritten: 'taffets', failed: 'Menus on delivery apps can’t be read from a link. Send a screenshot of the menu instead.' },
+            ],
+          }
+        : { ok: true, filed: 1, ids: ['s1'] }
+    open()
+    fireEvent.change(screen.getByLabelText('What did you see?'), { target: { value: 'here’s say she ate’s main dishes https://saysheate.co/menu/' } })
+    fireEvent.click(screen.getByRole('button', { name: 'See what changes' }))
+    const items = await screen.findByTestId('tell-us-items')
+    expect(items).toHaveTextContent('Main dishes here · 3')
+    expect(within(items).getAllByText('New · on its menu')).toHaveLength(2)
+    expect(items).toHaveTextContent('Always on the menu')
+    expect(within(items).getByRole('button', { name: 'Add another dish' })).toBeInTheDocument()
+    expect(screen.getByTestId('tell-us-menu')).toHaveTextContent('Read from its menu ↗. Main dishes only, not the whole menu.')
+    expect(within(screen.getByTestId('tell-us-menu')).getByRole('link')).toHaveAttribute('href', 'https://saysheate.co/menu/')
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+    // Then the next place: the menu it couldn't read, and why.
+    expect(await screen.findByText('Couldn’t read the menu.')).toBeInTheDocument()
+    expect(screen.getByText(/Send a screenshot of the menu instead/)).toBeInTheDocument()
+    const sent = calls.find((c) => c.url === '/api/message/send?community=philly')!
+    expect(JSON.parse(String(sent.init!.body)).stores).toEqual([{ listingId: 'say', items: dishes, menu: { url: 'https://saysheate.co/menu/' } }])
+  })
+
   // Oct 5: a guess about other stores read as "ask others", which showed
   // nothing at all.
   it('says nothing changes when it only read a guess about another store, with nothing to send', async () => {

@@ -24,6 +24,9 @@ export type SubmissionSource = {
   photoUrl?: string
   /** Anything said with it: the person's own note, or the reader's summary. */
   note?: string
+  /** Dishes read off the place's menu: its link, or null for photos of it.
+   *  Approval dates them "on its menu" and keeps the link for "Full menu". */
+  menu?: { url: string | null }
 }
 
 type SourceInput = {
