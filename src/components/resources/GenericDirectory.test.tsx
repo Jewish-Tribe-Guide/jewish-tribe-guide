@@ -403,7 +403,7 @@ describe('GenericDirectory', () => {
     await user.click(floatingAdd)
     await user.click(await screen.findByRole('button', { name: 'Find the place' }))
     await user.click(screen.getByRole('button', { name: 'Not on Google? Fill it in yourself' }))
-    expect(screen.getByRole('dialog', { name: 'Add a Grocery Store' })).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Add to Grocery Stores' })).toBeInTheDocument()
     expect(onAdd).not.toHaveBeenCalled()
   })
 

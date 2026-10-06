@@ -104,7 +104,7 @@ export default function TellUsSheet({
   onEditYourself?: () => void
 }) {
   const isMobile = useIsMobile()
-  // Each step names itself: "Find the place", "Add a Grocery".
+  // Each step names itself: "Find the place", "Add to Food".
   const [stepTitle, setStepTitle] = useState<string | null>(null)
   // Back is the header's chevron, before the title, on every step that has
   // somewhere to go back to (asked for Oct 5: it was text at the bottom,
@@ -144,6 +144,11 @@ export default function TellUsSheet({
     </ActionDialog>
   )
 }
+
+// The form's title, by the category's plural name (Oct 5): "Add a Food"
+// read badly, and "Add to Food", "Add to Synagogues", "Add to WhatsApp
+// Groups" read well for every category, a place or not.
+const addTitle = (c: CategoryConfig) => `Add to ${c.pluralLabel || c.label}`
 
 type Step = 'write' | 'result' | 'sent' | 'find' | 'kind' | 'add' | 'edit'
 
@@ -212,7 +217,7 @@ function TellUsBody({
   const startAdding = (start: Omit<NonNullable<typeof adding>, 'category'>, category = findCategory) => {
     if (category) {
       setAdding({ ...start, category })
-      setStep('add', `Add a ${category.label}`)
+      setStep('add', addTitle(category))
     } else {
       setAdding({ ...start, category: addable[0] })
       setStep('kind', 'What kind of place?')
@@ -710,7 +715,7 @@ function TellUsBody({
                 type="button"
                 onClick={() => {
                   setAdding({ ...adding, category: c })
-                  setStep('add', `Add a ${c.label}`)
+                  setStep('add', addTitle(c))
                 }}
                 className="cursor-pointer rounded-full border border-slate-300 px-3.5 py-1.5 text-[14px] font-semibold text-slate-800 hover:bg-slate-50"
               >

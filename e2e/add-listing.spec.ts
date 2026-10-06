@@ -22,7 +22,7 @@ test('Adding finds the place first, then asks the category’s questions, with B
   await find.getByRole('button', { name: 'Not on Google? Fill it in yourself' }).click()
 
   // Opened from this category's page, it's added there without asking.
-  const add = page.getByRole('dialog', { name: `Add a ${category.label}` })
+  const add = page.getByRole('dialog', { name: `Add to ${category.pluralLabel}` })
   await expect(add.getByRole('textbox', { name: 'Name *' })).toBeVisible()
   // "Verifying…" until the bot check has answered, then "Submit for review".
   await expect(add.locator('button[type="submit"]')).toBeVisible()

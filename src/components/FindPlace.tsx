@@ -49,7 +49,7 @@ export default function FindPlace({
     <div className="space-y-3" data-testid="find-place">
       <div>
         <label htmlFor={id} className="mb-1 block text-[14px] font-semibold text-slate-800">
-          Find the place
+          Name or address
         </label>
         <AddressInput
           id={id}

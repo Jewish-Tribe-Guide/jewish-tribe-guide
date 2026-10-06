@@ -78,7 +78,7 @@ describe('Saw something? Tell us', () => {
   const open = (props: Partial<Parameters<typeof TellUsSheet>[0]> = {}) =>
     renderWithProviders(<TellUsSheet isOpen onClose={() => {}} {...props} />, {
       community: { slug: 'philly' },
-      content: { categories: [makeCategory({ id: 'grocery', label: 'Grocery', detailFields: [{ key: 'm', label: 'Kosher items', type: 'tags' }] })] },
+      content: { categories: [makeCategory({ id: 'grocery', label: 'Grocery', pluralLabel: 'Groceries', detailFields: [{ key: 'm', label: 'Kosher items', type: 'tags' }] })] },
     })
 
   it('reads what they wrote with their photos, and shows each store as it will be', async () => {
@@ -265,7 +265,7 @@ describe('Saw something? Tell us', () => {
     respond = (url) => (url.includes('/read') ? { ...reading, proposals: [reading.proposals[0], hours] } : { ok: true, filed: 2, ids: ['a', 'b'] })
     renderWithProviders(<TellUsSheet isOpen onClose={() => {}} />, {
       community: { slug: 'philly' },
-      content: { categories: [makeCategory({ id: 'grocery', label: 'Grocery', detailFields: [{ key: 'm', label: 'Kosher items', type: 'tags' }, { key: 'hours', label: 'Hours', type: 'hours' }] })] },
+      content: { categories: [makeCategory({ id: 'grocery', label: 'Grocery', pluralLabel: 'Groceries', detailFields: [{ key: 'm', label: 'Kosher items', type: 'tags' }, { key: 'hours', label: 'Hours', type: 'hours' }] })] },
     })
     fireEvent.change(screen.getByLabelText('What did you see?'), { target: { value: 'TJ on Arch has croutons, and closes at 3 on Wednesdays now' } })
     fireEvent.click(screen.getByRole('button', { name: 'See what changes' }))
@@ -293,7 +293,7 @@ describe('Saw something? Tell us', () => {
     // Searched for already, and added as the grocery it was read as.
     expect(screen.getByPlaceholderText('Search by name or address…')).toHaveValue('South Square Market, 22nd & South')
     fireEvent.click(screen.getByRole('button', { name: 'Not on Google? Fill it in yourself' }))
-    expect(screen.getByRole('dialog', { name: 'Add a Grocery' })).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Add to Groceries' })).toBeInTheDocument()
     expect(screen.getByLabelText('Name *')).toHaveValue('South Square Market')
     fireEvent.change(screen.getByLabelText('Name *'), { target: { value: 'South Square Market & Deli' } })
     fireEvent.submit(screen.getByLabelText('Name *').closest('form')!)
@@ -394,8 +394,8 @@ describe('Saw something? Tell us', () => {
   // Agreed Oct 5: one search for adding and editing, inside the box, with
   // Back at every step.
   describe('Find the place', () => {
-    const grocery = makeCategory({ id: 'grocery', label: 'Grocery', detailFields: [{ key: 'm', label: 'Kosher items', type: 'tags' }] })
-    const shuls = makeCategory({ id: 'synagogue', label: 'Synagogue' })
+    const grocery = makeCategory({ id: 'grocery', label: 'Grocery', pluralLabel: 'Groceries', detailFields: [{ key: 'm', label: 'Kosher items', type: 'tags' }] })
+    const shuls = makeCategory({ id: 'synagogue', label: 'Synagogue', pluralLabel: 'Synagogues' })
     const tj = makeListing({ id: 'tj', name: 'Trader Joe’s', category: 'grocery', address: '1324 Arch St, Philadelphia' })
     const find = (props: Partial<Parameters<typeof TellUsSheet>[0]> = {}) => {
       respond = (url) => (url.includes('/api/resources') ? { ok: true, resources: [tj] } : {})
@@ -406,6 +406,9 @@ describe('Saw something? Tell us', () => {
     it('finds a place the guide has and opens its edit, with Back to the search and back to the box', async () => {
       find()
       expect(screen.getByRole('dialog', { name: 'Find the place' })).toBeInTheDocument()
+      // The title says it once; the field says what to type (Oct 5).
+      expect(screen.getByLabelText('Name or address')).toBeInTheDocument()
+      expect(screen.getAllByText('Find the place')).toHaveLength(1)
       fireEvent.change(screen.getByPlaceholderText('Search by name or address…'), { target: { value: 'trader j' } })
       fireEvent.click(await screen.findByRole('button', { name: /Trader Joe’s/ }))
       expect(screen.getByRole('dialog', { name: 'Trader Joe’s' })).toBeInTheDocument()
@@ -425,12 +428,12 @@ describe('Saw something? Tell us', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Not on Google? Fill it in yourself' }))
       expect(screen.getByTestId('pick-kind')).toBeInTheDocument()
       fireEvent.click(screen.getByRole('button', { name: 'Synagogue' }))
-      expect(screen.getByRole('dialog', { name: 'Add a Synagogue' })).toBeInTheDocument()
+      expect(screen.getByRole('dialog', { name: 'Add to Synagogues' })).toBeInTheDocument()
       expect(screen.getByLabelText('Name *')).toBeInTheDocument()
       cleanup()
       find({ category: grocery })
       fireEvent.click(screen.getByRole('button', { name: 'Not on Google? Fill it in yourself' }))
-      expect(screen.getByRole('dialog', { name: 'Add a Grocery' })).toBeInTheDocument()
+      expect(screen.getByRole('dialog', { name: 'Add to Groceries' })).toBeInTheDocument()
     })
 
     it('isn’t offered over a listing, where it’s that listing’s edit', () => {
