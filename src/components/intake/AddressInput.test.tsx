@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
+import { renderWithProviders } from '@/test/renderWithProviders'
 import AddressInput from './AddressInput'
 
 const mockMapsAuthFailed = vi.hoisted(() => vi.fn(() => false))
@@ -73,6 +74,24 @@ describe('AddressInput', () => {
 
     await waitFor(() => expect(screen.getByText('Test Shul')).toBeInTheDocument())
     expect(screen.getByText('Philadelphia, PA')).toBeInTheDocument()
+  })
+
+  // Oct 6: "Paulie Gee" listed Brooklyn and New York before the
+  // Philadelphia shop. Google is asked to lean toward the community's own
+  // centre, and outside a community (the admin's previews) asked as before.
+  it('asks Google to lean toward the community, and only inside one', async () => {
+    const user = userEvent.setup()
+    mockFetchAddressSuggestions.mockResolvedValue([])
+    renderWithProviders(<AddressInput value="" onChange={vi.fn()} />, { community: { mapCenter: { lat: 39.95, lng: -75.17 } } })
+    await user.type(screen.getByPlaceholderText('Address or location'), 'Paulie')
+    await waitOutDebounce()
+    await waitFor(() => expect(mockFetchAddressSuggestions).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ near: { lat: 39.95, lng: -75.17 } })))
+    cleanup()
+    mockFetchAddressSuggestions.mockClear()
+    render(<AddressInput value="" onChange={vi.fn()} />)
+    await user.type(screen.getByPlaceholderText('Address or location'), 'Paulie')
+    await waitOutDebounce()
+    await waitFor(() => expect(mockFetchAddressSuggestions).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ near: null })))
   })
 
   // Add marks places the guide already has right in the list, before

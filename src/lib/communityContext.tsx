@@ -128,6 +128,13 @@ export function useCommunityTimezone(): string {
   return useContext(CommunityContext)?.community.timezone ?? configCommunity.timezone
 }
 
+/** The community's map centre, or null outside a community route. Google's
+ *  place search leans toward it (Oct 6: "Paulie Gee" listed Brooklyn and
+ *  New York before the Philadelphia shop). */
+export function useCommunityCenter(): { lat: number; lng: number } | null {
+  return useContext(CommunityContext)?.community.mapCenter ?? null
+}
+
 // ── The "/" redirect hint ────────────────────────────────────────────────────
 
 /** Records the community the visitor is reading, so a later bare "/" can send

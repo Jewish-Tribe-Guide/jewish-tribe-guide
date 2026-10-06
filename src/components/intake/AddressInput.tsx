@@ -5,6 +5,7 @@ import { TextInput } from './FormControls'
 import { placesApiHoursToStructured, type StructuredHours } from '@/lib/hours'
 import { MAPS_API_KEY, mapsAuthFailed, onMapsAuthFailure } from '@/lib/loadGoogleMaps'
 import { fetchAddressSuggestions, resetAutocompleteSession, type AddressSuggestion } from '@/lib/placesAutocomplete'
+import { useCommunityCenter } from '@/lib/communityContext'
 
 /** Structured data returned when the user picks a suggestion from the autocomplete. */
 export type PlaceSelectResult = {
@@ -88,6 +89,7 @@ type Props = {
 // underlying API, just rendered with our own markup, so it's a normal inline
 // dropdown on every screen size.
 export default function AddressInput({ value, onChange, placeholder = 'Address or location', onCoords, onPlaceSelect, includedPrimaryTypes, disableAutocomplete, preferPlaceName, suggestionNote, inlineSuggestions, id, ariaLabel, autoFocus, searchOnMount }: Props) {
+  const near = useCommunityCenter()
   const [authFailed, setAuthFailed] = useState(mapsAuthFailed())
   const [open, setOpen] = useState(false)
   const [suggestions, setSuggestions] = useState<AddressSuggestion[]>([])
@@ -112,7 +114,7 @@ export default function AddressInput({ value, onChange, placeholder = 'Address o
   useEffect(() => {
     if (!startQuery || !liveSuggestions) return
     let live = true
-    fetchAddressSuggestions(startQuery, { includedPrimaryTypes }).then((results) => {
+    fetchAddressSuggestions(startQuery, { includedPrimaryTypes, near }).then((results) => {
       if (!live) return
       setSuggestions(results)
       setOpen(true)
@@ -120,7 +122,7 @@ export default function AddressInput({ value, onChange, placeholder = 'Address o
     return () => {
       live = false
     }
-  }, [startQuery, liveSuggestions, includedPrimaryTypes])
+  }, [startQuery, liveSuggestions, includedPrimaryTypes, near])
 
   // Close on any tap/click outside — same capture-phase pattern LocationControl
   // uses for its own popover, since this can render inside one.
@@ -149,7 +151,7 @@ export default function AddressInput({ value, onChange, placeholder = 'Address o
     }
     setOpen(true)
     debounceRef.current = setTimeout(async () => {
-      const results = await fetchAddressSuggestions(next, { includedPrimaryTypes })
+      const results = await fetchAddressSuggestions(next, { includedPrimaryTypes, near })
       setSuggestions(results)
     }, 200)
   }

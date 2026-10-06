@@ -24,6 +24,8 @@ export type AddressSuggestion = {
 // session spans exactly one field's typing episode regardless of which
 // field, so there's nothing gained by threading it through props — resetSession
 // just needs calling at the start and end of each episode.
+export const NEAR_RADIUS_M = 50_000
+
 let sessionToken: google.maps.places.AutocompleteSessionToken | null = null
 
 async function placesLibrary(): Promise<google.maps.PlacesLibrary> {
@@ -44,7 +46,7 @@ export function resetAutocompleteSession(): void {
  *  no dropdown rather than needing their own try/catch for this. */
 export async function fetchAddressSuggestions(
   input: string,
-  opts?: { includedPrimaryTypes?: string[] },
+  opts?: { includedPrimaryTypes?: string[]; near?: { lat: number; lng: number } | null },
 ): Promise<AddressSuggestion[]> {
   const trimmed = input.trim()
   if (!trimmed) return []
@@ -57,6 +59,9 @@ export async function fetchAddressSuggestions(
       input: trimmed,
       sessionToken,
       ...(opts?.includedPrimaryTypes?.length ? { includedPrimaryTypes: opts.includedPrimaryTypes } : {}),
+      // Leans toward the community, never limits to it: a place an hour
+      // out still comes up when it's the one typed. 50km is Google's most.
+      ...(opts?.near ? { locationBias: { center: opts.near, radius: NEAR_RADIUS_M } } : {}),
     })
 
     return suggestions
