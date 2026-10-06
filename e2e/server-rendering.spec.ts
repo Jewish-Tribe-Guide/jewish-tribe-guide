@@ -233,7 +233,7 @@ test.describe('the time is the browser’s, not the build’s', () => {
     const shuls = all.find((c) => c.detailFields?.some((f) => f.type === 'minyanim'))
     test.skip(!shuls, 'This community keeps no minyan times')
     const markup = serverMarkup(await (await request.get(`/${community}/${shuls!.id}`)).text())
-    expect(markup).not.toMatch(/(Shacharis|Mincha|Maariv) \d|No davening times listed|Nothing today or tomorrow|Shabbos only/)
+    expect(markup).not.toMatch(/(Shacharis|Mincha|Maariv) \d|No davening times listed|Nothing today or tomorrow|Shabbos only|Shabbos: (Fri|Sat) \d/)
   })
 
   test('the home screen opened half a day later hydrates without React redoing it', async ({ page }) => {

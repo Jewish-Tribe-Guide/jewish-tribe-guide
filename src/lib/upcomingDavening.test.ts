@@ -286,11 +286,18 @@ describe('shulRowByShul', () => {
     )
     expect(rows).toEqual({
       none: { text: 'No davening times listed', tone: 'quiet' },
-      shabbos: { text: 'Shabbos only', tone: 'quiet' },
+      // Oct 6: when, not just "Shabbos only".
+      shabbos: { text: 'Shabbos: Fri 6 PM, Sat 9 AM', tone: 'quiet' },
       thursday: { text: 'Nothing today or tomorrow', tone: 'quiet' },
-      erev: { text: 'Shabbos only', tone: 'quiet' },
+      erev: { text: 'Shabbos: Fri 7 PM, Sat 9 AM', tone: 'quiet' },
       friday: { text: 'Nothing today or tomorrow', tone: 'quiet' },
     })
+  })
+
+  it('a Shabbos-only shul with only Shabbos morning says just that; one with no times to give says “Shabbos only”', () => {
+    const rows = shulRowByShul([shul('sat', [m({ time: '10:00am' })]), shul('worded', [m({ time: 'After Kiddush' })])], opts(7 * 60))
+    expect(rows.sat.text).toBe('Shabbos: Sat 10 AM')
+    expect(rows.worded.text).toBe('Shabbos only')
   })
 
   it('carries the note on the minyan the row names', () => {

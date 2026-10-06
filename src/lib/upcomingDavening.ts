@@ -327,9 +327,25 @@ function shulRowStatus(shul: ShulMinyanim, opts: Parameters<typeof nextUpcomingD
     // month") says something about the shul; two different ones ("Ends at
     // 12:15", "Ends at 7:30") belong to their own minyanim.
     const notes = [...new Set(rows.map((row) => row.notes?.trim()).filter((n): n is string => !!n))]
-    return { text: 'Shabbos only', tone: 'quiet', note: wordedNote ?? (notes.length === 1 ? notes[0] : undefined) }
+    return { text: shabbosTimes(shul, opts) ?? 'Shabbos only', tone: 'quiet', note: wordedNote ?? (notes.length === 1 ? notes[0] : undefined) }
   }
   return { text: 'Nothing today or tomorrow', tone: 'quiet', note: wordedNote }
+}
+
+/** A Shabbos-only shul's row says when (Oct 6): "Shabbos: Fri 6 PM, Sat
+ *  10:45 AM", the first Friday-evening minyan and the first on Shabbos,
+ *  this season's, at this week's times for a candle-lighting or sunset one.
+ *  Null when neither has a time to give (a Yom Tov-only shul, words for
+ *  times). */
+function shabbosTimes(shul: ShulMinyanim, opts: Parameters<typeof nextUpcomingDavening>[1]): string | null {
+  const first = (day: MinyanDayKey, keep: (t: Tefillah) => boolean) =>
+    collectCandidates([shul], [day], opts.season, opts.anchors)
+      .filter((c) => keep(c.tefillah))
+      .sort((a, b) => a.minutes - b.minutes)[0]
+  const fri = first('fri', (t) => t !== 'shacharis')
+  const sat = first('sat', () => true)
+  const parts = [fri && `Fri ${clockTime(fri.minutes)}`, sat && `Sat ${clockTime(sat.minutes)}`].filter(Boolean)
+  return parts.length ? `Shabbos: ${parts.join(', ')}` : null
 }
 
 /** One line of a category page's Next minyan card. */
