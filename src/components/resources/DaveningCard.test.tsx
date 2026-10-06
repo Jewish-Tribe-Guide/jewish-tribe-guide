@@ -251,3 +251,45 @@ describe('this week’s schedule (Oct 6)', () => {
     expect(screen.queryByTestId('davening-this-week-waiting')).not.toBeInTheDocument()
   })
 })
+
+// Oct 6 (migration 072): each box its own date, and “Update their times”
+// beside it, opening in that box. Someone who only davens there on Shabbos
+// can vouch for Shabbos without vouching for Shacharis.
+describe('a date per box (Oct 6)', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.restoreAllMocks()
+  })
+  const times = [
+    { id: 'a', tefillah: 'shacharis', days: ['mon', 'thu'], time: '6:45am' },
+    { id: 'b', tefillah: 'shacharis', days: ['sat'], time: '9:15am' },
+  ]
+  const show = (over: object = {}) => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-10-06T17:30:00-04:00'))
+    const shul = makeListing({ id: '0b6c4c1e-2f55-4a8e-9d57-3b7f0d6f4a21', name: 'Mekor Habracha', category: 'synagogue', minyanim: times, ...over })
+    renderWithProviders(<DaveningCard item={shul} minyanim={times} category={shuls} />, { content: { categories: [shuls] } })
+  }
+
+  it('each box says when its own times were confirmed, the listing’s date where that’s later', () => {
+    show({ confirmedAt: '2026-08-20T12:00:00Z', sectionConfirmed: { shabbos: '2026-09-29T12:00:00Z' } })
+    expect(screen.getByTestId('davening-weekday')).toHaveTextContent('Weekday times confirmed Aug 20.')
+    expect(screen.getByTestId('davening-shabbos')).toHaveTextContent('Shabbos times confirmed Sep 29.')
+  })
+
+  it('“Yes” confirms that box’s times alone', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ ok: true, confirmedAt: '2026-10-06T21:30:00Z' }), { status: 200 }))
+    show()
+    fireEvent.click(within(screen.getByTestId('davening-shabbos')).getByRole('button', { name: 'Yes' }))
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalled())
+    expect(JSON.parse(String(fetchMock.mock.calls[0][1]!.body))).toEqual({ section: 'shabbos' })
+  })
+
+  it('“Update their times” sits beside the date and opens in that box; there’s no separate button at the end', () => {
+    show()
+    expect(screen.getAllByRole('button', { name: 'Update their times' })).toHaveLength(2)
+    fireEvent.click(within(screen.getByTestId('davening-weekday')).getByRole('button', { name: 'Update their times' }))
+    expect(within(screen.getByTestId('davening-weekday')).getByTestId('update-times')).toBeInTheDocument()
+    expect(screen.queryByTestId('davening-confirm')).not.toBeInTheDocument()
+  })
+})

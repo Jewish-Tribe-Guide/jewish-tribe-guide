@@ -296,7 +296,8 @@ describe('ListingView — how sure', () => {
     const shuls = makeCategory({ id: 'synagogue', detailFields: [{ key: 'minyanim', label: 'Davening', type: 'minyanim', renderAs: 'row' }] })
     const shul = makeListing({ confirmedAt: '2026-09-29T05:56:24Z', minyanim: [{ id: 'm1', tefillah: 'shacharis', days: ['sat'], time: '9:00am' }] })
     view({ item: shul, category: shuls })
-    expect(screen.getByTestId('listing-davening')).toHaveTextContent('Times confirmed Sep 29.')
+    // Oct 6: in the box the times are in, “Usual Shabbos times”, and once.
+    expect(screen.getByTestId('davening-shabbos')).toHaveTextContent('Shabbos times confirmed Sep 29.')
     expect(screen.getAllByText(/confirmed/i)).toHaveLength(1)
   })
 

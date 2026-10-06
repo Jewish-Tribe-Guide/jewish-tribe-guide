@@ -378,3 +378,15 @@ export function firstSentence(text: string): { first: string; rest: string } {
   const first = (sentence && sentence.length <= line.length ? sentence : line).trim()
   return { first, rest: t.slice(first.length).trim() }
 }
+
+/** When a section was last confirmed: its own date, or the listing's when
+ *  that's later (an admin's approval, or a confirmation from before
+ *  sections had their own, which spoke for all of them). A mikvah's
+ *  women's, men's and keilim hours; a shul's weekday and Shabbos times. */
+export function sectionConfirmedAt(item: DirectoryResource, key: string): string | undefined {
+  const own = (item.sectionConfirmed as Record<string, string> | undefined)?.[key]
+  const all = item.confirmedAt
+  if (!own) return all
+  if (!all) return own
+  return Date.parse(own) >= Date.parse(all) ? own : all
+}

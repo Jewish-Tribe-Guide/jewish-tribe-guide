@@ -21,6 +21,7 @@ import {
   confirmPlace,
   firstSentence,
   googleKeepsBox,
+  sectionConfirmedAt,
   isWebsite,
   siteName,
   itemsField,
@@ -1052,17 +1053,6 @@ function GroupBoxes({ item, groups, now, candlesAt }: { item: DirectoryResource;
       ))}
     </div>
   )
-}
-
-/** When a section's hours were last confirmed: its own date, or the
- *  listing's when that's later (an admin's approval, or a confirmation from
- *  before sections had their own, which spoke for all of them). */
-function sectionConfirmedAt(item: DirectoryResource, key: string): string | undefined {
-  const own = (item.sectionConfirmed as Record<string, string> | undefined)?.[key]
-  const all = item.confirmedAt
-  if (!own) return all
-  if (!all) return own
-  return Date.parse(own) >= Date.parse(all) ? own : all
 }
 
 function GroupBox({ item, group, now, candlesAt }: { item: DirectoryResource; group: AudienceGroup; now: Date | null; candlesAt: number | null }) {

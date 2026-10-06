@@ -8,6 +8,7 @@ import { geoKey, geoOrCommunityDefault, resolveAnchorTime, type AnchorTimes } fr
 import { dateText, readSchedules, regularMinyanim, scheduleDayText, sendsWeekly, thisWeeksPost, type DayPosting, type SpecialSchedule } from '@/lib/schedules'
 import { clockMinutes, noteText, SHABBOS_PART_LABELS, shabbosList, timeText, weekdayTable, type ShabbosLine } from '@/lib/weekTable'
 import { DAY_KEYS, type DayKey } from '@/lib/hours'
+import { sectionConfirmedAt } from '@/lib/listingView'
 import { resolveCapabilities, type CategoryConfig } from '@/lib/categories'
 import { ui } from '@/lib/uiConfig'
 import { ChevronRightIcon, PlusIcon } from '@/components/icons'
@@ -121,7 +122,18 @@ export default function DaveningCard({
       </div>
     )
   }
-  const confirm = <FreshnessFooter resourceId={item.id} confirmedAt={item.confirmedAt} subject="Times" />
+  /** A box's own date (agreed Oct 6, migration 072) and, beside it, the way
+   *  to send new times: "Confirmed Sep 29 · Update their times". */
+  const foot = (key: string, section: 'weekday' | 'shabbos', subject: string) => (
+    <div className="flex flex-wrap items-baseline gap-x-1.5">
+      <FreshnessFooter resourceId={item.id} confirmedAt={sectionConfirmedAt(item, section)} subject={subject} section={section} />
+      {canAdd && updatingIn !== key && updated?.in !== key && (
+        <button type="button" onClick={() => open(key)} className="cursor-pointer text-[13.5px] font-bold text-primary hover:underline">
+          Update their times
+        </button>
+      )}
+    </div>
+  )
 
   const folded = (key: 'week' | 'shabbos', title: string, body: ReactNode) => {
     const reason = foldReason(key)
@@ -149,7 +161,7 @@ export default function DaveningCard({
     ? folded(
         'week',
         'Usual weekday times',
-        <Card key="week" title="Usual weekday times" testId="davening-weekday">
+        <Card key="week" title="Usual weekday times" testId="davening-weekday" footer={foot('week', 'weekday', 'Weekday times')}>
           <WeekTable table={week} today={today} />
           <Notes
             lines={[
@@ -161,6 +173,7 @@ export default function DaveningCard({
               week.otherSeason,
             ]}
           />
+          {updateIn('week')}
         </Card>,
       )
     : shab && (
@@ -181,9 +194,10 @@ export default function DaveningCard({
     ? folded(
         'shabbos',
         'Usual Shabbos times',
-        <Card key="shabbos" title="Usual Shabbos times" testId="davening-shabbos">
+        <Card key="shabbos" title="Usual Shabbos times" testId="davening-shabbos" footer={foot('shabbos-usual', 'shabbos', 'Shabbos times')}>
           <ShabbosLines lines={shab.lines} anchors={anchors} today={today} />
           <Notes lines={[shab.otherSeason]} />
+          {updateIn('shabbos-usual')}
         </Card>,
       )
     : week && (
@@ -205,13 +219,27 @@ export default function DaveningCard({
   return (
     <div className="space-y-5" data-testid="listing-davening">
       {post && (
-        <Card title="This week’s schedule" testId="davening-this-week" footer={post.postedAt ? `Posted ${dateText(post.postedAt.slice(0, 10), { weekday: true })}` : undefined}>
+        <Card
+          title="This week’s schedule"
+          testId="davening-this-week"
+          footer={
+            <div className="flex flex-wrap items-baseline gap-x-1.5">
+              {post.postedAt && <span>Posted {dateText(post.postedAt.slice(0, 10), { weekday: true })}.</span>}
+              {canAdd && updatingIn !== 'this-week' && updated?.in !== 'this-week' && (
+                <button type="button" onClick={() => open('this-week')} className="cursor-pointer text-[13.5px] font-bold text-primary hover:underline">
+                  Update their times
+                </button>
+              )}
+            </div>
+          }
+        >
           <p className="text-[14.5px] font-semibold text-slate-700" data-testid="davening-this-week-dates">
             {postTitle(post)}
           </p>
           <p className="mt-1.5 rounded-lg bg-slate-100 px-2.5 py-1.5 text-[13px] leading-snug text-slate-700">In place of their usual times for these dates only.</p>
           {postShabbos && <ShabbosLines lines={postShabbos.lines} anchors={anchors} today={today} />}
           {postTable && <WeekTable table={postTable} today={today} />}
+          {updateIn('this-week')}
         </Card>
       )}
       {waiting && (
@@ -264,22 +292,15 @@ export default function DaveningCard({
       {!week && !shab && (
         <Card title="Davening times" testId="davening-none">
           <p className="pt-0.5 text-[14.5px] text-slate-700">No davening times listed yet.</p>
+          {canAdd && updatingIn !== 'none' && updated?.in !== 'none' && (
+            <button type="button" onClick={() => open('none')} className="mt-1.5 inline-flex cursor-pointer items-center gap-1.5 py-1 text-[14.5px] font-bold text-primary">
+              <PlusIcon className="h-4 w-4" />
+              Add their times
+            </button>
+          )}
+          {updateIn('none')}
         </Card>
       )}
-      {/* One date and one Update for the shul's times, for now; each box
-          gets its own with migration 072. */}
-      <Card testId="davening-confirm" footer={confirm}>
-        {canAdd && updatingIn !== 'end' && updated?.in !== 'end' && !adding && (
-          <button
-            type="button"
-            onClick={() => open('end')}
-            className="mt-2.5 h-10 w-full cursor-pointer rounded-[10px] border-[1.5px] border-primary bg-white text-[14.5px] font-bold text-primary hover:bg-primary/5"
-          >
-            Update their times
-          </button>
-        )}
-        {updateIn('end')}
-      </Card>
     </div>
   )
 }
