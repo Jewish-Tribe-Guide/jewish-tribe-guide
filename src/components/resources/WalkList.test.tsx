@@ -7,6 +7,8 @@ import { mockRouter } from '@/test/nextNavigationMock'
 import type { DirectoryResource } from '@/types'
 import ListingView from './ListingView'
 import { forgetLoadedPlaces } from './WalkList'
+import { WalkOnMapContext } from './walkOnMap'
+import { createHighlight } from './CategoryMap'
 
 vi.mock('next/navigation', () => ({
   useRouter: () => mockRouter,
@@ -159,6 +161,33 @@ describe('A hotel’s synagogues within a walk', () => {
     open(hotel, { ...hotels, walkList: undefined })
     expect(screen.queryByTestId('walk-lists')).not.toBeInTheDocument()
     expect(fetchMock).not.toHaveBeenCalled()
+  })
+})
+
+// Oct 6: where the category's map is beside the listing, an opened kind's
+// places go on it, a row under the pointer lights its pin, and there's no
+// "See them on the map" (the map is right there).
+describe('Within a walk, on the map beside it', () => {
+  it('shows the opened kind’s places on the map, lights a row’s pin, and clears them when closed', async () => {
+    const show = vi.fn()
+    const highlight = createHighlight()
+    renderWithProviders(
+      <WalkOnMapContext.Provider value={{ show, highlight }}>
+        <ListingView item={hotel} category={hotels} color="#000" path="/test" foot={null} />
+      </WalkOnMapContext.Provider>,
+      { content: { categories: [hotels, shuls] } },
+    )
+    const section = await openKind(/Synagogues · 3/)
+    expect(show).toHaveBeenLastCalledWith({ categoryId: 'synagogue', places: [nearby[0], nearby[1], nearby[2]] })
+    expect(within(section).queryByRole('link', { name: 'See them on the map' })).not.toBeInTheDocument()
+
+    fireEvent.mouseEnter(within(section).getByRole('link', { name: /Mikveh Israel/ }))
+    expect(highlight.get()).toBe('s2')
+    fireEvent.mouseLeave(within(section).getByRole('link', { name: /Mikveh Israel/ }))
+    expect(highlight.get()).toBeNull()
+
+    fireEvent.click(within(section).getByRole('button', { name: /Synagogues · 3/ }))
+    expect(show).toHaveBeenLastCalledWith(null)
   })
 })
 

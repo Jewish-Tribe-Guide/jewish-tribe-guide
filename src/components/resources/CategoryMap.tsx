@@ -12,6 +12,11 @@ import { usePinned } from '@/lib/pinnedContext'
 import { useOptionalLocation } from '@/lib/locationContext'
 import { useIsMobile } from '@/lib/useIsMobile'
 import type { MapPoint } from '@/components/map/ResourceMap'
+import { useRouter } from 'next/navigation'
+import { useCommunitySlug } from '@/lib/communityContext'
+import { routes } from '@/lib/routes'
+import { listingSlug } from '@/lib/listingSlug'
+import type { WalkShown } from './walkOnMap'
 
 // ── The map beside a category's list, on a wide screen ───────────────────────
 // List and map as equals: the map shows exactly the places the list holds
@@ -36,7 +41,7 @@ const WIDE = '(min-width: 1024px) and (min-height: 640px)'
 /** Whether the screen is that wide. False until known, so nothing loads
  *  before it's measured, and false wherever the page is shown as a phone
  *  (useIsMobile honours the admin preview's forced viewport). */
-function useWide(): boolean {
+export function useWide(): boolean {
   const mobile = useIsMobile()
   const [wide, setWide] = useState(false)
   useEffect(() => {
@@ -114,9 +119,14 @@ type Props = {
   onHide: () => void
   /** The full Map page, on the same places. */
   fullMapHref: string
+  /** The open listing's "Within a walk" list, opened (walkOnMap.ts): the
+   *  map shows that listing and those places, the page's own set aside. */
+  walk?: WalkShown | null
 }
 
-export default function CategoryMap({ category, items, searchActive, highlight, selectedId = null, onSelect, onHide, fullMapHref }: Props) {
+export default function CategoryMap({ category, items, searchActive, highlight, selectedId = null, onSelect, onHide, fullMapHref, walk = null }: Props) {
+  const router = useRouter()
+  const community = useCommunitySlug()
   const highlightedId = useSyncExternalStore(highlight.subscribe, highlight.get, () => null)
   // Asks the map to come to each listing opened beside it: a new number
   // each time one opens (worked out during render, React's way of
@@ -135,11 +145,15 @@ export default function CategoryMap({ category, items, searchActive, highlight, 
   // the list (a hover re-renders it): the map redraws its markers for each
   // new array.
   const pinnedKey = pinned.map((p) => p.id).join('|')
-  const itemsKey = items.map((i) => i.id).join('|')
+  // With a walk list shown: just the open listing, then its places.
+  const shown = walk ? items.filter((i) => i.id === selectedId) : items
+  const itemsKey = shown.map((i) => i.id).join('|')
+  const walkKey = walk ? `${walk.categoryId}:${walk.places.map((p) => p.id).join('|')}` : ''
+  const walkCategory = walk ? categories?.find((c) => c.id === walk.categoryId) : undefined
   const points = useMemo(() => {
     const pinnedIds = new Set(pinnedKey.split('|'))
     const out: MapPoint[] = []
-    for (const item of items) {
+    for (const item of shown) {
       const lat = item.geo?.lat
       const lng = item.geo?.lng
       if (typeof lat !== 'number' || typeof lng !== 'number') continue
@@ -159,9 +173,30 @@ export default function CategoryMap({ category, items, searchActive, highlight, 
         pinned: pinnedIds.has(item.id),
       })
     }
+    if (walk && walkCategory) {
+      const walkColor = getCategoryColor(categories ?? [walkCategory], walkCategory.id)
+      for (const item of walk.places) {
+        if (typeof item.geo?.lat !== 'number' || typeof item.geo?.lng !== 'number') continue
+        out.push({
+          id: item.id,
+          lat: item.geo.lat,
+          lng: item.geo.lng,
+          name: item.name,
+          address: item.address || undefined,
+          phone: item.phone,
+          color: walkColor,
+          glyph: walkCategory.icon ?? DEFAULT_CATEGORY_ICON,
+          glyphSrc: walkCategory.iconImageUrl ?? undefined,
+          categoryLabel: walkCategory.label,
+          filterId: walkCategory.id,
+          raw: item,
+          pinned: pinnedIds.has(item.id),
+        })
+      }
+    }
     return out
     // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on which places and pins, not the array's identity
-  }, [itemsKey, pinnedKey, color, category.icon, category.iconImageUrl, category.label, category.id])
+  }, [itemsKey, walkKey, pinnedKey, color, category.icon, category.iconImageUrl, category.label, category.id, walkCategory])
 
   const button =
     'flex h-9 cursor-pointer items-center gap-1.5 rounded-lg bg-white px-3 text-[13.5px] font-semibold text-slate-700 shadow-md ring-1 ring-slate-900/10 transition-colors hover:bg-slate-50'
@@ -173,15 +208,20 @@ export default function CategoryMap({ category, items, searchActive, highlight, 
         <Suspense fallback={<div className="h-full w-full animate-pulse rounded-2xl bg-slate-100" />}>
         <ResourceMap
           points={points}
-          userLocation={coords}
+          // Not with a walk list shown: the map frames the listing and its
+          // places, not them and wherever the visitor is.
+          userLocation={walk ? null : coords}
           searchActive={searchActive}
           // The listing open beside the map: its pin lit, the map on it.
-          // Otherwise the row under the pointer.
-          selectedId={selectedId ?? highlightedId ?? undefined}
+          // Otherwise the row under the pointer; with a walk list shown, the
+          // walk row under the pointer first.
+          selectedId={(walk ? (highlightedId ?? selectedId) : (selectedId ?? highlightedId)) ?? undefined}
           // A listing opened beside the map brings the map to it; a row
           // under the pointer only lights its pin.
           frameToken={selectedId ? frame : undefined}
-          onSelectPoint={(p) => onSelect(p.id)}
+          // A walk list's place opens on its own page; the page's own pin
+          // finds its row, as ever.
+          onSelectPoint={(p) => (p.filterId && p.filterId !== category.id && p.raw ? router.push(routes.listing(community, p.filterId, listingSlug(p.raw))) : onSelect(p.id))}
           onDeselectPoint={() => undefined}
           zoomRadiusMiles={zoomRadiusMiles}
         />

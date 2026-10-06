@@ -37,7 +37,8 @@ import { travelCompare } from '@/lib/listingTravel'
 import { useLogSearchMiss } from '@/lib/useLogSearchMiss'
 import CategoryAsk from './CategoryAsk'
 import NextMinyanCard from './NextMinyanCard'
-import CategoryMap, { createHighlight } from './CategoryMap'
+import CategoryMap, { createHighlight, useWide } from './CategoryMap'
+import { WalkOnMapContext, type WalkShown } from './walkOnMap'
 import RowLookSwitch, { useRowLook } from './RowLookSwitch'
 import { useListMapSplit } from './useListMapSplit'
 import { mapQueryString, routes } from '@/lib/routes'
@@ -1166,6 +1167,12 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   const [rowLook, setRowLook] = useRowLook()
   const flat = rowLook === 'list'
   const [highlight] = useState(createHighlight)
+  // An open listing's "Within a walk" list, opened, on the map beside it
+  // (walkOnMap.ts), where that map is on screen.
+  const [walkShown, setWalkShown] = useState<WalkShown | null>(null)
+  const wide = useWide()
+  const mapOnScreen = mapBeside && wide
+  const walkOnMap = mapOnScreen ? { show: setWalkShown, highlight } : null
   // A pin's row, found: opened to (its group too), scrolled to, and
   // outlined for a moment so the eye lands on it.
   const [flashId, setFlashId] = useState<string | null>(null)
@@ -1294,6 +1301,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
 
   return (
     <TellAboutContext.Provider value={canAdd || canEdit ? tellAbout : null}>
+    <WalkOnMapContext.Provider value={walkOnMap}>
     <div>
       {/* Phones: where the distances on each row are measured from, when
           the visitor hasn't set a location, with the way to set one. At the
@@ -1700,6 +1708,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
             searchActive={typed || activeFilterCount > 0}
             highlight={highlight}
             selectedId={columnItem?.id ?? null}
+            walk={columnItem && mapOnScreen ? walkShown : null}
             onSelect={columnItem ? (id) => switchListing(columnItem.id, id) : findRow}
             onHide={() => setMapHidden(true)}
             fullMapHref={fullMapHref}
@@ -1797,6 +1806,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
       )}
 
     </div>
+    </WalkOnMapContext.Provider>
     </TellAboutContext.Provider>
   )
 }

@@ -39,6 +39,9 @@ export const SYNC_INTERNAL_FIELDS = [
   // An admin's, never a submitter's: an edit can't date a dish "on its menu".
   'itemMenu',
   'menuUrl',
+  // When each of a mikvah's sections was last confirmed (confirm_section,
+  // migration 071): a visitor's tap, never a submitter's or a moderator's.
+  'sectionConfirmed',
 ] as const
 
 /** Additionally hidden from the moderation diff, though a submitter MAY change

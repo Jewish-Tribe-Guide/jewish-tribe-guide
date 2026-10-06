@@ -298,15 +298,50 @@ describe('ListingView — how sure', () => {
     expect(screen.queryByText(/checked/i)).not.toBeInTheDocument()
   })
 
-  it('a mikvah asks about its hours, in their card', () => {
-    const flag: CategoryField = { key: 'womenTevillah', label: 'Women', filterLabel: 'Women’s', type: 'boolean', renderAs: 'badge', filterable: true }
-    const mikvah = makeCategory({ id: 'mikvah', detailFields: [flag, { key: 'women_s_notes', label: 'Notes', type: 'textarea', renderAs: 'row', audienceKey: 'womenTevillah' }] })
-    view({ item: makeListing({ womenTevillah: true, women_s_notes: 'By appointment', confirmedAt: '2026-09-02T12:00:00Z' }), category: mikvah })
-    expect(screen.getByTestId('listing-groups')).toHaveTextContent('Hours confirmed Sep 2.')
-    expect(screen.getAllByTestId('freshness')).toHaveLength(1)
-    // Once, for every section's hours: under the boxes, not in the last
-    // one, where it read as the Keilim's (Oct 6).
-    expect(screen.getByTestId('freshness').closest('section')).toBeNull()
+  // Oct 6: each section on its own. One date for all three read as the last
+  // one's, and whoever uses one mikvah knows its hours, not the others'.
+  it('a mikvah asks about each section’s hours in its own box, the section’s own date or the listing’s if later', async () => {
+    const section = (key: string, filterLabel: string): CategoryField[] => [
+      { key, label: key, filterLabel, type: 'boolean', renderAs: 'badge', filterable: true },
+      { key: `${key}_hours`, label: 'Hours', type: 'hours', renderAs: 'row', audienceKey: key },
+    ]
+    const mikvah = makeCategory({
+      id: 'mikvah',
+      detailFields: [...section('womenTevillah', 'Women’s'), ...section('menTevillah', 'Men’s'), { key: 'keilim', label: 'Keilim', type: 'boolean', renderAs: 'badge' }, { key: 'keilim_notes', label: 'Notes', type: 'textarea', renderAs: 'row', audienceKey: 'keilim' }],
+    })
+    const week = { mon: { open: '20:30', close: '22:30' } }
+    view({
+      item: makeListing({
+        id: '0b6c4c1e-2f55-4a8e-9d57-3b7f0d6f4a21',
+        womenTevillah: true,
+        womenTevillah_hours: week,
+        menTevillah: true,
+        menTevillah_hours: week,
+        keilim: true,
+        keilim_notes: 'Right-hand door',
+        confirmedAt: '2026-09-02T12:00:00Z',
+        sectionConfirmed: { menTevillah: '2026-10-01T12:00:00Z' },
+      }),
+      category: mikvah,
+    })
+    const [women, men, keilim] = [...screen.getByTestId('listing-groups').querySelectorAll('section')]
+    expect(women).toHaveTextContent('Women’s hours confirmed Sep 2.')
+    expect(men).toHaveTextContent('Men’s hours confirmed Oct 1.')
+    // Notes and no hours: nothing to confirm.
+    expect(within(keilim).queryByTestId('freshness')).not.toBeInTheDocument()
+
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ ok: true, confirmedAt: '2026-10-06T12:00:00Z' }), { status: 200 }))
+    cleanup()
+    view({
+      item: makeListing({ id: '0b6c4c1e-2f55-4a8e-9d57-3b7f0d6f4a21', womenTevillah: true, womenTevillah_hours: week }),
+      category: mikvah,
+    })
+    fireEvent.click(within(screen.getByTestId('listing-groups')).getByRole('button', { name: 'Yes' }))
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalled())
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(String(url)).toBe('/api/resource/0b6c4c1e-2f55-4a8e-9d57-3b7f0d6f4a21/confirm')
+    expect(JSON.parse(String(init!.body))).toEqual({ section: 'womenTevillah' })
+    fetchMock.mockRestore()
   })
 
   it('asks nothing where nothing is the community’s to confirm', () => {

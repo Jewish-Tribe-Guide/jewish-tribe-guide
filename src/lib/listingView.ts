@@ -124,7 +124,7 @@ export function mainThing(item: DirectoryResource, category: CategoryConfig): Ma
 
 /** Where an opened listing asks "Still right?" (agreed Sep 30, trimmed
  *  Oct 6): beside what changes often, in its own box. A shul's times and a
- *  mikvah's hours in their cards, a named section ("Who to call first") in
+ *  mikvah's hours in each section's own box (each on its own date), a named section ("Who to call first") in
  *  its card, a group's join link in its Join box (not a website's).
  *
  *  What hardly changes isn't dated at all any more. A hechsher's proof is
@@ -135,13 +135,15 @@ export function mainThing(item: DirectoryResource, category: CategoryConfig): Ma
  *  and their own "Still here" (itemMarks.ts). Nothing in the header is
  *  ever dated. Null where there's nothing to ask about: no broad "is all of
  *  this right" instead. */
-export type ConfirmPlace = { at: 'card'; subject: string } | { at: 'join' }
+export type ConfirmPlace = { at: 'card'; subject: string } | { at: 'join' } | { at: 'sections' }
 
 export function confirmPlace(item: DirectoryResource, category: CategoryConfig): ConfirmPlace | null {
   const main = mainThing(item, category)
   if (main === 'section') return { at: 'card', subject: mainCardOf(category)!.label }
   if (main === 'davening') return { at: 'card', subject: 'Times' }
-  if (main === 'groups') return { at: 'card', subject: 'Hours' }
+  // Each section's hours in its own box, on its own date (Oct 6): whoever
+  // uses the women's mikvah knows its hours, not the keilim's.
+  if (main === 'groups') return { at: 'sections' }
   // A group's Join, not a network's website: "did it open the group?" is
   // a question only a joining link can be asked.
   if (main === 'join') {

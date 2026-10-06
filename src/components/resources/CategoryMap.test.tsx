@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { useState } from 'react'
 import { act, cleanup, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { renderWithProviders } from '@/test/renderWithProviders'
@@ -110,6 +111,58 @@ describe('CategoryMap', () => {
     const { onSelect } = render()
     await user.click(await screen.findByRole('button', { name: 'Cafe' }))
     expect(onSelect).toHaveBeenCalledWith('c')
+  })
+
+  // Oct 6: a hotel's "Within a walk" list, opened, on the map beside it.
+  describe('with an open listing’s walk list shown (walkOnMap.ts)', () => {
+    const shuls = makeCategory({ id: 'synagogue', label: 'Synagogue', pluralLabel: 'Synagogues' })
+    const mekor = makeListing({ id: 's1', category: 'synagogue', name: 'Mekor Habracha', geo: { lat: 39.951, lng: -75.17 } }) as DirectoryResource
+    const walk = { categoryId: 'synagogue', places: [mekor] }
+
+    it('pins the open listing and that list’s places, the rest of the page’s set aside', async () => {
+      screenWidth(1440)
+      renderWithProviders(
+        <CategoryMap category={food} items={items} searchActive={false} highlight={createHighlight()} selectedId="a" walk={walk} onSelect={vi.fn()} onHide={vi.fn()} fullMapHref="/x" />,
+        { content: { categories: [food, shuls] } },
+      )
+      await screen.findByTestId('google-map')
+      expect(screen.getAllByRole('button', { name: /Alpha Grill|Mekor Habracha|Cafe/ }).map((b) => b.textContent)).toEqual(['Alpha Grill (larger)', 'Mekor Habracha'])
+    })
+
+    it('puts the page’s own places back when the list closes', async () => {
+      screenWidth(1440)
+      const props = { category: food, items, searchActive: false, highlight: createHighlight(), selectedId: 'a', onSelect: vi.fn(), onHide: vi.fn(), fullMapHref: '/x' }
+      function Harness() {
+        const [open, setOpen] = useState(true)
+        return (
+          <>
+            <button onClick={() => setOpen(false)}>Close the list</button>
+            <CategoryMap {...props} walk={open ? walk : null} />
+          </>
+        )
+      }
+      renderWithProviders(<Harness />, { content: { categories: [food, shuls] } })
+      await screen.findByRole('button', { name: /Mekor Habracha/ })
+      act(() => screen.getByRole('button', { name: 'Close the list' }).click())
+      expect(screen.getAllByRole('button', { name: /Alpha Grill|Mekor Habracha|Cafe/ }).map((b) => b.textContent)).toEqual(['Alpha Grill (larger)', 'Cafe'])
+    })
+
+    it('lights a row’s pin over the open listing’s, and opens a place’s own page from its pin', async () => {
+      screenWidth(1440)
+      const highlight = createHighlight()
+      const onSelect = vi.fn()
+      const user = userEvent.setup()
+      renderWithProviders(
+        <CategoryMap category={food} items={items} searchActive={false} highlight={highlight} selectedId="a" walk={walk} onSelect={onSelect} onHide={vi.fn()} fullMapHref="/x" />,
+        { content: { categories: [food, shuls] } },
+      )
+      await screen.findByTestId('google-map')
+      act(() => highlight.set('s1'))
+      expect(screen.getByRole('button', { name: 'Mekor Habracha (larger)' })).toBeInTheDocument()
+      await user.click(screen.getByRole('button', { name: /Mekor Habracha/ }))
+      expect(onSelect).not.toHaveBeenCalled()
+      expect(mockRouter.push).toHaveBeenCalledWith(expect.stringMatching(/^\/test-community\/synagogue\/mekor-habracha-/))
+    })
   })
 
   it('keeps a map that fails to itself: its box says so, and nothing reaches the page', async () => {

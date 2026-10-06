@@ -788,6 +788,11 @@ async function withItemDates(
   // edit would be approved unseen.
   delete next.menuUrl
   if (existing?.menuUrl !== undefined) next.menuUrl = existing.menuUrl
+  // A mikvah section's own "Still right?" date (confirm_section, Oct 6) is
+  // the visitors', like an item's: never an edit's, which the queue doesn't
+  // show.
+  delete next.sectionConfirmed
+  if (existing?.sectionConfirmed !== undefined) next.sectionConfirmed = existing.sectionConfirmed
   if (keys.length === 0) {
     if (existing?.itemSeen !== undefined) next.itemSeen = existing.itemSeen
     if (existing?.itemGone !== undefined) next.itemGone = existing.itemGone

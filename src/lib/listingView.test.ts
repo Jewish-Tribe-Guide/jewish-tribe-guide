@@ -322,7 +322,7 @@ describe('googleKeeps', () => {
 describe('confirmPlace', () => {
   it('what changes often, asked about in its card: a shul’s times, a mikvah’s hours', () => {
     expect(confirmPlace(makeListing({ minyanim: [{ id: 'm1', tefillah: 'shacharis', days: ['sun'], time: '8:00am' }] }), shuls)).toEqual({ at: 'card', subject: 'Times' })
-    expect(confirmPlace(makeListing({ womenTevillah: true, women_s_notes: 'By appointment' }), mikvah)).toEqual({ at: 'card', subject: 'Hours' })
+    expect(confirmPlace(makeListing({ womenTevillah: true, women_s_notes: 'By appointment' }), mikvah)).toEqual({ at: 'sections' })
   })
   it('what hardly changes isn’t dated at all (Oct 6): the certificate proves a hechsher; a grocery’s items carry their own dates', () => {
     expect(confirmPlace(makeListing({ t: ['Meat'], kosherCert: 'Keystone-K', foodType: 'Restaurant' }), food)).toBeNull()

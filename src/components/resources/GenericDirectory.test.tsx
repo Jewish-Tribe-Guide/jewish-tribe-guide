@@ -174,6 +174,7 @@ vi.mock('./CategoryMap', async () => {
   const actual = await vi.importActual<typeof import('./CategoryMap')>('./CategoryMap')
   return {
     createHighlight: actual.createHighlight,
+    useWide: actual.useWide,
     default: function CategoryMap({
       items,
       highlight,

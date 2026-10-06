@@ -316,7 +316,7 @@ export default function ListingView({ item, category, color, place = null, upvot
     mainSection = <ItemsCard field={itemsF} found={found} api={itemApi} menuUrl={menuUrlOf(item)} />
   } else if (main === 'groups') {
     mainSection = (
-      <GroupBoxes item={item} groups={audienceGroups(item, category)} now={now} candlesAt={candlesAt} footer={confirmAt?.at === 'card' ? confirmLine(confirmAt.subject) : undefined} />
+      <GroupBoxes item={item} groups={audienceGroups(item, category)} now={now} candlesAt={candlesAt} />
     )
   } else if (main === 'walk') {
     const lists = parseWalkLists(category.walkList)
@@ -1032,31 +1032,28 @@ function ItemAnswer({ mark: m, api, clock, say }: { mark: ItemMark; api: ItemMar
 
 /** A mikvah's sections, a box each (Oct 6): today's hours, its phone and
  *  email, and the first sentence of its notes; opened, the week and the
- *  notes whole instead, nothing said twice. "Still right?" about the hours
- *  once, under them all. */
-function GroupBoxes({
-  item,
-  groups,
-  now,
-  candlesAt,
-  footer,
-}: {
-  item: DirectoryResource
-  groups: AudienceGroup[]
-  now: Date | null
-  candlesAt: number | null
-  footer?: ReactNode
-}) {
+ *  notes whole instead, nothing said twice. "Still right?" about each one's
+ *  hours in its own box, on its own date: one line for all three read as
+ *  the last one's, and someone who uses one knows that one. */
+function GroupBoxes({ item, groups, now, candlesAt }: { item: DirectoryResource; groups: AudienceGroup[]; now: Date | null; candlesAt: number | null }) {
   return (
     <div className="space-y-3" data-testid="listing-groups">
       {groups.map((g) => (
         <GroupBox key={g.key} item={item} group={g} now={now} candlesAt={candlesAt} />
       ))}
-      {/* Once, for all of them: the listing has one date (Oct 6). In the
-          last box it read as that section's. */}
-      {footer && <div className="px-1 text-[13px] leading-snug text-muted">{footer}</div>}
     </div>
   )
+}
+
+/** When a section's hours were last confirmed: its own date, or the
+ *  listing's when that's later (an admin's approval, or a confirmation from
+ *  before sections had their own, which spoke for all of them). */
+function sectionConfirmedAt(item: DirectoryResource, key: string): string | undefined {
+  const own = (item.sectionConfirmed as Record<string, string> | undefined)?.[key]
+  const all = item.confirmedAt
+  if (!own) return all
+  if (!all) return own
+  return Date.parse(own) >= Date.parse(all) ? own : all
 }
 
 function GroupBox({ item, group, now, candlesAt }: { item: DirectoryResource; group: AudienceGroup; now: Date | null; candlesAt: number | null }) {
@@ -1073,7 +1070,10 @@ function GroupBox({ item, group, now, candlesAt }: { item: DirectoryResource; gr
   const shut = !open || !foldable
   const foldLabel = hasWeek && more.length > 0 ? 'Week and notes' : hasWeek ? 'The week' : 'More'
   return (
-    <Card title={group.label}>
+    <Card
+      title={group.label}
+      footer={hoursF && <FreshnessFooter resourceId={item.id} confirmedAt={sectionConfirmedAt(item, group.key)} subject={`${group.label} hours`} section={group.key} />}
+    >
       <div className="divide-y divide-slate-100">
         {today && shut && (
           <Row icon={<ClockIcon className="h-[17px] w-[17px]" />}>

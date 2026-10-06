@@ -157,3 +157,33 @@ describe('DELETE /api/resource/:id/confirm', () => {
     expect(m.revalidateTag).not.toHaveBeenCalled()
   })
 })
+
+// Oct 6: a mikvah's sections are confirmed one at a time (confirm_section,
+// unconfirm_section in 20240101000071_section_confirm.sql, which checks the
+// section is really one of the listing's).
+describe('a section at a time', () => {
+  it('POST with a section stamps that section, and logs which one', async () => {
+    m.rpc.mockImplementation(async (_fn: string, args: { p_now: string }) => changed(args.p_now))
+    const json = await (await POST(req('POST', { section: 'womenTevillah' }), ctx())).json()
+    const [fn, args] = m.rpc.mock.calls[0]
+    expect(fn).toBe('confirm_section')
+    expect(args).toMatchObject({ p_id: ID, p_section: 'womenTevillah', p_cooldown_seconds: 600 })
+    expect(json).toMatchObject({ ok: true, changed: true, confirmedAt: args.p_now })
+    expect(m.recordActivity).toHaveBeenCalledWith([
+      { community: 'philly', resourceId: ID, kind: 'listing_confirmed', source: 'visitor', fieldKey: 'womenTevillah' },
+    ])
+  })
+
+  it('400s a section that couldn’t be a field key, without asking the database', async () => {
+    for (const bad of ['women Tevillah', 'x;drop', '', 42, 'a'.repeat(65)]) {
+      expect((await POST(req('POST', { section: bad }), ctx())).status).toBe(400)
+    }
+    expect(m.rpc).not.toHaveBeenCalled()
+  })
+
+  it('DELETE with a section undoes that section’s', async () => {
+    m.rpc.mockResolvedValue(changed(null))
+    await DELETE(req('DELETE', { section: 'menTevillah', confirmedAt: '2026-10-06T15:00:00.000Z' }), ctx())
+    expect(m.rpc).toHaveBeenCalledWith('unconfirm_section', { p_id: ID, p_section: 'menTevillah', p_expected: '2026-10-06T15:00:00.000Z', p_previous: null })
+  })
+})

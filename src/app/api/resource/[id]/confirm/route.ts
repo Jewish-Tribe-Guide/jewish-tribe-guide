@@ -4,8 +4,10 @@ import { enforceRateLimit } from '@/lib/rateLimit'
 import { TAGS } from '@/lib/cacheTags'
 import { recordActivity, removeVisitorConfirmation } from '@/lib/activityStore'
 
-// POST /api/resource/:id/confirm
+// POST /api/resource/:id/confirm   body: { section? }
 // Records that a visitor verified the community-curated info is still accurate.
+// With a section ("womenTevillah"), just that section's hours (Oct 6), in
+// details.sectionConfirmed.
 // Writes confirmedAt into details (same pattern as googleSyncedAt) — no separate
 // column needed, surfaces automatically via the normalizeRow spread.
 //
@@ -26,6 +28,19 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 type RpcRow = { out_community: string; out_confirmed_at: string | null; out_changed: boolean }
 
+/** A section, by its yes/no field's key ("womenTevillah"): a mikvah's
+ *  women's, men's or keilim hours, each confirmed on its own (Oct 6;
+ *  confirm_section checks it's really one of the listing's). Undefined when
+ *  none was sent; null when what was sent can't be one. */
+async function sectionOf(request: Request): Promise<string | null | undefined> {
+  const body = (await request
+    .clone()
+    .json()
+    .catch(() => ({}))) as { section?: unknown }
+  if (body.section === undefined) return undefined
+  return typeof body.section === 'string' && /^[A-Za-z0-9_]{1,64}$/.test(body.section) ? body.section : null
+}
+
 function isIso(v: unknown): v is string {
   return typeof v === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(v) && !Number.isNaN(Date.parse(v))
 }
@@ -36,12 +51,13 @@ export async function POST(request: Request, ctx: RouteContext<'/api/resource/[i
 
   const { id } = await ctx.params
   if (!UUID.test(id)) return Response.json({ ok: false, error: 'Not found.' }, { status: 404 })
+  const section = await sectionOf(request)
+  if (section === null) return Response.json({ ok: false, error: 'Invalid section.' }, { status: 400 })
 
-  const { data, error } = await getAdminClient().rpc('confirm_resource', {
-    p_id: id,
-    p_now: new Date().toISOString(),
-    p_cooldown_seconds: COOLDOWN_SECONDS,
-  })
+  const now = new Date().toISOString()
+  const { data, error } = section
+    ? await getAdminClient().rpc('confirm_section', { p_id: id, p_section: section, p_now: now, p_cooldown_seconds: COOLDOWN_SECONDS })
+    : await getAdminClient().rpc('confirm_resource', { p_id: id, p_now: now, p_cooldown_seconds: COOLDOWN_SECONDS })
   if (error) {
     console.error('[confirm] rpc failed:', error)
     return Response.json({ ok: false, error: 'Could not save confirmation.' }, { status: 502 })
@@ -52,7 +68,7 @@ export async function POST(request: Request, ctx: RouteContext<'/api/resource/[i
   let activityId: number | null = null
   if (row.out_changed) {
     ;[activityId = null] = await recordActivity([
-      { community: row.out_community, resourceId: id, kind: 'listing_confirmed', source: 'visitor' },
+      { community: row.out_community, resourceId: id, kind: 'listing_confirmed', source: 'visitor', ...(section ? { fieldKey: section } : {}) },
     ])
     // Same cached listApprovedResources() every category page reads through —
     // without this, the confirmation the visitor just made wouldn't show for
@@ -75,6 +91,8 @@ export async function DELETE(request: Request, ctx: RouteContext<'/api/resource/
 
   const { id } = await ctx.params
   if (!UUID.test(id)) return Response.json({ ok: false, error: 'Not found.' }, { status: 404 })
+  const section = await sectionOf(request)
+  if (section === null) return Response.json({ ok: false, error: 'Invalid section.' }, { status: 400 })
   const body = (await request.json().catch(() => ({}))) as {
     previousConfirmedAt?: unknown
     confirmedAt?: unknown
@@ -94,11 +112,9 @@ export async function DELETE(request: Request, ctx: RouteContext<'/api/resource/
     return Response.json({ ok: false, error: 'Invalid confirmation.' }, { status: 400 })
   }
 
-  const { data, error } = await getAdminClient().rpc('unconfirm_resource', {
-    p_id: id,
-    p_expected: expected ?? null,
-    p_previous: previous ?? null,
-  })
+  const { data, error } = section
+    ? await getAdminClient().rpc('unconfirm_section', { p_id: id, p_section: section, p_expected: expected ?? null, p_previous: previous ?? null })
+    : await getAdminClient().rpc('unconfirm_resource', { p_id: id, p_expected: expected ?? null, p_previous: previous ?? null })
   if (error) {
     console.error('[confirm] undo rpc failed:', error)
     return Response.json({ ok: false, error: 'Could not undo confirmation.' }, { status: 502 })

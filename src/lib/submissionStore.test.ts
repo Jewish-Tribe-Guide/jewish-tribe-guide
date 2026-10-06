@@ -1661,6 +1661,37 @@ describe('approveSubmission: activity log and grocery item dates', () => {
     expect(details.menuUrl).toBe('https://example.com/menu')
   })
 
+  // Oct 6: a mikvah section's own "Still right?" date (confirm_section) is
+  // the visitors', never an edit's: the queue doesn't show it.
+  it('keeps each section\'s confirmation date, and never takes one from a submission', async () => {
+    const sub = baseSubmission({
+      operation: 'update',
+      target_id: 'res-1',
+      payload: listingPayload({
+        category: 'mikvah',
+        details: { womenTevillah: true, sectionConfirmed: { womenTevillah: '2099-01-01T00:00:00.000Z', menTevillah: '2099-01-01T00:00:00.000Z' } },
+      }) as unknown as Record<string, unknown>,
+    })
+    const resource = mockFlow(sub, { id: 'res-1', details: { womenTevillah: true, sectionConfirmed: { womenTevillah: '2026-10-01T14:00:00.000Z' } } })
+
+    await approveSubmission('sub-1')
+
+    expect(lastCallArg(resource.update).details.sectionConfirmed).toEqual({ womenTevillah: '2026-10-01T14:00:00.000Z' })
+  })
+
+  it('drops a made-up sectionConfirmed from a listing that has none', async () => {
+    const sub = baseSubmission({
+      operation: 'update',
+      target_id: 'res-1',
+      payload: listingPayload({ category: 'mikvah', details: { womenTevillah: true, sectionConfirmed: { womenTevillah: '2099-01-01T00:00:00.000Z' } } }) as unknown as Record<string, unknown>,
+    })
+    const resource = mockFlow(sub, { id: 'res-1', details: { womenTevillah: true } })
+
+    await approveSubmission('sub-1')
+
+    expect(lastCallArg(resource.update).details.sectionConfirmed).toBeUndefined()
+  })
+
   it('logs nothing when the approval itself fails to save', async () => {
     const sub = baseSubmission({ operation: 'create', payload: listingPayload() as unknown as Record<string, unknown> })
     mockFlow(sub)

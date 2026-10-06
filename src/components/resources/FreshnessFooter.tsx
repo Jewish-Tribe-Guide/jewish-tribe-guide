@@ -16,6 +16,9 @@ type Props = {
   /** False for what hardly changes: just when it was last checked, with no
    *  "Still right?" and no button ("Kosher details last checked Aug 20"). */
   ask?: boolean
+  /** One section's own date, not the listing's: a mikvah's women's hours
+   *  ("womenTevillah", Oct 6). */
+  section?: string
 }
 
 // Shown at the end of every opened listing, and in a shul's times card: when
@@ -36,7 +39,7 @@ export default function FreshnessFooter(props: Props) {
   return <FreshnessStatus {...props} />
 }
 
-function FreshnessStatus({ resourceId, confirmedAt: initialConfirmedAt, lead, subject, ask = true }: Props) {
+function FreshnessStatus({ resourceId, confirmedAt: initialConfirmedAt, lead, subject, ask = true, section }: Props) {
   const now = useNow()
   const [confirmedAt, setConfirmedAt] = useState(initialConfirmedAt)
   // What confirmedAt was right before the most recent confirm — lets a
@@ -57,7 +60,10 @@ function FreshnessStatus({ resourceId, confirmedAt: initialConfirmedAt, lead, su
     setLoading(true)
     setError(false)
     try {
-      const res = await fetch(`/api/resource/${resourceId}/confirm`, { method: 'POST' })
+      const res = await fetch(
+        `/api/resource/${resourceId}/confirm`,
+        section ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ section }) } : { method: 'POST' },
+      )
       const json = (await res.json()) as { ok: boolean; confirmedAt?: string; changed?: boolean; activityId?: number | null }
       if (json.ok && json.confirmedAt) {
         setPreviousConfirmedAt(confirmedAt)
@@ -81,7 +87,7 @@ function FreshnessStatus({ resourceId, confirmedAt: initialConfirmedAt, lead, su
       const res = await fetch(`/api/resource/${resourceId}/confirm`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ previousConfirmedAt, confirmedAt: mine?.confirmedAt, activityId: mine?.activityId }),
+        body: JSON.stringify({ previousConfirmedAt, confirmedAt: mine?.confirmedAt, activityId: mine?.activityId, ...(section ? { section } : {}) }),
       })
       const json = (await res.json()) as { ok: boolean; confirmedAt?: string | null }
       if (json.ok) {

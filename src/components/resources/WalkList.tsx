@@ -25,6 +25,7 @@ import {
 import type { LatLng } from '@/lib/geo'
 import { NextMinyans, NextMinyansContext, useNextMinyan } from './nextMinyans'
 import { Card } from './listingParts'
+import { WalkOnMapContext } from './walkOnMap'
 
 // ── Other categories' places within a walk: a hotel's shuls, a hospital's
 // food, shuls, hotels and mikvah ─────────────────────────────────────────────
@@ -100,6 +101,12 @@ type Props = {
  *  most of a hospital's page. */
 export default function WalkLists({ lists, from, fromLabel, fromItem }: Props) {
   const categories = useCategories()
+  // One kind open at a time: the map beside it shows one list.
+  const [openId, setOpenId] = useState<string | null>(null)
+  const onMap = useContext(WalkOnMapContext)
+  const show = onMap?.show
+  // Off the map when the listing closes or another opens.
+  useEffect(() => () => show?.(null), [show])
   const shown = lists.flatMap((walk) => {
     const target = categories.find((c) => c.id === walk.categoryId)
     return target ? [{ walk, target }] : []
@@ -114,7 +121,20 @@ export default function WalkLists({ lists, from, fromLabel, fromItem }: Props) {
     >
       <ul className="divide-y divide-slate-100">
         {shown.map(({ walk, target }) => (
-          <WalkList key={target.id} walk={walk} target={target} places={places[target.id]} from={from} fromItem={fromItem} />
+          <WalkList
+            key={target.id}
+            walk={walk}
+            target={target}
+            places={places[target.id]}
+            from={from}
+            fromItem={fromItem}
+            open={openId === target.id}
+            onToggle={(rows) => {
+              const opening = openId !== target.id
+              setOpenId(opening ? target.id : null)
+              show?.(opening ? { categoryId: target.id, places: rows } : null)
+            }}
+          />
         ))}
       </ul>
     </Card>
@@ -129,15 +149,19 @@ function WalkList({
   places,
   from,
   fromItem,
+  open,
+  onToggle,
 }: {
   walk: WalkListSetting
   target: CategoryConfig
   places: DirectoryResource[] | 'failed' | null
   from: LatLng
   fromItem?: Pick<DirectoryResource, 'id' | 'category'>
+  open: boolean
+  /** With the places it lists, nearest first, for the map beside it. */
+  onToggle: (rows: DirectoryResource[]) => void
 }) {
   const community = useCommunitySlug()
-  const [open, setOpen] = useState(false)
   const noun = target.pluralLabel || target.label
   const shuls = isShuls(target)
   const rows = Array.isArray(places) ? walkGroups(from, places, walk.maxMinutes).flatMap((g) => g.rows).sort((a, b) => a.miles - b.miles) : []
@@ -177,7 +201,7 @@ function WalkList({
     <li data-testid="walk-list">
       {rows.length > 0 && Array.isArray(places) ? (
         <>
-          <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} className="flex w-full cursor-pointer items-center gap-3 py-2.5 text-left">
+          <button type="button" aria-expanded={open} onClick={() => onToggle(rows.map((r) => r.item))} className="flex w-full cursor-pointer items-center gap-3 py-2.5 text-left">
             <span className="min-w-0 flex-1">
               {title}
               {sub}
@@ -215,6 +239,7 @@ function ListBody({
   from: LatLng
   fromItem?: Pick<DirectoryResource, 'id' | 'category'>
 }) {
+  const onMap = useContext(WalkOnMapContext)
   const community = useCommunitySlug()
   const minyans = useContext(NextMinyansContext)
   const noun = (target.pluralLabel || target.label).toLowerCase()
@@ -273,7 +298,7 @@ function ListBody({
       <p className="mt-2 text-[12.5px] leading-snug text-slate-500">{shuls ? 'Tap one for its Shabbos times.' : 'Tap one to open it.'}</p>
       {/* These places aren't on this page's map, which shows its own
           category: the Map shows them around this one (Oct 6). */}
-      {fromItem && (
+      {fromItem && !onMap && (
         <Link
           href={`${routes.map(community)}${mapQueryString({ categories: [fromItem.category, target.id], place: fromItem.id })}`}
           className="mt-2 inline-block text-[14px] font-bold text-primary hover:underline"
@@ -290,6 +315,7 @@ function ListBody({
  *  a shul's next minyan; a caveat ("Not everything here is kosher"); or,
  *  with nothing to say, where it is. */
 function Row({ row, target, field, place }: { row: WalkRow; target: CategoryConfig; field: CategoryField | null; place: string | null }) {
+  const onMap = useContext(WalkOnMapContext)
   const community = useCommunitySlug()
   const clock = useNow()
   const shul = useNextMinyan(row.item.id)
@@ -308,6 +334,9 @@ function Row({ row, target, field, place }: { row: WalkRow; target: CategoryConf
       <Link
         href={routes.listing(community, target.id, listingSlug(item))}
         onClick={(e) => e.stopPropagation()}
+        // Its pin, lit on the map beside the listing (walkOnMap.ts).
+        onMouseEnter={onMap ? () => onMap.highlight.set(item.id) : undefined}
+        onMouseLeave={onMap ? () => onMap.highlight.set(null) : undefined}
         className="flex items-center gap-3 py-2.5 hover:bg-slate-50"
       >
         <span className="w-[52px] shrink-0 text-[15px] font-extrabold text-slate-900">
