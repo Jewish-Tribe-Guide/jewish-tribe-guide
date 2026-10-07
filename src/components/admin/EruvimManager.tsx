@@ -5,7 +5,7 @@ import { useLoadOnMount } from '@/lib/useLoadOnMount'
 import { fetchJson } from '@/lib/fetchJson'
 import { withCommunity } from '@/lib/useCommunityData'
 import { useCommunitySlug } from '@/lib/communityContext'
-import { eruvView } from '@/lib/eruv'
+import { eruvView, shortDay } from '@/lib/eruv'
 import { withoutNames, type EruvLineFile } from '@/lib/eruvLine'
 import { shapeOf } from '@/lib/eruvShape'
 import type { AdminEruv } from '@/lib/eruvStore'
@@ -19,10 +19,6 @@ import type { AdminEruv } from '@/lib/eruvStore'
 // keeps the line it had.
 
 type Loaded = { available: boolean; timezone: string; eruvim: AdminEruv[] }
-
-function day(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-}
 
 /** The line drawn small: its enclosed area filled, the gaps the guide
  *  joined in red, so an admin can compare it with the eruv's own map. */
@@ -106,7 +102,7 @@ function EruvCard({ eruv, timezone, busy, onAct, onSave }: { eruv: AdminEruv; ti
       </div>
       <p className={`mt-1 text-sm font-semibold ${tone}`}>{view.label}</p>
       {view.checked && <p className="text-xs text-muted">{view.checked}</p>}
-      {eruv.statusWords && <p className="text-xs text-muted">Read from: “{eruv.statusWords}”{eruv.statusPostedOn ? `, dated ${day(eruv.statusPostedOn)}` : ''}</p>}
+      {eruv.statusWords && <p className="text-xs text-muted">Read from: “{eruv.statusWords}”{eruv.statusPostedOn ? `, dated ${shortDay(eruv.statusPostedOn, timezone)}` : ''}</p>}
       {eruv.statusError && <p className="text-xs text-red-700">Last read failed: {eruv.statusError}</p>}
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
@@ -157,7 +153,7 @@ function EruvCard({ eruv, timezone, busy, onAct, onSave }: { eruv: AdminEruv; ti
             <div data-testid="eruv-line-pending">
               <p className="text-sm font-bold text-amber-800">{eruv.rawLine ? 'Its line has changed' : 'Its line, read for the first time'}</p>
               <p className="mb-1.5 text-xs text-muted">
-                Read {eruv.lineReadAt ? day(eruv.lineReadAt) : ''}. Check the green area against the eruv’s own map. Red marks a gap in their line the guide joined.
+                Read {eruv.lineReadAt ? shortDay(eruv.lineReadAt, timezone) : ''}. Check the green area against the eruv’s own map. Red marks a gap in their line the guide joined.
               </p>
               <LinePreview file={eruv.linePending} leaveOut={draft.lineLeaveOut} />
               <button type="button" disabled={busy || dirty} onClick={() => onAct('approve-line')} className="mt-2 cursor-pointer rounded-md bg-primary px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-50">
@@ -170,7 +166,7 @@ function EruvCard({ eruv, timezone, busy, onAct, onSave }: { eruv: AdminEruv; ti
             <div>
               <p className="text-sm font-bold text-slate-800">On the map now</p>
               <p className="mb-1.5 text-xs text-muted">
-                Used since {eruv.lineApprovedAt ? day(eruv.lineApprovedAt) : ''}
+                Used since {eruv.lineApprovedAt ? shortDay(eruv.lineApprovedAt, timezone) : ''}
                 {eruv.lineApprovedBy ? `, by ${eruv.lineApprovedBy}` : ''}.
               </p>
               <LinePreview file={eruv.rawLine} leaveOut={draft.lineLeaveOut} />

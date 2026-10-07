@@ -175,3 +175,10 @@ export function dialable(phone: string): string {
   const main = phone.split(/,|\s+option\b/i)[0]
   return main.replace(/[a-z]/gi, (c) => letters[c.toLowerCase()]).replace(/[^\d+]/g, '')
 }
+
+/** "Aug 28": a post's date as written (a calendar day, not a moment), or a
+ *  moment as it fell where the community is. */
+export function shortDay(iso: string, tz: string): string {
+  const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(iso)
+  return new Date(dateOnly ? `${iso}T12:00:00Z` : iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: dateOnly ? 'UTC' : tz })
+}

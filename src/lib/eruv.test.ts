@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { dialable, eruvView, firstDate, inCheckingHours, isStale, pageText, readStatus, staleAfterMs, weekStart, type Eruv } from './eruv'
+import { dialable, eruvView, firstDate, inCheckingHours, isStale, pageText, readStatus, shortDay, staleAfterMs, weekStart, type Eruv } from './eruv'
 
 // The three status pages, as their words read on Oct 7 2026.
 const CENTER_CITY =
@@ -127,5 +127,15 @@ describe('weekStart and dialable', () => {
   it('dials letters and drops the option', () => {
     expect(dialable('(215) 333-ERUV')).toBe('2153333788')
     expect(dialable('(610) 664-5626, option 3')).toBe('6106645626')
+  })
+})
+
+describe('shortDay', () => {
+  it('a post’s date is that day wherever it’s read', () => {
+    expect(shortDay('2026-08-28', TZ)).toBe('Aug 28')
+    expect(shortDay('2026-10-02', 'America/Los_Angeles')).toBe('Oct 2')
+  })
+  it('a moment is the day it was where the community is', () => {
+    expect(shortDay('2026-10-08T02:00:00Z', TZ)).toBe('Oct 7')
   })
 })
