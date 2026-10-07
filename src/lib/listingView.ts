@@ -7,7 +7,8 @@ import { haversineMiles, milesText, roundMiles } from './geo'
 import { rowBadgeFields, saysTheSame } from './listingRow'
 import { isMinyanim } from './davening'
 import { parseWalkLists } from './walkList'
-import { mainCardOf, parseListingParts } from './listingParts'
+import { boxesOf, mainCardOf } from './listingParts'
+import { readContacts } from './contacts'
 import type { DirectoryResource } from '@/types'
 
 // ── An opened listing ────────────────────────────────────────────────────────
@@ -93,11 +94,12 @@ export function listingDistance(item: DirectoryResource, region: string): string
 
 // ── The main thing ───────────────────────────────────────────────────────────
 
-export type MainThing = 'section' | 'davening' | 'items' | 'groups' | 'walk' | 'join'
+export type MainThing = 'section' | 'boxes' | 'davening' | 'items' | 'groups' | 'walk' | 'join'
 
 /** What the listing is mostly for. The section an admin named as it comes
- *  first (a hospital's "Who to call first", listingParts.ts), even while
- *  it's empty, so every listing in the category opens the same way.
+ *  first (a hotel's "Shabbos friendly", listingParts.ts), even while it's
+ *  empty, so every listing in the category opens the same way; then the
+ *  admin's boxes (a hospital's "Who to call", "Kosher food", Oct 6).
  *  Otherwise by what it holds, first that applies: davening times; items; one section per audience (a mikvah's women's,
  *  men's and keilim); the shuls within a walk (a hotel); the one link of a
  *  place with no address (Join a WhatsApp group). Never the hours on their
@@ -111,6 +113,7 @@ export type MainThing = 'section' | 'davening' | 'items' | 'groups' | 'walk' | '
 export function mainThing(item: DirectoryResource, category: CategoryConfig): MainThing | null {
   const fields = category.detailFields
   if (mainCardOf(category)) return 'section'
+  if (boxesOf(category).length > 0) return 'boxes'
   const minyanim = fields.find((f) => f.type === 'minyanim')
   if (minyanim && isMinyanim(item[minyanim.key]) && (item[minyanim.key] as unknown[]).length > 0) return 'davening'
   const items = itemsField(category)
@@ -135,7 +138,7 @@ export function mainThing(item: DirectoryResource, category: CategoryConfig): Ma
  *  and their own "Still here" (itemMarks.ts). Nothing in the header is
  *  ever dated. Null where there's nothing to ask about: no broad "is all of
  *  this right" instead. */
-export type ConfirmPlace = { at: 'card'; subject: string } | { at: 'join' } | { at: 'sections' }
+export type ConfirmPlace = { at: 'card'; subject: string } | { at: 'join' } | { at: 'sections' } | { at: 'boxes' }
 
 export function confirmPlace(item: DirectoryResource, category: CategoryConfig): ConfirmPlace | null {
   const main = mainThing(item, category)
@@ -144,6 +147,9 @@ export function confirmPlace(item: DirectoryResource, category: CategoryConfig):
   // Each section's hours in its own box, on its own date (Oct 6): whoever
   // uses the women's mikvah knows its hours, not the keilim's.
   if (main === 'groups') return { at: 'sections' }
+  // A hospital's boxes, each on its own date (Oct 6): whoever called the
+  // pantry knows the pantry, not the rides.
+  if (main === 'boxes') return { at: 'boxes' }
   // A group's Join, not a network's website: "did it open the group?" is
   // a question only a joining link can be asked.
   if (main === 'join') {
@@ -293,16 +299,16 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 export type ActionSpec =
   | { kind: 'directions' }
   | { kind: 'call' }
-  | { kind: 'location' }
   | { kind: 'link'; field: CategoryField; href: string }
   | { kind: 'email'; field: CategoryField; address: string }
 
 /** The buttons under the name, in order: Directions, Call, each link, an
  *  email. Share always comes last, so four of these at most; the rest are
  *  returned as `extra`, for the details. A place's one Join link isn't a
- *  button here: it's the main thing. A place people stay at and measure
- *  from (a hospital: listingParts.setLocation) ends with Set as location,
- *  which takes the fourth place. */
+ *  button here: it's the main thing. Set as location isn't one either any
+ *  more (Oct 6): it's a row under the address, so a hospital's buttons are
+ *  every listing's. A link the admin put in the contact box (linkInDetails:
+ *  a hospital's Refuah page) is always among the extra. */
 export function listingActions(item: DirectoryResource, category: CategoryConfig): { buttons: ActionSpec[]; extra: ActionSpec[] } {
   const all: ActionSpec[] = []
   if (category.hasAddress !== false && item.address) all.push({ kind: 'directions' })
@@ -310,17 +316,15 @@ export function listingActions(item: DirectoryResource, category: CategoryConfig
   const primary = primaryLink(item, category)?.field.key
   // A link on the admin's main card is said there, not twice.
   const onCard = new Set(mainCardOf(category)?.fields.map((f) => f.key) ?? [])
+  const inDetails: ActionSpec[] = []
   for (const f of category.detailFields) {
     if (f.audienceKey || f.key === primary || onCard.has(f.key)) continue
     const v = String(item[f.key] ?? '').trim()
     if (!v) continue
-    if (f.type === 'url') all.push({ kind: 'link', field: f, href: v })
+    if (f.type === 'url') (f.linkInDetails ? inDetails : all).push({ kind: 'link', field: f, href: v })
     else if (f.type === 'text' && EMAIL.test(v)) all.push({ kind: 'email', field: f, address: v })
   }
-  if (parseListingParts(category.listingParts).setLocation && category.hasAddress !== false && item.geo) {
-    return { buttons: [...all.slice(0, 3), { kind: 'location' }], extra: all.slice(3) }
-  }
-  return { buttons: all.slice(0, 4), extra: all.slice(4) }
+  return { buttons: all.slice(0, 4), extra: [...all.slice(4), ...inDetails] }
 }
 
 // ── How sure ─────────────────────────────────────────────────────────────────
@@ -389,4 +393,11 @@ export function sectionConfirmedAt(item: DirectoryResource, key: string): string
   if (!own) return all
   if (!all) return own
   return Date.parse(own) >= Date.parse(all) ? own : all
+}
+
+/** The key a box is confirmed under (migration 073): its first list of
+ *  contacts with anything in it. Null for a box with none, which isn't
+ *  asked about. */
+export function boxConfirmKey(item: DirectoryResource, fields: readonly CategoryField[]): string | null {
+  return fields.find((f) => f.type === 'contacts' && readContacts(item[f.key]).length > 0)?.key ?? null
 }

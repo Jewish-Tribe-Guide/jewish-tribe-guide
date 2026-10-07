@@ -9,7 +9,7 @@
 
 import type { AskWord } from './askWords'
 
-export type FieldType = 'text' | 'tel' | 'textarea' | 'number' | 'boolean' | 'select' | 'tags' | 'url' | 'hours' | 'minyanim' | 'image'
+export type FieldType = 'text' | 'tel' | 'textarea' | 'number' | 'boolean' | 'select' | 'tags' | 'url' | 'hours' | 'minyanim' | 'image' | 'contacts'
 
 /** The detail keys stored beside a field and edited with it: a tags
  *  field's items that are only sometimes there ("m_sometimes"), a minyanim
@@ -33,6 +33,7 @@ export const FIELD_TYPES: { value: FieldType; label: string }[] = [
   { value: 'tags', label: 'Tags' },
   { value: 'hours', label: 'Hours' },
   { value: 'minyanim', label: 'Davening Times (Minyanim)' },
+  { value: 'contacts', label: 'List of contacts' },
 ]
 
 /** Each type's natural display shape on a card — a `badge` (chip beside the
@@ -50,6 +51,7 @@ export const FIELD_TYPE_SHAPE: Record<FieldType, 'badge' | 'row'> = {
   number: 'row',
   hours: 'row',
   minyanim: 'row',
+  contacts: 'row',
   // Never actually rendered as a card row (see the "Photo" toggle below) —
   // this entry exists only because FIELD_TYPE_SHAPE is a Record over every
   // FieldType.
@@ -116,6 +118,10 @@ export type CategoryField = {
   showIf?: { field: string; equals: string | number | boolean }
   /** For `type: 'url'`: the button text shown on the card (e.g. "Join group"). */
   linkLabel?: string
+  /** For `type: 'url'`: on an opened listing, a line in the contact box
+   *  instead of a round button (a hospital's page on Refuah, Oct 6), so the
+   *  buttons stay every listing's Directions, Call, Website, Share. */
+  linkInDetails?: boolean
   /** For a row field: render just the value, without the "Label:" prefix. */
   hideLabel?: boolean
   // ── Presentation hints (used by the generic card renderer) ──
@@ -235,6 +241,13 @@ export type CategoryField = {
    *  real stored boolean exactly as before — nothing downstream needs to
    *  know this field is asked "backwards" in the form. */
   invertDisplay?: boolean
+  /** For `type: 'contacts'`: each entry also says where it's from ("From
+   *  Monsey"), for a hospital's rides, which families arrange from home. */
+  entryFrom?: boolean
+  /** Shown on a listing only from Rosh Hashanah to the end of Sukkos (a
+   *  hospital's sukkah), worked out from the Hebrew date (sukkosWindow.ts). Still
+   *  edited, searched and shown to a moderator all year. */
+  shownAround?: 'sukkos'
 }
 
 /** A named, admin-defined group of optional form fields — see

@@ -1,9 +1,9 @@
 'use client'
 
-import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import type { DirectoryResource } from '@/types'
-import { resolveCapabilities, type CategoryConfig } from '@/lib/categories'
+import { resolveCapabilities, type CategoryConfig, type CategoryField } from '@/lib/categories'
 import { changeableFields, changeLines, DAYS } from '@/lib/fieldChanges'
 import { dayLabel, fmt12, isStructuredHours, type DayKey, type StructuredHours } from '@/lib/hours'
 import { fmt } from '@/lib/submissionDiff'
@@ -21,6 +21,7 @@ import ActionDialog from '@/components/resources/ActionDialog'
 import MobileSheet from '@/components/resources/MobileSheet'
 import UpdateTimesBox from '@/components/resources/UpdateTimesBox'
 import ListingForm, { DetailFieldInput } from '@/components/resources/ListingForm'
+import { FieldsBox } from '@/components/resources/FieldsBox'
 import ListingEditor from '@/components/resources/ListingEditor'
 import type { SendVia } from '@/components/resources/useListingSubmit'
 import FindPlace from '@/components/FindPlace'
@@ -358,7 +359,7 @@ export function TellUsBody({
     }
     if (p?.kind === 'fields') {
       const r = fieldsReadingOf(p, picked[i] ?? null)
-      return { name: r?.listing.name ?? (p.asWritten || 'A place'), what: r ? r.lines.map((l) => l.split(':')[0]).join(', ') || 'A note' : '' }
+      return { name: r?.listing.name ?? (p.asWritten || 'A place'), what: r ? [...new Set(r.lines.map((l) => l.split(':')[0].split(',')[0]))].join(', ') || 'A note' : '' }
     }
     if (p?.kind === 'new_place') {
       const same = p.maybe.find((m) => m.id === picked[i])
@@ -788,6 +789,22 @@ export function TellUsBody({
   )
 }
 
+/** A list of contacts as the listing will show it (Oct 6: a pasted Refuah
+ *  page fills six), its form one tap away: the result to check, not six
+ *  forms to read. */
+function ContactsPreview({ field, item, children }: { field: CategoryField; item: DirectoryResource; children: ReactNode }) {
+  const [fixing, setFixing] = useState(false)
+  return (
+    <div className="rounded-2xl bg-slate-100 p-2" data-testid="contacts-preview">
+      <FieldsBox item={item} title={field.label} fields={[field]} />
+      <button type="button" aria-expanded={fixing} onClick={() => setFixing((v) => !v)} className="mt-1 cursor-pointer px-2 py-1.5 text-[14px] font-bold text-primary hover:underline">
+        {fixing ? 'Done' : `Change something in ${field.label.toLowerCase()}`}
+      </button>
+      {fixing && <div className="mt-1 rounded-xl bg-white p-2.5">{children}</div>}
+    </div>
+  )
+}
+
 function ChangeLines({ lines, held }: Lines) {
   return (
     <ul className="mt-1.5 space-y-0.5 text-[14px]">
@@ -981,7 +998,11 @@ function ResultCard({
               return (
                 <div key={key}>
                   {f.field ? (
-                    f.type === 'hours' ? (
+                    f.type === 'contacts' ? (
+                      <ContactsPreview field={f.field} item={{ ...r.before, [key]: shown[key] } as DirectoryResource}>
+                        <DetailFieldInput field={f.field} value={shown[key]} onChange={(v) => onFix(key, v)} />
+                      </ContactsPreview>
+                    ) : f.type === 'hours' ? (
                       <>
                         <WeekChange label={f.label} before={r.before[key]} after={shown[key]} />
                         <HoursFix label={f.label}>
@@ -997,7 +1018,7 @@ function ResultCard({
                       <input value={String(shown[key] ?? '')} onChange={(e) => onFix(key, e.target.value)} className={`${inputClass} mt-1`} />
                     </label>
                   )}
-                  {f.type !== 'hours' && <p className="mt-0.5 text-[12.5px] text-slate-500">Was: {was}</p>}
+                  {f.type !== 'hours' && f.type !== 'contacts' && <p className="mt-0.5 text-[12.5px] text-slate-500">Was: {was}</p>}
                 </div>
               )
             })}

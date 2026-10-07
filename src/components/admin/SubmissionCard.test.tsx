@@ -4,6 +4,7 @@ import { cleanup, render, screen } from '@testing-library/react'
 import type { CategoryField, FieldType } from '@/lib/categories'
 import { formatAnchorRule, type Minyan } from '@/lib/davening'
 import type { ScheduleMinyan, SpecialSchedule } from '@/lib/schedules'
+import type { ContactEntry } from '@/lib/contacts'
 import type { EnrichedSubmission, ResourceRow } from '@/types'
 import { SubmissionCard } from './SubmissionCard'
 import { makeCategory } from '@/test/providerFixtures'
@@ -49,6 +50,11 @@ const SAMPLES: Record<FieldType, { field: Omit<CategoryField, 'label'>; before: 
     field: { key: 'f', type: 'minyanim' },
     before: [{ id: 'm', tefillah: 'shacharis', days: ['mon'], time: '7:00am' }],
     after: [{ id: 'm', tefillah: 'shacharis', days: ['mon'], time: '7:30am' }],
+  },
+  contacts: {
+    field: { key: 'f', type: 'contacts' },
+    before: [{ name: 'Bikur Cholim of Philadelphia', phones: ['215-805-8668'] }],
+    after: [{ name: 'Bikur Cholim of Philadelphia', phones: ['215-805-8669'] }],
   },
 }
 
@@ -346,6 +352,57 @@ describe('a multi-line field marks only the lines that changed', () => {
     // The old rendering repeated every line — once struck through, once in
     // green — which is what made a ten-minyan edit unreadable.
     expect(screen.getAllByText(/^Mincha.*12:20pm$/)).toHaveLength(1)
+  })
+})
+
+// ── A list of contacts (Oct 6: a hospital's liaisons, pantries, rides) ──────
+// Every part of an entry is classified: adding one to ContactEntry is a
+// compile error until someone decides how a moderator sees it.
+const CONTACT_FIELD_VISIBILITY: Record<keyof ContactEntry, 'shown'> = {
+  name: 'shown',
+  who: 'shown',
+  phones: 'shown',
+  email: 'shown',
+  web: 'shown',
+  note: 'shown',
+  from: 'shown',
+}
+
+describe('moderation queue — every part of a contact a moderator should see', () => {
+  const base: ContactEntry = { name: 'Chai Lifeline', who: 'Mrs. Gorelick', phones: ['732-719-1700'], email: 'a@chai.org', web: 'chailifeline.org', note: 'Call first.', from: 'Monsey' }
+  const changed: Record<keyof ContactEntry, Partial<ContactEntry>> = {
+    name: { name: 'Chai Lifeline NJ/PA' },
+    who: { who: 'Mr. Brodsky' },
+    phones: { phones: ['732-719-1700', '908-770-5145'] },
+    email: { email: 'b@chai.org' },
+    web: { web: 'chailifeline.org/pa' },
+    note: { note: 'Call before coming.' },
+    from: { from: 'Boro Park' },
+  }
+  for (const key of Object.keys(CONTACT_FIELD_VISIBILITY) as (keyof ContactEntry)[]) {
+    it(`surfaces a change to ${key}`, () => {
+      renderDiff({ key: 'rides', type: 'contacts', entryFrom: true }, [base], [{ ...base, ...changed[key] }])
+      expect(diffText()).toContain('→')
+    })
+  }
+
+  it('reads each entry as a line, never as raw data', () => {
+    renderDiff({ key: 'rides', type: 'contacts', entryFrom: true }, [], [base])
+    const text = diffText()
+    expect(text).toContain('From Monsey: Chai Lifeline · Mrs. Gorelick · (732) 719-1700 · a@chai.org · chailifeline.org · Call first.')
+    expect(text).not.toContain('[object Object]')
+    expect(text).not.toContain('{')
+  })
+
+  it('marks only the entry that changed, the others plain context', () => {
+    const others: ContactEntry[] = [{ name: 'Naomi Gorelick', phones: ['908-770-5145'] }, { name: 'Heshy Horovitz', phones: ['732-810-7700'] }]
+    renderDiff({ key: 'call', type: 'contacts' }, [base, ...others], [{ ...base, phones: ['732-719-1760'] }, ...others])
+    expect(screen.getByText(/^From Monsey: Chai Lifeline .*1700/).className).toContain('line-through')
+    expect(screen.getByText(/^From Monsey: Chai Lifeline .*1760/).className).toContain('text-green-700')
+    for (const untouched of [/^Naomi Gorelick/, /^Heshy Horovitz/]) {
+      expect(screen.getAllByText(untouched)).toHaveLength(1)
+      expect(screen.getByText(untouched).className).not.toContain('line-through')
+    }
   })
 })
 

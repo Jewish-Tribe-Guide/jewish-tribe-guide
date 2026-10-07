@@ -32,11 +32,13 @@ import {
   mainThing,
   nearbyListings,
   primaryLink,
+  boxConfirmKey,
   type ActionSpec,
   type AudienceGroup,
 } from '@/lib/listingView'
 import { parseWalkLists } from '@/lib/walkList'
-import { mainCardOf, shabbosFieldsOf } from '@/lib/listingParts'
+import { boxesOf, mainCardOf, parseListingParts, shabbosAfter, shabbosFieldsOf } from '@/lib/listingParts'
+import { inSeason } from '@/lib/sukkosWindow'
 import { clockTime } from '@/lib/upcomingDavening'
 import { milesText } from '@/lib/geo'
 import type { SearchFound } from '@/lib/askSearch'
@@ -65,6 +67,7 @@ import DaveningCard from './DaveningCard'
 import { schedulesKey } from '@/lib/schedules'
 import WalkLists from './WalkList'
 import { SectionCard, ShabbosCard } from './listingCards'
+import { FieldsBox } from './FieldsBox'
 import { useNextMinyan } from './nextMinyans'
 import { Card, shortDate } from './listingParts'
 import FreshnessFooter from './FreshnessFooter'
@@ -132,8 +135,11 @@ export default function ListingView({ item, category, color, place = null, upvot
   const { community } = useActiveCommunity()
   const clock = useNow()
   const now = clock === null ? null : new Date(clock)
+  const timezone = useCommunityTimezone()
   const hoursFields = category.detailFields.filter((f) => f.type === 'hours')
-  const shabbosFields = shabbosFieldsOf(category)
+  // A field shown only around Sukkos (a hospital's sukkah) is left out the
+  // rest of the year, and until the page knows the date.
+  const shabbosFields = shabbosFieldsOf(category)?.filter((f) => inSeason(f, now, timezone)) ?? null
   // Tonight's candle lighting, on a Friday or erev Yom Tov: a place that
   // shuts before it says so, and the Shabbos card's first line. The same
   // cached request the list makes.
@@ -326,6 +332,28 @@ export default function ListingView({ item, category, color, place = null, upvot
     mainSection = lists.length > 0 && item.geo ? <WalkLists lists={lists} from={item.geo} fromLabel={category.label} fromItem={item} /> : null
   }
 
+  // The admin's boxes (a hospital's "Who to call", "Kosher food", Oct 6),
+  // then any list of contacts in none of them, as a box of its own. Each
+  // dated on its own.
+  const configured = boxesOf(category)
+  const placed = new Set([...configured.flatMap((b) => b.fields.map((f) => f.key)), ...(named?.fields.map((f) => f.key) ?? []), ...(shabbosFieldsOf(category) ?? []).map((f) => f.key)])
+  const boxDefs = [
+    ...configured,
+    ...category.detailFields.filter((f) => f.type === 'contacts' && f.renderAs !== 'hidden' && !placed.has(f.key)).map((f) => ({ title: f.label, fields: [f] })),
+  ]
+  const boxes = boxDefs.map((b) => {
+    const key = boxConfirmKey(item, b.fields)
+    return (
+      <FieldsBox
+        key={b.title}
+        item={item}
+        title={b.title}
+        fields={b.fields}
+        footer={key && confirmAt?.at === 'boxes' ? <FreshnessFooter resourceId={item.id} confirmedAt={sectionConfirmedAt(item, key)} subject={b.title} section={key} /> : undefined}
+      />
+    )
+  })
+
   // ── 4 · Details ────────────────────────────────────────────────────────
   const showAddress = category.hasAddress !== false && !!item.address
   const showPhone = category.hasPhone !== false && !!item.phone
@@ -340,6 +368,7 @@ export default function ListingView({ item, category, color, place = null, upvot
   const website = buttons.find((a): a is Extract<ActionSpec, { kind: 'link' }> => a.kind === 'link' && isWebsite(a.field))
   const websiteName = website ? siteName(website.href) : null
   const shownElsewhere = new Set<string>([
+    ...placed,
     ...(tagline ? [tagline.key] : []),
     ...(named ? named.fields.map((f) => f.key) : []),
     ...(shabbosFields ?? []).map((f) => f.key),
@@ -375,7 +404,10 @@ export default function ListingView({ item, category, color, place = null, upvot
   )
   // The contact box: address, phone, hours, links. No heading: its icons
   // say what each line is (Oct 6).
-  const details = (caveat?.title || showAddress || showPhone || websiteName || otherHours.length > 0 || detailFields.length > 0 || extra.length > 0 || quietBadges.length > 0 || otherTags.length > 0) && (
+  // "Set as my location" under the address (Oct 6), where a hospital's
+  // distances start from; it was a round button only hospitals had.
+  const showSetLocation = !!parseListingParts(category.listingParts).setLocation && category.hasAddress !== false && !!item.geo
+  const details = (caveat?.title || showAddress || showSetLocation || showPhone || websiteName || otherHours.length > 0 || detailFields.length > 0 || extra.length > 0 || quietBadges.length > 0 || otherTags.length > 0) && (
     <Card testId="listing-details" footer={googleLead && <span data-testid="listing-google">{googleLead}.</span>}>
     <div className="divide-y divide-slate-100">
       {caveat?.title && (
@@ -389,6 +421,7 @@ export default function ListingView({ item, category, color, place = null, upvot
         // already, and here it read as a second, duller copy of it.
         <Row icon={<PinIcon className="h-[17px] w-[17px]" />}>{item.address}</Row>
       )}
+      {showSetLocation && <SetLocationRow item={item} />}
       {showPhone && (
         <Row icon={<PhoneIcon className="h-[17px] w-[17px]" />}>
           <a href={`tel:${item.phone!.replace(/\D/g, '')}`} className="text-primary hover:underline">
@@ -410,7 +443,18 @@ export default function ListingView({ item, category, color, place = null, upvot
         </Row>
       ))}
       {extra.map((a) => (
-        <Row key={actionKey(a)} icon={a.kind === 'email' ? <MailIcon className="h-[17px] w-[17px]" /> : <GlobeIcon className="h-[17px] w-[17px]" />}>
+        <Row
+          key={actionKey(a)}
+          icon={
+            a.kind === 'email' ? (
+              <MailIcon className="h-[17px] w-[17px]" />
+            ) : a.kind === 'link' && a.field.linkInDetails ? (
+              <ExternalIcon className="h-[17px] w-[17px]" />
+            ) : (
+              <GlobeIcon className="h-[17px] w-[17px]" />
+            )
+          }
+        >
           {a.kind === 'email' ? (
             <a href={`mailto:${a.address}`} className="text-primary hover:underline">{a.address}</a>
           ) : a.kind === 'link' ? (
@@ -471,6 +515,11 @@ export default function ListingView({ item, category, color, place = null, upvot
   const nowMinutes = now ? now.getHours() * 60 + now.getMinutes() : null
   const shabbosFirst = candlesAt !== null && nowMinutes !== null && nowMinutes < candlesAt
   const shabbos = shabbosFields ? <ShabbosCard item={item} fields={shabbosFields} zmanim={zmanim} candlesAt={candlesAt} /> : null
+  // Among the boxes where the admin put it ("after A place to stay"), or
+  // after the places within a walk, as it always went.
+  const after = shabbosAfter(category)
+  const amongBoxes = !!shabbos && !shabbosFirst && after !== null && boxes.length > 0
+  const boxesAndShabbos = amongBoxes ? [...boxes.slice(0, after), <div key="shabbos">{shabbos}</div>, ...boxes.slice(after!)] : boxes
 
   return (
     <div className="space-y-5" data-testid="listing-view">
@@ -479,10 +528,11 @@ export default function ListingView({ item, category, color, place = null, upvot
       {actions}
       {mainSection}
       {shabbosFirst && shabbos}
+      {boxesAndShabbos}
       {/* A hotel's walk list is its main thing; anywhere else, the places
           within a walk follow it (a hospital's food, shuls and hotels). */}
       {walks}
-      {!shabbosFirst && shabbos}
+      {!shabbosFirst && !amongBoxes && shabbos}
       {/* A place whose list has nothing on it yet: just "+ Add the first
           item", after whatever it leads with. */}
       {main !== 'items' && itemsF && itemApi.marks.length === 0 && itemApi.canReport && <ItemsCard field={itemsF} found={null} api={itemApi} menuUrl={menuUrlOf(item)} />}
@@ -606,7 +656,6 @@ function Circle({ children }: { children: ReactNode }) {
 
 function ActionButton({ action, item }: { action: ActionSpec; item: DirectoryResource }) {
   const location = useOptionalLocation()
-  if (action.kind === 'location') return <SetLocationButton item={item} />
   let href: string
   let label: string
   let icon: ReactNode
@@ -653,26 +702,29 @@ function ActionButton({ action, item }: { action: ActionSpec; item: DirectoryRes
 
 /** Distances everywhere measured from this place: a hospital, for the
  *  family staying near it. The same anchor as the overflow fan's Set as
- *  location (useListingActions), here among the buttons. Not drawn where
+ *  location (useListingActions), as a row under the address. Not drawn where
  *  there's no LocationProvider (the admin's preview). */
-function SetLocationButton({ item }: { item: DirectoryResource }) {
+function SetLocationRow({ item }: { item: DirectoryResource }) {
   const location = useOptionalLocation()
   if (!location || !item.geo) return null
   const set = location.anchorListingId === item.id
   return (
-    <button
-      type="button"
-      aria-pressed={set}
-      onClick={() => {
-        track('listing_action', { action: 'Set as location' })
-        if (set) location.unsetListingAnchor()
-        else location.setListingAnchor({ id: item.id, name: item.name, coords: item.geo! })
-      }}
-      className="group flex w-16 cursor-pointer flex-col items-center gap-1 text-primary"
-    >
-      <Circle>{set ? <CheckIcon className="h-5 w-5" /> : <CrosshairIcon className="h-5 w-5" />}</Circle>
-      <span className="w-[84px] truncate text-center text-xs font-semibold">{set ? 'Location set' : 'Set as location'}</span>
-    </button>
+    <Row icon={set ? <CheckIcon className="h-[17px] w-[17px] text-emerald-700" /> : <CrosshairIcon className="h-[17px] w-[17px]" />}>
+      <button
+        type="button"
+        aria-pressed={set}
+        onClick={() => {
+          track('listing_action', { action: set ? 'Unset location' : 'Set as location' })
+          if (set) location.unsetListingAnchor()
+          else location.setListingAnchor({ id: item.id, name: item.name, coords: item.geo! })
+        }}
+        className="cursor-pointer text-left font-semibold text-primary hover:underline"
+        data-testid="set-location"
+      >
+        {set ? 'Your location' : 'Set as my location'}
+      </button>
+      <span className="block text-[13px] text-muted">{set ? 'The guide’s distances are from here. Tap to undo.' : 'The guide’s distances, from here'}</span>
+    </Row>
   )
 }
 

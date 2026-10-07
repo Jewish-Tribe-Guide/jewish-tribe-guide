@@ -622,7 +622,7 @@ describe('CategoryEditor — on each listing', () => {
     const shabbosFields = within(within(section).getByRole('group', { name: 'Fields on the Shabbos card' }))
     await user.click(shabbosFields.getByRole('checkbox', { name: 'Eruv' }))
     await user.click(shabbosFields.getByRole('checkbox', { name: 'Kosher food inside' }))
-    await user.click(within(section).getByRole('checkbox', { name: /Set as location/ }))
+    await user.click(within(section).getByRole('checkbox', { name: /Set as my location/ }))
     await user.click(screen.getByRole('button', { name: /save changes/i }))
     await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(2))
     expect(JSON.parse(payload()).listingParts).toEqual({
@@ -632,12 +632,55 @@ describe('CategoryEditor — on each listing', () => {
     })
   })
 
+  it('sends boxes of ticked fields in the admin’s order, and where the Shabbos card goes among them', async () => {
+    const onSaved = vi.fn()
+    const user = userEvent.setup()
+    const refuah = baseCategory({
+      ...hospitals,
+      detailFields: [
+        { key: 'liaisons', label: 'Liaisons', type: 'contacts' },
+        { key: 'pantry', label: 'Pantry', type: 'contacts' },
+        { key: 'packages', label: 'Food packages', type: 'contacts' },
+        { key: 'eruv', label: 'Eruv', type: 'select', renderAs: 'row', options: [{ value: 'uc', label: 'University City Eruv' }] },
+      ],
+    })
+    editor(refuah, onSaved)
+    const boxes = screen.getByTestId('boxes-editor')
+    await user.click(within(boxes).getByRole('button', { name: '+ Add a box' }))
+    await user.type(within(boxes).getByRole('textbox', { name: 'Box 1: its title' }), 'Kosher food')
+    // Ticked packages first, then pantry, then the other way round: the box
+    // keeps the order ticked.
+    let first = within(within(boxes).getAllByRole('group', { name: 'In it' })[0])
+    await user.click(first.getByRole('checkbox', { name: 'Pantry' }))
+    await user.click(first.getByRole('checkbox', { name: 'Food packages' }))
+    await user.click(within(boxes).getByRole('button', { name: '+ Add a box' }))
+    await user.type(within(boxes).getByRole('textbox', { name: 'Box 2: its title' }), 'Who to call')
+    await user.click(within(within(boxes).getAllByRole('group', { name: 'In it' })[1]).getByRole('checkbox', { name: 'Liaisons' }))
+    await user.click(within(boxes).getByRole('button', { name: 'Move box 2 up' }))
+    first = within(within(boxes).getAllByRole('group', { name: 'In it' })[0])
+    expect(first.getByRole('checkbox', { name: 'Liaisons' })).toBeChecked()
+
+    const section = screen.getByTestId('listing-parts-editor')
+    await user.click(within(section).getByRole('checkbox', { name: /This Shabbos/ }))
+    await user.click(within(within(section).getByRole('group', { name: 'Fields on the Shabbos card' })).getByRole('checkbox', { name: 'Eruv' }))
+    await user.selectOptions(within(section).getByRole('combobox', { name: 'Where it goes the rest of the week' }), 'After “Who to call”')
+    await user.click(screen.getByRole('button', { name: /save changes/i }))
+    await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1))
+    expect(JSON.parse(payload()).listingParts).toEqual({
+      boxes: [
+        { title: 'Who to call', fields: ['liaisons'] },
+        { title: 'Kosher food', fields: ['pantry', 'packages'] },
+      ],
+      shabbos: { fields: ['eruv'], after: 1 },
+    })
+  })
+
   it('shows what’s saved, and turning everything off sends null', async () => {
     const onSaved = vi.fn()
     const user = userEvent.setup()
     editor({ ...hospitals, listingParts: { setLocation: true } }, onSaved)
     const section = screen.getByTestId('listing-parts-editor')
-    const box = within(section).getByRole('checkbox', { name: /Set as location/ })
+    const box = within(section).getByRole('checkbox', { name: /Set as my location/ })
     expect(box).toBeChecked()
     await user.click(box)
     await user.click(screen.getByRole('button', { name: /save changes/i }))

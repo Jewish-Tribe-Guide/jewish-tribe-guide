@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { makeCategory } from '@/test/providerFixtures'
 import type { CategoryField } from './categories'
-import { cardFieldChoices, listingPartsFromKey, listingPartsKey, listingPartsToSave, mainCardOf, parseListingParts, shabbosFieldsOf } from './listingParts'
+import { boxesOf, cardFieldChoices, listingPartsFromKey, listingPartsKey, listingPartsToSave, mainCardOf, parseListingParts, shabbosAfter, shabbosFieldsOf } from './listingParts'
 
 const who: CategoryField = { key: 'who', label: 'Who to call first', type: 'text' }
 const phone: CategoryField = { key: 'who_phone', label: 'Their phone', type: 'tel' }
@@ -53,5 +53,43 @@ describe('in the editor’s draft', () => {
     expect(listingPartsKey({})).toBe('')
     expect(listingPartsFromKey('')).toEqual({})
     expect(listingPartsFromKey('{nope')).toEqual({})
+  })
+})
+
+// ── Boxes (Oct 6: a hospital on Refuah's sections) ──────────────────────────
+describe('boxes', () => {
+  const liaisons: CategoryField = { key: 'liaisons', label: 'Who to call', type: 'contacts' }
+  const pantry: CategoryField = { key: 'pantry', label: 'Pantry', type: 'contacts' }
+  const packages: CategoryField = { key: 'packages', label: 'Food packages', type: 'contacts' }
+  it('reads each box with a title and fields, and where the Shabbos card goes among them', () => {
+    expect(
+      parseListingParts({
+        boxes: [{ title: ' Kosher food ', fields: ['pantry', 'packages', 'pantry'] }, { title: '', fields: ['x'] }, { title: 'Empty', fields: [] }, 'nope'],
+        shabbos: { fields: ['eruv'], after: 3 },
+      }),
+    ).toEqual({ boxes: [{ title: 'Kosher food', fields: ['pantry', 'packages'] }], shabbos: { fields: ['eruv'], after: 3 } })
+    expect(parseListingParts({ shabbos: { fields: [], after: -1 } })).toEqual({ shabbos: { fields: [] } })
+    expect(parseListingParts({ shabbos: { fields: [], after: 1.5 } })).toEqual({ shabbos: { fields: [] } })
+  })
+  it('keeps each box’s own order of fields, leaving out one that’s gone or hidden', () => {
+    const hospital = makeCategory({
+      detailFields: [liaisons, packages, pantry, secret],
+      listingParts: { boxes: [{ title: 'Kosher food', fields: ['pantry', 'gone', 'packages'] }, { title: 'Who to call', fields: ['liaisons'] }, { title: 'Secret', fields: ['note'] }], shabbos: { fields: [], after: 1 } },
+    })
+    expect(boxesOf(hospital)).toEqual([
+      { title: 'Kosher food', fields: [pantry, packages] },
+      { title: 'Who to call', fields: [liaisons] },
+    ])
+    expect(shabbosAfter(hospital)).toBe(1)
+    expect(shabbosAfter(makeCategory({ listingParts: { shabbos: { fields: [] } } }))).toBeNull()
+    expect(boxesOf(makeCategory({ detailFields: [pantry] }))).toEqual([])
+  })
+  it('offers a list of contacts for a box', () => {
+    expect(cardFieldChoices([pantry, hours])).toEqual([pantry])
+  })
+  it('keeps a box the admin hasn’t finished in the draft, and saves only finished ones', () => {
+    const draft = listingPartsKey({ boxes: [{ title: 'Rides', fields: ['rides'] }, { title: '', fields: [] }], shabbos: { fields: [], after: 2 } })
+    expect(listingPartsFromKey(draft)).toEqual({ boxes: [{ title: 'Rides', fields: ['rides'] }, { title: '', fields: [] }], shabbos: { fields: [], after: 2 } })
+    expect(listingPartsToSave(draft)).toEqual({ boxes: [{ title: 'Rides', fields: ['rides'] }], shabbos: { fields: [], after: 2 } })
   })
 })

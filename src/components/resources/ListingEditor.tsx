@@ -26,6 +26,8 @@ import PrivacyNote from '@/components/PrivacyNote'
 import { CameraIcon, ClockIcon, DirectionsIcon, ExternalIcon, GlobeIcon, PhoneIcon, PinIcon, PlusIcon } from '@/components/icons'
 import DaveningTimes, { hasDaveningTimes } from './DaveningTimes'
 import TagsInput from './TagsInput'
+import ContactsInput from './ContactsInput'
+import { contactsSummary } from '@/lib/contacts'
 import RemovalRequest from './RemovalRequest'
 import { DetailFieldInput } from './ListingForm'
 import { useListingDraft, type ListingDraft } from './useListingDraft'
@@ -92,8 +94,9 @@ function placement(field: CategoryField): 'badge' | 'row' | 'hidden' {
  *  type can't quietly go missing from edit mode (the same guarantee
  *  SubmissionCard.test gives the moderation queue). "badge or row" follows
  *  the field's own placement, as the listing does. */
-const EDITED_AS: Record<FieldType, 'photo' | 'link button' | 'hours line' | 'davening' | 'tags' | 'badge or row' | 'row'> = {
+const EDITED_AS: Record<FieldType, 'photo' | 'link button' | 'hours line' | 'davening' | 'tags' | 'contacts' | 'badge or row' | 'row'> = {
   image: 'photo',
+  contacts: 'contacts',
   url: 'link button',
   hours: 'hours line',
   minyanim: 'davening',
@@ -433,6 +436,7 @@ export default function ListingEditor({
   const tagFields = fields.filter((f) => f.type === 'tags' && visible(f))
   const urlFields = fields.filter((f) => f.type === 'url' && visible(f))
   const minyanimField = fields.find((f) => f.type === 'minyanim' && visible(f))
+  const contactFields = fields.filter((f) => f.type === 'contacts' && visible(f))
   const badgeFields = fields.filter((f) => isBadgeField(f) && visible(f))
   const rowFields = fields.filter((f) => !isSpecial(f) && !isBadgeField(f) && placement(f) !== 'hidden' && visible(f))
   // The caveat's own two fields (its yes/no and its note) are placed
@@ -1063,6 +1067,23 @@ export default function ListingEditor({
     )
   })
 
+  // ── Lists of contacts (a hospital's liaisons, pantries, rides) ───────
+  const contactsSections = contactFields.map((f) => {
+    const change = changeFor(f.key)
+    // A blank first entry to fill in: it counts as no change until it has
+    // a name (sameContacts reads it as nothing).
+    if (isBlank(details[f.key]) && !change) {
+      return <AddButton key={f.key} id={`edit-contacts-${f.key}`} label={`Add ${f.label.toLowerCase()}`} onClick={() => setDetail(f.key, [{ name: '' }])} />
+    }
+    return (
+      <div key={f.key} id={`edit-contacts-${f.key}`}>
+        <Changed change={change} before={contactsSummary(item[f.key]) || 'None'} onUndo={() => undo(f.key)}>
+          <ContactsInput field={f} value={details[f.key]} onChange={(v) => setDetail(f.key, v)} />
+        </Changed>
+      </div>
+    )
+  })
+
   // ── Caveat notes, as the listing shows them — edited from their badge ─
   // Shown where the listing shows it, and tappable there too — it's where
   // your eye goes to fix it. It opens the certification panel with the
@@ -1100,6 +1121,7 @@ export default function ListingEditor({
     addressSection,
     daveningSection,
     rowsSection,
+    ...contactsSections,
     ...tagsSections,
     caveatNotes.length > 0 && <div className="space-y-1">{caveatNotes}</div>,
     otherSection,

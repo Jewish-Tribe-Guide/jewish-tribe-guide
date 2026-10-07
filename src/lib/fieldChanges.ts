@@ -4,6 +4,7 @@ import { editSubmission } from './editSubmission'
 import { dayLabel, fmt12, isStructuredHours, type DayHours, type DayKey, type StructuredHours } from './hours'
 import { fmt } from './submissionDiff'
 import { formatPhone, normalizeUrl } from './validation'
+import { contactLine, mergeContacts, readContacts, sameContacts } from './contacts'
 
 // ── A change to any field of a listing, read from a message ──────────────
 // Added Oct 5 after the box's first tries: "the women's hours go until 4pm
@@ -16,7 +17,7 @@ import { formatPhone, normalizeUrl } from './validation'
 // davening times keep their own readers.
 
 export const DAYS: DayKey[] = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
-const CHANGEABLE = new Set<FieldType>(['text', 'tel', 'textarea', 'url', 'number', 'boolean', 'select', 'hours'])
+const CHANGEABLE = new Set<FieldType>(['text', 'tel', 'textarea', 'url', 'number', 'boolean', 'select', 'hours', 'contacts'])
 const MAX_TEXT = 1000
 
 /** A field the box can change: the listing's own name, address and phone, or
@@ -86,12 +87,22 @@ export function fieldValue(f: ChangeableField, raw: unknown): unknown {
     }
     case 'url':
       return typeof raw === 'string' && raw.trim() ? normalizeUrl(raw.trim().slice(0, MAX_TEXT)) : undefined
+    // A list of contacts, each entry checked (contacts.ts); none is no value.
+    case 'contacts': {
+      const list = readContacts(raw)
+      return list.length ? list : undefined
+    }
     default:
       return typeof raw === 'string' && raw.trim() ? raw.trim().slice(0, MAX_TEXT) : undefined
   }
 }
 
 const current = (listing: DirectoryResource, key: string): unknown => listing[key]
+
+/** The same value for this field: a list of contacts entry by entry. */
+function sameFor(f: ChangeableField, a: unknown, b: unknown): boolean {
+  return f.type === 'contacts' ? sameContacts(a, b) : same(a, b)
+}
 
 function same(a: unknown, b: unknown): boolean {
   const norm = (v: unknown): unknown =>
@@ -115,6 +126,17 @@ export function changeLines(fields: ChangeableField[], listing: DirectoryResourc
       for (const d of DAYS) {
         if (!(d in a) || JSON.stringify(d in b ? b[d] : 'unset') === JSON.stringify(a[d])) continue
         lines.push(`${f.label}, ${dayLabel(d)}: ${dayText(b[d])} → ${dayText(a[d])}`)
+      }
+      continue
+    }
+    // A list: a line an entry added or changed, not the whole list twice.
+    if (f.type === 'contacts') {
+      const was = new Map(readContacts(before).map((e) => [e.name, contactLine(e)]))
+      for (const e of readContacts(after)) {
+        const line = contactLine(e)
+        const old = was.get(e.name)
+        if (old === line) continue
+        lines.push(old ? `${f.label}: ${old} → ${line}` : `${f.label}: + ${line}`)
       }
       continue
     }
@@ -222,8 +244,11 @@ export function readFieldChanges(category: CategoryConfig, listing: DirectoryRes
       notes.push(note)
       continue
     }
-    if (same(v, current(listing, f.key))) held.push(`${f.label}: already says that`)
-    else values[f.key] = v
+    // A list gains what was read (mergeContacts): the message gives the
+    // entries it's about, not the whole list.
+    const next = f.type === 'contacts' ? mergeContacts(values[f.key] ?? current(listing, f.key), v) : v
+    if (sameFor(f, next, current(listing, f.key))) held.push(`${f.label}: already says that`)
+    else values[f.key] = next
   }
   if (askWhen && !(askWhen.key in values)) askWhen = null
   return { values, lines: changeLines(fields, listing, values), held, notes, askWhen }
@@ -241,7 +266,7 @@ export function fieldsEdit(category: CategoryConfig, listing: DirectoryResource,
     for (const [key, raw] of Object.entries(sent as Record<string, unknown>)) {
       const f = fields.find((x) => x.key === key)
       const v = f ? fieldValue(f, raw) : undefined
-      if (f && v !== undefined && !same(v, current(listing, key))) values[key] = v
+      if (f && v !== undefined && !sameFor(f, v, current(listing, key))) values[key] = v
     }
   }
   const details = Object.fromEntries(Object.entries(values).filter(([k]) => !CORE.has(k)))

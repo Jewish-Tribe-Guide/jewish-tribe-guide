@@ -384,13 +384,16 @@ describe('a category’s own main card and Set as location', () => {
     const gone = makeCategory({ ...hospital, detailFields: [website, refuah] })
     expect(mainThing(hup, gone)).not.toBe('section')
   })
-  it('ends the buttons with Set as location, taking the fourth place; a link on the card isn’t a button too', () => {
+  it('has every listing’s buttons, Set as location not among them (Oct 6: a row under the address); a link on the card isn’t a button too', () => {
     const { buttons, extra } = listingActions({ ...hup, who_site: 'https://bikurcholim.org' }, hospital)
-    expect(buttons.map((b) => (b.kind === 'link' ? b.field.label : b.kind))).toEqual(['directions', 'call', 'Website', 'location'])
-    expect(extra.map((b) => (b.kind === 'link' ? b.field.label : b.kind))).toEqual(['Refuah Link'])
+    expect(buttons.map((b) => (b.kind === 'link' ? b.field.label : b.kind))).toEqual(['directions', 'call', 'Website', 'Refuah Link'])
+    expect(extra).toEqual([])
   })
-  it('no Set as location for a place the map can’t find', () => {
-    expect(listingActions({ ...hup, geo: undefined }, hospital).buttons.map((b) => b.kind)).not.toContain('location')
+  it('a link the admin put with the address is a line there, never a button', () => {
+    const inBox = makeCategory({ ...hospital, detailFields: hospital.detailFields.map((f) => (f.key === 'r' ? { ...f, linkInDetails: true } : f)) })
+    const { buttons, extra } = listingActions(hup, inBox)
+    expect(buttons.map((b) => (b.kind === 'link' ? b.field.label : b.kind))).toEqual(['directions', 'call', 'Website'])
+    expect(extra.map((b) => (b.kind === 'link' ? b.field.label : b.kind))).toEqual(['Refuah Link'])
   })
 })
 

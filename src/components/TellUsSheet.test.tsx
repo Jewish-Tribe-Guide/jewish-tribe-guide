@@ -296,6 +296,45 @@ describe('Saw something? Tell us', () => {
     expect(body.edits).toEqual([{ listingId: 'arch', values: { hours: { wed: { open: '09:00', close: '15:00' } } }, notes: [] }])
   })
 
+  // Oct 6: a pasted Refuah page fills a hospital's lists. Each shows as the
+  // listing will show it, its form a tap away, not a form per list to read.
+  it('shows a list of contacts it read as the listing will, with its form a tap away', async () => {
+    const HUP = { id: 'hup', name: 'HUP', address: '3400 Spruce St, Philadelphia', category: 'hospital', categoryLabel: 'Hospital' }
+    const pantry = [{ name: '1st floor, Pavilion Building', who: 'Bikur Cholim of Philadelphia', phones: ['215-805-8668'] }, { name: 'Buerger Center' }]
+    const fields = {
+      kind: 'fields',
+      listingId: 'hup',
+      listing: HUP,
+      asWritten: 'HUP',
+      ask: null,
+      values: { pantry },
+      before: {},
+      lines: ['Pantry: + 1st floor, Pavilion Building · Bikur Cholim of Philadelphia · (215) 805-8668', 'Pantry: + Buerger Center'],
+      held: [],
+      notes: [],
+      askWhen: null,
+    }
+    respond = (url) => (url.includes('/read') ? { ...reading, proposals: [fields] } : { ok: true, filed: 1, ids: ['a'] })
+    renderWithProviders(<TellUsSheet isOpen onClose={() => {}} />, {
+      community: { slug: 'philly' },
+      content: { categories: [makeCategory({ id: 'hospital', label: 'Hospital', pluralLabel: 'Hospitals', detailFields: [{ key: 'pantry', label: 'Pantry', type: 'contacts' }] })] },
+    })
+    fireEvent.change(screen.getByLabelText('What did you see?'), { target: { value: 'Pantry: 1st floor, Pavilion Building' } })
+    fireEvent.click(screen.getByRole('button', { name: 'See what changes' }))
+    const preview = await screen.findByTestId('contacts-preview')
+    expect(within(preview).getByRole('heading', { name: 'Pantry · 2' })).toBeInTheDocument()
+    expect(within(preview).getByRole('link', { name: '(215) 805-8668' })).toBeInTheDocument()
+    expect(screen.getByText('Pantry: + 1st floor, Pavilion Building · Bikur Cholim of Philadelphia · (215) 805-8668')).toBeInTheDocument()
+    expect(within(preview).queryByRole('textbox')).not.toBeInTheDocument()
+    fireEvent.click(within(preview).getByRole('button', { name: 'Change something in pantry' }))
+    fireEvent.change(within(preview).getAllByRole('textbox', { name: 'Name' })[0], { target: { value: 'Pavilion Building, 1st floor' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+    // The thank-you names what changed once, not once an entry.
+    expect(await screen.findByTestId('tell-us-sent')).toHaveTextContent(/HUP\s*Pantry\s*Email me/)
+    const body = JSON.parse(String(calls.find((c) => c.url.includes('/send'))!.init!.body))
+    expect(body.edits[0].values.pantry[0].name).toBe('Pavilion Building, 1st floor')
+  })
+
   // Agreed Oct 5: a new place is added with the form of questions, found on
   // Google first, filled in from what was read, and labelled with it.
   it('sends a new place with the add form, from what was read, then goes back to the rest', async () => {

@@ -105,7 +105,11 @@ export function buildCatalog(listings: DirectoryResource[], categories: Category
       return !!f && itemWording(f).noun === 'dish'
     })(),
     hasTimes: c.detailFields.some((f) => f.type === 'minyanim'),
-    fields: changeableFields(c).map((f) => ({ key: f.key, label: f.label, says: fieldSays(f.type, f.field?.options?.map((o) => o.label), f.field?.multiSelect) })),
+    fields: changeableFields(c).map((f) => ({
+      key: f.key,
+      label: f.label,
+      says: f.type === 'contacts' ? `list of contacts${f.field?.entryFrom ? ', each saying where from' : ''}` : fieldSays(f.type, f.field?.options?.map((o) => o.label), f.field?.multiSelect),
+    })),
   }))
   const byId = new Map(cats.map((c) => [c.id, c]))
   const out: CatalogListing[] = []
@@ -202,7 +206,8 @@ Rules
 - A food place's MENU (a link to its menu, a photo or screenshot of a menu, a menu PDF), or a request to add its dishes from one: one proposal of kind "menu" for that place, with "menu_url": the link given, or null when the menu is in the photos. Do not list the dishes; another reader picks them from the menu. A link to a menu is never a change to "website": a link changes the website only when the message says the place's website itself is new or has moved. The same store rules apply (which branch; ask the sender when unsure).
 - Food places (restaurants, ice cream, food trucks): give kosher certification only if shown or stated; meat/dairy/parve only if stated, else say what it is inferred from.
 - Any OTHER change to a listing in the guide (its hours, phone, website, address, name, hechsher or certification, meat/dairy, a yes/no, notes; a mikvah's women's hours; anything in its category's fields above): one proposal of kind "fields" for that listing, with "changes": one entry per field, using that category's field key. Pick the field whose label fits ("women's hours" is the women's hours field when the category has one). Change only what the message says; never fill in anything else. Items and davening times are never "fields". The same store rules apply (which branch; ask the sender when unsure).
-  Values: text, phone, link, long text: the new value as written. "one of" / "any of": one of the listed choices exactly (a list for "any of"); a value that is none of them goes in "note" instead. yes/no: true or false. number: a number.
+  A hospital's page or a list of its help (liaisons, a pantry, food packages, places to stay, rides, gemachs): one "fields" proposal for that hospital, each section into the "list of contacts" field whose label fits it.
+  Values: text, phone, link, long text: the new value as written. List of contacts: a list of entries, only those the message gives (they are added to the list, or update the entry of the same name), each {"name": the organisation, person or place as written ("Bikur Cholim of Philadelphia", "1st floor, Pavilion Building"), "who": a named person or the organisation running a place, or null, "phones": every phone given for it, "email", "web": or null, "note": a short line the message says about it ("Call to arrange.") or null, "from": for a list saying where from, the town as written ("Monsey"), else null}. A pantry, a room or any other place: "name" is where it is ("1st floor, Pavilion Building, near the cafeteria"), "who" the organisation running it. Never repeat in "note" what another part already says (the town it serves, the organisation, the website). "one of" / "any of": one of the listed choices exactly (a list for "any of"); a value that is none of them goes in "note" instead. yes/no: true or false. number: a number.
   Weekly hours: "days" (a list of sun, mon, tue, wed, thu, fri, sat, or "all" when no day is named), "open" and "close" as 24-hour "HH:MM" (null when not said), "closed": true when it's closed those days, and "when": "every_week" (from now on, "now", "new hours", "every Wednesday", "on Wednesdays"), "one_day" (one date: "this Wednesday", "tomorrow", "on the 12th", a holiday) or "unclear" (a day named with nothing saying which, like "closes at 3pm on Wednesday").
 - Something that is not an update (a question, a greeting, chat, a suggestion about the website): one proposal of kind "not_update", with what it is in "note".
 - With every listing_id give "listing_name": that listing's name exactly as in the list, so a mistyped id is caught.
@@ -212,7 +217,7 @@ Reply with JSON only:
 {"proposals":[{"kind":"items"|"fields"|"menu"|"new_place"|"times"|"ask_others"|"not_update",
  "store":{"listing_id":string|null,"listing_name":string|null,"as_written":string,"scope":"branch"|"chain","ask_sender":{"question":string,"choices":[{"label":string,"listing_id":string}]}|null},
  "items":[{"name":string,"availability":"always"|"sometimes"|"seen"|"stopped"|"announced","doubt":boolean,"doubt_words":string|null}],
- "changes":[{"field":string,"value":string|boolean|number|string[]|null,"days":string[]|"all"|null,"open":string|null,"close":string|null,"closed":boolean,"when":"every_week"|"one_day"|"unclear"|null}],
+ "changes":[{"field":string,"value":string|boolean|number|string[]|{"name":string,"who":string|null,"phones":string[],"email":string|null,"web":string|null,"note":string|null,"from":string|null}[]|null,"days":string[]|"all"|null,"open":string|null,"close":string|null,"closed":boolean,"when":"every_week"|"one_day"|"unclear"|null}],
  "category":string|null,
  "place":{"name":string,"kind":string,"address":string|null,"phone":string|null,"website":string|null,"kosher_cert":string|null,"meat_dairy":string|null,"notes":string|null}|null,
  "question":string|null,

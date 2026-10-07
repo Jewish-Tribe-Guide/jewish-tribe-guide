@@ -119,3 +119,20 @@ describe('listingSearchText', () => {
     expect(withoutConfig).toContain('cholov yisroel')
   })
 })
+
+describe('listingSearchText — a list of contacts (Oct 6)', () => {
+  it('holds each entry’s name, person, note and where from, not its phones', () => {
+    const text = listingSearchText(
+      listing({
+        rides: [
+          { name: 'Darchei Chesed', phones: ['845-425-4070'], from: 'Monsey' },
+          { name: 'Chai Lifeline NJ/PA', who: 'Mrs. Naomi Gorelick', note: 'Rides to appointments.' },
+        ],
+      }),
+      category([field('rides', 'contacts')]),
+    )
+    for (const word of ['darchei chesed', 'monsey', 'chai lifeline', 'gorelick', 'appointments']) expect(text).toContain(word)
+    expect(text).not.toContain('845')
+    expect(text).not.toContain('[object object]')
+  })
+})

@@ -214,6 +214,12 @@ describe('POST /api/submissions — accepted submissions', () => {
     expect(m.validateSubmission.mock.calls[0][0].details.site).toMatch(/^https:/)
   })
 
+  it('stores a list of contacts tidied, as typed in the editor or not', async () => {
+    m.getCategoryById.mockResolvedValue({ id: 'hospital', detailFields: [{ key: 'pantry', type: 'contacts' }] })
+    await post({ operation: 'create', payload: { ...listing, details: { pantry: [{ name: ' Pavilion ', phones: ['215-805-8668', ' '] }, { name: '' }, 'junk'] } } })
+    expect(m.submitListingCreate.mock.calls[0][1].details.pantry).toEqual([{ name: 'Pavilion', phones: ['215-805-8668'] }])
+  })
+
   it('sends both emails after the response, and a failed email never fails the request', async () => {
     m.sendSubmissionNotification.mockRejectedValue(new Error('resend down'))
     vi.spyOn(console, 'error').mockImplementation(() => {})

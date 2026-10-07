@@ -2,7 +2,7 @@
 
 import type { CategoryConfig, CategoryField } from '@/lib/categories'
 import { MAX_WALK_LISTS, WALK_LIST_MINUTES, walkGroupFields, walkListFromKey, walkListKey, walkListTargets, type WalkList } from '@/lib/walkList'
-import { cardFieldChoices, listingPartsFromKey, listingPartsKey, type ListingParts } from '@/lib/listingParts'
+import { cardFieldChoices, listingPartsFromKey, listingPartsKey, type ListingBox, type ListingParts } from '@/lib/listingParts'
 import { inputClass } from './CategoryFormFields'
 
 // ── The category editor's "On each listing" settings ────────────────────────
@@ -112,7 +112,8 @@ export function WalkListsEditor({
   )
 }
 
-/** The named main card, the Shabbos card, and Set as location. */
+/** The named main card, the boxes, the Shabbos card, and Set as my
+ *  location. */
 export function ListingPartsEditor({
   value,
   onChange,
@@ -145,8 +146,8 @@ export function ListingPartsEditor({
         </label>
         <span className={helpClass}>
           Instead of what the listing holds (times, items, hours), it opens with this card, even
-          before anyone has filled it in: e.g. &ldquo;Who to call first&rdquo; on a hospital, with
-          a name, what they help with, and a phone that becomes a Call button.
+          before anyone has filled it in: e.g. &ldquo;Shabbos friendly&rdquo; on a hotel. Its first
+          line of text leads, and a phone becomes a Call button.
         </span>
         {main && (
           <div className="mt-2 space-y-2 pl-6">
@@ -170,6 +171,17 @@ export function ListingPartsEditor({
         )}
       </div>
 
+      <BoxesEditor
+        boxes={parts.boxes ?? []}
+        choices={choices}
+        onChange={(boxes) => {
+          // A Shabbos card placed after a box that's gone goes after the last.
+          const after = parts.shabbos?.after
+          const shabbos = parts.shabbos && after !== undefined && after > boxes.length ? { ...parts.shabbos, after: boxes.length } : parts.shabbos
+          put({ ...parts, boxes: boxes.length ? boxes : undefined, shabbos })
+        }}
+      />
+
       <div className="mt-4">
         <label className="flex items-center gap-2 text-sm font-semibold text-slate-800">
           <input type="checkbox" checked={!!parts.shabbos} onChange={(e) => put({ ...parts, shabbos: e.target.checked ? { fields: [] } : undefined })} />
@@ -182,13 +194,34 @@ export function ListingPartsEditor({
           status.
         </span>
         {parts.shabbos && (
-          <div className="mt-2 pl-6">
+          <div className="mt-2 space-y-2 pl-6">
             <FieldTicks
               legend="Fields on the Shabbos card"
               choices={choices}
               ticked={parts.shabbos.fields}
-              onToggle={(key) => put({ ...parts, shabbos: { fields: toggle(parts.shabbos!.fields, key) } })}
+              onToggle={(key) => put({ ...parts, shabbos: { ...parts.shabbos!, fields: toggle(parts.shabbos!.fields, key) } })}
             />
+            {(parts.boxes?.length ?? 0) > 0 && (
+              <label className="block text-[12px] font-semibold text-slate-600">
+                Where it goes the rest of the week
+                <select
+                  value={parts.shabbos.after ?? ''}
+                  onChange={(e) => {
+                    const shabbos = { fields: parts.shabbos!.fields }
+                    put({ ...parts, shabbos: e.target.value === '' ? shabbos : { ...shabbos, after: Number(e.target.value) } })
+                  }}
+                  className={`${inputClass} mt-1`}
+                >
+                  <option value="">After the places within a walk</option>
+                  <option value={0}>Before the boxes</option>
+                  {parts.boxes!.map((b, i) => (
+                    <option key={i} value={i + 1}>
+                      After &ldquo;{b.title || `Box ${i + 1}`}&rdquo;
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
           </div>
         )}
       </div>
@@ -197,7 +230,7 @@ export function ListingPartsEditor({
         <div className="mt-4">
           <label className="flex items-center gap-2 text-sm font-semibold text-slate-800">
             <input type="checkbox" checked={!!parts.setLocation} onChange={(e) => put({ ...parts, setLocation: e.target.checked || undefined })} />
-            &ldquo;Set as location&rdquo; among its buttons
+            &ldquo;Set as my location&rdquo; under the address
           </label>
           <span className={helpClass}>
             For a place people stay at, like a hospital: one tap and every page measures from it.
@@ -233,5 +266,57 @@ function FieldTicks({
         ))}
       </div>
     </fieldset>
+  )
+}
+
+/** The admin's boxes, in order: each a title and the fields in it, in the
+ *  order ticked. A hospital's "Who to call", "Kosher food" (its pantry and
+ *  food packages), "A place to stay", "Rides". */
+function BoxesEditor({ boxes, choices, onChange }: { boxes: ListingBox[]; choices: readonly CategoryField[]; onChange: (boxes: ListingBox[]) => void }) {
+  const set = (i: number, patch: Partial<ListingBox>) => onChange(boxes.map((b, j) => (j === i ? { ...b, ...patch } : b)))
+  const move = (i: number, by: number) => {
+    const next = [...boxes]
+    ;[next[i], next[i + by]] = [next[i + by], next[i]]
+    onChange(next)
+  }
+  const small = 'text-[12px] font-semibold text-primary hover:underline disabled:text-slate-300 disabled:no-underline'
+  return (
+    <div className="mt-4" data-testid="boxes-editor">
+      <p className="text-sm font-semibold text-slate-800">Boxes</p>
+      <span className={helpClass}>
+        The listing leads with these, in this order, each holding the fields ticked, in the order
+        ticked. A box shows only when something in it is filled in. Two fields in one box each get
+        a small heading (&ldquo;Pantry&rdquo;, &ldquo;Food packages&rdquo;). A list of contacts in no
+        box gets one of its own, after these.
+      </span>
+      <ol className="mt-2 space-y-3">
+        {boxes.map((b, i) => (
+          <li key={i} className="space-y-2 rounded-md border border-slate-200 p-3">
+            <div className="flex items-center gap-2">
+              <input aria-label={`Box ${i + 1}: its title`} placeholder="Who to call" value={b.title} onChange={(e) => set(i, { title: e.target.value })} className={inputClass} />
+              <button type="button" aria-label={`Move box ${i + 1} up`} disabled={i === 0} onClick={() => move(i, -1)} className={small}>
+                Up
+              </button>
+              <button type="button" aria-label={`Move box ${i + 1} down`} disabled={i === boxes.length - 1} onClick={() => move(i, 1)} className={small}>
+                Down
+              </button>
+              <button type="button" onClick={() => onChange(boxes.filter((_, j) => j !== i))} className="text-[12px] font-semibold text-red-700 hover:underline">
+                Remove
+              </button>
+            </div>
+            {(!b.title.trim() || b.fields.length === 0) && <p className="text-[12px] font-semibold text-caution">Give it a title and tick at least one field, or it won&rsquo;t show.</p>}
+            <FieldTicks
+              legend="In it"
+              choices={choices}
+              ticked={b.fields}
+              onToggle={(key) => set(i, { fields: b.fields.includes(key) ? b.fields.filter((k) => k !== key) : [...b.fields, key] })}
+            />
+          </li>
+        ))}
+      </ol>
+      <button type="button" onClick={() => onChange([...boxes, { title: '', fields: [] }])} className="mt-2 text-sm font-semibold text-primary hover:underline">
+        + Add a box
+      </button>
+    </div>
   )
 }

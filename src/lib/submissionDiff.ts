@@ -22,6 +22,7 @@ import type { ResourceRow, ResourceSubmission } from '@/types'
 import { isStructuredHours, formatHoursSummary } from '@/lib/hours'
 import { isMinyanim, formatMinyanimSummary } from '@/lib/davening'
 import { formatSchedulesSummary, readSchedules, schedulesKey } from '@/lib/schedules'
+import { contactsSummary } from '@/lib/contacts'
 import type { CategoryField } from '@/lib/categories'
 import { SYNC_INTERNAL_FIELDS, DIFF_ONLY_HIDDEN_FIELDS, SHOWN_WHEN_CONFIGURED } from '@/lib/syncFields'
 
@@ -56,6 +57,10 @@ export function fmt(value: unknown, field?: CategoryField): string {
   if (field?.type === 'minyanim' || (structured && isMinyanim(value) && value.length > 0)) {
     return isMinyanim(value) ? formatMinyanimSummary(value) : String(value)
   }
+
+  // A list of contacts, a line an entry with every part of it, so a changed
+  // phone is a changed line (contactLine) and the rest stay context.
+  if (field?.type === 'contacts') return contactsSummary(value) || '—'
 
   if (Array.isArray(value)) return value.map((v) => resolveOptionLabel(field, v)).join(', ') || '—'
   if (field?.type === 'select') return resolveOptionLabel(field, value)

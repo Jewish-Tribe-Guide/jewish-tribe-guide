@@ -252,7 +252,40 @@ export function FieldEditor({
             />
             Also show as a button on the collapsed card, before the arrow
           </label>
+          <label className="flex items-center gap-1.5 text-xs text-slate-700 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={!!f.linkInDetails}
+              onChange={(e) => onChange({ linkInDetails: e.target.checked || undefined })}
+              className="rounded border-slate-300"
+            />
+            On an opened listing, a line with the address and phone, not a round button
+          </label>
         </>
+      )}
+
+      {f.type === 'contacts' && (
+        <label className="flex items-center gap-1.5 text-xs text-slate-700 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={!!f.entryFrom}
+            onChange={(e) => onChange({ entryFrom: e.target.checked || undefined })}
+            className="rounded border-slate-300"
+          />
+          Entries say where they&rsquo;re from (&ldquo;From Monsey&rdquo;), for rides
+        </label>
+      )}
+
+      {(f.type === 'text' || f.type === 'textarea') && (
+        <label className="flex items-center gap-1.5 text-xs text-slate-700 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={f.shownAround === 'sukkos'}
+            onChange={(e) => onChange({ shownAround: e.target.checked ? 'sukkos' : undefined })}
+            className="rounded border-slate-300"
+          />
+          On listings only from Rosh Hashanah to the end of Sukkos (a sukkah)
+        </label>
       )}
 
       {(f.type === 'text' || f.type === 'textarea') && (

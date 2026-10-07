@@ -2,6 +2,7 @@ import { selectValues, type CategoryField, type FieldType } from './categories'
 import { DAY_KEYS, dayLabel, fmt12, formatHoursSummary, isStructuredHours, type DayKey, type DayHours } from './hours'
 import type { DirectoryResource, ResourceSubmission } from '@/types'
 import { readSchedules, schedulesKey } from './schedules'
+import { contactsChange, sameContacts } from './contacts'
 
 type Proposed = Pick<ResourceSubmission, 'name' | 'address' | 'phone' | 'details'>
 
@@ -116,6 +117,8 @@ export function sameFieldValue(type: FieldType | 'name' | 'address' | 'phone', a
       return sameSet(asList(a), asList(b))
     case 'hours':
       return canonicalHours(a) === canonicalHours(b)
+    case 'contacts':
+      return sameContacts(a, b)
     case 'number':
       return normalize(a) === normalize(b) || (normalize(a) !== '' && Number(a) === Number(b))
     default:
@@ -228,7 +231,9 @@ export function listingChanges(existing: DirectoryResource | null | undefined, p
     const summary =
       field.type === 'hours'
         ? hoursSummary(before, after)
-        : field.type === 'image'
+        : field.type === 'contacts'
+          ? contactsChange(before, after)
+          : field.type === 'image'
           ? after
             ? before
               ? 'New photo'

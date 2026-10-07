@@ -1,5 +1,6 @@
 import type { DirectoryResource } from '@/types'
 import type { CategoryConfig } from '@/lib/categories'
+import { contactsText } from '@/lib/contacts'
 
 // Builds the lowercased text blob a listing is searched against — shared by the
 // landing-page "Places" search and every category directory's own search box, so
@@ -7,6 +8,8 @@ import type { CategoryConfig } from '@/lib/categories'
 //   • name + address (street / neighborhood)
 //   • every tag field's values, plus its `_sometimes` companion array
 //   • scalar text/textarea/select detail fields (denomination, kosher cert, …)
+//   • a list of contacts' names, people, notes and where from ("Chai Lifeline"
+//     finds CHOP, Oct 6)
 //
 // When the category config is known we walk its declared fields (precise, low
 // noise). Without it we fall back to grabbing every string-array value generically
@@ -30,6 +33,9 @@ export function listingSearchText(item: DirectoryResource, category?: CategoryCo
         else if (typeof v === 'string' && v) parts.push(v)
       } else if (f.type === 'text' || f.type === 'textarea') {
         if (typeof v === 'string' && v) parts.push(v)
+      } else if (f.type === 'contacts') {
+        const text = contactsText(v)
+        if (text) parts.push(text)
       }
     }
   } else {

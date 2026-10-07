@@ -6,6 +6,7 @@ import { formatPhone, normalizeUrl } from '@/lib/validation'
 import { hasListingChanged } from '@/lib/listingDiff'
 import type { DirectoryResource } from '@/types'
 import TagsInput from './TagsInput'
+import ContactsInput from './ContactsInput'
 import ImageUploadField from '@/components/ImageUploadField'
 import AddressInput, { type PlaceSelectResult } from '@/components/intake/AddressInput'
 import type { SendVia } from './useListingSubmit'
@@ -900,6 +901,10 @@ export function DetailFieldInput({
 
   if (field.type === 'hours') {
     return <HoursInput label={label} value={value} onChange={onChange} />
+  }
+
+  if (field.type === 'contacts') {
+    return <ContactsInput field={field} label={label} value={value} onChange={onChange} />
   }
 
   if (field.type === 'minyanim') {

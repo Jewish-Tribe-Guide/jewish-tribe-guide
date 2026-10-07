@@ -137,3 +137,52 @@ describe('fieldsEdit', () => {
     expect(submission).toMatchObject({ name: 'SayShe Ate', address: '1500 South St', phone: '(215) 555-0199', geo: null })
   })
 })
+
+// ── A hospital's lists of contacts (Oct 6: Refuah's sections) ─────────────
+describe('a list of contacts', () => {
+  const hospital = makeCategory({
+    id: 'hospital',
+    label: 'Hospital',
+    detailFields: [
+      { key: 'pantry', label: 'Pantry', type: 'contacts' },
+      { key: 'rides', label: 'Rides', type: 'contacts', entryFrom: true },
+    ],
+  })
+  const BC = 'Bikur Cholim of Philadelphia'
+  const hup = makeListing({ id: 'hup', name: 'HUP', category: 'hospital', rides: [{ name: BC, phones: ['215-805-8668'] }] })
+
+  it('is a field the box can change', () => {
+    expect(changeableFields(hospital).map((f) => f.key)).toContain('pantry')
+  })
+
+  it('a message’s entries are added, one named like an entry there updates it, and nothing is taken off', () => {
+    const read = readFieldChanges(hospital, hup, [
+      { key: 'rides', value: [{ name: 'Darchei Chesed', phones: ['(845) 425-4070'], from: 'Monsey' }, { name: 'bikur cholim of philadelphia', note: 'In Philadelphia.' }] },
+      { key: 'pantry', value: [{ name: '1st floor, Pavilion Building', who: BC, phones: '215-805-8668' }] },
+    ])
+    expect(read.values.rides).toEqual([
+      { name: 'bikur cholim of philadelphia', phones: ['215-805-8668'], note: 'In Philadelphia.' },
+      { name: 'Darchei Chesed', phones: ['(845) 425-4070'], from: 'Monsey' },
+    ])
+    expect(read.values.pantry).toEqual([{ name: '1st floor, Pavilion Building', who: BC, phones: ['215-805-8668'] }])
+    // A line an entry added, never "[object Object]".
+    expect(read.lines).toContain('Rides: + From Monsey: Darchei Chesed · (845) 425-4070')
+    expect(read.lines).toContain(`Pantry: + 1st floor, Pavilion Building · ${BC} · (215) 805-8668`)
+    expect(read.lines.join('\n')).not.toContain('[object Object]')
+  })
+
+  it('what the list already says is no change; something that isn’t an entry is nothing', () => {
+    const read = readFieldChanges(hospital, hup, [
+      { key: 'rides', value: [{ name: BC, phones: ['215-805-8668'] }] },
+      { key: 'pantry', value: 'Pavilion Building' },
+    ])
+    expect(read.values).toEqual({})
+    expect(read.held).toContain('Rides: already says that')
+  })
+
+  it('Send checks the list again and sends only a changed one', () => {
+    const sent = fieldsEdit(hospital, hup, { rides: [{ name: BC, phones: ['215-805-8668'] }], pantry: [{ name: 'Pavilion', junk: 1 }, 'nope'] })
+    expect(sent.submission.details).toMatchObject({ pantry: [{ name: 'Pavilion' }] })
+    expect(sent.lines).toEqual(['Pantry: + Pavilion'])
+  })
+})

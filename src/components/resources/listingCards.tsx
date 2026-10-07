@@ -2,29 +2,20 @@
 
 import { useContext, type ReactNode } from 'react'
 import type { DirectoryResource, ZmanimData } from '@/types'
-import { selectValues, type CategoryConfig, type CategoryField } from '@/lib/categories'
+import type { CategoryConfig, CategoryField } from '@/lib/categories'
 import { useCategories } from '@/lib/useCategories'
 import { useActiveCommunity } from '@/lib/communityContext'
-import { formatPhone } from '@/lib/validation'
 import { clockTime } from '@/lib/upcomingDavening'
 import { walkDistanceText, walkMinutes } from '@/lib/walkList'
 import { haversineMiles, type LatLng } from '@/lib/geo'
 import { eruvim } from '@/data/resources'
 import { CheckIcon, PhoneIcon } from '@/components/icons'
 import { Card } from './listingParts'
+import { fieldText } from './FieldsBox'
 import { NextMinyans, NextMinyansContext } from './nextMinyans'
 import { usePlaces } from './WalkList'
 
 // ── Cards an admin adds to a category's opened listings (listingParts.ts) ──
-
-/** What a field holds, as words: a pick-list's labels, a yes/no's label,
- *  the text. Empty when it holds nothing. */
-function fieldText(f: CategoryField, v: unknown): string {
-  if (f.type === 'boolean') return v === true ? (f.filterLabel ?? f.label) : ''
-  if (f.type === 'select') return selectValues(v).map((x) => f.options?.find((o) => o.value === x)?.label ?? x).join(', ')
-  if (f.type === 'tel') return String(v ?? '').trim() ? formatPhone(String(v)) : ''
-  return String(v ?? '').trim()
-}
 
 const NOT_YET = 'Not in the guide yet.'
 

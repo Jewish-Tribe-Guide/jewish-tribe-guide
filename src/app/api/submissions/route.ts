@@ -15,6 +15,7 @@ import { SERVER_ONLY_PAYLOAD_KEYS } from '@/lib/submissionSource'
 import { isHoneypotTripped } from '@/lib/honeypot'
 import { verifyTurnstile } from '@/lib/turnstile'
 import { normalizeUrl } from '@/lib/validation'
+import { readContacts } from '@/lib/contacts'
 import { hasListingChanged } from '@/lib/listingDiff'
 import { ui } from '@/lib/uiConfig'
 import type { ResourceSubmission, SubmissionRow } from '@/types'
@@ -152,6 +153,9 @@ export async function POST(request: Request) {
     // that skips that path (e.g. a stale client, direct API use).
     if (payload.details) {
       for (const field of category?.detailFields ?? []) {
+        // A list of contacts as it was typed in the editor ("215-805-8668, "),
+        // stored tidied: each entry checked, the blank ones gone.
+        if (field.type === 'contacts' && field.key in payload.details) payload.details[field.key] = readContacts(payload.details[field.key])
         if (field.type !== 'url') continue
         const raw = payload.details[field.key]
         if (typeof raw === 'string' && raw.trim()) payload.details[field.key] = normalizeUrl(raw)

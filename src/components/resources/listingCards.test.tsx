@@ -191,22 +191,150 @@ describe('This Shabbos', () => {
   })
 })
 
-describe('Set as location', () => {
-  it('is among the buttons, and sets the hospital as where every page measures from', () => {
+describe('Set as my location', () => {
+  // Oct 6: a row under the address, out of the round buttons, which are
+  // every listing's (Directions, Call, Website, Share).
+  it('is a row under the address, not a button, and sets the hospital as where every page measures from', () => {
     vi.setSystemTime(new Date(2026, 9, 6, 13, 30))
     open()
-    const actions = screen.getByTestId('listing-actions')
-    fireEvent.click(within(actions).getByRole('button', { name: 'Set as location' }))
+    expect(within(screen.getByTestId('listing-actions')).queryByRole('button', { name: /location/i })).not.toBeInTheDocument()
+    const details = screen.getByTestId('listing-details')
+    fireEvent.click(within(details).getByRole('button', { name: 'Set as my location' }))
     expect(location.setListingAnchor).toHaveBeenCalledWith({ id: 'hup', name: hup.name, coords: hup.geo })
+    expect(details).toHaveTextContent('The guide’s distances, from here')
   })
 
   it('once set, says so, and a tap unsets it', () => {
     vi.setSystemTime(new Date(2026, 9, 6, 13, 30))
     location.anchorListingId = 'hup'
     open()
-    const button = within(screen.getByTestId('listing-actions')).getByRole('button', { name: 'Location set' })
+    const button = within(screen.getByTestId('listing-details')).getByRole('button', { name: 'Your location' })
     expect(button).toHaveAttribute('aria-pressed', 'true')
     fireEvent.click(button)
     expect(location.unsetListingAnchor).toHaveBeenCalled()
+  })
+})
+
+// ── Oct 6: a hospital on Refuah's sections ─────────────────────────────────
+// Lists of contacts in the admin's boxes, in the order a family arriving
+// needs them, This Shabbos placed among them. Entries copied from Refuah's
+// CHOP page, Oct 6.
+describe('A hospital’s boxes', () => {
+  const lists: CategoryField[] = [
+    { key: 'liaisons', label: 'Liaisons', type: 'contacts' },
+    { key: 'pantry', label: 'Pantry', type: 'contacts' },
+    { key: 'packages', label: 'Food packages', type: 'contacts' },
+    { key: 'stay', label: 'Accommodations', type: 'contacts' },
+    { key: 'rides', label: 'Transportation', type: 'contacts', entryFrom: true },
+    { key: 'also', label: 'Miscellaneous', type: 'contacts' },
+    { key: 'eruv', label: 'Eruv', type: 'select', renderAs: 'row', options: [{ value: 'uc', label: 'University City Eruv' }] },
+    { key: 'sukkah', label: 'Sukkah', type: 'textarea', shownAround: 'sukkos' },
+  ]
+  const refuah = makeCategory({
+    id: 'hospital',
+    label: 'Hospital',
+    pluralLabel: 'Hospitals',
+    detailFields: lists,
+    walkList: [{ categoryId: 'synagogue', maxMinutes: 30 }],
+    listingParts: {
+      boxes: [
+        { title: 'Who to call', fields: ['liaisons'] },
+        { title: 'Kosher food', fields: ['pantry', 'packages'] },
+        { title: 'A place to stay', fields: ['stay'] },
+        { title: 'Rides', fields: ['rides'] },
+      ],
+      shabbos: { fields: ['eruv', 'sukkah'], after: 3 },
+      setLocation: true,
+    },
+  })
+  const CL = 'Chai Lifeline NJ/PA'
+  const chop = makeListing({
+    id: 'chop',
+    category: 'hospital',
+    name: 'Children’s Hospital of Philadelphia',
+    geo: { lat: 39.9483, lng: -75.1953 },
+    liaisons: [
+      { name: CL, phones: ['732-719-1700'] },
+      { name: 'Mrs. Naomi Gorelick', who: CL, phones: ['908-770-5145'], email: 'ngorelick@chailifeline.org' },
+      { name: 'Yehoshua Brodsky', who: CL, phones: ['732-485-5555'] },
+      { name: 'Heshy Horovitz', who: CL, phones: ['732-810-7700'] },
+    ],
+    pantry: [
+      { name: 'Main Hospital, right off the Food Court', who: CL, phones: ['732-719-1760'] },
+      { name: 'Buerger Center, off the Main Lobby in the Welcome Center', who: CL, phones: ['732-719-1700'] },
+    ],
+    packages: [{ name: 'Bikur Cholim of Philadelphia', phones: ['215-805-8668'], note: 'Call to arrange.' }],
+    stay: [{ name: 'Bikur Cholim of Philadelphia', who: 'Coordinated by Malky Schwartz', phones: ['215-805-8668'], web: 'https://bikkurcholimphilly.org/hospitality' }],
+    rides: [{ name: 'Darchei Chesed', phones: ['845-425-4070'], from: 'Monsey' }],
+    also: [{ name: 'Medical supplies', phones: ['215-725-2957'], note: 'Wheelchairs, walkers, crutches and more.' }],
+    eruv: 'uc',
+    sukkah: 'In the Brodsky Garden, between the Main Entrance and the ER.',
+  }) as DirectoryResource
+  const show = (item: DirectoryResource = chop) =>
+    renderWithProviders(<ListingView item={item} category={refuah} color="#000" path="/test" foot={null} />, { content: { categories: [refuah, shuls] } })
+  const parts = () =>
+    [...document.querySelectorAll('[data-testid="listing-view"] [data-testid]')]
+      .filter((el) => ['listing-box', 'listing-shabbos', 'walk-list', 'listing-details'].includes(el.getAttribute('data-testid')!))
+      .map((el) => (el.getAttribute('data-testid') === 'listing-box' ? el.querySelector('h2')!.textContent : el.getAttribute('data-testid')))
+
+  it('in the admin’s order, This Shabbos where they put it, then the places within a walk and the contact box', () => {
+    vi.setSystemTime(new Date(2026, 9, 6, 13, 30)) // Tue Oct 6
+    show()
+    expect(parts()).toEqual(['Who to call · 4', 'Kosher food', 'A place to stay', 'listing-shabbos', 'Rides', 'Miscellaneous', 'walk-list', 'listing-details'])
+  })
+
+  it('on a Friday before candles, This Shabbos comes first', () => {
+    vi.setSystemTime(new Date(2026, 9, 9, 13, 30)) // Fri Oct 9
+    show()
+    expect(parts().slice(0, 2)).toEqual(['listing-shabbos', 'Who to call · 4'])
+  })
+
+  it('two lists in one box each under its own heading, with a count when there’s more than one', () => {
+    vi.setSystemTime(new Date(2026, 9, 6, 13, 30))
+    show()
+    const food = screen.getAllByTestId('listing-box')[1]
+    expect(food).toHaveTextContent('Pantry · 2')
+    expect(food).toHaveTextContent(/Food packages(?! ·)/)
+    expect(within(food).getAllByTestId('contact')).toHaveLength(3)
+  })
+
+  it('each entry: who, where from, the note, its phones to call, its email and website', () => {
+    vi.setSystemTime(new Date(2026, 9, 6, 13, 30))
+    show()
+    const [call, , stay, rides, also] = screen.getAllByTestId('listing-box')
+    const naomi = within(call).getAllByTestId('contact')[1]
+    expect(naomi).toHaveTextContent(`Mrs. Naomi Gorelick${CL}`)
+    expect(within(naomi).getByRole('link', { name: '(908) 770-5145' })).toHaveAttribute('href', 'tel:9087705145')
+    expect(within(naomi).getByRole('link', { name: 'ngorelick@chailifeline.org' })).toHaveAttribute('href', 'mailto:ngorelick@chailifeline.org')
+    expect(within(stay).getByRole('link', { name: 'bikkurcholimphilly.org/hospitality' })).toHaveAttribute('href', 'https://bikkurcholimphilly.org/hospitality')
+    expect(rides).toHaveTextContent('From MonseyDarchei Chesed')
+    expect(also).toHaveTextContent('Wheelchairs, walkers, crutches and more.')
+  })
+
+  it('a box with nothing in it isn’t shown', () => {
+    vi.setSystemTime(new Date(2026, 9, 6, 13, 30))
+    show({ ...chop, pantry: [], packages: undefined, rides: [{ nope: 1 }] } as DirectoryResource)
+    expect(parts()).toEqual(['Who to call · 4', 'A place to stay', 'listing-shabbos', 'Miscellaneous', 'walk-list', 'listing-details'])
+  })
+
+  it('each box asks “Still right?” on its own date', () => {
+    vi.setSystemTime(new Date(2026, 9, 6, 13, 30))
+    show({ ...chop, sectionConfirmed: { pantry: '2026-10-05T12:00:00Z' } } as DirectoryResource)
+    const boxes = screen.getAllByTestId('listing-box')
+    for (const box of boxes) expect(within(box).getByTestId('freshness')).toBeInTheDocument()
+    expect(boxes[1]).toHaveTextContent('Oct 5')
+    expect(boxes[0]).not.toHaveTextContent('Oct 5')
+  })
+
+  it('the sukkah only from Rosh Hashanah to the end of Sukkos', () => {
+    vi.setSystemTime(new Date(2026, 8, 30, 13, 30)) // Wed Sep 30, Chol HaMoed
+    show()
+    expect(screen.getByTestId('listing-shabbos')).toHaveTextContent('SukkahIn the Brodsky Garden')
+    cleanup()
+    vi.setSystemTime(new Date(2026, 9, 6, 13, 30)) // Tue Oct 6, after Sukkos
+    show()
+    expect(screen.getByTestId('listing-shabbos')).not.toHaveTextContent('Sukkah')
+    // Nor anywhere else on the listing.
+    expect(screen.getByTestId('listing-view')).not.toHaveTextContent('Brodsky Garden')
   })
 })

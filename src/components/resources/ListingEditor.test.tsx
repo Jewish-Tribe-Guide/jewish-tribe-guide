@@ -527,3 +527,49 @@ describe('ListingEditor — every field type has a home', () => {
     }
   })
 })
+
+// Oct 6: a hospital's lists of contacts, each entry a few small fields.
+describe('ListingEditor — a list of contacts', () => {
+  const hospital = makeCategory({
+    id: 'hospital',
+    label: 'Hospital',
+    detailFields: [
+      { key: 'pantry', label: 'Pantry', type: 'contacts' },
+      { key: 'rides', label: 'Rides', type: 'contacts', entryFrom: true },
+    ],
+  })
+  const hup = makeListing({
+    id: 'hup',
+    category: 'hospital',
+    name: 'HUP',
+    address: '3400 Spruce St, Philadelphia, PA',
+    pantry: [{ name: '1st floor, Pavilion Building', who: 'Bikur Cholim of Philadelphia', phones: ['215-805-8668'] }],
+  })
+
+  it('edits an entry in place: a changed phone is one change, named, with Undo', async () => {
+    const u = user()
+    renderEditor({ item: hup, category: hospital })
+    const phones = screen.getByRole('textbox', { name: 'Phones' })
+    expect(phones).toHaveValue('215-805-8668')
+    await u.type(phones, ', 610-389-1412')
+    expect(send()).toHaveTextContent('Send 1 change')
+    expect(screen.getByText('Changed: 1st floor, Pavilion Building')).toBeInTheDocument()
+    await u.click(screen.getByRole('button', { name: 'Undo' }))
+    expect(send()).toHaveTextContent('No changes yet')
+  })
+
+  it('an empty list offers to add one, says where from for rides, and a blank entry is no change', async () => {
+    const u = user()
+    renderEditor({ item: hup, category: hospital })
+    await u.click(screen.getByRole('button', { name: 'Add rides' }))
+    expect(send()).toHaveTextContent('No changes yet')
+    const entries = screen.getAllByTestId('contact-entry')
+    const ride = entries[entries.length - 1]
+    await u.type(within(ride).getByRole('textbox', { name: 'Name' }), 'Darchei Chesed')
+    await u.type(within(ride).getByRole('textbox', { name: 'From where' }), 'Monsey')
+    expect(send()).toHaveTextContent('Send 1 change')
+    expect(screen.getByText('+ Darchei Chesed')).toBeInTheDocument()
+    await u.click(within(ride).getByRole('button', { name: 'Remove Darchei Chesed' }))
+    expect(send()).toHaveTextContent('No changes yet')
+  })
+})
