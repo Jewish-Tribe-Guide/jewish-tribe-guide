@@ -1,0 +1,803 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>Lower Merion Eruv Remap 5786</name>
+    <description/>
+    <Style id="icon-1125-normal">
+      <IconStyle>
+        <scale>1.1</scale>
+        <Icon>
+          <href>https://www.gstatic.com/mapspro/images/stock/1125-crisis-caution.png</href>
+        </Icon>
+      </IconStyle>
+      <LabelStyle>
+        <scale>0</scale>
+      </LabelStyle>
+    </Style>
+    <Style id="icon-1125-highlight">
+      <IconStyle>
+        <scale>1.1</scale>
+        <Icon>
+          <href>https://www.gstatic.com/mapspro/images/stock/1125-crisis-caution.png</href>
+        </Icon>
+      </IconStyle>
+      <LabelStyle>
+        <scale>1.1</scale>
+      </LabelStyle>
+    </Style>
+    <StyleMap id="icon-1125">
+      <Pair>
+        <key>normal</key>
+        <styleUrl>#icon-1125-normal</styleUrl>
+      </Pair>
+      <Pair>
+        <key>highlight</key>
+        <styleUrl>#icon-1125-highlight</styleUrl>
+      </Pair>
+    </StyleMap>
+    <Style id="icon-157-normal">
+      <IconStyle>
+        <scale>1.1</scale>
+        <Icon>
+          <href>https://www.gstatic.com/mapspro/images/stock/157-yellow-dot.png</href>
+        </Icon>
+        <hotSpot x="16" xunits="pixels" y="32" yunits="insetPixels"/>
+      </IconStyle>
+      <LabelStyle>
+        <scale>0</scale>
+      </LabelStyle>
+    </Style>
+    <Style id="icon-157-highlight">
+      <IconStyle>
+        <scale>1.1</scale>
+        <Icon>
+          <href>https://www.gstatic.com/mapspro/images/stock/157-yellow-dot.png</href>
+        </Icon>
+        <hotSpot x="16" xunits="pixels" y="32" yunits="insetPixels"/>
+      </IconStyle>
+      <LabelStyle>
+        <scale>1.1</scale>
+      </LabelStyle>
+    </Style>
+    <StyleMap id="icon-157">
+      <Pair>
+        <key>normal</key>
+        <styleUrl>#icon-157-normal</styleUrl>
+      </Pair>
+      <Pair>
+        <key>highlight</key>
+        <styleUrl>#icon-157-highlight</styleUrl>
+      </Pair>
+    </StyleMap>
+    <Style id="icon-22-normal">
+      <IconStyle>
+        <scale>1.1</scale>
+        <Icon>
+          <href>https://www.gstatic.com/mapspro/images/stock/22-blue-dot.png</href>
+        </Icon>
+        <hotSpot x="16" xunits="pixels" y="32" yunits="insetPixels"/>
+      </IconStyle>
+      <LabelStyle>
+        <scale>0</scale>
+      </LabelStyle>
+    </Style>
+    <Style id="icon-22-highlight">
+      <IconStyle>
+        <scale>1.1</scale>
+        <Icon>
+          <href>https://www.gstatic.com/mapspro/images/stock/22-blue-dot.png</href>
+        </Icon>
+        <hotSpot x="16" xunits="pixels" y="32" yunits="insetPixels"/>
+      </IconStyle>
+      <LabelStyle>
+        <scale>1.1</scale>
+      </LabelStyle>
+    </Style>
+    <StyleMap id="icon-22">
+      <Pair>
+        <key>normal</key>
+        <styleUrl>#icon-22-normal</styleUrl>
+      </Pair>
+      <Pair>
+        <key>highlight</key>
+        <styleUrl>#icon-22-highlight</styleUrl>
+      </Pair>
+    </StyleMap>
+    <Style id="icon-61-normal">
+      <IconStyle>
+        <scale>1.1</scale>
+        <Icon>
+          <href>https://www.gstatic.com/mapspro/images/stock/61-green-dot.png</href>
+        </Icon>
+        <hotSpot x="16" xunits="pixels" y="32" yunits="insetPixels"/>
+      </IconStyle>
+      <LabelStyle>
+        <scale>0</scale>
+      </LabelStyle>
+    </Style>
+    <Style id="icon-61-highlight">
+      <IconStyle>
+        <scale>1.1</scale>
+        <Icon>
+          <href>https://www.gstatic.com/mapspro/images/stock/61-green-dot.png</href>
+        </Icon>
+        <hotSpot x="16" xunits="pixels" y="32" yunits="insetPixels"/>
+      </IconStyle>
+      <LabelStyle>
+        <scale>1.1</scale>
+      </LabelStyle>
+    </Style>
+    <StyleMap id="icon-61">
+      <Pair>
+        <key>normal</key>
+        <styleUrl>#icon-61-normal</styleUrl>
+      </Pair>
+      <Pair>
+        <key>highlight</key>
+        <styleUrl>#icon-61-highlight</styleUrl>
+      </Pair>
+    </StyleMap>
+    <Style id="line-000000-3000-normal">
+      <LineStyle>
+        <color>ff000000</color>
+        <width>3</width>
+      </LineStyle>
+    </Style>
+    <Style id="line-000000-3000-highlight">
+      <LineStyle>
+        <color>ff000000</color>
+        <width>4.5</width>
+      </LineStyle>
+    </Style>
+    <StyleMap id="line-000000-3000">
+      <Pair>
+        <key>normal</key>
+        <styleUrl>#line-000000-3000-normal</styleUrl>
+      </Pair>
+      <Pair>
+        <key>highlight</key>
+        <styleUrl>#line-000000-3000-highlight</styleUrl>
+      </Pair>
+    </StyleMap>
+    <Style id="line-0000FF-5000-nodesc-normal">
+      <LineStyle>
+        <color>ffff0000</color>
+        <width>5</width>
+      </LineStyle>
+      <BalloonStyle>
+        <text><![CDATA[<h3>$[name]</h3>]]></text>
+      </BalloonStyle>
+    </Style>
+    <Style id="line-0000FF-5000-nodesc-highlight">
+      <LineStyle>
+        <color>ffff0000</color>
+        <width>7.5</width>
+      </LineStyle>
+      <BalloonStyle>
+        <text><![CDATA[<h3>$[name]</h3>]]></text>
+      </BalloonStyle>
+    </Style>
+    <StyleMap id="line-0000FF-5000-nodesc">
+      <Pair>
+        <key>normal</key>
+        <styleUrl>#line-0000FF-5000-nodesc-normal</styleUrl>
+      </Pair>
+      <Pair>
+        <key>highlight</key>
+        <styleUrl>#line-0000FF-5000-nodesc-highlight</styleUrl>
+      </Pair>
+    </StyleMap>
+    <Style id="line-009900-5000-nodesc-normal">
+      <LineStyle>
+        <color>ff009900</color>
+        <width>5</width>
+      </LineStyle>
+      <BalloonStyle>
+        <text><![CDATA[<h3>$[name]</h3>]]></text>
+      </BalloonStyle>
+    </Style>
+    <Style id="line-009900-5000-nodesc-highlight">
+      <LineStyle>
+        <color>ff009900</color>
+        <width>7.5</width>
+      </LineStyle>
+      <BalloonStyle>
+        <text><![CDATA[<h3>$[name]</h3>]]></text>
+      </BalloonStyle>
+    </Style>
+    <StyleMap id="line-009900-5000-nodesc">
+      <Pair>
+        <key>normal</key>
+        <styleUrl>#line-009900-5000-nodesc-normal</styleUrl>
+      </Pair>
+      <Pair>
+        <key>highlight</key>
+        <styleUrl>#line-009900-5000-nodesc-highlight</styleUrl>
+      </Pair>
+    </StyleMap>
+    <Style id="line-FF0000-5000-nodesc-normal">
+      <LineStyle>
+        <color>ff0000ff</color>
+        <width>5</width>
+      </LineStyle>
+      <BalloonStyle>
+        <text><![CDATA[<h3>$[name]</h3>]]></text>
+      </BalloonStyle>
+    </Style>
+    <Style id="line-FF0000-5000-nodesc-highlight">
+      <LineStyle>
+        <color>ff0000ff</color>
+        <width>7.5</width>
+      </LineStyle>
+      <BalloonStyle>
+        <text><![CDATA[<h3>$[name]</h3>]]></text>
+      </BalloonStyle>
+    </Style>
+    <StyleMap id="line-FF0000-5000-nodesc">
+      <Pair>
+        <key>normal</key>
+        <styleUrl>#line-FF0000-5000-nodesc-normal</styleUrl>
+      </Pair>
+      <Pair>
+        <key>highlight</key>
+        <styleUrl>#line-FF0000-5000-nodesc-highlight</styleUrl>
+      </Pair>
+    </StyleMap>
+    <Style id="line-FF0000-7000-nodesc-normal">
+      <LineStyle>
+        <color>ff0000ff</color>
+        <width>7</width>
+      </LineStyle>
+      <BalloonStyle>
+        <text><![CDATA[<h3>$[name]</h3>]]></text>
+      </BalloonStyle>
+    </Style>
+    <Style id="line-FF0000-7000-nodesc-highlight">
+      <LineStyle>
+        <color>ff0000ff</color>
+        <width>10.5</width>
+      </LineStyle>
+      <BalloonStyle>
+        <text><![CDATA[<h3>$[name]</h3>]]></text>
+      </BalloonStyle>
+    </Style>
+    <StyleMap id="line-FF0000-7000-nodesc">
+      <Pair>
+        <key>normal</key>
+        <styleUrl>#line-FF0000-7000-nodesc-normal</styleUrl>
+      </Pair>
+      <Pair>
+        <key>highlight</key>
+        <styleUrl>#line-FF0000-7000-nodesc-highlight</styleUrl>
+      </Pair>
+    </StyleMap>
+    <Folder>
+      <name>Eruv Boundaries and Markers</name>
+      <Placemark>
+        <name>Lower Merion Eruv Boundary</name>
+        <styleUrl>#line-FF0000-5000-nodesc</styleUrl>
+        <LineString>
+          <tessellate>1</tessellate>
+          <coordinates>
+            -75.243495,40.03555,0
+            -75.24789,40.03766,0
+            -75.25257,40.04207,0
+            -75.257093,40.04484,0
+          </coordinates>
+        </LineString>
+      </Placemark>
+      <Placemark>
+        <name>Lower Merion Eruv Boundary</name>
+        <styleUrl>#line-FF0000-7000-nodesc</styleUrl>
+        <LineString>
+          <tessellate>1</tessellate>
+          <coordinates>
+            -75.257109,40.044836,0
+            -75.259089,40.044253,0
+            -75.259652,40.044019,0
+            -75.25997,40.04381,0
+            -75.260071,40.04353,0
+            -75.260022,40.043091,0
+            -75.259845,40.042565,0
+            -75.25991,40.042257,0
+            -75.2608,40.0416,0
+            -75.261921,40.040967,0
+            -75.262635,40.04045,0
+            -75.263123,40.040035,0
+            -75.26345,40.039657,0
+            -75.263397,40.038478,0
+            -75.2636,40.038068,0
+            -75.263836,40.037678,0
+            -75.264174,40.037222,0
+            -75.264378,40.036725,0
+            -75.264357,40.03615,0
+            -75.26428,40.03559,0
+            -75.264287,40.035156,0
+            -75.26433,40.034971,0
+            -75.26445,40.03484,0
+            -75.26499,40.034486,0
+            -75.265676,40.034228,0
+            -75.267039,40.034022,0
+            -75.267967,40.033784,0
+            -75.268868,40.033451,0
+            -75.269094,40.033242,0
+            -75.269115,40.033082,0
+          </coordinates>
+        </LineString>
+      </Placemark>
+      <Placemark>
+        <name>Lower Merion Eruv Boundary</name>
+        <styleUrl>#line-FF0000-5000-nodesc</styleUrl>
+        <LineString>
+          <tessellate>1</tessellate>
+          <coordinates>
+            -75.269094,40.033082,0
+            -75.268616,40.033369,0
+            -75.26801,40.033521,0
+            -75.267275,40.033632,0
+            -75.266857,40.033574,0
+            -75.266449,40.033455,0
+            -75.26573,40.033049,0
+            -75.264984,40.032515,0
+            -75.264292,40.031968,0
+            -75.262951,40.030818,0
+            -75.262656,40.030235,0
+            -75.262114,40.029755,0
+            -75.260022,40.02828,0
+            -75.259566,40.027557,0
+            -75.259019,40.02685,0
+            -75.257737,40.025417,0
+            -75.258692,40.024887,0
+            -75.259421,40.024291,0
+            -75.259883,40.023802,0
+            -75.260248,40.023281,0
+            -75.26072,40.022751,0
+            -75.261235,40.02234,0
+            -75.261648,40.021937,0
+            -75.262007,40.021477,0
+            -75.262608,40.020606,0
+            -75.263852,40.018889,0
+          </coordinates>
+        </LineString>
+      </Placemark>
+      <Placemark>
+        <name>Lower Merion Eruv Boundary</name>
+        <styleUrl>#line-FF0000-5000-nodesc</styleUrl>
+        <LineString>
+          <tessellate>1</tessellate>
+          <coordinates>
+            -75.263852,40.018889,0
+            -75.263273,40.015915,0
+            -75.265333,40.014033,0
+            -75.265773,40.013384,0
+            -75.266776,40.013495,0
+            -75.269448,40.013495,0
+            -75.271497,40.013433,0
+            -75.272296,40.013244,0
+            -75.27304,40.01298,0
+            -75.273814,40.012574,0
+            -75.274463,40.012131,0
+          </coordinates>
+        </LineString>
+      </Placemark>
+      <Placemark>
+        <name>Lower Merion Eruv Boundary</name>
+        <styleUrl>#line-FF0000-5000-nodesc</styleUrl>
+        <LineString>
+          <tessellate>1</tessellate>
+          <coordinates>
+            -75.274478,40.0121259,0
+            -75.274368,40.0119159,0
+            -75.273478,40.0027559,0
+            -75.262228,40.0047759,0
+            -75.260088,40.0049659,0
+            -75.257788,40.0046359,0
+            -75.256198,40.0041759,0
+            -75.254868,40.0034459,0
+            -75.253558,40.0024659,0
+            -75.252658,40.0014459,0
+            -75.251838,40.0000059,0
+            -75.251578,39.9992759,0
+            -75.251438,39.9981759,0
+            -75.251358,39.9940759,0
+            -75.250868,39.9920259,0
+            -75.250047,39.9903139,0
+            -75.231117,39.9991415,0
+            -75.2311095,39.9992562,0
+            -75.2313045,39.9994942,0
+            -75.2310415,39.9996228,0
+            -75.2311312,39.9997348,0
+            -75.2306719,39.9999419,0
+            -75.2306621,40.0000547,0
+            -75.2303086,40.0002261,0
+            -75.2306092,40.0005913,0
+            -75.2296357,40.0010636,0
+            -75.2295486,40.0010799,0
+            -75.2294822,40.0010983,0
+            -75.2302017,40.001992,0
+            -75.2296779,40.0022369,0
+            -75.2298962,40.0025155,0
+            -75.2293616,40.0027328,0
+            -75.2301537,40.0037866,0
+            -75.2298337,40.0039396,0
+            -75.2281913,40.0017904,0
+            -75.2271746,40.0021978,0
+          </coordinates>
+        </LineString>
+      </Placemark>
+      <Placemark>
+        <name>Lower Merion Eruv Boundary</name>
+        <styleUrl>#line-FF0000-5000-nodesc</styleUrl>
+        <LineString>
+          <tessellate>1</tessellate>
+          <coordinates>
+            -75.2271666,40.0022019,0
+            -75.22804,40.00331,0
+            -75.22725,40.00368,0
+            -75.22635,40.00381,0
+            -75.22195,40.00566,0
+            -75.22935,40.01575,0
+          </coordinates>
+        </LineString>
+      </Placemark>
+      <Placemark>
+        <name>Lower Merion Eruv Boundary</name>
+        <styleUrl>#line-FF0000-5000-nodesc</styleUrl>
+        <LineString>
+          <tessellate>1</tessellate>
+          <coordinates>
+            -75.229365,40.015742,0
+            -75.229729,40.016597,0
+            -75.230362,40.018832,0
+            -75.230695,40.019924,0
+            -75.231028,40.021009,0
+            -75.23077,40.02257,0
+            -75.23048,40.02326,0
+            -75.23034,40.02396,0
+            -75.22974,40.02464,0
+            -75.228935,40.025339,0
+            -75.23072,40.02616,0
+            -75.232186,40.027138,0
+          </coordinates>
+        </LineString>
+      </Placemark>
+      <Placemark>
+        <name>Lower Merion Eruv Boundary</name>
+        <styleUrl>#line-FF0000-5000-nodesc</styleUrl>
+        <LineString>
+          <tessellate>1</tessellate>
+          <coordinates>
+            -75.243484,40.03555,0
+            -75.242121,40.034359,0
+            -75.241166,40.033209,0
+            -75.23999,40.03224,0
+            -75.23549,40.02978,0
+            -75.23218,40.02712,0
+          </coordinates>
+        </LineString>
+      </Placemark>
+      <Placemark>
+        <name>Main Line Eruv Boundary</name>
+        <styleUrl>#line-0000FF-5000-nodesc</styleUrl>
+        <LineString>
+          <tessellate>1</tessellate>
+          <coordinates>
+            -75.251412,39.98948,0
+            -75.250034,39.990318,0
+          </coordinates>
+        </LineString>
+      </Placemark>
+      <Placemark>
+        <name>Main Line Eruv Boundary</name>
+        <styleUrl>#line-0000FF-5000-nodesc</styleUrl>
+        <LineString>
+          <tessellate>1</tessellate>
+          <coordinates>
+            -75.2532,39.98862,0
+            -75.252963,39.988748,0
+            -75.251423,39.989468,0
+          </coordinates>
+        </LineString>
+      </Placemark>
+      <Placemark>
+        <name>Main Line Eruv Boundary</name>
+        <styleUrl>#line-0000FF-5000-nodesc</styleUrl>
+        <LineString>
+          <tessellate>1</tessellate>
+          <coordinates>
+            -75.25559,39.9875,0
+            -75.253183,39.988629,0
+          </coordinates>
+        </LineString>
+      </Placemark>
+      <Placemark>
+        <name>Main Line Eruv Boundary</name>
+        <styleUrl>#line-0000FF-5000-nodesc</styleUrl>
+        <LineString>
+          <tessellate>1</tessellate>
+          <coordinates>
+            -75.255597,39.98751,0
+            -75.256206,39.987218,0
+            -75.256769,39.986795,0
+            -75.258409,39.985508,0
+            -75.259343,39.984933,0
+            -75.258946,39.984316,0
+            -75.258763,39.983601,0
+            -75.258849,39.983058,0
+            -75.261008,39.981992,0
+            -75.260128,39.981121,0
+            -75.260342,39.980677,0
+            -75.260128,39.979822,0
+            -75.261286,39.978884,0
+            -75.262767,39.979674,0
+            -75.263304,39.979476,0
+            -75.265621,39.981597,0
+            -75.268496,39.980397,0
+            -75.266029,39.979295,0
+            -75.26605,39.979,0
+            -75.261887,39.977207,0
+            -75.261866,39.976829,0
+            -75.262853,39.975793,0
+            -75.259978,39.974609,0
+            -75.265127,39.97058,0
+            -75.265707,39.970613,0
+            -75.268561,39.972307,0
+            -75.26987,39.973425,0
+            -75.271672,39.972537,0
+            -75.274462,39.976089,0
+            -75.273281,39.976714,0
+            -75.273818,39.977602,0
+            -75.274934,39.977174,0
+            -75.275191,39.977372,0
+            -75.278088,39.976056,0
+            -75.280577,39.979493,0
+            -75.279719,39.979871,0
+            -75.280641,39.979887,0
+            -75.280749,39.981565,0
+            -75.281414,39.981236,0
+            -75.284868,39.984853,0
+            -75.28298,39.985609,0
+            -75.281628,39.986217,0
+            -75.280813,39.987598,0
+            -75.278796,39.988815,0
+            -75.279418,39.989769,0
+            -75.281328,39.990755,0
+            -75.284783,39.992645,0
+            -75.289203,39.992728,0
+            -75.295941,40.000684,0
+            -75.294203,40.001539,0
+            -75.295469,40.003067,0
+            -75.288624,40.006075,0
+            -75.287122,40.003725,0
+            -75.289847,40.002919,0
+            -75.287894,40.000355,0
+            -75.285491,40.000602,0
+            -75.287122,40.003725,0
+            -75.285834,40.005253,0
+            -75.285165,40.005791,0
+            -75.282376,40.004361,0
+            -75.280101,40.00344,0
+            -75.276732,40.002766,0
+            -75.273455,40.002754,0
+          </coordinates>
+        </LineString>
+      </Placemark>
+      <Placemark>
+        <name>Main Line Eruv Boundary</name>
+        <styleUrl>#line-0000FF-5000-nodesc</styleUrl>
+        <LineString>
+          <tessellate>1</tessellate>
+          <coordinates>
+            -75.264974,39.991136,0
+            -75.269533,39.991704,0
+            -75.270241,39.988662,0
+            -75.267431,39.988687,0
+            -75.264523,39.988777,0
+            -75.264974,39.991128,0
+          </coordinates>
+        </LineString>
+      </Placemark>
+      <Placemark>
+        <name>Main Line Eruv Boundary</name>
+        <styleUrl>#line-0000FF-5000-nodesc</styleUrl>
+        <LineString>
+          <tessellate>1</tessellate>
+          <coordinates>
+            -75.27372,40.00266,0
+            -75.26266,40.00461,0
+            -75.26006,40.0049,0
+            -75.25768,40.00451,0
+            -75.25622,40.00408,0
+            -75.25467,40.00319,0
+            -75.25362,40.00239,0
+            -75.25257,40.00111,0
+            -75.2518,39.99958,0
+            -75.25154,39.99748,0
+            -75.25159,39.99442,0
+            -75.25107,39.99209,0
+            -75.250044,39.990314,0
+          </coordinates>
+        </LineString>
+      </Placemark>
+      <Placemark>
+        <name>Crossing A</name>
+        <description>The crossing tunnel under the rail line at the Merion Station</description>
+        <styleUrl>#icon-22</styleUrl>
+        <Point>
+          <coordinates>
+            -75.251627,39.997441,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Crossing B</name>
+        <description>The Bowman Avenue Bridge</description>
+        <styleUrl>#icon-22</styleUrl>
+        <Point>
+          <coordinates>
+            -75.253472,40.00224,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Crossing C</name>
+        <description>The Narberth Bridge (South Narberth Avenue)</description>
+        <styleUrl>#icon-22</styleUrl>
+        <Point>
+          <coordinates>
+            -75.259781,40.004837,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Crossing D</name>
+        <description>The crossing tunnel under the Narberth Station</description>
+        <styleUrl>#icon-22</styleUrl>
+        <Point>
+          <coordinates>
+            -75.261626,40.004722,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Crossing E</name>
+        <description>Under the North Wynnewood Bridge. This is the arched stone bridge going under the train tracks near the Narberth playground.</description>
+        <styleUrl>#icon-22</styleUrl>
+        <Point>
+          <coordinates>
+            -75.267506,40.003785,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Lankenau Hospital Route</name>
+        <styleUrl>#line-009900-5000-nodesc</styleUrl>
+        <LineString>
+          <tessellate>1</tessellate>
+          <coordinates>
+            -75.25448,39.99231,0
+            -75.25145,39.989566,0
+            -75.254003,39.988346,0
+            -75.25759,39.99021,0
+            -75.25828,39.99031,0
+            -75.2591,39.98923,0
+            -75.26047,39.98913,0
+          </coordinates>
+        </LineString>
+      </Placemark>
+      <Placemark>
+        <name>Lankenau Hospital Route</name>
+        <description>Although most of the sidewalks on City Ave are outside both eruvin, the sidewalk between Wynnewood Road and Lancaster Avenue on the Main Line side is now inside the Main Line eruv to allow people to walk from Lower Merion to Lankenau Hospital. However, the sidewalk going over the RR bridge just south of Merion Road is NOT included; to get to Lankenau from within the Eruv of Lower Merion it is necessary to go under the railroad at the Merion train station, go to Wynnewood Road, turn left to City Avenue, and then turn right on City Avenue and right again on Lancaster Road.</description>
+        <styleUrl>#icon-61</styleUrl>
+        <Point>
+          <coordinates>
+            -75.246906,39.997671,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Lankenau Hospital Route</name>
+        <styleUrl>#line-009900-5000-nodesc</styleUrl>
+        <LineString>
+          <tessellate>1</tessellate>
+          <coordinates>
+            -75.254442,39.992284,0
+            -75.255404,39.993019,0
+            -75.251824,39.994684,0
+            -75.251724,39.997417,0
+            -75.246906,39.997704,0
+          </coordinates>
+        </LineString>
+      </Placemark>
+      <Placemark>
+        <name>Approaching East Wynnewood Rd.</name>
+        <description>Any streets that lead from the Merion Station tunnel to East Wynnewood Rd. can be used.</description>
+        <styleUrl>#icon-61</styleUrl>
+        <Point>
+          <coordinates>
+            -75.255404,39.992986,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Hill Gate</name>
+        <description><![CDATA[Entrance to Hill Gate is within the eruv only via Righters Ferry Rd. <br><br>See Instructions (http://lowermerioneruv.org/wordpress/wp-content/uploads/2011/01/west-laurel-hill-entrance-eruv.png)]]></description>
+        <styleUrl>#line-000000-3000</styleUrl>
+        <LineString>
+          <tessellate>1</tessellate>
+          <coordinates>
+            -75.220955,40.010532,0
+            -75.223745,40.008133,0
+            -75.223616,40.008363,0
+            -75.22427,40.009259,0
+            -75.223637,40.009752,0
+            -75.223487,40.010919,0
+            -75.222403,40.01151,0
+            -75.221298,40.010951,0
+            -75.220955,40.010532,0
+          </coordinates>
+        </LineString>
+      </Placemark>
+      <Placemark>
+        <name>Entrance to Hill Gate via Righters Ferry Rd</name>
+        <description><![CDATA[Entrance to Hill Gate only via Righters Ferry Rd.<br><br>See Instructions (http://lowermerioneruv.org/wordpress/wp-content/uploads/2011/01/west-laurel-hill-entrance-eruv.png)]]></description>
+        <styleUrl>#icon-157</styleUrl>
+        <Point>
+          <coordinates>
+            -75.223689,40.008289,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Winter 2026 Reroute Alert</name>
+        <description>A note that the eruv boundary now turns at Bala Ave and no longer follows City Line Ave at that point. The sidewalk on the Bala Park side of Bala Ave is no longer within the eruv boundary up until Bala Park. The sidewalk on the OPPOSITE SIDE of Bala Park is included in the eruv boundary UP UNTIL this point</description>
+        <styleUrl>#icon-1125</styleUrl>
+        <Point>
+          <coordinates>
+            -75.2295499,40.0010943,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Fall 2025 Reroute Alert</name>
+        <description>Note that the eruv boundary runs along Bala Ave from City Line Ave and turns just before the park fence. The park in its entirety, including the entrance to the park is within the eruv.</description>
+        <styleUrl>#icon-1125</styleUrl>
+        <Point>
+          <coordinates>
+            -75.2301863,40.0020217,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Fall 2025 Reroute Alert</name>
+        <description>Despite the eruv reroute, the entire Kelly property and access points are within the eruv boundary.</description>
+        <styleUrl>#icon-1125</styleUrl>
+        <Point>
+          <coordinates>
+            -75.2299001,40.0033867,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Fall 2025 Reroute Alert</name>
+        <description>Note that the newly built trail extension is no longer in the eruv boundary (past Union Ave approaching City Line Ave).</description>
+        <styleUrl>#icon-1125</styleUrl>
+        <Point>
+          <coordinates>
+            -75.2298358,40.0038593,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Winter 2026 Reroute Alert</name>
+        <description>A note that the eruv no longer continues on City Avenue past CVS Pharmacy. It turns on Bryn Mawr Avenue and continues BEHIND Firestone, Enterprise, and the French School, which are no longer included within the eruv. As a result, one cannot carry on Bryn Mawr all the way to City Ave.</description>
+        <styleUrl>#icon-1125</styleUrl>
+        <Point>
+          <coordinates>
+            -75.2310846,39.9992142,0
+          </coordinates>
+        </Point>
+      </Placemark>
+    </Folder>
+  </Document>
+</kml>

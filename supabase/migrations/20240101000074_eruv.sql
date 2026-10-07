@@ -19,6 +19,11 @@
 --   status_posted_on  the date the eruv put on it, when there is one
 --   status_checked_at the last good read
 --   status_error_at, status_error  the last failed read, and why
+--   line            the line on the guide's map, as an admin approved it
+--   line_pending    a line read from line_url that differs from `line`,
+--                   waiting for an admin (the first read too)
+--   line_read_at, line_error  the last read of line_url, and why it failed
+--   line_approved_at, line_approved_by
 --
 -- Run in the Supabase SQL editor, before deploying the code that calls it.
 -- The site works without it: the eruv page shows the old list, with links.
@@ -46,6 +51,12 @@ create table if not exists public.eruv (
   status_checked_at timestamptz,
   status_error_at   timestamptz,
   status_error      text,
+  line              jsonb,
+  line_pending      jsonb,
+  line_read_at      timestamptz,
+  line_error        text,
+  line_approved_at  timestamptz,
+  line_approved_by  text,
   created_at        timestamptz not null default now(),
   updated_at        timestamptz not null default now(),
   primary key (community_id, id)
