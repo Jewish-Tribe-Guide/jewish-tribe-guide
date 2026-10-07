@@ -11,7 +11,7 @@ import type { CategoryConfig, CategoryField } from './categories'
 export function tellUsPlaceholder(category?: Pick<CategoryConfig, 'detailFields' | 'hasPhone'>, { times = false }: { times?: boolean } = {}): string {
   if (!category) return 'What did you see? An item at a store, new hours, a new place, a shul’s times, or paste a post from the group.'
   const fields = category.detailFields
-  if (times) return 'Paste the shul’s email or this week’s times, or add a photo of the schedule.'
+  if (times) return 'Paste the shul’s email or this week’s times, or add a photo or PDF of the schedule.'
   if (fields.some((f) => f.type === 'tags')) return 'What did you see? “Trader Joe’s on Arch has kosher ground beef”, new hours, or paste a post from the group.'
   // Yes/no fields are left out: "its shabbat friendly" isn't a sentence.
   const rank = (f: CategoryField) => ['minyanim', 'hours', 'select'].indexOf(f.type)

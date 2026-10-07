@@ -516,9 +516,11 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // the page's own edit (onEdit).
   const [openItem, setOpenItem] = useState<DirectoryResource | null>(null)
   const editYourself = useRef<(() => void) | null>(null)
-  const tellAbout = (item: DirectoryResource, edit?: () => void) => {
+  const [tellTimes, setTellTimes] = useState(false)
+  const tellAbout = (item: DirectoryResource, edit?: () => void, opts?: { times?: boolean }) => {
     editYourself.current = edit ?? null
     setOpenItem(item)
+    setTellTimes(!!opts?.times)
     setTellOpen(true)
   }
   // Adding to a shul's times is an edit to the shul ("+ Add a minyan").
@@ -1563,7 +1565,6 @@ export default function GenericDirectory({ category, items, anchorLabel, address
           onHoverShul={mapBeside ? highlight.set : undefined}
           search={search}
           canAdd={canEdit}
-          minyanimKey={minyanimField?.key}
           shulText={(item) => filterableSelects.flatMap((f) => selectValues(item[f.key])).join(' · ')}
         />
       ) : filtered.length === 0 ? (
@@ -1834,7 +1835,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
           onClose={() => setTellOpen(false)}
           about={openItem ? { id: openItem.id, name: openItem.name } : undefined}
           category={category}
-          placeholder={tellUsPlaceholder(category, { times: minyanimViewOn })}
+          placeholder={tellUsPlaceholder(category, { times: minyanimViewOn || (!!openItem && tellTimes) })}
           onEditYourself={
             openItem
               ? () => {

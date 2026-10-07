@@ -37,7 +37,8 @@ const MAX_BYTES = 5 * 1024 * 1024
 const MAX_FILES = 3
 const MAX_TIMES = 2
 const MAX_MENUS = 1
-const IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif'])
+// Photos, and a PDF (Oct 6): shuls send their schedules as PDF flyers.
+const FILE_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'application/pdf'])
 const BUCKET = 'site-assets'
 
 export async function POST(request: Request) {
@@ -56,7 +57,7 @@ export async function POST(request: Request) {
   const files = form.getAll('file').filter((f): f is File => f instanceof File && f.size > 0)
   if (files.length > MAX_FILES) return Response.json({ ok: false, error: `Please add up to ${MAX_FILES} photos.` }, { status: 400 })
   for (const f of files) {
-    if (!IMAGE_TYPES.has(f.type)) return Response.json({ ok: false, error: 'Please add photos (PNG, JPG or WebP).' }, { status: 400 })
+    if (!FILE_TYPES.has(f.type)) return Response.json({ ok: false, error: 'Please add photos (PNG, JPG or WebP) or a PDF.' }, { status: 400 })
     if (f.size > MAX_BYTES) return Response.json({ ok: false, error: 'That photo is too large. Please keep each under 5MB.' }, { status: 400 })
   }
   if (text.length < 3 && files.length === 0) return Response.json({ ok: false, error: 'Write or paste what you saw, or add a photo.' }, { status: 400 })
@@ -113,7 +114,9 @@ export async function POST(request: Request) {
         if (isOrderingApp(url)) return 'Menus on delivery apps can’t be read from a link. Send a screenshot of the menu instead.'
         return (await findMenu(url)) ?? 'Couldn’t open that menu. Send a photo or screenshot of it instead.'
       }
-      if (images.length) return { url: null, text: null, pdf: null, images }
+      const pdf = images.find((i) => i.mime === 'application/pdf')
+      const photos = images.filter((i) => i.mime !== 'application/pdf')
+      if (pdf || photos.length) return { url: null, text: null, pdf: pdf?.b64 ?? null, images: photos }
       return 'Add the menu’s link, or a photo of it.'
     }
     const proposals = await Promise.all(
@@ -187,7 +190,8 @@ export async function POST(request: Request) {
           // A second reading, by the week reader, for at most two shuls: each
           // costs a model call.
           if (!key || ++timesRead > MAX_TIMES) return { ...p, listing: brief(p.listingId), item: l, minyanimKey: key ?? null, update: null }
-          const source = images[0] && !text ? { image: images[0].b64, mime: images[0].mime } : { text: text || '(see photo)' }
+          const first = images[0]
+          const source = first && !text ? (first.mime === 'application/pdf' ? { pdf: first.b64 } : { image: first.b64, mime: first.mime }) : { text: text || '(see photo)' }
           try {
             const { update } = await readShulWeek(l, key, source, apiKey)
             return { ...p, listing: brief(p.listingId), item: l, minyanimKey: key, update }

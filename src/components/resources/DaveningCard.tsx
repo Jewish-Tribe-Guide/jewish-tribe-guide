@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, type ReactNode } from 'react'
+import { useContext, useState, type ReactNode } from 'react'
 import type { DirectoryResource } from '@/types'
 import { TEFILLAH_LABELS, TEFILLAH_ORDER, type Minyan } from '@/lib/davening'
 import { useMinyanSchedule } from '@/lib/useMinyanSchedule'
@@ -14,6 +14,7 @@ import { ui } from '@/lib/uiConfig'
 import { ChevronRightIcon, PlusIcon } from '@/components/icons'
 import AddScheduleBox from './AddScheduleBox'
 import UpdateTimesBox from './UpdateTimesBox'
+import { TellAboutContext } from './tellAbout'
 import DaveningTimes from './DaveningTimes'
 import { Card } from './listingParts'
 import FreshnessFooter from './FreshnessFooter'
@@ -51,6 +52,7 @@ export default function DaveningCard({
   const [updatingIn, setUpdatingIn] = useState<string | null>(null)
   const [updated, setUpdated] = useState<{ in: string; what: 'sent' | 'confirmed' } | null>(null)
   const [unfolded, setUnfolded] = useState<Record<string, boolean>>({})
+  const tellAbout = useContext(TellAboutContext)
   const schedule = useMinyanSchedule(null, [item])
   const canAdd = ui.contributions.edit && (!category || resolveCapabilities(category.capabilities).edit)
 
@@ -97,7 +99,10 @@ export default function DaveningCard({
         ? 'Not this week: this week’s schedule replaces them'
         : null
 
-  const open = (key: string) => setUpdatingIn(key)
+  // On a category page, the regular "+ Add" box about the shul (Oct 6): one
+  // way to send a schedule everywhere, a photo or PDF or pasted email, its
+  // week shown to check before sending. Without one (the Map), in place.
+  const open = (key: string) => (tellAbout ? tellAbout(item, undefined, { times: true }) : setUpdatingIn(key))
   /** "Update their times", opened in the box `key`, or its thanks. */
   const updateIn = (key: string) => {
     if (!canAdd) return null

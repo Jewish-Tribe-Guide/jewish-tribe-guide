@@ -79,7 +79,8 @@ type Proposal = ItemsProposal | FieldsProposal | PlaceProposal | TimesProposal |
 type Reading = { proposals: Proposal[]; photoUrls: string[] }
 
 const MAX_PHOTOS = 3
-const PHOTO_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif']
+// Photos, and a PDF (Oct 6): a shul's schedule often comes as a PDF flyer.
+const PHOTO_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'application/pdf']
 
 /** A fields card's reading for the place it's about, or the branch picked. */
 function fieldsReadingOf(p: FieldsProposal, picked: string | null): (FieldsReading & { listing: Brief }) | null {
@@ -157,7 +158,7 @@ const addTitle = (c: CategoryConfig) => `Add to ${c.pluralLabel || c.label}`
 
 type Step = 'write' | 'result' | 'sent' | 'find' | 'kind' | 'add' | 'edit'
 
-function TellUsBody({
+export function TellUsBody({
   about,
   pageCategory,
   placeholder,
@@ -165,6 +166,7 @@ function TellUsBody({
   onClose,
   onTitle,
   onBack,
+  backFromStart,
 }: {
   about?: { id: string; name: string }
   pageCategory?: CategoryConfig
@@ -174,6 +176,9 @@ function TellUsBody({
   onTitle: (title: string | null) => void
   /** Where the header's Back goes from this step, or nothing. */
   onBack: (go: (() => void) | null) => void
+  /** Back from the first step, when the box was opened from another one:
+   *  "Add a minyan"'s whole-schedule link (Oct 6). */
+  backFromStart?: () => void
 }) {
   const community = useCommunitySlug()
   const categories = useCategories()
@@ -460,7 +465,7 @@ function TellUsBody({
   // step before (the test caught it, about one run in three).
   useLayoutEffect(() => {
     const go: Record<Step, (() => void) | null> = {
-      write: null,
+      write: backFromStart ?? null,
       sent: null,
       result: () => setStep('write'),
       find: () => setStep(findFrom),
@@ -552,8 +557,15 @@ function TellUsBody({
               <div className="flex flex-wrap gap-2 px-3 pb-2">
                 {photos.map((p, i) => (
                   <div key={p.preview} className="relative">
-                    {/* eslint-disable-next-line @next/next/no-img-element -- a local preview of the visitor's own photo */}
-                    <img src={p.preview} alt={`Photo ${i + 1}`} className="h-16 w-16 rounded-md border border-slate-200 object-cover" />
+                    {p.file.type === 'application/pdf' ? (
+                      <span title={p.file.name} className="flex h-16 w-16 flex-col items-center justify-center rounded-md border border-slate-200 bg-slate-50 text-[12px] font-bold text-slate-600">
+                        PDF
+                        <span className="w-14 truncate text-center text-[10.5px] font-normal">{p.file.name}</span>
+                      </span>
+                    ) : (
+                      // eslint-disable-next-line @next/next/no-img-element -- a local preview of the visitor's own photo
+                      <img src={p.preview} alt={`Photo ${i + 1}`} className="h-16 w-16 rounded-md border border-slate-200 object-cover" />
+                    )}
                     <button
                       type="button"
                       aria-label={`Remove photo ${i + 1}`}
@@ -577,7 +589,7 @@ function TellUsBody({
                 onClick={() => fileInput.current?.click()}
                 className="cursor-pointer rounded-md px-2 py-1 text-[13.5px] font-semibold text-primary hover:bg-primary/5 disabled:cursor-default disabled:text-slate-400"
               >
-                + Add a photo
+                + Add a photo or PDF
               </button>
               <input
                 ref={fileInput}

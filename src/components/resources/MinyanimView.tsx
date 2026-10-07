@@ -56,7 +56,6 @@ export default function MinyanimView({
   onHoverShul,
   search = '',
   canAdd = false,
-  minyanimKey = 'minyanim',
   shulText = () => '',
 }: {
   items: readonly DirectoryResource[]
@@ -72,7 +71,6 @@ export default function MinyanimView({
   /** Whether minyanim can be added here: "+ Add a minyan" as the list's
    *  last row, and "Add their times" for a shul that hasn't posted. */
   canAdd?: boolean
-  minyanimKey?: string
   /** A shul's pick-list values ("Orthodox (Ashkenazi)"): searched, and
    *  shown when choosing a shul to add a minyan to. */
   shulText?: (item: DirectoryResource) => string
@@ -207,7 +205,6 @@ export default function MinyanimView({
           day={day}
           shulId={oneShul}
           tefillah={sought?.named && (asked?.length === 1 || (asked?.length === 2 && asked.includes('mincha_maariv'))) ? asked?.find((t) => t !== 'mincha_maariv') : undefined}
-          minyanimKey={minyanimKey}
           shulText={shulText}
         />
       )}

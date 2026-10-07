@@ -4,6 +4,7 @@ import { cleanup, fireEvent, screen, within } from '@testing-library/react'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { makeCategory, makeListing } from '@/test/providerFixtures'
 import DaveningCard from './DaveningCard'
+import { TellAboutContext } from './tellAbout'
 
 vi.mock('@vercel/analytics', () => ({ track: vi.fn() }))
 // This week, as the calendar has it: Chol HaMoed Thursday, Hoshana Rabbah
@@ -291,5 +292,33 @@ describe('a date per box (Oct 6)', () => {
     fireEvent.click(within(screen.getByTestId('davening-weekday')).getByRole('button', { name: 'Update their times' }))
     expect(within(screen.getByTestId('davening-weekday')).getByTestId('update-times')).toBeInTheDocument()
     expect(screen.queryByTestId('davening-confirm')).not.toBeInTheDocument()
+  })
+})
+
+// Oct 6: on a category page, “Update their times” opens the regular “+ Add”
+// box about the shul, asking for their schedule: one way to send times
+// everywhere. It was a second box, inside the listing's, with a choice to
+// make first. Where there's no box (the Map), it still opens in place.
+describe('“Update their times” on a category page', () => {
+  afterEach(() => vi.useRealTimers())
+  const times = [
+    { id: 'a', tefillah: 'shacharis', days: ['mon', 'thu'], time: '6:45am' },
+    { id: 'b', tefillah: 'shacharis', days: ['sat'], time: '9:15am' },
+  ]
+
+  it('opens the regular box about the shul, asking for their schedule; nothing opens inside the listing', () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-10-06T17:30:00-04:00'))
+    const tellAbout = vi.fn()
+    const shul = makeListing({ id: 'k', name: 'Mekor Habracha', category: 'synagogue', minyanim: times })
+    renderWithProviders(
+      <TellAboutContext.Provider value={tellAbout}>
+        <DaveningCard item={shul} minyanim={times} category={shuls} />
+      </TellAboutContext.Provider>,
+      { content: { categories: [shuls] } },
+    )
+    fireEvent.click(within(screen.getByTestId('davening-weekday')).getByRole('button', { name: 'Update their times' }))
+    expect(tellAbout).toHaveBeenCalledWith(shul, undefined, { times: true })
+    expect(screen.queryByTestId('update-times')).not.toBeInTheDocument()
   })
 })

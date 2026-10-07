@@ -129,12 +129,21 @@ describe('Saw something? Tell us', () => {
     expect(screen.getByAltText('Photo 1')).toBeInTheDocument()
     fireEvent.dragEnter(box, { dataTransfer: { types: ['Files'] } })
     expect(screen.getByTestId('tell-us-drop')).toHaveTextContent('Drop to add the photo')
-    fireEvent.drop(box, { dataTransfer: { types: ['Files'], files: [png('a.png'), new File(['x'], 'notes.pdf', { type: 'application/pdf' }), png('b.png'), png('c.png')] } })
+    fireEvent.drop(box, { dataTransfer: { types: ['Files'], files: [png('a.png'), new File(['x'], 'notes.txt', { type: 'text/plain' }), png('b.png'), png('c.png')] } })
     expect(screen.queryByTestId('tell-us-drop')).not.toBeInTheDocument()
     expect(screen.getAllByAltText(/^Photo \d$/)).toHaveLength(3)
     // Pasting text is still just typing.
     fireEvent.paste(box, { clipboardData: { files: [] } })
     expect(screen.getAllByAltText(/^Photo \d$/)).toHaveLength(3)
+  })
+
+  // Oct 6: a PDF too (a shul's flyer), shown as a file, not a picture.
+  it('takes a PDF, shown by its name', () => {
+    open()
+    fireEvent.change(screen.getByLabelText('Add a photo'), { target: { files: [new File(['x'], 'mekor-shabbos.pdf', { type: 'application/pdf' })] } })
+    expect(screen.getByTitle('mekor-shabbos.pdf')).toHaveTextContent('PDF')
+    expect(screen.queryByAltText('Photo 1')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'See what changes' })).toBeEnabled()
   })
 
   // Agreed Oct 5: several places in one message, one at a time: "1 of 3",

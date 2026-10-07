@@ -64,6 +64,11 @@ describe('buildCatalog and the prompt', () => {
       { type: 'image_url', image_url: { url: 'data:image/webp;base64,AAA' } },
     ])
   })
+
+  it('sends a PDF as a file, the way the week reader does (Oct 6)', () => {
+    const user = messageMessages({ text: '', images: [{ b64: 'AAA', mime: 'application/pdf' }] }, catalog, { communityName: 'P' })[1] as { content: unknown[] }
+    expect(user.content[1]).toEqual({ type: 'file', file: { filename: 'attachment.pdf', file_data: 'data:application/pdf;base64,AAA' } })
+  })
 })
 
 describe('tidyMessageReading', () => {

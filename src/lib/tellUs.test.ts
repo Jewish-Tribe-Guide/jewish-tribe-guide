@@ -25,7 +25,7 @@ describe('tellUsPlaceholder', () => {
   it('gives a store’s items and a shul’s times their own, and the Minyanim view the times', () => {
     const shul = makeCategory({ detailFields: [website, f('denomination', 'Denomination', 'select'), f('minyanim', 'Davening Times', 'minyanim')] })
     expect(tellUsPlaceholder(shul)).toContain('its davening times, denomination or phone.')
-    expect(tellUsPlaceholder(shul, { times: true })).toBe('Paste the shul’s email or this week’s times, or add a photo of the schedule.')
+    expect(tellUsPlaceholder(shul, { times: true })).toBe('Paste the shul’s email or this week’s times, or add a photo or PDF of the schedule.')
     expect(tellUsPlaceholder(makeCategory({ detailFields: [f('m', 'Kosher items', 'tags')] }))).toContain('“Trader Joe’s on Arch has kosher ground beef”')
   })
 

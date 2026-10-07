@@ -77,7 +77,7 @@ afterEach(() => vi.unstubAllEnvs())
 describe('POST /api/message/read — refusals before any reading', () => {
   it.each([
     ['nothing to read', { text: ' hi ' }, 400],
-    ['a file that isn’t a photo', { text: 'Acme has challah', file: photo('application/pdf') }, 400],
+    ['a file that isn’t a photo or PDF', { text: 'Acme has challah', file: photo('text/plain') }, 400],
     ['more than three photos', { file: [photo(), photo(), photo(), photo()] }, 400],
     ['a honeypot hit', { text: 'Acme has challah', company: 'Spam Inc' }, 400],
   ])('refuses %s', async (_name, fields, status) => {
@@ -199,6 +199,17 @@ describe('POST /api/message/read — the reading', () => {
     expect(m.readMessage.mock.calls[0][0].images).toEqual([{ mime: 'image/webp', b64: 'AQID' }])
     expect(m.readShulWeek.mock.calls[0][2]).toEqual({ image: 'AQID', mime: 'image/webp' })
     expect(body.photoUrls).toEqual([expect.stringMatching(/site-assets\/message-source\/\d+-\w+\.webp$/)])
+  })
+
+  // Oct 6: a shul's schedule often comes as a PDF flyer.
+  it('reads a shul’s times from a PDF, and keeps it for the admin as one', async () => {
+    reads({ proposals: [{ kind: 'times', listingId: MEKOR, quote: 'flyer', checked: false }] })
+    m.readShulWeek.mockResolvedValue({ update: { kind: 'week', days: [] }, model: 'm' })
+    const res = await POST(req({ file: photo('application/pdf') }))
+    expect(res.status).toBe(200)
+    expect(m.readMessage.mock.calls[0][0].images).toEqual([{ mime: 'application/pdf', b64: 'AQID' }])
+    expect(m.readShulWeek.mock.calls[0][2]).toEqual({ pdf: 'AQID' })
+    expect((await res.json()).photoUrls).toEqual([expect.stringMatching(/message-source\/\d+-\w+\.pdf$/)])
   })
 
   it('502s, saying to try again, when the reader fails', async () => {

@@ -221,7 +221,12 @@ Reply with JSON only:
  "note":string|null}]}`
 
   const content: unknown[] = [{ type: 'text', text: source.text.trim() ? `Message:\n${source.text.slice(0, MAX_TEXT)}` : 'Message: (no text, only the photo(s) below)' }]
-  for (const img of source.images) content.push({ type: 'image_url', image_url: { url: `data:${img.mime};base64,${img.b64}` } })
+  // A PDF (a shul's flyer, a menu) goes as a file, the way the week reader
+  // sends one; a photo as an image.
+  for (const img of source.images) {
+    if (img.mime === 'application/pdf') content.push({ type: 'file', file: { filename: 'attachment.pdf', file_data: `data:application/pdf;base64,${img.b64}` } })
+    else content.push({ type: 'image_url', image_url: { url: `data:${img.mime};base64,${img.b64}` } })
+  }
   return [
     { role: 'system', content: system },
     { role: 'user', content },
