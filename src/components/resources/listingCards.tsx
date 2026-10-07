@@ -9,6 +9,11 @@ import { clockTime } from '@/lib/upcomingDavening'
 import { walkDistanceText, walkMinutes } from '@/lib/walkList'
 import { haversineMiles, type LatLng } from '@/lib/geo'
 import { eruvim } from '@/data/resources'
+import Link from 'next/link'
+import { useEruvStatuses } from '@/lib/useEruvStatuses'
+import { eruvView } from '@/lib/eruv'
+import { routes } from '@/lib/routes'
+import { useNow } from '@/lib/useNow'
 import { CheckIcon, PhoneIcon } from '@/components/icons'
 import { Card } from './listingParts'
 import { fieldText } from './FieldsBox'
@@ -114,17 +119,35 @@ function candleText(zmanim: ZmanimData | null, candlesAt: number | null): string
   return next ? `${next.label} ${next.time}` : null
 }
 
-/** A ticked field's line. A pick-list value that names an eruv on the
- *  guide's eruv page links to that eruv's own status, which it posts each
- *  week; the guide only knows what the eruv page says. */
+const EruvTone = { green: 'text-green-700', amber: 'text-amber-700', red: 'text-red-700', grey: 'text-slate-700' } as const
+
+/** A ticked field's line. A pick-list value that names an eruv shows that
+ *  eruv's status as the Eruv page does, read from its own site, and opens
+ *  that page. Until the eruv table exists (migration 074), it links to the
+ *  eruv's own status page instead. */
 function ShabbosField({ field, item }: { field: CategoryField; item: DirectoryResource }) {
   const text = fieldText(field, item[field.key])
-  const eruv = field.type === 'select' ? eruvim.find((e) => text.toLowerCase() === e.name.toLowerCase()) : undefined
+  const { community } = useActiveCommunity()
+  const clock = useNow()
+  const named = field.type === 'select' && /eruv/i.test(text)
+  const statuses = useEruvStatuses(community.slug, named)
+  const live = statuses?.available && clock !== null ? statuses.eruvim.find((e) => e.name.toLowerCase() === text.toLowerCase()) : undefined
+  const view = live && statuses?.available && clock !== null ? eruvView(live, new Date(clock), statuses.timezone, statuses.candles) : null
+  const eruv = !view && statuses && !statuses.available && field.type === 'select' ? eruvim.find((e) => text.toLowerCase() === e.name.toLowerCase()) : undefined
   return (
     <Line label={field.label}>
       {text ? (
         <>
           <span className={field.type === 'select' || field.type === 'boolean' ? 'font-semibold text-slate-900' : 'whitespace-pre-line'}>{text}</span>
+          {view && (
+            <>
+              {' · '}
+              <Link href={routes.slug(community.slug, 'eruv')} prefetch={false} className={`font-bold hover:underline ${EruvTone[view.tone]}`} data-testid="shabbos-eruv-status">
+                {view.label}
+              </Link>
+              {view.checked && <span className="block text-[13px] text-muted">{view.checked}</span>}
+            </>
+          )}
           {eruv && (
             <>
               {' · '}

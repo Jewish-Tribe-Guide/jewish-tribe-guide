@@ -8,6 +8,7 @@ import type { CategoryField } from '@/lib/categories'
 import type { DirectoryResource, ZmanimData } from '@/types'
 import ListingView from './ListingView'
 import { forgetLoadedPlaces } from './WalkList'
+import { clearEruvStatuses } from '@/lib/useEruvStatuses'
 
 vi.mock('@vercel/analytics', () => ({ track: vi.fn() }))
 vi.mock('next/navigation', () => ({
@@ -81,6 +82,7 @@ const order = () =>
 
 beforeEach(() => {
   forgetLoadedPlaces()
+  clearEruvStatuses()
   location.anchorListingId = null
   vi.useFakeTimers({ toFake: ['Date'] })
   vi.stubGlobal(
@@ -177,12 +179,30 @@ describe('This Shabbos', () => {
     expect(screen.getByTestId('listing-shabbos')).toHaveTextContent('Candle lightingFriday 6:13 PM, for Test Region')
   })
 
-  it('an eruv the eruv page knows links to its weekly status; what nobody has filled in says so', () => {
+  it('an eruv shows its status as the Eruv page does, read from its own site, and opens that page', async () => {
+    vi.setSystemTime(new Date('2026-10-09T19:00:00Z')) // Fri 3 PM
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) =>
+        String(url).startsWith('/api/eruv')
+          ? new Response(JSON.stringify({ ok: true, available: true, timezone: 'America/New_York', candles: 18 * 60 + 12, eruvim: [{ id: 'university-city', name: 'University City Eruv', statusUrl: 'https://www.pennocp.org/eruv', statusDated: false, status: 'up', statusWords: 'The Eruv is Up!', statusPostedOn: null, statusCheckedAt: '2026-10-09T18:55:00Z', statusErrorAt: null, statusError: null, line: null }] }))
+          : new Response(JSON.stringify({ ok: true, resources: [] })),
+      ),
+    )
+    open()
+    const status = await screen.findByTestId('shabbos-eruv-status')
+    expect(status).toHaveTextContent('Up for this Shabbos')
+    expect(status).toHaveAttribute('href', '/test-community/eruv')
+    expect(screen.getByTestId('listing-shabbos')).toHaveTextContent('Checked 2:55 PM · every 15 minutes until candle lighting')
+    expect(within(screen.getByTestId('listing-shabbos')).queryByRole('link', { name: 'This week’s status ↗' })).not.toBeInTheDocument()
+  })
+
+  it('without the eruv table, an eruv links to its weekly status; what nobody has filled in says so', async () => {
     vi.setSystemTime(new Date(2026, 9, 6, 13, 30))
     open()
     const card = screen.getByTestId('listing-shabbos')
+    expect(await within(card).findByRole('link', { name: 'This week’s status ↗' })).toHaveAttribute('href', 'https://www.pennocp.org/eruv')
     expect(card).toHaveTextContent('EruvUniversity City Eruv · This week’s status ↗')
-    expect(within(card).getByRole('link', { name: 'This week’s status ↗' })).toHaveAttribute('href', 'https://www.pennocp.org/eruv')
     expect(card).toHaveTextContent('Kosher food insideNot in the guide yet.')
     cleanup()
     open({ ...hup, eruv: 'none' })

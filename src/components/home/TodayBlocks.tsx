@@ -19,6 +19,7 @@ import type { CardDef } from './sections'
 import type { Change } from '@/lib/whatChanged'
 import { changeDay } from '@/lib/whatChanged'
 import ChangeRow from '@/components/changes/ChangeRow'
+import YourEruv from './YourEruv'
 
 // ── The Today home's blocks (step 6) ─────────────────────────────────────────
 // Under the Ask box, what this moment calls for, two answers at most:
@@ -88,6 +89,9 @@ export default function TodayBlocks(props: Props) {
       />,
     )
   }
+  // Your eruv, up or not, under the candles card on erev Shabbos or Yom Tov.
+  const eruvHref = kindLink('eruv')
+  if (moment.kind === 'erev' && now !== null && eruvHref) answers.push(<YourEruv key="eruv" communitySlug={communitySlug} href={eruvHref} now={now} />)
   if (moment.kind === 'erev' && on('beforeCandles')) answers.push(<BeforeCandles key="shop" {...props} />)
   if (on('nextMinyan')) answers.push(<NextMinyan key="minyan" {...props} shulsHref={shulsHref} />)
   if (moment.kind === 'weekday' && props.openNow && on('openNow')) answers.push(<OpenNow key="open" {...props} openNow={props.openNow} />)
