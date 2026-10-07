@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { eruvIdFor, readEruvEdit } from './eruvEdit'
+import { eruvIdFor, readEruvEdit, readingsToReset } from './eruvEdit'
 
 describe('readEruvEdit', () => {
   it('keeps what an admin may set, tidied', () => {
@@ -23,5 +23,16 @@ describe('eruvIdFor', () => {
   it('from the name', () => {
     expect(eruvIdFor('Center City Eruv')).toBe('center-city')
     expect(eruvIdFor('Cherry Hill (NJ) Eruv')).toBe('cherry-hill-nj')
+  })
+})
+
+describe('readingsToReset', () => {
+  const stored = { statusUrl: 'https://www.pennocp.org/eruv', lineUrl: 'https://www.google.com/maps/d/viewer?mid=x' }
+  it('a save that leaves the addresses as they were keeps the readings and the line waiting', () => {
+    expect(readingsToReset({ ...stored, lineLeaveOut: ['Directions'] }, stored)).toEqual({ status: false, line: false })
+  })
+  it('a new address, or one taken away, starts afresh', () => {
+    expect(readingsToReset({ ...stored, lineUrl: 'https://example.org/line.geojson' }, stored)).toEqual({ status: false, line: true })
+    expect(readingsToReset({ statusUrl: null }, stored)).toEqual({ status: true, line: false })
   })
 })

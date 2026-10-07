@@ -58,7 +58,7 @@ export async function POST(request: Request) {
     if (action === 'save') {
       const read = readEruvEdit(body?.edit)
       if (!read.ok) return bad(read.error)
-      await updateEruv(community.slug, id, read.edit)
+      await updateEruv(community.slug, id, read.edit, eruv)
       return Response.json({ ok: true, eruv: await one(community.slug, id) })
     }
     if (action === 'remove') {

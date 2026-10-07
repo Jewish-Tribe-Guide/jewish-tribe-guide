@@ -7,6 +7,7 @@ vi.mock('@/lib/loadGoogleMaps', () => ({ loadGoogleMaps: async () => {}, MAPS_MA
 
 // Google's map, as far as EruvMap uses it: counts what's drawn, removed and framed.
 const calls = { fitBounds: 0, drawn: 0, removed: 0, markers: 0 }
+const labels: { text: string; click: () => void }[] = []
 class Bounds {
   pts: unknown[] = []
   extend(p: unknown) { this.pts.push(p) }
@@ -16,10 +17,12 @@ class Bounds {
 class Shape {
   constructor() { calls.drawn++ }
   addListener() {}
+  setOptions() {}
   setMap(m: unknown) { if (m === null) calls.removed++ }
 }
 beforeEach(() => {
   Object.assign(calls, { fitBounds: 0, drawn: 0, removed: 0, markers: 0 })
+  labels.length = 0
   ;(globalThis as unknown as { google: unknown }).google = {
     maps: {
       importLibrary: async () => ({}),
@@ -27,7 +30,22 @@ beforeEach(() => {
       LatLngBounds: Bounds,
       Polygon: Shape,
       Polyline: Shape,
-      marker: { AdvancedMarkerElement: class { position: unknown; map: unknown; constructor(o: { position: unknown }) { calls.markers++; this.position = o.position } } },
+      marker: {
+        AdvancedMarkerElement: class {
+          position: unknown
+          map: unknown
+          zIndex = 0
+          content: HTMLElement
+          title: string
+          constructor(o: { position: unknown; content: HTMLElement; title: string }) {
+            this.position = o.position
+            this.content = o.content
+            this.title = o.title
+            if (o.title === 'You') calls.markers++
+          }
+          addListener(_: string, fn: () => void) { labels.push({ text: this.content.textContent ?? '', click: fn }) }
+        },
+      },
     },
   }
 })
@@ -44,6 +62,15 @@ const props = { fallbackCenter: { lat: 39.95, lng: -75.16 }, onSelect: () => {} 
 const settle = () => act(async () => { await new Promise((r) => setTimeout(r, 0)) })
 
 describe('EruvMap', () => {
+  it('writes each eruv’s name on it, and tapping the name opens that eruv', async () => {
+    const onSelect = vi.fn()
+    render(<EruvMap eruvim={[{ id: 'a', name: 'University City Eruv', tone: 'green', line: square(39.9) }, { id: 'b', name: 'Center City Eruv', tone: 'green', line: square(40.0) }]} you={null} focusId={null} {...props} onSelect={onSelect} />)
+    await settle()
+    expect(labels.map((l) => l.text)).toEqual(['University City', 'Center City'])
+    labels[1].click()
+    expect(onSelect).toHaveBeenCalledWith('b')
+  })
+
   it('a re-render with the same eruvim and a moved dot leaves the map where the visitor put it', async () => {
     const view = render(<EruvMap eruvim={list()} you={{ lat: 39.92, lng: -75.15 }} focusId="a" {...props} />)
     await settle()

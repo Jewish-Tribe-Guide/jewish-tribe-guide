@@ -60,3 +60,15 @@ export function eruvIdFor(name: string): string {
     .replace(/^-+|-+$/g, '')
     .slice(0, 60)
 }
+
+/** Which readings an edit throws away: a new status page or line address
+ *  starts afresh, since the old reading was of the old page. The admin tab
+ *  sends every field on each save, so an address only counts as new when
+ *  it differs from the stored one; otherwise ticking a line piece off
+ *  would also throw away the line waiting for a yes. */
+export function readingsToReset(edit: EruvEdit, stored: { statusUrl: string | null; lineUrl: string | null }): { status: boolean; line: boolean } {
+  return {
+    status: 'statusUrl' in edit && (edit.statusUrl ?? null) !== stored.statusUrl,
+    line: 'lineUrl' in edit && (edit.lineUrl ?? null) !== stored.lineUrl,
+  }
+}

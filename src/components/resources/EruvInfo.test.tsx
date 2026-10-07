@@ -19,8 +19,16 @@ vi.mock('next/navigation', () => ({
 
 // Fri Oct 9 2026, 3 PM in Philadelphia; candle lighting 6:12 PM.
 vi.mock('@/lib/useNow', () => ({ useNow: () => Date.parse('2026-10-09T19:00:00Z') }))
-// Google's map isn't in jsdom: the map is a stand-in naming what it draws.
-vi.mock('./EruvMap', () => ({ default: ({ eruvim }: { eruvim: { name: string }[] }) => <p data-testid="eruv-map">{eruvim.map((e) => e.name).join(', ')}</p> }))
+// Google's map isn't in jsdom: the map is a stand-in naming what it draws,
+// which eruv it picks out, and a way to point at one on it.
+vi.mock('./EruvMap', () => ({
+  default: ({ eruvim, highlightId, onHover }: { eruvim: { id: string; name: string }[]; highlightId?: string | null; onHover?: (id: string | null) => void }) => (
+    <div>
+      <p data-testid="eruv-map" data-highlight={highlightId ?? ''}>{eruvim.map((e) => e.name).join(', ')}</p>
+      {onHover && eruvim.map((e) => <span key={e.id} data-testid={`map-eruv-${e.id}`} onMouseEnter={() => onHover(e.id)} onMouseLeave={() => onHover(null)} />)}
+    </div>
+  ),
+}))
 const here = vi.hoisted(() => ({ coords: null as { lat: number; lng: number } | null, accuracyM: null as number | null }))
 vi.mock('@/lib/locationContext', () => ({ useOptionalLocation: () => here }))
 
@@ -91,6 +99,18 @@ describe('EruvInfo', () => {
     show()
     expect(await screen.findByRole('link', { name: /Check status/ })).toHaveAttribute('href', 'https://www.pennocp.org/eruv')
     expect(screen.queryByTestId('eruv-row')).not.toBeInTheDocument()
+  })
+
+  it('on desktop, pointing at a row picks out its eruv on the map, and pointing at an eruv picks out its row', async () => {
+    const user = userEvent.setup()
+    show()
+    const [row] = await screen.findAllByTestId('eruv-row')
+    await user.hover(row)
+    expect(screen.getByTestId('eruv-map')).toHaveAttribute('data-highlight', 'center-city')
+    await user.unhover(row)
+    expect(screen.getByTestId('eruv-map')).toHaveAttribute('data-highlight', '')
+    await user.hover(screen.getByTestId('map-eruv-center-city'))
+    expect(row).toHaveAttribute('data-pointed', 'true')
   })
 
   describe('where you are', () => {

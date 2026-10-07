@@ -261,3 +261,28 @@ export function locator(file: EruvLineFile): (point: LatLng, accuracyM: number |
   const b = build(file)
   return (point, accuracyM) => whereIs(point, accuracyM, file, b)
 }
+
+/** Where to write the eruv's name: inside its largest area, as far from
+ *  that area's line as a coarse search finds (a middle point can fall
+ *  outside an L-shaped eruv). Null without an enclosed area. */
+export function labelPoint(file: EruvLineFile): LatLng | null {
+  const b = build(file)
+  const ring = b.areas.reduce<XY[] | null>((best, r) => (!best || Math.abs(area(r)) > Math.abs(area(best)) ? r : best), null)
+  if (!ring) return null
+  const xs = ring.map((p) => p[0])
+  const ys = ring.map((p) => p[1])
+  const [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)]
+  const N = 24
+  let best: XY | null = null
+  let bestD = -1
+  for (let i = 1; i < N; i++) {
+    for (let j = 1; j < N; j++) {
+      const p: XY = [x0 + ((x1 - x0) * i) / N, y0 + ((y1 - y0) * j) / N]
+      if (!inRing(p, ring)) continue
+      let d = Infinity
+      for (let k = 0; k < ring.length && d > bestD; k++) d = Math.min(d, distToSegment(p, ring[k], ring[(k + 1) % ring.length]))
+      if (d > bestD) [best, bestD] = [p, d]
+    }
+  }
+  return best ? b.proj.back(best) : null
+}

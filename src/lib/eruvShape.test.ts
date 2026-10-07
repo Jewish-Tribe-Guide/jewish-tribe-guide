@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { lineFetchUrl, parseLineFile, sameLine, withoutNames, type EruvLineFile } from './eruvLine'
-import { locator, shapeOf } from './eruvShape'
+import { labelPoint, locator, shapeOf } from './eruvShape'
 
 // The eruvim's own line files, as published Oct 7 2026: Center City's
 // map-data.geojson, University City's and Lower Merion's Google My Maps.
@@ -10,6 +10,9 @@ const fixture = (f: string) => parseLineFile(readFileSync(join(__dirname, '__fix
 const CC = fixture('center-city.geojson')
 const UC = fixture('university-city.kml')
 const LM = fixture('lower-merion.kml')
+const NE = fixture('northeast.kml')
+const EP = fixture('elkins-park.kml')
+const EP_ROUTE = 'Directions from Elkins Park House to Young Israel of Elkins Park'
 
 describe('parseLineFile', () => {
   it('reads GeoJSON and KML into named lines of [lat, lng]', () => {
@@ -70,5 +73,33 @@ describe('the areas each line encloses', () => {
     expect(lm([40.0085, -75.2602], 20)).toBe('inside') // Narberth
     expect(lm([40.0076, -75.2341], 20)).toBe('inside') // Bala Cynwyd
     expect(lm([39.9496, -75.1718], 20)).toBe('outside')
+  })
+})
+
+describe('the Northeast and Elkins Park lines (Oct 7)', () => {
+  it('the Northeast is one closed boundary', () => {
+    expect(shapeOf(NE)).toMatchObject({ areas: [expect.any(Array)], joins: [] })
+  })
+  it('Elkins Park is one area once the walking route on its map is left out', () => {
+    expect(EP.lines.map((l) => l.name)).toContain(EP_ROUTE)
+    expect(shapeOf(withoutNames(EP, [EP_ROUTE]))).toMatchObject({ areas: [expect.any(Array)], joins: [] })
+  })
+})
+
+describe('labelPoint', () => {
+  it('puts each eruv’s name well inside it', () => {
+    for (const file of [CC, UC, LM, NE, withoutNames(EP, [EP_ROUTE])]) {
+      const p = labelPoint(file)!
+      expect(locator(file)(p, 150)).toBe('inside')
+    }
+  })
+  it('inside an L, where the middle of its box is outside', () => {
+    const L: EruvLineFile = { lines: [{ name: 'L', points: [[40, -75], [40, -74.98], [40.005, -74.98], [40.005, -74.995], [40.02, -74.995], [40.02, -75], [40, -75]] }] }
+    const p = labelPoint(L)!
+    expect(locator(L)(p, null)).toBe('inside')
+    expect(locator(L)([40.01, -74.99], null)).toBe('outside')
+  })
+  it('nothing without an enclosed area', () => {
+    expect(labelPoint({ lines: [{ name: 'x', points: [[40, -75], [40.01, -75]] }] })).toBeNull()
   })
 })

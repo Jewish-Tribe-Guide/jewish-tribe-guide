@@ -1,6 +1,7 @@
 import { getAdminClient } from './supabase/admin'
 import type { Eruv, EruvStatus } from './eruv'
 import { withoutNames, type EruvLineFile } from './eruvLine'
+import { readingsToReset } from './eruvEdit'
 
 // The eruv table (migration 074): each eruv, its status as last read, and
 // its line. Uncached: the status changes through the day, and /api/eruv
@@ -194,11 +195,12 @@ function editColumns(edit: EruvEdit): Record<string, unknown> {
 }
 
 /** Saves an admin's edit. A new status page or line address starts afresh:
- *  the old reading was of the old page. */
-export async function updateEruv(community: string, id: string, edit: EruvEdit): Promise<void> {
+ *  the old reading was of the old page (readingsToReset). */
+export async function updateEruv(community: string, id: string, edit: EruvEdit, stored: { statusUrl: string | null; lineUrl: string | null }): Promise<void> {
   const cols = editColumns(edit)
-  if ('statusUrl' in edit) Object.assign(cols, { status: null, status_words: null, status_posted_on: null, status_checked_at: null, status_error_at: null, status_error: null })
-  if ('lineUrl' in edit) Object.assign(cols, { line_pending: null, line_read_at: null, line_error: null })
+  const reset = readingsToReset(edit, stored)
+  if (reset.status) Object.assign(cols, { status: null, status_words: null, status_posted_on: null, status_checked_at: null, status_error_at: null, status_error: null })
+  if (reset.line) Object.assign(cols, { line_pending: null, line_read_at: null, line_error: null })
   const { error } = await getAdminClient()
     .from('eruv')
     .update({ ...cols, updated_at: new Date().toISOString() })

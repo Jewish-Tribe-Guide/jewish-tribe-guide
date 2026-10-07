@@ -27,6 +27,8 @@ import { CrosshairIcon } from '@/components/icons'
 // inside one ("Where you are"); then each eruv, whether it's up, and when
 // the guide checked: nothing else on the page. A row, the card, or an eruv
 // on the map opens its listing (where it goes, its site, hotline, alerts).
+// Each eruv's name is on the map; on desktop, pointing at a row picks out
+// its eruv on the map, and pointing at an eruv picks out its row.
 // "Inside" only well clear of the line (eruvShape.ts): closer, "at the
 // edge". Outside every mapped eruv, the card isn't shown: an eruv with no
 // line on the map could still be there. The statuses come from /api/eruv, which reads each
@@ -176,6 +178,7 @@ export default function EruvInfo({ eruvim, onUp, title = 'Eruv Information', ico
   const slug = useCommunitySlug()
   const clock = useNow()
   const [loaded, setLoaded] = useState<Loaded | null>(null)
+  const [pointedId, setPointedId] = useState<string | null>(null)
   const [openId, setOpenId] = useState<string | null>(null)
 
   useEffect(() => {
@@ -211,6 +214,8 @@ export default function EruvInfo({ eruvim, onUp, title = 'Eruv Information', ico
   const whereIn = (id: string): Where => (you && locators.get(id) ? locators.get(id)!([you.lat, you.lng], accuracy) : 'outside')
   const yours = ready ? (ready.eruvim.find((e) => whereIn(e.id) === 'inside') ?? ready.eruvim.find((e) => whereIn(e.id) === 'edge') ?? null) : null
   const others = ready ? ready.eruvim.filter((e) => e.id !== yours?.id) : []
+  // Desktop only: a phone has nothing to point with.
+  const pointAt = (id: string) => (isMobile ? {} : { onMouseEnter: () => setPointedId(id), onMouseLeave: () => setPointedId(null), onFocus: () => setPointedId(id), onBlur: () => setPointedId(null) })
   const mapped = ready && now ? ready.eruvim.filter((e) => e.line?.lines.length).map((e) => ({ id: e.id, name: e.name, tone: eruvView(e, now, ready.timezone, ready.candles).tone, line: e.line! })) : []
 
   return (
@@ -235,7 +240,14 @@ export default function EruvInfo({ eruvim, onUp, title = 'Eruv Information', ico
           <div className="space-y-3.5">
             {isMobile && mapped.length > 0 && <EruvMap eruvim={mapped} you={you} focusId={yours?.id ?? null} fallbackCenter={community.mapCenter} onSelect={setOpenId} className="h-[300px]" />}
             {yours && (
-              <button type="button" onClick={() => setOpenId(yours.id)} className="flex w-full cursor-pointer items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3.5 text-left" data-testid="eruv-yours">
+              <button
+                type="button"
+                onClick={() => setOpenId(yours.id)}
+                {...pointAt(yours.id)}
+                className={`flex w-full cursor-pointer items-center gap-2 rounded-2xl border px-4 py-3.5 text-left ${pointedId === yours.id ? 'border-slate-300 bg-slate-50' : 'border-slate-200 bg-white'}`}
+                data-pointed={pointedId === yours.id || undefined}
+                data-testid="eruv-yours"
+              >
                 <span className="min-w-0 flex-1">
                   <span className="block text-[11.5px] font-extrabold tracking-[0.06em] text-muted">WHERE YOU ARE</span>
                   <span className="mt-0.5 block text-lg font-extrabold text-slate-900">{whereIn(yours.id) === 'inside' ? `Inside the ${yours.name}` : `At the edge of the ${yours.name}`}</span>
@@ -252,7 +264,9 @@ export default function EruvInfo({ eruvim, onUp, title = 'Eruv Information', ico
                     key={eruv.id}
                     type="button"
                     onClick={() => setOpenId(eruv.id)}
-                    className="flex w-full cursor-pointer items-center gap-2 border-t border-slate-100 py-3 text-left first:border-t-0"
+                    {...pointAt(eruv.id)}
+                    className={`-mx-2 flex w-[calc(100%+1rem)] cursor-pointer items-center gap-2 rounded-lg border-t border-slate-100 px-2 py-3 text-left first:border-t-0 ${pointedId === eruv.id ? 'bg-slate-50' : ''}`}
+                    data-pointed={pointedId === eruv.id || undefined}
                     data-testid="eruv-row"
                   >
                     <span className="min-w-0 flex-1">
@@ -265,7 +279,7 @@ export default function EruvInfo({ eruvim, onUp, title = 'Eruv Information', ico
               </Card>
             )}
           </div>
-          {!isMobile && mapped.length > 0 && <EruvMap eruvim={mapped} you={you} focusId={yours?.id ?? null} fallbackCenter={community.mapCenter} onSelect={setOpenId} className="sticky top-4 h-[640px]" />}
+          {!isMobile && mapped.length > 0 && <EruvMap eruvim={mapped} you={you} focusId={yours?.id ?? null} fallbackCenter={community.mapCenter} onSelect={setOpenId} highlightId={pointedId} onHover={setPointedId} className="sticky top-4 h-[640px]" />}
         </div>
       )}
 
