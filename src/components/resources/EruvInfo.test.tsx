@@ -19,7 +19,7 @@ vi.mock('@/lib/useNow', () => ({ useNow: () => Date.parse('2026-10-09T19:00:00Z'
 
 const base: Omit<Eruv, 'id' | 'name'> = {
   covers: null, website: null, hotline: null, alertsUrl: null, statusUrl: 'https://example.org', statusDated: false,
-  status: 'up', statusWords: 'The Eruv is Up!', statusPostedOn: null, statusCheckedAt: '2026-10-09T18:55:00Z', statusErrorAt: null, statusError: null,
+  status: 'up', statusWords: 'The Eruv is Up!', statusPostedOn: null, statusCheckedAt: '2026-10-09T18:55:00Z', statusErrorAt: null, statusError: null, line: null,
 }
 const ERUVIM: Eruv[] = [
   { ...base, id: 'center-city', name: 'Center City Eruv', covers: 'Center City and South Philadelphia, including Jefferson.', website: 'https://www.centercityeruv.com/', alertsUrl: 'https://www.centercityeruv.com/' },

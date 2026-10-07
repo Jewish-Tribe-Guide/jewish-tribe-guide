@@ -1,3 +1,5 @@
+import type { EruvLineFile } from './eruvLine'
+
 // ── Eruvim and their status (Oct 7) ─────────────────────────────────────────
 // Each eruv's own site is the authority. The guide reads the page the eruv
 // posts its status on, keeps the words it found, and says when it checked:
@@ -40,6 +42,9 @@ export type Eruv = {
    *  the status shown is no longer current. */
   statusErrorAt: string | null
   statusError: string | null
+  /** Its line on the guide's map, as an admin approved it, without the
+   *  pieces they left out; null until one is approved. */
+  line: EruvLineFile | null
 }
 
 // ── Reading a page ──────────────────────────────────────────────────────────

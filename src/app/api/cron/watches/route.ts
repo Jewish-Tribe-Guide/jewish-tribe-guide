@@ -1,7 +1,8 @@
 // GET|POST /api/cron/watches
 //
 // Runs every active watch once (watches.ts): Keystone-K's list files its
-// differences as suggestions, a website is checked for a change. Meant to
+// differences as suggestions, a website is checked for a change. Then the
+// eruvim's lines, on the day before candles (eruvLineRun.ts). Meant to
 // run daily (vercel.json). Each run is recorded on the watch, and the admins
 // are emailed once when a watch breaks and once when it recovers.
 //
@@ -15,8 +16,16 @@ import { cronAuthorized } from '@/lib/cronAuth'
 import { listAllWatches } from '@/lib/watchStore'
 import { BUILT_IN_WATCHES, runAndRecord, runWatch } from '@/lib/watchRunner'
 import { sendWatchHealthAlert, type WatchHealthAlert } from '@/lib/email'
+import { runEruvLines } from '@/lib/eruvLineRun'
 
 export const maxDuration = 60
+
+async function eruvLines() {
+  return runEruvLines().catch((err) => {
+    console.error('[cron/watches] eruv lines failed:', err)
+    return [{ id: '*', result: 'failed' as const, error: err instanceof Error ? err.message : String(err) }]
+  })
+}
 
 async function runAll(): Promise<NextResponse> {
   const { watches, available } = await listAllWatches()
@@ -24,7 +33,7 @@ async function runAll(): Promise<NextResponse> {
   if (!available) {
     const results = []
     for (const w of BUILT_IN_WATCHES) results.push({ url: w.url, ...(await runWatch(w)) })
-    return NextResponse.json({ ok: true, recorded: false, results })
+    return NextResponse.json({ ok: true, recorded: false, results, eruvLines: await eruvLines() })
   }
 
   const alerts = new Map<string, WatchHealthAlert[]>()
@@ -45,7 +54,7 @@ async function runAll(): Promise<NextResponse> {
       sendWatchHealthAlert(community, list).catch((err) => console.error('[cron/watches] alert failed:', err)),
     ),
   )
-  return NextResponse.json({ ok: true, recorded: true, results })
+  return NextResponse.json({ ok: true, recorded: true, results, eruvLines: await eruvLines() })
 }
 
 export async function GET(req: NextRequest) {

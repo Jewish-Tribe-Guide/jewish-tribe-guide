@@ -24,6 +24,8 @@
 --                   waiting for an admin (the first read too)
 --   line_read_at, line_error  the last read of line_url, and why it failed
 --   line_approved_at, line_approved_by
+--   line_leave_out  names of lines in the file an admin left out of the
+--                   area ("Fall 2025 Reroute Alert")
 --
 -- Run in the Supabase SQL editor, before deploying the code that calls it.
 -- The site works without it: the eruv page shows the old list, with links.
@@ -57,6 +59,7 @@ create table if not exists public.eruv (
   line_error        text,
   line_approved_at  timestamptz,
   line_approved_by  text,
+  line_leave_out    text[] not null default '{}',
   created_at        timestamptz not null default now(),
   updated_at        timestamptz not null default now(),
   primary key (community_id, id)

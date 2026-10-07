@@ -16,6 +16,8 @@ const mockWebsite = vi.hoisted(() => vi.fn())
 vi.mock('@/lib/websiteWatch', () => ({ readWebsite: mockWebsite }))
 const mockAlert = vi.hoisted(() => vi.fn())
 vi.mock('@/lib/email', () => ({ sendWatchHealthAlert: mockAlert }))
+const mockEruvLines = vi.hoisted(() => vi.fn(async () => []))
+vi.mock('@/lib/eruvLineRun', () => ({ runEruvLines: mockEruvLines }))
 
 const { GET } = await import('./route')
 

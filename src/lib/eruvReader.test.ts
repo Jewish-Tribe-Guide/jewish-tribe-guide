@@ -9,7 +9,7 @@ function eruv(over: Partial<Eruv> = {}): Eruv {
   return {
     id: 'university-city', name: 'University City Eruv', covers: null, website: null, hotline: null, alertsUrl: null,
     statusUrl: 'https://www.pennocp.org/eruv', statusDated: false, status: 'up', statusWords: 'The Eruv is Up!', statusPostedOn: null,
-    statusCheckedAt: '2026-10-09T18:30:00Z', statusErrorAt: null, statusError: null, ...over,
+    statusCheckedAt: '2026-10-09T18:30:00Z', statusErrorAt: null, statusError: null, line: null, ...over,
   }
 }
 
