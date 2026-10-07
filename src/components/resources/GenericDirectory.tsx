@@ -42,8 +42,8 @@ import { WalkOnMapContext, type WalkShown } from './walkOnMap'
 import RowLookSwitch, { useRowLook } from './RowLookSwitch'
 import { useListMapSplit } from './useListMapSplit'
 import { mapQueryString, routes } from '@/lib/routes'
-import QuestionCard from './QuestionCard'
-import { parseQuestionCard } from '@/lib/questionCards'
+import QuestionCard, { useAskedPlaces } from './QuestionCard'
+import { parseQuestionCard, pickQuestion } from '@/lib/questionCards'
 import { ui } from '@/lib/uiConfig'
 import { useOptionalLocation } from '@/lib/locationContext'
 import { usePinned } from '@/lib/pinnedContext'
@@ -1231,23 +1231,26 @@ export default function GenericDirectory({ category, items, anchorLabel, address
     select: Object.fromEntries(Object.entries(selectFilters).filter(([, v]) => v.length > 0)),
   })}`
 
-  // The category's one question card (see QuestionCard), after the fifth
-  // place shown: below the first screen, where someone who has read that
-  // far is looking through the list. After the last place on a shorter
-  // list, and after the group lines when every closed group is shut. Not
+  // The category's one question card (see QuestionCard), right under the
+  // place it asks about (decided Oct 4, built Oct 6: it sat after the fifth
+  // place, whichever place it asked about). The page and the card share
+  // which places this browser has been asked about, so they agree on which
+  // one is next; while a thank-you shows, the card stays under the place it
+  // thanks for. After the group lines when that place's group is shut. Not
   // among a search's results, which are an answer.
+  const [askedPlaces, setAskedPlaces] = useAskedPlaces(category.id)
+  const [heldQuestion, setHeldQuestion] = useState<string | null>(null)
+  const questionShown = shownItems.length > 0 ? shownItems : filtered
+  const questionOn = !typed && !!parseQuestionCard(category.questionCard)
+  const questionAbout = questionOn
+    ? (heldQuestion ?? pickQuestion(category, questionShown, items, new Set(askedPlaces), (item) => rowPlaces.get(item.id) ?? null)?.item.id ?? null)
+    : null
   const questionSpot: { section: string; id: string } | 'end' | null = (() => {
-    if (typed || !parseQuestionCard(category.questionCard)) return null
-    let seen = 0
-    let last: { section: string; id: string } | null = null
+    if (!questionAbout) return null
     for (const section of sections) {
-      if (section.hidden) continue
-      for (const item of section.items) {
-        last = { section: section.key, id: item.id }
-        if (++seen === 5) return last
-      }
+      if (!section.hidden && section.items.some((item) => item.id === questionAbout)) return { section: section.key, id: questionAbout }
     }
-    return last ?? 'end'
+    return 'end'
   })()
   // ── A listing opened on desktop takes the list's column (ListingColumn) ──
   // The list stays mounted underneath, hidden, so its cards (and what's
@@ -1341,10 +1344,11 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   const questionCard = questionSpot && (
     <QuestionCard
       category={category}
-      shown={shownItems.length > 0 ? shownItems : filtered}
+      shown={questionShown}
       all={items}
       place={(item) => rowPlaces.get(item.id) ?? null}
       onEdit={onEdit}
+      asking={{ asked: askedPlaces, setAsked: setAskedPlaces, onHeld: setHeldQuestion }}
     />
   )
 
@@ -1836,6 +1840,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
           about={openItem ? { id: openItem.id, name: openItem.name } : undefined}
           category={category}
           placeholder={tellUsPlaceholder(category, { times: minyanimViewOn || (!!openItem && tellTimes) })}
+          heading={openItem && tellTimes ? `Update ${openItem.name}’s times` : undefined}
           onEditYourself={
             openItem
               ? () => {

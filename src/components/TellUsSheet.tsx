@@ -97,6 +97,7 @@ export default function TellUsSheet({
   category,
   placeholder = tellUsPlaceholder(),
   onEditYourself,
+  heading,
 }: {
   isOpen: boolean
   onClose: () => void
@@ -108,6 +109,9 @@ export default function TellUsSheet({
   placeholder?: string
   /** From a listing: "Edit the details myself", the listing's own editor. */
   onEditYourself?: () => void
+  /** Its first step's title, when it was opened for one thing: a shul's
+   *  "Update their times" opens "Update Mekor Habracha’s times" (Oct 6). */
+  heading?: string
 }) {
   const isMobile = useIsMobile()
   // Each step names itself: "Find the place", "Add to Food".
@@ -123,7 +127,7 @@ export default function TellUsSheet({
     setHasBack(false)
     onClose()
   }
-  const title = stepTitle ?? (about ? `Tell us about ${about.name}` : 'Saw something? Tell us')
+  const title = stepTitle ?? heading ?? (about ? `Tell us about ${about.name}` : 'Saw something? Tell us')
   const onBack = hasBack ? () => back.current() : undefined
   const body = (
     <TellUsBody

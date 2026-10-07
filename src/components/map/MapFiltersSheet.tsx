@@ -50,7 +50,7 @@ export default function MapFiltersSheet(props: Props) {
   const isMobile = useIsMobile()
   const body = <Body {...props} />
   return isMobile ? (
-    <MobileSheet isOpen={props.isOpen} onClose={props.onClose} title="Filters">
+    <MobileSheet isOpen={props.isOpen} onClose={props.onClose} title="Filters" draggable>
       {body}
     </MobileSheet>
   ) : (

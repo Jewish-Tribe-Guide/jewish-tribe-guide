@@ -96,7 +96,7 @@ describe('+ Add a minyan (the user’s note 2)', () => {
 
     fireEvent.click(whole)
     expect(screen.getByTestId('tell-us')).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Tell us about Mekor Habracha' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Send Mekor Habracha’s schedule' })).toBeInTheDocument()
     expect(screen.getByLabelText('What did you see?')).toHaveAttribute('placeholder', expect.stringMatching(/photo or PDF of the schedule/))
     expect(screen.queryByTestId('update-times')).toBeNull()
 

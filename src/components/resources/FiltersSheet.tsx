@@ -45,8 +45,9 @@ type Props = {
 export default function FiltersSheet(props: Props) {
   const isMobile = useIsMobile()
   const body = <FiltersBody {...props} />
+  // Drags down to close, like the phone's other sheets (Oct 6).
   return isMobile ? (
-    <MobileSheet isOpen={props.isOpen} onClose={props.onClose} title="Filters">
+    <MobileSheet isOpen={props.isOpen} onClose={props.onClose} title="Filters" draggable>
       {body}
     </MobileSheet>
   ) : (

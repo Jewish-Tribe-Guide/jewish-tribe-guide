@@ -42,19 +42,18 @@ type Props = {
   /** The opened listing's items, when they're its main thing: with nothing
    *  else to ask, it asks about one ("Kosher steak here today?"). */
   items?: { field: CategoryField; api: ItemMarksApi }
+  /** The page's own asked places, and where it's told which place the card
+   *  is about while a thank-you holds it there. */
+  asking?: { asked: string[]; setAsked: (update: (prev: string[]) => string[]) => void; onHeld: (id: string | null) => void }
 }
 
-type Phase =
-  | { kind: 'asking' }
-  | { kind: 'sending'; value: string | boolean }
-  | { kind: 'thanks'; text: string }
-  | { kind: 'failed'; text: string }
-
-export default function QuestionCard({ category, shown = [], all = [], place = () => null, onEdit, listing, items }: Props) {
+/** The places this browser has been asked about in a category, kept so
+ *  the card moves on. The category page holds them too, to put the card
+ *  right under the place it asks about (decided Oct 4, built Oct 6). */
+export function useAskedPlaces(categoryId: string): readonly [string[], (update: (prev: string[]) => string[]) => void] {
   const community = useCommunitySlug()
-  // The places this browser has been asked about, so the card moves on.
-  const askedKey = `jpc:asked:${community}:${category.id}`
-  const [asked, setAsked] = usePersistedState<string[]>(
+  const askedKey = `jpc:asked:${community}:${categoryId}`
+  return usePersistedState<string[]>(
     [],
     () => {
       try {
@@ -75,10 +74,28 @@ export default function QuestionCard({ category, shown = [], all = [], place = (
       [askedKey],
     ),
   )
+}
+
+type Phase =
+  | { kind: 'asking' }
+  | { kind: 'sending'; value: string | boolean }
+  | { kind: 'thanks'; text: string }
+  | { kind: 'failed'; text: string }
+
+export default function QuestionCard({ category, shown = [], all = [], place = () => null, onEdit, listing, items, asking }: Props) {
+  const community = useCommunitySlug()
+  // The places this browser has been asked about, so the card moves on:
+  // the page's, when it gives them (it puts the card under its place).
+  const own = useAskedPlaces(category.id)
+  const [asked, setAsked] = asking ? [asking.asked, asking.setAsked] : own
   const [phase, setPhase] = useState<Phase>({ kind: 'asking' })
   // Held while a thank-you or an error shows, so the card keeps talking
   // about the place just answered rather than jumping to the next one.
-  const [held, setHeld] = useState<PickedQuestion | null>(null)
+  const [held, setHeldOnly] = useState<PickedQuestion | null>(null)
+  const setHeld = (q: PickedQuestion | null) => {
+    setHeldOnly(q)
+    asking?.onHeld(q?.item.id ?? null)
+  }
   const [token, setToken] = useState('')
   // Each answer gets its own bot check: a token is single-use, so a retry
   // after a failure mounts a fresh one (the key below).

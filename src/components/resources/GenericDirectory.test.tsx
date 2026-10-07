@@ -1657,14 +1657,38 @@ describe('GenericDirectory — the question card', () => {
   }
   afterEach(() => localStorage.clear())
 
-  it('sits after the fifth place, below the first screen', () => {
-    renderWithProviders(<GenericDirectory category={food} items={places(8)} {...handlers} />)
-    expect(before()).toEqual(['Place 1', 'Place 2', 'Place 3', 'Place 4', 'Place 5'])
+  // Decided Oct 4, built Oct 6: right under the place it asks about. It sat
+  // after the fifth place, whichever place it asked about.
+  it('sits right under the place it asks about', () => {
+    const rows = places(8).map((p, i) => (i < 3 ? { ...p, t: 'Meat' } : p))
+    renderWithProviders(<GenericDirectory category={food} items={rows} {...handlers} />)
+    expect(screen.getByTestId('question-card')).toHaveTextContent(/Place 4 · [^:]+: meat or dairy/)
+    expect(before()).toEqual(['Place 1', 'Place 2', 'Place 3', 'Place 4'])
   })
 
-  it('sits after the last place on a shorter list', () => {
-    renderWithProviders(<GenericDirectory category={food} items={places(3)} {...handlers} />)
-    expect(before()).toEqual(['Place 1', 'Place 2', 'Place 3'])
+  it('moves under the next place it asks about', async () => {
+    const user = userEvent.setup()
+    // Places 4 and 7 don't say; the rest do.
+    const rows = places(8).map((p, i) => (i === 3 || i === 6 ? p : { ...p, t: 'Meat' }))
+    renderWithProviders(<GenericDirectory category={food} items={rows} {...handlers} />)
+    await user.click(within(screen.getByTestId('question-card')).getByRole('button', { name: 'Not sure' }))
+    expect(screen.getByTestId('question-card')).toHaveTextContent(/Place 7 · [^:]+: meat or dairy/)
+    expect(before()).toEqual(['Place 1', 'Place 2', 'Place 3', 'Place 4', 'Place 5', 'Place 6', 'Place 7'])
+  })
+
+  it('stays under the place it’s thanking for until Next question', async () => {
+    const user = userEvent.setup()
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ ok: true }), { status: 200 }))
+    try {
+      renderWithProviders(<GenericDirectory category={food} items={places(4)} {...handlers} />)
+      await user.click(within(screen.getByTestId('question-card')).getByRole('button', { name: 'Meat' }))
+      await screen.findByText(/Thanks!/)
+      expect(before()).toEqual(['Place 1'])
+      await user.click(screen.getByRole('button', { name: 'Next question' }))
+      expect(before()).toEqual(['Place 1', 'Place 2'])
+    } finally {
+      fetchMock.mockRestore()
+    }
   })
 
   it('isn’t among a search’s results', async () => {

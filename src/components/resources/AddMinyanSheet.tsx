@@ -73,7 +73,9 @@ export default function AddMinyanSheet({
   // render, and state would loop.
   const [tell, setTell] = useState<TellState>(null)
   const tellBack = useRef<() => void>(() => {})
-  const title = tell && shul ? (tell.title ?? `Tell us about ${shul.name}`) : shul ? `Add a minyan at ${shul.name}` : 'Add a minyan'
+  // Named for what's being done, as the link said (Oct 6): it was "Tell us
+  // about Mekor Habracha", the box's name anywhere.
+  const title = tell && shul ? (tell.title ?? `Send ${shul.name}’s schedule`) : shul ? `Add a minyan at ${shul.name}` : 'Add a minyan'
   // Back: the box's own, or from the minyan to "Which shul?" when it was
   // picked here (none when the search named it, or once sent).
   const onBack = tell ? (tell.hasBack ? () => tellBack.current() : undefined) : shul && !presetShul && !sent ? () => setShulId(null) : undefined
@@ -98,7 +100,7 @@ export default function AddMinyanSheet({
     />
   )
   return isMobile ? (
-    <MobileSheet isOpen={isOpen} onClose={onClose} title={title} onBack={onBack}>
+    <MobileSheet isOpen={isOpen} onClose={onClose} title={title} onBack={onBack} draggable>
       {body}
     </MobileSheet>
   ) : (

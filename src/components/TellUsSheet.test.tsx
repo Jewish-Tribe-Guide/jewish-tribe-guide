@@ -137,6 +137,12 @@ describe('Saw something? Tell us', () => {
     expect(screen.getAllByAltText(/^Photo \d$/)).toHaveLength(3)
   })
 
+  // Oct 6: opened from a shul's “Update their times”, it's named for that.
+  it('takes its first step’s title from what opened it', () => {
+    open({ about: { id: 'mekor', name: 'Mekor Habracha' }, heading: 'Update Mekor Habracha’s times' })
+    expect(screen.getByRole('heading', { name: 'Update Mekor Habracha’s times' })).toBeInTheDocument()
+  })
+
   // Oct 6: a PDF too (a shul's flyer), shown as a file, not a picture.
   it('takes a PDF, shown by its name', () => {
     open()
