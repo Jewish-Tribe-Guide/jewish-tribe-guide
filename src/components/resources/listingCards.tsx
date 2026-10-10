@@ -36,20 +36,45 @@ export function SectionCard({
   title,
   fields: all,
   footer,
+  onAnswer,
 }: {
   item: DirectoryResource
   title: string
   fields: readonly CategoryField[]
   footer?: ReactNode
+  /** A card led by a yes/no nobody has answered: its Yes or No, which opens
+   *  the card's edit with that answer in (Oct 10). */
+  onAnswer?: (preset: Record<string, unknown>) => void
 }) {
-  // A card that leads with a yes/no is about it (a hotel's "Shabbos
-  // friendly", Oct 6): shown only for a yes with something more to say, and
-  // the yes isn't said again inside; the title and the header's facts say
-  // it. No card at all for a no, or a hotel that doesn't say.
+  // A card that leads with a yes/no is about it (a hotel's "Shabbat
+  // friendly"): always shown (the user, Oct 10; it used to be a yes's
+  // only). A yes says it with a tick, a no says so, and one nobody has
+  // answered asks, Yes or No.
   const gate = all[0]?.type === 'boolean' ? all[0] : null
   const fields = gate ? all.slice(1) : all
-  if (gate && (item[gate.key] !== true || !fields.some((f) => fieldText(f, item[f.key])))) return null
-  const filled = fields.filter((f) => fieldText(f, item[f.key]))
+  if (gate && item[gate.key] !== true && item[gate.key] !== false) {
+    const label = gate.filterLabel ?? gate.label
+    return (
+      <Card title={title} testId="listing-section">
+        <p className="text-[15px] text-slate-700">Not known yet. Is it {label}?</p>
+        {onAnswer && (
+          <div className="mt-2.5 flex gap-2 pb-1">
+            {[true, false].map((v) => (
+              <button
+                key={String(v)}
+                type="button"
+                onClick={() => onAnswer({ [gate.key]: v })}
+                className="h-11 flex-1 cursor-pointer rounded-full border border-slate-300 bg-white text-[15px] font-bold text-slate-900 transition-colors hover:bg-slate-50"
+              >
+                {v ? 'Yes' : 'No'}
+              </button>
+            ))}
+          </div>
+        )}
+      </Card>
+    )
+  }
+  const filled = [...(gate ? [gate] : []), ...fields.filter((f) => fieldText(f, item[f.key]))]
   const lead = filled.find((f) => f.type === 'text')
   const leadText = lead ? fieldText(lead, item[lead.key]) : ''
   const parts: ReactNode[] = []
@@ -77,6 +102,13 @@ export function SectionCard({
         <a key={f.key} href={text} target="_blank" rel="noopener noreferrer" className="mt-1.5 block text-[15px] font-semibold text-primary hover:underline">
           {f.linkLabel ?? f.label}
         </a>,
+      )
+    } else if (f.type === 'boolean' && item[f.key] === false) {
+      // A no, said as one: "Not Shabbat friendly".
+      parts.push(
+        <p key={f.key} className="mt-1 text-[15px] font-semibold text-slate-700">
+          Not {f.filterLabel ?? f.label}
+        </p>,
       )
     } else if (f.type === 'boolean') {
       // Said once, ticked ("✓ Shabbat friendly"), not "Shabbat friendly:

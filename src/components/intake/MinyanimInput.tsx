@@ -59,6 +59,11 @@ type Props = {
   label?: string
   value: unknown
   onChange: (value: Minyan[]) => void
+  /** The days a row can be on, where the editor is for some of them: a
+   *  shul's "Usual Shabbos times" offers Friday and Shabbos (Oct 10). */
+  days?: readonly MinyanDayKey[]
+  /** The day a new row starts on, there. */
+  newRowDays?: MinyanDayKey[]
 }
 
 /**
@@ -66,7 +71,7 @@ type Props = {
  * Each row: tefillah select + time text + optional notes + day-chip toggles.
  * Value is a Minyan[].
  */
-export default function MinyanimInput({ label, value, onChange }: Props) {
+export default function MinyanimInput({ label, value, onChange, days: dayChoices = ALL_MINYAN_DAYS, newRowDays = [] }: Props) {
   const [rows, setRows] = useState<Minyan[]>(() => initMinyanim(value))
   // The clock / zman rules, shared with SchedulesInput (ZmanTimeFields).
   const modes = useTimeModes()
@@ -85,7 +90,7 @@ export default function MinyanimInput({ label, value, onChange }: Props) {
   function addRow() {
     update([
       ...rows,
-      { id: genId(), tefillah: 'shacharis', days: [], time: '' },
+      { id: genId(), tefillah: 'shacharis', days: newRowDays, time: '' },
     ])
   }
 
@@ -290,7 +295,7 @@ export default function MinyanimInput({ label, value, onChange }: Props) {
             {/* Line 3: day chips */}
             <div className="flex items-center gap-1 flex-wrap">
               <span className="text-xs text-muted shrink-0 mr-1">Days:</span>
-              {ALL_MINYAN_DAYS.map((day) => {
+              {dayChoices.map((day) => {
                 const active = row.days.includes(day)
                 return (
                   <label

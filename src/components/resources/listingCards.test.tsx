@@ -119,13 +119,14 @@ describe('A hospital’s own main card', () => {
   it('asks "Still right?" about what it says once it says something', () => {
     vi.setSystemTime(new Date(2026, 9, 6, 13, 30))
     open()
-    expect(screen.getByTestId('listing-section')).toHaveTextContent('Who to call first not confirmed by anyone yet')
+    // Not the card's name again (Oct 10): the line is under it.
+    expect(within(screen.getByTestId('listing-section')).getByTestId('freshness')).toHaveTextContent(/^Not confirmed yet · Right\?YesEdit$/)
   })
 })
 
-describe('A hotel’s own main card (Oct 6)', () => {
-  // "Shabbos friendly" leads with the yes/no it's about: shown only for a
-  // yes with something more to say, and the yes isn't said again inside.
+describe('A hotel’s own main card (Oct 6; always shown since Oct 10)', () => {
+  // "Shabbos here" leads with the yes/no it's about. A yes is ticked, a no
+  // says so, and one nobody has answered asks (the user, Oct 10).
   const hotels = makeCategory({
     id: 'hotel',
     label: 'Hotel',
@@ -133,7 +134,7 @@ describe('A hotel’s own main card (Oct 6)', () => {
       { key: 'shabbatFriendly', label: 'Shabbat friendly', type: 'boolean', renderAs: 'badge', filterable: true },
       { key: 'notes', label: 'Notes', type: 'textarea', renderAs: 'row' },
     ],
-    listingParts: { main: { title: 'Shabbos friendly', fields: ['shabbatFriendly', 'notes'] } },
+    listingParts: { main: { title: 'Shabbos here', fields: ['shabbatFriendly', 'notes'] } },
   })
   const hotel = (details: Record<string, unknown>) => {
     vi.setSystemTime(new Date(2026, 9, 6, 13, 30))
@@ -142,22 +143,28 @@ describe('A hotel’s own main card (Oct 6)', () => {
     })
   }
 
-  it('a Shabbos-friendly hotel: the title, then how it works there', () => {
+  it('a Shabbat-friendly hotel: ticked, then how it works there, then its date and Edit', () => {
     hotel({ shabbatFriendly: true, notes: 'Electronic keys, but reception will open door for you' })
-    expect(screen.getByTestId('listing-section')).toHaveTextContent(/^Shabbos friendlyElectronic keys, but reception will open door for you/)
+    const card = screen.getByTestId('listing-section')
+    expect(card).toHaveTextContent(/^Shabbos hereShabbat friendlyElectronic keys, but reception will open door for you/)
+    expect(within(card).getByRole('button', { name: 'Edit' })).toBeInTheDocument()
   })
 
-  it('no box for a hotel that isn’t, or doesn’t say', () => {
-    hotel({ shabbatFriendly: false, notes: 'Electronic keys only' })
-    expect(screen.queryByTestId('listing-section')).not.toBeInTheDocument()
-    cleanup()
-    hotel({ notes: 'Electronic keys only' })
-    expect(screen.queryByTestId('listing-section')).not.toBeInTheDocument()
+  it('one that isn’t says so, with Edit for when that changes', () => {
+    hotel({ shabbatFriendly: false })
+    const card = screen.getByTestId('listing-section')
+    expect(card).toHaveTextContent(/^Shabbos hereNot Shabbat friendly/)
+    expect(within(card).getByRole('button', { name: 'Edit' })).toBeInTheDocument()
   })
 
-  it('no box with nothing more to say than the yes the header already says', () => {
-    hotel({ shabbatFriendly: true })
-    expect(screen.queryByTestId('listing-section')).not.toBeInTheDocument()
+  it('one nobody has answered asks, and Yes opens its Edit with Yes in', () => {
+    hotel({ notes: '' })
+    const card = screen.getByTestId('listing-section')
+    expect(card).toHaveTextContent('Not known yet. Is it Shabbat friendly?')
+    fireEvent.click(within(card).getByRole('button', { name: 'Yes' }))
+    const sheet = screen.getByRole('dialog', { name: 'Shabbos here' })
+    expect(within(sheet).getByRole('switch', { name: /Shabbat friendly/ })).toHaveAttribute('aria-checked', 'true')
+    expect(within(sheet).getByRole('button', { name: 'Send' })).toBeInTheDocument()
   })
 })
 

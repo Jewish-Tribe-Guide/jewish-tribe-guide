@@ -293,13 +293,24 @@ describe('ListingView — how sure', () => {
     expect(screen.getByTestId('listing-view').querySelector('h2')!.parentElement!.parentElement).not.toHaveTextContent(/checked|confirmed/i)
   })
 
-  it('a shul says its confirmation with its times, not again at the end', () => {
+  it('a shul says its confirmation with its times, not again at the end, and Edit opens just that box (Oct 10)', () => {
     const shuls = makeCategory({ id: 'synagogue', detailFields: [{ key: 'minyanim', label: 'Davening', type: 'minyanim', renderAs: 'row' }] })
     const shul = makeListing({ confirmedAt: '2026-09-29T05:56:24Z', minyanim: [{ id: 'm1', tefillah: 'shacharis', days: ['sat'], time: '9:00am' }] })
     view({ item: shul, category: shuls })
-    // Oct 6: in the box the times are in, “Usual Shabbos times”, and once.
-    expect(screen.getByTestId('davening-shabbos')).toHaveTextContent('Shabbos times confirmed Sep 29.')
+    // In the box the times are in, “Usual Shabbos times”, once, without the
+    // box's name said again (Oct 10).
+    const box = screen.getByTestId('davening-shabbos')
+    expect(within(box).getByTestId('freshness')).toHaveTextContent(/^Confirmed Sep 29Edit$/)
     expect(screen.getAllByText(/confirmed/i)).toHaveLength(1)
+    expect(within(box).queryByRole('button', { name: 'Update their times' })).not.toBeInTheDocument()
+    fireEvent.click(within(box).getByRole('button', { name: 'Edit' }))
+    const sheet = screen.getByRole('dialog', { name: 'Usual Shabbos times' })
+    expect(within(sheet).getByTestId('box-edit')).toBeInTheDocument()
+    expect(within(sheet).getByRole('button', { name: 'No changes yet' })).toBeDisabled()
+    // Only that box's days to put a time on: Friday night and Shabbos.
+    expect(within(sheet).getByRole('checkbox', { name: 'Sat' })).toBeChecked()
+    expect(within(sheet).getByRole('checkbox', { name: 'Fri' })).toBeInTheDocument()
+    expect(within(sheet).queryByRole('checkbox', { name: 'Mon' })).not.toBeInTheDocument()
   })
 
   it('a grocery’s items aren’t dated as a whole: each item carries its own date', () => {
@@ -310,16 +321,27 @@ describe('ListingView — how sure', () => {
 
   // Oct 6: each section on its own. One date for all three read as the last
   // one's, and whoever uses one mikvah knows its hours, not the others'.
-  it('a mikvah asks about each section’s hours in its own box, the section’s own date or the listing’s if later', async () => {
+  // Oct 10: always dated, with Edit, and asked once the date is old.
+  it('a mikvah dates each section in its own box, with Edit, and asks once that date is old', async () => {
     const section = (key: string, filterLabel: string): CategoryField[] => [
       { key, label: key, filterLabel, type: 'boolean', renderAs: 'badge', filterable: true },
       { key: `${key}_hours`, label: 'Hours', type: 'hours', renderAs: 'row', audienceKey: key },
     ]
     const mikvah = makeCategory({
       id: 'mikvah',
-      detailFields: [...section('womenTevillah', 'Women’s'), ...section('menTevillah', 'Men’s'), { key: 'keilim', label: 'Keilim', type: 'boolean', renderAs: 'badge' }, { key: 'keilim_notes', label: 'Notes', type: 'textarea', renderAs: 'row', audienceKey: 'keilim' }],
+      detailFields: [
+        ...section('womenTevillah', 'Women’s'),
+        ...section('menTevillah', 'Men’s'),
+        { key: 'menTevillah_phone', label: 'Men’s Phone', type: 'tel', renderAs: 'row', audienceKey: 'menTevillah' },
+        { key: 'menTevillah_notes', label: 'Men’s Notes', type: 'textarea', renderAs: 'row', audienceKey: 'menTevillah' },
+        { key: 'keilim', label: 'Keilim', type: 'boolean', renderAs: 'badge' },
+        { key: 'keilim_notes', label: 'Notes', type: 'textarea', renderAs: 'row', audienceKey: 'keilim' },
+      ],
     })
     const week = { mon: { open: '20:30', close: '22:30' } }
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-12-20T12:00:00Z'))
+    try {
     view({
       item: makeListing({
         id: '0b6c4c1e-2f55-4a8e-9d57-3b7f0d6f4a21',
@@ -335,17 +357,22 @@ describe('ListingView — how sure', () => {
       category: mikvah,
     })
     const [women, men, keilim] = [...screen.getByTestId('listing-groups').querySelectorAll('section')]
-    // Asked once a section's opened (Oct 6), not over every box at once.
-    expect(screen.queryByTestId('freshness')).not.toBeInTheDocument()
-    fireEvent.click(within(women).getByRole('button', { name: 'More' }))
-    expect(women).toHaveTextContent('Women’s hours confirmed Sep 2.')
-    expect(within(men).queryByTestId('freshness')).not.toBeInTheDocument()
-    fireEvent.click(within(men).getByRole('button', { name: 'More' }))
-    expect(men).toHaveTextContent('Men’s hours confirmed Oct 1.')
-    fireEvent.click(within(women).getByRole('button', { name: 'Less' }))
-    expect(within(women).queryByTestId('freshness')).not.toBeInTheDocument()
-    // Notes and no hours: nothing to confirm.
-    expect(within(keilim).queryByTestId('freshness')).not.toBeInTheDocument()
+    // Old (over 90 days): asked, Yes or Edit. Recent: just the date and Edit.
+    expect(within(women).getByTestId('freshness')).toHaveTextContent(/^Confirmed Sep 2 · Still right\?YesEdit$/)
+    expect(within(men).getByTestId('freshness')).toHaveTextContent(/^Confirmed Oct 1Edit$/)
+    // A section with notes and no hours still has its Edit: hours can be added.
+    expect(within(keilim).getByRole('button', { name: 'Edit' })).toBeInTheDocument()
+
+    // Edit: the section's own fields and nothing else.
+    fireEvent.click(within(men).getByRole('button', { name: 'Edit' }))
+    const sheet = screen.getByRole('dialog', { name: 'Men’s hours' })
+    // Its hours and its note, empty or not; not an empty phone (Oct 10).
+    expect(within(sheet).getByText('Hours')).toBeInTheDocument()
+    expect(within(sheet).getByLabelText('Men’s Notes')).toHaveValue('')
+    expect(within(sheet).queryByLabelText('Men’s Phone')).not.toBeInTheDocument()
+    } finally {
+      vi.useRealTimers()
+    }
 
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ ok: true, confirmedAt: '2026-10-06T12:00:00Z' }), { status: 200 }))
     cleanup()
@@ -353,7 +380,8 @@ describe('ListingView — how sure', () => {
       item: makeListing({ id: '0b6c4c1e-2f55-4a8e-9d57-3b7f0d6f4a21', womenTevillah: true, womenTevillah_hours: week }),
       category: mikvah,
     })
-    fireEvent.click(within(screen.getByTestId('listing-groups')).getByRole('button', { name: 'More' }))
+    // Never confirmed: "Right?", Yes confirms that section.
+    expect(within(screen.getByTestId('listing-groups')).getByTestId('freshness')).toHaveTextContent(/^Not confirmed yet · Right\?YesEdit$/)
     fireEvent.click(within(screen.getByTestId('listing-groups')).getByRole('button', { name: 'Yes' }))
     await vi.waitFor(() => expect(fetchMock).toHaveBeenCalled())
     const [url, init] = fetchMock.mock.calls[0]

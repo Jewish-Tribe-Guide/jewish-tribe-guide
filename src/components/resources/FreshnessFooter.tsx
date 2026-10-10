@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useNow } from '@/lib/useNow'
 import { isStale } from '@/lib/listingView'
 import { shortDate } from './listingParts'
+import { PencilIcon } from '@/components/icons'
 
 
 type Props = {
@@ -19,6 +20,11 @@ type Props = {
   /** One section's own date, not the listing's: a mikvah's women's hours
    *  ("womenTevillah", Oct 6). */
   section?: string
+  /** Edit, at the line's end, for a box's own editor (Oct 10): "Confirmed
+   *  Oct 4 · Edit", and once the date is old, "Still right?" with Yes and
+   *  Edit, one question with two answers. The box's title isn't said again:
+   *  the line is under it. */
+  onEdit?: () => void
 }
 
 // Shown at the end of every opened listing, and in a shul's times card: when
@@ -39,7 +45,7 @@ export default function FreshnessFooter(props: Props) {
   return <FreshnessStatus {...props} />
 }
 
-function FreshnessStatus({ resourceId, confirmedAt: initialConfirmedAt, lead, subject, ask = true, section }: Props) {
+function FreshnessStatus({ resourceId, confirmedAt: initialConfirmedAt, lead, subject, ask = true, section, onEdit }: Props) {
   const now = useNow()
   const [confirmedAt, setConfirmedAt] = useState(initialConfirmedAt)
   // What confirmedAt was right before the most recent confirm — lets a
@@ -111,6 +117,38 @@ function FreshnessStatus({ resourceId, confirmedAt: initialConfirmedAt, lead, su
       {loading ? 'Saving…' : label}
     </button>
   )
+
+  if (onEdit && !justConfirmedNow) {
+    const asking = !confirmedAt || isStale(confirmedAt, now)
+    const pill = 'flex h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-full border border-slate-300 bg-white px-3.5 text-[14.5px] font-bold transition-colors hover:bg-slate-50 disabled:opacity-50'
+    const edit = asking ? (
+      <button type="button" onClick={onEdit} className={`${pill} text-primary`}>
+        <PencilIcon className="h-3.5 w-3.5" />
+        Edit
+      </button>
+    ) : (
+      <button type="button" onClick={onEdit} className="flex min-h-9 shrink-0 cursor-pointer items-center gap-1.5 text-[14.5px] font-bold text-primary hover:underline">
+        <PencilIcon className="h-3.5 w-3.5" />
+        Edit
+      </button>
+    )
+    return (
+      <div className="flex items-center gap-2" data-testid="freshness">
+        <p className={`min-w-0 flex-1 text-[13.5px] leading-snug ${asking ? 'text-caution' : 'text-slate-600'}`}>
+          {leadText}
+          {confirmedAt ? `Confirmed ${shortDate(confirmedAt, now)}` : 'Not confirmed yet'}
+          {asking && (confirmedAt ? ' · Still right?' : ' · Right?')}
+          {failed}
+        </p>
+        {asking && (
+          <button type="button" onClick={confirm} disabled={loading} className={`${pill} text-slate-900`}>
+            {loading ? 'Saving…' : 'Yes'}
+          </button>
+        )}
+        {edit}
+      </div>
+    )
+  }
 
   if (!ask) {
     const what = subject ?? 'Listing'

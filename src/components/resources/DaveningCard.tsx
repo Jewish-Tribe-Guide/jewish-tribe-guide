@@ -18,6 +18,7 @@ import { TellAboutContext } from './tellAbout'
 import DaveningTimes from './DaveningTimes'
 import { Card } from './listingParts'
 import FreshnessFooter from './FreshnessFooter'
+import type { MinyanBox } from '@/lib/minyanimBox'
 
 /** A shul's main thing (agreed Oct 6): its usual times as two boxes, “Usual
  *  weekday times” (one small table, today marked) and “Usual Shabbos times”
@@ -38,12 +39,16 @@ export default function DaveningCard({
   minyanim,
   schedules: rawSchedules,
   category,
+  onEditBox,
 }: {
   item: DirectoryResource
   minyanim: unknown
   /** The shul's special schedules, stored beside its times. */
   schedules?: unknown
   category?: CategoryConfig
+  /** Edit under a usual box (Oct 10): that box's times alone, in a plain
+   *  editor (BoxEditSheet). Without it, "Update their times" as before. */
+  onEditBox?: (box: MinyanBox, title: string) => void
 }) {
   const [adding, setAdding] = useState(false)
   const [sent, setSent] = useState(false)
@@ -129,16 +134,24 @@ export default function DaveningCard({
   }
   /** A box's own date (agreed Oct 6, migration 072) and, beside it, the way
    *  to send new times: "Confirmed Sep 29 · Update their times". */
-  const foot = (key: string, section: 'weekday' | 'shabbos', subject: string) => (
-    <div className="flex flex-wrap items-baseline gap-x-1.5">
-      <FreshnessFooter resourceId={item.id} confirmedAt={sectionConfirmedAt(item, section)} subject={subject} section={section} />
-      {canAdd && updatingIn !== key && updated?.in !== key && (
-        <button type="button" onClick={() => open(key)} className="cursor-pointer text-[13.5px] font-bold text-primary hover:underline">
-          Update their times
-        </button>
-      )}
-    </div>
-  )
+  const foot = (key: string, section: 'weekday' | 'shabbos', subject: string) =>
+    onEditBox ? (
+      <FreshnessFooter
+        resourceId={item.id}
+        confirmedAt={sectionConfirmedAt(item, section)}
+        section={section}
+        onEdit={() => onEditBox(section, section === 'weekday' ? 'Usual weekday times' : 'Usual Shabbos times')}
+      />
+    ) : (
+      <div className="flex flex-wrap items-baseline gap-x-1.5">
+        <FreshnessFooter resourceId={item.id} confirmedAt={sectionConfirmedAt(item, section)} subject={subject} section={section} />
+        {canAdd && updatingIn !== key && updated?.in !== key && (
+          <button type="button" onClick={() => open(key)} className="cursor-pointer text-[13.5px] font-bold text-primary hover:underline">
+            Update their times
+          </button>
+        )}
+      </div>
+    )
 
   const folded = (key: 'week' | 'shabbos', title: string, body: ReactNode) => {
     const reason = foldReason(key)

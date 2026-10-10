@@ -1,10 +1,11 @@
 'use client'
 
-import { useId, useState, type ReactNode } from 'react'
+import { useContext, useId, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { track } from '@vercel/analytics'
 import type { DirectoryResource } from '@/types'
-import { PHOTO_FIELD_KEY, selectValues, type CategoryConfig, type CategoryField } from '@/lib/categories'
+import { PHOTO_FIELD_KEY, resolveCapabilities, selectValues, type CategoryConfig, type CategoryField } from '@/lib/categories'
+import { ui } from '@/lib/uiConfig'
 import { formatTodayHours, hasAnyHours } from '@/lib/hours'
 import { useNow } from '@/lib/useNow'
 import { useZmanim } from '@/lib/useZmanim'
@@ -64,6 +65,8 @@ import {
 import Chip from './Chip'
 import Highlight from './Highlight'
 import DaveningCard from './DaveningCard'
+import BoxEditSheet, { type BoxEdit } from './BoxEditSheet'
+import { TellAboutContext } from './tellAbout'
 import { schedulesKey } from '@/lib/schedules'
 import WalkLists from './WalkList'
 import { SectionCard, ShabbosCard } from './listingCards'
@@ -156,7 +159,21 @@ export default function ListingView({ item, category, color, place = null, upvot
   // Where "Still right?" is asked: beside the one thing that's the
   // community's to keep, not about the whole listing (confirmPlace).
   const confirmAt = confirmPlace(item, category)
-  const confirmLine = (subject: string, ask = true) => <FreshnessFooter resourceId={item.id} confirmedAt={item.confirmedAt} subject={subject} ask={ask} />
+  // Edit under each main box (agreed Oct 10): a sheet with only that box's
+  // fields (BoxEditSheet), where the category takes edits.
+  const canEdit = ui.contributions.edit && resolveCapabilities(category.capabilities).edit
+  const [boxEdit, setBoxEdit] = useState<BoxEdit | null>(null)
+  const editBox = canEdit ? (edit: BoxEdit) => setBoxEdit(edit) : undefined
+  const tellAbout = useContext(TellAboutContext)
+  const editElse = tellAbout
+    ? () => {
+        setBoxEdit(null)
+        tellAbout(item)
+      }
+    : undefined
+  const confirmLine = (edit?: BoxEdit) => (
+    <FreshnessFooter resourceId={item.id} confirmedAt={item.confirmedAt} onEdit={edit && editBox ? () => editBox(edit) : undefined} />
+  )
   const [joined, setJoined] = useState(false)
   const photo = typeof item[PHOTO_FIELD_KEY] === 'string' && (item[PHOTO_FIELD_KEY] as string).trim() ? (item[PHOTO_FIELD_KEY] as string) : undefined
 
@@ -317,15 +334,50 @@ export default function ListingView({ item, category, color, place = null, upvot
   let mainSection: ReactNode = null
   const named = main === 'section' ? mainCardOf(category) : null
   if (named) {
-    mainSection = <SectionCard item={item} title={named.label} fields={named.fields} footer={confirmAt?.at === 'card' ? confirmLine(confirmAt.subject) : undefined} />
+    const edit = { title: named.label, fields: [...named.fields] }
+    mainSection = (
+      <SectionCard
+        item={item}
+        title={named.label}
+        fields={named.fields}
+        footer={confirmAt?.at === 'card' ? confirmLine(edit) : undefined}
+        onAnswer={editBox ? (preset) => editBox({ ...edit, preset }) : undefined}
+      />
+    )
   } else if (main === 'davening') {
     const f = category.detailFields.find((x) => x.type === 'minyanim')!
-    mainSection = <DaveningCard item={item} minyanim={item[f.key]} schedules={item[schedulesKey(f.key)]} category={category} />
+    mainSection = (
+      <DaveningCard
+        item={item}
+        minyanim={item[f.key]}
+        schedules={item[schedulesKey(f.key)]}
+        category={category}
+        onEditBox={editBox ? (box, title) => editBox({ title, fields: [f], minyanimBox: box }) : undefined}
+      />
+    )
   } else if (main === 'items' && itemsF) {
     mainSection = <ItemsCard field={itemsF} found={found} api={itemApi} menuUrl={menuUrlOf(item)} />
   } else if (main === 'groups') {
     mainSection = (
-      <GroupBoxes item={item} groups={audienceGroups(item, category)} now={now} candlesAt={candlesAt} />
+      <GroupBoxes
+        item={item}
+        groups={audienceGroups(item, category)}
+        now={now}
+        candlesAt={candlesAt}
+        onEdit={
+          editBox
+            ? (g) => {
+                // The section's hours and note, written or not; anything
+                // else (a phone, an email) only once it's there, as the box
+                // shows it. An empty box for every field was clutter.
+                const fields = category.detailFields.filter(
+                  (f) => f.audienceKey === g.key && f.renderAs !== 'hidden' && (f.type === 'hours' || f.type === 'textarea' || String(item[f.key] ?? '').trim() !== ''),
+                )
+                editBox({ title: fields.some((f) => f.type === 'hours') ? `${g.label} hours` : g.label, fields })
+              }
+            : undefined
+        }
+      />
     )
   } else if (main === 'walk') {
     const lists = parseWalkLists(category.walkList)
@@ -349,7 +401,16 @@ export default function ListingView({ item, category, color, place = null, upvot
         item={item}
         title={b.title}
         fields={b.fields}
-        footer={key && confirmAt?.at === 'boxes' ? <FreshnessFooter resourceId={item.id} confirmedAt={sectionConfirmedAt(item, key)} subject={b.title} section={key} /> : undefined}
+        footer={
+          key && confirmAt?.at === 'boxes' ? (
+            <FreshnessFooter
+              resourceId={item.id}
+              confirmedAt={sectionConfirmedAt(item, key)}
+              section={key}
+              onEdit={editBox ? () => editBox({ title: b.title, fields: [...b.fields] }) : undefined}
+            />
+          ) : undefined
+        }
       />
     )
   })
@@ -546,6 +607,7 @@ export default function ListingView({ item, category, color, place = null, upvot
           box it's about. Just Suggest an edit. */}
       {foot && <div className="pt-1" data-testid="listing-foot">{foot}</div>}
       {onward && <OnwardSection item={item} category={category} color={color} onward={onward} className={onwardClassName} />}
+      <BoxEditSheet item={item} category={category} edit={boxEdit} onClose={() => setBoxEdit(null)} onEditElse={editElse} />
     </div>
   )
 }
@@ -1094,17 +1156,41 @@ function ItemAnswer({ mark: m, api, clock, say }: { mark: ItemMark; api: ItemMar
  *  notes whole instead, nothing said twice. "Still right?" about each one's
  *  hours in its own box, on its own date: one line for all three read as
  *  the last one's, and someone who uses one knows that one. */
-function GroupBoxes({ item, groups, now, candlesAt }: { item: DirectoryResource; groups: AudienceGroup[]; now: Date | null; candlesAt: number | null }) {
+function GroupBoxes({
+  item,
+  groups,
+  now,
+  candlesAt,
+  onEdit,
+}: {
+  item: DirectoryResource
+  groups: AudienceGroup[]
+  now: Date | null
+  candlesAt: number | null
+  onEdit?: (group: AudienceGroup) => void
+}) {
   return (
     <div className="space-y-3" data-testid="listing-groups">
       {groups.map((g) => (
-        <GroupBox key={g.key} item={item} group={g} now={now} candlesAt={candlesAt} />
+        <GroupBox key={g.key} item={item} group={g} now={now} candlesAt={candlesAt} onEdit={onEdit ? () => onEdit(g) : undefined} />
       ))}
     </div>
   )
 }
 
-function GroupBox({ item, group, now, candlesAt }: { item: DirectoryResource; group: AudienceGroup; now: Date | null; candlesAt: number | null }) {
+function GroupBox({
+  item,
+  group,
+  now,
+  candlesAt,
+  onEdit,
+}: {
+  item: DirectoryResource
+  group: AudienceGroup
+  now: Date | null
+  candlesAt: number | null
+  onEdit?: () => void
+}) {
   const [open, setOpen] = useState(false)
   const hoursF = group.fields.find((f) => f.type === 'hours')
   const today = hoursF && now ? formatTodayHours(item[hoursF.key], now) : null
@@ -1116,14 +1202,13 @@ function GroupBox({ item, group, now, candlesAt }: { item: DirectoryResource; gr
   const more = [lead?.rest, ...texts.slice(1)].filter((t): t is string => !!t)
   const foldable = (hasWeek && !!now) || more.length > 0
   const shut = !open || !foldable
-  // "Still right?" once the section's opened (Oct 6): it's asked of whoever
-  // is reading its whole week, not over every box at once. A box with
-  // nothing to open asks it straight away.
-  const askable = !!hoursF && (open || !(hasWeek || more.length > 0))
+  // Each section's own date and its Edit, always (Oct 10): "Confirmed Oct 4
+  // · Edit", "Still right?" with Yes and Edit once that's old. It used to
+  // wait until the section was opened (Oct 6).
   return (
     <Card
       title={group.label}
-      footer={askable && <FreshnessFooter resourceId={item.id} confirmedAt={sectionConfirmedAt(item, group.key)} subject={`${group.label} hours`} section={group.key} />}
+      footer={(!!hoursF || !!onEdit) && <FreshnessFooter resourceId={item.id} confirmedAt={sectionConfirmedAt(item, group.key)} section={group.key} onEdit={onEdit} />}
     >
       <div className="divide-y divide-slate-100">
         {today && shut && (
