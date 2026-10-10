@@ -369,7 +369,7 @@ describe('a category’s own main card and Set as location', () => {
   const hospital = makeCategory({
     id: 'hospital',
     detailFields: [website, refuah, who, whoPhone, whoSite],
-    listingParts: { main: { title: 'Who to call first', fields: ['who', 'who_phone', 'who_site'] }, setLocation: true },
+    listingParts: { main: { title: 'Who to call first', fields: ['who', 'who_phone', 'who_site'] } },
   })
   const hup = makeListing({ phone: '(215) 662-4000', website: 'https://pennmedicine.org', r: 'https://refuah.com/hup', geo: { lat: 39.95, lng: -75.19 } })
 

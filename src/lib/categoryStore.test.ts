@@ -189,10 +189,10 @@ describe('listCategoriesUncached', () => {
       mockFrom.mockReturnValue(chainable({ data: [{ ...rawRow, listing_parts }], error: null }))
       return (await listCategoriesUncached('philly'))[0].listingParts
     }
-    expect(await read({ setLocation: true, shabbos: { fields: ['eruv'] } })).toEqual({ setLocation: true, shabbos: { fields: ['eruv'] } })
+    expect(await read({ shabbos: { fields: ['eruv'] } })).toEqual({ shabbos: { fields: ['eruv'] } })
     expect(await read(undefined)).toBeUndefined()
     expect(await read(null)).toBeUndefined()
-    expect(await read({ setLocation: 'yes' })).toBeUndefined()
+    expect(await read({ shabbos: 'yes' })).toBeUndefined()
   })
 })
 
@@ -474,8 +474,8 @@ describe('updateCategory', () => {
 
     await updateCategory('philly', 'hospital', { label: 'Hospitals' })
     expect(builder.update).toHaveBeenLastCalledWith({ label: 'Hospitals' })
-    await updateCategory('philly', 'hospital', { listingParts: { setLocation: true } })
-    expect(builder.update).toHaveBeenLastCalledWith({ listing_parts: { setLocation: true } })
+    await updateCategory('philly', 'hospital', { listingParts: { shabbos: { fields: ['eruv'] } } })
+    expect(builder.update).toHaveBeenLastCalledWith({ listing_parts: { shabbos: { fields: ['eruv'] } } })
     await updateCategory('philly', 'hospital', { listingParts: {} })
     expect(builder.update).toHaveBeenLastCalledWith({ listing_parts: null })
   })

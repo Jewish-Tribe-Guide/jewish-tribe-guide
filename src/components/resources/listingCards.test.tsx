@@ -55,7 +55,6 @@ const hospitals = makeCategory({
   listingParts: {
     main: { title: 'Who to call first', fields: ['who', 'who_phone', 'who_helps'] },
     shabbos: { fields: ['eruv', 'kosher_inside'] },
-    setLocation: true,
   },
 })
 const shuls = makeCategory({ id: 'synagogue', label: 'Synagogue', pluralLabel: 'Synagogues', detailFields: [{ key: 'minyanim', label: 'Minyanim', type: 'minyanim' }] })
@@ -213,7 +212,21 @@ describe('This Shabbos', () => {
 
 describe('Set as my location', () => {
   // Oct 6: a row under the address, out of the round buttons, which are
-  // every listing's (Directions, Call, Website, Share).
+  // every listing's (Directions, Call, Website, Share). Oct 10: on every
+  // listing with an address, not a hospital's only.
+  it('is on any listing with an address, with no setting for it, and not on one without', () => {
+    vi.setSystemTime(new Date(2026, 9, 6, 13, 30))
+    const food = makeCategory({ id: 'restaurant', label: 'Food', pluralLabel: 'Food' })
+    const cafe = makeListing({ id: 'cafe', name: 'Cafe', address: '1 Main St', geo: { lat: 39.95, lng: -75.16 } })
+    const view = (item: DirectoryResource) =>
+      renderWithProviders(<ListingView item={item} category={food} color="#000" path="/test" foot={null} />, { content: { categories: [food] } })
+    view(cafe)
+    expect(within(screen.getByTestId('listing-details')).getByRole('button', { name: 'Set as my location' })).toBeInTheDocument()
+    cleanup()
+    view({ ...cafe, geo: undefined })
+    expect(screen.queryByRole('button', { name: 'Set as my location' })).not.toBeInTheDocument()
+  })
+
   it('is a row under the address, not a button, and sets the hospital as where every page measures from', () => {
     vi.setSystemTime(new Date(2026, 9, 6, 13, 30))
     open()
@@ -264,7 +277,6 @@ describe('A hospital’s boxes', () => {
         { title: 'Rides', fields: ['rides'] },
       ],
       shabbos: { fields: ['eruv', 'sukkah'], after: 3 },
-      setLocation: true,
     },
   })
   const CL = 'Chai Lifeline NJ/PA'

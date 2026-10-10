@@ -432,8 +432,8 @@ export type CategoryConfig = {
    *  hotels). Unset means none. Read through parseWalkLists — see
    *  walkList.ts. */
   walkList?: unknown
-  /** What an admin adds to each opened listing: a named main thing, a
-   *  Shabbos card, Set as location among its buttons. Unset means none.
+  /** What an admin adds to each opened listing: a named main thing,
+   *  boxes, a Shabbos card. Unset means none.
    *  Read through parseListingParts — see listingParts.ts. */
   listingParts?: unknown
   /** Words an admin has taught the search to read as this category or one

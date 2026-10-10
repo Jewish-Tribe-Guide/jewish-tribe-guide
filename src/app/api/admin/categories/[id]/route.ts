@@ -46,7 +46,7 @@ type PatchBody = {
   /** Other categories' places within a walk, or null for none — see
    *  walkList.ts. Only sent when the admin changed it. */
   walkList?: WalkList[] | null
-  /** The named main thing, the Shabbos card and Set as location, or null
+  /** The named main thing, boxes and the Shabbos card, or null
    *  for none — see listingParts.ts. Only sent when the admin changed it. */
   listingParts?: ListingParts | null
   /** When address/phone is being turned off or a field removed on a category

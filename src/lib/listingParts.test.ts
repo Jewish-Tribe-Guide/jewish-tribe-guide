@@ -14,12 +14,12 @@ describe('parseListingParts', () => {
     expect(parseListingParts({ main: { title: ' Who to call first ', fields: ['who', 'who', 3] }, shabbos: { fields: ['eruv'] }, setLocation: true, x: 1 })).toEqual({
       main: { title: 'Who to call first', fields: ['who'] },
       shabbos: { fields: ['eruv'] },
-      setLocation: true,
     })
     // A card with no title or no fields isn't one.
     expect(parseListingParts({ main: { title: '', fields: ['who'] } })).toEqual({})
     expect(parseListingParts({ main: { title: 'Who', fields: [] } })).toEqual({})
-    expect(parseListingParts({ setLocation: 'yes' })).toEqual({})
+    // Set as location was a switch until Oct 10; a stored one means nothing.
+    expect(parseListingParts({ setLocation: true })).toEqual({})
     expect(parseListingParts(null)).toEqual({})
     expect(parseListingParts([])).toEqual({})
   })
@@ -46,9 +46,9 @@ describe('the cards’ fields', () => {
 
 describe('in the editor’s draft', () => {
   it('keeps a card the admin hasn’t finished, and saves only finished ones', () => {
-    const draft = listingPartsKey({ main: { title: '', fields: [] }, setLocation: true })
-    expect(listingPartsFromKey(draft)).toEqual({ main: { title: '', fields: [] }, setLocation: true })
-    expect(listingPartsToSave(draft)).toEqual({ setLocation: true })
+    const draft = listingPartsKey({ main: { title: '', fields: [] }, shabbos: { fields: ['eruv'] } })
+    expect(listingPartsFromKey(draft)).toEqual({ main: { title: '', fields: [] }, shabbos: { fields: ['eruv'] } })
+    expect(listingPartsToSave(draft)).toEqual({ shabbos: { fields: ['eruv'] } })
     expect(listingPartsToSave(listingPartsKey({ main: { title: '', fields: [] } }))).toBeNull()
     expect(listingPartsKey({})).toBe('')
     expect(listingPartsFromKey('')).toEqual({})

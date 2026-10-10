@@ -1,7 +1,7 @@
 import type { CategoryConfig, CategoryField } from './categories'
 
 // ── What an admin adds to each of a category's opened listings ──────────────
-// Three general tools, made for hospitals (step 5, agreed Oct 2) and open to
+// General tools, made for hospitals (step 5, agreed Oct 2) and open to
 // any category, set in the category editor and stored together
 // (CategoryConfig.listingParts):
 //
@@ -12,9 +12,6 @@ import type { CategoryConfig, CategoryField } from './categories'
 //   shabbos       a "This Shabbos" card: candle lighting, the nearest
 //                 minyan, and the fields ticked here (the eruv, kosher food
 //                 inside). First on the page on Friday and Erev Yom Tov.
-//   setLocation   "Set as my location", a row under the address in the
-//                 contact box (Oct 6; it was a round button), for a place
-//                 people stay at and measure from: a hospital.
 //   boxes         boxes the admin names, each of the fields they tick, in
 //                 order (Oct 6, a hospital on Refuah's sections: "Who to
 //                 call", "Kosher food" with its pantry and food packages,
@@ -30,7 +27,6 @@ export type ListingBox = { title: string; fields: string[] }
 export type ListingParts = {
   main?: { title: string; fields: string[] }
   shabbos?: { fields: string[]; after?: number }
-  setLocation?: boolean
   boxes?: ListingBox[]
 }
 
@@ -48,7 +44,6 @@ export function parseListingParts(raw: unknown): ListingParts {
     parts.shabbos = { fields: keys(sh.fields) }
     if (typeof sh.after === 'number' && Number.isInteger(sh.after) && sh.after >= 0) parts.shabbos.after = sh.after
   }
-  if (r.setLocation === true) parts.setLocation = true
   const boxes = Array.isArray(r.boxes)
     ? r.boxes.flatMap((b): ListingBox[] => {
         if (!b || typeof b !== 'object' || Array.isArray(b)) return []
@@ -67,7 +62,7 @@ function keys(raw: unknown): string[] {
 
 /** Whether there's anything to store: none of them is null in the column. */
 export function hasListingParts(parts: ListingParts): boolean {
-  return !!parts.main || !!parts.shabbos || !!parts.setLocation || !!parts.boxes?.length
+  return !!parts.main || !!parts.shabbos || !!parts.boxes?.length
 }
 
 /** The named main thing: its title and its fields, in the category's
@@ -131,7 +126,6 @@ export function listingPartsFromKey(key: string): ListingParts {
     return {
       ...(main ? { main: { title: title(main.title), fields: keys(main.fields) } } : {}),
       ...(shabbos ? { shabbos: { fields: keys(shabbos.fields), ...(typeof shabbos.after === 'number' ? { after: shabbos.after } : {}) } } : {}),
-      ...(r.setLocation === true ? { setLocation: true } : {}),
       // Kept while the admin fills one in: a box with no title or fields yet
       // stays in the draft.
       ...(boxes.length > 0 ? { boxes: boxes.map((b) => ({ title: title(b?.title), fields: keys(b?.fields) })) } : {}),

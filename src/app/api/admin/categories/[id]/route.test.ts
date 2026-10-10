@@ -116,14 +116,14 @@ describe('PATCH /api/admin/categories/:id — places within a walk', () => {
   })
 })
 
-// The main card, the Shabbos card and Set as location (listingParts.ts).
+// The main card and the Shabbos card (listingParts.ts).
 describe('PATCH /api/admin/categories/:id — what each listing adds', () => {
   it('saves only the parts it knows', async () => {
     await patch({ listingParts: { main: { title: ' Who to call first ', fields: ['who', 'who', 7] }, setLocation: true, extra: 1 } })
     expect(m.updateCategory).toHaveBeenLastCalledWith(
       'philly',
       'synagogue',
-      expect.objectContaining({ listingParts: { main: { title: 'Who to call first', fields: ['who'] }, setLocation: true } }),
+      expect.objectContaining({ listingParts: { main: { title: 'Who to call first', fields: ['who'] } } }),
     )
     expect((await patch({ listingParts: null })).status).toBe(200)
     expect(m.updateCategory).toHaveBeenLastCalledWith('philly', 'synagogue', expect.objectContaining({ listingParts: null }))
@@ -131,7 +131,7 @@ describe('PATCH /api/admin/categories/:id — what each listing adds', () => {
 
   it('says the migration is missing when the database has no listing_parts column yet', async () => {
     m.updateCategory.mockRejectedValue(new Error("Failed to update category: Could not find the 'listing_parts' column of 'category' in the schema cache"))
-    const res = await patch({ listingParts: { setLocation: true } })
+    const res = await patch({ listingParts: { shabbos: { fields: ['eruv'] } } })
     expect(res.status).toBe(502)
     expect((await res.json()).errors[0]).toMatch(/migration 066/)
   })

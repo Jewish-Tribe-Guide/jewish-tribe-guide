@@ -602,7 +602,7 @@ describe('CategoryEditor — on each listing', () => {
   const editor = (initial = hospitals, onSaved = vi.fn()) =>
     renderWithProviders(<CategoryEditor token="t" initial={initial} siblings={[initial]} hasMapCategory={false} onSaved={onSaved} onCancel={vi.fn()} />)
 
-  it('sends a titled main card of ticked fields, a Shabbos card and Set as location, only once changed', async () => {
+  it('sends a titled main card of ticked fields and a Shabbos card, only once changed', async () => {
     const onSaved = vi.fn()
     const user = userEvent.setup()
     editor(hospitals, onSaved)
@@ -622,13 +622,13 @@ describe('CategoryEditor — on each listing', () => {
     const shabbosFields = within(within(section).getByRole('group', { name: 'Fields on the Shabbos card' }))
     await user.click(shabbosFields.getByRole('checkbox', { name: 'Eruv' }))
     await user.click(shabbosFields.getByRole('checkbox', { name: 'Kosher food inside' }))
-    await user.click(within(section).getByRole('checkbox', { name: /Set as my location/ }))
+    // No Set as my location switch: every listing with an address has it (Oct 10).
+    expect(within(section).queryByRole('checkbox', { name: /Set as my location/ })).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: /save changes/i }))
     await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(2))
     expect(JSON.parse(payload()).listingParts).toEqual({
       main: { title: 'Who to call first', fields: ['who', 'who_phone'] },
       shabbos: { fields: ['eruv', 'kosher_inside'] },
-      setLocation: true,
     })
   })
 
@@ -678,9 +678,9 @@ describe('CategoryEditor — on each listing', () => {
   it('shows what’s saved, and turning everything off sends null', async () => {
     const onSaved = vi.fn()
     const user = userEvent.setup()
-    editor({ ...hospitals, listingParts: { setLocation: true } }, onSaved)
+    editor({ ...hospitals, listingParts: { shabbos: { fields: ['eruv'] } } }, onSaved)
     const section = screen.getByTestId('listing-parts-editor')
-    const box = within(section).getByRole('checkbox', { name: /Set as my location/ })
+    const box = within(section).getByRole('checkbox', { name: /This Shabbos/ })
     expect(box).toBeChecked()
     await user.click(box)
     await user.click(screen.getByRole('button', { name: /save changes/i }))

@@ -112,18 +112,16 @@ export function WalkListsEditor({
   )
 }
 
-/** The named main card, the boxes, the Shabbos card, and Set as my
- *  location. */
+/** The named main card, the boxes and the Shabbos card. ("Set as my
+ *  location" is on every listing with an address now, Oct 10.) */
 export function ListingPartsEditor({
   value,
   onChange,
   fields,
-  hasAddress,
 }: {
   value: string
   onChange: (key: string) => void
   fields: readonly CategoryField[]
-  hasAddress: boolean
 }) {
   const parts = listingPartsFromKey(value)
   const choices = cardFieldChoices(fields).filter((f) => f.key)
@@ -226,18 +224,6 @@ export function ListingPartsEditor({
         )}
       </div>
 
-      {hasAddress && (
-        <div className="mt-4">
-          <label className="flex items-center gap-2 text-sm font-semibold text-slate-800">
-            <input type="checkbox" checked={!!parts.setLocation} onChange={(e) => put({ ...parts, setLocation: e.target.checked || undefined })} />
-            &ldquo;Set as my location&rdquo; under the address
-          </label>
-          <span className={helpClass}>
-            For a place people stay at, like a hospital: one tap and every page measures from it.
-            Every listing already offers it in its &hellip; menu.
-          </span>
-        </div>
-      )}
     </section>
   )
 }

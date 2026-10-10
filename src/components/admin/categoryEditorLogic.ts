@@ -78,7 +78,7 @@ export type Draft = {
   /** Other categories' places within a walk, as walkListKey writes it (''
    *  for none). Saved only when changed, like groupBy. */
   walkList: string
-  /** The main card, the Shabbos card and Set as location, as
+  /** The main card, the boxes and the Shabbos card, as
    *  listingPartsKey writes them ('' for none). Saved only when changed. */
   listingParts: string
 }

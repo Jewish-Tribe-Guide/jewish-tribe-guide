@@ -400,14 +400,13 @@ export function CategoryEditor({
           <WalkListsEditor value={draft.walkList} onChange={(v) => set('walkList', v)} self={initial!} categories={siblings ?? []} />
         )}
 
-        {/* What each opened listing adds: a main card, a Shabbos card, Set
-            as location. */}
+        {/* What each opened listing adds: a main card, boxes, a Shabbos
+            card. */}
         {!isNew && (
           <ListingPartsEditor
             value={draft.listingParts}
             onChange={(v) => set('listingParts', v)}
             fields={draft.fields.map(normalizeField)}
-            hasAddress={draft.hasAddress}
           />
         )}
 

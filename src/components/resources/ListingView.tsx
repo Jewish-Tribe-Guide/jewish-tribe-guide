@@ -37,7 +37,7 @@ import {
   type AudienceGroup,
 } from '@/lib/listingView'
 import { parseWalkLists } from '@/lib/walkList'
-import { boxesOf, mainCardOf, parseListingParts, shabbosAfter, shabbosFieldsOf } from '@/lib/listingParts'
+import { boxesOf, mainCardOf, shabbosAfter, shabbosFieldsOf } from '@/lib/listingParts'
 import { inSeason } from '@/lib/sukkosWindow'
 import { clockTime } from '@/lib/upcomingDavening'
 import { milesText } from '@/lib/geo'
@@ -404,9 +404,10 @@ export default function ListingView({ item, category, color, place = null, upvot
   )
   // The contact box: address, phone, hours, links. No heading: its icons
   // say what each line is (Oct 6).
-  // "Set as my location" under the address (Oct 6), where a hospital's
-  // distances start from; it was a round button only hospitals had.
-  const showSetLocation = !!parseListingParts(category.listingParts).setLocation && category.hasAddress !== false && !!item.geo
+  // "Set as my location" under the address, on every listing with one (the
+  // user, Oct 10): someone planning where they'll be wants to see how far
+  // the next thing is from there. It was a hospital's only (Oct 6).
+  const showSetLocation = category.hasAddress !== false && !!item.geo
   const details = (caveat?.title || showAddress || showSetLocation || showPhone || websiteName || otherHours.length > 0 || detailFields.length > 0 || extra.length > 0 || quietBadges.length > 0 || otherTags.length > 0) && (
     <Card testId="listing-details" footer={googleLead && <span data-testid="listing-google">{googleLead}.</span>}>
     <div className="divide-y divide-slate-100">
