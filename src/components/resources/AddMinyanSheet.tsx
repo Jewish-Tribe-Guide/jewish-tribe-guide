@@ -147,7 +147,11 @@ function AddMinyanBody({
       {telling && (
       <TellUsBody
         about={{ id: shul.id, name: shul.name }}
-        placeholder={tellUsPlaceholder({ detailFields: [] }, { times: true })}
+        placeholder={tellUsPlaceholder({ times: true, about: shul })}
+        kind="times"
+        // Its do-it-yourself is the one minyan it was opened from (Oct 10).
+        onEditYourself={() => onTell(null)}
+        yourselfLabel="Add one time yourself"
         onClose={onClose}
         onTitle={(title) => onTell((t) => (t && t.title !== title ? { ...t, title } : t))}
         onBack={onTellBack}

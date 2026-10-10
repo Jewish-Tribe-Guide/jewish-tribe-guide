@@ -374,7 +374,7 @@ describe('GenericDirectory', () => {
     renderWithProviders(<GenericDirectory category={category} items={[]} {...handlers} onAdd={onAdd} />)
 
     await user.click(screen.getByRole('button', { name: /Add grocery store/ }))
-    expect(await screen.findByRole('dialog', { name: 'Saw something? Tell us' })).toBeInTheDocument()
+    expect(await screen.findByRole('dialog', { name: 'Add or update a place' })).toBeInTheDocument()
     expect(onAdd).not.toHaveBeenCalled()
   })
 
@@ -399,7 +399,7 @@ describe('GenericDirectory', () => {
     const floatingAdd = screen.getByRole('button', { name: 'Add' })
     expect(floatingAdd.className).not.toContain('desktop:hidden')
     await user.click(floatingAdd)
-    await user.click(await screen.findByRole('button', { name: 'Find the place' }))
+    await user.click(await screen.findByRole('button', { name: 'Fill it in yourself' }))
     await user.click(screen.getByRole('button', { name: 'Not on Google? Fill it in yourself' }))
     expect(screen.getByRole('dialog', { name: 'Add to Grocery Stores' })).toBeInTheDocument()
     expect(onAdd).not.toHaveBeenCalled()
@@ -451,14 +451,14 @@ describe('GenericDirectory', () => {
       </ForcedViewport>,
     )
     fireEvent.click(await screen.findByRole('button', { name: 'Add' }))
-    expect(await screen.findByRole('dialog', { name: 'Saw something? Tell us' })).toBeInTheDocument()
+    expect(await screen.findByRole('dialog', { name: 'Add or update a place' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Close' }))
     fireEvent.click(await screen.findByRole('button', { name: 'Suggest an edit to Trader Joe’s' }))
-    expect(await screen.findByRole('dialog', { name: 'Tell us about Trader Joe’s' })).toBeInTheDocument()
+    expect(await screen.findByRole('dialog', { name: 'Update Trader Joe’s' })).toBeInTheDocument()
     // From a listing, editing it yourself, not adding a place: the
     // listing's own editor, in place, never the page's form.
-    expect(screen.queryByRole('button', { name: 'Find the place' })).not.toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Edit the details myself' }))
+    expect(screen.queryByRole('button', { name: 'Fill it in yourself' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Edit it yourself' }))
     expect(columnEdit).toHaveBeenCalledWith(item.id)
     expect(handlers.onEdit).not.toHaveBeenCalled()
   })

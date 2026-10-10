@@ -518,10 +518,12 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   const [openItem, setOpenItem] = useState<DirectoryResource | null>(null)
   const editYourself = useRef<(() => void) | null>(null)
   const [tellTimes, setTellTimes] = useState(false)
-  const tellAbout = (item: DirectoryResource, edit?: () => void, opts?: { times?: boolean }) => {
+  const [tellMenu, setTellMenu] = useState(false)
+  const tellAbout = (item: DirectoryResource, edit?: () => void, opts?: { times?: boolean; menu?: boolean }) => {
     editYourself.current = edit ?? null
     setOpenItem(item)
     setTellTimes(!!opts?.times)
+    setTellMenu(!!opts?.menu)
     setTellOpen(true)
   }
   // Adding to a shul's times is an edit to the shul ("+ Add a minyan").
@@ -1891,8 +1893,10 @@ export default function GenericDirectory({ category, items, anchorLabel, address
           onClose={() => setTellOpen(false)}
           about={openItem ? { id: openItem.id, name: openItem.name } : undefined}
           category={category}
-          placeholder={tellUsPlaceholder(category, { times: minyanimViewOn || (!!openItem && tellTimes) })}
+          placeholder={tellUsPlaceholder({ times: minyanimViewOn || (!!openItem && tellTimes), menu: !!openItem && tellMenu, about: openItem ?? undefined })}
           heading={openItem && tellTimes ? `Update ${openItem.name}’s times` : undefined}
+          kind={openItem && tellMenu ? 'menu' : minyanimViewOn || (openItem && tellTimes) ? 'times' : undefined}
+          yourselfLabel={openItem && tellMenu ? 'Add one dish yourself' : undefined}
           onEditYourself={
             openItem
               ? () => {

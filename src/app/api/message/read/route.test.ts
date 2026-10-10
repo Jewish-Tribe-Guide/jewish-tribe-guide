@@ -160,27 +160,55 @@ describe('POST /api/message/read — the reading', () => {
       expect(body.proposals[0]).toMatchObject({ kind: 'items', menu: { url: null } })
     })
 
-    it('never fetches a delivery app’s menu, and says to send a screenshot', async () => {
+    it('never fetches a delivery app’s menu, and says why (the box offers a screenshot)', async () => {
       menu('https://www.doordash.com/store/say-she-ate-123')
       const body = await (await POST(req({ text: 'say she ate menu https://www.doordash.com/store/say-she-ate-123' }))).json()
       expect(m.findMenu).not.toHaveBeenCalled()
       expect(m.readMenu).not.toHaveBeenCalled()
-      expect(body.proposals[0]).toMatchObject({ kind: 'menu', listing: { name: 'Say She Ate' }, failed: expect.stringContaining('Send a screenshot') })
+      expect(body.proposals[0]).toMatchObject({ kind: 'menu', listing: { name: 'Say She Ate' }, why: 'ordering_app' })
     })
 
     it('says why when the menu can’t be opened or names no dishes, and reads one menu a message', async () => {
       menu('https://saysheate.co/menu/')
       m.findMenu.mockResolvedValue(null)
-      expect((await (await POST(req({ text: 'say she ate menu' }))).json()).proposals[0].failed).toMatch(/Couldn’t open that menu/)
+      expect((await (await POST(req({ text: 'say she ate menu' }))).json()).proposals[0].why).toBe('wont_open')
       m.findMenu.mockResolvedValue({ url: 'https://saysheate.co/', text: 'About us', pdf: null })
       m.readMenu.mockResolvedValue({ sourceUrl: 'https://saysheate.co/', dishes: [], note: 'Not a menu.', model: 'm' })
-      expect((await (await POST(req({ text: 'say she ate menu' }))).json()).proposals[0]).toMatchObject({ kind: 'menu', failed: 'Not a menu.' })
+      expect((await (await POST(req({ text: 'say she ate menu' }))).json()).proposals[0]).toMatchObject({ kind: 'menu', why: 'no_dishes', note: 'Not a menu.' })
       const two = { kind: 'menu' as const, listingId: SAY, asWritten: '', ask: null, url: 'https://saysheate.co/menu/', quote: 'x', checked: true }
       reads({ proposals: [two, two] })
       m.readMenu.mockClear()
       const body = await (await POST(req({ text: 'two menus' }))).json()
       expect(m.readMenu).toHaveBeenCalledTimes(1)
-      expect(body.proposals[1].failed).toMatch(/One menu at a time/)
+      expect(body.proposals[1].why).toBe('one_menu')
+    })
+
+    // Oct 10: "Add their menu" opens the box for the menu alone. What's sent
+    // is that place's menu: no general reading, straight to the menu reader.
+    describe('the menu box (mode=menu)', () => {
+      it('reads a link as the menu', async () => {
+        m.findMenu.mockResolvedValue({ url: 'https://saysheate.co/menu/', text: 'Masala Dosa', pdf: null })
+        m.readMenu.mockResolvedValue({ sourceUrl: 'https://saysheate.co/menu/', dishes, note: null, model: 'm' })
+        const body = await (await POST(req({ text: 'saysheate.co/menu/', listingId: SAY, mode: 'menu' }))).json()
+        expect(m.readMessage).not.toHaveBeenCalled()
+        expect(m.findMenu).toHaveBeenCalledWith('https://saysheate.co/menu/')
+        expect(body.proposals).toHaveLength(1)
+        expect(body.proposals[0]).toMatchObject({ kind: 'items', listingId: SAY, menu: { url: 'https://saysheate.co/menu/' } })
+      })
+
+      it('reads a whole menu pasted as text', async () => {
+        m.readMenu.mockResolvedValue({ sourceUrl: null, dishes, note: null, model: 'm' })
+        const text = 'STARTERS Masala Dosa 12 · SALADS House salad 9'
+        const body = await (await POST(req({ text, listingId: SAY, mode: 'menu' }))).json()
+        expect(m.findMenu).not.toHaveBeenCalled()
+        expect(m.readMenu.mock.calls[0][0]).toMatchObject({ url: null, text })
+        expect(body.proposals[0]).toMatchObject({ kind: 'items', listingId: SAY })
+      })
+
+      it('says why when it can’t, as the general box does', async () => {
+        const body = await (await POST(req({ text: 'https://www.doordash.com/store/say-she-ate-123', listingId: SAY, mode: 'menu' }))).json()
+        expect(body.proposals[0]).toMatchObject({ kind: 'menu', listing: { id: SAY }, why: 'ordering_app' })
+      })
     })
   })
 
@@ -216,6 +244,8 @@ describe('POST /api/message/read — the reading', () => {
     m.readMessage.mockRejectedValue(new Error('timeout'))
     const res = await POST(req({ text: 'Acme has challah' }))
     expect(res.status).toBe(502)
+    // The box says the reader isn't answering, and offers Try again.
+    expect(await res.json()).toMatchObject({ ok: false, code: 'down' })
     expect(m.upload).not.toHaveBeenCalled()
   })
 })

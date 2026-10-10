@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 import { categoryAddButton, categoryWithDistances, defaultCommunity, dismissLocationPrompt, ready } from './helpers'
 
-// Adding a place yourself (agreed Oct 5): the "+" box, "Find the place",
+// Adding a place yourself (agreed Oct 5): the "+" box, "Fill it in yourself",
 // then the category's form of questions, in the box, with Back at each
 // step. The Google search itself can't run here (it needs a real Maps key
 // and bills per search), so this takes "Not on Google? Fill it in
@@ -15,7 +15,7 @@ test('Adding finds the place first, then asks the category’s questions, with B
   await ready(page)
   await dismissLocationPrompt(page)
   await categoryAddButton(page).click()
-  await page.getByRole('dialog').getByRole('button', { name: 'Find the place' }).click()
+  await page.getByRole('dialog').getByRole('button', { name: 'Fill it in yourself' }).click()
 
   const find = page.getByRole('dialog', { name: 'Find the place' })
   await expect(find.getByPlaceholder('Search by name or address…')).toBeVisible()
@@ -31,5 +31,5 @@ test('Adding finds the place first, then asks the category’s questions, with B
   await add.getByRole('button', { name: 'Back', exact: true }).click()
   await expect(page.getByRole('dialog', { name: 'Find the place' })).toBeVisible()
   await page.getByRole('dialog').getByRole('button', { name: 'Back', exact: true }).click()
-  await expect(page.getByRole('dialog').getByLabel('What did you see?')).toBeVisible()
+  await expect(page.getByRole('dialog').getByLabel('Your message')).toBeVisible()
 })

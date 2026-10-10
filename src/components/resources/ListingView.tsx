@@ -171,6 +171,10 @@ export default function ListingView({ item, category, color, place = null, upvot
   const [boxEdit, setBoxEdit] = useState<BoxEdit | null>(null)
   const editBox = canEdit ? (edit: BoxEdit) => setBoxEdit(edit) : undefined
   const tellAbout = useContext(TellAboutContext)
+  // "Add their menu" on a place with no dishes: the box, for the menu; its
+  // do-it-yourself opens the card's own one-dish box. Where there's no box
+  // (the Map), the card keeps "+ Add the first dish".
+  const addMenu = tellAbout ? (addOne: () => void) => tellAbout(item, addOne, { menu: true }) : undefined
   const editElse = tellAbout
     ? () => {
         setBoxEdit(null)
@@ -362,7 +366,7 @@ export default function ListingView({ item, category, color, place = null, upvot
       />
     )
   } else if (main === 'items' && itemsF) {
-    mainSection = <ItemsCard field={itemsF} found={found} api={itemApi} menuUrl={menuUrlOf(item)} />
+    mainSection = <ItemsCard field={itemsF} found={found} api={itemApi} menuUrl={menuUrlOf(item)} onAddMenu={addMenu} />
   } else if (main === 'groups') {
     mainSection = (
       <GroupBoxes
@@ -603,7 +607,7 @@ export default function ListingView({ item, category, color, place = null, upvot
       {!shabbosFirst && !amongBoxes && shabbos}
       {/* A place whose list has nothing on it yet: just "+ Add the first
           item", after whatever it leads with. */}
-      {main !== 'items' && itemsF && itemApi.marks.length === 0 && itemApi.canReport && <ItemsCard field={itemsF} found={null} api={itemApi} menuUrl={menuUrlOf(item)} />}
+      {main !== 'items' && itemsF && itemApi.marks.length === 0 && itemApi.canReport && <ItemsCard field={itemsF} found={null} api={itemApi} menuUrl={menuUrlOf(item)} onAddMenu={addMenu} />}
       {details}
       {about}
       {/* Part 6: the one thing this listing doesn't say yet that a tap can
@@ -892,8 +896,11 @@ function menuUrlOf(item: DirectoryResource): string | null {
  *  words).
  *
  *  A restaurant's main dishes the same way, in a dish's words ("Still
- *  served", "+ Add a dish"), with "Full menu" for the rest of the menu. */
-function ItemsCard({ field, found, api, menuUrl }: { field: CategoryField; found: SearchFound | null; api: ItemMarksApi; menuUrl: string | null }) {
+ *  served", "+ Add a dish"), with "Full menu" for the rest of the menu.
+ *  With none yet, just "Add their menu" (Oct 10): the "+ Add" box for the
+ *  menu, a link, a pasted menu or photos, whose do-it-yourself is one dish
+ *  (`onAddMenu`, given the way to open that dish box). */
+function ItemsCard({ field, found, api, menuUrl, onAddMenu }: { field: CategoryField; found: SearchFound | null; api: ItemMarksApi; menuUrl: string | null; onAddMenu?: (addOne: () => void) => void }) {
   const timezone = useCommunityTimezone()
   const clock = useNow()
   const say = itemWording(field)
@@ -972,7 +979,16 @@ function ItemsCard({ field, found, api, menuUrl }: { field: CategoryField; found
       )}
       {/* "+ Add an item": the list's own last row (agreed Oct 1), where
           someone who's just seen something new finds it isn't listed. */}
-      {api.canReport &&
+      {api.canReport && onAddMenu && say.noun === 'dish' && rows.length + api.added.length === 0 && !adding ? (
+        <button
+          type="button"
+          onClick={() => onAddMenu(() => setAdding(true))}
+          className="mt-1 flex h-11.5 w-full cursor-pointer items-center justify-center gap-2 rounded-full border-[1.5px] border-primary text-[15px] font-bold text-primary hover:bg-primary/5"
+        >
+          <PlusIcon className="h-4 w-4" />
+          Add their menu
+        </button>
+      ) : api.canReport &&
         (adding ? (
           <AddItemBox
             api={api}

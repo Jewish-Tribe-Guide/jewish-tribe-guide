@@ -153,8 +153,16 @@ function AddAnother({ words, listed, taken, onAdd, onClose }: { words: { prompt:
   const suggestions = itemSuggestions(name, marks, 4).filter((x) => !taken.some((t) => same(t, x.name)))
   const add = (what: string) => onAdd({ name: addedItemName(what), availability: sometimes ? 'sometimes' : 'always', doubt: null })
   const row = 'flex min-h-11 w-full cursor-pointer items-center border-t border-slate-100 px-3 text-left text-[15px] text-slate-900 first:border-t-0 hover:bg-slate-50 disabled:cursor-default disabled:text-slate-400'
+  // No Cancel (Oct 10): left empty, it folds away when focus leaves it;
+  // Escape still closes it.
   return (
-    <div className="-mx-1 mt-1.5 rounded-xl border border-slate-300 bg-white px-2 pt-2.5 pb-2" data-testid="tell-us-add-item">
+    <div
+      className="-mx-1 mt-1.5 rounded-xl border border-slate-300 bg-white px-2 pt-2.5 pb-2"
+      data-testid="tell-us-add-item"
+      onBlur={(e) => {
+        if (!name && !e.currentTarget.contains(e.relatedTarget as Node | null)) onClose()
+      }}
+    >
       <label htmlFor={inputId} className="text-[14px] font-bold text-slate-900">
         {words.prompt}
       </label>
@@ -192,8 +200,13 @@ function AddAnother({ words, listed, taken, onAdd, onClose }: { words: { prompt:
         <input type="checkbox" checked={sometimes} onChange={(e) => setSometimes(e.target.checked)} className="h-5 w-5 accent-primary" />
         {words.sometimes}
       </label>
-      <button type="button" onClick={onClose} className="mt-0.5 cursor-pointer text-[14px] font-bold text-slate-500 hover:text-slate-700">
-        Cancel
+      <button
+        type="button"
+        disabled={name.length < 2 || !!alreadyListed(marks, name)}
+        onClick={() => add(name)}
+        className="mt-1 h-11 w-full cursor-pointer rounded-full border-[1.5px] border-primary text-[15px] font-bold text-primary hover:bg-primary/5 disabled:cursor-default disabled:border-slate-200 disabled:text-slate-400"
+      >
+        Add it
       </button>
     </div>
   )

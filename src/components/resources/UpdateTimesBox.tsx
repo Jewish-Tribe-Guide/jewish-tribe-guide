@@ -66,7 +66,10 @@ export default function UpdateTimesBox({
   item: DirectoryResource
   minyanim: Minyan[]
   onSent: (what: 'sent' | 'confirmed') => void
-  onClose: () => void
+  /** Its own Cancel, where nothing else closes it (the shul card on the
+   *  Map). In the "+ Add" box the header's Back does (Oct 10: no tiny
+   *  Cancel), so there's none. */
+  onClose?: () => void
   /** Already read elsewhere (the "+ Add" box's reader): open on the result,
    *  with what it was read from. */
   read?: { update: TimesUpdate; text: string; photoUrl: string | null }
@@ -241,9 +244,11 @@ export default function UpdateTimesBox({
         />
       )}
 
-      <button type="button" onClick={onClose} className="mt-2 cursor-pointer text-[14px] font-bold text-slate-500 hover:text-slate-700">
-        Cancel
-      </button>
+      {onClose && (
+        <button type="button" onClick={onClose} className="mt-2 cursor-pointer text-[14px] font-bold text-slate-500 hover:text-slate-700">
+          Cancel
+        </button>
+      )}
       {error && (
         <p role="alert" className="mt-2 text-[13.5px] text-red-700">
           {error}

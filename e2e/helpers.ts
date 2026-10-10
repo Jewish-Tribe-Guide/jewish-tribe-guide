@@ -259,12 +259,12 @@ export async function largestCategory(
  *  instant `state: 'visible'` is met OR the timeout is reached, not a fixed
  *  delay either way. */
 /** Opens an open listing's editor: Suggest an edit, then, on a category
- *  page where it opens the "+ Add" box about the listing (Oct 6), "Edit the
- *  details myself" there. `scope`: where the listing's own Suggest an edit
+ *  page where it opens the "+ Add" box about the listing (Oct 6), "Edit it
+ *  yourself" there (Oct 10; "Edit the details myself" before). `scope`: where the listing's own Suggest an edit
  *  is, when more than one could be on the page. */
 export async function openListingEditor(page: Page, scope: Page | Locator = page): Promise<void> {
   await scope.getByRole('button', { name: 'Suggest an edit' }).filter({ visible: true }).click()
-  const yourself = page.getByRole('button', { name: 'Edit the details myself' })
+  const yourself = page.getByRole('button', { name: 'Edit it yourself' })
   await yourself.or(page.getByRole('heading', { name: 'Suggest an edit' })).first().waitFor()
   if (await yourself.isVisible()) await yourself.click()
 }
@@ -295,18 +295,19 @@ export function categoryAddButton(page: Page): Locator {
   // test that opens Add failed to find the button — and those failures were
   // written off as the standing local baseline (AGENTS.md), measured at
   // that same commit.
-  // "Add" since Oct 5: it opens "Saw something? Tell us" now, with today's
-  // add form a few taps inside it (openAddForm).
+  // "Add" since Oct 5: it opens the box ("Add or update a place" since
+  // Oct 10), with today's add form a few taps inside it (openAddForm).
   return page.getByRole('main').getByRole('button', { name: 'Add', exact: true })
 }
 
-/** The add form: "+", then in the box it opens "Find the place", and "Not
+/** The add form: "+", then in the box it opens "Fill it in yourself" (which
+ *  opens "Find the place"), and "Not
  *  on Google? Fill it in yourself" (the Google search itself needs a real
  *  Maps key and bills per search). Lands on the category's form of
  *  questions, in the box. */
 export async function openAddForm(page: Page): Promise<void> {
   await categoryAddButton(page).click()
-  await page.getByRole('dialog').getByRole('button', { name: 'Find the place' }).click()
+  await page.getByRole('dialog').getByRole('button', { name: 'Fill it in yourself' }).click()
   await page.getByRole('dialog').getByRole('button', { name: 'Not on Google? Fill it in yourself' }).click()
 }
 

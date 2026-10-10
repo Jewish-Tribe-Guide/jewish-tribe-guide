@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, screen, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, screen, within } from '@testing-library/react'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { makeCategory, makeListing } from '@/test/providerFixtures'
 import { mockRouter } from '@/test/nextNavigationMock'
 import type { CategoryField } from '@/lib/categories'
+import { TellAboutContext } from './tellAbout'
 import ListingView from './ListingView'
 
 vi.mock('@vercel/analytics', () => ({ track: vi.fn() }))
@@ -673,6 +674,25 @@ describe('ListingView — add an item', () => {
     expect(screen.getByTestId('listing-details')).toHaveTextContent(/today/i)
     // The list comes before the details, as any main thing does.
     expect(card().compareDocumentPosition(screen.getByTestId('listing-details')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  // Oct 10: a restaurant with no dishes has just "Add their menu": the box,
+  // for the menu; its do-it-yourself opens the card's own one-dish box.
+  it('a place with no dishes offers just “Add their menu”, the box for it, one dish being its do-it-yourself', () => {
+    const dishesCat = makeCategory({ id: 'restaurant', detailFields: [{ key: 'dishes', label: 'Main dishes', type: 'tags', renderAs: 'badge', showCountInHeader: true, countLabel: 'main dish' }] })
+    const place = makeListing({ id: '7d0a7c1e-2f55-4a8e-9d57-3b7f0d6f4a21', name: 'Shtetl', category: 'restaurant' })
+    const tell = vi.fn()
+    renderWithProviders(
+      <TellAboutContext.Provider value={tell}>
+        <ListingView item={place} category={dishesCat} color="#2657bf" path="/philly/restaurant/shtetl" foot={<p>foot</p>} />
+      </TellAboutContext.Provider>,
+    )
+    expect(within(card()).queryByRole('button', { name: /Add the first/ })).not.toBeInTheDocument()
+    fireEvent.click(within(card()).getByRole('button', { name: 'Add their menu' }))
+    expect(tell).toHaveBeenCalledWith(place, expect.any(Function), { menu: true })
+    // Its do-it-yourself: the card's own box for one dish.
+    act(() => tell.mock.calls[0][1]())
+    expect(screen.getByTestId('add-item')).toBeInTheDocument()
   })
 
   it('where nobody can add to it, no empty list: the hours stay in the contact box', () => {

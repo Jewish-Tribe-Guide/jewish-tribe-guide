@@ -97,7 +97,10 @@ describe('+ Add a minyan (the user’s note 2)', () => {
     fireEvent.click(whole)
     expect(screen.getByTestId('tell-us')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Send Mekor Habracha’s schedule' })).toBeInTheDocument()
-    expect(screen.getByLabelText('What did you see?')).toHaveAttribute('placeholder', expect.stringMatching(/photo or PDF of the schedule/))
+    expect(screen.getByLabelText('Your message')).toHaveAttribute('placeholder', 'Paste Mekor Habracha’s email or newsletter for this week.')
+    expect(screen.getByRole('button', { name: 'Photo or PDF of the schedule' })).toBeInTheDocument()
+    // Its do-it-yourself is the one minyan it came from (Oct 10).
+    expect(screen.getByRole('button', { name: 'Add one time yourself' })).toBeInTheDocument()
     expect(screen.queryByTestId('update-times')).toBeNull()
 
     fireEvent.click(screen.getByRole('button', { name: 'Back' }))

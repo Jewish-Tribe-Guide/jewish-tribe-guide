@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
-import Link from 'next/link'
 import type { DirectoryResource } from '@/types'
 import { resolveCapabilities, type CategoryConfig, type CategoryField } from '@/lib/categories'
 import { changeableFields, changeLines, DAYS } from '@/lib/fieldChanges'
@@ -28,6 +27,10 @@ import FindPlace from '@/components/FindPlace'
 import TellUsItems, { changingItems, type CurrentItems } from '@/components/TellUsItems'
 import type { PlaceSelectResult } from '@/components/intake/AddressInput'
 import { TURNSTILE_ACTIVE } from '@/components/resources/useListingSubmit'
+import { CameraIcon } from '@/components/icons'
+import { track } from '@vercel/analytics'
+import { askMessage } from '@/lib/shareAnswer'
+import { useShareLink } from '@/lib/useShareLink'
 
 // "Saw something? Tell us" (agreed Oct 5, canvas TellSheet, TellAsk,
 // TellResult, TellSent; changes agreed on v83/v84). One box: type it, paste
@@ -43,6 +46,14 @@ import { TURNSTILE_ACTIVE } from '@/components/resources/useListingSubmit'
 //   - No word "AI" on the first screen; the result says it read it.
 //   - A shul's times open the shul card's own "Update their times" result,
 //     already filled in, with its own Send.
+//
+// Oct 10 (canvas page "AI box"): named for what it does ("Update Spruce
+// Market", "Add or update a place", "Add their menu"); the box says what to
+// do, no line above it; two paths, the box (a photo from its own bar) and
+// do it yourself, both at the foot; the result's "Read by AI" is a tag on
+// the card. When it can't use something, one line why, one button that
+// works instead, and do it yourself (whyOf); each such time is logged
+// (`tell_us_cant_use`) so we can see what isn't working.
 
 type Brief = { id: string; name: string; address: string; category: string; categoryLabel: string }
 type Lines = { lines: string[]; held: string[]; current?: CurrentItems; dishes?: boolean }
@@ -52,8 +63,8 @@ type Choice = { label: string; listingId: string; listing: Brief } & Lines
  *  (url null). */
 type MenuRead = { url: string | null; dishes: { name: string; quote: string; checked: boolean }[] }
 type ItemsProposal = { kind: 'items'; listingId: string | null; listing: Brief | null; asWritten: string; chain: boolean; ask: { question: string; choices: Choice[] } | null; items: ReadItem[]; menu?: MenuRead } & Lines
-/** A menu that couldn't be read, and why. */
-type MenuFailed = { kind: 'menu'; listing: Brief | null; asWritten: string; failed: string }
+/** A menu that couldn't be read, and why (the read route's MenuWhy). */
+type MenuFailed = { kind: 'menu'; listing: Brief | null; asWritten: string; why: string; note?: string | null }
 type PlaceProposal = {
   kind: 'new_place'
   category: string | null
@@ -98,7 +109,9 @@ export default function TellUsSheet({
   category,
   placeholder = tellUsPlaceholder(),
   onEditYourself,
+  yourselfLabel,
   heading,
+  kind,
 }: {
   isOpen: boolean
   onClose: () => void
@@ -108,11 +121,16 @@ export default function TellUsSheet({
    *  "Find the place" is added as, without asking. */
   category?: CategoryConfig
   placeholder?: string
-  /** From a listing: "Edit the details myself", the listing's own editor. */
+  /** From a listing: "Edit it yourself", the listing's own editor. */
   onEditYourself?: () => void
+  /** What that's called, when it isn't "Edit it yourself": "Add one dish
+   *  yourself" from the menu box. */
+  yourselfLabel?: string
   /** Its first step's title, when it was opened for one thing: a shul's
    *  "Update their times" opens "Update Mekor Habracha’s times" (Oct 6). */
   heading?: string
+  /** Opened for one thing: a shul's times, or "Add their menu". */
+  kind?: TellKind
 }) {
   const isMobile = useIsMobile()
   // Each step names itself: "Find the place", "Add to Food".
@@ -128,7 +146,8 @@ export default function TellUsSheet({
     setHasBack(false)
     onClose()
   }
-  const title = stepTitle ?? heading ?? (about ? `Tell us about ${about.name}` : 'Saw something? Tell us')
+  // Named for what it does (Oct 10): "Tell us about…" read like feedback.
+  const title = stepTitle ?? heading ?? (about ? (kind === 'menu' ? 'Add their menu' : `Update ${about.name}`) : 'Add or update a place')
   const onBack = hasBack ? () => back.current() : undefined
   const body = (
     <TellUsBody
@@ -137,6 +156,8 @@ export default function TellUsSheet({
       pageCategory={category}
       placeholder={placeholder}
       onEditYourself={onEditYourself}
+      yourselfLabel={yourselfLabel}
+      kind={kind}
       onClose={close}
       onTitle={setStepTitle}
       onBack={(go) => {
@@ -162,12 +183,70 @@ export default function TellUsSheet({
 const addTitle = (c: CategoryConfig) => `Add to ${c.pluralLabel || c.label}`
 
 type Step = 'write' | 'result' | 'sent' | 'find' | 'kind' | 'add' | 'edit'
+export type TellKind = 'times' | 'menu'
+
+/** Why the box can't use a reading, as a code for the log; null when it can. */
+export function whyCode(p: Proposal): string | null {
+  if (p.kind === 'menu') return `menu_${p.why}`
+  if (p.kind === 'times' && !p.update) return 'times_unread'
+  if (p.kind === 'items' && !p.listing && !p.ask) return p.chain ? 'chain' : 'no_place'
+  if (p.kind === 'ask_others') return 'guess'
+  if (p.kind === 'not_update') return 'question'
+  return null
+}
+
+const NOTHING_READ = {
+  head: 'We couldn’t find a change to the guide in this.',
+  line: 'Say what changed and where, or add a photo.',
+  act: { label: 'Change what you sent', does: 'write' as const },
+}
+
+type WhyAct = { label: string; does: 'photo' | 'write' | 'retry' | 'share' } | { label: string; does: 'new_place'; card: number; query: string }
+/** Why the box can't use a reading, in a line and a sentence, and the one
+ *  thing that works instead (Oct 10, canvas page "AI box"). */
+export function whyOf(p: Proposal, i: number): { head: string; line: string; act: WhyAct } | null {
+  if (!whyCode(p)) return null
+  if (p.kind === 'menu') {
+    const by: Record<string, [string, string, WhyAct]> = {
+      which_place: ['We couldn’t tell which place this menu is for.', 'Say the place’s name with the menu.', { label: 'Say which place', does: 'write' }],
+      one_menu: ['One menu at a time works best.', 'Send this one on its own.', { label: 'Change what you sent', does: 'write' }],
+      ordering_app: ['Delivery apps don’t let us read their menus.', 'A screenshot of the menu works. Take one in the app, then add it here.', { label: 'Add a screenshot', does: 'photo' }],
+      wont_open: ['Their menu page didn’t open for us.', 'A photo or screenshot of the menu works.', { label: 'Add a photo of the menu', does: 'photo' }],
+      no_dishes: ['We found no main dishes there.', 'A photo of the menu usually works.', { label: 'Add a photo of the menu', does: 'photo' }],
+      no_source: ['There’s no menu here to read.', 'Paste their menu or a link to it, or add a photo.', { label: 'Change what you sent', does: 'write' }],
+      down: ['We couldn’t read the menu right now.', 'What you sent is kept. Try again in a minute.', { label: 'Try again', does: 'retry' }],
+    }
+    const [head, line, act] = by[p.why] ?? by.down
+    return { head, line, act }
+  }
+  if (p.kind === 'times') return { head: 'We couldn’t find davening times in this.', line: 'A photo of the schedule usually works.', act: { label: 'Add a photo of the schedule', does: 'photo' } }
+  if (p.kind === 'items') {
+    const name = p.asWritten || 'that store'
+    return p.chain
+      ? { head: `This is about every ${name}, not one store.`, line: 'Say which one you saw it at.', act: { label: 'Say which store', does: 'write' } }
+      : { head: `We couldn’t find “${name}” in the guide.`, line: 'If it’s new to the guide, add it.', act: { label: 'Add it as a new place', does: 'new_place', card: i, query: p.asWritten } }
+  }
+  if (p.kind === 'ask_others') {
+    return {
+      head: p.listing ? `It sounds like news, not something you saw at ${p.listing.name}.` : 'It sounds like news or a guess, not something seen at a place.',
+      line: 'If you saw it yourself, say where, and we’ll add it.',
+      act: { label: 'Say where you saw it', does: 'write' },
+    }
+  }
+  return {
+    head: 'This reads like a question, not a change to the guide.',
+    line: 'Neighbours answer questions in the WhatsApp groups, usually within the hour.',
+    act: { label: 'Ask in a WhatsApp group', does: 'share' },
+  }
+}
 
 export function TellUsBody({
   about,
   pageCategory,
   placeholder,
   onEditYourself,
+  yourselfLabel,
+  kind,
   onClose,
   onTitle,
   onBack,
@@ -177,6 +256,8 @@ export function TellUsBody({
   pageCategory?: CategoryConfig
   placeholder: string
   onEditYourself?: () => void
+  yourselfLabel?: string
+  kind?: TellKind
   onClose: () => void
   onTitle: (title: string | null) => void
   /** Where the header's Back goes from this step, or nothing. */
@@ -265,12 +346,14 @@ export function TellUsBody({
   const [sentIds, setSentIds] = useState<string[]>([])
   const [toast, setToast] = useState<string | null>(null)
   const fileInput = useRef<HTMLInputElement>(null)
+  const textArea = useRef<HTMLTextAreaElement>(null)
+  // The reader didn't answer: say so, keep what was written (Oct 10).
+  const [down, setDown] = useState(false)
   // A screenshot pasted, or photos dropped, anywhere in the box (asked for
   // Oct 5: on desktop, a photo could only be added with the button). The
   // count, not a flag: dragging over the textarea inside fires a leave
   // for the box itself.
   const [dragging, setDragging] = useState(0)
-  const isMobile = useIsMobile()
   const textId = useId()
   const emailId = useId()
   const pending = useRef<(token: string) => void>(() => {})
@@ -297,11 +380,24 @@ export function TellUsBody({
       body.set('text', text)
       for (const p of photos) body.append('file', p.file)
       if (about) body.set('listingId', about.id)
+      if (kind === 'menu') body.set('mode', 'menu')
       body.set('turnstileToken', token)
       body.set('company', '')
-      const res = await fetch(withCommunity('/api/message/read', community), { method: 'POST', body })
-      const json = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string } & Partial<Reading>
+      const res = await fetch(withCommunity('/api/message/read', community), { method: 'POST', body }).catch(() => null)
+      const json = ((await res?.json().catch(() => null)) ?? {}) as { ok?: boolean; error?: string; code?: string } & Partial<Reading>
+      // No answer, or the reader failed: its own screen, with Try again.
+      if (!res || json.code === 'down') {
+        setDown(true)
+        track('tell_us_cant_use', { why: 'down' })
+        return
+      }
       if (!res.ok || !json.ok || !json.proposals) throw new Error(json.error ?? 'failed')
+      setDown(false)
+      for (const p of json.proposals) {
+        const why = whyCode(p)
+        if (why) track('tell_us_cant_use', { why })
+      }
+      if (json.proposals.length === 0) track('tell_us_cant_use', { why: 'nothing' })
       setReading({ proposals: json.proposals, photoUrls: json.photoUrls ?? [] })
       setSentCards(new Set())
       setAt(0)
@@ -481,6 +577,56 @@ export function TellUsBody({
     onBack(go[step])
   })
 
+  // Asking the group, for a question the box can't use (as a search that
+  // found nothing does, AskTheGroup).
+  const { share } = useShareLink(routes.ask(community, text.trim()), text.trim(), () => askMessage(text.trim()))
+  const backToWrite = () => {
+    setStep('write')
+    requestAnimationFrame(() => textArea.current?.focus())
+  }
+  const retry = () => start('read', (token) => void read(token))
+  /** What a "can't use it" button does, run when it's tapped. */
+  const runAct = (act: WhyAct) => {
+    if (act.does === 'photo') fileInput.current?.click()
+    else if (act.does === 'write') backToWrite()
+    else if (act.does === 'retry') retry()
+    else if (act.does === 'share') {
+      track('asked_group')
+      void share()
+    } else if (act.does === 'new_place') {
+      setAiPlace({ card: act.card, query: act.query, values: { name: act.query } })
+      openFind()
+    }
+  }
+  // The other path, on every screen: do it yourself (Oct 10). The listing's
+  // own editor, or whatever opened the box offers; from a page or the site's
+  // "+", the place found and filled in by hand.
+  const yourself = onEditYourself
+    ? { label: yourselfLabel ?? 'Edit it yourself', run: onEditYourself }
+    : !about && addable.length > 0
+      ? {
+          label: 'Fill it in yourself',
+          run: () => {
+            setAiPlace(null)
+            openFind()
+          },
+        }
+      : null
+  const yourselfLink = yourself && (
+    <button type="button" onClick={yourself.run} className="flex min-h-11 w-full cursor-pointer items-center justify-center text-[15.5px] font-bold text-primary hover:underline">
+      {yourself.label}
+    </button>
+  )
+  // What the result shows now: one place's readings, or (with no place)
+  // the rest. When none of it can be used, its first fix is the button.
+  const shown = cur === undefined ? proposals.map((_, i) => i).filter((i) => !PLACES.has(proposals[i].kind)) : cur
+  const whys = shown.map((i) => whyOf(proposals[i], i))
+  // Nothing read at all: a screen of its own, not a blank one.
+  const nothingRead = proposals.length === 0
+  const firstWhy = whys.find((w) => w !== null) ?? (nothingRead ? NOTHING_READ : null)
+  const allWhy = (shown.length > 0 && whys.every((w) => w !== null)) || nothingRead
+  const primary = 'h-12 w-full cursor-pointer rounded-full bg-primary px-4 text-[16px] font-bold text-white hover:bg-primary-dark disabled:cursor-default disabled:bg-slate-200 disabled:text-slate-500'
+
   if (step === 'sent') {
     return (
       <div className="space-y-3 p-1" data-testid="tell-us-sent">
@@ -544,19 +690,48 @@ export function TellUsBody({
           <p className="text-[17px] font-extrabold text-primary">{photos.length >= MAX_PHOTOS ? `Up to ${MAX_PHOTOS} photos` : 'Drop to add the photo'}</p>
         </div>
       )}
-      {step === 'write' && (
+      {/* The photo picker, kept mounted: a "can't use it" screen's "Add a
+          photo" opens it from the result, and the photo goes back to the box. */}
+      <input
+        ref={fileInput}
+        type="file"
+        accept={PHOTO_TYPES.join(',')}
+        multiple
+        className="hidden"
+        aria-label="Add a photo"
+        onChange={(e) => {
+          addPhotos(e.target.files)
+          e.target.value = ''
+          setDown(false)
+          if (step !== 'write') setStep('write')
+        }}
+      />
+      {step === 'write' && down && (
         <>
-          <div className="rounded-xl border border-slate-300 bg-white focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20">
+          <WhyBlock head="The reader isn’t answering right now." line="What you wrote is kept. Try again in a minute." />
+          <button type="button" disabled={busy === 'read'} onClick={retry} className={primary}>
+            {busy === 'read' ? 'Reading…' : 'Try again'}
+          </button>
+          {yourselfLink}
+        </>
+      )}
+      {step === 'write' && !down && (
+        <>
+          {/* What it's about, under the title, when that's a place's menu. */}
+          {kind === 'menu' && about && <p className="-mt-1 text-[14px] text-muted">{about.name}</p>}
+          <div className="rounded-xl border-[1.5px] border-slate-300 bg-white focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20">
+            {/* The line inside says what to write, by place; this names it. */}
             <label htmlFor={textId} className="sr-only">
-              What did you see?
+              Your message
             </label>
             <textarea
+              ref={textArea}
               id={textId}
               value={text}
               onChange={(e) => setText(e.target.value)}
               rows={5}
               placeholder={placeholder}
-              className="block w-full resize-none rounded-t-xl border-0 bg-transparent px-3 py-2.5 text-[15px] text-slate-900 placeholder:text-slate-400 focus:outline-none"
+              className="block w-full resize-none rounded-t-xl border-0 bg-transparent px-3.5 py-3 text-base text-slate-900 placeholder:text-slate-400 focus:outline-none"
             />
             {photos.length > 0 && (
               <div className="flex flex-wrap gap-2 px-3 pb-2">
@@ -579,7 +754,7 @@ export function TellUsBody({
                         previews.current.delete(p.preview)
                         setPhotos((ps) => ps.filter((x) => x !== p))
                       }}
-                      className="absolute -top-2 -right-2 flex h-5 w-5 cursor-pointer items-center justify-center rounded-full bg-slate-800 text-xs text-white"
+                      className="absolute -top-2 -right-2 flex h-6 w-6 cursor-pointer items-center justify-center rounded-full bg-slate-800 text-sm text-white"
                     >
                       ×
                     </button>
@@ -587,57 +762,28 @@ export function TellUsBody({
                 ))}
               </div>
             )}
-            <div className="flex items-center justify-between border-t border-slate-200 px-2 py-1.5">
+            {/* The photo is the box's own, in its bar (Oct 10): with the box
+                and do-it-yourself, two paths, not three. Paste and drop
+                still work, without a line saying so. */}
+            <div className="flex items-center justify-between border-t border-slate-200 px-1.5 py-1">
               <button
                 type="button"
                 disabled={photos.length >= MAX_PHOTOS}
                 onClick={() => fileInput.current?.click()}
-                className="cursor-pointer rounded-md px-2 py-1 text-[13.5px] font-semibold text-primary hover:bg-primary/5 disabled:cursor-default disabled:text-slate-400"
+                className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-lg px-2.5 text-[14.5px] font-bold text-primary hover:bg-primary/5 disabled:cursor-default disabled:text-slate-400"
               >
-                + Add a photo or PDF
+                <CameraIcon className="h-[18px] w-[18px]" />
+                {kind === 'menu' ? 'Photos or PDF of the menu' : kind === 'times' ? 'Photo or PDF of the schedule' : 'Photo or PDF'}
               </button>
-              <input
-                ref={fileInput}
-                type="file"
-                accept={PHOTO_TYPES.join(',')}
-                multiple
-                className="hidden"
-                aria-label="Add a photo"
-                onChange={(e) => {
-                  addPhotos(e.target.files)
-                  e.target.value = ''
-                }}
-              />
-              <span className="text-[12px] text-slate-400">{photos.length ? `${photos.length} of ${MAX_PHOTOS} photos` : isMobile ? 'or paste one' : 'or paste or drop one'}</span>
+              {photos.length > 0 && <span className="pr-2 text-[12.5px] text-slate-500">{`${photos.length} of ${MAX_PHOTOS}`}</span>}
             </div>
           </div>
-          <button
-            type="button"
-            disabled={!canRead || busy === 'read'}
-            onClick={() => start('read', (token) => void read(token))}
-            className="w-full cursor-pointer rounded-lg bg-primary px-4 py-2.5 text-[15px] font-bold text-white disabled:cursor-default disabled:opacity-50"
-          >
-            {busy === 'read' ? 'Reading…' : 'See what changes'}
-          </button>
-          {onEditYourself && (
-            <button type="button" onClick={onEditYourself} className="w-full cursor-pointer rounded-lg border-[1.5px] border-slate-300 px-4 py-2.5 text-[15px] font-bold text-slate-800 hover:bg-slate-50">
-              Edit the details myself
+          <div className="pt-2">
+            <button type="button" disabled={!canRead || busy === 'read'} onClick={() => start('read', (token) => void read(token))} className={primary}>
+              {busy === 'read' ? 'Reading…' : kind === 'menu' ? 'Read the menu' : kind === 'times' ? 'Read the times' : 'See what changes'}
             </button>
-          )}
-          {!about && addable.length > 0 && (
-            <p className="text-center text-[13.5px] text-slate-600">
-              Rather fill it in yourself?{' '}
-              <button
-                type="button"
-                onClick={() => {
-                  setAiPlace(null)
-                  openFind()
-                }}
-                className="cursor-pointer font-semibold text-primary hover:underline">
-                Find the place
-              </button>
-            </p>
-          )}
+            {yourselfLink}
+          </div>
         </>
       )}
 
@@ -657,11 +803,14 @@ export function TellUsBody({
               </button>
             </div>
           )}
-          <p className="text-[13.5px] leading-snug text-slate-600">
-            Read by AI from what you sent. Check it, then send it. An admin checks it too.
-          </p>
-          {(cur === undefined ? proposals.map((_, i) => i).filter((i) => !PLACES.has(proposals[i].kind)) : cur).map((i, k, all) => {
+          {/* No intro line (Oct 10): the card's "Read by AI" tag says it. */}
+          {nothingRead && <WhyBlock head={NOTHING_READ.head} line={NOTHING_READ.line} />}
+          {shown.map((i, k, all) => {
             const p = proposals[i]
+            const why = whys[k]
+            // Can't use it: why, and its one fix. On its own the fix is the
+            // button below; beside a change that can be sent, it's here.
+            if (why) return <WhyBlock key={i} head={why.head} line={why.line} action={allWhy ? undefined : { label: why.act.label, run: () => runAct(why.act) }} />
             return (
               <ResultCard
                 key={i}
@@ -689,28 +838,41 @@ export function TellUsBody({
                 onEditListing={(id) => void openEdit(id)}
                 text={text}
                 photoUrl={reading.photoUrls[0] ?? null}
-                community={community}
               />
             )
           })}
-          {cur !== undefined && (
-            <div className="flex gap-2">
+          {allWhy && firstWhy ? (
+            <div className="space-y-2 pt-2">
+              <button type="button" onClick={() => runAct(firstWhy.act)} className={primary}>
+                {firstWhy.act.label}
+              </button>
               {queue.length > 1 && (
-                <button type="button" onClick={() => setAt((pos + 1) % queue.length)} className="cursor-pointer rounded-lg border border-slate-300 px-5 py-2.5 text-[15px] font-bold text-slate-800 hover:bg-slate-50">
+                <button type="button" onClick={() => setAt((pos + 1) % queue.length)} className="h-11 w-full cursor-pointer rounded-full border border-slate-300 text-[15px] font-bold text-slate-800 hover:bg-slate-50">
                   Next
                 </button>
               )}
-              {cur.some((i) => proposals[i].kind === 'items' || proposals[i].kind === 'fields' || (proposals[i].kind === 'new_place' && picked[i])) && (
-                <button
-                  type="button"
-                  disabled={busy === 'send' || !groupPayload(cur)}
-                  onClick={() => start('send', (token) => void send(token, cur))}
-                  className="flex-1 cursor-pointer rounded-lg bg-primary px-4 py-2.5 text-[15px] font-bold text-white disabled:cursor-default disabled:opacity-50"
-                >
-                  {busy === 'send' ? 'Sending…' : 'Send'}
-                </button>
-              )}
+              {yourselfLink}
             </div>
+          ) : (
+            cur !== undefined && (
+              <div className="flex gap-2 pt-2">
+                {queue.length > 1 && (
+                  <button type="button" onClick={() => setAt((pos + 1) % queue.length)} className="h-12 cursor-pointer rounded-full border border-slate-300 px-5 text-[15px] font-bold text-slate-800 hover:bg-slate-50">
+                    Next
+                  </button>
+                )}
+                {cur.some((i) => proposals[i].kind === 'items' || proposals[i].kind === 'fields' || (proposals[i].kind === 'new_place' && picked[i])) && (
+                  <button
+                    type="button"
+                    disabled={busy === 'send' || !groupPayload(cur)}
+                    onClick={() => start('send', (token) => void send(token, cur))}
+                    className={`${primary} flex-1`}
+                  >
+                    {busy === 'send' ? 'Sending…' : 'Send to an admin'}
+                  </button>
+                )}
+              </div>
+            )
           )}
         </>
       )}
@@ -838,7 +1000,6 @@ function ResultCard({
   onEditListing,
   text,
   photoUrl,
-  community,
   fixes,
   onFix,
   when,
@@ -869,9 +1030,7 @@ function ResultCard({
   onEditListing: (id: string) => void
   text: string
   photoUrl: string | null
-  community: string
 }) {
-  const [timesOpen, setTimesOpen] = useState(true)
   const [timesSent, setTimesSent] = useState(false)
   // A place read as two parts is one card: the first open at the bottom,
   // the second joined to it.
@@ -925,11 +1084,6 @@ function ResultCard({
         )}
         {read && <TellUsItems current={read.current ?? { always: [], sometimes: [] }} items={items} held={read.held} onChange={onItems} dishes={!!read.dishes} fromMenu={!!p.menu} />}
         {chosen && more && <ChangeSomethingElse name={chosen.name} onClick={() => onEditListing(chosen.id)} />}
-        {!chosen && !p.ask && (
-          <p className="mt-1 text-[13.5px] text-slate-600">
-            {p.chain ? 'About the whole chain, not one store, so nothing changes in the guide.' : 'Couldn’t tell which store this is.'} Items: {p.items.map((i) => i.name).join(', ')}
-          </p>
-        )}
       </div>
     )
   }
@@ -1112,7 +1266,8 @@ function ResultCard({
         </p>
         {timesSent ? (
           <p className="mt-1 text-[13.5px] font-semibold text-emerald-700">Sent. An admin checks the times before they show.</p>
-        ) : p.update && timesOpen ? (
+        ) : (
+          p.update && (
           <UpdateTimesBox
             item={p.item}
             minyanim={minyanim}
@@ -1121,58 +1276,32 @@ function ResultCard({
               setTimesSent(true)
               onTimesSent()
             }}
-            onClose={() => setTimesOpen(false)}
           />
-        ) : (
-          <p className="mt-1 text-[13.5px] text-slate-600">{p.update ? 'Left out.' : 'Couldn’t read the times from it. You can update them on the shul’s own page.'}</p>
+          )
         )}
       </div>
     )
   }
 
-  // A menu it couldn't read: the link is a delivery app's, the page wouldn't
-  // open, or it named no dishes. What to send instead.
-  if (p.kind === 'menu') {
-    return (
-      <div className={card} data-testid="tell-us-card">
-        {head && (p.listing ? <PlaceHead name={p.listing.name} sub={`${p.listing.categoryLabel} · ${short(p.listing.address)}`} /> : <p className="text-[15px] font-extrabold text-slate-900">{p.asWritten || 'A place'}</p>)}
-        <p className="mt-1 text-[14px] text-slate-800">Couldn’t read the menu.</p>
-        <p className="mt-0.5 text-[13.5px] text-slate-600">{p.failed}</p>
-      </div>
-    )
-  }
-
-  // A guess about other stores, or an announcement with nobody saying they
-  // saw it here: the reader would ask shoppers, which nothing does yet, so
-  // the box says plainly that nothing changes (agreed Oct 5) rather than
-  // showing nothing. An announcement's own store card says it too, so this
-  // shows only when nothing else was read.
-  if (p.kind === 'ask_others') {
-    return (
-      <div className={card} data-testid="tell-us-card">
-        <p className="text-[14.5px] text-slate-800">Nothing in the guide changes from this.</p>
-        <p className="mt-1 text-[13.5px] text-slate-600">
-          {p.listing ? `It sounds like a guess about ${p.listing.name}, not something seen there.` : 'It sounds like an announcement or a guess, not something seen at a store here.'}{' '}
-          If you’ve seen it yourself, go back and say where.
-        </p>
-      </div>
-    )
-  }
-
-  if (p.kind === 'not_update') {
-    return (
-      <div className={card} data-testid="tell-us-card">
-        <p className="text-[14.5px] text-slate-800">This doesn’t look like a change to the guide.</p>
-        <p className="mt-1 text-[13.5px] text-slate-600">
-          A question or a suggestion for the site?{' '}
-          <Link href={routes.feedback(community)} className="font-semibold text-primary hover:underline">
-            Send it as feedback
-          </Link>
-        </p>
-      </div>
-    )
-  }
+  // A menu it couldn't read, a guess, a question: TellUsBody's whyOf says
+  // why and what works instead (WhyBlock), so nothing comes here.
   return null
+}
+
+/** Why the box can't use something, and (beside a change that can be sent)
+ *  the one thing that works instead (Oct 10). */
+function WhyBlock({ head, line, action }: { head: string; line: string; action?: { label: string; run: () => void } }) {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white px-3.5 py-3" data-testid="tell-us-why">
+      <p className="text-[16.5px] leading-snug font-extrabold text-slate-900">{head}</p>
+      <p className="mt-1 text-[15px] leading-snug text-slate-700">{line}</p>
+      {action && (
+        <button type="button" onClick={action.run} className="mt-2.5 h-11 w-full cursor-pointer rounded-full border-[1.5px] border-primary text-[15px] font-bold text-primary hover:bg-primary/5">
+          {action.label}
+        </button>
+      )}
+    </div>
+  )
 }
 
 /** The week's hours, shut until asked for: the lines above already say what
@@ -1188,12 +1317,14 @@ function HoursFix({ label, children }: { label: string; children: React.ReactNod
   )
 }
 
-/** The place a card is about, as its listing heads it. */
+/** The place a card is about, as its listing heads it, and that this was
+ *  read by AI (Oct 10: a tag, where it was a sentence above every card). */
 function PlaceHead({ name, sub }: { name: string; sub: string }) {
   return (
     <div>
       <p className="text-[18px] leading-tight font-extrabold text-slate-900">{name}</p>
       <p className="mt-0.5 text-[13.5px] text-slate-500">{sub}</p>
+      <span className="mt-1.5 inline-flex h-[22px] items-center rounded-full bg-slate-100 px-2 text-[12px] font-bold text-slate-600">Read by AI</span>
     </div>
   )
 }
