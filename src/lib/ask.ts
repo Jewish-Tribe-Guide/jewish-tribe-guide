@@ -592,6 +592,16 @@ const ERUV_CONTEXT = new Set([
 ])
 
 const SORT_NEAREST = /\b(?:(?:sort(?:ed)?|order(?:ed)?|list(?:ed)?) )?by (?:distance|closest|nearest)\b|\b(?:nearest|closest) (?:first|ones first|on top)\b/g
+// "Closest pizza", "the nearest shul": the visitor's nearest, unless it says
+// nearest to what ("closest to CHOP" is a place, read elsewhere).
+const NEAREST = /\b(?:closest|nearest)\b(?! to\b)/g
+// "Sort by popularity", "most liked", "popular first": the other order, the
+// one the Sort menu calls Popularity (Oct 10). Taken out like "sort by
+// distance"; read as `best`.
+const SORT_POPULAR =
+  /\b(?:(?:sort(?:ed)?|order(?:ed)?|list(?:ed)?|rank(?:ed)?) )?by (?:most )?(?:popularity|popular|ratings?|likes|upvotes|votes)\b|\bmost (?:liked|upvoted|loved|likes|upvotes|votes)\b|\b(?:most )?(?:popular|upvoted|liked)(?: ones)? (?:first|on top)\b|\bpopular(?:ity)?\b/g
+// BEST's words, longest first, for taking them out of the box (withoutSortWords).
+const BEST_WORDS = /\b(?:most popular|highest rated|highly rated|top rated|best|better|top|favou?rite|recommend(?:ed|ation|ations)?)\b/g
 export const NEAR_ME = /\b(?:(?:near|close to|closest to|nearest to|around|by|next to) (?:me|here|us)|nearby|near by|close by)\b/g
 const OPEN_TODAY = /\b(?:open (?:today|tonight|later(?: today| tonight)?|this (?:evening|afternoon))|still open (?:today|tonight))\b/g
 const OPEN_NOW = /\b(?:open (?:right now|now|late|on sunday|on friday)|(?:whats|what is|anything|something|who is|whos) open|open)\b/g
@@ -600,6 +610,17 @@ const OPEN_NOW = /\b(?:open (?:right now|now|late|on sunday|on friday)|(?:whats|
  *  without the clock: what the guide has, whatever the hour. */
 export function withoutOpenWords(input: string): string {
   return plainWords(readOpenAt(input).rest).join(' ').replace(OPEN_TODAY, ' ').replace(OPEN_NOW, ' ').replace(/\s+/g, ' ').trim()
+}
+
+/** The question without the words that set its order, for when the Sort
+ *  menu is set the other way: picking Popularity takes "near me" and
+ *  "closest" out, picking Distance "best" and "most liked" (Oct 10), so the
+ *  box and the Sort never disagree. Like withoutOpenWords, what's left is
+ *  in plain words. */
+export function withoutSortWords(input: string, order: 'nearest' | 'popular'): string {
+  const typed = plainWords(input).join(' ')
+  const out = order === 'nearest' ? typed.replace(SORT_NEAREST, ' ').replace(NEAR_ME, ' ').replace(NEAREST, ' ') : typed.replace(SORT_POPULAR, ' ').replace(BEST_WORDS, ' ')
+  return out.replace(/\s+/g, ' ').trim()
 }
 
 /** Reads a query into its parts. It never loses the query entirely: if only
@@ -621,9 +642,11 @@ export function parseAsk(input: string): AskQuery {
   const typed = plainWords(clock.rest).join(' ')
   // "Sort by distance", "nearest first": the order, not words to find, and
   // the same order as "near me" (fixes table, Sep 28: it found nothing).
-  const unsorted = typed.replace(SORT_NEAREST, ' ')
-  const withoutNear = unsorted.replace(NEAR_ME, ' ')
-  const nearMe = withoutNear !== typed
+  const sortedNear = typed.replace(SORT_NEAREST, ' ')
+  const unsorted = sortedNear.replace(SORT_POPULAR, ' ')
+  const asksPopular = unsorted !== sortedNear
+  const withoutNear = unsorted.replace(NEAR_ME, ' ').replace(NEAREST, ' ')
+  const nearMe = sortedNear !== typed || withoutNear !== unsorted
   const withoutToday = withoutNear.replace(OPEN_TODAY, ' ')
   const openToday = !openAt && withoutToday !== withoutNear
   const withoutOpen = withoutToday.replace(OPEN_NOW, ' ')
@@ -686,10 +709,12 @@ export function parseAsk(input: string): AskQuery {
   const withinAsked = within.within
   // Read before "better than Giant" is taken out: that's still asking
   // for a better one.
-  const best = BEST.test(typed)
+  const best = BEST.test(typed) || asksPopular
   const typing = raw !== '' && !/\s$/.test(input)
   const last = plainWords(raw).at(-1)
-  if (terms.length === 0 && concepts.length === 0 && !nearMe && !openNow && !openToday && !openAt && !eruv && !times && !meta) {
+  // "Best", "sort by popularity" on its own: every place, in that order,
+  // as "near me" on its own already was.
+  if (terms.length === 0 && concepts.length === 0 && !nearMe && !best && !openNow && !openToday && !openAt && !eruv && !times && !meta) {
     const all = words(raw)
     return { raw, terms: all, concepts, nearMe, openNow, openToday, openAt, best, eruv, times, meta, excluding, within: withinAsked, minyan, partial: typing && all.length > 1 ? (all.at(-1) ?? null) : null }
   }

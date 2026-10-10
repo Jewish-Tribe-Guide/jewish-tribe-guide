@@ -747,6 +747,37 @@ describe('GenericDirectory', () => {
       expect(order()).toEqual(['Kosher Near', 'Kosher Far'])
     })
 
+    // Oct 10: the order typed in the search shows on the Sort button, and
+    // picking the other order there takes those words out of the box.
+    it('a search asking for an order shows it on Sort, and picking the other takes the words out', async () => {
+      const user = userEvent.setup()
+      const category = makeCategory({ upvotesEnabled: true })
+      const items = [
+        makeListing({ id: 'far', name: 'Kosher Far', upvotes: 9, milesFromAddress: 5 }),
+        makeListing({ id: 'near', name: 'Kosher Near', upvotes: 0, milesFromAddress: 0.5 }),
+      ]
+      renderWithProviders(<GenericDirectory category={category} items={items} anchorLabel="123 Main St" {...handlers} />)
+      const order = () => screen.getAllByText(/^Kosher (Far|Near)$/).map((e) => e.textContent)
+      const box = screen.getByRole('searchbox')
+      expect(sortShows()).toBe('Distance')
+
+      await user.type(box, 'best kosher')
+      expect(sortShows()).toBe('Popularity')
+      expect(order()).toEqual(['Kosher Far', 'Kosher Near'])
+      await chooseSort(user, 'Distance')
+      expect(box).toHaveValue('kosher')
+      expect(sortShows()).toBe('Distance')
+      expect(order()).toEqual(['Kosher Near', 'Kosher Far'])
+
+      await chooseSort(user, 'Popularity')
+      await user.clear(box)
+      await user.type(box, 'closest kosher')
+      expect(sortShows()).toBe('Distance')
+      await chooseSort(user, 'Popularity')
+      expect(box).toHaveValue('kosher')
+      expect(sortShows()).toBe('Popularity')
+    })
+
     it('has no Sort where there is only one way to sort (likes off)', () => {
       renderWithProviders(<GenericDirectory category={makeCategory()} items={[makeListing()]} {...handlers} />)
       expect(screen.queryByRole('button', { name: /^Sort/ })).not.toBeInTheDocument()

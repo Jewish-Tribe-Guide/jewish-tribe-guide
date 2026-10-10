@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { makeCategory } from '@/test/providerFixtures'
-import { conceptCategories, editDistance, initialisms, parseAsk, termMatches, termsRequired, withoutTerms, wordMatches, words } from './ask'
+import { conceptCategories, editDistance, initialisms, parseAsk, termMatches, termsRequired, withoutSortWords, withoutTerms, wordMatches, words } from './ask'
 
 describe('words', () => {
   it('folds spellings so a visitor and a listing meet whichever way each spelled it', () => {
@@ -328,6 +328,46 @@ describe('parseAsk — "best"', () => {
       expect(q.terms.some((t) => /best|top|recommend|rated|highest|better/.test(t)), input).toBe(false)
     }
     expect(parseAsk('kosher pizza').best).toBe(false)
+  })
+})
+
+describe('parseAsk — the order asked for, as the Sort menu has it (Oct 10)', () => {
+  it('reads "sort by popularity", "most liked", "popular first" as Popularity, not words to find', () => {
+    for (const input of ['pizza sort by popularity', 'pizza by popularity', 'pizza most liked', 'most upvoted pizza', 'popular pizza', 'pizza, popular first', 'pizza sorted by rating']) {
+      const q = parseAsk(input)
+      expect(q.best, input).toBe(true)
+      expect(q.nearMe, input).toBe(false)
+      expect(q.terms, input).toEqual(['pizza'])
+    }
+  })
+
+  it('reads "closest pizza" as Distance, but not "closest to CHOP"', () => {
+    for (const input of ['closest pizza', 'the nearest shul']) {
+      const q = parseAsk(input)
+      expect(q.nearMe, input).toBe(true)
+      expect(q.terms, input).not.toContain('closest')
+    }
+    expect(parseAsk('food closest to CHOP').nearMe).toBe(false)
+  })
+
+  it('an order and nothing else is every place in that order, not a search for "best"', () => {
+    for (const input of ['best', 'sort by popularity', 'most popular']) {
+      const q = parseAsk(input)
+      expect(q.best, input).toBe(true)
+      expect(q.terms, input).toEqual([])
+    }
+  })
+
+  it('takes one order’s words out of the box and leaves the rest', () => {
+    expect(withoutSortWords('pizza near me', 'nearest')).toBe('pizza')
+    expect(withoutSortWords('Closest pizza', 'nearest')).toBe('pizza')
+    expect(withoutSortWords('meat sorted by distance', 'nearest')).toBe('meat')
+    expect(withoutSortWords('best pizza', 'popular')).toBe('pizza')
+    expect(withoutSortWords('top rated pizza', 'popular')).toBe('pizza')
+    expect(withoutSortWords('pizza sort by popularity', 'popular')).toBe('pizza')
+    expect(withoutSortWords('pizza most liked', 'popular')).toBe('pizza')
+    // The other order's words stay.
+    expect(withoutSortWords('best pizza near me', 'popular')).toBe('pizza near me')
   })
 })
 

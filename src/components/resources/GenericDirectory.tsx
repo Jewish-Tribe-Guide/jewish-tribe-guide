@@ -25,7 +25,7 @@ import { PlusIcon } from '@/components/icons'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { useScrollShowHide, useSetScreenHeader } from '@/lib/headerVisibility'
 import { foundFor, searchAsk } from '@/lib/askSearch'
-import { withoutOpenWords, withoutTerms } from '@/lib/ask'
+import { withoutOpenWords, withoutSortWords, withoutTerms } from '@/lib/ask'
 import { neighborhoodsFor, placeName, townsFrom } from '@/lib/places'
 import { readerPlaces } from '@/lib/questionReader'
 import { needsReading, ownFrom, readingAnswers, readingChips, readingLoses, readingOffers, searchReading } from '@/lib/readingSearch'
@@ -782,10 +782,6 @@ export default function GenericDirectory({ category, items, anchorLabel, address
     () => (q ? searchAsk(items, [category], search, { categoryId: category.id, places: neighborhoodsFor(communitySlug) }) : null),
     [q, items, category, search, communitySlug],
   )
-  // A question asking for the nearest ("near me", "sort by distance") puts
-  // them first while it's in the box, whatever the Sort says: "restaurant
-  // near me" came back by popularity (fixes table, Sep 29).
-  const asksNearest = !!todayResult?.query.nearMe
   const todayMatches = useMemo(
     () => (todayResult ? new Map(todayResult.hits.map((h) => [h.item.id, foundFor(h, todayResult)])) : null),
     [todayResult],
@@ -820,6 +816,16 @@ export default function GenericDirectory({ category, items, anchorLabel, address
     return () => clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [readable, search])
+  // ── The order the search asks for ──
+  // "Pizza near me", "closest pizza": nearest first; "best pizza", "sort by
+  // popularity": most liked first, while it's in the box, whatever the Sort
+  // was on ("restaurant near me" came back by popularity, fixes table Sep
+  // 29). The Sort button says which (Oct 10), and picking the other order
+  // there takes the words out of the box (selectSort), so the two never
+  // disagree.
+  const askedQuery = q ? (readResult ?? todayResult)?.query : undefined
+  const askedOrder: 'nearest' | 'popular' | null = askedQuery?.nearMe ? 'nearest' : askedQuery?.best && upvotes ? 'popular' : null
+  const byPopular = askedOrder ? askedOrder === 'popular' : sortByPopular
   const readChips = readResult && reading ? readingChips(reading, categories ?? [category], { reach: readResult.reach, categoryId: category.id, excluded: readResult.excluded }) : []
   const readAs = {
     reading: reader.isReading(search) && !readResult,
@@ -903,7 +909,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
       // not every open one.
       const pinnedDiff = Number(isPinned(b.id)) - Number(isPinned(a.id))
       if (pinnedDiff !== 0) return pinnedDiff
-      return upvotes && sortByPopular && !asksNearest
+      return upvotes && byPopular
         ? liveCount(b) - liveCount(a) || travelCompare(a, b)
         : travelCompare(a, b)
     })
@@ -957,13 +963,14 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // flips it to Distance the moment an anchor lands, same as an ordinary
   // load. An explicit Popular/Distance click marks the choice as touched so
   // it sticks even if the anchor later disappears or reappears.
-  const selectSort = (byPopular: boolean) => {
-    if (!byPopular && !anchorLabel) {
+  const selectSort = (popular: boolean) => {
+    if (!popular && !anchorLabel) {
       document.dispatchEvent(new CustomEvent('jpc:open-location'))
       return
     }
     touchedSort.current = true
-    setSortByPopular(byPopular)
+    setSortByPopular(popular)
+    if (askedOrder && (askedOrder === 'popular') !== popular) setSearch((prev) => withoutSortWords(prev, askedOrder))
   }
 
   // The pick-lists worth offering in the Filters sheet: a list needs two
@@ -1407,7 +1414,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
         noun={!grouping || grouping.closed}
         total={filtered.length}
         filters={hasActualFilters ? { active: sheetFilterCount, onOpen: () => setFiltersOpen(true) } : undefined}
-        sort={upvotes ? { byPopular: sortByPopular, onSelect: selectSort } : undefined}
+        sort={upvotes ? { byPopular, onSelect: selectSort } : undefined}
         // Only while the Next minyan card, which carries it, is gone.
         onDaveningTimes={hasMinyanim && !showMinyanCard ? showMinyanimView : undefined}
         onShowMap={hasMapColumn && mapHidden ? () => setMapHidden(false) : undefined}
@@ -1713,7 +1720,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
               place={rowPlaces.get(item.id) ?? null}
               omitKey={omitKey}
               flagUnconfirmed={flagUnconfirmed}
-              likes={upvotes && sortByPopular ? liveCount(item) : undefined}
+              likes={upvotes && byPopular ? liveCount(item) : undefined}
               look={rowLook}
               candlesAt={candlesAt}
               upvotes={upvotes}
