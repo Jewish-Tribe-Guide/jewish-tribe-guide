@@ -817,18 +817,17 @@ function menuUrlOf(item: DirectoryResource): string | null {
 
 /** A listing's items, each with when someone last saw it there, and a tap
  *  on one to say whether it still is (agreed Oct 1): "Still here" counts at
- *  once, "Not anymore" warns at once and asks an admin to take it off. One
- *  quiet line under the heading says the items can be tapped.
+ *  once, "Not anymore" warns at once and asks an admin to take it off. A
+ *  small ⌄ on each row says it opens; no line explaining it, and none
+ *  saying where a menu's dishes came from (the user, Oct 10: clear without
+ *  words).
  *
  *  A restaurant's main dishes the same way, in a dish's words ("Still
- *  served", "+ Add a dish"), with "Full menu ↗" for the rest of the menu,
- *  and a line saying where dishes read from the menu came from. */
+ *  served", "+ Add a dish"), with "Full menu" for the rest of the menu. */
 function ItemsCard({ field, found, api, menuUrl }: { field: CategoryField; found: SearchFound | null; api: ItemMarksApi; menuUrl: string | null }) {
   const timezone = useCommunityTimezone()
   const clock = useNow()
   const say = itemWording(field)
-  // The latest a dish was approved from the menu, for the line under them.
-  const menuAt = api.marks.reduce<string | null>((latest, m) => (m.menuAt && (!latest || m.menuAt > latest) ? m.menuAt : latest), null)
   const [all, setAll] = useState(false)
   const [open, setOpen] = useState<string | null>(null)
   const [adding, setAdding] = useState(false)
@@ -844,17 +843,11 @@ function ItemsCard({ field, found, api, menuUrl }: { field: CategoryField; found
       action={
         menuUrl && (
           <a href={menuUrl} target="_blank" rel="noopener noreferrer" className="shrink-0 text-[14px] font-bold text-primary hover:underline" data-testid="full-menu">
-            Full menu ↗
+            Full menu
           </a>
         )
       }
-      footer={
-        menuAt
-          ? `${say.nouns.charAt(0).toUpperCase()}${say.nouns.slice(1)} read from its own menu by the guide’s AI, ${dayText(menuAt, clock, timezone)}, and checked by an admin. “Seen” means someone has said so since.`
-          : undefined
-      }
     >
-      {rows.length > 0 && <p className="mb-1 text-[13.5px] leading-snug text-muted">{say.hint}</p>}
       <ul className="divide-y divide-slate-200/70">
         {shown.map((m) => {
           const key = `${m.key}:${m.name}`
@@ -875,7 +868,10 @@ function ItemsCard({ field, found, api, menuUrl }: { field: CategoryField; found
                 {isOpen ? (
                   <ChevronRightIcon className="h-4 w-4 shrink-0 -rotate-90 text-slate-500" />
                 ) : (
-                  seen && <span className={`shrink-0 whitespace-nowrap text-[13px] ${seen.old ? 'text-caution' : 'text-muted'}`}>{seen.text}</span>
+                  <span className="flex shrink-0 items-center gap-1">
+                    {seen && <span className={`whitespace-nowrap text-[13px] ${seen.old ? 'text-caution' : 'text-muted'}`}>{seen.text}</span>}
+                    <ChevronRightIcon className="h-4 w-4 rotate-90 text-slate-400" />
+                  </span>
                 )}
               </button>
               {m.goneAt && !isOpen && <GoneNote at={m.goneAt} clock={clock} />}

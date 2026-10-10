@@ -74,7 +74,6 @@ describe('a list’s words', () => {
       'not always on the menu',
       'dishes',
     ])
-    expect(dishes.hint).toBe('Been there? Tap a dish to say if it’s still served.')
     expect(dishes.question('shawarma')).toBe('Still serving shawarma?')
     // No count label: items.
     expect(itemWording({}).still).toBe('Still here')

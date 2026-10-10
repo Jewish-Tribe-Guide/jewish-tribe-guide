@@ -95,5 +95,5 @@ test('a menu reading is checked, edited and approved onto its listing, dated by 
   const dishes = page.getByTestId('listing-items')
   await expect(dishes).toContainText('Main dishes · 3', { timeout: 20_000 })
   await expect(dishes).toContainText('on its menu')
-  await expect(dishes.getByRole('link', { name: 'Full menu ↗' })).toHaveAttribute('href', sourceUrl)
+  await expect(dishes.getByRole('link', { name: 'Full menu' })).toHaveAttribute('href', sourceUrl)
 })

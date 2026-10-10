@@ -468,7 +468,8 @@ describe('ListingView — Still here and Not anymore, an item at a time', () => 
 
   it('each item says when it was last seen; an old date turns amber; a reported one says so; one nobody saw says nothing', () => {
     view({ item: tj, category: grocery })
-    expect(screen.getByTestId('listing-items')).toHaveTextContent('Been there? Tap an item to say if it’s still there.')
+    // No line explaining that the items can be tapped (the user, Oct 10).
+    expect(screen.getByTestId('listing-items')).not.toHaveTextContent('Been there?')
     expect(within(row('Challah')).getByText('seen today')).toHaveClass('text-muted')
     expect(within(row('Wine')).getByText('seen Jun 1')).toHaveClass('text-caution')
     expect(row('Chicken')).toHaveTextContent('Reported gone yesterday · we’ll check before taking it off')
@@ -549,7 +550,7 @@ describe('ListingView — a restaurant’s main dishes (agreed Oct 1)', () => {
   it('lead the listing, in a dish’s words, each dated by its menu until someone has seen it since', () => {
     view({ item: served, category: withDishes })
     expect(card()).toHaveTextContent('Main dishes · 2')
-    expect(card()).toHaveTextContent('Been there? Tap a dish to say if it’s still served.')
+    expect(card()).not.toHaveTextContent('Been there?')
     expect(within(row('Shawarma')).getByText('seen today')).toBeInTheDocument()
     expect(within(row('Falafel')).getByText('on its menu Oct 2')).toBeInTheDocument()
     expect(within(card()).getByRole('button', { name: 'Add a dish' })).toBeInTheDocument()
@@ -558,15 +559,15 @@ describe('ListingView — a restaurant’s main dishes (agreed Oct 1)', () => {
     expect(within(row('Falafel')).getByRole('button', { name: 'Still served' })).toBeInTheDocument()
   })
 
-  it('link the full menu they were read from, and say who read them', () => {
+  it('link the full menu they were read from, with no arrow and no line about who read them (the user, Oct 10)', () => {
     view({ item: served, category: withDishes })
-    expect(within(card()).getByRole('link', { name: 'Full menu ↗' })).toHaveAttribute('href', 'https://judahgrill.com/menu')
-    expect(card()).toHaveTextContent('Dishes read from its own menu by the guide’s AI, Oct 2, and checked by an admin.')
+    expect(within(card()).getByRole('link', { name: 'Full menu' })).toHaveAttribute('href', 'https://judahgrill.com/menu')
+    expect(card()).not.toHaveTextContent('guide’s AI')
   })
 
   it('no menu link that isn’t a web address, and no line about the AI for dishes a person added', () => {
     view({ item: makeListing({ ...judah, dishes: ['Shawarma'], menuUrl: 'javascript:alert(1)' }), category: withDishes })
-    expect(within(card()).queryByRole('link', { name: 'Full menu ↗' })).not.toBeInTheDocument()
+    expect(within(card()).queryByRole('link', { name: 'Full menu' })).not.toBeInTheDocument()
     expect(card()).not.toHaveTextContent('guide’s AI')
   })
 

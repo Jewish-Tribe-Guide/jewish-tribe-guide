@@ -149,8 +149,6 @@ export type ItemWording = {
   nouns: string
   /** The answer that it's still there: "Still here", "Still served". */
   still: string
-  /** The heading's hint. */
-  hint: string
   /** Said of an item in the `_sometimes` part. */
   sometimes: string
   /** The Add box's checkbox. */
@@ -173,7 +171,6 @@ export function itemWording(field: Pick<CategoryField, 'countLabel'>): ItemWordi
       noun,
       nouns: 'dishes',
       still: 'Still served',
-      hint: 'Been there? Tap a dish to say if it’s still served.',
       sometimes: 'not always on the menu',
       sometimesBox: 'Not always on the menu',
       add: 'Add a dish',
@@ -186,7 +183,6 @@ export function itemWording(field: Pick<CategoryField, 'countLabel'>): ItemWordi
     noun,
     nouns: plural(noun),
     still: 'Still here',
-    hint: `Been there? Tap ${article(noun)} ${noun} to say if it’s still there.`,
     sometimes: 'not always in stock',
     sometimesBox: 'Not always in stock',
     add: `Add ${article(noun)} ${noun}`,
