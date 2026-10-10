@@ -458,7 +458,7 @@ describe('GenericListingCard — items a search matched', () => {
     expect(screen.getByText('Challah · sometimes')).toBeInTheDocument()
   })
 
-  it('a restaurant’s dishes: their own line, and a matched one dated by its menu (agreed Oct 1)', () => {
+  it('a restaurant’s dishes: none on the card, but a matched one is named and dated by its menu (the user, Oct 10)', () => {
     vi.useFakeTimers({ toFake: ['Date'] })
     vi.setSystemTime(new Date('2026-10-09T17:30:00Z'))
     try {
@@ -467,10 +467,10 @@ describe('GenericListingCard — items a search matched', () => {
       const item = makeListing({ t: 'Meat', cert: 'OU', dishes: ['Burgers', 'Steak'], itemMenu: { dishes: { Burgers: '2026-10-02T15:00:00Z' } } })
       const props = { item, category, upvotes: false, count: 0, ...requiredHandlers }
       const { unmount } = renderWithProviders(<GenericListingCard {...props} />)
-      expect(screen.getByTestId('row-items')).toHaveTextContent('Burgers, steak')
+      expect(screen.queryByTestId('row-items')).not.toBeInTheDocument()
       expect(screen.getByTestId('row-facts')).not.toHaveTextContent('Burgers')
       unmount()
-      // Asked for one: the chip names it, so the line doesn't repeat it.
+      // Asked for one: the chip names it.
       renderWithProviders(<GenericListingCard {...props} found={{ terms: ['burger'], items: [{ tag: 'Burgers', sometimes: false }], fields: [] }} />)
       expect(screen.getByText('Burgers · on its menu Oct 2')).toBeInTheDocument()
       expect(screen.queryByTestId('row-items')).not.toBeInTheDocument()
@@ -530,12 +530,13 @@ describe('GenericListingCard — items on the row', () => {
   // "Challah, milk, chicken +5" says what "8 kosher items" didn't.
   const itemsField = { key: 'items', label: 'Kosher items available', type: 'tags' as const, showCountInHeader: true, countLabel: 'kosher item' }
 
-  it('names the items, sometimes ones after, marked', () => {
+  it('names the items on a line of their own, sometimes ones after, marked (the user, Oct 10)', () => {
     const category = makeCategory({ detailFields: [itemsField] })
     const item = makeListing({ items: ['Milk', 'Bread'], items_sometimes: ['Cheese'] })
     renderWithProviders(<GenericListingCard item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />)
 
-    expect(within(screen.getByTestId('row-facts')).getByText('Milk, bread, cheese (sometimes)')).toBeInTheDocument()
+    expect(screen.getByTestId('row-items')).toHaveTextContent('Milk, bread, cheese (sometimes)')
+    expect(screen.queryByTestId('row-facts')).not.toBeInTheDocument()
     expect(screen.queryByText(/kosher items?$/)).not.toBeInTheDocument()
   })
 
