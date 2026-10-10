@@ -5,6 +5,11 @@ import type { DirectoryResource, ZmanimData } from '@/types'
 import { parseTimeToMinutes } from './davening'
 import type { ShulRowStatus } from './upcomingDavening'
 
+/** A restaurant's dishes, not a store's items: the noun itemWording reads
+ *  from countLabel (not imported from itemMarks, which imports this file
+ *  by way of listingView). */
+const isDishes = (field: CategoryField) => (field.countLabel ?? '').trim().toLowerCase().split(/\s+/).at(-1) === 'dish'
+
 // ── A listing row ────────────────────────────────────────────────────────────
 // A directory row is two lines, as in the redesign's mockups: the name and
 // where it is, then the facts that decide whether to open it, in the order
@@ -18,7 +23,8 @@ import type { ShulRowStatus } from './upcomingDavening'
 //   Opens 4 PM · 1.2 mi · Parve · IKC
 //
 //   GIANT · Center City
-//   Open until 10 PM · 0.9 mi · Wine, challah, deli, cheese
+//   Open until 10 PM · 0.9 mi
+//   Wine, challah, deli, cheese
 //
 // Plain text, not chips. The row itself opens the listing, and the filters
 // above the list are where to narrow it; a row of pill buttons made every
@@ -115,7 +121,6 @@ export function listingRowFacts(
   const repeats = (field: CategoryField, label: string) =>
     !!items && field.key === itemsField?.countReplacesKey && saysTheSame(label, itemsField)
 
-  let badges = 0
   for (const f of rowBadgeFields(category)) {
     if (f.key === opts.omitKey) continue
     const present = f.type === 'boolean' ? !!item[f.key] : selectValues(item[f.key]).length > 0
@@ -128,15 +133,15 @@ export function listingRowFacts(
       // A hechsher's caveat is the row's third line now (listingRowNote),
       // where a phone can read it; a hover title was all it had.
       facts.push({ text, tone: 'plain' })
-      badges++
     }
   }
 
-  // After two facts of its own (a restaurant's "Meat · Keystone-K ·
-  // Restaurant"), the line is full, and the items would be cut off: they
-  // get a line of their own, "Shawarma, falafel, schnitzel +3" (agreed
-  // Oct 1). A grocery's one "Kosher store" leaves room, as before.
-  if (items) facts.push({ text: items, tone: 'plain', ...(badges >= 2 ? { ownLine: true } : {}) })
+  // A store's items on a line of their own, "Wine, challah, deli, cheese",
+  // where a phone can read them: they're why anyone opens a grocery (the
+  // user, Oct 10). A restaurant's dishes aren't on the row at all: a few
+  // dishes say little about a menu, and the facts line is full already. A
+  // search that finds a dish still names it on the row (see `found`).
+  if (items && !isDishes(itemsField!)) facts.push({ text: items, tone: 'plain', ownLine: true })
 
   return facts
 }

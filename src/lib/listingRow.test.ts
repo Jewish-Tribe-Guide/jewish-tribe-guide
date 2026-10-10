@@ -183,20 +183,20 @@ describe('listingRowFacts', () => {
   })
 })
 
-describe('a restaurant’s dishes on the row (agreed Oct 1)', () => {
+describe('a restaurant’s dishes stay off the row (the user, Oct 10)', () => {
   const dishes: CategoryField = { key: 'dishes', label: 'Main dishes', type: 'tags', showCountInHeader: true, countLabel: 'dish' }
   const listing = makeListing({ type: 'meat', cert: 'OU', dishes: ['Shawarma', 'Falafel', 'Schnitzel', 'Kebabs', 'Hummus'] })
 
-  it('after two facts of its own, on a line of their own', () => {
-    const facts = listingRowFacts(listing, makeCategory({ detailFields: [type, cert, dishes] }), null)
-    expect(facts.filter((f) => !f.ownLine).map((f) => f.text)).toEqual(['Meat', 'OU'])
-    expect(facts.find((f) => f.ownLine)?.text).toBe('Shawarma, falafel, schnitzel +2')
+  it('names none of them, however much room the line has', () => {
+    expect(texts(listingRowFacts(listing, makeCategory({ detailFields: [type, cert, dishes] }), null))).toEqual(['Meat', 'OU'])
+    expect(texts(listingRowFacts(listing, makeCategory({ detailFields: [type, dishes] }), null))).toEqual(['Meat'])
   })
+})
 
-  it('with room on the line, beside the facts as a grocery’s are', () => {
-    const facts = listingRowFacts(listing, makeCategory({ detailFields: [type, dishes] }), null)
-    expect(facts.some((f) => f.ownLine)).toBe(false)
-    expect(texts(facts)).toEqual(['Meat', 'Shawarma, falafel, schnitzel +2'])
+describe('a store’s items get a line of their own (the user, Oct 10)', () => {
+  it('even when the facts line has room for them', () => {
+    const facts = listingRowFacts(makeListing({ kosher: true, items: ['Milk', 'Challah'] }), makeCategory({ detailFields: [kosher, items] }), FRIDAY_2PM)
+    expect(facts).toEqual([{ text: 'Milk, challah', tone: 'plain', ownLine: true }])
   })
 })
 
