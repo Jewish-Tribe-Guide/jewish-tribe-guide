@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Minyan } from './davening'
-import { mergeMinyanimBox, minyanimForBox } from './minyanimBox'
+import { boxChangeCount, boxGroups, mergeMinyanimBox, minyanimForBox } from './minyanimBox'
 
 const shacharis: Minyan = { id: 's', tefillah: 'shacharis', days: ['mon', 'tue', 'wed', 'thu', 'fri'], time: '6:45am' }
 const mincha: Minyan = { id: 'm', tefillah: 'mincha_maariv', days: ['sun', 'mon', 'tue', 'wed', 'thu', 'fri'], time: '15 min before sunset' }
@@ -32,5 +32,35 @@ describe('one box of a shul’s times (Oct 10)', () => {
     const added: Minyan = { id: 'new', tefillah: 'mincha', days: ['sat'], time: '12:20pm' }
     const edited = [...minyanimForBox(rows, 'shabbos').filter((m) => m.id !== 'sh'), added]
     expect(mergeMinyanimBox(rows, 'shabbos', edited)).toEqual([shacharis, mincha, added])
+  })
+})
+
+describe('the box as a list (Oct 10, canvas page “Minyan edit”)', () => {
+  it('Shabbos in the order it happens: Friday night, morning, afternoon', () => {
+    const afternoon: Minyan = { id: 'a', tefillah: 'mincha', days: ['sat'], time: '5:30pm' }
+    const groups = boxGroups([afternoon, ...minyanimForBox(rows, 'shabbos')], 'shabbos')
+    expect(groups.map((g) => [g.label, g.rows.map((m) => m.id)])).toEqual([
+      ['Friday night', ['m']],
+      ['Shabbos morning', ['sh']],
+      ['Afternoon', ['a']],
+    ])
+  })
+
+  it('the week by tefillah, each in the order of its first day', () => {
+    const sunday: Minyan = { id: 'sun', tefillah: 'shacharis', days: ['sun'], time: '8:30am' }
+    const groups = boxGroups([...minyanimForBox(rows, 'weekday'), sunday], 'weekday')
+    expect(groups.map((g) => [g.label, g.rows.map((m) => m.id)])).toEqual([
+      ['Shacharis', ['sun', 's']],
+      ['Mincha & Maariv', ['m']],
+    ])
+  })
+
+  it('counts each minyan changed, added or taken out, and an emptied note as no change', () => {
+    const was = minyanimForBox(rows, 'shabbos')
+    expect(boxChangeCount(was, was)).toBe(0)
+    expect(boxChangeCount(was, was.map((m) => ({ ...m, notes: undefined })))).toBe(0)
+    const changed = was.map((m) => (m.id === 'sh' ? { ...m, time: '9:30am' } : m))
+    expect(boxChangeCount(was, changed)).toBe(1)
+    expect(boxChangeCount(was, [...changed.filter((m) => m.id !== 'm'), { id: 'n', tefillah: 'mincha', days: ['sat'], time: '12:20pm' }])).toBe(3)
   })
 })

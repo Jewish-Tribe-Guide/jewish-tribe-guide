@@ -1,15 +1,14 @@
 'use client'
 
-import { useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import type { DirectoryResource } from '@/types'
 import type { CategoryConfig, CategoryField } from '@/lib/categories'
 import { isMinyanim, type Minyan } from '@/lib/davening'
 import { listingChanges } from '@/lib/listingDiff'
-import { BOX_DAYS, mergeMinyanimBox, minyanimForBox, type MinyanBox } from '@/lib/minyanimBox'
+import { mergeMinyanimBox, minyanimForBox, type MinyanBox } from '@/lib/minyanimBox'
 import { useIsMobile } from '@/lib/useIsMobile'
 import Honeypot from '@/components/Honeypot'
 import TurnstileWidget from '@/components/TurnstileWidget'
-import MinyanimInput from '@/components/intake/MinyanimInput'
 import { CheckIcon } from '@/components/icons'
 import ActionDialog from './ActionDialog'
 import MobileSheet from './MobileSheet'
@@ -17,6 +16,7 @@ import { DetailFieldInput } from './ListingForm'
 import { useListingDraft } from './useListingDraft'
 import { useListingSubmit } from './useListingSubmit'
 import { SUBMIT_PILL } from './submitPill'
+import MinyanBoxEditor from './MinyanBoxEditor'
 
 // ── Edit, under one box of a listing (agreed Oct 10, canvas page "edits") ───
 // The box's own fields and nothing else: a mikvah section's hours and note,
@@ -54,14 +54,23 @@ export default function BoxEditSheet({
   onEditElse?: () => void
 }) {
   const isMobile = useIsMobile()
-  const title = edit?.title ?? ''
-  const body = edit && <BoxEditor key={title} item={item} category={category} edit={edit} onClose={onClose} onEditElse={onEditElse} />
+  // A step inside the box (a shul's one minyan): its title, and Back to
+  // the box's list. The Back in a ref, as AddMinyanSheet keeps its own.
+  const [stepTitle, setStepTitle] = useState<string | null>(null)
+  const stepBack = useRef<() => void>(() => {})
+  const onStep = useCallback((step: { title: string; back: () => void } | null) => {
+    stepBack.current = step?.back ?? (() => {})
+    setStepTitle(step?.title ?? null)
+  }, [])
+  const title = stepTitle ?? edit?.title ?? ''
+  const onBack = stepTitle ? () => stepBack.current() : undefined
+  const body = edit && <BoxEditor key={edit.title} item={item} category={category} edit={edit} onClose={onClose} onEditElse={onEditElse} onStep={onStep} />
   return isMobile ? (
-    <MobileSheet isOpen={!!edit} onClose={onClose} title={title}>
+    <MobileSheet isOpen={!!edit} onClose={onClose} title={title} onBack={onBack}>
       {body}
     </MobileSheet>
   ) : (
-    <ActionDialog isOpen={!!edit} onClose={onClose} title={title}>
+    <ActionDialog isOpen={!!edit} onClose={onClose} title={title} onBack={onBack}>
       {body}
     </ActionDialog>
   )
@@ -73,12 +82,15 @@ export function BoxEditor({
   edit,
   onClose,
   onEditElse,
+  onStep = () => {},
 }: {
   item: DirectoryResource
   category: CategoryConfig
   edit: BoxEdit
   onClose: () => void
   onEditElse?: () => void
+  /** A shul's one minyan opened, for the sheet's title and Back. */
+  onStep?: (step: { title: string; back: () => void } | null) => void
 }) {
   const draft = useListingDraft(category, item)
   const { ownTurnstileRef, setOwnTurnstileToken, ...sender } = useListingSubmit({ mode: 'edit', existing: item })
@@ -93,7 +105,9 @@ export function BoxEditor({
   // merged back into the whole list as they change.
   const minyanimField = edit.minyanimBox ? edit.fields.find((f) => f.type === 'minyanim') : undefined
   const allRows: Minyan[] = minyanimField && isMinyanim(item[minyanimField.key]) ? (item[minyanimField.key] as Minyan[]) : []
-  const [boxRows] = useState(() => (edit.minyanimBox ? minyanimForBox(allRows, edit.minyanimBox) : []))
+  // A row stored without an id gets one here, as the old editor gave it
+  // (MinyanimInput's initMinyanim): the list opens a minyan by its id.
+  const [boxRows] = useState(() => (edit.minyanimBox ? minyanimForBox(allRows, edit.minyanimBox).map((m) => (m.id ? m : { ...m, id: crypto.randomUUID() })) : []))
 
   const changes = listingChanges(
     item,
@@ -128,18 +142,42 @@ export function BoxEditor({
     await sender.submit(draft.buildSubmission())
   }
 
+  const errors = sender.errors.length > 0 && (
+    <ul className="list-inside list-disc space-y-0.5 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+      {sender.errors.map((err, i) => (
+        <li key={i}>{err}</li>
+      ))}
+    </ul>
+  )
+  const sendButton = (label: string) => (
+    <button type="button" onClick={send} disabled={nothing || sender.submitting || sender.verifying} className={SUBMIT_PILL}>
+      {sender.submitting ? 'Sending…' : nothing ? 'No changes yet' : sender.verifying ? 'Verifying…' : label}
+    </button>
+  )
+
   return (
     <div className="space-y-4" data-testid="box-edit">
       <Honeypot value={sender.honeypot} onChange={sender.setHoneypot} />
-      <p className="-mt-1 text-[14px] text-muted">{item.name}</p>
+      {/* The shul's list says it itself, with the box's name once a minyan is open. */}
+      {!minyanimField && <p className="-mt-1 text-[14px] text-muted">{item.name}</p>}
       {edit.fields.map((f) =>
         f === minyanimField ? (
-          <MinyanimInput
+          // A shul's box: its minyanim as a list, then one at a time, with
+          // its own Send ("Send 2 changes") under the list.
+          <MinyanBoxEditor
             key={f.key}
-            value={boxRows}
-            days={BOX_DAYS[edit.minyanimBox!].choices}
-            newRowDays={BOX_DAYS[edit.minyanimBox!].newRow}
+            original={boxRows}
+            box={edit.minyanimBox!}
+            boxTitle={edit.title}
+            place={item.name}
+            onStep={onStep}
             onChange={(rows) => setDetail(f.key, mergeMinyanimBox(allRows, edit.minyanimBox!, rows))}
+            send={(n) => (
+              <>
+                {errors}
+                {sendButton(`Send ${n} change${n === 1 ? '' : 's'}`)}
+              </>
+            )}
           />
         ) : (
           // A section's own short name ("Hours", not "Women’s Hours"): the
@@ -147,16 +185,12 @@ export function BoxEditor({
           <DetailFieldInput key={f.key} field={f} labelOverride={f.shortLabel} value={details[f.key]} onChange={(v) => setDetail(f.key, v)} />
         ),
       )}
-      {sender.errors.length > 0 && (
-        <ul className="list-inside list-disc space-y-0.5 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-          {sender.errors.map((err, i) => (
-            <li key={i}>{err}</li>
-          ))}
-        </ul>
+      {!minyanimField && (
+        <>
+          {errors}
+          {sendButton('Send')}
+        </>
       )}
-      <button type="button" onClick={send} disabled={nothing || sender.submitting || sender.verifying} className={SUBMIT_PILL}>
-        {sender.submitting ? 'Sending…' : nothing ? 'No changes yet' : sender.verifying ? 'Verifying…' : 'Send'}
-      </button>
       <TurnstileWidget ref={ownTurnstileRef} onVerify={setOwnTurnstileToken} />
     </div>
   )

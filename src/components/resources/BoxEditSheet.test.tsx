@@ -5,7 +5,7 @@ import { renderWithProviders } from '@/test/renderWithProviders'
 import { makeCategory, makeListing } from '@/test/providerFixtures'
 import { mockRouter } from '@/test/nextNavigationMock'
 import type { CategoryField } from '@/lib/categories'
-import { BoxEditor } from './BoxEditSheet'
+import BoxEditSheet, { BoxEditor } from './BoxEditSheet'
 
 vi.mock('@vercel/analytics', () => ({ track: vi.fn() }))
 vi.mock('next/navigation', () => ({
@@ -54,3 +54,106 @@ describe('BoxEditor', () => {
     expect(onEditElse).toHaveBeenCalled()
   })
 })
+
+// A shul's usual box (Oct 10, canvas page "Minyan edit"): its minyanim as a
+// list, one opened at a time, every change sent together.
+describe('BoxEditor, a shul’s usual Shabbos times', () => {
+  const minyanim: CategoryField = { key: 'minyanim', label: 'Davening', type: 'minyanim', renderAs: 'row' }
+  const shuls = makeCategory({ id: 'synagogue', detailFields: [minyanim] })
+  const shul = makeListing({
+    id: '5d0a7c1e-2f55-4a8e-9d57-3b7f0d6f4a21',
+    name: 'Mekor Habracha',
+    minyanim: [
+      { id: 'mm', tefillah: 'mincha_maariv', days: ['sun', 'mon', 'tue', 'wed', 'thu', 'fri'], time: '15 min before sunset', anchor: 'sunset', offsetMinutes: -15 },
+      { id: 'sh', tefillah: 'shacharis', days: ['sat'], time: '9:15am' },
+      { id: 'wk', tefillah: 'shacharis', days: ['mon', 'thu'], time: '6:45am' },
+    ],
+  })
+  const edit = { title: 'Usual Shabbos times', fields: [minyanim], minyanimBox: 'shabbos' as const }
+  const open = () => renderWithProviders(<BoxEditSheet item={shul} category={shuls} edit={edit} onClose={vi.fn()} />)
+
+  it('lists the box as it reads, in the order of Shabbos, and nothing of the week', () => {
+    open()
+    const list = screen.getByTestId('minyan-box-list')
+    expect(within(list).getAllByRole('button', { name: /^(Mincha|Shacharis)/ }).map((b) => b.textContent)).toEqual([
+      'Mincha & Maariv 15 min before sunset',
+      'Shacharis 9:15 AM',
+    ])
+    expect(within(list).getByText('Friday night')).toBeInTheDocument()
+    expect(within(list).queryByText(/6:45/)).not.toBeInTheDocument()
+    expect(within(list).getByRole('button', { name: 'No changes yet' })).toBeDisabled()
+  })
+
+  it('opens one minyan, Done marks it changed on the list, and Send sends only that part of the row', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ ok: true }), { status: 200 }))
+    open()
+    fireEvent.click(screen.getByRole('button', { name: /^Mincha & Maariv/ }))
+    const sheet = screen.getByRole('dialog', { name: 'Mincha & Maariv' })
+    // Which box and which shul, on one line under the minyan's name.
+    expect(within(sheet).getByText('Usual Shabbos times · Mekor Habracha')).toBeInTheDocument()
+    expect(within(sheet).queryByText('Mekor Habracha')).not.toBeInTheDocument()
+    expect(within(sheet).getByRole('button', { name: 'From a zman' })).toHaveAttribute('aria-pressed', 'true')
+    fireEvent.change(within(sheet).getByLabelText('Offset in minutes'), { target: { value: '25' } })
+    // Time of year and earliest/latest wait under More.
+    expect(within(sheet).queryByRole('group', { name: 'Time of year' })).not.toBeInTheDocument()
+    fireEvent.click(within(sheet).getByRole('button', { name: 'Done' }))
+
+    const list = screen.getByTestId('minyan-box-list')
+    expect(within(list).getByRole('button', { name: /25 min before sunset.*Changed/ })).toBeInTheDocument()
+    fireEvent.click(within(list).getByRole('button', { name: 'Send 1 change' }))
+    await screen.findByTestId('box-edit-sent')
+    const body = JSON.parse(String(fetchMock.mock.calls[0][1]!.body))
+    const sent = body.details?.minyanim ?? body.proposed?.minyanim ?? JSON.parse(JSON.stringify(body)).minyanim
+    const rows = (sent ?? findMinyanim(body)) as { id: string; days: string[]; time: string }[]
+    // The weekday part of the row is as it was; Friday night is the change.
+    expect(rows.find((r) => r.id === 'mm')).toMatchObject({ days: ['sun', 'mon', 'tue', 'wed', 'thu'], time: '15 min before sunset' })
+    expect(rows.find((r) => r.id === 'mm-shabbos')).toMatchObject({ days: ['fri'], anchor: 'sunset', offsetMinutes: -25 })
+    expect(rows.find((r) => r.id === 'wk')).toMatchObject({ time: '6:45am' })
+  })
+
+  it('adds a minyan on Shabbos, and takes one out, as two changes', () => {
+    open()
+    fireEvent.click(screen.getByRole('button', { name: 'Add a minyan' }))
+    const add = screen.getByRole('dialog', { name: 'Add a minyan' })
+    expect(within(add).getByRole('button', { name: 'Shabbos' })).toHaveAttribute('aria-pressed', 'true')
+    expect(within(add).queryByRole('button', { name: /Remove/ })).not.toBeInTheDocument()
+    expect(within(add).getByRole('button', { name: 'Done' })).toBeDisabled()
+    fireEvent.change(within(add).getByLabelText('Tefillah'), { target: { value: 'mincha' } })
+    fireEvent.change(within(add).getByLabelText('Time'), { target: { value: '12:20pm' } })
+    fireEvent.click(within(add).getByRole('button', { name: 'Done' }))
+    expect(screen.getByRole('button', { name: /^Mincha 12:20 PM.*New/ })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /^Shacharis/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Remove this minyan' }))
+    expect(screen.queryByRole('button', { name: /^Shacharis/ })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Send 2 changes' })).toBeEnabled()
+  })
+
+  it('says a minyan’s time of year once, with its note', () => {
+    const winter = makeListing({ id: shul.id, minyanim: [{ id: 'k', tefillah: 'mincha', days: ['sat'], time: '12:20pm', season: 'winter', notes: 'Following Kiddush' }] })
+    renderWithProviders(<BoxEditSheet item={winter} category={shuls} edit={edit} onClose={vi.fn()} />)
+    expect(screen.getByRole('button', { name: /^Mincha 12:20 PM/ })).toHaveTextContent(/Winter only · Following Kiddush$/)
+    fireEvent.click(screen.getByRole('button', { name: /^Mincha 12:20 PM/ }))
+    // A minyan that has one opens with More open, its season chosen.
+    expect(screen.getByRole('button', { name: 'Winter' })).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('Back from a minyan leaves it as it was', () => {
+    open()
+    fireEvent.click(screen.getByRole('button', { name: /^Shacharis/ }))
+    fireEvent.change(screen.getByLabelText('Time'), { target: { value: '9:30am' } })
+    fireEvent.click(screen.getByRole('button', { name: /back/i }))
+    expect(screen.getByRole('button', { name: /^Shacharis 9:15 AM$/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'No changes yet' })).toBeDisabled()
+  })
+})
+
+/** The minyanim list wherever the submission carries it. */
+function findMinyanim(v: unknown): unknown {
+  if (Array.isArray(v) && v.some((x) => x && typeof x === 'object' && 'tefillah' in x)) return v
+  if (v && typeof v === 'object') for (const x of Object.values(v)) {
+    const found = findMinyanim(x)
+    if (found) return found
+  }
+  return undefined
+}

@@ -307,10 +307,16 @@ describe('ListingView — how sure', () => {
     const sheet = screen.getByRole('dialog', { name: 'Usual Shabbos times' })
     expect(within(sheet).getByTestId('box-edit')).toBeInTheDocument()
     expect(within(sheet).getByRole('button', { name: 'No changes yet' })).toBeDisabled()
-    // Only that box's days to put a time on: Friday night and Shabbos.
-    expect(within(sheet).getByRole('checkbox', { name: 'Sat' })).toBeChecked()
-    expect(within(sheet).getByRole('checkbox', { name: 'Fri' })).toBeInTheDocument()
-    expect(within(sheet).queryByRole('checkbox', { name: 'Mon' })).not.toBeInTheDocument()
+    // The box as a list, one minyan a row; a tap opens that one, with only
+    // the box's days to put it on: Friday night and Shabbos.
+    fireEvent.click(within(sheet).getByRole('button', { name: /Shacharis 9 AM/ }))
+    const one = screen.getByRole('dialog', { name: 'Shacharis' })
+    expect(within(one).getByRole('button', { name: 'Shabbos' })).toHaveAttribute('aria-pressed', 'true')
+    expect(within(one).getByRole('button', { name: 'Friday night' })).toHaveAttribute('aria-pressed', 'false')
+    expect(within(one).queryByRole('button', { name: 'Mon' })).not.toBeInTheDocument()
+    // Back is to the list.
+    fireEvent.click(within(one).getByRole('button', { name: /back/i }))
+    expect(screen.getByRole('dialog', { name: 'Usual Shabbos times' })).toBeInTheDocument()
   })
 
   it('a grocery’s items aren’t dated as a whole: each item carries its own date', () => {

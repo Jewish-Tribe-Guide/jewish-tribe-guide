@@ -190,7 +190,13 @@ function partOf(m: Minyan, day: 'fri' | 'sat'): ShabbosPart {
   return 'afternoon'
 }
 
-const PART_ORDER: ShabbosPart[] = ['friday', 'morning', 'afternoon', 'motzei']
+export const PART_ORDER: ShabbosPart[] = ['friday', 'morning', 'afternoon', 'motzei']
+
+/** Where one row of the usual Shabbos box sits: Friday night when it's on
+ *  Friday, else its part of Shabbos (the box's edit list, minyanimBox.ts). */
+export function shabbosPartOf(m: Minyan): ShabbosPart {
+  return partOf(m, m.days.includes('fri') && m.tefillah !== 'shacharis' ? 'fri' : 'sat')
+}
 
 /** A shul's usual Shabbos, in the order it happens; null when it has none
  *  listed. `otherSeason`: "In winter, also Mincha 12:20 PM, after Kiddush." */
