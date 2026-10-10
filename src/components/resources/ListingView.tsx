@@ -1119,7 +1119,6 @@ function GroupBox({ item, group, now, candlesAt }: { item: DirectoryResource; gr
   const more = [lead?.rest, ...texts.slice(1)].filter((t): t is string => !!t)
   const foldable = (hasWeek && !!now) || more.length > 0
   const shut = !open || !foldable
-  const foldLabel = hasWeek && more.length > 0 ? 'Week and notes' : hasWeek ? 'The week' : 'More'
   // "Still right?" once the section's opened (Oct 6): it's asked of whoever
   // is reading its whole week, not over every box at once. A box with
   // nothing to open asks it straight away.
@@ -1165,7 +1164,9 @@ function GroupBox({ item, group, now, candlesAt }: { item: DirectoryResource; gr
       </div>
       {foldable && (
         <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} className="flex cursor-pointer items-center gap-1 py-1.5 text-[14.5px] font-bold text-primary">
-          {open ? 'Less' : foldLabel}
+          {/* "More", whatever's folded: "Week and notes" was one more
+              thing to read (the user, Oct 10). */}
+          {open ? 'Less' : 'More'}
           <ChevronRightIcon className={`h-4 w-4 transition-transform ${open ? '-rotate-90' : 'rotate-90'}`} />
         </button>
       )}

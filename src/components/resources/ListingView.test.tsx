@@ -188,7 +188,8 @@ describe('ListingView — a mikvah’s boxes (Oct 6)', () => {
     expect(box).toHaveTextContent('On Shabbos, by appointment only.')
     expect(box).not.toHaveTextContent('Motzei Shabbos')
     expect(within(box).getByRole('link', { name: '(215) 555-1234' })).toHaveAttribute('href', 'tel:2155551234')
-    fireEvent.click(within(box).getByRole('button', { name: /Week and notes/ }))
+    // "More", not "Week and notes" (the user, Oct 10).
+    fireEvent.click(within(box).getByRole('button', { name: 'More' }))
     expect(within(box).getByTestId('listing-group-more')).toHaveTextContent('On Motzei Shabbos, open for 2 hours.')
     expect(within(box).getByRole('button', { name: /Less/ })).toHaveAttribute('aria-expanded', 'true')
     // Opened, the week replaces today's line and the notes are said whole,
@@ -336,10 +337,10 @@ describe('ListingView — how sure', () => {
     const [women, men, keilim] = [...screen.getByTestId('listing-groups').querySelectorAll('section')]
     // Asked once a section's opened (Oct 6), not over every box at once.
     expect(screen.queryByTestId('freshness')).not.toBeInTheDocument()
-    fireEvent.click(within(women).getByRole('button', { name: /The week/ }))
+    fireEvent.click(within(women).getByRole('button', { name: 'More' }))
     expect(women).toHaveTextContent('Women’s hours confirmed Sep 2.')
     expect(within(men).queryByTestId('freshness')).not.toBeInTheDocument()
-    fireEvent.click(within(men).getByRole('button', { name: /The week/ }))
+    fireEvent.click(within(men).getByRole('button', { name: 'More' }))
     expect(men).toHaveTextContent('Men’s hours confirmed Oct 1.')
     fireEvent.click(within(women).getByRole('button', { name: 'Less' }))
     expect(within(women).queryByTestId('freshness')).not.toBeInTheDocument()
@@ -352,7 +353,7 @@ describe('ListingView — how sure', () => {
       item: makeListing({ id: '0b6c4c1e-2f55-4a8e-9d57-3b7f0d6f4a21', womenTevillah: true, womenTevillah_hours: week }),
       category: mikvah,
     })
-    fireEvent.click(within(screen.getByTestId('listing-groups')).getByRole('button', { name: /The week/ }))
+    fireEvent.click(within(screen.getByTestId('listing-groups')).getByRole('button', { name: 'More' }))
     fireEvent.click(within(screen.getByTestId('listing-groups')).getByRole('button', { name: 'Yes' }))
     await vi.waitFor(() => expect(fetchMock).toHaveBeenCalled())
     const [url, init] = fetchMock.mock.calls[0]
