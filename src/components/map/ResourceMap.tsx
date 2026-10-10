@@ -9,6 +9,7 @@ import { community } from '@/community.config'
 import type { DirectoryResource } from '@/types'
 import { glyphElementFor, glyphTextFor } from '@/lib/categoryIcons'
 import { PinIcon } from '@/components/icons'
+import { clearEruvim, drawEruvim, emphasizeEruvim, eruvDrawKey, type DrawnEruv, type MapEruv } from './eruvLayer'
 
 /** One plottable place on the map. */
 export type MapPoint = {
@@ -135,6 +136,13 @@ type Props = {
    *  which is unaffected by this) — they're just excluded from what the
    *  initial view has to include. */
   zoomRadiusMiles?: number | null
+  /** The Eruvim layer (its chip on): each eruv's line, area and name, under
+   *  the pins. Tapping a line or a name calls onSelectEruv; tapping inside
+   *  an eruv is still a tap on the map (see eruvLayer's areasClickable). */
+  eruvim?: MapEruv[]
+  onSelectEruv?: (id: string) => void
+  /** The eruv whose listing is open, picked out. */
+  selectedEruvId?: string | null
 }
 
 const DEFAULT_CENTER = community.mapCenter
@@ -465,7 +473,7 @@ function buildUserDot(): HTMLElement {
 /** The interactive Google map: one advanced marker per point, a distinct "you
  *  are here" marker for the visitor, an info window on click, and a viewport
  *  auto-fit to whatever points are currently shown. */
-export default function ResourceMap({ points, userLocation, directionsOrigin, follow = true, onResumeFollow, onManualDrag, fallbackCenter = DEFAULT_CENTER, onViewListing, onSelectPoint, onDeselectPoint, onBackgroundClick, onMapLongPress, onLongPressPoint, searchActive, selectedId, frameToken, obscuredBottomPx = 0, obscuredTopPx = 0, zoomRadiusMiles }: Props) {
+export default function ResourceMap({ points, userLocation, directionsOrigin, follow = true, onResumeFollow, onManualDrag, fallbackCenter = DEFAULT_CENTER, onViewListing, onSelectPoint, onDeselectPoint, onBackgroundClick, onMapLongPress, onLongPressPoint, searchActive, selectedId, frameToken, obscuredBottomPx = 0, obscuredTopPx = 0, zoomRadiusMiles, eruvim, onSelectEruv, selectedEruvId = null }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<google.maps.Map | null>(null)
   const markersRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([])
@@ -521,6 +529,27 @@ export default function ResourceMap({ points, userLocation, directionsOrigin, fo
   useEffect(() => { obscuredTopPxRef.current = obscuredTopPx }, [obscuredTopPx])
   useEffect(() => { onManualDragRef.current = onManualDrag }, [onManualDrag])
   useEffect(() => { zoomRadiusMilesRef.current = zoomRadiusMiles }, [zoomRadiusMiles])
+  const onSelectEruvRef = useRef(onSelectEruv)
+  const eruvimRef = useRef(eruvim)
+  useEffect(() => { onSelectEruvRef.current = onSelectEruv }, [onSelectEruv])
+  useEffect(() => { eruvimRef.current = eruvim }, [eruvim])
+
+  // ── The Eruvim layer ─────────────────────────────────────────────────────
+  // Redrawn only when an eruv's line or status changes (eruvDrawKey), never
+  // reframed: the eruvim are a layer under whatever the map is showing.
+  const drawnEruvimRef = useRef<Map<string, DrawnEruv>>(new Map())
+  const eruvKey = eruvim?.length ? eruvDrawKey(eruvim) : ''
+  useEffect(() => {
+    const map = mapRef.current
+    if (!ready || !map) return
+    clearEruvim(drawnEruvimRef.current)
+    drawnEruvimRef.current = eruvKey
+      ? drawEruvim(map, eruvimRef.current ?? [], { onSelect: (id) => onSelectEruvRef.current?.(id), areasClickable: false })
+      : new Map()
+  }, [ready, eruvKey])
+  useEffect(() => {
+    if (ready) emphasizeEruvim(drawnEruvimRef.current, selectedEruvId)
+  }, [ready, eruvKey, selectedEruvId])
   // ── Initialize the map once ──────────────────────────────────────────────
   useEffect(() => {
     if (!MAPS_API_KEY || mapsAuthFailed()) return
