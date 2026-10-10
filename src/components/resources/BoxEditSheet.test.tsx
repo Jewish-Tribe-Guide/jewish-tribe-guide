@@ -139,6 +139,30 @@ describe('BoxEditor, a shul’s usual Shabbos times', () => {
     expect(screen.getByRole('button', { name: 'Winter' })).toHaveAttribute('aria-pressed', 'true')
   })
 
+  it('More folds away again with Less, keeping what was set', () => {
+    open()
+    fireEvent.click(screen.getByRole('button', { name: /^Mincha & Maariv/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'More' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Winter' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Less' }))
+    expect(screen.queryByRole('group', { name: 'Time of year' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'More' }))
+    expect(screen.getByRole('button', { name: 'Winter' })).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('Yom Tov is a day in the Shabbos box, and not in the week’s; Kabbalas Shabbos isn’t a weekday tefillah', () => {
+    open()
+    fireEvent.click(screen.getByRole('button', { name: 'Add a minyan' }))
+    expect(screen.getByRole('button', { name: 'Yom Tov' })).toBeInTheDocument()
+    expect(within(screen.getByLabelText('Tefillah')).getByRole('option', { name: 'Kabbalas Shabbos' })).toBeInTheDocument()
+    cleanup()
+    renderWithProviders(<BoxEditSheet item={shul} category={shuls} edit={{ ...edit, title: 'Usual weekday times', minyanimBox: 'weekday' }} onClose={vi.fn()} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Add a minyan' }))
+    expect(screen.queryByRole('button', { name: 'Yom Tov' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Rosh Chodesh' })).toBeInTheDocument()
+    expect(within(screen.getByLabelText('Tefillah')).queryByRole('option', { name: 'Kabbalas Shabbos' })).not.toBeInTheDocument()
+  })
+
   it('Back from a minyan leaves it as it was', () => {
     open()
     fireEvent.click(screen.getByRole('button', { name: /^Shacharis/ }))

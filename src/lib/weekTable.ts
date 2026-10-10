@@ -125,11 +125,12 @@ export type ShabbosLine = {
 /** A shul's usual Shabbos, in the order it happens; null when it has none
  *  listed. `otherSeason`: "In winter, also Mincha 12:20 PM, after Kiddush." */
 export function shabbosList(minyanim: readonly Minyan[], season: Season | null): { lines: ShabbosLine[]; otherSeason: string | null } | null {
-  const lineOf = (m: Minyan, day: 'fri' | 'sat'): ShabbosLine => ({ part: partOf(m, day), tefillah: m.tefillah, when: timeText(m), note: noteText(m.notes), row: m })
+  const lineOf = (m: Minyan, day: 'fri' | 'sat' | 'yom_tov'): ShabbosLine => ({ part: partOf(m, day), tefillah: m.tefillah, when: timeText(m), note: noteText(m.notes), row: m })
   const of = (keep: (m: Minyan) => boolean) =>
     minyanim.filter(keep).flatMap((m) => [
       ...(m.days.includes('fri') && m.tefillah !== 'shacharis' ? [lineOf(m, 'fri')] : []),
       ...(m.days.includes('sat') ? [lineOf(m, 'sat')] : []),
+      ...(m.days.includes('yom_tov') ? [lineOf(m, 'yom_tov')] : []),
     ])
   const order = (a: ShabbosLine, b: ShabbosLine) =>
     PART_ORDER.indexOf(a.part) - PART_ORDER.indexOf(b.part) ||

@@ -17,14 +17,15 @@ export type MinyanBox = 'weekday' | 'shabbos'
 
 /** The days a row in the box can be put on, and a new row's first day. */
 export const BOX_DAYS: Record<MinyanBox, { choices: Minyan['days']; newRow: Minyan['days'] }> = {
-  shabbos: { choices: ['fri', 'sat'], newRow: ['sat'] },
-  weekday: { choices: ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'rosh_chodesh', 'yom_tov', 'holiday'], newRow: [] },
+  shabbos: { choices: ['fri', 'sat', 'yom_tov'], newRow: ['sat'] },
+  weekday: { choices: ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'rosh_chodesh', 'holiday'], newRow: [] },
 }
 
-/** The days of a row the box shows. Rosh Chodesh is the week's. */
+/** The days of a row the box shows. Rosh Chodesh is the week's; Yom Tov
+ *  is Shabbos's (the user, Oct 10). */
 function boxDays(m: Minyan, box: MinyanBox): Minyan['days'] {
   return m.days.filter((d) => {
-    const shabbos = d === 'sat' || (d === 'fri' && m.tefillah !== 'shacharis')
+    const shabbos = d === 'sat' || d === 'yom_tov' || (d === 'fri' && m.tefillah !== 'shacharis')
     return box === 'shabbos' ? shabbos : !shabbos
   })
 }

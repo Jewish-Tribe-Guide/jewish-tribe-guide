@@ -65,3 +65,12 @@ describe('the box as a list (Oct 10, canvas page “Minyan edit”)', () => {
     expect(boxChangeCount(was, [...changed.filter((m) => m.id !== 'm'), { id: 'n', tefillah: 'mincha', days: ['sat'], time: '12:20pm' }])).toBe(3)
   })
 })
+
+describe('Yom Tov is the Shabbos box’s (the user, Oct 10)', () => {
+  it('a row on weekdays and Yom Tov shows its Yom Tov in the Shabbos box, and the rest in the week’s', () => {
+    const row: Minyan = { id: 'y', tefillah: 'shacharis', days: ['mon', 'yom_tov'], time: '7:00am' }
+    expect(minyanimForBox([row], 'shabbos')).toEqual([{ ...row, days: ['yom_tov'] }])
+    expect(minyanimForBox([row], 'weekday')).toEqual([{ ...row, days: ['mon'] }])
+    expect(boxGroups(minyanimForBox([row], 'shabbos'), 'shabbos').map((g) => g.label)).toEqual(['Yom Tov'])
+  })
+})

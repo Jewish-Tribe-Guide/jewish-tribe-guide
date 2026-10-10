@@ -113,7 +113,7 @@ export default function MinyanBoxEditor({
             {g.rows.map((m) => {
               // The week's rows are under their tefillah already: the time
               // and the days. Shabbos's say which tefillah.
-              const sub = [box === 'weekday' ? formatDays(m.days) : m.days.length > 1 ? 'Friday night and Shabbos' : null, m.season ? SEASON_LABELS[m.season] : null, noteText(m.notes)].filter(Boolean).join(' · ')
+              const sub = [box === 'weekday' ? formatDays(m.days) : m.days.length > 1 ? m.days.map((d) => dayLabel(d, box)).join(' and ') : null, m.season ? SEASON_LABELS[m.season] : null, noteText(m.notes)].filter(Boolean).join(' · ')
               const changed = isChanged(m)
               return (
                 <li key={m.id}>
@@ -181,7 +181,7 @@ function OneMinyan({ start, box, under, onDone, onRemove }: { start: Minyan; box
           }}
           className={`${input} w-full font-semibold`}
         >
-          {TEFILLAH_ORDER.filter((t) => t !== 'shabbos_mussaf' || t === row.tefillah).map((t) => (
+          {TEFILLAH_ORDER.filter((t) => t === row.tefillah || (t !== 'shabbos_mussaf' && !(box === 'weekday' && t === 'kabbalas_shabbos'))).map((t) => (
             <option key={t} value={t}>
               {TEFILLAH_LABELS[t]}
             </option>
@@ -267,6 +267,11 @@ function OneMinyan({ start, box, under, onDone, onRemove }: { start: Minyan; box
               </div>
             </div>
           )}
+          {/* Folds it away again; what's set stays set. */}
+          <button type="button" onClick={() => setMore(false)} className="inline-flex cursor-pointer items-center gap-1 text-[14.5px] font-bold text-primary">
+            Less
+            <ChevronRightIcon className="h-4 w-4 -rotate-90" />
+          </button>
         </div>
       ) : (
         <button type="button" onClick={() => setMore(true)} className="inline-flex cursor-pointer items-center gap-1 text-[14.5px] font-bold text-primary">

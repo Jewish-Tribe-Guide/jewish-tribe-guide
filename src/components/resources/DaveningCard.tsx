@@ -400,7 +400,8 @@ function WeekTable({ table, today }: { table: NonNullable<ReturnType<typeof week
  *  Shabbos's; sunset is today's, so it's given only on the day itself. */
 function thisWeek(line: ShabbosLine, anchors: AnchorTimes | undefined, today: DayKey | null): string | null {
   const row = line.row
-  if (!row.anchor) return null
+  // Yom Tov's date isn't this week's to work out.
+  if (!row.anchor || line.part === 'yomtov') return null
   const onDay = line.part === 'friday' ? 'fri' : 'sat'
   if (row.anchor === 'sunset' && today !== onDay) return null
   const at = resolveAnchorTime(row, anchors)
