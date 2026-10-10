@@ -303,22 +303,19 @@ describe('GenericDirectory', () => {
       makeListing({ id: 'c', name: 'Acme', m: ['Challah'] }),
     ]
 
-    it('says it searches this category, with example searches under it that answer', () => {
+    it('is headed Search and says it searches this category, with no example searches under it (the user, Oct 10)', () => {
       renderWithProviders(<GenericDirectory category={grocery} items={stores} {...handlers} />)
+      expect(screen.getByRole('heading', { level: 2, name: 'Search' })).toBeInTheDocument()
       expect(screen.getByRole('searchbox', { name: 'Search Grocery Stores' })).toHaveAttribute('placeholder', 'Ask for any item or store')
       expect(screen.getByText('in Grocery Stores')).toBeInTheDocument()
-      const examples = within(screen.getByTestId('category-examples'))
-      expect(examples.getByRole('button', { name: 'challah' })).toBeInTheDocument()
-      expect(examples.getByRole('button', { name: 'wine' })).toBeInTheDocument()
+      expect(screen.queryByText('Try')).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'challah' })).not.toBeInTheDocument()
     })
 
-    it('types an example into the box when tapped, and answers it', async () => {
+    it('answers what is typed', async () => {
       const user = userEvent.setup()
       renderWithProviders(<GenericDirectory category={grocery} items={stores} {...handlers} />)
-      await user.click(within(screen.getByTestId('category-examples')).getByRole('button', { name: 'challah' }))
-      expect(screen.getByRole('searchbox')).toHaveValue('challah')
-      // The examples go once something is asked; the answer takes their place.
-      expect(screen.queryByTestId('category-examples')).not.toBeInTheDocument()
+      await user.type(screen.getByRole('searchbox'), 'challah')
       expect(screen.getByRole('status')).toHaveTextContent(/challah/i)
     })
 
@@ -1172,15 +1169,12 @@ describe('GenericDirectory — the list heading', () => {
     expect(screen.getByText('Cafe')).toBeInTheDocument()
   })
 
-  it('puts Open now under the heading as a switch once something is typed', async () => {
+  it('adds no Open now switch once something is typed: Open now lives in Filters (the user, Oct 10)', async () => {
     const user = userEvent.setup()
     renderWithProviders(<GenericDirectory category={food} items={items} {...handlers} />)
-    const heading = within(screen.getByTestId('list-heading'))
-    expect(heading.queryByRole('button', { name: 'Open now' })).not.toBeInTheDocument()
-
     await user.type(screen.getByRole('searchbox'), 'grill')
 
-    expect(heading.getByRole('button', { name: 'Open now', pressed: false })).toBeInTheDocument()
+    expect(within(screen.getByTestId('list-heading')).queryByRole('button', { name: 'Open now' })).not.toBeInTheDocument()
   })
 
   it('says so when the filters hide everything the search found, and clears just the filters', async () => {
@@ -2100,7 +2094,6 @@ describe('GenericDirectory — a listing opened on desktop', () => {
     await user.click(screen.getByRole('button', { name: 'Expand Beta Cafe' }))
 
     expect(screen.queryByRole('searchbox')).not.toBeInTheDocument()
-    expect(screen.queryByTestId('category-examples')).not.toBeInTheDocument()
     // The title stays for a screen reader only; the way back says where.
     expect(screen.getByRole('heading', { level: 1, name: 'Food' })).toHaveAttribute('class', 'sr-only')
     expect(screen.queryByRole('button', { name: /^Back to/ })).not.toBeInTheDocument()
@@ -2243,11 +2236,10 @@ describe('GenericDirectory — the Minyanim tab', () => {
   })
   afterEach(() => vi.useRealTimers())
 
-  it('has its own search, “in Minyanim”, with its own suggestions, and typing stays on the minyanim', async () => {
+  it('has its own search, “in Minyanim”, and typing stays on the minyanim', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
     renderWithProviders(<GenericDirectory category={shulCat} items={[mekor, aleph]} openMinyanimView {...handlers} />, { content: { categories: [shulCat] } })
     expect(screen.getByRole('searchbox', { name: 'Search Minyanim' })).toHaveAttribute('placeholder', 'Ask: mincha tonight')
-    expect(screen.getByTestId('category-examples')).toHaveTextContent('mincha tonight')
     await user.type(screen.getByRole('searchbox'), 'maariv')
     // It used to drop back to the list of shuls.
     expect(screen.getByTestId('minyanim-view')).toBeInTheDocument()

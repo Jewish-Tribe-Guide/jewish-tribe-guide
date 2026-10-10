@@ -3,7 +3,7 @@
 import type { ReactNode } from 'react'
 import { ClockIcon } from '@/components/icons'
 import { FilterChip } from './FiltersSheet'
-import SortMenu from './SortMenu'
+import SortMenu, { HEADING_BUTTON } from './SortMenu'
 
 // ── The list's own heading: what it is, how many, and how it's arranged ─────
 // "57 listings   Filters  Sort Popularity ▾". Above the list is for asking
@@ -13,10 +13,12 @@ import SortMenu from './SortMenu'
 //
 // Under it, a line of the filters that are on, as filled chips a tap
 // switches off, so a filter set from a listing's own badge deep in the list
-// is never on unseen. Once something is typed, Open now leads that line as
-// a switch, on or off: the one refinement people reach for after asking,
-// without opening the sheet. It sits on that line rather than beside Filters
-// and Sort because there isn't room for all three on a phone.
+// is never on unseen. Open now is one of those filters, in the sheet like
+// the rest: it used to appear as a switch the moment anything was typed,
+// which the user (Oct 10) found a puzzle rather than a help.
+//
+// Filters and Sort are outlined buttons a thumb can find, 40px tall; as
+// bold blue words they were hard to hit on a phone (the user, Oct 10).
 
 type Props = {
   /** The first group's name, or what closed groups are grouped by ("By
@@ -28,8 +30,6 @@ type Props = {
   noun?: boolean
   /** How many the whole list holds, whatever the heading shows. */
   total: number
-  /** Open now as a switch leading the chip line, for after a search. */
-  openNow?: { on: boolean; onToggle: () => void }
   /** Filters, with how many are on; absent where the category keeps none. */
   filters?: { active: number; onOpen: () => void }
   /** Sort, where there's more than one way to (likes on). */
@@ -42,7 +42,7 @@ type Props = {
   onShowMap?: () => void
 }
 
-export default function ListHeading({ label, count, noun = !label, total, openNow, filters, sort, onDaveningTimes, activeChips, onShowMap }: Props) {
+export default function ListHeading({ label, count, noun = !label, total, filters, sort, onDaveningTimes, activeChips, onShowMap }: Props) {
   const countText = noun ? `${count} listing${count === 1 ? '' : 's'}` : String(count)
   return (
     <div data-testid="list-heading" data-total={total} className="space-y-2 pt-2">
@@ -57,7 +57,7 @@ export default function ListHeading({ label, count, noun = !label, total, openNo
             countText
           )}
         </h2>
-        <div className="ml-auto flex items-center gap-3.5">
+        <div className="ml-auto flex items-center gap-2">
           {onDaveningTimes && (
             <TextAction>
               <button type="button" onClick={onDaveningTimes} aria-label="Minyanim by time" className="flex cursor-pointer items-center gap-1 whitespace-nowrap">
@@ -69,8 +69,7 @@ export default function ListHeading({ label, count, noun = !label, total, openNo
             </TextAction>
           )}
           {filters && (
-            <TextAction>
-              <button type="button" onClick={filters.onOpen} aria-haspopup="dialog" className="flex cursor-pointer items-center gap-1 whitespace-nowrap">
+            <button type="button" onClick={filters.onOpen} aria-haspopup="dialog" className={HEADING_BUTTON}>
                 <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" className="h-3.5 w-3.5">
                   <path d="M20 7h-9" />
                   <path d="M14 17H5" />
@@ -83,8 +82,7 @@ export default function ListHeading({ label, count, noun = !label, total, openNo
                     {filters.active}
                   </span>
                 )}
-              </button>
-            </TextAction>
+            </button>
           )}
           {sort && <SortMenu byPopular={sort.byPopular} onSelect={sort.onSelect} />}
           {onShowMap && (
@@ -103,9 +101,8 @@ export default function ListHeading({ label, count, noun = !label, total, openNo
           )}
         </div>
       </div>
-      {(openNow || activeChips.length > 0) && (
+      {activeChips.length > 0 && (
         <div className="-mx-4 flex items-center gap-2 overflow-x-auto px-4 pb-1 desktop:mx-0 desktop:flex-wrap desktop:px-0" style={{ scrollbarWidth: 'none' }} data-testid="active-filters">
-          {openNow && <FilterChip label="Open now" on={openNow.on} onToggle={openNow.onToggle} dot />}
           {activeChips.map((c) => (
             <FilterChip key={c.id} label={c.label} on onToggle={c.onOff} />
           ))}

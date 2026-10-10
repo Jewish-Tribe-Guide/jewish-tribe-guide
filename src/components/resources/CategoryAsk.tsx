@@ -4,9 +4,6 @@ import Link from 'next/link'
 import type { DirectoryResource } from '@/types'
 import { searchAsk, type AskResult } from '@/lib/askSearch'
 import { answerFor } from '@/lib/askAnswer'
-import { answersWell, pickPrompts } from '@/lib/searchPrompts'
-import { categoryExamples } from '@/lib/categoryExamples'
-import { MINYANIM_EXAMPLES } from '@/lib/minyanimSearch'
 import { neighborhoodsFor } from '@/lib/places'
 import { answerSchedule, useMinyanSchedule, type MinyanSchedule } from '@/lib/useMinyanSchedule'
 import { useNow } from '@/lib/useNow'
@@ -24,10 +21,12 @@ import ReadAs from '@/components/home/ReadAs'
 import type { ReadingChip, ReadingOffer } from '@/lib/readingSearch'
 
 // ── A category page's search: asking comes first ─────────────────────────────
-// The one search box on the page, limited to this category and saying so
-// ("in Food ×"), with a few example searches under it that answer well
-// (see categoryExamples), and once something is typed, one sentence answering
-// it (see askAnswer.ts) above the list. The answer only ever follows a
+// The one search box on the page, headed "Search" as the list below is
+// headed "22 listings", limited to this category and saying so ("in Food
+// ×"), and once something is typed, one sentence answering it (see
+// askAnswer.ts) above the list. No example searches under it: the user
+// (Oct 10) found the page cleaner without them, and the box's own
+// placeholder says what it's for. The answer only ever follows a
 // search: a sentence directly under the box reads as "here's the answer to
 // what you asked", so nothing sits there unasked.
 //
@@ -84,9 +83,7 @@ function Ask({ category, items, search, onSearch, schedule, readAs, scope }: Pro
   // means nothing measured from anywhere but where the visitor is.
   //
   // Not before the page has hydrated, when there's no time yet (see useNow):
-  // every answer says what's open, so none is given, and an example asking
-  // when something is ("open now", "next mincha") isn't offered yet. The
-  // rest are picked by what they find, which the time doesn't change.
+  // every answer says what's open, so none is given.
   const ask = (text: string) => {
     const result = searchAsk(items, [category], text, { categoryId: category.id, coords, now: new Date(now ?? 0), places })
     const answer = answerFor(result, {
@@ -97,7 +94,6 @@ function Ask({ category, items, search, onSearch, schedule, readAs, scope }: Pro
     return { result, answer }
   }
 
-  const asksWhen = (r: AskResult) => r.query.openNow || r.query.openToday || r.query.openAt !== null || r.query.minyan !== null
   const q = search.trim()
   // Read by the reader, its result answers (see readingSearch.ts).
   const onMinyanim = scope === 'minyanim'
@@ -129,19 +125,6 @@ function Ask({ category, items, search, onSearch, schedule, readAs, scope }: Pro
           categories: [category],
         }
       : null
-  const examples = q
-    ? []
-    : onMinyanim
-      ? MINYANIM_EXAMPLES
-      : pickPrompts(
-          categoryExamples(category, items, categories, places),
-          (p) => {
-            const tried = ask(p)
-            return (now !== null || !asksWhen(tried.result)) && answersWell(tried.answer, tried.result.hits.length)
-          },
-          5,
-        )
-
   const plural = category.pluralLabel.toLowerCase()
   const scopeLabel = onMinyanim ? 'Minyanim' : category.pluralLabel
   const placeholder = onMinyanim
@@ -154,6 +137,7 @@ function Ask({ category, items, search, onSearch, schedule, readAs, scope }: Pro
 
   return (
     <div className="space-y-3">
+      <h2 className="text-[15px] font-bold text-ink">Search</h2>
       <label className="flex h-12 items-center gap-2 rounded-xl border-[1.5px] border-primary bg-white pl-3 pr-1.5 shadow-sm focus-within:ring-2 focus-within:ring-primary/30">
         <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" className="h-5 w-5 shrink-0 text-primary">
           <circle cx="11" cy="11" r="8" />
@@ -198,29 +182,6 @@ function Ask({ category, items, search, onSearch, schedule, readAs, scope }: Pro
           </button>
         )}
       </label>
-
-      {examples.length > 0 && (
-        // Example searches, grey and borderless with a magnifier, so they
-        // read as searches to try rather than switches that stay on. A tap
-        // types the words into the box. One line that scrolls sideways.
-        <div className="-mx-4 flex items-center gap-2 overflow-x-auto px-4 desktop:mx-0 desktop:px-0" style={{ scrollbarWidth: 'none' }} data-testid="category-examples">
-          <span className="shrink-0 text-[13px] font-semibold text-slate-500">Try</span>
-          {examples.map((e) => (
-            <button
-              key={e}
-              type="button"
-              onClick={() => onSearch(e)}
-              className="flex h-9 shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-full bg-slate-100 pl-2.5 pr-3 text-[14px] font-medium text-ink transition-colors hover:bg-slate-200"
-            >
-              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" className="h-3.5 w-3.5 text-slate-500">
-                <circle cx="11" cy="11" r="8" />
-                <path d="m21 21-4.3-4.3" />
-              </svg>
-              {e}
-            </button>
-          ))}
-        </div>
-      )}
 
       {q && readAs && <ReadAs reading={readAs.reading} chips={readAs.chips} onRemove={readAs.onRemove} offers={readAs.offers} onPick={readAs.onPick} />}
       {answer && <AskAnswer answer={answer} share={share} />}

@@ -15,6 +15,11 @@ import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
 // for a location instead (selectSort in GenericDirectory), and Sort stays
 // on Popularity until one is set.
 
+/** Sort and the list heading's Filters (ListHeading): an outlined button a
+ *  thumb can find, 40px tall. */
+export const HEADING_BUTTON =
+  'flex h-10 shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-full border border-slate-300 bg-white px-3.5 text-[14px] font-bold text-primary transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30'
+
 const CHOICES = [
   { byPopular: true, label: 'Popularity' },
   { byPopular: false, label: 'Distance' },
@@ -78,12 +83,12 @@ export default function SortMenu({ byPopular, onSelect }: { byPopular: boolean; 
             setOpen(true)
           }
         }}
-        className="flex cursor-pointer items-center gap-1 rounded py-1.5 text-[13.5px] text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+        className={HEADING_BUTTON}
       >
         {/* The space is for the name it's read out by, "Sort Popularity";
             a flex row doesn't draw it. */}
-        Sort{' '}
-        <span className="flex items-center gap-0.5 font-bold text-primary">
+        <span className="font-medium text-slate-500">Sort</span>{' '}
+        <span className="flex items-center gap-0.5">
           <span data-testid="sort-shown">{CHOICES[current].label}</span>
           <svg
             aria-hidden="true"

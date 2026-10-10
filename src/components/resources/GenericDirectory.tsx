@@ -1105,11 +1105,9 @@ export default function GenericDirectory({ category, items, anchorLabel, address
       const cur = prev[key] ?? []
       return { ...prev, [key]: cur.includes(value) ? cur.filter((x) => x !== value) : [...cur, value] }
     })
-  // Whatever is switched on, as chips under the list heading. Open now is
-  // left out once something is typed: it leads that line as its own switch
-  // then, on or off.
+  // Whatever is switched on, as chips under the list heading.
   const activeChips = [
-    ...(openNow && hasFilterableHours && !typed ? [{ id: 'openNow', label: 'Open now', onOff: () => setOpenNow(false) }] : []),
+    ...(openNow && hasFilterableHours ? [{ id: 'openNow', label: 'Open now', onOff: () => setOpenNow(false) }] : []),
     ...filterableBooleans
       .filter((f) => boolFilters[f.key])
       .map((f) => ({ id: `f_${f.key}`, label: f.filterLabel ?? f.label, onOff: () => toggleBool(f.key) })),
@@ -1364,7 +1362,6 @@ export default function GenericDirectory({ category, items, anchorLabel, address
         count={grouping && !grouping.closed ? (grouping.groups[0]?.items.length ?? 0) : filtered.length}
         noun={!grouping || grouping.closed}
         total={filtered.length}
-        openNow={typed && hasFilterableHours ? { on: openNow, onToggle: () => setOpenNow((v) => !v) } : undefined}
         filters={hasActualFilters ? { active: activeFilterCount, onOpen: () => setFiltersOpen(true) } : undefined}
         sort={upvotes ? { byPopular: sortByPopular, onSelect: selectSort } : undefined}
         // Only while the Next minyan card, which carries it, is gone.

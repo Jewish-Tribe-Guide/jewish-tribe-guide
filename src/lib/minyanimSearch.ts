@@ -12,10 +12,6 @@ import type { DirectoryResource } from '@/types'
 // (ask.ts parseAsk), as a minyan question: on this tab, every search is
 // one, so "shabbos" alone is a day, not a word in a listing.
 
-/** The tab's suggested searches. Each is something the tab answers by
- *  narrowing: the next minyan is already its first line. */
-export const MINYANIM_EXAMPLES = ['mincha tonight', 'shacharis tomorrow', 'Shabbos morning', 'maariv near me']
-
 export type MinyanimSearch = {
   /** The tefillos asked about, or null for every one. */
   tefillos: Tefillah[] | null
