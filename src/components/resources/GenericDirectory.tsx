@@ -1366,7 +1366,12 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // The list's own heading: how many, and Filters and Sort, the same place
   // on every category page (see ListHeading). Under the search box, or at
   // the top of the list's column where the map sits beside it.
-  const listHeading = (
+  // A search that found nothing has no list to count or arrange: the box
+  // under the search says so, and "0 listings · Filters · Sort" under it
+  // was only more to read. Not when filters hid what it found: then
+  // Filters is the way back.
+  const searchFoundNothing = typed && filtered.length === 0 && !hiddenByFilters
+  const listHeading = searchFoundNothing ? null : (
       <ListHeading
         // Open groups: the first group's heading is the list's own ("Open
         // now · 57"), saving a line above the first place on a phone.
@@ -1581,7 +1586,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
           canAdd={canEdit}
           shulText={(item) => filterableSelects.flatMap((f) => selectValues(item[f.key])).join(' · ')}
         />
-      ) : filtered.length === 0 && typed && !hiddenByFilters ? (
+      ) : searchFoundNothing ? (
         // The search found nothing: the box under the search says so, with
         // one way to ask (AskTheGroup). A second "No groceries match your
         // search" with its own buttons was more to read (the user, Oct 10).

@@ -291,6 +291,8 @@ describe('GenericDirectory', () => {
     expect(screen.getByTestId('ask-the-group')).toHaveTextContent('Nothing in the guide for “nonexistent”.')
     expect(screen.queryByText('No grocery stores match your search.')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Clear search & filters' })).not.toBeInTheDocument()
+    // Nor "0 listings" with Filters and Sort for a list that isn't there.
+    expect(screen.queryByTestId('list-heading')).not.toBeInTheDocument()
   })
 
   describe('the search box: asking comes first', () => {
