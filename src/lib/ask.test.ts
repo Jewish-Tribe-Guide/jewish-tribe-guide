@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { makeCategory } from '@/test/providerFixtures'
-import { conceptCategories, editDistance, initialisms, parseAsk, termMatches, termsRequired, wordMatches, words } from './ask'
+import { conceptCategories, editDistance, initialisms, parseAsk, termMatches, termsRequired, withoutTerms, wordMatches, words } from './ask'
 
 describe('words', () => {
   it('folds spellings so a visitor and a listing meet whichever way each spelled it', () => {
@@ -382,5 +382,13 @@ describe('parseAsk — questions about the guide itself', () => {
     for (const input of ["what's in the kiddush", 'what can I find in center city', 'whats on the menu', "what's open now", 'who has challah']) {
       expect(parseAsk(input).meta, input).toBeNull()
     }
+  })
+})
+
+describe('withoutTerms', () => {
+  it('drops the words of a term as they were typed, and keeps the rest as typed', () => {
+    expect(withoutTerms('IKC Dairy places', ['dairy'])).toBe('IKC places')
+    expect(withoutTerms('dairy', ['dairy'])).toBe('')
+    expect(withoutTerms('Chalav Yisroel milk', ['chalav', 'yisroel'])).toBe('milk')
   })
 })

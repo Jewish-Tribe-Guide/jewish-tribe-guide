@@ -25,6 +25,7 @@ import { PlusIcon } from '@/components/icons'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { useScrollShowHide, useSetScreenHeader } from '@/lib/headerVisibility'
 import { foundFor, searchAsk } from '@/lib/askSearch'
+import { withoutTerms } from '@/lib/ask'
 import { neighborhoodsFor, placeName, townsFrom } from '@/lib/places'
 import { readerPlaces } from '@/lib/questionReader'
 import { needsReading, ownFrom, readingAnswers, readingChips, readingLoses, readingOffers, searchReading } from '@/lib/readingSearch'
@@ -1105,9 +1106,21 @@ export default function GenericDirectory({ category, items, anchorLabel, address
       const cur = prev[key] ?? []
       return { ...prev, [key]: cur.includes(value) ? cur.filter((x) => x !== value) : [...cur, value] }
     })
+  // A word in the search an admin taught to mean one of this category's
+  // filters ("dairy" is Food type: Dairy) narrows the list as that filter
+  // does, so it shows as one: a chip beside the rest, which takes the word
+  // out of the search. It used to narrow with nothing under Filters to say
+  // so (the user, Oct 10).
+  const taughtChips = ((readResult ?? todayResult)?.taught ?? []).flatMap((t) => {
+    const field = t.categoryId === category.id && t.field ? category.detailFields.find((f) => f.key === t.field) : undefined
+    if (!field) return []
+    const label = t.value === undefined ? (field.filterLabel ?? field.label) : (field.options?.find((o) => o.value === t.value)?.label ?? t.value)
+    return [{ id: `taught_${t.word}_${t.value ?? ''}`, label, onOff: () => setSearch(withoutTerms(search, t.word.split(' '))) }]
+  })
   // Whatever is switched on, as chips under the list heading.
   const activeChips = [
     ...(openNow && hasFilterableHours ? [{ id: 'openNow', label: 'Open now', onOff: () => setOpenNow(false) }] : []),
+    ...taughtChips,
     ...filterableBooleans
       .filter((f) => boolFilters[f.key])
       .map((f) => ({ id: `f_${f.key}`, label: f.filterLabel ?? f.label, onOff: () => toggleBool(f.key) })),

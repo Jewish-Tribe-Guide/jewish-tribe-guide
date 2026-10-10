@@ -196,6 +196,21 @@ export function termsAsTyped(raw: string, terms: readonly string[], beside: read
     .join(' ')
 }
 
+/** What was typed without the words of `terms` ("chalav yisroel"), as it
+ *  was typed otherwise: "IKC dairy" without ["dairy"] is "IKC". A typed
+ *  abbreviation goes with what it stands for ("cy"). For taking one
+ *  taught word out of a search, from its chip. */
+export function withoutTerms(raw: string, terms: readonly string[]): string {
+  return raw
+    .split(/\s+/)
+    .filter((token) => {
+      const ws = words(token)
+      return ws.length === 0 || !ws.every((w) => terms.includes(w))
+    })
+    .join(' ')
+    .trim()
+}
+
 /** The words of a text a question would search for: folded, with filler
  *  ("kosher", "store"), kinds of place ("food") and tefillos left out, as
  *  parseAsk leaves them out of a question's terms. Used for a filter's

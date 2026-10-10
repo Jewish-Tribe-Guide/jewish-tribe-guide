@@ -1177,6 +1177,19 @@ describe('GenericDirectory — the list heading', () => {
     expect(within(screen.getByTestId('list-heading')).queryByRole('button', { name: 'Open now' })).not.toBeInTheDocument()
   })
 
+  it('shows a word the search was taught as a filter chip, which takes the word out of the search (the user, Oct 10)', async () => {
+    const user = userEvent.setup()
+    const taught = { ...food, askWords: [{ word: 'dairy', field: 't', value: 'Dairy' }] }
+    renderWithProviders(<GenericDirectory category={taught} items={items} {...handlers} />)
+    await user.type(screen.getByRole('searchbox'), 'Dairy places')
+
+    const heading = within(screen.getByTestId('list-heading'))
+    expect(heading.getByRole('heading', { name: '1 listing' })).toBeInTheDocument()
+    await user.click(within(screen.getByTestId('active-filters')).getByRole('button', { name: 'Dairy' }))
+    expect(screen.getByRole('searchbox')).toHaveValue('places')
+    expect(screen.queryByTestId('active-filters')).not.toBeInTheDocument()
+  })
+
   it('says so when the filters hide everything the search found, and clears just the filters', async () => {
     const user = userEvent.setup()
     renderWithProviders(<GenericDirectory category={food} items={items} {...handlers} />)
