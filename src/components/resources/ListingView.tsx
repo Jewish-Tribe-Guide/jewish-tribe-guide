@@ -2,6 +2,7 @@
 
 import { useContext, useId, useState, type ReactNode } from 'react'
 import Link from 'next/link'
+import dynamic from 'next/dynamic'
 import { track } from '@vercel/analytics'
 import type { DirectoryResource } from '@/types'
 import { PHOTO_FIELD_KEY, resolveCapabilities, selectValues, type CategoryConfig, type CategoryField } from '@/lib/categories'
@@ -65,7 +66,7 @@ import {
 import Chip from './Chip'
 import Highlight from './Highlight'
 import DaveningCard from './DaveningCard'
-import BoxEditSheet, { type BoxEdit } from './BoxEditSheet'
+import type { BoxEdit } from './BoxEditSheet'
 import { TellAboutContext } from './tellAbout'
 import { schedulesKey } from '@/lib/schedules'
 import WalkLists from './WalkList'
@@ -133,6 +134,10 @@ const TONE: Record<RowFact['tone'], string> = {
   quiet: 'text-muted',
   plain: 'text-slate-700',
 }
+
+// The edit sheet and the form fields it carries load when Edit is tapped,
+// not with every listing: they were 15 KB on the home screen's first load.
+const BoxEditSheet = dynamic(() => import('./BoxEditSheet'))
 
 export default function ListingView({ item, category, color, place = null, upvote, found = null, path, foot, onward, wide = false, onwardClassName = '', titleAs: Title = 'h2' }: Props) {
   const { community } = useActiveCommunity()
@@ -607,7 +612,7 @@ export default function ListingView({ item, category, color, place = null, upvot
           box it's about. Just Suggest an edit. */}
       {foot && <div className="pt-1" data-testid="listing-foot">{foot}</div>}
       {onward && <OnwardSection item={item} category={category} color={color} onward={onward} className={onwardClassName} />}
-      <BoxEditSheet item={item} category={category} edit={boxEdit} onClose={() => setBoxEdit(null)} onEditElse={editElse} />
+      {boxEdit && <BoxEditSheet item={item} category={category} edit={boxEdit} onClose={() => setBoxEdit(null)} onEditElse={editElse} />}
     </div>
   )
 }
