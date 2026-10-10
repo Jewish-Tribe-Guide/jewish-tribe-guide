@@ -171,13 +171,11 @@ describe('HeroSearchDropdown', () => {
         categories={[]}
         onCardClick={noop}
         onOpenPlace={noop}
-        askGroup={{ nothingClose: true, askHref: '/philly/whatsapp', addHref: '/philly/feedback?about=dentist', sharePath: '/philly/ask/dentist' }}
+        askGroup={{ nothingClose: true, sharePath: '/philly/ask/dentist' }}
       />,
     )
-    expect(screen.getByText('Nothing in the guide for “dentist” yet.')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Ask a WhatsApp group' })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /See the community’s groups/ })).toHaveAttribute('href', '/philly/whatsapp')
-    expect(screen.getByRole('link', { name: /Add it to the guide/ })).toHaveAttribute('href', '/philly/feedback?about=dentist')
+    expect(screen.getByText('Nothing in the guide for “dentist”.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Ask in a WhatsApp group' })).toBeInTheDocument()
     expect(screen.queryByText(/Nothing matches/)).not.toBeInTheDocument()
   })
 
@@ -191,7 +189,7 @@ describe('HeroSearchDropdown', () => {
         onCardClick={noop}
         onOpenPlace={noop}
         answer={{ text: 'Nothing in the guide for “packaged pretzels”. 3 places have pretzels.', rows: [] }}
-        askGroup={{ nothingClose: false, askHref: null, addHref: '/philly/feedback?about=x', sharePath: '/philly/ask/packaged-pretzels' }}
+        askGroup={{ nothingClose: false, sharePath: '/philly/ask/packaged-pretzels' }}
       />,
     )
     const listing = screen.getByText('Listings')

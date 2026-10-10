@@ -867,8 +867,8 @@ describe('Landing', () => {
 
 })
 
-// A search that finds nothing shows what's close, then where to ask and how
-// to add the answer — and still counts as a miss, since it is one.
+// A search that finds nothing shows what's close, then where to ask — and
+// still counts as a miss, since it is one.
 describe('Landing — when nothing matches', () => {
   const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores', detailFields: [{ key: 'm', label: 'Kosher items', type: 'tags' }] })
   const whatsapp = makeCategory({ id: 'whatsapp', label: 'WhatsApp Group', pluralLabel: 'WhatsApp Groups' })
@@ -884,22 +884,18 @@ describe('Landing — when nothing matches', () => {
     // Headed as close, so the places aren't read as the answer.
     expect(screen.getAllByText('Closest matches').length).toBeGreaterThan(0)
     expect(screen.queryByRole('heading', { name: 'Places' })).toBeNull()
-    expect(screen.getAllByRole('button', { name: 'Ask a WhatsApp group' }).length).toBeGreaterThan(0)
-    const groups = screen.getAllByRole('link', { name: /See the community’s groups/ })[0]
-    expect(groups).toHaveAttribute('href', '/test-community/whatsapp')
+    expect(screen.getAllByRole('button', { name: 'Ask in a WhatsApp group' }).length).toBeGreaterThan(0)
     const lastCall = vi.mocked(useLogSearchMiss).mock.calls.at(-1)![0]
     expect(lastCall).toMatchObject({ query: 'packaged pretzels', hasResults: false })
   })
 
-  it('with nothing close either, offers to add the answer, the question written in', async () => {
+  it('with nothing close either, says so and offers only to ask (the user, Oct 10)', async () => {
     const user = userEvent.setup()
     renderLanding(undefined, { content: { categories: [grocery] } }, [store])
     await user.type(screen.getAllByLabelText('Search resources')[0]!, 'dentist')
 
-    expect(screen.getAllByText('Nothing in the guide for “dentist” yet.').length).toBeGreaterThan(0)
-    expect(screen.getAllByRole('link', { name: /Add it to the guide/ })[0]).toHaveAttribute('href', '/test-community/feedback?about=dentist')
-    // No WhatsApp groups in this community: nowhere to send anyone.
-    expect(screen.queryByRole('link', { name: /WhatsApp/ })).not.toBeInTheDocument()
+    expect(screen.getAllByText('Nothing in the guide for “dentist”.').length).toBeGreaterThan(0)
+    expect(screen.queryByRole('link', { name: /Add it to the guide/ })).not.toBeInTheDocument()
   })
 
   it('mobile: puts where to ask at the end of the results', async () => {
@@ -922,14 +918,6 @@ describe('Landing — when nothing matches', () => {
     expect(boxes.some((b) => places.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true)
   })
 
-  it('adds to the one kind of place the question named', async () => {
-    const user = userEvent.setup()
-    const food = makeCategory({ id: 'restaurant', label: 'Food', pluralLabel: 'Food' })
-    renderLanding(undefined, { content: { categories: [grocery, food] } }, [store])
-    await user.type(screen.getAllByLabelText('Search resources')[0]!, 'vegan food')
-
-    expect(screen.getAllByRole('link', { name: /Add it to the guide/ })[0]).toHaveAttribute('href', '/test-community/restaurant?form=create')
-  })
 })
 
 // The community's neighborhoods reach the home search: "food in Rittenhouse".

@@ -1581,6 +1581,11 @@ export default function GenericDirectory({ category, items, anchorLabel, address
           canAdd={canEdit}
           shulText={(item) => filterableSelects.flatMap((f) => selectValues(item[f.key])).join(' · ')}
         />
+      ) : filtered.length === 0 && typed && !hiddenByFilters ? (
+        // The search found nothing: the box under the search says so, with
+        // one way to ask (AskTheGroup). A second "No groceries match your
+        // search" with its own buttons was more to read (the user, Oct 10).
+        null
       ) : filtered.length === 0 ? (
         <div className="text-center py-12">
           <p className="text-sm text-muted">

@@ -280,7 +280,7 @@ describe('GenericDirectory', () => {
     expect(screen.queryByText('Trader Joe')).not.toBeInTheDocument()
   })
 
-  it('shows a "no matches" empty state with a clear button when a search narrows to nothing', async () => {
+  it('says a search found nothing once, in the box under the search, not again below it (the user, Oct 10)', async () => {
     const user = userEvent.setup()
     const category = makeCategory({ pluralLabel: 'Grocery Stores' })
     const items = [makeListing({ id: 'a', name: 'Kosher Mart' })]
@@ -288,11 +288,9 @@ describe('GenericDirectory', () => {
 
     await user.type(screen.getByRole('searchbox'), 'nonexistent')
 
-    expect(screen.getByText('No grocery stores match your search.')).toBeInTheDocument()
-    const clear = screen.getByRole('button', { name: 'Clear search & filters' })
-
-    await user.click(clear)
-    expect(screen.getByText('Kosher Mart')).toBeInTheDocument()
+    expect(screen.getByTestId('ask-the-group')).toHaveTextContent('Nothing in the guide for “nonexistent”.')
+    expect(screen.queryByText('No grocery stores match your search.')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Clear search & filters' })).not.toBeInTheDocument()
   })
 
   describe('the search box: asking comes first', () => {
@@ -338,17 +336,14 @@ describe('GenericDirectory', () => {
       }
     })
 
-    it('found nothing: asks the group, or where it’s sold, as the home search does', async () => {
+    it('found nothing: asks the group, as the home search does, and nothing else', async () => {
       const user = userEvent.setup()
-      // Its items are the listing's main list (showCountInHeader), as Grocery's are.
-      const withItems = makeCategory({ detailFields: [{ key: 'm', label: 'Kosher items', type: 'tags', showCountInHeader: true }] })
-      renderWithProviders(<GenericDirectory category={withItems} items={stores} {...handlers} />)
+      renderWithProviders(<GenericDirectory category={grocery} items={stores} {...handlers} />)
       await user.type(screen.getByRole('searchbox'), 'rugelach')
       const card = within(screen.getByTestId('ask-the-group'))
-      expect(card.getByText('Nothing in the guide for “rugelach” yet.')).toBeInTheDocument()
-      expect(card.getByRole('button', { name: 'Ask a WhatsApp group' })).toBeInTheDocument()
-      await user.click(card.getByRole('button', { name: /Know where to find it/ }))
-      expect(screen.getByTestId('where-seen')).toHaveTextContent('Seen rugelach somewhere?')
+      expect(card.getByText('Nothing in the guide for “rugelach”.')).toBeInTheDocument()
+      expect(card.getByRole('button', { name: 'Ask in a WhatsApp group' })).toBeInTheDocument()
+      expect(card.queryByRole('button', { name: /Know where to find it/ })).not.toBeInTheDocument()
     })
 
     it('shows an answer only after a search: nothing sits under the box unasked', () => {

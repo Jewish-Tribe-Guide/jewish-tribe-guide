@@ -13,10 +13,8 @@ import { useActiveCommunity, useOptionalCommunitySlug } from '@/lib/communityCon
 import { routes } from '@/lib/routes'
 import AskAnswer from '@/components/home/AskAnswer'
 import AskTheGroup from '@/components/home/AskTheGroup'
-import { categoryQuestion, itemAskedFor, shareMessage, shareSummary } from '@/lib/shareAnswer'
-import { itemsField } from '@/lib/listingView'
-import { resolveCapabilities, type CategoryConfig } from '@/lib/categories'
-import { ui } from '@/lib/uiConfig'
+import { categoryQuestion, shareMessage, shareSummary } from '@/lib/shareAnswer'
+import type { CategoryConfig } from '@/lib/categories'
 import ReadAs from '@/components/home/ReadAs'
 import type { ReadingChip, ReadingOffer } from '@/lib/readingSearch'
 
@@ -107,24 +105,10 @@ function Ask({ category, items, search, onSearch, schedule, readAs, scope }: Pro
     answer && communitySlug
       ? { path: routes.ask(communitySlug, sharedQ), title: sharedQ, text: () => shareMessage(q, shareSummary(sharedQ, items, categories, places)) }
       : null
-  // Found nothing, and the reader isn't still reading: where to ask, and
-  // how to add the answer (AskTheGroup), as on the home search.
+  // Found nothing, and the reader isn't still reading: where to ask
+  // (AskTheGroup), as on the home search.
   const foundNothing = !!asked && !readAs?.reading && asked.result.hits.length === 0 && asked.result.noHours.length === 0 && !answer
-  const whatsapp = categories.find((c) => /whatsapp/i.test(`${c.id} ${c.label}`))
-  const canEdit = ui.contributions.edit && resolveCapabilities(category.capabilities).edit
-  const canAdd = ui.contributions.add && resolveCapabilities(category.capabilities).add
-  const askGroup =
-    foundNothing && communitySlug
-      ? {
-          nothingClose: true,
-          askHref: whatsapp ? routes.slug(communitySlug, whatsapp.id) : null,
-          addHref: canAdd ? `${routes.slug(communitySlug, category.id)}?form=create` : `${routes.feedback(communitySlug)}?about=${encodeURIComponent(q)}`,
-          sharePath: routes.ask(communitySlug, sharedQ),
-          item: canEdit && itemsField(category) ? itemAskedFor(asked!.result) : null,
-          listings: items,
-          categories: [category],
-        }
-      : null
+  const askGroup = foundNothing && communitySlug ? { nothingClose: true, sharePath: routes.ask(communitySlug, sharedQ) } : null
   const plural = category.pluralLabel.toLowerCase()
   const scopeLabel = onMinyanim ? 'Minyanim' : category.pluralLabel
   const placeholder = onMinyanim

@@ -1,5 +1,5 @@
 import { answerFor } from './askAnswer'
-import { formatOpenAtTime, parseAsk, termsAsTyped, withoutOpenWords } from './ask'
+import { formatOpenAtTime, parseAsk, withoutOpenWords } from './ask'
 import { searchAsk, type AskResult } from './askSearch'
 import type { CategoryConfig } from './categories'
 import type { Place } from './places'
@@ -111,7 +111,7 @@ export function shareMessage(question: string, summary: string): string {
   return `${asQuestion(question)} ${summary}`
 }
 
-/** What "Ask a WhatsApp group" writes for the visitor to send: the
+/** What "Ask in a WhatsApp group" writes for the visitor to send: the
  *  question, and the question's own link (sent with it), which answers it
  *  once someone adds it to the guide. */
 export function askMessage(question: string): string {
@@ -127,14 +127,4 @@ export function askMessage(question: string): string {
 export function categoryQuestion(question: string, category: CategoryConfig, categories: readonly CategoryConfig[]): string {
   const named = searchAsk([], categories, question).categoryIds
   return named?.length === 1 && named[0] === category.id ? question : `${category.label.toLowerCase()} ${question}`
-}
-
-/** What a question that found nothing asks for, as typed ("rugelach"), when
- *  it's an item someone could have seen somewhere: not a question about
- *  times, minyanim, the eruv or the guide itself. Null otherwise. */
-export function itemAskedFor(result: AskResult): string | null {
-  const { query } = result
-  if (query.minyan || query.meta || query.times || query.eruv || result.terms.length === 0) return null
-  const typed = termsAsTyped(query.raw, result.terms).trim()
-  return typed.length >= 2 && typed.length <= 60 ? typed : null
 }

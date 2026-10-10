@@ -2,8 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { makeCategory } from '@/test/providerFixtures'
 import type { DirectoryResource } from '@/types'
 import { routes, slugRejectionReason } from './routes'
-import { askMessage, asQuestion, categoryQuestion, itemAskedFor, questionFromSlug, questionSlug, questionTitle, shareMessage, shareSummary } from './shareAnswer'
-import { searchAsk } from './askSearch'
+import { askMessage, asQuestion, categoryQuestion, questionFromSlug, questionSlug, questionTitle, shareMessage, shareSummary } from './shareAnswer'
 
 describe('a shared question’s link', () => {
   it('is readable, and reads back as the question', () => {
@@ -123,13 +122,5 @@ describe('what a share and a question to the group say (agreed Oct 1)', () => {
     expect(categoryQuestion('open now', food, [grocery, food])).toBe('food open now')
     expect(categoryQuestion('challah', grocery, [grocery, food])).toBe('grocery challah')
     expect(categoryQuestion('food open now', food, [grocery, food])).toBe('food open now')
-  })
-
-  it('a question that found nothing asks for an item only when it’s about one', () => {
-    const ask = (q: string) => itemAskedFor(searchAsk([], [grocery], q))
-    expect(ask('rugelach')).toBe('rugelach')
-    expect(ask('where can I get kosher rugelach?')).toMatch(/rugelach/)
-    expect(ask('candle lighting')).toBeNull()
-    expect(ask('how do I add a listing')).toBeNull()
   })
 })
