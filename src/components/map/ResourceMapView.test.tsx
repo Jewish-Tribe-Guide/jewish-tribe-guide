@@ -1582,7 +1582,9 @@ describe('ResourceMapView — the Filters sheet', () => {
     const user = userEvent.setup()
     renderMap(<ResourceMapView onUp={vi.fn()} />, listings, [food, grocery, cemetery])
     await user.click(screen.getByTestId('map-filters-button'))
-    const top = within(screen.getByTestId('map-filters-open-all')).getByRole('switch', { name: 'Open now' })
+    // Headed as every category's, like the sections under it (the user, Oct 10).
+    const top = within(screen.getByRole('region', { name: 'All categories' })).getByRole('switch', { name: 'Open now' })
+    expect(within(screen.getByTestId('map-filters-open-all')).getByRole('heading', { name: 'All categories' })).toBeInTheDocument()
     const foodSwitch = within(screen.getByTestId('map-filters-restaurant')).getByRole('switch', { name: 'Open now' })
     const grocerySwitch = within(screen.getByTestId('map-filters-grocery')).getByRole('switch', { name: 'Open now' })
     // A cemetery keeps no hours: no Open now of its own.

@@ -10,9 +10,9 @@ import { FilterChip, FiltersDialog, SwitchRow, type FilterSelect } from '@/compo
 // The category pages' own sheet (FiltersSheet), with a section for each
 // category the map is showing: its Open now where it keeps hours, its
 // yes/no switches, its pick-lists, in the category's own order. Above them,
-// one Open now for everything showing that keeps hours, when two or more
-// do: on turns each one on, off turns them all off, and it reads as on
-// only when all of them are (see mapFilters.ts).
+// headed "All categories", one Open now for everything showing that keeps
+// hours, when two or more do: on turns each one on, off turns them all off,
+// and it reads as on only when all of them are (see mapFilters.ts).
 //
 // A sheet from the bottom on a phone, a dialog on a wider screen, as on a
 // category page. The map updates as each is switched; "Show N places" just
@@ -70,11 +70,15 @@ function Body({ top, onTopOpenNow, sections, onOpenNow, onBoolean, onSelect, onC
           Clear all
         </button>
       </div>
+      {/* Headed like each category's own section below it, so it reads as
+          Open now for every category rather than for the first one (the
+          user, Oct 10). */}
       {top.shown && (
-        <div data-testid="map-filters-open-all">
+        <section aria-label="All categories" className="space-y-3" data-testid="map-filters-open-all">
+          <h3 className="text-[17px] font-extrabold text-ink">All categories</h3>
           <SwitchRow label="Open now" on={top.on} onToggle={onTopOpenNow} />
-          {top.note && <p className="-mt-0.5 text-[13px] text-muted">{top.note}</p>}
-        </div>
+          {top.note && <p className="-mt-2 text-[13px] text-muted">{top.note}</p>}
+        </section>
       )}
       {sections.length === 0 && <p className="text-[15px] text-muted">Nothing showing has filters. Turn on a category above.</p>}
       {sections.map((s) => (
