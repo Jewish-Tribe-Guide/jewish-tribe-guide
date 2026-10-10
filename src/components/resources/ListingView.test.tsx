@@ -552,10 +552,10 @@ describe('ListingView — a restaurant’s main dishes (agreed Oct 1)', () => {
     expect(card()).toHaveTextContent('Main dishes · 2')
     expect(card()).not.toHaveTextContent('Been there?')
     expect(within(row('Shawarma')).getByText('seen today')).toBeInTheDocument()
-    expect(within(row('Falafel')).getByText('on its menu Oct 2')).toBeInTheDocument()
+    expect(within(row('Falafel')).getByText('seen Oct 2')).toBeInTheDocument()
     expect(within(card()).getByRole('button', { name: 'Add a dish' })).toBeInTheDocument()
     fireEvent.click(within(row('Falafel')).getByRole('button', { name: /Falafel/ }))
-    expect(row('Falafel')).toHaveTextContent('On its menu Oct 2.')
+    expect(row('Falafel')).toHaveTextContent('Last seen Oct 2.')
     expect(within(row('Falafel')).getByRole('button', { name: 'Still served' })).toBeInTheDocument()
   })
 

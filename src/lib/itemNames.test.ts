@@ -160,14 +160,14 @@ describe('main dishes on Food (agreed Oct 1)', () => {
 
   it('"burger" finds the burgers, however each menu names them, and says where they’re meatless', () => {
     expect(ask('burger')).toBe(
-      '4 places have burgers. At PLNT (parve) and Cafe Dairy (dairy) they’re meatless. Nearest: Cherry Grill, 0.1 mi, on its menu Oct 2.',
+      '4 places have burgers. At PLNT (parve) and Cafe Dairy (dairy) they’re meatless. Nearest: Cherry Grill, 0.1 mi, seen Oct 2.',
     )
     expect(ask('hamburger')).toMatch(/^4 places have /)
   })
 
   it('says it of one place too, and nothing where the place is meat or says neither', () => {
     expect(ask('burger', [places[1]])).toBe('PLNT has Burgers, 0.7 mi. It’s parve, so they’re meatless.')
-    expect(ask('burger', [places[0], places[3]])).toBe('2 places have Burgers. Nearest: Cherry Grill, 0.1 mi, on its menu Oct 2.')
+    expect(ask('burger', [places[0], places[3]])).toBe('2 places have Burgers. Nearest: Cherry Grill, 0.1 mi, seen Oct 2.')
     // Meat and dairy both: not said.
     expect(ask('burger', [place('Both', ['Meat', 'Dairy'], { dishes: ['Burgers'] }, 39.96)])).toBe('Both has Burgers, 0.7 mi.')
   })

@@ -18,9 +18,10 @@ import { ITEM_NAMES, itemEntry, itemName } from './itemNames'
 // seen.
 //
 // A dish can carry a second kind of date: when an admin approved it from the
-// place's own menu (details.itemMenu, see menuReader.ts). That's a menu
-// saying it exists, not someone eating there, so it says "on its menu Oct 2",
-// never "seen" (agreed Oct 1). Whichever is newer is the one said.
+// place's own menu (details.itemMenu, see menuReader.ts). It used to say "on
+// its menu Oct 2" (agreed Oct 1); the user (Oct 10) wants one plain word, so
+// it says "seen Oct 2" like the rest: the admin did see it, on the menu.
+// The two dates are still kept apart, and whichever is newer is said.
 
 export type ItemMark = {
   /** The item as the listing stores it: "Challah". */
@@ -79,9 +80,9 @@ export function itemDateFor(item: DirectoryResource, name: string): ItemDate | n
   return newer(seenAtFor(item, name), dateFor(item, 'itemMenu', name))
 }
 
-/** "seen today", "on its menu Oct 2". */
+/** "seen today", "seen Oct 2", whichever kind of date it is. */
 export function itemDateText(date: ItemDate, now: number | null, timezone: string): string {
-  return `${date.kind === 'menu' ? 'on its menu' : 'seen'} ${dayText(date.at, now, timezone)}`
+  return `seen ${dayText(date.at, now, timezone)}`
 }
 
 /** A listing's items with their dates, the always-there ones first. */
@@ -130,12 +131,12 @@ export function seenLabel(mark: ItemMark, now: number | null, timezone: string):
   return { text: itemDateText(date, now, timezone), old: isStale(date.at, now) }
 }
 
-/** The line under an opened item: "Last seen today.", "On its menu Oct 2.",
+/** The line under an opened item: "Last seen today.", "Last seen Oct 2.",
  *  or "No one has said yet." */
 export function lastSeenText(mark: ItemMark, now: number | null, timezone: string): string {
   const date = markDate(mark)
   if (!date) return 'No one has said yet.'
-  return `${date.kind === 'menu' ? 'On its menu' : 'Last seen'} ${dayText(date.at, now, timezone)}.`
+  return `Last seen ${dayText(date.at, now, timezone)}.`
 }
 
 // ── Items and dishes ─────────────────────────────────────────────────────────

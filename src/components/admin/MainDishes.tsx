@@ -304,7 +304,7 @@ export default function MainDishes({ token }: { token: string }) {
         The AI reads each food place&rsquo;s own menu page once, when you ask, and picks its main dishes, showing the
         menu&rsquo;s own words it read each from. A dish whose words aren&rsquo;t on the page is dropped before you see it.
         <strong> Nothing shows on the site until you approve it.</strong> Untick what&rsquo;s wrong, add what&rsquo;s missing.
-        Approved dishes say &ldquo;on its menu&rdquo; with the date, until a visitor says they&rsquo;re still served.
+        Approved dishes say &ldquo;seen&rdquo; with the date the menu was read, until a visitor says they&rsquo;re still served.
       </p>
       {!data.available && (
         <p className="bg-amber-50 border border-amber-200 rounded-md p-3 text-sm text-amber-800">Reading menus needs database migration 065.</p>

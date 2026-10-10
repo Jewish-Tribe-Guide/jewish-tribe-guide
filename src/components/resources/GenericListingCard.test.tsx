@@ -472,7 +472,7 @@ describe('GenericListingCard — items a search matched', () => {
       unmount()
       // Asked for one: the chip names it.
       renderWithProviders(<GenericListingCard {...props} found={{ terms: ['burger'], items: [{ tag: 'Burgers', sometimes: false }], fields: [] }} />)
-      expect(screen.getByText('Burgers · on its menu Oct 2')).toBeInTheDocument()
+      expect(screen.getByText('Burgers · seen Oct 2')).toBeInTheDocument()
       expect(screen.queryByTestId('row-items')).not.toBeInTheDocument()
     } finally {
       vi.useRealTimers()

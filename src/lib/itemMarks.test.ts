@@ -39,18 +39,18 @@ describe('itemMarks', () => {
   })
 })
 
-describe('a dish read from its menu (agreed Oct 1)', () => {
+describe('a dish read from its menu (agreed Oct 1; "seen" since the user, Oct 10)', () => {
   const mark = { name: 'Shawarma', key: 'dishes', sometimes: false, goneAt: null }
   const menuAt = '2026-10-02T15:00:00Z'
 
-  it('says "on its menu", never "seen", until someone has seen it since', () => {
-    expect(seenLabel({ ...mark, seenAt: null, menuAt }, now, TZ)?.text).toBe('on its menu Oct 2')
-    expect(lastSeenText({ ...mark, seenAt: null, menuAt }, now, TZ)).toBe('On its menu Oct 2.')
+  it('says "seen" with the menu’s date, until someone has seen it since', () => {
+    expect(seenLabel({ ...mark, seenAt: null, menuAt }, now, TZ)?.text).toBe('seen Oct 2')
+    expect(lastSeenText({ ...mark, seenAt: null, menuAt }, now, TZ)).toBe('Last seen Oct 2.')
     // Seen since: a person's word, newer.
     expect(seenLabel({ ...mark, seenAt: new Date(now).toISOString(), menuAt }, now, TZ)?.text).toBe('seen today')
     expect(lastSeenText({ ...mark, seenAt: new Date(now).toISOString(), menuAt }, now, TZ)).toBe('Last seen today.')
     // Seen before the menu was read: the menu is the newer word.
-    expect(seenLabel({ ...mark, seenAt: '2026-09-01T15:00:00Z', menuAt }, now, TZ)?.text).toBe('on its menu Oct 2')
+    expect(seenLabel({ ...mark, seenAt: '2026-09-01T15:00:00Z', menuAt }, now, TZ)?.text).toBe('seen Oct 2')
     expect(lastSeenText({ ...mark, seenAt: null, menuAt: null }, now, TZ)).toBe('No one has said yet.')
   })
 

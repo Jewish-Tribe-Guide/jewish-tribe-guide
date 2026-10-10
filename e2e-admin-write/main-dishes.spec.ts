@@ -6,7 +6,7 @@ import { createClient } from '@supabase/supabase-js'
 // Drives the Main dishes tab for real (agreed Oct 1): what the menu reader
 // proposed for a food place is listed with the menu's own words, the admin
 // unticks one, adds one and approves, and the listing then has exactly
-// those dishes, each dated "on its menu", with the menu's address, through
+// those dishes, each dated by the menu ("seen"), with the menu's address, through
 // approve_menu_dishes. The proposal is inserted straight into menu_reading:
 // no test ever calls the AI. Needs migration 065 on the test project, and
 // a category with a list of dishes (Food's "Main dishes").
@@ -94,6 +94,6 @@ test('a menu reading is checked, edited and approved onto its listing, dated by 
   await page.goto(`/philly/${c.id}/${id}`)
   const dishes = page.getByTestId('listing-items')
   await expect(dishes).toContainText('Main dishes · 3', { timeout: 20_000 })
-  await expect(dishes).toContainText('on its menu')
+  await expect(dishes).toContainText('seen')
   await expect(dishes.getByRole('link', { name: 'Full menu' })).toHaveAttribute('href', sourceUrl)
 })
