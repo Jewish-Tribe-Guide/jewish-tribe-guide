@@ -16,9 +16,12 @@ import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
 // on Popularity until one is set.
 
 /** Sort and the list heading's Filters (ListHeading): an outlined button a
- *  thumb can find, 40px tall. */
-export const HEADING_BUTTON =
-  'flex h-10 shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-full border border-slate-300 bg-white px-3.5 text-[14px] font-bold text-primary transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30'
+ *  thumb can find, 40px tall; solid blue while it has something on
+ *  (Filters, with filters on). */
+export function headingButton(on = false): string {
+  const base = 'flex h-10 shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-full border px-3.5 text-[14px] font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30'
+  return `${base} ${on ? 'border-primary bg-primary text-white hover:bg-primary-dark' : 'border-slate-300 bg-white text-primary hover:bg-slate-50'}`
+}
 
 const CHOICES = [
   { byPopular: true, label: 'Popularity' },
@@ -83,7 +86,7 @@ export default function SortMenu({ byPopular, onSelect }: { byPopular: boolean; 
             setOpen(true)
           }
         }}
-        className={HEADING_BUTTON}
+        className={headingButton()}
       >
         {/* The space is for the name it's read out by, "Sort Popularity";
             a flex row doesn't draw it. */}

@@ -2,8 +2,7 @@
 
 import type { ReactNode } from 'react'
 import { ClockIcon } from '@/components/icons'
-import { FilterChip } from './FiltersSheet'
-import SortMenu, { HEADING_BUTTON } from './SortMenu'
+import SortMenu, { headingButton } from './SortMenu'
 
 // ── The list's own heading: what it is, how many, and how it's arranged ─────
 // "57 listings   Filters  Sort Popularity ▾". Above the list is for asking
@@ -11,14 +10,14 @@ import SortMenu, { HEADING_BUTTON } from './SortMenu'
 // place on every category page: Filters, which opens the one sheet holding
 // every filter (FiltersSheet), and Sort.
 //
-// Under it, a line of the filters that are on, as filled chips a tap
-// switches off, so a filter set from a listing's own badge deep in the list
-// is never on unseen. Open now is one of those filters, in the sheet like
-// the rest: it used to appear as a switch the moment anything was typed,
-// which the user (Oct 10) found a puzzle rather than a help.
+// No line of chips under it for the filters that are on: the Filters
+// button turns solid blue with how many, and the sheet shows which. A word
+// typed in the search that reads as a filter ("dairy") counts there too
+// and shows ticked; the word itself is in the box (the user, Oct 10).
 //
 // Filters and Sort are outlined buttons a thumb can find, 40px tall; as
 // bold blue words they were hard to hit on a phone (the user, Oct 10).
+// 16px under them before the first card.
 
 type Props = {
   /** The first group's name, or what closed groups are grouped by ("By
@@ -35,17 +34,15 @@ type Props = {
   /** Sort, where there's more than one way to (likes on). */
   sort?: { byPopular: boolean; onSelect: (byPopular: boolean) => void }
   onDaveningTimes?: () => void
-  /** The filters switched on, each switched off by a tap. */
-  activeChips: { id: string; label: string; onOff: () => void }[]
   /** "Show map", at the right end, once the map beside the list has been
    *  hidden. Only on a screen wide enough to show it. */
   onShowMap?: () => void
 }
 
-export default function ListHeading({ label, count, noun = !label, total, filters, sort, onDaveningTimes, activeChips, onShowMap }: Props) {
+export default function ListHeading({ label, count, noun = !label, total, filters, sort, onDaveningTimes, onShowMap }: Props) {
   const countText = noun ? `${count} listing${count === 1 ? '' : 's'}` : String(count)
   return (
-    <div data-testid="list-heading" data-total={total} className="space-y-2 pt-2">
+    <div data-testid="list-heading" data-total={total} className="pb-2 pt-2">
       {/* Wraps rather than running off the side of a narrow phone. */}
       <div className="flex min-h-9 flex-wrap items-center justify-between gap-x-3">
         <h2 className="shrink-0 text-[15px] font-bold text-ink">
@@ -69,7 +66,12 @@ export default function ListHeading({ label, count, noun = !label, total, filter
             </TextAction>
           )}
           {filters && (
-            <button type="button" onClick={filters.onOpen} aria-haspopup="dialog" className={HEADING_BUTTON}>
+            <button
+              type="button"
+              onClick={filters.onOpen}
+              aria-haspopup="dialog"
+              className={headingButton(filters.active > 0)}
+            >
                 <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" className="h-3.5 w-3.5">
                   <path d="M20 7h-9" />
                   <path d="M14 17H5" />
@@ -78,7 +80,7 @@ export default function ListHeading({ label, count, noun = !label, total, filter
                 </svg>
                 Filters
                 {filters.active > 0 && (
-                  <span className="ml-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-primary px-1 text-[11px] font-bold text-white">
+                  <span className="ml-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-white px-1 text-[11px] font-bold text-primary">
                     {filters.active}
                   </span>
                 )}
@@ -101,13 +103,6 @@ export default function ListHeading({ label, count, noun = !label, total, filter
           )}
         </div>
       </div>
-      {activeChips.length > 0 && (
-        <div className="-mx-4 flex items-center gap-2 overflow-x-auto px-4 pb-1 desktop:mx-0 desktop:flex-wrap desktop:px-0" style={{ scrollbarWidth: 'none' }} data-testid="active-filters">
-          {activeChips.map((c) => (
-            <FilterChip key={c.id} label={c.label} on onToggle={c.onOff} />
-          ))}
-        </div>
-      )}
     </div>
   )
 }

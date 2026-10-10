@@ -303,9 +303,9 @@ describe('GenericDirectory', () => {
       makeListing({ id: 'c', name: 'Acme', m: ['Challah'] }),
     ]
 
-    it('is headed Search and says it searches this category, with no example searches under it (the user, Oct 10)', () => {
+    it('says it searches this category, with no heading and no example searches (the user, Oct 10)', () => {
       renderWithProviders(<GenericDirectory category={grocery} items={stores} {...handlers} />)
-      expect(screen.getByRole('heading', { level: 2, name: 'Search' })).toBeInTheDocument()
+      expect(screen.queryByRole('heading', { name: 'Search' })).not.toBeInTheDocument()
       expect(screen.getByRole('searchbox', { name: 'Search Grocery Stores' })).toHaveAttribute('placeholder', 'Ask for any item or store')
       expect(screen.getByText('in Grocery Stores')).toBeInTheDocument()
       expect(screen.queryByText('Try')).not.toBeInTheDocument()
@@ -1151,19 +1151,22 @@ describe('GenericDirectory — the list heading', () => {
     expect(screen.queryByRole('dialog', { name: 'Filters' })).not.toBeInTheDocument()
   })
 
-  it('shows each filter that is on as a chip under the heading, and a tap switches it off', async () => {
+  it('shows no chip line: Filters turns solid with how many are on, and the sheet switches them off (the user, Oct 10)', async () => {
     const user = userEvent.setup()
     renderWithProviders(<GenericDirectory category={food} items={items} {...handlers} />)
+    expect(screen.getByRole('button', { name: /^Filters/ })).not.toHaveClass('bg-primary')
     await user.click(screen.getByRole('button', { name: /^Filters/ }))
     await user.click(screen.getByRole('switch', { name: 'Shabbat friendly' }))
     await user.click(screen.getByRole('button', { name: 'Show 1 listing' }))
 
-    const on = within(screen.getByTestId('active-filters'))
-    expect(screen.getByRole('button', { name: /^Filters\s*1/ })).toBeInTheDocument()
-    await user.click(on.getByRole('button', { name: 'Shabbat friendly', pressed: true }))
-
     expect(screen.queryByTestId('active-filters')).not.toBeInTheDocument()
+    const filters = screen.getByRole('button', { name: /^Filters\s*1$/ })
+    expect(filters).toHaveClass('bg-primary')
+    await user.click(filters)
+    await user.click(screen.getByRole('switch', { name: 'Shabbat friendly', checked: true }))
+    await user.click(screen.getByRole('button', { name: 'Show 3 listings' }))
     expect(screen.getByText('Cafe')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Filters$/ })).not.toHaveClass('bg-primary')
   })
 
   it('adds no Open now switch once something is typed: Open now lives in Filters (the user, Oct 10)', async () => {
@@ -1174,17 +1177,31 @@ describe('GenericDirectory — the list heading', () => {
     expect(within(screen.getByTestId('list-heading')).queryByRole('button', { name: 'Open now' })).not.toBeInTheDocument()
   })
 
-  it('shows a word the search was taught as a filter chip, which takes the word out of the search (the user, Oct 10)', async () => {
+  it('counts a word the search reads as a filter, shows it ticked in Filters, and unticking it takes the word out (the user, Oct 10)', async () => {
     const user = userEvent.setup()
     const taught = { ...food, askWords: [{ word: 'dairy', field: 't', value: 'Dairy' }] }
     renderWithProviders(<GenericDirectory category={taught} items={items} {...handlers} />)
     await user.type(screen.getByRole('searchbox'), 'Dairy places')
 
-    const heading = within(screen.getByTestId('list-heading'))
-    expect(heading.getByRole('heading', { name: '1 listing' })).toBeInTheDocument()
-    await user.click(within(screen.getByTestId('active-filters')).getByRole('button', { name: 'Dairy' }))
-    expect(screen.getByRole('searchbox')).toHaveValue('places')
+    expect(within(screen.getByTestId('list-heading')).getByRole('heading', { name: '1 listing' })).toBeInTheDocument()
     expect(screen.queryByTestId('active-filters')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /^Filters\s*1$/ }))
+    await user.click(screen.getByRole('button', { name: 'Dairy', pressed: true }))
+    expect(screen.getByRole('searchbox')).toHaveValue('places')
+    expect(screen.getByRole('button', { name: 'Dairy', pressed: false })).toBeInTheDocument()
+  })
+
+  it('counts "open now" typed as Open now, on in Filters, and switching it off there takes the words out (the user, Oct 10)', async () => {
+    const user = userEvent.setup()
+    const allDay = Object.fromEntries(['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'].map((d) => [d, { open: '00:00', close: '23:59' }]))
+    const open = [{ ...makeListing({ id: 'g', name: 'Grill' }), hours: allDay, t: 'Meat' }] as unknown as DirectoryResource[]
+    renderWithProviders(<GenericDirectory category={food} items={open} {...handlers} />)
+    await user.type(screen.getByRole('searchbox'), 'grill open now')
+
+    await user.click(screen.getByRole('button', { name: /^Filters\s*1$/ }))
+    await user.click(screen.getByRole('switch', { name: 'Open now', checked: true }))
+    expect(screen.getByRole('searchbox')).toHaveValue('grill')
+    expect(screen.getByRole('switch', { name: 'Open now', checked: false })).toBeInTheDocument()
   })
 
   it('says so when the filters hide everything the search found, and clears just the filters', async () => {
@@ -1795,7 +1812,9 @@ describe('GenericDirectory — the map beside the list', () => {
       content: { categories: [food] },
     })
     expect(screen.getByText('map shows: Alpha Grill')).toBeInTheDocument()
-    await user.click(within(screen.getByTestId('active-filters')).getByRole('button', { name: /Kosher/ }))
+    await user.click(screen.getByRole('button', { name: /^Filters/ }))
+    await user.click(screen.getByRole('switch', { name: /Kosher/, checked: true }))
+    await user.click(screen.getByRole('button', { name: /^Show/ }))
     await user.type(screen.getByRole('searchbox'), 'beta')
     expect(screen.getByText('map shows: Beta Cafe')).toBeInTheDocument()
   })

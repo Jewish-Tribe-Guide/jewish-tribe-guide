@@ -25,7 +25,7 @@ import { PlusIcon } from '@/components/icons'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { useScrollShowHide, useSetScreenHeader } from '@/lib/headerVisibility'
 import { foundFor, searchAsk } from '@/lib/askSearch'
-import { withoutTerms } from '@/lib/ask'
+import { withoutOpenWords, withoutTerms } from '@/lib/ask'
 import { neighborhoodsFor, placeName, townsFrom } from '@/lib/places'
 import { readerPlaces } from '@/lib/questionReader'
 import { needsReading, ownFrom, readingAnswers, readingChips, readingLoses, readingOffers, searchReading } from '@/lib/readingSearch'
@@ -1106,28 +1106,54 @@ export default function GenericDirectory({ category, items, anchorLabel, address
       const cur = prev[key] ?? []
       return { ...prev, [key]: cur.includes(value) ? cur.filter((x) => x !== value) : [...cur, value] }
     })
-  // A word in the search an admin taught to mean one of this category's
-  // filters ("dairy" is Food type: Dairy) narrows the list as that filter
-  // does, so it shows as one: a chip beside the rest, which takes the word
-  // out of the search. It used to narrow with nothing under Filters to say
-  // so (the user, Oct 10).
-  const taughtChips = ((readResult ?? todayResult)?.taught ?? []).flatMap((t) => {
+  // ── What the search reads as filters ──
+  // A word an admin taught the search ("dairy" is Food type: Dairy), or
+  // "open now", narrows the list as that filter would. The Filters sheet
+  // shows it ticked and the button counts it; unticking it there takes the
+  // word out of the search, so the two never disagree. Nothing about it on
+  // the page itself: the word is in the box already (the user, Oct 10).
+  const searchResult = typed ? (readResult ?? todayResult) : null
+  const searchBools = new Map<string, string>()
+  const searchSelects = new Map<string, Map<string, string>>()
+  for (const t of searchResult?.taught ?? []) {
     const field = t.categoryId === category.id && t.field ? category.detailFields.find((f) => f.key === t.field) : undefined
-    if (!field) return []
-    const label = t.value === undefined ? (field.filterLabel ?? field.label) : (field.options?.find((o) => o.value === t.value)?.label ?? t.value)
-    return [{ id: `taught_${t.word}_${t.value ?? ''}`, label, onOff: () => setSearch(withoutTerms(search, t.word.split(' '))) }]
-  })
-  // Whatever is switched on, as chips under the list heading.
-  const activeChips = [
-    ...(openNow && hasFilterableHours ? [{ id: 'openNow', label: 'Open now', onOff: () => setOpenNow(false) }] : []),
-    ...taughtChips,
-    ...filterableBooleans
-      .filter((f) => boolFilters[f.key])
-      .map((f) => ({ id: `f_${f.key}`, label: f.filterLabel ?? f.label, onOff: () => toggleBool(f.key) })),
-    ...filterableSelects.flatMap((f) =>
-      (selectFilters[f.key] ?? []).map((v) => ({ id: `sel_${f.key}_${v}`, label: v, onOff: () => toggleSelect(f.key, v) })),
-    ),
-  ]
+    if (field?.type === 'boolean') searchBools.set(field.key, t.word)
+    else if (field?.type === 'select' && t.value !== undefined) searchSelects.set(field.key, (searchSelects.get(field.key) ?? new Map()).set(t.value, t.word))
+  }
+  const searchOpenNow = !!searchResult?.query.openNow && hasFilterableHours
+  const dropWord = (word: string) => setSearch((prev) => withoutTerms(prev, word.split(' ')))
+  const sheetOpenNow = openNow || searchOpenNow
+  const toggleSheetOpenNow = () => {
+    if (!sheetOpenNow) return setOpenNow(true)
+    if (searchOpenNow) setSearch((prev) => withoutOpenWords(prev))
+    setOpenNow(false)
+  }
+  const toggleSheetBool = (key: string) => {
+    const word = searchBools.get(key)
+    if (!word) return toggleBool(key)
+    dropWord(word)
+    setBoolFilters((prev) => ({ ...prev, [key]: false }))
+  }
+  const toggleSheetSelect = (key: string, value: string) => {
+    const word = searchSelects.get(key)?.get(value)
+    if (!word) return toggleSelect(key, value)
+    dropWord(word)
+    setSelectFilters((prev) => ({ ...prev, [key]: (prev[key] ?? []).filter((x) => x !== value) }))
+  }
+  // The sheet's Clear all clears what it shows, the search's filter words
+  // too; the empty list's "Clear filters" (clearFilters) keeps the search.
+  const clearSheet = () => {
+    clearFilters()
+    let next = search
+    for (const word of [...searchBools.values(), ...[...searchSelects.values()].flatMap((m) => [...m.values()])]) next = withoutTerms(next, word.split(' '))
+    setSearch(searchOpenNow ? withoutOpenWords(next) : next)
+  }
+  const sheetSelects = selectsToShow.map((sel) => ({ ...sel, chosen: [...new Set([...sel.chosen, ...(searchSelects.get(sel.key)?.keys() ?? [])])] }))
+  // What the Filters button counts: everything the sheet shows ticked.
+  const sheetFilterCount =
+    filterableBooleans.filter((f) => boolFilters[f.key] || searchBools.has(f.key)).length +
+    filterableSelects.filter((f) => (selectFilters[f.key]?.length ?? 0) > 0 || searchSelects.has(f.key)).length +
+    (sheetOpenNow ? 1 : 0)
 
   // Desktop-only shared-element morph target for the same icon badge
   // CompactCard shows next to this category on the home screen — that's
@@ -1380,11 +1406,10 @@ export default function GenericDirectory({ category, items, anchorLabel, address
         count={grouping && !grouping.closed ? (grouping.groups[0]?.items.length ?? 0) : filtered.length}
         noun={!grouping || grouping.closed}
         total={filtered.length}
-        filters={hasActualFilters ? { active: activeFilterCount, onOpen: () => setFiltersOpen(true) } : undefined}
+        filters={hasActualFilters ? { active: sheetFilterCount, onOpen: () => setFiltersOpen(true) } : undefined}
         sort={upvotes ? { byPopular: sortByPopular, onSelect: selectSort } : undefined}
         // Only while the Next minyan card, which carries it, is gone.
         onDaveningTimes={hasMinyanim && !showMinyanCard ? showMinyanimView : undefined}
-        activeChips={activeChips}
         onShowMap={hasMapColumn && mapHidden ? () => setMapHidden(false) : undefined}
       />
   )
@@ -1878,13 +1903,13 @@ export default function GenericDirectory({ category, items, anchorLabel, address
           isOpen={filtersOpen}
           onClose={() => setFiltersOpen(false)}
           hasOpenNow={hasFilterableHours}
-          openNow={openNow}
-          onOpenNow={() => setOpenNow((v) => !v)}
-          booleans={filterableBooleans.map((f) => ({ key: f.key, label: f.filterLabel ?? f.label, on: !!boolFilters[f.key] }))}
-          onBoolean={toggleBool}
-          selects={selectsToShow}
-          onSelect={toggleSelect}
-          onClearAll={clearFilters}
+          openNow={sheetOpenNow}
+          onOpenNow={toggleSheetOpenNow}
+          booleans={filterableBooleans.map((f) => ({ key: f.key, label: f.filterLabel ?? f.label, on: !!boolFilters[f.key] || searchBools.has(f.key) }))}
+          onBoolean={toggleSheetBool}
+          selects={sheetSelects}
+          onSelect={toggleSheetSelect}
+          onClearAll={clearSheet}
           count={filtered.length}
         />
       )}

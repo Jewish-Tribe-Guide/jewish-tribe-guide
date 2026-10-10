@@ -19,12 +19,11 @@ import ReadAs from '@/components/home/ReadAs'
 import type { ReadingChip, ReadingOffer } from '@/lib/readingSearch'
 
 // ── A category page's search: asking comes first ─────────────────────────────
-// The one search box on the page, headed "Search" as the list below is
-// headed "22 listings", limited to this category and saying so ("in Food
-// ×"), and once something is typed, one sentence answering it (see
-// askAnswer.ts) above the list. No example searches under it: the user
-// (Oct 10) found the page cleaner without them, and the box's own
-// placeholder says what it's for. The answer only ever follows a
+// The one search box on the page, limited to this category and saying so
+// ("in Food ×"), and once something is typed, one sentence answering it
+// (see askAnswer.ts) above the list. No heading and no example searches:
+// the magnifier, "in Food" and the placeholder already say what it is, and
+// the page reads cleaner without them (the user, Oct 10). The answer only ever follows a
 // search: a sentence directly under the box reads as "here's the answer to
 // what you asked", so nothing sits there unasked.
 //
@@ -121,7 +120,6 @@ function Ask({ category, items, search, onSearch, schedule, readAs, scope }: Pro
 
   return (
     <div className="space-y-3">
-      <h2 className="text-[15px] font-bold text-ink">Search</h2>
       <label className="flex h-12 items-center gap-2 rounded-xl border-[1.5px] border-primary bg-white pl-3 pr-1.5 shadow-sm focus-within:ring-2 focus-within:ring-primary/30">
         <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" className="h-5 w-5 shrink-0 text-primary">
           <circle cx="11" cy="11" r="8" />
