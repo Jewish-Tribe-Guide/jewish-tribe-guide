@@ -2,8 +2,8 @@
 
 import { useEffect, useState, type ReactNode } from 'react'
 import { RELATIVE_ELIGIBLE, SEASON_LABELS, TEFILLAH_LABELS, TEFILLAH_ORDER, formatDays, parseTimeToMinutes, type Minyan, type Season, type Tefillah } from '@/lib/davening'
-import { BOX_DAYS, boxChangeCount, boxGroups, type MinyanBox } from '@/lib/minyanimBox'
-import { noteText, timeText } from '@/lib/weekTable'
+import { BOX_DAYS, boxChangeCount, type MinyanBox } from '@/lib/minyanimBox'
+import type { MinyanWriting } from '@/lib/minyanText'
 import { RelativeTimeFields, ZMAN_ANCHOR_ORDER, useTimeModes } from '@/components/intake/ZmanTimeFields'
 import { ChevronRightIcon, PlusIcon } from '@/components/icons'
 import { SUBMIT_PILL } from './submitPill'
@@ -47,6 +47,7 @@ export default function MinyanBoxEditor({
   box,
   boxTitle,
   place,
+  writing,
   onChange,
   onStep,
   send,
@@ -58,6 +59,9 @@ export default function MinyanBoxEditor({
   boxTitle: string
   /** The shul's name, under the title. */
   place: string
+  /** How the listing writes a minyan, from the listing (minyanText.ts says
+   *  why it's handed over rather than imported). */
+  writing: MinyanWriting
   onChange: (rows: Minyan[]) => void
   /** A minyan opened: its title and the way back to the list, for the
    *  sheet's header; null on the list. */
@@ -68,6 +72,7 @@ export default function MinyanBoxEditor({
   const [rows, setRows] = useState<Minyan[]>(original)
   // The minyan open: an id, 'new' for one being added, or null for the list.
   const [open, setOpen] = useState<string | null>(null)
+  const { timeText, noteText, boxGroups } = writing
   const was = new Map(original.map((m) => [m.id, m]))
   const isChanged = (m: Minyan) => !was.has(m.id) || boxChangeCount([was.get(m.id)!], [m]) > 0
 

@@ -6,6 +6,7 @@ import type { CategoryConfig, CategoryField } from '@/lib/categories'
 import { isMinyanim, type Minyan } from '@/lib/davening'
 import { listingChanges } from '@/lib/listingDiff'
 import { mergeMinyanimBox, minyanimForBox, type MinyanBox } from '@/lib/minyanimBox'
+import type { MinyanWriting } from '@/lib/minyanText'
 import { useIsMobile } from '@/lib/useIsMobile'
 import Honeypot from '@/components/Honeypot'
 import TurnstileWidget from '@/components/TurnstileWidget'
@@ -33,8 +34,10 @@ export type BoxEdit = {
   /** The sheet's title: the box's own ("Women’s hours"). */
   title: string
   fields: CategoryField[]
-  /** For a shul's minyanim field: which usual box's times (minyanimBox.ts). */
+  /** For a shul's minyanim field: which usual box's times (minyanimBox.ts),
+   *  and how the listing writes them. */
   minyanimBox?: MinyanBox
+  writing?: MinyanWriting
   /** Values already answered in the box ("Is it Shabbat friendly?" Yes). */
   preset?: Record<string, unknown>
 }
@@ -103,7 +106,7 @@ export function BoxEditor({
   }
   // A shul's box: its rows, cut to its days, edited on their own and
   // merged back into the whole list as they change.
-  const minyanimField = edit.minyanimBox ? edit.fields.find((f) => f.type === 'minyanim') : undefined
+  const minyanimField = edit.minyanimBox && edit.writing ? edit.fields.find((f) => f.type === 'minyanim') : undefined
   const allRows: Minyan[] = minyanimField && isMinyanim(item[minyanimField.key]) ? (item[minyanimField.key] as Minyan[]) : []
   // A row stored without an id gets one here, as the old editor gave it
   // (MinyanimInput's initMinyanim): the list opens a minyan by its id.
@@ -170,6 +173,7 @@ export function BoxEditor({
             box={edit.minyanimBox!}
             boxTitle={edit.title}
             place={item.name}
+            writing={edit.writing!}
             onStep={onStep}
             onChange={(rows) => setDetail(f.key, mergeMinyanimBox(allRows, edit.minyanimBox!, rows))}
             send={(n) => (

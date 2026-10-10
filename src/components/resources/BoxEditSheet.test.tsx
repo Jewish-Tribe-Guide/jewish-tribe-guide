@@ -5,6 +5,7 @@ import { renderWithProviders } from '@/test/renderWithProviders'
 import { makeCategory, makeListing } from '@/test/providerFixtures'
 import { mockRouter } from '@/test/nextNavigationMock'
 import type { CategoryField } from '@/lib/categories'
+import { minyanWriting } from '@/lib/minyanText'
 import BoxEditSheet, { BoxEditor } from './BoxEditSheet'
 
 vi.mock('@vercel/analytics', () => ({ track: vi.fn() }))
@@ -69,7 +70,7 @@ describe('BoxEditor, a shul’s usual Shabbos times', () => {
       { id: 'wk', tefillah: 'shacharis', days: ['mon', 'thu'], time: '6:45am' },
     ],
   })
-  const edit = { title: 'Usual Shabbos times', fields: [minyanim], minyanimBox: 'shabbos' as const }
+  const edit = { title: 'Usual Shabbos times', fields: [minyanim], minyanimBox: 'shabbos' as const, writing: minyanWriting }
   const open = () => renderWithProviders(<BoxEditSheet item={shul} category={shuls} edit={edit} onClose={vi.fn()} />)
 
   it('lists the box as it reads, in the order of Shabbos, and nothing of the week', () => {

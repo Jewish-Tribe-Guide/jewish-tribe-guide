@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Minyan } from './davening'
-import { boxChangeCount, boxGroups, mergeMinyanimBox, minyanimForBox } from './minyanimBox'
+import { boxChangeCount, mergeMinyanimBox, minyanimForBox } from './minyanimBox'
+import { boxGroups } from './minyanText'
 
 const shacharis: Minyan = { id: 's', tefillah: 'shacharis', days: ['mon', 'tue', 'wed', 'thu', 'fri'], time: '6:45am' }
 const mincha: Minyan = { id: 'm', tefillah: 'mincha_maariv', days: ['sun', 'mon', 'tue', 'wed', 'thu', 'fri'], time: '15 min before sunset' }

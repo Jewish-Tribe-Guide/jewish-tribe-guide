@@ -67,6 +67,7 @@ import Chip from './Chip'
 import Highlight from './Highlight'
 import DaveningCard from './DaveningCard'
 import type { BoxEdit } from './BoxEditSheet'
+import { minyanWriting } from '@/lib/minyanText'
 import { TellAboutContext } from './tellAbout'
 import { schedulesKey } from '@/lib/schedules'
 import WalkLists from './WalkList'
@@ -357,7 +358,7 @@ export default function ListingView({ item, category, color, place = null, upvot
         minyanim={item[f.key]}
         schedules={item[schedulesKey(f.key)]}
         category={category}
-        onEditBox={editBox ? (box, title) => editBox({ title, fields: [f], minyanimBox: box }) : undefined}
+        onEditBox={editBox ? (box, title) => editBox({ title, fields: [f], minyanimBox: box, writing: minyanWriting }) : undefined}
       />
     )
   } else if (main === 'items' && itemsF) {

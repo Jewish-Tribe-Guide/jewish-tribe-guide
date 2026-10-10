@@ -1,5 +1,4 @@
-import { TEFILLAH_LABELS, TEFILLAH_ORDER, type Minyan } from './davening'
-import { PART_ORDER, SHABBOS_PART_LABELS, clockMinutes, shabbosPartOf } from './weekTable'
+import type { Minyan } from './davening'
 
 // ── One of a shul's two usual boxes, edited on its own (Oct 10) ─────────────
 // A shul's times are one list of rows, shown as two boxes: "Usual weekday
@@ -73,32 +72,8 @@ export function mergeMinyanimBox(rows: readonly Minyan[], box: MinyanBox, edited
   return out
 }
 
-// ── The box's minyanim as a list, one minyan at a time (Oct 10) ─────────────
-// Edit under a box opens its minyanim as the box reads ("Mincha & Maariv at
-// candle lighting"), one row each; a tap opens that one minyan. Shabbos's
-// in the order of Shabbos (Friday night, morning, afternoon), the week's by
-// tefillah, each with its days.
-
-export type BoxGroup = { label: string; rows: Minyan[] }
-
-const DAY_ORDER: Minyan['days'] = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'rosh_chodesh', 'yom_tov', 'holiday']
-const firstDay = (m: Minyan) => Math.min(...m.days.map((d) => DAY_ORDER.indexOf(d)), DAY_ORDER.length)
-const atMinutes = (m: Minyan) => clockMinutes(m.time) ?? 24 * 60
-
-export function boxGroups(rows: readonly Minyan[], box: MinyanBox): BoxGroup[] {
-  if (box === 'shabbos') {
-    return PART_ORDER.map((part) => ({
-      label: SHABBOS_PART_LABELS[part],
-      rows: rows
-        .filter((m) => shabbosPartOf(m) === part)
-        .sort((a, b) => atMinutes(a) - atMinutes(b) || TEFILLAH_ORDER.indexOf(a.tefillah) - TEFILLAH_ORDER.indexOf(b.tefillah)),
-    })).filter((g) => g.rows.length > 0)
-  }
-  return TEFILLAH_ORDER.map((t) => ({
-    label: TEFILLAH_LABELS[t],
-    rows: rows.filter((m) => m.tefillah === t).sort((a, b) => firstDay(a) - firstDay(b) || atMinutes(a) - atMinutes(b)),
-  })).filter((g) => g.rows.length > 0)
-}
+// ── How many minyanim the box's edit changes (Oct 10) ───────────────────────
+// The list it's edited in is written by minyanText.ts's boxGroups.
 
 /** How many minyanim the box's edit changes: each changed, added or taken
  *  out, for "Send 2 changes". */
