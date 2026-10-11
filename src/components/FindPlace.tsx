@@ -90,7 +90,7 @@ export default function FindPlace({
       )}
       <p className="text-center">
         <button type="button" onClick={onBlank} className="cursor-pointer text-[13.5px] font-semibold text-primary hover:underline">
-          It’s not on Google
+          Not on Google? Fill it in yourself
         </button>
       </p>
     </div>

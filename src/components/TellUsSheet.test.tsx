@@ -355,7 +355,7 @@ describe('Saw something? Tell us', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Find it and fill it in' }))
     // Searched for already, and added as the grocery it was read as.
     expect(screen.getByPlaceholderText('Search by name or address…')).toHaveValue('South Square Market, 22nd & South')
-    fireEvent.click(screen.getByRole('button', { name: 'It’s not on Google' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Not on Google? Fill it in yourself' }))
     expect(screen.getByRole('dialog', { name: 'Add to Groceries' })).toBeInTheDocument()
     expect(screen.getByLabelText('Name *')).toHaveValue('South Square Market')
     fireEvent.change(screen.getByLabelText('Name *'), { target: { value: 'South Square Market & Deli' } })
@@ -526,14 +526,14 @@ describe('Saw something? Tell us', () => {
 
     it('adds a place as the form of questions, every section open, asking the kind only when it isn’t known', () => {
       find()
-      fireEvent.click(screen.getByRole('button', { name: 'It’s not on Google' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Not on Google? Fill it in yourself' }))
       expect(screen.getByTestId('pick-kind')).toBeInTheDocument()
       fireEvent.click(screen.getByRole('button', { name: 'Synagogue' }))
       expect(screen.getByRole('dialog', { name: 'Add to Synagogues' })).toBeInTheDocument()
       expect(screen.getByLabelText('Name *')).toBeInTheDocument()
       cleanup()
       find({ category: grocery })
-      fireEvent.click(screen.getByRole('button', { name: 'It’s not on Google' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Not on Google? Fill it in yourself' }))
       expect(screen.getByRole('dialog', { name: 'Add to Groceries' })).toBeInTheDocument()
     })
 

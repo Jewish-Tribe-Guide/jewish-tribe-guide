@@ -301,13 +301,14 @@ export function categoryAddButton(page: Page): Locator {
 }
 
 /** The add form: "+", then in the box it opens "Fill it in yourself" (which
- *  opens "Find the place"), and "It’s not on Google" there (the Google
- *  search itself needs a real Maps key and bills per search). Lands on the category's form of
+ *  opens "Find the place"), and "Not
+ *  on Google? Fill it in yourself" (the Google search itself needs a real
+ *  Maps key and bills per search). Lands on the category's form of
  *  questions, in the box. */
 export async function openAddForm(page: Page): Promise<void> {
   await categoryAddButton(page).click()
   await page.getByRole('dialog').getByRole('button', { name: 'Fill it in yourself' }).click()
-  await page.getByRole('dialog').getByRole('button', { name: 'It’s not on Google' }).click()
+  await page.getByRole('dialog').getByRole('button', { name: 'Not on Google? Fill it in yourself' }).click()
 }
 
 /** Waits for the page to be settled enough to assert on.

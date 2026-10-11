@@ -28,7 +28,7 @@ type Props = {
  * edit uses (ListingEditor), started from what Google gave, so only what
  * Google can't know is left — kosher type, certification, a photo.
  *
- * "It’s not on Google" skips to the second step empty, and a
+ * "Not on Google? Enter it yourself" skips to the second step empty, and a
  * category with no address (a WhatsApp group, say) has nothing to look up,
  * so it opens there directly. One design either way; there's no second
  * form for the rare case.
@@ -147,7 +147,7 @@ function AddFlow({
             }}
             className="cursor-pointer text-sm text-primary hover:underline"
           >
-            It’s not on Google
+            Not on Google? Enter it yourself
           </button>
         </p>
       </div>

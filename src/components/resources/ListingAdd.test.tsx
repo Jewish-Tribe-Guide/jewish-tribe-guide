@@ -191,7 +191,7 @@ describe('ListingAdd — entered by hand', () => {
   it('opens the same listing, empty, naming what it still needs on Send', async () => {
     const u = userEvent.setup()
     renderAdd()
-    await u.click(screen.getByRole('button', { name: 'It’s not on Google' }))
+    await u.click(screen.getByRole('button', { name: 'Not on Google? Enter it yourself' }))
 
     expect(screen.getByRole('textbox', { name: 'Name' })).toHaveValue('')
     expect(screen.queryByText(/Filled in from Google/)).not.toBeInTheDocument()
@@ -207,7 +207,7 @@ describe('ListingAdd — entered by hand', () => {
   it('shows each empty badge group as a named chip that opens its choices', async () => {
     const u = userEvent.setup()
     renderAdd()
-    await u.click(screen.getByRole('button', { name: 'It’s not on Google' }))
+    await u.click(screen.getByRole('button', { name: 'Not on Google? Enter it yourself' }))
     expect(screen.queryByRole('button', { name: 'Add a badge' })).not.toBeInTheDocument()
 
     await u.click(screen.getByRole('button', { name: '+ Food Type' }))
@@ -225,7 +225,7 @@ describe('ListingAdd — entered by hand', () => {
   it('says when the name matches a listing already in the guide', async () => {
     const u = userEvent.setup()
     renderAdd()
-    await u.click(screen.getByRole('button', { name: 'It’s not on Google' }))
+    await u.click(screen.getByRole('button', { name: 'Not on Google? Enter it yourself' }))
     await u.type(screen.getByRole('textbox', { name: 'Name' }), 'kosher mart')
     expect(screen.getByRole('status')).toHaveTextContent('Kosher Mart is already in the guide. It has the same name.')
   })
