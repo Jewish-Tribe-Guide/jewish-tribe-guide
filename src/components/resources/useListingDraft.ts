@@ -10,9 +10,9 @@ import type { PlaceSelectResult } from '@/components/intake/AddressInput'
  * A listing being written — every value a visitor can change, plus the
  * Google place data an address pick carries along with it — and how to turn
  * it into a submission. Shared by everything that writes listings: the
- * whole-listing editor (ListingEditor, for Edit and Add), one box's Edit
- * (BoxEditor), and the admin's form (ListingForm), so what a submission
- * contains can't depend on which of them produced it.
+ * whole-listing editor (ListingEditor, for Edit and Add, and the admin
+ * console's direct add and preview) and one box's Edit (BoxEditor), so
+ * what a submission contains can't depend on which of them produced it.
  *
  * Holds no UI and posts nothing; useListingSubmit does the sending.
  */
@@ -92,7 +92,7 @@ export function useListingDraft(category: CategoryConfig, existingListing?: Dire
     // a Website field to compare against (websiteKey there mirrors this same
     // lookup).
     // Matched by key (the fixed `googleDescription` convention — see
-    // src/lib/categories.ts's showInHeader doc), not label, since a category
+    // OWNABLE_SYNC_FIELDS in src/lib/googlePlaces.ts), not label, since a category
     // names this field's display label whatever it wants ("Description",
     // "About", …). Unlike name/phone/hours above, only FILLS a gap rather
     // than always overwriting: re-picking the address on an edit shouldn't

@@ -54,7 +54,7 @@ type Props = {
    *  For callers where the field IS the display label shown back to the
    *  visitor — e.g. the "where should distances be measured from" picker —
    *  rather than a structured address value another field depends on
-   *  (ListingForm's `address` field must stay a real address; it gets the
+   *  (a listing's `address` field must stay a real address; it gets the
    *  place's name separately via onPlaceSelect). */
   preferPlaceName?: boolean
   /** A short note to show under a suggestion, by its Google place id — Add

@@ -11,7 +11,7 @@ import FindResources from './FindResources'
 // FindResources is a router — which sub-screen renders for a given `view`,
 // and how the searchItem/searchQuery/searchForm props drive
 // it — not a renderer of any one of those screens itself. Every real
-// sub-screen (EruvInfo, ZmanimCard, ResourceLoader, ListingForm) is its own component with its
+// sub-screen (EruvInfo, ZmanimCard, ResourceLoader, ListingEditor) is its own component with its
 // own concerns and gets mocked out to a stub that surfaces just enough props
 // to assert the routing decision was right — same approach as Landing.test.tsx.
 //

@@ -15,7 +15,7 @@ export const TURNSTILE_ACTIVE = !!process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY
 type Options = {
   mode: 'create' | 'edit'
   existing?: DirectoryResource
-  /** See ListingForm's own prop of the same name. */
+  /** See ListingEditor's own prop of the same name. */
   sharedTurnstile?: { token: string; reset: () => void }
   /** See ListingEditor's own prop of the same name. */
   adminSubmit?: { token: string }

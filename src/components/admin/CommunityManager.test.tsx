@@ -24,7 +24,7 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
 }))
 
-// Same stub pattern ListingForm.test.tsx uses for the same component — a
+// Same stub pattern ListingEditor.test.tsx uses for the same component — a
 // real AddressInput needs Google Maps loaded, which this test env has no
 // business doing. The stub's button simulates picking "Baltimore, MD, USA"
 // with real-ish Baltimore coordinates, exactly the shape a real selection

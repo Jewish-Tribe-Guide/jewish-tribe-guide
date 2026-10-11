@@ -8,7 +8,7 @@ import { markTimes, submissionSource, type SubmissionSource } from '@/lib/submis
 import { schedulesKey, type SpecialSchedule } from '@/lib/schedules'
 import { formatPhone } from '@/lib/validation'
 import AddressInput from '@/components/intake/AddressInput'
-import { DetailFieldInput } from '@/components/resources/ListingForm'
+import { DetailFieldInput } from '@/components/resources/DetailFieldInput'
 import { linkify } from './SubmissionCard'
 
 // An opened card in the moderation queue (agreed Oct 5, canvas QOpen,

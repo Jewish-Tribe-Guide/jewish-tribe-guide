@@ -107,8 +107,8 @@ function websiteFieldKey(category: CategoryConfig): string | undefined {
   return category.detailFields.find((f) => f.type === 'url' && f.label.trim().toLowerCase() === 'website')?.key
 }
 
-// Fixed key, unlike `website` — see ListingForm.tsx's `googleDescription`
-// convention doc. Still a lookup (not a bare `true`) because not every
+// Fixed key, unlike `website` — see useListingDraft's handlePlaceSelect
+// for the `googleDescription` convention. Still a lookup (not a bare `true`) because not every
 // category configures a field with that key at all.
 function hasDescriptionField(category: CategoryConfig): boolean {
   return category.detailFields.some((f) => f.key === 'googleDescription')
