@@ -119,8 +119,12 @@ test('a category created hidden stays hidden, and "+ Add listing" publishes a li
   // though the category itself is hidden. This is the path a hidden
   // seasonal category (e.g. Sukkahs, ahead of its campaign banner's reveal
   // date) is meant to be seeded through.
+  // The visitors' editor (ListingEditor): the Name row, then Done back to
+  // the list, where Send reads "Add listing".
   await row.getByRole('button', { name: '+ Add listing' }).click()
-  await visible(page.getByLabel('Name *')).fill(listingName)
+  await visible(page.getByTestId('editor-row-name')).click()
+  await visible(page.getByRole('textbox', { name: 'Name' })).fill(listingName)
+  await visible(page.getByRole('button', { name: 'Done' })).click()
   const addButton = visible(page.getByRole('button', { name: 'Add listing' }))
   await expect(addButton).toBeEnabled()
   await addButton.click()

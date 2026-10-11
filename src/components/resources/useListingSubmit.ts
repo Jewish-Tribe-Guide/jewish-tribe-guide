@@ -17,7 +17,7 @@ type Options = {
   existing?: DirectoryResource
   /** See ListingForm's own prop of the same name. */
   sharedTurnstile?: { token: string; reset: () => void }
-  /** See ListingForm's own prop of the same name. */
+  /** See ListingEditor's own prop of the same name. */
   adminSubmit?: { token: string }
   /** Admin mode only: the listing is already live, so there's no "Thank you,
    *  it's being reviewed" screen to show — this runs instead. */
@@ -41,8 +41,8 @@ export type SendVia = (body: {
 /**
  * Sending a listing: the anti-abuse layer (Turnstile, honeypot), the
  * optional contact email, the POST itself, its error handling and retries,
- * and the done state afterwards. Shared by ListingEditor, BoxEditor and the
- * admin's ListingForm so all of them treat a refused or expired submission
+ * and the done state afterwards. Shared by ListingEditor (the admin
+ * console's direct add too) and BoxEditor so all of them treat a refused or expired submission
  * the same way. What gets sent comes from useListingDraft.
  */
 export function useListingSubmit({ mode, existing, sharedTurnstile, adminSubmit, onAdminSubmitted, via, onSent }: Options) {

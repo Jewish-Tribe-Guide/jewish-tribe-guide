@@ -81,6 +81,14 @@ type Props = {
   /** See useListingSubmit. */
   via?: SendVia
   onSent?: (body: unknown) => void
+  /** The admin console's "+ Add listing": Send puts it live straight away
+   *  (/api/admin/listings, see useListingSubmit), with no challenge, and
+   *  closes the editor once it's in. */
+  adminSubmit?: { token: string }
+  /** The category editor's Preview: Send builds the listing here and hands
+   *  it over instead of sending anything, and the address box doesn't call
+   *  Google. */
+  onPreviewSend?: (listing: DirectoryResource) => void
 }
 
 type Lookalike = { listing: DirectoryResource; reason: string }
@@ -190,6 +198,8 @@ export default function ListingEditor({
   onStep,
   via,
   onSent,
+  adminSubmit,
+  onPreviewSend,
 }: Props) {
   // Adding: a blank listing stands in for `item`, so the reads below don't
   // each need a guard; `creating` switches off what only makes sense for an
@@ -199,7 +209,10 @@ export default function ListingEditor({
   const ownDraft = useListingDraft(category, itemProp)
   const draft = draftProp ?? ownDraft
   const { hasAddress, hasPhone, details, setDetail } = draft
-  const { ownTurnstileRef, setOwnTurnstileToken, ...sender } = useListingSubmit({ mode: creating ? 'create' : 'edit', existing: itemProp, sharedTurnstile, via, onSent })
+  const { ownTurnstileRef, setOwnTurnstileToken, ...sender } = useListingSubmit({ mode: creating ? 'create' : 'edit', existing: itemProp, sharedTurnstile, via, onSent, adminSubmit, onAdminSubmitted: onClose })
+  // Nothing goes out from the admin console's two uses, so no challenge.
+  const challenged = !adminSubmit && !onPreviewSend
+  const verifying = challenged && sender.verifying
   const [openId, setOpenId] = useState<string | null>(null)
   // A step inside a row (a minyan, a person): its title and Back, and
   // which field it belongs to, so the row shows only that one.
@@ -279,8 +292,22 @@ export default function ListingEditor({
   const nothingToSend = creating ? missing.length > 0 : changed.size === 0
 
   async function send() {
-    if (nothingToSend || sender.submitting || sender.verifying) return
+    if (nothingToSend || sender.submitting || verifying) return
     sender.setErrors([])
+    if (onPreviewSend) {
+      onPreviewSend({
+        id: item.id || `preview-${crypto.randomUUID()}`,
+        category: category.id,
+        name: draft.name,
+        anchorId: hasAddress ? 'all' : 'community',
+        distance: 0,
+        address: hasAddress ? draft.address : '',
+        phone: hasPhone ? draft.phone : '',
+        geo: hasAddress ? draft.coords : null,
+        ...draft.visibleDetails(),
+      })
+      return
+    }
     await sender.submit(draft.buildSubmission())
   }
 
@@ -290,10 +317,12 @@ export default function ListingEditor({
       ? creating
         ? `Still needed: ${missing.join(', ')}`
         : 'No changes yet'
-      : sender.verifying
+      : verifying
         ? 'Verifying…'
         : creating
-          ? 'Send'
+          ? adminSubmit
+            ? 'Add listing'
+            : 'Send'
           : `Send ${changed.size} change${changed.size === 1 ? '' : 's'}`
   const foot = (button: ReactNode) => (sendSlot ? !removalOpen && createPortal(button, sendSlot) : button)
   const errors = sender.errors.length > 0 && (
@@ -319,6 +348,7 @@ export default function ListingEditor({
   const listScreen = (
     <div className="space-y-4" data-testid="editor-list">
       {creating && fromGoogle && <p className="-mt-1 text-[14px] text-muted">Filled in from Google</p>}
+      {adminSubmit && <p className="-mt-1 text-[14px] text-muted">Goes live as soon as you add it, with no review.</p>}
       {creating && existingListings && <Lookalike existing={existingListings} draft={draft} category={category} />}
       <ul className="divide-y divide-slate-200/70">
         {filled.map((r) => {
@@ -372,7 +402,7 @@ export default function ListingEditor({
       )}
       {errors}
       {foot(
-        <button type="button" onClick={send} disabled={nothingToSend || sender.submitting || sender.verifying} className={SUBMIT_PILL}>
+        <button type="button" onClick={send} disabled={nothingToSend || sender.submitting || verifying} className={SUBMIT_PILL}>
           {sendLabel}
         </button>,
       )}
@@ -429,6 +459,7 @@ export default function ListingEditor({
                 onChange={draft.setAddress}
                 onCoords={draft.setCoords}
                 onPlaceSelect={draft.handlePlaceSelect}
+                disableAutocomplete={!!onPreviewSend}
                 placeholder={draft.syncEligible ? 'Search by business name or address…' : 'Start typing an address…'}
               />
             </div>
@@ -526,7 +557,7 @@ export default function ListingEditor({
 
   return (
     <div className="space-y-4">
-      <Honeypot value={sender.honeypot} onChange={sender.setHoneypot} />
+      {challenged && <Honeypot value={sender.honeypot} onChange={sender.setHoneypot} />}
       {titleSlot && (!creating || stepTitle || removalOpen) && createPortal(title, titleSlot)}
       {!titleSlot && !creating && !onStep && <div className="text-base">{title}</div>}
       <div className={removalOpen ? 'hidden' : ''}>{rowScreen ?? listScreen}</div>
@@ -551,7 +582,7 @@ export default function ListingEditor({
       )}
       {/* One challenge for Send and a removal request, kept mounted across
           the screens so a pending challenge isn't lost. */}
-      {!sharedTurnstile && <TurnstileWidget ref={ownTurnstileRef} onVerify={setOwnTurnstileToken} />}
+      {challenged && !sharedTurnstile && <TurnstileWidget ref={ownTurnstileRef} onVerify={setOwnTurnstileToken} />}
     </div>
   )
 }

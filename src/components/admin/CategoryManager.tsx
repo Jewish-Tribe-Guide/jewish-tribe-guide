@@ -9,7 +9,7 @@ import { useCommunitySlug } from '@/lib/communityContext'
 import { withCommunity } from '@/lib/useCommunityData'
 import FormEditor from './FormEditor'
 import { CategoryEditor } from './CategoryEditor'
-import ListingForm from '@/components/resources/ListingForm'
+import ListingEditorScreen from './ListingEditorScreen'
 import CategoryPreview from './CategoryPreview'
 import { CardBackgroundField, CardBandImageField, IconField } from './CategoryFormFields'
 import { getCategoryColor } from '@/lib/categoryColor'
@@ -305,13 +305,7 @@ export default function CategoryManager({
     const category = categories?.find((c) => c.id === id) ?? null
     if (!category) return <p className="text-sm text-muted">Loading…</p>
     return (
-      <ListingForm
-        category={category}
-        mode="create"
-        adminSubmit={{ token }}
-        onUp={onCloseEditor}
-        onSubmitted={onCloseEditor}
-      />
+      <ListingEditorScreen heading={`Add a ${category.label}`} category={category} adminSubmit={{ token }} onClose={onCloseEditor} />
     )
   }
 

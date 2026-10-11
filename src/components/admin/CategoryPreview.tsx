@@ -11,7 +11,6 @@ import { eruvim } from '@/data/resources'
 import GenericDirectory from '@/components/resources/GenericDirectory'
 import EruvInfo from '@/components/resources/EruvInfo'
 import ZmanimCard from '@/components/ZmanimCard'
-import ListingForm from '@/components/resources/ListingForm'
 import ResourceMapView from '@/components/map/ResourceMapView'
 import SiteHeader from '@/components/SiteHeader'
 import SiteFooter from '@/components/SiteFooter'
@@ -21,13 +20,17 @@ import { DroppedPinsProvider } from '@/lib/droppedPinsContext'
 import { ListingsProvider } from '@/lib/listingsContext'
 import { PreviewCategoryProvider } from '@/lib/contentContext'
 import DevicePreviewFrame from './DevicePreviewFrame'
+import ListingEditorScreen from './ListingEditorScreen'
 
 // A preview of the real directory page for a category — the exact same
-// GenericDirectory/ListingForm components a visitor sees, driven
+// GenericDirectory/ListingEditor components a visitor sees, driven
 // by the admin's in-progress (unsaved) draft. Shows the category's real,
-// already-approved listings; Add/Edit build a listing locally and drop it
+// already-approved listings; Edit builds the listing locally and drops it
 // straight into the preview list instead of posting to /api/submissions, so
-// the admin can see a new listing "appear" without persisting anything.
+// the admin can see the change "appear" without persisting anything.
+// There's no Add here: the page's "+" opens the "+ Add" box (GenericDirectory
+// hasn't called onAdd since Oct 5), and the box isn't preview-aware — it,
+// and a box's own Edit on an opened listing, still send for real.
 // Report similarly shows its confirmation screen without actually filing one.
 // The Map button opens the real site-wide map, pre-filtered to this category.
 // Its *listings* are live, already-saved data — the map has no notion of an
@@ -37,7 +40,6 @@ import DevicePreviewFrame from './DevicePreviewFrame'
 // the ones still in the database.
 
 type Action =
-  | { mode: 'create' }
   | { mode: 'edit'; listing: DirectoryResource }
   | { mode: 'map'; query?: string; filters?: MapFilters }
 
@@ -142,25 +144,15 @@ export default function CategoryPreview({
         bandImageUrl={bandImageFor(category)}
       />
     )
-  } else if (action?.mode === 'create') {
-    content = (
-      <ListingForm
-        category={category}
-        mode="create"
-        onUp={goToDirectory}
-        onSubmitted={goToDirectory}
-        onPreviewSubmit={addOrReplaceLocal}
-      />
-    )
   } else if (action?.mode === 'edit') {
     content = (
-      <ListingForm
+      <ListingEditorScreen
+        key={action.listing.id}
+        heading="Suggest an edit"
+        item={action.listing}
         category={category}
-        mode="edit"
-        existing={action.listing}
-        onUp={goToDirectory}
-        onSubmitted={goToDirectory}
-        onPreviewSubmit={addOrReplaceLocal}
+        onClose={goToDirectory}
+        onPreviewSend={addOrReplaceLocal}
       />
     )
   } else if (action?.mode === 'map') {
@@ -188,7 +180,6 @@ export default function CategoryPreview({
         anchorLabel={(coords && address) || undefined}
         addressPrompt={!(coords && address) && category.hasAddress !== false}
         onUp={onClose}
-        onAdd={() => setAction({ mode: 'create' })}
         onEdit={(listing) => setAction({ mode: 'edit', listing })}
       />
     )

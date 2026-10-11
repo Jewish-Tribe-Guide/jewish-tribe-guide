@@ -285,3 +285,54 @@ describe('ListingEditor — boxes with their own editors', () => {
     expect(row('box:Who to call')).toHaveTextContent('Changed')
   })
 })
+
+describe('ListingEditor — the admin console', () => {
+  it('“+ Add listing” puts it live: Add listing, no challenge, and closes once it’s in', async () => {
+    const u = user()
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ ok: true }) })
+    vi.stubGlobal('fetch', fetchMock)
+    const { onClose, container } = renderEditor({ item: undefined, category: { ...FOOD, hasAddress: false }, adminSubmit: { token: 'admin-token' } })
+    expect(screen.getByText('Goes live as soon as you add it, with no review.')).toBeInTheDocument()
+    expect(container.querySelector('input[name="company"]')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Still needed: Name' })).toBeDisabled()
+
+    await u.click(row('name'))
+    await u.type(screen.getByRole('textbox', { name: 'Name' }), 'Kosher Corner')
+    await u.click(done())
+    await u.click(screen.getByRole('button', { name: 'Add listing' }))
+
+    await waitFor(() => expect(onClose).toHaveBeenCalled())
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(url).toContain('/api/admin/listings')
+    expect(init.headers.Authorization).toBe('Bearer admin-token')
+    expect(JSON.parse(init.body).payload).toMatchObject({ category: 'restaurant', name: 'Kosher Corner' })
+    expect(screen.queryByTestId('editor-sent')).not.toBeInTheDocument()
+  })
+
+  it('the category preview’s edit hands the listing back instead of sending it', async () => {
+    const u = user()
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    const onPreviewSend = vi.fn()
+    const { container } = renderEditor({ onPreviewSend })
+    expect(container.querySelector('input[name="company"]')).toBeNull()
+
+    await u.click(row('contact'))
+    const phone = screen.getByLabelText('Phone')
+    await u.clear(phone)
+    await u.type(phone, '2676066613')
+    await u.click(done())
+    await u.click(sendButton())
+
+    expect(onPreviewSend).toHaveBeenCalledTimes(1)
+    expect(onPreviewSend.mock.calls[0][0]).toMatchObject({
+      id: 'sweet-box',
+      category: 'restaurant',
+      name: 'Sweet Box Bakery',
+      phone: '(267) 606-6613',
+      dishes: ['Cupcakes', 'Cookies', 'Brownies'],
+    })
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(screen.queryByTestId('editor-sent')).not.toBeInTheDocument()
+  })
+})
