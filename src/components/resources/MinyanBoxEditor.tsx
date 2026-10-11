@@ -51,7 +51,6 @@ export default function MinyanBoxEditor({
   onChange,
   onStep,
   send,
-  onWholeSchedule,
 }: {
   /** The box's minyanim as they are (minyanimForBox). */
   original: Minyan[]
@@ -69,9 +68,6 @@ export default function MinyanBoxEditor({
   onStep: (step: { title: string; back: () => void } | null) => void
   /** The list's button, given how many minyanim changed. */
   send: (changes: number) => ReactNode
-  /** "Have their whole schedule? Paste it instead": the schedule box about
-   *  this shul, as Add a minyan offers it (the user, Oct 10). */
-  onWholeSchedule?: () => void
 }) {
   const [rows, setRows] = useState<Minyan[]>(original)
   // The minyan open: an id, 'new' for one being added, or null for the list.
@@ -156,14 +152,6 @@ export default function MinyanBoxEditor({
         Add a minyan
       </button>
       {send(boxChangeCount(original, rows))}
-      {onWholeSchedule && (
-        <p className="border-t border-slate-100 pt-3 text-center text-[14px] text-slate-600">
-          Have their whole schedule?{' '}
-          <button type="button" onClick={onWholeSchedule} className="cursor-pointer font-bold text-primary hover:underline">
-            Send it instead ›
-          </button>
-        </p>
-      )}
     </div>
   )
 }

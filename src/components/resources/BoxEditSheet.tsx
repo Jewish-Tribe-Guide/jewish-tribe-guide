@@ -48,7 +48,6 @@ export default function BoxEditSheet({
   edit,
   onClose,
   onEditElse,
-  onWholeSchedule,
 }: {
   item: DirectoryResource
   category: CategoryConfig
@@ -56,8 +55,6 @@ export default function BoxEditSheet({
   onClose: () => void
   /** "Edit something else here", once it's sent: the listing's whole edit. */
   onEditElse?: () => void
-  /** A shul's box: "Have their whole schedule?", the schedule box. */
-  onWholeSchedule?: () => void
 }) {
   const isMobile = useIsMobile()
   // A step inside the box (a shul's one minyan): its title, and Back to
@@ -70,7 +67,7 @@ export default function BoxEditSheet({
   }, [])
   const title = stepTitle ?? edit?.title ?? ''
   const onBack = stepTitle ? () => stepBack.current() : undefined
-  const body = edit && <BoxEditor key={edit.title} item={item} category={category} edit={edit} onClose={onClose} onEditElse={onEditElse} onWholeSchedule={onWholeSchedule} onStep={onStep} />
+  const body = edit && <BoxEditor key={edit.title} item={item} category={category} edit={edit} onClose={onClose} onEditElse={onEditElse} onStep={onStep} />
   return isMobile ? (
     <MobileSheet isOpen={!!edit} onClose={onClose} title={title} onBack={onBack}>
       {body}
@@ -88,7 +85,6 @@ export function BoxEditor({
   edit,
   onClose,
   onEditElse,
-  onWholeSchedule,
   onStep = () => {},
 }: {
   item: DirectoryResource
@@ -96,7 +92,6 @@ export function BoxEditor({
   edit: BoxEdit
   onClose: () => void
   onEditElse?: () => void
-  onWholeSchedule?: () => void
   /** A shul's one minyan opened, for the sheet's title and Back. */
   onStep?: (step: { title: string; back: () => void } | null) => void
 }) {
@@ -180,7 +175,6 @@ export function BoxEditor({
             place={item.name}
             writing={edit.writing!}
             onStep={onStep}
-            onWholeSchedule={onWholeSchedule}
             onChange={(rows) => setDetail(f.key, mergeMinyanimBox(allRows, edit.minyanimBox!, rows))}
             send={(n) => (
               <>

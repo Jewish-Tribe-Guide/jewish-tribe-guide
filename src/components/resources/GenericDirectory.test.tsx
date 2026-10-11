@@ -400,7 +400,7 @@ describe('GenericDirectory', () => {
     expect(floatingAdd.className).not.toContain('desktop:hidden')
     await user.click(floatingAdd)
     await user.click(await screen.findByRole('button', { name: 'Fill it in yourself' }))
-    await user.click(screen.getByRole('button', { name: 'Not on Google? Fill it in yourself' }))
+    await user.click(screen.getByRole('button', { name: 'It’s not on Google' }))
     expect(screen.getByRole('dialog', { name: 'Add to Grocery Stores' })).toBeInTheDocument()
     expect(onAdd).not.toHaveBeenCalled()
   })
@@ -1170,7 +1170,9 @@ describe('GenericDirectory — the list heading', () => {
   it('puts the category’s own link (“Other Mikvahs”) after the last row, not in the heading', () => {
     const mikvahs = { ...food, externalLink: { label: 'Other Mikvahs', url: 'https://mikvah.org/directory' } }
     renderWithProviders(<GenericDirectory category={mikvahs} items={items} {...handlers} />)
-    const link = screen.getByRole('link', { name: /Other Mikvahs/ })
+    // The whole text is the link: no "Not listed here?" before it, no arrow.
+    const link = screen.getByRole('link', { name: 'Other Mikvahs' })
+    expect(screen.getByTestId('external-link')).toHaveTextContent(/^Other Mikvahs$/)
     expect(within(screen.getByTestId('list-heading')).queryByRole('link')).not.toBeInTheDocument()
     const lastRow = screen.getByText('Truck')
     expect(lastRow.compareDocumentPosition(link) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()

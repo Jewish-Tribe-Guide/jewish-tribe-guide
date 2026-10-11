@@ -181,10 +181,6 @@ export default function ListingView({ item, category, color, place = null, upvot
         tellAbout(item)
       }
     : undefined
-  // A shul's usual times, edited a minyan at a time: "Have their whole
-  // schedule?" opens the schedule box over it; its do-it-yourself, and its
-  // Back, return to the list (the user, Oct 10).
-  const wholeSchedule = tellAbout ? () => tellAbout(item, () => {}, { times: true }) : undefined
   const confirmLine = (edit?: BoxEdit) => (
     <FreshnessFooter resourceId={item.id} confirmedAt={item.confirmedAt} onEdit={edit && editBox ? () => editBox(edit) : undefined} />
   )
@@ -624,7 +620,7 @@ export default function ListingView({ item, category, color, place = null, upvot
       {/* Its own boundary: loading it the first time otherwise hid the
           listing for a moment, and the listing came back at its top. */}
       <Suspense fallback={null}>
-        {boxEdit && <BoxEditSheet item={item} category={category} edit={boxEdit} onClose={() => setBoxEdit(null)} onEditElse={editElse} onWholeSchedule={wholeSchedule} />}
+        {boxEdit && <BoxEditSheet item={item} category={category} edit={boxEdit} onClose={() => setBoxEdit(null)} onEditElse={editElse} />}
       </Suspense>
     </div>
   )

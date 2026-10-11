@@ -87,25 +87,12 @@ describe('+ Add a minyan (the user’s note 2)', () => {
     expect(screen.queryByRole('button', { name: /^Only/ })).toBeNull()
   })
 
-  it('“Have their whole schedule?” is under Send, and opens the regular box about the shul; Back returns to the minyan as left', () => {
+  // Oct 10: one minyan, one task. The whole schedule has its ways in
+  // already (the shul's Suggest an edit, "Add this week's schedule").
+  it('is for one minyan only: no “Have their whole schedule?” under Send', () => {
     open({ shulId: 'mekor', day: aTuesday })
-    const send = screen.getByRole('button', { name: 'Send for a check' })
-    const whole = screen.getByRole('button', { name: 'Send it instead ›' })
-    expect(send.compareDocumentPosition(whole) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-    fireEvent.change(screen.getByLabelText('Time'), { target: { value: '7:15am' } })
-
-    fireEvent.click(whole)
-    expect(screen.getByTestId('tell-us')).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Send Mekor Habracha’s schedule' })).toBeInTheDocument()
-    expect(screen.getByLabelText('Your message')).toHaveAttribute('placeholder', 'Paste Mekor Habracha’s email or newsletter for this week.')
-    expect(screen.getByRole('button', { name: 'Photo or PDF of the schedule' })).toBeInTheDocument()
-    // Its do-it-yourself is the one minyan it came from (Oct 10).
-    expect(screen.getByRole('button', { name: 'Add one time yourself' })).toBeInTheDocument()
-    expect(screen.queryByTestId('update-times')).toBeNull()
-
-    fireEvent.click(screen.getByRole('button', { name: 'Back' }))
-    expect(screen.queryByTestId('tell-us')).toBeNull()
-    expect(screen.getByRole('heading', { name: 'Add a minyan at Mekor Habracha' })).toBeInTheDocument()
-    expect(screen.getByLabelText('Time')).toHaveValue('7:15am')
+    expect(screen.getByRole('button', { name: 'Send for a check' })).toBeInTheDocument()
+    expect(screen.queryByText(/whole schedule/i)).toBeNull()
+    expect(screen.queryByRole('button', { name: /Send it instead/ })).toBeNull()
   })
 })

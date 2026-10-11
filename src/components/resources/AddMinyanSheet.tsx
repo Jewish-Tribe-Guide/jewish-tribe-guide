@@ -7,13 +7,11 @@ import { DAY_KEYS, dayLabel, type DayKey } from '@/lib/hours'
 import { milesText } from '@/lib/geo'
 import { dateText, type DateFacts } from '@/lib/schedules'
 import type { UpdateRow } from '@/lib/scheduleUpdate'
-import { tellUsPlaceholder } from '@/lib/tellUs'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { RelativeTimeFields, TimeModeToggle, useTimeModes, ZMAN_ANCHOR_ORDER } from '@/components/intake/ZmanTimeFields'
 import TurnstileWidget from '@/components/TurnstileWidget'
 import ActionDialog from './ActionDialog'
 import MobileSheet from './MobileSheet'
-import { TellUsBody } from '@/components/TellUsSheet'
 import { TURNSTILE_ACTIVE } from './useListingSubmit'
 
 // "+ Add a minyan" on the Minyanim tab (the user's note 2, agreed Oct 2):
@@ -27,9 +25,9 @@ import { TURNSTILE_ACTIVE } from './useListingSubmit'
 // Tidied Oct 6: Back is the header's chevron (it was "· Change" by the
 // shul's denomination); the time sits beside its tefillah; the days need no
 // explaining, and "Only Hoshana Rabbah" is offered only on a day with a
-// name. "Have their whole schedule?" moved under Send and opens the regular
-// "+ Add" box about the shul, in this sheet, where it was a second box with
-// a choice to make first.
+// name. "Have their whole schedule?" is gone (the user, Oct 10): this
+// screen is for one minyan, and a whole schedule has its ways in already,
+// the shul's Suggest an edit and its "Add this week's schedule".
 
 const inputClass = 'rounded-md border border-slate-300 px-2.5 py-1.5 text-sm text-slate-900 focus:border-primary focus:outline-none'
 
@@ -67,18 +65,10 @@ export default function AddMinyanSheet({
   const [shulId, setShulId] = useState<string | null>(presetShul ?? null)
   const shul = shulId ? shuls.find((s) => s.id === shulId) : undefined
   const [sent, setSent] = useState(false)
-  // The "+ Add" box, about this shul, while it's open here: its step's
-  // title, and whether it has a Back (none on its thanks). The Back itself
-  // is kept in a ref, as TellUsSheet keeps it: the box reports it on every
-  // render, and state would loop.
-  const [tell, setTell] = useState<TellState>(null)
-  const tellBack = useRef<() => void>(() => {})
-  // Named for what's being done, as the link said (Oct 6): it was "Tell us
-  // about Mekor Habracha", the box's name anywhere.
-  const title = tell && shul ? (tell.title ?? `Send ${shul.name}’s schedule`) : shul ? `Add a minyan at ${shul.name}` : 'Add a minyan'
-  // Back: the box's own, or from the minyan to "Which shul?" when it was
-  // picked here (none when the search named it, or once sent).
-  const onBack = tell ? (tell.hasBack ? () => tellBack.current() : undefined) : shul && !presetShul && !sent ? () => setShulId(null) : undefined
+  const title = shul ? `Add a minyan at ${shul.name}` : 'Add a minyan'
+  // Back: from the minyan to "Which shul?" when it was picked here (none
+  // when the search named it, or once sent).
+  const onBack = shul && !presetShul && !sent ? () => setShulId(null) : undefined
   const body = (
     <AddMinyanBody
       key={shulId ?? 'pick'}
@@ -90,12 +80,6 @@ export default function AddMinyanSheet({
       onPick={setShulId}
       sent={sent}
       onSent={() => setSent(true)}
-      telling={!!tell}
-      onTell={setTell}
-      onTellBack={(back) => {
-        tellBack.current = back ?? (() => {})
-        setTell((t) => (t && t.hasBack !== !!back ? { ...t, hasBack: !!back } : t))
-      }}
       onClose={onClose}
     />
   )
@@ -110,8 +94,6 @@ export default function AddMinyanSheet({
   )
 }
 
-type TellState = { title: string | null; hasBack: boolean } | null
-
 function AddMinyanBody({
   shuls,
   shul,
@@ -121,9 +103,6 @@ function AddMinyanBody({
   onPick,
   sent,
   onSent,
-  telling,
-  onTell,
-  onTellBack,
   onClose,
 }: {
   shuls: readonly DirectoryResource[]
@@ -134,43 +113,10 @@ function AddMinyanBody({
   onPick: (id: string) => void
   sent: boolean
   onSent: () => void
-  telling: boolean
-  onTell: (t: TellState | ((t: TellState) => TellState)) => void
-  onTellBack: (back: (() => void) | null) => void
   onClose: () => void
 }) {
   if (!shul) return <PickShul shuls={shuls} dayLine={`${dateText(day.date, { weekday: true })}${day.name ? ` · ${day.name}` : ''}`} shulText={shulText} onPick={onPick} />
-  // The whole schedule: the regular box, about this shul. Its Back from the
-  // start comes back here, to the minyan as it was left (kept, hidden).
-  return (
-    <>
-      {telling && (
-      <TellUsBody
-        about={{ id: shul.id, name: shul.name }}
-        placeholder={tellUsPlaceholder({ times: true, about: shul })}
-        kind="times"
-        // Its do-it-yourself is the one minyan it was opened from (Oct 10).
-        onEditYourself={() => onTell(null)}
-        yourselfLabel="Add one time yourself"
-        onClose={onClose}
-        onTitle={(title) => onTell((t) => (t && t.title !== title ? { ...t, title } : t))}
-        onBack={onTellBack}
-        backFromStart={() => onTell(null)}
-      />
-      )}
-      <div hidden={telling}>
-    <MinyanTime
-      shul={shul}
-      day={day}
-      presetTefillah={presetTefillah}
-      sent={sent}
-      onSent={onSent}
-      onWholeSchedule={() => onTell({ title: null, hasBack: false })}
-      onClose={onClose}
-    />
-      </div>
-    </>
-  )
+  return <MinyanTime shul={shul} day={day} presetTefillah={presetTefillah} sent={sent} onSent={onSent} onClose={onClose} />
 }
 
 /** Which shul: nearest first, searchable, the closest few then all. */
@@ -217,7 +163,6 @@ function MinyanTime({
   presetTefillah,
   sent,
   onSent,
-  onWholeSchedule,
   onClose,
 }: {
   shul: DirectoryResource
@@ -225,7 +170,6 @@ function MinyanTime({
   presetTefillah?: Tefillah
   sent: boolean
   onSent: () => void
-  onWholeSchedule: () => void
   onClose: () => void
 }) {
   const [row, setRow] = useState<UpdateRow>({ id: 'new', day: day.weekday, tefillah: presetTefillah ?? 'shacharis', time: '', status: 'new' })
@@ -370,12 +314,6 @@ function MinyanTime({
         )}
         <p className="text-center text-[12.5px] leading-snug text-muted">An admin checks it before anyone sees it.</p>
       </div>
-      <p className="border-t border-slate-100 pt-3 text-center text-[14px] text-slate-600">
-        Have their whole schedule?{' '}
-        <button type="button" onClick={onWholeSchedule} className="cursor-pointer font-bold text-primary hover:underline">
-          Send it instead ›
-        </button>
-      </p>
       {busy && TURNSTILE_ACTIVE && <TurnstileWidget key={attempt} onVerify={(token) => pending.current(token)} />}
     </div>
   )

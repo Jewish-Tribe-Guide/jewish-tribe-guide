@@ -320,28 +320,6 @@ describe('ListingView — how sure', () => {
     expect(screen.getByRole('dialog', { name: 'Usual Shabbos times' })).toBeInTheDocument()
   })
 
-  // Oct 10: a newsletter in hand while editing the usual times: "Have their
-  // whole schedule?" opens the schedule box over the list, as Add a minyan
-  // offers it.
-  it('a shul’s usual-times edit offers the whole schedule instead, the box about that shul', () => {
-    const shuls = makeCategory({ id: 'synagogue', detailFields: [{ key: 'minyanim', label: 'Davening', type: 'minyanim', renderAs: 'row' }] })
-    const shul = makeListing({ confirmedAt: '2026-09-29T05:56:24Z', minyanim: [{ id: 'm1', tefillah: 'shacharis', days: ['sat'], time: '9:00am' }] })
-    const tell = vi.fn()
-    renderWithProviders(
-      <TellAboutContext.Provider value={tell}>
-        <ListingView item={shul} category={shuls} color="#2657bf" path="/philly/synagogue/x" foot={<p>foot</p>} />
-      </TellAboutContext.Provider>,
-    )
-    fireEvent.click(within(screen.getByTestId('davening-shabbos')).getByRole('button', { name: 'Edit' }))
-    const sheet = screen.getByRole('dialog', { name: 'Usual Shabbos times' })
-    expect(within(sheet).getByText(/Have their whole schedule\?/)).toBeInTheDocument()
-    fireEvent.click(within(sheet).getByRole('button', { name: 'Send it instead ›' }))
-    expect(tell).toHaveBeenCalledWith(shul, expect.any(Function), { times: true })
-    // Not on one minyan's screen: that one's task is the one minyan.
-    fireEvent.click(within(sheet).getByRole('button', { name: /Shacharis 9 AM/ }))
-    expect(screen.queryByRole('button', { name: 'Send it instead ›' })).not.toBeInTheDocument()
-  })
-
   it('a grocery’s items aren’t dated as a whole: each item carries its own date', () => {
     const m: CategoryField = { key: 'm', label: 'Kosher items', type: 'tags', renderAs: 'badge', showCountInHeader: true }
     view({ item: makeListing({ m: ['Challah'] }), category: makeCategory({ detailFields: [hours, m] }) })
