@@ -16,12 +16,10 @@ import { initialsOf } from '@/lib/listingRow'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { formatPhone } from '@/lib/validation'
 import { ui } from '@/lib/uiConfig'
-import { schedulesKey } from '@/lib/schedules'
 import { scrollingAncestor } from '@/lib/scrollingAncestor'
 import CategoryIcon from '@/components/CategoryIcon'
 import ImageUploadField from '@/components/ImageUploadField'
 import AddressInput from '@/components/intake/AddressInput'
-import SchedulesInput from '@/components/intake/SchedulesInput'
 import Honeypot from '@/components/Honeypot'
 import TurnstileWidget from '@/components/TurnstileWidget'
 import { CheckIcon, ChevronRightIcon, PlusIcon } from '@/components/icons'
@@ -589,10 +587,6 @@ export default function ListingEditor({
         />
       )
     }
-    if (r.kind === 'schedules') {
-      const key = schedulesKey(r.fields[0].key)
-      return <SchedulesInput value={details[key]} onChange={(v) => setDetail(key, v)} />
-    }
     if (r.kind === 'audience') {
       // The section's hours and note, written or not; anything else (a
       // phone, an email) once it's there, or once someone adds it.
@@ -625,7 +619,6 @@ export default function ListingEditor({
   // A row holding a list, open on its own screen, in the same white card.
   const rowScreen = row && !inPlace ? (
     <div className="space-y-4" data-testid={`editor-open-${row.id}`}>
-      {row.kind !== 'name' && row.kind !== 'minyans' && !child && <p className="-mt-1 text-[14px] text-muted">{item.name || draft.name}</p>}
       <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4">{rowBody(row)}</div>
       {!child &&
         foot(

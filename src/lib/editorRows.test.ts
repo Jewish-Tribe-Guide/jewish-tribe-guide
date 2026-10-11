@@ -35,9 +35,11 @@ describe('the whole-listing editor’s rows', () => {
     expect(titles(editorRows(MIKVAH, { womenTevillah: true, menTevillah: true }))).toContain('Men’s')
   })
 
-  it('a shul: its denomination, then its usual times as the listing’s two boxes', () => {
+  // No Yom Tov and special schedules row (the user, Oct 11): a shul
+  // doesn't have those ahead of time.
+  it('a shul: its denomination, then its usual times as the listing’s two boxes, and no schedules row', () => {
     const rows = editorRows(SHUL, {})
-    expect(titles(rows)).toEqual(['Name', 'Denomination', 'Usual weekday times', 'Usual Shabbos times', 'Yom Tov and special schedules', 'Address, phone and website'])
+    expect(titles(rows)).toEqual(['Name', 'Denomination', 'Usual weekday times', 'Usual Shabbos times', 'Address, phone and website'])
     expect(rows.filter((r) => r.kind === 'minyans').map((r) => r.box)).toEqual(['weekday', 'shabbos'])
   })
 
@@ -49,12 +51,13 @@ describe('the whole-listing editor’s rows', () => {
 
 describe('where a row opens', () => {
   const inPlace = (rows: ReturnType<typeof editorRows>) => rows.filter(opensInPlace).map((r) => r.id)
-  it('Food: a few inputs open where they are; the dishes and the hours are lists, on their own screen', () => {
-    expect(inPlace(editorRows(FOOD, {}))).toEqual(['name', 'kind', 'facts', 'contact', 'about'])
+  // Hours alone open in place too (the user, Oct 11).
+  it('Food: a few inputs, and the hours, open where they are; the dishes are a list, on their own screen', () => {
+    expect(inPlace(editorRows(FOOD, {}))).toEqual(['name', 'kind', 'facts', 'contact', 'hours', 'about'])
   })
-  it('a shul’s times and schedules, a mikvah’s sections and a hospital’s people are their own screens', () => {
+  it('a shul’s times, a mikvah’s sections (hours beside a note) and a hospital’s people are their own screens', () => {
     const shul = editorRows(SHUL, {})
-    expect(shul.filter((r) => r.kind === 'minyans' || r.kind === 'schedules').some(opensInPlace)).toBe(false)
+    expect(shul.filter((r) => r.kind === 'minyans').some(opensInPlace)).toBe(false)
     const mikvah = editorRows(MIKVAH, Object.fromEntries(MIKVAH.detailFields.filter((f) => f.type === 'boolean').map((f) => [f.key, true])))
     expect(mikvah.filter((r) => r.kind === 'audience').length).toBeGreaterThan(0)
     expect(mikvah.filter((r) => r.kind === 'audience').some(opensInPlace)).toBe(false)

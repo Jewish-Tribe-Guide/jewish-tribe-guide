@@ -168,17 +168,21 @@ export async function categoryWithGeocodedListings(
 export async function categoryWithHoursField(
   request: APIRequestContext,
   community: string,
-  /** The one with the most fields first: the longest editor, for a test
-   *  that needs to scroll it. */
-  { longest = false }: { longest?: boolean } = {},
+  /** `longest`: the one with the most fields first, the longest editor,
+   *  for a test that needs to scroll it. `also`: only one that has a field
+   *  of this type too, outside a mikvah-style section. */
+  { longest = false, also }: { longest?: boolean; also?: string } = {},
 ): Promise<{ category: Category; item: { id: string; name: string } }> {
   // Via categories() rather than its own inline fetch — this used to duplicate
   // that call, and the duplicate is the line CI timed out on.
   const all = (await categories(request, community)) as (Category & {
-    detailFields?: { type: string }[]
+    detailFields?: { type: string; audienceKey?: string }[]
   })[]
   const withHours = all.filter(
-    (c) => c.kind === 'listing' && c.detailFields?.some((f) => f.type === 'hours'),
+    (c) =>
+      c.kind === 'listing' &&
+      c.detailFields?.some((f) => f.type === 'hours') &&
+      (!also || c.detailFields?.some((f) => f.type === also && !f.audienceKey)),
   )
   if (longest) withHours.sort((a, b) => (b.detailFields?.length ?? 0) - (a.detailFields?.length ?? 0))
   for (const category of withHours) {

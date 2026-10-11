@@ -32,9 +32,10 @@ describe('ListingEditorScreen', () => {
     expect(screen.queryByTestId('editor-open-name')).not.toBeInTheDocument()
     expect(onClose).not.toHaveBeenCalled()
 
-    // A week of hours is its own screen, and the heading says so.
-    await u.click(within(screen.getByTestId('editor-empty')).getByRole('button', { name: 'Hours' }))
-    expect(screen.getByRole('heading', { name: 'Hours' })).toBeInTheDocument()
+    // The dishes are a list of their own: their own screen, and the
+    // heading says so.
+    await u.click(within(screen.getByTestId('editor-empty')).getByRole('button', { name: 'Main dishes' }))
+    expect(screen.getByRole('heading', { name: 'Main dishes' })).toBeInTheDocument()
     await u.click(screen.getByRole('button', { name: 'Back' }))
     expect(screen.getByRole('heading', { name: 'Suggest an edit' })).toBeInTheDocument()
     expect(screen.getByTestId('editor-list')).toBeInTheDocument()

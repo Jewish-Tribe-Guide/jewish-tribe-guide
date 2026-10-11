@@ -7,7 +7,6 @@ import { sameFieldValue } from './listingDiff'
 import { boxesOf, mainCardOf, shabbosAfter, shabbosFieldsOf } from './listingParts'
 import { isWebsite, itemsField, kindField, siteName } from './listingView'
 import { minyanimForBox, type MinyanBox } from './minyanimBox'
-import { readSchedules, schedulesKey } from './schedules'
 
 // ── The whole-listing editor's rows (agreed Oct 11, canvas page "editor") ───
 // "Suggest an edit" is the listing's own boxes, in the listing's order, one
@@ -25,7 +24,7 @@ export type EditorRow = {
    *  'minyans:weekday', 'box:Who to call', 'contact', 'hours', 'about'… */
   id: string
   title: string
-  kind: 'name' | 'fields' | 'contact' | 'items' | 'minyans' | 'schedules' | 'audience'
+  kind: 'name' | 'fields' | 'contact' | 'items' | 'minyans' | 'audience'
   fields: CategoryField[]
   /** A shul's usual-times box. */
   box?: MinyanBox
@@ -41,7 +40,8 @@ const isBadge = (f: CategoryField) => (f.renderAs ?? (f.type === 'boolean' ? 'ba
 
 /** Whether a field is a list of its own (a week of hours, the dishes,
  *  the minyanim, the people to call), which a row opens on a screen of its
- *  own; anything else is a few inputs, which open where the row is.
+ *  own; anything else is a few inputs, which open where the row is. A row
+ *  of hours alone opens where it is all the same (see opensInPlace).
  *  Keyed on every type, so a new one is a compile error until it's placed. */
 const IS_A_LIST: Record<FieldType, boolean> = {
   text: false,
@@ -61,7 +61,11 @@ const IS_A_LIST: Record<FieldType, boolean> = {
 /** A row opens where it is, inside its own card, unless it holds a list
  *  (agreed Oct 11, canvas page "editorlook"): then it's its own screen. */
 export function opensInPlace(row: EditorRow): boolean {
-  if (row.kind === 'items' || row.kind === 'minyans' || row.kind === 'schedules') return false
+  // A mikvah's sections (Women's, Men's, Keilim) are alike, each its own
+  // screen, whichever fields an admin gave one.
+  if (row.kind === 'items' || row.kind === 'minyans' || row.kind === 'audience') return false
+  // Just a week of hours opens where it is too (the user, Oct 11).
+  if (row.fields.length > 0 && row.fields.every((f) => f.type === 'hours')) return true
   return !row.fields.some((f) => IS_A_LIST[f.type])
 }
 
@@ -111,7 +115,9 @@ export function editorRows(category: CategoryConfig, details: Record<string, unk
     take([minyanim])
     rows.push({ id: 'minyans:weekday', title: 'Usual weekday times', kind: 'minyans', fields: [minyanim], box: 'weekday' })
     rows.push({ id: 'minyans:shabbos', title: 'Usual Shabbos times', kind: 'minyans', fields: [minyanim], box: 'shabbos' })
-    rows.push({ id: 'schedules', title: 'Yom Tov and special schedules', kind: 'schedules', fields: [minyanim] })
+    // No Yom Tov and special schedules row (the user, Oct 11): a shul
+    // doesn't have those ahead of time; they're added when posted, from
+    // the listing's own schedule box.
   }
   if (items && !placed.has(items.key)) rows.push({ id: 'items', title: items.label, kind: 'items', fields: take([items]) })
   // A section per audience (a mikvah's Women’s, Men’s, Keilim), while it's on.
@@ -220,7 +226,6 @@ export function rowSummary(row: EditorRow, values: EditorValues, timeText: (m: M
     const rows = minyanimForBox(isMinyanim(d[row.fields[0].key]) ? (d[row.fields[0].key] as Minyan[]) : [], row.box!)
     return rows.map((m) => minyanText(m, timeText)).join(' · ')
   }
-  if (row.kind === 'schedules') return readSchedules(d[schedulesKey(row.fields[0].key)]).map((s) => s.name).join(' · ')
   if (row.kind === 'items') {
     const f = row.fields[0]
     const all = [...selectValues(d[f.key]), ...selectValues(d[`${f.key}_sometimes`])]
@@ -262,7 +267,6 @@ export function rowIsEmpty(row: EditorRow, values: EditorValues): boolean {
   if (row.kind === 'name') return false
   const d = values.details
   if (row.kind === 'minyans') return minyanimForBox(isMinyanim(d[row.fields[0].key]) ? (d[row.fields[0].key] as Minyan[]) : [], row.box!).length === 0
-  if (row.kind === 'schedules') return readSchedules(d[schedulesKey(row.fields[0].key)]).length === 0
   if (row.kind === 'items') return blank(row.fields[0], d[row.fields[0].key]) && selectValues(d[`${row.fields[0].key}_sometimes`]).length === 0
   if (row.kind === 'contact' && (values.address.trim() || values.phone.trim())) return false
   return row.fields.every((f) => (f.invertDisplay ? true : blank(f, d[f.key])))
@@ -284,10 +288,6 @@ export function rowChanged(row: EditorRow, item: DirectoryResource, values: Edit
     // stored without one an id when a box is opened, and the other box's
     // rows go back with them.
     return boxText(minyanimForBox(was, row.box!)) !== boxText(minyanimForBox(now, row.box!))
-  }
-  if (row.kind === 'schedules') {
-    const key = schedulesKey(row.fields[0].key)
-    return JSON.stringify(readSchedules(item[key])) !== JSON.stringify(readSchedules(d[key]))
   }
   return row.fields.some((f) => {
     if (!fieldIsVisible(f, d) && !fieldIsVisible(f, item)) return false

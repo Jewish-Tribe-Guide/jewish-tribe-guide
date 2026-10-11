@@ -426,7 +426,8 @@ test('Request removal, from the ••• menu, is its own screen, and Back retu
 // closes the row, not the editor.
 test('Back steps out of an open row of the editor, not out of editing', async ({ page, request, isMobile }) => {
   const community = await defaultCommunity(page)
-  const { category, item } = await categoryWithHoursField(request, community)
+  // The longest editor: it has rows of both kinds.
+  const { category, item } = await categoryWithHoursField(request, community, { longest: true })
 
   await page.goto(`/${community}/${category.id}`)
   await dismissLocationPrompt(page)
@@ -461,12 +462,13 @@ test('Back steps out of an open row of the editor, not out of editing', async ({
 // A row's own screen swapped out the list inside the same scroll region and
 // kept its offset (Oct 11): opened from low in the list, it started part way
 // down, its first lines out of sight. It starts at its top, and Back comes
-// back to the row. Where the old offset hid it depends on how long the list
-// is against how tall the screen is, so a short editor and the longest.
-for (const longest of [false, true]) {
-  test(`a row’s own screen starts at its top, and Back returns to the row (${longest ? 'the longest editor' : 'a short editor'})`, async ({ page, request, isMobile }) => {
+// back to the row. The longest editor, where the list runs furthest: on a
+// phone this goes red without the fix. On desktop no category shows it since
+// Hours opens in place (a tall screen low in the list was what did); it runs
+// there as a guard.
+test('a row’s own screen starts at its top, and Back returns to the row', async ({ page, request, isMobile }) => {
     const community = await defaultCommunity(page)
-    const { category, item } = await categoryWithHoursField(request, community, { longest })
+    const { category, item } = await categoryWithHoursField(request, community, { longest: true })
 
     await page.goto(`/${community}/${category.id}`)
     await dismissLocationPrompt(page)
@@ -507,5 +509,34 @@ for (const longest of [false, true]) {
 
     await page.getByRole('button', { name: 'Back', exact: true }).filter({ visible: true }).first().click()
     await expect(row).toBeInViewport()
-  })
-}
+})
+
+// A note box was three lines high whatever was in it, so a mikvah's longer
+// note or an About scrolled inside the box, its end out of sight (the user,
+// Oct 11). It grows to fit. Typed only, never sent.
+test('a long note grows its box rather than scrolling inside it', async ({ page, request, isMobile }) => {
+  const community = await defaultCommunity(page)
+  const { category, item } = await categoryWithHoursField(request, community, { also: 'textarea' })
+
+  await page.goto(`/${community}/${category.id}`)
+  await dismissLocationPrompt(page)
+  await page.getByRole('button', { name: `Show details for ${item.name}` }).first().click()
+  const listing = isMobile ? page.getByRole('dialog', { name: item.name }) : page.getByTestId('listing-column')
+  await expect(listing.getByRole('heading', { name: item.name, exact: true })).toBeVisible()
+  test.skip((await listing.getByRole('button', { name: 'Suggest an edit' }).count()) === 0, `${category.id} can't be edited`)
+  await openListingEditor(page, listing)
+  await expect(page.getByTestId('editor-list')).toBeVisible()
+  // Whichever row opening in place holds a note: About, or one of the
+  // admin's boxes.
+  const open = page.locator('[data-testid^="editor-open-"]')
+  const box = open.locator('textarea').first()
+  const rows = page.locator('[data-opens="here"]')
+  for (let i = 0; i < (await rows.count()); i++) {
+    await rows.nth(i).click()
+    if (await box.count()) break
+    await open.getByRole('button', { name: 'Done' }).click()
+  }
+  test.skip((await box.count()) === 0, `${category.id} has no note opening in place`)
+  await box.fill(Array.from({ length: 10 }, (_, i) => `Line ${i + 1} of a long note`).join('\n'))
+  await expect.poll(() => box.evaluate((el) => el.scrollHeight - el.clientHeight)).toBeLessThanOrEqual(1)
+})

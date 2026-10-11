@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type TextareaHTMLAttributes } from 'react'
 import { fieldIsVisible, resolveCapabilities, selectValues, type CategoryConfig, type CategoryField } from '@/lib/categories'
 import { formatPhone, normalizeUrl } from '@/lib/validation'
 import { hasListingChanged } from '@/lib/listingDiff'
@@ -730,6 +730,21 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
  *  edits most fields in their listing-shaped place but uses this for the
  *  ones whose editor is the same either way (yes/no switches, the kosher
  *  caveat's question and note, and any field type it has no layout for). */
+/** A textarea as tall as what's in it, three lines at least: a mikvah's
+ *  note or an About ran past its three lines and scrolled inside the box,
+ *  its end out of sight (the user, Oct 11). */
+function GrowingTextarea({ value, ...rest }: TextareaHTMLAttributes<HTMLTextAreaElement>) {
+  const ref = useRef<HTMLTextAreaElement>(null)
+  useLayoutEffect(() => {
+    const el = ref.current
+    // Not while it's hidden: it has no height to measure then.
+    if (!el || el.scrollHeight === 0) return
+    el.style.height = 'auto'
+    el.style.height = `${el.scrollHeight + el.offsetHeight - el.clientHeight}px`
+  }, [value])
+  return <textarea ref={ref} value={value} {...rest} />
+}
+
 export function DetailFieldInput({
   field,
   labelOverride,
@@ -899,7 +914,7 @@ export function DetailFieldInput({
     return (
       <div>
         <label htmlFor={`detail-${field.key}`} className="block text-sm font-medium text-slate-700 mb-1">{label}</label>
-        <textarea id={`detail-${field.key}`} value={(value as string) ?? ''} onChange={(e) => onChange(e.target.value)} rows={3} placeholder={field.placeholder} className={inputClass} />
+        <GrowingTextarea id={`detail-${field.key}`} value={(value as string) ?? ''} onChange={(e) => onChange(e.target.value)} rows={3} placeholder={field.placeholder} className={inputClass} />
         {field.help && <p className="text-xs text-muted mt-1">{field.help}</p>}
       </div>
     )

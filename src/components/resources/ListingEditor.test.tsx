@@ -145,19 +145,26 @@ describe('ListingEditor — the listing’s boxes, one row each', () => {
     await waitFor(() => expect(screen.queryByTestId('editor-open-name')).not.toBeInTheDocument())
   })
 
-  it('opens a row holding a list on its own screen, its title for the host’s header', async () => {
+  it('opens a week of hours where it is too', async () => {
     const u = user()
     const { step } = renderEditor()
     await u.click(row('hours'))
-    expect(screen.getByTestId('editor-open-hours')).toBeInTheDocument()
+    expect(screen.getByTestId('editor-list')).toContainElement(screen.getByTestId('editor-open-hours'))
+    expect(step()?.title).toBeUndefined()
+  })
+
+  it('opens a row holding a list on its own screen, its title for the host’s header, and nothing else above it', async () => {
+    const u = user()
+    const { step } = renderEditor()
+    await u.click(row('items'))
     expect(screen.queryByTestId('editor-list')).not.toBeInTheDocument()
-    expect(step()?.title).toBe('Hours')
+    expect(step()?.title).toBe('Main dishes')
+    // The header says which box; the listing's own name isn't repeated.
+    expect(within(screen.getByTestId('editor-open-items')).queryByText('Sweet Box Bakery')).not.toBeInTheDocument()
     step()!.back()
     expect(await screen.findByTestId('editor-list')).toBeInTheDocument()
 
     await u.click(row('items'))
-    expect(screen.queryByTestId('editor-list')).not.toBeInTheDocument()
-    expect(step()?.title).toBe('Main dishes')
     await u.click(done())
     expect(screen.getByTestId('editor-list')).toBeInTheDocument()
   })
@@ -267,7 +274,7 @@ describe('ListingEditor — sending', () => {
     await u.click(row('about'))
     expect(within(screen.getByTestId('editor-open-about')).getByRole('button', { name: 'Done' })).toBeInTheDocument()
     expect(within(slot).getByRole('button', { name: 'No changes yet' })).toBeInTheDocument()
-    await u.click(row('hours'))
+    await u.click(row('items'))
     expect(within(slot).getByRole('button', { name: 'Done' })).toBeInTheDocument()
     slot.remove()
   })
