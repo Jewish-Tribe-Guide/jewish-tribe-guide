@@ -13,6 +13,7 @@ import ListingEditBar from './ListingEditBar'
 import dynamic from 'next/dynamic'
 import { ChevronLeftIcon, ChevronRightIcon } from '@/components/icons'
 import { useBodyScrollLock } from '@/lib/useBodyScrollLock'
+import { useBackdropClose } from '@/lib/useBackdropClose'
 import BackIconButton from '@/components/BackIconButton'
 import BodyPortal from '@/components/BodyPortal'
 
@@ -160,6 +161,7 @@ export default function ListingDetailModal({
   // tick raced, and whichever happened to run last could leave the page
   // scrollable while a dialog was still open — see the hook's own comment.
   useBodyScrollLock(isOpen)
+  const backdrop = useBackdropClose(onClose)
 
   useEffect(() => {
     if (!isOpen) return
@@ -212,7 +214,7 @@ export default function ListingDetailModal({
     <BodyPortal>
       <div
         className="overlay-in fixed inset-0 z-50 flex items-center justify-center gap-3 p-4 bg-slate-900/40"
-        onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
+        {...backdrop}
         role="presentation"
       >
         {/* Anchored right next to the card as flex siblings, not fixed to the

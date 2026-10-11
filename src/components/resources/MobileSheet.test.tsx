@@ -61,6 +61,21 @@ describe('MobileSheet', () => {
     expect(onClose).toHaveBeenCalledTimes(1)
   })
 
+  // Found while testing note 11 (Oct 10): selecting text and letting go past
+  // the sheet's edge is a press inside and a release outside, which the
+  // browser reports as a click on the backdrop.
+  it('doesn’t close when a press inside the sheet is let go outside it', async () => {
+    const user = userEvent.setup()
+    const onClose = vi.fn()
+    render(
+      <MobileSheet isOpen onClose={onClose} title="Add or update a place">
+        <p>form contents</p>
+      </MobileSheet>,
+    )
+    await user.pointer([{ keys: '[MouseLeft>]', target: screen.getByText('form contents') }, { target: screen.getByRole('presentation') }, { keys: '[/MouseLeft]' }])
+    expect(onClose).not.toHaveBeenCalled()
+  })
+
   it('closes on Escape', async () => {
     const user = userEvent.setup()
     const onClose = vi.fn()
@@ -378,6 +393,42 @@ describe('MobileSheet', () => {
 
       fireEvent.pointerUp(content, { clientY: 300 })
       expect(sheet.style.height).toBe(`${FULL_PX}px`)
+    })
+
+    // The user's note 11 (Oct 10): dragging a finger to select what was
+    // pasted into the box moved the sheet. A touch in a text field, or one
+    // that's selecting text, is the browser's.
+    it('a drag that starts in a text field selects in it, and doesn’t move the sheet', () => {
+      render(
+        <MobileSheet isOpen onClose={vi.fn()} title="Add or update a place" draggable>
+          <textarea aria-label="Your message" defaultValue="Shacharis 7:15" />
+        </MobileSheet>,
+      )
+      const sheet = document.body.querySelector('[role="dialog"]') as HTMLElement
+      const box = screen.getByLabelText('Your message')
+      fireEvent.pointerDown(box, { clientY: 500 })
+      fireEvent.pointerMove(box, { clientY: 300 })
+      fireEvent.pointerUp(box, { clientY: 300 })
+      expect(sheet.style.height).toBe(`${HALF_PX}px`)
+    })
+
+    it('a long-press that starts selecting text stops moving the sheet, which goes back where it was', () => {
+      render(
+        <MobileSheet isOpen onClose={vi.fn()} title="Shtetl" draggable>
+          <p>Fish and chips, schnitzel</p>
+        </MobileSheet>,
+      )
+      const sheet = document.body.querySelector('[role="dialog"]') as HTMLElement
+      const text = screen.getByText('Fish and chips, schnitzel')
+      fireEvent.pointerDown(text, { clientY: 500 })
+      fireEvent.pointerMove(text, { clientY: 480 })
+      expect(Number.parseInt(sheet.style.height)).toBe(HALF_PX + 20)
+      // The browser selected a word under the finger.
+      const selected = vi.spyOn(document, 'getSelection').mockReturnValue({ isCollapsed: false } as Selection)
+      fireEvent.pointerMove(text, { clientY: 300 })
+      fireEvent.pointerUp(text, { clientY: 300 })
+      expect(sheet.style.height).toBe(`${HALF_PX}px`)
+      selected.mockRestore()
     })
 
     // The actual gap request #2 closed: pulling down on the FORM itself,

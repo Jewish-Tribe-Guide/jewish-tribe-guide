@@ -4,6 +4,7 @@ import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, useSy
 import { useBodyScrollLock } from '@/lib/useBodyScrollLock'
 import BodyPortal from '@/components/BodyPortal'
 import BackIconButton from '@/components/BackIconButton'
+import { useBackdropClose } from '@/lib/useBackdropClose'
 
 type Props = {
   isOpen: boolean
@@ -61,6 +62,20 @@ const subscribeSheets = (l: () => void) => {
   return () => sheetListeners.delete(l)
 }
 const noSheets: readonly OpenSheet[] = []
+
+// ── Selecting text isn't moving the sheet (the user's note 11, Oct 10) ─────
+// Dragging a finger to select and copy what was pasted into the box moved
+// the sheet instead. A touch that starts in a text field, or moves while
+// text is selected (a long-press then drag), is the browser's: selecting,
+// moving the caret, scrolling the field. The sheet still moves from its
+// handle and header, and from anywhere else in it.
+function inTextField(target: EventTarget | null): boolean {
+  return target instanceof Element && !!target.closest('textarea, input, select, [contenteditable="true"]')
+}
+function selecting(): boolean {
+  const selection = typeof document === 'undefined' ? null : document.getSelection()
+  return !!selection && !selection.isCollapsed
+}
 
 type Snap = 'half' | 'full'
 // 'open': fully visible, driven by the header/handle/content drags below.
@@ -228,6 +243,7 @@ export default function MobileSheet({ isOpen, onClose, title, children, draggabl
     setPhase('closing')
     onClose()
   }, [onClose])
+  const backdrop = useBackdropClose(close)
 
   useEffect(() => {
     if (!draggable && !over) return
@@ -408,6 +424,10 @@ export default function MobileSheet({ isOpen, onClose, title, children, draggabl
    *  already started somewhere it can't see. */
   function onContentPointerDown(e: React.PointerEvent) {
     stopMomentum()
+    if (inTextField(e.target) || selecting()) {
+      contentDragRef.current = null
+      return
+    }
     // Deliberately NOT capturing here, same reasoning as
     // MobileNearbySheet's own onContentPointerDown: capturing unconditionally
     // on every touchdown would win the pointer before a field's own native
@@ -419,6 +439,13 @@ export default function MobileSheet({ isOpen, onClose, title, children, draggabl
   function onContentPointerMove(e: React.PointerEvent) {
     const drag = contentDragRef.current
     if (!drag) return
+    // A long-press started selecting: the rest of this touch is the
+    // selection's, and the sheet goes back to where it was.
+    if (selecting()) {
+      contentDragRef.current = null
+      setDragHeight(null)
+      return
+    }
     // Captured before trackDrag overwrites drag.lastY with the new position —
     // both the handoff check and the manual scroll below need the finger's
     // most recent increment, not its position relative to wherever this
@@ -521,7 +548,8 @@ export default function MobileSheet({ isOpen, onClose, title, children, draggabl
         className={`fixed inset-0 z-50 flex items-end ${over ? '' : 'bg-slate-900/40'} transition-opacity duration-[280ms] ${isClosing && !over ? 'opacity-0' : 'opacity-100'}`}
         style={covered ? { pointerEvents: 'none' } : undefined}
         aria-hidden={covered || undefined}
-        onClick={(e) => { if (e.target === e.currentTarget) close() }}
+        // A tap outside closes it, not a selection dragged out of it.
+        {...backdrop}
         role="presentation"
       >
         <div

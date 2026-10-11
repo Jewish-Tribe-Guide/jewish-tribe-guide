@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { categories, defaultCommunity, dismissLocationPrompt, ready } from './helpers'
+import { categories, categoryAddButton, categoryWithListings, defaultCommunity, dismissLocationPrompt, ready } from './helpers'
 
 // One sheet at a time on a phone (Oct 10): Edit under a listing's box used
 // to slide a second sheet up over the listing's. Now it takes the listing's
@@ -46,4 +46,31 @@ test('Edit under a listing’s box takes the listing’s place, and Back returns
   await expect(listing).toBeVisible()
   await expect(box).toBeHidden()
   expect(await scroller.evaluate((e) => e.scrollTop)).toBe(scrolled)
+})
+
+// The user's note 11 (Oct 10): dragging a finger across what was written in
+// the box, to select and copy it, moved the sheet instead. A real browser,
+// because which element a drag starts in is hit-testing jsdom doesn't do.
+// Whether iOS's own selection handles then behave can only be seen on a
+// phone.
+test('dragging across the box’s text selects it, and leaves the sheet where it is', async ({ page, request, isMobile }) => {
+  test.skip(!isMobile, 'The box is a sheet only on a phone')
+  const community = await defaultCommunity(page)
+  const { category } = await categoryWithListings(request, community)
+  await page.goto(`/${community}/${category.id}`)
+  await ready(page)
+  await dismissLocationPrompt(page)
+  await categoryAddButton(page).click()
+  const sheet = page.getByRole('dialog', { name: 'Add or update a place' })
+  const box = sheet.getByLabel('Your message')
+  await box.fill('Shacharis moved to 7:15 this week, Mincha stays at 1:45')
+  const height = await sheet.evaluate((e) => e.getBoundingClientRect().height)
+
+  const at = (await box.boundingBox())!
+  await page.mouse.move(at.x + at.width - 10, at.y + at.height - 10)
+  await page.mouse.down()
+  await page.mouse.move(at.x + 10, at.y - 150, { steps: 10 })
+  await page.mouse.up()
+
+  expect(await sheet.evaluate((e) => e.getBoundingClientRect().height)).toBe(height)
 })

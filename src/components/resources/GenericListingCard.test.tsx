@@ -1430,7 +1430,12 @@ describe('GenericListingCard — mobile listing sheet', () => {
     renderMobile({ defaultExpanded: true, onExpandedChange })
     const backdrop = screen.getByRole('dialog', { name: 'Goldi Market' }).parentElement!
 
-    act(() => void fireEvent.click(backdrop))
+    // A tap: pressed and let go on the backdrop (a press inside the sheet
+    // let go there doesn't close it, see useBackdropClose).
+    act(() => {
+      fireEvent.pointerDown(backdrop)
+      fireEvent.click(backdrop)
+    })
     expect(onExpandedChange).toHaveBeenLastCalledWith(false)
     expect(screen.getByRole('dialog', { name: 'Goldi Market' })).toBeInTheDocument()
 

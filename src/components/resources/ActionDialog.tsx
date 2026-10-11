@@ -2,6 +2,7 @@
 
 import { useEffect, type ReactNode } from 'react'
 import { useBodyScrollLock } from '@/lib/useBodyScrollLock'
+import { useBackdropClose } from '@/lib/useBackdropClose'
 import BackIconButton from '@/components/BackIconButton'
 
 type Props = {
@@ -36,6 +37,7 @@ type Props = {
  *  Escape both close it, body scroll locks while open. */
 export default function ActionDialog({ isOpen, onClose, title, children, onBack: stepBack, listingShaped }: Props) {
   useBodyScrollLock(isOpen)
+  const backdrop = useBackdropClose(onClose)
 
   useEffect(() => {
     if (!isOpen) return
@@ -70,7 +72,7 @@ export default function ActionDialog({ isOpen, onClose, title, children, onBack:
     return (
       <div
         className="overlay-in fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40"
-        onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
+        {...backdrop}
         role="presentation"
       >
         {/* The same box as the listing dialog: max-w-md, and a max height
@@ -95,7 +97,7 @@ export default function ActionDialog({ isOpen, onClose, title, children, onBack:
   return (
     <div
       className="overlay-in fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40"
-      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
+      {...backdrop}
       role="presentation"
     >
       <div

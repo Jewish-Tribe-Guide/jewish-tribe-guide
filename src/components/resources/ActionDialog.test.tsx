@@ -48,6 +48,16 @@ describe('ActionDialog', () => {
     expect(onClose).toHaveBeenCalledTimes(1)
   })
 
+  // Oct 10: selecting text in the box and letting go past the dialog's
+  // edge read as a click on the backdrop, and closed it.
+  it('doesn’t close when a press inside the dialog is let go outside it', async () => {
+    const user = userEvent.setup()
+    const onClose = vi.fn()
+    renderDialog(true, onClose)
+    await user.pointer([{ keys: '[MouseLeft>]', target: screen.getByRole('dialog') }, { target: screen.getByRole('presentation') }, { keys: '[/MouseLeft]' }])
+    expect(onClose).not.toHaveBeenCalled()
+  })
+
   it('closes on a backdrop click, but not on a click inside the dialog', async () => {
     const user = userEvent.setup()
     const onClose = vi.fn()
