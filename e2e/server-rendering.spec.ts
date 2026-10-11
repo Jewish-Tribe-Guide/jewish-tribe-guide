@@ -1,3 +1,5 @@
+import { existsSync, readFileSync } from 'node:fs'
+import path from 'node:path'
 import { expect, test } from '@playwright/test'
 import {
   apiCallsForThisDocument,
@@ -193,6 +195,36 @@ test.describe('content is server-rendered', () => {
     const text = await heading.getByRole('heading').innerText()
     if (/listings?$/.test(text)) expect(text).toMatch(new RegExp(`(^|· )${count}\\s+listings?$`))
   })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// A URL no build knew — a question nobody built ahead, a listing approved
+// since the deploy — is served from a shell Next prerenders with that segment
+// left open. The community layout is in every one of those shells, so a
+// Client Component in it that reads the URL (usePathname) outside <Suspense>
+// empties all of them: the "+ Add" button did, from 8a73fed on, and `next
+// build` passed regardless. Only `next dev` said so, and only on such a URL.
+//
+// The ask page is where it shows. It reads its question inside its own
+// boundary precisely so an unbuilt question still gets the shell at once
+// (see its page.tsx); a listing's page reads its id before any boundary on
+// purpose, to answer a made-up id with a real 404, so its shell is empty
+// whatever the layout does and can't stand in for this.
+//
+// Read from the build itself because nothing over HTTP tells the two apart:
+// an empty shell only means the whole page is rendered on request instead,
+// and the HTML that comes back is the same.
+// ─────────────────────────────────────────────────────────────────────────────
+test('a question nobody built ahead still gets the site in its prerendered shell', async ({ page }) => {
+  const community = await defaultCommunity(page)
+  // Same expression as next.config.ts; the e2e build runs in this directory.
+  const distDir = path.resolve(process.env.NEXT_DIST_DIR || '.next')
+  const shell = path.join(distDir, 'server', 'app', community, 'ask', '[question].html')
+  expect(existsSync(shell), `no prerendered shell at ${shell} — has Next renamed its build output?`).toBe(true)
+
+  const markup = serverMarkup(readFileSync(shell, 'utf8'))
+  expect(markup.length, 'the shell is empty: something in the layout blocks prerendering').toBeGreaterThan(0)
+  expect(markup, 'the shell has no site header').toContain('<header')
 })
 
 // ─────────────────────────────────────────────────────────────────────────────
