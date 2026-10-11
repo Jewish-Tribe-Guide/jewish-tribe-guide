@@ -48,9 +48,11 @@ type Props = {
 // it came from; the one underneath stays mounted (its scroll, its state) but
 // out of sight until it's back on top. Only the top sheet answers Escape and
 // a tap outside.
-let openSheets: readonly string[] = []
+type OpenSheet = { id: string; at: number }
+let openSheets: readonly OpenSheet[] = []
+let sheetsOpened = 0
 const sheetListeners = new Set<() => void>()
-const setOpenSheets = (next: readonly string[]) => {
+const setOpenSheets = (next: readonly OpenSheet[]) => {
   openSheets = next
   sheetListeners.forEach((l) => l())
 }
@@ -58,7 +60,7 @@ const subscribeSheets = (l: () => void) => {
   sheetListeners.add(l)
   return () => sheetListeners.delete(l)
 }
-const noSheets: readonly string[] = []
+const noSheets: readonly OpenSheet[] = []
 
 type Snap = 'half' | 'full'
 // 'open': fully visible, driven by the header/handle/content drags below.
@@ -145,16 +147,26 @@ export default function MobileSheet({ isOpen, onClose, title, children, draggabl
   // Where this sheet is among the open ones: `over` another (opened from
   // inside it, so it takes its place), or `covered` by a newer one. Before
   // it's registered, any sheet already open is the one it's over. In the
-  // list from layout time, so neither ever paints a frame side by side.
+  // list from layout time, so neither ever paints a frame side by side, and
+  // in the order they opened: a page hidden for a moment while code loads
+  // registers its sheets again, inner ones first, and the edit inside a
+  // listing must stay over it.
   const sheetId = useId()
+  const openedAt = useRef<number | null>(null)
   const sheets = useSyncExternalStore(subscribeSheets, () => openSheets, () => noSheets)
-  const at = sheets.indexOf(sheetId)
+  const at = sheets.findIndex((x) => x.id === sheetId)
   const over = at === -1 ? sheets.length > 0 : at > 0
   const covered = at !== -1 && at < sheets.length - 1
   useLayoutEffect(() => {
     if (!isOpen) return
-    setOpenSheets([...openSheets, sheetId])
-    return () => setOpenSheets(openSheets.filter((x) => x !== sheetId))
+    if (!isOpen) {
+      openedAt.current = null
+      return
+    }
+    openedAt.current ??= ++sheetsOpened
+    const mine = { id: sheetId, at: openedAt.current }
+    setOpenSheets([...openSheets.filter((x) => x.id !== sheetId), mine].sort((a, b) => a.at - b.at))
+    return () => setOpenSheets(openSheets.filter((x) => x.id !== sheetId))
   }, [isOpen, sheetId])
 
   const [snap, setSnap] = useState<Snap>(() => (openSheets.length > 0 ? 'full' : 'half'))

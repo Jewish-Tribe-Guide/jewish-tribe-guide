@@ -2,7 +2,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { useState } from 'react'
+import { lazy, Suspense, useState } from 'react'
 import MobileSheet from './MobileSheet'
 
 afterEach(cleanup)
@@ -200,6 +200,37 @@ describe('MobileSheet', () => {
       expect(sheet.style.height).toBe(`${window.innerHeight - 76}px`)
       expect(sheet.className).not.toContain('animate-')
       expect(sheet.parentElement!.className).not.toContain('bg-slate-900')
+    })
+
+    // Found on dev: the "+ Add" box's code loading the first time hid the
+    // page for a moment, which registered its sheets again, inner first, and
+    // the listing came back over the edit opened inside it.
+    it('keeps the order they opened in when the page is hidden for a moment while code loads', async () => {
+      let loaded!: () => void
+      const Later = lazy(() => new Promise<{ default: () => null }>((r) => (loaded = () => r({ default: () => null }))))
+      function Page() {
+        const [edit, setEdit] = useState(false)
+        const [more, setMore] = useState(false)
+        return (
+          <Suspense fallback={null}>
+            <MobileSheet isOpen onClose={vi.fn()} title="Mekor" draggable surface>
+              <button type="button" onClick={() => setEdit(true)}>Edit</button>
+              <MobileSheet isOpen={edit} onClose={() => setEdit(false)} title="Usual Shabbos times">
+                <button type="button" onClick={() => setMore(true)}>Whole schedule</button>
+              </MobileSheet>
+            </MobileSheet>
+            {more && <Later />}
+          </Suspense>
+        )
+      }
+      const user = userEvent.setup()
+      render(<Page />)
+      await user.click(screen.getByRole('button', { name: 'Edit' }))
+      await user.click(screen.getByRole('button', { name: 'Whole schedule' }))
+      await act(async () => loaded())
+
+      expect(await screen.findByRole('dialog', { name: 'Usual Shabbos times' })).toBeVisible()
+      expect(screen.queryByRole('dialog', { name: 'Mekor' })).not.toBeInTheDocument()
     })
 
     it('Escape and a tap outside close only the top sheet', async () => {

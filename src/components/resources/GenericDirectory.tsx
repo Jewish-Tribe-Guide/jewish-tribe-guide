@@ -1,6 +1,6 @@
 'use client'
 
-import { Fragment, useCallback, useEffect, useEffectEvent, useMemo, useRef, useState, ViewTransition, type ReactNode } from 'react'
+import { Fragment, Suspense, useCallback, useEffect, useEffectEvent, useMemo, useRef, useState, ViewTransition, type ReactNode } from 'react'
 import type { DirectoryResource } from '@/types'
 import { resolveCapabilities, selectValues, bandImageFor, type CategoryConfig } from '@/lib/categories'
 import { hoursOpenNow, businessClosure } from '@/lib/hours'
@@ -1896,27 +1896,31 @@ export default function GenericDirectory({ category, items, anchorLabel, address
           <span className="hidden desktop:inline font-medium whitespace-nowrap">Add</span>
         </button>
       )}
-      {tellOpen && (
-        <TellUsSheet
-          isOpen
-          onClose={() => setTellOpen(false)}
-          about={openItem ? { id: openItem.id, name: openItem.name } : undefined}
-          category={category}
-          placeholder={tellUsPlaceholder({ times: minyanimViewOn || (!!openItem && tellTimes), menu: !!openItem && tellMenu, about: openItem ?? undefined })}
-          heading={openItem && tellTimes ? `Update ${openItem.name}’s times` : undefined}
-          kind={openItem && tellMenu ? 'menu' : minyanimViewOn || (openItem && tellTimes) ? 'times' : undefined}
-          yourselfLabel={openItem && tellMenu ? 'Add one dish yourself' : undefined}
-          onEditYourself={
-            openItem
-              ? () => {
-                  setTellOpen(false)
-                  if (editYourself.current) editYourself.current()
-                  else onEdit(openItem)
-                }
-              : undefined
-          }
-        />
-      )}
+      {/* Its own boundary: loading it the first time otherwise hid the page
+          for a moment, the open listing under it included. */}
+      <Suspense fallback={null}>
+        {tellOpen && (
+          <TellUsSheet
+            isOpen
+            onClose={() => setTellOpen(false)}
+            about={openItem ? { id: openItem.id, name: openItem.name } : undefined}
+            category={category}
+            placeholder={tellUsPlaceholder({ times: minyanimViewOn || (!!openItem && tellTimes), menu: !!openItem && tellMenu, about: openItem ?? undefined })}
+            heading={openItem && tellTimes ? `Update ${openItem.name}’s times` : undefined}
+            kind={openItem && tellMenu ? 'menu' : minyanimViewOn || (openItem && tellTimes) ? 'times' : undefined}
+            yourselfLabel={openItem && tellMenu ? 'Add one dish yourself' : undefined}
+            onEditYourself={
+              openItem
+                ? () => {
+                    setTellOpen(false)
+                    if (editYourself.current) editYourself.current()
+                    else onEdit(openItem)
+                  }
+                : undefined
+            }
+          />
+        )}
+      </Suspense>
 
       {hasActualFilters && (
         <FiltersSheet
