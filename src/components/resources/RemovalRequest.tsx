@@ -4,6 +4,7 @@ import { useId, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { withCommunity } from '@/lib/useCommunityData'
+import { useFetchOrPreview } from '@/lib/previewSend'
 import PrivacyNote from '@/components/PrivacyNote'
 
 const REASONS = ['Permanently closed', 'Duplicate listing', 'Shouldn’t be listed', 'Other'] as const
@@ -67,6 +68,7 @@ export default function RemovalRequest({
 }) {
   const uid = useId()
   const community = useCommunitySlug()
+  const fetchOrPreview = useFetchOrPreview()
   const [reason, setReason] = useState<(typeof REASONS)[number]>(REASONS[0])
   const [details, setDetails] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -79,7 +81,7 @@ export default function RemovalRequest({
     try {
       const note = details.trim() ? `${reason}: ${details.trim()}` : reason
       const submittedBy = submitterEmail.trim() ? { email: submitterEmail.trim() } : undefined
-      const res = await fetch(withCommunity('/api/submissions', community), {
+      const res = await fetchOrPreview(withCommunity('/api/submissions', community), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -6,7 +6,7 @@ import type { Minyan } from '@/lib/davening'
 import { compareTimes, type ReadRegularTime, type RegularReading } from '@/lib/scheduleUpdate'
 import UpdateTimesBox from './UpdateTimesBox'
 
-vi.mock('./useListingSubmit', () => ({ TURNSTILE_ACTIVE: false }))
+vi.mock('./useListingSubmit', () => ({ TURNSTILE_ACTIVE: false, useTurnstileActive: () => false }))
 afterEach(() => cleanup())
 
 const ID = '0b6c4c1e-2f55-4a8e-9d57-3b7f0d6f4a21'

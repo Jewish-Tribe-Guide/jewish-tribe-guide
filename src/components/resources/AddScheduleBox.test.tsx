@@ -4,7 +4,7 @@ import { cleanup, fireEvent, render, screen, within } from '@testing-library/rea
 import { makeListing } from '@/test/providerFixtures'
 import AddScheduleBox from './AddScheduleBox'
 
-vi.mock('./useListingSubmit', () => ({ TURNSTILE_ACTIVE: false }))
+vi.mock('./useListingSubmit', () => ({ TURNSTILE_ACTIVE: false, useTurnstileActive: () => false }))
 afterEach(() => cleanup())
 
 const ID = '0b6c4c1e-2f55-4a8e-9d57-3b7f0d6f4a21'

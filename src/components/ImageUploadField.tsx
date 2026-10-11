@@ -2,6 +2,7 @@
 
 import { useRef, useState } from 'react'
 import ImageCropModal from './ImageCropModal'
+import { useFetchOrPreview } from '@/lib/previewSend'
 
 const ACCEPT = 'image/png,image/jpeg,image/webp,image/gif,image/svg+xml'
 
@@ -84,6 +85,7 @@ export default function ImageUploadField({
   collapseUrlInput = false,
 }: Props) {
   const [uploading, setUploading] = useState(false)
+  const fetchOrPreview = useFetchOrPreview()
   const [error, setError] = useState<string | null>(null)
   const [dragOver, setDragOver] = useState(false)
   // Starts open unless the caller asked to collapse it (see collapseUrlInput's
@@ -149,11 +151,17 @@ export default function ImageUploadField({
       // notion of a filename) — wrap it so the upload route's multipart
       // parser sees a real file, same as the unmodified original would have.
       body.append('file', new File([file], 'photo.jpg', { type: file.type || 'image/jpeg' }))
-      const res = await fetch(uploadUrl, {
-        method: 'POST',
-        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-        body,
-      })
+      // The admin console's preview uploads nothing: the photo is shown
+      // from this browser's own copy.
+      const res = await fetchOrPreview(
+        uploadUrl,
+        {
+          method: 'POST',
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+          body,
+        },
+        () => ({ url: URL.createObjectURL(file) }),
+      )
       const json = await res.json()
       if (!res.ok || !json.ok) throw new Error(json.errors?.join(' ') || 'Upload failed.')
       onChange(json.url as string)

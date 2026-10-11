@@ -21,7 +21,7 @@ describe('ListingEditorScreen', () => {
     const u = userEvent.setup()
     const onClose = vi.fn()
     const item = makeListing({ id: 'sweet-box', category: 'restaurant', name: 'Sweet Box Bakery', website: 'https://shopsweetbox.com' })
-    renderWithProviders(<ListingEditorScreen heading="Suggest an edit" item={item} category={FOOD} onClose={onClose} onPreviewSend={() => {}} />)
+    renderWithProviders(<ListingEditorScreen heading="Suggest an edit" item={item} category={FOOD} onClose={onClose} />)
     expect(screen.getByRole('heading', { name: 'Suggest an edit' })).toBeInTheDocument()
 
     // Open where it is: the heading stays, Back closes it.

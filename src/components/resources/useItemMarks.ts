@@ -5,7 +5,8 @@ import type { DirectoryResource } from '@/types'
 import { resolveCapabilities, type CategoryConfig, type CategoryField } from '@/lib/categories'
 import { itemMarks, type ItemMark } from '@/lib/itemMarks'
 import { ui } from '@/lib/uiConfig'
-import { TURNSTILE_ACTIVE } from './useListingSubmit'
+import { useFetchOrPreview } from '@/lib/previewSend'
+import { useTurnstileActive } from './useListingSubmit'
 
 // ── An opened listing's items, and this visitor's answers about them ────────
 // Shared by the items card (tap an item) and the listing's one question
@@ -71,6 +72,8 @@ export function useItemMarks(item: DirectoryResource, category: CategoryConfig, 
     | null
   >(null)
   const [added, setAdded] = useState<AddedItem[]>([])
+  const fetchOrPreview = useFetchOrPreview()
+  const turnstileActive = useTurnstileActive()
 
   const marks = useMemo(
     () => (field ? itemMarks(item, field).map((m) => ({ ...m, ...dated[id(m)] })) : []),
@@ -83,9 +86,9 @@ export function useItemMarks(item: DirectoryResource, category: CategoryConfig, 
   const date = (m: ItemMark, d: Partial<{ seenAt: string | null; goneAt: string | null }>) =>
     setDated((prev) => ({ ...prev, [id(m)]: { ...(prev[id(m)] ?? { seenAt: m.seenAt, goneAt: m.goneAt }), ...d } }))
 
-  async function call(url: string, method: string, body: unknown): Promise<Record<string, unknown> | null> {
+  async function call(url: string, method: string, body: unknown, inPreview?: Record<string, unknown>): Promise<Record<string, unknown> | null> {
     try {
-      const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      const res = await fetchOrPreview(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }, inPreview)
       const json = (await res.json().catch(() => ({}))) as Record<string, unknown>
       return res.ok && json.ok ? json : null
     } catch {
@@ -95,7 +98,7 @@ export function useItemMarks(item: DirectoryResource, category: CategoryConfig, 
 
   async function seen(m: ItemMark) {
     patch(m, { busy: true, error: null })
-    const json = await call(`/api/resource/${item.id}/item`, 'POST', { field: m.key, item: m.name })
+    const json = await call(`/api/resource/${item.id}/item`, 'POST', { field: m.key, item: m.name }, { seenAt: new Date().toISOString(), changed: true, previous: m.seenAt, clearedGone: m.goneAt })
     if (!json || typeof json.seenAt !== 'string') return patch(m, { busy: false, error: FAILED })
     const seenAt = json.seenAt
     date(m, { seenAt, goneAt: json.changed ? null : m.goneAt })
@@ -114,7 +117,7 @@ export function useItemMarks(item: DirectoryResource, category: CategoryConfig, 
   }
 
   async function sendGone(m: ItemMark, token: string) {
-    const json = await call(`/api/resource/${item.id}/item/gone`, 'POST', { field: m.key, item: m.name, turnstileToken: token, company: '' })
+    const json = await call(`/api/resource/${item.id}/item/gone`, 'POST', { field: m.key, item: m.name, turnstileToken: token, company: '' }, { goneAt: new Date().toISOString(), changed: true })
     if (!json || typeof json.goneAt !== 'string') return patch(m, { busy: false, error: FAILED })
     date(m, { goneAt: json.goneAt })
     patch(m, {
@@ -135,7 +138,7 @@ export function useItemMarks(item: DirectoryResource, category: CategoryConfig, 
   // single-use.
   function gone(m: ItemMark, from: AnswerFrom) {
     patch(m, { busy: true, error: null })
-    if (!TURNSTILE_ACTIVE) return void sendGone(m, '')
+    if (!turnstileActive) return void sendGone(m, '')
     setPending((prev) => ({ kind: 'gone', mark: m, from, attempt: (prev?.attempt ?? 0) + 1 }))
   }
   function verified(token: string) {
@@ -146,7 +149,7 @@ export function useItemMarks(item: DirectoryResource, category: CategoryConfig, 
   }
 
   async function sendAdd(name: string, sometimes: boolean, token: string): Promise<AddOutcome> {
-    const json = await call(`/api/resource/${item.id}/item/add`, 'POST', { item: name, sometimes, turnstileToken: token, company: '' })
+    const json = await call(`/api/resource/${item.id}/item/add`, 'POST', { item: name, sometimes, turnstileToken: token, company: '' }, { item: name })
     if (!json) return 'failed'
     const already = json.already as { item?: unknown; field?: unknown } | undefined
     if (already && typeof already.item === 'string') {
@@ -161,7 +164,7 @@ export function useItemMarks(item: DirectoryResource, category: CategoryConfig, 
 
   /** Each Add gets its own bot check, as each "Not anymore" does. */
   function add(name: string, sometimes: boolean): Promise<AddOutcome> {
-    if (!TURNSTILE_ACTIVE) return sendAdd(name, sometimes, '')
+    if (!turnstileActive) return sendAdd(name, sometimes, '')
     return new Promise((settle) => setPending((prev) => ({ kind: 'add', name, sometimes, from: 'add', attempt: (prev?.attempt ?? 0) + 1, settle })))
   }
 
@@ -187,7 +190,7 @@ export function useItemMarks(item: DirectoryResource, category: CategoryConfig, 
         goneAt: mine.goneAt,
         submissionId: mine.submissionId,
         activityId: mine.activityId,
-      })
+      }, { changed: true })
       if (!json) return patch(m, { busy: false, error: 'Couldn’t undo that. Please try again.' })
       if (json.changed) date(m, { goneAt: null })
     }

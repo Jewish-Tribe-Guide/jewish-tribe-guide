@@ -6,6 +6,7 @@ import { makeListing } from '@/test/providerFixtures'
 import { FOOD, HOSPITAL, MIKVAH, SHUL } from '@/test/editorFixtures'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { mockRouter } from '@/test/nextNavigationMock'
+import { PreviewSendProvider } from '@/lib/previewSend'
 import ListingEditor, { type EditorStep } from './ListingEditor'
 
 vi.mock('next/navigation', () => ({
@@ -386,7 +387,11 @@ describe('ListingEditor — the admin console', () => {
     const fetchMock = vi.fn()
     vi.stubGlobal('fetch', fetchMock)
     const onPreviewSend = vi.fn()
-    const { container } = renderEditor({ onPreviewSend })
+    const { container } = renderWithProviders(
+      <PreviewSendProvider listing={onPreviewSend}>
+        <ListingEditor item={bakery} category={FOOD} onClose={() => {}} />
+      </PreviewSendProvider>,
+    )
     expect(container.querySelector('input[name="company"]')).toBeNull()
 
     await u.click(row('contact'))
@@ -405,6 +410,7 @@ describe('ListingEditor — the admin console', () => {
       dishes: ['Cupcakes', 'Cookies', 'Brownies'],
     })
     expect(fetchMock).not.toHaveBeenCalled()
-    expect(screen.queryByTestId('editor-sent')).not.toBeInTheDocument()
+    // Then the visitor's own end: Sent, with nothing sent.
+    expect(await screen.findByTestId('editor-sent')).toBeInTheDocument()
   })
 })

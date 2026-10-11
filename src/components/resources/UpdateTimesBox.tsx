@@ -7,9 +7,10 @@ import { DAY_KEYS, dayLabel, type DayKey } from '@/lib/hours'
 import { dateText } from '@/lib/schedules'
 import { changesAnything, compareTimes, datesBetween, seasonFromNotes, type TimesUpdate, type UpdateRow } from '@/lib/scheduleUpdate'
 import { clockTime } from '@/lib/upcomingDavening'
+import { PREVIEW_READ_ERROR, useFetchOrPreview } from '@/lib/previewSend'
 import { RelativeTimeFields, TimeModeToggle, useTimeModes, ZMAN_ANCHOR_ORDER } from '@/components/intake/ZmanTimeFields'
 import TurnstileWidget from '@/components/TurnstileWidget'
-import { TURNSTILE_ACTIVE } from './useListingSubmit'
+import { useTurnstileActive } from './useListingSubmit'
 
 // "Update their times" on a shul's card (agreed Oct 1). The user's words:
 // a shul that redoes its times doesn't want to "go one by one and compare
@@ -75,6 +76,8 @@ export default function UpdateTimesBox({
   read?: { update: TimesUpdate; text: string; photoUrl: string | null }
 }) {
   const [step, setStep] = useState<Step>(alreadyRead ? 'result' : 'choose')
+  const fetchOrPreview = useFetchOrPreview()
+  const turnstileActive = useTurnstileActive()
   const [text, setText] = useState('')
   const [source, setSource] = useState<Source | null>(() =>
     alreadyRead ? (alreadyRead.text ? { text: alreadyRead.text } : alreadyRead.photoUrl ? { file: null, url: alreadyRead.photoUrl } : null) : null,
@@ -96,7 +99,7 @@ export default function UpdateTimesBox({
       body.set('company', '')
       if (what.file) body.set('file', what.file)
       else body.set('text', what.text ?? '')
-      const res = await fetch('/api/schedule/read', { method: 'POST', body })
+      const res = await fetchOrPreview('/api/schedule/read', { method: 'POST', body }, { ok: false, error: PREVIEW_READ_ERROR })
       const json = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string; code?: string; update?: TimesUpdate; sourceUrl?: string | null }
       if (!res.ok || !json.ok || !json.update) {
         if (json.code === 'off') {
@@ -118,7 +121,7 @@ export default function UpdateTimesBox({
 
   const send = async (token: string, u: TimesUpdate) => {
     try {
-      const res = await fetch(`/api/resource/${item.id}/times`, {
+      const res = await fetchOrPreview(`/api/resource/${item.id}/times`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -143,7 +146,7 @@ export default function UpdateTimesBox({
     setBusy('send')
     setError(null)
     try {
-      const res = await fetch(`/api/resource/${item.id}/confirm`, { method: 'POST' })
+      const res = await fetchOrPreview(`/api/resource/${item.id}/confirm`, { method: 'POST' }, { confirmedAt: new Date().toISOString() })
       const json = (await res.json().catch(() => ({}))) as { ok?: boolean }
       if (!res.ok || !json.ok) throw new Error('failed')
       onSent('confirmed')
@@ -160,7 +163,7 @@ export default function UpdateTimesBox({
     setError(null)
     setAttempt((n) => n + 1)
     pending.current = run
-    if (!TURNSTILE_ACTIVE) run('')
+    if (!turnstileActive) run('')
   }
 
   const big =
@@ -254,7 +257,7 @@ export default function UpdateTimesBox({
           {error}
         </p>
       )}
-      {busy && TURNSTILE_ACTIVE && <TurnstileWidget key={attempt} onVerify={(token) => pending.current(token)} />}
+      {busy && turnstileActive && <TurnstileWidget key={attempt} onVerify={(token) => pending.current(token)} />}
     </div>
   )
 }

@@ -11,8 +11,9 @@ import TurnstileWidget from '@/components/TurnstileWidget'
 import type { CategoryField } from '@/lib/categories'
 import { itemPhrase, itemWording, lastSeenText, pickItemToAsk, type ItemMark } from '@/lib/itemMarks'
 import { useNow } from '@/lib/useNow'
+import { useFetchOrPreview } from '@/lib/previewSend'
 import { community as communityConfig } from '@/community.config'
-import { TURNSTILE_ACTIVE } from './useListingSubmit'
+import { useTurnstileActive } from './useListingSubmit'
 import type { ItemMarksApi } from './useItemMarks'
 
 // ── One question card in a category page's list ─────────────────────────────
@@ -84,6 +85,8 @@ type Phase =
 
 export default function QuestionCard({ category, shown = [], all = [], place = () => null, onEdit, listing, items, asking }: Props) {
   const community = useCommunitySlug()
+  const fetchOrPreview = useFetchOrPreview()
+  const turnstileActive = useTurnstileActive()
   // The places this browser has been asked about, so the card moves on:
   // the page's, when it gives them (it puts the card under its place).
   const own = useAskedPlaces(category.id)
@@ -116,10 +119,10 @@ export default function QuestionCard({ category, shown = [], all = [], place = (
   const sending = phase.kind === 'sending' ? phase : null
   useEffect(() => {
     if (!sending || !held || held.kind !== 'field') return
-    if (TURNSTILE_ACTIVE && !token) return
+    if (turnstileActive && !token) return
     let cancelled = false
     const payload = answerSubmission(category, held.item, held.field, sending.value)
-    fetch(withCommunity('/api/submissions', community), {
+    fetchOrPreview(withCommunity('/api/submissions', community), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -171,7 +174,7 @@ export default function QuestionCard({ category, shown = [], all = [], place = (
     setHeld(q)
     setPhase({ kind: 'sending', value: true })
     try {
-      const res = await fetch(`/api/resource/${q.item.id}/confirm`, { method: 'POST' })
+      const res = await fetchOrPreview(`/api/resource/${q.item.id}/confirm`, { method: 'POST' }, { confirmedAt: new Date().toISOString() })
       const body = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string }
       if (res.ok && body.ok) {
         markAsked(q.item.id)
@@ -242,7 +245,7 @@ export default function QuestionCard({ category, shown = [], all = [], place = (
         </>
       )}
       {/* The bot check, only once an answer has been tapped. */}
-      {phase.kind === 'sending' && q.kind === 'field' && <TurnstileWidget key={attempt} onVerify={setToken} />}
+      {phase.kind === 'sending' && q.kind === 'field' && turnstileActive && <TurnstileWidget key={attempt} onVerify={setToken} />}
     </section>
   )
 }

@@ -27,11 +27,12 @@ import type { SendVia } from '@/components/resources/useListingSubmit'
 import FindPlace from '@/components/FindPlace'
 import TellUsItems, { changingItems, type CurrentItems } from '@/components/TellUsItems'
 import type { PlaceSelectResult } from '@/components/intake/AddressInput'
-import { TURNSTILE_ACTIVE } from '@/components/resources/useListingSubmit'
+import { useTurnstileActive } from '@/components/resources/useListingSubmit'
 import { CameraIcon } from '@/components/icons'
 import { track } from '@vercel/analytics'
 import { askMessage } from '@/lib/shareAnswer'
 import { useShareLink } from '@/lib/useShareLink'
+import { PREVIEW_READ_ERROR, useFetchOrPreview } from '@/lib/previewSend'
 
 // "Saw something? Tell us" (agreed Oct 5, canvas TellSheet, TellAsk,
 // TellResult, TellSent; changes agreed on v83/v84). One box: type it, paste
@@ -320,6 +321,8 @@ export function TellUsBody({
       setStep('kind', 'What kind of place?')
     }
   }
+  const fetchOrPreview = useFetchOrPreview()
+  const turnstileActive = useTurnstileActive()
   const [text, setText] = useState('')
   const [photos, setPhotos] = useState<{ file: File; preview: string }[]>([])
   const [reading, setReading] = useState<Reading | null>(null)
@@ -382,7 +385,7 @@ export function TellUsBody({
     setError(null)
     setAttempt((n) => n + 1)
     pending.current = run
-    if (!TURNSTILE_ACTIVE) run('')
+    if (!turnstileActive) run('')
   }
 
   const read = async (token: string) => {
@@ -394,7 +397,8 @@ export function TellUsBody({
       if (kind === 'menu') body.set('mode', 'menu')
       body.set('turnstileToken', token)
       body.set('company', '')
-      const res = await fetch(withCommunity('/api/message/read', community), { method: 'POST', body }).catch(() => null)
+      // The admin console's preview reads nothing: an answer that says so.
+      const res = await fetchOrPreview(withCommunity('/api/message/read', community), { method: 'POST', body }, { ok: false, error: PREVIEW_READ_ERROR }).catch(() => null)
       const json = ((await res?.json().catch(() => null)) ?? {}) as { ok?: boolean; error?: string; code?: string } & Partial<Reading>
       // No answer, or the reader failed: its own screen, with Try again.
       if (!res || json.code === 'down') {
@@ -519,7 +523,7 @@ export function TellUsBody({
   }
 
   const viaMessage: SendVia = ({ payload, submittedBy, company, turnstileToken }) =>
-    fetch(withCommunity('/api/message/send', community), {
+    fetchOrPreview(withCommunity('/api/message/send', community), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text, photoUrls: reading?.photoUrls ?? [], forms: [{ submission: payload }], email: submittedBy?.email ?? '', turnstileToken, company }),
@@ -527,7 +531,7 @@ export function TellUsBody({
 
   const send = async (token: string, g: number[]) => {
     try {
-      const res = await fetch(withCommunity('/api/message/send', community), {
+      const res = await fetchOrPreview(withCommunity('/api/message/send', community), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text, photoUrls: reading?.photoUrls ?? [], ...groupPayload(g), turnstileToken: token, company: '' }),
@@ -557,7 +561,7 @@ export function TellUsBody({
     if (email.trim() && sentIds.length) {
       setBusy('send')
       setError(null)
-      const res = await fetch(withCommunity('/api/message/email', community), {
+      const res = await fetchOrPreview(withCommunity('/api/message/email', community), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ids: sentIds, email }),
@@ -958,7 +962,7 @@ export function TellUsBody({
           {error}
         </p>
       )}
-      {busy && TURNSTILE_ACTIVE && <TurnstileWidget key={attempt} onVerify={(token) => pending.current(token)} />}
+      {busy && turnstileActive && <TurnstileWidget key={attempt} onVerify={(token) => pending.current(token)} />}
     </div>
   )
 }

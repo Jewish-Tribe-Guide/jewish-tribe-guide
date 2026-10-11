@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { bandImageFor, type CategoryConfig } from '@/lib/categories'
 import { getCategoryColor } from '@/lib/categoryColor'
 import type { DirectoryResource, MapFilters } from '@/types'
@@ -19,19 +19,24 @@ import { PinnedProvider } from '@/lib/pinnedContext'
 import { DroppedPinsProvider } from '@/lib/droppedPinsContext'
 import { ListingsProvider } from '@/lib/listingsContext'
 import { PreviewCategoryProvider } from '@/lib/contentContext'
+import { PreviewSendProvider } from '@/lib/previewSend'
 import DevicePreviewFrame from './DevicePreviewFrame'
 import ListingEditorScreen from './ListingEditorScreen'
 
 // A preview of the real directory page for a category — the exact same
 // GenericDirectory/ListingEditor components a visitor sees, driven
 // by the admin's in-progress (unsaved) draft. Shows the category's real,
-// already-approved listings; Edit builds the listing locally and drops it
-// straight into the preview list instead of posting to /api/submissions, so
-// the admin can see the change "appear" without persisting anything.
-// There's no Add here: the page's "+" opens the "+ Add" box (GenericDirectory
-// hasn't called onAdd since Oct 5), and the box isn't preview-aware — it,
-// and a box's own Edit on an opened listing, still send for real.
-// Report similarly shows its confirmation screen without actually filing one.
+// already-approved listings. Nothing done inside it is sent anywhere: the
+// whole page sits under PreviewSendProvider (src/lib/previewSend.tsx), which
+// every way a visitor can send something goes through. A listing's edit —
+// the page's Edit, a box's own Edit on an opened listing, or the "+ Add"
+// box's "Fill it in yourself" (the page's "+") — is built into a listing
+// locally and dropped straight into the preview list (addOrReplaceLocal), so
+// the admin sees the change "appear" without persisting anything. The box
+// is shown as visitors see it, but reads nothing (no AI call; it says it's
+// the preview). The rest — "Still right?", an item's "Still here", Update
+// their times, Add a minyan, an upvote, Request removal — shows a visitor's
+// own "Sent"/"Thanks" with nothing filed and the listing unchanged.
 // The Map button opens the real site-wide map, pre-filtered to this category.
 // Its *listings* are live, already-saved data — the map has no notion of an
 // unpublished listing — but the category itself is the draft: everything below
@@ -109,10 +114,12 @@ export default function CategoryPreview({
     setAction(null)
   }
 
-  function addOrReplaceLocal(resource: DirectoryResource) {
+  // Handed to everything under PreviewSendProvider, so the same function
+  // every render.
+  const addOrReplaceLocal = useCallback((resource: DirectoryResource) => {
     setLocalListings((prev) => [...prev.filter((l) => l.id !== resource.id), resource])
-    goToDirectory()
-  }
+    setAction(null)
+  }, [])
 
   let content: React.ReactNode
   if (category.kind === 'eruv') {
@@ -152,7 +159,6 @@ export default function CategoryPreview({
         item={action.listing}
         category={category}
         onClose={goToDirectory}
-        onPreviewSend={addOrReplaceLocal}
       />
     )
   } else if (action?.mode === 'map') {
@@ -194,28 +200,31 @@ export default function CategoryPreview({
           without this the preview showed the saved colour while the editor
           showed the new one. */}
       <PreviewCategoryProvider category={category}>
-        {/* Same provider stack SiteChrome wraps every real screen in (minus
-            LocationProvider — this preview tracks its own address/coords above
-            and hands them to SiteHeader directly, no context needed) — the Map
-            action renders the real ResourceMapView, and PinButton shows up
-            inside its own place detail, and both reach for PinnedProvider/
-            DroppedPinsProvider the same way they do on the live site. Missing
-            either here is invisible until an admin actually clicks Map or a
-            pin from inside this preview, at which point it throws instead of
-            just rendering wrong. */}
-        <PinnedProvider>
-          <DroppedPinsProvider>
-            <HeaderCollapseProvider>
-              <SiteHeader
-                onGoHome={onClose}
-                location={{ address, coords, onAddressChange: setAddress, onCoords: setCoords, tracking: false, geoError: null, geoErrorSilent: false, onStartTracking: () => {}, onStopTracking: () => {} }}
-                hideNav
-              />
-              <main className="flex-1 w-full max-w-4xl mx-auto px-4 py-8">{content}</main>
-              <SiteFooter year={new Date().getFullYear()} />
-            </HeaderCollapseProvider>
-          </DroppedPinsProvider>
-        </PinnedProvider>
+        {/* Nothing below sends anything (see the note at the top). */}
+        <PreviewSendProvider listing={addOrReplaceLocal}>
+          {/* Same provider stack SiteChrome wraps every real screen in (minus
+              LocationProvider — this preview tracks its own address/coords above
+              and hands them to SiteHeader directly, no context needed) — the Map
+              action renders the real ResourceMapView, and PinButton shows up
+              inside its own place detail, and both reach for PinnedProvider/
+              DroppedPinsProvider the same way they do on the live site. Missing
+              either here is invisible until an admin actually clicks Map or a
+              pin from inside this preview, at which point it throws instead of
+              just rendering wrong. */}
+          <PinnedProvider>
+            <DroppedPinsProvider>
+              <HeaderCollapseProvider>
+                <SiteHeader
+                  onGoHome={onClose}
+                  location={{ address, coords, onAddressChange: setAddress, onCoords: setCoords, tracking: false, geoError: null, geoErrorSilent: false, onStartTracking: () => {}, onStopTracking: () => {} }}
+                  hideNav
+                />
+                <main className="flex-1 w-full max-w-4xl mx-auto px-4 py-8">{content}</main>
+                <SiteFooter year={new Date().getFullYear()} />
+              </HeaderCollapseProvider>
+            </DroppedPinsProvider>
+          </PinnedProvider>
+        </PreviewSendProvider>
       </PreviewCategoryProvider>
     </DevicePreviewFrame>
   )
