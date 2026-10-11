@@ -343,6 +343,10 @@ export default function ListingEditor({
   const photo = String(details[PHOTO_FIELD_KEY] ?? '').trim()
 
   // ── The list ──────────────────────────────────────────────────────────
+  // In a white box (Oct 11): flat on the page's gray, the rows read as
+  // more of the listing rather than things to tap, and Changed's yellow
+  // was faint on it. The listing itself stays flat; it's for reading.
+  const box = 'rounded-2xl border border-slate-200 bg-white px-4'
   const filled = rows.filter((r) => !rowIsEmpty(r, values) || needed(r))
   const empty = rows.filter((r) => rowIsEmpty(r, values) && !needed(r))
   const listScreen = (
@@ -350,7 +354,7 @@ export default function ListingEditor({
       {creating && fromGoogle && <p className="-mt-1 text-[14px] text-muted">Filled in from Google</p>}
       {adminSubmit && <p className="-mt-1 text-[14px] text-muted">Goes live as soon as you add it, with no review.</p>}
       {creating && existingListings && <Lookalike existing={existingListings} draft={draft} category={category} />}
-      <ul className="divide-y divide-slate-200/70">
+      <ul className={`${box} divide-y divide-slate-200/70`}>
         {filled.map((r) => {
           const isChanged = changed.has(r.id)
           const summary = r.kind === 'name' ? rowSummary(r, values, timeText) : rowSummary(r, values, timeText) || (needed(r) ? 'Not added yet' : '')
@@ -388,7 +392,7 @@ export default function ListingEditor({
       {empty.length > 0 && (
         <div data-testid="editor-empty">
           <p className="pb-1 text-[12.5px] font-extrabold uppercase tracking-[0.04em] text-muted">Not on the listing yet</p>
-          <ul className="divide-y divide-slate-200/70 border-t border-slate-200/70">
+          <ul className={`${box} divide-y divide-slate-200/70`}>
             {empty.map((r) => (
               <li key={r.id}>
                 <button type="button" onClick={() => setOpenId(r.id)} className="flex min-h-11 w-full cursor-pointer items-center gap-2 text-left text-[15px] font-bold text-primary">

@@ -95,6 +95,13 @@ describe('ListingEditor — the listing’s boxes, one row each', () => {
     expect(sendButton()).toBeDisabled()
   })
 
+  it('sits its rows in a white box, apart from the page they’re on', () => {
+    // Adding: some rows filled (Needed), the rest not on the listing yet.
+    renderEditor({ item: undefined })
+    expect(row('name').closest('ul')).toHaveClass('bg-white', 'border', 'rounded-2xl')
+    expect(within(screen.getByTestId('editor-empty')).getByRole('list')).toHaveClass('bg-white', 'border', 'rounded-2xl')
+  })
+
   it('puts what the listing doesn’t show yet under “Not on the listing yet”, one line each', async () => {
     const u = user()
     renderWithProviders(<ListingEditor item={{ ...bakery, googleDescription: undefined }} category={FOOD} onClose={() => {}} />)

@@ -231,6 +231,31 @@ test.describe('listing detail — desktop', () => {
     await expect(column.getByRole('heading', { level: 2 }).first()).toBeInViewport()
     await expect(column.getByTestId('listing-column-bar')).toContainText('7 of')
   })
+  // Editing (Oct 11): ‹ Food, ‹ 1 of 72 › and the places beside it each
+  // left the edit, dropping what was changed. The editor's own ‹ is the
+  // only way back, and the bar returns with the listing.
+  test('the column’s bar goes while the listing is being edited, and comes back after', async ({ page, request }) => {
+    const community = await defaultCommunity(page)
+    const { category, item } = await categoryWithHoursField(request, community)
+
+    await page.goto(`/${community}/${category.id}`)
+    await dismissLocationPrompt(page)
+    await page.getByRole('button', { name: `Show details for ${item.name}` }).first().click()
+    const column = page.getByTestId('listing-column')
+    await expect(column.getByRole('heading', { name: item.name, exact: true })).toBeVisible()
+    const bar = column.getByTestId('listing-column-bar')
+    await expect(bar).toBeVisible()
+    test.skip((await column.getByRole('button', { name: 'Suggest an edit' }).count()) === 0, `${category.id} can't be edited`)
+
+    await openListingEditor(page, column)
+    await expect(page.getByTestId('editor-list')).toBeVisible()
+    await expect(bar).toHaveCount(0)
+    await expect(column.getByRole('button', { name: 'Next listing' })).toHaveCount(0)
+
+    await column.getByRole('button', { name: 'Back', exact: true }).click()
+    await expect(column.getByRole('heading', { name: item.name, exact: true })).toBeVisible()
+    await expect(bar).toBeVisible()
+  })
 })
 
 test.describe('listing detail — mobile', () => {

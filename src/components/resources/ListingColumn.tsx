@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import type { DirectoryResource } from '@/types'
 import type { CategoryConfig } from '@/lib/categories'
 import type { SearchFound } from '@/lib/askSearch'
@@ -42,6 +42,10 @@ type Props = {
 }
 
 export default function ListingColumn({ item, category, color, place, found, upvote, onward, backLabel, onBack, position, onStep, alone, onShowMap, phone = false }: Props) {
+  // Editing (Oct 11): the bar and the places beside it are about the
+  // listing, and each one left the edit without a word, what was changed
+  // lost. The editor's own ‹ is the way back.
+  const [editing, setEditing] = useState(false)
   const hasPrev = position.index > 0
   const hasNext = position.index < position.total - 1
 
@@ -109,6 +113,7 @@ export default function ListingColumn({ item, category, color, place, found, upv
       upvote={upvote}
       onward={onward}
       wide
+      onEditingChange={setEditing}
       // Beside the listing instead, where there's room for it.
       onwardClassName={alone ? 'lg:hidden' : ''}
     />
@@ -124,11 +129,11 @@ export default function ListingColumn({ item, category, color, place, found, upv
 
   return (
     <section aria-label={item.name} data-testid="listing-column">
-      {bar}
+      {!editing && bar}
       {alone ? (
         <div className="lg:grid lg:grid-cols-[minmax(0,720px)_384px] lg:justify-between lg:gap-12">
           <div className="min-w-0">{listing}</div>
-          <div className="hidden lg:block">
+          <div className={editing ? 'hidden' : 'hidden lg:block'}>
             <div className="sticky top-[4.5rem]">
               <OnwardSection item={item} category={category} color={color} onward={onward} aside />
             </div>

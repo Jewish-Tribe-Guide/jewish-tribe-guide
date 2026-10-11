@@ -44,6 +44,9 @@ type Props = {
   onwardClassName?: string
   /** See ListingView's `titleAs`. */
   titleAs?: 'h1' | 'h2'
+  /** Whether the editor has taken the listing's place, for a host whose
+   *  own controls are about the listing (ListingColumn's back and ‹ ›). */
+  onEditingChange?: (editing: boolean) => void
 }
 
 /** The nearest ancestor that scrolls, i.e. the parent's scroll region. */
@@ -70,7 +73,7 @@ function scrollingAncestor(el: HTMLElement | null): HTMLElement | null {
  * directory. The upvote shows only when the directory's sheet passes one
  * (`upvote`): upvotes rank a category's list, which the map doesn't have.
  */
-export default function MapPlaceDetail({ item, category, color, onBack, found, upvote, place = null, onward, wide = false, onwardClassName, titleAs }: Props) {
+export default function MapPlaceDetail({ item, category, color, onBack, found, upvote, place = null, onward, wide = false, onwardClassName, titleAs, onEditingChange }: Props) {
   const community = useCommunitySlug()
   const listingPath = routes.listing(community, category.id, listingSlug(item))
   // Edit swaps this whole detail view for the listing-shaped editor
@@ -141,6 +144,9 @@ export default function MapPlaceDetail({ item, category, color, onBack, found, u
     const region = scrollingAncestor(rootRef.current)
     if (region) region.scrollTop = 0
   }, [formOpen])
+  useEffect(() => {
+    onEditingChange?.(formOpen !== null)
+  }, [formOpen, onEditingChange])
   const caps = resolveCapabilities(category.capabilities)
   const canEdit = ui.contributions.edit && caps.edit
   const canReport = ui.contributions.report && caps.report
