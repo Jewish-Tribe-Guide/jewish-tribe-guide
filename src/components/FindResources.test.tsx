@@ -43,24 +43,23 @@ vi.mock('@/components/resources/ResourceLoader', () => ({
     </div>
   ),
 }))
-vi.mock('@/components/resources/ListingForm', () => ({
+vi.mock('@/components/resources/ListingEditor', () => ({
   default: ({
-    mode,
-    embedded,
-    onUp,
+    onClose,
     onRemovalOpenChange,
+    onStep,
   }: {
-    mode: string
-    embedded?: boolean
-    onUp: () => void
+    onClose: () => void
     onRemovalOpenChange?: (open: boolean) => void
+    onStep?: (step: { title: string; back: () => void } | null) => void
   }) => (
     <div>
-      <p>ListingForm: {mode}{embedded ? ' (embedded)' : ''}</p>
-      <button onClick={onUp}>stub cancel</button>
-      {/* Stands in for ListingForm's own Request removal trigger — see the
-          dedicated test below and ListingForm's own file for the real one. */}
+      <p>ListingEditor: edit</p>
+      <button onClick={onClose}>stub cancel</button>
+      {/* Stands in for the ••• menu's Request removal. */}
       <button onClick={() => onRemovalOpenChange?.(true)}>stub open removal</button>
+      {/* Stands in for opening one of the editor's rows. */}
+      <button onClick={() => onStep?.({ title: 'Kosher', back: () => onStep(null) })}>stub open row</button>
     </div>
   ),
 }))
@@ -141,7 +140,7 @@ describe('FindResources — a real listing category', () => {
     await user.click(screen.getByText('Edit l1'))
 
     expect(onParamsChange).toHaveBeenCalledWith({ form: 'edit', item: 'l1' }, { replace: true })
-    expect(screen.getByText('ListingForm: edit (embedded)')).toBeInTheDocument()
+    expect(screen.getByText('ListingEditor: edit')).toBeInTheDocument()
   })
 
   // openAction/goToCategoryList's `replace: true` deliberately never updates
@@ -157,11 +156,11 @@ describe('FindResources — a real listing category', () => {
       <FindResources view="grocery" listings={[listing({ id: 'l1' })]} anchor={anchor} onUp={vi.fn()} searchForm="edit" searchItem="l1" />,
       { content: { categories: [grocery] } },
     )
-    expect(screen.getByText('ListingForm: edit (embedded)')).toBeInTheDocument()
+    expect(screen.getByText('ListingEditor: edit')).toBeInTheDocument()
 
     rerenderWithProviders(<FindResources view="grocery" listings={[listing({ id: 'l1' })]} anchor={anchor} onUp={vi.fn()} searchForm={null} searchItem={null} />)
 
-    expect(screen.queryByText('ListingForm: edit (embedded)')).not.toBeInTheDocument()
+    expect(screen.queryByText('ListingEditor: edit')).not.toBeInTheDocument()
   })
 
   // Unlike edit/report, 'create' has no listing to resolve — UpdateListingsCard's
@@ -215,13 +214,31 @@ describe('FindResources — a real listing category', () => {
 
     expect(screen.getByText('ResourceLoader')).toBeInTheDocument()
     expect(screen.getByRole('dialog', { name: 'Suggest an edit' })).toBeInTheDocument()
-    expect(screen.getByText('ListingForm: edit (embedded)')).toBeInTheDocument()
+    expect(screen.getByText('ListingEditor: edit')).toBeInTheDocument()
   })
 
   // No second, smaller title nested inside the form — the sheet's OWN title
   // becomes "Request removal of {name}" itself, reported via
   // onRemovalOpenChange, on both platforms.
-  it('the sheet/dialog title becomes "Request removal of {name}" once ListingForm reports the removal panel is open', async () => {
+  // A row of the editor open (Oct 11): its title is the sheet's, and the
+  // sheet's Back closes the row, not the editor.
+  it('takes the open row’s title, and its Back steps out of the row', async () => {
+    const user = userEvent.setup()
+    const grocery = makeCategory({ id: 'grocery', kind: 'listing' })
+    renderWithProviders(
+      <ForcedViewport isMobile>
+        <FindResources view="grocery" listings={[listing({ id: 'l1', name: 'Kosher Mart' })]} anchor={anchor} onUp={vi.fn()} searchForm="edit" searchItem="l1" />
+      </ForcedViewport>,
+      { content: { categories: [grocery] } },
+    )
+    await user.click(screen.getByRole('button', { name: 'stub open row' }))
+    const sheet = screen.getByRole('dialog', { name: 'Kosher' })
+    await user.click(within(sheet).getByRole('button', { name: 'Back' }))
+    expect(screen.getByRole('dialog', { name: 'Suggest an edit' })).toBeInTheDocument()
+    expect(screen.getByText('ListingEditor: edit')).toBeInTheDocument()
+  })
+
+  it('the sheet/dialog title becomes "Request removal of {name}" once the editor reports the removal screen is open', async () => {
     const user = userEvent.setup()
     const grocery = makeCategory({ id: 'grocery', kind: 'listing' })
     renderWithProviders(
@@ -240,7 +257,7 @@ describe('FindResources — a real listing category', () => {
 
   // Report was folded into the edit form (RemovalRequest). A link shared before
   // that still says ?form=report, and should land on the edit form.
-  it('on mobile, a legacy ?form=report link opens the edit sheet over the still-mounted directory', () => {
+  it('on mobile, a ?form=report link opens straight onto Request removal, over the still-mounted directory', () => {
     const grocery = makeCategory({ id: 'grocery', kind: 'listing' })
     renderWithProviders(
       <ForcedViewport isMobile>
@@ -250,8 +267,8 @@ describe('FindResources — a real listing category', () => {
     )
 
     expect(screen.getByText('ResourceLoader')).toBeInTheDocument()
-    expect(screen.getByRole('dialog', { name: 'Suggest an edit' })).toBeInTheDocument()
-    expect(screen.getByText('ListingForm: edit (embedded)')).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Request removal of Acme Grocery' })).toBeInTheDocument()
+    expect(screen.getByText('ListingEditor: edit')).toBeInTheDocument()
     expect(screen.queryByRole('dialog', { name: 'Report a problem' })).not.toBeInTheDocument()
   })
 
@@ -281,10 +298,10 @@ describe('FindResources — a real listing category', () => {
 
     expect(screen.getByText('ResourceLoader')).toBeInTheDocument()
     expect(screen.getByRole('dialog', { name: 'Suggest an edit' })).toBeInTheDocument()
-    expect(screen.getByText('ListingForm: edit (embedded)')).toBeInTheDocument()
+    expect(screen.getByText('ListingEditor: edit')).toBeInTheDocument()
   })
 
-  it('on desktop, a legacy ?form=report link opens the edit dialog over the still-mounted directory', () => {
+  it('on desktop, a ?form=report link opens straight onto Request removal, over the still-mounted directory', () => {
     const grocery = makeCategory({ id: 'grocery', kind: 'listing' })
     renderWithProviders(
       <FindResources view="grocery" listings={[listing({ id: 'l1' })]} anchor={anchor} onUp={vi.fn()} searchForm="report" searchItem="l1" />,
@@ -292,8 +309,8 @@ describe('FindResources — a real listing category', () => {
     )
 
     expect(screen.getByText('ResourceLoader')).toBeInTheDocument()
-    expect(screen.getByRole('dialog', { name: 'Suggest an edit' })).toBeInTheDocument()
-    expect(screen.getByText('ListingForm: edit (embedded)')).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Request removal of Acme Grocery' })).toBeInTheDocument()
+    expect(screen.getByText('ListingEditor: edit')).toBeInTheDocument()
     expect(screen.queryByRole('dialog', { name: 'Report a problem' })).not.toBeInTheDocument()
   })
 
@@ -444,7 +461,7 @@ describe('FindResources — the shared Turnstile widget', () => {
       <FindResources view="grocery" listings={[listing()]} anchor={anchor} onUp={vi.fn()} searchForm="report" searchItem="l1" />,
       { content: { categories: [grocery] } },
     )
-    expect(screen.getByText('ListingForm: edit (embedded)')).toBeInTheDocument()
+    expect(screen.getByText('ListingEditor: edit')).toBeInTheDocument()
     expect(screen.getByTestId('turnstile')).toBeInTheDocument()
   })
 })

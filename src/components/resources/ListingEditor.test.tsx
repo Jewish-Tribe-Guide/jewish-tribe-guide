@@ -1,12 +1,12 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { act, cleanup, screen, waitFor, within } from '@testing-library/react'
+import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { makeCategory, makeListing } from '@/test/providerFixtures'
+import { makeListing } from '@/test/providerFixtures'
+import { FOOD, HOSPITAL, MIKVAH, SHUL } from '@/test/editorFixtures'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { mockRouter } from '@/test/nextNavigationMock'
-import type { CategoryField } from '@/lib/categories'
-import ListingEditor from './ListingEditor'
+import ListingEditor, { type EditorStep } from './ListingEditor'
 
 vi.mock('next/navigation', () => ({
   useRouter: () => mockRouter,
@@ -14,18 +14,28 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
 }))
 
-// The real AddressInput loads the Google Maps SDK — see ListingForm.test.tsx's
-// identical stub.
+// The real AddressInput loads the Google Maps SDK. This one types, and has
+// a button standing in for picking a Google suggestion.
 vi.mock('@/components/intake/AddressInput', () => ({
-  default: ({ value, onChange }: { value: string; onChange: (v: string) => void }) => (
-    <input aria-label="Address" value={value} onChange={(e) => onChange(e.target.value)} />
+  default: ({ value, onChange, onPlaceSelect }: { value: string; onChange: (v: string) => void; onPlaceSelect?: (r: unknown) => void }) => (
+    <>
+      <input aria-label="Address" value={value} onChange={(e) => onChange(e.target.value)} />
+      <button
+        type="button"
+        onClick={() => {
+          onChange('400 Arch St, Philadelphia, PA')
+          onPlaceSelect?.({ placeId: 'p2', name: 'Sweet Box Bakery & Cafe', hours: { mon: { open: '08:00', close: '20:00' } }, businessStatus: 'OPERATIONAL' })
+        }}
+      >
+        Pick from Google
+      </button>
+    </>
   ),
 }))
 
-// Monday noon: the fixture's hours say open.
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] })
-  vi.setSystemTime(new Date(2026, 8, 21, 12, 0))
+  vi.setSystemTime(new Date(2026, 9, 12, 12, 0))
 })
 afterEach(() => {
   cleanup()
@@ -33,543 +43,245 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-const open = { open: '11:30', close: '22:00' }
-const week = { sun: open, mon: open, tue: open, wed: open, thu: open, fri: open, sat: null }
-
-// Shaped like the real Food category: a multi-choice badge, a certification
-// badge carrying the kosher caveat (whose yes/no and note are `hidden` and
-// edit from the badge), a website and a certification link.
-const food = makeCategory({
-  id: 'restaurant',
-  label: 'Food',
-  detailFields: [
-    { key: 'hours', label: 'Hours', type: 'hours' },
-    { key: 'website', label: 'Website', type: 'url' },
-    { key: 'photo', label: 'Photo', type: 'image' },
-    {
-      key: 't',
-      label: 'Kashrus',
-      type: 'select',
-      renderAs: 'badge',
-      multiSelect: true,
-      options: [
-        { value: 'meat', label: 'Meat' },
-        { value: 'dairy', label: 'Dairy' },
-        { value: 'parve', label: 'Parve' },
-      ],
-    },
-    {
-      key: 'kosherCert',
-      label: 'Kosher Certification',
-      type: 'select',
-      renderAs: 'badge',
-      multiSelect: true,
-      options: [
-        { value: 'ikc', label: 'IKC' },
-        { value: 'ou', label: 'OU' },
-      ],
-      caveat: { flagField: 'kosherPartial', noteField: 'kosherNote' },
-    },
-    { key: 'kosherPartial', label: 'Everything here is kosher', type: 'boolean', renderAs: 'hidden', invertDisplay: true },
-    { key: 'kosherNote', label: 'What isn’t kosher?', type: 'textarea', renderAs: 'hidden', showIf: { field: 'kosherPartial', equals: true } },
-    { key: 'k', label: 'Certification', type: 'url' },
-  ],
-})
-
-const barBombon = makeListing({
-  id: 'bar-bombon',
+const nine = { open: '09:00', close: '19:00' }
+const bakery = makeListing({
+  id: 'sweet-box',
   category: 'restaurant',
-  name: 'Bar Bombón',
-  phone: '(267) 606-6612',
-  address: '133 S 18th St, Philadelphia, PA 19103',
-  hours: week,
-  website: 'https://bar.example',
-  t: ['parve'],
-  kosherCert: ['ikc'],
-  kosherPartial: true,
-  kosherNote: 'Alcoholic beverages are NOT under supervision',
-  photo: 'https://img.example/bar-bombon.jpg',
+  name: 'Sweet Box Bakery',
+  address: '339 S 13th St, Philadelphia, PA',
+  phone: '(267) 975-1711',
+  website: 'https://shopsweetbox.com',
+  hours: { sun: nine, mon: nine, tue: nine, wed: nine, thu: nine, fri: nine, sat: nine },
+  s: 'Dessert Shop',
+  foodType: 'Bakery',
+  kosherCert: 'IKC',
+  googleDescription: 'Quaint, cheery bakery.',
+  dishes: ['Cupcakes', 'Cookies', 'Brownies'],
 })
+
+const user = () => userEvent.setup({ advanceTimers: (ms) => vi.advanceTimersByTime(ms) })
 
 function renderEditor(props: Partial<Parameters<typeof ListingEditor>[0]> = {}) {
   const onClose = vi.fn()
-  const view = renderWithProviders(<ListingEditor item={barBombon} category={food} onClose={onClose} {...props} />)
-  return { ...view, onClose }
+  const steps: (EditorStep | null)[] = []
+  const onStep = (s: EditorStep | null) => steps.push(s)
+  const view = renderWithProviders(<ListingEditor item={bakery} category={FOOD} onClose={onClose} onStep={onStep} {...props} />)
+  return { ...view, onClose, step: () => steps.at(-1) ?? null }
 }
 
-const send = () => screen.getByRole('button', { name: /^(Send \d+ changes?|No changes yet)$/ })
-const user = () => userEvent.setup({ advanceTimers: (ms) => vi.advanceTimersByTime(ms) })
+const row = (id: string) => screen.getByTestId(`editor-row-${id}`)
+const sendButton = () => screen.getByRole('button', { name: /^(Send \d+ changes?|No changes yet|Send)$/ })
+const done = () => screen.getByRole('button', { name: 'Done' })
 
-describe('ListingEditor — the listing, editable', () => {
-  // Option A's whole premise: switching to edit doesn't move anything. The
-  // same pieces the listing shows, in its order, each one now editable.
-  it('shows the listing\'s own pieces, not a form: photo, name, badges, buttons, hours', () => {
+describe('ListingEditor — the listing’s boxes, one row each', () => {
+  it('lists the boxes in the listing’s order, each saying what it says now; nothing else before Send', () => {
     renderEditor()
-    expect(screen.getByRole('heading', { name: 'Suggest an edit' })).toBeInTheDocument()
-    expect(screen.getByText('Reviewed by a moderator before it goes live')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Change photo' })).toBeInTheDocument()
-    expect(screen.getByRole('textbox', { name: 'Name' })).toHaveValue('Bar Bombón')
-    for (const badge of ['Open', 'Parve', 'IKC']) expect(screen.getByRole('button', { name: badge })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Add a badge' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Directions' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Edit Website link' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Add Certification link' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Today: 11:30 AM – 10:00 PM/ })).toBeInTheDocument()
-    // No category line: it never changes, so it has no place in edit mode.
-    expect(screen.queryByText('Food')).not.toBeInTheDocument()
+    const list = screen.getByTestId('editor-list')
+    const titles = within(list)
+      .getAllByRole('button')
+      .filter((b) => b.dataset.testid?.startsWith('editor-row-'))
+      .map((b) => b.dataset.testid)
+    expect(titles).toEqual(['editor-row-name', 'editor-row-kind', 'editor-row-facts', 'editor-row-items', 'editor-row-contact', 'editor-row-hours', 'editor-row-about'])
+    expect(row('name')).toHaveTextContent('Sweet Box Bakery')
+    expect(row('name')).toHaveTextContent('Dessert Shop')
+    expect(row('facts')).toHaveTextContent('IKC · Everything here is kosher')
+    expect(row('items')).toHaveTextContent('3 · Cupcakes, Cookies, Brownies')
+    expect(row('hours')).toHaveTextContent('Sun–Sat 9 AM–7 PM')
+    // One task: no email box, no removal link, no review line.
+    expect(screen.queryByText(/Your email/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Request removal/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Reviewed by a moderator/)).not.toBeInTheDocument()
+    expect(sendButton()).toHaveTextContent('No changes yet')
+    expect(sendButton()).toBeDisabled()
   })
 
-  it('offers "Add a photo" on a listing with none', () => {
-    renderEditor({ item: { ...barBombon, photo: undefined } })
-    expect(screen.getByRole('button', { name: 'Add a photo' })).toBeInTheDocument()
-    renderEditor({ item: { ...barBombon, photo: 'https://img.example/p.jpg' } })
-    expect(screen.getByRole('button', { name: 'Change photo' })).toBeInTheDocument()
+  it('puts what the listing doesn’t show yet under “Not on the listing yet”, one line each', async () => {
+    const u = user()
+    renderWithProviders(<ListingEditor item={{ ...bakery, googleDescription: undefined }} category={FOOD} onClose={() => {}} />)
+    const empty = screen.getByTestId('editor-empty')
+    expect(within(empty).getByText('Not on the listing yet')).toBeInTheDocument()
+    await u.click(within(empty).getByRole('button', { name: 'About' }))
+    expect(screen.getByTestId('editor-open-about')).toBeInTheDocument()
+  })
+
+  it('opens one box at a time, its title for the host’s header, and Done or Back to the list', async () => {
+    const u = user()
+    const { step } = renderEditor()
+    await u.click(row('facts'))
+    expect(screen.getByTestId('editor-open-facts')).toBeInTheDocument()
+    expect(screen.queryByTestId('editor-list')).not.toBeInTheDocument()
+    expect(step()?.title).toBe('Kosher')
+    await u.click(done())
+    expect(screen.getByTestId('editor-list')).toBeInTheDocument()
+    expect(step()).toBeNull()
+
+    await u.click(row('hours'))
+    step()!.back()
+    expect(await screen.findByTestId('editor-list')).toBeInTheDocument()
   })
 })
 
-describe('ListingEditor — knowing what changed', () => {
-  it('waits for a change, counts each one, and goes back to zero when undone by hand', async () => {
+describe('ListingEditor — what’s changed', () => {
+  it('marks the row Changed and counts it on Send; putting it back by hand unmarks it', async () => {
     const u = user()
     renderEditor()
-    expect(send()).toHaveTextContent('No changes yet')
-    expect(send()).toBeDisabled()
+    await u.click(row('facts'))
+    const facts = screen.getByTestId('editor-open-facts')
+    await u.click(within(facts).getByRole('button', { name: 'Dairy' }))
+    expect(within(facts).getByRole('button', { name: 'Dairy' })).toHaveAttribute('aria-pressed', 'true')
+    await u.click(done())
+    expect(row('facts')).toHaveTextContent('Changed')
+    expect(row('facts')).toHaveTextContent('Dairy · IKC')
+    expect(sendButton()).toHaveTextContent(/^(Send 1 change|Verifying…)$/)
 
-    const phone = screen.getByRole('textbox', { name: 'Phone' })
-    await u.clear(phone)
-    await u.type(phone, '2676066613')
-    expect(send()).toHaveTextContent('Send 1 change')
-    expect(send()).toBeEnabled()
-
-    await u.clear(phone)
-    await u.type(phone, '2676066612')
-    expect(send()).toHaveTextContent('No changes yet')
+    await u.click(row('facts'))
+    await u.click(within(screen.getByTestId('editor-open-facts')).getByRole('button', { name: 'Dairy' }))
+    await u.click(done())
+    expect(row('facts')).not.toHaveTextContent('Changed')
+    expect(sendButton()).toHaveTextContent('No changes yet')
   })
 
-  it('marks a changed field with its old value crossed out, and Undo puts it back', async () => {
+  it('a hechsher’s caveat: No asks what isn’t kosher, and the row says so', async () => {
     const u = user()
     renderEditor()
-    const name = screen.getByRole('textbox', { name: 'Name' })
-    await u.type(name, ' & Café')
-
-    const old = screen.getByText('Bar Bombón', { selector: '.line-through' })
-    expect(old).toBeInTheDocument()
-    await u.click(screen.getByRole('button', { name: 'Undo' }))
-    expect(name).toHaveValue('Bar Bombón')
-    expect(screen.queryByRole('button', { name: 'Undo' })).not.toBeInTheDocument()
+    await u.click(row('facts'))
+    expect(screen.queryByLabelText('What isn’t kosher?')).not.toBeInTheDocument()
+    const question = screen.getByRole('group', { name: 'Everything here is kosher' })
+    await u.click(within(question).getByRole('button', { name: 'No' }))
+    await u.type(screen.getByLabelText('What isn’t kosher?'), 'The meat counter')
+    await u.click(done())
+    expect(row('facts')).toHaveTextContent('Everything here is kosher: No · The meat counter')
   })
 
-  it('lists the changes above Send', async () => {
+  // The user, Oct 11: an address picked from Google fills in the name and
+  // hours too. Every row it changed comes back marked, not only the one
+  // that was opened.
+  it('an address picked from Google marks the name and hours rows as well', async () => {
     const u = user()
     renderEditor()
-    await u.click(screen.getByRole('button', { name: 'Parve' }))
-    await u.click(within(screen.getByRole('group', { name: 'Kashrus' })).getByRole('button', { name: 'Dairy' }))
-
-    expect(screen.getByText(/Your suggestion · 1 change/)).toBeInTheDocument()
-    expect(screen.getByText('Parve → Parve, Dairy')).toBeInTheDocument()
+    await u.click(row('contact'))
+    await u.click(screen.getByRole('button', { name: 'Pick from Google' }))
+    await u.click(done())
+    expect(row('name')).toHaveTextContent('Changed')
+    expect(row('contact')).toHaveTextContent('Changed')
+    expect(row('hours')).toHaveTextContent('Changed')
+    expect(row('facts')).not.toHaveTextContent('Changed')
+    expect(sendButton()).toHaveTextContent(/^(Send 3 changes|Verifying…)$/)
   })
 })
 
-describe('ListingEditor — badges, edited where they sit', () => {
-  it('opens a badge\'s whole group under the row, and shows a newly picked one as new', async () => {
+describe('ListingEditor — dishes and items', () => {
+  it('this place’s dishes only; tap one for Always, Not always or Remove; a removed one keeps Keep', async () => {
     const u = user()
     renderEditor()
-    await u.click(screen.getByRole('button', { name: 'Parve' }))
-    const group = screen.getByRole('group', { name: 'Kashrus' })
-    expect(within(group).getByRole('button', { name: 'Parve' })).toHaveAttribute('aria-pressed', 'true')
-    expect(within(group).getByRole('button', { name: 'Meat' })).toHaveAttribute('aria-pressed', 'false')
-
-    await u.click(within(group).getByRole('button', { name: 'Dairy' }))
-    // The badge row now holds Dairy too, outside the panel.
-    const row = screen.getByRole('button', { name: 'Add a badge' }).parentElement!
-    expect(within(row).getByRole('button', { name: 'Dairy' }).parentElement!.className).toContain('border-primary')
-  })
-
-  // Taking back your own addition is one tap on its ×, not a trip back into
-  // the panel to find the pill again.
-  it('takes an added badge straight back off with its ×', async () => {
-    const u = user()
-    renderEditor()
-    await u.click(screen.getByRole('button', { name: 'Add a badge' }))
-    await u.click(screen.getByRole('button', { name: '+ Meat' }))
-    expect(send()).toHaveTextContent('Send 1 change')
-
-    await u.click(screen.getByRole('button', { name: 'Remove Meat' }))
-    expect(send()).toHaveTextContent('No changes yet')
-  })
-
-  // A badge that was already there comes off the same way as one you added
-  // — otherwise adding one teaches "chips have an ×" and the old ones look
-  // fixed. It stays, crossed out, to be brought back.
-  it('takes an existing badge off with its ×, crossed out and one tap from coming back', async () => {
-    const u = user()
-    renderEditor()
-    await u.click(screen.getByRole('button', { name: 'Remove Parve' }))
-    expect(send()).toHaveTextContent('Send 1 change')
-    expect(screen.getByText('Parve → None')).toBeInTheDocument()
-
-    await u.click(screen.getByRole('button', { name: 'Bring back Parve' }))
-    expect(send()).toHaveTextContent('No changes yet')
-  })
-
-  // The listing only shows a caveat beside a certification it has, so
-  // taking the last one off quiets the caveat without a second change —
-  // in particular, never a "Yes, everything is kosher" nobody said.
-  it('quiets the caveat when the last certification comes off, without counting it as a change', async () => {
-    const u = user()
-    renderEditor()
-    await u.click(screen.getByRole('button', { name: 'Remove IKC' }))
-    expect(screen.queryByRole('button', { name: 'Edit: What isn’t kosher?' })).not.toBeInTheDocument()
-    expect(send()).toHaveTextContent('Send 1 change')
-
-    await u.click(screen.getByRole('button', { name: 'Bring back IKC' }))
-    expect(screen.getByRole('button', { name: 'Edit: What isn’t kosher?' })).toBeInTheDocument()
-  })
-
-  it('brings a removed badge back with a tap on its crossed-out chip', async () => {
-    const u = user()
-    renderEditor()
-    await u.click(screen.getByRole('button', { name: 'Parve' }))
-    await u.click(within(screen.getByRole('group', { name: 'Kashrus' })).getByRole('button', { name: 'Parve' }))
-    expect(send()).toHaveTextContent('Send 1 change')
-
-    await u.click(screen.getByRole('button', { name: 'Bring back Parve' }))
-    expect(send()).toHaveTextContent('No changes yet')
-  })
-
-  // A certifier the admin hasn't listed can still be named, the way the form
-  // allows it for a field with allowOther.
-  it('lets you type your own choice when the field allows "Other"', async () => {
-    const u = user()
-    const withOther = makeCategory({
-      ...food,
-      detailFields: food.detailFields.map((f) => (f.key === 'kosherCert' ? { ...f, allowOther: true } : f)),
-    })
-    renderEditor({ category: withOther })
-    await u.click(screen.getByRole('button', { name: 'IKC' }))
-    await u.click(screen.getByRole('button', { name: '+ Other…' }))
-    await u.type(screen.getByRole('textbox', { name: 'Other kosher certification' }), 'Badatz{Enter}')
-
-    const group = screen.getByRole('group', { name: 'Kosher Certification' })
-    expect(within(group).getByRole('button', { name: 'Badatz' })).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getByText('IKC → IKC, Badatz')).toBeInTheDocument()
-  })
-
-  // Still marked new (the blue edge), but in the colour the listing will
-  // show it: a certification added under the caveat is amber like the rest.
-  it('colours an added certification amber when the caveat applies, keeping its "new" edge', async () => {
-    const u = user()
-    renderEditor()
-    await u.click(screen.getByRole('button', { name: 'Add a badge' }))
-    await u.click(screen.getByRole('button', { name: '+ OU' }))
-    const chip = screen.getByRole('button', { name: 'Remove OU' }).parentElement!
-    expect(chip.className).toContain('border-primary')
-    expect(chip.className).toContain('text-caution')
-  })
-
-  // A listing with no certification has no badge to open, so the "+" is
-  // the only way in — and it has to take a certifier that isn't listed.
-  it('adds a certifier that isn\'t listed from the "+", on a listing with none', async () => {
-    const u = user()
-    const withOther = makeCategory({
-      ...food,
-      detailFields: food.detailFields.map((f) => (f.key === 'kosherCert' ? { ...f, allowOther: true } : f)),
-    })
-    renderEditor({ category: withOther, item: { ...barBombon, kosherCert: [], kosherPartial: false } })
-    expect(screen.queryByRole('button', { name: 'IKC' })).not.toBeInTheDocument()
-
-    await u.click(screen.getByRole('button', { name: 'Add a badge' }))
-    await u.click(screen.getByRole('button', { name: '+ Other…' }))
-    await u.type(screen.getByRole('textbox', { name: 'Other kosher certification' }), 'Badatz{Enter}')
-    expect(screen.getByRole('button', { name: 'Remove Badatz' })).toBeInTheDocument()
-    expect(send()).toHaveTextContent('Send 1 change')
-  })
-
-  it('offers no "Other…" on a field that doesn\'t allow it', async () => {
-    const u = user()
-    renderEditor()
-    await u.click(screen.getByRole('button', { name: 'IKC' }))
-    expect(screen.queryByRole('button', { name: '+ Other…' })).not.toBeInTheDocument()
-  })
-
-  // The orange note is where your eye goes to fix it, so it's tappable too,
-  // but it opens the one editor for it rather than a second box.
-  it('opens the caveat\'s editor from the orange note, with the cursor in the note', async () => {
-    const u = user()
-    renderEditor()
-    await u.click(screen.getByRole('button', { name: 'Edit: What isn’t kosher?' }))
-    await waitFor(() => expect(screen.getByRole('textbox', { name: 'What isn’t kosher?' })).toHaveFocus())
-    expect(screen.getAllByRole('textbox', { name: 'What isn’t kosher?' })).toHaveLength(1)
-  })
-
-  it('crosses out a badge that was switched off, rather than just dropping it', async () => {
-    const u = user()
-    renderEditor()
-    await u.click(screen.getByRole('button', { name: 'Parve' }))
-    await u.click(within(screen.getByRole('group', { name: 'Kashrus' })).getByRole('button', { name: 'Parve' }))
-
-    const row = screen.getByRole('button', { name: 'Add a badge' }).parentElement!
-    expect(within(row).getByText('Parve').className).toContain('line-through')
-  })
-
-  // A "no" never shows on the listing, so without the "+" there'd be no way
-  // to turn one on. It lists only what isn't there yet.
-  it('adds a badge that isn\'t there from the "+", which offers only what\'s missing', async () => {
-    const u = user()
-    renderEditor()
-    await u.click(screen.getByRole('button', { name: 'Add a badge' }))
-    expect(screen.getByRole('button', { name: '+ Meat' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '+ OU' })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: '+ Parve' })).not.toBeInTheDocument()
-
-    await u.click(screen.getByRole('button', { name: '+ OU' }))
-    expect(send()).toHaveTextContent('Send 1 change')
-  })
-
-  // The caveat edits from the badge it colours amber, and nowhere else.
-  // Saying "Yes, everything's kosher" hides the note, and that's one
-  // decision — the hidden note isn't counted as a second change.
-  it('edits the kosher caveat from the certification badge, as one change', async () => {
-    const u = user()
-    renderEditor()
-    expect(screen.getByRole('button', { name: 'IKC' }).parentElement!.className).toContain('text-caution')
-    expect(screen.getByRole('button', { name: 'Edit: What isn’t kosher?' })).toHaveTextContent('Alcoholic beverages are NOT under supervision')
-
-    await u.click(screen.getByRole('button', { name: 'IKC' }))
-    expect(screen.getByRole('textbox', { name: 'What isn’t kosher?' })).toHaveValue('Alcoholic beverages are NOT under supervision')
-    await u.click(within(screen.getByRole('group', { name: 'Everything here is kosher' })).getByRole('button', { name: 'Yes' }))
-
-    expect(screen.queryByRole('textbox', { name: 'What isn’t kosher?' })).not.toBeInTheDocument()
-    expect(send()).toHaveTextContent('Send 1 change')
-    const row = screen.getByRole('button', { name: 'Add a badge' }).parentElement!
-    expect(within(row).getByRole('button', { name: 'IKC' }).parentElement!.className).not.toContain('text-caution')
-  })
-})
-
-describe('ListingEditor — buttons and derived pieces', () => {
-  it('edits a link from its button, and adds a missing one from its dashed "+"', async () => {
-    const u = user()
-    renderEditor()
-    await u.click(screen.getByRole('button', { name: 'Add Certification link' }))
-    await u.type(screen.getByRole('textbox', { name: 'Certification link' }), 'ikc.example/bar')
-    expect(send()).toHaveTextContent('Send 1 change')
-  })
-
-  // Call comes from the phone number; editing it in two places would make
-  // one of them wrong. A tap goes to the real field instead.
-  it('takes Call to the phone field, rather than editing a second copy', async () => {
-    const u = user()
-    renderEditor()
-    await u.click(screen.getByRole('button', { name: 'Call' }))
-    expect(screen.getByRole('textbox', { name: 'Phone' })).toHaveFocus()
-  })
-
-  // The address's id sits on the box around the address picker, not on
-  // the input itself — so this checks the jump lands IN the field. It
-  // didn't at first: the scroll happened, and the cursor went nowhere.
-  it('takes Directions into the address field itself', async () => {
-    const u = user()
-    renderEditor()
-    await u.click(screen.getByRole('button', { name: 'Directions' }))
-    expect(screen.getByRole('textbox', { name: 'Address' })).toHaveFocus()
-  })
-
-  it('reads hours as the listing does, opens the week on a tap, and names the day that changed', async () => {
-    const u = user()
-    renderEditor()
-    await u.click(screen.getByRole('button', { name: /Today: 11:30 AM – 10:00 PM/ }))
-    await u.click(screen.getByRole('checkbox', { name: 'Monday closed' }))
-
-    expect(screen.getByText('1 day changed · Monday')).toBeInTheDocument()
-    expect(send()).toHaveTextContent('Send 1 change')
-  })
-
-  // A mikvah's women's section only applies once Women's Tevillah is on:
-  // switching it on is what brings those fields into the listing.
-  it('brings in the fields a badge unlocks, where the listing shows them', async () => {
-    const u = user()
-    const mikvah = makeCategory({
-      id: 'mikvah',
-      detailFields: [
-        { key: 'womenTevillah', label: "Women's Tevillah", type: 'boolean', filterLabel: "Women's" },
-        { key: 'women_s_phone', label: "Women's Phone", type: 'tel', audienceKey: 'womenTevillah' },
-      ],
-    })
-    renderEditor({ category: mikvah, item: makeListing({ category: 'mikvah', name: 'Community Mikvah' }) })
-    expect(screen.queryByRole('button', { name: /women's phone/i })).not.toBeInTheDocument()
-
-    await u.click(screen.getByRole('button', { name: 'Add a badge' }))
-    await u.click(screen.getByRole('button', { name: "+ Women's" }))
-    expect(screen.getByRole('button', { name: "Add women's phone" })).toBeInTheDocument()
+    await u.click(row('items'))
+    const editor = screen.getByTestId('items-editor')
+    expect(within(editor).queryByText(/always in stock/i)).not.toBeInTheDocument()
+    await u.click(within(editor).getByRole('button', { name: 'Cookies' }))
+    await u.click(within(screen.getByRole('group', { name: 'Cookies' })).getByRole('button', { name: 'Remove' }))
+    expect(within(editor).getByText('Cookies')).toHaveClass('line-through')
+    await u.click(within(editor).getByRole('button', { name: 'Brownies' }))
+    await u.click(within(screen.getByRole('group', { name: 'Brownies' })).getByRole('button', { name: 'Not always' }))
+    expect(within(editor).getByText('Not always on the menu')).toBeInTheDocument()
+    await u.type(within(editor).getByLabelText('Add a dish'), 'Babka{Enter}')
+    await u.click(done())
+    expect(row('items')).toHaveTextContent('Changed')
+    expect(row('items')).toHaveTextContent('3 · Cupcakes, Babka, Brownies')
   })
 })
 
 describe('ListingEditor — sending', () => {
-  it('sends an update with the change, then shows a receipt of what was sent', async () => {
+  it('sends the edit, then says it’s sent; Done leaves', async () => {
     const u = user()
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ ok: true }) })
     vi.stubGlobal('fetch', fetchMock)
-    renderEditor()
-    const phone = screen.getByRole('textbox', { name: 'Phone' })
+    const { onClose } = renderEditor()
+    await u.click(row('contact'))
+    const phone = screen.getByLabelText('Phone')
     await u.clear(phone)
     await u.type(phone, '2676066613')
-    await u.click(send())
+    await u.click(done())
+    await u.click(sendButton())
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
     const body = JSON.parse(fetchMock.mock.calls[0][1].body)
     expect(body.operation).toBe('update')
-    expect(body.targetId).toBe('bar-bombon')
+    expect(body.targetId).toBe('sweet-box')
     expect(body.payload.phone).toBe('(267) 606-6613')
-    // Untouched values go along unchanged, the caveat's note included.
-    expect(body.payload.details.kosherNote).toBe('Alcoholic beverages are NOT under supervision')
+    expect(body.payload.details.dishes).toEqual(['Cupcakes', 'Cookies', 'Brownies'])
 
-    expect(await screen.findByText('Sent for review. A moderator checks it before it goes live.')).toBeInTheDocument()
-    expect(screen.getByText('(267) 606-6612 → (267) 606-6613')).toBeInTheDocument()
+    expect(await screen.findByTestId('editor-sent')).toHaveTextContent('An admin checks it, usually within a day.')
+    await u.click(screen.getByRole('button', { name: 'Done' }))
+    expect(onClose).toHaveBeenCalled()
   })
 
-  // Desktop floats Send below the dialog, in the spot "Suggest an edit" held.
-  it('puts Send in the host\'s slot when given one, and takes it out while the removal panel is up', async () => {
+  it('puts the foot’s button in the host’s slot: Send on the list, Done in a box', async () => {
     const u = user()
     const slot = document.createElement('div')
     document.body.appendChild(slot)
     renderEditor({ sendSlot: slot })
     expect(within(slot).getByRole('button', { name: 'No changes yet' })).toBeInTheDocument()
+    await u.click(row('about'))
+    expect(within(slot).getByRole('button', { name: 'Done' })).toBeInTheDocument()
+    slot.remove()
+  })
 
-    await u.click(screen.getByRole('button', { name: /Request removal/ }))
+  it('Request removal, opened by the host, is its own screen with nothing of the edit beside it', () => {
+    const slot = document.createElement('div')
+    document.body.appendChild(slot)
+    renderEditor({ removalOpen: true, onRemovalOpenChange: () => {}, sendSlot: slot })
+    expect(screen.getByTestId('editor-list').parentElement).toHaveClass('hidden')
     expect(within(slot).queryByRole('button', { name: 'No changes yet' })).not.toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Request removal' })).toBeInTheDocument()
-    slot.remove()
-  })
-
-  // Send is the last thing on every screen: under the desktop dialog, and
-  // the end of the content on a phone, after the removal link, not before.
-  it('ends with Send, after the removal link, when Send is in the content', () => {
-    renderEditor()
-    const link = screen.getByRole('button', { name: 'Closed for good? Request removal' })
-    expect(link.compareDocumentPosition(send()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-  })
-
-  // Removal's confirm is where Send was, and looks the same: it's a request
-  // a moderator reviews, not a deletion, so it isn't the red of danger.
-  it('puts the removal confirm in Send\'s slot, looking the same as Send', async () => {
-    const u = user()
-    const slot = document.createElement('div')
-    document.body.appendChild(slot)
-    renderEditor({ sendSlot: slot })
-    const sendClass = within(slot).getByRole('button', { name: 'No changes yet' }).className
-
-    await u.click(screen.getByRole('button', { name: /Request removal/ }))
-    const confirm = within(slot).getByRole('button', { name: /^(Confirm removal request|Verifying…)$/ })
-    expect(confirm.className).toBe(sendClass)
-    slot.remove()
-  })
-
-  // A host that owns the removal step has a Back that leaves it, so the
-  // screen has no Cancel; on its own, the editor keeps one.
-  it('drops the removal screen\'s Cancel when the host owns the step', async () => {
-    const u = user()
-    const onRemovalOpenChange = vi.fn()
-    const { rerenderWithProviders } = renderEditor({ removalOpen: false, onRemovalOpenChange })
-    await u.click(screen.getByRole('button', { name: /Request removal/ }))
-    expect(onRemovalOpenChange).toHaveBeenLastCalledWith(true)
-
-    rerenderWithProviders(<ListingEditor item={barBombon} category={food} onClose={() => {}} removalOpen onRemovalOpenChange={onRemovalOpenChange} />)
-    expect(screen.getByRole('heading', { name: 'Request removal' })).toBeInTheDocument()
+    expect(within(slot).getByRole('button', { name: /^(Confirm removal request|Verifying…)$/ })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument()
-  })
-
-  it('keeps a Cancel on the removal screen when it owns the step itself', async () => {
-    const u = user()
-    renderEditor()
-    await u.click(screen.getByRole('button', { name: /Request removal/ }))
-    await u.click(screen.getByRole('button', { name: 'Cancel' }))
-    expect(screen.getByRole('heading', { name: 'Suggest an edit' })).toBeInTheDocument()
-  })
-
-  // The host's header row (Back … Close) would otherwise be an empty band;
-  // the title goes there, and isn't repeated in the content.
-  it('puts its title in the host\'s header slot when given one', async () => {
-    const u = user()
-    const slot = document.createElement('div')
-    document.body.appendChild(slot)
-    const { container } = renderEditor({ titleSlot: slot })
-    expect(within(slot).getByRole('heading', { name: 'Suggest an edit' })).toBeInTheDocument()
-    expect(within(container).queryByRole('heading', { name: 'Suggest an edit' })).not.toBeInTheDocument()
-
-    await u.click(screen.getByRole('button', { name: /Request removal/ }))
-    expect(within(slot).getByRole('heading', { name: 'Request removal' })).toBeInTheDocument()
     slot.remove()
   })
 })
 
-// Every field type has to have somewhere to be edited — a Record in the
-// component makes adding one without deciding a compile error; this checks
-// the decision actually renders something for each.
-describe('ListingEditor — every field type has a home', () => {
-  it('renders an editor, or an "Add" for it, for each field type', () => {
-    const fields: CategoryField[] = [
-      { key: 'a', label: 'Note', type: 'text' },
-      { key: 'b', label: 'Details', type: 'textarea' },
-      { key: 'c', label: 'Other phone', type: 'tel' },
-      { key: 'd', label: 'Seats', type: 'number' },
-      { key: 'e', label: 'Delivery', type: 'boolean' },
-      { key: 'f', label: 'Style', type: 'select', renderAs: 'badge', options: [{ value: 'x', label: 'X' }] },
-      { key: 'g', label: 'Items', type: 'tags' },
-      { key: 'h', label: 'Menu', type: 'url' },
-      { key: 'i', label: 'Hours', type: 'hours' },
-      { key: 'j', label: 'Davening', type: 'minyanim' },
-      { key: 'photo', label: 'Photo', type: 'image' },
-    ]
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ ok: true, tags: [] }) }))
-    renderEditor({ category: makeCategory({ detailFields: fields }), item: makeListing({ name: 'Blank' }) })
-    act(() => {})
-    for (const name of ['Add note', 'Add details', 'Add other phone', 'Add seats', 'Add items', 'Add Menu link', 'Add hours', 'Add davening times', 'Add a photo', 'Add a badge']) {
-      expect(screen.getByRole('button', { name })).toBeInTheDocument()
-    }
-  })
-})
-
-// Oct 6: a hospital's lists of contacts, each entry a few small fields.
-describe('ListingEditor — a list of contacts', () => {
-  const hospital = makeCategory({
-    id: 'hospital',
-    label: 'Hospital',
-    detailFields: [
-      { key: 'pantry', label: 'Pantry', type: 'contacts' },
-      { key: 'rides', label: 'Rides', type: 'contacts', entryFrom: true },
-    ],
-  })
-  const hup = makeListing({
-    id: 'hup',
-    category: 'hospital',
-    name: 'HUP',
-    address: '3400 Spruce St, Philadelphia, PA',
-    pantry: [{ name: '1st floor, Pavilion Building', who: 'Bikur Cholim of Philadelphia', phones: ['215-805-8668'] }],
-  })
-
-  it('edits an entry in place: a changed phone is one change, named, with Undo', async () => {
+describe('ListingEditor — boxes with their own editors', () => {
+  it('a shul’s usual times open the same list as the box’s own Edit', async () => {
     const u = user()
-    renderEditor({ item: hup, category: hospital })
-    const phones = screen.getByRole('textbox', { name: 'Phones' })
-    expect(phones).toHaveValue('215-805-8668')
-    await u.type(phones, ', 610-389-1412')
-    expect(send()).toHaveTextContent('Send 1 change')
-    expect(screen.getByText('Changed: 1st floor, Pavilion Building')).toBeInTheDocument()
-    await u.click(screen.getByRole('button', { name: 'Undo' }))
-    expect(send()).toHaveTextContent('No changes yet')
+    const shul = makeListing({ id: 'mi', category: 'synagogue', name: 'Mikveh Israel', minyanim: [{ id: 'a', tefillah: 'shacharis', days: ['sat'], time: '9:00am' }] })
+    renderWithProviders(<ListingEditor item={shul} category={SHUL} onClose={() => {}} />)
+    expect(row('minyans:shabbos')).toHaveTextContent('Shacharis 9 AM')
+    expect(within(screen.getByTestId('editor-empty')).getByRole('button', { name: 'Usual weekday times' })).toBeInTheDocument()
+    await u.click(row('minyans:shabbos'))
+    expect(screen.getByTestId('minyan-box-list')).toBeInTheDocument()
   })
 
-  it('an empty list offers to add one, says where from for rides, and a blank entry is no change', async () => {
+  it('a mikvah’s section: its hours and note, and a phone only once someone adds one', async () => {
     const u = user()
-    renderEditor({ item: hup, category: hospital })
-    await u.click(screen.getByRole('button', { name: 'Add rides' }))
-    expect(send()).toHaveTextContent('No changes yet')
-    const entries = screen.getAllByTestId('contact-entry')
-    const ride = entries[entries.length - 1]
-    await u.type(within(ride).getByRole('textbox', { name: 'Name' }), 'Darchei Chesed')
-    await u.type(within(ride).getByRole('textbox', { name: 'From where' }), 'Monsey')
-    expect(send()).toHaveTextContent('Send 1 change')
-    expect(screen.getByText('+ Darchei Chesed')).toBeInTheDocument()
-    await u.click(within(ride).getByRole('button', { name: 'Remove Darchei Chesed' }))
-    expect(send()).toHaveTextContent('No changes yet')
+    const mikvah = makeListing({ id: 'lm', category: 'mikvah', name: 'Lower Merion Mikvah', womenTevillah: true, women_s_notes: 'By appointment' })
+    renderWithProviders(<ListingEditor item={mikvah} category={MIKVAH} onClose={() => {}} />)
+    await u.click(row('audience:womenTevillah'))
+    expect(screen.getByDisplayValue('By appointment')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Phone')).not.toBeInTheDocument()
+    await u.click(screen.getByRole('button', { name: 'Add a phone' }))
+    expect(screen.getByLabelText('Phone')).toBeInTheDocument()
+  })
+
+  it('a hospital’s people: one row each, a person on their own screen, Remove as words', async () => {
+    const u = user()
+    const hospital = makeListing({
+      id: 'chop',
+      category: 'hospital',
+      name: 'CHOP',
+      liaisons: [
+        { name: 'Naomi Gorelick', phones: ['9087705145'] },
+        { name: 'Heshy Horovitz', phones: ['7328107700'] },
+      ],
+    })
+    const steps: (EditorStep | null)[] = []
+    renderWithProviders(<ListingEditor item={hospital} category={HOSPITAL} onClose={() => {}} onStep={(s) => steps.push(s)} />)
+    expect(row('box:Who to call')).toHaveTextContent('Naomi Gorelick, Heshy Horovitz')
+    await u.click(row('box:Who to call'))
+    await u.click(screen.getByRole('button', { name: /Naomi Gorelick/ }))
+    expect(steps.at(-1)?.title).toBe('Naomi Gorelick')
+    expect(screen.queryByLabelText('Who')).not.toBeInTheDocument()
+    await u.click(screen.getByRole('button', { name: 'Remove this person' }))
+    expect(steps.at(-1)?.title).toBe('Who to call')
+    await u.click(done())
+    expect(row('box:Who to call')).toHaveTextContent('Heshy Horovitz')
+    expect(row('box:Who to call')).toHaveTextContent('Changed')
   })
 })

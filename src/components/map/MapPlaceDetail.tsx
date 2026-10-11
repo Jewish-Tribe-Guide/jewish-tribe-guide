@@ -17,6 +17,7 @@ import BackIconButton from '@/components/BackIconButton'
 // The editor (address lookup, hours, photos) loads when editing starts, not
 // with the listing, so the Map page's code stays light.
 const ListingEditor = dynamic(() => import('@/components/resources/ListingEditor'))
+import type { EditorStep } from '@/components/resources/ListingEditor'
 
 type Props = {
   item: DirectoryResource
@@ -119,6 +120,17 @@ export default function MapPlaceDetail({ item, category, color, onBack, found, u
       setRemovalOpen(true)
     } else stepBack()
   }
+  // The ••• menu's Request removal (Oct 11): straight to that screen, one
+  // history entry, so Back returns to the listing.
+  const openRemoval = () => {
+    history.pushState({ ...(window.history.state ?? {}), mapSheetForm: 'edit', mapSheetRemoval: true }, '')
+    setFormOpen('edit')
+    setRemovalOpen(true)
+  }
+  // A row of the editor open (or a minyan, a person in one): Back closes
+  // that, not the editor.
+  const [editorStep, setEditorStep] = useState<EditorStep | null>(null)
+  const back = () => (editorStep ? editorStep.back() : stepBack())
   // Opening or closing the form swaps everything inside the parent's scroll
   // region, and that region stays mounted, so it would keep its offset: the
   // bar is the LAST thing in the listing, so the form typically opened
@@ -131,6 +143,7 @@ export default function MapPlaceDetail({ item, category, color, onBack, found, u
   }, [formOpen])
   const caps = resolveCapabilities(category.capabilities)
   const canEdit = ui.contributions.edit && caps.edit
+  const canReport = ui.contributions.report && caps.report
 
   if (formOpen) {
     return (
@@ -144,7 +157,7 @@ export default function MapPlaceDetail({ item, category, color, onBack, found, u
             centred. */}
         <div className="mb-3 grid grid-cols-[1fr_auto_1fr] items-center gap-2">
           <span>
-            <BackIconButton onClick={stepBack} />
+            <BackIconButton onClick={back} />
           </span>
           <div ref={setTitleSlot} className="min-w-0 text-center text-base" />
         </div>
@@ -155,6 +168,7 @@ export default function MapPlaceDetail({ item, category, color, onBack, found, u
           titleSlot={titleSlot}
           removalOpen={removalOpen}
           onRemovalOpenChange={changeRemovalOpen}
+          onStep={setEditorStep}
         />
       </div>
     )
@@ -183,6 +197,7 @@ export default function MapPlaceDetail({ item, category, color, onBack, found, u
           // `placement`.
           <ListingEditBar
             onEdit={canEdit ? () => openForm('edit') : undefined}
+            onRequestRemoval={canEdit && canReport ? openRemoval : undefined}
             item={item}
             category={category}
             path={listingPath}

@@ -44,6 +44,7 @@ const chip = (on: boolean) =>
 
 export default function MinyanBoxEditor({
   original,
+  initial,
   box,
   boxTitle,
   place,
@@ -54,6 +55,10 @@ export default function MinyanBoxEditor({
 }: {
   /** The box's minyanim as they are (minyanimForBox). */
   original: Minyan[]
+  /** Where the list starts, when it isn't `original`: the whole-listing
+   *  editor reopening a box already changed. Changes are still marked
+   *  against `original`. */
+  initial?: Minyan[]
   box: MinyanBox
   /** "Usual Shabbos times", under a minyan's own title. */
   boxTitle: string
@@ -69,7 +74,7 @@ export default function MinyanBoxEditor({
   /** The list's button, given how many minyanim changed. */
   send: (changes: number) => ReactNode
 }) {
-  const [rows, setRows] = useState<Minyan[]>(original)
+  const [rows, setRows] = useState<Minyan[]>(initial ?? original)
   // The minyan open: an id, 'new' for one being added, or null for the list.
   const [open, setOpen] = useState<string | null>(null)
   const { timeText, noteText, boxGroups } = writing

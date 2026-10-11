@@ -28,10 +28,9 @@ import type { ListingAction } from './useListingActions'
 //
 // Deliberately ONE action. "Request removal" is not a peer here — it's rare,
 // it sounds destructive, and giving it equal billing makes a visitor stop to
-// choose between two things instead of reading one invitation. It keeps the
-// home it already had: the last panel of the edit form itself (see
-// RemovalRequest in ListingForm), the same trail Google Maps uses for
-// "Close or remove."
+// choose between two things instead of reading one invitation. It's last in
+// the overflow (Oct 11): at the foot of the edit it was one more thing
+// beside Send.
 //
 // Where the page has the "+ Add" box (TellAboutContext: a category page),
 // Suggest an edit opens it about this listing, with "Edit the details
@@ -60,6 +59,7 @@ import type { ListingAction } from './useListingActions'
 // A category with editing turned off lost all three for those visitors.
 export default function ListingEditBar({
   onEdit,
+  onRequestRemoval,
   item,
   category,
   path,
@@ -70,6 +70,8 @@ export default function ListingEditBar({
   /** Omitted when the listing can't be edited — the bar then renders the
    *  overflow on its own. See above for why it never disappears outright. */
   onEdit?: () => void
+  /** The overflow's Request removal: see ListingActionsFan. */
+  onRequestRemoval?: () => void
   item: DirectoryResource
   category: CategoryConfig
   /** The listing's own URL — what the overflow's Share copies. */
@@ -115,7 +117,7 @@ export default function ListingEditBar({
           Suggest an edit
         </button>
       )}
-      <ListingActionsFan item={item} category={category} path={path} placement={fanPlacement} omit={omit} />
+      <ListingActionsFan item={item} category={category} path={path} placement={fanPlacement} omit={omit} onRequestRemoval={onRequestRemoval} />
     </div>
   )
 }

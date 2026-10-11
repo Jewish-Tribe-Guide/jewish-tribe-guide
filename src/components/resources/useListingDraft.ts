@@ -9,10 +9,10 @@ import type { PlaceSelectResult } from '@/components/intake/AddressInput'
 /**
  * A listing being written — every value a visitor can change, plus the
  * Google place data an address pick carries along with it — and how to turn
- * it into a submission. Shared by the two surfaces that write listings: the
- * plain form (ListingForm, for Add) and the listing-shaped editor
- * (ListingEditor, for Edit), so what a submission contains can't depend on
- * which of them produced it.
+ * it into a submission. Shared by everything that writes listings: the
+ * whole-listing editor (ListingEditor, for Edit and Add), one box's Edit
+ * (BoxEditor), and the admin's form (ListingForm), so what a submission
+ * contains can't depend on which of them produced it.
  *
  * Holds no UI and posts nothing; useListingSubmit does the sending.
  */

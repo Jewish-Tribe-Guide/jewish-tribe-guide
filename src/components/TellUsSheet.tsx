@@ -19,9 +19,10 @@ import { tellUsPlaceholder } from '@/lib/tellUs'
 import ActionDialog from '@/components/resources/ActionDialog'
 import MobileSheet from '@/components/resources/MobileSheet'
 import UpdateTimesBox from '@/components/resources/UpdateTimesBox'
-import ListingForm, { DetailFieldInput } from '@/components/resources/ListingForm'
+import { DetailFieldInput } from '@/components/resources/ListingForm'
 import { FieldsBox } from '@/components/resources/FieldsBox'
-import ListingEditor from '@/components/resources/ListingEditor'
+import ListingEditor, { type EditorStep } from '@/components/resources/ListingEditor'
+import { useListingDraft } from '@/components/resources/useListingDraft'
 import type { SendVia } from '@/components/resources/useListingSubmit'
 import FindPlace from '@/components/FindPlace'
 import TellUsItems, { changingItems, type CurrentItems } from '@/components/TellUsItems'
@@ -338,6 +339,16 @@ export function TellUsBody({
   // Where Back goes from a listing's editor: the result it was opened from,
   // or the search.
   const [editFrom, setEditFrom] = useState<'find' | 'result'>('find')
+  // A row of the editor open (or a minyan, a person in one): its title in
+  // the header, and Back closes it (Oct 11).
+  const [editorStep, setEditorStep] = useState<EditorStep | null>(null)
+  const editorTitle = editorStep?.title ?? null
+  useLayoutEffect(() => {
+    if (step === 'edit' && editing) onTitle(editorTitle ?? editing.name)
+    else if (step === 'add' && adding) onTitle(editorTitle ?? addTitle(adding.category))
+    // Only when the editor's own step changes: the steps set their titles.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editorTitle])
   const [email, setEmail] = useState('')
   // One place at a time (agreed Oct 5): which one is showing, among those
   // not sent yet; and what's been sent, for the thank-you and its email.
@@ -571,8 +582,8 @@ export function TellUsBody({
       result: () => setStep('write'),
       find: () => setStep(findFrom),
       kind: () => openFind(true),
-      add: () => openFind(true),
-      edit: () => (editFrom === 'result' ? setStep('result') : openFind(true)),
+      add: editorStep ? editorStep.back : () => openFind(true),
+      edit: editorStep ? editorStep.back : () => (editFrom === 'result' ? setStep('result') : openFind(true)),
     }
     onBack(go[step])
   })
@@ -913,15 +924,16 @@ export function TellUsBody({
         </div>
       )}
       {step === 'add' && adding && (
-        <ListingForm
+        <AddByHand
           key={`${adding.category.id}:${adding.place?.placeId ?? ''}`}
           category={adding.category}
-          mode="create"
-          seed={{ place: adding.place, address: adding.address, coords: adding.coords, values: aiPlace?.values }}
-          openAll
-          embedded
-          onUp={() => openFind(true)}
-          onSubmitted={onClose}
+          place={adding.place}
+          address={adding.address}
+          coords={adding.coords}
+          values={aiPlace?.values}
+          existing={(listings ?? []).filter((l) => l.category === adding.category.id)}
+          onClose={onClose}
+          onStep={setEditorStep}
           // A place the reader found goes in labelled with what it was read
           // from, and the box goes back to the rest of what it read.
           via={aiPlace ? viaMessage : undefined}
@@ -938,7 +950,7 @@ export function TellUsBody({
         />
       )}
       {step === 'edit' && editing && categories?.find((c) => c.id === editing.category) && (
-        <ListingEditor item={editing} category={categories.find((c) => c.id === editing.category)!} onClose={onClose} />
+        <ListingEditor item={editing} category={categories.find((c) => c.id === editing.category)!} onClose={onClose} onStep={setEditorStep} />
       )}
 
       {error && (
@@ -1363,4 +1375,35 @@ function WeekChange({ label, before, after }: { label: string; before: unknown; 
       </ul>
     </section>
   )
+}
+
+/** Adding a place by hand: the whole-listing editor, started from the
+ *  Google pick, the address typed, or what the reader found (Oct 11; it
+ *  was the old sectioned form). */
+function AddByHand({
+  category,
+  place,
+  address,
+  coords,
+  values,
+  existing,
+  onClose,
+  onStep,
+  via,
+  onSent,
+}: {
+  category: CategoryConfig
+  place?: PlaceSelectResult
+  address?: string
+  coords?: { lat: number; lng: number } | null
+  values?: Partial<DirectoryResource>
+  existing: DirectoryResource[]
+  onClose: () => void
+  onStep: (step: EditorStep | null) => void
+  via?: SendVia
+  onSent?: (body: unknown) => void
+}) {
+  const [seed] = useState(() => ({ ...values, address: address || values?.address || '', ...(coords ? { geo: coords } : {}) }) as DirectoryResource)
+  const draft = useListingDraft(category, seed, place)
+  return <ListingEditor category={category} draft={draft} fromGoogle={!!place} existingListings={existing} onClose={onClose} onStep={onStep} via={via} onSent={onSent} />
 }

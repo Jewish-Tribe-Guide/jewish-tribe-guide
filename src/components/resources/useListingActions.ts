@@ -13,7 +13,7 @@ import { ui } from '@/lib/uiConfig'
  *  row in one place, a white glyph on a coloured swipe panel in another, and
  *  a circle in a third, and only the caller knows which. */
 export type ListingAction = {
-  id: 'pin' | 'share' | 'location'
+  id: 'pin' | 'share' | 'location' | 'remove'
   /** Already reflects state — "Pin"/"Pinned", "Share"/"Copied!",
    *  "Set as location"/"Location set". That matters beyond cosmetics: these
    *  render as `role="menuitem"`, where `aria-pressed` is not an allowed

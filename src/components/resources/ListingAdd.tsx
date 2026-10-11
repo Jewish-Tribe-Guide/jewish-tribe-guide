@@ -6,7 +6,7 @@ import type { DirectoryResource } from '@/types'
 import AddressInput from '@/components/intake/AddressInput'
 import BackIconButton from '@/components/BackIconButton'
 import ActionDialog from './ActionDialog'
-import ListingEditor from './ListingEditor'
+import ListingEditor, { type EditorStep } from './ListingEditor'
 import MobileSheet from './MobileSheet'
 import { useListingDraft } from './useListingDraft'
 
@@ -55,8 +55,11 @@ export default function ListingAdd({ category, listings, isMobile, isOpen, onClo
     if (isOpen) setStep(firstStep)
   }
 
-  const title = `Add a ${category.label}`
-  const onBack = googleFirst && step === 'finish' ? () => setStep('find') : undefined
+  // A row of the editor open (or a person in one): its title, and Back
+  // closes it (Oct 11).
+  const [editorStep, setEditorStep] = useState<EditorStep | null>(null)
+  const title = editorStep?.title ?? `Add a ${category.label}`
+  const onBack = editorStep ? editorStep.back : googleFirst && step === 'finish' ? () => setStep('find') : undefined
   // Mounted only while open, so the draft starts fresh every time.
   const flow = isOpen && (
     <AddFlow
@@ -67,6 +70,7 @@ export default function ListingAdd({ category, listings, isMobile, isOpen, onClo
       sendSlot={isMobile ? null : sendSlot}
       sharedTurnstile={sharedTurnstile}
       onClose={onClose}
+      onStep={setEditorStep}
     />
   )
 
@@ -99,6 +103,7 @@ function AddFlow({
   sendSlot,
   sharedTurnstile,
   onClose,
+  onStep,
 }: {
   category: CategoryConfig
   listings: DirectoryResource[]
@@ -107,6 +112,7 @@ function AddFlow({
   sendSlot: HTMLElement | null
   sharedTurnstile?: { token: string; reset: () => void }
   onClose: () => void
+  onStep: (step: EditorStep | null) => void
 }) {
   // Lives here, above both steps, so the search fills it in and going Back
   // to search again keeps what was already typed on the second step.
@@ -163,6 +169,7 @@ function AddFlow({
       onClose={onClose}
       sendSlot={sendSlot}
       sharedTurnstile={sharedTurnstile}
+      onStep={onStep}
     />
   )
 }

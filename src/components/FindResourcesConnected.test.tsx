@@ -39,8 +39,8 @@ vi.mock('@/components/resources/ResourceLoader', () => ({
     </div>
   ),
 }))
-vi.mock('@/components/resources/ListingForm', () => ({
-  default: ({ mode }: { mode: string }) => <p>ListingForm: {mode}</p>,
+vi.mock('@/components/resources/ListingEditor', () => ({
+  default: () => <p>ListingEditor: edit</p>,
 }))
 // Add's first step is the Google search; the real one loads the Maps SDK.
 vi.mock('@/components/intake/AddressInput', () => ({
@@ -71,7 +71,7 @@ describe('FindResourcesConnected', () => {
       { content: { categories: [grocery] } },
     )
 
-    expect(screen.getByText('ListingForm: edit')).toBeInTheDocument()
+    expect(screen.getByText('ListingEditor: edit')).toBeInTheDocument()
   })
 
   it('opens the form immediately via local state, updating the URL through history.replaceState rather than router.push', async () => {

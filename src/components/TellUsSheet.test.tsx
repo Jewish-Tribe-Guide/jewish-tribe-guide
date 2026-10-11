@@ -257,7 +257,7 @@ describe('Saw something? Tell us', () => {
     expect(screen.queryByTestId('tell-us-add-item')).not.toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: 'Change something else about Trader Joe’s ›' }))
-    expect(await screen.findByText('Suggest an edit')).toBeInTheDocument()
+    expect(await screen.findByTestId('editor-list')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Back' }))
     expect(await screen.findByTestId('tell-us-items')).toHaveTextContent('Croutons')
 
@@ -357,9 +357,11 @@ describe('Saw something? Tell us', () => {
     expect(screen.getByPlaceholderText('Search by name or address…')).toHaveValue('South Square Market, 22nd & South')
     fireEvent.click(screen.getByRole('button', { name: 'Not on Google? Fill it in yourself' }))
     expect(screen.getByRole('dialog', { name: 'Add to Groceries' })).toBeInTheDocument()
-    expect(screen.getByLabelText('Name *')).toHaveValue('South Square Market')
-    fireEvent.change(screen.getByLabelText('Name *'), { target: { value: 'South Square Market & Deli' } })
-    fireEvent.submit(screen.getByLabelText('Name *').closest('form')!)
+    expect(screen.getByTestId('editor-row-name')).toHaveTextContent('South Square Market')
+    fireEvent.click(screen.getByTestId('editor-row-name'))
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'South Square Market & Deli' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
 
     // Back to the rest, that one out of the count.
     expect(await screen.findByText('Sent: South Square Market')).toBeInTheDocument()
@@ -513,7 +515,12 @@ describe('Saw something? Tell us', () => {
       fireEvent.change(screen.getByPlaceholderText('Search by name or address…'), { target: { value: 'trader j' } })
       fireEvent.click(await screen.findByRole('button', { name: /Trader Joe’s/ }))
       expect(screen.getByRole('dialog', { name: 'Trader Joe’s' })).toBeInTheDocument()
-      expect(screen.getByText('Suggest an edit')).toBeInTheDocument()
+      expect(screen.getByTestId('editor-list')).toBeInTheDocument()
+      // A row opened: its title in the header, and Back closes it first.
+      fireEvent.click(screen.getByTestId('editor-row-contact'))
+      expect(screen.getByRole('dialog', { name: 'Address and phone' })).toBeInTheDocument()
+      fireEvent.click(screen.getByRole('button', { name: 'Back' }))
+      expect(screen.getByRole('dialog', { name: 'Trader Joe’s' })).toBeInTheDocument()
       // The chevron before the title, in the header.
       expect(screen.getByRole('heading', { name: 'Trader Joe’s' }).parentElement).toContainElement(screen.getByRole('button', { name: 'Back' }))
       fireEvent.click(screen.getByRole('button', { name: 'Back' }))
@@ -524,13 +531,13 @@ describe('Saw something? Tell us', () => {
       expect(calls.filter((c) => c.url.includes('/api/resources'))).toHaveLength(1)
     })
 
-    it('adds a place as the form of questions, every section open, asking the kind only when it isn’t known', () => {
+    it('adds a place as the listing’s boxes, asking the kind only when it isn’t known', () => {
       find()
       fireEvent.click(screen.getByRole('button', { name: 'Not on Google? Fill it in yourself' }))
       expect(screen.getByTestId('pick-kind')).toBeInTheDocument()
       fireEvent.click(screen.getByRole('button', { name: 'Synagogue' }))
       expect(screen.getByRole('dialog', { name: 'Add to Synagogues' })).toBeInTheDocument()
-      expect(screen.getByLabelText('Name *')).toBeInTheDocument()
+      expect(screen.getByTestId('editor-row-name')).toHaveTextContent('Needed')
       cleanup()
       find({ category: grocery })
       fireEvent.click(screen.getByRole('button', { name: 'Not on Google? Fill it in yourself' }))

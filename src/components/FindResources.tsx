@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { eruvim } from '@/data/resources'
 import ResourceLoader from '@/components/resources/ResourceLoader'
 import ListingAdd from '@/components/resources/ListingAdd'
-import ListingForm from '@/components/resources/ListingForm'
+import ListingEditor, { type EditorStep } from '@/components/resources/ListingEditor'
 import ActionDialog from '@/components/resources/ActionDialog'
 import MobileSheet from '@/components/resources/MobileSheet'
 import EruvInfo from '@/components/resources/EruvInfo'
@@ -228,7 +228,13 @@ export default function FindResources({
   // "Suggest an edit". Reset at both openAction (a fresh edit starting) and
   // goToCategoryList (closing back out), the two places a stale `true` from
   // a previous visit could otherwise leak into the next one.
-  const [removalOpen, setRemovalOpen] = useState(false)
+  // A link's ?form=report opens straight onto Request removal.
+  const [removalOpen, setRemovalOpen] = useState(formParam === 'report' && !!deepLinkListing)
+  // A row of the editor open (or a minyan, a person in one): its title,
+  // and Back closes it (Oct 11).
+  const [editorStep, setEditorStep] = useState<EditorStep | null>(null)
+  const editTitle = editorStep?.title ?? (removalOpen && action?.mode === 'edit' ? `Request removal of ${action.listing.name}` : 'Suggest an edit')
+  const editBack = editorStep ? editorStep.back : removalOpen ? () => setRemovalOpen(false) : undefined
 
   // Adjusting state during render, not in an effect: React re-renders this
   // component immediately with the new value, before anything is painted, so
@@ -397,19 +403,19 @@ export default function FindResources({
             <MobileSheet
               isOpen={action?.mode === 'edit'}
               onClose={goToCategoryList}
-              title={removalOpen && action?.mode === 'edit' ? `Request removal of ${action.listing.name}` : 'Suggest an edit'}
+              title={editTitle}
+              onBack={editBack}
               draggable
             >
               {action?.mode === 'edit' && (
-                <ListingForm
+                <ListingEditor
+                  item={action.listing}
                   category={category}
-                  mode="edit"
-                  existing={action.listing}
-                  onUp={goToCategoryList}
-                  onSubmitted={goToCategoryList}
+                  onClose={goToCategoryList}
                   sharedTurnstile={sharedTurnstile}
+                  removalOpen={removalOpen}
                   onRemovalOpenChange={setRemovalOpen}
-                  embedded
+                  onStep={setEditorStep}
                 />
               )}
             </MobileSheet>
@@ -419,18 +425,18 @@ export default function FindResources({
             <ActionDialog
               isOpen={action?.mode === 'edit'}
               onClose={goToCategoryList}
-              title={removalOpen && action?.mode === 'edit' ? `Request removal of ${action.listing.name}` : 'Suggest an edit'}
+              title={editTitle}
+              onBack={editBack}
             >
               {action?.mode === 'edit' && (
-                <ListingForm
+                <ListingEditor
+                  item={action.listing}
                   category={category}
-                  mode="edit"
-                  existing={action.listing}
-                  onUp={goToCategoryList}
-                  onSubmitted={goToCategoryList}
+                  onClose={goToCategoryList}
                   sharedTurnstile={sharedTurnstile}
+                  removalOpen={removalOpen}
                   onRemovalOpenChange={setRemovalOpen}
-                  embedded
+                  onStep={setEditorStep}
                 />
               )}
             </ActionDialog>

@@ -103,7 +103,8 @@ function renderAdd(props: Partial<Parameters<typeof ListingAdd>[0]> = {}) {
   return { onClose }
 }
 
-const send = () => screen.getByRole('button', { name: /^(Send for review|Still needed: .*|Verifying…|Sending…)$/ })
+const send = () => screen.getByRole('button', { name: /^(Send|Still needed: .*|Verifying…|Sending…)$/ })
+const row = (id: string) => screen.getByTestId(`editor-row-${id}`)
 
 describe('ListingAdd — find it first', () => {
   it('opens on the Google search, in a dialog titled for the category', () => {
@@ -120,11 +121,11 @@ describe('ListingAdd — find it first', () => {
     renderAdd()
     await u.click(screen.getByRole('button', { name: 'pick the place' }))
 
-    expect(screen.getByRole('textbox', { name: 'Name' })).toHaveValue('Shalom Bagels')
-    expect(screen.getByRole('textbox', { name: 'Phone' })).toHaveValue('(215) 555-0134')
-    expect(screen.getByText(/Filled in from Google\./)).toBeInTheDocument()
+    expect(row('name')).toHaveTextContent('Shalom Bagels')
+    expect(row('contact')).toHaveTextContent('1200 Example Ave · (215) 555-0134 · shalombagels.example')
+    expect(screen.getByText('Filled in from Google')).toBeInTheDocument()
     // Name and address are all this category requires, and Google gave both.
-    expect(send()).toHaveTextContent('Send for review')
+    expect(send()).toHaveTextContent('Send')
     expect(send()).toBeEnabled()
   })
 
@@ -181,8 +182,8 @@ describe('ListingAdd — find it first', () => {
     expect(body.payload.details.placeId).toBe('place-new')
     expect(body.payload.details.googleAutofill.name).toBe('Shalom Bagels')
 
-    expect(await screen.findByText('Sent for review. A moderator checks it before it goes live.')).toBeInTheDocument()
-    await u.click(screen.getByRole('button', { name: 'Back to the list' }))
+    expect(await screen.findByTestId('editor-sent')).toHaveTextContent('An admin checks it, usually within a day.')
+    await u.click(screen.getByRole('button', { name: 'Done' }))
     expect(onClose).toHaveBeenCalled()
   })
 })
@@ -193,40 +194,39 @@ describe('ListingAdd — entered by hand', () => {
     renderAdd()
     await u.click(screen.getByRole('button', { name: 'Not on Google? Enter it yourself' }))
 
-    expect(screen.getByRole('textbox', { name: 'Name' })).toHaveValue('')
+    expect(row('name')).toHaveTextContent('Needed')
+    expect(row('contact')).toHaveTextContent('Needed')
     expect(screen.queryByText(/Filled in from Google/)).not.toBeInTheDocument()
     expect(send()).toHaveTextContent('Still needed: Name, Address')
     expect(send()).toBeDisabled()
 
+    await u.click(row('name'))
     await u.type(screen.getByRole('textbox', { name: 'Name' }), 'Shalom Bagels')
+    await u.click(screen.getByRole('button', { name: 'Done' }))
+    expect(row('name')).not.toHaveTextContent('Needed')
     expect(send()).toHaveTextContent('Still needed: Address')
   })
 
-  // A new listing has no badges to tap, so each empty group is its own
-  // named chip rather than a lone "+".
-  it('shows each empty badge group as a named chip that opens its choices', async () => {
+  // A new listing's empty boxes are one line each; a few choices are
+  // buttons, a yes/no is Yes and No.
+  it('fills in an empty box from its line under “Not on the listing yet”', async () => {
     const u = userEvent.setup()
     renderAdd()
     await u.click(screen.getByRole('button', { name: 'Not on Google? Enter it yourself' }))
-    expect(screen.queryByRole('button', { name: 'Add a badge' })).not.toBeInTheDocument()
-
-    await u.click(screen.getByRole('button', { name: '+ Food Type' }))
+    await u.click(within(screen.getByTestId('editor-empty')).getByRole('button', { name: 'Details' }))
     await u.click(within(screen.getByRole('group', { name: 'Food Type' })).getByRole('button', { name: 'Dairy' }))
-    expect(screen.getByRole('button', { name: 'Remove Dairy' })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: '+ Food Type' })).not.toBeInTheDocument()
-    // With a badge in the row, the "+" is back for adding more to it.
-    expect(screen.getByRole('button', { name: 'Add a badge' })).toBeInTheDocument()
-
-    // A yes/no turns on straight from its chip.
-    await u.click(screen.getByRole('button', { name: '+ Shabbat friendly' }))
-    expect(screen.getByRole('button', { name: 'Remove Shabbat friendly' })).toBeInTheDocument()
+    await u.click(within(screen.getByRole('group', { name: 'Shabbat friendly' })).getByRole('button', { name: 'Yes' }))
+    await u.click(screen.getByRole('button', { name: 'Done' }))
+    expect(row('facts')).toHaveTextContent('Dairy · Shabbat friendly')
   })
 
   it('says when the name matches a listing already in the guide', async () => {
     const u = userEvent.setup()
     renderAdd()
     await u.click(screen.getByRole('button', { name: 'Not on Google? Enter it yourself' }))
+    await u.click(row('name'))
     await u.type(screen.getByRole('textbox', { name: 'Name' }), 'kosher mart')
+    await u.click(screen.getByRole('button', { name: 'Done' }))
     expect(screen.getByRole('status')).toHaveTextContent('Kosher Mart is already in the guide. It has the same name.')
   })
 })
@@ -237,7 +237,7 @@ describe('ListingAdd — a category with no address', () => {
     renderAdd({ category: whatsapp, listings: [] })
     expect(screen.queryByLabelText('Find the place')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument()
-    expect(screen.getByRole('textbox', { name: 'Name' })).toBeInTheDocument()
+    expect(row('name')).toBeInTheDocument()
     // No address to ask for; the admin's required link is.
     expect(send()).toHaveTextContent('Still needed: Name, Join group')
   })
@@ -247,8 +247,9 @@ describe('ListingAdd — a category with no address', () => {
     const u = userEvent.setup()
     const group = makeListing({ id: 'g1', category: 'whatsapp', name: 'Philly Shabbos Meals', join: 'https://chat.whatsapp.com/AbC123' })
     renderAdd({ category: whatsapp, listings: [group] })
-    await u.click(screen.getByRole('button', { name: 'Add Join group link' }))
-    await u.type(screen.getByRole('textbox', { name: 'Join group link' }), 'chat.whatsapp.com/AbC123')
+    await u.click(row('contact'))
+    await u.type(within(screen.getByTestId('editor-open-contact')).getByRole('textbox'), 'chat.whatsapp.com/AbC123')
+    await u.click(screen.getByRole('button', { name: 'Done' }))
     expect(screen.getByRole('status')).toHaveTextContent('Philly Shabbos Meals is already in the guide. It has the same join group link.')
   })
 

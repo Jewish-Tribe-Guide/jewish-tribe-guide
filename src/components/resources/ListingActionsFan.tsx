@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom'
 import type { DirectoryResource } from '@/types'
 import type { CategoryConfig } from '@/lib/categories'
 import { useIsMobile } from '@/lib/useIsMobile'
-import { CheckIcon, DotsIcon, ExternalIcon, PinIcon, ThumbtackIcon } from '@/components/icons'
+import { CheckIcon, ClosedIcon, DotsIcon, ExternalIcon, PinIcon, ThumbtackIcon } from '@/components/icons'
 import { useListingActions, type ListingAction } from './useListingActions'
 
 // ── The overflow beside an open listing's "Suggest an edit" pill ─────────
@@ -85,6 +85,7 @@ function ActionGlyph({ action }: { action: ListingAction }) {
   const cls = 'h-5 w-5'
   if (action.id === 'pin') return <ThumbtackIcon filled={action.active} className={cls} />
   if (action.id === 'share') return <ExternalIcon className={cls} />
+  if (action.id === 'remove') return <ClosedIcon className={cls} />
   return action.active ? <CheckIcon className={cls} /> : <PinIcon className={cls} />
 }
 
@@ -94,6 +95,7 @@ export default function ListingActionsFan({
   path,
   placement: requested = 'auto',
   omit = [],
+  onRequestRemoval,
 }: {
   item: DirectoryResource
   category: CategoryConfig
@@ -109,8 +111,14 @@ export default function ListingActionsFan({
    *  pale greens and greys. `side` and `row` also clear the directory
    *  dialog's ‹ › arrows (NAV_CLEARANCE), which nothing else has. */
   placement?: 'auto' | 'stack'
+  /** "Request removal", last in the fan (Oct 11): it moved here from the
+   *  foot of the edit, where it was one more thing beside Send. */
+  onRequestRemoval?: () => void
 }) {
-  const actions = useListingActions(item, category, path).filter((a) => !omit.includes(a.id))
+  const actions = [
+    ...useListingActions(item, category, path).filter((a) => !omit.includes(a.id)),
+    ...(onRequestRemoval ? [{ id: 'remove' as const, label: 'Request removal', active: false, onSelect: onRequestRemoval }] : []),
+  ]
   const isMobile = useIsMobile()
   const triggerRef = useRef<HTMLButtonElement>(null)
   const [placement, setPlacement] = useState<Placement | null>(null)

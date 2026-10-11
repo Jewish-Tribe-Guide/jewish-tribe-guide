@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { DirectoryResource } from '@/types'
-import type { CategoryConfig } from '@/lib/categories'
+import { resolveCapabilities, type CategoryConfig } from '@/lib/categories'
+import { ui } from '@/lib/uiConfig'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { routes } from '@/lib/routes'
 import { listingSlug } from '@/lib/listingSlug'
@@ -19,6 +20,7 @@ import BodyPortal from '@/components/BodyPortal'
 
 // Loaded when editing starts (see MapPlaceDetail).
 const ListingEditor = dynamic(() => import('./ListingEditor'))
+import type { EditorStep } from './ListingEditor'
 
 type Props = {
   isOpen: boolean
@@ -88,6 +90,7 @@ export default function ListingDetailModal({
   const community = useCommunitySlug()
   // The listing's own URL, for the edit bar's overflow Share.
   const listingPath = routes.listing(community, category.id, listingSlug(item))
+  const canReport = ui.contributions.report && resolveCapabilities(category.capabilities).report
 
   // Own history entry, nested on top of whatever real navigation got this
   // dialog open in the first place — so browser back closes the form and
@@ -131,6 +134,17 @@ export default function ListingDetailModal({
       setRemovalOpen(true)
     } else stepBack()
   }
+  // The ••• menu's Request removal (Oct 11): straight to that screen, one
+  // history entry, so Back returns to the listing.
+  const openRemoval = () => {
+    history.pushState({ ...(window.history.state ?? {}), detailModalForm: 'edit', detailModalRemoval: true }, '')
+    setFormOpen('edit')
+    setRemovalOpen(true)
+  }
+  // A row of the editor open (or a minyan, a person in one): Back and
+  // Escape close that, not the editor.
+  const [editorStep, setEditorStep] = useState<EditorStep | null>(null)
+  const back = () => (editorStep ? editorStep.back() : stepBack())
   // Where ListingEditor portals its Send button — the floating slot below
   // the dialog. State, not a ref, so the editor re-renders once it exists.
   const [sendSlot, setSendSlot] = useState<HTMLElement | null>(null)
@@ -170,8 +184,10 @@ export default function ListingDetailModal({
         // Steps back one level at a time, same as a real nested screen
         // would: out of the form to the detail view first, and only a
         // SECOND Escape (formOpen now null) closes the dialog entirely.
-        if (formOpen) stepBack()
-        else onClose()
+        if (formOpen) {
+          if (editorStep) editorStep.back()
+          else stepBack()
+        } else onClose()
         return
       }
       // Sibling-listing navigation doesn't mean anything mid-edit — arrow
@@ -189,7 +205,7 @@ export default function ListingDetailModal({
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [isOpen, onClose, onNavigate, formOpen])
+  }, [isOpen, onClose, onNavigate, formOpen, editorStep])
 
   if (!isOpen) return null
 
@@ -305,7 +321,7 @@ export default function ListingDetailModal({
               // the title sits in the middle of the dialog, not of the gap.
               <>
               <div className="min-w-0 flex-1">
-                <BackIconButton onClick={stepBack} />
+                <BackIconButton onClick={back} />
               </div>
               <div ref={setTitleSlot} className="min-w-0 text-center text-lg" />
               </>
@@ -349,7 +365,7 @@ export default function ListingDetailModal({
 
           <div className={`flex-1 overflow-y-auto px-6 space-y-4 ${formOpen ? 'py-5' : 'pb-5'}`}>
             {formOpen === 'edit' ? (
-              <ListingEditor item={item} category={category} onClose={closeForm} sendSlot={sendSlot} titleSlot={titleSlot} removalOpen={removalOpen} onRemovalOpenChange={changeRemovalOpen} />
+              <ListingEditor item={item} category={category} onClose={closeForm} sendSlot={sendSlot} titleSlot={titleSlot} removalOpen={removalOpen} onRemovalOpenChange={changeRemovalOpen} onStep={setEditorStep} />
             ) : (
               <ListingView
                 item={item}
@@ -376,6 +392,7 @@ export default function ListingDetailModal({
           <div className="pointer-events-none absolute inset-x-0 top-full mt-3 flex">
             <ListingEditBar
               onEdit={canEdit ? () => openForm('edit') : undefined}
+              onRequestRemoval={canEdit && canReport ? openRemoval : undefined}
               item={item}
               category={category}
               path={listingPath}

@@ -26,17 +26,24 @@ vi.mock('@/components/resources/ListingEditor', async () => {
       item,
       onClose,
       onRemovalOpenChange,
+      removalOpen,
+      onStep,
       sendSlot,
       titleSlot,
     }: {
       item: { name: string }
       onClose: () => void
       onRemovalOpenChange?: (open: boolean) => void
+      removalOpen?: boolean
+      onStep?: (step: { title: string; back: () => void } | null) => void
       sendSlot?: HTMLElement | null
       titleSlot?: HTMLElement | null
     }) => (
       <div>
         <p>ListingEditor stub — item={item.name}</p>
+        {removalOpen && <p>stub editor: removal</p>}
+        {/* Stands in for opening one of the editor's rows. */}
+        <button onClick={() => onStep?.({ title: 'Kosher', back: () => onStep(null) })}>stub open row</button>
         <button onClick={onClose}>stub cancel</button>
         {/* Stands in for the editor's Request removal link, for tests that
             prove the HOST's title reacts to it. */}
@@ -187,8 +194,10 @@ describe('MapPlaceDetail', () => {
     await user.click(screen.getByRole('button', { name: 'Actions for Goldi Market' }))
     expect(screen.getByRole('menuitem', { name: 'Pin' })).toBeInTheDocument()
     expect(screen.queryByRole('menuitem', { name: 'Share' })).not.toBeInTheDocument()
-    // Removal is requested at the foot of the edit form, not from here.
-    expect(screen.queryByRole('menuitem', { name: /report|remov/i })).not.toBeInTheDocument()
+    // Request removal is the last thing in it (Oct 11), not at the foot of
+    // the edit, and opens its own screen with the listing behind it.
+    await user.click(screen.getByRole('menuitem', { name: 'Request removal' }))
+    expect(await screen.findByText('stub editor: removal')).toBeInTheDocument()
   })
 
   // Part of the listing, not docked over it (which phase 3 did): the last
@@ -285,6 +294,28 @@ describe('MapPlaceDetail', () => {
     })
     expect(screen.getByText(/ListingEditor stub/)).toBeInTheDocument()
     push.mockRestore()
+    back.mockRestore()
+  })
+
+  // A row of the editor open (Oct 11): Back closes the row, and the editor
+  // stays; it doesn't step out of editing or touch the history.
+  it('steps back out of an open row of the editor, not out of editing', async () => {
+    const userEvent = (await import('@testing-library/user-event')).default
+    const user = userEvent.setup()
+    renderWithProviders(
+      <PinnedProvider>
+        <MapPlaceDetail item={makeListing({ name: 'Goldi Market' })} category={makeCategory()} color="#000" />
+      </PinnedProvider>,
+    )
+    await user.click(screen.getByRole('button', { name: 'Suggest an edit' }))
+    await user.click(screen.getByRole('button', { name: 'stub open row' }))
+    const back = vi.spyOn(window.history, 'back').mockImplementation(() => {})
+    await user.click(screen.getByRole('button', { name: 'Back' }))
+    expect(back).not.toHaveBeenCalled()
+    expect(screen.getByText(/ListingEditor stub/)).toBeInTheDocument()
+    // The row closed, so the next Back leaves the editor.
+    await user.click(screen.getByRole('button', { name: 'Back' }))
+    expect(back).toHaveBeenCalledTimes(1)
     back.mockRestore()
   })
 

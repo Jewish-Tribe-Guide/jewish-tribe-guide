@@ -41,9 +41,9 @@ export type SendVia = (body: {
 /**
  * Sending a listing: the anti-abuse layer (Turnstile, honeypot), the
  * optional contact email, the POST itself, its error handling and retries,
- * and the done state afterwards. Shared by ListingForm (Add) and
- * ListingEditor (Edit) so both treat a refused or expired submission the
- * same way. What gets sent comes from useListingDraft.
+ * and the done state afterwards. Shared by ListingEditor, BoxEditor and the
+ * admin's ListingForm so all of them treat a refused or expired submission
+ * the same way. What gets sent comes from useListingDraft.
  */
 export function useListingSubmit({ mode, existing, sharedTurnstile, adminSubmit, onAdminSubmitted, via, onSent }: Options) {
   const community = useCommunitySlug()
