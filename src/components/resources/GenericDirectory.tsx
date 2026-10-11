@@ -303,10 +303,22 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // they're already-undefined by the time Activity reveals this screen
   // again, hydrated-once refs and all — so any later activation blanking
   // unconditionally is the right call, not just the achievable one.
+  //
+  // But effects also tear down and re-run when a Suspense boundary above
+  // hides this screen for a moment while some code loads (the user's note
+  // 10, Oct 10: a listing tapped in search results on a phone loaded its
+  // view, the search was cleared, and the listing closed again). Leaving
+  // for another screen has already changed the address by the time this
+  // screen is hidden; a pause while code loads hasn't. So it clears only
+  // when the address it was hidden at isn't this screen's own.
   const hasActivatedBeforeRef = useRef(false)
+  const hiddenAtRef = useRef<string | null>(null)
   useEffect(() => {
-    if (hasActivatedBeforeRef.current) clearFiltersRef.current!()
+    if (hasActivatedBeforeRef.current && hiddenAtRef.current !== window.location.pathname) clearFiltersRef.current!()
     hasActivatedBeforeRef.current = true
+    return () => {
+      hiddenAtRef.current = window.location.pathname
+    }
   }, [])
 
   // ── Sync search + "Open now" into the URL (see onParamsChange's own doc) ──
@@ -1623,6 +1635,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
           items={filtered}
           categoryId={category.id}
           initialDay={initialDaveningDay}
+          onDayChange={(day) => onParamsChange?.({ day }, { replace: true })}
           // A minyan and its shul's pin light up together, as a shul's row does.
           onHoverShul={mapBeside ? highlight.set : undefined}
           search={search}

@@ -1,6 +1,6 @@
 'use client'
 
-import { forwardRef, useImperativeHandle, useRef, useState } from 'react'
+import { forwardRef, Suspense, useImperativeHandle, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { track } from '@vercel/analytics'
 import type { DirectoryResource } from '@/types'
@@ -695,22 +695,30 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
           stays on screen long enough to animate closed. */}
       {isMobile && !inColumn && (
         <MobileSheet isOpen={expanded} onClose={close} title={item.name} draggable titleHidden surface>
-          {opened && <MapPlaceDetail
-            item={item}
-            category={category}
-            color={color}
-            found={found}
-            upvote={upvote}
-            place={place ?? null}
-            onward={onward}
-          />}
+          {/* Its own boundary (the user's note 10, Oct 10): loading it the
+              first time hid the whole page for a moment, and the page took
+              coming back for a return to it and cleared the search, so a
+              listing tapped in search results closed again. */}
+          <Suspense fallback={null}>
+            {opened && <MapPlaceDetail
+              item={item}
+              category={category}
+              color={color}
+              found={found}
+              upvote={upvote}
+              place={place ?? null}
+              onward={onward}
+            />}
+          </Suspense>
         </MobileSheet>
       )}
 
       {/* Desktop: a dialog, where nothing hosts the listing itself. A
           category page does: it opens in the list's column (ListingColumn). */}
       {/* It draws nothing while closed, so it's only there once opened. */}
+      {/* Its own boundary too, for the same reason. */}
       {!isMobile && !inColumn && opened && (
+        <Suspense fallback={null}>
         <ListingDetailModal
           isOpen={expanded}
           onClose={close}
@@ -725,6 +733,7 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
           found={found}
           upvote={upvote}
         />
+        </Suspense>
       )}
     </div>
   )

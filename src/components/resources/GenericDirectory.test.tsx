@@ -677,13 +677,17 @@ describe('GenericDirectory', () => {
       expect(screen.getByRole('searchbox')).toHaveValue('kosher')
       onParamsChange.mockClear()
 
-      // Away (hidden — the visitor is looking at Home) and back (visible
-      // again — they returned to this same category), same component tree.
+      // Away (hidden — the visitor is looking at Home, whose address it now
+      // is) and back (visible again — they returned to this same
+      // category), same component tree.
+      const here = window.location.pathname
+      window.history.pushState(null, '', '/philly')
       rerenderWithProviders(
         <Activity mode="hidden">
           <GenericDirectory category={category} items={items} {...handlers} onParamsChange={onParamsChange} />
         </Activity>,
       )
+      window.history.pushState(null, '', here)
       rerenderWithProviders(
         <Activity mode="visible">
           <GenericDirectory category={category} items={items} {...handlers} onParamsChange={onParamsChange} />
@@ -697,6 +701,36 @@ describe('GenericDirectory', () => {
         expect.objectContaining({ q: null, f_isKosher: null }),
         { replace: true },
       )
+    })
+
+    // The user's note 10 (Oct 10): on a phone, a listing tapped in search
+    // results loaded its view the first time, which hid this screen for a
+    // moment without leaving it, and the search was cleared, closing the
+    // listing again. Hidden and shown at its own address, it keeps it.
+    it('keeps the search when it’s hidden for a moment without leaving (code loading)', async () => {
+      const user = userEvent.setup()
+      const onParamsChange = vi.fn()
+      const category = makeCategory()
+      const items = [makeListing({ id: 'a', name: 'Kosher Mart' }), makeListing({ id: 'b', name: 'Regular Mart' })]
+      const { rerenderWithProviders } = renderWithProviders(
+        <Activity mode="visible">
+          <GenericDirectory category={category} items={items} {...handlers} onParamsChange={onParamsChange} />
+        </Activity>,
+      )
+      await user.type(screen.getByRole('searchbox'), 'kosher')
+      onParamsChange.mockClear()
+
+      for (const mode of ['hidden', 'visible'] as const) {
+        rerenderWithProviders(
+          <Activity mode={mode}>
+            <GenericDirectory category={category} items={items} {...handlers} onParamsChange={onParamsChange} />
+          </Activity>,
+        )
+      }
+
+      expect(screen.getByRole('searchbox')).toHaveValue('kosher')
+      expect(screen.queryByText('Regular Mart')).not.toBeInTheDocument()
+      expect(onParamsChange).not.toHaveBeenCalledWith(expect.objectContaining({ q: null }), expect.anything())
     })
   })
 
@@ -823,6 +857,26 @@ describe('GenericDirectory', () => {
 
     expect(await screen.findByTestId('minyanim-view')).toBeInTheDocument()
     expect(screen.getByRole('heading', { level: 1, name: 'Minyanim by time' })).toBeInTheDocument()
+  })
+
+  // The user's note 10 (Oct 10): Back from a shul opened from the Minyanim
+  // view "seems to get stuck". A shul is a page of its own, and the view
+  // came back on today, at its top, wherever the visitor had been. The day
+  // tapped is in the address now, so Back comes back to it.
+  it('puts the day tapped in the Minyanim view in the address, and today takes it out', async () => {
+    const user = userEvent.setup()
+    const onParamsChange = vi.fn()
+    renderWithProviders(<GenericDirectory category={shulCategory()} items={[shulItem()]} openMinyanimView {...handlers} onParamsChange={onParamsChange} />)
+    const tabs = within(await screen.findByRole('tablist', { name: 'Day' })).getAllByRole('tab')
+
+    await user.click(tabs[2])
+    const [[changes, how]] = onParamsChange.mock.calls.filter(([c]) => 'day' in c)
+    expect(changes).toEqual({ day: expect.stringMatching(/^(sun|mon|tue|wed|thu|fri|sat)$/) })
+    expect(how).toEqual({ replace: true })
+
+    onParamsChange.mockClear()
+    await user.click(tabs[0])
+    expect(onParamsChange).toHaveBeenCalledWith({ day: null }, { replace: true })
   })
 
   it('opens on the Minyanim view on arrival when openMinyanimView is set (?davening=1)', async () => {

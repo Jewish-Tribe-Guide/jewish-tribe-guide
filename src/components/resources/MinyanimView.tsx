@@ -57,6 +57,7 @@ export default function MinyanimView({
   search = '',
   canAdd = false,
   shulText = () => '',
+  onDayChange,
 }: {
   items: readonly DirectoryResource[]
   categoryId: string
@@ -74,6 +75,11 @@ export default function MinyanimView({
   /** A shul's pick-list values ("Orthodox (Ashkenazi)"): searched, and
    *  shown when choosing a shul to add a minyan to. */
   shulText?: (item: DirectoryResource) => string
+  /** A day tapped (its weekday; null for today), for the address: a shul
+   *  opened from the list is a page of its own, and Back to the list came
+   *  back on today, wherever the visitor had been (the user's note 10,
+   *  Oct 10: Back "seems to get stuck"). */
+  onDayChange?: (weekday: string | null) => void
 }) {
   const schedule = useMinyanSchedule(null, items)
   const { community } = useActiveCommunity()
@@ -166,7 +172,14 @@ export default function MinyanimView({
 
   return (
     <div data-testid="minyanim-view">
-      <DayTabs days={days} index={index} onPick={(i) => setPicked({ index: i, search })} />
+      <DayTabs
+        days={days}
+        index={index}
+        onPick={(i) => {
+          setPicked({ index: i, search })
+          onDayChange?.(i === 0 ? null : days[i].weekday)
+        }}
+      />
 
       <div className="mt-3 rounded-xl bg-primary/[0.07] px-3.5 py-3" data-testid="minyanim-answer">
         <p className="text-[14.5px] font-semibold leading-snug text-slate-900">{answer}</p>
