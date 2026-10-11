@@ -153,6 +153,25 @@ describe('ListingEditor — the listing’s boxes, one row each', () => {
     expect(step()?.title).toBeUndefined()
   })
 
+  // The user, Oct 11: "Hours" said twice, the card's title and the field's
+  // label under it. A row of one field says it once; screen readers still
+  // get the field's name.
+  it('says a one-field row’s name once, in its title', async () => {
+    const u = user()
+    renderEditor()
+    const shown = (card: HTMLElement, text: string) => within(card).getAllByText(text).filter((el) => !el.closest('.sr-only'))
+    await u.click(row('hours'))
+    expect(shown(screen.getByTestId('editor-open-hours'), 'Hours')).toHaveLength(1)
+    expect(within(screen.getByTestId('editor-open-hours')).getByText('Hours', { selector: '.sr-only' })).toBeInTheDocument()
+    await u.click(row('kind'))
+    const kind = screen.getByTestId('editor-open-kind')
+    expect(shown(kind, 'Store Type')).toHaveLength(1)
+    expect(within(kind).getByRole('group', { name: 'Store Type' })).toBeInTheDocument()
+    // Several fields: each keeps its label.
+    await u.click(row('facts'))
+    expect(shown(screen.getByTestId('editor-open-facts'), 'Food Type')).toHaveLength(1)
+  })
+
   it('opens a row holding a list on its own screen, its title for the host’s header, and nothing else above it', async () => {
     const u = user()
     const { step } = renderEditor()

@@ -748,6 +748,7 @@ function GrowingTextarea({ value, ...rest }: TextareaHTMLAttributes<HTMLTextArea
 export function DetailFieldInput({
   field,
   labelOverride,
+  labelHidden = false,
   value,
   onChange,
   sometimes,
@@ -759,6 +760,9 @@ export function DetailFieldInput({
   /** Shown instead of field.label — used inside an audience section so
    *  "Women's Phone" reads as just "Phone" under the "Women's" heading. */
   labelOverride?: string
+  /** For screen readers only: the box around it already says it (an
+   *  editor row of one field, "Hours" under "Hours"). */
+  labelHidden?: boolean
   value: unknown
   onChange: (value: unknown) => void
   sometimes?: string[]
@@ -768,6 +772,7 @@ export function DetailFieldInput({
   onChangeSchedules?: (v: SpecialSchedule[]) => void
 }) {
   const label = `${labelOverride ?? field.label}${field.required ? ' *' : ''}`
+  const labelClass = labelHidden ? 'sr-only' : 'block text-sm font-medium text-slate-700 mb-1'
 
   if (field.type === 'tags') {
     return (
@@ -784,7 +789,7 @@ export function DetailFieldInput({
   if (field.type === 'url') {
     return (
       <div>
-        <label htmlFor={`detail-${field.key}`} className="block text-sm font-medium text-slate-700 mb-1">{label}</label>
+        <label htmlFor={`detail-${field.key}`} className={labelClass}>{label}</label>
         <input
           id={`detail-${field.key}`}
           type="url"
@@ -805,7 +810,7 @@ export function DetailFieldInput({
   if (field.type === 'image') {
     return (
       <div>
-        <span className="block text-sm font-medium text-slate-700 mb-1">{labelOverride ?? field.label}</span>
+        <span className={labelClass}>{labelOverride ?? field.label}</span>
         {/* Every other field type gets its visual weight for free — a
             select/textarea/input is browser-rendered with its own border.
             The photo picker is several loose pieces (a preview, three
@@ -848,7 +853,7 @@ export function DetailFieldInput({
             repeated next to the checkbox. Reported live as awkward once it
             sat next to titled fields for real, especially alone in a box of
             its own. */}
-        <span className="block text-sm font-medium text-slate-700 mb-1">{label}</span>
+        <span className={labelClass}>{label}</span>
         {/* Two buttons, Yes and No (the user, Oct 10), where it was a
             switch. A switch is for turning something on or off (the
             Filters sheet's "Shabbat friendly" shows only those); this is
@@ -894,7 +899,7 @@ export function DetailFieldInput({
   }
 
   if (field.type === 'hours') {
-    return <HoursInput label={label} value={value} onChange={onChange} />
+    return <HoursInput label={label} labelHidden={labelHidden} value={value} onChange={onChange} />
   }
 
   if (field.type === 'contacts') {
@@ -913,7 +918,7 @@ export function DetailFieldInput({
   if (field.type === 'textarea') {
     return (
       <div>
-        <label htmlFor={`detail-${field.key}`} className="block text-sm font-medium text-slate-700 mb-1">{label}</label>
+        <label htmlFor={`detail-${field.key}`} className={labelClass}>{label}</label>
         <GrowingTextarea id={`detail-${field.key}`} value={(value as string) ?? ''} onChange={(e) => onChange(e.target.value)} rows={3} placeholder={field.placeholder} className={inputClass} />
         {field.help && <p className="text-xs text-muted mt-1">{field.help}</p>}
       </div>
@@ -921,17 +926,17 @@ export function DetailFieldInput({
   }
 
   if (field.type === 'select' && field.multiSelect) {
-    return <MultiSelectField field={field} label={label} value={value} onChange={onChange} />
+    return <MultiSelectField field={field} label={label} labelHidden={labelHidden} value={value} onChange={onChange} />
   }
 
   if (field.type === 'select' && field.allowOther) {
-    return <SelectOtherField field={field} label={label} value={value} onChange={onChange} />
+    return <SelectOtherField field={field} label={label} labelHidden={labelHidden} value={value} onChange={onChange} />
   }
 
   if (field.type === 'select') {
     return (
       <div>
-        <label htmlFor={`detail-${field.key}`} className="block text-sm font-medium text-slate-700 mb-1">{label}</label>
+        <label htmlFor={`detail-${field.key}`} className={labelClass}>{label}</label>
         <select id={`detail-${field.key}`} value={(value as string) ?? ''} onChange={(e) => onChange(e.target.value)} className={inputClass}>
           <option value="">Select…</option>
           {field.options?.map((opt) => (
@@ -947,7 +952,7 @@ export function DetailFieldInput({
 
   return (
     <div>
-      <label htmlFor={`detail-${field.key}`} className="block text-sm font-medium text-slate-700 mb-1">{label}</label>
+      <label htmlFor={`detail-${field.key}`} className={labelClass}>{label}</label>
       <input
         id={`detail-${field.key}`}
         type={field.type === 'number' ? 'number' : field.type === 'tel' ? 'tel' : 'text'}
@@ -992,11 +997,13 @@ export function DetailFieldInput({
 function SelectOtherField({
   field,
   label,
+  labelHidden = false,
   value,
   onChange,
 }: {
   field: CategoryField
   label: string
+  labelHidden?: boolean
   value: unknown
   onChange: (value: unknown) => void
 }) {
@@ -1006,7 +1013,7 @@ function SelectOtherField({
 
   return (
     <div>
-      <label htmlFor={`detail-${field.key}`} className="block text-sm font-medium text-slate-700 mb-1">{label}</label>
+      <label htmlFor={`detail-${field.key}`} className={labelHidden ? 'sr-only' : 'block text-sm font-medium text-slate-700 mb-1'}>{label}</label>
       <select
         id={`detail-${field.key}`}
         value={showOther ? OTHER_OPTION_VALUE : strValue}
@@ -1068,11 +1075,13 @@ const OTHER_OPTION_VALUE = '__other__'
 function MultiSelectField({
   field,
   label,
+  labelHidden = false,
   value,
   onChange,
 }: {
   field: CategoryField
   label: string
+  labelHidden?: boolean
   value: unknown
   onChange: (value: unknown) => void
 }) {
@@ -1123,7 +1132,7 @@ function MultiSelectField({
 
   return (
     <div ref={containerRef} className="relative">
-      <label htmlFor={`detail-${field.key}`} className="block text-sm font-medium text-slate-700 mb-1">{label}</label>
+      <label htmlFor={`detail-${field.key}`} className={labelHidden ? 'sr-only' : 'block text-sm font-medium text-slate-700 mb-1'}>{label}</label>
       <button
         id={`detail-${field.key}`}
         type="button"

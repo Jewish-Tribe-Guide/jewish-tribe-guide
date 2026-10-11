@@ -231,6 +231,42 @@ test.describe('listing detail — desktop', () => {
     await expect(column.getByRole('heading', { level: 2 }).first()).toBeInViewport()
     await expect(column.getByTestId('listing-column-bar')).toContainText('7 of')
   })
+  // A closed group (a shul's denomination) opened, a listing in it read and
+  // closed: the group then couldn't be closed (the user, Oct 11). Coming
+  // back marks the listing's row found, which held its group open, and the
+  // heading flipped what was remembered underneath it.
+  for (const back of ['the column’s back', 'the browser’s Back'] as const) {
+    test(`a group opened, a listing in it read and closed by ${back}, closes again`, async ({ page, request }) => {
+      const community = await defaultCommunity(page)
+      const res = await request.get(`/api/categories?community=${community}`)
+      const grouped = ((await res.json()).categories as { id: string; kind: string; groupBy?: unknown }[]).filter((c) => c.kind === 'listing' && c.groupBy)
+      let found = false
+      for (const category of grouped) {
+        await page.goto(`/${community}/${category.id}`)
+        await dismissLocationPrompt(page)
+        if ((await page.locator('button[aria-expanded="false"][aria-controls]').count()) > 0) {
+          found = true
+          break
+        }
+      }
+      test.skip(!found, 'No category has closed groups')
+
+      const rowsId = (await page.locator('button[aria-expanded="false"][aria-controls]').first().getAttribute('aria-controls'))!
+      const heading = page.locator(`button[aria-controls="${rowsId}"]`)
+      await heading.click()
+      await expect(heading).toHaveAttribute('aria-expanded', 'true')
+      await page.locator(`[id="${rowsId}"]`).getByRole('button', { name: /^Show details for / }).first().click()
+      const column = page.getByTestId('listing-column')
+      await expect(column).toBeVisible()
+      if (back === 'the browser’s Back') await page.goBack()
+      else await column.getByTestId('listing-column-bar').getByRole('button').first().click()
+      await expect(column).toHaveCount(0)
+
+      await heading.click()
+      await expect(heading).toHaveAttribute('aria-expanded', 'false')
+    })
+  }
+
   // Editing (Oct 11): ‹ Food, ‹ 1 of 72 › and the places beside it each
   // left the edit, dropping what was changed. The editor's own ‹ is the
   // only way back, and the bar returns with the listing.

@@ -1065,10 +1065,21 @@ export default function GenericDirectory({ category, items, anchorLabel, address
     (!!reopenItemId && reopenItemId !== reopenClosedId && g.items.some((i) => i.id === reopenItemId)) ||
     (!!revealedId && g.items.some((i) => i.id === revealedId)) ||
     (activeFilterCount > 0 ? !closedNow.includes(g.id) : openGroupIds.includes(g.id))
-  const toggleGroup = (id: string) => {
-    const flip = (ids: string[]) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id])
-    if (activeFilterCount > 0) setClosedWhileFiltered({ key: filtersKey, ids: flip(closedNow) })
-    else setOpenGroupIds(flip)
+  // From what the group shows, not what's remembered: a group held open by
+  // a listing (one just read, found from its pin, arrived by a link) used to
+  // flip its remembered state underneath and stay open, so after reading a
+  // shul and coming back its group couldn't be closed (the user, Oct 11).
+  // Closing it lets go of whatever held it.
+  const toggleGroup = (g: ListGroup<DirectoryResource>) => {
+    const open = isGroupOpen(g)
+    if (open) {
+      if (revealedId && g.items.some((i) => i.id === revealedId)) setRevealedId(null)
+      if (reopenItemId && g.items.some((i) => i.id === reopenItemId)) setReopenClosedId(reopenItemId)
+    }
+    const set = (ids: string[], on: boolean) => (on ? (ids.includes(g.id) ? ids : [...ids, g.id]) : ids.filter((x) => x !== g.id))
+    // While a filter is on the list says which are closed; otherwise which are open.
+    if (activeFilterCount > 0) setClosedWhileFiltered({ key: filtersKey, ids: set(closedNow, open) })
+    else setOpenGroupIds((ids) => set(ids, !open))
   }
   // ── What each row says (see listingRow.ts) ──
   // Where each place is, beside its name: its neighbourhood or its town,
@@ -1247,7 +1258,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
               count={g.items.length}
               nearest={g.nearest}
               open={open}
-              onToggle={() => toggleGroup(g.id)}
+              onToggle={() => toggleGroup(g)}
               controls={rowsId}
             />
           ),

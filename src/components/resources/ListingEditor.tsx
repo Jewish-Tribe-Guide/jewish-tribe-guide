@@ -147,7 +147,7 @@ const fieldLabel = 'mb-1.5 block text-[14px] font-bold text-slate-700'
 /** A choice of a few as big buttons ("Meat", "Dairy", "Parve"), the way
  *  the minyan editor's days are: one replaces the other for a single
  *  choice, several can be on for a multi-choice. */
-function ChoiceButtons({ field, value, onChange }: { field: CategoryField; value: unknown; onChange: (v: unknown) => void }) {
+function ChoiceButtons({ field, value, onChange, labelHidden = false }: { field: CategoryField; value: unknown; onChange: (v: unknown) => void; labelHidden?: boolean }) {
   const chosen = selectValues(value)
   const known = new Set((field.options ?? []).map((o) => o.value))
   const options = [...(field.options ?? []), ...chosen.filter((v) => !known.has(v)).map((v) => ({ value: v, label: v }))]
@@ -158,7 +158,7 @@ function ChoiceButtons({ field, value, onChange }: { field: CategoryField; value
   }
   return (
     <div>
-      <p className={fieldLabel}>{field.label}</p>
+      {!labelHidden && <p className={fieldLabel}>{field.label}</p>}
       <div className="flex flex-wrap gap-2" role="group" aria-label={field.label}>
         {options.map((o) => {
           const on = chosen.includes(o.value)
@@ -487,13 +487,13 @@ export default function ListingEditor({
   // ── One row ───────────────────────────────────────────────────────────
   // Declarations, not consts: the list above opens a short row in place,
   // so it calls these before they're reached.
-  function fieldInput(f: CategoryField, label?: string) {
+  function fieldInput(f: CategoryField, label?: string, labelHidden = false) {
     return f.type === 'contacts' ? (
       <ContactsEditor key={f.key} field={f} value={details[f.key]} onChange={(v) => setDetail(f.key, v)} onStep={stepFor[f.key]} place={item.name || draft.name} />
     ) : asButtons(f) ? (
-      <ChoiceButtons key={f.key} field={f} value={details[f.key]} onChange={(v) => setDetail(f.key, v)} />
+      <ChoiceButtons key={f.key} field={f} value={details[f.key]} onChange={(v) => setDetail(f.key, v)} labelHidden={labelHidden} />
     ) : (
-      <DetailFieldInput key={f.key} field={f} labelOverride={label} value={details[f.key]} onChange={(v) => setDetail(f.key, v)} />
+      <DetailFieldInput key={f.key} field={f} labelOverride={label} labelHidden={labelHidden} value={details[f.key]} onChange={(v) => setDetail(f.key, v)} />
     )
   }
 
@@ -613,7 +613,10 @@ export default function ListingEditor({
         </>
       )
     }
-    return <>{only.map((f) => fieldInput(f))}</>
+    // A row of one field whose label is the row's own title ("Hours",
+    // "Denomination") says it once, in the title (the user, Oct 11).
+    const same = (a?: string) => !!a && a.trim().toLowerCase() === r.title.trim().toLowerCase()
+    return <>{only.map((f) => fieldInput(f, undefined, only.length === 1 && (same(f.label) || same(f.shortLabel))))}</>
   }
 
   // A row holding a list, open on its own screen, in the same white card.

@@ -11,6 +11,8 @@ function initHours(value: unknown): StructuredHours {
 
 type Props = {
   label?: string
+  /** For screen readers only, when what's around it already says Hours. */
+  labelHidden?: boolean
   value: unknown
   onChange: (value: StructuredHours) => void
 }
@@ -25,7 +27,7 @@ type Props = {
 // boolean field's checkbox right next to it, which reveals what it gates
 // with no toggle of its own either. Each day has a "Closed" toggle and
 // open/close time inputs. Value is stored as StructuredHours.
-export default function HoursInput({ label, value, onChange }: Props) {
+export default function HoursInput({ label, labelHidden = false, value, onChange }: Props) {
   const hours = initHours(value)
 
   function setDay(key: DayKey, dayHours: DayHours) {
@@ -34,7 +36,7 @@ export default function HoursInput({ label, value, onChange }: Props) {
 
   return (
     <div>
-      <span className="block text-sm font-medium text-slate-700 mb-1">{label ?? 'Hours'}</span>
+      <span className={labelHidden ? 'sr-only' : 'block text-sm font-medium text-slate-700 mb-1'}>{label ?? 'Hours'}</span>
 
       <div className="border border-slate-200 rounded-md overflow-hidden divide-y divide-slate-100">
         {DAY_KEYS.map((key) => {
