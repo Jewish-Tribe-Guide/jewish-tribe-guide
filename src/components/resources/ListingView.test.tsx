@@ -68,6 +68,30 @@ describe('ListingView — who and whether', () => {
     expect(within(screen.getByTestId('listing-details')).getByTestId('listing-caveat-note')).toHaveTextContent('The bar is not supervised')
   })
 
+  // The user's note 9 (agreed Oct 10): on Food, what isn't kosher is its
+  // own box, first after the buttons, said once.
+  it('on Food, what isn’t kosher is its own box first after the buttons, said once', () => {
+    const dishes: CategoryField = { key: 'dishes', label: 'Main dishes', type: 'tags', renderAs: 'badge', showCountInHeader: true, countLabel: 'main dish' }
+    view({ item: { ...judah, kosherPartial: true, kosherNote: 'The bar is not supervised', dishes: ['Shawarma'] }, category: makeCategory({ ...food, detailFields: [...food.detailFields, dishes] }) })
+    const box = screen.getByTestId('listing-caveat-box')
+    expect(within(box).getByRole('heading', { name: 'What isn’t kosher' })).toBeInTheDocument()
+    expect(box).toHaveTextContent('The bar is not supervised')
+    const after = (a: Element, b: Element) => !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING)
+    expect(after(screen.getByTestId('listing-actions'), box)).toBe(true)
+    expect(after(box, screen.getByTestId('listing-items'))).toBe(true)
+    expect(screen.queryByTestId('listing-caveat')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('listing-caveat-note')).not.toBeInTheDocument()
+    expect(screen.getAllByText(/The bar is not supervised/)).toHaveLength(1)
+  })
+
+  it('a grocery’s caveat stays under the name and in the details', () => {
+    const m: CategoryField = { key: 'm', label: 'Kosher items', type: 'tags', renderAs: 'badge', showCountInHeader: true }
+    view({ item: { ...judah, kosherPartial: true, kosherNote: 'The deli is not supervised', m: ['Challah'] }, category: makeCategory({ ...food, detailFields: [...food.detailFields, m] }) })
+    expect(screen.queryByTestId('listing-caveat-box')).not.toBeInTheDocument()
+    expect(screen.getByTestId('listing-caveat')).toHaveTextContent('Not everything here is kosher')
+    expect(screen.getByTestId('listing-caveat-note')).toHaveTextContent('The deli is not supervised')
+  })
+
   it('says what isn’t kosher once: not again in About', () => {
     const note: CategoryField = { key: 'kosherNote', label: 'What isn’t kosher?', type: 'textarea', renderAs: 'hidden' }
     const withNote = makeCategory({ ...food, detailFields: [...food.detailFields, note] })
@@ -688,6 +712,8 @@ describe('ListingView — add an item', () => {
       </TellAboutContext.Provider>,
     )
     expect(within(card()).queryByRole('button', { name: /Add the first/ })).not.toBeInTheDocument()
+    // Plain, as "+ Add their Shabbos times" is, not an outlined pill (Oct 10).
+    expect(within(card()).getByRole('button', { name: 'Add their menu' }).className).not.toMatch(/rounded-full|border/)
     fireEvent.click(within(card()).getByRole('button', { name: 'Add their menu' }))
     expect(tell).toHaveBeenCalledWith(place, expect.any(Function), { menu: true })
     // Its do-it-yourself: the card's own box for one dish.

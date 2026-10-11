@@ -193,6 +193,11 @@ export default function ListingView({ item, category, color, place = null, upvot
   const facts = listingFacts(item, category)
   const note = listingRowNote(item, category, now, { shulNote: shul?.note })
   const caveat = note?.kind === 'exception' && note.tone === 'caution' ? note : null
+  // Food: what isn't kosher is its own box, first after the buttons (the
+  // user's note 9, agreed Oct 10): the one fact that does harm if missed.
+  // Said there in full, so not again under the name or in the details. A
+  // grocery's items are kosher items in a regular store: it stays as it was.
+  const caveatFirst = !!caveat && !!itemsF && itemWording(itemsF).noun === 'dish'
   // A short description the admin put in the row ("Sit-down glatt kosher
   // steakhouse"): one line, under the header.
   const tagline = category.detailFields.find((f) => f.type === 'text' && f.showInHeader && f.headerMaxLength != null && String(item[f.key] ?? '').trim())
@@ -257,7 +262,7 @@ export default function ListingView({ item, category, color, place = null, upvot
           )}
           {/* The warning alone, on one line: it decides the visit. What
               isn't kosher is said in full in the details. */}
-          {caveat && (
+          {caveat && !caveatFirst && (
             <p className="mt-1 text-sm font-semibold text-caution" data-testid="listing-caveat">
               {caveat.text}
             </p>
@@ -479,10 +484,10 @@ export default function ListingView({ item, category, color, place = null, upvot
   // user, Oct 10): someone planning where they'll be wants to see how far
   // the next thing is from there. It was a hospital's only (Oct 6).
   const showSetLocation = category.hasAddress !== false && !!item.geo
-  const details = (caveat?.title || showAddress || showSetLocation || showPhone || websiteName || otherHours.length > 0 || detailFields.length > 0 || extra.length > 0 || quietBadges.length > 0 || otherTags.length > 0) && (
+  const details = ((caveat?.title && !caveatFirst) || showAddress || showSetLocation || showPhone || websiteName || otherHours.length > 0 || detailFields.length > 0 || extra.length > 0 || quietBadges.length > 0 || otherTags.length > 0) && (
     <Card testId="listing-details" footer={googleLead && <span data-testid="listing-google">{googleLead}.</span>}>
     <div className="divide-y divide-slate-100">
-      {caveat?.title && (
+      {caveat?.title && !caveatFirst && (
         <Row>
           <span className="block text-[13px] font-semibold text-caution">What isn’t kosher</span>
           <span className="text-caution" data-testid="listing-caveat-note">{caveat.title}</span>
@@ -598,6 +603,12 @@ export default function ListingView({ item, category, color, place = null, upvot
       {who}
       {foundBox}
       {actions}
+      {caveatFirst && (
+        <section className="rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3" data-testid="listing-caveat-box">
+          <h2 className="text-base font-extrabold text-caution">What isn’t kosher</h2>
+          <p className="mt-0.5 text-[15px] leading-snug text-slate-800">{caveat!.title ?? 'Not everything here is kosher.'}</p>
+        </section>
+      )}
       {mainSection}
       {shabbosFirst && shabbos}
       {boxesAndShabbos}
@@ -984,10 +995,13 @@ function ItemsCard({ field, found, api, menuUrl, onAddMenu }: { field: CategoryF
       {/* "+ Add an item": the list's own last row (agreed Oct 1), where
           someone who's just seen something new finds it isn't listed. */}
       {api.canReport && onAddMenu && say.noun === 'dish' && rows.length + api.added.length === 0 && !adding ? (
+        // Plain, as "+ Add their Shabbos times" is (the user, Oct 10: the
+        // outlined pill was louder than anything else in a box).
         <button
           type="button"
           onClick={() => onAddMenu(() => setAdding(true))}
-          className="mt-1 flex h-11.5 w-full cursor-pointer items-center justify-center gap-2 rounded-full border-[1.5px] border-primary text-[15px] font-bold text-primary hover:bg-primary/5"
+          className="mt-0.5 inline-flex cursor-pointer items-center gap-1.5 py-1 text-[14.5px] font-bold text-primary"
+          data-testid="add-their-menu"
         >
           <PlusIcon className="h-4 w-4" />
           Add their menu
