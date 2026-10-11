@@ -135,16 +135,20 @@ export function ClosedGroupLine({
   /** The id of the rows it opens. */
   controls: string
 }) {
+  // A heading on the page, not a box (the user's note 10, Oct 10): boxed,
+  // a group looked like a place's card, and opening one read as opening a
+  // place. The only cards on the page are places now.
   return (
+    <h2>
     <button
       type="button"
       aria-expanded={open}
       aria-controls={controls}
       onClick={onToggle}
-      className="flex w-full cursor-pointer items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-left transition-colors hover:bg-slate-50"
+      className="flex w-full cursor-pointer items-center gap-3 border-b border-slate-300 px-1 py-3 text-left"
     >
       <span className="min-w-0 flex-1">
-        <span className={`block text-[15.5px] font-bold ${open ? 'text-primary' : 'text-ink'}`}>
+        <span className={`block text-[16.5px] font-extrabold ${open ? 'text-primary' : 'text-ink'}`}>
           {label} <span className="font-medium text-slate-500">· {count}</span>
         </span>
         {/* Open, its rows say it themselves. */}
@@ -165,6 +169,7 @@ export function ClosedGroupLine({
         <path d="m9 18 6-6-6-6" />
       </svg>
     </button>
+    </h2>
   )
 }
 

@@ -1422,6 +1422,14 @@ describe('GenericDirectory — groups', () => {
       expect(screen.getByText('Mekor')).not.toBeVisible()
     })
 
+    // The user's note 10 (Oct 10): boxed, a group looked like a shul's
+    // card, and opening one read as opening a place. It's a heading now.
+    it('draws each group as a heading on the page, not a card', () => {
+      renderWithProviders(<GenericDirectory category={shuls} items={shulItems} {...handlers} />)
+      expect(screen.getByRole('heading', { name: /^Orthodox · 2/ })).toContainElement(line(/^Orthodox · 2/))
+      expect(line(/^Orthodox · 2/).className).not.toMatch(/\bbg-white\b|\brounded/)
+    })
+
     // Oct 6: a group opens in place, so its chevron points down, then up;
     // pointing right is for a row that goes to another page.
     it('points its chevron down while closed and up once open', async () => {
