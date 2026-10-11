@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Minyan } from './davening'
-import { boxChangeCount, mergeMinyanimBox, minyanimForBox } from './minyanimBox'
+import { BOX_DAYS, boxChangeCount, mergeMinyanimBox, minyanimForBox } from './minyanimBox'
 import { boxGroups } from './minyanText'
 
 const shacharis: Minyan = { id: 's', tefillah: 'shacharis', days: ['mon', 'tue', 'wed', 'thu', 'fri'], time: '6:45am' }
@@ -66,11 +66,21 @@ describe('the box as a list (Oct 10, canvas page “Minyan edit”)', () => {
   })
 })
 
-describe('Yom Tov is the Shabbos box’s (the user, Oct 10)', () => {
-  it('a row on weekdays and Yom Tov shows its Yom Tov in the Shabbos box, and the rest in the week’s', () => {
-    const row: Minyan = { id: 'y', tefillah: 'shacharis', days: ['mon', 'yom_tov'], time: '7:00am' }
-    expect(minyanimForBox([row], 'shabbos')).toEqual([{ ...row, days: ['yom_tov'] }])
+describe('Yom Tov is in neither usual box (the user, Oct 10): its dated schedule has it', () => {
+  it('neither box shows or offers Yom Tov', () => {
+    const row: Minyan = { id: 'y', tefillah: 'shacharis', days: ['mon', 'sat', 'yom_tov'], time: '7:00am' }
+    expect(minyanimForBox([row], 'shabbos')).toEqual([{ ...row, days: ['sat'] }])
     expect(minyanimForBox([row], 'weekday')).toEqual([{ ...row, days: ['mon'] }])
-    expect(boxGroups(minyanimForBox([row], 'shabbos'), 'shabbos').map((g) => g.label)).toEqual(['Yom Tov'])
+    expect(BOX_DAYS.shabbos.choices).not.toContain('yom_tov')
+    expect(BOX_DAYS.weekday.choices).not.toContain('yom_tov')
+  })
+
+  it('saving a box keeps a row’s Yom Tov days', () => {
+    const row: Minyan = { id: 'y', tefillah: 'shacharis', days: ['mon', 'yom_tov'], time: '7:00am' }
+    const merged = mergeMinyanimBox([row], 'weekday', [{ ...row, days: ['mon'], time: '7:15am' }])
+    expect(merged).toEqual([
+      { ...row, days: ['yom_tov'] },
+      { ...row, id: 'y-weekday', days: ['mon'], time: '7:15am' },
+    ])
   })
 })

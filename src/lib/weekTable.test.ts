@@ -89,13 +89,9 @@ describe('the usual Shabbos times, in the order Shabbos happens', () => {
     ])
   })
 
-  it('Yom Tov times are the Shabbos box’s, after Motzei Shabbos (Oct 10)', () => {
+  it('Yom Tov times aren’t the usual Shabbos’s: the dated Yom Tov schedule has them (Oct 10)', () => {
     const s = shabbosList([m({ days: ['sat', 'yom_tov'], time: '9:00am' }), m({ tefillah: 'mincha', days: ['yom_tov'], time: '6:30pm' })], null)!
-    expect(s.lines.map((l) => [l.part, l.tefillah, l.when])).toEqual([
-      ['morning', 'shacharis', '9 AM'],
-      ['yomtov', 'shacharis', '9 AM'],
-      ['yomtov', 'mincha', '6:30 PM'],
-    ])
+    expect(s.lines.map((l) => [l.part, l.tefillah, l.when])).toEqual([['morning', 'shacharis', '9 AM']])
   })
 
   it('"Ends at" notes read "Until" (Rodeph Shalom)', () => {

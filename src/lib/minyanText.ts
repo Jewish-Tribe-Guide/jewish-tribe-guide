@@ -67,31 +67,28 @@ export function noteText(note: string | undefined): string | null {
   return n.charAt(0).toUpperCase() + n.slice(1)
 }
 
-export type ShabbosPart = 'friday' | 'morning' | 'afternoon' | 'motzei' | 'yomtov'
+export type ShabbosPart = 'friday' | 'morning' | 'afternoon' | 'motzei'
 
 export const SHABBOS_PART_LABELS: Record<ShabbosPart, string> = {
   friday: 'Friday night',
   morning: 'Shabbos morning',
   afternoon: 'Afternoon',
   motzei: 'Motzei Shabbos',
-  // A shul's usual Yom Tov times live with its Shabbos (the user, Oct 10).
-  yomtov: 'Yom Tov',
 }
 
-export function partOf(m: Minyan, day: 'fri' | 'sat' | 'yom_tov'): ShabbosPart {
+export function partOf(m: Minyan, day: 'fri' | 'sat'): ShabbosPart {
   if (day === 'fri') return 'friday'
-  if (day === 'yom_tov') return 'yomtov'
   if (m.tefillah === 'shacharis' || m.tefillah === 'shabbos_mussaf') return 'morning'
   if (m.tefillah === 'maariv' || m.anchor === 'havdalah') return 'motzei'
   return 'afternoon'
 }
 
-export const PART_ORDER: ShabbosPart[] = ['friday', 'morning', 'afternoon', 'motzei', 'yomtov']
+export const PART_ORDER: ShabbosPart[] = ['friday', 'morning', 'afternoon', 'motzei']
 
 /** Where one row of the usual Shabbos box sits: Friday night when it's on
- *  Friday, else its part of Shabbos, else Yom Tov (the box's edit list). */
+ *  Friday, else its part of Shabbos (the box's edit list). */
 export function shabbosPartOf(m: Minyan): ShabbosPart {
-  return partOf(m, m.days.includes('fri') && m.tefillah !== 'shacharis' ? 'fri' : m.days.includes('sat') ? 'sat' : 'yom_tov')
+  return partOf(m, m.days.includes('fri') && m.tefillah !== 'shacharis' ? 'fri' : 'sat')
 }
 
 // ── The box's minyanim as a list, one minyan at a time (Oct 10) ─────────────

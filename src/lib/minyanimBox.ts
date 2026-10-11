@@ -17,15 +17,18 @@ export type MinyanBox = 'weekday' | 'shabbos'
 
 /** The days a row in the box can be put on, and a new row's first day. */
 export const BOX_DAYS: Record<MinyanBox, { choices: Minyan['days']; newRow: Minyan['days'] }> = {
-  shabbos: { choices: ['fri', 'sat', 'yom_tov'], newRow: ['sat'] },
+  shabbos: { choices: ['fri', 'sat'], newRow: ['sat'] },
   weekday: { choices: ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'rosh_chodesh', 'holiday'], newRow: [] },
 }
 
-/** The days of a row the box shows. Rosh Chodesh is the week's; Yom Tov
- *  is Shabbos's (the user, Oct 10). */
+/** The days of a row the box shows. Rosh Chodesh is the week's. Yom Tov
+ *  is neither's: its times change from one Yom Tov to the next, so they
+ *  belong to the shul's dated Yom Tov schedule, not its usual times (the
+ *  user, Oct 10). A row's Yom Tov days stay on it untouched. */
 function boxDays(m: Minyan, box: MinyanBox): Minyan['days'] {
   return m.days.filter((d) => {
-    const shabbos = d === 'sat' || d === 'yom_tov' || (d === 'fri' && m.tefillah !== 'shacharis')
+    if (d === 'yom_tov') return false
+    const shabbos = d === 'sat' || (d === 'fri' && m.tefillah !== 'shacharis')
     return box === 'shabbos' ? shabbos : !shabbos
   })
 }
@@ -38,7 +41,6 @@ export function minyanimForBox(rows: readonly Minyan[], box: MinyanBox): Minyan[
   })
 }
 
-const other = (box: MinyanBox): MinyanBox => (box === 'shabbos' ? 'weekday' : 'shabbos')
 // Field by field, whatever order the fields were set in; an emptied field
 // (undefined) is the same as one never set.
 const plain = (m: Minyan) => JSON.stringify(Object.fromEntries(Object.entries(m).filter(([, v]) => v !== undefined && v !== '').sort(([a], [b]) => a.localeCompare(b))))
@@ -62,7 +64,8 @@ export function mergeMinyanimBox(rows: readonly Minyan[], box: MinyanBox, edited
       out.push(row)
       continue
     }
-    const rest = boxDays(row, other(box))
+    // The row's other days: the other box's, and any Yom Tov.
+    const rest = row.days.filter((d) => !days.includes(d))
     if (rest.length > 0) out.push({ ...row, days: rest })
     // The edited part under its own id once the row is split, so two rows
     // never share one.

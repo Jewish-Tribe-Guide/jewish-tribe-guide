@@ -150,10 +150,11 @@ describe('BoxEditor, a shul’s usual Shabbos times', () => {
     expect(screen.getByRole('button', { name: 'Winter' })).toHaveAttribute('aria-pressed', 'true')
   })
 
-  it('Yom Tov is a day in the Shabbos box, and not in the week’s; Kabbalas Shabbos isn’t a weekday tefillah', () => {
+  it('Yom Tov is a day in neither usual box; Kabbalas Shabbos isn’t a weekday tefillah', () => {
     open()
     fireEvent.click(screen.getByRole('button', { name: 'Add a minyan' }))
-    expect(screen.getByRole('button', { name: 'Yom Tov' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Friday night' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Yom Tov' })).not.toBeInTheDocument()
     expect(within(screen.getByLabelText('Tefillah')).getByRole('option', { name: 'Kabbalas Shabbos' })).toBeInTheDocument()
     cleanup()
     renderWithProviders(<BoxEditSheet item={shul} category={shuls} edit={{ ...edit, title: 'Usual weekday times', minyanimBox: 'weekday' }} onClose={vi.fn()} />)
