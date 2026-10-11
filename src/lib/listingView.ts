@@ -371,6 +371,14 @@ export function isWebsite(field: CategoryField): boolean {
   return field.key === 'website' || /website/i.test(field.linkLabel ?? field.label)
 }
 
+/** A link to a place's kosher certificate (Food's "Kosher Certification
+ *  URL"), by what it's called, as its button's rosette is chosen: the
+ *  editor asks for it with the hechsher, not with the website. */
+export function isCertificateLink(field: CategoryField): boolean {
+  const words = `${field.key} ${field.linkLabel ?? field.label}`.toLowerCase()
+  return field.type === 'url' && !/website/.test(words) && /certif|hechsher|kosher/.test(words)
+}
+
 /** A note's first sentence, and what's left after it: a mikvah section's
  *  box shows the first and folds the rest (Oct 6). The first line, when it
  *  ends before any full stop ("Friday: 4:30 AM – 1 hours before Candle

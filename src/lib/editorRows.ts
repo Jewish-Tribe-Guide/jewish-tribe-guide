@@ -5,7 +5,7 @@ import { isMinyanim, TEFILLAH_LABELS, type Minyan } from './davening'
 import { formatHoursSummary, hasAnyHours } from './hours'
 import { sameFieldValue } from './listingDiff'
 import { boxesOf, mainCardOf, shabbosAfter, shabbosFieldsOf } from './listingParts'
-import { isWebsite, itemsField, kindField, siteName } from './listingView'
+import { isCertificateLink, isWebsite, itemsField, kindField, siteName } from './listingView'
 import { minyanimForBox, type MinyanBox } from './minyanimBox'
 
 // ── The whole-listing editor's rows (agreed Oct 11, canvas page "editor") ───
@@ -106,6 +106,15 @@ export function editorRows(category: CategoryConfig, details: Record<string, unk
   const shabbosKeys = new Set(shabbos.map((f) => f.key))
   const boxKeys = new Set(boxesOf(category).flatMap((b) => b.fields.map((f) => f.key)))
   const facts = factFields.filter((f) => !namedKeys.has(f.key) && !shabbosKeys.has(f.key) && !boxKeys.has(f.key))
+  // The certificate's link goes under the hechsher, not with the website
+  // (the user, Oct 11), unless the admin put it in a box of its own.
+  const hechsher = facts.findIndex((f) => f.caveat)
+  if (hechsher >= 0) {
+    const links = fields.filter(
+      (f) => isCertificateLink(f) && !placed.has(f.key) && !f.audienceKey && !namedKeys.has(f.key) && !shabbosKeys.has(f.key) && !boxKeys.has(f.key),
+    )
+    facts.splice(hechsher + 1, 0, ...links)
+  }
   if (facts.length > 0) rows.push({ id: 'facts', title: factsTitle(facts), kind: 'fields', fields: take(facts) })
 
   // 3 · The main thing.

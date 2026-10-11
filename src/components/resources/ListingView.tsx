@@ -24,6 +24,7 @@ import {
   firstSentence,
   googleKeepsBox,
   sectionConfirmedAt,
+  isCertificateLink,
   isWebsite,
   siteName,
   itemsField,
@@ -765,10 +766,9 @@ function ActionButton({ action, item }: { action: ActionSpec; item: DirectoryRes
   } else {
     href = action.href
     label = action.field.linkLabel ?? action.field.label
-    const words = `${action.field.key} ${label}`.toLowerCase()
-    icon = /website/.test(words) ? (
+    icon = /website/i.test(`${action.field.key} ${label}`) ? (
       <GlobeIcon className="h-5 w-5" />
-    ) : /certif|hechsher|kosher/.test(words) ? (
+    ) : isCertificateLink(action.field) ? (
       <CertificateIcon className="h-5 w-5" />
     ) : (
       <ExternalIcon className="h-5 w-5" />

@@ -18,7 +18,7 @@ export const FOOD: CategoryConfig = makeCategory({
     { key: 'kosherPartial', type: 'boolean', label: 'Everything here is kosher', renderAs: 'hidden', invertDisplay: true },
     { key: 'kosherNote', type: 'textarea', label: 'What isn’t kosher?', renderAs: 'hidden', showIf: { field: 'kosherPartial', equals: true } },
     { key: 'foodType', type: 'select', label: 'Store Type', renderAs: 'badge', filterable: true, options: [{ label: 'Restaurant', value: 'Restaurant' }, { label: 'Bakery', value: 'Bakery' }] },
-    { key: 'k', type: 'url', label: 'Kosher Certification URL', renderAs: 'row' },
+    { key: 'k', type: 'url', label: 'Kosher Certification URL', linkLabel: 'Certification', renderAs: 'row' },
     { key: 'delivery_details', type: 'textarea', label: 'Delivery Details', renderAs: 'row' },
     { key: 'dishes', type: 'tags', label: 'Main dishes', renderAs: 'badge', showCountInHeader: true, countLabel: 'dish' },
     { key: 'secret', type: 'text', label: 'Internal', renderAs: 'hidden' },

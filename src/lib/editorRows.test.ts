@@ -12,11 +12,17 @@ const values = (details: Record<string, unknown>, core: Partial<EditorValues> = 
 describe('the whole-listing editor’s rows', () => {
   it('Food: the listing’s order, the kosher facts together, the dishes as the main thing', () => {
     const rows = editorRows(FOOD, {})
-    expect(titles(rows)).toEqual(['Name', 'Store Type', 'Kosher', 'Main dishes', 'Address, phone, website and links', 'Hours', 'About'])
+    expect(titles(rows)).toEqual(['Name', 'Store Type', 'Kosher', 'Main dishes', 'Address, phone and website', 'Hours', 'About'])
     expect(keys(rows, 'name')).toEqual(['photo', 's'])
-    expect(keys(rows, 'facts')).toEqual(['t', 'kosherCert', 'kosherPartial', 'kosherNote'])
-    expect(keys(rows, 'contact')).toEqual(['website', 'k'])
+    // The certificate's link right under the hechsher, not with the website.
+    expect(keys(rows, 'facts')).toEqual(['t', 'kosherCert', 'k', 'kosherPartial', 'kosherNote'])
+    expect(keys(rows, 'contact')).toEqual(['website'])
     expect(keys(rows, 'about')).toEqual(['googleDescription', 'delivery_details'])
+  })
+
+  it('a certificate link stays with the website where there’s no hechsher to put it under', () => {
+    const noHechsher = { ...FOOD, detailFields: FOOD.detailFields.filter((f) => !f.caveat) }
+    expect(keys(editorRows(noHechsher, {}), 'contact')).toEqual(['website', 'k'])
   })
 
   it('a hidden field that isn’t a hechsher’s caveat isn’t offered: the listing never shows it', () => {
@@ -77,9 +83,12 @@ describe('what a row says', () => {
   })
   it('the contact row: the street, the phone, the site by name', () => {
     const contact = editorRows(FOOD, {}).find((r) => r.id === 'contact')!
-    expect(rowSummary(contact, values({ website: 'https://www.shopsweetbox.com/', k: 'https://x1.blob.vercel-storage.com/cert.pdf' }, { address: '339 S 13th St, Philadelphia, PA', phone: '(267) 975-1711' }), timeText)).toBe(
-      '339 S 13th St · (267) 975-1711 · shopsweetbox.com · Kosher Certification URL',
+    expect(rowSummary(contact, values({ website: 'https://www.shopsweetbox.com/' }, { address: '339 S 13th St, Philadelphia, PA', phone: '(267) 975-1711' }), timeText)).toBe(
+      '339 S 13th St · (267) 975-1711 · shopsweetbox.com',
     )
+  })
+  it('the certificate link by what it is, not a file’s address', () => {
+    expect(rowSummary(facts, values({ kosherCert: 'IKC', k: 'https://x1.blob.vercel-storage.com/cert.pdf' }), timeText)).toBe('IKC · Certification · Everything here is kosher')
   })
   it('hours as a short line', () => {
     const hours = editorRows(FOOD, {}).find((r) => r.id === 'hours')!
