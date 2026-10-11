@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import type { DirectoryResource } from '@/types'
 import { PHOTO_FIELD_KEY, fieldIsVisible, resolveCapabilities, selectValues, type CategoryConfig, type CategoryField } from '@/lib/categories'
-import { editorRows, rowChanged, rowIsEmpty, rowSummary, type EditorRow, type EditorValues } from '@/lib/editorRows'
+import { editorRows, opensInPlace, rowChanged, rowIsEmpty, rowSummary, type EditorRow, type EditorValues } from '@/lib/editorRows'
 import { sameFieldValue } from '@/lib/listingDiff'
 import { isMinyanim, type Minyan } from '@/lib/davening'
 import { mergeMinyanimBox, minyanimForBox } from '@/lib/minyanimBox'
@@ -17,6 +17,7 @@ import { useCommunitySlug } from '@/lib/communityContext'
 import { formatPhone } from '@/lib/validation'
 import { ui } from '@/lib/uiConfig'
 import { schedulesKey } from '@/lib/schedules'
+import { scrollingAncestor } from '@/lib/scrollingAncestor'
 import CategoryIcon from '@/components/CategoryIcon'
 import ImageUploadField from '@/components/ImageUploadField'
 import AddressInput from '@/components/intake/AddressInput'
@@ -49,7 +50,10 @@ import { SUBMIT_PILL } from './submitPill'
 // and Request removal is in the listing's ••• menu, not at the foot of the
 // edit.
 
-export type EditorStep = { title: string; back: () => void }
+/** A step inside the editor, for the host's header: a row open on its own
+ *  screen (or a minyan, a person in one) has a title; a row open where it
+ *  is has none, the header keeps its own, and Back closes the row. */
+export type EditorStep = { title?: string; back: () => void }
 
 type Props = {
   /** The listing being edited. Omitted, the editor adds a new one, starting
@@ -228,7 +232,12 @@ export default function ListingEditor({
   const rowTitle = (r: EditorRow) => (r.kind === 'name' ? draft.name.trim() || 'Name' : r.title)
 
   // ── What the host's header shows ──────────────────────────────────────
-  const step: EditorStep | null = removalOpen ? null : (child ?? (row ? { title: rowTitle(row), back: () => setOpenId(null) } : null))
+  // A short row opens where it is, inside its own card; a row holding a
+  // list (the dishes, a week of hours, the minyanim) on its own screen
+  // (agreed Oct 11, canvas page "editorlook").
+  const inPlace = row !== null && opensInPlace(row)
+  const closeRow = () => setOpenId(null)
+  const step: EditorStep | null = removalOpen ? null : (child ?? (row ? (inPlace ? { back: closeRow } : { title: rowTitle(row), back: closeRow }) : null))
   // The host asks for Back through a function that stays the same, so
   // the latest step's own Back is kept in a ref, set after each render.
   const stepBack = useRef<() => void>(() => {})
@@ -236,9 +245,39 @@ export default function ListingEditor({
     stepBack.current = step?.back ?? (() => {})
   })
   const stepTitle = step?.title ?? null
+  const stepKey = step === null ? null : (stepTitle ?? `in-place:${openId}`)
   useEffect(() => {
-    onStep?.(stepTitle === null ? null : { title: stepTitle, back: () => stepBack.current() })
-  }, [stepTitle, onStep])
+    onStep?.(stepKey === null ? null : { title: stepTitle ?? undefined, back: () => stepBack.current() })
+  }, [stepKey, stepTitle, onStep])
+  // The open card into view, the rows around it where they were.
+  const openCard = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (inPlace) openCard.current?.scrollIntoView?.({ block: 'nearest' })
+  }, [inPlace, openId])
+  // A row's own screen swaps out the list inside the same scroll region,
+  // which kept its offset: opened from low in the list, Main dishes
+  // started at its last dish, "Add a dish" out of sight. It starts at its
+  // top; back on the list, the row it came from is in view. Before paint,
+  // so the wrong offset never shows.
+  const rootRef = useRef<HTMLDivElement>(null)
+  const cameFrom = useRef<string | null>(null)
+  const screenOpen = row !== null && !inPlace
+  useLayoutEffect(() => {
+    const root = rootRef.current
+    if (!root) return
+    if (screenOpen) {
+      cameFrom.current = openId
+      const region = scrollingAncestor(root)
+      if (region) region.scrollTop = 0
+      else if (root.getBoundingClientRect().top < 0) root.scrollIntoView?.({ block: 'start' })
+    } else if (cameFrom.current) {
+      // A filled row, or its line under "Not on the listing yet".
+      const ids = [`editor-row-${cameFrom.current}`, `editor-add-${cameFrom.current}`]
+      cameFrom.current = null
+      const rowButton = [...root.querySelectorAll<HTMLElement>('[data-opens]')].find((el) => ids.includes(el.dataset.testid ?? ''))
+      rowButton?.scrollIntoView?.({ block: 'nearest' })
+    }
+  }, [screenOpen, openId])
   useEffect(() => () => onStep?.(null), [onStep])
   // Each field's own way to report its step, the same function every time.
   const stepFor = useMemo(
@@ -343,10 +382,30 @@ export default function ListingEditor({
   const photo = String(details[PHOTO_FIELD_KEY] ?? '').trim()
 
   // ── The list ──────────────────────────────────────────────────────────
-  // In a white box (Oct 11): flat on the page's gray, the rows read as
-  // more of the listing rather than things to tap, and Changed's yellow
-  // was faint on it. The listing itself stays flat; it's for reading.
-  const box = 'rounded-2xl border border-slate-200 bg-white px-4'
+  // Each row its own white card (Oct 11, canvas page "editorlook"): flat on
+  // the page's gray, the rows read as more of the listing rather than
+  // things to tap. The same › on every row, whatever it opens.
+  const tags = (r: EditorRow) => (
+    <>
+      {changed.has(r.id) && <span className="shrink-0 rounded-full bg-amber-100 px-2.5 py-0.5 text-[12.5px] font-extrabold text-amber-800">Changed</span>}
+      {needed(r) && <span className="shrink-0 rounded-full bg-red-100 px-2.5 py-0.5 text-[12.5px] font-extrabold text-red-700">Needed</span>}
+    </>
+  )
+  // A short row, open: its fields inside its card, Done under them. Its
+  // heading closes it too.
+  const openInPlace = (r: EditorRow) => (
+    <div ref={openCard} data-testid={`editor-open-${r.id}`} className="scroll-my-4 space-y-4 rounded-2xl border-[1.5px] border-slate-400 bg-white px-4 pt-2.5 pb-4 shadow-sm">
+      <button type="button" onClick={closeRow} aria-expanded="true" className="flex min-h-11 w-full cursor-pointer items-center gap-3 text-left">
+        <span className="min-w-0 flex-1 text-[16px] font-extrabold text-slate-900">{rowTitle(r)}</span>
+        {tags(r)}
+        <ChevronRightIcon className="h-4 w-4 shrink-0 -rotate-90 text-slate-500" />
+      </button>
+      {rowBody(r)}
+      <button type="button" onClick={closeRow} className="h-11 w-full cursor-pointer rounded-full border border-slate-300 bg-white text-[15px] font-bold text-primary">
+        Done
+      </button>
+    </div>
+  )
   const filled = rows.filter((r) => !rowIsEmpty(r, values) || needed(r))
   const empty = rows.filter((r) => rowIsEmpty(r, values) && !needed(r))
   const listScreen = (
@@ -354,8 +413,9 @@ export default function ListingEditor({
       {creating && fromGoogle && <p className="-mt-1 text-[14px] text-muted">Filled in from Google</p>}
       {adminSubmit && <p className="-mt-1 text-[14px] text-muted">Goes live as soon as you add it, with no review.</p>}
       {creating && existingListings && <Lookalike existing={existingListings} draft={draft} category={category} />}
-      <ul className={`${box} divide-y divide-slate-200/70`}>
+      <ul className="space-y-2">
         {filled.map((r) => {
+          if (inPlace && r.id === openId) return <li key={r.id}>{openInPlace(r)}</li>
           const isChanged = changed.has(r.id)
           const summary = r.kind === 'name' ? rowSummary(r, values, timeText) : rowSummary(r, values, timeText) || (needed(r) ? 'Not added yet' : '')
           return (
@@ -364,7 +424,9 @@ export default function ListingEditor({
                 type="button"
                 onClick={() => setOpenId(r.id)}
                 data-testid={`editor-row-${r.id}`}
-                className={`flex min-h-14 w-full cursor-pointer items-center gap-3 py-2.5 text-left ${isChanged ? '-mx-2.5 w-[calc(100%+20px)] rounded-xl bg-yellow-50 px-2.5' : ''}`}
+                // Where it opens, for tests; nothing on screen says (the user, Oct 11).
+                data-opens={opensInPlace(r) ? 'here' : 'screen'}
+                className={`flex min-h-16 w-full cursor-pointer items-center gap-3 rounded-2xl border px-4 py-2.5 text-left ${isChanged ? 'border-amber-200 bg-yellow-50' : 'border-slate-200 bg-white'}`}
               >
                 {r.kind === 'name' && (
                   <CategoryIcon
@@ -381,8 +443,7 @@ export default function ListingEditor({
                   <span className="block text-[16px] font-extrabold text-slate-900">{rowTitle(r)}</span>
                   {summary && <span className="mt-0.5 line-clamp-2 block text-[14px] leading-snug text-muted">{summary}</span>}
                 </span>
-                {isChanged && <span className="shrink-0 rounded-full bg-amber-100 px-2.5 py-0.5 text-[12.5px] font-extrabold text-amber-800">Changed</span>}
-                {needed(r) && <span className="shrink-0 rounded-full bg-red-100 px-2.5 py-0.5 text-[12.5px] font-extrabold text-red-700">Needed</span>}
+                {tags(r)}
                 <ChevronRightIcon className="h-4 w-4 shrink-0 text-slate-400" />
               </button>
             </li>
@@ -392,13 +453,25 @@ export default function ListingEditor({
       {empty.length > 0 && (
         <div data-testid="editor-empty">
           <p className="pb-1 text-[12.5px] font-extrabold uppercase tracking-[0.04em] text-muted">Not on the listing yet</p>
-          <ul className={`${box} divide-y divide-slate-200/70`}>
+          {/* Plain lines on the gray, so they don't read as boxes the
+              listing has. */}
+          <ul className="space-y-1">
             {empty.map((r) => (
               <li key={r.id}>
-                <button type="button" onClick={() => setOpenId(r.id)} className="flex min-h-11 w-full cursor-pointer items-center gap-2 text-left text-[15px] font-bold text-primary">
-                  <PlusIcon className="h-4 w-4 shrink-0" />
-                  {r.title}
-                </button>
+                {inPlace && r.id === openId ? (
+                  openInPlace(r)
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setOpenId(r.id)}
+                    data-testid={`editor-add-${r.id}`}
+                    data-opens={opensInPlace(r) ? 'here' : 'screen'}
+                    className="flex min-h-11 w-full cursor-pointer items-center gap-2 text-left text-[15px] font-bold text-primary"
+                  >
+                    <PlusIcon className="h-4 w-4 shrink-0" />
+                    {r.title}
+                  </button>
+                )}
               </li>
             ))}
           </ul>
@@ -414,14 +487,17 @@ export default function ListingEditor({
   )
 
   // ── One row ───────────────────────────────────────────────────────────
-  const fieldInput = (f: CategoryField, label?: string) =>
-    f.type === 'contacts' ? (
+  // Declarations, not consts: the list above opens a short row in place,
+  // so it calls these before they're reached.
+  function fieldInput(f: CategoryField, label?: string) {
+    return f.type === 'contacts' ? (
       <ContactsEditor key={f.key} field={f} value={details[f.key]} onChange={(v) => setDetail(f.key, v)} onStep={stepFor[f.key]} place={item.name || draft.name} />
     ) : asButtons(f) ? (
       <ChoiceButtons key={f.key} field={f} value={details[f.key]} onChange={(v) => setDetail(f.key, v)} />
     ) : (
       <DetailFieldInput key={f.key} field={f} labelOverride={label} value={details[f.key]} onChange={(v) => setDetail(f.key, v)} />
     )
+  }
 
   function rowBody(r: EditorRow): ReactNode {
     const shown = r.fields.filter(visible)
@@ -546,10 +622,11 @@ export default function ListingEditor({
     return <>{only.map((f) => fieldInput(f))}</>
   }
 
-  const rowScreen = row && (
+  // A row holding a list, open on its own screen, in the same white card.
+  const rowScreen = row && !inPlace ? (
     <div className="space-y-4" data-testid={`editor-open-${row.id}`}>
       {row.kind !== 'name' && row.kind !== 'minyans' && !child && <p className="-mt-1 text-[14px] text-muted">{item.name || draft.name}</p>}
-      {rowBody(row)}
+      <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4">{rowBody(row)}</div>
       {!child &&
         foot(
           <button type="button" onClick={() => setOpenId(null)} className={SUBMIT_PILL}>
@@ -557,10 +634,10 @@ export default function ListingEditor({
           </button>,
         )}
     </div>
-  )
+  ) : null
 
   return (
-    <div className="space-y-4">
+    <div ref={rootRef} className="space-y-4">
       {challenged && <Honeypot value={sender.honeypot} onChange={sender.setHoneypot} />}
       {titleSlot && (!creating || stepTitle || removalOpen) && createPortal(title, titleSlot)}
       {!titleSlot && !creating && !onStep && <div className="text-base">{title}</div>}

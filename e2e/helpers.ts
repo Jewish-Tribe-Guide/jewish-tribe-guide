@@ -168,6 +168,9 @@ export async function categoryWithGeocodedListings(
 export async function categoryWithHoursField(
   request: APIRequestContext,
   community: string,
+  /** The one with the most fields first: the longest editor, for a test
+   *  that needs to scroll it. */
+  { longest = false }: { longest?: boolean } = {},
 ): Promise<{ category: Category; item: { id: string; name: string } }> {
   // Via categories() rather than its own inline fetch — this used to duplicate
   // that call, and the duplicate is the line CI timed out on.
@@ -177,6 +180,7 @@ export async function categoryWithHoursField(
   const withHours = all.filter(
     (c) => c.kind === 'listing' && c.detailFields?.some((f) => f.type === 'hours'),
   )
+  if (longest) withHours.sort((a, b) => (b.detailFields?.length ?? 0) - (a.detailFields?.length ?? 0))
   for (const category of withHours) {
     const body = await apiGet(request, `/api/resources?category=${category.id}&community=${community}`)
     const resources = body.resources as { id: string; name: string }[]

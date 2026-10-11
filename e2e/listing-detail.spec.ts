@@ -440,9 +440,72 @@ test('Back steps out of an open row of the editor, not out of editing', async ({
   const list = page.getByTestId('editor-list')
   await expect(list).toBeVisible()
 
-  // Whichever box comes after the name.
-  await page.locator('[data-testid^="editor-row-"]').nth(1).click()
+  const back = page.getByRole('button', { name: 'Back', exact: true }).filter({ visible: true }).first()
+  // The name opens where it is, inside its card (Oct 11, "editorlook").
+  await page.getByTestId('editor-row-name').click()
+  await expect(list.getByTestId('editor-open-name')).toBeVisible()
+  await back.click()
+  await expect(page.getByTestId('editor-open-name')).toHaveCount(0)
+  await expect(list).toBeVisible()
+
+  // A row holding a list opens on a screen of its own.
+  const screenRow = page.locator('[data-opens="screen"]').first()
+  test.skip((await screenRow.count()) === 0, `${item.name} has no row on a screen of its own`)
+  await screenRow.click()
   await expect(page.locator('[data-testid^="editor-open-"]')).toBeVisible()
-  await page.getByRole('button', { name: 'Back', exact: true }).filter({ visible: true }).first().click()
+  await expect(list).toHaveCount(0)
+  await back.click()
   await expect(list).toBeVisible()
 })
+
+// A row's own screen swapped out the list inside the same scroll region and
+// kept its offset (Oct 11): opened from low in the list, it started part way
+// down, its first lines out of sight. It starts at its top, and Back comes
+// back to the row. Where the old offset hid it depends on how long the list
+// is against how tall the screen is, so a short editor and the longest.
+for (const longest of [false, true]) {
+  test(`a row’s own screen starts at its top, and Back returns to the row (${longest ? 'the longest editor' : 'a short editor'})`, async ({ page, request, isMobile }) => {
+    const community = await defaultCommunity(page)
+    const { category, item } = await categoryWithHoursField(request, community, { longest })
+
+    await page.goto(`/${community}/${category.id}`)
+    await dismissLocationPrompt(page)
+    await page.getByRole('button', { name: `Show details for ${item.name}` }).first().click()
+    const listing = isMobile ? page.getByRole('dialog', { name: item.name }) : page.getByTestId('listing-column')
+    await expect(listing.getByRole('heading', { name: item.name, exact: true })).toBeVisible()
+    test.skip((await listing.getByRole('button', { name: 'Suggest an edit' }).count()) === 0, `${category.id} can't be edited`)
+    await openListingEditor(page, listing)
+    await expect(page.getByTestId('editor-list')).toBeVisible()
+    // A filled row, or one under "Not on the listing yet".
+    const rows = page.locator('[data-opens="screen"]')
+    test.skip((await rows.count()) === 0, `${item.name} has no row on a screen of its own`)
+
+    // Read down to the end of the list first, as someone checking it has:
+    // the sheet's own scroll region on a phone, the page on desktop.
+    await page.getByTestId('editor-list').evaluate((el) => {
+      let region = el.parentElement
+      while (region && !/^(auto|scroll)$/.test(getComputedStyle(region).overflowY)) region = region.parentElement
+      if (region) region.scrollTop = region.scrollHeight
+      else window.scrollTo(0, document.documentElement.scrollHeight)
+    })
+    const row = page.getByTestId((await rows.first().getAttribute('data-testid'))!)
+    await row.click()
+
+    // The screen's top edge, inside what its scroll region shows.
+    const open = page.locator('[data-testid^="editor-open-"]')
+    await expect(open).toBeVisible()
+    await expect
+      .poll(() =>
+        open.evaluate((el) => {
+          let region = el.parentElement
+          while (region && !/^(auto|scroll)$/.test(getComputedStyle(region).overflowY)) region = region.parentElement
+          const top = region && region !== document.body && region !== document.documentElement ? region.getBoundingClientRect().top : 0
+          return el.getBoundingClientRect().top - top
+        }),
+      )
+      .toBeGreaterThanOrEqual(0)
+
+    await page.getByRole('button', { name: 'Back', exact: true }).filter({ visible: true }).first().click()
+    await expect(row).toBeInViewport()
+  })
+}

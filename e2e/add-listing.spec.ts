@@ -27,10 +27,13 @@ test('Adding finds the place first, then asks the category’s questions, with B
   // waiting for it.
   await expect(add.getByTestId('editor-row-name')).toContainText('Needed')
   await expect(add.getByRole('button', { name: /^Still needed: Name/ })).toBeVisible()
-  // A row opens on its own; the header's Back closes the row first.
+  // The name opens where it is (Oct 11, "editorlook"); the header keeps
+  // its title, and its Back closes the row first.
   await add.getByTestId('editor-row-name').click()
-  await expect(page.getByRole('dialog', { name: 'Name' }).getByRole('textbox', { name: 'Name' })).toBeVisible()
-  await page.getByRole('dialog', { name: 'Name' }).getByRole('button', { name: 'Back', exact: true }).click()
+  await expect(add.getByTestId('editor-open-name').getByRole('textbox', { name: 'Name' })).toBeVisible()
+  await expect(add.getByTestId('editor-list')).toBeVisible()
+  await add.getByRole('button', { name: 'Back', exact: true }).click()
+  await expect(add.getByTestId('editor-open-name')).toHaveCount(0)
   await expect(add.getByTestId('editor-list')).toBeVisible()
 
   // Back is the header's chevron, before the title.

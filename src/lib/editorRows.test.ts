@@ -3,7 +3,7 @@ import type { DirectoryResource } from '@/types'
 import { FOOD, GROCERY, HOSPITAL, MIKVAH, SHUL } from '@/test/editorFixtures'
 import { timeText } from './minyanText'
 import type { Minyan } from './davening'
-import { editorRows, rowChanged, rowIsEmpty, rowSummary, type EditorValues } from './editorRows'
+import { editorRows, opensInPlace, rowChanged, rowIsEmpty, rowSummary, type EditorValues } from './editorRows'
 
 const titles = (rows: ReturnType<typeof editorRows>) => rows.map((r) => r.title)
 const keys = (rows: ReturnType<typeof editorRows>, id: string) => rows.find((r) => r.id === id)!.fields.map((f) => f.key)
@@ -44,6 +44,23 @@ describe('the whole-listing editor’s rows', () => {
   it('a hospital: the admin’s boxes in order, Shabbos where the admin put it', () => {
     expect(titles(editorRows(HOSPITAL, {}))).toEqual(['Name', 'Who to call', 'Kosher food', 'Shabbos', 'Rides', 'Address, phone, website and links', 'Hours'])
     expect(keys(editorRows(HOSPITAL, {}), 'box:Kosher food')).toEqual(['pantry', 'food_packages'])
+  })
+})
+
+describe('where a row opens', () => {
+  const inPlace = (rows: ReturnType<typeof editorRows>) => rows.filter(opensInPlace).map((r) => r.id)
+  it('Food: a few inputs open where they are; the dishes and the hours are lists, on their own screen', () => {
+    expect(inPlace(editorRows(FOOD, {}))).toEqual(['name', 'kind', 'facts', 'contact', 'about'])
+  })
+  it('a shul’s times and schedules, a mikvah’s sections and a hospital’s people are their own screens', () => {
+    const shul = editorRows(SHUL, {})
+    expect(shul.filter((r) => r.kind === 'minyans' || r.kind === 'schedules').some(opensInPlace)).toBe(false)
+    const mikvah = editorRows(MIKVAH, Object.fromEntries(MIKVAH.detailFields.filter((f) => f.type === 'boolean').map((f) => [f.key, true])))
+    expect(mikvah.filter((r) => r.kind === 'audience').length).toBeGreaterThan(0)
+    expect(mikvah.filter((r) => r.kind === 'audience').some(opensInPlace)).toBe(false)
+    const people = editorRows(HOSPITAL, {}).filter((r) => r.fields.some((f) => f.type === 'contacts'))
+    expect(people.length).toBeGreaterThan(0)
+    expect(people.some(opensInPlace)).toBe(false)
   })
 })
 

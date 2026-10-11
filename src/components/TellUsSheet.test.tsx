@@ -516,10 +516,13 @@ describe('Saw something? Tell us', () => {
       fireEvent.click(await screen.findByRole('button', { name: /Trader Joe’s/ }))
       expect(screen.getByRole('dialog', { name: 'Trader Joe’s' })).toBeInTheDocument()
       expect(screen.getByTestId('editor-list')).toBeInTheDocument()
-      // A row opened: its title in the header, and Back closes it first.
+      // A row opened where it is: the header keeps its title, and Back
+      // closes the row first.
       fireEvent.click(screen.getByTestId('editor-row-contact'))
-      expect(screen.getByRole('dialog', { name: 'Address and phone' })).toBeInTheDocument()
+      expect(screen.getByTestId('editor-open-contact')).toBeInTheDocument()
+      expect(screen.getByRole('dialog', { name: 'Trader Joe’s' })).toBeInTheDocument()
       fireEvent.click(screen.getByRole('button', { name: 'Back' }))
+      expect(screen.queryByTestId('editor-open-contact')).not.toBeInTheDocument()
       expect(screen.getByRole('dialog', { name: 'Trader Joe’s' })).toBeInTheDocument()
       // The chevron before the title, in the header.
       expect(screen.getByRole('heading', { name: 'Trader Joe’s' }).parentElement).toContainElement(screen.getByRole('button', { name: 'Back' }))

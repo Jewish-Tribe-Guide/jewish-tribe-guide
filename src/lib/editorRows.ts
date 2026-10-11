@@ -1,5 +1,5 @@
 import type { DirectoryResource } from '@/types'
-import { PHOTO_FIELD_KEY, fieldIsVisible, selectValues, type CategoryConfig, type CategoryField } from './categories'
+import { PHOTO_FIELD_KEY, fieldIsVisible, selectValues, type CategoryConfig, type CategoryField, type FieldType } from './categories'
 import { readContacts, sameContacts } from './contacts'
 import { isMinyanim, TEFILLAH_LABELS, type Minyan } from './davening'
 import { formatHoursSummary, hasAnyHours } from './hours'
@@ -38,6 +38,32 @@ export type EditorRow = {
 export type EditorValues = { name: string; address: string; phone: string; details: Record<string, unknown> }
 
 const isBadge = (f: CategoryField) => (f.renderAs ?? (f.type === 'boolean' ? 'badge' : 'row')) === 'badge' && (f.type === 'boolean' || f.type === 'select')
+
+/** Whether a field is a list of its own (a week of hours, the dishes,
+ *  the minyanim, the people to call), which a row opens on a screen of its
+ *  own; anything else is a few inputs, which open where the row is.
+ *  Keyed on every type, so a new one is a compile error until it's placed. */
+const IS_A_LIST: Record<FieldType, boolean> = {
+  text: false,
+  tel: false,
+  textarea: false,
+  number: false,
+  boolean: false,
+  select: false,
+  url: false,
+  image: false,
+  tags: true,
+  hours: true,
+  minyanim: true,
+  contacts: true,
+}
+
+/** A row opens where it is, inside its own card, unless it holds a list
+ *  (agreed Oct 11, canvas page "editorlook"): then it's its own screen. */
+export function opensInPlace(row: EditorRow): boolean {
+  if (row.kind === 'items' || row.kind === 'minyans' || row.kind === 'schedules') return false
+  return !row.fields.some((f) => IS_A_LIST[f.type])
+}
 
 export function editorRows(category: CategoryConfig, details: Record<string, unknown>): EditorRow[] {
   const fields = category.detailFields

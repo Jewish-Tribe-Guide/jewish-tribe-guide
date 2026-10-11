@@ -5,6 +5,7 @@ import type { DirectoryResource } from '@/types'
 import { resolveCapabilities, type CategoryConfig } from '@/lib/categories'
 import ListingView, { type Onward } from '@/components/resources/ListingView'
 import type { SearchFound } from '@/lib/askSearch'
+import { scrollingAncestor } from '@/lib/scrollingAncestor'
 import ListingEditBar from '@/components/resources/ListingEditBar'
 import dynamic from 'next/dynamic'
 import UpButton from '@/components/UpButton'
@@ -47,15 +48,6 @@ type Props = {
   /** Whether the editor has taken the listing's place, for a host whose
    *  own controls are about the listing (ListingColumn's back and ‹ ›). */
   onEditingChange?: (editing: boolean) => void
-}
-
-/** The nearest ancestor that scrolls, i.e. the parent's scroll region. */
-function scrollingAncestor(el: HTMLElement | null): HTMLElement | null {
-  for (let node = el?.parentElement ?? null; node; node = node.parentElement) {
-    const { overflowY } = getComputedStyle(node)
-    if (overflowY === 'auto' || overflowY === 'scroll') return node
-  }
-  return null
 }
 
 /**

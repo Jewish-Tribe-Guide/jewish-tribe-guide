@@ -95,11 +95,14 @@ describe('ListingEditor — the listing’s boxes, one row each', () => {
     expect(sendButton()).toBeDisabled()
   })
 
-  it('sits its rows in a white box, apart from the page they’re on', () => {
+  it('makes each row its own white card; what isn’t there yet stays plain lines', () => {
     // Adding: some rows filled (Needed), the rest not on the listing yet.
     renderEditor({ item: undefined })
-    expect(row('name').closest('ul')).toHaveClass('bg-white', 'border', 'rounded-2xl')
-    expect(within(screen.getByTestId('editor-empty')).getByRole('list')).toHaveClass('bg-white', 'border', 'rounded-2xl')
+    expect(row('name')).toHaveClass('bg-white', 'border', 'rounded-2xl')
+    expect(row('name').closest('ul')).not.toHaveClass('bg-white')
+    const empty = screen.getByTestId('editor-empty')
+    expect(within(empty).getByRole('list')).not.toHaveClass('bg-white')
+    expect(within(empty).getAllByRole('button')[0]).not.toHaveClass('bg-white')
   })
 
   it('puts what the listing doesn’t show yet under “Not on the listing yet”, one line each', async () => {
@@ -111,20 +114,52 @@ describe('ListingEditor — the listing’s boxes, one row each', () => {
     expect(screen.getByTestId('editor-open-about')).toBeInTheDocument()
   })
 
-  it('opens one box at a time, its title for the host’s header, and Done or Back to the list', async () => {
+  // Agreed Oct 11 (canvas page "editorlook"): a few inputs open where the
+  // row is; a list of its own opens on its own screen.
+  it('opens a short row where it is, the rows around it staying; Done, its heading or Back closes it', async () => {
     const u = user()
     const { step } = renderEditor()
     await u.click(row('facts'))
-    expect(screen.getByTestId('editor-open-facts')).toBeInTheDocument()
-    expect(screen.queryByTestId('editor-list')).not.toBeInTheDocument()
-    expect(step()?.title).toBe('Kosher')
+    const facts = screen.getByTestId('editor-open-facts')
+    expect(within(facts).getByRole('button', { name: 'Dairy' })).toBeInTheDocument()
+    expect(screen.getByTestId('editor-list')).toContainElement(facts)
+    expect(row('name')).toBeInTheDocument()
+    expect(row('about')).toBeInTheDocument()
+    // The host's header keeps its title; its Back closes the row.
+    expect(step()).not.toBeNull()
+    expect(step()?.title).toBeUndefined()
     await u.click(done())
-    expect(screen.getByTestId('editor-list')).toBeInTheDocument()
+    expect(screen.queryByTestId('editor-open-facts')).not.toBeInTheDocument()
     expect(step()).toBeNull()
 
+    // One at a time.
+    await u.click(row('facts'))
+    await u.click(row('about'))
+    expect(screen.getByTestId('editor-open-about')).toBeInTheDocument()
+    expect(screen.queryByTestId('editor-open-facts')).not.toBeInTheDocument()
+    await u.click(within(screen.getByTestId('editor-open-about')).getByRole('button', { name: /About/, expanded: true }))
+    expect(screen.queryByTestId('editor-open-about')).not.toBeInTheDocument()
+
+    await u.click(row('name'))
+    step()!.back()
+    await waitFor(() => expect(screen.queryByTestId('editor-open-name')).not.toBeInTheDocument())
+  })
+
+  it('opens a row holding a list on its own screen, its title for the host’s header', async () => {
+    const u = user()
+    const { step } = renderEditor()
     await u.click(row('hours'))
+    expect(screen.getByTestId('editor-open-hours')).toBeInTheDocument()
+    expect(screen.queryByTestId('editor-list')).not.toBeInTheDocument()
+    expect(step()?.title).toBe('Hours')
     step()!.back()
     expect(await screen.findByTestId('editor-list')).toBeInTheDocument()
+
+    await u.click(row('items'))
+    expect(screen.queryByTestId('editor-list')).not.toBeInTheDocument()
+    expect(step()?.title).toBe('Main dishes')
+    await u.click(done())
+    expect(screen.getByTestId('editor-list')).toBeInTheDocument()
   })
 })
 
@@ -222,13 +257,17 @@ describe('ListingEditor — sending', () => {
     expect(onClose).toHaveBeenCalled()
   })
 
-  it('puts the foot’s button in the host’s slot: Send on the list, Done in a box', async () => {
+  it('puts the foot’s button in the host’s slot: Send on the list, Done on a row’s own screen', async () => {
     const u = user()
     const slot = document.createElement('div')
     document.body.appendChild(slot)
     renderEditor({ sendSlot: slot })
     expect(within(slot).getByRole('button', { name: 'No changes yet' })).toBeInTheDocument()
+    // A row open in place keeps its Done in its card; Send stays below.
     await u.click(row('about'))
+    expect(within(screen.getByTestId('editor-open-about')).getByRole('button', { name: 'Done' })).toBeInTheDocument()
+    expect(within(slot).getByRole('button', { name: 'No changes yet' })).toBeInTheDocument()
+    await u.click(row('hours'))
     expect(within(slot).getByRole('button', { name: 'Done' })).toBeInTheDocument()
     slot.remove()
   })
