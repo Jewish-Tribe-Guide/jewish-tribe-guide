@@ -10,6 +10,12 @@ import { FilterChip } from '@/components/resources/FiltersSheet'
 import NearbyList from './NearbyList'
 import MapPlaceDetail from './MapPlaceDetail'
 import MobileNearbySheet, { type MobileNearbySheetHandle } from './MobileNearbySheet'
+import MapEruvDetail from './MapEruvDetail'
+import type { MapEruv } from './eruvLayer'
+import { useEruvStatuses } from '@/lib/useEruvStatuses'
+import { eruvView } from '@/lib/eruv'
+import { labelPoint, locator, type Where } from '@/lib/eruvShape'
+import { useOptionalLocation } from '@/lib/locationContext'
 import { useAllListings } from '@/lib/useAllListings'
 import { useCategories } from '@/lib/useCategories'
 import { DEFAULT_CATEGORY_ICON, resolveCapabilities, selectValues } from '@/lib/categories'
@@ -99,6 +105,10 @@ export { HOSPITAL_COLOR, HOSPITAL_ICON }
 // threaded through every consumer — see droppedMapPoints below.
 const DROPPED_PREFIX = 'dropped:'
 const DROPPED_FILTER_ID = '__dropped__'
+// An eruv opened from the Eruvim layer: not a pin, but it opens in the same
+// sheet or sidebar a place does, with the same way back (id `eruv:<id>`).
+const ERUV_FILTER_ID = '__eruv__'
+const ERUV_PREFIX = 'eruv:'
 const DROPPED_PIN_COLOR = '#D85A30'
 
 // Typing one of these in the search box searches "open now" instead of
@@ -1611,6 +1621,77 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
     </div>
   )
 
+  // ── The Eruvim layer (agreed Oct 7, canvas page "eruv", board 3) ────────
+  // A chip beside Filters draws each eruv's outline, in its status's colour,
+  // under the pins. Tapping a line or a name opens that eruv's listing where
+  // a place opens. Off to begin with; there only when the community has an
+  // Eruv page and an eruv with a line.
+  const eruvCategory = (categories ?? []).find((c) => c.kind === 'eruv') ?? null
+  const eruvStatuses = useEruvStatuses(countCommunity ?? '', !!countCommunity && !!eruvCategory)
+  const eruvData = eruvStatuses?.available ? eruvStatuses : null
+  const eruvimWithLines = useMemo(() => (eruvData ? eruvData.eruvim.filter((e) => e.line?.lines.length) : []), [eruvData])
+  const [eruvimOn, setEruvimOn] = useState(false)
+  const mapEruvim = useMemo<MapEruv[]>(
+    () => (eruvimOn && eruvData && clock !== null ? eruvimWithLines.map((e) => ({ id: e.id, name: e.name, tone: eruvView(e, new Date(clock), eruvData.timezone, eruvData.candles).tone, line: e.line! })) : []),
+    // Each tick makes a new list, but the map redraws only when a line or
+    // a status's colour changes (eruvDrawKey).
+    [eruvimOn, eruvData, eruvimWithLines, clock],
+  )
+  const openEruvId = selectedPointId?.startsWith(ERUV_PREFIX) ? selectedPointId.slice(ERUV_PREFIX.length) : null
+  const eruvLocators = useMemo(() => new Map(eruvimWithLines.map((e) => [e.id, locator(e.line!)])), [eruvimWithLines])
+  const locationAccuracy = useOptionalLocation()?.accuracyM ?? null
+  const openEruv = (id: string) => {
+    const e = eruvimWithLines.find((x) => x.id === id)
+    const at = e ? labelPoint(e.line!) : null
+    if (!e || !at) return
+    const p: SelectablePoint = { id: `${ERUV_PREFIX}${id}`, lat: at[0], lng: at[1], name: e.name, color: colorById.get(eruvCategory?.id ?? '') ?? '#64748b', filterId: ERUV_FILTER_ID }
+    // Opened where it's tapped: the map stays where the visitor put it.
+    if (isMobile) nearbySheetRef.current?.selectPoint(p, false)
+    else {
+      setDesktopSelected(p)
+      setSidebarCollapsed(false)
+    }
+  }
+  // A link to an open eruv (?place=eruv:center-city) opens it again, with
+  // the layer on, once the eruvim have arrived (their fetch outlasts the
+  // render a phone takes to know it's a phone; see the restore above).
+  const restoredEruv = useRef(false)
+  useEffect(() => {
+    if (!standalone || restoredEruv.current || !initialPlaceId?.startsWith(ERUV_PREFIX) || eruvimWithLines.length === 0) return
+    restoredEruv.current = true
+    setEruvimOn(true)
+    openEruv(initialPlaceId.slice(ERUV_PREFIX.length))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [eruvimWithLines, standalone, initialPlaceId])
+  const toggleEruvim = () => {
+    if (eruvimOn && openEruvId) deselectPlace()
+    setEruvimOn(!eruvimOn)
+  }
+  const eruvDetail = (id: string, onBack: () => void) => {
+    const e = eruvData?.eruvim.find((x) => x.id === id)
+    if (!e || !eruvData || clock === null) return null
+    const where: Where = activeLocation && eruvLocators.get(id) ? eruvLocators.get(id)!([activeLocation.lat, activeLocation.lng], locationAccuracy) : 'outside'
+    return <MapEruvDetail eruv={e} color={colorById.get(eruvCategory?.id ?? '') ?? '#64748b'} now={new Date(clock)} timezone={eruvData.timezone} candles={eruvData.candles} where={where} onBack={onBack} />
+  }
+  const eruvChip = eruvimWithLines.length > 0 && (
+    <button
+      type="button"
+      onClick={toggleEruvim}
+      aria-pressed={eruvimOn}
+      data-testid="map-eruvim-chip"
+      className={`flex shrink-0 cursor-pointer items-center gap-1 rounded-full border py-1 text-xs font-bold shadow-sm transition-colors ${
+        eruvimOn ? 'border-primary/35 bg-[#eef3fe] pl-2.5 pr-2 text-primary' : 'border-slate-300 bg-white px-2.5 text-slate-600 hover:bg-slate-50'
+      }`}
+    >
+      Eruvim
+      {eruvimOn && (
+        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" className="h-3 w-3">
+          <path d="M18 6 6 18M6 6l12 12" />
+        </svg>
+      )}
+    </button>
+  )
+
   // ── Filters: one button, one sheet, the chips of what's on ───────────────
   // The categories showing, in the chip row's order: the sheet's sections.
   const showingCategories = useMemo(() => {
@@ -1671,6 +1752,14 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
       {filtersOn > 0 && <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[11px] text-white">{filtersOn}</span>}
     </button>
   )
+  // Filters, then the Eruvim layer's chip, before the categories.
+  const leadingChips = (
+    <>
+      {filtersButton}
+      {eruvChip}
+    </>
+  )
+
   // What's on, under the category chips, as under a category page's
   // heading: a tap switches that one off.
   // Read by the reader, the row starts "Read as" and adds what a reading
@@ -1727,7 +1816,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
       selected={effectiveSelected}
       onToggle={toggle}
       onAll={showAll}
-      leadingChip={filtersButton}
+      leadingChip={leadingChips}
       campaignChip={campaignChip}
       pinnedChip={pinnedChip}
       pinnedOn={pinnedSelected}
@@ -1868,7 +1957,9 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                   padding is part of the same scrolling content. ────────── */}
               <div className="h-16 shrink-0" />
               {ui.map.nearbyList &&
-                (desktopSelected && desktopSelected.raw && desktopSelectedCategory ? (
+                (desktopSelected?.filterId === ERUV_FILTER_ID && eruvDetail(desktopSelected.id.slice(ERUV_PREFIX.length), () => setDesktopSelected(null)) ? (
+                  sidebarScroll(desktopSelected.id, eruvDetail(desktopSelected.id.slice(ERUV_PREFIX.length), () => setDesktopSelected(null)))
+                ) : desktopSelected && desktopSelected.raw && desktopSelectedCategory ? (
                   sidebarScroll(
                     `place:${desktopSelected.id}`,
                     <MapPlaceDetail
@@ -2098,6 +2189,9 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                 obscuredBottomPx={isMobile ? sheetHeightPx : 0}
                 obscuredTopPx={isMobile ? topOverlayHeight : 0}
                 zoomRadiusMiles={mapZoomRadiusMiles}
+                eruvim={mapEruvim}
+                onSelectEruv={openEruv}
+                selectedEruvId={openEruvId}
               />
 
               {/* ── Fullscreen toggle (desktop only) — the map starts as a
@@ -2278,7 +2372,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                         maxVisible={4}
                         resortToken={categoryResortToken}
                         onMore={openCategoriesPicker}
-                        leadingChip={filtersButton}
+                        leadingChip={leadingChips}
                         campaignChip={campaignChip}
                         pinnedChip={pinnedChip}
                         pinnedOn={pinnedSelected}
@@ -2409,6 +2503,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                     if (point && frame !== false) setFrameToken((t) => t + 1)
                   }}
                   onHeightChange={setSheetHeightPx}
+                  renderOther={(p, back) => (p.filterId === ERUV_FILTER_ID ? eruvDetail(p.id.slice(ERUV_PREFIX.length), back) : null)}
                 />
               )}
           </div>

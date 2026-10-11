@@ -74,6 +74,9 @@ type Props = {
    *  selected pin within the visible strip of map ABOVE the sheet, instead of
    *  the whole container's center (which the sheet mostly covers at half/full). */
   onHeightChange?: (px: number) => void
+  /** What a selected point that isn't a listing shows (an eruv opened from
+   *  the Eruvim layer), given the way back. Null for anything else. */
+  renderOther?: (point: Point, back: () => void) => ReactNode
 }
 
 export type MobileNearbySheetHandle = {
@@ -123,7 +126,7 @@ export type MobileNearbySheetHandle = {
  * is still visible underneath.
  */
 const MobileNearbySheet = forwardRef<MobileNearbySheetHandle, Props>(function MobileNearbySheet(
-  { points, userLocation, onViewListing, categories, foundOn, containerHeight, onSelectionChange, onHeightChange },
+  { points, userLocation, onViewListing, categories, foundOn, containerHeight, onSelectionChange, onHeightChange, renderOther },
   ref,
 ) {
   const [snap, setSnap] = useState<Snap>('peek')
@@ -522,6 +525,7 @@ const MobileNearbySheet = forwardRef<MobileNearbySheetHandle, Props>(function Mo
   }
 
   const selectedCategory = selected ? categories.find((c) => c.id === selected.filterId) : undefined
+  const other = selected && !selected.raw ? (renderOther?.(selected, clearSelection) ?? null) : null
 
   // The sheet's scroll region, as a function rather than inline JSX so the
   // list and the place detail can't drift apart on any of this region's
@@ -579,7 +583,9 @@ const MobileNearbySheet = forwardRef<MobileNearbySheetHandle, Props>(function Mo
       </div>
       {scrollRegion(
         selected ? `place:${selected.id}` : 'list',
-        selected && selected.raw && selectedCategory ? (
+        other ? (
+          other
+        ) : selected && selected.raw && selectedCategory ? (
           <MapPlaceDetail item={selected.raw} category={selectedCategory} color={selected.color} onBack={clearSelection} found={foundOn?.(selected.raw.id) ?? null} />
         ) : (
           <NearbyList points={points} userLocation={userLocation} onViewListing={onViewListing} onSelectPlace={selectPlace} />

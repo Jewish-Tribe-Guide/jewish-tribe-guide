@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { lineFetchUrl, parseLineFile, sameLine, withoutNames, type EruvLineFile } from './eruvLine'
-import { labelPoint, locator, shapeOf } from './eruvShape'
+import { labelPoint, locator, outlineOf, shapeOf } from './eruvShape'
 
 // The eruvim's own line files, as published Oct 7 2026: Center City's
 // map-data.geojson, University City's and Lower Merion's Google My Maps.
@@ -101,5 +101,46 @@ describe('labelPoint', () => {
   })
   it('nothing without an enclosed area', () => {
     expect(labelPoint({ lines: [{ name: 'x', points: [[40, -75], [40.01, -75]] }] })).toBeNull()
+  })
+})
+
+describe('outlineOf: what the map draws (Oct 11)', () => {
+  // Metres from a point to the nearest drawn segment, roughly.
+  const away = (runs: [number, number][][], [lat, lng]: [number, number]) => {
+    const kx = 111_320 * Math.cos((lat * Math.PI) / 180)
+    const ky = 110_540
+    let best = Infinity
+    for (const run of runs) {
+      for (let i = 1; i < run.length; i++) {
+        const [ax, ay] = [(run[i - 1][1] - lng) * kx, (run[i - 1][0] - lat) * ky]
+        const [bx, by] = [(run[i][1] - lng) * kx, (run[i][0] - lat) * ky]
+        const len2 = (bx - ax) ** 2 + (by - ay) ** 2
+        const t = len2 ? Math.max(0, Math.min(1, -(ax * (bx - ax) + ay * (by - ay)) / len2)) : 0
+        best = Math.min(best, Math.hypot(ax + t * (bx - ax), ay + t * (by - ay)))
+      }
+    }
+    return best
+  }
+  const middle = (name: string) => {
+    const l = CC.lines.find((x) => x.name === name)!
+    return l.points[Math.floor(l.points.length / 2)]
+  }
+
+  it('not a line with the eruv on both sides (Washington Avenue), nor a connector out of it', () => {
+    const runs = outlineOf(CC)
+    expect(away(runs, middle('Washington Border'))).toBeGreaterThan(100)
+    expect(away(runs, middle('South Street Bridge'))).toBeGreaterThan(20)
+    // The outside is still drawn: Poplar Street, its north edge.
+    expect(away(runs, middle('Poplar Street'))).toBeLessThan(5)
+  })
+  it('Center City, as the eruv draws it, is one line round', () => {
+    const own = withoutNames(CC, ['Washington Border', 'Front St Border', "Grey's Ferry Border", 'South Street Bridge', 'Line 25', 'Line 26', 'Line 27', 'Line 28', 'Line 29', 'Line 30'])
+    const runs = outlineOf(own)
+    expect(runs).toHaveLength(1)
+    expect(runs[0][0]).toEqual(runs[0].at(-1))
+  })
+  it('a file that encloses nothing is drawn as it comes', () => {
+    const open: EruvLineFile = { lines: [{ name: 'x', points: [[40, -75], [40.01, -75]] }] }
+    expect(outlineOf(open)).toEqual([open.lines[0].points])
   })
 })

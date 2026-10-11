@@ -91,6 +91,9 @@ type Built = {
   joins: [XY, XY][]
   /** The lines that border the outside, and the loose connectors. */
   edges: [XY, XY][]
+  /** The eruv's outline: the lines with an area on one side only, joined
+   *  end to end. No connector, and no line with the eruv on both sides. */
+  outline: XY[][]
   proj: ReturnType<typeof projector>
 }
 
@@ -235,14 +238,60 @@ function build(file: EruvLineFile): Built {
     }
   }
   const edges: [XY, XY][] = [...loosePieces]
-  for (const [u, s] of adj) for (const v of s) if (u < v && !(enclosedSide.has(`${u}>${v}`) && enclosedSide.has(`${v}>${u}`))) edges.push([nodes[u], nodes[v]])
-  return { areas, joins, edges, proj }
+  const rim = new Map<number, Set<number>>()
+  for (const [u, s] of adj) {
+    for (const v of s) {
+      if (u > v || (enclosedSide.has(`${u}>${v}`) && enclosedSide.has(`${v}>${u}`))) continue
+      edges.push([nodes[u], nodes[v]])
+      if (enclosedSide.has(`${u}>${v}`) || enclosedSide.has(`${v}>${u}`)) {
+        for (const [a, b] of [[u, v], [v, u]]) {
+          if (!rim.has(a)) rim.set(a, new Set())
+          rim.get(a)!.add(b)
+        }
+      }
+    }
+  }
+  return { areas, joins, edges, outline: chain(rim).map((ids) => ids.map((k) => nodes[k])), proj }
+}
+
+/** Edges joined into as few runs as there are: from each end or fork
+ *  first, then round what's left (closed rings). */
+function chain(adj: Map<number, Set<number>>): number[][] {
+  const used = new Set<string>()
+  const key = (a: number, b: number) => (a < b ? `${a}-${b}` : `${b}-${a}`)
+  const runs: number[][] = []
+  const walk = (start: number, next: number) => {
+    const run = [start]
+    let [a, b] = [start, next]
+    for (;;) {
+      used.add(key(a, b))
+      run.push(b)
+      const on = [...(adj.get(b) ?? [])].filter((c) => !used.has(key(b, c)))
+      if ((adj.get(b)?.size ?? 0) !== 2 || on.length === 0) break
+      ;[a, b] = [b, on[0]]
+    }
+    runs.push(run)
+  }
+  const starts = [...adj.keys()].sort((p, q) => Number(adj.get(p)!.size === 2) - Number(adj.get(q)!.size === 2))
+  for (const u of starts) for (const v of adj.get(u)!) if (!used.has(key(u, v))) walk(u, v)
+  return runs
 }
 
 /** The areas an eruv's line encloses, and the gaps joined to make them. */
 export function shapeOf(file: EruvLineFile): EruvShape {
   const b = build(file)
   return { areas: b.areas.map((r) => r.map(b.proj.back)), joins: b.joins.map(([p, q]) => [b.proj.back(p), b.proj.back(q)]) }
+}
+
+/** What the map draws of an eruv: its outline, the line around the areas
+ *  "inside" is answered from, so what's drawn and what's said agree. A
+ *  piece inside the eruv (Center City's Washington Avenue, between it and
+ *  South Philadelphia), or one leading out of it (a connector to the next
+ *  eruv), isn't drawn (Oct 11: the user found too many lines). A file that
+ *  encloses nothing is drawn as it comes. */
+export function outlineOf(file: EruvLineFile): LatLng[][] {
+  const b = build(file)
+  return b.outline.length ? b.outline.map((run) => run.map(b.proj.back)) : file.lines.map((l) => l.points)
 }
 
 export type Where = 'inside' | 'edge' | 'outside'

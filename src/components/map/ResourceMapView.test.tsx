@@ -23,6 +23,18 @@ import ResourceMapView from './ResourceMapView'
 
 vi.mock('@vercel/analytics', () => ({ track: vi.fn() }))
 
+// The eruvim, as /api/eruv gives them: one with a line (a square), one
+// without, which the layer can't draw.
+const ERUV_SQUARE = { lines: [{ name: 'Boundary', points: [[39.94, -75.17], [39.94, -75.15], [39.96, -75.15], [39.96, -75.17], [39.94, -75.17]] as [number, number][] }] }
+const eruvStatus = (id: string, name: string, line: typeof ERUV_SQUARE | null) => ({
+  id, name, covers: `Where ${name} goes.`, website: null, hotline: null, alertsUrl: null, statusUrl: 'https://example.org/', statusDated: false,
+  status: 'up' as const, statusWords: 'Up', statusPostedOn: null, statusCheckedAt: new Date().toISOString(), statusErrorAt: null, statusError: null, line,
+})
+vi.mock('@/lib/useEruvStatuses', () => ({
+  useEruvStatuses: (_slug: string, wanted: boolean) =>
+    wanted ? { available: true, timezone: 'America/New_York', candles: null, eruvim: [eruvStatus('center-city', 'Center City Eruv', ERUV_SQUARE), eruvStatus('elkins-park', 'Elkins Park Eruv', null)] } : null,
+}))
+
 // NearbyList's row-level Share action calls useCommunitySlug(), which pulls
 // in next/navigation's useRouter() unconditionally (see nextNavigationMock's
 // own comment) — required here even though this suite never asserts on
@@ -46,16 +58,29 @@ vi.mock('./ResourceMap', () => ({
     onLongPressPoint,
     onBackgroundClick,
     frameToken,
+    eruvim,
+    onSelectEruv,
+    selectedEruvId,
   }: {
     points: MapPoint[]
     onSelectPoint?: (p: MapPoint) => void
     onLongPressPoint?: (p: MapPoint) => void
     onBackgroundClick?: () => void
     frameToken?: number
+    eruvim?: { id: string; name: string; tone: string }[]
+    onSelectEruv?: (id: string) => void
+    selectedEruvId?: string | null
   }) => (
     <div data-testid="resource-map">
       <p data-testid="point-count">{points.length}</p>
       <p data-testid="frame-token">{frameToken ?? 0}</p>
+      <p data-testid="eruv-count">{eruvim?.length ?? 0}</p>
+      <p data-testid="eruv-selected">{selectedEruvId ?? ''}</p>
+      {eruvim?.map((e) => (
+        <button key={e.id} onClick={() => onSelectEruv?.(e.id)}>
+          Eruv {e.name} {e.tone}
+        </button>
+      ))}
       {points.map((p) => (
         <div key={p.id}>
           <button onClick={() => onSelectPoint?.(p)}>Select {p.name}</button>
@@ -1632,5 +1657,53 @@ describe('ResourceMapView — the Filters sheet', () => {
     await user.click(screen.getByTestId('map-filters-button'))
     expect(screen.queryByTestId('map-filters-open-all')).not.toBeInTheDocument()
     expect(within(screen.getByTestId('map-filters-restaurant')).getByRole('switch', { name: 'Open now' })).toBeInTheDocument()
+  })
+})
+
+describe('ResourceMapView — the Eruvim layer', () => {
+  const withEruvPage = [makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' }), makeCategory({ id: 'eruv', label: 'Eruv', pluralLabel: 'Eruvim', kind: 'eruv' })]
+  // The chips show once there's a place to plot.
+  const store = [makeListing({ id: 'g1', name: 'Grocer', category: 'grocery', geo: { lat: 39.95, lng: -75.16 } })]
+
+  it('a chip beside Filters draws the eruvim with a line; off to begin with', async () => {
+    renderMap(<ResourceMapView onUp={() => {}} />, store, withEruvPage)
+    const chip = await screen.findByTestId('map-eruvim-chip')
+    expect(chip).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByTestId('eruv-count')).toHaveTextContent('0')
+    fireEvent.click(chip)
+    expect(chip).toHaveAttribute('aria-pressed', 'true')
+    // Center City only: Elkins Park has no line to draw.
+    expect(screen.getByTestId('eruv-count')).toHaveTextContent('1')
+    expect(screen.getByRole('button', { name: 'Eruv Center City Eruv green' })).toBeInTheDocument()
+  })
+
+  it('tapping an eruv opens its listing where a place opens, picked out, with a way back', async () => {
+    renderMap(<ResourceMapView onUp={() => {}} />, store, withEruvPage)
+    fireEvent.click(await screen.findByTestId('map-eruvim-chip'))
+    fireEvent.click(screen.getByRole('button', { name: 'Eruv Center City Eruv green' }))
+    const detail = screen.getByTestId('map-eruv-detail')
+    expect(within(detail).getByText('Center City Eruv')).toBeInTheDocument()
+    expect(within(detail).getByText('Where Center City Eruv goes.')).toBeInTheDocument()
+    expect(screen.getByTestId('eruv-selected')).toHaveTextContent('center-city')
+    fireEvent.click(within(detail).getByRole('button', { name: 'Back to list' }))
+    expect(screen.queryByTestId('map-eruv-detail')).not.toBeInTheDocument()
+    expect(screen.getByTestId('eruv-selected')).toHaveTextContent('')
+  })
+
+  it('turning the layer off closes an open eruv', async () => {
+    renderMap(<ResourceMapView onUp={() => {}} />, store, withEruvPage)
+    const chip = await screen.findByTestId('map-eruvim-chip')
+    fireEvent.click(chip)
+    fireEvent.click(screen.getByRole('button', { name: 'Eruv Center City Eruv green' }))
+    expect(screen.getByTestId('map-eruv-detail')).toBeInTheDocument()
+    fireEvent.click(chip)
+    expect(screen.queryByTestId('map-eruv-detail')).not.toBeInTheDocument()
+    expect(screen.getByTestId('eruv-count')).toHaveTextContent('0')
+  })
+
+  it('no chip where the community has no Eruv page', () => {
+    renderMap(<ResourceMapView onUp={() => {}} />, store)
+    expect(screen.getByTestId('map-filters-button')).toBeInTheDocument()
+    expect(screen.queryByTestId('map-eruvim-chip')).not.toBeInTheDocument()
   })
 })

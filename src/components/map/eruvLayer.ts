@@ -1,4 +1,4 @@
-import { labelPoint, shapeOf } from '@/lib/eruvShape'
+import { labelPoint, outlineOf, shapeOf } from '@/lib/eruvShape'
 import type { EruvLineFile } from '@/lib/eruvLine'
 import type { EruvTone } from '@/lib/eruv'
 
@@ -7,7 +7,8 @@ import type { EruvTone } from '@/lib/eruv'
 // (ResourceMap's Eruvim layer), so an eruv looks the same on both: its own
 // line in its status's colour, its area faintly filled, and its name inside
 // it. Nothing here decides anything: the lines are the eruvim's, as an admin
-// approved them, and the colour is their status.
+// approved them, and the colour is their status. Only the outline is drawn
+// (outlineOf), not every piece of the file.
 
 export type MapEruv = { id: string; name: string; tone: EruvTone; line: EruvLineFile }
 
@@ -51,8 +52,8 @@ export function drawEruvim(map: google.maps.Map, eruvim: MapEruv[], { onSelect, 
       }
       d.areas.push(poly)
     }
-    for (const l of e.line.lines) {
-      const path = l.points.map(([lat, lng]) => ({ lat, lng }))
+    for (const run of outlineOf(e.line)) {
+      const path = run.map(([lat, lng]) => ({ lat, lng }))
       const line = new google.maps.Polyline({ map, path, strokeColor: color, strokeOpacity: 0.95, strokeWeight: 3, clickable: true })
       line.addListener('click', select)
       line.addListener('mouseover', enter)
