@@ -118,6 +118,19 @@ describe('what the AI said, kept to what holds up', () => {
     expect(tidyMenuReading('nonsense', source)).toEqual({ sourceUrl: source.url, dishes: [], note: 'No main dishes found on the menu.' })
   })
 
+  // The user's note 16 (Oct 10): menus read badly. Tried on twelve real
+  // places' menus and two sets of screenshots: one food came back as three
+  // dishes ("Falafel Pita", "Falafel Bowl", "Falafel Salad"), and a few
+  // photos of one section of a menu were padded out with its vegetable
+  // sides. The instructions now say both.
+  it('tells the model one dish per kind of food, and never to pad a part of a menu with sides', () => {
+    const [system] = menuMessages(source, 'Judah') as { content: string }[]
+    expect(system.content).toMatch(/one dish per kind of food/i)
+    expect(system.content).toContain('"Falafel Pita", "Falafel Bowl" and "Falafel Salad" are one dish, Falafel')
+    expect(system.content).toMatch(/only part of a menu/i)
+    expect(system.content).toMatch(/never fill the list with vegetables, rice, noodles or other sides/i)
+  })
+
   it('sends a page as text and a PDF as a file', () => {
     const [, user] = menuMessages(source, 'Judah') as { content: unknown }[]
     expect(user.content).toContain('Chicken or beef SHAWARMA plate')

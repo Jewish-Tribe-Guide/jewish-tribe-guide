@@ -264,7 +264,9 @@ const INSTRUCTIONS = `You read a kosher food place's own menu and pick its main 
 Rules:
 - Up to ${MAX_DISHES} dishes, the ones the menu is built around. Not drinks, sides, sauces, add-ons or kids' items, unless the place is mostly that (a bakery's pastries, an ice cream shop's ice cream).
 - Only dishes the menu actually names. Never add one it doesn't, however likely.
+- One dish per kind of food, named for the food, not how it's served: a menu's "Falafel Pita", "Falafel Bowl" and "Falafel Salad" are one dish, Falafel; "Sesame Chicken" and "Orange Chicken" can stay two only if people would ask for each by name.
 - Name each the way people ask for it, short and general, plural where people order several kinds ("Burgers", "Pizza", "Shawarma", "Salads"). Use one of these names when it fits: ${DISH_NAMES.join(', ')}. Otherwise a short plain name in Title Case.
+- Fewer is better than padding. If you were shown only part of a menu (a few photos, one section), pick the main dishes in that part; never fill the list with vegetables, rice, noodles or other sides because nothing else is there. Return fewer, or none, and say in "note" that it looks like only part of the menu.
 - For each dish, "quote" is a few words copied exactly from the menu where you read it (a heading or an item line), so a person can find it. Copy the words exactly as written, including their spelling and capitals.
 - If what you were given isn't a menu, or names no dishes, return no dishes and say why in "note".
 
