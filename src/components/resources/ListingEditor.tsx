@@ -361,7 +361,7 @@ export default function ListingEditor({
           <ul className="divide-y divide-slate-200/70 border-t border-slate-200/70">
             {empty.map((r) => (
               <li key={r.id}>
-                <button type="button" onClick={() => setOpenId(r.id)} className="flex min-h-11 w-full cursor-pointer items-center gap-2 text-left text-[15px] font-bold text-primary">
+                <button type="button" onClick={() => setOpenId(r.id)} data-testid={`editor-row-${r.id}`} className="flex min-h-11 w-full cursor-pointer items-center gap-2 text-left text-[15px] font-bold text-primary">
                   <PlusIcon className="h-4 w-4 shrink-0" />
                   {r.title}
                 </button>

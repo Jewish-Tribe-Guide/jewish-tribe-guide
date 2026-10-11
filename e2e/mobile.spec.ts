@@ -201,13 +201,13 @@ test.describe('mobile', () => {
     // details myself" there is the editor.
     await openListingEditor(page)
 
-    // The editor reads hours the way the listing does: today's line, tapped
-    // to open the week (see ListingEditor), or "Add hours" for a listing
-    // with none anyone can use (saved as closed every day, as some test
-    // listings are; see hasAnyHours). Either opens the same week editor.
-    const hoursToggle = page.getByRole('button', { name: /^(Today:|Closed today|Add hours)/ })
-    await expect(hoursToggle).toBeVisible()
-    await hoursToggle.click()
+    // The editor is the listing's boxes as rows (Oct 11); Hours is its own
+    // row, filled or under "Not on the listing yet", or, for a place with a
+    // section per audience (a mikvah's Women's), inside that section's row.
+    // Either opens the same week editor.
+    const hoursRow = page.locator('[data-testid="editor-row-hours"], [data-testid^="editor-row-audience:"]').first()
+    await expect(hoursRow).toBeVisible()
+    await hoursRow.click()
 
     // Sunday is guaranteed present regardless of this listing's real hours;
     // force it open so both time inputs are on screen no matter what data
