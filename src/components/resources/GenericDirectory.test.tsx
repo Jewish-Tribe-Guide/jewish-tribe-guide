@@ -716,6 +716,30 @@ describe('GenericDirectory', () => {
       document.removeEventListener('jpc:open-location', openLocation)
     })
 
+    // Oct 10: the list already shows miles from the centre, so Distance
+    // sorts by them rather than asking for a location first.
+    it('with no location, Distance sorts by the miles from the centre the list shows', async () => {
+      const user = userEvent.setup()
+      const category = makeCategory({ upvotesEnabled: true })
+      const openLocation = vi.fn()
+      document.addEventListener('jpc:open-location', openLocation)
+      const items = [
+        makeListing({ id: 'far', name: 'Kosher Far', upvotes: 9, milesFromCenter: 5 }),
+        makeListing({ id: 'near', name: 'Kosher Near', upvotes: 0, milesFromCenter: 0.5 }),
+      ]
+      renderWithProviders(<GenericDirectory category={category} items={items} {...handlers} />)
+      const order = () => screen.getAllByText(/^Kosher (Far|Near)$/).map((e) => e.textContent)
+      expect(sortShows()).toBe('Popularity')
+      expect(order()).toEqual(['Kosher Far', 'Kosher Near'])
+
+      await chooseSort(user, 'Distance')
+
+      expect(openLocation).not.toHaveBeenCalled()
+      expect(sortShows()).toBe('Distance')
+      expect(order()).toEqual(['Kosher Near', 'Kosher Far'])
+      document.removeEventListener('jpc:open-location', openLocation)
+    })
+
     it('switches to Distance when an anchor is already set', async () => {
       const user = userEvent.setup()
       const category = makeCategory({ upvotesEnabled: true })

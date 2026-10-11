@@ -21,6 +21,15 @@ const at = (name: string, travel: Partial<DirectoryResource> = {}): DirectoryRes
 const sortedNames = (items: DirectoryResource[]) => [...items].sort(travelCompare).map((i) => i.name)
 
 describe('travelCompare', () => {
+  it('sorts by miles from the centre only when asked to (Distance chosen with no location, Oct 10)', () => {
+    const items = [
+      { id: 'a', name: 'Alpha', milesFromCenter: 5 },
+      { id: 'b', name: 'Beta', milesFromCenter: 1 },
+    ] as DirectoryResource[]
+    expect(sortedNames(items)).toEqual(['Alpha', 'Beta'])
+    expect([...items].sort((x, y) => travelCompare(x, y, { fromCenter: true })).map((i) => i.name)).toEqual(['Beta', 'Alpha'])
+  })
+
   it('puts the closest first when the visitor typed an address', () => {
     expect(
       sortedNames([

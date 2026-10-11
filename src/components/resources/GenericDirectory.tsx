@@ -913,7 +913,9 @@ export default function GenericDirectory({ category, items, anchorLabel, address
       if (pinnedDiff !== 0) return pinnedDiff
       return upvotes && byPopular
         ? liveCount(b) - liveCount(a) || travelCompare(a, b)
-        : travelCompare(a, b)
+        : // From the centre only when Distance was chosen or asked for
+          // ("near me"); otherwise, with no location, by name.
+          travelCompare(a, b, { fromCenter: !byPopular })
     })
 
   // fromId is the card issuing the request (arrow key pressed while ITS
@@ -965,8 +967,15 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // flips it to Distance the moment an anchor lands, same as an ordinary
   // load. An explicit Popular/Distance click marks the choice as touched so
   // it sticks even if the anchor later disappears or reappears.
+  //
+  // Distances from the community's centre count as something to sort by
+  // (the user, Oct 10): the list already shows "12 mi" from central
+  // Philadelphia, so Distance sorts by those, and "Use my location" above
+  // the list is there for a real one. The picker opens only when there are
+  // no distances at all.
+  const centerDistances = items.some((i) => i.milesFromCenter != null)
   const selectSort = (popular: boolean) => {
-    if (!popular && !anchorLabel) {
+    if (!popular && !anchorLabel && !centerDistances) {
       document.dispatchEvent(new CustomEvent('jpc:open-location'))
       return
     }

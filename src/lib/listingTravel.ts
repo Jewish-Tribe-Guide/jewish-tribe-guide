@@ -51,9 +51,15 @@ export function withMilesFromCenter<T extends DirectoryResource>(items: T[], cen
   return items.map((item) => (item.geo ? { ...item, milesFromCenter: haversineMiles(center, item.geo) } : item))
 }
 
-export function travelCompare(a: DirectoryResource, b: DirectoryResource): number {
+/** `fromCenter`: the visitor chose Distance with no location set, so the
+ *  miles from the centre the list already shows are the order (the user,
+ *  Oct 10: we show the numbers, so sort by them). Never the default. */
+export function travelCompare(a: DirectoryResource, b: DirectoryResource, { fromCenter = false }: { fromCenter?: boolean } = {}): number {
   if (a.milesFromAddress != null || b.milesFromAddress != null) {
     return (a.milesFromAddress ?? Infinity) - (b.milesFromAddress ?? Infinity)
+  }
+  if (fromCenter && (a.milesFromCenter != null || b.milesFromCenter != null)) {
+    return (a.milesFromCenter ?? Infinity) - (b.milesFromCenter ?? Infinity)
   }
   return a.name.localeCompare(b.name)
 }
