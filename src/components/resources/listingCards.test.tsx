@@ -163,7 +163,7 @@ describe('A hotel’s own main card (Oct 6; always shown since Oct 10)', () => {
     expect(card).toHaveTextContent('Not known yet. Is it Shabbat friendly?')
     fireEvent.click(within(card).getByRole('button', { name: 'Yes' }))
     const sheet = screen.getByRole('dialog', { name: 'Shabbos here' })
-    expect(within(sheet).getByRole('switch', { name: /Shabbat friendly/ })).toHaveAttribute('aria-checked', 'true')
+    expect(within(within(sheet).getByRole('group', { name: /Shabbat friendly/ })).getByRole('button', { name: 'Yes' })).toHaveAttribute('aria-pressed', 'true')
     expect(within(sheet).getByRole('button', { name: 'Send' })).toBeInTheDocument()
   })
 })

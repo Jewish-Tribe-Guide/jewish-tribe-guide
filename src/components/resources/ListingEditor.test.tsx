@@ -336,7 +336,7 @@ describe('ListingEditor — badges, edited where they sit', () => {
 
     await u.click(screen.getByRole('button', { name: 'IKC' }))
     expect(screen.getByRole('textbox', { name: 'What isn’t kosher?' })).toHaveValue('Alcoholic beverages are NOT under supervision')
-    await u.click(screen.getByRole('switch', { name: 'Everything here is kosher' }))
+    await u.click(within(screen.getByRole('group', { name: 'Everything here is kosher' })).getByRole('button', { name: 'Yes' }))
 
     expect(screen.queryByRole('textbox', { name: 'What isn’t kosher?' })).not.toBeInTheDocument()
     expect(send()).toHaveTextContent('Send 1 change')

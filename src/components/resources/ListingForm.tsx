@@ -834,60 +834,39 @@ export function DetailFieldInput({
             sat next to titled fields for real, especially alone in a box of
             its own. */}
         <span className="block text-sm font-medium text-slate-700 mb-1">{label}</span>
-        {/* A switch, not a checkbox+repeated-label: a bare tick box reads as
-            "check this to confirm X", so it still needs its own text to say
-            what X is even once a title sits above it — that's the box a
-            checkbox+"Yes"/"No" caption fell back into, and it still read as
-            an odd mix of a question and its own answer stacked in one box.
-            A switch's two positions ARE the yes/no answer (this is the
-            standard WAI-ARIA "switch" pattern — role="switch" + aria-checked
-            on a real <button>, not a styled native checkbox), so the box
-            only needs to hold the control itself, exactly like a select's
-            box only needs to hold the dropdown. Same border/rounded/px-3
-            py-2 footprint as a text input or select (see inputClass), so it
-            still reads as one more field in the same stack, not a stray
-            control. */}
+        {/* Two buttons, Yes and No (the user, Oct 10), where it was a
+            switch. A switch is for turning something on or off (the
+            Filters sheet's "Shabbat friendly" shows only those); this is
+            answering a question, and a switch's off read as "No" when
+            nobody had said so. The same look as the minyan editor's "Clock
+            time / From a zman". Unanswered, neither is chosen. */}
         {/* invertDisplay (see its own doc on CategoryField): shows the
-            logical opposite of the stored value — clicking still always
-            flips the real stored boolean (onChange(!value)), only what's
-            RENDERED from it differs. `!value` (not `!!value`) is deliberate:
-            an unset field is falsy either way, so an inverted field with no
-            answer yet reads as "on"/"Yes" — the friendlier default a
-            positively-phrased question like "Everything here is kosher?"
-            wants, rather than opening on a negative "No" nobody chose. */}
-        {/* The WHOLE row is the switch (one <button>, not a span of inert
-            text next to a separate small control) — a separate
-            `<button role="switch">` stranded at one edge, with plain text
-            beside it doing nothing, made the gap between where you read and
-            where you click feel real instead of just visual. The switch
-            itself comes first (left), its "Yes"/"No" state right next to
-            it — adjacent, not spread to opposite ends of the row — so the
-            two read as one compact unit: the control, then the answer it
-            just gave. */}
+            logical opposite of the stored value — Yes still stores what
+            the field means by yes, only what's RENDERED from it differs.
+            An inverted field with no answer yet reads as "Yes", the
+            friendlier default a positively-phrased question like
+            "Everything here is kosher?" wants, rather than opening on a
+            negative "No" nobody chose. */}
         {(() => {
+          const answered = field.invertDisplay || value === true || value === false
           const displayValue = field.invertDisplay ? !value : !!value
           return (
-            <button
-              type="button"
-              role="switch"
-              aria-checked={displayValue}
-              aria-label={labelOverride ?? field.label}
-              onClick={() => onChange(!value)}
-              className="flex w-full cursor-pointer items-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 transition-colors hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-primary"
-            >
-              <span
-                className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
-                  displayValue ? 'bg-primary' : 'bg-slate-300'
-                }`}
-              >
-                <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                    displayValue ? 'translate-x-6' : 'translate-x-1'
-                  }`}
-                />
-              </span>
-              <span className="text-sm text-slate-600">{displayValue ? 'Yes' : 'No'}</span>
-            </button>
+            <div className="flex gap-1 rounded-xl bg-slate-100 p-[3px]" role="group" aria-label={labelOverride ?? field.label}>
+              {([true, false] as const).map((yes) => {
+                const on = answered && displayValue === yes
+                return (
+                  <button
+                    key={String(yes)}
+                    type="button"
+                    aria-pressed={on}
+                    onClick={() => onChange(field.invertDisplay ? !yes : yes)}
+                    className={`h-10 flex-1 cursor-pointer rounded-[10px] text-[14.5px] focus:outline-none focus-visible:ring-2 focus-visible:ring-primary ${on ? 'bg-white font-bold text-slate-900 shadow-sm' : 'font-semibold text-muted'}`}
+                  >
+                    {yes ? 'Yes' : 'No'}
+                  </button>
+                )
+              })}
+            </div>
           )
         })()}
         {/* Flush left, matching every other field's help text (no more
