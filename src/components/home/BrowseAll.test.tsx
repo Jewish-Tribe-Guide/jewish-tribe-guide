@@ -77,7 +77,8 @@ describe('the Browse tab', () => {
     expect(foodRow).toHaveTextContent(/^Food1 open now2$/)
     expect(groceryRow).toHaveTextContent(/^Grocery1$/)
     const [shulRow, eruvRow] = within(screen.getByTestId('browse-group-Jewish Institutions')).getAllByRole('link')
-    expect(shulRow).toHaveTextContent('Next: Mincha 2 PM · Mikveh Israel')
+    // Not the next minyan: Today leads with that.
+    expect(shulRow).toHaveTextContent(/^Synagogues\d*$/)
     expect(eruvRow).toHaveTextContent(/^Eruv Information$/)
   })
 

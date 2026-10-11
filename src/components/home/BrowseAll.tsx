@@ -11,7 +11,6 @@ import { useHomeSections } from '@/lib/useHomeSections'
 import { useSiteSettings } from '@/lib/useSiteSettings'
 import { useSiteNavigation } from '@/lib/useSiteNavigation'
 import { getCategoryColor } from '@/lib/categoryColor'
-import { nextMinyansAcross } from '@/lib/upcomingDavening'
 import { browseLine, shabbosMoment } from '@/lib/todayHome'
 import { routes } from '@/lib/routes'
 import { withMilesFromAddress, withMilesFromCenter } from '@/lib/listingTravel'
@@ -24,9 +23,10 @@ import { groupCardsIntoSections, resourceCards, useEntryCards } from './sections
 // ── The Browse tab (step 6) ──────────────────────────────────────────────────
 // Every category, in the admin's home page groups, one compact row each: its
 // icon in its colour, its name, how many places, and one live line, the
-// thing its own page says first ("59 open now", "3 Shabbat friendly",
-// "Next: Mincha 2 PM · Mikveh Israel"); nothing where its page has nothing to
-// say. Then What changed, Feedback, About and Privacy, which a phone has
+// thing its own page says first ("59 open now", "3 Shabbat friendly");
+// nothing where its page has nothing to say. Not the next minyan on the
+// Synagogues row (the user, Oct 10): one shul's time read as noise in a list
+// of categories, and Today already leads with it. Then What changed, Feedback, About and Privacy, which a phone has
 // nowhere else once the tabs are Today · Map · Browse.
 
 type Props = {
@@ -61,7 +61,6 @@ export default function BrowseAll({ communitySlug, listings, schedule, zmanim, t
   const lineFor = (id: string | undefined): string | null => {
     const category = categories?.find((c) => c.id === id)
     if (!category || !listings) return null
-    if (category.id === schedule?.linkCategoryId) return nextMinyanLine(schedule)
     if (category.kind !== 'listing') return null
     const items = listings.filter((l) => l.category === category.id)
     // Each place's distance, as its category page measures it (for a list
@@ -125,21 +124,4 @@ export default function BrowseAll({ communitySlug, listings, schedule, zmanim, t
       </nav>
     </div>
   )
-}
-
-/** The shuls' row: the next minyan anywhere, as the Today home's Next
- *  minyan block puts it first. */
-function nextMinyanLine(schedule: MinyanSchedule | null): string | null {
-  if (!schedule) return null
-  const [first] =
-    nextMinyansAcross(
-      schedule.shuls,
-      { today: schedule.todayDayKeys, tomorrow: schedule.tomorrowDayKeys, nowMinutes: schedule.nowMinutes, season: schedule.season, anchors: schedule.anchors },
-      () => null,
-      1,
-    ) ?? []
-  if (!first) return null
-  const tomorrow = first.label.endsWith(' tomorrow')
-  const label = tomorrow ? first.label.slice(0, -' tomorrow'.length) : first.label
-  return `Next: ${label} ${first.time}${tomorrow ? ' tomorrow' : ''} · ${first.shulName}`
 }
