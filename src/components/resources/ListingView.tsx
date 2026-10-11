@@ -1,6 +1,6 @@
 'use client'
 
-import { useContext, useId, useState, type ReactNode } from 'react'
+import { Suspense, useContext, useId, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { track } from '@vercel/analytics'
@@ -617,7 +617,11 @@ export default function ListingView({ item, category, color, place = null, upvot
           box it's about. Just Suggest an edit. */}
       {foot && <div className="pt-1" data-testid="listing-foot">{foot}</div>}
       {onward && <OnwardSection item={item} category={category} color={color} onward={onward} className={onwardClassName} />}
-      {boxEdit && <BoxEditSheet item={item} category={category} edit={boxEdit} onClose={() => setBoxEdit(null)} onEditElse={editElse} />}
+      {/* Its own boundary: loading it the first time otherwise hid the
+          listing for a moment, and the listing came back at its top. */}
+      <Suspense fallback={null}>
+        {boxEdit && <BoxEditSheet item={item} category={category} edit={boxEdit} onClose={() => setBoxEdit(null)} onEditElse={editElse} />}
+      </Suspense>
     </div>
   )
 }

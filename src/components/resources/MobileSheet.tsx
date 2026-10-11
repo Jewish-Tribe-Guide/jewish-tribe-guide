@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { useBodyScrollLock } from '@/lib/useBodyScrollLock'
 import BodyPortal from '@/components/BodyPortal'
 import BackIconButton from '@/components/BackIconButton'
@@ -39,6 +39,26 @@ type Props = {
    *  boxes are white on it (Oct 6). */
   surface?: boolean
 }
+
+// ── One sheet at a time (Oct 10) ────────────────────────────────────────────
+// A sheet opened from inside another (Edit under a listing's box, Suggest an
+// edit, Add their menu) used to slide up over it: two handles, the first
+// sheet's edges showing, and no telling which one a swipe would close. Now
+// the newer sheet takes the same place, at full height, with Back to the one
+// it came from; the one underneath stays mounted (its scroll, its state) but
+// out of sight until it's back on top. Only the top sheet answers Escape and
+// a tap outside.
+let openSheets: readonly string[] = []
+const sheetListeners = new Set<() => void>()
+const setOpenSheets = (next: readonly string[]) => {
+  openSheets = next
+  sheetListeners.forEach((l) => l())
+}
+const subscribeSheets = (l: () => void) => {
+  sheetListeners.add(l)
+  return () => sheetListeners.delete(l)
+}
+const noSheets: readonly string[] = []
 
 type Snap = 'half' | 'full'
 // 'open': fully visible, driven by the header/handle/content drags below.
@@ -122,7 +142,22 @@ export default function MobileSheet({ isOpen, onClose, title, children, draggabl
   const [phase, setPhase] = useState<Phase>(isOpen ? 'open' : 'closed')
   useBodyScrollLock(phase !== 'closed')
 
-  const [snap, setSnap] = useState<Snap>('half')
+  // Where this sheet is among the open ones: `over` another (opened from
+  // inside it, so it takes its place), or `covered` by a newer one. Before
+  // it's registered, any sheet already open is the one it's over. In the
+  // list from layout time, so neither ever paints a frame side by side.
+  const sheetId = useId()
+  const sheets = useSyncExternalStore(subscribeSheets, () => openSheets, () => noSheets)
+  const at = sheets.indexOf(sheetId)
+  const over = at === -1 ? sheets.length > 0 : at > 0
+  const covered = at !== -1 && at < sheets.length - 1
+  useLayoutEffect(() => {
+    if (!isOpen) return
+    setOpenSheets([...openSheets, sheetId])
+    return () => setOpenSheets(openSheets.filter((x) => x !== sheetId))
+  }, [isOpen, sheetId])
+
+  const [snap, setSnap] = useState<Snap>(() => (openSheets.length > 0 ? 'full' : 'half'))
   const [dragHeight, setDragHeight] = useState<number | null>(null)
   const dragRef = useRef<DragState | null>(null)
   const contentRef = useRef<HTMLDivElement>(null)
@@ -146,7 +181,7 @@ export default function MobileSheet({ isOpen, onClose, title, children, draggabl
     setWasOpen(isOpen)
     if (isOpen) {
       setPhase('open')
-      setSnap('half')
+      setSnap(over ? 'full' : 'half')
       setDragHeight(null)
     } else {
       setPhase('closing')
@@ -183,20 +218,20 @@ export default function MobileSheet({ isOpen, onClose, title, children, draggabl
   }, [onClose])
 
   useEffect(() => {
-    if (!draggable) return
+    if (!draggable && !over) return
     const onResize = () => setViewportH(window.innerHeight)
     window.addEventListener('resize', onResize)
     return () => window.removeEventListener('resize', onResize)
-  }, [draggable])
+  }, [draggable, over])
 
   useEffect(() => {
-    if (!isOpen) return
+    if (!isOpen || covered) return
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') close()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [isOpen, close])
+  }, [isOpen, covered, close])
 
   const halfPx = Math.round(viewportH * HALF_FRACTION)
   // max: on a short viewport, viewportH - TOP_INSET_PX could fall below
@@ -456,18 +491,30 @@ export default function MobileSheet({ isOpen, onClose, title, children, draggabl
   // still this component's own documented, supported shape.
   const style: React.CSSProperties = draggable
     ? { height: currentHeight, transition: isClosing || dragHeight === null ? `height ${SNAP_DURATION_MS}ms cubic-bezier(0.32, 0.72, 0, 1)` : 'none' }
-    : { transform: isClosing ? 'translateY(100%)' : 'translateY(0)', transition: `transform ${SNAP_DURATION_MS}ms cubic-bezier(0.32, 0.72, 0, 1)` }
+    : {
+        transform: isClosing ? 'translateY(100%)' : 'translateY(0)',
+        transition: `transform ${SNAP_DURATION_MS}ms cubic-bezier(0.32, 0.72, 0, 1)`,
+        // In another's place, the whole height the one under it had.
+        ...(over ? { height: heights.full } : {}),
+      }
+  // In another sheet's place, Back returns to it when the sheet has no step
+  // of its own to go back to.
+  const back = onBack ?? (over ? close : undefined)
 
   return (
     <BodyPortal>
       <div
-        className={`fixed inset-0 z-50 flex items-end bg-slate-900/40 transition-opacity duration-[280ms] ${isClosing ? 'opacity-0' : 'opacity-100'}`}
+        // Covered: its sheet out of sight and out of reach, kept as it was,
+        // its dimmed backdrop staying for the one over it, which adds none.
+        className={`fixed inset-0 z-50 flex items-end ${over ? '' : 'bg-slate-900/40'} transition-opacity duration-[280ms] ${isClosing && !over ? 'opacity-0' : 'opacity-100'}`}
+        style={covered ? { pointerEvents: 'none' } : undefined}
+        aria-hidden={covered || undefined}
         onClick={(e) => { if (e.target === e.currentTarget) close() }}
         role="presentation"
       >
         <div
-          className={`flex w-full flex-col rounded-t-2xl ${surface ? 'bg-surface' : 'bg-white'} shadow-xl ${isClosing ? '' : 'animate-[sheetUp_220ms_ease-out]'} ${draggable ? '' : 'max-h-[85vh]'}`}
-          style={style}
+          className={`flex w-full flex-col rounded-t-2xl ${surface ? 'bg-surface' : 'bg-white'} shadow-xl ${isClosing || over ? '' : 'animate-[sheetUp_220ms_ease-out]'} ${draggable || over ? '' : 'max-h-[85vh]'}`}
+          style={covered ? { ...style, visibility: 'hidden' } : style}
           role="dialog"
           aria-modal="true"
           aria-label={title}
@@ -512,7 +559,7 @@ export default function MobileSheet({ isOpen, onClose, title, children, draggabl
               className={`flex items-center justify-between px-5 py-4 border-b border-slate-200 shrink-0 ${draggable ? 'touch-none select-none cursor-grab active:cursor-grabbing' : ''}`}
             >
               <div className="flex min-w-0 items-center gap-3">
-                {onBack && <BackIconButton onClick={onBack} />}
+                {back && <BackIconButton onClick={back} />}
                 <h2 className="truncate text-base font-semibold text-slate-900">{title}</h2>
               </div>
               {!draggable && (

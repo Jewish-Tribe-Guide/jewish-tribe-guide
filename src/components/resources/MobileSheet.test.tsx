@@ -2,6 +2,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { useState } from 'react'
 import MobileSheet from './MobileSheet'
 
 afterEach(cleanup)
@@ -159,6 +160,61 @@ describe('MobileSheet', () => {
     } finally {
       vi.useRealTimers()
     }
+  })
+
+  // Oct 10: a sheet opened from inside another takes its place, with Back
+  // to it, instead of sliding up over it.
+  describe('one sheet at a time', () => {
+    function Stacked({ onListingClose = vi.fn() }: { onListingClose?: () => void }) {
+      const [edit, setEdit] = useState(false)
+      return (
+        <>
+          <MobileSheet isOpen onClose={onListingClose} title="Shtetl" draggable surface>
+            <button type="button" onClick={() => setEdit(true)}>Edit</button>
+          </MobileSheet>
+          <MobileSheet isOpen={edit} onClose={() => setEdit(false)} title="Shabbos friendly">
+            <p>the edit</p>
+          </MobileSheet>
+        </>
+      )
+    }
+
+    it('hides the sheet underneath while another is open from it, and Back returns to it', async () => {
+      const user = userEvent.setup()
+      render(<Stacked />)
+      await user.click(screen.getByRole('button', { name: 'Edit' }))
+
+      expect(screen.getByRole('dialog', { name: 'Shabbos friendly' })).toBeVisible()
+      expect(screen.queryByRole('dialog', { name: 'Shtetl' })).not.toBeInTheDocument()
+      expect(screen.getByText('Edit', { selector: 'button' })).not.toBeVisible()
+
+      await user.click(screen.getByRole('button', { name: /back/i }))
+      expect(await screen.findByRole('dialog', { name: 'Shtetl' })).toBeVisible()
+    })
+
+    it('opens in place at full height, with no slide up and no second dimmed backdrop', async () => {
+      const user = userEvent.setup()
+      render(<Stacked />)
+      await user.click(screen.getByRole('button', { name: 'Edit' }))
+      const sheet = screen.getByRole('dialog', { name: 'Shabbos friendly' })
+      expect(sheet.style.height).toBe(`${window.innerHeight - 76}px`)
+      expect(sheet.className).not.toContain('animate-')
+      expect(sheet.parentElement!.className).not.toContain('bg-slate-900')
+    })
+
+    it('Escape and a tap outside close only the top sheet', async () => {
+      const user = userEvent.setup()
+      const onListingClose = vi.fn()
+      render(<Stacked onListingClose={onListingClose} />)
+      await user.click(screen.getByRole('button', { name: 'Edit' }))
+      await user.keyboard('{Escape}')
+      expect(onListingClose).not.toHaveBeenCalled()
+      expect(await screen.findByRole('dialog', { name: 'Shtetl' })).toBeVisible()
+
+      await user.click(screen.getByRole('button', { name: 'Edit' }))
+      fireEvent.click(screen.getByRole('dialog', { name: 'Shabbos friendly' }).parentElement!)
+      expect(onListingClose).not.toHaveBeenCalled()
+    })
   })
 
   it('renders no drag handle unless draggable is set', () => {
