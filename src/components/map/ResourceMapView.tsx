@@ -1450,7 +1450,9 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
           ref={desktopSearchInputRef}
           type="text"
           autoComplete="off"
-          placeholder="Search name, address, or 'open now'…"
+          // Short enough to fit beside ‹ Back; "Open now" is offered once the
+          // box is clicked into (showOpenNowSuggestion).
+          placeholder="Search name, address…"
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onFocus={() => setSearchFocused(true)}
@@ -1999,7 +2001,24 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                 transition: isDraggingSidebar ? 'none' : 'width 200ms ease-in-out',
               }}
             >
-              {desktopSearchForm}
+              {/* ‹ Back, beside the search (the user, Oct 10): the map covers
+                  the whole page on a computer, header and all, and the way
+                  out was a small corner icon people read as "smaller". It
+                  goes where the old icon did: back where the map was opened
+                  from, or home (exitFullscreen). */}
+              <div className="flex items-center gap-2">
+                {standalone && fullscreen && (
+                  <button
+                    type="button"
+                    onClick={exitFullscreen}
+                    aria-label="Back"
+                    className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-full bg-white text-slate-700 shadow-sm ring-1 ring-slate-900/10 hover:bg-slate-50"
+                  >
+                    <ChevronLeftIcon className="h-5 w-5" />
+                  </button>
+                )}
+                <div className="min-w-0 flex-1">{desktopSearchForm}</div>
+              </div>
             </div>
           )}
 
@@ -2086,6 +2105,9 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                       (Escape, or tapping it again, collapses it back — or,
                       arriving from a listing's Map button, exits straight
                       back to that listing; see exitFullscreen). ─────────── */}
+              {/* Not on the map page itself, where ‹ Back by the search is
+                  the way out (Oct 10). */}
+              {!standalone && (
               <button
                 onClick={() => (fullscreen ? exitFullscreen() : setFullscreen(true))}
                 aria-label={fullscreen ? 'Exit fullscreen' : 'View fullscreen'}
@@ -2094,6 +2116,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
               >
                 {fullscreen ? <CollapseIcon className="h-4 w-4" /> : <ExpandIcon className="h-4 w-4" />}
               </button>
+              )}
 
               {/* ── Live-tracking toggle (desktop only) — a map control, not a
                       sidebar row, same as Google Maps' own "my location" button.

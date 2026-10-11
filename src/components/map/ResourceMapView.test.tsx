@@ -1250,26 +1250,31 @@ describe('ResourceMapView — standalone map Escape/exit', () => {
     const onExit = vi.fn()
     renderStandalone(onExit)
 
-    expect(screen.getByRole('button', { name: 'Exit fullscreen' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Back' })).toBeInTheDocument()
 
     fireEvent.keyDown(document, { key: 'Escape' })
 
     expect(onExit).toHaveBeenCalledTimes(1)
     // Still the fullscreen layout, synchronously — nothing ever flipped it to
     // the boxed one, so there's no frame for that flash to happen in.
-    expect(screen.getByRole('button', { name: 'Exit fullscreen' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Back' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'View fullscreen' })).not.toBeInTheDocument()
   })
 
-  it('clicking the fullscreen-toggle button (its other exit path) behaves the same way', async () => {
+  // Oct 10: the way out is ‹ Back beside the search, where people look for
+  // it; the corner icon read as "make the map smaller", and is gone here.
+  it('‹ Back beside the search (its other exit path) behaves the same way, and there’s no corner icon', async () => {
     const user = userEvent.setup()
     const onExit = vi.fn()
     renderStandalone(onExit)
+    expect(screen.queryByRole('button', { name: 'Exit fullscreen' })).not.toBeInTheDocument()
+    const back = screen.getByRole('button', { name: 'Back' })
+    expect(back.compareDocumentPosition(screen.getByPlaceholderText(/Search name, address/)) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
 
-    await user.click(screen.getByRole('button', { name: 'Exit fullscreen' }))
+    await user.click(back)
 
     expect(onExit).toHaveBeenCalledTimes(1)
-    expect(screen.getByRole('button', { name: 'Exit fullscreen' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Back' })).toBeInTheDocument()
   })
 
   // Regression coverage for a real, live-confirmed bug: the fullscreen
