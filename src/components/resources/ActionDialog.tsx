@@ -29,7 +29,7 @@ type Props = {
  *  directory grid instead of replacing the whole screen with the form, the
  *  same "stay in place" reasoning as ListingDetailModal (viewing a listing)
  *  and mobile's own MobileSheet. Unlike ListingDetailModal's max-w-md — sized
- *  for a listing's own facts — this holds a real form (ListingForm),
+ *  for a listing's own facts — this holds a real form (ListingEditor, the "+ Add" box),
  *  which needs more width for address/hours/tag inputs and
  *  more height before it needs its own internal scroll.
  *

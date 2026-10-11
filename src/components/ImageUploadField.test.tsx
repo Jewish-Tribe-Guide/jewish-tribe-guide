@@ -38,7 +38,7 @@ function fakeFile(name: string) {
 }
 
 // A real caller always feeds the resulting URL straight back in as the next
-// `value` (see SiteSettingsEditor, CategoryFormFields, ListingForm) — this
+// `value` (see SiteSettingsEditor, CategoryFormFields, DetailFieldInput) — this
 // wrapper does the same, which is what lets a SECOND reposition see the
 // first crop's uploaded URL as `value` at all.
 function ControlledField() {

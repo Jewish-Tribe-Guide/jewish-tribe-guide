@@ -18,9 +18,10 @@ type Props = {
 // Compact 7-row hours editor. Always expanded — it used to collapse behind
 // its own chevron (defaulting shut, auto-opening once hours were pre-filled
 // from Google), back when it sat in one long flat field list and needed its
-// own space-saving toggle. Now that it renders inside ListingForm's Basics
-// group (itself already collapsed/expanded as a whole), that second layer
-// of hiding was pure friction — open Basics, then still have to click again
+// own space-saving toggle. Once it rendered inside a group that was itself
+// already collapsed/expanded as a whole (the old form's Basics; now the
+// listing editor's Hours row), that second layer of hiding was pure
+// friction — open the group, then still have to click again
 // just to see or set Hours — and looked jarringly different next to a plain
 // boolean field's checkbox right next to it, which reveals what it gates
 // with no toggle of its own either. Each day has a "Closed" toggle and

@@ -748,8 +748,8 @@ describe('approveSubmission: Google-sync field ownership', () => {
   // `description` (googleDescription) used to be a Google-only concept with
   // no ownership tracking at all — these two mirror the `name` tests above,
   // now that it's an ordinary ownable field. Matched by a fixed key, not
-  // label, unlike `website` — see ListingForm.tsx's own doc on the
-  // convention.
+  // label, unlike `website` — see useListingDraft's handlePlaceSelect
+  // on the convention.
   it('owns a description field whose submitted value matches its autofill snapshot — no Google call needed', async () => {
     const sub = baseSubmission({
       operation: 'create',

@@ -38,7 +38,7 @@ type Props = {
    *  lives, so it needs to live somewhere that survives whatever the
    *  caller's own component does. Pass both or neither; when omitted, this
    *  component tracks it internally exactly as before (fine for a caller,
-   *  like ListingForm or CategoryFormFields, that never unmounts this field
+   *  like DetailFieldInput or CategoryFormFields, that never unmounts this field
    *  except when the photo itself is genuinely done with). */
   originalSource?: File | string | null
   onOriginalSourceChange?: (source: File | string | null) => void
@@ -47,8 +47,8 @@ type Props = {
    *  reposition/re-zoom it" once a photo is set, or "or drag an image onto
    *  the preview, or click it and paste one (⌘V / Ctrl+V)" before one is.
    *  Default true (admin's logo/hero/category-icon editors keep both — see
-   *  SiteSettingsEditor's own tests). Off for the public listing form
-   *  (ListingForm) specifically: confirmed with the site owner that a
+   *  SiteSettingsEditor's own tests). Off for the public listing editors
+   *  (DetailFieldInput, ListingEditor's photo row) specifically: confirmed with the site owner that a
    *  visitor filling out one form field at a time doesn't need either
    *  spelled out the way an admin configuring branding once might — Upload
    *  image/Paste URL are already visible, self-explanatory buttons, and
@@ -58,10 +58,10 @@ type Props = {
   /** Starts the "…or paste an image URL directly" row collapsed behind a
    *  small link instead of always showing its own label + input. Default
    *  false (admin's own uploaders keep it always visible — admins actually
-   *  use this for stock-photo links). On for the public listing form
+   *  use this for stock-photo links). On for the public listing editors
    *  specifically: most visitors upload a file, and two permanently-visible
    *  lines for an edge-case path is exactly the bulk that field didn't need
-   *  — see ListingForm's own call site. */
+   *  — see DetailFieldInput's own call site. */
   collapseUrlInput?: boolean
 }
 

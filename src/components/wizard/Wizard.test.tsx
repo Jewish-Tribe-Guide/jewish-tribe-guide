@@ -14,7 +14,7 @@ import Wizard, { type Step } from './Wizard'
 vi.mock('@vercel/analytics', () => ({ track: vi.fn() }))
 // Needed by PrivacyNote's useCommunitySlug() (communityContext.tsx), the same
 // way every other form embedding it already mocks this — see FeedbackForm.
-// test.tsx/ListingForm.test.tsx's own identical mock.
+// test.tsx/ListingEditor.test.tsx's own identical mock.
 vi.mock('next/navigation', () => ({
   useRouter: () => mockRouter,
   usePathname: () => '/test-community',

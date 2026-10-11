@@ -24,7 +24,7 @@ function stubFetch(body: Record<string, unknown>, ok = true) {
 }
 
 const listing = { id: 'listing-1', name: 'Kosher Mart' }
-// ListingForm now owns the trigger button and mounting/showing this panel —
+// ListingEditor owns opening and showing this panel —
 // this suite exercises the panel on its own, so it's always "open" as far as
 // this component is concerned.
 function setup(props: Partial<React.ComponentProps<typeof RemovalRequest>> = {}) {
@@ -93,9 +93,8 @@ describe('RemovalRequest', () => {
   })
 
   // Removal used to be the one screen in the form with no way to leave an
-  // email at all — that field lived in the block this panel replaces, not
-  // inside it. Now it has its own, sharing ListingForm's own state. No name
-  // field, here or on the edit screen — see ListingForm's own comment on why.
+  // email at all. Now it has its own, on useListingSubmit's shared state. No
+  // name field — see the component's own comment on why.
   it('offers an email field, pre-filled from the shared state', () => {
     setup({ submitterEmail: 'dana@example.com' })
     expect(screen.getByLabelText('Your email (optional)')).toHaveValue('dana@example.com')
@@ -115,11 +114,9 @@ describe('RemovalRequest', () => {
     expect(box).toContainElement(screen.getByLabelText('Your email (optional)'))
   })
 
-  // This panel had no privacy note of its own — ListingForm's copy used to
-  // live outside the removalOpen-hidden block and cover both screens, but
-  // moving it to live inside ListingForm's own email field (see that
-  // component's test) means this screen needs its own. Fails without the
-  // <PrivacyNote /> added alongside RemovalRequest's own email field.
+  // This panel had no privacy note of its own — the old form's copy used to
+  // cover both screens — so it needs its own, under its own email field.
+  // Fails without the <PrivacyNote /> added alongside that field.
   it('shows its own privacy note directly under its own email field', () => {
     setup()
     const emailInput = screen.getByLabelText('Your email (optional)')

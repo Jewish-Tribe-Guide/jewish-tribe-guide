@@ -23,8 +23,8 @@ declare global {
 
 export type TurnstileHandle = {
   /** Re-runs the challenge for a fresh token — call this after the server
-   *  rejects a submission for a stale/already-used token (see ListingForm's
-   *  handleSubmit), so the visitor can just retry without losing their
+   *  rejects a submission for a stale/already-used token (see
+   *  useListingSubmit's submit), so the visitor can just retry without losing their
    *  filled-in form or reloading the page. */
   reset: () => void
 }

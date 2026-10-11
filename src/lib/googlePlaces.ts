@@ -33,7 +33,7 @@ export type PlaceSync = {
   address: string | null
   /** Only written when the sync owns the category's Website field — see
    *  OWNABLE_SYNC_FIELDS. Matched to a listing's own Website detail field by
-   *  label, same convention as ListingForm.tsx's intake autofill (categories
+   *  label, same convention as useListingDraft's address-pick autofill (categories
    *  predate a fixed key convention for this one). */
   website: string | null
   businessStatus: BusinessStatus | null
@@ -60,7 +60,7 @@ function serverKey(): string | null {
 // field is empty) → Google's, refreshed forever. Differs → the submitter's,
 // never touched. The comparison itself is cheap for the common case — the
 // form already captures what picking an address autofilled (see
-// ListingForm.tsx's `googleAutofill`), so most fields are checked against
+// useListingDraft's `googleAutofill`), so most fields are checked against
 // that for free; only a field that's new/changed AND was never autofilled
 // costs a live Google Places lookup to verify.
 //
@@ -96,7 +96,7 @@ function serverKey(): string | null {
  *  legitimately differ from the parent business Google links.
  *
  *  `description` (stored as the listing's `googleDescription` detail, only on
- *  categories that configure a field with that key — see ListingForm.tsx)
+ *  categories that configure a field with that key — see useListingDraft)
  *  used to be a Google-only concept too, always fill-once-when-empty and
  *  never tracked. It's tracked now for the same reason `website` is: some
  *  categories let a submitter write their own, and that shouldn't be

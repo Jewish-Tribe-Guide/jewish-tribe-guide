@@ -11,8 +11,7 @@ afterEach(() => {
 describe('HoursInput', () => {
   // No collapse any more — see the component's own doc for why (it used to
   // hide behind its own chevron, which was a second layer of collapsing once
-  // it started rendering inside ListingForm's already-collapsible Basics
-  // group, and looked inconsistent next to the plain checkbox beside it).
+  // it started rendering inside an already-collapsible group, and looked inconsistent next to the plain checkbox beside it).
   it('always shows all 7 days, with no collapse control', () => {
     render(<HoursInput value={null} onChange={vi.fn()} />)
     expect(screen.queryByRole('button')).not.toBeInTheDocument()

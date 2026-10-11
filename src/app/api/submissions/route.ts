@@ -162,8 +162,9 @@ export async function POST(request: Request) {
       }
     }
     const errors = validateSubmission(payload, category)
-    // The authoritative version of the same guard ListingForm.tsx already
-    // runs client-side — this one can't be bypassed by posting directly.
+    // The authoritative version of the guard the editors already apply
+    // client-side (ListingEditor and BoxEditor keep Send off until something
+    // changed) — this one can't be bypassed by posting directly.
     // Only for 'update': a 'create' has no `existingResource` to compare
     // against (hasListingChanged treats that as always "a change" anyway).
     if (operation === 'update' && !hasListingChanged(existingResource, payload, category?.detailFields ?? [])) {

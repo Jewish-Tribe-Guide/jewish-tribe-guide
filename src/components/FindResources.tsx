@@ -132,8 +132,8 @@ export default function FindResources({
   // but that meant every visitor to every category page, including the great
   // majority who only browse, loaded Cloudflare's script and ran a challenge
   // (a third-party script plus two or three iframes) for a form they never
-  // opened. Submit is disabled until the token arrives anyway (ListingForm),
-  // and the challenge runs while they fill the form in, which takes far longer
+  // opened. Send is disabled until the token arrives anyway (useListingSubmit's
+  // `verifying`), and the challenge runs while they fill the form in, which takes far longer
   // than it does.
   const [turnstileToken, setTurnstileToken] = useState('')
   const turnstileRef = useRef<TurnstileHandle>(null)
@@ -222,7 +222,7 @@ export default function FindResources({
 
   const action = actionSubject
 
-  // Whether ListingForm has swapped to its Request removal panel — reported
+  // Whether ListingEditor is showing its Request removal panel — reported
   // up via onRemovalOpenChange so the Edit MobileSheet/ActionDialog's own
   // title can become "Request removal of {name}" instead of a static
   // "Suggest an edit". Reset at both openAction (a fresh edit starting) and

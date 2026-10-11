@@ -37,7 +37,7 @@ export type SyncOneResult =
   | { outcome: 'synced'; statusChange: StatusChange | null; flaggedClosed: boolean }
 
 // The category's Website field key, matched by label — same convention
-// ListingForm.tsx's intake autofill uses, since categories predate a fixed
+// useListingDraft's address-pick autofill uses, since categories predate a fixed
 // key convention for this field. Cached per community so a run with many
 // listings across few categories doesn't refetch the same category list once
 // per row.
@@ -177,8 +177,8 @@ export async function syncOneListing(row: SyncedRow, { statusOnly = false }: { s
     details[websiteKey] = sync.website
     wrote.push('website')
   }
-  // Fixed key, unlike `website` — see ListingForm.tsx's `googleDescription`
-  // convention doc.
+  // Fixed key, unlike `website` — see useListingDraft's handlePlaceSelect
+  // for the `googleDescription` convention.
   if (sync.description && syncMayWrite(row.details, 'description', row.details?.googleDescription)) {
     details.googleDescription = sync.description
     wrote.push('description')
