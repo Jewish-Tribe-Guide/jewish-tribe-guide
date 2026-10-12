@@ -33,8 +33,12 @@ import type { Locator, Page, APIRequestContext } from '@playwright/test'
 // contended one, which warming cannot.
 const API_TIMEOUT = 45_000
 
+function budgetedGet(request: APIRequestContext, url: string) {
+  return request.get(url, { timeout: API_TIMEOUT })
+}
+
 async function apiGet(request: APIRequestContext, url: string): Promise<Record<string, unknown>> {
-  const res = await request.get(url, { timeout: API_TIMEOUT })
+  const res = await budgetedGet(request, url)
   if (!res.ok()) throw new Error(`GET ${url} returned ${res.status()}`)
   return (await res.json()) as Record<string, unknown>
 }
@@ -62,6 +66,18 @@ export async function defaultCommunity(page: Page): Promise<string> {
   if (!response) throw new Error('No response for "/"')
   const slug = new URL(page.url()).pathname.split('/').filter(Boolean)[0]
   if (!slug) throw new Error(`"/" did not redirect to a community (landed on ${page.url()})`)
+  return slug
+}
+
+/** The same slug, found by following the redirect outside the browser. For a
+ *  test measuring what a page load downloads, that load has to be the
+ *  browser's first: a visit to the home page beforehand registers the service
+ *  worker, which can then take control halfway through the measured load and
+ *  fetch every script a second time (see e2e/budgets.spec.ts). */
+export async function defaultCommunitySlug(request: APIRequestContext): Promise<string> {
+  const res = await budgetedGet(request, '/')
+  const slug = new URL(res.url()).pathname.split('/').filter(Boolean)[0]
+  if (!slug) throw new Error(`"/" did not redirect to a community (landed on ${res.url()})`)
   return slug
 }
 
