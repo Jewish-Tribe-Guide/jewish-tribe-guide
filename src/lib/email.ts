@@ -699,28 +699,28 @@ export async function sendWatchHealthAlert(communitySlug: string, alerts: WatchH
 }
 
 /**
- * An eruv's line, read from its own map, is new or has changed and waits
- * for an admin before the guide's map uses it. Sent once per new line,
- * not every week it waits.
+ * Parts an admin left out of an eruv's map that the map no longer has: the
+ * eruv renamed or redrew them, so whatever replaced them is showing. Sent
+ * once per change, not every day it lasts.
  */
-export async function sendEruvLineAlert(communitySlug: string, eruvim: { name: string; first: boolean }[]): Promise<void> {
+export async function sendEruvLineAlert(communitySlug: string, eruvim: { name: string; missing: string[] }[]): Promise<void> {
   if (eruvim.length === 0) return
   const to = await notificationRecipients(communitySlug)
   const rows = eruvim
     .map(
       (e) => `<tr>
-        <td style="padding:6px 10px;border-bottom:1px solid #e2e8f0;">${escapeHtml(e.name)}</td>
-        <td style="padding:6px 10px;border-bottom:1px solid #e2e8f0;color:#334155;">${e.first ? 'Its line, read for the first time' : 'Its line has changed'}</td>
+        <td style="padding:6px 10px;border-bottom:1px solid #e2e8f0;vertical-align:top;">${escapeHtml(e.name)}</td>
+        <td style="padding:6px 10px;border-bottom:1px solid #e2e8f0;color:#334155;">${e.missing.map((n) => `“${escapeHtml(n)}”`).join(', ')}</td>
       </tr>`,
     )
     .join('')
   const admin = adminAppUrl()
   await sendEmail({
     to,
-    subject: eruvim.length === 1 ? `${eruvim[0].name}: a line to check` : `${eruvim.length} eruv lines to check`,
+    subject: eruvim.length === 1 ? `${eruvim[0].name}: its map has changed` : `${eruvim.length} eruv maps have changed`,
     html: `<div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:640px;margin:0 auto;">
-      <h2 style="color:#1d4ed8;font-size:18px;">Eruv lines</h2>
-      <p style="color:#334155;font-size:14px;">The guide read these from each eruv's own map. Check the area against the eruv's map before using it: until then, the guide keeps showing the line it had.</p>
+      <h2 style="color:#1d4ed8;font-size:18px;">Eruv maps</h2>
+      <p style="color:#334155;font-size:14px;">The guide shows each eruv's own map, without the parts you left out. These parts aren't in the eruv's map any more: it may have renamed or redrawn them, so the guide could now be showing something you meant to leave out. Check the map and choose again in the Eruvim tab.</p>
       <table style="border-collapse:collapse;font-size:14px;width:100%;">${rows}</table>
       ${admin ? `<p style="font-size:13px;"><a href="${admin}/${encodeURIComponent(communitySlug)}/admin/eruvim" style="color:#1d4ed8;">Open the Eruvim tab</a></p>` : ''}
     </div>`,

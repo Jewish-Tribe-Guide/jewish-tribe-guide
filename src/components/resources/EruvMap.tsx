@@ -4,13 +4,12 @@ import { useEffect, useRef, useState } from 'react'
 import { loadGoogleMaps, MAPS_MAP_ID, onMapsAuthFailure } from '@/lib/loadGoogleMaps'
 import { clearEruvim, drawEruvim, emphasizeEruvim, eruvDrawKey, type DrawnEruv, type MapEruv } from '@/components/map/eruvLayer'
 
-// ── The eruvim on a map (Oct 7) ─────────────────────────────────────────────
-// Each eruv's own line, drawn on the site's Google map in its status's
-// colour, its enclosed area faintly filled, and the visitor's dot. Tapping
-// an eruv, or its name, opens its listing. Nothing here decides anything:
-// the lines are the eruvim's, as an admin approved them, and the colour is
-// their status. Each eruv carries its name, so the map and the list can be
-// matched up; on desktop, pointing at either picks out the other.
+// ── The eruvim on a map (Oct 7; their own maps Oct 12) ──────────────────────
+// Each eruv's own map, drawn on the site's Google map as the eruv draws it
+// (eruvLayer.ts), with its name in its status's colour, and the visitor's
+// dot. Tapping an eruv, or its name, opens its listing. Nothing here
+// decides anything. Each eruv carries its name, so the map and the list
+// can be matched up; on desktop, pointing at either picks out the other.
 
 export type { MapEruv } from '@/components/map/eruvLayer'
 export { mapLabel } from '@/components/map/eruvLayer'
@@ -18,8 +17,6 @@ export { mapLabel } from '@/components/map/eruvLayer'
 type Props = {
   eruvim: MapEruv[]
   you: { lat: number; lng: number } | null
-  /** Frame this eruv (yours), or every eruv when null. */
-  focusId: string | null
   fallbackCenter: { lat: number; lng: number }
   onSelect: (id: string) => void
   /** The eruv to pick out (a row being pointed at), the rest faded. */
@@ -29,12 +26,12 @@ type Props = {
   className?: string
 }
 
-export default function EruvMap({ eruvim, you, focusId, fallbackCenter, onSelect, highlightId = null, onHover, className = '' }: Props) {
+export default function EruvMap({ eruvim, you, fallbackCenter, onSelect, highlightId = null, onHover, className = '' }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<google.maps.Map | null>(null)
   const drawnRef = useRef<Map<string, DrawnEruv>>(new Map())
   const markerRef = useRef<google.maps.marker.AdvancedMarkerElement | null>(null)
-  const framedRef = useRef<string | null>(null)
+  const framedRef = useRef(false)
   const onSelectRef = useRef(onSelect)
   const onHoverRef = useRef(onHover)
   const eruvimRef = useRef(eruvim)
@@ -115,25 +112,17 @@ export default function EruvMap({ eruvim, you, focusId, fallbackCenter, onSelect
     markerRef.current = new google.maps.marker.AdvancedMarkerElement({ map, position: you, content: dot, title: 'You' })
   }, [ready, you?.lat, you?.lng]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Framed once: on the visitor's eruv, or on every eruv; again only when
-  // that changes. Anything else leaves the map where the visitor put it.
+  // Framed once, on every eruv. Anything else leaves the map where the
+  // visitor put it.
   const hasLines = drawKey !== ''
   useEffect(() => {
     const map = mapRef.current
-    if (!ready || !map || !hasLines) return
-    const target = focusId ?? ''
-    if (framedRef.current === target) return
-    framedRef.current = target
+    if (!ready || !map || !hasLines || framedRef.current) return
+    framedRef.current = true
     const frame = new google.maps.LatLngBounds()
-    const focus = focusId ? drawnRef.current.get(focusId)?.bounds : undefined
-    if (focus && !focus.isEmpty()) {
-      frame.union(focus)
-      if (you) frame.extend(you)
-    } else {
-      for (const d of drawnRef.current.values()) frame.union(d.bounds)
-    }
+    for (const d of drawnRef.current.values()) frame.union(d.bounds)
     if (!frame.isEmpty()) map.fitBounds(frame, 24)
-  }, [ready, hasLines, focusId]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [ready, hasLines])
 
   if (failed) return null
   return <div ref={containerRef} className={`overflow-hidden rounded-2xl border border-slate-200 bg-slate-100 ${className}`} data-testid="eruv-map" aria-label="Map of the eruvim" role="region" />

@@ -8,13 +8,21 @@ import { parseLineFile } from '@/lib/eruvLine'
 import { clearEruvStatuses } from '@/lib/useEruvStatuses'
 import YourEruv from './YourEruv'
 
-const here = vi.hoisted(() => ({ coords: null as { lat: number; lng: number } | null, accuracyM: null as number | null }))
+const here = vi.hoisted(() => ({ coords: null as { lat: number; lng: number } | null }))
 vi.mock('@/lib/locationContext', () => ({ useOptionalLocation: () => here }))
 
 const NOW = Date.parse('2026-10-09T19:00:00Z') // Fri 3 PM
-const line = parseLineFile(readFileSync(join(__dirname, '../../lib/__fixtures__/eruv/center-city.geojson'), 'utf8'))
-const fetchMock = vi.fn(async () =>
-  new Response(JSON.stringify({ ok: true, available: true, timezone: 'America/New_York', candles: 18 * 60 + 12, eruvim: [{ id: 'center-city', name: 'Center City Eruv', statusUrl: 'https://www.centercityeruv.com/', statusDated: false, status: 'up', statusWords: 'x', statusPostedOn: null, statusCheckedAt: '2026-10-09T18:55:00Z', statusErrorAt: null, statusError: null, line }] })),
+const map = (f: string) => parseLineFile(readFileSync(join(__dirname, '../../lib/__fixtures__/eruv', f), 'utf8'))
+const eruv = (id: string, name: string, status: 'up' | 'down') => ({ id, name, statusUrl: 'https://example.org/', statusDated: false, status, statusWords: 'x', statusPostedOn: null, statusCheckedAt: '2026-10-09T18:55:00Z', statusErrorAt: null, statusError: null })
+// /api/eruv, and /api/eruv/maps.
+const fetchMock = vi.fn(async (url: string) =>
+  new Response(
+    JSON.stringify(
+      String(url).startsWith('/api/eruv/maps')
+        ? { ok: true, maps: [{ id: 'center-city', map: map('center-city.geojson') }, { id: 'university-city', map: map('university-city.kml') }] }
+        : { ok: true, available: true, timezone: 'America/New_York', candles: 18 * 60 + 12, eruvim: [eruv('center-city', 'Center City Eruv', 'up'), eruv('university-city', 'University City Eruv', 'down')] },
+    ),
+  ),
 )
 
 beforeEach(() => {
@@ -31,12 +39,20 @@ afterEach(() => {
 const show = () => renderWithProviders(<YourEruv communitySlug="philly" href="/philly/eruv" now={NOW} />)
 
 describe('YourEruv', () => {
-  it('inside an eruv: its name, whether it’s up, when the guide checked; opens the Eruv page', async () => {
-    here.coords = { lat: 39.9496, lng: -75.1718 }
+  it('the nearest eruv: its name, whether it’s up, when the guide checked; opens the Eruv page', async () => {
+    here.coords = { lat: 39.9496, lng: -75.1718 } // Rittenhouse Square
     show()
     const card = await screen.findByTestId('today-eruv')
-    expect(card).toHaveTextContent('YOUR ERUVCenter City EruvUp for this ShabbosChecked 2:55 PM · every 15 minutes until candle lighting')
+    expect(card).toHaveTextContent('NEAREST ERUVCenter City EruvUp for this ShabbosChecked 2:55 PM · every 15 minutes until candle lighting')
     expect(card).toHaveAttribute('href', '/philly/eruv')
+    // Never whether they're in it (Oct 12).
+    expect(card).not.toHaveTextContent(/inside|your eruv/i)
+  })
+
+  it('whichever eruv is nearest, with its own status', async () => {
+    here.coords = { lat: 39.956, lng: -75.2 } // Powelton, in University City
+    show()
+    expect(await screen.findByTestId('today-eruv')).toHaveTextContent('University City EruvDown this Shabbos')
   })
 
   it('no location: nothing, and nothing fetched', async () => {
@@ -46,8 +62,8 @@ describe('YourEruv', () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
-  it('outside every mapped eruv: nothing', async () => {
-    here.coords = { lat: 39.945, lng: -75.12 }
+  it('no eruv within reach: nothing', async () => {
+    here.coords = { lat: 39.93, lng: -75.0 } // Cherry Hill
     show()
     await vi.waitFor(() => expect(fetchMock).toHaveBeenCalled())
     await new Promise((r) => setTimeout(r, 0))

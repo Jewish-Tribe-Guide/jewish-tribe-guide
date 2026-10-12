@@ -1,11 +1,11 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { lineFetchUrl, parseLineFile, sameLine, withoutNames, type EruvLineFile } from './eruvLine'
-import { labelPoint, locator, outlineOf, shapeOf } from './eruvShape'
+import { lineFetchUrl, missingNames, parseLineFile, partNames, sameLine, shownMap, type EruvLineFile } from './eruvLine'
+import { labelPoint, metresFrom } from './eruvShape'
 
-// The eruvim's own line files, as published Oct 7 2026: Center City's
-// map-data.geojson, University City's and Lower Merion's Google My Maps.
+// The eruvim's own map files, as published Oct 7 2026: Center City's
+// map-data.geojson, and the others' Google My Maps.
 const fixture = (f: string) => parseLineFile(readFileSync(join(__dirname, '__fixtures__/eruv', f), 'utf8'))
 const CC = fixture('center-city.geojson')
 const UC = fixture('university-city.kml')
@@ -13,6 +13,9 @@ const LM = fixture('lower-merion.kml')
 const NE = fixture('northeast.kml')
 const EP = fixture('elkins-park.kml')
 const EP_ROUTE = 'Directions from Elkins Park House to Young Israel of Elkins Park'
+// The ten pieces of Center City's file its own site doesn't draw (its
+// page's `boundarySegments` uses the other 21), migration 076.
+const CC_LEFT_OUT = ['Washington Border', 'Front St Border', "Grey's Ferry Border", 'South Street Bridge', 'Line 25', 'Line 26', 'Line 27', 'Line 28', 'Line 29', 'Line 30']
 
 describe('parseLineFile', () => {
   it('reads GeoJSON and KML into named lines of [lat, lng]', () => {
@@ -22,8 +25,7 @@ describe('parseLineFile', () => {
     expect(UC.lines.map((l) => l.name)).toEqual(['Main Eruv Boundary', 'Penn Park Boundary'])
     expect(LM.lines.filter((l) => l.name === 'Lower Merion Eruv Boundary')).toHaveLength(8)
   })
-  it('a marker isn’t a line; a page that isn’t a line file is an error', () => {
-    expect(UC.lines.some((l) => l.name === 'Entry to Penn Park')).toBe(false)
+  it('a page that isn’t a map file is an error', () => {
     expect(() => parseLineFile('<html><body>Eruv map</body></html>')).toThrow('Not a GeoJSON or KML file')
     expect(() => parseLineFile('{"type":"FeatureCollection","features":[]}')).toThrow('No lines in the file')
   })
@@ -32,115 +34,106 @@ describe('parseLineFile', () => {
     expect(lineFetchUrl('https://www.google.com/maps/d/embed?mid=1SaMJDaGuBq1fHZun3FyKUHFYsu0aYms&ehbc=2E312F')).toBe('https://www.google.com/maps/d/kml?mid=1SaMJDaGuBq1fHZun3FyKUHFYsu0aYms&forcekml=1')
     expect(lineFetchUrl('https://www.centercityeruv.com/map-data.geojson')).toBe('https://www.centercityeruv.com/map-data.geojson')
   })
-  it('a line an admin leaves out, by name', () => {
-    const file: EruvLineFile = { lines: [{ name: 'Boundary', points: [[1, 1], [2, 2]] }, { name: 'Fall 2025 Reroute Alert', points: [[3, 3], [4, 4]] }] }
-    expect(withoutNames(file, ['fall 2025 reroute alert']).lines.map((l) => l.name)).toEqual(['Boundary'])
-    expect(sameLine(file, JSON.parse(JSON.stringify(file)))).toBe(true)
+})
+
+describe('each map as the eruv draws it (Oct 12)', () => {
+  it('its lines in its own colours and widths: University City’s blue eruv and pink Penn Park', () => {
+    expect(UC.lines.map((l) => [l.name, l.color, l.width])).toEqual([
+      ['Main Eruv Boundary', '#01579b', 11.269],
+      ['Penn Park Boundary', '#c2185b', 8.75],
+    ])
+  })
+  it('Lower Merion’s red, the Main Line’s blue, the Lankenau route’s green', () => {
+    const colour = (name: string) => [...new Set(LM.lines.filter((l) => l.name === name).map((l) => l.color))]
+    expect(colour('Lower Merion Eruv Boundary')).toEqual(['#ff0000'])
+    expect(colour('Main Line Eruv Boundary')).toEqual(['#0000ff'])
+    expect(colour('Lankenau Hospital Route')).toEqual(['#009900'])
+  })
+  it('a shaded area keeps its shading: the Northeast', () => {
+    expect(NE.lines).toHaveLength(1)
+    expect(NE.lines[0].fill).toEqual({ color: '#ccffff', opacity: 0.47 })
+  })
+  it('its markers, with their notes: a plain pin is its colour, anything else its picture', () => {
+    const crossing = LM.marks!.find((m) => m.name === 'Crossing A')!
+    expect(crossing.note).toBe('The crossing tunnel under the rail line at the Merion Station')
+    expect(crossing.icon).toMatch(/22-blue-dot\.png$/)
+    const entry = UC.marks!.find((m) => m.name === 'Entry to Penn Park')!
+    expect(entry).toMatchObject({ color: '#c2185b' })
+    expect(entry.icon).toBeUndefined()
+    expect(LM.marks!.filter((m) => /Reroute Alert/.test(m.name)).length).toBeGreaterThan(0)
+  })
+  it('a file that sets no colours (Center City’s) leaves them to the map', () => {
+    expect(CC.lines.every((l) => l.color === undefined)).toBe(true)
   })
 })
 
-describe('the areas each line encloses', () => {
-  it('Center City: Center City and South Philadelphia, its gaps joined for an admin to see', () => {
-    const s = shapeOf(CC)
-    expect(s.areas.length).toBeGreaterThanOrEqual(2)
-    expect(s.joins.length).toBe(4)
+describe('what the guide shows of a map', () => {
+  it('without the parts an admin left out: Center City as its own site draws it', () => {
+    const shown = shownMap(CC, CC_LEFT_OUT)
+    expect(shown.lines).toHaveLength(21)
+    expect(partNames(shown)).not.toContain('Washington Border')
   })
-
-  const cc = locator(CC)
-  it('inside, outside, at the edge', () => {
-    expect(cc([39.9496, -75.1718], 20)).toBe('inside') // Rittenhouse Square
-    expect(cc([39.925, -75.17], 20)).toBe('inside') // South Philadelphia
-    expect(cc([39.935, -75.195], 20)).toBe('inside') // the Grays Ferry piece, closed by a join
-    expect(cc([39.945, -75.12], 20)).toBe('outside') // Camden
-    expect(cc([39.9522, -75.1932], 20)).toBe('outside') // Penn, across the river
-    expect(cc([39.954408, -75.141721], 20)).toBe('edge') // on the line by the Delaware
+  it('without its markers when they’re hidden (the Northeast’s shuls), and with them otherwise', () => {
+    expect(NE.marks!.length).toBeGreaterThan(0)
+    expect(shownMap(NE, [], true).marks).toBeUndefined()
+    expect(shownMap(LM, []).marks).toEqual(LM.marks)
   })
-  it('a line between two of its areas isn’t an edge: Washington Avenue', () => {
-    expect(cc([39.93782, -75.1667], 20)).toBe('inside')
+  it('a left-out name the map no longer has is missing', () => {
+    expect(missingNames(CC, CC_LEFT_OUT)).toEqual([])
+    expect(missingNames(CC, ['Washington Border', 'Line 99'])).toEqual(['Line 99'])
+    expect(missingNames(EP, [EP_ROUTE])).toEqual([])
   })
-  it('a phone that isn’t sure where it is is at the edge sooner', () => {
-    // 120 m in from the line by the Delaware.
-    expect(cc([39.954408, -75.1431], 20)).toBe('inside')
-    expect(cc([39.954408, -75.1431], 150)).toBe('edge')
-    expect(cc([39.9496, -75.1718], 2000)).toBe('edge')
-  })
-
-  it('University City and Lower Merion', () => {
-    const uc = locator(UC)
-    expect(uc([39.9522, -75.1932], 20)).toBe('inside') // Penn
-    expect(uc([39.9496, -75.1718], 20)).toBe('outside')
-    const lm = locator(LM)
-    expect(lm([40.0085, -75.2602], 20)).toBe('inside') // Narberth
-    expect(lm([40.0076, -75.2341], 20)).toBe('inside') // Bala Cynwyd
-    expect(lm([39.9496, -75.1718], 20)).toBe('outside')
+  it('a read compares as a whole', () => {
+    expect(sameLine(UC, JSON.parse(JSON.stringify(UC)))).toBe(true)
+    expect(sameLine(UC, shownMap(UC, ['Penn Park Boundary']))).toBe(false)
   })
 })
 
-describe('the Northeast and Elkins Park lines (Oct 7)', () => {
-  it('the Northeast is one closed boundary', () => {
-    expect(shapeOf(NE)).toMatchObject({ areas: [expect.any(Array)], joins: [] })
-  })
-  it('Elkins Park is one area once the walking route on its map is left out', () => {
-    expect(EP.lines.map((l) => l.name)).toContain(EP_ROUTE)
-    expect(shapeOf(withoutNames(EP, [EP_ROUTE]))).toMatchObject({ areas: [expect.any(Array)], joins: [] })
-  })
-})
+// A point in a ring, to check where a name lands.
+const inRing = ([lat, lng]: [number, number], ring: [number, number][]) => {
+  let inside = false
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [yi, xi] = ring[i]
+    const [yj, xj] = ring[j]
+    if (yi > lat !== yj > lat && lng < ((xj - xi) * (lat - yi)) / (yj - yi) + xi) inside = !inside
+  }
+  return inside
+}
 
-describe('labelPoint', () => {
-  it('puts each eruv’s name well inside it', () => {
-    for (const file of [CC, UC, LM, NE, withoutNames(EP, [EP_ROUTE])]) {
-      const p = labelPoint(file)!
-      expect(locator(file)(p, 150)).toBe('inside')
-    }
+describe('labelPoint: where an eruv’s name is written', () => {
+  it('well inside it', () => {
+    expect(inRing(labelPoint(NE)!, NE.lines[0].points)).toBe(true)
+    const ep = shownMap(EP, [EP_ROUTE])
+    expect(inRing(labelPoint(ep)!, ep.lines[0].points)).toBe(true)
+    // Center City's, in Center City or South Philadelphia, east of the
+    // Schuylkill.
+    const [lat, lng] = labelPoint(shownMap(CC, CC_LEFT_OUT))!
+    expect(lat).toBeGreaterThan(39.91)
+    expect(lat).toBeLessThan(39.97)
+    expect(lng).toBeGreaterThan(-75.185)
   })
   it('inside an L, where the middle of its box is outside', () => {
-    const L: EruvLineFile = { lines: [{ name: 'L', points: [[40, -75], [40, -74.98], [40.005, -74.98], [40.005, -74.995], [40.02, -74.995], [40.02, -75], [40, -75]] }] }
-    const p = labelPoint(L)!
-    expect(locator(L)(p, null)).toBe('inside')
-    expect(locator(L)([40.01, -74.99], null)).toBe('outside')
+    const ring: [number, number][] = [[40, -75], [40, -74.98], [40.005, -74.98], [40.005, -74.995], [40.02, -74.995], [40.02, -75], [40, -75]]
+    const p = labelPoint({ lines: [{ name: 'L', points: ring }] })!
+    expect(inRing(p, ring)).toBe(true)
   })
   it('nothing without an enclosed area', () => {
     expect(labelPoint({ lines: [{ name: 'x', points: [[40, -75], [40.01, -75]] }] })).toBeNull()
   })
 })
 
-describe('outlineOf: what the map draws (Oct 11)', () => {
-  // Metres from a point to the nearest drawn segment, roughly.
-  const away = (runs: [number, number][][], [lat, lng]: [number, number]) => {
-    const kx = 111_320 * Math.cos((lat * Math.PI) / 180)
-    const ky = 110_540
-    let best = Infinity
-    for (const run of runs) {
-      for (let i = 1; i < run.length; i++) {
-        const [ax, ay] = [(run[i - 1][1] - lng) * kx, (run[i - 1][0] - lat) * ky]
-        const [bx, by] = [(run[i][1] - lng) * kx, (run[i][0] - lat) * ky]
-        const len2 = (bx - ax) ** 2 + (by - ay) ** 2
-        const t = len2 ? Math.max(0, Math.min(1, -(ax * (bx - ax) + ay * (by - ay)) / len2)) : 0
-        best = Math.min(best, Math.hypot(ax + t * (bx - ax), ay + t * (by - ay)))
-      }
-    }
-    return best
-  }
-  const middle = (name: string) => {
-    const l = CC.lines.find((x) => x.name === name)!
-    return l.points[Math.floor(l.points.length / 2)]
-  }
-
-  it('not a line with the eruv on both sides (Washington Avenue), nor a connector out of it', () => {
-    const runs = outlineOf(CC)
-    expect(away(runs, middle('Washington Border'))).toBeGreaterThan(100)
-    expect(away(runs, middle('South Street Bridge'))).toBeGreaterThan(20)
-    // The outside is still drawn: Poplar Street, its north edge.
-    expect(away(runs, middle('Poplar Street'))).toBeLessThan(5)
+describe('metresFrom: the eruv nearest someone', () => {
+  it('how far from its nearest line', () => {
+    const line: EruvLineFile = { lines: [{ name: 'x', points: [[40, -75], [40, -74.99]] }] }
+    expect(metresFrom(line, [40, -74.995])).toBeLessThan(1)
+    expect(metresFrom(line, [40.009, -74.995])).toBeGreaterThan(990)
+    expect(metresFrom(line, [40.009, -74.995])).toBeLessThan(1010)
   })
-  it('Center City, as the eruv draws it, is one line round', () => {
-    const own = withoutNames(CC, ['Washington Border', 'Front St Border', "Grey's Ferry Border", 'South Street Bridge', 'Line 25', 'Line 26', 'Line 27', 'Line 28', 'Line 29', 'Line 30'])
-    const runs = outlineOf(own)
-    expect(runs).toHaveLength(1)
-    expect(runs[0][0]).toEqual(runs[0].at(-1))
+  it('Rittenhouse Square is nearer Center City’s line than University City’s', () => {
+    const at: [number, number] = [39.9496, -75.1718]
+    expect(metresFrom(shownMap(CC, CC_LEFT_OUT), at)).toBeLessThan(metresFrom(UC, at))
   })
-  it('a file that encloses nothing is drawn as it comes', () => {
-    const open: EruvLineFile = { lines: [{ name: 'x', points: [[40, -75], [40.01, -75]] }] }
-    expect(outlineOf(open)).toEqual([open.lines[0].points])
+  it('a map with no lines is nowhere', () => {
+    expect(metresFrom({ lines: [] }, [40, -75])).toBe(Infinity)
   })
 })

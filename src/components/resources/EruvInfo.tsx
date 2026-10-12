@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { EruvRecord } from '@/types'
 import DirectoryHeader from './DirectoryHeader'
 import { CategoryBandFrame, CategoryBandBadge } from './CategoryBandFrame'
@@ -18,22 +18,20 @@ import MobileSheet from './MobileSheet'
 import ActionDialog from './ActionDialog'
 import { Card } from './listingParts'
 import EruvMap from './EruvMap'
-import { locator, type Where } from '@/lib/eruvShape'
 import { useOptionalLocation } from '@/lib/locationContext'
-import { CrosshairIcon } from '@/components/icons'
+import { useEruvMaps } from '@/lib/useEruvStatuses'
 
 // ── The Eruv page (Oct 7, canvas page "eruv") ───────────────────────────────
-// The eruvim's own lines on a map with the visitor's dot; whether they're
-// inside one ("Where you are"); then each eruv, whether it's up, and when
-// the guide checked: nothing else on the page. A row, the card, or an eruv
-// on the map opens its listing (where it goes, its site, hotline, alerts).
-// Each eruv's name is on the map; on desktop, pointing at a row picks out
-// its eruv on the map, and pointing at an eruv picks out its row.
-// "Inside" only well clear of the line (eruvShape.ts): closer, "at the
-// edge". Outside every mapped eruv, the card isn't shown: an eruv with no
-// line on the map could still be there. The statuses come from /api/eruv, which reads each
-// eruv's own page; until migration 074 is run there are none, and the page
-// shows the old list with its links.
+// The eruvim's own maps, as each eruv draws them, with the visitor's dot;
+// then each eruv, whether it's up, and when the guide checked: nothing
+// else on the page. A row, or an eruv on the map, opens its listing (where
+// it goes, its site, hotline, alerts). Each eruv's name is on the map; on
+// desktop, pointing at a row picks out its eruv on the map, and pointing
+// at an eruv picks out its row. The guide doesn't say whether someone is
+// inside an eruv (Oct 12): they see their dot on the eruv's own map. The
+// statuses come from /api/eruv, which reads each eruv's own page, and the
+// maps from /api/eruv/maps; until migration 074 is run there are none,
+// and the page shows the old list with its links.
 
 type Props = {
   /** The old list, shown until the eruv table exists. */
@@ -103,24 +101,7 @@ const siteLabel = (url: string) => url.replace(/^https?:\/\//i, '').replace(/^ww
 
 /** One eruv's listing: its status, where it goes, and the eruv's own
  *  site, hotline and alerts. */
-function WhereLine({ where }: { where: Where }) {
-  if (where === 'outside') return null
-  return (
-    <div className="mt-2 flex items-start gap-3 border-t border-slate-100 pt-2.5 text-[15px] leading-snug" data-testid="eruv-where">
-      <CrosshairIcon className="mt-0.5 h-[17px] w-[17px] shrink-0 text-slate-400" />
-      {where === 'inside' ? (
-        <p className="font-bold text-slate-900">You’re inside it</p>
-      ) : (
-        <div>
-          <p className="font-bold text-amber-700">You’re at its edge</p>
-          <p className="mt-0.5 text-[13px] text-muted">Too close to the line to tell which side you’re on.</p>
-        </div>
-      )}
-    </div>
-  )
-}
-
-export function EruvListing({ eruv, color, now, timezone, candles, where = 'outside' }: { eruv: Eruv; color: string; now: Date; timezone: string; candles: number | null; where?: Where }) {
+export function EruvListing({ eruv, color, now, timezone, candles }: { eruv: Eruv; color: string; now: Date; timezone: string; candles: number | null }) {
   const contact = [
     eruv.website && (
       <ListingRow key="web" icon={<GlobeIcon className="h-[17px] w-[17px]" />}>
@@ -156,7 +137,6 @@ export function EruvListing({ eruv, color, now, timezone, candles, where = 'outs
       <Card>
         <div className="py-2">
           <EruvStatusLine eruv={eruv} now={now} timezone={timezone} candles={candles} />
-          <WhereLine where={where} />
         </div>
       </Card>
       {eruv.covers && (
@@ -206,17 +186,12 @@ export default function EruvInfo({ eruvim, onUp, title = 'Eruv Information', ico
   const open = ready?.eruvim.find((e) => e.id === openId) ?? null
   const shabbosSide = ready && now ? [5, 6].includes(localParts(now, ready.timezone).weekday) : false
 
-  // Where the visitor is, against each eruv with a line on the map.
-  const location = useOptionalLocation()
-  const you = location?.coords ?? null
-  const accuracy = location?.accuracyM ?? null
-  const locators = useMemo(() => new Map((loaded?.available ? loaded.eruvim : []).filter((e) => e.line?.lines.length).map((e) => [e.id, locator(e.line!)])), [loaded])
-  const whereIn = (id: string): Where => (you && locators.get(id) ? locators.get(id)!([you.lat, you.lng], accuracy) : 'outside')
-  const yours = ready ? (ready.eruvim.find((e) => whereIn(e.id) === 'inside') ?? ready.eruvim.find((e) => whereIn(e.id) === 'edge') ?? null) : null
-  const others = ready ? ready.eruvim.filter((e) => e.id !== yours?.id) : []
+  // The visitor's dot, on the eruvim's own maps.
+  const you = useOptionalLocation()?.coords ?? null
+  const maps = useEruvMaps(slug, !!loaded?.available)
   // Desktop only: a phone has nothing to point with.
   const pointAt = (id: string) => (isMobile ? {} : { onMouseEnter: () => setPointedId(id), onMouseLeave: () => setPointedId(null), onFocus: () => setPointedId(id), onBlur: () => setPointedId(null) })
-  const mapped = ready && now ? ready.eruvim.filter((e) => e.line?.lines.length).map((e) => ({ id: e.id, name: e.name, tone: eruvView(e, now, ready.timezone, ready.candles).tone, line: e.line! })) : []
+  const mapped = ready && now && maps ? ready.eruvim.flatMap((e) => (maps.get(e.id) ? [{ id: e.id, name: e.name, tone: eruvView(e, now, ready.timezone, ready.candles).tone, map: maps.get(e.id)! }] : [])) : []
 
   return (
     <CategoryBandFrame color={color} imageUrl={bandImageUrl}>
@@ -238,28 +213,10 @@ export default function EruvInfo({ eruvim, onUp, title = 'Eruv Information', ico
       {ready && now && (
         <div className="md:grid md:grid-cols-[minmax(0,420px)_minmax(0,1fr)] md:items-start md:gap-7">
           <div className="space-y-3.5">
-            {isMobile && mapped.length > 0 && <EruvMap eruvim={mapped} you={you} focusId={yours?.id ?? null} fallbackCenter={community.mapCenter} onSelect={setOpenId} className="h-[300px]" />}
-            {yours && (
-              <button
-                type="button"
-                onClick={() => setOpenId(yours.id)}
-                {...pointAt(yours.id)}
-                className={`flex w-full cursor-pointer items-center gap-2 rounded-2xl border px-4 py-3.5 text-left ${pointedId === yours.id ? 'border-slate-300 bg-slate-50' : 'border-slate-200 bg-white'}`}
-                data-pointed={pointedId === yours.id || undefined}
-                data-testid="eruv-yours"
-              >
-                <span className="min-w-0 flex-1">
-                  <span className="block text-[11.5px] font-extrabold tracking-[0.06em] text-muted">WHERE YOU ARE</span>
-                  <span className="mt-0.5 block text-lg font-extrabold text-slate-900">{whereIn(yours.id) === 'inside' ? `Inside the ${yours.name}` : `At the edge of the ${yours.name}`}</span>
-                  {whereIn(yours.id) === 'edge' && <span className="mt-0.5 block text-[14px] text-slate-700">Too close to the line to tell which side you’re on.</span>}
-                  <EruvStatusLine eruv={yours} now={now} timezone={ready.timezone} candles={ready.candles} />
-                </span>
-                <ChevronRightIcon className="h-4 w-4 shrink-0 text-slate-400" />
-              </button>
-            )}
-            {others.length > 0 && (
-              <Card title={yours ? 'The other eruvim' : shabbosSide ? 'This Shabbos' : 'Eruvim'} testId="eruv-list">
-                {others.map((eruv) => (
+            {isMobile && mapped.length > 0 && <EruvMap eruvim={mapped} you={you} fallbackCenter={community.mapCenter} onSelect={setOpenId} className="h-[300px]" />}
+            {ready.eruvim.length > 0 && (
+              <Card title={shabbosSide ? 'This Shabbos' : 'Eruvim'} testId="eruv-list">
+                {ready.eruvim.map((eruv) => (
                   <button
                     key={eruv.id}
                     type="button"
@@ -279,17 +236,17 @@ export default function EruvInfo({ eruvim, onUp, title = 'Eruv Information', ico
               </Card>
             )}
           </div>
-          {!isMobile && mapped.length > 0 && <EruvMap eruvim={mapped} you={you} focusId={yours?.id ?? null} fallbackCenter={community.mapCenter} onSelect={setOpenId} highlightId={pointedId} onHover={setPointedId} className="sticky top-4 h-[640px]" />}
+          {!isMobile && mapped.length > 0 && <EruvMap eruvim={mapped} you={you} fallbackCenter={community.mapCenter} onSelect={setOpenId} highlightId={pointedId} onHover={setPointedId} className="sticky top-4 h-[640px]" />}
         </div>
       )}
 
       {ready && now && open && (isMobile ? (
         <MobileSheet isOpen onClose={() => setOpenId(null)} title={open.name} titleHidden draggable>
-          <EruvListing eruv={open} color={color} now={now} timezone={ready.timezone} candles={ready.candles} where={whereIn(open.id)} />
+          <EruvListing eruv={open} color={color} now={now} timezone={ready.timezone} candles={ready.candles} />
         </MobileSheet>
       ) : (
         <ActionDialog isOpen onClose={() => setOpenId(null)} title={open.name}>
-          <EruvListing eruv={open} color={color} now={now} timezone={ready.timezone} candles={ready.candles} where={whereIn(open.id)} />
+          <EruvListing eruv={open} color={color} now={now} timezone={ready.timezone} candles={ready.candles} />
         </ActionDialog>
       ))}
     </CategoryBandFrame>

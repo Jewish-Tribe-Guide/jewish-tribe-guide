@@ -6,26 +6,24 @@ import { fetchJson } from '@/lib/fetchJson'
 import { withCommunity } from '@/lib/useCommunityData'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { eruvView, shortDay } from '@/lib/eruv'
-import { withoutNames, type EruvLineFile } from '@/lib/eruvLine'
-import { shapeOf } from '@/lib/eruvShape'
+import { partNames, shownMap, type EruvLineFile } from '@/lib/eruvLine'
 import type { AdminEruv } from '@/lib/eruvStore'
 
 // ── The "Eruvim" tab (Oct 7) ────────────────────────────────────────────────
 // Each eruv the guide shows: what the public sees of it (its status, as
 // read from its own page), what an admin sets (where it goes, its site,
-// hotline, alerts, the status page, its line's address), and its line.
-// A line read from the eruv's map waits here until an admin checks the
-// area against the eruv's own map and uses it; until then the guide's map
-// keeps the line it had.
+// hotline, alerts, the status page, its map's address), and its map. The
+// guide shows each eruv's own map as the eruv draws it, read about every
+// hour (Oct 12); what's chosen here is only what to leave out of it: parts
+// by name, and its markers.
 
 type Loaded = { available: boolean; timezone: string; eruvim: AdminEruv[] }
 
-/** The line drawn small: its enclosed area filled, the gaps the guide
- *  joined in red, so an admin can compare it with the eruv's own map. */
-function LinePreview({ file, leaveOut }: { file: EruvLineFile; leaveOut: string[] }) {
-  const kept = useMemo(() => withoutNames(file, leaveOut), [file, leaveOut])
-  const shape = useMemo(() => (kept.lines.length ? shapeOf(kept) : { areas: [], joins: [] }), [kept])
-  const pts = file.lines.flatMap((l) => l.points)
+/** The map drawn small, as the guide shows it: each line in the eruv's
+ *  colour, a left-out one dashed and grey, and its markers as dots. */
+function LinePreview({ file, leaveOut, hideMarks }: { file: EruvLineFile; leaveOut: string[]; hideMarks: boolean }) {
+  const shown = useMemo(() => shownMap(file, leaveOut, hideMarks), [file, leaveOut, hideMarks])
+  const pts = [...file.lines.flatMap((l) => l.points), ...(file.marks ?? []).map((m) => m.at)]
   if (pts.length === 0) return null
   const lats = pts.map((p) => p[0])
   const lngs = pts.map((p) => p[1])
@@ -36,18 +34,22 @@ function LinePreview({ file, leaveOut }: { file: EruvLineFile; leaveOut: string[
   const W = 320
   const H = Math.max(120, Math.min(320, (W * h) / w))
   const s = Math.min((W - 16) / w, (H - 16) / h)
-  const xy = ([lat, lng]: [number, number]) => `${(8 + (lng - minLng) * k * s).toFixed(1)},${(H - 8 - (lat - minLat) * s).toFixed(1)}`
-  const left = new Set(leaveOut.map((n) => n.toLowerCase()))
+  const x = (lng: number) => 8 + (lng - minLng) * k * s
+  const y = (lat: number) => H - 8 - (lat - minLat) * s
+  const xy = ([lat, lng]: [number, number]) => `${x(lng).toFixed(1)},${y(lat).toFixed(1)}`
+  const kept = new Set(shown.lines)
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} width={W} height={H} className="max-w-full rounded-lg border border-slate-200 bg-slate-50" role="img" aria-label="The eruv’s area">
-      {shape.areas.map((a, i) => (
-        <polygon key={i} points={a.map(xy).join(' ')} fill="rgba(21,128,61,.22)" stroke="none" />
-      ))}
+    <svg viewBox={`0 0 ${W} ${H}`} width={W} height={H} className="max-w-full rounded-lg border border-slate-200 bg-slate-50" role="img" aria-label="The eruv’s map, as the guide shows it">
+      {shown.lines
+        .filter((l) => l.fill)
+        .map((l, i) => (
+          <polygon key={`a${i}`} points={l.points.map(xy).join(' ')} fill={l.fill!.color} fillOpacity={l.fill!.opacity} stroke="none" />
+        ))}
       {file.lines.map((l, i) => (
-        <polyline key={i} points={l.points.map(xy).join(' ')} fill="none" stroke={left.has(l.name.toLowerCase()) ? '#94a3b8' : '#14532d'} strokeWidth={1.5} strokeDasharray={left.has(l.name.toLowerCase()) ? '3 3' : undefined} />
+        <polyline key={i} points={l.points.map(xy).join(' ')} fill="none" stroke={kept.has(l) ? (l.color ?? '#b7372d') : '#94a3b8'} strokeWidth={kept.has(l) ? 2 : 1.5} strokeDasharray={kept.has(l) ? undefined : '3 3'} />
       ))}
-      {shape.joins.map((j, i) => (
-        <polyline key={i} points={j.map(xy).join(' ')} fill="none" stroke="#dc2626" strokeWidth={3} />
+      {(shown.marks ?? []).map((m, i) => (
+        <circle key={`m${i}`} cx={x(m.at[1])} cy={y(m.at[0])} r={3.5} fill={m.color ?? '#0288d1'} stroke="#fff" strokeWidth={1} />
       ))}
     </svg>
   )
@@ -55,7 +57,7 @@ function LinePreview({ file, leaveOut }: { file: EruvLineFile; leaveOut: string[
 
 const input = 'w-full rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary'
 
-type Draft = Pick<AdminEruv, 'name' | 'covers' | 'website' | 'hotline' | 'alertsUrl' | 'statusUrl' | 'statusDated' | 'lineUrl' | 'sortOrder' | 'active' | 'lineLeaveOut'>
+type Draft = Pick<AdminEruv, 'name' | 'covers' | 'website' | 'hotline' | 'alertsUrl' | 'statusUrl' | 'statusDated' | 'lineUrl' | 'sortOrder' | 'active' | 'lineLeaveOut' | 'lineHidePoints'>
 const draftOf = (e: AdminEruv): Draft => ({
   name: e.name,
   covers: e.covers,
@@ -68,6 +70,7 @@ const draftOf = (e: AdminEruv): Draft => ({
   sortOrder: e.sortOrder,
   active: e.active,
   lineLeaveOut: e.lineLeaveOut,
+  lineHidePoints: e.lineHidePoints,
 })
 
 function Field({ label, help, children }: { label: string; help?: string; children: React.ReactNode }) {
@@ -80,13 +83,13 @@ function Field({ label, help, children }: { label: string; help?: string; childr
   )
 }
 
-function EruvCard({ eruv, timezone, busy, onAct, onSave }: { eruv: AdminEruv; timezone: string; busy: boolean; onAct: (action: 'check' | 'remove' | 'approve-line') => void; onSave: (d: Draft) => void }) {
+function EruvCard({ eruv, timezone, busy, onAct, onSave }: { eruv: AdminEruv; timezone: string; busy: boolean; onAct: (action: 'check' | 'remove') => void; onSave: (d: Draft) => void }) {
   const [draft, setDraft] = useState<Draft>(() => draftOf(eruv))
   const [confirmRemove, setConfirmRemove] = useState(false)
   const dirty = JSON.stringify(draft) !== JSON.stringify(draftOf(eruv))
   const set = <K extends keyof Draft>(k: K, v: Draft[K]) => setDraft((d) => ({ ...d, [k]: v }))
   const view = eruvView(eruv, new Date(), timezone, null)
-  const names = [...new Set([...(eruv.linePending?.lines ?? []), ...(eruv.rawLine?.lines ?? [])].map((l) => l.name).filter(Boolean))]
+  const names = eruv.rawLine ? partNames(eruv.rawLine) : []
   const tone = { green: 'text-green-700', amber: 'text-amber-700', red: 'text-red-700', grey: 'text-slate-600' }[view.tone]
 
   return (
@@ -137,7 +140,7 @@ function EruvCard({ eruv, timezone, busy, onAct, onSave }: { eruv: AdminEruv; ti
           </span>
         </label>
         <div className="sm:col-span-2">
-          <Field label="Its line" help="A GeoJSON file, or a Google My Maps link. Read every Thursday and the day before Yom Tov.">
+          <Field label="Its map" help="A Google My Maps link, or a GeoJSON file. Shown as the eruv draws it, read about every hour.">
             <input className={input} value={draft.lineUrl ?? ''} onChange={(e) => set('lineUrl', e.target.value)} />
           </Field>
         </div>
@@ -147,38 +150,23 @@ function EruvCard({ eruv, timezone, busy, onAct, onSave }: { eruv: AdminEruv; ti
         </label>
       </div>
 
-      {(eruv.linePending || eruv.rawLine) && (
-        <div className="mt-4 grid gap-4 sm:grid-cols-2">
-          {eruv.linePending && (
-            <div data-testid="eruv-line-pending">
-              <p className="text-sm font-bold text-amber-800">{eruv.rawLine ? 'Its line has changed' : 'Its line, read for the first time'}</p>
-              <p className="mb-1.5 text-xs text-muted">
-                Read {eruv.lineReadAt ? shortDay(eruv.lineReadAt, timezone) : ''}. Check the green area against the eruv’s own map. Red marks a gap in their line the guide joined.
-              </p>
-              <LinePreview file={eruv.linePending} leaveOut={draft.lineLeaveOut} />
-              <button type="button" disabled={busy || dirty} onClick={() => onAct('approve-line')} className="mt-2 cursor-pointer rounded-md bg-primary px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-50">
-                Use this line
-              </button>
-              {dirty && <p className="mt-1 text-xs text-muted">Save your changes first.</p>}
-            </div>
-          )}
-          {eruv.rawLine && (
-            <div>
-              <p className="text-sm font-bold text-slate-800">On the map now</p>
-              <p className="mb-1.5 text-xs text-muted">
-                Used since {eruv.lineApprovedAt ? shortDay(eruv.lineApprovedAt, timezone) : ''}
-                {eruv.lineApprovedBy ? `, by ${eruv.lineApprovedBy}` : ''}.
-              </p>
-              <LinePreview file={eruv.rawLine} leaveOut={draft.lineLeaveOut} />
-            </div>
-          )}
+      {eruv.rawLine && (
+        <div className="mt-4" data-testid="eruv-map-preview">
+          <p className="text-sm font-bold text-slate-800">As the guide shows it</p>
+          <p className="mb-1.5 text-xs text-muted">Read {eruv.lineReadAt ? shortDay(eruv.lineReadAt, timezone) : ''}. Compare it with the eruv’s own map.</p>
+          <LinePreview file={eruv.rawLine} leaveOut={draft.lineLeaveOut} hideMarks={draft.lineHidePoints} />
         </div>
       )}
-      {eruv.lineError && <p className="mt-2 text-xs text-red-700">Last read of its line failed: {eruv.lineError}</p>}
+      {eruv.lineMissing.length > 0 && (
+        <p className="mt-2 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-900" data-testid="eruv-line-missing">
+          Left out, but no longer in its map: {eruv.lineMissing.map((n) => `“${n}”`).join(', ')}. The eruv may have renamed or redrawn it, so check the map above and choose again.
+        </p>
+      )}
+      {eruv.lineError && <p className="mt-2 text-xs text-red-700">Last read of its map failed, so the guide shows the read before: {eruv.lineError}</p>}
 
       {names.length > 1 && (
         <fieldset className="mt-3">
-          <legend className="text-xs font-semibold text-slate-700">Pieces of its line (untick one to leave it out of the area)</legend>
+          <legend className="text-xs font-semibold text-slate-700">Parts of its map (untick one to leave it out)</legend>
           <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
             {names.map((n) => (
               <label key={n} className="flex items-center gap-1.5 text-sm text-slate-700">
@@ -189,6 +177,16 @@ function EruvCard({ eruv, timezone, busy, onAct, onSave }: { eruv: AdminEruv; ti
           </div>
         </fieldset>
       )}
+
+      {eruv.rawLine?.marks?.length ? (
+        <label className="mt-3 flex items-start gap-2 text-sm text-slate-700">
+          <input type="checkbox" className="mt-0.5" checked={draft.lineHidePoints} onChange={(e) => set('lineHidePoints', e.target.checked)} />
+          <span>
+            Hide its markers
+            <span className="block text-xs text-muted">For a map that pins places the guide already lists (its shuls). Keep them for notes about the eruv: crossings, reroutes, entrances.</span>
+          </span>
+        </label>
+      ) : null}
 
       <div className="mt-4 flex flex-wrap items-center gap-3">
         <button type="button" disabled={busy || !dirty} onClick={() => onSave(draft)} className="cursor-pointer rounded-md bg-primary px-4 py-1.5 text-sm font-semibold text-white disabled:opacity-50">
@@ -265,12 +263,12 @@ export default function EruvimManager({ token }: { token: string }) {
     <div className="space-y-4">
       <div>
         <h1 className="text-xl font-bold text-slate-900">Eruvim</h1>
-        <p className="text-sm text-muted">The guide reads each eruv’s status page every 15 minutes on Friday afternoon, and its line every Thursday. It never sets a status itself.</p>
+        <p className="text-sm text-muted">The guide reads each eruv’s status page every 15 minutes on Friday afternoon, and its map about every hour. It never sets a status itself, or draws a line of its own.</p>
       </div>
       {saveError && <p className="text-sm text-red-700">{saveError}</p>}
       {data.eruvim.map((e) => (
         <EruvCard
-          key={`${e.id}:${e.lineApprovedAt}:${e.lineReadAt}`}
+          key={`${e.id}:${e.lineReadAt}`}
           eruv={e}
           timezone={data.timezone}
           busy={busy === e.id}

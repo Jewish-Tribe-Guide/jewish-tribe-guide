@@ -12,10 +12,9 @@ import MapPlaceDetail from './MapPlaceDetail'
 import MobileNearbySheet, { type MobileNearbySheetHandle } from './MobileNearbySheet'
 import MapEruvDetail from './MapEruvDetail'
 import type { MapEruv } from './eruvLayer'
-import { useEruvStatuses } from '@/lib/useEruvStatuses'
+import { useEruvMaps, useEruvStatuses } from '@/lib/useEruvStatuses'
 import { eruvView } from '@/lib/eruv'
-import { labelPoint, locator, type Where } from '@/lib/eruvShape'
-import { useOptionalLocation } from '@/lib/locationContext'
+import { labelPoint } from '@/lib/eruvShape'
 import { useAllListings } from '@/lib/useAllListings'
 import { useCategories } from '@/lib/useCategories'
 import { DEFAULT_CATEGORY_ICON, resolveCapabilities, selectValues } from '@/lib/categories'
@@ -1622,28 +1621,32 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   )
 
   // ── The Eruvim layer (agreed Oct 7, canvas page "eruv", board 3) ────────
-  // A chip beside Filters draws each eruv's outline, in its status's colour,
-  // under the pins. Tapping a line or a name opens that eruv's listing where
-  // a place opens. Off to begin with; there only when the community has an
-  // Eruv page and an eruv with a line.
+  // A chip beside Filters draws each eruv's own map, as the eruv draws it,
+  // under the pins, its name in its status's colour (eruvLayer.ts). Tapping
+  // a line or a name opens that eruv's listing where a place opens. Off to
+  // begin with; there only when the community has an Eruv page and an eruv
+  // with a map.
   const eruvCategory = (categories ?? []).find((c) => c.kind === 'eruv') ?? null
   const eruvStatuses = useEruvStatuses(countCommunity ?? '', !!countCommunity && !!eruvCategory)
   const eruvData = eruvStatuses?.available ? eruvStatuses : null
-  const eruvimWithLines = useMemo(() => (eruvData ? eruvData.eruvim.filter((e) => e.line?.lines.length) : []), [eruvData])
+  const eruvMaps = useEruvMaps(countCommunity ?? '', !!eruvData)
+  const eruvimWithLines = useMemo(
+    () => (eruvData && eruvMaps ? eruvData.eruvim.flatMap((e) => (eruvMaps.get(e.id) ? [{ eruv: e, map: eruvMaps.get(e.id)! }] : [])) : []),
+    [eruvData, eruvMaps],
+  )
   const [eruvimOn, setEruvimOn] = useState(false)
   const mapEruvim = useMemo<MapEruv[]>(
-    () => (eruvimOn && eruvData && clock !== null ? eruvimWithLines.map((e) => ({ id: e.id, name: e.name, tone: eruvView(e, new Date(clock), eruvData.timezone, eruvData.candles).tone, line: e.line! })) : []),
+    () => (eruvimOn && eruvData && clock !== null ? eruvimWithLines.map(({ eruv: e, map }) => ({ id: e.id, name: e.name, tone: eruvView(e, new Date(clock), eruvData.timezone, eruvData.candles).tone, map })) : []),
     // Each tick makes a new list, but the map redraws only when a line or
     // a status's colour changes (eruvDrawKey).
     [eruvimOn, eruvData, eruvimWithLines, clock],
   )
   const openEruvId = selectedPointId?.startsWith(ERUV_PREFIX) ? selectedPointId.slice(ERUV_PREFIX.length) : null
-  const eruvLocators = useMemo(() => new Map(eruvimWithLines.map((e) => [e.id, locator(e.line!)])), [eruvimWithLines])
-  const locationAccuracy = useOptionalLocation()?.accuracyM ?? null
   const openEruv = (id: string) => {
-    const e = eruvimWithLines.find((x) => x.id === id)
-    const at = e ? labelPoint(e.line!) : null
-    if (!e || !at) return
+    const found = eruvimWithLines.find((x) => x.eruv.id === id)
+    const at = found ? (labelPoint(found.map) ?? found.map.lines[0]?.points[0]) : null
+    if (!found || !at) return
+    const e = found.eruv
     const p: SelectablePoint = { id: `${ERUV_PREFIX}${id}`, lat: at[0], lng: at[1], name: e.name, color: colorById.get(eruvCategory?.id ?? '') ?? '#64748b', filterId: ERUV_FILTER_ID }
     // Opened where it's tapped: the map stays where the visitor put it.
     if (isMobile) nearbySheetRef.current?.selectPoint(p, false)
@@ -1670,8 +1673,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   const eruvDetail = (id: string, onBack: () => void) => {
     const e = eruvData?.eruvim.find((x) => x.id === id)
     if (!e || !eruvData || clock === null) return null
-    const where: Where = activeLocation && eruvLocators.get(id) ? eruvLocators.get(id)!([activeLocation.lat, activeLocation.lng], locationAccuracy) : 'outside'
-    return <MapEruvDetail eruv={e} color={colorById.get(eruvCategory?.id ?? '') ?? '#64748b'} now={new Date(clock)} timezone={eruvData.timezone} candles={eruvData.candles} where={where} onBack={onBack} />
+    return <MapEruvDetail eruv={e} color={colorById.get(eruvCategory?.id ?? '') ?? '#64748b'} now={new Date(clock)} timezone={eruvData.timezone} candles={eruvData.candles} onBack={onBack} />
   }
   const eruvChip = eruvimWithLines.length > 0 && (
     <button

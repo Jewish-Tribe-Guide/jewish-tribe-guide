@@ -14,6 +14,10 @@ describe('readEruvEdit', () => {
     expect(readEruvEdit({ sortOrder: 'first' })).toMatchObject({ ok: false })
     expect(readEruvEdit(null)).toMatchObject({ ok: false })
   })
+  it('whether its markers are hidden: only a real yes hides them', () => {
+    expect(readEruvEdit({ lineHidePoints: true })).toEqual({ ok: true, edit: { lineHidePoints: true } })
+    expect(readEruvEdit({ lineHidePoints: 'yes' })).toEqual({ ok: true, edit: { lineHidePoints: false } })
+  })
   it('an emptied address is cleared', () => {
     expect(readEruvEdit({ alertsUrl: '' })).toEqual({ ok: true, edit: { alertsUrl: null } })
   })

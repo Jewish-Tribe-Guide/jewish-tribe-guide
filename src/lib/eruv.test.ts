@@ -28,7 +28,6 @@ function eruv(over: Partial<Eruv> = {}): Eruv {
     statusCheckedAt: '2026-10-09T18:55:00Z',
     statusErrorAt: null,
     statusError: null,
-    line: null,
     ...over,
   }
 }

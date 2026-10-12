@@ -1,17 +1,16 @@
 import { getAdminUserForCommunity } from '@/lib/adminAuth'
 import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
-import { addEruv, approveLine, listEruvimForAdmin, removeEruv, saveLineRead, saveStatusRead, updateEruv, type AdminEruv } from '@/lib/eruvStore'
+import { addEruv, listEruvimForAdmin, removeEruv, saveLineMissing, saveLineRead, saveStatusRead, updateEruv, type AdminEruv } from '@/lib/eruvStore'
 import { readEruvPage } from '@/lib/eruvReader'
-import { runLine } from '@/lib/eruvLines'
+import { readEruvMap } from '@/lib/eruvLines'
 import { readEruvEdit, eruvIdFor } from '@/lib/eruvEdit'
 
 // GET  /api/admin/eruvim — the "Eruvim" tab: every eruv of this community
-//      (eruv, migration 074), hidden ones too, with its status, its line
-//      and any new line waiting. Admin only.
+//      (eruv, migrations 074 and 076), hidden ones too, with its status and
+//      the last read of its map. Admin only.
 // POST /api/admin/eruvim  body: { action: 'save', id, edit } | { action: 'add', name }
-//      | { action: 'remove' | 'check' | 'approve-line', id }
-//      'check' reads its status page and its line now; 'approve-line' puts
-//      the waiting line on the map.
+//      | { action: 'remove' | 'check', id }
+//      'check' reads its status page and its map now.
 
 export const maxDuration = 60
 
@@ -68,12 +67,12 @@ export async function POST(request: Request) {
     if (action === 'check') {
       const now = new Date()
       if (eruv.statusUrl) await saveStatusRead(community.slug, id, await readEruvPage(eruv.statusUrl, now))
-      const { save } = await runLine(eruv, { due: true, now })
-      if (save) await saveLineRead(community.slug, id, save)
-      return Response.json({ ok: true, eruv: await one(community.slug, id) })
-    }
-    if (action === 'approve-line') {
-      if (!(await approveLine(community.slug, id, admin.email))) return bad('There’s no new line waiting.')
+      if (eruv.lineUrl) {
+        const read = await readEruvMap({ ...eruv, lineUrl: eruv.lineUrl }, now)
+        if (read.save) await saveLineRead(community.slug, id, read.save)
+        // Seen here, so no email about it later.
+        if (read.missing) await saveLineMissing(community.slug, id, read.missing)
+      }
       return Response.json({ ok: true, eruv: await one(community.slug, id) })
     }
     return bad('Unknown action.')

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import type { Eruv } from './eruv'
+import type { EruvLineFile } from './eruvLine'
 
 // The eruvim and their statuses (/api/eruv), fetched once per community per
 // page load and shared: a hospital listing's Shabbos box and the home's
@@ -29,6 +30,7 @@ export function fetchEruvStatuses(communitySlug: string): Promise<EruvStatuses> 
 /** For tests. */
 export function clearEruvStatuses(): void {
   cache.clear()
+  mapsCache.clear()
 }
 
 export function useEruvStatuses(communitySlug: string, wanted = true): EruvStatuses | null {
@@ -37,6 +39,41 @@ export function useEruvStatuses(communitySlug: string, wanted = true): EruvStatu
     if (!wanted) return
     let live = true
     fetchEruvStatuses(communitySlug).then((d) => live && setData(d))
+    return () => {
+      live = false
+    }
+  }, [communitySlug, wanted])
+  return data
+}
+
+// ── Their maps (/api/eruv/maps, Oct 12) ─────────────────────────────────────
+// Each eruv's own map, as the eruv draws it, for the maps that show them:
+// the Eruv page and the Map tab's Eruvim layer. Fetched only when one of
+// them is there, and shared. Empty without any (or without migration 076).
+
+export type EruvMaps = Map<string, EruvLineFile>
+
+const mapsCache = new Map<string, Promise<EruvMaps>>()
+
+export function fetchEruvMaps(communitySlug: string): Promise<EruvMaps> {
+  let p = mapsCache.get(communitySlug)
+  if (!p) {
+    p = fetch(`/api/eruv/maps?community=${encodeURIComponent(communitySlug)}`)
+      .then((r) => r.json())
+      .then((b): EruvMaps => new Map(b?.ok && Array.isArray(b.maps) ? (b.maps as { id: string; map: EruvLineFile }[]).map((m) => [m.id, m.map]) : []))
+      .catch((): EruvMaps => new Map())
+    mapsCache.set(communitySlug, p)
+    p.then((m) => m.size === 0 && mapsCache.delete(communitySlug))
+  }
+  return p
+}
+
+export function useEruvMaps(communitySlug: string, wanted = true): EruvMaps | null {
+  const [data, setData] = useState<EruvMaps | null>(null)
+  useEffect(() => {
+    if (!wanted) return
+    let live = true
+    fetchEruvMaps(communitySlug).then((d) => live && setData(d))
     return () => {
       live = false
     }

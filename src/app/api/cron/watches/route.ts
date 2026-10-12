@@ -2,7 +2,7 @@
 //
 // Runs every active watch once (watches.ts): Keystone-K's list files its
 // differences as suggestions, a website is checked for a change. Then the
-// eruvim's lines, on the day before candles (eruvLineRun.ts). Meant to
+// eruvim's maps, for a part an admin left out that's gone (eruvLineRun.ts). Meant to
 // run daily (vercel.json). Each run is recorded on the watch, and the admins
 // are emailed once when a watch breaks and once when it recovers.
 //

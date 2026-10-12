@@ -39,6 +39,7 @@ export function readEruvEdit(raw: unknown): { ok: true; edit: EruvEdit } | { ok:
   }
   if ('statusDated' in r) edit.statusDated = r.statusDated === true
   if ('active' in r) edit.active = r.active !== false
+  if ('lineHidePoints' in r) edit.lineHidePoints = r.lineHidePoints === true
   if ('sortOrder' in r) {
     const n = Number(r.sortOrder)
     if (!Number.isFinite(n)) return { ok: false, error: 'The order must be a number.' }
@@ -61,11 +62,11 @@ export function eruvIdFor(name: string): string {
     .slice(0, 60)
 }
 
-/** Which readings an edit throws away: a new status page or line address
+/** Which readings an edit throws away: a new status page or map address
  *  starts afresh, since the old reading was of the old page. The admin tab
  *  sends every field on each save, so an address only counts as new when
- *  it differs from the stored one; otherwise ticking a line piece off
- *  would also throw away the line waiting for a yes. */
+ *  it differs from the stored one; otherwise ticking a part off would also
+ *  throw away the copy of the map kept for when their site is down. */
 export function readingsToReset(edit: EruvEdit, stored: { statusUrl: string | null; lineUrl: string | null }): { status: boolean; line: boolean } {
   return {
     status: 'statusUrl' in edit && (edit.statusUrl ?? null) !== stored.statusUrl,

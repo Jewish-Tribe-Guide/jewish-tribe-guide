@@ -23,16 +23,18 @@ import ResourceMapView from './ResourceMapView'
 
 vi.mock('@vercel/analytics', () => ({ track: vi.fn() }))
 
-// The eruvim, as /api/eruv gives them: one with a line (a square), one
-// without, which the layer can't draw.
+// The eruvim, as /api/eruv gives them, and their maps, as /api/eruv/maps
+// does: Center City's (a square), and none for Elkins Park, which the
+// layer can't draw.
 const ERUV_SQUARE = { lines: [{ name: 'Boundary', points: [[39.94, -75.17], [39.94, -75.15], [39.96, -75.15], [39.96, -75.17], [39.94, -75.17]] as [number, number][] }] }
-const eruvStatus = (id: string, name: string, line: typeof ERUV_SQUARE | null) => ({
+const eruvStatus = (id: string, name: string) => ({
   id, name, covers: `Where ${name} goes.`, website: null, hotline: null, alertsUrl: null, statusUrl: 'https://example.org/', statusDated: false,
-  status: 'up' as const, statusWords: 'Up', statusPostedOn: null, statusCheckedAt: new Date().toISOString(), statusErrorAt: null, statusError: null, line,
+  status: 'up' as const, statusWords: 'Up', statusPostedOn: null, statusCheckedAt: new Date().toISOString(), statusErrorAt: null, statusError: null,
 })
 vi.mock('@/lib/useEruvStatuses', () => ({
   useEruvStatuses: (_slug: string, wanted: boolean) =>
-    wanted ? { available: true, timezone: 'America/New_York', candles: null, eruvim: [eruvStatus('center-city', 'Center City Eruv', ERUV_SQUARE), eruvStatus('elkins-park', 'Elkins Park Eruv', null)] } : null,
+    wanted ? { available: true, timezone: 'America/New_York', candles: null, eruvim: [eruvStatus('center-city', 'Center City Eruv'), eruvStatus('elkins-park', 'Elkins Park Eruv')] } : null,
+  useEruvMaps: (_slug: string, wanted: boolean) => (wanted ? new Map([['center-city', ERUV_SQUARE]]) : null),
 }))
 
 // NearbyList's row-level Share action calls useCommunitySlug(), which pulls
@@ -1672,7 +1674,7 @@ describe('ResourceMapView — the Eruvim layer', () => {
     expect(screen.getByTestId('eruv-count')).toHaveTextContent('0')
     fireEvent.click(chip)
     expect(chip).toHaveAttribute('aria-pressed', 'true')
-    // Center City only: Elkins Park has no line to draw.
+    // Center City only: Elkins Park has no map to draw.
     expect(screen.getByTestId('eruv-count')).toHaveTextContent('1')
     expect(screen.getByRole('button', { name: 'Eruv Center City Eruv green' })).toBeInTheDocument()
   })

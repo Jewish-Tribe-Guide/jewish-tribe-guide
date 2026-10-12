@@ -1,16 +1,30 @@
 import { getAdminClient } from './supabase/admin'
 import type { Eruv, EruvStatus } from './eruv'
-import { withoutNames, type EruvLineFile } from './eruvLine'
+import type { EruvLineFile } from './eruvLine'
 import { readingsToReset } from './eruvEdit'
 
 // The eruv table (migration 074): each eruv, its status as last read, and
-// its line. Uncached: the status changes through the day, and /api/eruv
-// reads it fresh. A missing table (the migration not run yet) isn't an
-// error: the page falls back to the old list.
+// where its map is. Uncached: the status changes through the day, and
+// /api/eruv reads it fresh. A missing table (the migration not run yet)
+// isn't an error: the page falls back to the old list. The maps themselves
+// are /api/eruv/maps (eruvMaps.ts), read from each eruv's own file
+// (migration 076).
 
 const PUBLIC_COLUMNS =
-  'id, name, covers, website, hotline, alerts_url, status_url, status_dated, status, status_words, status_posted_on, status_checked_at, status_error_at, status_error, line, line_leave_out'
-const ADMIN_COLUMNS = `${PUBLIC_COLUMNS}, line_url, sort_order, active, line_pending, line_read_at, line_error, line_approved_at, line_approved_by`
+  'id, name, covers, website, hotline, alerts_url, status_url, status_dated, status, status_words, status_posted_on, status_checked_at, status_error_at, status_error'
+const ADMIN_COLUMNS = `${PUBLIC_COLUMNS}, line_url, sort_order, active, line, line_read_at, line_error, line_leave_out`
+const SOURCE_COLUMNS = 'community_id, id, name, line_url, line, line_leave_out'
+// Migration 076's: until it's run, no markers are hidden and nothing is
+// remembered as missing, and everything else works.
+const MAP_CHOICE_COLUMNS = 'line_hide_points, line_missing'
+const without076 = (message: string | undefined) => !!message && /line_hide_points|line_missing/.test(message)
+
+/** A select of `columns` plus 076's, or without them before it's run. */
+async function selectWith076<T>(run: (columns: string) => PromiseLike<{ data: unknown; error: { message: string } | null }>, columns: string): Promise<{ data: T[] | null; error: { message: string } | null }> {
+  const first = await run(`${columns}, ${MAP_CHOICE_COLUMNS}`)
+  const res = first.error && without076(first.error.message) ? await run(columns) : first
+  return { data: (res.data as T[] | null) ?? null, error: res.error }
+}
 
 type Row = {
   id: string
@@ -27,34 +41,56 @@ type Row = {
   status_checked_at: string | null
   status_error_at: string | null
   status_error: string | null
-  line: EruvLineFile | null
-  line_leave_out: string[] | null
 }
 type AdminRow = Row & {
   line_url: string | null
   sort_order: number
   active: boolean
-  line_pending: EruvLineFile | null
+  line: EruvLineFile | null
   line_read_at: string | null
   line_error: string | null
-  line_approved_at: string | null
-  line_approved_by: string | null
+  line_leave_out: string[] | null
+  line_hide_points?: boolean | null
+  line_missing?: string[] | null
 }
 
-/** Everything an admin sets and sees about one eruv. `rawLine` is the
- *  approved line with every piece, `line` without the ones left out. */
+/** Everything an admin sets and sees about one eruv. `rawLine` is the last
+ *  good read of its map, every part of it. */
 export type AdminEruv = Eruv & {
   lineUrl: string | null
   sortOrder: number
   active: boolean
   rawLine: EruvLineFile | null
-  linePending: EruvLineFile | null
   lineReadAt: string | null
   lineError: string | null
-  lineApprovedAt: string | null
-  lineApprovedBy: string | null
   lineLeaveOut: string[]
+  lineHidePoints: boolean
+  /** Left-out names its map no longer has, as last told to the admins. */
+  lineMissing: string[]
 }
+
+/** Where an eruv's map is, and what an admin chose to show of it. */
+export type EruvMapSource = {
+  communityId: string
+  id: string
+  name: string
+  lineUrl: string
+  rawLine: EruvLineFile | null
+  lineLeaveOut: string[]
+  lineHidePoints: boolean
+  lineMissing: string[]
+}
+type SourceRow = { community_id: string; id: string; name: string; line_url: string; line: EruvLineFile | null; line_leave_out: string[] | null; line_hide_points?: boolean | null; line_missing?: string[] | null }
+const fromSourceRow = (r: SourceRow): EruvMapSource => ({
+  communityId: r.community_id,
+  id: r.id,
+  name: r.name,
+  lineUrl: r.line_url,
+  rawLine: r.line,
+  lineLeaveOut: r.line_leave_out ?? [],
+  lineHidePoints: !!r.line_hide_points,
+  lineMissing: r.line_missing ?? [],
+})
 
 function fromRow(r: Row): Eruv {
   return {
@@ -72,7 +108,6 @@ function fromRow(r: Row): Eruv {
     statusCheckedAt: r.status_checked_at,
     statusErrorAt: r.status_error_at,
     statusError: r.status_error,
-    line: r.line ? withoutNames(r.line, r.line_leave_out ?? []) : null,
   }
 }
 
@@ -83,12 +118,11 @@ function fromAdminRow(r: AdminRow): AdminEruv {
     sortOrder: r.sort_order,
     active: r.active,
     rawLine: r.line,
-    linePending: r.line_pending,
     lineReadAt: r.line_read_at,
     lineError: r.line_error,
-    lineApprovedAt: r.line_approved_at,
-    lineApprovedBy: r.line_approved_by,
     lineLeaveOut: r.line_leave_out ?? [],
+    lineHidePoints: !!r.line_hide_points,
+    lineMissing: r.line_missing ?? [],
   }
 }
 
@@ -109,7 +143,7 @@ export async function listEruvim(community: string): Promise<{ eruvim: Eruv[]; a
 
 /** Every eruv of a community, hidden ones too, for its admin tab. */
 export async function listEruvimForAdmin(community: string): Promise<{ eruvim: AdminEruv[]; available: boolean }> {
-  const { data, error } = await getAdminClient().from('eruv').select(ADMIN_COLUMNS).eq('community_id', community).order('sort_order').order('name')
+  const { data, error } = await selectWith076<AdminRow>((cols) => getAdminClient().from('eruv').select(cols).eq('community_id', community).order('sort_order').order('name'), ADMIN_COLUMNS)
   if (error) {
     if (eruvTableMissing(error.message)) return { eruvim: [], available: false }
     throw new Error(`Failed to load eruvim: ${error.message}`)
@@ -117,14 +151,18 @@ export async function listEruvimForAdmin(community: string): Promise<{ eruvim: A
   return { eruvim: ((data ?? []) as AdminRow[]).map(fromAdminRow), available: true }
 }
 
-/** Every community's active eruvim that publish a line, for the weekly read. */
-export async function listEruvimWithLines(): Promise<(AdminEruv & { communityId: string })[]> {
-  const { data, error } = await getAdminClient().from('eruv').select(`community_id, ${ADMIN_COLUMNS}`).eq('active', true).not('line_url', 'is', null)
+/** The active eruvim that publish a map: one community's, for its map, or
+ *  every community's, for the daily check. */
+export async function listEruvMapSources(community?: string): Promise<EruvMapSource[]> {
+  const { data, error } = await selectWith076<SourceRow>((cols) => {
+    const q = getAdminClient().from('eruv').select(cols).eq('active', true).not('line_url', 'is', null)
+    return (community ? q.eq('community_id', community) : q).order('sort_order').order('name')
+  }, SOURCE_COLUMNS)
   if (error) {
     if (eruvTableMissing(error.message)) return []
-    throw new Error(`Failed to load eruv lines: ${error.message}`)
+    throw new Error(`Failed to load the eruv maps: ${error.message}`)
   }
-  return ((data ?? []) as (AdminRow & { community_id: string })[]).map((r) => ({ ...fromAdminRow(r), communityId: r.community_id }))
+  return ((data ?? []) as SourceRow[]).map(fromSourceRow)
 }
 
 export type StatusWrite =
@@ -142,37 +180,27 @@ export async function saveStatusRead(community: string, id: string, read: Status
   if (error) throw new Error(`Failed to save the eruv status: ${error.message}`)
 }
 
-/** Records one read of an eruv's line: a line that differs from the
- *  approved one waits as pending; the same line clears any pending one. */
+/** Records one read of an eruv's map: a new copy when it changed (kept for
+ *  when their site can't be reached), or why it couldn't be read. */
 export async function saveLineRead(
   community: string,
   id: string,
-  read: { ok: true; pending: EruvLineFile | null; at: string } | { ok: false; error: string; at: string },
+  read: { ok: true; file: EruvLineFile | null; at: string } | { ok: false; error: string; at: string },
 ): Promise<void> {
-  const patch = read.ok ? { line_pending: read.pending, line_read_at: read.at, line_error: null } : { line_read_at: read.at, line_error: read.error.slice(0, 300) }
+  const patch = read.ok ? { ...(read.file ? { line: read.file } : {}), line_read_at: read.at, line_error: null } : { line_read_at: read.at, line_error: read.error.slice(0, 300) }
   const { error } = await getAdminClient().from('eruv').update(patch).eq('community_id', community).eq('id', id)
-  if (error) throw new Error(`Failed to save the eruv line: ${error.message}`)
+  if (error) throw new Error(`Failed to save the eruv map: ${error.message}`)
 }
 
-/** An admin's yes to the pending line: it becomes the line on the map. */
-export async function approveLine(community: string, id: string, by: string): Promise<boolean> {
-  const { data: row, error: readError } = await getAdminClient().from('eruv').select('line_pending').eq('community_id', community).eq('id', id).maybeSingle()
-  if (readError) throw new Error(`Failed to load the eruv: ${readError.message}`)
-  const pending = (row as { line_pending: EruvLineFile | null } | null)?.line_pending
-  if (!pending) return false
-  const at = new Date().toISOString()
-  const { error } = await getAdminClient()
-    .from('eruv')
-    .update({ line: pending, line_pending: null, line_approved_at: at, line_approved_by: by, updated_at: at })
-    .eq('community_id', community)
-    .eq('id', id)
-  if (error) throw new Error(`Failed to approve the line: ${error.message}`)
-  return true
+/** The left-out names an eruv's map no longer has, as told to the admins. */
+export async function saveLineMissing(community: string, id: string, missing: string[]): Promise<void> {
+  const { error } = await getAdminClient().from('eruv').update({ line_missing: missing }).eq('community_id', community).eq('id', id)
+  if (error && !without076(error.message)) throw new Error(`Failed to save the eruv map: ${error.message}`)
 }
 
 /** The fields an admin edits, by their names in AdminEruv. */
 export type EruvEdit = Partial<
-  Pick<AdminEruv, 'name' | 'covers' | 'website' | 'hotline' | 'alertsUrl' | 'statusUrl' | 'statusDated' | 'lineUrl' | 'sortOrder' | 'active' | 'lineLeaveOut'>
+  Pick<AdminEruv, 'name' | 'covers' | 'website' | 'hotline' | 'alertsUrl' | 'statusUrl' | 'statusDated' | 'lineUrl' | 'sortOrder' | 'active' | 'lineLeaveOut' | 'lineHidePoints'>
 >
 const EDIT_COLUMN: Record<keyof EruvEdit, string> = {
   name: 'name',
@@ -186,6 +214,7 @@ const EDIT_COLUMN: Record<keyof EruvEdit, string> = {
   sortOrder: 'sort_order',
   active: 'active',
   lineLeaveOut: 'line_leave_out',
+  lineHidePoints: 'line_hide_points',
 }
 
 function editColumns(edit: EruvEdit): Record<string, unknown> {
@@ -194,18 +223,23 @@ function editColumns(edit: EruvEdit): Record<string, unknown> {
   return out
 }
 
-/** Saves an admin's edit. A new status page or line address starts afresh:
+/** Saves an admin's edit. A new status page or map address starts afresh:
  *  the old reading was of the old page (readingsToReset). */
 export async function updateEruv(community: string, id: string, edit: EruvEdit, stored: { statusUrl: string | null; lineUrl: string | null }): Promise<void> {
   const cols = editColumns(edit)
   const reset = readingsToReset(edit, stored)
   if (reset.status) Object.assign(cols, { status: null, status_words: null, status_posted_on: null, status_checked_at: null, status_error_at: null, status_error: null })
-  if (reset.line) Object.assign(cols, { line_pending: null, line_read_at: null, line_error: null })
-  const { error } = await getAdminClient()
-    .from('eruv')
-    .update({ ...cols, updated_at: new Date().toISOString() })
-    .eq('community_id', community)
-    .eq('id', id)
+  if (reset.line) Object.assign(cols, { line: null, line_read_at: null, line_error: null, line_missing: [] })
+  const save = (patch: Record<string, unknown>) =>
+    getAdminClient()
+      .from('eruv')
+      .update({ ...patch, updated_at: new Date().toISOString() })
+      .eq('community_id', community)
+      .eq('id', id)
+  let { error } = await save(cols)
+  if (error && without076(error.message)) {
+    ;({ error } = await save(Object.fromEntries(Object.entries(cols).filter(([k]) => k !== 'line_hide_points' && k !== 'line_missing'))))
+  }
   if (error) throw new Error(`Failed to save the eruv: ${error.message}`)
 }
 

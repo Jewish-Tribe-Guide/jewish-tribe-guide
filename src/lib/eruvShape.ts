@@ -1,9 +1,9 @@
 import type { EruvLineFile, LatLng } from './eruvLine'
 
-// ── Inside an eruv, or at its edge (Oct 7) ──────────────────────────────────
+// ── Where to write an eruv's name (Oct 7; Oct 12 only this) ────────────────
 // An eruv publishes its line as pieces (Center City: 31), not as an area:
 // "Washington Border", "Front St Border", a connector over the South Street
-// Bridge. To say whether someone is inside, the pieces are joined into the
+// Bridge. To write its name inside it, the pieces are joined into the
 // areas they enclose:
 //
 //   1. Every crossing and shared point becomes a junction (points within a
@@ -12,23 +12,18 @@ import type { EruvLineFile, LatLng } from './eruvLine'
 //   2. A loose end within GAP metres of another loose end is joined to it:
 //      Center City's file leaves gaps of 50 and 290 metres along the south
 //      of its South Philadelphia part, where the line is a wall or a fence
-//      no one drew. These joins are guesses, so they're returned for the
-//      admin to look at before the line is used, and standing near one
-//      counts as being at the edge.
-//      A loose end within T_GAP metres of another line joins it the same way.
+//      no one drew. A loose end within T_GAP metres of another line joins
+//      it the same way.
 //   3. Ends still loose (a connector to the next eruv) are dropped.
-//   4. The areas the remaining lines enclose are the eruv.
+//   4. The areas the remaining lines enclose; the name goes in the largest.
 //
-// whereIs then answers "inside" only when the point is in one of those areas
-// AND further from every line than the phone's accuracy (and never less
-// than EDGE_MIN): a street on the line counts as outside, and a phone's
-// location can be off by a block. "edge" otherwise near a line; "outside"
-// elsewhere.
+// The guide no longer says whether someone is inside an eruv (Oct 12, the
+// user: people see their dot on the eruv's own map and judge for
+// themselves), so this is only ever where a name is written.
 
 const SNAP_M = 8
 const GAP_M = 400
 const T_GAP_M = 150
-export const EDGE_MIN_M = 30
 
 type XY = [number, number]
 
@@ -79,21 +74,8 @@ function inRing(p: XY, ring: XY[]): boolean {
   return inside
 }
 
-export type EruvShape = {
-  /** The areas the eruv encloses. */
-  areas: LatLng[][]
-  /** Gaps in the published line the guide joined, for an admin to check. */
-  joins: [LatLng, LatLng][]
-}
-
 type Built = {
   areas: XY[][]
-  joins: [XY, XY][]
-  /** The lines that border the outside, and the loose connectors. */
-  edges: [XY, XY][]
-  /** The eruv's outline: the lines with an area on one side only, joined
-   *  end to end. No connector, and no line with the eruv on both sides. */
-  outline: XY[][]
   proj: ReturnType<typeof projector>
 }
 
@@ -147,7 +129,6 @@ function build(file: EruvLineFile): Built {
 
   // 2 · Join loose ends that are nearest each other and close enough.
   const loose = () => [...adj].filter(([, s]) => s.size === 1).map(([k]) => k)
-  const joins: [XY, XY][] = []
   const ends = loose()
   const nearest = (k: number) => {
     let best = -1
@@ -163,7 +144,6 @@ function build(file: EruvLineFile): Built {
     const { best, bestD } = nearest(k)
     if (best > k && bestD <= GAP_M && nearest(best).best === k) {
       link(k, best)
-      joins.push([nodes[k], nodes[best]])
     }
   }
   // A loose end that stops short of a line (Center City's Grays Ferry
@@ -192,14 +172,10 @@ function build(file: EruvLineFile): Built {
       link(w, best.v)
     }
     link(k, w)
-    joins.push([nodes[k], nodes[w]])
   }
 
-  // 3 · Drop what's still loose. Kept aside as lines: standing on a
-  // connector (the South Street Bridge) is standing at an edge.
-  const loosePieces: [XY, XY][] = []
+  // 3 · Drop what's still loose.
   for (let ks = loose(); ks.length; ks = loose()) {
-    for (const k of ks) for (const m of adj.get(k) ?? []) loosePieces.push([nodes[k], nodes[m]])
     for (const k of ks) {
       for (const m of adj.get(k) ?? []) adj.get(m)?.delete(k)
       adj.delete(k)
@@ -212,10 +188,6 @@ function build(file: EruvLineFile): Built {
   for (const [u, s] of adj) around.set(u, [...s].sort((v, w) => angle(u, v) - angle(u, w)))
   const seen = new Set<string>()
   const areas: XY[][] = []
-  // Each side of each line, and whether that side is an enclosed area: a
-  // line with an area on both sides (Washington Avenue, between Center City
-  // and South Philadelphia) is inside, not an edge.
-  const enclosedSide = new Set<string>()
   for (const [u, s] of adj) {
     for (const v0 of s) {
       if (seen.has(`${u}>${v0}`)) continue
@@ -231,84 +203,10 @@ function build(file: EruvLineFile): Built {
         ;[a, b] = [b, next]
       }
       const pts = ring.map((k) => nodes[k])
-      if (area(pts) > 100) {
-        areas.push(pts)
-        ring.forEach((k, i) => enclosedSide.add(`${k}>${ring[(i + 1) % ring.length]}`))
-      }
+      if (area(pts) > 100) areas.push(pts)
     }
   }
-  const edges: [XY, XY][] = [...loosePieces]
-  const rim = new Map<number, Set<number>>()
-  for (const [u, s] of adj) {
-    for (const v of s) {
-      if (u > v || (enclosedSide.has(`${u}>${v}`) && enclosedSide.has(`${v}>${u}`))) continue
-      edges.push([nodes[u], nodes[v]])
-      if (enclosedSide.has(`${u}>${v}`) || enclosedSide.has(`${v}>${u}`)) {
-        for (const [a, b] of [[u, v], [v, u]]) {
-          if (!rim.has(a)) rim.set(a, new Set())
-          rim.get(a)!.add(b)
-        }
-      }
-    }
-  }
-  return { areas, joins, edges, outline: chain(rim).map((ids) => ids.map((k) => nodes[k])), proj }
-}
-
-/** Edges joined into as few runs as there are: from each end or fork
- *  first, then round what's left (closed rings). */
-function chain(adj: Map<number, Set<number>>): number[][] {
-  const used = new Set<string>()
-  const key = (a: number, b: number) => (a < b ? `${a}-${b}` : `${b}-${a}`)
-  const runs: number[][] = []
-  const walk = (start: number, next: number) => {
-    const run = [start]
-    let [a, b] = [start, next]
-    for (;;) {
-      used.add(key(a, b))
-      run.push(b)
-      const on = [...(adj.get(b) ?? [])].filter((c) => !used.has(key(b, c)))
-      if ((adj.get(b)?.size ?? 0) !== 2 || on.length === 0) break
-      ;[a, b] = [b, on[0]]
-    }
-    runs.push(run)
-  }
-  const starts = [...adj.keys()].sort((p, q) => Number(adj.get(p)!.size === 2) - Number(adj.get(q)!.size === 2))
-  for (const u of starts) for (const v of adj.get(u)!) if (!used.has(key(u, v))) walk(u, v)
-  return runs
-}
-
-/** The areas an eruv's line encloses, and the gaps joined to make them. */
-export function shapeOf(file: EruvLineFile): EruvShape {
-  const b = build(file)
-  return { areas: b.areas.map((r) => r.map(b.proj.back)), joins: b.joins.map(([p, q]) => [b.proj.back(p), b.proj.back(q)]) }
-}
-
-/** What the map draws of an eruv: its outline, the line around the areas
- *  "inside" is answered from, so what's drawn and what's said agree. A
- *  piece inside the eruv (Center City's Washington Avenue, between it and
- *  South Philadelphia), or one leading out of it (a connector to the next
- *  eruv), isn't drawn (Oct 11: the user found too many lines). A file that
- *  encloses nothing is drawn as it comes. */
-export function outlineOf(file: EruvLineFile): LatLng[][] {
-  const b = build(file)
-  return b.outline.length ? b.outline.map((run) => run.map(b.proj.back)) : file.lines.map((l) => l.points)
-}
-
-export type Where = 'inside' | 'edge' | 'outside'
-
-/** Where `point` is, for a phone that says it's accurate to `accuracyM`. */
-export function whereIs(point: LatLng, accuracyM: number | null, file: EruvLineFile, shape?: Built): Where {
-  const b = shape ?? build(file)
-  const p = b.proj.to(point)
-  const near = Math.max(accuracyM ?? 0, EDGE_MIN_M)
-  if (b.edges.some(([s, t]) => distToSegment(p, s, t) <= near)) return 'edge'
-  return b.areas.some((r) => inRing(p, r)) ? 'inside' : 'outside'
-}
-
-/** whereIs for many points against one line, building the shape once. */
-export function locator(file: EruvLineFile): (point: LatLng, accuracyM: number | null) => Where {
-  const b = build(file)
-  return (point, accuracyM) => whereIs(point, accuracyM, file, b)
+  return { areas, proj }
 }
 
 /** Where to write the eruv's name: inside its largest area, as far from
@@ -334,4 +232,20 @@ export function labelPoint(file: EruvLineFile): LatLng | null {
     }
   }
   return best ? b.proj.back(best) : null
+}
+
+/** How far `point` is from an eruv's nearest line, in metres: the eruv
+ *  nearest someone, for the home's card (Oct 12), never whether they're
+ *  inside it. */
+export function metresFrom(file: EruvLineFile, point: LatLng): number {
+  const all = file.lines.flatMap((l) => l.points)
+  if (all.length === 0) return Infinity
+  const proj = projector([point])
+  const p = proj.to(point)
+  let best = Infinity
+  for (const l of file.lines) {
+    const pts = l.points.map(proj.to)
+    for (let i = 1; i < pts.length; i++) best = Math.min(best, distToSegment(p, pts[i - 1], pts[i]))
+  }
+  return best
 }
