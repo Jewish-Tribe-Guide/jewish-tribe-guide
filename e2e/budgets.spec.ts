@@ -1,6 +1,6 @@
 import { gzipSync } from 'node:zlib'
 import { expect, test, type Page } from '@playwright/test'
-import { openAddForm, defaultCommunity, dismissLocationPrompt, largestCategory, ready } from './helpers'
+import { openAddForm, defaultCommunitySlug, dismissLocationPrompt, largestCategory, ready } from './helpers'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // What a page actually downloads.
@@ -63,6 +63,16 @@ async function load(page: Page, path: string): Promise<Loaded[]> {
     )
   })
 
+  // The measured load must be this browser's first. These tests used to find
+  // the community by opening "/" in the same page, and that visit registered
+  // the service worker. Its install sometimes finished halfway through the
+  // load measured here, and on taking control it fetched every script again,
+  // after the preloads already had: every script counted twice, so the phone
+  // home read 653 KB instead of 326, intermittently and more often under load.
+  // That visit's late prefetches landed in the count as well. Find the community
+  // with defaultCommunitySlug(request), never by navigating.
+  expect(page.url(), 'load() must be the first navigation in this context').toBe('about:blank')
+
   await page.goto(path)
   await dismissLocationPrompt(page)
   await ready(page)
@@ -98,8 +108,8 @@ function requestedAsset(loaded: Loaded[], assetUrl: string): boolean {
 }
 
 test.describe('home screen weight', () => {
-  test('initial JavaScript stays under its ceiling', async ({ page }, testInfo) => {
-    const community = await defaultCommunity(page)
+  test('initial JavaScript stays under its ceiling', async ({ page, request }, testInfo) => {
+    const community = await defaultCommunitySlug(request)
     const loaded = await load(page, `/${community}`)
 
     const js = sum(loaded.filter(isScript))
@@ -112,8 +122,8 @@ test.describe('home screen weight', () => {
     expect(kb(js), 'initial JavaScript, gzipped').toBeLessThan(400)
   })
 
-  test('images stay light: none over 150 KB, and the total under 600 KB', async ({ page }, testInfo) => {
-    const community = await defaultCommunity(page)
+  test('images stay light: none over 150 KB, and the total under 600 KB', async ({ page, request }, testInfo) => {
+    const community = await defaultCommunitySlug(request)
     const images = (await load(page, `/${community}`)).filter(isImage)
 
     console.log(`[budget:${testInfo.project.name}] home images=${images.length} (${kb(sum(images))}KB)`)
@@ -126,8 +136,8 @@ test.describe('home screen weight', () => {
     expect(kb(sum(images)), 'total image bytes').toBeLessThan(600)
   })
 
-  test('preloads no more than one row of tiles plus the hero', async ({ page }) => {
-    const community = await defaultCommunity(page)
+  test('preloads no more than one row of tiles plus the hero', async ({ page, request }) => {
+    const community = await defaultCommunitySlug(request)
     await page.goto(`/${community}`)
     await ready(page)
 
@@ -137,8 +147,8 @@ test.describe('home screen weight', () => {
     expect(preloads).toBeLessThanOrEqual(6)
   })
 
-  test('the desktop hero photo is fetched on desktop and never on a phone', async ({ page, isMobile }) => {
-    const community = await defaultCommunity(page)
+  test('the desktop hero photo is fetched on desktop and never on a phone', async ({ page, request, isMobile }) => {
+    const community = await defaultCommunitySlug(request)
     const hero = await heroUrl(page, community)
     test.skip(!hero, 'this community has no desktop hero image set')
 
@@ -159,7 +169,7 @@ test.describe('home screen weight', () => {
 
 test.describe('category page weight', () => {
   test('the server-rendered page stays under 100 KB gzipped, even for the largest category', async ({ page, request }, testInfo) => {
-    const community = await defaultCommunity(page)
+    const community = await defaultCommunitySlug(request)
     const { category, count } = await largestCategory(request, community)
     const loaded = await load(page, `/${community}/${category.id}`)
 
@@ -177,7 +187,7 @@ test.describe('category page weight', () => {
   // desktop project is the positive control, so this can't pass because the
   // map is simply broken.
   test('a phone loads nothing from Google Maps on a category page; a desktop loads the map beside the list', async ({ page, request, isMobile }) => {
-    const community = await defaultCommunity(page)
+    const community = await defaultCommunitySlug(request)
     const { category } = await largestCategory(request, community)
 
     const hosts: string[] = []
@@ -194,7 +204,7 @@ test.describe('category page weight', () => {
       !process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY,
       'no Turnstile site key at build time, so the widget renders nothing and this could not fail',
     )
-    const community = await defaultCommunity(page)
+    const community = await defaultCommunitySlug(request)
     const { category } = await largestCategory(request, community)
 
     const hosts: string[] = []
