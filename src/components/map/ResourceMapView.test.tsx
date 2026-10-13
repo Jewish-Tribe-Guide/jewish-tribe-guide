@@ -1667,26 +1667,41 @@ describe('ResourceMapView — the Filters sheet', () => {
   })
 })
 
-describe('ResourceMapView — the Eruvim layer', () => {
+describe('ResourceMapView — eruv lines', () => {
   const withEruvPage = [makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' }), makeCategory({ id: 'eruv', label: 'Eruv', pluralLabel: 'Eruvim', kind: 'eruv' })]
   // The chips show once there's a place to plot.
   const store = [makeListing({ id: 'g1', name: 'Grocer', category: 'grocery', geo: { lat: 39.95, lng: -75.16 } })]
+  // Filters' "Eruv lines" switch, once the eruvim have arrived.
+  const eruvSwitch = async () => {
+    fireEvent.click(screen.getByTestId('map-filters-button'))
+    return within(await screen.findByTestId('map-filters-eruv-lines')).getByRole('switch', { name: 'Eruv lines' })
+  }
 
-  it('a chip beside Filters draws the eruvim with a line; off to begin with', async () => {
+  it('a switch in Filters draws every eruv with a line, all or none; off to begin with; a chip beside All only while on', async () => {
     renderMap(<ResourceMapView onUp={() => {}} />, store, withEruvPage)
-    const chip = await screen.findByTestId('map-eruvim-chip')
-    expect(chip).toHaveAttribute('aria-pressed', 'false')
+    const toggle = await eruvSwitch()
+    expect(toggle).toHaveAttribute('aria-checked', 'false')
     expect(screen.getByTestId('eruv-count')).toHaveTextContent('0')
-    fireEvent.click(chip)
-    expect(chip).toHaveAttribute('aria-pressed', 'true')
+    // Off, nothing of it in the chip row.
+    expect(screen.queryByTestId('map-eruv-lines-chip')).not.toBeInTheDocument()
+    fireEvent.click(toggle)
+    expect(toggle).toHaveAttribute('aria-checked', 'true')
     // Not Elkins Park: it has no map to draw.
     expect(screen.getByTestId('eruv-count')).toHaveTextContent('2')
     expect(screen.getByRole('button', { name: 'Eruv Center City Eruv green' })).toBeInTheDocument()
+    // Nothing picks one eruv from another.
+    expect(screen.queryByTestId('map-filters-__eruv__')).not.toBeInTheDocument()
+    // Counted as on, and a chip beside All while on, a tap from off.
+    expect(screen.getByTestId('map-filters-button')).toHaveAccessibleName('Filters, 1 on')
+    expect(screen.getByTestId('map-eruv-lines-chip')).toHaveTextContent(/^Eruv$/)
+    fireEvent.click(screen.getByTestId('map-eruv-lines-chip'))
+    expect(screen.getByTestId('eruv-count')).toHaveTextContent('0')
+    expect(screen.queryByTestId('map-eruv-lines-chip')).not.toBeInTheDocument()
   })
 
   it('tapping an eruv opens its listing where a place opens, picked out, with a way back', async () => {
     renderMap(<ResourceMapView onUp={() => {}} />, store, withEruvPage)
-    fireEvent.click(await screen.findByTestId('map-eruvim-chip'))
+    fireEvent.click(await eruvSwitch())
     fireEvent.click(screen.getByRole('button', { name: 'Eruv Center City Eruv green' }))
     const detail = screen.getByTestId('map-eruv-detail')
     expect(within(detail).getByText('Center City Eruv')).toBeInTheDocument()
@@ -1697,26 +1712,27 @@ describe('ResourceMapView — the Eruvim layer', () => {
     expect(screen.getByTestId('eruv-selected')).toHaveTextContent('')
   })
 
-  it('turning the layer off closes an open eruv', async () => {
+  it('turning the lines off closes an open eruv', async () => {
     renderMap(<ResourceMapView onUp={() => {}} />, store, withEruvPage)
-    const chip = await screen.findByTestId('map-eruvim-chip')
-    fireEvent.click(chip)
+    const toggle = await eruvSwitch()
+    fireEvent.click(toggle)
     fireEvent.click(screen.getByRole('button', { name: 'Eruv Center City Eruv green' }))
     expect(screen.getByTestId('map-eruv-detail')).toBeInTheDocument()
-    fireEvent.click(chip)
+    fireEvent.click(toggle)
     expect(screen.queryByTestId('map-eruv-detail')).not.toBeInTheDocument()
     expect(screen.getByTestId('eruv-count')).toHaveTextContent('0')
   })
 
-  it('the chip reads as a category’s: how many eruvim it draws', async () => {
+  it('Clear all turns the lines off too', async () => {
     renderMap(<ResourceMapView onUp={() => {}} />, store, withEruvPage)
-    expect(await screen.findByTestId('map-eruvim-chip')).toHaveTextContent('Eruvim2')
+    fireEvent.click(await eruvSwitch())
+    fireEvent.click(screen.getByRole('button', { name: 'Clear all' }))
+    expect(screen.getByTestId('eruv-count')).toHaveTextContent('0')
   })
 
   it('the Eruv page’s Full map: the eruvim alone, framed, no places; a category adds its places', async () => {
-    renderMap(<ResourceMapView onUp={() => {}} initialEruvim="all" />, store, withEruvPage)
-    const chip = await screen.findByTestId('map-eruvim-chip')
-    expect(chip).toHaveAttribute('aria-pressed', 'true')
+    renderMap(<ResourceMapView onUp={() => {}} initialEruvim />, store, withEruvPage)
+    expect(await eruvSwitch()).toHaveAttribute('aria-checked', 'true')
     expect(screen.getByTestId('eruv-count')).toHaveTextContent('2')
     expect(screen.getByTestId('point-count')).toHaveTextContent('0')
     expect(screen.getByTestId('eruv-framed')).toHaveTextContent('yes')
@@ -1725,40 +1741,16 @@ describe('ResourceMapView — the Eruvim layer', () => {
     expect(screen.getByTestId('eruv-framed')).toHaveTextContent('no')
   })
 
-  it('switching the eruvim off when they were all it showed brings every place back, not an empty map', async () => {
-    renderMap(<ResourceMapView onUp={() => {}} initialEruvim="all" />, store, withEruvPage)
-    fireEvent.click(await screen.findByTestId('map-eruvim-chip'))
+  it('switching the lines off when they were all it showed brings every place back, not an empty map', async () => {
+    renderMap(<ResourceMapView onUp={() => {}} initialEruvim />, store, withEruvPage)
+    fireEvent.click(await eruvSwitch())
     expect(screen.getByTestId('eruv-count')).toHaveTextContent('0')
     expect(screen.getByTestId('point-count')).toHaveTextContent('1')
   })
 
-  it('Filters choose which eruvim show; none chosen is every one', async () => {
-    renderMap(<ResourceMapView onUp={() => {}} />, store, withEruvPage)
-    const chip = await screen.findByTestId('map-eruvim-chip')
-    fireEvent.click(chip)
-    fireEvent.click(screen.getByTestId('map-filters-button'))
-    const section = screen.getByTestId('map-filters-__eruv__')
-    expect(section).toHaveTextContent('all 2')
-    fireEvent.click(within(section).getByRole('button', { name: /Center City/ }))
-    expect(screen.getByTestId('eruv-count')).toHaveTextContent('1')
-    expect(screen.getByRole('button', { name: 'Eruv Center City Eruv green' })).toBeInTheDocument()
-    expect(chip).toHaveTextContent('Eruvim1')
-    expect(section).toHaveTextContent('1 of 2')
-    // Unchosen again: every one.
-    fireEvent.click(within(section).getByRole('button', { name: /Center City/ }))
-    expect(screen.getByTestId('eruv-count')).toHaveTextContent('2')
-  })
-
-  it('a link with eruvim chosen shows those', async () => {
-    renderMap(<ResourceMapView onUp={() => {}} initialEruvim={['university-city']} />, store, withEruvPage)
-    await screen.findByTestId('map-eruvim-chip')
-    expect(screen.getByTestId('eruv-count')).toHaveTextContent('1')
-    expect(screen.getByRole('button', { name: 'Eruv University City Eruv green' })).toBeInTheDocument()
-  })
-
-  it('no chip where the community has no Eruv page', () => {
+  it('no Eruv lines switch where the community has no Eruv page', () => {
     renderMap(<ResourceMapView onUp={() => {}} />, store)
-    expect(screen.getByTestId('map-filters-button')).toBeInTheDocument()
-    expect(screen.queryByTestId('map-eruvim-chip')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByTestId('map-filters-button'))
+    expect(screen.queryByTestId('map-filters-eruv-lines')).not.toBeInTheDocument()
   })
 })

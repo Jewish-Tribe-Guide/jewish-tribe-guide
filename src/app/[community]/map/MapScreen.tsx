@@ -61,7 +61,7 @@ export default function MapScreen() {
         userLocation={coords}
         initialSelectedCategories={view.categories ?? undefined}
         initialPinned={view.pinned}
-        initialEruvim={view.eruvim ?? undefined}
+        initialEruvim={view.eruvim}
         initialQuery={view.query ?? undefined}
         initialPlaceId={view.place ?? undefined}
         viewSearch={params.toString()}

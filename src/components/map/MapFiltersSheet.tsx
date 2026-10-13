@@ -46,6 +46,8 @@ type Props = {
   count: number
   /** What the map shows when it isn't places: "Show 5 eruvim". */
   doneLabel?: string
+  /** Eruv lines on the map, all or none; null where there are none. */
+  eruvLines?: { on: boolean; onToggle: () => void } | null
 }
 
 export default function MapFiltersSheet(props: Props) {
@@ -62,7 +64,7 @@ export default function MapFiltersSheet(props: Props) {
   )
 }
 
-function Body({ top, onTopOpenNow, sections, onOpenNow, onBoolean, onSelect, onClearAll, anyOn, onClose, count, doneLabel }: Props) {
+function Body({ top, onTopOpenNow, sections, onOpenNow, onBoolean, onSelect, onClearAll, anyOn, onClose, count, doneLabel, eruvLines }: Props) {
   return (
     <div className="space-y-4" data-testid="map-filters">
       {/* Always takes its line, as on a category page's sheet: appearing on
@@ -80,6 +82,15 @@ function Body({ top, onTopOpenNow, sections, onOpenNow, onBoolean, onSelect, onC
           <h3 className="text-[17px] font-extrabold text-ink">All categories</h3>
           <SwitchRow label="Open now" on={top.on} onToggle={onTopOpenNow} />
           {top.note && <p className="-mt-2 text-[13px] text-muted">{top.note}</p>}
+        </section>
+      )}
+      {/* Not a filter of places but something drawn with them, on its own,
+          near the top: below every category's filters it took a long
+          scroll to find (Oct 13). */}
+      {eruvLines && (
+        <section aria-label="On the map" className={`space-y-3 ${top.shown ? 'border-t border-slate-200 pt-4' : ''}`} data-testid="map-filters-eruv-lines">
+          <h3 className="text-[17px] font-extrabold text-ink">On the map</h3>
+          <SwitchRow label="Eruv lines" on={eruvLines.on} onToggle={eruvLines.onToggle} />
         </section>
       )}
       {sections.length === 0 && <p className="text-[15px] text-muted">Nothing showing has filters. Turn on a category above.</p>}

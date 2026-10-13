@@ -198,7 +198,7 @@ export default function EruvInfo({ eruvim, onUp, title = 'Eruv Information', ico
   const mapped = ready && now && maps ? ready.eruvim.flatMap((e) => (maps.get(e.id) ? [{ id: e.id, name: e.name, tone: eruvView(e, now, ready.timezone, ready.candles).tone, map: maps.get(e.id)! }] : [])) : []
   const mapBeside = wide && !mapHidden && mapped.length > 0
   // The Map tab on the eruvim alone, the open one open there too.
-  const fullMapHref = `${routes.map(slug)}${mapQueryString({ eruvim: 'all', place: open ? `eruv:${open.id}` : null })}`
+  const fullMapHref = `${routes.map(slug)}${mapQueryString({ eruvim: true, place: open ? `eruv:${open.id}` : null })}`
   const eruvMap = (className: string, onHide?: () => void) => (
     <EruvMap
       eruvim={mapped}
