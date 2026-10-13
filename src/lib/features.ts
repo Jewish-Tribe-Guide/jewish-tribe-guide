@@ -1,7 +1,7 @@
 // Features that are built but held back from the live site (Oct 13): browse,
 // contribute and search come first. Nothing is deleted; each switch turns its
 // feature back on everywhere it shows. They're switched on, and worked on, on
-// redesign/today-home.
+// redesign/today-home — this branch. Before it merges, decide what ships.
 //
 // Read at render time (features.todayHome), never copied into a module-level
 // constant, so a test can turn one on or off.
@@ -18,6 +18,6 @@ type Features = {
 }
 
 export const features: Features = {
-  todayHome: false,
-  whatChanged: false,
+  todayHome: true,
+  whatChanged: true,
 }
