@@ -232,6 +232,10 @@ export type LinesContext = {
   /** "Mincha next at 2 PM · Kahal Kadosh Mikveh Israel, 0.9 mi", for a
    *  minyan question (the home works it out from the schedules). */
   minyanSub?: string | null
+  /** The day the first minyan in minyanSub is on, when it isn't today
+   *  ("next mincha" in the evening is tomorrow's): Minyanim by time opens
+   *  on it (`?day=wed`), not on a today with nothing left. */
+  minyanDay?: string | null
   /** "Candles Fri 6:01 PM · Havdalah Sat 6:59 PM", for a zman question. */
   timesSub?: string | null
   /** The home's other cards whose words match (see cardSearch.ts): Patient
@@ -303,7 +307,7 @@ export function searchLines(raw: string, ctx: LinesContext): SearchLine[] {
       kind: 'minyanim',
       title: 'Minyanim by time',
       sub: ctx.minyanSub ?? 'Every minyan, by time',
-      href: `${routes.slug(slug, shuls.id)}?davening=1&q=${encodeURIComponent(q)}`,
+      href: `${routes.slug(slug, shuls.id)}?davening=1${ctx.minyanDay ? `&day=${ctx.minyanDay}` : ''}&q=${encodeURIComponent(q)}`,
       categoryId: shuls.id,
     })
     const n = listings.filter((l) => l.category === shuls.id).length

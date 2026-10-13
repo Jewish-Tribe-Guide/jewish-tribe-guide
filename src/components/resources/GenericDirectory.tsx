@@ -29,7 +29,7 @@ import { withoutOpenWords, withoutSortWords, withoutTerms } from '@/lib/ask'
 import { neighborhoodsFor, placeName, townsFrom } from '@/lib/places'
 import { readerPlaces } from '@/lib/questionReader'
 import { needsReading, ownFrom, readingAnswers, readingLoses } from '@/lib/readingSearch'
-import { itemCounts, itemFields, listingHas, listingItems, searchItems } from '@/lib/itemFilter'
+import { itemCounts, itemFields, listingHas, listingItems, sameItem, searchItems } from '@/lib/itemFilter'
 import { itemName } from '@/lib/itemNames'
 import { useReading } from '@/lib/useReading'
 import { ListingOnwardContext, type ListingOnwardSource } from './listingOnward'
@@ -63,6 +63,44 @@ import { tellUsPlaceholder } from '@/lib/tellUs'
  *  page's own way back can take that same step (the Minyanim view, Oct 6).
  *  Neither: a navigation of its own. */
 export type ParamsOpts = { replace?: boolean; step?: string }
+
+/** A question the Filters were read from (`read=1`), and what it turned on
+ *  there: taken off again when the question is edited or cleared. */
+type Landed = { search: string; openNow: boolean; bool: string[]; select: Record<string, string[]>; has: Record<string, string[]> }
+
+/** The Filters an address carries: `f_<key>=1`, `sel_<key>=a,b`,
+ *  `has_<key>=Challah,Wine`. */
+function addressFilters(category: CategoryConfig, params: Record<string, string>) {
+  const bools: Record<string, boolean> = {}
+  const sels: Record<string, string[]> = {}
+  const has: Record<string, string[]> = {}
+  for (const f of category.detailFields) {
+    if (f.type === 'tags') {
+      const raw = params[`has_${f.key}`]
+      if (raw) has[f.key] = raw.split(',').map((v) => itemName(v)).filter(Boolean)
+    }
+    if (f.filterable && f.type === 'boolean' && params[`f_${f.key}`] === '1') bools[f.key] = true
+    if (f.filterable && f.type === 'select') {
+      const raw = params[`sel_${f.key}`]
+      if (raw) sels[f.key] = raw.split(',').filter(Boolean)
+    }
+  }
+  return { bools, sels, has }
+}
+
+/** Whether an address carries a search or Filters for this page. */
+function carriesSearch(category: CategoryConfig, params: Record<string, string>) {
+  const { bools, sels, has } = addressFilters(category, params)
+  return !!params.q?.trim() || params.openNow === '1' || [bools, sels, has].some((x) => Object.keys(x).length > 0)
+}
+
+/** `chosen` with `gone` taken out of it, key by key. */
+function withoutChosen(chosen: Record<string, string[]>, gone: Record<string, string[]>): Record<string, string[]> {
+  if (Object.keys(gone).length === 0) return chosen
+  const out = { ...chosen }
+  for (const [key, values] of Object.entries(gone)) out[key] = (out[key] ?? []).filter((v) => !values.some((g) => sameItem(g, v)))
+  return out
+}
 const MINYANIM_STEP = 'minyanim'
 const LISTING_STEP = 'listing'
 
@@ -168,8 +206,11 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // reader read it, here or on the home search): it stays in the box, as
   // asked, but isn't searched by again while it's unchanged, so switching
   // one of its filters off really widens the list. Typing anything else
-  // searches as usual.
-  const [landedSearch, setLandedSearch] = useState<string | null>(null)
+  // searches as usual. And what it was read as goes with it: editing or
+  // clearing the question takes off the Filters it turned on (`landed`),
+  // and leaves the ones the visitor ticked.
+  const [landed, setLanded] = useState<Landed | null>(null)
+  const landedSearch = landed?.search ?? null
 
   // Which card currently has its listing open — the desktop column or the
   // mobile sheet. On a phone the floating Add button steps aside while it's
@@ -226,32 +267,27 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // before those are in scope, and duplicating the two-line filter here is
   // cheaper than reordering the whole component around it).
   const appliedInitialFiltersRef = useRef(false)
+  // The Filters an address carries, and, for a question read into them
+  // (`read=1`), that question with them.
+  const applyAddressFilters = (params: Record<string, string>) => {
+    const { bools, sels, has } = addressFilters(category, params)
+    if (Object.keys(bools).length > 0) setBoolFilters((prev) => ({ ...prev, ...bools }))
+    if (Object.keys(sels).length > 0) setSelectFilters((prev) => ({ ...prev, ...sels }))
+    if (Object.keys(has).length > 0) setHasFilters((prev) => ({ ...prev, ...has }))
+    if (params.read === '1' && params.q) {
+      setLanded({ search: params.q, openNow: params.openNow === '1', bool: Object.keys(bools), select: sels, has })
+    }
+  }
   useEffect(() => {
     if (appliedInitialFiltersRef.current || !initialFilters) return
     appliedInitialFiltersRef.current = true
     if (arrivedViaBackForward) return
-    const bools: Record<string, boolean> = {}
-    const sels: Record<string, string[]> = {}
-    const has: Record<string, string[]> = {}
-    for (const f of category.detailFields) {
-      if (f.type === 'tags') {
-        const raw = initialFilters[`has_${f.key}`]
-        if (raw) has[f.key] = raw.split(',').map((v) => itemName(v)).filter(Boolean)
-      }
-      if (f.filterable && f.type === 'boolean' && initialFilters[`f_${f.key}`] === '1') bools[f.key] = true
-      if (f.filterable && f.type === 'select') {
-        const raw = initialFilters[`sel_${f.key}`]
-        if (raw) sels[f.key] = raw.split(',').filter(Boolean)
-      }
-    }
     // One-time application of an external value on arrival, guarded above by
     // appliedInitialFiltersRef — not the "derive state from props on every
     // render" pattern this lint rule is otherwise right to flag.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (Object.keys(bools).length > 0) setBoolFilters((prev) => ({ ...prev, ...bools }))
-    if (Object.keys(sels).length > 0) setSelectFilters((prev) => ({ ...prev, ...sels }))
-    if (Object.keys(has).length > 0) setHasFilters((prev) => ({ ...prev, ...has }))
-    if (initialFilters.read === '1' && initialFilters.q) setLandedSearch(initialFilters.q)
+    applyAddressFilters(initialFilters)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialFilters, category, arrivedViaBackForward])
   // Resets this screen's own search/openNow/filters to blank, both in local
   // state and (via onParamsChange) back out to the address bar — what a
@@ -270,14 +306,27 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // block's own doc above) — category/onParamsChange can be a fresh value
   // each render, and the two effects below only ever call this well after
   // it, never in the same commit, so ordinary (not layout) timing is fine.
+  // Only this screen's own state; clearFiltersRef clears the address too.
+  const blankRef = useRef<() => void>(undefined)
+  // This screen's state as an address has it (`?q=challah&has_m=Challah`).
+  const fromAddressRef = useRef<(params: Record<string, string>) => void>(undefined)
   useEffect(() => {
-    clearFiltersRef.current = () => {
+    fromAddressRef.current = (params) => {
+      blankRef.current!()
+      setSearch(params.q ?? '')
+      setOpenNow(params.openNow === '1')
+      applyAddressFilters(params)
+    }
+    blankRef.current = () => {
       setSearch('')
       setOpenNow(false)
       setBoolFilters({})
       setSelectFilters({})
       setHasFilters({})
-      setLandedSearch(null)
+      setLanded(null)
+    }
+    clearFiltersRef.current = () => {
+      blankRef.current!()
       const changes: Record<string, string | null> = { q: null, openNow: null, read: null }
       for (const f of category.detailFields) {
         if (f.filterable && f.type === 'boolean') changes[`f_${f.key}`] = null
@@ -333,14 +382,27 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // for another screen has already changed the address by the time this
   // screen is hidden; a pause while code loads hasn't. So it clears only
   // when the address it was hidden at isn't this screen's own.
+  //
+  // Come back by a link that carries a search (the home search's "Grocery ·
+  // 10 with Challah" is `?q=challah`), it's that search, not a blank page:
+  // the `initialXxx` props were applied once, on the first visit, and a
+  // second search from home landed on the whole list (the user, Oct 13).
+  // Only back/forward blanks it, as on a first arrival.
   const hasActivatedBeforeRef = useRef(false)
   const hiddenAtRef = useRef<string | null>(null)
   useEffect(() => {
-    if (hasActivatedBeforeRef.current && hiddenAtRef.current !== window.location.pathname) clearFiltersRef.current!()
+    if (hasActivatedBeforeRef.current && hiddenAtRef.current !== window.location.pathname) {
+      const params = Object.fromEntries(new URLSearchParams(window.location.search))
+      if (didArriveViaBackForward() || !carriesSearch(category, params)) clearFiltersRef.current!()
+      else fromAddressRef.current!(params)
+    }
     hasActivatedBeforeRef.current = true
     return () => {
       hiddenAtRef.current = window.location.pathname
     }
+    // On each activation only (Activity re-runs it), never on a change of
+    // category: a category is its own screen.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // ── Sync search + "Open now" into the URL (see onParamsChange's own doc) ──
@@ -350,18 +412,41 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // typing doesn't fire a history replace per keystroke; `openNow` is a
   // single toggle, so it goes out immediately.
   const searchSyncedOnce = useRef(false)
+  // Read when the debounce fires, not when it was set: arriving by a link,
+  // the question can reach `search` a render before `landed` does, and
+  // `read=1` came off the address (Oct 13).
+  const landedSearchRef = useRef(landedSearch)
+  useEffect(() => {
+    landedSearchRef.current = landedSearch
+  })
   useEffect(() => {
     if (!searchSyncedOnce.current) {
       searchSyncedOnce.current = true
       return
     }
     const timer = setTimeout(() => {
-      onParamsChange?.({ q: search.trim() || null, ...(landedSearch !== null && search === landedSearch ? {} : { read: null }) }, { replace: true })
+      const kept = landedSearchRef.current !== null && search === landedSearchRef.current
+      onParamsChange?.({ q: search.trim() || null, ...(kept ? {} : { read: null }) }, { replace: true })
     }, 300)
     return () => clearTimeout(timer)
-    // landedSearch only changes alongside a search it already describes.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search, onParamsChange])
+  // The question edited or cleared: the Filters it was read as come off
+  // with it (see `landed`). What's typed now is searched, and read again
+  // if it needs it.
+  useEffect(() => {
+    if (!landed || search === landed.search) return
+    const was = landed
+    // Follows the visitor's own edit of the box, once: not state derived
+    // from props.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setLanded(null)
+    if (was.openNow) setOpenNow(false)
+    if (was.bool.length) setBoolFilters((prev) => ({ ...prev, ...Object.fromEntries(was.bool.map((key) => [key, false])) }))
+    setSelectFilters((prev) => withoutChosen(prev, was.select))
+    setHasFilters((prev) => withoutChosen(prev, was.has))
+    // Only the box's own changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search])
   const openNowSyncedOnce = useRef(false)
   useEffect(() => {
     if (!openNowSyncedOnce.current) {
@@ -889,18 +974,31 @@ export default function GenericDirectory({ category, items, anchorLabel, address
     if (!readingAnswers(r, category.id)) return
     if ((todayMatches?.size ?? 0) > 0 && readingLoses(question, r, categories ?? [category])) return
     const here = r.categories.find((c) => c.id === category.id)
-    if (hasFilterableHours && (here?.openNow || mine.openNow)) setOpenNow(true)
+    const openNowAdded = hasFilterableHours && !!(here?.openNow || mine.openNow) && !openNow
+    if (openNowAdded) setOpenNow(true)
     const bools = (here?.bool ?? []).filter((key) => filterableBooleans.some((f) => f.key === key))
     if (bools.length) setBoolFilters((prev) => ({ ...prev, ...Object.fromEntries(bools.map((key) => [key, true])) }))
     const sels = Object.entries(here?.select ?? {}).filter(([key, v]) => v.length && filterableSelects.some((f) => f.key === key))
     if (sels.length) setSelectFilters((prev) => ({ ...prev, ...Object.fromEntries(sels) }))
     const field = itemFields(category)[0]
+    const hasAdded: string[] = []
     if (field && r.items?.length) {
-      const known = new Set(itemCounts(items, field.key).map((i) => i.tag.toLowerCase()))
-      const wanted = r.items.map(itemName).filter((i) => known.has(i.toLowerCase()))
-      if (wanted.length) setHasFilters((prev) => ({ ...prev, [field.key]: [...new Set([...(prev[field.key] ?? []), ...wanted])] }))
+      // As the listings spell it ("wine" read is their "Wine").
+      const known = new Map(itemCounts(items, field.key).map((i) => [i.tag.toLowerCase(), i.tag]))
+      const already = (hasFilters[field.key] ?? []).map((t) => t.toLowerCase())
+      for (const i of r.items) {
+        const tag = known.get(itemName(i).toLowerCase())
+        if (tag && !already.includes(tag.toLowerCase()) && !hasAdded.includes(tag)) hasAdded.push(tag)
+      }
+      if (hasAdded.length) setHasFilters((prev) => ({ ...prev, [field.key]: [...(prev[field.key] ?? []), ...hasAdded] }))
     }
-    setLandedSearch(question)
+    setLanded({
+      search: question,
+      openNow: openNowAdded,
+      bool: bools.filter((key) => !boolFilters[key]),
+      select: Object.fromEntries(sels.map(([key, v]) => [key, v.filter((x) => !(selectFilters[key] ?? []).includes(x))])),
+      has: field && hasAdded.length ? { [field.key]: hasAdded } : {},
+    })
     onParamsChange?.({ read: '1' }, { replace: true })
   })
   useEffect(() => {
@@ -1279,8 +1377,8 @@ export default function GenericDirectory({ category, items, anchorLabel, address
     if (word) dropWord(word)
     setHasFilters((prev) => {
       const cur = prev[key] ?? []
-      const on = cur.includes(tag) || !!word
-      return { ...prev, [key]: on ? cur.filter((x) => x !== tag) : [...cur, tag] }
+      const on = cur.some((x) => sameItem(x, tag)) || !!word
+      return { ...prev, [key]: on ? cur.filter((x) => !sameItem(x, tag)) : [...cur, tag] }
     })
   }
   // The sheet's Clear all clears what it shows, the search's filter words
@@ -1294,7 +1392,12 @@ export default function GenericDirectory({ category, items, anchorLabel, address
     for (const word of [...searchBools.values(), ...[...searchSelects.values()].flatMap((m) => [...m.values()]), ...[...searchHas.values()].flatMap((m) => [...m.values()])]) next = withoutTerms(next, word.split(' '))
     setSearch(searchOpenNow ? withoutOpenWords(next) : next)
   }
-  const sheetItems = itemsToShow.map((f) => ({ ...f, chosen: [...new Set([...(hasFilters[f.key] ?? []), ...(searchHas.get(f.key)?.keys() ?? [])])] }))
+  // Each ticked item as its listings spell it, so "has_m=wine" from an
+  // address ticks their "Wine" rather than adding a second chip.
+  const sheetItems = itemsToShow.map((f) => {
+    const spelled = (t: string) => f.counts.find((c) => sameItem(c.tag, t))?.tag ?? t
+    return { ...f, chosen: [...new Set([...(hasFilters[f.key] ?? []), ...(searchHas.get(f.key)?.keys() ?? [])].map(spelled))] }
+  })
   const sheetSelects = selectsToShow.map((sel) => ({ ...sel, chosen: [...new Set([...sel.chosen, ...(searchSelects.get(sel.key)?.keys() ?? [])])] }))
   // What the Filters button counts: everything the sheet shows ticked.
   const sheetFilterCount =

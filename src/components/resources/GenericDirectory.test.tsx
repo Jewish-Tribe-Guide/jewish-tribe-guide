@@ -724,6 +724,41 @@ describe('GenericDirectory', () => {
       expect(screen.queryByText('Regular Mart')).not.toBeInTheDocument()
       expect(onParamsChange).not.toHaveBeenCalledWith(expect.objectContaining({ q: null }), expect.anything())
     })
+
+    // The user, Oct 13: a search from home landed on a category already
+    // visited showed the whole list. The arrival props were applied on the
+    // first visit only, and coming back cleared everything. Come back by a
+    // link with a search, it's that search.
+    it('comes back by a link that carries a search: that search, and its Filters', async () => {
+      const user = userEvent.setup()
+      const onParamsChange = vi.fn()
+      const category = makeCategory({ detailFields: [{ key: 'm', label: 'Kosher items', type: 'tags' }] })
+      const items = [
+        makeListing({ id: 'a', name: 'Kosher Mart', m: ['Challah'] }),
+        makeListing({ id: 'b', name: 'Regular Mart', m: ['Wine'] }),
+        makeListing({ id: 'c', name: 'Corner Shop', m: ['Wine'] }),
+      ]
+      const screenAs = (mode: 'visible' | 'hidden') => (
+        <Activity mode={mode}>
+          <GenericDirectory category={category} items={items} {...handlers} onParamsChange={onParamsChange} />
+        </Activity>
+      )
+      const { rerenderWithProviders } = renderWithProviders(screenAs('visible'))
+      await user.type(screen.getByRole('searchbox'), 'kosher')
+
+      const here = window.location.pathname
+      window.history.pushState(null, '', '/philly')
+      rerenderWithProviders(screenAs('hidden'))
+      window.history.pushState(null, '', `${here}?q=regular&has_m=Wine`)
+      rerenderWithProviders(screenAs('visible'))
+
+      expect(screen.getByRole('searchbox')).toHaveValue('regular')
+      expect(screen.getByText('Regular Mart')).toBeInTheDocument()
+      expect(screen.queryByText('Kosher Mart')).not.toBeInTheDocument()
+      expect(screen.queryByText('Corner Shop')).not.toBeInTheDocument()
+      expect(onParamsChange).not.toHaveBeenCalledWith(expect.objectContaining({ q: null }), expect.anything())
+      window.history.pushState(null, '', here)
+    })
   })
 
   // Reported live on desktop: open a listing, press Back to home, pick
@@ -2599,6 +2634,57 @@ describe('GenericDirectory — Has', () => {
     await user.click(sheet.getByRole('button', { name: /^Wine/ }))
     expect(screen.getByText('Acme')).toBeInTheDocument()
     expect(screen.getByRole('searchbox')).toHaveValue(question)
+  })
+
+  // The user, Oct 13: "removing search doesn't remove filter". What a
+  // question was read as belongs to it: clear or edit the question and its
+  // Filters come off, and a filter ticked by hand stays.
+  it('read=1: clearing the question takes off the Filters it was read as, not one ticked by hand', async () => {
+    const user = userEvent.setup()
+    const question = 'something to drink for kiddush'
+    const four = [...stores, makeListing({ id: 'd', name: 'Corner Shop', m: ['Wine'] })]
+    const tagged = makeCategory({ detailFields: [{ key: 'm', label: 'Kosher items', type: 'tags' }, { key: 'v', label: 'Delivers', type: 'boolean', filterable: true }] })
+    const items = four.map((l) => ({ ...l, v: l.id !== 'd' })) as unknown as DirectoryResource[]
+    renderWithProviders(<GenericDirectory category={tagged} items={items} {...handlers} initialSearch={question} initialFilters={{ q: question, read: '1', has_m: 'Wine' }} />)
+    expect(screen.queryByText('Acme')).not.toBeInTheDocument()
+
+    const sheet = await openFilters(user)
+    await user.click(sheet.getByRole('switch', { name: 'Delivers' }))
+    await user.keyboard('{Escape}')
+    await user.clear(screen.getByRole('searchbox'))
+
+    // Wine is off, with the question; Delivers, ticked by hand, stays.
+    expect(screen.getByText('Acme')).toBeInTheDocument()
+    expect(screen.queryByText('Corner Shop')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Filters/ })).toHaveTextContent('1')
+  })
+
+  // Arriving by a link, the question reached the box a render before the
+  // page knew it was read (`read=1`), and the address lost it: reloaded,
+  // the page then searched the words over the Filters.
+  it('read=1 stays in the address when the question arrives a render before its Filters', async () => {
+    const onParamsChange = vi.fn()
+    const question = 'something to drink for kiddush'
+    const page = (filters: Record<string, string> | null) => (
+      <GenericDirectory category={grocery} items={stores} {...handlers} onParamsChange={onParamsChange} initialSearch={question} initialFilters={filters} />
+    )
+    const { rerenderWithProviders } = renderWithProviders(<GenericDirectory category={grocery} items={stores} {...handlers} onParamsChange={onParamsChange} />)
+    rerenderWithProviders(page(null))
+    rerenderWithProviders(page({ q: question, read: '1', has_m: 'Wine' }))
+    await new Promise((r) => setTimeout(r, 400))
+    expect(onParamsChange).not.toHaveBeenCalledWith(expect.objectContaining({ read: null }), expect.anything())
+  })
+
+  // Any capitals: "has_m=pinot" is the listings' "Pinot", one chip, ticked.
+  it('an item from the address in other capitals ticks the listings’ own', async () => {
+    const user = userEvent.setup()
+    const wines = [makeListing({ id: 'a', name: 'ShopRite', m: ['Pinot'] }), makeListing({ id: 'c', name: 'Acme', m: ['Challah'] })]
+    renderWithProviders(<GenericDirectory category={grocery} items={wines} {...handlers} initialFilters={{ has_m: 'pinot' }} />)
+    expect(screen.queryByText('Acme')).not.toBeInTheDocument()
+    const has = within((await openFilters(user)).getByRole('group', { name: 'Has' }))
+    expect(has.getAllByRole('button', { name: /pinot/i })).toHaveLength(1)
+    await user.click(has.getByRole('button', { name: /^Pinot/ }))
+    expect(screen.getByText('Acme')).toBeInTheDocument()
   })
 
   // The reader's reading goes into the page's own Filters, not "Read as"

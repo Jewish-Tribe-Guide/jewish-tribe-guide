@@ -28,21 +28,34 @@ export function listingItems(item: DirectoryResource, key: string): { tag: strin
   return [...out].map(([tag, sometimes]) => ({ tag, sometimes }))
 }
 
+/** Whether two names are one item, whatever their capitals: "wine" from
+ *  an address or a reading is the listings' "Wine". */
+export function sameItem(a: string, b: string): boolean {
+  return itemName(a).toLowerCase() === itemName(b).toLowerCase()
+}
+
 /** Whether a listing has every one of `chosen` in that field, always or
  *  sometimes: "Has: Challah" keeps the store that only sometimes does,
  *  and its row says so. */
 export function listingHas(item: DirectoryResource, key: string, chosen: readonly string[]): boolean {
   if (chosen.length === 0) return true
-  const have = new Set(listingItems(item, key).map((t) => t.tag.toLowerCase()))
-  return chosen.every((c) => have.has(itemName(c).toLowerCase()))
+  const have = listingItems(item, key)
+  return chosen.every((c) => have.some((t) => sameItem(t.tag, c)))
 }
 
 /** Every item in a field across a category's listings, with how many have
  *  it, most first, then A to Z: "Challah 10, Chicken 5, Wine 5 …". */
 export function itemCounts(items: readonly DirectoryResource[], key: string): { tag: string; count: number }[] {
-  const counts = new Map<string, number>()
-  for (const item of items) for (const { tag } of listingItems(item, key)) counts.set(tag, (counts.get(tag) ?? 0) + 1)
-  return [...counts].map(([tag, count]) => ({ tag, count })).sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag))
+  // One item whatever its capitals ("wine" on one store, "Wine" on
+  // another), under the spelling the first store has.
+  const counts = new Map<string, { tag: string; count: number }>()
+  for (const item of items) {
+    for (const { tag } of listingItems(item, key)) {
+      const had = counts.get(tag.toLowerCase())
+      counts.set(tag.toLowerCase(), { tag: had?.tag ?? tag, count: (had?.count ?? 0) + 1 })
+    }
+  }
+  return [...counts.values()].sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag))
 }
 
 /** The items a search names, by item field, each with the word that named

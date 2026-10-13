@@ -287,6 +287,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
           options: { coords, now: new Date(schedule?.now ?? 0), places },
           reading: text === q && useReadingLines ? reading!.reading : null,
           minyanSub: result.query.minyan && answer ? minyanLine(answer.rows[0], answer.text) : null,
+          minyanDay: result.query.minyan && answer?.rows[0]?.tomorrow && schedule ? schedule.tomorrowKey : null,
           timesSub: result.query.times ? (timesLine(result.query.times, zmanim.data) ?? (zmanim.status === 'error' ? null : 'Looking up the times…')) : null,
           cards: otherCards.map((c) => ({ id: c.id, title: c.title, href: categories.some((cat) => cat.id === c.id) ? c.href : null })),
           placeSub,

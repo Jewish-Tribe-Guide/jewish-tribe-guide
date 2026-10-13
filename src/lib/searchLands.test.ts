@@ -81,6 +81,14 @@ describe('searchLines — where Enter goes', () => {
     ])
   })
 
+  // "next mincha" in the evening is tomorrow's: the page opens on that
+  // day, not on a today with none left (the user, Oct 13).
+  it('a minyan whose next is tomorrow: Minyanim by time opens on tomorrow', () => {
+    expect(brief('next mincha', { minyanSub: 'Mincha next at 2 PM tomorrow · Mekor Habracha', minyanDay: 'wed' })[0]).toBe(
+      'Minyanim by time · Mincha next at 2 PM tomorrow · Mekor Habracha → /philly/synagogue?davening=1&day=wed&q=next%20mincha',
+    )
+  })
+
   it('a zman: the times page, that time picked out (board 6b)', () => {
     expect(brief('when is candle lighting', { timesSub: 'Candles Friday 6:01 PM' })).toEqual([
       'Prayer & Shabbat Times · Candles Friday 6:01 PM → /philly/zmanim?time=candles',
@@ -133,6 +141,11 @@ describe('Has — items as a filter', () => {
       { tag: 'Apples', count: 1 },
       { tag: 'Wine', count: 1 },
     ])
+  })
+
+  it('one item whatever its capitals, under the first store’s spelling', () => {
+    const stores = [{ ...listings[1], m: ['Pinot'], m_sometimes: [] }, { ...listings[1], id: 'x', m: ['pinot'], m_sometimes: [] }] as typeof listings
+    expect(itemCounts(stores, 'm')).toEqual([{ tag: 'Pinot', count: 2 }])
   })
 
   it('a listing has an item always or sometimes, by the name the guide uses for it', () => {

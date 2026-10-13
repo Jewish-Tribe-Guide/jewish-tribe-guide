@@ -84,6 +84,38 @@ test('an item: Enter goes where its first line says, the item in that page’s b
   await expect(page.getByTestId('read-as')).toHaveCount(0)
 })
 
+// The user, Oct 13: a search from home to a category page already
+// visited showed the whole list, the box empty. The page is kept alive
+// between visits, and only its first took the address's search.
+test('a second search to a page already visited lands on that search, not the whole list', async ({ page, request }) => {
+  const community = await defaultCommunity(page)
+  const found = await itemOnAListing(request, community)
+  test.skip(!found, 'no listing has an item')
+  const { category, item } = found!
+
+  const box = await homeBox(page, community)
+  await typeAndWait(page, box, category.label)
+  const first = page.getByTestId('search-lines').filter({ visible: true }).getByRole('option').first()
+  await expect(first.getByRole('link')).toHaveAttribute('href', `/${community}/${category.id}`)
+  await box.press('Enter')
+  await page.waitForURL((url) => url.pathname === `/${community}/${category.id}`)
+  await expect(page.getByRole('searchbox').filter({ visible: true }).first()).toHaveValue('')
+
+  await page.goBack()
+  await page.waitForURL((url) => url.pathname === `/${community}`)
+  const again = page.getByRole('textbox', { name: 'Search resources' }).filter({ visible: true })
+  const lines = await typeAndWait(page, again, item)
+  const href = await lines.getByRole('option').first().getByRole('link').getAttribute('href')
+  test.skip(!href?.startsWith(`/${community}/${category.id}?`), `"${item}" goes elsewhere first`)
+  await again.press('Enter')
+
+  await page.waitForURL((url) => `${url.pathname}${url.search}` === href)
+  await expect(page.getByRole('searchbox').filter({ visible: true }).first()).toHaveValue(item)
+  // And it stays: nothing clears the address after landing.
+  await page.waitForTimeout(800)
+  expect(new URL(page.url()).searchParams.get('q')).toBe(item)
+})
+
 test('a minyan: Minyanim by time, the words in its box, no sentence over the list', async ({ page, request }) => {
   const community = await defaultCommunity(page)
   const shuls = ((await categories(request, community)) as Cat[]).find((c) => c.detailFields?.some((f) => f.type === 'minyanim'))
