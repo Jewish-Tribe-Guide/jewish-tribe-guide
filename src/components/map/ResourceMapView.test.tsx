@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { ReactElement } from 'react'
+import { Activity, type ReactElement } from 'react'
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { renderWithProviders } from '@/test/renderWithProviders'
@@ -1474,6 +1474,37 @@ describe('ResourceMapView — its own address-bar writes coming back', () => {
     expect(screen.getByTestId('point-count')).toHaveTextContent('1')
     expect(screen.getByRole('button', { name: 'Select Beth Shalom' })).toBeInTheDocument()
   })
+
+  // Kept mounted between visits, the screen is shown again for a link with
+  // that link's props, and its effects re-run as it's shown. Its own write
+  // never came back as props (Next doesn't always echo one), so the same
+  // link again looked like nothing new, and the commit that showed it wrote
+  // the last view back over the address: Food's Full map came back on All
+  // (the user, Oct 13).
+  it('the same link again, after the visitor changed the view, shows the link', async () => {
+    const user = userEvent.setup()
+    const { wrap, rerender } = setup()
+    const map = (mode: 'visible' | 'hidden') =>
+      wrap(
+        <Activity mode={mode}>
+          <ResourceMapView onUp={vi.fn()} standalone visible initialSelectedCategories={['grocery']} viewSearch="cat=grocery" />
+        </Activity>,
+      )
+    window.history.replaceState(null, '', '/?cat=grocery')
+    rerender(map('visible'))
+    expect(screen.getByTestId('point-count')).toHaveTextContent('1')
+    await user.click(screen.getByRole('button', { name: 'All' })) // writes, and no echo comes
+    expect(screen.getByTestId('point-count')).toHaveTextContent('2')
+    expect(window.location.search).not.toBe('?cat=grocery')
+
+    // Away, then the same link: Groceries only, Pinned off.
+    rerender(map('hidden'))
+    window.history.pushState(null, '', '/?cat=grocery')
+    rerender(map('visible'))
+    expect(window.location.search).toBe('?cat=grocery')
+    expect(screen.getByTestId('point-count')).toHaveTextContent('1')
+    expect(screen.getByRole('button', { name: 'All' })).toHaveAttribute('aria-pressed', 'false')
+  })
 })
 
 // The map's search is the same question-reading search as the home and
@@ -1730,20 +1761,18 @@ describe('ResourceMapView — eruv lines', () => {
     expect(screen.getByTestId('eruv-count')).toHaveTextContent('0')
   })
 
-  it('the Eruv page’s Full map: the eruvim alone, framed, no places; a category adds its places', async () => {
+  it('the Eruv page’s Full map: every place with the lines on, and Filters as ever', async () => {
     renderMap(<ResourceMapView onUp={() => {}} initialEruvim />, store, withEruvPage)
-    expect(await eruvSwitch()).toHaveAttribute('aria-checked', 'true')
+    const toggle = await eruvSwitch()
+    expect(toggle).toHaveAttribute('aria-checked', 'true')
     expect(screen.getByTestId('eruv-count')).toHaveTextContent('2')
-    expect(screen.getByTestId('point-count')).toHaveTextContent('0')
-    expect(screen.getByTestId('eruv-framed')).toHaveTextContent('yes')
-    fireEvent.click(screen.getByRole('button', { name: /^Grocery Stores/ }))
     expect(screen.getByTestId('point-count')).toHaveTextContent('1')
-    expect(screen.getByTestId('eruv-framed')).toHaveTextContent('no')
-  })
-
-  it('switching the lines off when they were all it showed brings every place back, not an empty map', async () => {
-    renderMap(<ResourceMapView onUp={() => {}} initialEruvim />, store, withEruvPage)
-    fireEvent.click(await eruvSwitch())
+    expect(screen.getByRole('button', { name: 'All' })).toHaveAttribute('aria-pressed', 'true')
+    // The switch sits under All categories, no heading of its own.
+    expect(within(screen.getByTestId('map-filters-open-all')).getByRole('switch', { name: 'Eruv lines' })).toBe(toggle)
+    expect(screen.queryByRole('heading', { name: 'On the map' })).not.toBeInTheDocument()
+    // Off, the places stay.
+    fireEvent.click(toggle)
     expect(screen.getByTestId('eruv-count')).toHaveTextContent('0')
     expect(screen.getByTestId('point-count')).toHaveTextContent('1')
   })

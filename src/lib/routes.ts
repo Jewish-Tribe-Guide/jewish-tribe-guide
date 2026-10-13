@@ -212,9 +212,7 @@ export function mapQueryString(state: {
   place?: string | null
   /** The Pinned chip is on (the visitor's pinned places; see pinned.ts). */
   pinned?: boolean
-  /** Eruv lines on (Filters' switch). With no `cat`, only the eruvim show,
-   *  no places (the Eruv page's Full map), as `pinned` with no `cat` shows
-   *  only the pins. */
+  /** Eruv lines on (Filters' switch), over whatever places show. */
   eruvim?: boolean
 }): string {
   const params = new URLSearchParams()

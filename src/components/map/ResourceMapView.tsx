@@ -65,11 +65,11 @@ import type { DirectoryResource, MapFilters } from '@/types'
 // Shared by the initial useState below and the resync effect further down
 // (see its own comment) — one place for the initialSelectedCategories-vs-
 // initialCategory precedence so the two can't drift apart.
-function resolveInitialSelected(categories: string[] | undefined, category: string | undefined, pinned = false, eruvim = false): Set<string> | null {
+function resolveInitialSelected(categories: string[] | undefined, category: string | undefined, pinned = false): Set<string> | null {
   // Arriving on the Pinned chip alone ("See them on the map" on the Pinned
-  // page): no category chip on, only the pins. The same for the eruvim
-  // alone (the Eruv page's Full map).
-  if ((pinned || eruvim) && categories === undefined && !category) return new Set()
+  // page): no category chip on, only the pins. Eruv lines don't narrow the
+  // places: the Eruv page's Full map is every place with the lines on.
+  if (pinned && categories === undefined && !category) return new Set()
   return categories !== undefined ? new Set(categories) : category ? new Set([category]) : null
 }
 
@@ -636,7 +636,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // browser back) takes precedence over initialCategory (the single-category
   // arrival case from a directory's "Map" button).
   const [selected, setSelected] = useState<Set<string> | null>(
-    resolveInitialSelected(initialSelectedCategories, initialCategory, initialPinned, !!initialEruvim),
+    resolveInitialSelected(initialSelectedCategories, initialCategory, initialPinned),
   )
   // Eruv lines (see "Eruv lines" below).
   const [eruvimOn, setEruvimOn] = useState(!!initialEruvim)
@@ -986,7 +986,10 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
       .map(([k, v]) => `${k}=${[...v].sort().join('|')}`)
       .join(';'),
   ].join('::')
-  const appliedInitialViewKeyRef = useRef(initialViewKey)
+  const appliedInitialViewKeyRef = useRef<string | null>(initialViewKey)
+  // Each render's own mark, and the render whose commit applied a link.
+  const thisRender = {}
+  const applyingRenderRef = useRef<object | null>(null)
   // The query strings this screen wrote to its own address bar (the sync
   // effect below), oldest first, until Next echoes each one back. Next does:
   // history.replaceState feeds useSearchParams in this version (see
@@ -997,6 +1000,15 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // after a reading set the categories and Open now) would put the old
   // search back. A real navigation's address was never written here.
   const ownWritesRef = useRef<string[]>([])
+  // Hidden (another screen showing; this one is kept mounted), nothing
+  // echoes: what it wrote and never heard back would otherwise take the
+  // next link to that address for an echo, and ignore it.
+  useEffect(
+    () => () => {
+      ownWritesRef.current = []
+    },
+    [],
+  )
   useEffect(() => {
     if (initialViewKey === appliedInitialViewKeyRef.current) return
     const echo = viewSearch === undefined ? -1 : ownWritesRef.current.indexOf(normalizeSearch(viewSearch))
@@ -1007,7 +1019,10 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
       return
     }
     appliedInitialViewKeyRef.current = initialViewKey
-    setSelected(resolveInitialSelected(initialSelectedCategories, initialCategory, initialPinned, !!initialEruvim))
+    applyingRenderRef.current = thisRender
+    setSelected(resolveInitialSelected(initialSelectedCategories, initialCategory, initialPinned))
+    // The link's Pinned too: "All" turns it on, and it outlives this screen.
+    setPinnedSelected(initialPinned)
     setEruvimOn(!!initialEruvim)
     setInput(initialQueryText)
     setCommittedQuery(initialQueryText)
@@ -1077,11 +1092,13 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   const allSelected = !selected || (selected.size === options.length && options.every((o) => selected.has(o.id)))
   useEffect(() => {
     if (!standalone) return
+    // Not in the commit that applies a link: its state is the last view's
+    // until the next render, and writing it would put that view back over
+    // the link's address (see the re-sync above).
+    if (applyingRenderRef.current === thisRender) return
     const written = writeMapFilters(filters, categories ?? [])
     const qs = mapQueryString({
-      // With the eruvim on, every category is spelled out: `eruv` with no
-      // `cat` is the eruvim alone.
-      categories: allSelected ? (eruvimOn ? options.map((o) => o.id) : null) : Array.from(selected ?? []),
+      categories: allSelected ? null : Array.from(selected ?? []),
       query: committedQuery || null,
       openNow: written.open === '1',
       openIn: written.open && written.open !== '1' ? written.open.split(',') : null,
@@ -1095,6 +1112,10 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
     if (url === `${window.location.pathname}${window.location.search}`) return
     window.history.replaceState(window.history.state, '', url)
     ownWritesRef.current = [...ownWritesRef.current, normalizeSearch(qs)].slice(-20)
+    // The view is the visitor's now, no link's: the same link again is a
+    // new navigation, even if this write never comes back as props (Next
+    // doesn't always echo one).
+    appliedInitialViewKeyRef.current = null
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [standalone, committedQuery, selected, allSelected, filtersKey, categories, selectedPointId, pinnedSelected, eruvimOn, options])
 
@@ -1271,7 +1292,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
     // same as Google Maps/Too Good To Go's filter rows — there's no
     // "nothing shown" state a chip tap can land you in, so a separate
     // Hide-all shortcut has nothing left to do.
-    if (next.size === 0 && !pinnedSelected && !eruvimOn) {
+    if (next.size === 0 && !pinnedSelected) {
       showAll()
       return
     }
@@ -1680,9 +1701,6 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   const toggleEruvim = () => {
     if (eruvimOn && openEruvId) deselectPlace()
     setEruvimOn(!eruvimOn)
-    // Off with nothing else on would leave an empty map: everything, as
-    // the last category chip switched off does.
-    if (eruvimOn && effectiveSelected.size === 0 && !pinnedSelected) showAll()
   }
   const eruvDetail = (id: string, onBack: () => void) => {
     const e = eruvData?.eruvim.find((x) => x.id === id)

@@ -197,7 +197,7 @@ export default function EruvInfo({ eruvim, onUp, title = 'Eruv Information', ico
   const { gridRef: splitRef, gridStyle: splitStyle, handleProps: splitHandle } = useListMapSplit({ onHideMap: () => setMapHidden(true) })
   const mapped = ready && now && maps ? ready.eruvim.flatMap((e) => (maps.get(e.id) ? [{ id: e.id, name: e.name, tone: eruvView(e, now, ready.timezone, ready.candles).tone, map: maps.get(e.id)! }] : [])) : []
   const mapBeside = wide && !mapHidden && mapped.length > 0
-  // The Map tab on the eruvim alone, the open one open there too.
+  // The Map tab with the eruv lines on, the open one open there too.
   const fullMapHref = `${routes.map(slug)}${mapQueryString({ eruvim: true, place: open ? `eruv:${open.id}` : null })}`
   const eruvMap = (className: string, onHide?: () => void) => (
     <EruvMap
