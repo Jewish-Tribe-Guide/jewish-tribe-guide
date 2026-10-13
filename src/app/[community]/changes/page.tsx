@@ -1,7 +1,9 @@
 import type { Metadata } from 'next'
+import { notFound } from 'next/navigation'
 import ChangesScreen from './ChangesScreen'
 import { ChangesProvider } from '@/lib/changesContext'
 import { listChangeLog } from '@/lib/changesStore'
+import { features } from '@/lib/features'
 import { siteUrl } from '@/lib/siteUrl'
 import { routes } from '@/lib/routes'
 
@@ -16,6 +18,8 @@ export async function generateMetadata(props: PageProps<'/[community]/changes'>)
 }
 
 export default async function ChangesPage(props: PageProps<'/[community]/changes'>) {
+  // Held back from the site for now (see features.ts).
+  if (!features.whatChanged) notFound()
   const { community } = await props.params
   const rows = await listChangeLog(community).catch((err) => {
     console.error('[changes] the log failed to load:', err)

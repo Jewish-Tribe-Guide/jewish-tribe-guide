@@ -16,6 +16,7 @@ import DesktopNavEditor from './DesktopNavEditor'
 import MobileTabsEditor from './MobileTabsEditor'
 import SubscriberManager from './SubscriberManager'
 import CollapsibleSection from './CollapsibleSection'
+import { features } from '@/lib/features'
 import ImageUploadField from '@/components/ImageUploadField'
 import {
   DEFAULT_MOBILE_TABS,
@@ -288,7 +289,9 @@ export default function SiteSettingsEditor({
         <p className="bg-red-50 border border-red-200 rounded-md p-3 text-sm text-red-700 mb-4">{error}</p>
       )}
 
-      {isSite && (
+      {/* Held back from the site for now (see features.ts): nothing to
+          choose until the Today home is back. */}
+      {isSite && features.todayHome && (
       <div className="mb-6 max-w-2xl">
       <CollapsibleSection title="Home page" description="Which home page visitors get." contentClassName="p-4">
         <fieldset data-testid="home-style">

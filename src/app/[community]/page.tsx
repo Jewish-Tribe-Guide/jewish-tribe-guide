@@ -7,6 +7,7 @@ import { listApprovedResources } from '@/lib/resourceStore'
 import { listCommunities } from '@/lib/communityStore'
 import { getSiteSettings } from '@/lib/siteSettingsStore'
 import { SITE_SETTINGS_DEFAULTS } from '@/lib/siteSettings'
+import { features } from '@/lib/features'
 import { siteUrl } from '@/lib/siteUrl'
 import { routes } from '@/lib/routes'
 import { buildJsonLdScript } from '@/lib/jsonLdScript'
@@ -39,11 +40,14 @@ export default async function HomePage(props: PageProps<'/[community]'>) {
     }),
     getSiteSettings(community).catch(() => SITE_SETTINGS_DEFAULTS),
     listCommunities().catch(() => []),
-    // Today's "This week" block (step 7a). Without it, no block.
-    listChangeLog(community).catch((err) => {
-      console.error('[home] changes failed to load:', err)
-      return null
-    }),
+    // Today's "This week" block (step 7a). Without it, no block — and not
+    // read at all while either is held back (see features.ts).
+    features.todayHome && features.whatChanged
+      ? listChangeLog(community).catch((err) => {
+          console.error('[home] changes failed to load:', err)
+          return null
+        })
+      : null,
   ])
   // Same admin-edited-wins-over-community-row fallback as
   // [community]/layout.tsx's generateMetadata, so this never disagrees with

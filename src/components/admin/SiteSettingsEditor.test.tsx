@@ -25,6 +25,10 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
 }))
 vi.mock('@/lib/fetchJson', () => ({ fetchJson: vi.fn(), parseOkJson: vi.fn() }))
+// The Today home is held back from the site (features.ts); its settings are
+// tested with it switched on, and once with it off.
+const features = vi.hoisted(() => ({ todayHome: true, whatChanged: true }))
+vi.mock('@/lib/features', () => ({ features }))
 vi.mock('@/lib/previewDraft', () => ({
   previewUrl: () => 'https://example.com/preview',
   writePreviewDraft: vi.fn(),
@@ -182,6 +186,21 @@ describe('SiteSettingsEditor — the Site tab', () => {
     )
     const body = JSON.parse((vi.mocked(fetchJson).mock.calls[0]![1] as RequestInit).body as string)
     expect(body.name).toBe('New Name')
+  })
+
+  // Held back (features.ts): nothing to choose, so the section isn't there.
+  it('while the Today home is held back, the Site tab has no Home page section', async () => {
+    const user = userEvent.setup()
+    features.todayHome = false
+    try {
+      await renderEditor('site')
+      await openAllSections(user)
+      expect(screen.queryByTestId('home-style')).not.toBeInTheDocument()
+      expect(screen.queryByTestId('today-blocks')).not.toBeInTheDocument()
+      expect(screen.queryByRole('textbox', { name: /^Before candles looks for/ })).not.toBeInTheDocument()
+    } finally {
+      features.todayHome = true
+    }
   })
 
   // The Today home (step 6) is chosen here, tried in Preview first, and

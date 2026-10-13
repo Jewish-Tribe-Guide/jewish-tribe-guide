@@ -1,3 +1,5 @@
+import { features } from './features'
+
 // /admin and /inbox's real, externally-visible URLs — masked via a rewrite in
 // next.config.ts onto the actual (internal) route files, since both live
 // outside /[community] and would otherwise inherit its public SiteChrome (see
@@ -53,7 +55,8 @@ export function adminTabs(community: string, isSuperAdmin: boolean): { tab: Admi
   const base = adminBase(community)
   return [
     { tab: 'queue', href: base, label: 'Moderation queue' },
-    { tab: 'changes', href: `${base}/changes`, label: 'What changed' },
+    // Held back from the site for now (see features.ts).
+    ...(features.whatChanged ? [{ tab: 'changes' as const, href: `${base}/changes`, label: 'What changed' }] : []),
     { tab: 'metrics', href: `${base}/metrics`, label: 'Metrics' },
     // What visitors searched for and didn't find: the seeding to-do list.
     { tab: 'searches', href: `${base}/searches`, label: 'Missed searches' },

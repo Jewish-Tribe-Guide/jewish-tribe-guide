@@ -1,7 +1,9 @@
 import type { Metadata } from 'next'
+import { notFound } from 'next/navigation'
 import PinnedScreen from './PinnedScreen'
 import { ListingsProvider } from '@/lib/listingsContext'
 import { listApprovedResources } from '@/lib/resourceStore'
+import { features } from '@/lib/features'
 import { siteUrl } from '@/lib/siteUrl'
 import { routes } from '@/lib/routes'
 
@@ -18,6 +20,9 @@ export async function generateMetadata(props: PageProps<'/[community]/pinned'>):
 }
 
 export default async function PinnedPage(props: PageProps<'/[community]/pinned'>) {
+  // Only the Today home links here, and it's held back for now (see
+  // features.ts). Pinning itself, on the map and atop a category, stays.
+  if (!features.todayHome) notFound()
   const { community } = await props.params
   // Pins can be in any category, so every listing, as the home and the map
   // load them.

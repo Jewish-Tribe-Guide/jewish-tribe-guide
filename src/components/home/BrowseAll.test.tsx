@@ -10,6 +10,9 @@ import type { MinyanSchedule } from '@/lib/useMinyanSchedule'
 import { SITE_SETTINGS_DEFAULTS } from '@/lib/siteSettings'
 import BrowseAll from './BrowseAll'
 
+const features = vi.hoisted(() => ({ todayHome: false, whatChanged: true }))
+vi.mock('@/lib/features', () => ({ features }))
+
 vi.mock('next/navigation', () => ({
   useRouter: () => mockRouter,
   usePathname: () => '/philly/browse',
@@ -102,5 +105,17 @@ describe('the Browse tab', () => {
     cleanup()
     show(false)
     expect(within(screen.getByRole('navigation', { name: 'About the guide' })).queryByRole('link', { name: 'Feedback' })).not.toBeInTheDocument()
+  })
+
+  // Held back from the site (features.ts): no link to a page that isn't there.
+  it('no What changed link while What changed is held back', () => {
+    features.whatChanged = false
+    try {
+      show()
+      const nav = screen.getByRole('navigation', { name: 'About the guide' })
+      expect(within(nav).getAllByRole('link').map((a) => a.textContent)).toEqual(['Feedback', 'About', 'Privacy'])
+    } finally {
+      features.whatChanged = true
+    }
   })
 })

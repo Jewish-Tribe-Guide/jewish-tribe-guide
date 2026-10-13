@@ -13,6 +13,7 @@ import { useSiteNavigation } from '@/lib/useSiteNavigation'
 import { getCategoryColor } from '@/lib/categoryColor'
 import { browseLine, shabbosMoment } from '@/lib/todayHome'
 import { routes } from '@/lib/routes'
+import { features } from '@/lib/features'
 import { withMilesFromAddress, withMilesFromCenter } from '@/lib/listingTravel'
 import type { LatLng } from '@/lib/geo'
 import { ChevronRightIcon } from '@/components/icons'
@@ -28,6 +29,9 @@ import { groupCardsIntoSections, resourceCards, useEntryCards } from './sections
 // Synagogues row (the user, Oct 10): one shul's time read as noise in a list
 // of categories, and Today already leads with it. Then What changed, Feedback, About and Privacy, which a phone has
 // nowhere else once the tabs are Today · Map · Browse.
+//
+// The list itself (BrowseList) is also the phone's home screen, under the
+// home's own search (Oct 13: the home is Browse while Today is held back).
 
 type Props = {
   communitySlug: string
@@ -42,14 +46,35 @@ type Props = {
   center: LatLng
 }
 
-export default function BrowseAll({ communitySlug, listings, schedule, zmanim, timezone, coords, center }: Props) {
+export default function BrowseAll(props: Props) {
+  const settings = useSiteSettings()
+  const router = useRouter()
+  const [query, setQuery] = useState('')
+
+  const ask = () => {
+    const q = query.trim()
+    if (q) router.push(routes.ask(props.communitySlug, q))
+  }
+
+  return (
+    <div data-testid="browse-page">
+      <h1 className="text-[28px] font-extrabold tracking-tight text-ink desktop:text-[36px]">Browse</h1>
+      <div className="mt-3">
+        <SearchBox query={query} onQueryChange={setQuery} onSubmit={ask} placeholder={settings.searchPlaceholder} />
+      </div>
+      <BrowseList {...props} />
+    </div>
+  )
+}
+
+/** Every category in the admin's groups, one row each, then the guide's own
+ *  pages (What changed, Feedback, About, Privacy). */
+export function BrowseList({ communitySlug, listings, schedule, zmanim, timezone, coords, center }: Props) {
   const categories = useCategories()
   const homeSections = useHomeSections()
   const settings = useSiteSettings()
   const { navigate, openFlow } = useSiteNavigation()
   const entryCards = useEntryCards(openFlow)
-  const router = useRouter()
-  const [query, setQuery] = useState('')
 
   const counts: Record<string, number> = {}
   for (const l of listings ?? []) counts[l.category] = (counts[l.category] ?? 0) + 1
@@ -68,17 +93,8 @@ export default function BrowseAll({ communitySlug, listings, schedule, zmanim, t
     return browseLine(category, coords ? withMilesFromAddress(items, coords) : withMilesFromCenter(items, center), now, restDay)
   }
 
-  const ask = () => {
-    const q = query.trim()
-    if (q) router.push(routes.ask(communitySlug, q))
-  }
-
   return (
-    <div data-testid="browse-page">
-      <h1 className="text-[28px] font-extrabold tracking-tight text-ink desktop:text-[36px]">Browse</h1>
-      <div className="mt-3">
-        <SearchBox query={query} onQueryChange={setQuery} onSubmit={ask} placeholder={settings.searchPlaceholder} />
-      </div>
+    <>
       {sections === null ? (
         <div aria-hidden="true" className="mt-6 space-y-3">
           {[0, 1, 2, 3, 4].map((i) => (
@@ -116,12 +132,12 @@ export default function BrowseAll({ communitySlug, listings, schedule, zmanim, t
       )}
       <nav aria-label="About the guide" className="mt-8 flex flex-wrap gap-x-5 gap-y-2 border-t border-slate-200 pt-3 text-[15px] font-bold text-primary">
         {/* Always here, so a quiet week (no "This week" on Today) still has a
-            way to the page. */}
-        <Link href={routes.changes(communitySlug)}>What changed</Link>
+            way to the page — unless it's held back (see features.ts). */}
+        {features.whatChanged && <Link href={routes.changes(communitySlug)}>What changed</Link>}
         {settings.feedbackEnabled && <Link href={routes.feedback(communitySlug)}>Feedback</Link>}
         <Link href={routes.about(communitySlug)}>About</Link>
         <Link href={routes.privacy(communitySlug)}>Privacy</Link>
       </nav>
-    </div>
+    </>
   )
 }

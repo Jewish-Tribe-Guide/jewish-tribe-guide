@@ -116,6 +116,18 @@ function renderLanding(
 }
 
 describe('Landing', () => {
+  // The Today home is held back from the site (features.ts, Oct 13): a
+  // community whose saved setting still says Today (dev's did) gets the
+  // classic home, and the photo band's "Explore by Category".
+  it('the classic home even when the saved home is Today, while Today is held back', () => {
+    renderLanding(undefined, {
+      content: { categories: [makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })], settings: { ...SITE_SETTINGS_DEFAULTS, homeStyle: 'today' } },
+    })
+    expect(screen.queryByTestId('today-home')).not.toBeInTheDocument()
+    expect(screen.getByTestId('browse-everything-card')).toBeInTheDocument()
+    expect(screen.getByTestId('home-browse-list')).toBeInTheDocument()
+  })
+
   it('shows the configured hero title/mission and the category grid', () => {
     const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
     renderLanding(undefined, {
@@ -133,11 +145,9 @@ describe('Landing', () => {
     expect(screen.getAllByText('Grocery Stores').length).toBeGreaterThan(0)
   })
 
-  it('mobile: only the first section\'s first row loads its tile photos eagerly, not every section\'s', () => {
-    // The home screen renders one CardGrid per section. Each used to mark its
-    // own first four tiles as top priority — roughly ten tiles, most of them
-    // below the fold — and a priority image is fetched even when its
-    // container is display:none (this grid is hidden on desktop).
+  it('mobile: browsing is the category list, in the admin\'s groups, with no tile photos to download', () => {
+    // The phone's home is the Browse tab's list (BrowseList) while the Today
+    // home is held back (Oct 13), in place of one photo tile per category.
     const cats = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l'].map((id) =>
       makeCategory({ id, pluralLabel: `Cat ${id}`, cardImageUrl: `https://images.unsplash.com/photo-${id}` }),
     )
@@ -160,12 +170,11 @@ describe('Landing', () => {
       },
     })
 
+    const list = within(screen.getByTestId('home-browse-list'))
+    expect(list.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)).toEqual(['Section 1', 'Section 2', 'Section 3'])
+    expect(list.getAllByRole('listitem').map((li) => li.textContent)).toEqual(cats.map((c) => expect.stringContaining(c.pluralLabel)))
     const mobileSection = container.querySelector<HTMLElement>('.mt-12.desktop\\:hidden')!
-    const tiles = [...mobileSection.querySelectorAll('img')]
-    expect(tiles.length).toBe(12)
-    expect(tiles.filter((i) => i.getAttribute('loading') === 'eager')).toHaveLength(4)
-    // ...and they are the first section's, i.e. the ones above the fold.
-    expect(tiles.slice(0, 4).every((i) => i.getAttribute('loading') === 'eager')).toBe(true)
+    expect(mobileSection.querySelectorAll('img')).toHaveLength(0)
   })
 
   it('mobile: narrows its own permanent grid to matching cards when typing, and hides the rest', async () => {

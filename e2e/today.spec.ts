@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test'
 import { defaultCommunity, dismissLocationPrompt, previewSettings } from './helpers'
+import { features } from '../src/lib/features'
 
 // The Today home (step 6), on a real build, at a fixed moment for each kind
 // of day: which blocks show, in what order, and which never do.
@@ -15,6 +16,10 @@ import { defaultCommunity, dismissLocationPrompt, previewSettings } from './help
 // The service worker is kept out: once it controls the page, it fetches
 // /api/zmanim itself, where page.route can't stand in for it.
 test.use({ timezoneId: 'America/New_York', serviceWorkers: 'block' })
+
+// Held back from the site for now (src/lib/features.ts): the home ignores the
+// Today setting, so there's nothing here to test until it's switched back on.
+test.skip(!features.todayHome, 'the Today home is held back (src/lib/features.ts)')
 
 const ZMANIM = {
   hebrewDate: '28 Tishrei 5787',

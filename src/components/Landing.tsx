@@ -22,6 +22,7 @@ import { answersWell, candidatePrompts, pickPrompts } from '@/lib/searchPrompts'
 import { answerSchedule, useMinyanSchedule } from '@/lib/useMinyanSchedule'
 import HeroHeading from '@/components/home/HeroHeading'
 import TodayBlocks from '@/components/home/TodayBlocks'
+import { BrowseList } from '@/components/home/BrowseAll'
 import { PinnedBlock } from '@/components/home/PinnedPlaces'
 import DaveningTimesCard from '@/components/home/DaveningTimesCard'
 import UpdateListingsCard from '@/components/home/UpdateListingsCard'
@@ -36,6 +37,7 @@ import { useHomeSections } from '@/lib/useHomeSections'
 import { BUILT_IN_BLOCKS, type HomeBlockKind } from '@/lib/homeSections'
 import { useAllListings } from '@/lib/useAllListings'
 import { useChangeLog } from '@/lib/changesContext'
+import { features } from '@/lib/features'
 import { thisWeek, whatChanged } from '@/lib/whatChanged'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { useNavTransitionProps } from '@/lib/navTransitions'
@@ -123,8 +125,9 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
   // The hero's "Browse Categories" button scrolls here.
   const browseCardRef = useRef<HTMLDivElement>(null)
   const settings = useSiteSettings()
-  // The Today home (step 6), when the admin has switched it on.
-  const today = settings.homeStyle === 'today'
+  // The Today home (step 6), when the admin has switched it on — and it
+  // isn't held back from the site (see features.ts).
+  const today = features.todayHome && settings.homeStyle === 'today'
   const timezone = useCommunityTimezone()
   // Desktop only (see headerVisibility.tsx/SiteHeader): lets the header sit
   // transparent over this screen's photo hero until scrolled past it.
@@ -355,10 +358,6 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
     source: 'Home',
   })
 
-  // Sections only exist once loading is done and there's something to group;
-  // while loading, a single flat grid of entry cards + skeletons stands in.
-  const sections = filtered ? groupCardsIntoSections(filtered, homeSections ?? []) : []
-
   // The desktop gateway's own block order (admin-editable — see
   // HomeSectionManager/DesktopTopicsManager's Home screen cards list).
   // Category sections don't interleave here — the flat "Browse everything"
@@ -411,12 +410,12 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
     <PlacesResults hits={placeHits} onOpen={openPlace} closest={!!miss} />
   )
 
-  // Mobile's own permanent grid — this doubles as its whole "browse
+  // Mobile's own permanent list — this doubles as its whole "browse
   // everything", not just search results, so it always renders regardless
-  // of `q`. Full CardGrid tiles, unchanged from before. Browsing (no query)
-  // keeps the admin-configured section titles as real, large headings —
-  // useful information architecture when there's no "Places" heading next
-  // to it to clash with. Once there's a query, though, `placesNode` brings
+  // of `q`. Browsing (no query) is the Browse tab's list (BrowseList): the
+  // admin's groups, one compact row per category, then Feedback, About and
+  // Privacy — the phone's home while Today is held back (Oct 13; it replaced
+  // the photo tiles). Once there's a query, though, `placesNode` brings
   // its own small-caps "Places" heading into the same list, and a section
   // title sitting next to that read as a style mismatch — same fix as
   // desktop's own "Categories" vs "Food and Hospitality" (see
@@ -427,9 +426,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
       {readAsNode}
       {q && answer && <AskAnswer answer={answer} onOpenShul={openShul} share={share} />}
       {noMatchesMessage}
-      {loading ? (
-        <CardGrid cards={entryCards} loadingCount={6} />
-      ) : q ? (
+      {q ? (
         filtered &&
         filtered.length > 0 && (
           <div>
@@ -438,14 +435,17 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
           </div>
         )
       ) : (
-        sections.map((s, i) => (
-          <div key={s.title}>
-            <h2 className="mb-3 text-lg font-semibold text-slate-900">{s.title}</h2>
-            {/* Only the first section's first row is above the fold: 4 is the
-                widest row the grid renders. */}
-            <CardGrid cards={s.cards} priorityCount={i === 0 ? 4 : 0} />
-          </div>
-        ))
+        <div data-testid="home-browse-list">
+          <BrowseList
+            communitySlug={communitySlug}
+            listings={listings}
+            schedule={schedule}
+            zmanim={zmanim.data}
+            timezone={timezone}
+            coords={coords}
+            center={community.mapCenter}
+          />
+        </div>
       )}
       {placesNode}
       {askGroup && <AskTheGroup query={q} {...askGroup} />}
