@@ -20,8 +20,6 @@ import ListHeading from './ListHeading'
 import { useWide } from './CategoryMap'
 import { useListMapSplit } from './useListMapSplit'
 import { useSharedPreference } from '@/lib/useSharedPreference'
-import CategoryIcon from '@/components/CategoryIcon'
-import { initialsOf } from '@/lib/listingRow'
 import { EruvListing, EruvStatusLine } from './EruvListing'
 import EruvMap from './EruvMap'
 import { useOptionalLocation } from '@/lib/locationContext'
@@ -267,27 +265,24 @@ export default function EruvInfo({ eruvim, onUp, title = 'Eruv Information', ico
                   units={['eruv', 'eruvim']}
                   onShowMap={wide && mapHidden && mapped.length > 0 ? () => setMapHidden(false) : undefined}
                 />
-                <ul className="space-y-2">
+                {/* One box, the eruvim as its rows: here the map and
+                    whether each is up are the point, not the listings. */}
+                <ul className="rounded-2xl border border-slate-200 bg-white px-2 py-1">
                   {ready.eruvim.map((eruv) => (
-                    <li key={eruv.id}>
-                      {/* A category's card row (GenericListingCard): the
-                          eruv's initials, its name, whether it's up. */}
+                    <li key={eruv.id} className="border-t border-slate-100 first:border-t-0">
                       <button
                         type="button"
                         onClick={() => openEruv(eruv.id)}
                         {...pointAt(eruv.id)}
-                        className={`flex w-full cursor-pointer items-start gap-3 rounded-lg border border-slate-200 px-4 py-3 text-left shadow-sm transition-colors hover:bg-slate-50 active:bg-slate-100 ${pointedId === eruv.id ? 'bg-slate-50' : 'bg-white'}`}
+                        className={`flex w-full cursor-pointer items-center gap-2 rounded-lg px-2 py-3 text-left transition-colors hover:bg-slate-50 active:bg-slate-100 ${pointedId === eruv.id ? 'bg-slate-50' : ''}`}
                         data-pointed={pointedId === eruv.id || undefined}
                         data-testid="eruv-row"
                       >
-                        <span className="mt-0.5 shrink-0" aria-hidden="true">
-                          <CategoryIcon icon="" initials={initialsOf(eruv.name)} shape="square" color={color} className="h-10 w-10 text-xl" />
-                        </span>
                         <span className="min-w-0 flex-1">
-                          <span className="block truncate font-semibold text-slate-900">{eruv.name}</span>
+                          <span className="block text-[15.5px] font-bold text-slate-900">{eruv.name}</span>
                           <EruvStatusLine eruv={eruv} now={now} timezone={ready.timezone} candles={ready.candles} />
                         </span>
-                        <ChevronRightIcon className="mt-3 h-4 w-4 shrink-0 text-slate-400" />
+                        <ChevronRightIcon className="h-4 w-4 shrink-0 text-slate-400" />
                       </button>
                     </li>
                   ))}

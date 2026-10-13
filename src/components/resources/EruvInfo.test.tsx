@@ -94,11 +94,11 @@ describe('EruvInfo', () => {
   it('each eruv: whether it’s up, and when the guide checked; nothing else', async () => {
     show()
     const rows = await screen.findAllByTestId('eruv-row')
-    // A category's card row: the initials, the name, whether it's up.
+    // One box of rows: the name, whether it's up.
     expect(rows.map((r) => r.textContent)).toEqual([
-      'CCCenter City EruvUp for this ShabbosChecked 2:55 PM · every 15 minutes until candle lighting',
-      'LMLower Merion EruvNot posted yet this weekChecked 2:55 PM · every 15 minutes until candle lighting',
-      'EPElkins Park EruvNo status online',
+      'Center City EruvUp for this ShabbosChecked 2:55 PM · every 15 minutes until candle lighting',
+      'Lower Merion EruvNot posted yet this weekChecked 2:55 PM · every 15 minutes until candle lighting',
+      'Elkins Park EruvNo status online',
     ])
     // Headed as a category's list is: what it is, and how many.
     expect(screen.getByTestId('list-heading')).toHaveTextContent('This Shabbos · 3 eruvim')
@@ -215,29 +215,27 @@ describe('EruvInfo', () => {
     })
   })
 
-  describe('Suggest an edit (Oct 13): the editor every listing has', () => {
-    it('the eruv’s rows as cards; one opens where it is; Send counts the changes and files them; then Sent', async () => {
+  describe('Suggest an edit (Oct 13): its four things, open together', () => {
+    it('the eruv’s fields filled in as they are; Send counts the changes and files them; then Sent', async () => {
       const user = userEvent.setup()
       show()
       await user.click((await screen.findAllByTestId('eruv-row'))[1])
       await user.click(screen.getByRole('button', { name: 'Suggest an edit' }))
-      const list = await screen.findByTestId('editor-list')
+      const form = await screen.findByTestId('eruv-suggest')
       // On a computer the editor's own ‹ is the way back: no ‹ 2 of 3 › bar.
       expect(screen.queryByTestId('listing-column-bar')).not.toBeInTheDocument()
-      expect(within(list).getByTestId('editor-row-hotline')).toHaveTextContent('(610) 664-5626, option 3')
-      // What it doesn't have yet, to add.
-      expect(within(screen.getByTestId('editor-empty')).getByTestId('editor-add-website')).toBeInTheDocument()
-      expect(within(list).getByRole('button', { name: 'No changes yet' })).toBeDisabled()
+      // Every field open at once, nothing to open first.
+      expect(within(form).getByLabelText('Hotline')).toHaveValue('(610) 664-5626, option 3')
+      expect(within(form).getByLabelText('Website')).toHaveValue('')
+      expect(within(form).queryByLabelText(/email \(optional\)/i)).not.toBeInTheDocument()
+      expect(within(form).getByRole('button', { name: 'No changes yet' })).toBeDisabled()
 
-      await user.click(within(list).getByTestId('editor-row-hotline'))
-      const hotline = within(screen.getByTestId('editor-open-hotline')).getByLabelText('Hotline')
+      const hotline = within(form).getByLabelText('Hotline')
       await user.clear(hotline)
       await user.type(hotline, '(610) 555-0100')
-      await user.click(within(screen.getByTestId('editor-open-hotline')).getByRole('button', { name: 'Done' }))
-      expect(screen.getByTestId('editor-row-hotline')).toHaveTextContent('Changed')
-      await user.click(screen.getByTestId('editor-add-website'))
-      await user.type(within(screen.getByTestId('editor-open-website')).getByLabelText('Website'), 'lowermerioneruv.org')
-      await user.click(screen.getByRole('button', { name: 'Send 2 changes' }))
+      expect(within(form).getByRole('button', { name: 'Send 1 change' })).toBeEnabled()
+      await user.type(within(form).getByLabelText('Website'), 'lowermerioneruv.org')
+      await user.click(within(form).getByRole('button', { name: 'Send 2 changes' }))
 
       expect(await screen.findByTestId('editor-sent')).toHaveTextContent('An admin checks it')
       expect(posted).toEqual([
@@ -258,7 +256,7 @@ describe('EruvInfo', () => {
       show()
       await user.click((await screen.findAllByTestId('eruv-row'))[0])
       await user.click(screen.getByRole('button', { name: 'Suggest an edit' }))
-      await screen.findByTestId('editor-list')
+      await screen.findByTestId('eruv-suggest')
       await user.click(screen.getByRole('button', { name: /back/i }))
       expect(await screen.findByTestId('eruv-listing')).toBeInTheDocument()
       expect(posted).toEqual([])

@@ -49,7 +49,7 @@ const siteLabel = (url: string) => url.replace(/^https?:\/\//i, '').replace(/^ww
 
 /** One eruv's listing: its status, where it goes, and the eruv's own
  *  site, hotline and alerts; under it, "Suggest an edit" (Oct 13), which
- *  turns the listing into the editor every listing has (EruvEditor), hosted
+ *  turns the listing into its edit form (EruvEditor), hosted
  *  as MapPlaceDetail hosts a listing's: a ‹ and "Suggest an edit" over it,
  *  and its own step in the history, so Back (and a phone's back swipe)
  *  returns to the listing. */
@@ -84,7 +84,7 @@ export function EruvListing(props: { eruv: Eruv; color: string; now: Date; timez
           </span>
           <h2 className="truncate text-base font-semibold text-slate-900">Suggest an edit</h2>
         </div>
-        <EruvEditor eruv={props.eruv} color={props.color} onClose={closeEditor} />
+        <EruvEditor eruv={props.eruv} onClose={closeEditor} />
       </div>
     )
   }
