@@ -133,7 +133,8 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/
   // synced values too — but never allowed to fail the approval, which has
   // already happened by this point and must not be reported as failed because
   // Google was unreachable. It's just late instead: tonight's run picks it up.
-  if (decision === 'approved' && submission.operation !== 'delete') {
+  // Not an eruv suggestion: an eruv has no Google place.
+  if (decision === 'approved' && submission.operation !== 'delete' && submission.target_type !== 'eruv') {
     try {
       const row = await loadSyncableListing(submission.target_id ?? '')
       if (row && !row.details.googleSyncedAt) {

@@ -504,3 +504,37 @@ describe('moderation queue — a shul’s special schedules, every time shown', 
     expect(renderScheduleDiff([baseSchedule], [baseSchedule]).marked).toBe(false)
   })
 })
+
+// A fix to an eruv's listing (Oct 13): the queue shows each of its rows,
+// what changes struck and replaced, so it's never approved blind.
+describe('an eruv suggestion', () => {
+  it('names the eruv, and shows each row it changes, before and after', () => {
+    const submission = {
+      id: 's9',
+      operation: 'update',
+      target_type: 'eruv',
+      target_id: null,
+      payload: { eruvId: 'center-city', name: 'Center City Eruv', covers: 'Center City.', website: 'https://centercityeruv.org', hotline: '(215) 555-0100', alertsUrl: null },
+      note: null,
+      status: 'pending',
+      submitted_by: null,
+      created_at: new Date().toISOString(),
+      reviewed_at: null,
+      reviewed_by: null,
+      current: null,
+      categoryLabel: 'Eruv',
+      currentEruv: { name: 'Center City Eruv', covers: 'Center City.', website: 'https://www.centercityeruv.com/', hotline: null, alertsUrl: null },
+    } as unknown as EnrichedSubmission
+    const onOpen = () => {}
+    render(<SubmissionCard submission={submission} categoriesById={new Map()} onModerate={() => {}} onOpen={onOpen} />)
+    expect(screen.getByText('Center City Eruv')).toBeInTheDocument()
+    expect(screen.getByText('Eruv')).toBeInTheDocument()
+    const diff = screen.getByTestId('eruv-diff')
+    expect(diff).toHaveTextContent('Websitehttps://www.centercityeruv.com/ → https://centercityeruv.org')
+    expect(diff).toHaveTextContent('Hotline— → (215) 555-0100')
+    expect(screen.getByText('https://www.centercityeruv.com/')).toHaveClass('line-through')
+    // Unchanged rows read as they are, not struck.
+    expect(diff).toHaveTextContent('Where it goesCenter City.')
+    expect(screen.getByText('Center City.')).not.toHaveClass('line-through')
+  })
+})

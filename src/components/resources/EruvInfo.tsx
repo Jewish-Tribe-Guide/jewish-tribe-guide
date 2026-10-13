@@ -8,7 +8,7 @@ import type { EruvRecord } from '@/types'
 import DirectoryHeader from './DirectoryHeader'
 import { CategoryBandFrame, CategoryBandBadge } from './CategoryBandFrame'
 import { CategoryGlyph } from '@/lib/categoryIcons'
-import { ChevronRightIcon, ExternalIcon, GlobeIcon, MailIcon, PhoneIcon } from '@/components/icons'
+import { ChevronRightIcon, ExternalIcon, GlobeIcon, MailIcon, PencilIcon, PhoneIcon } from '@/components/icons'
 import { community } from '@/community.config'
 import { useSetScreenHeader } from '@/lib/headerVisibility'
 import { useIsMobile } from '@/lib/useIsMobile'
@@ -20,6 +20,7 @@ import CategoryIcon from '@/components/CategoryIcon'
 import MobileSheet from './MobileSheet'
 import { Card } from './listingParts'
 import EruvMap from './EruvMap'
+import EruvSuggestEdit from './EruvSuggestEdit'
 import { useOptionalLocation } from '@/lib/locationContext'
 import { useEruvMaps } from '@/lib/useEruvStatuses'
 
@@ -111,8 +112,33 @@ const linkClass = 'font-semibold text-primary hover:underline'
 const siteLabel = (url: string) => url.replace(/^https?:\/\//i, '').replace(/^www\./i, '').replace(/\/$/, '')
 
 /** One eruv's listing: its status, where it goes, and the eruv's own
- *  site, hotline and alerts. */
-export function EruvListing({ eruv, color, now, timezone, candles }: { eruv: Eruv; color: string; now: Date; timezone: string; candles: number | null }) {
+ *  site, hotline and alerts; under it, "Suggest an edit" (Oct 13), which
+ *  turns the listing into its rows to fix and send (EruvSuggestEdit). */
+export function EruvListing(props: { eruv: Eruv; color: string; now: Date; timezone: string; candles: number | null }) {
+  const [editing, setEditing] = useState(false)
+  // Another eruv opened in its place starts as its listing.
+  const [shownId, setShownId] = useState(props.eruv.id)
+  if (shownId !== props.eruv.id) {
+    setShownId(props.eruv.id)
+    setEditing(false)
+  }
+  if (editing) return <EruvSuggestEdit eruv={props.eruv} onClose={() => setEditing(false)} />
+  return (
+    <div className="space-y-3.5">
+      <EruvDetails {...props} />
+      <button
+        type="button"
+        onClick={() => setEditing(true)}
+        className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-full bg-primary px-5 py-3 text-sm font-semibold text-white shadow-lg transition-transform active:scale-[0.98]"
+      >
+        <PencilIcon className="h-4 w-4 shrink-0" />
+        Suggest an edit
+      </button>
+    </div>
+  )
+}
+
+function EruvDetails({ eruv, color, now, timezone, candles }: { eruv: Eruv; color: string; now: Date; timezone: string; candles: number | null }) {
   const contact = [
     eruv.website && (
       <ListingRow key="web" icon={<GlobeIcon className="h-[17px] w-[17px]" />}>

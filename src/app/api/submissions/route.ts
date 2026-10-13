@@ -5,7 +5,10 @@ import {
   submitListingCreate,
   submitListingUpdate,
   submitListingDelete,
+  submitEruvUpdate,
 } from '@/lib/submissionStore'
+import { listEruvim } from '@/lib/eruvStore'
+import { readEruvSuggestion } from '@/lib/eruvSuggestion'
 import { after } from 'next/server'
 import { sendSubmissionNotification } from '@/lib/email'
 import { sendSubmissionConfirmation } from '@/lib/confirmationEmail'
@@ -23,7 +26,7 @@ import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore
 
 type Body = {
   operation?: 'create' | 'update' | 'delete'
-  targetType?: 'listing' | 'category'
+  targetType?: 'listing' | 'category' | 'eruv'
   targetId?: string
   payload?: ResourceSubmission
   note?: string
@@ -32,7 +35,8 @@ type Body = {
 }
 
 // POST /api/submissions — public endpoint for proposing a change: add/edit/report
-// a listing. Everything lands in the moderation queue as `pending`; nothing goes
+// a listing, or a fix to an eruv's listing (`targetType: 'eruv'`, an update
+// only; eruvSuggestion.ts). Everything lands in the moderation queue as `pending`; nothing goes
 // live until an admin approves. (`targetType: 'category'` is rejected outright —
 // suggesting a new category is no longer a public path; feedback comes through
 // the general feedback form instead. Older `category` rows may still exist in the
@@ -76,6 +80,24 @@ export async function POST(request: Request) {
 
   if (targetType === 'category') {
     return Response.json({ ok: false, errors: ['This action is not available.'] }, { status: 403 })
+  }
+
+  if (targetType === 'eruv') {
+    if (!ui.contributions.edit) return Response.json({ ok: false, errors: ['This action is not available.'] }, { status: 403 })
+    if (operation !== 'update' || !targetId) return Response.json({ ok: false, errors: ['Unknown operation.'] }, { status: 400 })
+    const eruv = (await listEruvim(community.slug)).eruvim.find((e) => e.id === targetId)
+    if (!eruv) return Response.json({ ok: false, errors: ['Eruv not found.'] }, { status: 404 })
+    const read = readEruvSuggestion(body.payload, eruv)
+    if (!read.ok) return Response.json({ ok: false, errors: read.errors }, { status: 400 })
+    let submission: SubmissionRow
+    try {
+      submission = await submitEruvUpdate(community.slug, read.suggestion, note?.trim() || null, submittedBy)
+    } catch (err) {
+      console.error('[submissions] eruv insert failed:', err)
+      return Response.json({ ok: false, errors: ['Could not save your submission. Please try again.'] }, { status: 502 })
+    }
+    after(() => notify(submission))
+    return Response.json({ ok: true, id: submission.id })
   }
 
   // Curated-directory gate: refuse whichever contribution paths the community

@@ -7,6 +7,7 @@ import type { CategoryConfig, CategoryField } from '@/lib/categories'
 // emails render the identical before/after — see that file's own note.
 import { diffLines, diffListing, flatListing, isMultiline } from '@/lib/submissionDiff'
 import { markTimes, submissionSource } from '@/lib/submissionSource'
+import { ERUV_SUGGESTION_FIELDS, eruvChanges, type EruvSuggestion } from '@/lib/eruvSuggestion'
 
 // One submission's card — the moderation queue (pending, with Approve/Reject
 // buttons) and the read-only history view (approved/rejected, past tense)
@@ -60,17 +61,20 @@ export function SubmissionCard({
   const [rejectReason, setRejectReason] = useState('')
 
   const isCategory = s.target_type === 'category'
+  // A fix to an eruv's listing (eruvSuggestion.ts): its rows, before and
+  // after, decided from the list.
+  const isEruv = s.target_type === 'eruv'
   const op = isCategory
     ? { label: 'New category', cls: 'bg-purple-50 text-purple-700 border border-purple-200' }
     : OP_META[s.operation]
   const categoryLabel = s.categoryLabel ?? ''
   const title = isCategory
     ? (s.payload as CategorySubmissionPayload).label
-    : (s.payload as Partial<ResourceSubmission>).name || s.current?.name || '(unknown listing)'
+    : (s.payload as Partial<ResourceSubmission>).name || s.current?.name || s.currentEruv?.name || '(unknown listing)'
   // A create's category lives on the proposed payload; an edit/removal's
   // lives on the existing row (the payload for those is a partial patch that
   // may not repeat the category). Either one resolves the same detailFields.
-  const categoryId = !isCategory
+  const categoryId = !isCategory && !isEruv
     ? (s.payload as Partial<ResourceSubmission>).category ?? s.current?.category
     : undefined
   const detailFields = categoryId ? categoriesById.get(categoryId)?.detailFields : undefined
@@ -78,7 +82,7 @@ export function SubmissionCard({
   const source = submissionSource(s)
   // Only a listing that's new or edited has anything to fix; a removal or a
   // new category is decided from the list.
-  const openable = Boolean(onOpen) && !isCategory && s.operation !== 'delete'
+  const openable = Boolean(onOpen) && !isCategory && !isEruv && s.operation !== 'delete'
   const unused =
     !isCategory && source.readBy === 'ai' && source.original
       ? markTimes(source.original, (s.payload as Partial<ResourceSubmission>).details ?? {}).unused
@@ -130,13 +134,15 @@ export function SubmissionCard({
           </div>
 
           {isCategory && <CategoryDetails payload={s.payload as CategorySubmissionPayload} />}
-          {!isCategory && s.operation === 'create' && (
+          {isEruv && <EruvDiff current={s.currentEruv ?? null} proposed={s.payload as Partial<EruvSuggestion>} />}
+          {isEruv && s.note && <SourceNote text={s.note} />}
+          {!isCategory && !isEruv && s.operation === 'create' && (
             <ProposedDetails src={s.payload as ResourceSubmission} fields={detailFields} />
           )}
-          {!isCategory && s.operation === 'update' && (
+          {!isCategory && !isEruv && s.operation === 'update' && (
             <Diff current={s.current} proposed={s.payload as ResourceSubmission} fields={detailFields} />
           )}
-          {!isCategory && s.operation !== 'delete' && listNote && <SourceNote text={listNote} />}
+          {!isCategory && !isEruv && s.operation !== 'delete' && listNote && <SourceNote text={listNote} />}
           {unused > 0 && (
             <p className="mt-2 text-xs font-medium text-amber-800">
               {unused === 1 ? '1 time in the original isn’t used.' : `${unused} times in the original aren’t used.`} Open it to check.
@@ -273,6 +279,35 @@ function ProposedDetails({ src, fields }: { src: ResourceSubmission; fields?: Ca
           <dd className="min-w-0 break-words whitespace-pre-line text-slate-800">{r.value}</dd>
         </div>
       ))}
+    </dl>
+  )
+}
+
+/** An eruv's listing rows: what the suggestion changes, struck and
+ *  replaced, and the rest as they are. */
+function EruvDiff({ current, proposed }: { current: EnrichedSubmission['currentEruv']; proposed: Partial<EruvSuggestion> }) {
+  const changed = new Set(eruvChanges(current ?? null, proposed).map((c) => c.key))
+  return (
+    <dl className="text-xs space-y-0.5" data-testid="eruv-diff">
+      {ERUV_SUGGESTION_FIELDS.map(({ key, label }) => {
+        const before = current?.[key] || '—'
+        const after = proposed[key] || '—'
+        return (
+          <div key={key} className="flex gap-2">
+            <dt className="text-muted w-28 shrink-0">{label}</dt>
+            <dd className={`min-w-0 break-words ${changed.has(key) ? 'text-slate-800' : 'text-slate-400'}`}>
+              {changed.has(key) ? (
+                <span>
+                  <span className="line-through text-red-500">{before}</span> <span aria-hidden="true">→</span>{' '}
+                  <span className="text-green-700 font-medium">{after}</span>
+                </span>
+              ) : (
+                after
+              )}
+            </dd>
+          </div>
+        )
+      })}
     </dl>
   )
 }

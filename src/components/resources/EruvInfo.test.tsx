@@ -47,11 +47,19 @@ const ERUVIM: Eruv[] = [
 ]
 const OLD = [{ id: 'university-city', name: 'University City Eruv', area: 'Penn, Drexel', statusLink: 'https://www.pennocp.org/eruv', notes: 'Covers University City.' }]
 
-// /api/eruv, and /api/eruv/maps: Center City's own map only.
+// /api/eruv, and /api/eruv/maps: Center City's own map only. A suggestion
+// posted to /api/submissions is kept, and filed.
+const posted: unknown[] = []
 function answer(body: unknown) {
   vi.stubGlobal(
     'fetch',
-    vi.fn(async (url: string) => new Response(JSON.stringify(String(url).startsWith('/api/eruv/maps') ? { ok: true, maps: [{ id: 'center-city', map: CC_LINE }] } : body))),
+    vi.fn(async (url: string, init?: RequestInit) => {
+      if (String(url).startsWith('/api/submissions')) {
+        posted.push(JSON.parse(String(init?.body)))
+        return new Response(JSON.stringify({ ok: true, id: 's1' }))
+      }
+      return new Response(JSON.stringify(String(url).startsWith('/api/eruv/maps') ? { ok: true, maps: [{ id: 'center-city', map: CC_LINE }] } : body))
+    }),
   )
 }
 function show({ isMobile = false, itemId = null as string | null, onParamsChange = undefined as ((c: Record<string, string | null>, o?: { replace?: boolean; step?: string }) => void) | undefined } = {}) {
@@ -64,6 +72,7 @@ function show({ isMobile = false, itemId = null as string | null, onParamsChange
 
 beforeEach(() => answer({ ok: true, available: true, timezone: 'America/New_York', candles: 18 * 60 + 12, eruvim: ERUVIM }))
 afterEach(() => {
+  posted.length = 0
   here.coords = null
   clearEruvStatuses()
   cleanup()
@@ -190,6 +199,44 @@ describe('EruvInfo', () => {
       expect(await screen.findByTestId('eruv-map')).toHaveAttribute('data-full-map', '/test-community/map?eruv=1')
       await user.click((await screen.findAllByTestId('eruv-row'))[0])
       expect(screen.getByTestId('eruv-map')).toHaveAttribute('data-full-map', '/test-community/map?eruv=1&place=eruv%3Acenter-city')
+    })
+  })
+
+  describe('Suggest an edit (Oct 13)', () => {
+    it('the listing’s rows as they are, to fix and send to the queue; then a thank-you', async () => {
+      const user = userEvent.setup()
+      show()
+      await user.click((await screen.findAllByTestId('eruv-row'))[1])
+      await user.click(screen.getByRole('button', { name: 'Suggest an edit' }))
+      const form = screen.getByTestId('eruv-suggest')
+      expect(within(form).getByLabelText('Hotline')).toHaveValue('(610) 664-5626, option 3')
+      // Nothing changed yet: nothing to send.
+      expect(within(form).getByRole('button', { name: 'Send' })).toBeDisabled()
+      await user.clear(within(form).getByLabelText('Hotline'))
+      await user.type(within(form).getByLabelText('Hotline'), '(610) 555-0100')
+      await user.type(within(form).getByLabelText('Website'), 'lowermerioneruv.org')
+      await user.click(within(form).getByRole('button', { name: 'Send' }))
+      expect(await screen.findByTestId('eruv-suggest-sent')).toHaveTextContent('An admin will check it')
+      expect(posted).toEqual([
+        expect.objectContaining({
+          operation: 'update',
+          targetType: 'eruv',
+          targetId: 'lower-merion',
+          payload: { covers: '', website: 'lowermerioneruv.org', hotline: '(610) 555-0100', alertsUrl: '' },
+        }),
+      ])
+      await user.click(screen.getByRole('button', { name: 'Done' }))
+      expect(screen.getByTestId('eruv-listing')).toBeInTheDocument()
+    })
+
+    it('Cancel goes back to the listing, sending nothing', async () => {
+      const user = userEvent.setup()
+      show()
+      await user.click((await screen.findAllByTestId('eruv-row'))[0])
+      await user.click(screen.getByRole('button', { name: 'Suggest an edit' }))
+      await user.click(screen.getByRole('button', { name: 'Cancel' }))
+      expect(screen.getByTestId('eruv-listing')).toBeInTheDocument()
+      expect(posted).toEqual([])
     })
   })
 })

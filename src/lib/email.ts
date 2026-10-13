@@ -9,6 +9,8 @@ import { adminBase } from './adminNav'
 import { formatHoursSummary } from './hours'
 import type { ResourceSubmission, SubmissionRow, CategorySubmissionPayload } from '@/types'
 import type { CategoryField } from './categories'
+import { listEruvimForAdmin } from './eruvStore'
+import { eruvChanges, type EruvSuggestion } from './eruvSuggestion'
 
 // ── Shared utilities ──────────────────────────────────────────────────────────
 
@@ -385,6 +387,20 @@ export async function sendSubmissionNotification(submission: SubmissionRow): Pro
       ${row('First listing', f?.name ?? '')}
       ${row('Address', f?.address ?? '')}
       ${row('Phone', f?.phone ?? '')}`
+  } else if (submission.target_type === 'eruv') {
+    // A fix to an eruv's listing: each row it changes, before and after,
+    // as the queue shows it (eruvSuggestion.ts).
+    const payload = submission.payload as Partial<EruvSuggestion>
+    verb = 'Suggested edit'
+    title = payload.name ?? 'an eruv'
+    subject = subjectLine(submissionRef(submission.case_number), `Eruv Edit Suggestion — ${title}`)
+    const current = await listEruvimForAdmin(submission.community_id)
+      .then(({ eruvim }) => eruvim.find((e) => e.id === payload.eruvId) ?? null)
+      .catch(() => null)
+    proposedRows = `${row('Eruv', title)}
+      ${eruvChanges(current, payload)
+        .map((c) => diffRow(c.label, c.before ?? '', c.after ?? ''))
+        .join('')}`
   } else {
     const payload = submission.payload as Partial<ResourceSubmission>
     verb =

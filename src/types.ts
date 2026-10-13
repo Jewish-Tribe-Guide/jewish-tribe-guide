@@ -225,7 +225,7 @@ export type ResourceSubmission = {
 // ── Moderation queue (the `submission` table) ──────────────────────────────────
 
 export type SubmissionOperation = 'create' | 'update' | 'delete'
-export type SubmissionTargetType = 'listing' | 'tag' | 'category'
+export type SubmissionTargetType = 'listing' | 'tag' | 'category' | 'eruv'
 export type SubmissionStatus = 'pending' | 'approved' | 'rejected'
 
 /** A row from the `submission` table — one proposed change awaiting review. */
@@ -262,6 +262,8 @@ export type SubmissionRow = {
 export type EnrichedSubmission = SubmissionRow & {
   current?: ResourceRow | null
   categoryLabel?: string
+  /** An eruv suggestion's eruv as it is now (eruvSuggestion.ts). */
+  currentEruv?: { name: string; covers: string | null; website: string | null; hotline: string | null; alertsUrl: string | null } | null
 }
 
 /** Payload for a `category` create submission: the proposed category + its first

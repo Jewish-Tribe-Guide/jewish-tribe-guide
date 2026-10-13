@@ -25,6 +25,9 @@ vi.mock('./categoryStore', () => ({ getCategoryById: mockGetCategoryById }))
 const mockGetResourceRowById = vi.hoisted(() => vi.fn())
 vi.mock('./resourceStore', () => ({ getResourceRowById: mockGetResourceRowById }))
 
+const mockListEruvimForAdmin = vi.hoisted(() => vi.fn())
+vi.mock('./eruvStore', () => ({ listEruvimForAdmin: mockListEruvimForAdmin }))
+
 // escapeHtml is the only thing standing between a submitter's free-typed name/
 // notes and raw HTML in an admin's inbox — an XSS vector, not just cosmetics.
 
@@ -266,6 +269,35 @@ describe('sendEmail', () => {
         }
         await sendSubmissionNotification(submission)
         expect(sendSpy).toHaveBeenCalledWith(expect.objectContaining({ subject: expect.stringMatching(/^#77 /) }))
+      })
+
+      // A fix to an eruv's listing (Oct 13): the rows it changes, before
+      // and after, as the queue shows them.
+      it('sendSubmissionNotification shows an eruv suggestion’s changed rows against the eruv', async () => {
+        mockGetCommunityNotifyRecipients.mockResolvedValue(['admin@example.com'])
+        mockListEruvimForAdmin.mockResolvedValue({ available: true, eruvim: [{ id: 'center-city', name: 'Center City Eruv', covers: 'Center City.', website: 'https://old.example', hotline: null, alertsUrl: null }] })
+        const submission: SubmissionRow = {
+          id: 's2',
+          community_id: 'philly',
+          operation: 'update',
+          target_type: 'eruv',
+          target_id: null,
+          payload: { eruvId: 'center-city', name: 'Center City Eruv', covers: 'Center City.', website: 'https://new.example', hotline: null, alertsUrl: null },
+          note: null,
+          status: 'pending',
+          submitted_by: null,
+          created_at: '2026-01-01T00:00:00Z',
+          reviewed_at: null,
+          reviewed_by: null,
+          case_number: 12,
+        }
+        await sendSubmissionNotification(submission)
+        const sent = sendSpy.mock.calls[0]![0] as { subject: string; html: string }
+        expect(sent.subject).toBe('#12 Eruv Edit Suggestion — Center City Eruv')
+        expect(sent.html).toContain('https://old.example')
+        expect(sent.html).toContain('https://new.example')
+        // The row it doesn't change isn't listed as a change.
+        expect(sent.html).not.toContain('Where it goes')
       })
 
       // Real bug, in every notification email this app has ever sent: the

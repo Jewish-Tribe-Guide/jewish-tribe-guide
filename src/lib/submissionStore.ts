@@ -10,6 +10,8 @@ import { recordActivity } from './activityStore'
 import { newListingFacts, visitorChanges, type ChangePart } from './changeParts'
 import { normalizeRow, validateSubmission } from './resourceStore'
 import { withReviewEdits } from './reviewEdits'
+import { listEruvimForAdmin, updateEruv } from './eruvStore'
+import type { EruvSuggestion } from './eruvSuggestion'
 import type {
   ResourceRow,
   ResourceSubmission,
@@ -111,11 +113,12 @@ export async function listSubmissionsByStatus(
   const labelById = new Map(categories.map((c) => [c.id, c.label]))
   const categoryLabel = (s: SubmissionRow, current: ResourceRow | null): string | undefined => {
     if (s.target_type === 'category') return (s.payload as CategorySubmissionPayload).label
+    if (s.target_type === 'eruv') return 'Eruv'
     const slug = (s.payload as { category?: string }).category ?? current?.category
     return slug ? labelById.get(slug) ?? slug : undefined
   }
 
-  const targetIds = [...new Set(submissions.map((s) => s.target_id).filter(Boolean))] as string[]
+  const targetIds = [...new Set(submissions.filter((s) => s.target_type === 'listing').map((s) => s.target_id).filter(Boolean))] as string[]
   let byId = new Map<string, ResourceRow>()
   if (targetIds.length > 0) {
     const { data: current, error: curErr } = await supabase
@@ -127,7 +130,14 @@ export async function listSubmissionsByStatus(
     byId = new Map((current as ResourceRow[]).map((r) => [r.id, r]))
   }
 
+  // An eruv suggestion is read against the eruv as it is now.
+  const eruvById = submissions.some((s) => s.target_type === 'eruv') ? new Map((await listEruvimForAdmin(community)).eruvim.map((e) => [e.id, e])) : new Map()
+
   return submissions.map((s) => {
+    if (s.target_type === 'eruv') {
+      const e = eruvById.get((s.payload as Partial<EruvSuggestion>).eruvId ?? '')
+      return { ...s, current: null, categoryLabel: categoryLabel(s, null), currentEruv: e ? { name: e.name, covers: e.covers, website: e.website, hotline: e.hotline, alertsUrl: e.alertsUrl } : null }
+    }
     const current = s.target_id ? byId.get(s.target_id) ?? null : null
     return { ...s, current, categoryLabel: categoryLabel(s, current) }
   })
@@ -199,6 +209,24 @@ export async function submitListingUpdate(
     target_type: 'listing',
     target_id: targetId,
     payload: payload as unknown as Record<string, unknown>,
+    note,
+    submitted_by: submittedBy,
+  })
+}
+
+// Records a suggested fix to an eruv's listing (eruvSuggestion.ts).
+export async function submitEruvUpdate(
+  community: string,
+  suggestion: EruvSuggestion,
+  note: string | null,
+  submittedBy: { name?: string; email?: string } | null,
+): Promise<SubmissionRow> {
+  return insertSubmission({
+    community_id: community,
+    operation: 'update',
+    target_type: 'eruv',
+    target_id: null,
+    payload: suggestion as unknown as Record<string, unknown>,
     note,
     submitted_by: submittedBy,
   })
@@ -371,6 +399,8 @@ export async function approveSubmission(id: string, community?: string, reviewed
     ;({ id: affectedResourceId, newItems, changes } = await applyListing(submission))
   } else if (submission.target_type === 'category') {
     await applyCategory(submission)
+  } else if (submission.target_type === 'eruv' && submission.operation === 'update') {
+    await applyEruv(submission)
   } else {
     // tag handled in a later phase.
     throw new Error(`Unsupported submission target_type: ${submission.target_type}`)
@@ -400,6 +430,16 @@ export async function approveSubmission(id: string, community?: string, reviewed
     await recordActivity(activityForApproval(submission, affectedResourceId, newItems, changes))
   }
   return data as SubmissionRow
+}
+
+/** An approved eruv suggestion: its four rows, as suggested, on the eruv.
+ *  Its name, status page and map are untouched. */
+async function applyEruv(submission: SubmissionRow): Promise<void> {
+  const s = submission.payload as Partial<EruvSuggestion>
+  const id = s.eruvId ?? ''
+  const eruv = (await listEruvimForAdmin(submission.community_id)).eruvim.find((e) => e.id === id)
+  if (!eruv) throw new Error(`Eruv not found: ${id}`)
+  await updateEruv(submission.community_id, id, { covers: s.covers ?? null, website: s.website ?? null, hotline: s.hotline ?? null, alertsUrl: s.alertsUrl ?? null }, { statusUrl: eruv.statusUrl, lineUrl: eruv.lineUrl })
 }
 
 const APPROVAL_KIND = { create: 'listing_added', update: 'listing_edited', delete: 'listing_removed' } as const

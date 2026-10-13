@@ -286,3 +286,16 @@ describe('PATCH /api/admin/submissions/:id — Google sync after approval', () =
     expect(order).toEqual(['sync', 'revalidate'])
   })
 })
+
+// A fix to an eruv's listing (Oct 13): approved like any edit, but there's
+// no Google place to sync it against.
+describe('PATCH /api/admin/submissions/:id — an eruv suggestion', () => {
+  it('approves it, emails, refreshes, and asks Google nothing', async () => {
+    m.approveSubmission.mockResolvedValue(submission('update', { target_type: 'eruv', target_id: null }))
+    expect((await patch({ status: 'approved' }, '?community=ues')).status).toBe(200)
+    await runAfter()
+    expect(m.loadSyncableListing).not.toHaveBeenCalled()
+    expect(m.sendDecisionEmail).toHaveBeenCalled()
+    expect(m.revalidatePublicContent).toHaveBeenCalled()
+  })
+})

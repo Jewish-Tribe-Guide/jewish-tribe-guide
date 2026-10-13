@@ -65,6 +65,12 @@ vi.mock('./activityStore', () => ({
   recordActivity: mockRecordActivity,
 }))
 
+// The eruvim (eruvStore.ts), for an eruv suggestion's queue card and
+// approval.
+const mockListEruvimForAdmin = vi.hoisted(() => vi.fn())
+const mockUpdateEruv = vi.hoisted(() => vi.fn())
+vi.mock('./eruvStore', () => ({ listEruvimForAdmin: mockListEruvimForAdmin, updateEruv: mockUpdateEruv }))
+
 const {
   activityForApproval,
   approveSubmission,
@@ -121,6 +127,8 @@ afterEach(() => {
   mockFetchPlaceSync.mockReset()
   mockRecordActivity.mockReset()
   mockRpc.mockReset()
+  mockListEruvimForAdmin.mockReset()
+  mockUpdateEruv.mockReset()
 })
 
 // ── listPendingSubmissions: category-label resolution ───────────────────────
@@ -1729,5 +1737,52 @@ describe('activityForApproval', () => {
   it('leaves an edit with no email as "a neighbor" (no actor)', () => {
     const sub = baseSubmission({ operation: 'update', target_id: 'res-1', submitted_by: { email: 'not an email' } })
     expect(activityForApproval(sub, 'res-1', [])[0].actorEmail).toBeNull()
+  })
+})
+
+// A fix to an eruv's listing (Oct 13): read against the eruv, and applied
+// to its four rows only.
+describe('an eruv suggestion', () => {
+  const eruv = { id: 'center-city', name: 'Center City Eruv', covers: 'Center City.', website: 'https://old.example', hotline: null, alertsUrl: null, statusUrl: 'https://status.example', lineUrl: 'https://map.example' }
+  const payload = { eruvId: 'center-city', name: 'Center City Eruv', covers: 'Center City.', website: 'https://new.example', hotline: '215', alertsUrl: null }
+  const sub = baseSubmission({ operation: 'update', target_type: 'eruv', payload })
+
+  it('the queue reads it against the eruv as it is now, never as a listing', async () => {
+    const resource = chainable({ data: [], error: null })
+    mockFrom.mockImplementation((table: string) => (table === 'submission' ? chainable({ data: [sub], error: null }) : resource))
+    mockListCategories.mockResolvedValue([])
+    mockListEruvimForAdmin.mockResolvedValue({ available: true, eruvim: [eruv] })
+    const [card] = await listPendingSubmissions('philly')
+    expect(card.categoryLabel).toBe('Eruv')
+    expect(card.currentEruv).toEqual({ name: 'Center City Eruv', covers: 'Center City.', website: 'https://old.example', hotline: null, alertsUrl: null })
+    expect(resource.in).not.toHaveBeenCalled()
+  })
+
+  it('approving puts its four rows on the eruv, and nothing else of it', async () => {
+    let calls = 0
+    const approveBuilder = chainable({ data: { ...sub, status: 'approved' }, error: null })
+    mockFrom.mockImplementation((table: string) => {
+      if (table !== 'submission') throw new Error(`unexpected table ${table}`)
+      calls += 1
+      return calls === 1 ? chainable({ data: sub, error: null }) : approveBuilder
+    })
+    mockListEruvimForAdmin.mockResolvedValue({ available: true, eruvim: [eruv] })
+    mockUpdateEruv.mockResolvedValue(undefined)
+    await approveSubmission('sub-1', 'philly', 'admin@example.org')
+    expect(mockUpdateEruv).toHaveBeenCalledWith(
+      'philly',
+      'center-city',
+      { covers: 'Center City.', website: 'https://new.example', hotline: '215', alertsUrl: null },
+      { statusUrl: 'https://status.example', lineUrl: 'https://map.example' },
+    )
+    expect(approveBuilder.update).toHaveBeenCalledWith(expect.objectContaining({ status: 'approved' }))
+    expect(mockRecordActivity).not.toHaveBeenCalled()
+  })
+
+  it('an eruv that’s gone can’t be approved', async () => {
+    mockFrom.mockReturnValue(chainable({ data: sub, error: null }))
+    mockListEruvimForAdmin.mockResolvedValue({ available: true, eruvim: [] })
+    await expect(approveSubmission('sub-1')).rejects.toThrow('Eruv not found: center-city')
+    expect(mockUpdateEruv).not.toHaveBeenCalled()
   })
 })

@@ -14,6 +14,8 @@ const m = vi.hoisted(() => ({
   submitListingCreate: vi.fn(),
   submitListingUpdate: vi.fn(),
   submitListingDelete: vi.fn(),
+  submitEruvUpdate: vi.fn(),
+  listEruvim: vi.fn(),
   sendSubmissionNotification: vi.fn(),
   sendSubmissionConfirmation: vi.fn(),
   after: vi.fn(),
@@ -33,7 +35,9 @@ vi.mock('@/lib/submissionStore', () => ({
   submitListingCreate: m.submitListingCreate,
   submitListingUpdate: m.submitListingUpdate,
   submitListingDelete: m.submitListingDelete,
+  submitEruvUpdate: m.submitEruvUpdate,
 }))
+vi.mock('@/lib/eruvStore', () => ({ listEruvim: m.listEruvim }))
 vi.mock('@/lib/email', () => ({ sendSubmissionNotification: m.sendSubmissionNotification }))
 vi.mock('@/lib/confirmationEmail', () => ({ sendSubmissionConfirmation: m.sendSubmissionConfirmation }))
 vi.mock('next/server', () => ({ after: m.after }))
@@ -45,6 +49,10 @@ const post = (body: unknown, query = '') =>
   POST(new Request(`http://x/api/submissions${query}`, { method: 'POST', body: typeof body === 'string' ? body : JSON.stringify(body) }))
 
 const listing = { name: 'Shul', category: 'synagogue', address: '1 Main St' }
+const eruv = {
+  id: 'center-city', name: 'Center City Eruv', covers: 'Center City.', website: 'https://www.centercityeruv.com/', hotline: null, alertsUrl: null,
+  statusUrl: null, statusDated: false, status: null, statusWords: null, statusPostedOn: null, statusCheckedAt: null, statusErrorAt: null, statusError: null,
+}
 
 beforeEach(() => {
   vi.resetAllMocks()
@@ -59,6 +67,8 @@ beforeEach(() => {
   m.submitListingCreate.mockResolvedValue({ id: 's1' })
   m.submitListingUpdate.mockResolvedValue({ id: 's2' })
   m.submitListingDelete.mockResolvedValue({ id: 's3' })
+  m.submitEruvUpdate.mockResolvedValue({ id: 's4' })
+  m.listEruvim.mockResolvedValue({ available: true, eruvim: [eruv] })
   m.sendSubmissionNotification.mockResolvedValue(undefined)
   m.sendSubmissionConfirmation.mockResolvedValue(undefined)
 })
@@ -237,5 +247,46 @@ describe('POST /api/submissions — accepted submissions', () => {
     const res = await post({ operation: 'create', payload: listing })
     expect(res.status).toBe(502)
     expect(m.after).not.toHaveBeenCalled()
+  })
+})
+
+// A fix to an eruv's listing (Oct 13): the same queue, its own rows.
+describe('POST /api/submissions — an eruv', () => {
+  const fix = { operation: 'update', targetType: 'eruv', targetId: 'center-city', payload: { covers: 'Center City.', website: 'centercityeruv.org', hotline: '', alertsUrl: '' } }
+
+  it('files the fix, tidied, with the eruv’s id in it, and its submitter', async () => {
+    const res = await post({ ...fix, submittedBy: { email: 'a@b.c' } }, '?community=philly')
+    expect(await res.json()).toEqual({ ok: true, id: 's4' })
+    expect(m.submitEruvUpdate).toHaveBeenCalledWith(
+      'philly',
+      { eruvId: 'center-city', name: 'Center City Eruv', covers: 'Center City.', website: 'https://centercityeruv.org', hotline: null, alertsUrl: null },
+      null,
+      { email: 'a@b.c' },
+    )
+    expect(m.after).toHaveBeenCalledTimes(1)
+  })
+
+  it('404s an eruv not in this community', async () => {
+    expect((await post({ ...fix, targetId: 'elsewhere' })).status).toBe(404)
+    expect(m.submitEruvUpdate).not.toHaveBeenCalled()
+  })
+
+  it('400s a fix that changes nothing', async () => {
+    const res = await post({ ...fix, payload: { covers: 'Center City.', website: 'https://www.centercityeruv.com/' } })
+    expect(res.status).toBe(400)
+    expect((await res.json()).errors).toEqual(['Nothing was changed.'])
+    expect(m.submitEruvUpdate).not.toHaveBeenCalled()
+  })
+
+  it('only an edit: no adding or removing an eruv', async () => {
+    expect((await post({ ...fix, operation: 'delete' })).status).toBe(400)
+    expect((await post({ ...fix, operation: 'create' })).status).toBe(400)
+    expect(m.submitEruvUpdate).not.toHaveBeenCalled()
+  })
+
+  it('403s where the community has edits switched off', async () => {
+    m.contributions.edit = false
+    expect((await post(fix)).status).toBe(403)
+    expect(m.submitEruvUpdate).not.toHaveBeenCalled()
   })
 })
