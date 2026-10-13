@@ -118,8 +118,8 @@ function Chrome({ children, year }: { children: React.ReactNode; year: number })
           was rejected because the only things left to put in it were two
           links, and folding Feedback in alongside them would bury the one
           action we actually want.
-          The consequence to keep in mind: this footer holds the only /about
-          link in the app, so About is desktop-only by the same choice.
+          On a phone, About (with Feedback) is at the foot of the home's
+          category list instead (BrowseList).
           /privacy is deliberately NOT in that position — it's linked from
           the forms that collect personal data, which is where it belongs on
           every device (see PrivacyNote). */}
