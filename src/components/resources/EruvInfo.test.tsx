@@ -23,8 +23,13 @@ vi.mock('@/lib/useNow', () => ({ useNow: () => Date.parse('2026-10-09T19:00:00Z'
 // Google's map isn't in jsdom: the map is a stand-in naming what it draws,
 // which eruv it picks out, and a way to point at one on it.
 vi.mock('./EruvMap', () => ({
-  default: ({ eruvim, highlightId, onHover, focusId, fullMapHref }: { eruvim: { id: string; name: string }[]; highlightId?: string | null; onHover?: (id: string | null) => void; focusId?: string | null; fullMapHref?: string }) => (
+  default: ({ eruvim, highlightId, onHover, focusId, fullMapHref, onHide }: { eruvim: { id: string; name: string }[]; highlightId?: string | null; onHover?: (id: string | null) => void; focusId?: string | null; fullMapHref?: string; onHide?: () => void }) => (
     <div>
+      {onHide && (
+        <button type="button" onClick={onHide}>
+          Hide map
+        </button>
+      )}
       <p data-testid="eruv-map" data-highlight={highlightId ?? ''} data-focus={focusId ?? ''} data-full-map={fullMapHref ?? ''}>
         {eruvim.map((e) => e.name).join(', ')}
       </p>
@@ -32,6 +37,10 @@ vi.mock('./EruvMap', () => ({
     </div>
   ),
 }))
+// Whether the screen is wide enough for the map beside the list (jsdom has
+// no layout to measure).
+const screenSize = vi.hoisted(() => ({ wide: false }))
+vi.mock('./CategoryMap', () => ({ useWide: () => screenSize.wide }))
 const here = vi.hoisted(() => ({ coords: null as { lat: number; lng: number } | null }))
 vi.mock('@/lib/locationContext', () => ({ useOptionalLocation: () => here }))
 
@@ -73,6 +82,8 @@ function show({ isMobile = false, itemId = null as string | null, onParamsChange
 beforeEach(() => answer({ ok: true, available: true, timezone: 'America/New_York', candles: 18 * 60 + 12, eruvim: ERUVIM }))
 afterEach(() => {
   posted.length = 0
+  screenSize.wide = false
+  localStorage.clear()
   here.coords = null
   clearEruvStatuses()
   cleanup()
@@ -83,12 +94,14 @@ describe('EruvInfo', () => {
   it('each eruv: whether it’s up, and when the guide checked; nothing else', async () => {
     show()
     const rows = await screen.findAllByTestId('eruv-row')
+    // A category's card row: the initials, the name, whether it's up.
     expect(rows.map((r) => r.textContent)).toEqual([
-      'Center City EruvUp for this ShabbosChecked 2:55 PM · every 15 minutes until candle lighting',
-      'Lower Merion EruvNot posted yet this weekChecked 2:55 PM · every 15 minutes until candle lighting',
-      'Elkins Park EruvNo status online',
+      'CCCenter City EruvUp for this ShabbosChecked 2:55 PM · every 15 minutes until candle lighting',
+      'LMLower Merion EruvNot posted yet this weekChecked 2:55 PM · every 15 minutes until candle lighting',
+      'EPElkins Park EruvNo status online',
     ])
-    expect(screen.getByTestId('eruv-list')).toHaveTextContent('This Shabbos')
+    // Headed as a category's list is: what it is, and how many.
+    expect(screen.getByTestId('list-heading')).toHaveTextContent('This Shabbos · 3 eruvim')
     expect(screen.queryByText(/Check status/)).not.toBeInTheDocument()
   })
 
@@ -202,21 +215,31 @@ describe('EruvInfo', () => {
     })
   })
 
-  describe('Suggest an edit (Oct 13)', () => {
-    it('the listing’s rows as they are, to fix and send to the queue; then a thank-you', async () => {
+  describe('Suggest an edit (Oct 13): the editor every listing has', () => {
+    it('the eruv’s rows as cards; one opens where it is; Send counts the changes and files them; then Sent', async () => {
       const user = userEvent.setup()
       show()
       await user.click((await screen.findAllByTestId('eruv-row'))[1])
       await user.click(screen.getByRole('button', { name: 'Suggest an edit' }))
-      const form = screen.getByTestId('eruv-suggest')
-      expect(within(form).getByLabelText('Hotline')).toHaveValue('(610) 664-5626, option 3')
-      // Nothing changed yet: nothing to send.
-      expect(within(form).getByRole('button', { name: 'Send' })).toBeDisabled()
-      await user.clear(within(form).getByLabelText('Hotline'))
-      await user.type(within(form).getByLabelText('Hotline'), '(610) 555-0100')
-      await user.type(within(form).getByLabelText('Website'), 'lowermerioneruv.org')
-      await user.click(within(form).getByRole('button', { name: 'Send' }))
-      expect(await screen.findByTestId('eruv-suggest-sent')).toHaveTextContent('An admin will check it')
+      const list = await screen.findByTestId('editor-list')
+      // On a computer the editor's own ‹ is the way back: no ‹ 2 of 3 › bar.
+      expect(screen.queryByTestId('listing-column-bar')).not.toBeInTheDocument()
+      expect(within(list).getByTestId('editor-row-hotline')).toHaveTextContent('(610) 664-5626, option 3')
+      // What it doesn't have yet, to add.
+      expect(within(screen.getByTestId('editor-empty')).getByTestId('editor-add-website')).toBeInTheDocument()
+      expect(within(list).getByRole('button', { name: 'No changes yet' })).toBeDisabled()
+
+      await user.click(within(list).getByTestId('editor-row-hotline'))
+      const hotline = within(screen.getByTestId('editor-open-hotline')).getByLabelText('Hotline')
+      await user.clear(hotline)
+      await user.type(hotline, '(610) 555-0100')
+      await user.click(within(screen.getByTestId('editor-open-hotline')).getByRole('button', { name: 'Done' }))
+      expect(screen.getByTestId('editor-row-hotline')).toHaveTextContent('Changed')
+      await user.click(screen.getByTestId('editor-add-website'))
+      await user.type(within(screen.getByTestId('editor-open-website')).getByLabelText('Website'), 'lowermerioneruv.org')
+      await user.click(screen.getByRole('button', { name: 'Send 2 changes' }))
+
+      expect(await screen.findByTestId('editor-sent')).toHaveTextContent('An admin checks it')
       expect(posted).toEqual([
         expect.objectContaining({
           operation: 'update',
@@ -226,17 +249,37 @@ describe('EruvInfo', () => {
         }),
       ])
       await user.click(screen.getByRole('button', { name: 'Done' }))
-      expect(screen.getByTestId('eruv-listing')).toBeInTheDocument()
+      expect(await screen.findByTestId('eruv-listing')).toBeInTheDocument()
+      expect(screen.getByTestId('listing-column-bar')).toBeInTheDocument()
     })
 
-    it('Cancel goes back to the listing, sending nothing', async () => {
+    it('‹ goes back to the listing, sending nothing', async () => {
       const user = userEvent.setup()
       show()
       await user.click((await screen.findAllByTestId('eruv-row'))[0])
       await user.click(screen.getByRole('button', { name: 'Suggest an edit' }))
-      await user.click(screen.getByRole('button', { name: 'Cancel' }))
-      expect(screen.getByTestId('eruv-listing')).toBeInTheDocument()
+      await screen.findByTestId('editor-list')
+      await user.click(screen.getByRole('button', { name: /back/i }))
+      expect(await screen.findByTestId('eruv-listing')).toBeInTheDocument()
       expect(posted).toEqual([])
+    })
+  })
+
+  describe('laid out as a category page (Oct 13)', () => {
+    it('on a wide screen the map is beside the list, and Hide map gives the list the width, Show map brings it back', async () => {
+      const user = userEvent.setup()
+      screenSize.wide = true
+      show()
+      await user.click(await screen.findByRole('button', { name: 'Hide map' }))
+      expect(screen.queryByTestId('eruv-map')).not.toBeInTheDocument()
+      await user.click(within(screen.getByTestId('list-heading')).getByRole('button', { name: /Show map/ }))
+      expect(await screen.findByTestId('eruv-map')).toBeInTheDocument()
+    })
+
+    it('narrower, the map is above the list, with nothing to hide it', async () => {
+      show()
+      expect(await screen.findByTestId('eruv-map')).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Hide map' })).not.toBeInTheDocument()
     })
   })
 })

@@ -16,7 +16,12 @@ import { useCommunitySlug } from '@/lib/communityContext'
 import { useNow } from '@/lib/useNow'
 import { eruvView, localParts, type Eruv } from '@/lib/eruv'
 import MobileSheet from './MobileSheet'
-import { Card } from './listingParts'
+import ListHeading from './ListHeading'
+import { useWide } from './CategoryMap'
+import { useListMapSplit } from './useListMapSplit'
+import { useSharedPreference } from '@/lib/useSharedPreference'
+import CategoryIcon from '@/components/CategoryIcon'
+import { initialsOf } from '@/lib/listingRow'
 import { EruvListing, EruvStatusLine } from './EruvListing'
 import EruvMap from './EruvMap'
 import { useOptionalLocation } from '@/lib/locationContext'
@@ -91,6 +96,9 @@ export default function EruvInfo({ eruvim, onUp, title = 'Eruv Information', ico
   const [loaded, setLoaded] = useState<Loaded | null>(null)
   const [pointedId, setPointedId] = useState<string | null>(null)
   const [openId, setOpenId] = useState<string | null>(itemId)
+  // Its Suggest an edit open: the editor's own ‹ is the way back, so the
+  // column's bar goes, as a listing's does (ListingColumn).
+  const [editing, setEditing] = useState(false)
   // The address is the open eruv: a link to one, Back, Forward (which
   // write to the address before this hears of it).
   const [seenItemId, setSeenItemId] = useState(itemId)
@@ -101,11 +109,15 @@ export default function EruvInfo({ eruvim, onUp, title = 'Eruv Information', ico
   // Back and Forward over a step this page pushed: Next doesn't always hand
   // the address back as a new ?item=, so it's read here (as GenericDirectory
   // does).
+  // Only where the address carries it: the admin's preview has none, and
+  // Back out of an eruv's edit there would read as no eruv open.
+  const addressed = !!onParamsChange
   useEffect(() => {
+    if (!addressed) return
     const onPop = () => setOpenId(new URLSearchParams(window.location.search).get('item'))
     window.addEventListener('popstate', onPop)
     return () => window.removeEventListener('popstate', onPop)
-  }, [])
+  }, [addressed])
 
   useEffect(() => {
     let live = true
@@ -158,6 +170,12 @@ export default function EruvInfo({ eruvim, onUp, title = 'Eruv Information', ico
   useEffect(() => {
     if (!column) return
     const onKey = (e: KeyboardEvent) => {
+      // While editing, Escape steps back out of the edit; the arrows are
+      // the form's.
+      if ((window.history.state as { mapSheetForm?: string } | null)?.mapSheetForm) {
+        if (e.key === 'Escape') window.history.back()
+        return
+      }
       const target = e.target as HTMLElement | null
       if (target && (/^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName) || target.isContentEditable)) return
       if (e.key === 'Escape') closeEruv()
@@ -173,10 +191,17 @@ export default function EruvInfo({ eruvim, onUp, title = 'Eruv Information', ico
   const maps = useEruvMaps(slug, !!loaded?.available)
   // Desktop only: a phone has nothing to point with.
   const pointAt = (id: string) => (isMobile ? {} : { onMouseEnter: () => setPointedId(id), onMouseLeave: () => setPointedId(null), onFocus: () => setPointedId(id), onBlur: () => setPointedId(null) })
+  // Beside the list where it's wide enough and not hidden, as on every
+  // category page (the same remembered Hide map).
+  const wide = useWide()
+  const [mapHidden, storeMapHidden] = useSharedPreference('jpc:map-hidden', (raw) => raw === '1')
+  const setMapHidden = (hidden: boolean) => storeMapHidden(hidden ? '1' : null)
+  const { gridRef: splitRef, gridStyle: splitStyle, handleProps: splitHandle } = useListMapSplit({ onHideMap: () => setMapHidden(true) })
   const mapped = ready && now && maps ? ready.eruvim.flatMap((e) => (maps.get(e.id) ? [{ id: e.id, name: e.name, tone: eruvView(e, now, ready.timezone, ready.candles).tone, map: maps.get(e.id)! }] : [])) : []
+  const mapBeside = wide && !mapHidden && mapped.length > 0
   // The Map tab on the eruvim alone, the open one open there too.
   const fullMapHref = `${routes.map(slug)}${mapQueryString({ eruvim: 'all', place: open ? `eruv:${open.id}` : null })}`
-  const eruvMap = (className: string) => (
+  const eruvMap = (className: string, onHide?: () => void) => (
     <EruvMap
       eruvim={mapped}
       you={you}
@@ -186,6 +211,7 @@ export default function EruvInfo({ eruvim, onUp, title = 'Eruv Information', ico
       onHover={isMobile ? undefined : setPointedId}
       focusId={open?.id ?? null}
       fullMapHref={fullMapHref}
+      onHide={onHide}
       className={className}
     />
   )
@@ -208,41 +234,85 @@ export default function EruvInfo({ eruvim, onUp, title = 'Eruv Information', ico
       {!loaded && <p className="text-sm text-muted" role="status">Checking each eruv…</p>}
 
       {ready && now && (
-        <div className="md:grid md:grid-cols-[minmax(0,420px)_minmax(0,1fr)] md:items-start md:gap-7">
-          <div className="space-y-3.5">
-            {isMobile && mapped.length > 0 && eruvMap('h-[300px]')}
+        // A category page's list and map (GenericDirectory): the map beside
+        // the list from a wide screen up, the line between them dragged to
+        // share the width, Hide map and Show map remembered with every
+        // category's. Narrower, the map above the list: the lines are what
+        // people come here for.
+        <div ref={splitRef} className={mapBeside ? 'group/split lg:grid lg:items-start' : undefined} style={mapBeside ? splitStyle : undefined}>
+          <div className="min-w-0 space-y-3.5">
+            {!mapBeside && !(wide && mapHidden) && mapped.length > 0 && eruvMap('h-[300px]')}
             {column && open && (
               <section aria-label={open.name} data-testid="eruv-column">
-                <ListingBar backLabel={title} onBack={closeEruv} position={{ index: openIndex, total: ready.eruvim.length }} onStep={stepEruv} />
-                <EruvListing eruv={open} color={color} now={now} timezone={ready.timezone} candles={ready.candles} />
+                {!editing && (
+                  <ListingBar
+                    backLabel={title}
+                    onBack={closeEruv}
+                    position={{ index: openIndex, total: ready.eruvim.length }}
+                    onStep={stepEruv}
+                    onShowMap={wide && mapHidden ? () => setMapHidden(false) : undefined}
+                  />
+                )}
+                <EruvListing eruv={open} color={color} now={now} timezone={ready.timezone} candles={ready.candles} onEditingChange={setEditing} />
               </section>
             )}
             {ready.eruvim.length > 0 && (
               // Kept while one is open, hidden, as a category's list is.
-              <div hidden={column}>
-                <Card title={shabbosSide ? 'This Shabbos' : 'Eruvim'} testId="eruv-list">
+              <div hidden={column} data-testid="eruv-list">
+                <ListHeading
+                  label={shabbosSide ? 'This Shabbos' : undefined}
+                  noun
+                  count={ready.eruvim.length}
+                  total={ready.eruvim.length}
+                  units={['eruv', 'eruvim']}
+                  onShowMap={wide && mapHidden && mapped.length > 0 ? () => setMapHidden(false) : undefined}
+                />
+                <ul className="space-y-2">
                   {ready.eruvim.map((eruv) => (
-                    <button
-                      key={eruv.id}
-                      type="button"
-                      onClick={() => openEruv(eruv.id)}
-                      {...pointAt(eruv.id)}
-                      className={`-mx-2 flex w-[calc(100%+1rem)] cursor-pointer items-center gap-2 rounded-lg border-t border-slate-100 px-2 py-3 text-left first:border-t-0 ${pointedId === eruv.id ? 'bg-slate-50' : ''}`}
-                      data-pointed={pointedId === eruv.id || undefined}
-                      data-testid="eruv-row"
-                    >
-                      <span className="min-w-0 flex-1">
-                        <span className="block text-[15.5px] font-bold text-slate-900">{eruv.name}</span>
-                        <EruvStatusLine eruv={eruv} now={now} timezone={ready.timezone} candles={ready.candles} />
-                      </span>
-                      <ChevronRightIcon className="h-4 w-4 shrink-0 text-slate-400" />
-                    </button>
+                    <li key={eruv.id}>
+                      {/* A category's card row (GenericListingCard): the
+                          eruv's initials, its name, whether it's up. */}
+                      <button
+                        type="button"
+                        onClick={() => openEruv(eruv.id)}
+                        {...pointAt(eruv.id)}
+                        className={`flex w-full cursor-pointer items-start gap-3 rounded-lg border border-slate-200 px-4 py-3 text-left shadow-sm transition-colors hover:bg-slate-50 active:bg-slate-100 ${pointedId === eruv.id ? 'bg-slate-50' : 'bg-white'}`}
+                        data-pointed={pointedId === eruv.id || undefined}
+                        data-testid="eruv-row"
+                      >
+                        <span className="mt-0.5 shrink-0" aria-hidden="true">
+                          <CategoryIcon icon="" initials={initialsOf(eruv.name)} shape="square" color={color} className="h-10 w-10 text-xl" />
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate font-semibold text-slate-900">{eruv.name}</span>
+                          <EruvStatusLine eruv={eruv} now={now} timezone={ready.timezone} candles={ready.candles} />
+                        </span>
+                        <ChevronRightIcon className="mt-3 h-4 w-4 shrink-0 text-slate-400" />
+                      </button>
+                    </li>
                   ))}
-                </Card>
+                </ul>
               </div>
             )}
           </div>
-          {!isMobile && mapped.length > 0 && eruvMap('sticky top-4 h-[640px]')}
+          {/* The line between list and map: drag it to share the width
+              differently, double-click it for half and half. */}
+          {mapBeside && (
+            <div
+              {...splitHandle}
+              className="group hidden cursor-col-resize touch-none items-center justify-center outline-none lg:sticky lg:top-[4.5rem] lg:flex lg:h-[min(calc(100vh-6rem),720px)]"
+            >
+              <span className="h-12 w-1.5 rounded-full bg-slate-300 transition-colors group-hover:bg-slate-500 group-focus-visible:bg-primary group-focus-visible:ring-2 group-focus-visible:ring-primary/40" />
+            </div>
+          )}
+          {mapBeside && (
+            <div className="relative hidden lg:sticky lg:top-[4.5rem] lg:block lg:h-[min(calc(100vh-6rem),720px)]">
+              <div className="h-full transition-opacity group-data-[snap=map]/split:opacity-30">{eruvMap('h-full', () => setMapHidden(true))}</div>
+              <div aria-hidden="true" className="pointer-events-none absolute inset-0 hidden items-center justify-center group-data-[snap=map]/split:flex">
+                <span className="rounded-full bg-slate-900/85 px-4 py-2 text-[14px] font-semibold text-white shadow-lg">Let go to hide the map</span>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

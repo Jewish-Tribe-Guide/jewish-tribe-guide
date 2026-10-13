@@ -37,10 +37,12 @@ type Props = {
   /** "Show map", at the right end, once the map beside the list has been
    *  hidden. Only on a screen wide enough to show it. */
   onShowMap?: () => void
+  /** What the list holds, where it isn't listings: ['eruv', 'eruvim']. */
+  units?: [string, string]
 }
 
-export default function ListHeading({ label, count, noun = !label, total, filters, sort, onDaveningTimes, onShowMap }: Props) {
-  const countText = noun ? `${count} listing${count === 1 ? '' : 's'}` : String(count)
+export default function ListHeading({ label, count, noun = !label, total, filters, sort, onDaveningTimes, onShowMap, units = ['listing', 'listings'] }: Props) {
+  const countText = noun ? `${count} ${count === 1 ? units[0] : units[1]}` : String(count)
   return (
     <div data-testid="list-heading" data-total={total} className="pb-2 pt-2">
       {/* Wraps rather than running off the side of a narrow phone. */}

@@ -17,6 +17,8 @@ import { clearEruvim, drawEruvim, emphasizeEruvim, eruvDrawKey, type DrawnEruv, 
 export type { MapEruv } from '@/components/map/eruvLayer'
 export { mapLabel } from '@/components/map/eruvLayer'
 
+const MAP_BUTTON = 'flex h-9 cursor-pointer items-center gap-1.5 rounded-lg bg-white px-3 text-[13.5px] font-semibold text-slate-700 shadow-md ring-1 ring-slate-900/10 transition-colors hover:bg-slate-50'
+
 /** Every eruv in view. */
 function frameAll(map: google.maps.Map, drawn: Map<string, DrawnEruv>) {
   const frame = new google.maps.LatLngBounds()
@@ -37,10 +39,13 @@ type Props = {
   focusId?: string | null
   /** The Map tab on the eruvim, for the "Full map" button. */
   fullMapHref?: string
+  /** "Hide map", where the list beside it can take the width (as on a
+   *  category page, CategoryMap). */
+  onHide?: () => void
   className?: string
 }
 
-export default function EruvMap({ eruvim, you, fallbackCenter, onSelect, highlightId = null, onHover, focusId = null, fullMapHref, className = '' }: Props) {
+export default function EruvMap({ eruvim, you, fallbackCenter, onSelect, highlightId = null, onHover, focusId = null, fullMapHref, onHide, className = '' }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<google.maps.Map | null>(null)
   const drawnRef = useRef<Map<string, DrawnEruv>>(new Map())
@@ -163,13 +168,14 @@ export default function EruvMap({ eruvim, you, fallbackCenter, onSelect, highlig
   return (
     <div className={`relative ${className}`}>
       <div ref={containerRef} className="absolute inset-0 overflow-hidden rounded-2xl border border-slate-200 bg-slate-100" data-testid="eruv-map" aria-label="Map of the eruvim" role="region" />
+      {/* As on a category page's map (CategoryMap). */}
+      {onHide && (
+        <button type="button" onClick={onHide} className={`absolute left-3 top-3 ${MAP_BUTTON}`}>
+          Hide map
+        </button>
+      )}
       {fullMapHref && (
-        // As on a category page's map (CategoryMap).
-        <Link
-          href={fullMapHref}
-          aria-label="Open the full map"
-          className="absolute right-3 top-3 flex h-9 cursor-pointer items-center gap-1.5 rounded-lg bg-white px-2.5 text-[13.5px] font-semibold text-slate-700 shadow-md ring-1 ring-slate-900/10 transition-colors hover:bg-slate-50"
-        >
+        <Link href={fullMapHref} aria-label="Open the full map" className={`absolute right-3 top-3 ${MAP_BUTTON} px-2.5`}>
           <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
             <path d="M15 3h6v6" />
             <path d="M9 21H3v-6" />

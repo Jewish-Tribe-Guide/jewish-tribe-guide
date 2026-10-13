@@ -1,11 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { GlobeIcon, MailIcon, PencilIcon, PhoneIcon } from '@/components/icons'
 import { dialable, eruvView, type Eruv, type EruvTone } from '@/lib/eruv'
 import { initialsOf } from '@/lib/listingRow'
 import CategoryIcon from '@/components/CategoryIcon'
+import BackIconButton from '@/components/BackIconButton'
 import { Card } from './listingParts'
 
 // ── One eruv's listing (Oct 7; its own file Oct 13) ─────────────────────────
@@ -15,7 +16,7 @@ import { Card } from './listingParts'
 // (budgets.spec counts it).
 
 // Loaded on the first tap of "Suggest an edit", for the same reason.
-const EruvSuggestEdit = dynamic(() => import('./EruvSuggestEdit'))
+const EruvEditor = dynamic(() => import('./EruvEditor'))
 
 const DOT: Record<EruvTone, string> = { green: 'bg-green-700', amber: 'bg-amber-700', red: 'bg-red-700', grey: 'bg-slate-500' }
 const WORDS: Record<EruvTone, string> = { green: 'text-green-700', amber: 'text-amber-700', red: 'text-red-700', grey: 'text-slate-700' }
@@ -48,8 +49,12 @@ const siteLabel = (url: string) => url.replace(/^https?:\/\//i, '').replace(/^ww
 
 /** One eruv's listing: its status, where it goes, and the eruv's own
  *  site, hotline and alerts; under it, "Suggest an edit" (Oct 13), which
- *  turns the listing into its rows to fix and send (EruvSuggestEdit). */
-export function EruvListing(props: { eruv: Eruv; color: string; now: Date; timezone: string; candles: number | null }) {
+ *  turns the listing into the editor every listing has (EruvEditor), hosted
+ *  as MapPlaceDetail hosts a listing's: a ‹ and "Suggest an edit" over it,
+ *  and its own step in the history, so Back (and a phone's back swipe)
+ *  returns to the listing. */
+export function EruvListing(props: { eruv: Eruv; color: string; now: Date; timezone: string; candles: number | null; onEditingChange?: (editing: boolean) => void }) {
+  const { onEditingChange, ...listing } = props
   const [editing, setEditing] = useState(false)
   // Another eruv opened in its place starts as its listing.
   const [shownId, setShownId] = useState(props.eruv.id)
@@ -57,13 +62,38 @@ export function EruvListing(props: { eruv: Eruv; color: string; now: Date; timez
     setShownId(props.eruv.id)
     setEditing(false)
   }
-  if (editing) return <EruvSuggestEdit eruv={props.eruv} onClose={() => setEditing(false)} />
+  useEffect(() => {
+    const onPop = (e: PopStateEvent) => setEditing((e.state as { mapSheetForm?: string } | null)?.mapSheetForm === 'edit')
+    window.addEventListener('popstate', onPop)
+    return () => window.removeEventListener('popstate', onPop)
+  }, [])
+  useEffect(() => {
+    onEditingChange?.(editing)
+  }, [editing, onEditingChange])
+  const openEditor = () => {
+    window.history.pushState({ ...(window.history.state ?? {}), mapSheetForm: 'edit' }, '')
+    setEditing(true)
+  }
+  const closeEditor = () => window.history.back()
+  if (editing) {
+    return (
+      <div data-testid="eruv-editing">
+        <div className="mb-3 grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+          <span>
+            <BackIconButton onClick={closeEditor} />
+          </span>
+          <h2 className="truncate text-base font-semibold text-slate-900">Suggest an edit</h2>
+        </div>
+        <EruvEditor eruv={props.eruv} color={props.color} onClose={closeEditor} />
+      </div>
+    )
+  }
   return (
     <div className="space-y-3.5">
-      <EruvDetails {...props} />
+      <EruvDetails {...listing} />
       <button
         type="button"
-        onClick={() => setEditing(true)}
+        onClick={openEditor}
         className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-full bg-primary px-5 py-3 text-sm font-semibold text-white shadow-lg transition-transform active:scale-[0.98]"
       >
         <PencilIcon className="h-4 w-4 shrink-0" />

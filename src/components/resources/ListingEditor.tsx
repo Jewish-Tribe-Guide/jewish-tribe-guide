@@ -22,7 +22,6 @@ import ImageUploadField from '@/components/ImageUploadField'
 import AddressInput from '@/components/intake/AddressInput'
 import Honeypot from '@/components/Honeypot'
 import TurnstileWidget from '@/components/TurnstileWidget'
-import { CheckIcon, ChevronRightIcon, PlusIcon } from '@/components/icons'
 import RemovalRequest from './RemovalRequest'
 import { DetailFieldInput } from './ListingForm'
 import ContactsEditor from './ContactsEditor'
@@ -30,7 +29,9 @@ import ItemsEditor, { itemLists } from './ItemsEditor'
 import MinyanBoxEditor from './MinyanBoxEditor'
 import { useListingDraft, type ListingDraft } from './useListingDraft'
 import { TURNSTILE_ACTIVE, useListingSubmit, type SendVia } from './useListingSubmit'
+import { PlusIcon } from '@/components/icons'
 import { SUBMIT_PILL } from './submitPill'
+import { ChangedTag, EditorAddLine, EditorEmptyRows, EditorOpenCard, EditorRowCard, EditorSent, editorFieldLabel, editorInputClass } from './editorParts'
 
 // ── Suggest an edit, the whole listing (agreed Oct 11, canvas page "editor") ─
 // The listing's own boxes, in the listing's order, one row each: its
@@ -141,8 +142,8 @@ function isBlank(v: unknown): boolean {
   return String(v).trim() === ''
 }
 
-const inputClass = 'h-11.5 w-full rounded-xl border border-slate-300 bg-white px-3.5 text-[15.5px] text-slate-900 placeholder:text-slate-400 focus:border-primary focus:outline-none'
-const fieldLabel = 'mb-1.5 block text-[14px] font-bold text-slate-700'
+const inputClass = editorInputClass
+const fieldLabel = editorFieldLabel
 
 /** A choice of a few as big buttons ("Meat", "Dairy", "Parve"), the way
  *  the minyan editor's days are: one replaces the other for a single
@@ -297,20 +298,7 @@ export default function ListingEditor({
 
   // ── Sent ──────────────────────────────────────────────────────────────
   if (sender.done) {
-    return (
-      <div className="flex flex-col items-center gap-2.5 py-8 text-center" role="status" data-testid="editor-sent">
-        <span className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-50">
-          <CheckIcon className="h-8 w-8 text-emerald-700" />
-        </span>
-        <p className="text-[22px] font-extrabold text-ink">Sent</p>
-        <p className="text-[15.5px] text-slate-700">
-          {sender.doneKind === 'removal' ? 'An admin checks a removal before anything changes.' : 'An admin checks it, usually within a day.'}
-        </p>
-        <button type="button" onClick={onClose} className={`${SUBMIT_PILL} mt-6`}>
-          Done
-        </button>
-      </div>
-    )
+    return <EditorSent message={sender.doneKind === 'removal' ? 'An admin checks a removal before anything changes.' : 'An admin checks it, usually within a day.'} onDone={onClose} />
   }
 
   // ── What's changed, and what's still needed ───────────────────────────
@@ -385,24 +373,16 @@ export default function ListingEditor({
   // things to tap. The same › on every row, whatever it opens.
   const tags = (r: EditorRow) => (
     <>
-      {changed.has(r.id) && <span className="shrink-0 rounded-full bg-amber-100 px-2.5 py-0.5 text-[12.5px] font-extrabold text-amber-800">Changed</span>}
+      {changed.has(r.id) && <ChangedTag />}
       {needed(r) && <span className="shrink-0 rounded-full bg-red-100 px-2.5 py-0.5 text-[12.5px] font-extrabold text-red-700">Needed</span>}
     </>
   )
   // A short row, open: its fields inside its card, Done under them. Its
   // heading closes it too.
   const openInPlace = (r: EditorRow) => (
-    <div ref={openCard} data-testid={`editor-open-${r.id}`} className="scroll-my-4 space-y-4 rounded-2xl border-[1.5px] border-slate-400 bg-white px-4 pt-2.5 pb-4 shadow-sm">
-      <button type="button" onClick={closeRow} aria-expanded="true" className="flex min-h-11 w-full cursor-pointer items-center gap-3 text-left">
-        <span className="min-w-0 flex-1 text-[16px] font-extrabold text-slate-900">{rowTitle(r)}</span>
-        {tags(r)}
-        <ChevronRightIcon className="h-4 w-4 shrink-0 -rotate-90 text-slate-500" />
-      </button>
+    <EditorOpenCard cardRef={openCard} testId={`editor-open-${r.id}`} title={rowTitle(r)} tags={tags(r)} onClose={closeRow}>
       {rowBody(r)}
-      <button type="button" onClick={closeRow} className="h-11 w-full cursor-pointer rounded-full border border-slate-300 bg-white text-[15px] font-bold text-primary">
-        Done
-      </button>
-    </div>
+    </EditorOpenCard>
   )
   const filled = rows.filter((r) => !rowIsEmpty(r, values) || needed(r))
   const empty = rows.filter((r) => rowIsEmpty(r, values) && !needed(r))
@@ -418,62 +398,44 @@ export default function ListingEditor({
           const summary = r.kind === 'name' ? rowSummary(r, values, timeText) : rowSummary(r, values, timeText) || (needed(r) ? 'Not added yet' : '')
           return (
             <li key={r.id}>
-              <button
-                type="button"
-                onClick={() => setOpenId(r.id)}
-                data-testid={`editor-row-${r.id}`}
-                // Where it opens, for tests; nothing on screen says (the user, Oct 11).
-                data-opens={opensInPlace(r) ? 'here' : 'screen'}
-                className={`flex min-h-16 w-full cursor-pointer items-center gap-3 rounded-2xl border px-4 py-2.5 text-left ${isChanged ? 'border-amber-200 bg-yellow-50' : 'border-slate-200 bg-white'}`}
-              >
-                {r.kind === 'name' && (
-                  <CategoryIcon
-                    icon={category.icon}
-                    categoryId={category.id}
-                    iconImageUrl={photo || undefined}
-                    initials={draft.name.trim() ? initialsOf(draft.name) : undefined}
-                    color="#94a3b8"
-                    className="h-11 w-11 shrink-0 text-lg"
-                    sizePx={44}
-                  />
-                )}
-                <span className="min-w-0 flex-1">
-                  <span className="block text-[16px] font-extrabold text-slate-900">{rowTitle(r)}</span>
-                  {summary && <span className="mt-0.5 line-clamp-2 block text-[14px] leading-snug text-muted">{summary}</span>}
-                </span>
-                {tags(r)}
-                <ChevronRightIcon className="h-4 w-4 shrink-0 text-slate-400" />
-              </button>
+              <EditorRowCard
+                onOpen={() => setOpenId(r.id)}
+                testId={`editor-row-${r.id}`}
+                opens={opensInPlace(r) ? 'here' : 'screen'}
+                changed={isChanged}
+                leading={
+                  r.kind === 'name' && (
+                    <CategoryIcon
+                      icon={category.icon}
+                      categoryId={category.id}
+                      iconImageUrl={photo || undefined}
+                      initials={draft.name.trim() ? initialsOf(draft.name) : undefined}
+                      color="#94a3b8"
+                      className="h-11 w-11 shrink-0 text-lg"
+                      sizePx={44}
+                    />
+                  )
+                }
+                title={rowTitle(r)}
+                summary={summary}
+                tags={tags(r)}
+              />
             </li>
           )
         })}
       </ul>
       {empty.length > 0 && (
-        <div data-testid="editor-empty">
-          <p className="pb-1 text-[12.5px] font-extrabold uppercase tracking-[0.04em] text-muted">Not on the listing yet</p>
-          {/* Plain lines on the gray, so they don't read as boxes the
-              listing has. */}
-          <ul className="space-y-1">
-            {empty.map((r) => (
-              <li key={r.id}>
-                {inPlace && r.id === openId ? (
-                  openInPlace(r)
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => setOpenId(r.id)}
-                    data-testid={`editor-add-${r.id}`}
-                    data-opens={opensInPlace(r) ? 'here' : 'screen'}
-                    className="flex min-h-11 w-full cursor-pointer items-center gap-2 text-left text-[15px] font-bold text-primary"
-                  >
-                    <PlusIcon className="h-4 w-4 shrink-0" />
-                    {r.title}
-                  </button>
-                )}
-              </li>
-            ))}
-          </ul>
-        </div>
+        <EditorEmptyRows>
+          {empty.map((r) => (
+            <li key={r.id}>
+              {inPlace && r.id === openId ? (
+                openInPlace(r)
+              ) : (
+                <EditorAddLine onOpen={() => setOpenId(r.id)} testId={`editor-add-${r.id}`} opens={opensInPlace(r) ? 'here' : 'screen'} title={r.title} />
+              )}
+            </li>
+          ))}
+        </EditorEmptyRows>
       )}
       {errors}
       {foot(
