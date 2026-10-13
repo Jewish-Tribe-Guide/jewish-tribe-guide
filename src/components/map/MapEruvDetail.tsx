@@ -1,7 +1,7 @@
 'use client'
 
 import UpButton from '@/components/UpButton'
-import { EruvListing } from '@/components/resources/EruvInfo'
+import { EruvListing } from '@/components/resources/EruvListing'
 import type { Eruv } from '@/lib/eruv'
 
 /** An eruv opened on the guide's map: its listing, as the Eruv page shows
