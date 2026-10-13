@@ -10,6 +10,7 @@ import { join } from 'node:path'
 import { parseLineFile } from '@/lib/eruvLine'
 import { mockRouter } from '@/test/nextNavigationMock'
 import { clearEruvStatuses } from '@/lib/useEruvStatuses'
+import { PreviewSendProvider } from '@/lib/previewSend'
 import EruvInfo from './EruvInfo'
 
 vi.mock('next/navigation', () => ({
@@ -249,6 +250,28 @@ describe('EruvInfo', () => {
       await user.click(screen.getByRole('button', { name: 'Done' }))
       expect(await screen.findByTestId('eruv-listing')).toBeInTheDocument()
       expect(screen.getByTestId('listing-column-bar')).toBeInTheDocument()
+    })
+
+    // The admin's category Preview promises nothing done in it is filed
+    // (previewSend.tsx); the eruv's edit came after that, and filed for real.
+    it('in the admin’s Preview, Send shows Sent and files nothing', async () => {
+      const user = userEvent.setup()
+      renderWithProviders(
+        <PreviewSendProvider listing={() => {}}>
+          <ForcedViewport isMobile={false}>
+            <EruvInfo eruvim={OLD} onUp={() => {}} title="Eruvim" />
+          </ForcedViewport>
+        </PreviewSendProvider>,
+      )
+      await user.click((await screen.findAllByTestId('eruv-row'))[1])
+      await user.click(screen.getByRole('button', { name: 'Suggest an edit' }))
+      const form = await screen.findByTestId('eruv-suggest')
+      await user.type(within(form).getByLabelText('Website'), 'lowermerioneruv.org')
+      await user.click(within(form).getByRole('button', { name: 'Send 1 change' }))
+      expect(await screen.findByTestId('editor-sent')).toBeInTheDocument()
+      expect(posted).toEqual([])
+      await user.click(screen.getByRole('button', { name: 'Done' }))
+      expect(await screen.findByTestId('eruv-listing')).toBeInTheDocument()
     })
 
     it('‹ goes back to the listing, sending nothing', async () => {
