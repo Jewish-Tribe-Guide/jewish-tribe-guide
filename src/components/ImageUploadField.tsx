@@ -2,6 +2,7 @@
 
 import { useRef, useState } from 'react'
 import ImageCropModal from './ImageCropModal'
+import { useFetchOrPreview } from '@/lib/previewSend'
 
 const ACCEPT = 'image/png,image/jpeg,image/webp,image/gif,image/svg+xml'
 
@@ -38,7 +39,7 @@ type Props = {
    *  lives, so it needs to live somewhere that survives whatever the
    *  caller's own component does. Pass both or neither; when omitted, this
    *  component tracks it internally exactly as before (fine for a caller,
-   *  like ListingForm or CategoryFormFields, that never unmounts this field
+   *  like DetailFieldInput or CategoryFormFields, that never unmounts this field
    *  except when the photo itself is genuinely done with). */
   originalSource?: File | string | null
   onOriginalSourceChange?: (source: File | string | null) => void
@@ -47,8 +48,8 @@ type Props = {
    *  reposition/re-zoom it" once a photo is set, or "or drag an image onto
    *  the preview, or click it and paste one (⌘V / Ctrl+V)" before one is.
    *  Default true (admin's logo/hero/category-icon editors keep both — see
-   *  SiteSettingsEditor's own tests). Off for the public listing form
-   *  (ListingForm) specifically: confirmed with the site owner that a
+   *  SiteSettingsEditor's own tests). Off for the public listing editors
+   *  (DetailFieldInput, ListingEditor's photo row) specifically: confirmed with the site owner that a
    *  visitor filling out one form field at a time doesn't need either
    *  spelled out the way an admin configuring branding once might — Upload
    *  image/Paste URL are already visible, self-explanatory buttons, and
@@ -58,10 +59,10 @@ type Props = {
   /** Starts the "…or paste an image URL directly" row collapsed behind a
    *  small link instead of always showing its own label + input. Default
    *  false (admin's own uploaders keep it always visible — admins actually
-   *  use this for stock-photo links). On for the public listing form
+   *  use this for stock-photo links). On for the public listing editors
    *  specifically: most visitors upload a file, and two permanently-visible
    *  lines for an edge-case path is exactly the bulk that field didn't need
-   *  — see ListingForm's own call site. */
+   *  — see DetailFieldInput's own call site. */
   collapseUrlInput?: boolean
 }
 
@@ -84,6 +85,7 @@ export default function ImageUploadField({
   collapseUrlInput = false,
 }: Props) {
   const [uploading, setUploading] = useState(false)
+  const fetchOrPreview = useFetchOrPreview()
   const [error, setError] = useState<string | null>(null)
   const [dragOver, setDragOver] = useState(false)
   // Starts open unless the caller asked to collapse it (see collapseUrlInput's
@@ -149,11 +151,17 @@ export default function ImageUploadField({
       // notion of a filename) — wrap it so the upload route's multipart
       // parser sees a real file, same as the unmodified original would have.
       body.append('file', new File([file], 'photo.jpg', { type: file.type || 'image/jpeg' }))
-      const res = await fetch(uploadUrl, {
-        method: 'POST',
-        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-        body,
-      })
+      // The admin console's preview uploads nothing: the photo is shown
+      // from this browser's own copy.
+      const res = await fetchOrPreview(
+        uploadUrl,
+        {
+          method: 'POST',
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+          body,
+        },
+        () => ({ url: URL.createObjectURL(file) }),
+      )
       const json = await res.json()
       if (!res.ok || !json.ok) throw new Error(json.errors?.join(' ') || 'Upload failed.')
       onChange(json.url as string)

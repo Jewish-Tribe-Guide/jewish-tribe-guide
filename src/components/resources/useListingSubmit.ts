@@ -5,6 +5,7 @@ import type { DirectoryResource, ResourceSubmission } from '@/types'
 import type { TurnstileHandle } from '@/components/TurnstileWidget'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { withCommunity } from '@/lib/useCommunityData'
+import { previewAnswer, previewListing, usePreviewSend } from '@/lib/previewSend'
 
 // Whether the Turnstile challenge is actually active for this deploy — mirrors
 // TurnstileWidget's own check. When it's not configured, the widget renders
@@ -12,10 +13,20 @@ import { withCommunity } from '@/lib/useCommunityData'
 // having one.
 export const TURNSTILE_ACTIVE = !!process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY
 
+/** Whether to wait for a challenge here: TURNSTILE_ACTIVE, except in the
+ *  admin console's category Preview (previewSend.tsx), where nothing is
+ *  sent, so there's nothing to check. Its challenge can't finish there
+ *  either (the preview is an about:blank frame), so a send that waited for
+ *  one sat on "Sending…" for good. */
+export function useTurnstileActive(): boolean {
+  const preview = usePreviewSend()
+  return TURNSTILE_ACTIVE && !preview
+}
+
 type Options = {
   mode: 'create' | 'edit'
   existing?: DirectoryResource
-  /** See ListingForm's own prop of the same name. */
+  /** See ListingEditor's own prop of the same name. */
   sharedTurnstile?: { token: string; reset: () => void }
   /** See ListingEditor's own prop of the same name. */
   adminSubmit?: { token: string }
@@ -44,9 +55,14 @@ export type SendVia = (body: {
  * and the done state afterwards. Shared by ListingEditor (the admin
  * console's direct add too) and BoxEditor so all of them treat a refused or expired submission
  * the same way. What gets sent comes from useListingDraft.
+ *
+ * In the admin console's category Preview (previewSend.tsx) nothing is
+ * sent: the listing it would have filed goes into the preview's list, with
+ * no bot check to wait for, and the rest runs as if it went in.
  */
 export function useListingSubmit({ mode, existing, sharedTurnstile, adminSubmit, onAdminSubmitted, via, onSent }: Options) {
   const community = useCommunitySlug()
+  const preview = usePreviewSend()
   const [submitterEmail, setSubmitterEmail] = useState('')
   // Honeypot — stays empty for humans; bots that auto-fill it get dropped server-side.
   const [honeypot, setHoneypot] = useState('')
@@ -64,7 +80,7 @@ export function useListingSubmit({ mode, existing, sharedTurnstile, adminSubmit,
    *  Turnstile is configured), or a visitor who fills the form faster than
    *  the background challenge completes submits an empty token and gets
    *  rejected for no visible reason. An admin submission has no challenge. */
-  const verifying = !adminSubmit && TURNSTILE_ACTIVE && !turnstileToken
+  const verifying = !adminSubmit && !preview && TURNSTILE_ACTIVE && !turnstileToken
 
   // Whether we've already refreshed the challenge once for this form. A second
   // failure means retrying is not the answer, so stop telling the visitor it is
@@ -87,7 +103,10 @@ export function useListingSubmit({ mode, existing, sharedTurnstile, adminSubmit,
 
     setSubmitting(true)
     try {
-      const res = via
+      if (preview) preview.listing(previewListing(payload, mode === 'edit' ? existing : undefined))
+      const res = preview
+        ? previewAnswer()
+        : via
         ? await via({ payload, submittedBy, company: honeypot, turnstileToken })
         : adminSubmit
         ? await fetch(withCommunity('/api/admin/listings', community), {

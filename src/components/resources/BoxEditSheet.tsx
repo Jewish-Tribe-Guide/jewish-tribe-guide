@@ -13,9 +13,9 @@ import TurnstileWidget from '@/components/TurnstileWidget'
 import { CheckIcon } from '@/components/icons'
 import ActionDialog from './ActionDialog'
 import MobileSheet from './MobileSheet'
-import { DetailFieldInput } from './ListingForm'
+import { DetailFieldInput } from './DetailFieldInput'
 import { useListingDraft } from './useListingDraft'
-import { useListingSubmit } from './useListingSubmit'
+import { useListingSubmit, useTurnstileActive } from './useListingSubmit'
 import { SUBMIT_PILL } from './submitPill'
 import MinyanBoxEditor from './MinyanBoxEditor'
 
@@ -97,6 +97,8 @@ export function BoxEditor({
 }) {
   const draft = useListingDraft(category, item)
   const { ownTurnstileRef, setOwnTurnstileToken, ...sender } = useListingSubmit({ mode: 'edit', existing: item })
+  // None in the admin console's preview, where nothing is sent.
+  const turnstileActive = useTurnstileActive()
   const { details, setDetail } = draft
   // A preset answer goes in once, as if typed.
   const [presetDone, setPresetDone] = useState(false)
@@ -195,7 +197,7 @@ export function BoxEditor({
           {sendButton('Send')}
         </>
       )}
-      <TurnstileWidget ref={ownTurnstileRef} onVerify={setOwnTurnstileToken} />
+      {turnstileActive && <TurnstileWidget ref={ownTurnstileRef} onVerify={setOwnTurnstileToken} />}
     </div>
   )
 }

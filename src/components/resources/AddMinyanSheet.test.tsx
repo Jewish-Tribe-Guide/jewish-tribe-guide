@@ -7,7 +7,7 @@ import { mockRouter } from '@/test/nextNavigationMock'
 import type { DateFacts } from '@/lib/schedules'
 import AddMinyanSheet from './AddMinyanSheet'
 
-vi.mock('./useListingSubmit', () => ({ TURNSTILE_ACTIVE: false }))
+vi.mock('./useListingSubmit', () => ({ TURNSTILE_ACTIVE: false, useTurnstileActive: () => false }))
 vi.mock('@/lib/useIsMobile', () => ({ useIsMobile: () => true }))
 vi.mock('next/navigation', () => ({
   useRouter: () => mockRouter,

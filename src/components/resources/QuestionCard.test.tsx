@@ -6,6 +6,7 @@ import { renderWithProviders } from '@/test/renderWithProviders'
 import { makeCategory, makeListing } from '@/test/providerFixtures'
 import type { DirectoryResource } from '@/types'
 import { mockRouter } from '@/test/nextNavigationMock'
+import { PreviewSendProvider } from '@/lib/previewSend'
 
 vi.mock('next/navigation', () => ({
   useRouter: () => mockRouter,
@@ -15,7 +16,8 @@ vi.mock('next/navigation', () => ({
 
 // The bot check is configured here, as it is on the live site, so these
 // tests see when it's loaded and that nothing is sent without its token.
-vi.mock('./useListingSubmit', () => ({ TURNSTILE_ACTIVE: true }))
+// Set before anything imports useListingSubmit, which reads it once.
+vi.hoisted(() => vi.stubEnv('NEXT_PUBLIC_TURNSTILE_SITE_KEY', 'test-site-key'))
 vi.mock('@/components/TurnstileWidget', () => ({
   default: ({ onVerify }: { onVerify: (token: string) => void }) => (
     <button type="button" onClick={() => onVerify('tok')}>
@@ -150,6 +152,35 @@ describe('QuestionCard: a quick question', () => {
     await user.click(screen.getByRole('button', { name: 'pass the bot check' }))
     expect(await screen.findByText('Thanks! An admin will check it before it shows.')).toBeInTheDocument()
     expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+})
+
+// The admin console's category Preview: the visitor's thank-you, with
+// nothing sent and no bot check to wait for (its challenge can't finish in
+// the preview's frame, so waiting for one sat on "Sending…" for good).
+describe('QuestionCard: in the category preview', () => {
+  const inPreview = (category = food) =>
+    renderWithProviders(
+      <PreviewSendProvider listing={() => {}}>
+        <QuestionCard category={category} shown={items} all={items} place={() => null} onEdit={vi.fn()} />
+      </PreviewSendProvider>,
+    )
+
+  it('thanks for an answer without the bot check, sending nothing', async () => {
+    const user = userEvent.setup()
+    inPreview()
+    await user.click(screen.getByRole('button', { name: 'Dairy' }))
+    expect(await screen.findByText('Thanks! An admin will check it before it shows.')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'pass the bot check' })).not.toBeInTheDocument()
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('“Yes, still right” thanks without marking the live listing', async () => {
+    const user = userEvent.setup()
+    inPreview(makeCategory({ id: 'grocery', label: 'Grocery', questionCard: { kind: 'confirm' }, detailFields: [] }))
+    await user.click(screen.getByRole('button', { name: 'Yes, still right' }))
+    expect(await screen.findByText('Thanks! It’s marked as current.')).toBeInTheDocument()
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 })
 

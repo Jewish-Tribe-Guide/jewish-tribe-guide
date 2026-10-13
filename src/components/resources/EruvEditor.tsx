@@ -7,7 +7,8 @@ import { useCommunitySlug } from '@/lib/communityContext'
 import { withCommunity } from '@/lib/useCommunityData'
 import Honeypot from '@/components/Honeypot'
 import TurnstileWidget, { type TurnstileHandle } from '@/components/TurnstileWidget'
-import { TURNSTILE_ACTIVE } from './useListingSubmit'
+import { useTurnstileActive } from './useListingSubmit'
+import { useFetchOrPreview } from '@/lib/previewSend'
 import { SUBMIT_PILL } from './submitPill'
 import { Card } from './listingParts'
 import { EditorSent, editorFieldLabel, editorInputClass, sendChangesLabel } from './editorParts'
@@ -35,14 +36,18 @@ export default function EruvEditor({ eruv, onClose }: { eruv: Eruv; onClose: () 
   const [errors, setErrors] = useState<string[]>([])
 
   const changes = eruvChanges(eruv, Object.fromEntries(Object.entries(values).map(([k, v]) => [k, v.trim() || null]))).length
-  const verifying = TURNSTILE_ACTIVE && !token
+  // In the admin's category Preview, Send files nothing and there's no
+  // check to pass (see previewSend.tsx).
+  const fetchOrPreview = useFetchOrPreview()
+  const turnstileActive = useTurnstileActive()
+  const verifying = turnstileActive && !token
 
   async function send() {
     if (changes === 0 || sending || verifying) return
     setErrors([])
     setSending(true)
     try {
-      const res = await fetch(withCommunity('/api/submissions', community), {
+      const res = await fetchOrPreview(withCommunity('/api/submissions', community), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ operation: 'update', targetType: 'eruv', targetId: eruv.id, payload: values, company: honeypot, turnstileToken: token }),
@@ -116,7 +121,7 @@ export default function EruvEditor({ eruv, onClose }: { eruv: Eruv; onClose: () 
       <button type="submit" disabled={changes === 0 || sending || verifying} className={SUBMIT_PILL}>
         {sendChangesLabel(changes, sending, verifying)}
       </button>
-      {changes > 0 && <TurnstileWidget ref={turnstileRef} onVerify={setToken} />}
+      {changes > 0 && turnstileActive && <TurnstileWidget ref={turnstileRef} onVerify={setToken} />}
     </form>
   )
 }

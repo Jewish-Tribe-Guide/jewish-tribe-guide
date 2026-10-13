@@ -4,9 +4,10 @@ import { useId, useRef, useState } from 'react'
 import type { DirectoryResource } from '@/types'
 import type { SpecialSchedule } from '@/lib/schedules'
 import type { ReadTime } from '@/lib/scheduleReader'
+import { PREVIEW_READ_ERROR, useFetchOrPreview } from '@/lib/previewSend'
 import SchedulesInput from '@/components/intake/SchedulesInput'
 import TurnstileWidget from '@/components/TurnstileWidget'
-import { TURNSTILE_ACTIVE } from './useListingSubmit'
+import { useTurnstileActive } from './useListingSubmit'
 
 // "Know their Sukkos times? Add them" on a shul's card (step 4, agreed
 // Oct 1). Three ways in, the first two the user's idea:
@@ -24,6 +25,8 @@ type Step = 'choose' | 'paste' | 'type' | 'check'
 
 export default function AddScheduleBox({ item, festival, onSent, onClose }: { item: DirectoryResource; festival: string; onSent: () => void; onClose: () => void }) {
   const [step, setStep] = useState<Step>('choose')
+  const fetchOrPreview = useFetchOrPreview()
+  const turnstileActive = useTurnstileActive()
   const [text, setText] = useState('')
   const [file, setFile] = useState<File | null>(null)
   const [reading, setReading] = useState<Reading | null>(null)
@@ -45,7 +48,7 @@ export default function AddScheduleBox({ item, festival, onSent, onClose }: { it
       body.set('company', '')
       if (what.file) body.set('file', what.file)
       else body.set('text', what.text ?? '')
-      const res = await fetch('/api/schedule/read', { method: 'POST', body })
+      const res = await fetchOrPreview('/api/schedule/read', { method: 'POST', body }, { ok: false, error: PREVIEW_READ_ERROR })
       const json = (await res.json().catch(() => ({}))) as Partial<Reading> & { ok?: boolean; error?: string; code?: string }
       if (!res.ok || !json.ok || !json.schedule) {
         if (json.code === 'off') setStep('type')
@@ -65,7 +68,7 @@ export default function AddScheduleBox({ item, festival, onSent, onClose }: { it
   // ── Sending it for a check ───────────────────────────────────────────────
   const send = async (token: string) => {
     try {
-      const res = await fetch(`/api/resource/${item.id}/schedule`, {
+      const res = await fetchOrPreview(`/api/resource/${item.id}/schedule`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ schedule: ready, source: reading && !file ? text : undefined, sourceUrl: reading?.sourceUrl ?? undefined, turnstileToken: token, company: '' }),
@@ -86,7 +89,7 @@ export default function AddScheduleBox({ item, festival, onSent, onClose }: { it
     setError(null)
     setAttempt((n) => n + 1)
     pending.current = run
-    if (!TURNSTILE_ACTIVE) run('')
+    if (!turnstileActive) run('')
   }
 
   const big =
@@ -204,7 +207,7 @@ export default function AddScheduleBox({ item, festival, onSent, onClose }: { it
       <p className="mt-2 text-[12.5px] leading-snug text-muted">
         {step === 'check' ? 'What you sent goes with it, so the admin checks the times against it. ' : ''}An admin checks them before anyone sees them.
       </p>
-      {busy && TURNSTILE_ACTIVE && <TurnstileWidget key={attempt} onVerify={(token) => pending.current(token)} />}
+      {busy && turnstileActive && <TurnstileWidget key={attempt} onVerify={(token) => pending.current(token)} />}
     </div>
   )
 }

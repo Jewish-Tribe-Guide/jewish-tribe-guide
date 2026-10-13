@@ -756,8 +756,8 @@ describe('approveSubmission: Google-sync field ownership', () => {
   // `description` (googleDescription) used to be a Google-only concept with
   // no ownership tracking at all — these two mirror the `name` tests above,
   // now that it's an ordinary ownable field. Matched by a fixed key, not
-  // label, unlike `website` — see ListingForm.tsx's own doc on the
-  // convention.
+  // label, unlike `website` — see useListingDraft's handlePlaceSelect
+  // on the convention.
   it('owns a description field whose submitted value matches its autofill snapshot — no Google call needed', async () => {
     const sub = baseSubmission({
       operation: 'create',
@@ -1144,6 +1144,28 @@ describe('approveSubmission: placeId vs verifiedPlaceId', () => {
     expect(written.details.placeId).toBeUndefined()
     expect(written.details.verifiedPlaceId).toBe('place-citizens-bank')
     expect(mockFetchPlaceSync).not.toHaveBeenCalled()
+  })
+
+  // The stadium's "Permanently closed" must not close the grill inside it.
+  it('drops the businessStatus read off that other business, too', async () => {
+    const sub = baseSubmission({
+      operation: 'create',
+      payload: listingPayload({
+        name: 'The Kosher Grill',
+        phone: '',
+        details: {
+          placeId: 'place-citizens-bank',
+          businessStatus: 'CLOSED_PERMANENTLY',
+          googleAutofill: { name: 'Citizens Bank Park' },
+        },
+      }) as unknown as Record<string, unknown>,
+    })
+    const resourceInsertBuilder = mockCreateFlow(sub)
+    mockGetCategoryById.mockResolvedValue(shulCategory)
+
+    await approveSubmission('sub-1')
+
+    expect(lastCallArg(resourceInsertBuilder.insert).details.businessStatus).toBeUndefined()
   })
 
   it('keeps a placeId whose picked name overlaps the listing name', async () => {

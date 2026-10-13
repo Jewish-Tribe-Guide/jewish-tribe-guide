@@ -4,8 +4,9 @@ import { useEffect, useState } from 'react'
 import type { DirectoryResource } from '@/types'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { withCommunity } from '@/lib/useCommunityData'
+import { useFetchOrPreview } from '@/lib/previewSend'
 import TurnstileWidget from '@/components/TurnstileWidget'
-import { TURNSTILE_ACTIVE } from './useListingSubmit'
+import { useTurnstileActive } from './useListingSubmit'
 import FreshnessFooter from './FreshnessFooter'
 
 // ── A group's join link: does it still work? ─────────────────────────────────
@@ -26,6 +27,8 @@ export const JOIN_BROKEN_NOTE = 'The join link didn’t work: someone tapped Joi
 
 export default function JoinLinkCheck({ item, joined }: { item: DirectoryResource; joined: boolean }) {
   const community = useCommunitySlug()
+  const fetchOrPreview = useFetchOrPreview()
+  const turnstileActive = useTurnstileActive()
   const [phase, setPhase] = useState<Phase>('idle')
   const [token, setToken] = useState('')
 
@@ -46,7 +49,7 @@ export default function JoinLinkCheck({ item, joined }: { item: DirectoryResourc
   const yes = async () => {
     setPhase('confirming')
     try {
-      const res = await fetch(`/api/resource/${item.id}/confirm`, { method: 'POST' })
+      const res = await fetchOrPreview(`/api/resource/${item.id}/confirm`, { method: 'POST' }, { confirmedAt: new Date().toISOString() })
       const body = (await res.json().catch(() => ({}))) as { ok?: boolean }
       setPhase(res.ok && body.ok ? 'thanks-yes' : 'failed')
     } catch {
@@ -57,9 +60,9 @@ export default function JoinLinkCheck({ item, joined }: { item: DirectoryResourc
   // The report goes once the bot check has passed (or straight away where
   // there's none configured), as QuestionCard's answers do.
   useEffect(() => {
-    if (phase !== 'reporting' || (TURNSTILE_ACTIVE && !token)) return
+    if (phase !== 'reporting' || (turnstileActive && !token)) return
     let cancelled = false
-    fetch(withCommunity('/api/submissions', community), {
+    fetchOrPreview(withCommunity('/api/submissions', community), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ operation: 'delete', targetType: 'listing', targetId: item.id, note: JOIN_BROKEN_NOTE, company: '', turnstileToken: token }),
@@ -74,7 +77,7 @@ export default function JoinLinkCheck({ item, joined }: { item: DirectoryResourc
     return () => {
       cancelled = true
     }
-  }, [phase, token, community, item.id])
+  }, [phase, token, community, item.id, fetchOrPreview, turnstileActive])
 
   const button = 'h-9 cursor-pointer rounded-full border border-slate-300 bg-white px-3.5 text-[14px] font-semibold text-slate-900 hover:bg-slate-50 disabled:cursor-default disabled:opacity-60'
 
@@ -108,7 +111,7 @@ export default function JoinLinkCheck({ item, joined }: { item: DirectoryResourc
         </p>
       )}
       {busy && <p className="mt-2 text-[13px] text-slate-500">Sending…</p>}
-      {phase === 'reporting' && <TurnstileWidget onVerify={setToken} />}
+      {phase === 'reporting' && turnstileActive && <TurnstileWidget onVerify={setToken} />}
     </div>
   )
 }

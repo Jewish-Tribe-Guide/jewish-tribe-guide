@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useNow } from '@/lib/useNow'
 import { isStale } from '@/lib/listingView'
+import { useFetchOrPreview } from '@/lib/previewSend'
 import { shortDate } from './listingParts'
 import { PencilIcon } from '@/components/icons'
 
@@ -47,6 +48,7 @@ export default function FreshnessFooter(props: Props) {
 
 function FreshnessStatus({ resourceId, confirmedAt: initialConfirmedAt, lead, subject, ask = true, section, onEdit }: Props) {
   const now = useNow()
+  const fetchOrPreview = useFetchOrPreview()
   const [confirmedAt, setConfirmedAt] = useState(initialConfirmedAt)
   // What confirmedAt was right before the most recent confirm — lets a
   // misclick be undone back to the prior state instead of just cleared.
@@ -66,9 +68,10 @@ function FreshnessStatus({ resourceId, confirmedAt: initialConfirmedAt, lead, su
     setLoading(true)
     setError(false)
     try {
-      const res = await fetch(
+      const res = await fetchOrPreview(
         `/api/resource/${resourceId}/confirm`,
         section ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ section }) } : { method: 'POST' },
+        { confirmedAt: new Date().toISOString(), changed: true, activityId: null },
       )
       const json = (await res.json()) as { ok: boolean; confirmedAt?: string; changed?: boolean; activityId?: number | null }
       if (json.ok && json.confirmedAt) {
@@ -90,11 +93,15 @@ function FreshnessStatus({ resourceId, confirmedAt: initialConfirmedAt, lead, su
     setLoading(true)
     setError(false)
     try {
-      const res = await fetch(`/api/resource/${resourceId}/confirm`, {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ previousConfirmedAt, confirmedAt: mine?.confirmedAt, activityId: mine?.activityId, ...(section ? { section } : {}) }),
-      })
+      const res = await fetchOrPreview(
+        `/api/resource/${resourceId}/confirm`,
+        {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ previousConfirmedAt, confirmedAt: mine?.confirmedAt, activityId: mine?.activityId, ...(section ? { section } : {}) }),
+        },
+        { confirmedAt: previousConfirmedAt ?? null },
+      )
       const json = (await res.json()) as { ok: boolean; confirmedAt?: string | null }
       if (json.ok) {
         setConfirmedAt(json.confirmedAt ?? undefined)

@@ -101,7 +101,14 @@ function Chrome({ children, year }: { children: React.ReactNode; year: number })
           a fallback has to announce itself rather than pass as data. */}
       <ContentFailureNotice />
       {children}
-      <SiteAddButton />
+      {/* Reads the path, so its own boundary for the same reason as the tab
+          bar's below: on a URL no build knew (a shared question nobody built
+          ahead) the path waits for the request, and unwrapped this one button
+          emptied that page's whole prerendered shell. Holds nothing back
+          where the path is known. */}
+      <Suspense fallback={null}>
+        <SiteAddButton />
+      </Suspense>
       {/* Desktop only, deliberately — not an oversight, and tried the other
           way once. A phone here is an app shell with a fixed bottom tab bar,
           and a document footer under one reads as a website; none of the
@@ -111,8 +118,8 @@ function Chrome({ children, year }: { children: React.ReactNode; year: number })
           was rejected because the only things left to put in it were two
           links, and folding Feedback in alongside them would bury the one
           action we actually want.
-          The consequence to keep in mind: this footer holds the only /about
-          link in the app, so About is desktop-only by the same choice.
+          On a phone, About (with Feedback) is at the foot of the home's
+          category list instead (BrowseList).
           /privacy is deliberately NOT in that position — it's linked from
           the forms that collect personal data, which is where it belongs on
           every device (see PrivacyNote). */}

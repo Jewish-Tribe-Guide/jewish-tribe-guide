@@ -192,6 +192,12 @@ export type Closure = 'temporary' | 'permanent'
 
 export type BusinessStatus = 'OPERATIONAL' | 'CLOSED_TEMPORARILY' | 'CLOSED_PERMANENTLY'
 
+export const BUSINESS_STATUS_WORDS: Record<BusinessStatus, string> = {
+  OPERATIONAL: 'Open',
+  CLOSED_TEMPORARILY: 'Temporarily closed',
+  CLOSED_PERMANENTLY: 'Permanently closed',
+}
+
 /**
  * What the app should treat this listing's status as: an admin's override
  * where one is set, otherwise whatever Google last said.

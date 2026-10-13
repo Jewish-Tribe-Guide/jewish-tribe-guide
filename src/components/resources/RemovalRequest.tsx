@@ -4,32 +4,30 @@ import { useId, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { withCommunity } from '@/lib/useCommunityData'
+import { useFetchOrPreview } from '@/lib/previewSend'
 import PrivacyNote from '@/components/PrivacyNote'
 
 const REASONS = ['Permanently closed', 'Duplicate listing', 'Shouldn’t be listed', 'Other'] as const
 
-/** Requesting a listing's removal — the edit form's other real option,
- *  reached via ListingForm's own "Request removal" button (see that
- *  component's own doc for the button itself and why it's a full swap, not
- *  an accordion appended below the fields).
+/** Requesting a listing's removal — opened from the listing's ••• menu
+ *  into the listing editor (ListingEditor), which shows it in place of the
+ *  edit's own screens, not as an accordion appended below them.
  *
  *  Removal used to be a separate "Report a problem" action in the kebab, which
  *  meant a visitor had to decide up front whether they were fixing a listing
  *  or reporting one. It's the same act — the listing is wrong — so it lives
- *  inside the edit form now, the way Google Maps and Yelp fold "this place
+ *  with the edit now, the way Google Maps and Yelp fold "this place
  *  closed" into their own edit flow rather than a separate destructive action.
  *
  *  It files the same reviewed removal request Report always did (operation
  *  'delete'); nothing is removed until a moderator approves it. Deliberately
  *  worded "Request removal", not "Delete", since it isn't instant.
  *
- *  Rendered inside ListingForm's <form> but built only from type="button"
- *  controls, so it never nests a form or submits the edit by accident. It
- *  borrows the form's own Turnstile token, honeypot and email — a visitor
- *  either edits or requests removal, never both, so one single-use token
- *  covers whichever they do. ListingForm keeps this mounted (toggling
- *  visibility, not presence) whether or not it's showing, so a reason already
- *  typed survives switching back to the fields and returning. */
+ *  Built only from type="button" controls, so it can never submit an
+ *  enclosing form by accident. It borrows the editor's own Turnstile token,
+ *  honeypot and email state (useListingSubmit's) — a visitor either edits or
+ *  requests removal, never both, so one single-use token covers whichever
+ *  they do. */
 export default function RemovalRequest({
   listing,
   turnstileToken,
@@ -49,15 +47,12 @@ export default function RemovalRequest({
   canSubmit: boolean
   resetTurnstile: () => void
   honeypot: string
-  // Same state ListingForm's own "Your email" field uses — lifted rather
-  // than a local copy, so switching back and forth between this panel and
-  // the edit fields never loses what was typed on either screen, and a
-  // removal request carries whichever email the visitor actually left,
-  // wherever they left it.
+  // useListingSubmit's own submitter email — lifted rather than a local
+  // copy, so it's the same state an edit sent from the same editor carries.
   submitterEmail: string
   onSubmitterEmailChange: (v: string) => void
-  /** Back to the edit fields — the form itself, not this panel, decides
-   *  whether that means unmounting or just hiding it again. Omitted, there's
+  /** Back to the edit — the editor, not this panel, decides what that
+   *  means. Omitted, there's
    *  no Cancel button: the listing editor's host has a Back that steps out
    *  of this screen (and Escape, and the phone's back swipe), so a Cancel
    *  beside Confirm would be a second way to do the same thing. */
@@ -73,6 +68,7 @@ export default function RemovalRequest({
 }) {
   const uid = useId()
   const community = useCommunitySlug()
+  const fetchOrPreview = useFetchOrPreview()
   const [reason, setReason] = useState<(typeof REASONS)[number]>(REASONS[0])
   const [details, setDetails] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -85,7 +81,7 @@ export default function RemovalRequest({
     try {
       const note = details.trim() ? `${reason}: ${details.trim()}` : reason
       const submittedBy = submitterEmail.trim() ? { email: submitterEmail.trim() } : undefined
-      const res = await fetch(withCommunity('/api/submissions', community), {
+      const res = await fetchOrPreview(withCommunity('/api/submissions', community), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -150,27 +146,19 @@ export default function RemovalRequest({
     // onRemovalOpenChange, reported to whichever caller embeds this — e.g.
     // ListingDetailModal), so repeating that fact and a bordered box around
     // it here was just saying the same thing twice. No "moderator reviews
-    // this" copy either — ListingForm's own blue banner already says that
-    // for every screen, and the rest ("this isn't for a wrong address")
+    // this" copy either — the editor's Sent screen says that ("An admin
+    // checks a removal before anything changes"), and the rest ("this isn't for a wrong address")
     // wasn't worth a permanent line either: Cancel and Confirm are the only
     // two things this screen does, and that's clear on its own.
     <div className="space-y-3">
       {/* One static box for everything this screen actually asks — why,
-          optional details, and an optional way to reach the visitor back —
-          the same visual language as ListingForm's own field groups
-          (Basics, an audience/formSection section), just without a collapse
-          control since there's only ever this one. Email used to sit in its
-          own bare block below this box (matching ListingForm's OWN "a box
-          means a field group" rule, where its submitter field stays bare
-          outside every field-group box) — but on this one screen, stacked
-          three bordered blocks deep (this box, the bare email field, then
-          the full-width buttons) read as visual noise rather than three
-          meaningfully different things, since email is still part of "what
-          you're telling us about this removal," not a separate topic the
-          way it's genuinely optional context on the longer edit form.
-          Folding it in here is a deliberate one-screen exception, not a
-          reversal of that rule. The actions below still stay bare, matching
-          ListingForm's own Submit/Request removal. */}
+          optional details, and an optional way to reach the visitor back.
+          Email used to sit in its own bare block below this box, but
+          stacked three bordered blocks deep (this box, the bare email
+          field, then the buttons) it read as visual noise rather than three
+          meaningfully different things: email is still part of "what
+          you're telling us about this removal," not a separate topic. The
+          actions below stay bare. */}
       <div className="space-y-4 rounded-md border border-slate-200 p-4">
         <div>
           <label htmlFor={`${uid}-reason`} className="mb-1 block text-sm font-medium text-slate-700">
@@ -195,33 +183,26 @@ export default function RemovalRequest({
             className={inputClass}
           />
         </div>
-        {/* Same field as ListingForm's own "Your email", not a separate ask
-            — a removal request is a bigger claim than a routine edit (a
+        {/* A removal request is a bigger claim than a routine edit (a
             moderator may genuinely want to follow up: "are you sure, or did
-            it just move?"), and unlike the edit fields, this panel used to
-            be the one place in the form with no way to leave one at all —
-            that input lives in the block this panel replaces, not inside
-            it. No name field, here or on the edit screen — see
-            ListingForm's own comment on why. */}
+            it just move?"), so it asks for a way back even though the
+            editor's own list doesn't. No name field: there's no account to
+            attach one to, and an email alone is enough to follow up. */}
         <div>
           <label htmlFor={`${uid}-email`} className="mb-1 block text-sm font-medium text-slate-700">Your email (optional)</label>
           <input id={`${uid}-email`} type="email" value={submitterEmail} onChange={(e) => onSubmitterEmailChange(e.target.value)} className={inputClass} />
-          {/* Directly under this field, inside the same box — same reasoning
-              as ListingForm's own placement (see its comment on emailField). */}
+          {/* Directly under the one field it's about, inside the same box,
+              not after the buttons — by then the email's already typed. */}
           <PrivacyNote className="mt-2" />
         </div>
       </div>
       {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
       <div className="space-y-2">
-        {/* The default look (for ListingForm) — full width, matching
-            the reason/details fields above it and ListingForm's own
-            Submit/Request removal buttons — outline, not solid: the
-            strong red cue belongs on the PREVIOUS screen, where Request
-            removal sits beside Submit and has to read as "the other
-            option" at a glance; by the time someone is on this screen,
-            the heading above already says "Request removal of {name}",
-            so the button no longer needs to carry that signal itself.
-            The listing editor passes its own Send's look instead. */}
+        {/* The default look — full width, matching the reason/details
+            fields above it, outline rather than solid: the heading already
+            says "Request removal of {name}", so the button needn't carry
+            that signal itself. The listing editor passes its own Send's
+            look instead. */}
         {submitSlot ? createPortal(confirm, submitSlot) : confirm}
         {/* A real bordered secondary button, visible at rest — same
             border/rounded/padded treatment this app already uses for a

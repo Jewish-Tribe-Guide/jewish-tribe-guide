@@ -195,7 +195,10 @@ export type CategoryField = {
    *  lives together instead of getting split by a rule that has nothing to
    *  do with where the data came from. Purely a form-layout concern — has no
    *  bearing on `showInHeader`/card placement, or on the field's position in
-   *  the expanded panel. See ListingForm.tsx's `coreDetailFields`. */
+   *  the expanded panel. The sectioned form that laid this out (ListingForm)
+   *  is gone, and the listing editor places its rows by editorRows.ts, so
+   *  today this only marks the category's own Website field (the admin's
+   *  Website checkbox sets it; /api/admin/main-dishes' websiteOf reads it). */
   coreSection?: boolean
   /** For a badge field: when `flagField` is truthy on the listing, render this
    *  badge in amber (caution) and surface `noteField`'s free text as the
@@ -226,7 +229,9 @@ export type CategoryField = {
    *  section grouping, see audienceKey above) falls into a single generic
    *  "More details" catch-all group instead, so every category gets the same
    *  decluttered shape even before an admin has defined any real sections.
-   *  Ignored on a coreSection field, which always renders in Basics. */
+   *  Ignored on a coreSection field, which always renders in Basics. Only
+   *  that sectioned form (ListingForm, since deleted) read this; the listing
+   *  editor groups its rows by editorRows.ts and doesn't. */
   formSection?: string
   /** For `type: 'boolean'`: shows the SUBMISSION FORM's switch/state as the
    *  logical opposite of what's actually stored — for a field whose stored

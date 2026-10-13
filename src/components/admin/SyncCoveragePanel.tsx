@@ -6,7 +6,7 @@ import { fetchJson } from '@/lib/fetchJson'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { withCommunity } from '@/lib/useCommunityData'
 import type { SyncCoverage, SyncCheckField, ClosureReport, PendingFirstSyncReport } from '@/lib/syncCoverage'
-import type { BusinessStatus } from '@/lib/hours'
+import { BUSINESS_STATUS_WORDS, type BusinessStatus } from '@/lib/hours'
 import Section from './CollapsibleSection'
 
 // The Metrics tab's Google Places sync coverage report — three questions an
@@ -153,11 +153,7 @@ function CheckAgainstGoogle({
   )
 }
 
-const STATUS_WORDS: Record<BusinessStatus, string> = {
-  OPERATIONAL: 'Open',
-  CLOSED_TEMPORARILY: 'Temporarily closed',
-  CLOSED_PERMANENTLY: 'Permanently closed',
-}
+const STATUS_WORDS = BUSINESS_STATUS_WORDS
 
 /**
  * Corrects what the public sees about one listing when Google has it wrong.

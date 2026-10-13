@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { getVoterToken, getMyVotedIds } from '@/lib/voteToken'
+import { usePreviewSend, useFetchOrPreview } from '@/lib/previewSend'
 import { ThumbIcon } from '@/components/icons'
 
 const VOTED_KEY = 'jpc_voted'
@@ -73,6 +74,9 @@ export default function UpvoteButton({
   const [count, setCount] = useState(initialCount)
   const [voted, setVoted] = useState(false) // set from localStorage after mount (hydration-safe)
   const [busy, setBusy] = useState(false)
+  const fetchOrPreview = useFetchOrPreview()
+  // The admin console's preview: its vote isn't kept as this browser's.
+  const preview = usePreviewSend()
 
   // Fast paint from the local cache first, then correct against the server's
   // own record below — not a useSyncExternalStore candidate: this reconciles
@@ -120,17 +124,23 @@ export default function UpvoteButton({
     applyCount(prevCount + (prevVoted ? -1 : 1))
 
     try {
-      const res = await fetch('/api/votes', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ resourceId, token: getVoterToken() }),
-      })
+      const res = await fetchOrPreview(
+        '/api/votes',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ resourceId, token: getVoterToken() }),
+        },
+        { count: prevCount + (prevVoted ? -1 : 1), voted: !prevVoted },
+      )
       const body = await res.json()
       if (res.ok && body.ok) {
         applyCount(body.count)
         setVoted(body.voted)
-        rememberVote(resourceId, body.voted)
-        rememberCount(resourceId, body.count)
+        if (!preview) {
+          rememberVote(resourceId, body.voted)
+          rememberCount(resourceId, body.count)
+        }
       } else {
         setVoted(prevVoted)
         applyCount(prevCount)

@@ -14,6 +14,7 @@ import { routes } from '@/lib/routes'
 import { listingSlug } from '@/lib/listingSlug'
 import { initialsOf } from '@/lib/listingRow'
 import { useCommunitySlug } from '@/lib/communityContext'
+import { usePreviewSend } from '@/lib/previewSend'
 import { formatPhone } from '@/lib/validation'
 import { ui } from '@/lib/uiConfig'
 import { scrollingAncestor } from '@/lib/scrollingAncestor'
@@ -23,12 +24,12 @@ import AddressInput from '@/components/intake/AddressInput'
 import Honeypot from '@/components/Honeypot'
 import TurnstileWidget from '@/components/TurnstileWidget'
 import RemovalRequest from './RemovalRequest'
-import { DetailFieldInput } from './ListingForm'
+import { DetailFieldInput } from './DetailFieldInput'
 import ContactsEditor from './ContactsEditor'
 import ItemsEditor, { itemLists } from './ItemsEditor'
 import MinyanBoxEditor from './MinyanBoxEditor'
 import { useListingDraft, type ListingDraft } from './useListingDraft'
-import { TURNSTILE_ACTIVE, useListingSubmit, type SendVia } from './useListingSubmit'
+import { useListingSubmit, useTurnstileActive, type SendVia } from './useListingSubmit'
 import { PlusIcon } from '@/components/icons'
 import { SUBMIT_PILL } from './submitPill'
 import { ChangedTag, EditorAddLine, EditorEmptyRows, EditorOpenCard, EditorRowCard, EditorSent, editorFieldLabel, editorInputClass } from './editorParts'
@@ -88,10 +89,6 @@ type Props = {
    *  (/api/admin/listings, see useListingSubmit), with no challenge, and
    *  closes the editor once it's in. */
   adminSubmit?: { token: string }
-  /** The category editor's Preview: Send builds the listing here and hands
-   *  it over instead of sending anything, and the address box doesn't call
-   *  Google. */
-  onPreviewSend?: (listing: DirectoryResource) => void
 }
 
 type Lookalike = { listing: DirectoryResource; reason: string }
@@ -202,7 +199,6 @@ export default function ListingEditor({
   via,
   onSent,
   adminSubmit,
-  onPreviewSend,
 }: Props) {
   // Adding: a blank listing stands in for `item`, so the reads below don't
   // each need a guard; `creating` switches off what only makes sense for an
@@ -213,8 +209,13 @@ export default function ListingEditor({
   const draft = draftProp ?? ownDraft
   const { hasAddress, hasPhone, details, setDetail } = draft
   const { ownTurnstileRef, setOwnTurnstileToken, ...sender } = useListingSubmit({ mode: creating ? 'create' : 'edit', existing: itemProp, sharedTurnstile, via, onSent, adminSubmit, onAdminSubmitted: onClose })
+  // The category editor's Preview (previewSend.tsx): Send puts the listing
+  // in the preview's list instead of sending it, and the address box
+  // doesn't call Google.
+  const preview = usePreviewSend()
+  const turnstileActive = useTurnstileActive()
   // Nothing goes out from the admin console's two uses, so no challenge.
-  const challenged = !adminSubmit && !onPreviewSend
+  const challenged = !adminSubmit && !preview
   const verifying = challenged && sender.verifying
   const [openId, setOpenId] = useState<string | null>(null)
   // A step inside a row (a minyan, a person): its title and Back, and
@@ -319,20 +320,6 @@ export default function ListingEditor({
   async function send() {
     if (nothingToSend || sender.submitting || verifying) return
     sender.setErrors([])
-    if (onPreviewSend) {
-      onPreviewSend({
-        id: item.id || `preview-${crypto.randomUUID()}`,
-        category: category.id,
-        name: draft.name,
-        anchorId: hasAddress ? 'all' : 'community',
-        distance: 0,
-        address: hasAddress ? draft.address : '',
-        phone: hasPhone ? draft.phone : '',
-        geo: hasAddress ? draft.coords : null,
-        ...draft.visibleDetails(),
-      })
-      return
-    }
     await sender.submit(draft.buildSubmission())
   }
 
@@ -499,7 +486,7 @@ export default function ListingEditor({
                 onChange={draft.setAddress}
                 onCoords={draft.setCoords}
                 onPlaceSelect={draft.handlePlaceSelect}
-                disableAutocomplete={!!onPreviewSend}
+                disableAutocomplete={!!preview}
                 placeholder={draft.syncEligible ? 'Search by business name or address…' : 'Start typing an address…'}
               />
             </div>
@@ -607,7 +594,7 @@ export default function ListingEditor({
           <RemovalRequest
             listing={{ id: item.id, name: item.name }}
             turnstileToken={sender.turnstileToken}
-            canSubmit={!TURNSTILE_ACTIVE || !!sender.turnstileToken}
+            canSubmit={!turnstileActive || !!sender.turnstileToken}
             resetTurnstile={sender.resetTurnstile}
             honeypot={sender.honeypot}
             submitterEmail={sender.submitterEmail}

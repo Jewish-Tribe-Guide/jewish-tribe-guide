@@ -152,7 +152,7 @@ describe('ModerationQueue — a pending submission', () => {
   })
 
   // Some categories configure `googleDescription` as a real, human-editable
-  // "Description" field (see ListingForm.tsx's intake autofill and
+  // "Description" field (see useListingDraft's address-pick autofill and
   // googlePlaces.ts's recurring sync) — that's real content worth a
   // moderator seeing. Others never configure it at all, in which case any
   // value there is only the sync's own fallback card-subtitle text and

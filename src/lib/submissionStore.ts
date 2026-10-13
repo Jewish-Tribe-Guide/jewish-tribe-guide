@@ -520,7 +520,7 @@ async function keepReportedItems(submission: SubmissionRow): Promise<void> {
 // to keep refreshing name/hours/phone/website going forward. The rule: a
 // field is Google's if the value being approved matches what Google actually
 // has — checked, per field, against the free autofill snapshot the form
-// already captured when picking an address ran (see ListingForm.tsx's
+// already captured when picking an address ran (see useListingDraft's
 // `googleAutofill`), and only falling back to a live Google Places lookup
 // for a NEW or CHANGED field autofill never touched. An edit's UNCHANGED
 // fields are never re-decided at all — they simply keep whatever ownership
@@ -697,6 +697,9 @@ function withResolvedPlaceId(details: Record<string, unknown>, payload: Resource
   if (!pickedName || namesOverlap(pickedName, payload.name)) return details
   const next: Record<string, unknown> = { ...details, verifiedPlaceId: placeId }
   delete next.placeId
+  // The status the form read off that place is the other business's too. An
+  // edit then keeps the listing's stored one (withPreservedInternals).
+  delete next.businessStatus
   return next
 }
 
@@ -705,7 +708,7 @@ function withResolvedPlaceId(details: Record<string, unknown>, payload: Resource
  * submitter — and which therefore have to survive an edit.
  *
  * An edit's payload is built from the category's configured `detailFields`
- * only (see ListingForm's `details` initializer), so none of these are in it,
+ * only (see useListingDraft's `details` initializer), so none of these are in it,
  * and applying an update REPLACES `details` wholesale. Every approved edit was
  * therefore wiping the listing's sync state: when it last synced, what Google
  * said about it, the transition history — and an admin's business-status
@@ -727,7 +730,9 @@ function withPreservedInternals(
   const next = { ...details }
   for (const key of SUBMITTER_CANNOT_TOUCH) {
     // `in`, not a truthiness check: an edit that legitimately supplies one of
-    // these (the intake now captures businessStatus) must still win.
+    // these must still win. Only two can arrive that way — businessStatus
+    // with a newly picked place, and a configured googleDescription — since
+    // the submissions route strips the rest (syncFields' submitterDetails).
     if (!(key in next) && key in before) next[key] = before[key]
   }
   return next

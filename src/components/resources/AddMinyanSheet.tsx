@@ -8,11 +8,12 @@ import { milesText } from '@/lib/geo'
 import { dateText, type DateFacts } from '@/lib/schedules'
 import type { UpdateRow } from '@/lib/scheduleUpdate'
 import { useIsMobile } from '@/lib/useIsMobile'
+import { useFetchOrPreview } from '@/lib/previewSend'
 import { RelativeTimeFields, TimeModeToggle, useTimeModes, ZMAN_ANCHOR_ORDER } from '@/components/intake/ZmanTimeFields'
 import TurnstileWidget from '@/components/TurnstileWidget'
 import ActionDialog from './ActionDialog'
 import MobileSheet from './MobileSheet'
-import { TURNSTILE_ACTIVE } from './useListingSubmit'
+import { useTurnstileActive } from './useListingSubmit'
 
 // "+ Add a minyan" on the Minyanim tab (the user's note 2, agreed Oct 2):
 // adding a minyan where the minyanim are, rather than going to the shul.
@@ -172,6 +173,8 @@ function MinyanTime({
   onSent: () => void
   onClose: () => void
 }) {
+  const fetchOrPreview = useFetchOrPreview()
+  const turnstileActive = useTurnstileActive()
   const [row, setRow] = useState<UpdateRow>({ id: 'new', day: day.weekday, tefillah: presetTefillah ?? 'shacharis', time: '', status: 'new' })
   const [days, setDays] = useState<DayKey[]>([day.weekday])
   const [oneOff, setOneOff] = useState(false)
@@ -208,7 +211,7 @@ function MinyanTime({
       const rows = oneOff && oneOffName
         ? [{ ...base, id: crypto.randomUUID(), day: day.date, occasion: oneOffName }]
         : days.map((d) => ({ ...base, id: crypto.randomUUID(), day: d }))
-      const res = await fetch(`/api/resource/${shul.id}/times`, {
+      const res = await fetchOrPreview(`/api/resource/${shul.id}/times`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ update: { kind: 'schedule', complete: false, season: null, title: null, startsOn: null, from: null, to: null, rows }, turnstileToken: token, company: '' }),
@@ -227,7 +230,7 @@ function MinyanTime({
     setError(null)
     setAttempt((n) => n + 1)
     pending.current = (token) => void send(token)
-    if (!TURNSTILE_ACTIVE) void send('')
+    if (!turnstileActive) void send('')
   }
   const chip = (on: boolean) =>
     `cursor-pointer rounded-full border-[1.5px] px-3 py-1.5 text-[13px] font-semibold ${on ? 'border-primary bg-primary/10 text-primary' : 'border-slate-300 bg-white text-slate-600'}`
@@ -314,7 +317,7 @@ function MinyanTime({
         )}
         <p className="text-center text-[12.5px] leading-snug text-muted">An admin checks it before anyone sees it.</p>
       </div>
-      {busy && TURNSTILE_ACTIVE && <TurnstileWidget key={attempt} onVerify={(token) => pending.current(token)} />}
+      {busy && turnstileActive && <TurnstileWidget key={attempt} onVerify={(token) => pending.current(token)} />}
     </div>
   )
 }
