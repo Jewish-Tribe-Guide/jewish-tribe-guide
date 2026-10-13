@@ -5,13 +5,9 @@ import Image from 'next/image'
 import Link from 'next/link'
 import type { CategoryConfig } from '@/lib/categories'
 import type { HomeSection } from '@/lib/homeSections'
-import type { DirectoryResource, NavigateFn } from '@/types'
+import type { NavigateFn } from '@/types'
 import { isOptimizableImage } from '@/lib/imageHosts'
-import { haversineMiles } from '@/lib/geo'
 import { categoryCards } from '@/lib/cardSearch'
-import { foundFor, searchAsk, type AskResult, type SearchFound } from '@/lib/askSearch'
-import { hitHoursNote } from '@/lib/askAnswer'
-import { GenericListingCard } from '@/components/resources/GenericListingCard'
 import { useForm, useForms } from '@/lib/useForms'
 import { community } from '@/community.config'
 import { useCommunitySlug } from '@/lib/communityContext'
@@ -21,7 +17,6 @@ import CategoryIcon from '@/components/CategoryIcon'
 import { DotsIcon } from '@/components/icons'
 import { getCategoryColor } from '@/lib/categoryColor'
 import { useIsMobile } from '@/lib/useIsMobile'
-import { SwipeRowGroup } from '@/components/SwipeRow'
 
 export type CardDef = {
   title: string
@@ -589,126 +584,6 @@ export function groupCardsIntoSections(
 
   return grouped
 }
-
-// ── Listing (within-card) search ───────────────────────────────────────────────
-
-/** A single place that matched the landing search — e.g. a grocery store whose
- *  "cheese" tag matched "kosher cheese". */
-export type ListingHit = {
-  item: DirectoryResource
-  /** Full category config — needed to render the real listing card. */
-  category: CategoryConfig
-  /** The category's plural label, e.g. "Grocery Stores". */
-  categoryLabel: string
-  /** Tags that matched the query — used to seed the category search on tap. */
-  matchedTags: string[]
-  /** The term to pre-fill the category's own search with on tap: the matched tag
-   *  when there is one (so the place survives that page's filter), else the query. */
-  term: string
-  /** The items it matched, each marked if only sometimes in stock — shown on
-   *  the result as the reason it's there (see askSearch's AskHit.matched). */
-  matched: { tag: string; sometimes: boolean }[]
-  /** For an "open now" or "open today" question, which of its hours answer
-   *  it ("Men's open until 10:00 AM"), or that it has none listed. Null for
-   *  any other question. */
-  hours: { text: string; known: boolean } | null
-  /** Everything the search matched on it, and the words to bold — shown as
-   *  its reason, and carried into the listing it opens (see SearchFound). */
-  found: SearchFound | null
-}
-
-/** Individual listings that answer the query (see askSearch.ts): name,
- *  address, items and details, read as a question rather than word for word.
- *  At most `limit` hits, so a broad question like "kosher food" can't flood
- *  the home page; the matching category card carries the rest. */
-export function searchListings(
-  listings: DirectoryResource[],
-  categories: CategoryConfig[],
-  query: string,
-  coords: { lat: number; lng: number } | null = null,
-  limit = 8,
-): ListingHit[] {
-  return listingHitsFrom(searchAsk(listings, categories, query, { coords }), coords, limit)
-}
-
-/** The same, from a search already run — Landing runs it once and reads both
- *  these hits and the answer (askAnswer.ts) off the one result. */
-export function listingHitsFrom(
-  result: AskResult,
-  coords: { lat: number; lng: number } | null = null,
-  limit = 8,
-): ListingHit[] {
-  const { query: asked } = result
-  // Places with no hours saved come after the open ones, not in with the
-  // closed: nobody knows they're closed (see AskResult.noHours).
-  const hits = [...result.hits, ...result.noHours].slice(0, limit)
-  const query = asked.raw
-  return hits.map((h) => ({
-    // The distance shown is always from the visitor, the way every other
-    // list shows it, even when the order is by distance from a place the
-    // question named ("food near HUP").
-    item:
-      coords && h.category.hasAddress !== false && h.item.geo
-        ? { ...h.item, milesFromAddress: haversineMiles(coords, h.item.geo) }
-        : h.item,
-    category: h.category,
-    categoryLabel: h.category.pluralLabel,
-    matchedTags: h.matchedTags,
-    term: h.matchedTags[0] ?? query.trim(),
-    matched: h.matched,
-    hours: hitHoursNote(h, result.openNowIn?.includes(h.category.id) ? { ...asked, openNow: true } : asked),
-    found: foundFor(h, result),
-  }))
-}
-
-/** The "Places" results list: each hit rendered as the same card its category
- *  directory uses, so a searched place is the full listing (davening times,
- *  upvotes, filters, and all). */
-export function PlacesResults({
-  hits,
-  onOpen,
-  closest = false,
-}: {
-  hits: ListingHit[]
-  /** The places answer a question close to the one asked, not the one
-   *  asked (see nearMiss): headed as such, so they aren't read as results. */
-  closest?: boolean
-  onOpen: (hit: ListingHit, action?: 'edit') => void
-}) {
-  const [voteCounts, setVoteCounts] = useState<Record<string, number>>({})
-
-  return (
-    <section className="mt-10 sm:mt-12">
-      <h2 className={`${closest ? 'mb-0.5' : 'mb-3'} text-sm font-semibold uppercase tracking-wide text-slate-500`}>
-        {closest ? 'Closest matches' : 'Places'}
-      </h2>
-      {closest && <p className="mb-3 text-sm text-slate-500">Not exactly what you searched for.</p>}
-      {/* desktop: the same grid as a category page's listings — see
-          GenericDirectory's own note on the 420px columns. */}
-      {/* One card's swipe actions revealed at a time — see SwipeRowGroup. */}
-      <SwipeRowGroup>
-      <div className="space-y-2 desktop:space-y-0 desktop:grid desktop:gap-3 desktop:grid-cols-[repeat(auto-fill,minmax(420px,1fr))]">
-        {hits.map((hit) => (
-          <div key={hit.item.id}>
-            <GenericListingCard
-              item={hit.item}
-              category={hit.category}
-              upvotes={!!hit.category.upvotesEnabled}
-              count={voteCounts[hit.item.id] ?? hit.item.upvotes ?? 0}
-              onVote={(c) => setVoteCounts((prev) => ({ ...prev, [hit.item.id]: c }))}
-              onNameClick={() => onOpen(hit)}
-              onEdit={() => onOpen(hit, 'edit')}
-              found={hit.found}
-            />
-          </div>
-        ))}
-      </div>
-      </SwipeRowGroup>
-    </section>
-  )
-}
-
-// ── Card definitions ──────────────────────────────────────────────────────────
 
 /** "22 listings" for a category's browse-index row, or undefined when
  *  there's nothing honest to say.

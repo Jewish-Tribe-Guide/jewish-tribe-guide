@@ -29,6 +29,10 @@ vi.mock('@/lib/backForwardNavigation', () => ({
   didArriveViaBackForward: vi.fn(() => false),
 }))
 
+// The question reader (an AI, over the network): off unless a test reads.
+const readerMock = vi.hoisted(() => ({ answer: { ok: false, reason: 'off' } as unknown }))
+vi.mock('@/lib/askReader', () => ({ askReader: vi.fn(async () => readerMock.answer), forgetReaderAnswers: vi.fn() }))
+
 // GenericListingCard is real and separately tested (GenericListingCard.test.tsx)
 // — stubbed here, same "mock the heavy leaf child" pattern as Landing.test.tsx's
 // DaveningTimesCard, so what's under test is GenericDirectory's own
@@ -312,30 +316,18 @@ describe('GenericDirectory', () => {
       expect(screen.queryByRole('button', { name: 'challah' })).not.toBeInTheDocument()
     })
 
-    it('answers what is typed', async () => {
+    // Search takes you to the page (Oct 13): once there, the list is the
+    // answer. No sentence over it, no "Share this answer" (the address
+    // carries the search, for the browser's own share), no "Read as": what
+    // the words meant is ticked in Filters, which counts it.
+    it('answers nothing in a sentence: the list is the answer, and Filters counts what the words meant', async () => {
       const user = userEvent.setup()
       renderWithProviders(<GenericDirectory category={grocery} items={stores} {...handlers} />)
-      await user.type(screen.getByRole('searchbox'), 'challah')
-      expect(screen.getByRole('status')).toHaveTextContent(/challah/i)
-    })
-
-    it('shares an answer as the question naming this category, with the answer in the message (agreed Oct 1)', async () => {
-      const shareFn = vi.fn().mockResolvedValue(undefined)
-      vi.stubGlobal('navigator', { ...navigator, share: shareFn })
-      try {
-        const user = userEvent.setup()
-        renderWithProviders(<GenericDirectory category={grocery} items={stores} {...handlers} />)
-        await user.type(screen.getByRole('searchbox'), 'challah')
-        await user.click(screen.getByRole('button', { name: 'Share this answer' }))
-        const asked = `${grocery.label.toLowerCase()} challah`
-        expect(shareFn).toHaveBeenCalledWith({
-          title: asked,
-          text: 'Where can I get challah? 3 places have Challah.',
-          url: `${window.location.origin}/test-community/ask/${asked.replace(/ /g, '-')}`,
-        })
-      } finally {
-        vi.unstubAllGlobals()
-      }
+      await user.type(screen.getByRole('searchbox'), 'wine')
+      expect(screen.queryByRole('status')).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Share this answer' })).not.toBeInTheDocument()
+      expect(screen.queryByText('Acme')).not.toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /^Filters/ })).toHaveTextContent('1')
     })
 
     it('found nothing: asks the group, as the home search does, and nothing else', async () => {
@@ -2512,3 +2504,119 @@ describe('GenericDirectory — the Minyanim tab', () => {
   })
 })
 
+// Items as a real filter (Oct 13, canvas boards 3c and 3d): "Has", for a
+// category that keeps an item list, in the one Filters sheet.
+describe('GenericDirectory — Has', () => {
+  const grocery = makeCategory({ detailFields: [{ key: 'm', label: 'Kosher items', type: 'tags' }] })
+  const stores = [
+    makeListing({ id: 'a', name: 'ShopRite', m: ['Challah', 'Wine'] }),
+    makeListing({ id: 'b', name: 'Trader Joe', m: ['Challah'], m_sometimes: ['Wine'] }),
+    makeListing({ id: 'c', name: 'Acme', m: ['Challah'] }),
+  ]
+  const openFilters = async (user: ReturnType<typeof userEvent.setup>) => {
+    await user.click(screen.getByRole('button', { name: /^Filters/ }))
+    return within(screen.getByRole('dialog', { name: 'Filters' }))
+  }
+
+  afterEach(() => {
+    readerMock.answer = { ok: false, reason: 'off' }
+  })
+
+  it('lists the items, most common first, each with how many have it; one ticked narrows the list and the address', async () => {
+    const user = userEvent.setup()
+    const onParamsChange = vi.fn()
+    renderWithProviders(<GenericDirectory category={grocery} items={stores} {...handlers} onParamsChange={onParamsChange} />)
+    const sheet = await openFilters(user)
+    const has = within(sheet.getByRole('group', { name: 'Has' }))
+    expect(has.getAllByRole('button').map((b) => b.textContent)).toEqual(['Challah3', 'Wine2'])
+
+    await user.click(has.getByRole('button', { name: /^Wine/ }))
+    expect(screen.queryByText('Acme')).not.toBeInTheDocument()
+    // Sometimes counts: Trader Joe only sometimes has wine, and says so.
+    expect(screen.getByText('found on Trader Joe: Wine')).toBeInTheDocument()
+    await vi.waitFor(() => expect(onParamsChange).toHaveBeenCalledWith({ has_m: 'Wine' }, { replace: true }))
+  })
+
+  it('arrives ticked from the address (has_m=Wine)', () => {
+    renderWithProviders(<GenericDirectory category={grocery} items={stores} {...handlers} initialFilters={{ has_m: 'Wine' }} />)
+    expect(screen.queryByText('Acme')).not.toBeInTheDocument()
+    expect(screen.getByText('ShopRite')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Filters/ })).toHaveTextContent('1')
+  })
+
+  it('shows the 8 most common, then "All N items": every one, A to Z, with a box to find one', async () => {
+    const user = userEvent.setup()
+    const many = ['Apples', 'Beef', 'Cheese', 'Dates', 'Eggs', 'Figs', 'Grapes', 'Honey', 'Ice Cream', 'Jam']
+    const items = [makeListing({ id: 'x', name: 'Big Store', m: many }), makeListing({ id: 'y', name: 'Small Store', m: ['Jam'] })]
+    renderWithProviders(<GenericDirectory category={grocery} items={items} {...handlers} />)
+    const sheet = await openFilters(user)
+    const chips = within(sheet.getByRole('group', { name: 'Has' })).getAllByRole('button').filter((b) => b.hasAttribute('aria-pressed'))
+    expect(chips).toHaveLength(8)
+    expect(chips[0]).toHaveTextContent('Jam2')
+
+    await user.click(sheet.getByRole('button', { name: 'All 10 items' }))
+    const all = within(screen.getByTestId('all-items'))
+    expect(all.getAllByRole('checkbox')).toHaveLength(10)
+    await user.type(all.getByRole('searchbox', { name: 'Find an item' }), 'ho')
+    expect(all.getAllByRole('checkbox')).toHaveLength(1)
+    await user.click(all.getByRole('checkbox'))
+    expect(screen.queryByText('Small Store')).not.toBeInTheDocument()
+
+    await user.click(all.getByRole('button', { name: 'Back to Filters' }))
+    // Ticked further down the list, it stays in view with the 8.
+    expect(sheet.getByRole('button', { name: /^Honey/ })).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  // An item said in the box is Has, ticked, as Open now is for "open now";
+  // unticking it takes the word out, so the box and Filters never disagree.
+  it('the words in the box tick their item, and unticking it takes the word out', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(<GenericDirectory category={grocery} items={stores} {...handlers} />)
+    await user.type(screen.getByRole('searchbox'), 'wine')
+    const sheet = await openFilters(user)
+    const wine = sheet.getByRole('button', { name: /^Wine/ })
+    expect(wine).toHaveAttribute('aria-pressed', 'true')
+
+    await user.click(wine)
+    expect(screen.getByRole('searchbox')).toHaveValue('')
+    expect(screen.getByText('Acme')).toBeInTheDocument()
+  })
+
+  // A question already turned into the Filters (the reader read it, here or
+  // on the home search): it stays in the box as asked, but isn't searched
+  // again, so switching its filter off really widens the list.
+  it('read=1: the question stays in the box, and switching its filter off widens the list', async () => {
+    const user = userEvent.setup()
+    const question = 'something to drink for kiddush'
+    renderWithProviders(
+      <GenericDirectory category={grocery} items={stores} {...handlers} initialSearch={question} initialFilters={{ q: question, read: '1', has_m: 'Wine' }} />,
+    )
+    expect(screen.getByRole('searchbox')).toHaveValue(question)
+    expect(screen.getByText('ShopRite')).toBeInTheDocument()
+    expect(screen.queryByText('Acme')).not.toBeInTheDocument()
+
+    const sheet = await openFilters(user)
+    await user.click(sheet.getByRole('button', { name: /^Wine/ }))
+    expect(screen.getByText('Acme')).toBeInTheDocument()
+    expect(screen.getByRole('searchbox')).toHaveValue(question)
+  })
+
+  // The reader's reading goes into the page's own Filters, not "Read as"
+  // chips over the list (Oct 13).
+  it('a question the reader reads switches its Filters on, and the address says so', async () => {
+    const user = userEvent.setup()
+    const onParamsChange = vi.fn()
+    readerMock.answer = { ok: true, reading: { categories: [{ id: 'grocery' }], items: ['Wine'] } }
+    renderWithProviders(<GenericDirectory category={grocery} items={stores} {...handlers} onParamsChange={onParamsChange} />)
+    await user.type(screen.getByRole('searchbox'), 'something to drink for kiddush{Enter}')
+
+    // While it's read, the sentence finds nothing: wait for the reading.
+    await vi.waitFor(() => {
+      expect(screen.getByText('ShopRite')).toBeInTheDocument()
+      expect(screen.queryByText('Acme')).not.toBeInTheDocument()
+    })
+    expect(screen.getByRole('button', { name: /^Filters/ })).toHaveTextContent('1')
+    expect(screen.queryByText(/Read as/)).not.toBeInTheDocument()
+    expect(onParamsChange).toHaveBeenCalledWith({ read: '1' }, { replace: true })
+  })
+})

@@ -2,21 +2,24 @@
 
 import { useEffect, useMemo, useRef, useState, ViewTransition } from 'react'
 import { track } from '@vercel/analytics'
-import { CardGrid, CategoryTileRow, PlacesResults, listingHitsFrom, groupCardsIntoSections, resourceCards, useEntryCards } from '@/components/home/sections'
+import { CategoryTileRow, groupCardsIntoSections, resourceCards, useEntryCards } from '@/components/home/sections'
 import { cardMatches } from '@/lib/cardSearch'
-import AskAnswer from '@/components/home/AskAnswer'
 import dynamic from 'next/dynamic'
-import ReadAs from '@/components/home/ReadAs'
-import { nearMiss, searchAsk } from '@/lib/askSearch'
-import { answerFor, eruvAnswer, metaAnswer, nearMissAnswer, timesAnswer } from '@/lib/askAnswer'
+import { useRouter } from 'next/navigation'
+import { nearMiss, openState, searchAsk, type AskResult } from '@/lib/askSearch'
+import { answerFor, eruvAnswer, metaAnswer, timesAnswer, type Answer } from '@/lib/askAnswer'
+import { minyanLine, namedListings, searchLines, timesLine, type SearchLine } from '@/lib/searchLands'
+import SearchLines from '@/components/home/SearchLines'
+import { haversineMiles, milesText } from '@/lib/geo'
+import type { CategoryConfig } from '@/lib/categories'
+import type { DirectoryResource } from '@/types'
 import { useZmanim } from '@/lib/useZmanim'
 import { eruvim } from '@/data/resources'
 import { resolveCapabilities } from '@/lib/categories'
 import { routes } from '@/lib/routes'
-import { shareMessage, shareSummary } from '@/lib/shareAnswer'
 import { neighborhoodsFor } from '@/lib/places'
 import { readerPlaces } from '@/lib/questionReader'
-import { needsReading, ownFrom, readingAnswers, readingChips, readingLoses, readingOffers, searchReading } from '@/lib/readingSearch'
+import { needsReading, ownFrom, readingAnswers, readingLoses } from '@/lib/readingSearch'
 import { useReading } from '@/lib/useReading'
 import { answersWell, candidatePrompts, pickPrompts } from '@/lib/searchPrompts'
 import { answerSchedule, useMinyanSchedule } from '@/lib/useMinyanSchedule'
@@ -230,29 +233,23 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
   }
   const asked = q && listings && schedule ? ask(q) : null
 
-  // ── The question reader (questionReader.ts) ──────────────────────────────
-  // Only when our own search left something it didn't understand
-  // (needsReading): then the question is also read, by an AI, into the
-  // site's own categories, filters and items, which can add to what our
-  // search understood but never take it away (ownFrom), and the listings
-  // answer both (readingSearch.ts), shown as "Read as" and its chips above
-  // the answer. Read on Enter, on a shared question's arrival, and after a
-  // pause. Never a place's own name. Until a reading arrives, or with
-  // none, today's search answers.
+  // ── Search takes you to the page (Oct 13; see searchLands.ts) ────────────
+  // Typing shows where it could go, each line with what you'd find there;
+  // Enter goes to the first. Nothing is answered here: the home used to put
+  // a sentence, places and categories under the box, out of nowhere, and
+  // testers didn't trust it. The question reader (questionReader.ts) reads a
+  // question our own search doesn't follow, after a pause or on Enter, and
+  // its reading decides the lines: the page it opens has that reading in its
+  // Filters. Never a place's own name.
   const reader = useReading(communitySlug)
   const readerPlacesHere = useMemo(() => readerPlaces(listings ?? [], communitySlug), [listings, communitySlug])
-  const typedName = q.toLowerCase().replace(/['’]/g, '')
-  const namesAPlace = !!q && (listings ?? []).some((l) => l.name.toLowerCase().replace(/['’]/g, '').includes(typedName))
+  const namesAPlace = !!q && namedListings(listings ?? [], q).length > 0
   const readable = !!asked && !namesAPlace && needsReading(asked.result)
   const reading = readable ? reader.readingFor(q) : null
-  // Today's search answers instead when the reading lost the kind of place
-  // our own parser is sure was named, and today's search found something
-  // (see readingLoses).
+  // Only a reading that names a kind of place, and doesn't lose the one our
+  // own parser is sure of (see readingLoses), decides the lines.
   const todayFound = !!asked && (asked.result.hits.length > 0 || asked.result.noHours.length > 0)
-  const readResult =
-    reading && listings && schedule && readingAnswers(reading.reading) && !(todayFound && readingLoses(q, reading.reading, categories ?? []))
-      ? searchReading(listings, categories ?? [], reading, q, { coords, now: new Date(schedule.now), places: readerPlacesHere })
-      : null
+  const useReadingLines = !!reading && readingAnswers(reading.reading) && !(todayFound && readingLoses(q, reading.reading, categories ?? []))
   const sharedQuestion = !!initialQuery && q === initialQuery.trim()
   const own = asked ? ownFrom(asked.result, readerPlacesHere) : null
   useEffect(() => {
@@ -261,99 +258,144 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
     return () => clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [readable, q])
-  const readChips = readResult && reading ? readingChips(reading, categories ?? [], { reach: readResult.reach, excluded: readResult.excluded }) : []
-  const readOffers =
-    readResult && reading && listings && schedule
-      ? readingOffers(reading, listings, categories ?? [], q, {
-          coords,
-          now: new Date(schedule.now),
-          places: readerPlacesHere,
-          found: readResult.hits.length + readResult.noHours.length,
-          chips: readChips,
+  const readingNow = !!q && reader.isReading(q)
+  const readerAnswered = reader.answered(q)
+
+  const placeSub = (item: DirectoryResource, category: CategoryConfig) => {
+    const now = schedule ? new Date(schedule.now) : null
+    const open = now ? openState(item, category, now) : null
+    const from = coords ?? community.mapCenter
+    const miles = item.geo ? haversineMiles(from, item.geo) : null
+    return [
+      category.label,
+      open?.known ? (open.open ? (open.closesAt ? `Open until ${open.closesAt}` : 'Open now') : 'Closed now') : null,
+      miles !== null ? milesText(miles) : null,
+    ]
+      .filter(Boolean)
+      .join(' · ')
+  }
+  // The home's own cards the words name that aren't a kind of place with
+  // listings (Patient & Family Support, a form): a line that opens them.
+  const otherCards = (filtered ?? []).filter((c) => !categories?.some((cat) => cat.id === c.id && cat.kind === 'listing'))
+  const linesFor = (text: string, result: AskResult, answer: Answer | null): SearchLine[] =>
+    listings && categories
+      ? searchLines(text, {
+          slug: communitySlug,
+          categories,
+          listings,
+          result,
+          options: { coords, now: new Date(schedule?.now ?? 0), places },
+          reading: text === q && useReadingLines ? reading!.reading : null,
+          minyanSub: result.query.minyan && answer ? minyanLine(answer.rows[0], answer.text) : null,
+          timesSub: result.query.times ? (timesLine(result.query.times, zmanim.data) ?? (zmanim.status === 'error' ? null : 'Looking up the times…')) : null,
+          cards: otherCards.map((c) => ({ id: c.id, title: c.title, href: categories.some((cat) => cat.id === c.id) ? c.href : null })),
+          placeSub,
         })
       : []
-  const readAsNode = q && (
-    <ReadAs
-      reading={reader.isReading(q) && !readResult}
-      chips={readChips}
-      onRemove={(chip) => reader.edit(chip.without)}
-      offers={readOffers}
-      onPick={(offer) => reader.edit(offer.next)}
-    />
-  )
-  const shown = readResult ? { result: readResult, answer: answerFor(readResult, { coords, now: schedule?.now ?? null }) } : asked
+  const exact = asked ? linesFor(q, asked.result, asked.answer) : []
+  // Nothing as asked: the closest question that does find something, with
+  // a word or two left out ("packaged pretzels" → pretzels; see nearMiss),
+  // each line saying what was left out. A reading, once it comes, has the
+  // lines instead when it found something.
+  const miss = asked && exact.length === 0 && listings ? nearMiss(listings, categories ?? [], q, { coords, now: new Date(schedule?.now ?? 0), places }) : null
+  const lines = miss
+    ? linesFor(miss.kept, miss.result, null).map((line) => ({ ...line, sub: `${line.sub} · nothing for “${miss.dropped}”` }))
+    : exact
 
-  const askResult = shown?.result ?? null
-  // A question about the guide itself has no places to list ("how do I add
-  // a restaurant" isn't asking for every restaurant).
-  const strictHits = askResult && !askResult.query.meta ? listingHitsFrom(askResult, coords) : []
-  const strictAnswer = shown?.answer ?? null
-  // Questions to tap under the empty box: the first try at search, made one
-  // that works (see searchPrompts.ts).
+  // Enter (or a "Try asking" tapped): the first line. A question still
+  // being read waits for its reading; nothing anywhere stays here and says
+  // so (nothingFor), with where to ask.
+  const router = useRouter()
+  const [nothingFor, setNothingFor] = useState<string | null>(null)
+  const [waitingFor, setWaitingFor] = useState<string | null>(null)
+  const goTo = (line: SearchLine, text: string) => {
+    track('search_landed', { kind: line.kind, query: text })
+    if (line.listing) {
+      track('listing_opened', { listing: line.listing.name, category: line.listing.category, source: 'search' })
+      countEvent(communitySlug, 'listing_view', line.listing.id)
+    } else if (line.categoryId) {
+      track('category_opened', { category: line.categoryId, source: 'search' })
+    }
+    if (line.href) return router.push(line.href)
+    if (line.kind === 'add') return document.dispatchEvent(new CustomEvent('jpc:open-add'))
+    allCards?.find((c) => c.id === line.cardId)?.go()
+  }
+  const submit = () => {
+    if (!q || !listings || !schedule) return
+    // A question our own search doesn't follow waits for its reading.
+    if (lines[0] && !readingNow && !(readable && !reading)) return goTo(lines[0], q)
+    if (readable && own && !reading) {
+      reader.ask(q, own)
+      return setWaitingFor(q)
+    }
+    if (readingNow) return setWaitingFor(q)
+    if (lines[0]) return goTo(lines[0], q)
+    setNothingFor(q)
+  }
+  // The reading Enter waited for has arrived (or couldn't be had).
+  useEffect(() => {
+    if (!waitingFor || waitingFor !== q || (!readerAnswered && !reading)) return
+    // Acting once on something that arrived from outside (the reader's
+    // answer), not state derived from props on every render.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setWaitingFor(null)
+    if (lines[0]) goTo(lines[0], q)
+    else setNothingFor(q)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [waitingFor, readingNow, readerAnswered, lines[0]?.key])
+  // A shared question (/philly/ask/…) goes where Enter would, once the page
+  // can work out where; the address is replaced, so Back doesn't return to
+  // a page that leaves again.
+  // A question to be read waits for the reader's answer (asked at once,
+  // above): it may be off, and then our own search's lines are where it
+  // goes.
+  const sharedLanded = useRef(false)
+  useEffect(() => {
+    if (sharedLanded.current || !sharedQuestion || !asked) return
+    if (readable && !reading && !readerAnswered) return
+    sharedLanded.current = true
+    const first = lines[0]
+    if (first?.href) router.replace(first.href)
+    else if (first) goTo(first, q)
+    // Once, when the shared question can first be placed.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    else setNothingFor(q)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sharedQuestion, !!asked, readerAnswered, !!reading])
+
+  // Questions to tap under the empty box (see searchPrompts.ts): each goes
+  // where it would on Enter, so only ones that go somewhere are offered.
   const prompts =
     !q && listings
       ? pickPrompts(candidatePrompts(schedule && { day: schedule.todayKey, minutes: schedule.nowMinutes }), (p) => {
           const tried = ask(p)
-          return answersWell(tried.answer, tried.result.hits.length)
+          return answersWell(tried.answer, tried.result.hits.length) && linesFor(p, tried.result, tried.answer).length > 0
         })
       : []
-
-  // Found nothing as asked: first the closest question that does find
-  // something ("packaged pretzels" → pretzels, see nearMiss), then where to
-  // ask and how to add the answer (AskTheGroup), last. The near miss is shown
-  // as such, never as a hit — and the search-miss log below still counts the
-  // question as a miss, since it is one.
-  const foundNothing = !!askResult && askResult.hits.length === 0 && askResult.noHours.length === 0 && strictAnswer === null
-  const miss = foundNothing && listings && schedule ? nearMiss(listings, categories ?? [], q, { coords, now: new Date(schedule.now), places }) : null
-  const placeHits = miss ? listingHitsFrom(miss.result, coords) : strictHits
-  const answer = miss ? nearMissAnswer(miss, q, { coords }) : strictAnswer
-  // The answer's own link, for the Share button (which AskAnswer leaves off
-  // a near miss: that answers a different question).
-  const share =
-    q && answer
-      ? { path: routes.ask(communitySlug, q), title: q, text: () => shareMessage(q, shareSummary(q, listings ?? [], categories ?? [], places)) }
-      : null
-  // Where to ask (AskTheGroup), last.
-  const askGroup = foundNothing ? { nothingClose: !miss, sharePath: routes.ask(communitySlug, q) } : null
-  // A shul named in a minyan answer opens its listing, the same way a place
-  // in the results does.
-  const openShul = (shulId: string) => {
-    const shul = listings?.find((l) => l.id === shulId)
-    if (!shul) return
-    track('listing_opened', { listing: shul.name, category: shul.category, source: 'search-answer' })
-    countEvent(communitySlug, 'listing_view', shul.id)
-    onNavigate('patient', 'find', { findView: shul.category, findItemId: shul.id })
+  const pickPrompt = (p: string) => {
+    track('search_prompt_tapped', { prompt: p })
+    const tried = ask(p)
+    const first = linesFor(p, tried.result, tried.answer)[0]
+    if (first) goTo(first, p)
+    else changeQuery(p)
   }
 
-  // Tapping a place opens its category directory with just that place
-  // expanded — not also pre-filtered to the matched search term. That used
-  // to carry the term along as `?q=`, on the reasoning that it'd survive
-  // closing the modal back to a relevant list — the user's own call,
-  // reviewing it live: picking a listing should show exactly that listing,
-  // not a filtered category page underneath it. Edit additionally
-  // carry `findAction` so the directory opens straight into that form
-  // instead of just the expanded card.
-  const openPlace = (hit: (typeof placeHits)[number], action?: 'edit') => {
-    if (!action) {
-      track('listing_opened', { listing: hit.item.name, category: hit.item.category, source: 'search' })
-      countEvent(communitySlug, 'listing_view', hit.item.id)
-    }
-    onNavigate('patient', 'find', {
-      findView: hit.item.category,
-      findItemId: hit.item.id,
-      // The search itself, so the listing it opens can mark what matched
-      // (see PlaceDetailBody's `found`).
-      ...(hit.found && !action ? { findMatch: q } : {}),
-      ...(action ? { findAction: action } : {}),
-    })
-  }
+  const foundNothing = !!q && nothingFor === q
+  const askGroup = foundNothing ? { nothingClose: true, sharePath: routes.ask(communitySlug, q) } : null
+  // AskTheGroup says "Nothing in the guide for …" itself.
+  const nothingNode = askGroup && (
+    <div data-testid="search-nothing">
+      <AskTheGroup query={q} {...askGroup} />
+    </div>
+  )
+  const linesNode = q && !foundNothing && <SearchLines lines={lines} categories={categories} reading={readingNow || waitingFor === q} onPick={(line) => goTo(line, q)} />
 
   // Capture searches that come up empty — the most actionable signal for what
   // content to add next. Only counts once data has loaded, so a slow load never
   // looks like a "miss".
   useLogSearchMiss({
     query,
-    hasResults: (filtered?.length ?? 0) > 0 || strictHits.length > 0 || strictAnswer !== null,
+    hasResults: lines.length > 0 || readingNow,
     ready: allCards !== null && listings !== null,
     source: 'Home',
   })
@@ -396,59 +438,26 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
   // orders them.
   const builtInOrder = today ? allBuiltIns.filter((b) => b.kind === 'listings' || b.kind === 'subscribe') : allBuiltIns
 
-  // Shared between mobile's permanent grid and desktop's search results —
-  // see below for why the two don't share one JSX node any more.
-  const noMatchesMessage = q && !askGroup && !answer && (filtered?.length ?? 0) === 0 && placeHits.length === 0 && (
-    <p className="text-center text-sm text-slate-500">
-      Nothing matches “{q}”. Try a different word or clear the filter.
-    </p>
-  )
-  // No location set yet — same signal GenericDirectory's own addressPrompt
-  // uses to hold each distance-based card's distance column open with a
-  // placeholder instead of omitting it outright (see PlacesResults' own doc).
-  const placesNode = placeHits.length > 0 && (
-    <PlacesResults hits={placeHits} onOpen={openPlace} closest={!!miss} />
-  )
-
   // Mobile's own permanent list — this doubles as its whole "browse
-  // everything", not just search results, so it always renders regardless
-  // of `q`. Browsing (no query) is the Browse tab's list (BrowseList): the
-  // admin's groups, one compact row per category, then Feedback, About and
-  // Privacy — the phone's home while Today is held back (Oct 13; it replaced
-  // the photo tiles). Once there's a query, though, `placesNode` brings
-  // its own small-caps "Places" heading into the same list, and a section
-  // title sitting next to that read as a style mismatch — same fix as
-  // desktop's own "Categories" vs "Food and Hospitality" (see
-  // desktopResultsNode's own comment): one flat "Categories" heading,
-  // styled like "Places", over every matching card regardless of section.
+  // everything", not just search results, so it always renders. Browsing
+  // is the Browse tab's list (BrowseList): the admin's groups, one compact
+  // row per category, then Feedback, About and Privacy — the phone's home
+  // while Today is held back (Oct 13; it replaced the photo tiles). While
+  // something is typed, where it could go shows under the box (HeroHeading's
+  // searchPanel), and the list dims.
   const mobileResultsNode = (
     <>
-      {readAsNode}
-      {q && answer && <AskAnswer answer={answer} onOpenShul={openShul} share={share} />}
-      {noMatchesMessage}
-      {q ? (
-        filtered &&
-        filtered.length > 0 && (
-          <div>
-            <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">Categories</h2>
-            <CardGrid cards={filtered} />
-          </div>
-        )
-      ) : (
-        <div data-testid="home-browse-list">
-          <BrowseList
-            communitySlug={communitySlug}
-            listings={listings}
-            schedule={schedule}
-            zmanim={zmanim.data}
-            timezone={timezone}
-            coords={coords}
-            center={community.mapCenter}
-          />
-        </div>
-      )}
-      {placesNode}
-      {askGroup && <AskTheGroup query={q} {...askGroup} />}
+      <div data-testid="home-browse-list" className={q ? 'opacity-40 transition-opacity' : 'transition-opacity'}>
+        <BrowseList
+          communitySlug={communitySlug}
+          listings={listings}
+          schedule={schedule}
+          zmanim={zmanim.data}
+          timezone={timezone}
+          coords={coords}
+          center={community.mapCenter}
+        />
+      </div>
     </>
   )
 
@@ -589,8 +598,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
           settings={settings}
           query={query}
           onQueryChange={changeQuery}
-          onSearchSubmit={() => readable && own && reader.ask(q, own)}
-          searchReadAs={readAsNode || null}
+          onSearchSubmit={submit}
           mapIcon={hasMap ? mapIcon : null}
           onViewMap={() => onNavigate(null, 'map')}
           onBrowseCategories={() => {
@@ -602,17 +610,9 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
             setBrowseExpanded(true)
             browseCardRef.current?.scrollIntoView({ block: 'start' })
           }}
-          searchCards={filtered}
-          searchPlaceHits={placeHits}
-          searchAnswer={answer}
-          searchShare={share}
-          searchAskGroup={askGroup}
-          onOpenAnswerShul={openShul}
+          searchPanel={linesNode || nothingNode || null}
           searchPrompts={prompts}
-          onPickPrompt={(prompt) => track('search_prompt_tapped', { prompt })}
-          categories={categories}
-          onSearchCardClick={(card) => track('category_opened', { category: card.id ?? card.title, source: 'hero-search' })}
-          onOpenSearchPlace={(hit) => openPlace(hit)}
+          onPickPrompt={pickPrompt}
           today={today ? { dayLine: dayLine(schedule?.now ?? null, timezone, zmanim.data) } : undefined}
         />
 

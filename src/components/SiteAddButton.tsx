@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { usePathname } from 'next/navigation'
 import { PlusIcon } from '@/components/icons'
@@ -33,6 +33,13 @@ export default function SiteAddButton() {
   const community = useOptionalCommunitySlug()
   const categories = useCategories()
   const [open, setOpen] = useState(false)
+  // "How do I add a listing?" in the home search opens this same box
+  // (searchLands.ts), as tapping "+ Add" would.
+  useEffect(() => {
+    const onOpen = () => setOpen(true)
+    document.addEventListener('jpc:open-add', onOpen)
+    return () => document.removeEventListener('jpc:open-add', onOpen)
+  }, [])
   if (!community || !ui.contributions.add || !showsSiteAdd(pathname, community, (categories ?? []).map((c) => c.id))) return null
   return (
     <>

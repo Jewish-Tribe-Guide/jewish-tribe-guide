@@ -83,9 +83,10 @@ describe('the Minyanim view (step 4)', () => {
     expect(onHoverShul).toHaveBeenLastCalledWith(null)
   })
 
+  // No sentence over the list (Oct 13): the first row is the next minyan.
   it('today: the next minyan first, then each with whose times they are; earlier ones folded', () => {
     view()
-    expect(screen.getByTestId('minyanim-answer')).toHaveTextContent('Next: Mincha & Maariv 6:30 PM at Mekor Habracha, 1.3 mi, its Sukkos times.')
+    expect(screen.queryByTestId('minyanim-answer')).not.toBeInTheDocument()
     expect(screen.getByText(/1 of 2 shuls/)).toBeInTheDocument()
     const rows = within(screen.getByTestId('minyanim-rows')).getAllByRole('listitem').map((li) => li.textContent)
     expect(rows).toEqual(['6:30 PMMekor HabrachaMincha & Maariv · 1.3 mi✓ Sukkos times', '7:45 PMKesher IsraelMaariv · 2.4 mi⚠ Regular times · Sukkos not posted'])
@@ -141,10 +142,13 @@ describe('the Minyanim tab’s search (the user’s note 4)', () => {
   const searched = (search: string, more: object = {}) =>
     renderWithProviders(<MinyanimView items={[mekor, kesher]} categoryId="synagogue" search={search} {...more} />, { content: { categories: [shuls] } })
 
-  it('a tefillah narrows the minyanim, and the answer says what was asked', () => {
+  it('a tefillah narrows the minyanim; a sentence only says why there are none', () => {
     searched('maariv')
-    expect(screen.getByTestId('minyanim-answer')).toHaveTextContent('Maariv today: first 6:30 PM at Mekor Habracha, 1.3 mi, its Sukkos times. 1 more.')
-    expect(within(screen.getByTestId('minyanim-rows')).getAllByRole('link')).toHaveLength(2)
+    expect(screen.queryByTestId('minyanim-answer')).not.toBeInTheDocument()
+    expect(within(screen.getByTestId('minyanim-rows')).getAllByRole('link').map((a) => a.textContent)).toEqual([
+      expect.stringMatching(/^6:30 PMMekor Habracha/),
+      expect.stringMatching(/Kesher Israel/),
+    ])
     cleanup()
     searched('shacharis')
     expect(screen.getByTestId('minyanim-answer')).toHaveTextContent('No more Shacharis today.')
@@ -152,7 +156,8 @@ describe('the Minyanim tab’s search (the user’s note 4)', () => {
 
   it('a part of the day typed reads as typed; a Yom Tov nobody has posted for says so', () => {
     searched('Shabbos morning')
-    expect(screen.getByTestId('minyanim-answer')).toHaveTextContent(/^Shabbos morning: first 9 AM at Mekor Habracha, 1\.3 mi, its Sukkos times\.$/)
+    expect(screen.queryByTestId('minyanim-answer')).not.toBeInTheDocument()
+    expect(within(screen.getByTestId('minyanim-rows')).getAllByRole('link')[0]).toHaveTextContent(/^9 AMMekor Habracha/)
     cleanup()
     renderWithProviders(<MinyanimView items={[kesher]} categoryId="synagogue" search="Shabbos morning" />, { content: { categories: [shuls] } })
     expect(screen.getByTestId('minyanim-answer')).toHaveTextContent('No shul has posted Shemini Atzeres times yet.')

@@ -1,9 +1,8 @@
 // @vitest-environment jsdom
 import { useState } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import type { CardDef } from './sections'
 import HeroHeading from './HeroHeading'
 
 afterEach(() => cleanup())
@@ -177,9 +176,8 @@ describe('HeroHeading — the photo panel', () => {
 // scroll a visitor down to a card near the bottom of the page — nothing
 // changed where they were actually looking. HeroSearchDropdown opens right
 // under the box instead; this covers the open/close state machine
-// HeroHeading owns around it (HeroSearchDropdown itself, and its own
-// content/capping/click-handler behavior, are covered in
-// HeroSearchDropdown.test.tsx).
+// HeroHeading owns around it (the panel itself, where a search could go,
+// is Landing's: see SearchLines and Landing.test.tsx).
 describe('HeroHeading — the search dropdown', () => {
   const settings = {
     name: 'Philly Jewish Guide',
@@ -190,7 +188,6 @@ describe('HeroHeading — the search dropdown', () => {
     desktopHeroSubhead: '',
     desktopHeroImage: null,
   }
-  const foodCard: CardDef = { title: 'Food', id: 'restaurant', href: '/philly/restaurant', go: () => {} }
 
   // A real controlled query (useState), same shape as Landing's own — the
   // dropdown reopening on typing depends on a genuine query→prop round
@@ -202,9 +199,7 @@ describe('HeroHeading — the search dropdown', () => {
         settings={settings}
         query={query}
         onQueryChange={setQuery}
-        searchCards={[foodCard]}
-        searchPlaceHits={[]}
-        categories={[]}
+        searchPanel={<p>Food</p>}
         {...props}
       />
     )
@@ -217,34 +212,39 @@ describe('HeroHeading — the search dropdown', () => {
     const desktopSection = container.querySelector('.desktop\\:block')!
     return desktopSection.querySelector('input')!
   }
+  // The panel over the page, on desktop (the phone has its own copy, in
+  // the page's flow).
+  function panel(container: HTMLElement) {
+    return within(container.querySelector<HTMLElement>('.desktop\\:block')!)
+  }
 
   it('stays closed with an empty query, and opens once there is one', async () => {
     const user = userEvent.setup()
     const { container } = render(<Wrapper />)
 
-    expect(screen.queryByText('Food')).not.toBeInTheDocument()
+    expect(panel(container).queryByText('Food')).not.toBeInTheDocument()
     await user.type(desktopSearchInput(container), 'food')
-    expect(screen.getByText('Food')).toBeInTheDocument()
+    expect(panel(container).getByText('Food')).toBeInTheDocument()
   })
 
   it('closes on Escape', async () => {
     const user = userEvent.setup()
     const { container } = render(<Wrapper />)
     await user.type(desktopSearchInput(container), 'food')
-    expect(screen.getByText('Food')).toBeInTheDocument()
+    expect(panel(container).getByText('Food')).toBeInTheDocument()
 
     await user.keyboard('{Escape}')
-    expect(screen.queryByText('Food')).not.toBeInTheDocument()
+    expect(panel(container).queryByText('Food')).not.toBeInTheDocument()
   })
 
   it('closes on a click outside the search box', async () => {
     const user = userEvent.setup()
     const { container } = render(<Wrapper />)
     await user.type(desktopSearchInput(container), 'food')
-    expect(screen.getByText('Food')).toBeInTheDocument()
+    expect(panel(container).getByText('Food')).toBeInTheDocument()
 
     await user.click(document.body)
-    expect(screen.queryByText('Food')).not.toBeInTheDocument()
+    expect(panel(container).queryByText('Food')).not.toBeInTheDocument()
   })
 
   // Reported via a shared answer (/philly/ask/…): it opened with the answer
@@ -262,7 +262,7 @@ describe('HeroHeading — the search dropdown', () => {
     )
     await user.type(desktopSearchInput(container), 'food')
     await user.click(screen.getByRole('button', { name: 'Not now' }))
-    expect(screen.getByText('Food')).toBeInTheDocument()
+    expect(panel(container).getByText('Food')).toBeInTheDocument()
   })
 
   // Escape (and "See all") close the dropdown without necessarily blurring
@@ -274,19 +274,27 @@ describe('HeroHeading — the search dropdown', () => {
     const input = desktopSearchInput(container)
     await user.type(input, 'food')
     await user.keyboard('{Escape}')
-    expect(screen.queryByText('Food')).not.toBeInTheDocument()
+    expect(panel(container).queryByText('Food')).not.toBeInTheDocument()
 
     await user.click(input)
-    expect(screen.getByText('Food')).toBeInTheDocument()
+    expect(panel(container).getByText('Food')).toBeInTheDocument()
   })
 
-  it('stays hidden while the search data is still loading (searchCards null), rather than showing a false "nothing matches"', async () => {
+  it('stays hidden while there is nothing to show yet (no panel), rather than an empty box', async () => {
     const user = userEvent.setup()
-    const { container } = render(<Wrapper searchCards={null} />)
+    const { container } = render(<Wrapper searchPanel={null} />)
     await user.type(desktopSearchInput(container), 'food')
 
-    expect(screen.queryByText('Food')).not.toBeInTheDocument()
-    expect(screen.queryByText(/Nothing matches/)).not.toBeInTheDocument()
+    expect(panel(container).queryByText('Food')).not.toBeInTheDocument()
+  })
+
+  it('on a phone, sits right under the box, in the page', async () => {
+    const user = userEvent.setup()
+    const { container } = render(<Wrapper />)
+    const phone = container.querySelector<HTMLElement>('section.desktop\\:hidden')!
+    expect(within(phone).queryByText('Food')).not.toBeInTheDocument()
+    await user.type(phone.querySelector('input')!, 'food')
+    expect(within(phone).getByText('Food')).toBeInTheDocument()
   })
 })
 
@@ -328,16 +336,18 @@ describe('HeroHeading — example questions', () => {
     desktopHeroImage: null,
   }
 
-  it('offers them under an empty box, and a tap asks it', async () => {
+  // A tap goes where Enter would (Landing's onPickPrompt): the box isn't
+  // filled first.
+  it('offers them under an empty box, and a tap picks it', async () => {
     const user = userEvent.setup()
     const onQueryChange = vi.fn()
     const onPickPrompt = vi.fn()
     render(
-      <HeroHeading settings={settings} query="" onQueryChange={onQueryChange} searchPrompts={['Next Mincha', 'Kosher wine']} onPickPrompt={onPickPrompt} searchCards={[]} />,
+      <HeroHeading settings={settings} query="" onQueryChange={onQueryChange} searchPrompts={['Next Mincha', 'Kosher wine']} onPickPrompt={onPickPrompt} />,
     )
     await user.click(screen.getAllByRole('button', { name: 'Kosher wine' })[0])
-    expect(onQueryChange).toHaveBeenCalledWith('Kosher wine')
     expect(onPickPrompt).toHaveBeenCalledWith('Kosher wine')
+    expect(onQueryChange).not.toHaveBeenCalled()
   })
 
   it('shows them on the phone layout and the desktop one', () => {

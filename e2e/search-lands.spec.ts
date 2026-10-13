@@ -1,0 +1,140 @@
+import { expect, test, type APIRequestContext, type Page } from '@playwright/test'
+import { categories, categoryWithListings, defaultCommunity, dismissLocationPrompt } from './helpers'
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Search takes you to the page (Oct 13, canvas page "lands"): typing on the
+// home screen shows where it could go, and Enter goes to the first, a real
+// page with the words in its box. One test per row of "where Enter goes"
+// (src/lib/searchLands.ts), against whatever the data holds.
+// ─────────────────────────────────────────────────────────────────────────────
+
+type Field = { key: string; type: string }
+type Cat = Awaited<ReturnType<typeof categories>>[number] & { detailFields?: Field[] }
+
+async function homeBox(page: Page, community: string) {
+  await page.goto(`/${community}`)
+  await dismissLocationPrompt(page)
+  return page.getByRole('textbox', { name: 'Search resources' }).filter({ visible: true })
+}
+
+/** Types into the home box and waits for its lines: the page is running,
+ *  and has worked out where Enter goes. */
+async function typeAndWait(page: Page, box: ReturnType<Page['getByRole']>, text: string) {
+  await box.fill(text)
+  const lines = page.getByTestId('search-lines').filter({ visible: true })
+  await expect(lines).toBeVisible()
+  return lines
+}
+
+async function itemOnAListing(request: APIRequestContext, community: string): Promise<{ category: Cat; item: string } | null> {
+  const all = (await categories(request, community)) as Cat[]
+  for (const c of all.filter((x) => x.kind === 'listing')) {
+    const keys = (c.detailFields ?? []).filter((f) => f.type === 'tags').map((f) => f.key)
+    if (!keys.length) continue
+    const body = await (await request.get(`/api/resources?category=${c.id}&community=${community}`, { timeout: 45_000 })).json()
+    for (const r of (body.resources ?? []) as Record<string, unknown>[]) {
+      for (const k of keys) {
+        const tags = r[k]
+        const item = Array.isArray(tags) ? (tags as unknown[]).find((t) => typeof t === 'string' && /^[A-Za-z]{4,}$/.test(t)) : undefined
+        if (typeof item === 'string') return { category: c, item }
+      }
+    }
+  }
+  return null
+}
+
+test('a place’s name: its line opens its listing', async ({ page, request }) => {
+  const community = await defaultCommunity(page)
+  const { category } = await categoryWithListings(request, community)
+  const body = await (await request.get(`/api/resources?category=${category.id}&community=${community}`, { timeout: 45_000 })).json()
+  const place = (body.resources as { id: string; name: string }[])[0]!
+
+  const box = await homeBox(page, community)
+  const lines = await typeAndWait(page, box, place.name)
+  await lines.getByRole('option').filter({ hasText: place.name }).first().click()
+
+  await page.waitForURL((url) => url.pathname.startsWith(`/${community}/${category.id}/`))
+  await expect(page.getByText(place.name).filter({ visible: true }).first()).toBeVisible()
+})
+
+test('an item: Enter goes where its first line says, the item in that page’s box and ticked in its Filters', async ({ page, request }) => {
+  const community = await defaultCommunity(page)
+  const found = await itemOnAListing(request, community)
+  test.skip(!found, 'no listing has an item')
+  const { item } = found!
+
+  const box = await homeBox(page, community)
+  const lines = await typeAndWait(page, box, item)
+  const first = lines.getByRole('option').first()
+  const href = await first.getByRole('link').getAttribute('href')
+  const says = (await first.textContent()) ?? ''
+  await box.press('Enter')
+
+  await page.waitForURL((url) => `${url.pathname}${url.search}` === href)
+  await expect(page.getByRole('searchbox').filter({ visible: true }).first()).toHaveValue(item)
+  // "Grocery · 10 with Challah": the page has Challah ticked, and counts it.
+  if (says.includes(`with ${item}`)) {
+    const filters = page.getByRole('button', { name: /^Filters/ }).filter({ visible: true })
+    await expect(filters).toContainText(/[1-9]/)
+    await filters.click()
+    await expect(page.getByRole('group', { name: 'Has' }).getByRole('button', { name: new RegExp(`^${item}`) })).toHaveAttribute('aria-pressed', 'true')
+  }
+  // No sentence answering over the list, no Share this answer, no Read as.
+  await expect(page.getByRole('button', { name: 'Share this answer' })).toHaveCount(0)
+  await expect(page.getByTestId('read-as')).toHaveCount(0)
+})
+
+test('a minyan: Minyanim by time, the words in its box, no sentence over the list', async ({ page, request }) => {
+  const community = await defaultCommunity(page)
+  const shuls = ((await categories(request, community)) as Cat[]).find((c) => c.detailFields?.some((f) => f.type === 'minyanim'))
+  test.skip(!shuls, 'no category with minyanim')
+
+  const box = await homeBox(page, community)
+  await typeAndWait(page, box, 'next maariv')
+  await box.press('Enter')
+
+  await page.waitForURL((url) => url.pathname === `/${community}/${shuls!.id}` && url.searchParams.get('davening') === '1')
+  await expect(page.getByTestId('minyanim-view')).toBeVisible()
+  await expect(page.getByRole('searchbox').filter({ visible: true }).first()).toHaveValue('next maariv')
+  // The sentence stays only to say why a list is empty.
+  const rows = page.getByTestId('minyanim-rows').getByRole('link')
+  if ((await rows.count()) > 0) await expect(page.getByTestId('minyanim-answer')).toHaveCount(0)
+})
+
+test('a zman: the times page, with the time asked for picked out', async ({ page, request }) => {
+  const community = await defaultCommunity(page)
+  const zmanim = ((await categories(request, community)) as Cat[]).find((c) => c.kind === 'zmanim')
+  test.skip(!zmanim, 'no zmanim page')
+
+  const box = await homeBox(page, community)
+  await typeAndWait(page, box, 'when is candle lighting')
+  await box.press('Enter')
+
+  await page.waitForURL((url) => url.pathname === `/${community}/${zmanim!.id}` && url.searchParams.get('time') === 'candles')
+  await expect(page.locator('[data-picked="true"]').filter({ visible: true }).first()).toContainText(/Candle|Candles/)
+})
+
+test('the eruv: its page', async ({ page, request }) => {
+  const community = await defaultCommunity(page)
+  const eruv = ((await categories(request, community)) as Cat[]).find((c) => c.kind === 'eruv')
+  test.skip(!eruv, 'no eruv page')
+
+  const box = await homeBox(page, community)
+  await typeAndWait(page, box, 'is the eruv up')
+  await box.press('Enter')
+  await page.waitForURL((url) => url.pathname === `/${community}/${eruv!.id}`)
+})
+
+test('nothing anywhere: Enter stays on home and says so, with where to ask', async ({ page }) => {
+  const community = await defaultCommunity(page)
+  const box = await homeBox(page, community)
+  await box.fill('xqzvplk wobblefrump')
+  // Nothing to wait on but the page running: Enter is pressed until it
+  // takes (before hydration the box has no handler).
+  await expect(async () => {
+    await box.press('Enter')
+    await expect(page.getByTestId('ask-the-group').filter({ visible: true })).toBeVisible({ timeout: 1_000 })
+  }).toPass({ timeout: 15_000 })
+  await expect(page.getByTestId('ask-the-group').filter({ visible: true })).toContainText('Nothing in the guide for “xqzvplk wobblefrump”.')
+  expect(new URL(page.url()).pathname).toBe(`/${community}`)
+})

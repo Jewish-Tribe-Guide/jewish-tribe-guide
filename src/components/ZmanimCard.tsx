@@ -1,6 +1,7 @@
 'use client'
 
 import ZmanimBody from '@/components/ZmanimBody'
+import type { TimesAsk } from '@/lib/ask'
 import DirectoryHeader from '@/components/resources/DirectoryHeader'
 import { CategoryBandFrame, CategoryBandBadge } from '@/components/resources/CategoryBandFrame'
 import { CategoryGlyph } from '@/lib/categoryIcons'
@@ -25,9 +26,11 @@ type Props = {
   icon?: string
   color?: string
   bandImageUrl?: string | null
+  /** The time a search asked for (`?time=candles`), picked out. */
+  picked?: TimesAsk | null
 }
 
-export default function ZmanimCard({ coords, locationLabel, onUp, title = 'Zmanim & Shabbos', icon, color = '#64748b', bandImageUrl }: Props) {
+export default function ZmanimCard({ coords, locationLabel, onUp, title = 'Zmanim & Shabbos', icon, color = '#64748b', bandImageUrl, picked = null }: Props) {
   const { data, status } = useZmanim(coords)
   const now = useNow()
 
@@ -56,7 +59,7 @@ export default function ZmanimCard({ coords, locationLabel, onUp, title = 'Zmani
             they skip a level (axe: heading-order). Screen-reader-only: the h1
             already says the same thing visibly. */}
         <h2 className="sr-only">Times and Shabbos</h2>
-        <ZmanimBody data={data} status={status} now={now} />
+        <ZmanimBody data={data} status={status} now={now} picked={picked} />
       </section>
     </CategoryBandFrame>
   )
