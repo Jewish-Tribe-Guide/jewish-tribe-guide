@@ -319,6 +319,8 @@ export default function FindResources({
         icon={eruv?.icon}
         color={eruv ? getCategoryColor(categories, eruv.id) : undefined}
         bandImageUrl={eruv ? bandImageFor(eruv) : undefined}
+        itemId={searchItem}
+        onParamsChange={setParams}
       />
     )
   }

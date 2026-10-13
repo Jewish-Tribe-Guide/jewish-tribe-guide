@@ -44,6 +44,8 @@ type Props = {
   anyOn: boolean
   /** How many places the map shows with these filters. */
   count: number
+  /** What the map shows when it isn't places: "Show 5 eruvim". */
+  doneLabel?: string
 }
 
 export default function MapFiltersSheet(props: Props) {
@@ -60,7 +62,7 @@ export default function MapFiltersSheet(props: Props) {
   )
 }
 
-function Body({ top, onTopOpenNow, sections, onOpenNow, onBoolean, onSelect, onClearAll, anyOn, onClose, count }: Props) {
+function Body({ top, onTopOpenNow, sections, onOpenNow, onBoolean, onSelect, onClearAll, anyOn, onClose, count, doneLabel }: Props) {
   return (
     <div className="space-y-4" data-testid="map-filters">
       {/* Always takes its line, as on a category page's sheet: appearing on
@@ -111,7 +113,7 @@ function Body({ top, onTopOpenNow, sections, onOpenNow, onBoolean, onSelect, onC
         onClick={onClose}
         className="h-12 w-full cursor-pointer rounded-xl bg-primary text-[15.5px] font-bold text-white transition-transform active:scale-[0.99]"
       >
-        Show {count} place{count === 1 ? '' : 's'}
+        {doneLabel ?? `Show ${count} place${count === 1 ? '' : 's'}`}
       </button>
     </div>
   )

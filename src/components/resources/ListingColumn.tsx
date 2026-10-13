@@ -72,36 +72,7 @@ export default function ListingColumn({ item, category, color, place, found, upv
     return () => window.removeEventListener('keydown', onKey)
   }, [onBack, onStep, hasPrev, hasNext, phone])
 
-  // Quiet (Oct 6): the way back is "‹ Synagogues", where the page's title
-  // was, and ‹ › are the arrow keys' small mouse version. It was a bar,
-  // "‹ Back to Synagogues", ringed arrows, a rule under it, under the whole
-  // list's search box and examples.
-  const step = 'flex h-7 w-7 cursor-pointer items-center justify-center rounded-full text-muted transition-colors hover:bg-slate-200/60 hover:text-slate-700 disabled:cursor-default disabled:opacity-30 disabled:hover:bg-transparent'
-
-  const bar = (
-    <div className="mb-4 flex items-center justify-between gap-3" data-testid="listing-column-bar">
-      <button type="button" onClick={onBack} className="-ml-1 flex cursor-pointer items-center gap-0.5 rounded-md px-1 py-1 text-[15px] font-bold text-primary hover:underline">
-        <ChevronLeftIcon className="h-[18px] w-[18px]" />
-        {backLabel}
-      </button>
-      <div className="flex items-center gap-0.5 text-[13px] text-muted">
-        {onShowMap && (
-          <button type="button" onClick={onShowMap} className="mr-2 h-9 cursor-pointer rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50">
-            Show map
-          </button>
-        )}
-        <button type="button" aria-label="Previous listing" disabled={!hasPrev} onClick={() => onStep(-1)} className={step}>
-          <ChevronLeftIcon className="h-4 w-4" />
-        </button>
-        <span>
-          {position.index + 1} of {position.total}
-        </span>
-        <button type="button" aria-label="Next listing" disabled={!hasNext} onClick={() => onStep(1)} className={step}>
-          <ChevronRightIcon className="h-4 w-4" />
-        </button>
-      </div>
-    </div>
-  )
+  const bar = <ListingBar backLabel={backLabel} onBack={onBack} position={position} onStep={onStep} onShowMap={onShowMap} />
 
   const listing = (
     <MapPlaceDetail
@@ -143,5 +114,42 @@ export default function ListingColumn({ item, category, color, place, found, upv
         listing
       )}
     </section>
+  )
+}
+
+/** The way back to the list and the steps through it, over an opened
+ *  listing: "‹ Synagogues", and ‹ 12 of 73 ›. Also the Eruv page's. */
+export function ListingBar({ backLabel, onBack, position, onStep, onShowMap }: { backLabel: string; onBack: () => void; position: { index: number; total: number }; onStep: (direction: 1 | -1) => void; onShowMap?: () => void }) {
+  const hasPrev = position.index > 0
+  const hasNext = position.index < position.total - 1
+  // Quiet (Oct 6): the way back is "‹ Synagogues", where the page's title
+  // was, and ‹ › are the arrow keys' small mouse version. It was a bar,
+  // "‹ Back to Synagogues", ringed arrows, a rule under it, under the whole
+  // list's search box and examples.
+  const step = 'flex h-7 w-7 cursor-pointer items-center justify-center rounded-full text-muted transition-colors hover:bg-slate-200/60 hover:text-slate-700 disabled:cursor-default disabled:opacity-30 disabled:hover:bg-transparent'
+
+  return (
+    <div className="mb-4 flex items-center justify-between gap-3" data-testid="listing-column-bar">
+      <button type="button" onClick={onBack} className="-ml-1 flex cursor-pointer items-center gap-0.5 rounded-md px-1 py-1 text-[15px] font-bold text-primary hover:underline">
+        <ChevronLeftIcon className="h-[18px] w-[18px]" />
+        {backLabel}
+      </button>
+      <div className="flex items-center gap-0.5 text-[13px] text-muted">
+        {onShowMap && (
+          <button type="button" onClick={onShowMap} className="mr-2 h-9 cursor-pointer rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+            Show map
+          </button>
+        )}
+        <button type="button" aria-label="Previous listing" disabled={!hasPrev} onClick={() => onStep(-1)} className={step}>
+          <ChevronLeftIcon className="h-4 w-4" />
+        </button>
+        <span>
+          {position.index + 1} of {position.total}
+        </span>
+        <button type="button" aria-label="Next listing" disabled={!hasNext} onClick={() => onStep(1)} className={step}>
+          <ChevronRightIcon className="h-4 w-4" />
+        </button>
+      </div>
+    </div>
   )
 }

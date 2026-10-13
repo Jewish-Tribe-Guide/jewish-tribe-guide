@@ -23,9 +23,11 @@ vi.mock('@/lib/useNow', () => ({ useNow: () => Date.parse('2026-10-09T19:00:00Z'
 // Google's map isn't in jsdom: the map is a stand-in naming what it draws,
 // which eruv it picks out, and a way to point at one on it.
 vi.mock('./EruvMap', () => ({
-  default: ({ eruvim, highlightId, onHover }: { eruvim: { id: string; name: string }[]; highlightId?: string | null; onHover?: (id: string | null) => void }) => (
+  default: ({ eruvim, highlightId, onHover, focusId, fullMapHref }: { eruvim: { id: string; name: string }[]; highlightId?: string | null; onHover?: (id: string | null) => void; focusId?: string | null; fullMapHref?: string }) => (
     <div>
-      <p data-testid="eruv-map" data-highlight={highlightId ?? ''}>{eruvim.map((e) => e.name).join(', ')}</p>
+      <p data-testid="eruv-map" data-highlight={highlightId ?? ''} data-focus={focusId ?? ''} data-full-map={fullMapHref ?? ''}>
+        {eruvim.map((e) => e.name).join(', ')}
+      </p>
       {onHover && eruvim.map((e) => <span key={e.id} data-testid={`map-eruv-${e.id}`} onMouseEnter={() => onHover(e.id)} onMouseLeave={() => onHover(null)} />)}
     </div>
   ),
@@ -52,10 +54,10 @@ function answer(body: unknown) {
     vi.fn(async (url: string) => new Response(JSON.stringify(String(url).startsWith('/api/eruv/maps') ? { ok: true, maps: [{ id: 'center-city', map: CC_LINE }] } : body))),
   )
 }
-function show() {
+function show({ isMobile = false, itemId = null as string | null, onParamsChange = undefined as ((c: Record<string, string | null>, o?: { replace?: boolean; step?: string }) => void) | undefined } = {}) {
   return renderWithProviders(
-    <ForcedViewport isMobile={false}>
-      <EruvInfo eruvim={OLD} onUp={() => {}} title="Eruvim" />
+    <ForcedViewport isMobile={isMobile}>
+      <EruvInfo eruvim={OLD} onUp={() => {}} title="Eruvim" itemId={itemId} onParamsChange={onParamsChange} />
     </ForcedViewport>,
   )
 }
@@ -134,5 +136,60 @@ describe('EruvInfo', () => {
     expect(screen.queryByText(/inside/i)).not.toBeInTheDocument()
     await user.click(rows[0])
     expect(within(screen.getByTestId('eruv-listing')).queryByText(/inside|edge/i)).not.toBeInTheDocument()
+  })
+
+  describe('an eruv opens as any listing opens (Oct 13)', () => {
+    it('on desktop, in the list’s column, the map beside it on that eruv, and the address names it', async () => {
+      const user = userEvent.setup()
+      const onParamsChange = vi.fn()
+      show({ onParamsChange })
+      await user.click((await screen.findAllByTestId('eruv-row'))[0])
+      const column = screen.getByTestId('eruv-column')
+      expect(within(column).getByText('Center City Eruv')).toBeInTheDocument()
+      expect(screen.getByTestId('eruv-list')).not.toBeVisible()
+      expect(screen.getByTestId('eruv-map')).toHaveAttribute('data-focus', 'center-city')
+      expect(screen.getByTestId('eruv-map')).toHaveAttribute('data-highlight', 'center-city')
+      // A step Back undoes.
+      expect(onParamsChange).toHaveBeenLastCalledWith({ item: 'center-city' }, { step: 'eruv' })
+    })
+
+    it('‹ › step through the eruvim in the list’s order, and ‹ Eruvim goes back to the list', async () => {
+      const user = userEvent.setup()
+      const onParamsChange = vi.fn()
+      show({ onParamsChange })
+      await user.click((await screen.findAllByTestId('eruv-row'))[0])
+      expect(screen.getByTestId('listing-column-bar')).toHaveTextContent('1 of 3')
+      await user.click(screen.getByRole('button', { name: 'Next listing' }))
+      expect(within(screen.getByTestId('eruv-column')).getByText('Lower Merion Eruv')).toBeInTheDocument()
+      expect(screen.getByTestId('eruv-map')).toHaveAttribute('data-focus', 'lower-merion')
+      expect(onParamsChange).toHaveBeenLastCalledWith({ item: 'lower-merion' }, { replace: true })
+      await user.click(screen.getByRole('button', { name: 'Eruvim' }))
+      expect(screen.queryByTestId('eruv-column')).not.toBeInTheDocument()
+      expect(screen.getByTestId('eruv-list')).toBeVisible()
+      expect(screen.getByTestId('eruv-map')).toHaveAttribute('data-focus', '')
+    })
+
+    it('a link to an eruv (?item=) opens it', async () => {
+      show({ itemId: 'lower-merion' })
+      expect(within(await screen.findByTestId('eruv-column')).getByText('Lower Merion Eruv')).toBeInTheDocument()
+      expect(await screen.findByTestId('eruv-map')).toHaveAttribute('data-focus', 'lower-merion')
+    })
+
+    it('on a phone, in a sheet, the map above it on that eruv', async () => {
+      const user = userEvent.setup()
+      show({ isMobile: true })
+      await user.click((await screen.findAllByTestId('eruv-row'))[1])
+      expect(screen.queryByTestId('eruv-column')).not.toBeInTheDocument()
+      expect(within(screen.getByTestId('eruv-listing')).getByText('Lower Merion Eruv')).toBeInTheDocument()
+      expect(screen.getByTestId('eruv-map')).toHaveAttribute('data-focus', 'lower-merion')
+    })
+
+    it('Full map opens the Map tab on the eruvim alone, the open one open there', async () => {
+      const user = userEvent.setup()
+      show()
+      expect(await screen.findByTestId('eruv-map')).toHaveAttribute('data-full-map', '/test-community/map?eruv=1')
+      await user.click((await screen.findAllByTestId('eruv-row'))[0])
+      expect(screen.getByTestId('eruv-map')).toHaveAttribute('data-full-map', '/test-community/map?eruv=1&place=eruv%3Acenter-city')
+    })
   })
 })

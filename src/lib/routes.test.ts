@@ -143,8 +143,10 @@ describe('parseMapQuery', () => {
       select: { hechsher: ['OU', 'Star-K'] },
       place: 'abc123',
       pinned: false,
+      eruvim: ['center-city', 'university-city'] as string[] | 'all' | null,
     }
     expect(parse(mapQueryString(state))).toEqual(state)
+    expect(parse(mapQueryString({ ...state, eruvim: 'all' })).eruvim).toBe('all')
   })
 
   // Open now per category (the map's Filters sheet, see mapFilters.ts), and
@@ -159,6 +161,7 @@ describe('parseMapQuery', () => {
       select: { 'restaurant.t': ['Meat'] },
       place: null,
       pinned: false,
+      eruvim: null,
     }
     expect(parse(mapQueryString(state))).toEqual(state)
   })
@@ -173,6 +176,7 @@ describe('parseMapQuery', () => {
       select: null,
       place: null,
       pinned: false,
+      eruvim: null,
     })
   })
 

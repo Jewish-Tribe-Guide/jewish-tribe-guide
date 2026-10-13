@@ -11,6 +11,7 @@ const calls = { fitBounds: 0, drawn: 0, removed: 0, markers: 0 }
 const labels: { text: string; click: () => void; content: HTMLElement }[] = []
 const shapes: Record<string, unknown>[] = []
 const notes: string[] = []
+const fits: Bounds[] = []
 class Bounds {
   pts: unknown[] = []
   extend(p: unknown) { this.pts.push(p) }
@@ -28,16 +29,18 @@ beforeEach(() => {
   labels.length = 0
   shapes.length = 0
   notes.length = 0
+  fits.length = 0
   ;(globalThis as unknown as { google: unknown }).google = {
     maps: {
       importLibrary: async () => ({}),
+      event: { addListenerOnce: (_: unknown, __: string, fn: () => void) => void queueMicrotask(fn) },
       InfoWindow: class {
         content: HTMLElement | null = null
         setContent(c: HTMLElement) { this.content = c }
         open() { notes.push(this.content?.textContent ?? '') }
         close() {}
       },
-      Map: class { fitBounds() { calls.fitBounds++ } },
+      Map: class { fitBounds(b: Bounds) { calls.fitBounds++; fits.push(b) } },
       LatLngBounds: Bounds,
       Polygon: Shape,
       Polyline: Shape,
@@ -79,7 +82,35 @@ const list = (tone: MapEruv['tone'] = 'green'): MapEruv[] => [
 const props = { fallbackCenter: { lat: 39.95, lng: -75.16 }, onSelect: () => {} }
 const settle = () => act(async () => { await new Promise((r) => setTimeout(r, 0)) })
 
+// What a fit took in: the eruvim whose points it holds, by latitude.
+const fitOf = (b: Bounds) => [...new Set((b.pts as { lat: number }[]).map((p) => (p.lat < 39.98 ? 'a' : 'b')))].sort().join('')
+
 describe('EruvMap', () => {
+  it('an eruv opened brings the map to it; closed, back to them all', async () => {
+    const view = render(<EruvMap eruvim={list()} you={null} {...props} />)
+    await settle()
+    expect(fits.map(fitOf)).toEqual(['ab'])
+    view.rerender(<EruvMap eruvim={list()} you={null} {...props} focusId="b" />)
+    await settle()
+    expect(fits.map(fitOf)).toEqual(['ab', 'b'])
+    view.rerender(<EruvMap eruvim={list()} you={null} {...props} />)
+    await settle()
+    expect(fits.map(fitOf)).toEqual(['ab', 'b', 'ab'])
+  })
+
+  it('a link to one eruv frames that one only: one fit, not all and then it', async () => {
+    render(<EruvMap eruvim={list()} you={null} {...props} focusId="a" />)
+    await settle()
+    expect(fits.map(fitOf)).toEqual(['a'])
+  })
+
+  it('Full map goes to the Map tab it’s given', async () => {
+    const view = render(<EruvMap eruvim={list()} you={null} {...props} fullMapHref="/philly/map?eruv=1" />)
+    await settle()
+    expect(view.getByRole('link', { name: 'Open the full map' })).toHaveAttribute('href', '/philly/map?eruv=1')
+  })
+
+
   it('writes each eruv’s name on it, and tapping the name opens that eruv', async () => {
     const onSelect = vi.fn()
     render(<EruvMap eruvim={[{ id: 'a', name: 'University City Eruv', tone: 'green', map: square(39.9) }, { id: 'b', name: 'Center City Eruv', tone: 'green', map: square(40.0) }]} you={null} {...props} onSelect={onSelect} />)

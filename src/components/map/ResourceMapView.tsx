@@ -11,7 +11,8 @@ import NearbyList from './NearbyList'
 import MapPlaceDetail from './MapPlaceDetail'
 import MobileNearbySheet, { type MobileNearbySheetHandle } from './MobileNearbySheet'
 import MapEruvDetail from './MapEruvDetail'
-import type { MapEruv } from './eruvLayer'
+import { mapLabel, type MapEruv } from './eruvLayer'
+import { CategoryGlyph } from '@/lib/categoryIcons'
 import { useEruvMaps, useEruvStatuses } from '@/lib/useEruvStatuses'
 import { eruvView } from '@/lib/eruv'
 import { labelPoint } from '@/lib/eruvShape'
@@ -65,10 +66,11 @@ import type { DirectoryResource, MapFilters } from '@/types'
 // Shared by the initial useState below and the resync effect further down
 // (see its own comment) — one place for the initialSelectedCategories-vs-
 // initialCategory precedence so the two can't drift apart.
-function resolveInitialSelected(categories: string[] | undefined, category: string | undefined, pinned = false): Set<string> | null {
+function resolveInitialSelected(categories: string[] | undefined, category: string | undefined, pinned = false, eruvim = false): Set<string> | null {
   // Arriving on the Pinned chip alone ("See them on the map" on the Pinned
-  // page): no category chip on, only the pins.
-  if (pinned && categories === undefined && !category) return new Set()
+  // page): no category chip on, only the pins. The same for the eruvim
+  // alone (the Eruv page's Full map).
+  if ((pinned || eruvim) && categories === undefined && !category) return new Set()
   return categories !== undefined ? new Set(categories) : category ? new Set([category]) : null
 }
 
@@ -145,6 +147,9 @@ type Props = {
   initialSelectedCategories?: string[]
   /** The Pinned chip on, from the URL's `pinned` (see mapQueryString). */
   initialPinned?: boolean
+  /** The Eruvim layer on, from the URL's `eruv`: every eruv, or the ones
+   *  chosen (see mapQueryString). */
+  initialEruvim?: 'all' | string[]
   /** Field filters (open-now / kosher / type / …) carried from the directory the
    *  visitor came from, applied to pins and shown as removable chips. */
   initialFilters?: MapFilters
@@ -212,7 +217,7 @@ function normalizeSearch(search: string): string {
   return new URLSearchParams(search.startsWith('?') ? search.slice(1) : search).toString()
 }
 
-export default function ResourceMapView({ userLocation, initialCategory, initialQuery, initialSelectedCategories, initialPinned = false, initialFilters, initialPlaceId, viewSearch, onViewListing, standalone, visible, onExitFullscreenToListing, liveTracking, controls }: Props) {
+export default function ResourceMapView({ userLocation, initialCategory, initialQuery, initialSelectedCategories, initialPinned = false, initialEruvim, initialFilters, initialPlaceId, viewSearch, onViewListing, standalone, visible, onExitFullscreenToListing, liveTracking, controls }: Props) {
   const timezone = useCommunityTimezone()
   const listings = useAllListings()
   const categories = useCategories()
@@ -633,8 +638,12 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // browser back) takes precedence over initialCategory (the single-category
   // arrival case from a directory's "Map" button).
   const [selected, setSelected] = useState<Set<string> | null>(
-    resolveInitialSelected(initialSelectedCategories, initialCategory, initialPinned),
+    resolveInitialSelected(initialSelectedCategories, initialCategory, initialPinned, !!initialEruvim),
   )
+  // The Eruvim layer (see "The Eruvim layer" below), and the eruvim chosen
+  // in Filters: null for every one.
+  const [eruvimOn, setEruvimOn] = useState(!!initialEruvim)
+  const [eruvChosen, setEruvChosen] = useState<Set<string> | null>(Array.isArray(initialEruvim) ? new Set(initialEruvim) : null)
   // The Pinned chip lives in PinnedContext (it outlives this screen); a link
   // that says to show the pins turns it on.
   useEffect(() => {
@@ -972,6 +981,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   const initialViewKey = [
     categoriesKey,
     initialPinned ? 'pinned' : '',
+    initialEruvim === undefined ? '' : `eruv:${initialEruvim === 'all' ? 'all' : [...initialEruvim].sort().join(',')}`,
     initialQueryText,
     initialFiltersQuery.open ?? '',
     [...(initialFilters?.bool ?? [])].sort().join(','),
@@ -1001,7 +1011,9 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
       return
     }
     appliedInitialViewKeyRef.current = initialViewKey
-    setSelected(resolveInitialSelected(initialSelectedCategories, initialCategory, initialPinned))
+    setSelected(resolveInitialSelected(initialSelectedCategories, initialCategory, initialPinned, !!initialEruvim))
+    setEruvimOn(!!initialEruvim)
+    setEruvChosen(Array.isArray(initialEruvim) ? new Set(initialEruvim) : null)
     setInput(initialQueryText)
     setCommittedQuery(initialQueryText)
     setOwnFilters(null)
@@ -1072,7 +1084,9 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
     if (!standalone) return
     const written = writeMapFilters(filters, categories ?? [])
     const qs = mapQueryString({
-      categories: allSelected ? null : Array.from(selected ?? []),
+      // With the eruvim on, every category is spelled out: `eruv` with no
+      // `cat` is the eruvim alone.
+      categories: allSelected ? (eruvimOn ? options.map((o) => o.id) : null) : Array.from(selected ?? []),
       query: committedQuery || null,
       openNow: written.open === '1',
       openIn: written.open && written.open !== '1' ? written.open.split(',') : null,
@@ -1080,13 +1094,14 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
       select: written.sel ? Object.fromEntries(written.sel.split(',').map((pair) => [pair.slice(0, pair.indexOf(':')), pair.slice(pair.indexOf(':') + 1).split('|')])) : null,
       place: selectedPointId ?? null,
       pinned: pinnedSelected,
+      eruvim: eruvimOn ? (eruvChosen ? [...eruvChosen] : 'all') : null,
     })
     const url = `${window.location.pathname}${qs}`
     if (url === `${window.location.pathname}${window.location.search}`) return
     window.history.replaceState(window.history.state, '', url)
     ownWritesRef.current = [...ownWritesRef.current, normalizeSearch(qs)].slice(-20)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [standalone, committedQuery, selected, allSelected, filtersKey, categories, selectedPointId, pinnedSelected])
+  }, [standalone, committedQuery, selected, allSelected, filtersKey, categories, selectedPointId, pinnedSelected, eruvimOn, eruvChosen, options])
 
   // "Open now" has to re-answer as the clock moves — a pin that closed at 6pm
   // should drop off a filtered map at 6pm, not when the visitor next reloads.
@@ -1261,7 +1276,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
     // same as Google Maps/Too Good To Go's filter rows — there's no
     // "nothing shown" state a chip tap can land you in, so a separate
     // Hide-all shortcut has nothing left to do.
-    if (next.size === 0 && !pinnedSelected) {
+    if (next.size === 0 && !pinnedSelected && !eruvimOn) {
       showAll()
       return
     }
@@ -1634,12 +1649,16 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
     () => (eruvData && eruvMaps ? eruvData.eruvim.flatMap((e) => (eruvMaps.get(e.id) ? [{ eruv: e, map: eruvMaps.get(e.id)! }] : [])) : []),
     [eruvData, eruvMaps],
   )
-  const [eruvimOn, setEruvimOn] = useState(false)
+  // The ones chosen in Filters, of those there are; all when none is.
+  const eruvimShown = useMemo(() => {
+    const chosen = eruvimWithLines.filter(({ eruv }) => eruvChosen?.has(eruv.id))
+    return chosen.length > 0 ? chosen : eruvimWithLines
+  }, [eruvimWithLines, eruvChosen])
   const mapEruvim = useMemo<MapEruv[]>(
-    () => (eruvimOn && eruvData && clock !== null ? eruvimWithLines.map(({ eruv: e, map }) => ({ id: e.id, name: e.name, tone: eruvView(e, new Date(clock), eruvData.timezone, eruvData.candles).tone, map })) : []),
+    () => (eruvimOn && eruvData && clock !== null ? eruvimShown.map(({ eruv: e, map }) => ({ id: e.id, name: e.name, tone: eruvView(e, new Date(clock), eruvData.timezone, eruvData.candles).tone, map })) : []),
     // Each tick makes a new list, but the map redraws only when a line or
     // a status's colour changes (eruvDrawKey).
-    [eruvimOn, eruvData, eruvimWithLines, clock],
+    [eruvimOn, eruvData, eruvimShown, clock],
   )
   const openEruvId = selectedPointId?.startsWith(ERUV_PREFIX) ? selectedPointId.slice(ERUV_PREFIX.length) : null
   const openEruv = (id: string) => {
@@ -1668,30 +1687,50 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   }, [eruvimWithLines, standalone, initialPlaceId])
   const toggleEruvim = () => {
     if (eruvimOn && openEruvId) deselectPlace()
+    if (eruvimOn) setEruvChosen(null)
     setEruvimOn(!eruvimOn)
+    // Off with nothing else on would leave an empty map: everything, as
+    // the last category chip switched off does.
+    if (eruvimOn && effectiveSelected.size === 0 && !pinnedSelected) showAll()
   }
+  // Filters' pick of eruvim, by the name on the map. None picked is all.
+  const eruvByLabel = new Map(eruvimWithLines.map(({ eruv }) => [mapLabel(eruv.name), eruv.id]))
+  const toggleEruvChoice = (label: string) => {
+    const id = eruvByLabel.get(label)
+    if (!id) return
+    const next = new Set(eruvChosen ?? [])
+    if (next.has(id)) next.delete(id)
+    else next.add(id)
+    if (openEruvId && next.size > 0 && !next.has(openEruvId)) deselectPlace()
+    setEruvChosen(next.size > 0 ? next : null)
+  }
+  const chosenEruvim = eruvChosen ? eruvimWithLines.filter(({ eruv }) => eruvChosen.has(eruv.id)) : []
+  const eruvColor = colorById.get(eruvCategory?.id ?? '') ?? '#64748b'
   const eruvDetail = (id: string, onBack: () => void) => {
     const e = eruvData?.eruvim.find((x) => x.id === id)
     if (!e || !eruvData || clock === null) return null
     return <MapEruvDetail eruv={e} color={colorById.get(eruvCategory?.id ?? '') ?? '#64748b'} now={new Date(clock)} timezone={eruvData.timezone} candles={eruvData.candles} onBack={onBack} />
   }
+  // Looks like a category's chip, with how many it shows, though it adds
+  // a layer rather than choosing places (Oct 13).
   const eruvChip = eruvimWithLines.length > 0 && (
-    <button
-      type="button"
-      onClick={toggleEruvim}
-      aria-pressed={eruvimOn}
-      data-testid="map-eruvim-chip"
-      className={`flex shrink-0 cursor-pointer items-center gap-1 rounded-full border py-1 text-xs font-bold shadow-sm transition-colors ${
-        eruvimOn ? 'border-primary/35 bg-[#eef3fe] pl-2.5 pr-2 text-primary' : 'border-slate-300 bg-white px-2.5 text-slate-600 hover:bg-slate-50'
-      }`}
+    <div
+      className={`flex shrink-0 items-stretch rounded-full border text-xs font-medium transition-colors ${eruvimOn ? 'border-transparent text-white' : 'border-slate-300 bg-white text-slate-500'}`}
+      style={eruvimOn ? { backgroundColor: eruvColor } : undefined}
     >
-      Eruvim
-      {eruvimOn && (
-        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" className="h-3 w-3">
-          <path d="M18 6 6 18M6 6l12 12" />
-        </svg>
-      )}
-    </button>
+      <button
+        type="button"
+        onClick={toggleEruvim}
+        aria-pressed={eruvimOn}
+        data-testid="map-eruvim-chip"
+        className={`flex cursor-pointer items-center gap-1 rounded-full py-1 pl-2.5 pr-2.5 ${eruvimOn ? '' : 'hover:bg-slate-50'}`}
+      >
+        <span className="inline-block h-2 w-2 rounded-full ring-1 ring-white/60" style={{ backgroundColor: eruvimOn ? 'rgba(255,255,255,0.9)' : eruvColor }} aria-hidden="true" />
+        {eruvCategory?.icon && <CategoryGlyph categoryId={eruvCategory.id} icon={eruvCategory.icon} className="h-3 w-3 shrink-0" />}
+        <span>Eruvim</span>
+        <span className={eruvimOn ? 'text-white/80' : 'text-slate-400'}>{eruvimShown.length}</span>
+      </button>
+    </div>
   )
 
   // ── Filters: one button, one sheet, the chips of what's on ───────────────
@@ -1701,7 +1740,20 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
     return options.flatMap((o) => (effectiveSelected.has(o.id) && byId.has(o.id) ? [byId.get(o.id)!] : []))
   }, [options, effectiveSelected, categories])
   const topOpenNow = openNowAll(filters, showingCategories)
-  const filterSections = useMemo<MapFilterSection[]>(() => {
+  const eruvSection: MapFilterSection | null =
+    eruvimOn && eruvimWithLines.length > 1
+      ? {
+          id: ERUV_FILTER_ID,
+          label: 'Eruvim',
+          icon: eruvCategory?.icon,
+          color: eruvColor,
+          note: chosenEruvim.length > 0 ? `${chosenEruvim.length} of ${eruvimWithLines.length}` : `all ${eruvimWithLines.length}`,
+          openNow: null,
+          booleans: [],
+          selects: [{ key: 'eruv', label: 'Show', values: eruvimWithLines.map(({ eruv }) => mapLabel(eruv.name)), chosen: chosenEruvim.map(({ eruv }) => mapLabel(eruv.name)) }],
+        }
+      : null
+  const categorySections = useMemo<MapFilterSection[]>(() => {
     return showingCategories.flatMap((c) => {
       const f = filters[c.id] ?? {}
       const fields = filterFields(c)
@@ -1734,13 +1786,14 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showingCategories, filtersKey, allPoints, optionsWithFilters, colorById])
+  const filterSections = eruvSection ? [eruvSection, ...categorySections] : categorySections
   const andNames = (names: string[]) => (names.length <= 1 ? names.join('') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`)
   const topOpenNowNote = topOpenNow.on
     ? `For ${andNames(topOpenNow.withHours.map((c) => c.pluralLabel))}.`
     : topOpenNow.onFor.length > 0
       ? `On for ${andNames(topOpenNow.onFor)} only.`
       : null
-  const filtersOn = filterCount(filters, showingCategories)
+  const filtersOn = filterCount(filters, showingCategories) + chosenEruvim.length
   const filtersButton = (
     <button
       type="button"
@@ -1771,7 +1824,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   const readReach = shownReach ? reachLabel(shownReach) : null
   const dropFromReading = (change: Partial<Reading>) => applied && setApplied({ ...applied, reading: { ...applied.reading, ...change } })
   const showReadingRow = readingNow !== null && readingNow === committedQuery
-  const activeFilterRow = (onFilters.length > 0 || readItems.length > 0 || readReach || showReadingRow) && (
+  const activeFilterRow = (onFilters.length > 0 || chosenEruvim.length > 0 || readItems.length > 0 || readReach || showReadingRow) && (
     <div className="chip-scroll mt-1.5 flex items-center gap-1.5 overflow-x-auto pb-1" data-testid="map-active-filters">
       {showReadingRow && (
         // Only after a moment: a remembered question answers faster than that.
@@ -1788,6 +1841,9 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
         <FilterChip key={`item:${item}`} label={item} on onToggle={() => dropFromReading({ items: readItems.filter((i) => i !== item) })} />
       ))}
       {readReach && <FilterChip key="reach" label={readReach} on onToggle={() => dropFromReading({ near: null, withinMiles: null })} />}
+      {chosenEruvim.map(({ eruv }) => (
+        <FilterChip key={`eruv:${eruv.id}`} label={mapLabel(eruv.name)} on onToggle={() => toggleEruvChoice(mapLabel(eruv.name))} />
+      ))}
       {onFilters.map((a) => (
         <FilterChip key={a.key} label={a.label} on onToggle={() => updateFilters(a.remove)} />
       ))}
@@ -1802,10 +1858,14 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
       sections={filterSections}
       onOpenNow={onSheetOpenNow}
       onBoolean={onSheetBoolean}
-      onSelect={onSheetSelect}
-      onClearAll={() => setOwnFilters({})}
-      anyOn={hasFilters}
+      onSelect={(categoryId, key, value) => (categoryId === ERUV_FILTER_ID ? toggleEruvChoice(value) : onSheetSelect(categoryId, key, value))}
+      onClearAll={() => {
+        setOwnFilters({})
+        setEruvChosen(null)
+      }}
+      anyOn={hasFilters || chosenEruvim.length > 0}
       count={visiblePoints.length}
+      doneLabel={visiblePoints.length === 0 && mapEruvim.length > 0 ? `Show ${mapEruvim.length} ${mapEruvim.length === 1 ? 'eruv' : 'eruvim'}` : undefined}
     />
   )
 
@@ -2194,6 +2254,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                 eruvim={mapEruvim}
                 onSelectEruv={openEruv}
                 selectedEruvId={openEruvId}
+                frameEruvim={mapEruvim.length > 0 && visiblePoints.length === 0}
               />
 
               {/* ── Fullscreen toggle (desktop only) — the map starts as a

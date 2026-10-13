@@ -24,8 +24,8 @@ import ResourceMapView from './ResourceMapView'
 vi.mock('@vercel/analytics', () => ({ track: vi.fn() }))
 
 // The eruvim, as /api/eruv gives them, and their maps, as /api/eruv/maps
-// does: Center City's (a square), and none for Elkins Park, which the
-// layer can't draw.
+// does: Center City's and University City's (squares), and none for
+// Elkins Park, which the layer can't draw.
 const ERUV_SQUARE = { lines: [{ name: 'Boundary', points: [[39.94, -75.17], [39.94, -75.15], [39.96, -75.15], [39.96, -75.17], [39.94, -75.17]] as [number, number][] }] }
 const eruvStatus = (id: string, name: string) => ({
   id, name, covers: `Where ${name} goes.`, website: null, hotline: null, alertsUrl: null, statusUrl: 'https://example.org/', statusDated: false,
@@ -33,8 +33,10 @@ const eruvStatus = (id: string, name: string) => ({
 })
 vi.mock('@/lib/useEruvStatuses', () => ({
   useEruvStatuses: (_slug: string, wanted: boolean) =>
-    wanted ? { available: true, timezone: 'America/New_York', candles: null, eruvim: [eruvStatus('center-city', 'Center City Eruv'), eruvStatus('elkins-park', 'Elkins Park Eruv')] } : null,
-  useEruvMaps: (_slug: string, wanted: boolean) => (wanted ? new Map([['center-city', ERUV_SQUARE]]) : null),
+    wanted
+      ? { available: true, timezone: 'America/New_York', candles: null, eruvim: [eruvStatus('center-city', 'Center City Eruv'), eruvStatus('university-city', 'University City Eruv'), eruvStatus('elkins-park', 'Elkins Park Eruv')] }
+      : null,
+  useEruvMaps: (_slug: string, wanted: boolean) => (wanted ? new Map([['center-city', ERUV_SQUARE], ['university-city', ERUV_SQUARE]]) : null),
 }))
 
 // NearbyList's row-level Share action calls useCommunitySlug(), which pulls
@@ -63,6 +65,7 @@ vi.mock('./ResourceMap', () => ({
     eruvim,
     onSelectEruv,
     selectedEruvId,
+    frameEruvim,
   }: {
     points: MapPoint[]
     onSelectPoint?: (p: MapPoint) => void
@@ -72,12 +75,14 @@ vi.mock('./ResourceMap', () => ({
     eruvim?: { id: string; name: string; tone: string }[]
     onSelectEruv?: (id: string) => void
     selectedEruvId?: string | null
+    frameEruvim?: boolean
   }) => (
     <div data-testid="resource-map">
       <p data-testid="point-count">{points.length}</p>
       <p data-testid="frame-token">{frameToken ?? 0}</p>
       <p data-testid="eruv-count">{eruvim?.length ?? 0}</p>
       <p data-testid="eruv-selected">{selectedEruvId ?? ''}</p>
+      <p data-testid="eruv-framed">{frameEruvim ? 'yes' : 'no'}</p>
       {eruvim?.map((e) => (
         <button key={e.id} onClick={() => onSelectEruv?.(e.id)}>
           Eruv {e.name} {e.tone}
@@ -1674,8 +1679,8 @@ describe('ResourceMapView — the Eruvim layer', () => {
     expect(screen.getByTestId('eruv-count')).toHaveTextContent('0')
     fireEvent.click(chip)
     expect(chip).toHaveAttribute('aria-pressed', 'true')
-    // Center City only: Elkins Park has no map to draw.
-    expect(screen.getByTestId('eruv-count')).toHaveTextContent('1')
+    // Not Elkins Park: it has no map to draw.
+    expect(screen.getByTestId('eruv-count')).toHaveTextContent('2')
     expect(screen.getByRole('button', { name: 'Eruv Center City Eruv green' })).toBeInTheDocument()
   })
 
@@ -1701,6 +1706,54 @@ describe('ResourceMapView — the Eruvim layer', () => {
     fireEvent.click(chip)
     expect(screen.queryByTestId('map-eruv-detail')).not.toBeInTheDocument()
     expect(screen.getByTestId('eruv-count')).toHaveTextContent('0')
+  })
+
+  it('the chip reads as a category’s: how many eruvim it draws', async () => {
+    renderMap(<ResourceMapView onUp={() => {}} />, store, withEruvPage)
+    expect(await screen.findByTestId('map-eruvim-chip')).toHaveTextContent('Eruvim2')
+  })
+
+  it('the Eruv page’s Full map: the eruvim alone, framed, no places; a category adds its places', async () => {
+    renderMap(<ResourceMapView onUp={() => {}} initialEruvim="all" />, store, withEruvPage)
+    const chip = await screen.findByTestId('map-eruvim-chip')
+    expect(chip).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByTestId('eruv-count')).toHaveTextContent('2')
+    expect(screen.getByTestId('point-count')).toHaveTextContent('0')
+    expect(screen.getByTestId('eruv-framed')).toHaveTextContent('yes')
+    fireEvent.click(screen.getByRole('button', { name: /^Grocery Stores/ }))
+    expect(screen.getByTestId('point-count')).toHaveTextContent('1')
+    expect(screen.getByTestId('eruv-framed')).toHaveTextContent('no')
+  })
+
+  it('switching the eruvim off when they were all it showed brings every place back, not an empty map', async () => {
+    renderMap(<ResourceMapView onUp={() => {}} initialEruvim="all" />, store, withEruvPage)
+    fireEvent.click(await screen.findByTestId('map-eruvim-chip'))
+    expect(screen.getByTestId('eruv-count')).toHaveTextContent('0')
+    expect(screen.getByTestId('point-count')).toHaveTextContent('1')
+  })
+
+  it('Filters choose which eruvim show; none chosen is every one', async () => {
+    renderMap(<ResourceMapView onUp={() => {}} />, store, withEruvPage)
+    const chip = await screen.findByTestId('map-eruvim-chip')
+    fireEvent.click(chip)
+    fireEvent.click(screen.getByTestId('map-filters-button'))
+    const section = screen.getByTestId('map-filters-__eruv__')
+    expect(section).toHaveTextContent('all 2')
+    fireEvent.click(within(section).getByRole('button', { name: /Center City/ }))
+    expect(screen.getByTestId('eruv-count')).toHaveTextContent('1')
+    expect(screen.getByRole('button', { name: 'Eruv Center City Eruv green' })).toBeInTheDocument()
+    expect(chip).toHaveTextContent('Eruvim1')
+    expect(section).toHaveTextContent('1 of 2')
+    // Unchosen again: every one.
+    fireEvent.click(within(section).getByRole('button', { name: /Center City/ }))
+    expect(screen.getByTestId('eruv-count')).toHaveTextContent('2')
+  })
+
+  it('a link with eruvim chosen shows those', async () => {
+    renderMap(<ResourceMapView onUp={() => {}} initialEruvim={['university-city']} />, store, withEruvPage)
+    await screen.findByTestId('map-eruvim-chip')
+    expect(screen.getByTestId('eruv-count')).toHaveTextContent('1')
+    expect(screen.getByRole('button', { name: 'Eruv University City Eruv green' })).toBeInTheDocument()
   })
 
   it('no chip where the community has no Eruv page', () => {

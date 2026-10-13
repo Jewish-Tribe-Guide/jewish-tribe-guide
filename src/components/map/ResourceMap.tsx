@@ -143,6 +143,9 @@ type Props = {
   onSelectEruv?: (id: string) => void
   /** The eruv whose listing is open, picked out. */
   selectedEruvId?: string | null
+  /** The eruvim are all the map shows (no places): framed on them, as the
+   *  places would be. */
+  frameEruvim?: boolean
 }
 
 const DEFAULT_CENTER = community.mapCenter
@@ -473,7 +476,7 @@ function buildUserDot(): HTMLElement {
 /** The interactive Google map: one advanced marker per point, a distinct "you
  *  are here" marker for the visitor, an info window on click, and a viewport
  *  auto-fit to whatever points are currently shown. */
-export default function ResourceMap({ points, userLocation, directionsOrigin, follow = true, onResumeFollow, onManualDrag, fallbackCenter = DEFAULT_CENTER, onViewListing, onSelectPoint, onDeselectPoint, onBackgroundClick, onMapLongPress, onLongPressPoint, searchActive, selectedId, frameToken, obscuredBottomPx = 0, obscuredTopPx = 0, zoomRadiusMiles, eruvim, onSelectEruv, selectedEruvId = null }: Props) {
+export default function ResourceMap({ points, userLocation, directionsOrigin, follow = true, onResumeFollow, onManualDrag, fallbackCenter = DEFAULT_CENTER, onViewListing, onSelectPoint, onDeselectPoint, onBackgroundClick, onMapLongPress, onLongPressPoint, searchActive, selectedId, frameToken, obscuredBottomPx = 0, obscuredTopPx = 0, zoomRadiusMiles, eruvim, onSelectEruv, selectedEruvId = null, frameEruvim = false }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<google.maps.Map | null>(null)
   const markersRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([])
@@ -550,6 +553,25 @@ export default function ResourceMap({ points, userLocation, directionsOrigin, fo
   useEffect(() => {
     if (ready) emphasizeEruvim(drawnEruvimRef.current, selectedEruvId)
   }, [ready, eruvKey, selectedEruvId])
+  // Shown alone (the Eruv page's Full map, or every place switched off),
+  // the eruvim are framed, once for each set of them: a status changing
+  // colour, or the visitor moving the map, doesn't reframe it.
+  const eruvIds = eruvim?.map((e) => e.id).join(',') ?? ''
+  const framedEruvimRef = useRef('')
+  useEffect(() => {
+    const map = mapRef.current
+    if (!ready || !map || !frameEruvim || !eruvIds) {
+      if (!frameEruvim) framedEruvimRef.current = ''
+      return
+    }
+    if (framedEruvimRef.current === eruvIds) return
+    framedEruvimRef.current = eruvIds
+    const frame = new google.maps.LatLngBounds()
+    for (const d of drawnEruvimRef.current.values()) frame.union(d.bounds)
+    // After the map settles: a fit while it's still laying itself out (a
+    // phone's full-bleed map, just opened) was undone.
+    if (!frame.isEmpty()) onIdleOrTimeout(map, IDLE_FALLBACK_MS, () => map.fitBounds(frame, 24))
+  }, [ready, frameEruvim, eruvIds, eruvKey])
   // ── Initialize the map once ──────────────────────────────────────────────
   useEffect(() => {
     if (!MAPS_API_KEY || mapsAuthFailed()) return
