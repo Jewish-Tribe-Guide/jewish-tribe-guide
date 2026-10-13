@@ -42,6 +42,10 @@ vi.mock('next/navigation', () => ({
 // into these independent cards, so this preserves that.
 
 vi.mock('@vercel/analytics', () => ({ track: vi.fn() }))
+// Pinned, not read from features.ts, so these hold on a branch that has the
+// Today home switched back on too.
+const features = vi.hoisted(() => ({ todayHome: false, whatChanged: false }))
+vi.mock('@/lib/features', () => ({ features }))
 // Recorded, not run: the tests read what the search-miss log was told.
 vi.mock('@/lib/useLogSearchMiss', () => ({ useLogSearchMiss: vi.fn() }))
 // Zmanim come from a network request; each test says what it has. Loading
