@@ -16,7 +16,7 @@ import {
   type Ref,
   type SetStateAction,
 } from 'react'
-import { ExternalIcon, ThumbtackIcon } from '@/components/icons'
+import { BookmarkIcon, ExternalIcon } from '@/components/icons'
 
 // ── Swipe-to-reveal for a list row — the ONE implementation ──────────────
 //
@@ -46,7 +46,7 @@ const ACTION_WIDTH = 52
 // 50% made this feel like it needed "swipe far" next to iMessage/Mail's own
 // row actions, which commit noticeably sooner. 30% is close to where those
 // apps' own reveal visually crosses the halfway point of the FIRST button
-// (Pin, at the row's edge), which reads as "I've clearly exposed something"
+// (Save, at the row's edge), which reads as "I've clearly exposed something"
 // well before the whole strip is out. A fraction rather than a pixel count,
 // so that reasoning holds at any strip width — which does mean narrowing the
 // strip shortened the absolute distance too.
@@ -109,37 +109,30 @@ const getHoverCapableSnapshot = () => window.matchMedia(HOVER_QUERY).matches
 const getHoverCapableServerSnapshot = () => false
 
 export type SwipeAction = {
-  id: 'pin' | 'share'
-  /** The caption under the circle — "Pin"/"Unpin", "Share"/"Copied!". */
+  id: 'save' | 'share'
+  /** The caption under the circle — "Save"/"Saved", "Share"/"Copied!". */
   label: string
-  /** The caption plus the listing's name. Every row in a list has a "Pin",
+  /** The caption plus the listing's name. Every row in a list has a "Save",
    *  so the caption alone doesn't say which listing it acts on. */
   ariaLabel: string
   active: boolean
   onSelect: () => void
 }
 
-// The colours these actions have always had on the map list — carried over
-// as they were rather than chosen afresh. How the pinned state should look
-// (colour, fill) is a design conversation still to be had; until it is,
-// nothing here should look different from what shipped.
+// The colours these actions have always had on the map list. A saved row's
+// Save is grey: tapping it takes the place off.
 const SHARE_COLOR = '#0f172a'
-const PIN_COLOR = '#2563eb'
-const UNPIN_COLOR = '#64748b'
+const SAVE_COLOR = '#2563eb'
+const SAVED_COLOR = '#64748b'
 
 function actionColor(action: SwipeAction) {
   if (action.id === 'share') return SHARE_COLOR
-  return action.active ? UNPIN_COLOR : PIN_COLOR
+  return action.active ? SAVED_COLOR : SAVE_COLOR
 }
 
 function ActionGlyph({ action }: { action: SwipeAction }) {
-  // The thumbtack, never the map-marker PinIcon: that teardrop is reserved
-  // for "set as location" (see ThumbtackIcon's own doc), and the map list
-  // drew Pin with it until it moved onto this component. Always the outline
-  // variant too — ThumbtackIcon's filled one is the literal 📌 emoji, which
-  // PinnedBadge already puts on the row's avatar once it's pinned. The state
-  // is carried by the caption and the circle's colour instead.
-  if (action.id === 'pin') return <ThumbtackIcon className="h-4 w-4" />
+  // Filled once saved, as the bookmark is everywhere.
+  if (action.id === 'save') return <BookmarkIcon filled={action.active} className="h-4 w-4" />
   return <ExternalIcon className="h-4 w-4" />
 }
 
@@ -185,10 +178,10 @@ export default function SwipeRow({
   onContentClick?: () => void
   children: ReactNode
 }) {
-  // Share sits left of Pin, which stays at the row's edge — that's the
+  // Share sits left of Save, which stays at the row's edge — that's the
   // button a visitor already has muscle memory for, so a small swipe still
   // reveals it first.
-  const ordered = useMemo(() => [...actions].sort((a, b) => (a.id === 'pin' ? 1 : 0) - (b.id === 'pin' ? 1 : 0)), [actions])
+  const ordered = useMemo(() => [...actions].sort((a, b) => (a.id === 'save' ? 1 : 0) - (b.id === 'save' ? 1 : 0)), [actions])
   const revealWidth = ordered.length * ACTION_WIDTH
   const active = enabled && ordered.length > 0
 

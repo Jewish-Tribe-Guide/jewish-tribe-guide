@@ -42,7 +42,7 @@ import { foundFor, searchAsk, type SearchFound } from '@/lib/askSearch'
 import { hoursOpenNow, businessClosure } from '@/lib/hours'
 import { useNow } from '@/lib/useNow'
 import { ui } from '@/lib/uiConfig'
-import { ChevronLeftIcon, ExpandIcon, CollapseIcon, PinIcon, SlidersIcon } from '@/components/icons'
+import { ChevronLeftIcon, ExpandIcon, CollapseIcon, BookmarkIcon, PinIcon, SlidersIcon } from '@/components/icons'
 import { categoryTint, getCategoryColor, HOSPITAL_COLOR, HOSPITAL_ICON } from '@/lib/categoryColor'
 import LocationControl, { type LocationControls } from '@/components/home/LocationControl'
 import { usePinned } from '@/lib/pinnedContext'
@@ -1623,15 +1623,15 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // already said. The real toggle state (aria-pressed, the click handler)
   // stays keyed on `pinnedSelected` itself.
   const pinnedHighlighted = pinnedSelected && !allChipsOn
+  // "Saved" (Pin until Oct 14, canvas page "you", board YouMap): right after
+  // Filters, before All — the visitor's own places, not one more category.
   const pinnedChip = ui.map.pins && mappablePinnedCount > 0 && (
     <div
-      className={`relative flex shrink-0 items-stretch rounded-full border text-xs font-medium transition-colors ${
-        pinnedHighlighted ? 'border-transparent text-white' : 'border-slate-300 bg-white text-slate-500'
+      className={`relative flex shrink-0 items-stretch rounded-full border text-xs font-semibold transition-colors ${
+        pinnedHighlighted ? 'border-transparent text-white' : 'border-slate-300 bg-white text-[#2563eb]'
       }`}
-      // Same blue as the pin badge overlaid on a pinned marker (see
-      // ResourceMap's buildPin) — Pinned isn't a real category with its own
-      // hue, but this chip should still read with exactly the same weight
-      // (size, dot, count) as one, not a lighter/different-shaped control.
+      // The same blue as the bookmark badge on a saved place's marker (see
+      // ResourceMap's buildPin).
       style={pinnedHighlighted ? { backgroundColor: '#2563eb' } : undefined}
     >
       <button
@@ -1639,14 +1639,9 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
         aria-pressed={pinnedSelected}
         className={`flex items-center gap-1 py-1 pl-2.5 pr-2.5 rounded-full cursor-pointer ${pinnedHighlighted ? '' : 'hover:bg-slate-50'}`}
       >
-        <span
-          className="inline-block h-2 w-2 rounded-full ring-1 ring-white/60"
-          style={{ backgroundColor: pinnedHighlighted ? 'rgba(255,255,255,0.9)' : '#2563eb' }}
-          aria-hidden="true"
-        />
-        <span aria-hidden="true">📌</span>
-        <span>Pinned</span>
-        <span className={pinnedHighlighted ? 'text-white/80' : 'text-slate-400'}>{mappablePinnedCount}</span>
+        <BookmarkIcon filled={pinnedHighlighted} className="h-3 w-3" />
+        <span>Saved</span>
+        <span className={pinnedHighlighted ? 'text-white/80' : ''}>{mappablePinnedCount}</span>
       </button>
     </div>
   )

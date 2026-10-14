@@ -46,7 +46,8 @@ import { clockTime } from '@/lib/upcomingDavening'
 import { milesText } from '@/lib/geo'
 import type { SearchFound } from '@/lib/askSearch'
 import CategoryIcon from '@/components/CategoryIcon'
-import PinnedBadge from '@/components/PinnedBadge'
+import SavedBadge from '@/components/SavedBadge'
+import SaveButton from '@/components/SaveButton'
 import { usePinned } from '@/lib/pinnedContext'
 import {
   CertificateIcon,
@@ -156,7 +157,7 @@ export default function ListingView({ item, category, color, place = null, upvot
   const { data: zmanim } = useZmanim(hoursFields.length > 0 || shabbosFields ? community.mapCenter : null)
   const candlesAt = candlesToday(zmanim, now)
   const shul = useNextMinyan(item.id)
-  const { isPinned } = usePinned()
+  const { isPinned, toggle: toggleSaved } = usePinned()
 
   const main = mainThing(item, category)
   // A listing's items and this visitor's answers about them, shared by the
@@ -211,7 +212,7 @@ export default function ListingView({ item, category, color, place = null, upvot
   const who = (
     <div>
       <div className="flex items-start gap-3.5">
-        {/* PinnedBadge, as on the row's own picture. */}
+        {/* SavedBadge, as on the row's own picture. */}
         <span className="relative shrink-0">
           <CategoryIcon
             icon={category.icon}
@@ -223,7 +224,7 @@ export default function ListingView({ item, category, color, place = null, upvot
             className={wide ? 'h-20 w-20 text-3xl' : 'h-16 w-16 text-2xl'}
             sizePx={wide ? 80 : 64}
           />
-          {isPinned(item.id) && <PinnedBadge />}
+          {isPinned(item.id) && <SavedBadge />}
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex items-start gap-2">
@@ -234,6 +235,11 @@ export default function ListingView({ item, category, color, place = null, upvot
                 {item.name}
               </Link>
             </Title>
+            {/* Save, beside the thumbs-up (Oct 13, board YouSave): the
+                place is one tap from You, wherever it's opened. */}
+            {ui.map.pins && (
+              <SaveButton saved={isPinned(item.id)} onToggle={() => toggleSaved({ id: item.id, categoryId: category.id })} name={item.name} />
+            )}
             {upvote}
           </div>
           <p className="mt-1 text-[14.5px] leading-snug text-muted">

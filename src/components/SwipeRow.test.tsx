@@ -23,14 +23,14 @@ afterEach(() => {
 })
 
 function makeActions(name: string, overrides: Partial<Record<SwipeAction['id'], Partial<SwipeAction>>> = {}) {
-  const pin = vi.fn()
+  const save = vi.fn()
   const share = vi.fn()
   const actions: SwipeAction[] = [
-    // Pin first on purpose — SwipeRow must still put it at the row's edge.
-    { id: 'pin', label: 'Pin', ariaLabel: `Pin ${name}`, active: false, onSelect: pin, ...overrides.pin },
+    // Save first on purpose — SwipeRow must still put it at the row's edge.
+    { id: 'save', label: 'Save', ariaLabel: `Save ${name}`, active: false, onSelect: save, ...overrides.save },
     { id: 'share', label: 'Share', ariaLabel: `Share ${name}`, active: false, onSelect: share, ...overrides.share },
   ]
-  return { actions, pin, share }
+  return { actions, save, share }
 }
 
 function Row({ name, actions, enabled, onTap }: { name: string; actions: SwipeAction[]; enabled?: boolean; onTap?: () => void }) {
@@ -73,7 +73,7 @@ describe('SwipeRow — touch', () => {
     drag(contentOf('Goldi'), -40)
 
     expect(isOpen('Goldi')).toBe(true)
-    expect(screen.getByRole('button', { name: 'Pin Goldi' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Save Goldi' })).toBeInTheDocument()
   })
 
   it('springs back from a slow drag short of that, rather than half-opening', () => {
@@ -81,7 +81,7 @@ describe('SwipeRow — touch', () => {
     drag(contentOf('Goldi'), -20)
 
     expect(contentOf('Goldi').style.transform).toBe('')
-    expect(screen.queryByRole('button', { name: 'Pin Goldi' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Save Goldi' })).not.toBeInTheDocument()
   })
 
   // The other half of why iMessage/Mail feel quick: a short, fast flick is
@@ -137,7 +137,7 @@ describe('SwipeRow — what the swipe reveals', () => {
   // map list shipped that way until it moved onto this component.
   it('keeps its actions out of the page until the row is swiped', () => {
     render(<Row name="Goldi" actions={makeActions('Goldi').actions} />)
-    expect(screen.queryByRole('button', { name: 'Pin Goldi' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Save Goldi' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Share Goldi' })).not.toBeInTheDocument()
   })
 
@@ -148,19 +148,19 @@ describe('SwipeRow — what the swipe reveals', () => {
     expect(contentOf('Goldi').style.transform).toBe('')
   })
 
-  // Pin stays at the row's edge — the first thing a small swipe reveals,
+  // Save stays at the row's edge — the first thing a small swipe reveals,
   // and where muscle memory from the map list expects it — whatever order
   // a caller happens to pass them in.
-  it('puts Pin at the row edge and Share beside it', () => {
+  it('puts Save at the row edge and Share beside it', () => {
     render(<Row name="Goldi" actions={makeActions('Goldi').actions} />)
     drag(contentOf('Goldi'), -60)
 
     const labels = screen.getAllByRole('button', { name: /Goldi$/ }).map((b) => b.getAttribute('aria-label'))
-    expect(labels).toEqual(['Share Goldi', 'Pin Goldi'])
+    expect(labels).toEqual(['Share Goldi', 'Save Goldi'])
   })
 
-  it('closes after Pin, but stays open after Share so its "Copied!" can be read', () => {
-    const { actions, pin, share } = makeActions('Goldi')
+  it('closes after Save, but stays open after Share so its "Copied!" can be read', () => {
+    const { actions, save, share } = makeActions('Goldi')
     render(<Row name="Goldi" actions={actions} />)
 
     drag(contentOf('Goldi'), -60)
@@ -168,8 +168,8 @@ describe('SwipeRow — what the swipe reveals', () => {
     expect(share).toHaveBeenCalledTimes(1)
     expect(isOpen('Goldi')).toBe(true)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Pin Goldi' }))
-    expect(pin).toHaveBeenCalledTimes(1)
+    fireEvent.click(screen.getByRole('button', { name: 'Save Goldi' }))
+    expect(save).toHaveBeenCalledTimes(1)
     expect(contentOf('Goldi').style.transform).toBe('')
   })
 })
@@ -222,7 +222,7 @@ describe('SwipeRow — groups and switching it off', () => {
     drag(contentOf('Acme'), -60)
     expect(isOpen('Acme')).toBe(true)
     expect(contentOf('Goldi').style.transform).toBe('')
-    expect(screen.queryByRole('button', { name: 'Pin Goldi' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Save Goldi' })).not.toBeInTheDocument()
   })
 
   // For a surface that reveals these another way (the category card's
@@ -233,7 +233,7 @@ describe('SwipeRow — groups and switching it off', () => {
     drag(contentOf('Goldi'), -60)
 
     expect(contentOf('Goldi').style.transform).toBe('')
-    expect(screen.queryByRole('button', { name: 'Pin Goldi' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Save Goldi' })).not.toBeInTheDocument()
     tap(contentOf('Goldi'))
     expect(onTap).toHaveBeenCalled()
   })

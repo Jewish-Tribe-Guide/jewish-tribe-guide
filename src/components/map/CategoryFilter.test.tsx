@@ -69,12 +69,12 @@ describe('CategoryFilter', () => {
     expect(screen.getByRole('button', { name: 'All' })).toHaveAttribute('aria-pressed', 'false')
   })
 
-  it('renders the pinned chip right after All, when provided', () => {
-    render(<CategoryFilter {...baseProps({ pinnedChip: <button>Pinned</button> })} />)
+  // Board YouMap: Filters, Saved, All, then the categories.
+  it('renders the Saved chip after the leading chip and before All, when provided', () => {
+    render(<CategoryFilter {...baseProps({ leadingChip: <button>Filters</button>, pinnedChip: <button>Saved</button> })} />)
 
     const buttons = screen.getAllByRole('button').map((b) => b.textContent)
-    expect(buttons[0]).toBe('All')
-    expect(buttons[1]).toBe('Pinned')
+    expect(buttons.slice(0, 3)).toEqual(['Filters', 'Saved', 'All'])
   })
 
   describe('maxVisible truncation', () => {

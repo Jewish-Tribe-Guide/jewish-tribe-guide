@@ -52,8 +52,7 @@ afterEach(() => {
   // in the file expects to find it.
   Object.defineProperty(window, 'scrollY', { value: 0, configurable: true })
   // usePinned is backed by real localStorage, and every test here uses the
-  // same listing id — a pin left by one would turn the next one's "Pin"
-  // into "Pinned".
+  // same listing id — a save left by one would carry into the next.
   localStorage.clear()
   ui.map.pins = true
 })
@@ -62,10 +61,8 @@ describe('ListingActionsFan', () => {
   // This is the whole point of the component and the one thing most likely
   // to be "simplified" away later, so it is asserted on the rendered TEXT,
   // not on aria-labels: a screen reader would be fine either way, and a
-  // sighted visitor staring at three white discs would not. Pin is a
-  // thumbtack and Set-as-location is a map marker — glyphs this codebase
-  // already had to split apart deliberately — and with the words gone they
-  // are a coin toss.
+  // sighted visitor staring at white discs would not. With the words gone
+  // the glyphs are a coin toss.
   it('gives every action a visible caption, not just an accessible name', async () => {
     withLocation()
     const user = userEvent.setup()
@@ -74,7 +71,7 @@ describe('ListingActionsFan', () => {
     await user.click(screen.getByRole('button', { name: 'Actions for Goldi Market' }))
 
     const menu = screen.getByRole('menu')
-    for (const label of ['Pin', 'Share', 'Set as location']) {
+    for (const label of ['Share', 'Set as location']) {
       // Asserting on textContent alone is NOT enough, and this test was
       // briefly written that way: `sr-only` captions satisfy it perfectly,
       // so it passed against an icon-only fan — the exact thing it exists to
@@ -106,7 +103,7 @@ describe('ListingActionsFan', () => {
     renderFan()
 
     await user.click(screen.getByRole('button', { name: 'Actions for Goldi Market' }))
-    await user.click(screen.getByRole('menuitem', { name: 'Pin' }))
+    await user.click(screen.getByRole('menuitem', { name: 'Set as location' }))
 
     expect(screen.queryByRole('menu')).not.toBeInTheDocument()
   })
@@ -202,7 +199,7 @@ describe('ListingActionsFan', () => {
   // That file was the only coverage several of these had: the backdrop that
   // makes outside-tap dismissal work (with the real-iPhone history written
   // up in ListingActionsFan's own doc), the aria-pressed rule axe flags as
-  // critical, and useListingActions' whole Pin/Set-as-location state
+  // critical, and useListingActions' whole Set-as-location state
   // machine, which has no test file of its own. Deleting a file along with
   // the component it tests quietly deletes every guarantee only it made.
 
@@ -252,7 +249,7 @@ describe('ListingActionsFan', () => {
     )
 
     await openFan(user)
-    await user.click(screen.getByRole('menuitem', { name: 'Pin' }))
+    await user.click(screen.getByRole('menuitem', { name: 'Set as location' }))
     expect(onParentClick).not.toHaveBeenCalled()
   })
 
@@ -283,18 +280,19 @@ describe('ListingActionsFan', () => {
 
     await openFan(user)
     const items = screen.getAllByRole('menuitem')
-    expect(items.length).toBe(3)
+    expect(items.length).toBe(2)
     for (const item of items) expect(item, item.textContent ?? '').not.toHaveAttribute('aria-pressed')
   })
 
-  it('drops Pin when the community has pins turned off, but keeps Share', async () => {
-    ui.map.pins = false
+  // Save is the bookmark at the top of an opened listing (Oct 14), beside
+  // the thumbs-up; a second copy in here would be two ways to do one thing.
+  it('never offers Save: an opened listing has it at the top', async () => {
     withLocation()
     const user = userEvent.setup()
     renderFan()
 
     await openFan(user)
-    expect(screen.queryByRole('menuitem', { name: /^pin/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('menuitem', { name: /^(save|pin)/i })).not.toBeInTheDocument()
     expect(screen.getByRole('menuitem', { name: 'Share' })).toBeInTheDocument()
   })
 
@@ -329,17 +327,6 @@ describe('ListingActionsFan', () => {
     await openFan(user)
     await user.click(screen.getByRole('menuitem', { name: 'Location set' }))
     expect(unsetListingAnchor).toHaveBeenCalledTimes(1)
-  })
-
-  it('pins the listing, and says so the next time it opens', async () => {
-    withLocation()
-    const user = userEvent.setup()
-    renderFan()
-
-    await openFan(user)
-    await user.click(screen.getByRole('menuitem', { name: 'Pin' }))
-    await openFan(user)
-    expect(screen.getByRole('menuitem', { name: 'Pinned' })).toBeInTheDocument()
   })
 
   // ── placement="stack", for surfaces with no scrim (the map) ───────────

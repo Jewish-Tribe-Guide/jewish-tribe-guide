@@ -3,7 +3,7 @@
 import { useMemo } from 'react'
 import { haversineMiles } from '@/lib/geo'
 import CategoryIcon from '@/components/CategoryIcon'
-import PinnedBadge from '@/components/PinnedBadge'
+import SavedBadge from '@/components/SavedBadge'
 import SwipeRow, { SwipeRowGroup, type SwipeAction } from '@/components/SwipeRow'
 import { CategoryGlyph } from '@/lib/categoryIcons'
 import { categoryTint } from '@/lib/categoryColor'
@@ -16,7 +16,7 @@ import { listingSlug } from '@/lib/listingSlug'
 import type { MapPoint } from './ResourceMap'
 import type { DirectoryResource } from '@/types'
 
-// Rows swipe to reveal Pin/Share through SwipeRow, the one swipe
+// Rows swipe to reveal Save/Share through SwipeRow, the one swipe
 // implementation both lists share — the gesture's tuning (thresholds, flick
 // velocity, the trackpad path) and the reveal's look live there now.
 
@@ -56,9 +56,8 @@ export default function NearbyList({ points, userLocation, onViewListing, onSele
       miles: userLocation ? haversineMiles(userLocation, { lat: p.lat, lng: p.lng }) : null,
     }))
     return scored.sort((a, b) => {
-      // Pinned listings always float to the top, ahead of distance/upvote
-      // ordering — that's the whole point of pinning something from here.
-      if (!!a.pinned !== !!b.pinned) return a.pinned ? -1 : 1
+      // Saved places keep their place (Oct 14): nearest first means nearest
+      // first. Their badge is how they stand out.
       if (a.miles === null && b.miles === null) {
         return (b.raw?.upvotes ?? 0) - (a.raw?.upvotes ?? 0) || a.name.localeCompare(b.name)
       }
@@ -121,9 +120,9 @@ function NearbyRow({ point: p, canViewListing, canPin, onSelect, onTogglePin }: 
   const swipeActions: SwipeAction[] = [
     { id: 'share', label: copied ? 'Copied!' : 'Share', ariaLabel: `Share ${p.name}`, active: copied, onSelect: share },
     {
-      id: 'pin',
-      label: p.pinned ? 'Unpin' : 'Pin',
-      ariaLabel: p.pinned ? `Unpin ${p.name}` : `Pin ${p.name}`,
+      id: 'save',
+      label: p.pinned ? 'Saved' : 'Save',
+      ariaLabel: p.pinned ? `Saved ${p.name}` : `Save ${p.name}`,
       active: !!p.pinned,
       onSelect: onTogglePin,
     },
@@ -147,7 +146,7 @@ function NearbyRow({ point: p, canViewListing, canPin, onSelect, onTogglePin }: 
         disabled={!canViewListing}
         className={`flex min-w-0 flex-1 items-center gap-3 text-left ${canViewListing ? 'cursor-pointer group' : 'cursor-default'}`}
       >
-        {/* Same PinnedBadge the category page's card puts on its own
+        {/* Same SavedBadge the category page's card puts on its own
             avatar (see GenericListingCard) — the right-side category
             badge further down keeps its own separate, smaller pin overlay
             untouched; this is purely additive on the left icon. */}
@@ -164,7 +163,7 @@ function NearbyRow({ point: p, canViewListing, canPin, onSelect, onTogglePin }: 
             className="h-9 w-9 text-lg"
             sizePx={36}
           />
-          {p.pinned && <PinnedBadge />}
+          {p.pinned && <SavedBadge />}
         </span>
         <span className="min-w-0 flex-1">
           <p className={`text-sm font-semibold leading-tight ${canViewListing ? 'text-slate-900 group-hover:text-blue-600 transition-colors' : 'text-slate-900'}`}>
@@ -192,7 +191,7 @@ function NearbyRow({ point: p, canViewListing, canPin, onSelect, onTogglePin }: 
           markers on the map themselves sit above their labels. */}
       <div className="flex shrink-0 flex-col items-center justify-center gap-1 ml-1">
         {/* No pinned sub-badge here any more — the row's own left avatar
-            (see the CategoryIcon/PinnedBadge pairing above) already shows
+            (see the CategoryIcon/SavedBadge pairing above) already shows
             it, and duplicating it on this second, smaller badge too just
             repeated the same fact twice on one row. */}
         <span

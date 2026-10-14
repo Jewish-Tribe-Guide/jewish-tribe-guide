@@ -15,7 +15,7 @@ import { useCommunitySlug } from '@/lib/communityContext'
 import { routes } from '@/lib/routes'
 import { listingSlug } from '@/lib/listingSlug'
 import CategoryIcon from '@/components/CategoryIcon'
-import PinnedBadge from '@/components/PinnedBadge'
+import SavedBadge from '@/components/SavedBadge'
 import UpvoteButton from './UpvoteButton'
 import MobileSheet from './MobileSheet'
 import { useListingOnward } from './listingOnward'
@@ -39,7 +39,7 @@ import { countEvent } from '@/lib/countEvent'
 const ListingDetailModal = dynamic(() => import('./ListingDetailModal'))
 const MapPlaceDetail = dynamic(() => import('@/components/map/MapPlaceDetail'))
 
-/** Pin and Share are the two that belong to SCANNING a list — shortlisting
+/** Save and Share are the two that belong to SCANNING a list — shortlisting
  *  as you read, sending one to someone. "Set as location" is deliberately
  *  not here: it re-sorts the entire directory, which is a deliberate act
  *  rather than something you do in passing, and two actions is the practical
@@ -49,7 +49,7 @@ const MapPlaceDetail = dynamic(() => import('@/components/map/MapPlaceDetail'))
  *  A phone's swipe only. A desktop row used to show the two on hover, over
  *  its likes; hovering a row now lights its pin on the map beside the list,
  *  and an opened listing has both one click away. */
-const CARD_ACTION_IDS: ListingAction['id'][] = ['pin', 'share']
+const CARD_ACTION_IDS: ListingAction['id'][] = ['save', 'share']
 
 // Colour only where it means something: see lib/listingRow.ts.
 const FACT_TONE: Record<RowFactTone, string> = {
@@ -217,7 +217,7 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
   const { isPinned } = usePinned()
   const pinned = isPinned(item.id)
 
-  // Pin/Share for the collapsed row, revealed by a swipe on mobile. A
+  // Save/Share for the collapsed row, revealed by a swipe on mobile. A
   // shortcut: ListingActionsFan below an opened listing is where these are
   // reachable by every visitor, which is what makes it safe for the card's
   // own copies to be invisible until asked for.
@@ -226,11 +226,12 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
   )
   // The mobile swipe is SwipeRow, the same one the map's nearby list uses,
   // so the gesture and the circles it reveals are identical on both. Worded
-  // the way that swipe always has been: "Unpin" says what the tap will do,
+  // the way the fan words them: "Saved", with the bookmark filled, and a tap
+  // takes it off (with Undo).
   // where the fan's "Pinned" (a menu item, whose label is its only state
   // cue) says what's true now.
   const rowSwipeActions: SwipeAction[] = cardActions.map((a) => {
-    const label = a.id === 'pin' ? (a.active ? 'Unpin' : 'Pin') : a.label
+    const label = a.label
     return { id: a.id as SwipeAction['id'], label, ariaLabel: `${label} ${item.name}`, active: a.active, onSelect: a.onSelect }
   })
 
@@ -435,7 +436,7 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
               color={color}
               className="h-10 w-10 text-xl"
             />
-            {pinned && <PinnedBadge />}
+            {pinned && <SavedBadge />}
           </span>
 
           {/* Name, then the facts line, then where it is. One line each:

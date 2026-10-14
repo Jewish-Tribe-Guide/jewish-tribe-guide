@@ -224,6 +224,7 @@ export default function CategoryFilter({
           chip, filled to match whenever it's already the active state,
           rather than a Show all/Hide all pair. */}
       {leadingChip}
+      {pinnedChip}
       <button
         onClick={onAll}
         aria-pressed={allOn}
@@ -236,7 +237,6 @@ export default function CategoryFilter({
         All
       </button>
       {campaignChip}
-      {pinnedChip}
       {visible.map((o) => {
         const selectedState = selected.has(o.id)
         // Display only — while "All" is active every category is technically

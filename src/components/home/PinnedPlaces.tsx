@@ -12,7 +12,7 @@ import { haversineMiles, milesText, type LatLng } from '@/lib/geo'
 import { initialsOf, listingRowFacts, listingRowNote, type RowFact } from '@/lib/listingRow'
 import { listingSlug } from '@/lib/listingSlug'
 import { mapQueryString, routes } from '@/lib/routes'
-import { ChevronRightIcon, ThumbtackIcon } from '@/components/icons'
+import { BookmarkIcon, ChevronRightIcon } from '@/components/icons'
 import CategoryIcon from '@/components/CategoryIcon'
 import SwipeRow, { SwipeRowGroup } from '@/components/SwipeRow'
 import { NextMinyans, useNextMinyan } from '@/components/resources/nextMinyans'
@@ -227,7 +227,7 @@ function PinnedRow({ place, communitySlug, from, now, onUnpin }: { place: Pinned
     <div className="border-t border-slate-100 first:border-t-0 desktop:[&:nth-child(2)]:border-t-0">
       <SwipeRow
         rowId={item.id}
-        actions={[{ id: 'pin', label: 'Unpin', ariaLabel: `Unpin ${item.name}`, active: true, onSelect: onUnpin }]}
+        actions={[{ id: 'save', label: 'Saved', ariaLabel: `Saved ${item.name}`, active: true, onSelect: onUnpin }]}
         className="bg-white"
         contentClassName="relative flex items-center gap-2 bg-white py-2.5 touch-pan-y"
       >
@@ -257,7 +257,7 @@ function PinnedRow({ place, communitySlug, from, now, onUnpin }: { place: Pinned
           title="Unpin"
           className="hidden h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-full bg-primary/10 text-primary hover:bg-primary/20 desktop:flex"
         >
-          <ThumbtackIcon className="h-[18px] w-[18px]" />
+          <BookmarkIcon filled className="h-[18px] w-[18px]" />
         </button>
       </SwipeRow>
     </div>

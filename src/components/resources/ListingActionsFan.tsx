@@ -5,20 +5,19 @@ import { createPortal } from 'react-dom'
 import type { DirectoryResource } from '@/types'
 import type { CategoryConfig } from '@/lib/categories'
 import { useIsMobile } from '@/lib/useIsMobile'
-import { CheckIcon, ClosedIcon, DotsIcon, ExternalIcon, PinIcon, ThumbtackIcon } from '@/components/icons'
+import { CheckIcon, ClosedIcon, DotsIcon, ExternalIcon, PinIcon } from '@/components/icons'
 import { useListingActions, type ListingAction } from './useListingActions'
 
 // ── The overflow beside an open listing's "Suggest an edit" pill ─────────
 //
-// Pin / Share / Set as location, as a fan of floating circles rather than a
+// Share / Set as location / Request removal, as a fan of floating circles rather than a
 // dropdown card — so everything in this layer (the Add "+", the edit pill,
 // these) reads as one family of floating controls instead of a pill with a
 // menu stapled to it.
 //
 // **Every circle carries a visible caption, always.** That isn't decoration
-// and it isn't negotiable: Pin and Set-as-location are a thumbtack and a
-// map-marker, two glyphs this codebase already had to split apart on purpose
-// (see ActionGlyph below, and ThumbtackIcon's own doc), and stripped of text they are a
+// and it isn't negotiable: Set-as-location is a map-marker and Share an arrow
+// out of a box, and stripped of text they are a
 // coin toss. The same lesson is written on the Add button itself, which
 // grew a visible label on desktop precisely because a bare icon floating in
 // a corner was "invisible unless you already knew to hover-and-guess".
@@ -83,7 +82,6 @@ type Placement =
 
 function ActionGlyph({ action }: { action: ListingAction }) {
   const cls = 'h-5 w-5'
-  if (action.id === 'pin') return <ThumbtackIcon filled={action.active} className={cls} />
   if (action.id === 'share') return <ExternalIcon className={cls} />
   if (action.id === 'remove') return <ClosedIcon className={cls} />
   return action.active ? <CheckIcon className={cls} /> : <PinIcon className={cls} />
@@ -102,7 +100,8 @@ export default function ListingActionsFan({
   path: string
   /** Actions the listing already shows as buttons of their own: the opened
    *  listing has Share among Directions and Call, so the fan holds only
-   *  Pin and Set as location there. */
+   *  Set as location there. Save is never here: an opened listing has its
+   *  bookmark at the top, beside the thumbs-up (SaveButton). */
   omit?: ListingAction['id'][]
   /** `stack` for a surface with no scrim behind it — the map's panels,
    *  whose background is a live map. The captions are white with a text
@@ -116,7 +115,7 @@ export default function ListingActionsFan({
   onRequestRemoval?: () => void
 }) {
   const actions = [
-    ...useListingActions(item, category, path).filter((a) => !omit.includes(a.id)),
+    ...useListingActions(item, category, path).filter((a) => a.id !== 'save' && !omit.includes(a.id)),
     ...(onRequestRemoval ? [{ id: 'remove' as const, label: 'Request removal', active: false, onSelect: onRequestRemoval }] : []),
   ]
   const isMobile = useIsMobile()

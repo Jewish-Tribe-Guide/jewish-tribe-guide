@@ -49,7 +49,6 @@ import QuestionCard, { useAskedPlaces } from './QuestionCard'
 import { parseQuestionCard, pickQuestion } from '@/lib/questionCards'
 import { ui } from '@/lib/uiConfig'
 import { useOptionalLocation } from '@/lib/locationContext'
-import { usePinned } from '@/lib/pinnedContext'
 import { useCategories } from '@/lib/useCategories'
 import { didArriveViaBackForward } from '@/lib/backForwardNavigation'
 import { getCategoryColor } from '@/lib/categoryColor'
@@ -183,7 +182,6 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // visitor drilled into, never the home grid itself. Called further down,
   // once it's known whether a listing is this screen (a phone, from a link).
 
-  const { isPinned } = usePinned()
   // Captured once, on this component's very first render — see
   // backForwardNavigation's own module doc. A visitor who presses back/
   // forward should land on a blank slate here even though the URL they're
@@ -1097,13 +1095,8 @@ export default function GenericDirectory({ category, items, anchorLabel, address
         Number(!!businessClosure(a as unknown as Record<string, unknown>)) -
         Number(!!businessClosure(b as unknown as Record<string, unknown>))
       if (closedDiff !== 0) return closedDiff
-      // Pinned listings float to the top next, ahead of popularity/distance —
-      // same tier NearbyList.tsx's own sort gives them on the map, "that's
-      // the whole point of pinning something." Still below the closed check
-      // above: a pinned-but-closed listing outranks other closed listings,
-      // not every open one.
-      const pinnedDiff = Number(isPinned(b.id)) - Number(isPinned(a.id))
-      if (pinnedDiff !== 0) return pinnedDiff
+      // Saved places don't float to the top (Oct 14): the order is what Sort
+      // says. Their badge is how they stand out.
       return upvotes && byPopular
         ? liveCount(b) - liveCount(a) || travelCompare(a, b)
         : // From the centre only when Distance was chosen or asked for

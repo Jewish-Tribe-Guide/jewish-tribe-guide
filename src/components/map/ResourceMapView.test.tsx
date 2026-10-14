@@ -763,17 +763,25 @@ describe('ResourceMapView — selecting a place', () => {
   })
 })
 
-describe('ResourceMapView — pinning', () => {
-  it('long-pressing a point pins it, which turns the Pinned chip on', async () => {
+describe('ResourceMapView — saving', () => {
+  // Pin used to turn its chip on, narrowing the map to the pins the moment
+  // one was added. Save doesn't (Oct 14, board YouMap): the map keeps showing
+  // everything, the saved place marked, and the Saved chip appears, off.
+  it('long-pressing a point saves it: the Saved chip appears, and the map still shows everything', async () => {
     const user = userEvent.setup()
     const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
-    renderMap(<ResourceMapView onUp={vi.fn()} />, [listingWithGeo({ id: 'g1', category: 'grocery', name: 'Acme Grocery' })], [grocery])
+    renderMap(
+      <ResourceMapView onUp={vi.fn()} />,
+      [listingWithGeo({ id: 'g1', category: 'grocery', name: 'Acme Grocery' }), listingWithGeo({ id: 'g2', category: 'grocery', name: 'Other Grocery' })],
+      [grocery],
+    )
 
-    expect(screen.queryByRole('button', { name: /^Pinned/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Saved/ })).not.toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Long-press Acme Grocery' }))
 
-    expect(await screen.findByRole('button', { name: /^Pinned/ })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: /^Saved/ })).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByRole('button', { name: 'Long-press Other Grocery' })).toBeInTheDocument()
   })
 
   // Real bug: a listing in a non-mappable category (WhatsApp Groups,
@@ -793,7 +801,7 @@ describe('ResourceMapView — pinning', () => {
   // GenericDirectory.test.tsx's "pinned listings sort first" for the same
   // pattern) — the mocked ResourceMap only renders a Long-press button for
   // points actually passed to it, and this listing is never one of them.
-  it('does not show the Pinned chip for a pin in a non-mappable category (e.g. WhatsApp Groups)', () => {
+  it('does not show the Saved chip for a save in a non-mappable category (e.g. WhatsApp Groups)', () => {
     localStorage.setItem('jpc:pinned-listings', JSON.stringify([{ id: 'wa1', categoryId: 'whatsapp' }]))
     // A normal mappable category alongside it — a map with only a
     // non-mappable category would hide the whole chip row regardless of the
@@ -820,7 +828,7 @@ describe('ResourceMapView — pinning', () => {
       [grocery, whatsapp],
     )
 
-    expect(screen.queryByRole('button', { name: /^Pinned/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Saved/ })).not.toBeInTheDocument()
   })
 })
 
@@ -946,7 +954,7 @@ describe('ResourceMapView — nested touch gestures', () => {
     fireEvent.pointerUp(rowContent, { clientX: 190 })
 
     expect(rowContent.style.transform).toBe('translateX(-104px)') // two 52px actions — fully revealed
-    expect(within(sheetContent).getByRole('button', { name: 'Pin Nosh Deli' })).toBeInTheDocument()
+    expect(within(sheetContent).getByRole('button', { name: 'Save Nosh Deli' })).toBeInTheDocument()
   })
 
   // Real bug, the other direction: a plain `abs(deltaX) >= 8` threshold
@@ -974,7 +982,7 @@ describe('ResourceMapView — nested touch gestures', () => {
 
     // No transform at all at rest — SwipeRow only sets one while displaced.
     expect(rowContent.style.transform).toBe('')
-    expect(within(sheetContent).queryByRole('button', { name: 'Pin Corner Bakery' })).not.toBeInTheDocument()
+    expect(within(sheetContent).queryByRole('button', { name: 'Save Corner Bakery' })).not.toBeInTheDocument()
 
     fireEvent.pointerUp(rowContent, { clientX: 290, clientY: 350 })
   })

@@ -1694,14 +1694,15 @@ describe('GenericDirectory — where distances are from', () => {
   })
 })
 
-describe('GenericDirectory — pinned listings sort first', () => {
+describe('GenericDirectory — saved places keep their place', () => {
   afterEach(() => localStorage.clear())
 
   // Seeded directly via the real pinned.ts storage shape rather than driven
   // through a kebab click — GenericListingCard is stubbed in this file (see
-  // the mock at the top), so there's no real Pin control to click here; this
-  // is the same thing PinnedProvider itself reads on mount.
-  it('renders a pinned listing first, ahead of popularity/alphabetical order', () => {
+  // the mock at the top), so there's no real Save control to click here; this
+  // is the same thing PinnedProvider itself reads on mount. Saved places used
+  // to float to the top (as Pin); since Oct 14 the order is what Sort says.
+  it('keeps a saved listing where the sort puts it, not first', () => {
     localStorage.setItem('jpc:pinned-listings', JSON.stringify([{ id: 'b', categoryId: 'grocery' }]))
     const category = makeCategory({ id: 'grocery', upvotesEnabled: true })
     const items = [
@@ -1711,7 +1712,7 @@ describe('GenericDirectory — pinned listings sort first', () => {
     renderWithProviders(<GenericDirectory category={category} items={items} {...handlers} />)
 
     const names = screen.getAllByText(/^(Alpha|Beta)$/).map((el) => el.textContent)
-    expect(names).toEqual(['Beta', 'Alpha'])
+    expect(names).toEqual(['Alpha', 'Beta'])
   })
 })
 

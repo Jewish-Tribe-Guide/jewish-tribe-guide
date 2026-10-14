@@ -171,8 +171,9 @@ describe('MapPlaceDetail', () => {
 
   // ── The edit bar ───────────────────────────────────────────────────────
 
-  // Where Edit, Pin, Share and Set as location live now: one "Suggest an
-  // edit" bar at the end of the panel, with the other three in its overflow.
+  // Where Edit, Share and Set as location live now: one "Suggest an edit"
+  // bar at the end of the panel, with Set as location in its overflow, and
+  // Save at the top beside the thumbs-up (Oct 14).
   // They used to sit behind a kebab next to the name, which people open
   // expecting Share and never expecting to author anything — plus a quiet
   // grey "Suggest a correction" link in the footer, now gone.
@@ -189,10 +190,12 @@ describe('MapPlaceDetail', () => {
     expect(screen.queryByRole('button', { name: 'Suggest a correction' })).not.toBeInTheDocument()
 
     // Share is one of the listing's own buttons now, beside Directions and
-    // Call, so the overflow holds Pin (and Set as location) only.
+    // Call, and Save is the bookmark at the top, so neither is in the
+    // overflow.
     expect(screen.getByRole('button', { name: 'Share' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Save Goldi Market' })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Actions for Goldi Market' }))
-    expect(screen.getByRole('menuitem', { name: 'Pin' })).toBeInTheDocument()
+    expect(screen.queryByRole('menuitem', { name: /^(save|pin)/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('menuitem', { name: 'Share' })).not.toBeInTheDocument()
     // Request removal is the last thing in it (Oct 11), not at the foot of
     // the edit, and opens its own screen with the listing behind it.
@@ -319,11 +322,9 @@ describe('MapPlaceDetail', () => {
     back.mockRestore()
   })
 
-  // Pin, Share and Set as location have no other home on the map now, and
-  // none of them is a contribution — so a category with editing off keeps
-  // them, and loses only the pill.
-  it('keeps the overflow, without the pill, when the category cannot be edited', async () => {
-    const user = (await import('@testing-library/user-event')).default.setup()
+  // Save, Share and Set as location aren't contributions — so a category
+  // with editing off keeps them, and loses only the pill.
+  it('keeps Save, without the pill, when the category cannot be edited', async () => {
     renderWithProviders(
       <PinnedProvider>
         <MapPlaceDetail
@@ -335,8 +336,8 @@ describe('MapPlaceDetail', () => {
       </PinnedProvider>,
     )
     expect(screen.queryByRole('button', { name: 'Suggest an edit' })).not.toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Actions for Goldi Market' }))
-    expect(screen.getByRole('menuitem', { name: 'Pin' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Save Goldi Market' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Share' })).toBeInTheDocument()
   })
 
   // The overflow's captions are white with a text shadow, written for a dark

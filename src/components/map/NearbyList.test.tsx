@@ -52,8 +52,8 @@ function renderRow(point = makePoint()) {
     </PinnedProvider>,
   )
   // The row's sliding content, found through the row's own name: the
-  // Pin/Share strip is only mounted while a row is swiped open (see
-  // SwipeRow), so there's no Pin button to find it by at rest.
+  // Save/Share strip is only mounted while a row is swiped open (see
+  // SwipeRow), so there's no Save button to find it by at rest.
   const content = screen.getByText('Test Grocery').closest('div.px-4') as HTMLElement
   // The wrapper spans the content and the revealed strip both, and is where
   // the wheel listener lives — see the closing-swipe test below.
@@ -61,7 +61,7 @@ function renderRow(point = makePoint()) {
   return { wrapper, content }
 }
 
-const pinButton = () => screen.getByRole('button', { name: /Pin Test Grocery/ })
+const pinButton = () => screen.getByRole('button', { name: /^Save Test Grocery/ })
 
 // A trackpad swipe has no discrete "end" the way a touch release does — the
 // row treats a 150ms gap since the last wheel tick as the gesture finishing
@@ -71,10 +71,10 @@ async function settle() {
 }
 
 describe('NearbyList row swipe (desktop trackpad)', () => {
-  it('opens on a leftward swipe, revealing the Pin/Share strip', async () => {
+  it('opens on a leftward swipe, revealing the Save/Share strip', async () => {
     const { content } = renderRow()
     expect(content.style.transform).toBe('')
-    expect(screen.queryByRole('button', { name: /Pin Test Grocery/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Save Test Grocery/ })).not.toBeInTheDocument()
 
     fireEvent.wheel(content, { deltaX: 100, deltaY: 0 })
     await settle()
@@ -86,11 +86,11 @@ describe('NearbyList row swipe (desktop trackpad)', () => {
   // The bug this guards: the wheel listener used to live on the content row
   // only, which had already slid REVEAL_WIDTH out from under the cursor once
   // open — a closing swipe starting with the pointer over the now-revealed
-  // Pin button landed on that button (no wheel listener of its own) and did
+  // Save button landed on that button (no wheel listener of its own) and did
   // nothing at all. Moving the listener to the row's outer wrapper (which
   // spans the revealed strip too, regardless of the content's own transform)
   // is what makes this pass.
-  it('closes on a rightward swipe even when it starts over the revealed Pin button', async () => {
+  it('closes on a rightward swipe even when it starts over the revealed Save button', async () => {
     const { content } = renderRow()
 
     fireEvent.wheel(content, { deltaX: 100, deltaY: 0 })
@@ -138,7 +138,7 @@ describe('NearbyList row swipe (desktop trackpad)', () => {
   // something NearbyList re-derives for itself mid-render — so this checks
   // the actual persisted effect of the click (localStorage, via
   // PinnedProvider) rather than an aria-label this component doesn't own.
-  it('still lets a plain click on the Pin button toggle pinning', async () => {
+  it('still lets a plain click on the Save button save the place', async () => {
     const { content } = renderRow()
     fireEvent.wheel(content, { deltaX: 100, deltaY: 0 })
     await settle()
@@ -148,17 +148,17 @@ describe('NearbyList row swipe (desktop trackpad)', () => {
     expect(localStorage.getItem('jpc:pinned-listings')).toContain('listing-1')
   })
 
-  // The left avatar's own PinnedBadge (see GenericListingCard's identical
+  // The left avatar's own SavedBadge (see GenericListingCard's identical
   // treatment) — the row's right-side category badge used to draw its own
-  // separate 📌 overlay too, which repeated the same fact twice on one row;
-  // that overlay is gone now, so a pinned row shows the glyph exactly once.
-  it('shows a pin badge on the left avatar only when the point is pinned', () => {
+  // separate overlay too, which repeated the same fact twice on one row;
+  // that overlay is gone now, so a saved row shows the badge exactly once.
+  it('shows the saved badge on the left avatar only when the point is saved', () => {
     renderWithProviders(
       <PinnedProvider>
         <NearbyList points={[makePoint({ pinned: false })]} userLocation={null} onViewListing={vi.fn()} />
       </PinnedProvider>,
     )
-    expect(screen.queryByText('📌')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('saved-badge')).not.toBeInTheDocument()
 
     cleanup()
     renderWithProviders(
@@ -166,6 +166,6 @@ describe('NearbyList row swipe (desktop trackpad)', () => {
         <NearbyList points={[makePoint({ pinned: true })]} userLocation={null} onViewListing={vi.fn()} />
       </PinnedProvider>,
     )
-    expect(screen.getByText('📌')).toBeInTheDocument()
+    expect(screen.getAllByTestId('saved-badge')).toHaveLength(1)
   })
 })

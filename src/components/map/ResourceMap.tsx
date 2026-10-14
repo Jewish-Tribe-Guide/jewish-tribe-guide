@@ -8,7 +8,7 @@ import { haversineMiles } from '@/lib/geo'
 import { community } from '@/community.config'
 import type { DirectoryResource } from '@/types'
 import { glyphElementFor, glyphTextFor } from '@/lib/categoryIcons'
-import { PinIcon } from '@/components/icons'
+import { BookmarkIcon } from '@/components/icons'
 import { clearEruvim, drawEruvim, emphasizeEruvim, eruvDrawKey, type DrawnEruv, type MapEruv } from './eruvLayer'
 
 /** One plottable place on the map. */
@@ -357,8 +357,10 @@ function buildPin(p: MapPoint, isSelected: boolean): HTMLElement {
     badge.style.cssText =
       'position:absolute;top:0;right:0;width:16px;height:16px;border-radius:9999px;' +
       'background:#2563eb;border:2px solid #fff;display:flex;align-items:center;justify-content:center;' +
-      'font-size:9px;line-height:1;color:#fff'
-    badge.textContent = '📌'
+      'color:#fff'
+    // The bookmark SavedBadge draws, as markup: a marker is plain DOM.
+    badge.innerHTML =
+      '<svg viewBox="0 0 24 24" width="8" height="8" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/></svg>'
     wrap.appendChild(badge)
   }
   return wrap
@@ -492,7 +494,7 @@ export default function ResourceMap({ points, userLocation, directionsOrigin, fo
   const infoWindowRef = useRef<google.maps.InfoWindow | null>(null)
   const [ready, setReady] = useState(false)
   const [authFailed, setAuthFailed] = useState(mapsAuthFailed())
-  // Right-click's Pin/Unpin menu — see the marker's 'contextmenu' listener
+  // Right-click's Save/Saved menu — see the marker's 'contextmenu' listener
   // below for how this opens. `point` carries whatever pinned state it had
   // at the moment of the right-click; closing-and-reopening the menu after a
   // toggle (rather than patching this in place) keeps it simple, and the
@@ -766,7 +768,7 @@ export default function ResourceMap({ points, userLocation, directionsOrigin, fo
       let longPressTimer: ReturnType<typeof setTimeout> | null = null
       let longPressFired = false
       let pressStart = { x: 0, y: 0 }
-      // Right-click already opens a proper menu with a Pin/Unpin option (see
+      // Right-click already opens a proper menu with a Save option (see
       // the 'contextmenu' listener below) — a mouse doesn't need the timer
       // too, and 500ms of held-mouse-button is a touch-native pattern with
       // no visible affordance hinting it does anything on desktop. Tracked
@@ -810,7 +812,7 @@ export default function ResourceMap({ points, userLocation, directionsOrigin, fo
       // pin here" at this exact spot. Always swallowed here, before it can
       // bubble — then, for an actual right-click specifically (not a touch
       // long-press synthesizing the same event, which already toggled the
-      // pin directly above), open a small Pin/Unpin menu at the cursor: the
+      // pin directly above), open a small Save menu at the cursor: the
       // desktop-native way to discover "there's a hidden action here" that a
       // held mouse button never was.
       marker.addEventListener('contextmenu', (e: Event) => {
@@ -1168,7 +1170,7 @@ export default function ResourceMap({ points, userLocation, directionsOrigin, fo
     }
   }, [userLocation, follow, ready])
 
-  // Dismiss the right-click Pin/Unpin menu the same way any menu should: an
+  // Dismiss the right-click Save menu the same way any menu should: an
   // outside click, Escape, or the map moving out from under it (panning or
   // zooming would leave it pointing at empty space otherwise). Checked
   // against contextMenuRef, not just "was this inside the menu" — a capture-
@@ -1285,8 +1287,8 @@ export default function ResourceMap({ points, userLocation, directionsOrigin, fo
               }}
               className="flex items-center gap-1.5 whitespace-nowrap px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 cursor-pointer"
             >
-              <PinIcon filled={contextMenu.point.pinned} className="h-3 w-3 text-slate-500" />
-              {contextMenu.point.pinned ? 'Unpin' : 'Pin'}
+              <BookmarkIcon filled={contextMenu.point.pinned} className="h-3 w-3 text-slate-500" />
+              {contextMenu.point.pinned ? 'Saved' : 'Save'}
             </button>
           </div>,
           document.body,

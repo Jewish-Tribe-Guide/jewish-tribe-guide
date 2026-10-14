@@ -13,8 +13,8 @@ import { ui } from '@/lib/uiConfig'
  *  row in one place, a white glyph on a coloured swipe panel in another, and
  *  a circle in a third, and only the caller knows which. */
 export type ListingAction = {
-  id: 'pin' | 'share' | 'location' | 'remove'
-  /** Already reflects state — "Pin"/"Pinned", "Share"/"Copied!",
+  id: 'save' | 'share' | 'location' | 'remove'
+  /** Already reflects state — "Save"/"Saved", "Share"/"Copied!",
    *  "Set as location"/"Location set". That matters beyond cosmetics: these
    *  render as `role="menuitem"`, where `aria-pressed` is not an allowed
    *  attribute (axe flags aria-allowed-attr as critical), so the label is
@@ -56,11 +56,13 @@ export function useListingActions(
 
   const actions: ListingAction[] = []
 
-  // The same community-wide flag the map's own pin filter chip respects.
+  // Save (Pin until Oct 14). The same community-wide flag the map's Saved
+  // chip respects. Shown by the row's swipe; an opened listing has its own
+  // bookmark at the top instead (SaveButton), so the fan leaves it out.
   if (ui.map.pins) {
     actions.push({
-      id: 'pin',
-      label: pinned ? 'Pinned' : 'Pin',
+      id: 'save',
+      label: pinned ? 'Saved' : 'Save',
       active: pinned,
       onSelect: () => toggle({ id: item.id, categoryId: category.id }),
     })

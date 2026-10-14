@@ -60,7 +60,7 @@ vi.mock('./ListingEditor', async () => {
 })
 
 afterEach(() => {
-  // Pinned state lives in localStorage, and a test that throws before its own
+  // Saved state lives in localStorage, and a test that throws before its own
   // cleanup used to poison every test after it — a listing silently pinned
   // turns "Pin" into "Pinned" and adds a second 📌 to the card, which reads
   // as half a dozen unrelated failures somewhere far away. Cleared here so a
@@ -304,9 +304,9 @@ describe('GenericListingCard — collapsed', () => {
     expect(screen.getByRole('button', { name: /show details for/i })).toBeInTheDocument()
   })
 
-  // PinnedBadge on the avatar — same treatment NearbyList's own left icon
+  // SavedBadge on the avatar — same treatment NearbyList's own left icon
   // gets (see that file's identical test).
-  it('shows a pin badge on the avatar only once the listing is pinned', () => {
+  it('shows the saved badge on the avatar only once the listing is saved', () => {
     localStorage.setItem('jpc:pinned-listings', JSON.stringify([{ id: 'listing-1', categoryId: 'grocery' }]))
     const category = makeCategory({ id: 'grocery' })
     const item = makeListing({ id: 'listing-1', name: 'Acme Grocery' })
@@ -314,18 +314,18 @@ describe('GenericListingCard — collapsed', () => {
       <GenericListingCard item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />,
     )
 
-    expect(screen.getByText('📌')).toBeInTheDocument()
+    expect(screen.getByTestId('saved-badge')).toBeInTheDocument()
     localStorage.clear()
   })
 
-  it('shows no pin badge for an unpinned listing', () => {
+  it('shows no saved badge for a listing not saved', () => {
     const category = makeCategory()
     const item = makeListing({ name: 'Acme Grocery' })
     renderWithProviders(
       <GenericListingCard item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />,
     )
 
-    expect(screen.queryByText('📌')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('saved-badge')).not.toBeInTheDocument()
   })
 })
 
@@ -786,16 +786,17 @@ describe('GenericListingCard — expanded', () => {
     expect(screen.getByRole('button', { name: 'Suggest an edit' })).toBeInTheDocument()
   })
 
-  // A category that can't be edited loses the pill and KEEPS the overflow.
-  // This test used to assert only the first half, and so certified a real
-  // regression: the bar was gated on edit wholesale, and the overflow is the
-  // only home Set-as-location has, and the only route to Pin/Share a
-  // keyboard or screen reader can reach — the card's swipe and hover-reveal
+  // A category that can't be edited loses the pill and KEEPS Save. This test
+  // used to assert only the first half, and so certified a real regression:
+  // the bar was gated on edit wholesale, and the overflow was then the only
+  // route to Pin a keyboard or screen reader could reach. Save is now the
+  // bookmark at the top of the listing (Oct 14), the route a keyboard has —
+  // the card's swipe and hover-reveal — the card's swipe and hover-reveal
   // are pointer-only precisely because this exists. Both surfaces, since
   // they gate independently (MapPlaceDetail in the mobile sheet,
   // ListingDetailModal on desktop).
   for (const [surface, isMobile] of [['mobile sheet', true], ['desktop dialog', false]] as const) {
-    it(`keeps the overflow, without the pill, when the category cannot be edited (${surface})`, async () => {
+    it(`keeps Save, without the pill, when the category cannot be edited (${surface})`, async () => {
       const user = userEvent.setup()
       renderWithProviders(
         <ForcedViewport isMobile={isMobile}>
@@ -812,9 +813,10 @@ describe('GenericListingCard — expanded', () => {
       await Promise.resolve()
       expect(screen.queryByRole('button', { name: 'Suggest an edit' })).not.toBeInTheDocument()
 
-      await user.click(screen.getByRole('button', { name: 'Actions for Goldi Market' }))
-      // Share has its own button in the listing now, so the overflow keeps Pin.
-      expect(screen.getByRole('menuitem', { name: 'Pin' })).toBeInTheDocument()
+      const save = screen.getByRole('button', { name: 'Save Goldi Market' })
+      expect(save).toHaveAttribute('aria-pressed', 'false')
+      await user.click(save)
+      expect(screen.getByRole('button', { name: 'Save Goldi Market' })).toHaveAttribute('aria-pressed', 'true')
     })
   }
 
@@ -1157,7 +1159,7 @@ describe('GenericListingCard — the row', () => {
 // These used to live in a kebab in the card's corner. The kebab is gone:
 // people open a ⋯ expecting Share and Save, never expecting to author
 // anything, which is exactly why Edit spent so long invisible in there.
-// Pin and Share are reached by swiping the row on mobile; Edit and
+// Save and Share are reached by swiping the row on mobile; Edit and
 // Set-as-location live below an opened listing (the edit bar and its fan).
 // The swipe is a SHORTCUT — the fan is where every visitor can reach these,
 // which is what makes it safe for the card's own copies to be invisible
@@ -1181,13 +1183,13 @@ describe('GenericListingCard — collapsed row actions', () => {
 
   // They used to appear over the row's corner on hover, hiding its likes.
   // Now a desktop row's hover lights its pin on the map, and the likes stay.
-  it('has no Pin or Share on a desktop row, and never hides its likes', () => {
+  it('has no Save or Share on a desktop row, and never hides its likes', () => {
     renderWithProviders(
       <ForcedViewport isMobile={false}>
         <GenericListingCard item={makeListing({ name: 'Goldi Market' })} category={makeCategory()} upvotes={false} count={0} likes={3} {...requiredHandlers} />
       </ForcedViewport>,
     )
-    for (const name of ['Pin Goldi Market', 'Share Goldi Market']) {
+    for (const name of ['Save Goldi Market', 'Share Goldi Market']) {
       expect(screen.queryByRole('button', { name, hidden: true })).not.toBeInTheDocument()
     }
     const likes = screen.getByLabelText('3 likes')
@@ -1237,7 +1239,7 @@ describe('GenericListingCard — collapsed row actions', () => {
 
 // ── Swipe to reveal, on mobile ───────────────────────────────────────────
 // A gesture is invisible and unreachable by keyboard, so everything here is
-// a SHORTCUT: Pin and Share are also in the fan below an opened listing,
+// a SHORTCUT: Save is also at the top of an opened listing, Share among its buttons,
 // which is the route that works for everyone. The gesture itself is
 // SwipeRow, shared with the map's nearby list, and its own rules are tested
 // there (SwipeRow.test.tsx). These check the card's side: that it's wired
@@ -1273,11 +1275,11 @@ describe('GenericListingCard — swipe actions', () => {
     fireEvent.pointerUp(row, { pointerType: 'touch', clientX: to.x, clientY: to.y })
   }
 
-  it('reveals Pin and Share when dragged far enough left', () => {
+  it('reveals Save and Share when dragged far enough left', () => {
     const row = renderRow()
     drag(row, { x: 300, y: 100 }, { x: 180, y: 100 })
 
-    expect(screen.getByRole('button', { name: 'Pin Goldi Market' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Save Goldi Market' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Share Goldi Market' })).toBeInTheDocument()
   })
 
@@ -1296,7 +1298,7 @@ describe('GenericListingCard — swipe actions', () => {
     const row = renderRow()
     drag(row, { x: 300, y: 100 }, { x: 280, y: 100 })
 
-    expect(screen.queryByRole('button', { name: 'Pin Goldi Market' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Save Goldi Market' })).not.toBeInTheDocument()
   })
 
   // The row sits in a scrolling list. A drag that is mostly vertical has to
@@ -1306,7 +1308,7 @@ describe('GenericListingCard — swipe actions', () => {
     const row = renderRow()
     drag(row, { x: 300, y: 100 }, { x: 240, y: 260 })
 
-    expect(screen.queryByRole('button', { name: 'Pin Goldi Market' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Save Goldi Market' })).not.toBeInTheDocument()
   })
 
   // iOS treats a drag from the left screen edge as "go back", and this app is
@@ -1326,7 +1328,7 @@ describe('GenericListingCard — swipe actions', () => {
     drag(row, { x: 300, y: 100 }, { x: 275, y: 100 })
     fireEvent.click(row)
 
-    expect(screen.queryByRole('button', { name: 'Pin Goldi Market' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Save Goldi Market' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: /show details for Goldi Market/i })).toHaveAttribute('aria-expanded', 'false')
   })
 
@@ -1338,14 +1340,14 @@ describe('GenericListingCard — swipe actions', () => {
   it('closes the actions on the next tap, without expanding', () => {
     const row = renderRow()
     drag(row, { x: 300, y: 100 }, { x: 180, y: 100 })
-    expect(screen.getByRole('button', { name: 'Pin Goldi Market' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Save Goldi Market' })).toBeInTheDocument()
     // A real tap, pointerdown first — see SwipeRow.test.tsx's tap() for why
     // a bare click can't reach the rule this checks.
     fireEvent.pointerDown(row, { pointerType: 'touch', clientX: 200, clientY: 100 })
     fireEvent.pointerUp(row, { pointerType: 'touch', clientX: 200, clientY: 100 })
     fireEvent.click(row)
 
-    expect(screen.queryByRole('button', { name: 'Pin Goldi Market' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Save Goldi Market' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: /show details for Goldi Market/i })).toHaveAttribute('aria-expanded', 'false')
   })
 
