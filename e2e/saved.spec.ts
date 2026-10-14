@@ -1,5 +1,5 @@
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test'
-import { categoryWithListings, categoryWithMapPoints, defaultCommunity, defaultCommunitySlug } from './helpers'
+import { categoryWithListings, categoryWithMapPoints, defaultCommunity, defaultCommunitySlug, largestCategory } from './helpers'
 
 // A more patient version of helpers.ts' dismissLocationPrompt: that one is a
 // single point-in-time check (`isVisible()`, no retry), which assumes the
@@ -152,7 +152,9 @@ test.describe('saved places', () => {
   // and opens its page with the words in the box and the bookmark filled.
   test('a search saved from a home line is on You, and opens its page', async ({ page, request }) => {
     const community = await defaultCommunity(page)
-    const { category } = await categoryWithListings(request, community)
+    // The largest kind of place: its name is a search, never one place's
+    // name (a test fixture's category can be both, and its place line leads).
+    const { category } = await largestCategory(request, community)
 
     await page.goto(`/${community}`)
     await dismissLocationPromptIfItAppears(page)
