@@ -23,7 +23,7 @@
 import { existsSync } from 'node:fs'
 import { spawn } from 'node:child_process'
 import { createClient } from '@supabase/supabase-js'
-import { CACHE_TEST_ADMIN_EMAIL, resolveDefaultCommunityAdminEmail } from './cacheE2eAdmin.mjs'
+import { ADMIN_WRITE_TEST_ADMIN_EMAIL, CACHE_TEST_ADMIN_EMAIL, resolveDefaultCommunityAdminEmail } from './cacheE2eAdmin.mjs'
 import { FORM_E2E_FORM_ID } from './formE2eConstants.mjs'
 
 if (existsSync('.env.local')) process.loadEnvFile('.env.local')
@@ -233,16 +233,26 @@ const PORT = process.env.CACHE_E2E_PORT || '3211'
 
 // Superadmin-gated routes (getAdminUser, e.g. GET /api/admin/pages — see
 // adminAuth.ts's own comment on what's still superadmin-only) check this
-// list directly, never the per-community admin_email. Both auth.setup.ts
-// files mint a session for whichever email resolveDefaultCommunityAdminEmail
-// resolves — CACHE_TEST_ADMIN_EMAIL on a pristine test project, or the
-// default community's real admin_email once one's configured on a shared
-// project (see that function's own comment). This list has to include
-// BOTH: the per-community check alone would already accept the resolved
-// email once admin_email is set, but the global superadmin check wouldn't
-// unless it's listed here too.
+// list directly, never the per-community admin_email. Each auth.setup.ts
+// mints a session for whichever email resolveDefaultCommunityAdminEmail
+// resolves — its own suite-specific fallback (CACHE_TEST_ADMIN_EMAIL or
+// ADMIN_WRITE_TEST_ADMIN_EMAIL) on a pristine test project, or the default
+// community's real admin_email once one's configured on a shared project
+// (see that function's own comment). This list has to include all of them:
+// the per-community check alone would already accept the resolved email
+// once admin_email is set, but the global superadmin check wouldn't unless
+// it's listed here too.
+//
+// This script is shared by every suite (cache-roundtrip, admin-write,
+// form-roundtrip), each booting its own independent server process on its
+// own port — so a single process only ever needs ONE of these two fallback
+// identities authorized. Listing both here anyway is deliberate and cheap:
+// it means this script doesn't need to know which suite is invoking it
+// (there's no env var threaded through for that), and the unused one is
+// simply never minted a session by whichever suite's own auth.setup.ts runs
+// against this process.
 const testAdminEmail = await resolveDefaultCommunityAdminEmail(url, serviceRoleKey)
-const adminEmails = Array.from(new Set([CACHE_TEST_ADMIN_EMAIL, testAdminEmail])).join(',')
+const adminEmails = Array.from(new Set([CACHE_TEST_ADMIN_EMAIL, ADMIN_WRITE_TEST_ADMIN_EMAIL, testAdminEmail])).join(',')
 
 const env = {
   ...process.env,

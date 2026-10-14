@@ -282,6 +282,10 @@ export default function HeaderNav() {
             <Link
               key={item.id}
               href={href}
+              // Not the Map: prefetched, every desktop page downloaded the
+              // Map's code with its own (106 KB on the home, over its 400
+              // KB budget; the user, Oct 13). It loads when it's opened.
+              prefetch={item.target === 'map' ? false : undefined}
               className="whitespace-nowrap text-sm font-semibold text-slate-700 transition-colors hover:text-primary"
             >
               {item.label}
