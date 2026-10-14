@@ -2,7 +2,7 @@
 
 import type { AppMode } from '@/types'
 import { isBuiltInTabTarget, type MobileTabConfig } from '@/lib/siteSettings'
-import { GridIcon, HomeIcon, MapFoldIcon, MessageIcon } from './icons'
+import { BookmarkIcon, GridIcon, HomeIcon, MapFoldIcon, MessageIcon } from './icons'
 import { CategoryGlyph, hasCategoryIcon } from '@/lib/categoryIcons'
 
 /** Which app screens each built-in target counts as "current" for. Card tabs
@@ -13,6 +13,7 @@ const BUILT_IN_MODES: Record<string, AppMode[]> = {
   map: ['map'],
   feedback: ['feedback'],
   browse: ['browse'],
+  you: ['you'],
 }
 
 const BUILT_IN_ICONS: Record<string, typeof GridIcon> = {
@@ -20,6 +21,8 @@ const BUILT_IN_ICONS: Record<string, typeof GridIcon> = {
   map: MapFoldIcon,
   feedback: MessageIcon,
   browse: GridIcon,
+  // The Save mark itself, as Google Maps does: You is what's been saved.
+  you: BookmarkIcon,
 }
 
 type Props = {

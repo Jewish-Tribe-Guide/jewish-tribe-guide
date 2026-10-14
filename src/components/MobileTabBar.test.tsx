@@ -43,3 +43,28 @@ describe('the phone tabs with Browse', () => {
     expect(iconOf('Categories')).toMatch(/^<rect/)
   })
 })
+
+// You (Oct 14): the third tab, its icon the Save mark (a bookmark, as
+// Google Maps does), lit on the You page.
+describe('the You tab', () => {
+  const tabs: MobileTabConfig[] = [
+    { id: 'categories', label: 'Home', target: 'categories' },
+    { id: 'map', label: 'Map', target: 'map' },
+    { id: 'you', label: 'You', target: 'you' },
+  ]
+
+  it('is lit on You, and the home tab isn’t', () => {
+    render(<MobileTabBar mode="you" tabs={tabs} onSelect={vi.fn()} />)
+    expect(screen.getByRole('button', { name: 'You' })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('button', { name: 'Home' })).not.toHaveAttribute('aria-current')
+  })
+
+  it('wears the bookmark', () => {
+    render(<MobileTabBar mode="home" tabs={tabs} onSelect={vi.fn()} />)
+    expect(iconOf('You')).toContain('m19 21-7-4-7 4V5')
+  })
+
+  it('is on the bar by default, after Map', () => {
+    expect(DEFAULT_MOBILE_TABS.map((t) => t.target).slice(0, 3)).toEqual(['categories', 'map', 'you'])
+  })
+})

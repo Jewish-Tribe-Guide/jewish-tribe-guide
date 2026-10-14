@@ -33,6 +33,7 @@ type OpenPanel = string | null
  *  'map' with no Map category, or a category that's since been deleted). */
 function resolveHref(target: string, hrefById: Map<string, string>, communitySlug: string, hasMap: boolean): string | null {
   if (target === 'map') return hasMap ? routes.map(communitySlug) : null
+  if (target === 'you') return routes.you(communitySlug)
   if (target === 'about') return routes.about(communitySlug)
   if (target === 'privacy') return routes.privacy(communitySlug)
   if (target === 'feedback') return null
@@ -285,7 +286,9 @@ export default function HeaderNav() {
               // Not the Map: prefetched, every desktop page downloaded the
               // Map's code with its own (106 KB on the home, over its 400
               // KB budget; the user, Oct 13). It loads when it's opened.
-              prefetch={item.target === 'map' ? false : undefined}
+              // Nor You, which carries the home's search to ask saved
+              // searches again.
+              prefetch={item.target === 'map' || item.target === 'you' ? false : undefined}
               className="whitespace-nowrap text-sm font-semibold text-slate-700 transition-colors hover:text-primary"
             >
               {item.label}

@@ -26,6 +26,7 @@ const BUILT_IN_LABELS: Record<string, string> = {
   map: 'Map',
   feedback: 'Feedback form',
   browse: 'Browse (every category, grouped)',
+  you: 'You (saved places and searches)',
 }
 
 /** Ids must survive renames, so they're minted once and never derived from the

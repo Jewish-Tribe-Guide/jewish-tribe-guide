@@ -119,6 +119,16 @@ describe('HeaderNav — Map', () => {
   })
 })
 
+// You (Oct 14, board YouDesk): between Map and More, by default.
+describe('HeaderNav — You', () => {
+  it('links to You, after Map', () => {
+    renderWithProviders(<HeaderNav />, { content: { categories: [grocery, mapCategory] } })
+    expect(screen.getByRole('link', { name: 'You' })).toHaveAttribute('href', '/test-community/you')
+    const links = screen.getAllByRole('link').map((a) => a.textContent)
+    expect(links.indexOf('You')).toBe(links.indexOf('Map') + 1)
+  })
+})
+
 describe('HeaderNav — More', () => {
   // Was right-0, sized to the panel's own fixed width rather than to where
   // its trigger sits — "More" is well clear of the viewport's right edge in

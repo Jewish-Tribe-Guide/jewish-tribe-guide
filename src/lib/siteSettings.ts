@@ -159,7 +159,7 @@ export type DesktopNavItem = {
  *  pseudo-category, same gating the mobile tab bar and the old hardcoded nav
  *  already applied. 'feedback' opens the feedback modal instead of
  *  navigating. */
-export const BUILT_IN_DESKTOP_LINK_TARGETS = ['map', 'about', 'privacy', 'feedback'] as const
+export const BUILT_IN_DESKTOP_LINK_TARGETS = ['map', 'you', 'about', 'privacy', 'feedback'] as const
 export type BuiltInDesktopLinkTarget = (typeof BUILT_IN_DESKTOP_LINK_TARGETS)[number]
 
 export function isBuiltInDesktopLinkTarget(target: string): target is BuiltInDesktopLinkTarget {
@@ -171,6 +171,8 @@ export function isBuiltInDesktopLinkTarget(target: string): target is BuiltInDes
 export const DEFAULT_DESKTOP_NAV_ITEMS: DesktopNavItem[] = [
   { id: 'categories', label: 'Categories', kind: 'categories-menu' },
   { id: 'map', label: 'Map', kind: 'link', target: 'map' },
+  // Saved places and searches (Oct 14), between Map and More (board YouDesk).
+  { id: 'you', label: 'You', kind: 'link', target: 'you' },
   {
     id: 'more',
     label: 'More',
@@ -191,8 +193,8 @@ export type MobileTabConfig = {
   /** The text under the icon. */
   label: string
   /** Where the tab goes. The built-in screens are 'categories' (the home),
-   *  'map', 'feedback' and 'browse' (every category, grouped; with the Today
-   *  home); any other value is a CardDef id (a category slug, or a
+   *  'map', 'feedback', 'browse' (every category, grouped; with the Today
+   *  home) and 'you' (saved places and searches); any other value is a CardDef id (a category slug, or a
    *  form id like 'support') and opens exactly what tapping that card on the
    *  home screen opens. */
   target: string
@@ -201,7 +203,7 @@ export type MobileTabConfig = {
 /** The built-in targets, which behave differently from card targets: they're
  *  whole app screens rather than one category, and two of them are gated on
  *  site config (a Map category existing, feedback being enabled). */
-export const BUILT_IN_TAB_TARGETS = ['categories', 'map', 'feedback', 'browse'] as const
+export const BUILT_IN_TAB_TARGETS = ['categories', 'map', 'feedback', 'browse', 'you'] as const
 export type BuiltInTabTarget = (typeof BUILT_IN_TAB_TARGETS)[number]
 
 export function isBuiltInTabTarget(target: string): target is BuiltInTabTarget {
@@ -218,6 +220,7 @@ export const MAX_MOBILE_TABS = 5
 export const DEFAULT_MOBILE_TABS: MobileTabConfig[] = [
   { id: 'categories', label: 'Categories', target: 'categories' },
   { id: 'map', label: 'Map', target: 'map' },
+  { id: 'you', label: 'You', target: 'you' },
   { id: 'feedback', label: 'Feedback', target: 'feedback' },
 ]
 

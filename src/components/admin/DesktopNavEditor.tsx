@@ -27,6 +27,7 @@ import { useCardOptions } from './HomeSectionManager'
 
 const BUILT_IN_LABELS: Record<string, string> = {
   map: 'Map',
+  you: 'You (saved places and searches)',
   about: 'About page',
   privacy: 'Privacy page',
   feedback: 'Feedback form',
