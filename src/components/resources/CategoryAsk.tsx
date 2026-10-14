@@ -1,113 +1,55 @@
 'use client'
 
 import Link from 'next/link'
-import type { DirectoryResource } from '@/types'
-import { searchAsk, type AskResult } from '@/lib/askSearch'
-import { answerFor } from '@/lib/askAnswer'
-import { neighborhoodsFor } from '@/lib/places'
-import { answerSchedule, useMinyanSchedule, type MinyanSchedule } from '@/lib/useMinyanSchedule'
-import { useNow } from '@/lib/useNow'
 import { useCategories } from '@/lib/useCategories'
-import { useOptionalLocation } from '@/lib/locationContext'
-import { useActiveCommunity, useOptionalCommunitySlug } from '@/lib/communityContext'
+import { useOptionalCommunitySlug } from '@/lib/communityContext'
 import { routes } from '@/lib/routes'
-import AskAnswer from '@/components/home/AskAnswer'
 import AskTheGroup from '@/components/home/AskTheGroup'
-import { categoryQuestion, shareMessage, shareSummary } from '@/lib/shareAnswer'
+import { categoryQuestion } from '@/lib/shareAnswer'
 import type { CategoryConfig } from '@/lib/categories'
-import ReadAs from '@/components/home/ReadAs'
-import type { ReadingChip, ReadingOffer } from '@/lib/readingSearch'
 
 // ── A category page's search: asking comes first ─────────────────────────────
 // The one search box on the page, limited to this category and saying so
-// ("in Food ×"), and once something is typed, one sentence answering it
-// (see askAnswer.ts) above the list. No heading and no example searches:
-// the magnifier, "in Food" and the placeholder already say what it is, and
-// the page reads cleaner without them (the user, Oct 10). The answer only ever follows a
-// search: a sentence directly under the box reads as "here's the answer to
-// what you asked", so nothing sits there unasked.
+// ("in Food ×"). No heading and no example searches: the magnifier, "in
+// Food" and the placeholder already say what it is, and the page reads
+// cleaner without them (the user, Oct 10).
+//
+// Nothing answers under it any more (Oct 13, "search takes you to the
+// page"): the list is the answer, and what the words meant is ticked in the
+// list's own Filters, with the count on its button. The sentence that used
+// to sit here, its "Share this answer" and the reader's "Read as" chips
+// went; the address carries the search, so the browser's own share sends
+// the page as it is. Only when nothing at all is found does it say so,
+// with where to ask (AskTheGroup).
 //
 // Arranging the list (Filters, Sort) lives in the list's own heading, not
 // here: above the list is for asking.
 
 type Props = {
   category: CategoryConfig
-  items: readonly DirectoryResource[]
   search: string
   onSearch: (text: string) => void
-  /** Whether this category's listings carry minyan times: only then does the
-   *  page work out the minyan schedule (it fetches sunset times, which a food
-   *  or grocery page has no use for). */
-  hasMinyanim: boolean
   /** "minyanim" on the Synagogues page's Minyanim tab (the user's notes 4
-   *  and 6, agreed Oct 2): the box says "in Minyanim" and offers that tab's
-   *  own searches. What's typed narrows the minyanim below (MinyanimView),
-   *  which says what it found, so there's no answer here. */
+   *  and 6, agreed Oct 2): the box says "in Minyanim". What's typed narrows
+   *  the minyanim below (MinyanimView). */
   scope?: 'minyanim'
-  /** The question reader's side (see GenericDirectory): whether it's
-   *  reading, how it read, and once read, the result that answers. */
-  readAs?: {
-    reading: boolean
-    chips: ReadingChip[]
-    onRemove: (chip: ReadingChip) => void
-    offers: ReadingOffer[]
-    onPick: (offer: ReadingOffer) => void
-    onSubmit: () => void
-    result: AskResult | null
-  }
+  /** The question is being read (see GenericDirectory's reader). */
+  reading?: boolean
+  /** Enter. */
+  onSubmit?: () => void
+  /** The search found nothing here: where to ask instead. */
+  foundNothing?: boolean
 }
 
-export default function CategoryAsk(props: Props) {
-  return props.hasMinyanim ? <WithSchedule {...props} /> : <Ask {...props} schedule={null} />
-}
-
-function WithSchedule(props: Props) {
-  const schedule = useMinyanSchedule(null, props.items)
-  return <Ask {...props} schedule={schedule} />
-}
-
-function Ask({ category, items, search, onSearch, schedule, readAs, scope }: Props & { schedule: MinyanSchedule | null }) {
-  const now = useNow()
-  const categories = useCategories() ?? [category]
+export default function CategoryAsk({ category, search, onSearch, scope, reading = false, onSubmit, foundNothing = false }: Props) {
   const communitySlug = useOptionalCommunitySlug()
-  const { community } = useActiveCommunity()
-  const coords = useOptionalLocation()?.coords ?? null
-  const places = neighborhoodsFor(communitySlug)
-
-  // One search, answered. Distances in the sentence are measured from the
-  // visitor's location, or from the community's centre like the rows' own
-  // (the line under the box says so) — except for "within 3 miles", which
-  // means nothing measured from anywhere but where the visitor is.
-  //
-  // Not before the page has hydrated, when there's no time yet (see useNow):
-  // every answer says what's open, so none is given.
-  const ask = (text: string) => {
-    const result = searchAsk(items, [category], text, { categoryId: category.id, coords, now: new Date(now ?? 0), places })
-    const answer = answerFor(result, {
-      coords: coords ?? (result.query.within ? null : community.mapCenter),
-      schedule: result.query.minyan && schedule ? answerSchedule(schedule) : null,
-      now,
-    })
-    return { result, answer }
-  }
-
+  const categories = useCategories() ?? [category]
   const q = search.trim()
-  // Read by the reader, its result answers (see readingSearch.ts).
   const onMinyanim = scope === 'minyanim'
-  const asked = q && now !== null && !onMinyanim ? (readAs?.result ? { result: readAs.result, answer: answerFor(readAs.result, { coords: coords ?? community.mapCenter, now }) } : ask(q)) : null
-  const answer = asked?.answer ?? null
   // Shared, the link's question names this category when it doesn't
-  // already, so it opens answering the same thing (agreed Oct 1). The
-  // message says what was asked, in the asker's words.
+  // already, so it opens answering the same thing (agreed Oct 1).
   const sharedQ = q ? categoryQuestion(q, category, categories) : ''
-  const share =
-    answer && communitySlug
-      ? { path: routes.ask(communitySlug, sharedQ), title: sharedQ, text: () => shareMessage(q, shareSummary(sharedQ, items, categories, places)) }
-      : null
-  // Found nothing, and the reader isn't still reading: where to ask
-  // (AskTheGroup), as on the home search.
-  const foundNothing = !!asked && !readAs?.reading && asked.result.hits.length === 0 && asked.result.noHours.length === 0 && !answer
-  const askGroup = foundNothing && communitySlug ? { nothingClose: true, sharePath: routes.ask(communitySlug, sharedQ) } : null
+  const askGroup = foundNothing && q && communitySlug ? { nothingClose: true, sharePath: routes.ask(communitySlug, sharedQ) } : null
   const plural = category.pluralLabel.toLowerCase()
   const scopeLabel = onMinyanim ? 'Minyanim' : category.pluralLabel
   const placeholder = onMinyanim
@@ -146,7 +88,7 @@ function Ask({ category, items, search, onSearch, schedule, readAs, scope }: Pro
           value={search}
           onChange={(e) => onSearch(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === 'Enter') readAs?.onSubmit()
+            if (e.key === 'Enter') onSubmit?.()
           }}
           enterKeyHint="search"
           className="min-w-0 flex-1 bg-transparent text-[15.5px] text-ink placeholder:text-slate-400 focus:outline-none [&::-webkit-search-cancel-button]:hidden"
@@ -165,8 +107,11 @@ function Ask({ category, items, search, onSearch, schedule, readAs, scope }: Pro
         )}
       </label>
 
-      {q && readAs && <ReadAs reading={readAs.reading} chips={readAs.chips} onRemove={readAs.onRemove} offers={readAs.offers} onPick={readAs.onPick} />}
-      {answer && <AskAnswer answer={answer} share={share} />}
+      {q && reading && (
+        <p className="text-[13.5px] font-medium text-slate-500" role="status">
+          Reading your question…
+        </p>
+      )}
       {askGroup && <AskTheGroup query={q} {...askGroup} />}
     </div>
   )

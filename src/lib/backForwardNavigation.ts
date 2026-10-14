@@ -77,7 +77,16 @@ if (typeof window !== 'undefined') {
 /** Read once per mount (typically via a lazy `useState` initializer, so it's
  *  captured on the very first render rather than a tick later) — see this
  *  module's own doc for why it's a plain read, not consumed/cleared by the
- *  read itself. */
-export function didArriveViaBackForward(): boolean {
-  return arrivedViaBackForward
+ *  read itself.
+ *
+ *  `segment`: the screen's own path segment ("grocery"). Back/forward
+ *  moves the address before the screen renders; a link doesn't, until
+ *  after (its pushState, which clears the flag, comes once the new screen
+ *  has rendered). So a screen whose address isn't yet its own came by a
+ *  link, even with a back/forward just before it: Back to home, then a
+ *  search from there, blanked the page the search went to (the user,
+ *  Oct 13: "going in and out … seems to break it"). */
+export function didArriveViaBackForward(segment?: string): boolean {
+  if (!arrivedViaBackForward) return false
+  return !segment || window.location.pathname.split('/').includes(segment)
 }

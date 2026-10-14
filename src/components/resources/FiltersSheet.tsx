@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useBodyScrollLock } from '@/lib/useBodyScrollLock'
 import { useIsMobile } from '@/lib/useIsMobile'
 import MobileSheet from './MobileSheet'
@@ -16,8 +16,24 @@ import { orderForPicking } from '@/lib/listGroups'
 // stay on. Example searches under the search box look like searches instead
 // (grey, a magnifier), so the two never get mistaken for each other.
 //
+// "Has" (Oct 13), for a category that keeps an item list (Grocery's items,
+// Food's dishes): the 8 most common, each with how many places have it,
+// then "All N items" opens every one, A to Z, with a box to find one. A
+// search for an item ticks it here, the same as tapping it.
+//
 // A sheet from the bottom on a phone, a dialog on a wider screen. The list
 // updates as each one is switched; "Show N listings" just closes.
+
+export type FilterItems = {
+  key: string
+  label: string
+  /** Every item, with how many listings have it, most first. */
+  counts: { tag: string; count: number }[]
+  chosen: string[]
+}
+
+/** How many of the most common items show before "All N items". */
+export const TOP_ITEMS = 8
 
 export type FilterSelect = {
   key: string
@@ -37,6 +53,9 @@ type Props = {
   onBoolean: (key: string) => void
   selects: FilterSelect[]
   onSelect: (key: string, value: string) => void
+  /** "Has": each item list's items. */
+  items?: FilterItems[]
+  onItem?: (key: string, tag: string) => void
   onClearAll: () => void
   /** What the list holds with these filters: "Show 11 listings". */
   count: number
@@ -57,8 +76,12 @@ export default function FiltersSheet(props: Props) {
   )
 }
 
-function FiltersBody({ hasOpenNow, openNow, onOpenNow, booleans, onBoolean, selects, onSelect, onClearAll, onClose, count }: Props) {
-  const anyOn = openNow || booleans.some((b) => b.on) || selects.some((s) => s.chosen.length > 0)
+function FiltersBody({ hasOpenNow, openNow, onOpenNow, booleans, onBoolean, selects, onSelect, items = [], onItem, onClearAll, onClose, count }: Props) {
+  const anyOn = openNow || booleans.some((b) => b.on) || selects.some((s) => s.chosen.length > 0) || items.some((i) => i.chosen.length > 0)
+  // "All N items", A to Z, in place of the rest of the sheet.
+  const [allOf, setAllOf] = useState<string | null>(null)
+  const all = items.find((i) => i.key === allOf)
+  if (all) return <AllItems items={all} onItem={(tag) => onItem?.(all.key, tag)} onBack={() => setAllOf(null)} onClose={onClose} count={count} />
   return (
     <div className="space-y-4">
       {/* Always takes its line, and only shows once something is on: a
@@ -83,13 +106,109 @@ function FiltersBody({ hasOpenNow, openNow, onOpenNow, booleans, onBoolean, sele
           </div>
         </fieldset>
       ))}
-      <button
-        type="button"
-        onClick={onClose}
-        className="h-12 w-full cursor-pointer rounded-xl bg-primary text-[15.5px] font-bold text-white transition-transform active:scale-[0.99]"
-      >
-        Show {count} listing{count === 1 ? '' : 's'}
-      </button>
+      {items.map((it) => {
+        // The most common, and anything ticked further down the list, so
+        // what's on is always in view.
+        const top = it.counts.slice(0, TOP_ITEMS)
+        const shown = [...top, ...it.counts.filter((c) => it.chosen.includes(c.tag) && !top.includes(c))]
+        return (
+          <fieldset key={it.key} className="space-y-2">
+            <legend className="mb-2 text-[13px] font-bold text-slate-500">{it.label}</legend>
+            <div className="flex flex-wrap gap-2">
+              {shown.map((c) => (
+                <FilterChip key={c.tag} label={c.tag} count={c.count} on={it.chosen.includes(c.tag)} onToggle={() => onItem?.(it.key, c.tag)} />
+              ))}
+            </div>
+            {it.counts.length > TOP_ITEMS && (
+              <button
+                type="button"
+                onClick={() => setAllOf(it.key)}
+                className="mt-1 flex cursor-pointer items-center gap-1 text-sm font-bold text-primary hover:underline"
+              >
+                All {it.counts.length} items
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                  <path d="m9 18 6-6-6-6" />
+                </svg>
+              </button>
+            )}
+          </fieldset>
+        )
+      })}
+      <ShowButton count={count} onClose={onClose} />
+    </div>
+  )
+}
+
+function ShowButton({ count, onClose }: { count: number; onClose: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClose}
+      className="h-12 w-full cursor-pointer rounded-xl bg-primary text-[15.5px] font-bold text-white transition-transform active:scale-[0.99]"
+    >
+      Show {count} listing{count === 1 ? '' : 's'}
+    </button>
+  )
+}
+
+/** Every item in one list, A to Z, with how many places have each; the box
+ *  finds one. Ticking one here is the same as ticking it in the sheet. */
+function AllItems({ items, onItem, onBack, onClose, count }: { items: FilterItems; onItem: (tag: string) => void; onBack: () => void; onClose: () => void; count: number }) {
+  const [find, setFind] = useState('')
+  const wanted = find.trim().toLowerCase()
+  // Opened from partway down the sheet: starts at its own top.
+  const top = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    top.current?.scrollIntoView?.({ block: 'start' })
+  }, [])
+  const rows = [...items.counts].sort((a, b) => a.tag.localeCompare(b.tag)).filter((c) => !wanted || c.tag.toLowerCase().includes(wanted))
+  return (
+    <div ref={top} className="scroll-mt-4 space-y-3" data-testid="all-items">
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={onBack}
+          aria-label="Back to Filters"
+          className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full border border-slate-200 text-primary hover:bg-slate-50"
+        >
+          <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
+            <path d="m15 18-6-6 6-6" />
+          </svg>
+        </button>
+        <h3 className="text-[17px] font-extrabold text-ink">
+          {items.label} · {items.counts.length} items
+        </h3>
+      </div>
+      <label className="flex h-11 items-center gap-2 rounded-xl border border-slate-300 px-3 focus-within:ring-2 focus-within:ring-primary/30">
+        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" className="h-4 w-4 shrink-0 text-slate-400">
+          <circle cx="11" cy="11" r="8" />
+          <path d="m21 21-4.3-4.3" />
+        </svg>
+        <input
+          type="search"
+          value={find}
+          onChange={(e) => setFind(e.target.value)}
+          placeholder="Find an item"
+          aria-label="Find an item"
+          className="min-w-0 flex-1 bg-transparent text-[15px] text-ink placeholder:text-slate-400 focus:outline-none"
+        />
+      </label>
+      <ul className="divide-y divide-slate-100 border-y border-slate-100">
+        {rows.map((c) => {
+          const on = items.chosen.includes(c.tag)
+          return (
+            <li key={c.tag}>
+              <label className="flex h-11 cursor-pointer items-center gap-3">
+                <input type="checkbox" checked={on} onChange={() => onItem(c.tag)} className="h-5 w-5 shrink-0 cursor-pointer accent-primary" />
+                <span className={`flex-1 text-[15px] text-ink ${on ? 'font-bold' : ''}`}>{c.tag}</span>
+                <span className="text-[13.5px] text-slate-500 tabular-nums">{c.count}</span>
+              </label>
+            </li>
+          )
+        })}
+        {rows.length === 0 && <li className="py-3 text-[14px] text-slate-500">No item called “{find.trim()}”.</li>}
+      </ul>
+      <ShowButton count={count} onClose={onClose} />
     </div>
   )
 }
@@ -123,12 +242,15 @@ export function FilterChip({
   on,
   onToggle,
   dot,
+  count,
 }: {
   label: string
   on: boolean
   onToggle: () => void
   /** Open now's green dot, while it's off. */
   dot?: boolean
+  /** How many listings have it ("Challah 10"). */
+  count?: number
 }) {
   return (
     <button
@@ -150,6 +272,7 @@ export function FilterChip({
         <span aria-hidden="true" className="mr-0.5 h-[7px] w-[7px] rounded-full bg-green-600" />
       ) : null}
       {label}
+      {count !== undefined && <span className={`ml-0.5 font-medium ${on ? 'text-white/80' : 'text-slate-500'}`}>{count}</span>}
     </button>
   )
 }

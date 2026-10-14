@@ -20,11 +20,15 @@ import AddScheduleBox from './AddScheduleBox'
 // ── The Synagogues page's Minyanim view (step 4, agreed Oct 1) ───────────────
 // The same page's shuls, as every minyan by time, for a day picked from the
 // week ahead: "Today · Chol HaMoed", "Fri · Hoshana Rabbah", "Shabbos ·
-// Shemini Atzeres". An answer first ("Next: Mincha 6:15 PM at…"), then each
-// minyan with its shul, how far, and whose times they are: the shul's own
+// Shemini Atzeres". Each minyan with its shul, how far, and whose times they are: the shul's own
 // festival times, or its regular ones marked "Sukkos not posted". On a Yom
 // Tov, shuls with nothing posted are folded into one note: their regular
 // times are too likely wrong to list as if they applied.
+//
+// No sentence over the list (Oct 13, "search takes you to the page"): the
+// first row, in time order, is the next minyan, and the home search says it
+// on its line before anyone lands here. The sentence stays only to say why
+// a list is empty: nothing more today, no shul by that name, not posted.
 //
 // Times are worked out exactly as the shul's card and the Next minyan card
 // work them out (useMinyanSchedule), so the three can't disagree.
@@ -181,9 +185,11 @@ export default function MinyanimView({
         }}
       />
 
-      <div className="mt-3 rounded-xl bg-primary/[0.07] px-3.5 py-3" data-testid="minyanim-answer">
-        <p className="text-[14.5px] font-semibold leading-snug text-slate-900">{answer}</p>
-      </div>
+      {(upcoming.length === 0 || named?.length === 0) && (
+        <div className="mt-3 rounded-xl bg-primary/[0.07] px-3.5 py-3" data-testid="minyanim-answer">
+          <p className="text-[14.5px] font-semibold leading-snug text-slate-900">{answer}</p>
+        </div>
+      )}
       {festival && (
         <p className="mt-2.5 text-[13.5px] leading-snug text-slate-600">
           {day.name ?? festival}. <b>{postedCount} of {shulCount} shuls</b> have posted {festival} times

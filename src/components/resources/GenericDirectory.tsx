@@ -28,7 +28,9 @@ import { foundFor, searchAsk } from '@/lib/askSearch'
 import { withoutOpenWords, withoutSortWords, withoutTerms } from '@/lib/ask'
 import { neighborhoodsFor, placeName, townsFrom } from '@/lib/places'
 import { readerPlaces } from '@/lib/questionReader'
-import { needsReading, ownFrom, readingAnswers, readingChips, readingLoses, readingOffers, searchReading } from '@/lib/readingSearch'
+import { needsReading, ownFrom, readingAnswers, readingLoses } from '@/lib/readingSearch'
+import { itemCounts, itemFields, listingHas, listingItems, sameItem, searchItems } from '@/lib/itemFilter'
+import { itemName } from '@/lib/itemNames'
 import { useReading } from '@/lib/useReading'
 import { ListingOnwardContext, type ListingOnwardSource } from './listingOnward'
 import ListingColumn from './ListingColumn'
@@ -61,6 +63,44 @@ import { tellUsPlaceholder } from '@/lib/tellUs'
  *  page's own way back can take that same step (the Minyanim view, Oct 6).
  *  Neither: a navigation of its own. */
 export type ParamsOpts = { replace?: boolean; step?: string }
+
+/** A question the Filters were read from (`read=1`), and what it turned on
+ *  there: taken off again when the question is edited or cleared. */
+type Landed = { search: string; openNow: boolean; bool: string[]; select: Record<string, string[]>; has: Record<string, string[]> }
+
+/** The Filters an address carries: `f_<key>=1`, `sel_<key>=a,b`,
+ *  `has_<key>=Challah,Wine`. */
+function addressFilters(category: CategoryConfig, params: Record<string, string>) {
+  const bools: Record<string, boolean> = {}
+  const sels: Record<string, string[]> = {}
+  const has: Record<string, string[]> = {}
+  for (const f of category.detailFields) {
+    if (f.type === 'tags') {
+      const raw = params[`has_${f.key}`]
+      if (raw) has[f.key] = raw.split(',').map((v) => itemName(v)).filter(Boolean)
+    }
+    if (f.filterable && f.type === 'boolean' && params[`f_${f.key}`] === '1') bools[f.key] = true
+    if (f.filterable && f.type === 'select') {
+      const raw = params[`sel_${f.key}`]
+      if (raw) sels[f.key] = raw.split(',').filter(Boolean)
+    }
+  }
+  return { bools, sels, has }
+}
+
+/** Whether an address carries a search or Filters for this page. */
+function carriesSearch(category: CategoryConfig, params: Record<string, string>) {
+  const { bools, sels, has } = addressFilters(category, params)
+  return !!params.q?.trim() || params.openNow === '1' || [bools, sels, has].some((x) => Object.keys(x).length > 0)
+}
+
+/** `chosen` with `gone` taken out of it, key by key. */
+function withoutChosen(chosen: Record<string, string[]>, gone: Record<string, string[]>): Record<string, string[]> {
+  if (Object.keys(gone).length === 0) return chosen
+  const out = { ...chosen }
+  for (const [key, values] of Object.entries(gone)) out[key] = (out[key] ?? []).filter((v) => !values.some((g) => sameItem(g, v)))
+  return out
+}
 const MINYANIM_STEP = 'minyanim'
 const LISTING_STEP = 'listing'
 
@@ -153,11 +193,24 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // navigation — a clicked link, a shared URL, typing an address — is
   // exactly the case that SHOULD still hydrate from it, since that's what
   // makes a filtered link shareable in the first place.
-  const [arrivedViaBackForward] = useState(() => didArriveViaBackForward())
+  const [arrivedViaBackForward] = useState(() => didArriveViaBackForward(category.id))
   const [search, setSearch] = useState(arrivedViaBackForward ? '' : (initialSearch ?? ''))
   const [boolFilters, setBoolFilters] = useState<Record<string, boolean>>({})
   // Multi-select: each key maps to the set of chosen values (empty = no filter).
   const [selectFilters, setSelectFilters] = useState<Record<string, string[]>>({})
+  // "Has": items in a listing's item list (`?has_<key>=Challah,Wine`; see
+  // searchLands.ts), each listing having every one ticked, always or
+  // sometimes.
+  const [hasFilters, setHasFilters] = useState<Record<string, string[]>>({})
+  // A question whose meaning is already in the Filters (`?read=1`: the AI
+  // reader read it, here or on the home search): it stays in the box, as
+  // asked, but isn't searched by again while it's unchanged, so switching
+  // one of its filters off really widens the list. Typing anything else
+  // searches as usual. And what it was read as goes with it: editing or
+  // clearing the question takes off the Filters it turned on (`landed`),
+  // and leaves the ones the visitor ticked.
+  const [landed, setLanded] = useState<Landed | null>(null)
+  const landedSearch = landed?.search ?? null
 
   // Which card currently has its listing open — the desktop column or the
   // mobile sheet. On a phone the floating Add button steps aside while it's
@@ -214,25 +267,27 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // before those are in scope, and duplicating the two-line filter here is
   // cheaper than reordering the whole component around it).
   const appliedInitialFiltersRef = useRef(false)
+  // The Filters an address carries, and, for a question read into them
+  // (`read=1`), that question with them.
+  const applyAddressFilters = (params: Record<string, string>) => {
+    const { bools, sels, has } = addressFilters(category, params)
+    if (Object.keys(bools).length > 0) setBoolFilters((prev) => ({ ...prev, ...bools }))
+    if (Object.keys(sels).length > 0) setSelectFilters((prev) => ({ ...prev, ...sels }))
+    if (Object.keys(has).length > 0) setHasFilters((prev) => ({ ...prev, ...has }))
+    if (params.read === '1' && params.q) {
+      setLanded({ search: params.q, openNow: params.openNow === '1', bool: Object.keys(bools), select: sels, has })
+    }
+  }
   useEffect(() => {
     if (appliedInitialFiltersRef.current || !initialFilters) return
     appliedInitialFiltersRef.current = true
     if (arrivedViaBackForward) return
-    const bools: Record<string, boolean> = {}
-    const sels: Record<string, string[]> = {}
-    for (const f of category.detailFields) {
-      if (f.filterable && f.type === 'boolean' && initialFilters[`f_${f.key}`] === '1') bools[f.key] = true
-      if (f.filterable && f.type === 'select') {
-        const raw = initialFilters[`sel_${f.key}`]
-        if (raw) sels[f.key] = raw.split(',').filter(Boolean)
-      }
-    }
     // One-time application of an external value on arrival, guarded above by
     // appliedInitialFiltersRef — not the "derive state from props on every
     // render" pattern this lint rule is otherwise right to flag.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (Object.keys(bools).length > 0) setBoolFilters((prev) => ({ ...prev, ...bools }))
-    if (Object.keys(sels).length > 0) setSelectFilters((prev) => ({ ...prev, ...sels }))
+    applyAddressFilters(initialFilters)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialFilters, category, arrivedViaBackForward])
   // Resets this screen's own search/openNow/filters to blank, both in local
   // state and (via onParamsChange) back out to the address bar — what a
@@ -251,16 +306,32 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // block's own doc above) — category/onParamsChange can be a fresh value
   // each render, and the two effects below only ever call this well after
   // it, never in the same commit, so ordinary (not layout) timing is fine.
+  // Only this screen's own state; clearFiltersRef clears the address too.
+  const blankRef = useRef<() => void>(undefined)
+  // This screen's state as an address has it (`?q=challah&has_m=Challah`).
+  const fromAddressRef = useRef<(params: Record<string, string>) => void>(undefined)
   useEffect(() => {
-    clearFiltersRef.current = () => {
+    fromAddressRef.current = (params) => {
+      blankRef.current!()
+      setSearch(params.q ?? '')
+      setOpenNow(params.openNow === '1')
+      applyAddressFilters(params)
+    }
+    blankRef.current = () => {
       setSearch('')
       setOpenNow(false)
       setBoolFilters({})
       setSelectFilters({})
-      const changes: Record<string, string | null> = { q: null, openNow: null }
+      setHasFilters({})
+      setLanded(null)
+    }
+    clearFiltersRef.current = () => {
+      blankRef.current!()
+      const changes: Record<string, string | null> = { q: null, openNow: null, read: null }
       for (const f of category.detailFields) {
         if (f.filterable && f.type === 'boolean') changes[`f_${f.key}`] = null
         if (f.filterable && f.type === 'select') changes[`sel_${f.key}`] = null
+        if (f.type === 'tags') changes[`has_${f.key}`] = null
       }
       onParamsChange?.(changes, { replace: true })
     }
@@ -311,14 +382,27 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // for another screen has already changed the address by the time this
   // screen is hidden; a pause while code loads hasn't. So it clears only
   // when the address it was hidden at isn't this screen's own.
+  //
+  // Come back by a link that carries a search (the home search's "Grocery ·
+  // 10 with Challah" is `?q=challah`), it's that search, not a blank page:
+  // the `initialXxx` props were applied once, on the first visit, and a
+  // second search from home landed on the whole list (the user, Oct 13).
+  // Only back/forward blanks it, as on a first arrival.
   const hasActivatedBeforeRef = useRef(false)
   const hiddenAtRef = useRef<string | null>(null)
   useEffect(() => {
-    if (hasActivatedBeforeRef.current && hiddenAtRef.current !== window.location.pathname) clearFiltersRef.current!()
+    if (hasActivatedBeforeRef.current && hiddenAtRef.current !== window.location.pathname) {
+      const params = Object.fromEntries(new URLSearchParams(window.location.search))
+      if (didArriveViaBackForward(category.id) || !carriesSearch(category, params)) clearFiltersRef.current!()
+      else fromAddressRef.current!(params)
+    }
     hasActivatedBeforeRef.current = true
     return () => {
       hiddenAtRef.current = window.location.pathname
     }
+    // On each activation only (Activity re-runs it), never on a change of
+    // category: a category is its own screen.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // ── Sync search + "Open now" into the URL (see onParamsChange's own doc) ──
@@ -328,16 +412,41 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // typing doesn't fire a history replace per keystroke; `openNow` is a
   // single toggle, so it goes out immediately.
   const searchSyncedOnce = useRef(false)
+  // Read when the debounce fires, not when it was set: arriving by a link,
+  // the question can reach `search` a render before `landed` does, and
+  // `read=1` came off the address (Oct 13).
+  const landedSearchRef = useRef(landedSearch)
+  useEffect(() => {
+    landedSearchRef.current = landedSearch
+  })
   useEffect(() => {
     if (!searchSyncedOnce.current) {
       searchSyncedOnce.current = true
       return
     }
     const timer = setTimeout(() => {
-      onParamsChange?.({ q: search.trim() || null }, { replace: true })
+      const kept = landedSearchRef.current !== null && search === landedSearchRef.current
+      onParamsChange?.({ q: search.trim() || null, ...(kept ? {} : { read: null }) }, { replace: true })
     }, 300)
     return () => clearTimeout(timer)
   }, [search, onParamsChange])
+  // The question edited or cleared: the Filters it was read as come off
+  // with it (see `landed`). What's typed now is searched, and read again
+  // if it needs it.
+  useEffect(() => {
+    if (!landed || search === landed.search) return
+    const was = landed
+    // Follows the visitor's own edit of the box, once: not state derived
+    // from props.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setLanded(null)
+    if (was.openNow) setOpenNow(false)
+    if (was.bool.length) setBoolFilters((prev) => ({ ...prev, ...Object.fromEntries(was.bool.map((key) => [key, false])) }))
+    setSelectFilters((prev) => withoutChosen(prev, was.select))
+    setHasFilters((prev) => withoutChosen(prev, was.has))
+    // Only the box's own changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search])
   const openNowSyncedOnce = useRef(false)
   useEffect(() => {
     if (!openNowSyncedOnce.current) {
@@ -508,6 +617,24 @@ export default function GenericDirectory({ category, items, anchorLabel, address
     return () => clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectFilters, onParamsChange])
+
+  const hasFiltersSyncedOnce = useRef(false)
+  useEffect(() => {
+    if (!hasFiltersSyncedOnce.current) {
+      hasFiltersSyncedOnce.current = true
+      return
+    }
+    const timer = setTimeout(() => {
+      const changes: Record<string, string | null> = {}
+      for (const f of itemFields(category)) {
+        const chosen = hasFilters[f.key] ?? []
+        changes[`has_${f.key}`] = chosen.length > 0 ? chosen.join(',') : null
+      }
+      onParamsChange?.(changes, { replace: true })
+    }, 300)
+    return () => clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasFilters, onParamsChange])
 
   // "All davening times" — only for categories with a `minyanim`-type field
   // (today, just Synagogues) and at least one listing with structured data.
@@ -803,7 +930,10 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // the user's note 4): it isn't a search of the shuls, nor a question for
   // the reader.
   const searchingMinyanim = hasMinyanim && minyanimViewOn
-  const q = searchingMinyanim ? '' : search.trim().toLowerCase()
+  // What the list is searched by: the box, unless what's in it is a
+  // question already turned into the Filters (see landedSearch).
+  const searchedFor = landedSearch !== null && search === landedSearch ? '' : search
+  const q = searchingMinyanim ? '' : searchedFor.trim().toLowerCase()
   const communitySlug = useOptionalCommunitySlug()
   // Read as a question, the same way as the home search (see askSearch.ts),
   // limited to this category — so a place tapped there ("where can I get
@@ -812,8 +942,8 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // Each match keeps what it matched on (see SearchFound), for the card to
   // say why it's here and the listing to mark it once opened.
   const todayResult = useMemo(
-    () => (q ? searchAsk(items, [category], search, { categoryId: category.id, places: neighborhoodsFor(communitySlug) }) : null),
-    [q, items, category, search, communitySlug],
+    () => (q ? searchAsk(items, [category], searchedFor, { categoryId: category.id, places: neighborhoodsFor(communitySlug) }) : null),
+    [q, items, category, searchedFor, communitySlug],
   )
   const todayMatches = useMemo(
     () => (todayResult ? new Map(todayResult.hits.map((h) => [h.item.id, foundFor(h, todayResult)])) : null),
@@ -822,33 +952,78 @@ export default function GenericDirectory({ category, items, anchorLabel, address
 
   // ── The question reader (questionReader.ts), as on the home search ──────
   // Only when our own search left something it didn't understand
-  // (needsReading), on Enter or after a pause; the reading can add to what
-  // our search understood, never take it away (ownFrom). Its own part of
-  // the reading (this category's filters, items, how far) answers, shown
-  // as "Read as" in CategoryAsk. Never a place's own name. When its part
-  // of the reading finds nothing here and today's search does ("challah"
-  // on Food, read as Grocery), today's search answers: this page is about
-  // this category.
+  // (needsReading), on Enter or after a pause. Its reading of this category
+  // (Open now, its yes/nos and pick-lists, items) is switched on in the
+  // page's own Filters, where it can be seen and switched off, and the
+  // question stays in the box without being searched by again (see
+  // landedSearch). It used to narrow the list itself and show what it read
+  // as "Read as" chips above it, a second set of filters beside Filters
+  // (the user, Oct 13). Never a place's own name. When the reading is about
+  // another kind of place and today's search finds something here
+  // ("challah" on Food, read as Grocery), today's search answers: this page
+  // is about this category.
   const reader = useReading(communitySlug)
-  const coords = useOptionalLocation()?.coords ?? null
   // The neighbourhoods; a hospital named comes with where it is (see the route).
   const readerPlacesHere = useMemo(() => readerPlaces(items, communitySlug ?? ''), [items, communitySlug])
   const typedName = q.replace(/['’]/g, '')
   const readable = !!todayResult && needsReading(todayResult) && !items.some((i) => i.name.toLowerCase().replace(/['’]/g, '').includes(typedName))
   const own = todayResult ? ownFrom(todayResult, readerPlacesHere) : null
   const reading = readable ? reader.readingFor(search) : null
-  const readResult = useMemo(() => {
-    if (!reading || !readingAnswers(reading.reading, category.id) || ((todayMatches?.size ?? 0) > 0 && readingLoses(search, reading.reading, categories ?? [category]))) return null
-    const result = searchReading(items, categories ?? [category], reading, search, { coords, now: new Date(clock ?? 0), places: readerPlacesHere, categoryId: category.id })
-    const found = result.hits.length + result.noHours.length
-    return found === 0 && (todayMatches?.size ?? 0) > 0 ? null : result
-  }, [reading, items, categories, category, search, coords, readerPlacesHere, todayMatches, clock])
+  const applyReading = useEffectEvent((asked: NonNullable<typeof reading>, question: string) => {
+    const { reading: r, own: mine } = asked
+    if (!readingAnswers(r, category.id)) return
+    if ((todayMatches?.size ?? 0) > 0 && readingLoses(question, r, categories ?? [category])) return
+    const here = r.categories.find((c) => c.id === category.id)
+    const openNowAdded = hasFilterableHours && !!(here?.openNow || mine.openNow) && !openNow
+    if (openNowAdded) setOpenNow(true)
+    const bools = (here?.bool ?? []).filter((key) => filterableBooleans.some((f) => f.key === key))
+    if (bools.length) setBoolFilters((prev) => ({ ...prev, ...Object.fromEntries(bools.map((key) => [key, true])) }))
+    const sels = Object.entries(here?.select ?? {}).filter(([key, v]) => v.length && filterableSelects.some((f) => f.key === key))
+    if (sels.length) setSelectFilters((prev) => ({ ...prev, ...Object.fromEntries(sels) }))
+    const field = itemFields(category)[0]
+    const hasAdded: string[] = []
+    if (field && r.items?.length) {
+      // As the listings spell it ("wine" read is their "Wine").
+      const known = new Map(itemCounts(items, field.key).map((i) => [i.tag.toLowerCase(), i.tag]))
+      const already = (hasFilters[field.key] ?? []).map((t) => t.toLowerCase())
+      for (const i of r.items) {
+        const tag = known.get(itemName(i).toLowerCase())
+        if (tag && !already.includes(tag.toLowerCase()) && !hasAdded.includes(tag)) hasAdded.push(tag)
+      }
+      if (hasAdded.length) setHasFilters((prev) => ({ ...prev, [field.key]: [...(prev[field.key] ?? []), ...hasAdded] }))
+    }
+    setLanded({
+      search: question,
+      openNow: openNowAdded,
+      bool: bools.filter((key) => !boolFilters[key]),
+      select: Object.fromEntries(sels.map(([key, v]) => [key, v.filter((x) => !(selectFilters[key] ?? []).includes(x))])),
+      has: field && hasAdded.length ? { [field.key]: hasAdded } : {},
+    })
+    onParamsChange?.({ read: '1' }, { replace: true })
+  })
+  useEffect(() => {
+    // Applied once, as a reading arrives from the reader, like a shared
+    // link's filters are on arrival (see appliedInitialFiltersRef).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (reading) applyReading(reading, search)
+    // Once per reading that arrives.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reading])
   useEffect(() => {
     if (!readable || !own) return
     const timer = setTimeout(() => reader.ask(search, own), 1000)
     return () => clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [readable, search])
+  // A minyan question typed over the list of shuls ("mincha tonight") is
+  // asked of Minyanim by time, as the home search would send it: the list
+  // of shuls has nothing to answer it with.
+  const asksMinyan = hasMinyanim && !minyanimViewOn && !!todayResult?.query.minyan
+  useEffect(() => {
+    if (!asksMinyan) return
+    const timer = setTimeout(() => setMinyanimViewOn(true), 700)
+    return () => clearTimeout(timer)
+  }, [asksMinyan])
   // ── The order the search asks for ──
   // "Pizza near me", "closest pizza": nearest first; "best pizza", "sort by
   // popularity": most liked first, while it's in the box, whatever the Sort
@@ -856,33 +1031,10 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // 29). The Sort button says which (Oct 10), and picking the other order
   // there takes the words out of the box (selectSort), so the two never
   // disagree.
-  const askedQuery = q ? (readResult ?? todayResult)?.query : undefined
+  const askedQuery = q ? todayResult?.query : undefined
   const askedOrder: 'nearest' | 'popular' | null = askedQuery?.nearMe ? 'nearest' : askedQuery?.best && upvotes ? 'popular' : null
   const byPopular = askedOrder ? askedOrder === 'popular' : sortByPopular
-  const readChips = readResult && reading ? readingChips(reading, categories ?? [category], { reach: readResult.reach, categoryId: category.id, excluded: readResult.excluded }) : []
-  const readAs = {
-    reading: reader.isReading(search) && !readResult,
-    chips: readChips,
-    onRemove: (chip: { without: Parameters<typeof reader.edit>[0] }) => reader.edit(chip.without),
-    offers:
-      readResult && reading
-        ? readingOffers(reading, items, categories ?? [category], search, {
-            coords,
-            now: new Date(clock ?? 0),
-            places: readerPlacesHere,
-            categoryId: category.id,
-            found: readResult.hits.length + readResult.noHours.length,
-            chips: readChips,
-          })
-        : [],
-    onPick: (offer: { next: Parameters<typeof reader.edit>[0] }) => reader.edit(offer.next),
-    onSubmit: () => readable && own && reader.ask(search, own),
-    result: readResult,
-  }
-  const askMatches = useMemo(
-    () => (readResult ? new Map([...readResult.hits, ...readResult.noHours].map((h) => [h.item.id, foundFor(h, readResult)])) : todayMatches),
-    [readResult, todayMatches],
-  )
+  const askMatches = todayMatches
   const matchesSearch = (item: DirectoryResource) => askMatches === null || askMatches.has(item.id)
   // A listing opened from the home search: what that search matched in it.
   // Until that listing is closed — reopened later, it's just the listing.
@@ -894,8 +1046,17 @@ export default function GenericDirectory({ category, items, anchorLabel, address
     const result = searchAsk([reopened], [category], reopenMatch, { categoryId: category.id })
     return result.hits[0] ? foundFor(result.hits[0], result) : null
   }, [reopenKey, reopenItemId, reopenMatch, items, category])
+  // Ticked in Has, the items say why each listing is in the list
+  // ("Challah · sometimes"), as a search for them would.
+  const hasChosen = Object.entries(hasFilters).filter(([, v]) => v.length > 0)
+  const hadItems = (item: DirectoryResource) => {
+    if (hasChosen.length === 0) return null
+    const wanted = new Set(hasChosen.flatMap(([, v]) => v.map((t) => itemName(t).toLowerCase())))
+    const its = hasChosen.flatMap(([key]) => listingItems(item, key)).filter((t) => wanted.has(t.tag.toLowerCase()))
+    return its.length ? { terms: [], items: its, fields: [] } : null
+  }
   const foundOn = (item: DirectoryResource) =>
-    askMatches?.get(item.id) ?? (item.id === reopenItemId && closedMatchFor !== reopenKey ? reopenFound : null)
+    askMatches?.get(item.id) ?? hadItems(item) ?? (item.id === reopenItemId && closedMatchFor !== reopenKey ? reopenFound : null)
 
   const filtered = items
     .filter((item) => {
@@ -910,6 +1071,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
         // filter set if ANY of its own values is one of the chosen ones.
         if (chosen?.length && !selectValues(item[f.key]).some((v) => chosen.includes(v))) return false
       }
+      for (const [key, chosen] of Object.entries(hasFilters)) if (!listingHas(item, key, chosen)) return false
       if (openNow && hasFilterableHours) {
         // Closed businesses are never open, whatever hours they still have
         // saved — a temporarily-closed shop kept passing this filter on last
@@ -1024,18 +1186,25 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   })
   // Whether there's any filter at all, so a category with none (WhatsApp
   // Groups) has no Filters button opening onto an empty sheet.
-  const hasActualFilters = filterableBooleans.length > 0 || selectsToShow.length > 0 || hasFilterableHours
+  // "Has", for each item list some listing here has anything in.
+  const itemsToShow = itemFields(category).flatMap((f) => {
+    const counts = itemCounts(items, f.key)
+    return counts.length === 0 ? [] : [{ key: f.key, label: 'Has', counts }]
+  })
+  const hasActualFilters = filterableBooleans.length > 0 || selectsToShow.length > 0 || hasFilterableHours || itemsToShow.length > 0
   const typed = !searchingMinyanim && search.trim() !== ''
 
   const hasActiveFilters =
     typed ||
     Object.values(boolFilters).some(Boolean) ||
     Object.values(selectFilters).some((v) => v.length > 0) ||
+    Object.values(hasFilters).some((v) => v.length > 0) ||
     openNow
 
   const activeFilterCount =
     Object.values(boolFilters).filter(Boolean).length +
     Object.values(selectFilters).filter((v) => v.length > 0).length +
+    Object.values(hasFilters).filter((v) => v.length > 0).length +
     (openNow ? 1 : 0)
   // The search found places, and the filters hid every one of them: the
   // answer above the list says "2 places have pizza", so an empty list has
@@ -1153,6 +1322,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   const clearFilters = () => {
     setBoolFilters({})
     setSelectFilters({})
+    setHasFilters({})
     setOpenNow(false)
   }
   const clearAll = () => {
@@ -1172,7 +1342,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // shows it ticked and the button counts it; unticking it there takes the
   // word out of the search, so the two never disagree. Nothing about it on
   // the page itself: the word is in the box already (the user, Oct 10).
-  const searchResult = typed ? (readResult ?? todayResult) : null
+  const searchResult = typed ? todayResult : null
   const searchBools = new Map<string, string>()
   const searchSelects = new Map<string, Map<string, string>>()
   for (const t of searchResult?.taught ?? []) {
@@ -1180,6 +1350,8 @@ export default function GenericDirectory({ category, items, anchorLabel, address
     if (field?.type === 'boolean') searchBools.set(field.key, t.word)
     else if (field?.type === 'select' && t.value !== undefined) searchSelects.set(field.key, (searchSelects.get(field.key) ?? new Map()).set(t.value, t.word))
   }
+  // An item said ("challah") is Has: Challah, the same way (searchItems).
+  const searchHas = searchResult ? searchItems(category, items, searchResult) : new Map<string, Map<string, string>>()
   const searchOpenNow = !!searchResult?.query.openNow && hasFilterableHours
   const dropWord = (word: string) => setSearch((prev) => withoutTerms(prev, word.split(' ')))
   const sheetOpenNow = openNow || searchOpenNow
@@ -1200,19 +1372,38 @@ export default function GenericDirectory({ category, items, anchorLabel, address
     dropWord(word)
     setSelectFilters((prev) => ({ ...prev, [key]: (prev[key] ?? []).filter((x) => x !== value) }))
   }
+  const toggleSheetHas = (key: string, tag: string) => {
+    const word = searchHas.get(key)?.get(tag)
+    if (word) dropWord(word)
+    setHasFilters((prev) => {
+      const cur = prev[key] ?? []
+      const on = cur.some((x) => sameItem(x, tag)) || !!word
+      return { ...prev, [key]: on ? cur.filter((x) => !sameItem(x, tag)) : [...cur, tag] }
+    })
+  }
   // The sheet's Clear all clears what it shows, the search's filter words
   // too; the empty list's "Clear filters" (clearFilters) keeps the search.
+  // A question read into the Filters (landedSearch) goes with them: it's
+  // what they were.
   const clearSheet = () => {
     clearFilters()
+    if (landedSearch !== null && search === landedSearch) return setSearch('')
     let next = search
-    for (const word of [...searchBools.values(), ...[...searchSelects.values()].flatMap((m) => [...m.values()])]) next = withoutTerms(next, word.split(' '))
+    for (const word of [...searchBools.values(), ...[...searchSelects.values()].flatMap((m) => [...m.values()]), ...[...searchHas.values()].flatMap((m) => [...m.values()])]) next = withoutTerms(next, word.split(' '))
     setSearch(searchOpenNow ? withoutOpenWords(next) : next)
   }
+  // Each ticked item as its listings spell it, so "has_m=wine" from an
+  // address ticks their "Wine" rather than adding a second chip.
+  const sheetItems = itemsToShow.map((f) => {
+    const spelled = (t: string) => f.counts.find((c) => sameItem(c.tag, t))?.tag ?? t
+    return { ...f, chosen: [...new Set([...(hasFilters[f.key] ?? []), ...(searchHas.get(f.key)?.keys() ?? [])].map(spelled))] }
+  })
   const sheetSelects = selectsToShow.map((sel) => ({ ...sel, chosen: [...new Set([...sel.chosen, ...(searchSelects.get(sel.key)?.keys() ?? [])])] }))
   // What the Filters button counts: everything the sheet shows ticked.
   const sheetFilterCount =
     filterableBooleans.filter((f) => boolFilters[f.key] || searchBools.has(f.key)).length +
     filterableSelects.filter((f) => (selectFilters[f.key]?.length ?? 0) > 0 || searchSelects.has(f.key)).length +
+    sheetItems.filter((f) => f.chosen.length > 0).length +
     (sheetOpenNow ? 1 : 0)
 
   // Desktop-only shared-element morph target for the same icon badge
@@ -1597,12 +1788,15 @@ export default function GenericDirectory({ category, items, anchorLabel, address
             <div className={hasMapColumn ? 'lg:max-w-[720px]' : undefined}>
               <CategoryAsk
                 category={category}
-                items={items}
                 search={search}
                 onSearch={setSearch}
-                hasMinyanim={hasMinyanim}
                 scope={minyanimView ? 'minyanim' : undefined}
-                readAs={minyanimView ? undefined : readAs}
+                reading={!minyanimView && reader.isReading(search)}
+                onSubmit={() => {
+                  if (asksMinyan) setMinyanimViewOn(true)
+                  else if (readable && own) reader.ask(search, own)
+                }}
+                foundNothing={!minyanimView && searchFoundNothing && !reader.isReading(search)}
               />
             </div>
           )}
@@ -1978,6 +2172,8 @@ export default function GenericDirectory({ category, items, anchorLabel, address
           onBoolean={toggleSheetBool}
           selects={sheetSelects}
           onSelect={toggleSheetSelect}
+          items={sheetItems}
+          onItem={toggleSheetHas}
           onClearAll={clearSheet}
           count={filtered.length}
         />

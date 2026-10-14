@@ -4,7 +4,7 @@ import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/re
 import { makeCategory, makeListing } from '@/test/providerFixtures'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { mockRouter } from '@/test/nextNavigationMock'
-import { showsSiteAdd } from './SiteAddButton'
+import SiteAddButton, { showsSiteAdd } from './SiteAddButton'
 import TellUsSheet from './TellUsSheet'
 import { track } from '@vercel/analytics'
 
@@ -643,5 +643,16 @@ describe('showsSiteAdd', () => {
     expect(['/philly/map', '/philly/grocery', '/philly/grocery/abc', '/philly/feedback', '/philly/about', '/philly/privacy', '/ues', '/admin'].map((p) => showsSiteAdd(p, 'philly', cats))).toEqual(
       Array(8).fill(false),
     )
+  })
+})
+
+// "How do I add a listing?" in the home search opens this box, as "+ Add"
+// does (searchLands.ts, Oct 13).
+describe('SiteAddButton — opened by the search', () => {
+  it('opens the box on jpc:open-add', async () => {
+    renderWithProviders(<SiteAddButton />, { content: { categories: [makeCategory()] }, community: { slug: 'philly' } })
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    fireEvent(document, new CustomEvent('jpc:open-add'))
+    expect(await screen.findByRole('dialog')).toBeInTheDocument()
   })
 })

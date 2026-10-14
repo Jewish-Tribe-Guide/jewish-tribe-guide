@@ -17,6 +17,8 @@ export type PageReading = { question: string; asked: Asked }
 export function useReading(community: string | null) {
   const [read, setRead] = useState<PageReading | null>(null)
   const [readingNow, setReadingNow] = useState<string | null>(null)
+  // The last question the reader has answered, read or not.
+  const [answered, setAnswered] = useState<string | null>(null)
   const asked = useRef<string | null>(null)
 
   /** Read `question`; `own` is what our own search understood of it,
@@ -28,6 +30,7 @@ export function useReading(community: string | null) {
     setReadingNow(q)
     void askReader(q, community).then((answer) => {
       setReadingNow((now) => (now === q ? null : now))
+      setAnswered(q)
       if (answer.ok) setRead({ question: q, asked: { reading: withTaught(answer.reading, own.taught), own } })
       // Not kept as asked when it couldn't be read: Enter tries again.
       else if (asked.current === q) asked.current = null
@@ -39,6 +42,9 @@ export function useReading(community: string | null) {
     readingFor: (question: string) => (read && read.question === question.trim() ? read.asked : null),
     /** Whether `question` is being read right now. */
     isReading: (question: string) => readingNow !== null && readingNow === question.trim(),
+    /** Whether the reader has answered `question`, with a reading or
+     *  without one (it may be off): something waiting on it can go on. */
+    answered: (question: string) => answered !== null && answered === question.trim(),
     ask,
     /** The visitor removed a chip. */
     edit: (asked: Asked) => read && setRead({ ...read, asked }),

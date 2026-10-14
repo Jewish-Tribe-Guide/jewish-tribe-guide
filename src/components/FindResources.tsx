@@ -9,6 +9,7 @@ import ActionDialog from '@/components/resources/ActionDialog'
 import MobileSheet from '@/components/resources/MobileSheet'
 import EruvInfo from '@/components/resources/EruvInfo'
 import ZmanimCard from '@/components/ZmanimCard'
+import { pickedTime } from '@/components/ZmanimBody'
 import UpButton from '@/components/UpButton'
 import TurnstileWidget, { type TurnstileHandle } from '@/components/TurnstileWidget'
 import type { DirectoryResource, DirectoryAnchor } from '@/types'
@@ -338,6 +339,7 @@ export default function FindResources({
         icon={zmanim?.icon}
         color={zmanim ? getCategoryColor(categories, zmanim.id) : undefined}
         bandImageUrl={zmanim ? bandImageFor(zmanim) : undefined}
+        picked={pickedTime(searchFilters?.time)}
       />
     )
   }

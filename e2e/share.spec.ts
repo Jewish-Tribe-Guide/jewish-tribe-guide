@@ -2,9 +2,8 @@ import { expect, test } from '@playwright/test'
 import { defaultCommunity, dismissLocationPrompt, ready, serverMarkup } from './helpers'
 
 // ─────────────────────────────────────────────────────────────────────────────
-// "Share this answer": a question's own page, /philly/ask/<question>, opens
-// the home screen with the question asked and has a link preview that
-// answers it (see shareAnswer.ts). The question is built from a real item
+// A question's own page, /philly/ask/<question>: its link preview answers
+// it (see shareAnswer.ts), and opened, it goes where the home search would. The question is built from a real item
 // on a real listing, so the preview has something true to say whatever the
 // data is.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -49,19 +48,21 @@ test('a shared question’s link preview answers it, and stays out of search eng
   expect(serverMarkup(html)).not.toContain('Share this answer')
 })
 
-test('a shared question opens already asked, with the answer and its Share button', async ({ page, request }) => {
+// Search takes you to the page (Oct 13): a shared question goes where
+// Enter would, the address replaced so Back doesn't return to a page that
+// leaves again. The link preview above still answers it.
+test('a shared question goes to the page Enter would, with the item in its box', async ({ page, request }) => {
   const community = await defaultCommunity(page)
   const { item, question } = await itemQuestion(request, community)
 
   await page.goto(pathFor(community, question))
+  await page.waitForURL((url) => !url.pathname.includes('/ask/'))
   await ready(page)
   await dismissLocationPrompt(page)
 
-  const box = page.getByLabel('Search resources').locator('visible=true').first()
-  await expect(box).toHaveValue(question.toLowerCase())
-  const answer = page.getByRole('status').filter({ hasText: new RegExp(item, 'i') }).locator('visible=true').first()
-  await expect(answer).toBeVisible()
-  await expect(answer.getByRole('button', { name: 'Share this answer' })).toBeVisible()
+  const url = new URL(page.url())
+  expect(url.searchParams.get('q')?.toLowerCase()).toBe(item.toLowerCase())
+  await expect(page.getByRole('searchbox').filter({ visible: true }).first()).toHaveValue(new RegExp(`^${item}$`, 'i'))
 })
 
 test('a link with no readable question opens the plain home page', async ({ page }) => {

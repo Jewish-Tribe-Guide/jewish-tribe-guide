@@ -5,15 +5,10 @@ import { preload } from 'react-dom'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { ui } from '@/lib/uiConfig'
 import type { SiteSettings } from '@/lib/siteSettings'
-import type { CategoryConfig } from '@/lib/categories'
 import { isOptimizableImage } from '@/lib/imageHosts'
 import { SkylineIcon } from '@/components/icons'
 import SearchBox from './SearchBox'
-import HeroSearchDropdown from './HeroSearchDropdown'
 import SearchPrompts from './SearchPrompts'
-import type { Answer } from '@/lib/askAnswer'
-import type { CardDef, ListingHit } from './sections'
-import type { AskGroupProps } from './AskTheGroup'
 
 /** The `desktop:` variant's own media query (see globals.css) — the hero band is
  *  `hidden` outside it. Kept in sync by hand; it's a link `media` attribute, so
@@ -27,10 +22,9 @@ type Props = {
   >
   query: string
   onQueryChange: (query: string) => void
-  /** Enter in the search box: the question is read (see questionReader.ts). */
+  /** Enter in the search box: the page goes where the first line says
+   *  (see searchLands.ts). */
   onSearchSubmit?: () => void
-  /** How the question was read, or that it's being read (see ReadAs). */
-  searchReadAs?: ReactNode
   /** Admin-preview only: renders the search box inert (nothing to filter in a
    *  preview) instead of driving Landing's card grid. */
   interactive?: boolean
@@ -48,27 +42,13 @@ type Props = {
    *  leaves this undefined the same way it leaves onViewMap undefined — the
    *  button still renders, it just doesn't do anything. */
   onBrowseCategories?: () => void
-  /** Desktop only — categories/listings matching `query`, already computed
-   *  by Landing (the same `filtered`/`placeHits` its own full results
-   *  section below reads), so this and that section can never disagree
-   *  about what matched. `null` cards means "still loading"; omitted
-   *  entirely (preview mode) just renders no dropdown, same as an empty
-   *  query would. */
-  searchCards?: CardDef[] | null
-  searchPlaceHits?: ListingHit[]
-  categories?: CategoryConfig[] | null
-  onSearchCardClick?: (card: CardDef) => void
-  onOpenSearchPlace?: (hit: ListingHit) => void
-  /** The answer to the query, when there is one (see askAnswer.ts) — shown
-   *  at the top of the dropdown. */
-  searchAnswer?: Answer | null
-  /** The answer's share link — see AskAnswer's `share`. */
-  searchShare?: { path: string; title: string } | null
-  /** Where to ask and add, for a search that found nothing (see AskTheGroup). */
-  searchAskGroup?: AskGroupProps | null
-  onOpenAnswerShul?: (shulId: string) => void
-  /** Questions to tap under the empty box, each known to answer well right
-   *  now (see searchPrompts.ts). */
+  /** Where the search could go (SearchLines), or that nothing was found:
+   *  under the box while something is typed, over the page on desktop,
+   *  in the page's flow on a phone. Built by Landing. */
+  searchPanel?: ReactNode
+  /** Questions to tap under the empty box, each known to go somewhere
+   *  right now (see searchPrompts.ts). Tapped, the page goes there, as on
+   *  Enter. */
   searchPrompts?: string[]
   onPickPrompt?: (prompt: string) => void
   /** The Today home (SiteSettings.homeStyle): the day as a small line over
@@ -145,20 +125,11 @@ export default function HeroHeading({
   query,
   onQueryChange,
   onSearchSubmit,
-  searchReadAs = null,
   interactive = true,
   mapIcon,
   onViewMap,
   onBrowseCategories,
-  searchCards,
-  searchPlaceHits = [],
-  categories = null,
-  onSearchCardClick,
-  onOpenSearchPlace,
-  searchAnswer = null,
-  searchShare = null,
-  searchAskGroup = null,
-  onOpenAnswerShul,
+  searchPanel = null,
   searchPrompts = [],
   onPickPrompt,
   today,
@@ -198,7 +169,7 @@ export default function HeroHeading({
   // exact moment would race the click.
   const [dismissed, setDismissed] = useState(false)
   const trimmedQuery = query.trim()
-  const dropdownOpen = trimmedQuery.length > 0 && !dismissed && searchCards != null
+  const dropdownOpen = trimmedQuery.length > 0 && !dismissed && searchPanel != null
   const searchShellRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -227,12 +198,11 @@ export default function HeroHeading({
     setDismissed(false)
     onQueryChange(next)
   }
-  // Only under an empty box: once something's typed, the answer is the point.
+  // Only under an empty box: once something's typed, where it goes is the point.
   const prompts = interactive && !trimmedQuery ? searchPrompts : []
-  const pickPrompt = (p: string) => {
-    onPickPrompt?.(p)
-    handleQueryChange(p)
-  }
+  const pickPrompt = (p: string) => onPickPrompt?.(p)
+  // On a phone, right under the box, in the page's flow.
+  const phonePanel = trimmedQuery && searchPanel ? <div className="mt-2 text-left">{searchPanel}</div> : null
 
   return (
     <>
@@ -247,6 +217,7 @@ export default function HeroHeading({
           {ui.search.landing && (
             <div className="mt-3">
               <SearchBox query={query} onQueryChange={onQueryChange} onSubmit={onSearchSubmit} interactive={interactive} placeholder={settings.searchPlaceholder} />
+              {phonePanel}
               <SearchPrompts prompts={prompts} onPick={pickPrompt} className="mt-2.5" oneRow />
             </div>
           )}
@@ -272,6 +243,7 @@ export default function HeroHeading({
         {ui.search.landing && (
           <div className="mt-8 max-w-xl mx-auto">
             <SearchBox query={query} onQueryChange={onQueryChange} onSubmit={onSearchSubmit} interactive={interactive} placeholder={settings.searchPlaceholder} />
+            {phonePanel}
             <SearchPrompts prompts={prompts} onPick={pickPrompt} className="mt-3 justify-center" />
           </div>
         )}
@@ -429,21 +401,8 @@ export default function HeroHeading({
                 onFocus={() => setDismissed(false)}
                 className="pl-6 pr-2.5 py-3"
               />
-              {dropdownOpen && (
-                <HeroSearchDropdown
-                  query={trimmedQuery}
-                  cards={searchCards ?? []}
-                  placeHits={searchPlaceHits}
-                  categories={categories}
-                  onCardClick={(card) => onSearchCardClick?.(card)}
-                  onOpenPlace={(hit) => onOpenSearchPlace?.(hit)}
-                  readAs={searchReadAs}
-                  answer={searchAnswer}
-                  share={searchShare}
-                  askGroup={searchAskGroup}
-                  onOpenShul={onOpenAnswerShul}
-                />
-              )}
+              {/* Over the page, right under the box (canvas board 8b). */}
+              {dropdownOpen && <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-20">{searchPanel}</div>}
               <SearchPrompts prompts={prompts} onPick={pickPrompt} className="mt-3" />
             </div>
           )}

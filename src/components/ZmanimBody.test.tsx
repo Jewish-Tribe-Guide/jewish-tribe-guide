@@ -305,3 +305,27 @@ describe('ZmanimBody — the "Prayer & Shabbat Times" page/strip content', () =>
     expect(screen.getByText(/unavailable right now/)).toBeInTheDocument()
   })
 })
+
+// A search lands here with the time it asked for (`?time=`, Oct 13): that
+// row is picked out in gold, and only that row.
+describe('ZmanimBody — the time a search asked for', () => {
+  const picked = () => screen.queryAllByText((_, el) => el?.getAttribute('data-picked') === 'true').map((el) => el.textContent)
+
+  it('candles: the candle-lighting row', () => {
+    render(<ZmanimBody data={readyData} status="ready" now={NOW} picked="candles" />)
+    expect(picked()).toEqual(['Candle Lighting Friday7:09 PM'])
+  })
+
+  it('Shabbos: candles and havdalah; a daily zman: its own row', () => {
+    render(<ZmanimBody data={readyData} status="ready" now={NOW} picked="shabbos" />)
+    expect(picked()).toEqual(['Candle Lighting Friday7:09 PM', 'Havdalah Saturday8:07 PM'])
+    cleanup()
+    render(<ZmanimBody data={readyData} status="ready" now={NOW} picked="Sunset" />)
+    expect(picked()).toEqual(['Sunset7:27 PM'])
+  })
+
+  it('nothing asked: nothing picked out', () => {
+    render(<ZmanimBody data={readyData} status="ready" now={NOW} />)
+    expect(picked()).toEqual([])
+  })
+})

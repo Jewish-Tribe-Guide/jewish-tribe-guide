@@ -5,7 +5,6 @@ import { act, cleanup, screen, within, type RenderResult } from '@testing-librar
 import userEvent from '@testing-library/user-event'
 import { track } from '@vercel/analytics'
 import { renderWithProviders } from '@/test/renderWithProviders'
-import { eruvim } from '@/data/resources'
 import { makeCategory, makeListing } from '@/test/providerFixtures'
 import { SITE_SETTINGS_DEFAULTS } from '@/lib/siteSettings'
 import { LocationProvider } from '@/lib/locationContext'
@@ -52,6 +51,17 @@ vi.mock('@/lib/useLogSearchMiss', () => ({ useLogSearchMiss: vi.fn() }))
 // by default, as on a page that's just opened.
 const zmanimMock = vi.hoisted(() => ({ result: { data: null as unknown, status: 'loading' as string } }))
 vi.mock('@/lib/useZmanim', () => ({ useZmanim: () => zmanimMock.result }))
+// The question reader (an AI, over the network): off unless a test reads.
+const readerMock = vi.hoisted(() => ({ answer: { ok: false, reason: 'off' } as unknown }))
+vi.mock('@/lib/askReader', () => ({ askReader: vi.fn(async () => readerMock.answer), forgetReaderAnswers: vi.fn() }))
+
+/** The lines under the home box (SearchLines), each as its text. jsdom
+ *  applies no CSS, so the phone's and the desktop's copies are both there:
+ *  the first is enough. */
+function lineTexts(): string[] {
+  const lists = screen.queryAllByTestId('search-lines')
+  return lists.length ? within(lists[0]!).getAllByRole('option').map((o) => o.textContent ?? '') : []
+}
 vi.mock('@/components/home/DaveningTimesCard', () => ({
   default: () => <div data-testid="davening-stub" />,
 }))
@@ -181,34 +191,28 @@ describe('Landing', () => {
     expect(mobileSection.querySelectorAll('img')).toHaveLength(0)
   })
 
-  it('mobile: narrows its own permanent grid to matching cards when typing, and hides the rest', async () => {
+  // Search takes you to the page (Oct 13): typing shows where it could go,
+  // each line with what you'd find there, and nothing is answered in place.
+  it('typing shows where it could go: the kind of place named, with how many there are', async () => {
     const user = userEvent.setup()
-    const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
+    const grocery = makeCategory({ id: 'grocery', label: 'Grocery', pluralLabel: 'Grocery Stores' })
     // A real label, not makeCategory's default "Grocery Store": search now reads
     // a category's label to know what kind of place it is (see ask.ts).
     const synagogue = makeCategory({ id: 'synagogue', label: 'Synagogue', pluralLabel: 'Synagogues' })
-    const { container } = renderLanding(undefined, { content: { categories: [grocery, synagogue] } })
-
-    // Scoped to mobile's own results section specifically (CSS-only toggle
-    // — jsdom applies no CSS, so both mobile and desktop copies are
-    // genuinely in the DOM at once) rather than relying on useIsMobile(),
-    // which starts `false` on every render regardless of a mocked
-    // matchMedia (see HeroHeading's own doc on why) and so can't be used to
-    // isolate a query immediately after render. `.mt-12.desktop\\:hidden`,
-    // not the bare class — HeroHeading's own mobile hero block is also
-    // `desktop:hidden` and renders first in the DOM.
-    const mobileSection = container.querySelector<HTMLElement>('.mt-12.desktop\\:hidden')!
+    renderLanding(undefined, { content: { categories: [grocery, synagogue] } }, [makeListing({ id: 'g', category: 'grocery', name: 'Corner Store' })])
     await user.type(screen.getAllByLabelText('Search resources')[0]!, 'grocery')
 
-    expect(within(mobileSection).getByText('Grocery Stores')).toBeInTheDocument()
-    expect(within(mobileSection).queryByText('Synagogues')).not.toBeInTheDocument()
+    expect(lineTexts()).toEqual(['Grocery Stores1 listing'])
+    expect(screen.getAllByTestId('home-browse-list')[0]).toHaveClass('opacity-40')
   })
 
   // Two people tried the redesign prototype: one typed a question the way
   // they would into Google, and the item is tagged "Chalav", not "Cholov".
-  // Word-for-word matching found nothing for either.
-  it('answers a question typed like into Google, with the store and the food card', async () => {
+  // Word-for-word matching found nothing for either. Enter goes to the
+  // page, with the words in its box (less the filler it started with).
+  it('reads a question typed like into Google, and Enter goes to that kind of place with the words in its box', async () => {
     const user = userEvent.setup()
+    mockRouter.push.mockClear()
     const grocery = makeCategory({
       id: 'grocery',
       label: 'Grocery Store',
@@ -219,20 +223,21 @@ describe('Landing', () => {
     const listings = [
       makeListing({ id: 'g1', category: 'grocery', name: 'ShopRite', m: ['Chalav Yisroel Milk'] }),
       makeListing({ id: 'g2', category: 'grocery', name: 'Acme Grocery', m: ['Challah'] }),
+      makeListing({ id: 'f1', category: 'restaurant', name: 'Some Cafe' }),
     ]
-    const { container } = renderLanding(undefined, { content: { categories: [grocery, food] } }, listings)
-    // Mobile's own results section — see the test above for why it's scoped.
-    const results = container.querySelector<HTMLElement>('.mt-12.desktop\\:hidden')!
+    renderLanding(undefined, { content: { categories: [grocery, food] } }, listings)
     const box = screen.getAllByLabelText('Search resources')[0]!
 
     await user.type(box, 'where can I buy cholov yisroel milk')
-    expect(within(results).getByText('ShopRite')).toBeInTheDocument()
-    expect(within(results).queryByText('Acme Grocery')).not.toBeInTheDocument()
+    // Chalav Yisroel Milk, an item in three words, is understood: the line
+    // says so, and the AI isn't asked (the user, Oct 13).
+    expect(lineTexts()[0]).toBe('Grocery Stores1 with Chalav Yisroel Milk')
+    await user.keyboard('{Enter}')
+    expect(mockRouter.push).toHaveBeenCalledWith('/test-community/grocery?q=cholov+yisroel+milk')
 
     await user.clear(box)
     await user.type(box, 'kosher food')
-    expect(within(results).getByText('Food Establishments')).toBeInTheDocument()
-    expect(within(results).queryByText('Grocery Stores')).not.toBeInTheDocument()
+    expect(lineTexts()).toEqual(['Food Establishments1 listing'])
   })
 
   // Reported live: mobile has no HeroSearchDropdown of its own (see
@@ -316,45 +321,44 @@ describe('Landing', () => {
     expect(within(card).getByText('Synagogues')).toBeInTheDocument()
   })
 
-  it('shows a "nothing matches" message for a query with no hits', async () => {
+  it('Enter on a search that finds nothing stays here and says so, with where to ask', async () => {
     const user = userEvent.setup()
-    renderLanding(undefined, { content: { categories: [makeCategory()] } })
+    mockRouter.push.mockClear()
+    renderLanding(undefined, { content: { categories: [makeCategory()] } }, [])
 
-    await user.type(screen.getAllByLabelText('Search resources')[0]!, 'xyznotreal')
+    await user.type(screen.getAllByLabelText('Search resources')[0]!, 'xyznotreal{Enter}')
 
-    expect(screen.getAllByText(/Nothing matches “xyznotreal”/).length).toBeGreaterThan(0)
+    expect(await screen.findAllByText('Nothing in the guide for “xyznotreal”.')).not.toHaveLength(0)
+    expect(screen.getAllByRole('button', { name: 'Ask in a WhatsApp group' }).length).toBeGreaterThan(0)
+    expect(mockRouter.push).not.toHaveBeenCalled()
   })
 
-  // Reported live: picking a listing from the hero's own search dropdown
-  // used to also carry the typed search term along as `?q=` on the
-  // destination category page, pre-filtering its list underneath the
-  // listing's own modal — the user's own call to drop it: picking a
-  // listing should show exactly that listing, nothing else narrowed.
-  it("opening a listing from the hero's search dropdown carries no leftover search term to the destination category page", async () => {
+  // A place's name is the first line, and Enter opens its listing (board 2b)
+  // — the listing alone, no search carried along to narrow its page.
+  it("a place's name is the first line, and Enter opens its listing", async () => {
     const user = userEvent.setup()
-    vi.mocked(handlers.onNavigate).mockClear()
-    const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
+    mockRouter.push.mockClear()
+    const grocery = makeCategory({ id: 'grocery', label: 'Grocery', pluralLabel: 'Grocery Stores' })
     renderLanding(
       undefined,
       { content: { categories: [grocery] } },
       [makeListing({ id: 'l1', category: 'grocery', name: 'Test Grocery' })],
     )
 
-    await user.type(screen.getAllByLabelText('Search resources')[0]!, 'Test Grocery')
-    await user.click(screen.getAllByText('Test Grocery')[0]!)
+    await user.type(screen.getAllByLabelText('Search resources')[0]!, 'test gro')
+    expect(lineTexts()[0]).toMatch(/^TGTest GroceryGrocery/)
+    await user.keyboard('{Enter}')
 
-    expect(handlers.onNavigate).toHaveBeenCalledWith('patient', 'find', {
-      findView: 'grocery',
-      findItemId: 'l1',
-    })
+    expect(mockRouter.push).toHaveBeenCalledWith(expect.stringMatching(/^\/test-community\/grocery\/test-grocery/))
+    expect(vi.mocked(track)).toHaveBeenCalledWith('listing_opened', { listing: 'Test Grocery', category: 'grocery', source: 'search' })
   })
 
-  // …but it does carry the search, for the opened listing to mark what
-  // matched (not to narrow anything).
-  it('opening a listing found by one of its items carries the search along, to mark it', async () => {
+  // An item is its category's page, the item in its box, where the page
+  // ticks Has: Cheddar Cheese and each row says it (see GenericDirectory).
+  it('an item goes to the page of the stores that have it, the item in its box', async () => {
     const user = userEvent.setup()
-    vi.mocked(handlers.onNavigate).mockClear()
-    const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores', detailFields: [{ key: 'm', label: 'Kosher items', type: 'tags' }] })
+    mockRouter.push.mockClear()
+    const grocery = makeCategory({ id: 'grocery', label: 'Grocery', pluralLabel: 'Grocery Stores', detailFields: [{ key: 'm', label: 'Kosher items', type: 'tags' }] })
     renderLanding(
       undefined,
       { content: { categories: [grocery] } },
@@ -362,13 +366,63 @@ describe('Landing', () => {
     )
 
     await user.type(screen.getAllByLabelText('Search resources')[0]!, 'cheddar')
-    await user.click(screen.getAllByText('Test Grocery')[0]!)
+    expect(lineTexts()).toEqual(['Grocery Stores1 with Cheddar Cheese'])
+    await user.keyboard('{Enter}')
 
-    expect(handlers.onNavigate).toHaveBeenCalledWith('patient', 'find', {
-      findView: 'grocery',
-      findItemId: 'l1',
-      findMatch: 'cheddar',
-    })
+    expect(mockRouter.push).toHaveBeenCalledWith('/test-community/grocery?q=cheddar')
+  })
+
+  // A question only the reader follows: its reading decides the page, and
+  // the page gets the reading as its Filters (read=1: the words aren't
+  // searched again there).
+  // The user, Oct 13: "kosher wine" from home was "super inconsistent",
+  // and Enter waited for the AI though the line already showed the answer.
+  // A question our own search understood (its first line says what it
+  // found) is never sent to the reader, and Enter goes at once.
+  it('a question our own search understood isn’t sent to the reader: Enter goes where its line says, at once', async () => {
+    const user = userEvent.setup()
+    mockRouter.push.mockClear()
+    const { askReader } = await import('@/lib/askReader')
+    vi.mocked(askReader).mockClear()
+    readerMock.answer = { ok: true, reading: { categories: [{ id: 'restaurant' }] } }
+    const grocery = makeCategory({ id: 'grocery', label: 'Grocery', pluralLabel: 'Grocery', detailFields: [{ key: 'm', label: 'Kosher items', type: 'tags' }] })
+    // A Food place whose type is "Wine Bar": "wine" there isn't an item,
+    // so the question would once have gone to the AI.
+    const food = makeCategory({ id: 'restaurant', label: 'Food', pluralLabel: 'Food', detailFields: [{ key: 't', label: 'Type', type: 'select', filterable: true, options: [{ value: 'Wine Bar', label: 'Wine Bar' }] }] })
+    try {
+      renderLanding(undefined, { content: { categories: [grocery, food] } }, [
+        makeListing({ id: 'g1', category: 'grocery', name: 'ShopRite', m: ['Wine'] }),
+        makeListing({ id: 'g2', category: 'grocery', name: 'Acme', m: ['Wine'] }),
+        makeListing({ id: 'f1', category: 'restaurant', name: 'Bistro', t: 'Wine Bar' }),
+      ])
+      await user.type(screen.getAllByLabelText('Search resources')[0]!, 'kosher wine')
+      expect(lineTexts()[0]).toBe('Grocery2 with Wine')
+      await user.keyboard('{Enter}')
+      expect(mockRouter.push).toHaveBeenCalledWith('/test-community/grocery?q=wine')
+      await new Promise((r) => setTimeout(r, 1200))
+      expect(askReader).not.toHaveBeenCalled()
+    } finally {
+      readerMock.answer = { ok: false, reason: 'off' }
+    }
+  })
+
+  it('a question the reader reads lands with its reading in the Filters', async () => {
+    const user = userEvent.setup()
+    mockRouter.push.mockClear()
+    readerMock.answer = { ok: true, reading: { categories: [{ id: 'restaurant', select: { t: ['Meat'] } }] } }
+    const food = makeCategory({ id: 'restaurant', label: 'Food', pluralLabel: 'Food', detailFields: [{ key: 't', label: 'Type', type: 'select', filterable: true, options: [{ value: 'Meat', label: 'Meat' }, { value: 'Dairy', label: 'Dairy' }] }] })
+    try {
+      renderLanding(undefined, { content: { categories: [food] } }, [
+        makeListing({ id: 'm', category: 'restaurant', name: 'Grill', t: 'Meat' }),
+        makeListing({ id: 'd', category: 'restaurant', name: 'Cafe', t: 'Dairy' }),
+      ])
+      await user.type(screen.getAllByLabelText('Search resources')[0]!, 'somewhere fleishig for a sit down dinner{Enter}')
+      await vi.waitFor(() =>
+        expect(mockRouter.push).toHaveBeenCalledWith('/test-community/restaurant?q=somewhere+fleishig+for+a+sit+down+dinner&sel_t=Meat&read=1'),
+      )
+    } finally {
+      readerMock.answer = { ok: false, reason: 'off' }
+    }
   })
 
   // The map is retired as a home-screen card (the user's own call — it only
@@ -883,66 +937,46 @@ describe('Landing', () => {
 // A search that finds nothing shows what's close, then where to ask — and
 // still counts as a miss, since it is one.
 describe('Landing — when nothing matches', () => {
-  const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores', detailFields: [{ key: 'm', label: 'Kosher items', type: 'tags' }] })
+  const grocery = makeCategory({ id: 'grocery', label: 'Grocery', pluralLabel: 'Grocery Stores', detailFields: [{ key: 'm', label: 'Kosher items', type: 'tags' }] })
   const whatsapp = makeCategory({ id: 'whatsapp', label: 'WhatsApp Group', pluralLabel: 'WhatsApp Groups' })
   const store = makeListing({ id: 'l1', category: 'grocery', name: 'Test Grocery', m: ['Pretzel Buns'] })
 
-  it('shows the closest match as such, then where to ask', async () => {
+  // The closest question that finds something, a word left out, as lines
+  // that say what was left out: never as if it were what was asked.
+  it('offers the closest search as such, and logs the question as a miss', async () => {
     const user = userEvent.setup()
     renderLanding(undefined, { content: { categories: [grocery, whatsapp] } }, [store])
     await user.type(screen.getAllByLabelText('Search resources')[0]!, 'packaged pretzels')
 
-    expect(screen.getAllByText('Nothing in the guide for “packaged pretzels”. Test Grocery has Pretzel Buns.').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('Test Grocery').length).toBeGreaterThan(0)
-    // Headed as close, so the places aren't read as the answer.
-    expect(screen.getAllByText('Closest matches').length).toBeGreaterThan(0)
-    expect(screen.queryByRole('heading', { name: 'Places' })).toBeNull()
-    expect(screen.getAllByRole('button', { name: 'Ask in a WhatsApp group' }).length).toBeGreaterThan(0)
+    expect(lineTexts()).toEqual(['Grocery Stores1 for “pretzels” · nothing for “packaged”'])
     const lastCall = vi.mocked(useLogSearchMiss).mock.calls.at(-1)![0]
-    expect(lastCall).toMatchObject({ query: 'packaged pretzels', hasResults: false })
+    expect(lastCall).toMatchObject({ query: 'packaged pretzels' })
   })
 
-  it('with nothing close either, says so and offers only to ask (the user, Oct 10)', async () => {
+  it('with nothing close either, Enter says so and offers only to ask (the user, Oct 10)', async () => {
     const user = userEvent.setup()
     renderLanding(undefined, { content: { categories: [grocery] } }, [store])
-    await user.type(screen.getAllByLabelText('Search resources')[0]!, 'dentist')
+    await user.type(screen.getAllByLabelText('Search resources')[0]!, 'dentist{Enter}')
 
-    expect(screen.getAllByText('Nothing in the guide for “dentist”.').length).toBeGreaterThan(0)
+    expect(await screen.findAllByText('Nothing in the guide for “dentist”.')).not.toHaveLength(0)
     expect(screen.queryByRole('link', { name: /Add it to the guide/ })).not.toBeInTheDocument()
+    expect(vi.mocked(useLogSearchMiss).mock.calls.at(-1)![0]).toMatchObject({ query: 'dentist', hasResults: false })
   })
-
-  it('mobile: puts where to ask at the end of the results', async () => {
-    const user = userEvent.setup()
-    renderWithProviders(
-      <ForcedViewport isMobile>
-        <HeaderCollapseProvider>
-          <LocationProvider>
-            <ListingsProvider listings={[store]}>
-              <Landing {...handlers} />
-            </ListingsProvider>
-          </LocationProvider>
-        </HeaderCollapseProvider>
-      </ForcedViewport>,
-      { content: { categories: [grocery, whatsapp] } },
-    )
-    await user.type(screen.getAllByLabelText('Search resources')[0]!, 'packaged pretzels')
-    const boxes = screen.getAllByTestId('ask-the-group')
-    const places = screen.getByRole('heading', { name: 'Closest matches' })
-    expect(boxes.some((b) => places.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true)
-  })
-
 })
 
 // The community's neighborhoods reach the home search: "food in Rittenhouse".
 describe('Landing — neighborhoods', () => {
-  it('keeps a search to the neighborhood it names', async () => {
+  it('counts only what\u2019s in the neighborhood named, and the page gets the words', async () => {
     const user = userEvent.setup()
+    mockRouter.push.mockClear()
     const food = makeCategory({ id: 'restaurant', label: 'Food', pluralLabel: 'Food' })
     const near = makeListing({ id: 'n', category: 'restaurant', name: 'Square Cafe', geo: { lat: 39.9497, lng: -75.172 } })
     const far = makeListing({ id: 'f', category: 'restaurant', name: 'Far Cafe', geo: { lat: 40.1, lng: -75.0 } })
     renderLanding(undefined, { content: { categories: [food] }, community: { slug: 'philly' } }, [near, far])
     await user.type(screen.getAllByLabelText('Search resources')[0]!, 'food in rittenhouse')
-    expect(screen.getAllByText('1 food in Rittenhouse: Square Cafe.').length).toBeGreaterThan(0)
+    expect(lineTexts()).toEqual(['Food1 for “in rittenhouse”'])
+    await user.keyboard('{Enter}')
+    expect(mockRouter.push).toHaveBeenCalledWith('/philly/restaurant?q=in+rittenhouse')
   })
 })
 
@@ -951,12 +985,13 @@ describe('Landing — neighborhoods', () => {
 describe('Landing — example questions', () => {
   const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores', detailFields: [{ key: 'm', label: 'Kosher items', type: 'tags' }] })
 
-  it('offers a question the guide answers, and a tap shows the answer', async () => {
+  it('offers a question the guide answers, and a tap goes where Enter would', async () => {
     const user = userEvent.setup()
+    mockRouter.push.mockClear()
     const store = makeListing({ id: 'w', category: 'grocery', name: 'Wine Shop', m: ['Wine'] })
     renderLanding(undefined, { content: { categories: [grocery] } }, [store])
     await user.click(screen.getAllByRole('button', { name: 'Kosher wine' })[0])
-    expect(screen.getAllByText('Wine Shop has Wine.').length).toBeGreaterThan(0)
+    expect(mockRouter.push).toHaveBeenCalledWith('/test-community/grocery?q=wine')
     expect(vi.mocked(track)).toHaveBeenCalledWith('search_prompt_tapped', { prompt: 'Kosher wine' })
   })
 
@@ -968,51 +1003,40 @@ describe('Landing — example questions', () => {
   })
 })
 
-// "Share this answer": the answer's own link, and that link opening with the
-// question already asked (see shareAnswer.ts and /[community]/ask/[question]).
-describe('Landing — sharing an answer', () => {
-  const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores', detailFields: [{ key: 'm', label: 'Kosher items', type: 'tags' }] })
+// A shared question (/[community]/ask/[question], see shareAnswer.ts) goes
+// where Enter would: the address is replaced, so Back doesn't land on a
+// page that leaves again.
+describe('Landing — a shared question', () => {
+  const grocery = makeCategory({ id: 'grocery', label: 'Grocery', pluralLabel: 'Grocery Stores', detailFields: [{ key: 'm', label: 'Kosher items', type: 'tags' }] })
   const store = makeListing({ id: 'l1', category: 'grocery', name: 'Test Grocery', m: ['Challah'] })
 
   afterEach(() => {
-    vi.unstubAllGlobals()
     window.history.replaceState(null, '', '/')
   })
 
-  it('opens a shared question already asked', () => {
+  it('goes to the page Enter would', async () => {
+    mockRouter.replace.mockClear()
     renderLanding({ initialQuery: 'where can I get challah' }, { content: { categories: [grocery] } }, [store])
-    expect(screen.getAllByText('Test Grocery has Challah.').length).toBeGreaterThan(0)
-    expect((screen.getAllByLabelText('Search resources')[0] as HTMLInputElement).value).toBe('where can I get challah')
+    await vi.waitFor(() => expect(mockRouter.replace).toHaveBeenCalledWith('/test-community/grocery?q=challah'))
   })
 
-  it('shares the answer’s own link', async () => {
-    const shareFn = vi.fn().mockResolvedValue(undefined)
-    vi.stubGlobal('navigator', { ...navigator, share: shareFn })
-    const user = userEvent.setup()
-    renderLanding(undefined, { content: { categories: [grocery] } }, [store])
-    await user.type(screen.getAllByLabelText('Search resources')[0]!, 'where can I get challah?')
-    await user.click(screen.getAllByRole('button', { name: 'Share this answer' })[0]!)
-    // The answer goes with the link, so a preview that never loads still
-    // says something (agreed Oct 1).
-    expect(shareFn).toHaveBeenCalledWith({
-      title: 'where can I get challah?',
-      text: 'Where can I get challah? Test Grocery has Challah.',
-      url: `${window.location.origin}/test-community/ask/where-can-i-get-challah`,
-    })
-  })
-
-  it('offers no share for a near miss, which answers a different question', async () => {
-    const user = userEvent.setup()
-    renderLanding(undefined, { content: { categories: [grocery] } }, [store])
-    await user.type(screen.getAllByLabelText('Search resources')[0]!, 'frozen challah')
-    expect(screen.getAllByText(/Nothing in the guide for “frozen challah”/).length).toBeGreaterThan(0)
-    expect(screen.queryByRole('button', { name: 'Share this answer' })).toBeNull()
+  // The reader is off on most servers: a question to read is read once,
+  // then goes where our own search would, here nowhere.
+  it('a question the reader can’t read is asked of it once, then says it found nothing', async () => {
+    const { askReader } = await import('@/lib/askReader')
+    vi.mocked(askReader).mockClear()
+    mockRouter.replace.mockClear()
+    renderLanding({ initialQuery: 'dentist' }, { content: { categories: [grocery] } }, [store])
+    expect(await screen.findAllByText('Nothing in the guide for “dentist”.')).not.toHaveLength(0)
+    await new Promise((r) => setTimeout(r, 50))
+    expect(vi.mocked(askReader)).toHaveBeenCalledTimes(1)
+    expect(mockRouter.replace).not.toHaveBeenCalled()
   })
 
   it('stops naming the shared question in the address once another is asked', async () => {
-    window.history.replaceState(null, '', '/test-community/ask/where-can-i-get-challah')
+    window.history.replaceState(null, '', '/test-community/ask/dentist')
     const user = userEvent.setup()
-    renderLanding({ initialQuery: 'where can I get challah' }, { content: { categories: [grocery] } }, [store])
+    renderLanding({ initialQuery: 'dentist' }, { content: { categories: [grocery] } }, [store])
     await user.clear(screen.getAllByLabelText('Search resources')[0]!)
     await user.type(screen.getAllByLabelText('Search resources')[0]!, 'wine')
     expect(window.location.pathname).toBe('/test-community')
@@ -1022,22 +1046,21 @@ describe('Landing — sharing an answer', () => {
 describe('Landing — "is the eruv up"', () => {
   const eruv = makeCategory({ id: 'eruv-information', label: 'Eruv Information', pluralLabel: 'Eruv Information', kind: 'eruv' })
 
-  it('answers with where each eruv posts its status, and the eruv page', async () => {
+  it('goes to the eruv page', async () => {
     const user = userEvent.setup()
+    mockRouter.push.mockClear()
     renderLanding(undefined, { content: { categories: [makeCategory(), eruv] } }, [])
     await user.type(screen.getAllByLabelText('Search resources')[0]!, 'is the eruv up')
-    expect(screen.getAllByText(/The guide can't say whether an eruv is up this week/).length).toBeGreaterThan(0)
-    for (const e of eruvim) {
-      expect(screen.getAllByRole('link', { name: `${e.name} ↗` })[0]).toHaveAttribute('href', e.statusLink)
-    }
-    expect(screen.getAllByRole('link', { name: 'More about the eruvim →' })[0]).toHaveAttribute('href', '/test-community/eruv')
+    expect(lineTexts()).toEqual(['Eruv InformationEach eruv’s status this week'])
+    await user.keyboard('{Enter}')
+    expect(mockRouter.push).toHaveBeenCalledWith('/test-community/eruv-information')
   })
 
   it('doesn’t, for a community with no eruv page', async () => {
     const user = userEvent.setup()
     renderLanding(undefined, { content: { categories: [makeCategory()] } }, [])
     await user.type(screen.getAllByLabelText('Search resources')[0]!, 'is the eruv up')
-    expect(screen.queryByText(/The guide can't say whether an eruv is up/)).toBeNull()
+    expect(lineTexts()).not.toContainEqual(expect.stringMatching(/^Eruv/))
   })
 })
 
@@ -1047,7 +1070,7 @@ describe('Landing — Shabbos times', () => {
     zmanimMock.result = { data: null, status: 'loading' }
   })
 
-  it('answers "when is candle lighting" from the zmanim, linking to them', async () => {
+  it('"when is candle lighting": the time is the line, and Enter opens the times page with it picked out', async () => {
     zmanimMock.result = {
       status: 'ready',
       data: {
@@ -1057,31 +1080,46 @@ describe('Landing — Shabbos times', () => {
       },
     }
     const user = userEvent.setup()
+    mockRouter.push.mockClear()
     renderLanding(undefined, { content: { categories: [makeCategory(), zmanimCat] } }, [])
     await user.type(screen.getAllByLabelText('Search resources')[0]!, 'when is candle lighting')
-    expect(screen.getAllByText('Candle lighting: Friday, 6:34 PM.').length).toBeGreaterThan(0)
-    expect(screen.getAllByRole('link', { name: 'All zmanim →' })[0]).toHaveAttribute('href', '/test-community/zmanim')
+    expect(lineTexts()).toEqual(['ZmanimCandles Friday 6:34 PM'])
+    await user.keyboard('{Enter}')
+    expect(mockRouter.push).toHaveBeenCalledWith('/test-community/zmanim?time=candles')
     await user.clear(screen.getAllByLabelText('Search resources')[0]!)
     await user.type(screen.getAllByLabelText('Search resources')[0]!, 'shkia')
-    expect(screen.getAllByText('Sunset today: 6:52 PM.').length).toBeGreaterThan(0)
+    expect(lineTexts()).toEqual(['ZmanimSunset today 6:52 PM'])
   })
 
   it('says it’s looking them up while they load, rather than "nothing in the guide"', async () => {
     const user = userEvent.setup()
-    renderLanding(undefined, { content: { categories: [makeCategory()] } }, [])
+    renderLanding(undefined, { content: { categories: [makeCategory(), zmanimCat] } }, [])
     await user.type(screen.getAllByLabelText('Search resources')[0]!, 'havdalah')
-    expect(screen.getAllByText('Looking up the times…').length).toBeGreaterThan(0)
+    expect(lineTexts()).toEqual(['ZmanimLooking up the times…'])
     expect(screen.queryByText(/Nothing in the guide/)).toBeNull()
   })
 })
 
 describe('Landing — questions about the guide itself', () => {
-  it('answers "how do I add a restaurant" with its Add form, and lists no restaurants', async () => {
+  it('"how do I add a restaurant" is its Add form, and lists no restaurants', async () => {
     const food = makeCategory({ id: 'restaurant', label: 'Food', pluralLabel: 'Food' })
     const user = userEvent.setup()
     renderLanding(undefined, { content: { categories: [food] } }, [makeListing({ id: 'r1', category: 'restaurant', name: 'Some Cafe' })])
     await user.type(screen.getAllByLabelText('Search resources')[0]!, 'how do I add a restaurant')
-    expect(screen.getAllByRole('link', { name: 'Add a food listing →' })[0]).toHaveAttribute('href', '/test-community/restaurant?form=create')
-    expect(screen.queryByText('Some Cafe')).toBeNull()
+    expect(lineTexts()).toEqual(['Add a food listingAnyone can add one. An admin checks it first.'])
+    expect(screen.getAllByRole('link', { name: /Add a food listing/ })[0]).toHaveAttribute('href', '/test-community/restaurant?form=create')
+  })
+
+  it('"how do I add a listing" opens + Add', async () => {
+    const user = userEvent.setup()
+    const opened = vi.fn()
+    document.addEventListener('jpc:open-add', opened)
+    try {
+      renderLanding(undefined, { content: { categories: [makeCategory()] } }, [])
+      await user.type(screen.getAllByLabelText('Search resources')[0]!, 'how do I add a listing{Enter}')
+      expect(opened).toHaveBeenCalled()
+    } finally {
+      document.removeEventListener('jpc:open-add', opened)
+    }
   })
 })

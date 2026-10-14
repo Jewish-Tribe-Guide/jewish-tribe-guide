@@ -3,6 +3,7 @@
 import type { ZmanimData, ZmanEntry } from '@/types'
 import type { ZmanimStatus } from '@/lib/useZmanim'
 import { holidayOverShabbos } from '@/lib/zmanim'
+import type { TimesAsk } from '@/lib/ask'
 
 // ── The zmanim content itself — Hebrew date, the daily zmanim grid, and
 // upcoming Shabbos — shared by the full Zmanim & Shabbos page (ZmanimCard)
@@ -10,13 +11,26 @@ import { holidayOverShabbos } from '@/lib/zmanim'
 // wrap this in the same bordered card. Keeping the rendering in one place
 // means the two can never drift on what a "ready" zmanim view actually shows.
 
+const TIMES: readonly string[] = ['candles', 'havdalah', 'shabbos', 'Sunrise', 'Latest Shema', 'Sunset', 'Nightfall']
+
+/** A search's `?time=` (see searchLands.ts), when it's one this page has. */
+export function pickedTime(value: string | null | undefined): TimesAsk | null {
+  return value && TIMES.includes(value) ? (value as TimesAsk) : null
+}
+
+// The time a search asked for ("when is candle lighting") is picked out in
+// gold, the candles' colour, so the page a search lands on shows where its
+// answer is (Oct 13, canvas board 6).
+const PICKED = 'rounded-lg bg-amber-50 px-3 py-1.5 -mx-1 ring-[1.5px] ring-amber-500'
+
 /** `now` is useNow's: null until the page has hydrated, which a ready
- *  view waits for as it would for the zmanim. */
-export default function ZmanimBody({ data, status, now }: { data: ZmanimData | null; status: ZmanimStatus; now: number | null }) {
+ *  view waits for as it would for the zmanim. `picked`, the time a search
+ *  asked for. */
+export default function ZmanimBody({ data, status, now, picked = null }: { data: ZmanimData | null; status: ZmanimStatus; now: number | null; picked?: TimesAsk | null }) {
   if (status === 'loading' || (status === 'ready' && now === null)) return <LoadingState />
   if (status === 'no-location') return <NoLocationState />
   if (status === 'error') return <ErrorState />
-  if (status === 'ready' && data && now !== null) return <ReadyState data={data} now={now} />
+  if (status === 'ready' && data && now !== null) return <ReadyState data={data} now={now} picked={picked} />
   return null
 }
 
@@ -55,7 +69,9 @@ function ErrorState() {
   )
 }
 
-function ReadyState({ data, now }: { data: ZmanimData; now: number }) {
+function ReadyState({ data, now, picked }: { data: ZmanimData; now: number; picked: TimesAsk | null }) {
+  const candles = picked === 'candles' || picked === 'shabbos'
+  const ends = picked === 'havdalah' || picked === 'shabbos'
   const { hebrewDate, dailyZmanim, shabbos, isFriday, isShabbos, holidays, holidayPeriod, fastPeriod } = data
 
   // An upcoming holiday never preempts a Shabbos that's still in progress
@@ -84,12 +100,19 @@ function ReadyState({ data, now }: { data: ZmanimData; now: number }) {
 
       {/* Daily zmanim */}
       <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5">
-        {dailyZmanim.map((z) => (
-          <div key={z.label} className="flex items-baseline justify-between gap-3">
-            <dt className="text-sm text-muted">{z.label}</dt>
-            <dd className="text-sm font-medium text-slate-900 tabular-nums">{z.time}</dd>
-          </div>
-        ))}
+        {dailyZmanim.map((z) =>
+          z.label === picked ? (
+            <div key={z.label} className={`flex items-baseline justify-between gap-3 ${PICKED}`} data-picked="true">
+              <dt className="text-sm font-bold text-ink">{z.label}</dt>
+              <dd className="text-sm font-bold text-ink tabular-nums">{z.time}</dd>
+            </div>
+          ) : (
+            <div key={z.label} className="flex items-baseline justify-between gap-3">
+              <dt className="text-sm text-muted">{z.label}</dt>
+              <dd className="text-sm font-medium text-slate-900 tabular-nums">{z.time}</dd>
+            </div>
+          ),
+        )}
       </dl>
 
       {/* Upcoming Shabbos — replaced entirely by the upcoming Yom Tov period
@@ -117,9 +140,9 @@ function ReadyState({ data, now }: { data: ZmanimData; now: number }) {
                   distinguishes which night is which without needing a
                   "Night 1"/"Night 2" label. */}
               {holidayPeriod.candleLightings.map((entry, i) => (
-                <ShabbosRow key={entry.iso ?? i} label="Candles" entry={entry} emphasized={i === 0} />
+                <ShabbosRow key={entry.iso ?? i} label="Candles" entry={entry} emphasized={i === 0} picked={candles && i === 0} />
               ))}
-              <ShabbosRow label="Ends" entry={holidayPeriod.ends} emphasized={false} />
+              <ShabbosRow label="Ends" entry={holidayPeriod.ends} emphasized={false} picked={ends} />
             </div>
           </>
         ) : (
@@ -132,8 +155,9 @@ function ReadyState({ data, now }: { data: ZmanimData; now: number }) {
                 label="Candle Lighting"
                 entry={shabbos.candleLighting}
                 emphasized={isFriday}
+                picked={candles}
               />
-              <ShabbosRow label="Havdalah" entry={shabbos.havdalah} emphasized={isShabbos} />
+              <ShabbosRow label="Havdalah" entry={shabbos.havdalah} emphasized={isShabbos} picked={ends} />
             </div>
           </>
         )}
@@ -178,10 +202,12 @@ function ShabbosRow({
   label,
   entry,
   emphasized,
+  picked = false,
 }: {
   label: string
   entry: ZmanEntry | null
   emphasized: boolean
+  picked?: boolean
 }) {
   if (!entry) return null
 
@@ -192,6 +218,15 @@ function ShabbosRow({
   // "Fri, Sep 11 6:57 PM"), which read differently from the other card
   // showing the identical Hebcal data.
   const rowLabel = `${label} ${entry.label}`
+
+  if (picked) {
+    return (
+      <div className={`flex items-baseline justify-between gap-3 ${PICKED}`} data-picked="true">
+        <span className="text-sm font-bold text-ink">{rowLabel}</span>
+        <span className="text-sm font-bold text-ink tabular-nums">{entry.time}</span>
+      </div>
+    )
+  }
 
   if (emphasized) {
     return (
