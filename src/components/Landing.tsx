@@ -6,23 +6,15 @@ import { CategoryTileRow, groupCardsIntoSections, resourceCards, useEntryCards }
 import { cardMatches } from '@/lib/cardSearch'
 import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
-import { nearMiss, openState, searchAsk, type AskResult } from '@/lib/askSearch'
-import { answerFor, eruvAnswer, metaAnswer, timesAnswer, type Answer } from '@/lib/askAnswer'
-import { minyanLine, namedListings, searchLines, timesLine, type LinesContext, type SearchLine } from '@/lib/searchLands'
+import { nearMiss, type AskResult } from '@/lib/askSearch'
+import type { Answer } from '@/lib/askAnswer'
+import { namedListings, type LinesContext, type SearchLine } from '@/lib/searchLands'
 import SearchLines from '@/components/home/SearchLines'
-import { haversineMiles, milesText } from '@/lib/geo'
-import type { CategoryConfig } from '@/lib/categories'
-import type { DirectoryResource } from '@/types'
-import { useZmanim } from '@/lib/useZmanim'
-import { eruvim } from '@/data/resources'
-import { resolveCapabilities } from '@/lib/categories'
 import { routes } from '@/lib/routes'
-import { neighborhoodsFor } from '@/lib/places'
 import { readerPlaces } from '@/lib/questionReader'
 import { needsReading, ownFrom, readingAnswers, readingLoses } from '@/lib/readingSearch'
 import { useReading } from '@/lib/useReading'
 import { answersWell, candidatePrompts, pickPrompts } from '@/lib/searchPrompts'
-import { answerSchedule, useMinyanSchedule } from '@/lib/useMinyanSchedule'
 import HeroHeading from '@/components/home/HeroHeading'
 import TodayBlocks from '@/components/home/TodayBlocks'
 import { BrowseList } from '@/components/home/BrowseAll'
@@ -34,6 +26,7 @@ import ShabbatTimesCard from '@/components/home/ShabbatTimesCard'
 import SubscribeSection from '@/components/home/SubscribeSection'
 import CampaignBannerCard from '@/components/home/CampaignBannerCard'
 import { useLogSearchMiss } from '@/lib/useLogSearchMiss'
+import { useHomeSearch } from '@/lib/useHomeSearch'
 import { useHydrated } from '@/lib/useHydrated'
 import { useCategories } from '@/lib/useCategories'
 import { useHomeSections } from '@/lib/useHomeSections'
@@ -180,96 +173,20 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
   // one result. Only computed once the visitor types. Against useMinyanSchedule's
   // clock, not a fresh `new Date()` in render (which Cache Components rejects),
   // so "open now" and the next minyan agree on what now is.
-  const schedule = useMinyanSchedule(coords)
-  // Not wrapped in useMemo: the React Compiler memoizes this component, and
-  // searchAsk caches each listing's words, so a keystroke stays cheap.
-  // The community's neighborhoods, for "food in Center City" (towns come
-  // from the listings' own addresses — see places.ts).
-  const places = neighborhoodsFor(communitySlug)
-  // One question, searched and answered — the typed query, and each example
-  // question under the box, which is only offered if it answers well.
-  const eruvPage = categories?.some((c) => c.kind === 'eruv') ?? false
-  const zmanimPage = categories?.some((c) => c.kind === 'zmanim') ?? false
-  // The same request the minyan schedule makes (same place, so one fetch).
-  const zmanim = useZmanim(coords ?? community.mapCenter)
-  // The schedule, and with it the time, is null until the page has hydrated
-  // (see useNow): no question is answered before then, and only the
-  // suggestions that don't depend on the time are tried, where the 0 below
-  // changes nothing.
-  const ask = (text: string) => {
-    const result = searchAsk(listings ?? [], categories ?? [], text, { coords, now: new Date(schedule?.now ?? 0), places })
-    const answer = answerFor(result, {
-      coords,
-      center: community.mapCenter,
-      schedule: result.query.minyan && schedule ? answerSchedule(schedule) : null,
-      now: schedule?.now ?? null,
-    })
-    // "What's on this site?", "how do I add a listing?" (see metaAnswer).
-    if (result.query.meta) {
-      const kind = result.categoryIds?.length === 1 ? categories?.find((c) => c.id === result.categoryIds![0]) : undefined
-      const addTo = kind && ui.contributions.add && resolveCapabilities(kind.capabilities).add
-        ? { label: kind.label, href: `${routes.slug(communitySlug, kind.id)}?form=create` }
-        : null
-      return {
-        result,
-        answer: metaAnswer(result.query.meta, { listings: listings ?? [], categories: categories ?? [], aboutHref: routes.about(communitySlug), addTo }),
-      }
-    }
-    // "When is candle lighting?": from the zmanim (see timesAnswer).
-    if (result.query.times) {
-      return {
-        result,
-        answer: timesAnswer(result.query.times, zmanim.data, {
-          nowMs: schedule?.now ?? 0,
-          pageHref: zmanimPage ? routes.slug(communitySlug, 'zmanim') : null,
-          failed: zmanim.status === 'error',
-        }),
-      }
-    }
-    // "Is the eruv up?": where to check, when the community has an eruv
-    // page (see eruvAnswer).
-    if (result.query.eruv && eruvPage) return { result, answer: eruvAnswer(eruvim, routes.slug(communitySlug, 'eruv')) }
-    return { result, answer }
-  }
+  const { schedule, zmanim, places, ask, linesFor: homeLines } = useHomeSearch(coords)
   const asked = q && listings && schedule ? ask(q) : null
 
   // ── Search takes you to the page (Oct 13; see searchLands.ts) ────────────
   // Typing shows where it could go, each line with what you'd find there;
   // Enter goes to the first. Nothing is answered here: the home used to put
   // a sentence, places and categories under the box, out of nowhere, and
-  // testers didn't trust it.
-  const placeSub = (item: DirectoryResource, category: CategoryConfig) => {
-    const now = schedule ? new Date(schedule.now) : null
-    const open = now ? openState(item, category, now) : null
-    const from = coords ?? community.mapCenter
-    const miles = item.geo ? haversineMiles(from, item.geo) : null
-    return [
-      category.label,
-      open?.known ? (open.open ? (open.closesAt ? `Open until ${open.closesAt}` : 'Open now') : 'Closed now') : null,
-      miles !== null ? milesText(miles) : null,
-    ]
-      .filter(Boolean)
-      .join(' · ')
-  }
+  // testers didn't trust it. The search itself is useHomeSearch's, which You
+  // asks again for a saved search.
   // The home's own cards the words name that aren't a kind of place with
   // listings (Patient & Family Support, a form): a line that opens them.
   const otherCards = (filtered ?? []).filter((c) => !categories?.some((cat) => cat.id === c.id && cat.kind === 'listing'))
   const linesFor = (text: string, result: AskResult, answer: Answer | null, reading: LinesContext['reading'] = null): SearchLine[] =>
-    listings && categories
-      ? searchLines(text, {
-          slug: communitySlug,
-          categories,
-          listings,
-          result,
-          options: { coords, now: new Date(schedule?.now ?? 0), places },
-          reading,
-          minyanSub: result.query.minyan && answer ? minyanLine(answer.rows[0], answer.text) : null,
-          minyanDay: result.query.minyan && answer?.rows[0]?.tomorrow && schedule ? schedule.tomorrowKey : null,
-          timesSub: result.query.times ? (timesLine(result.query.times, zmanim.data) ?? (zmanim.status === 'error' ? null : 'Looking up the times…')) : null,
-          cards: otherCards.map((c) => ({ id: c.id, title: c.title, href: categories.some((cat) => cat.id === c.id) ? c.href : null })),
-          placeSub,
-        })
-      : []
+    homeLines(text, result, answer, reading, categories ? otherCards.map((c) => ({ id: c.id, title: c.title, href: categories.some((cat) => cat.id === c.id) ? c.href : null })) : [])
   // Our own search's lines.
   const ownLines = asked ? linesFor(q, asked.result, asked.answer) : []
 

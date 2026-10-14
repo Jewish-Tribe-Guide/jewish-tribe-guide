@@ -104,6 +104,19 @@ export function categoryHref(slug: string, categoryId: string, words: string, f:
   return `${routes.slug(slug, categoryId)}${qs ? `?${qs}` : ''}`
 }
 
+/** A category page's address read back: its words, Filters and whether
+ *  the Filters hold all of it (`read=1`). The other half of categoryHref. */
+export function hrefFilters(href: string): { words: string; filters: LandFilters; read: boolean } {
+  const p = new URLSearchParams(href.split('?')[1] ?? '')
+  const filters: LandFilters = { openNow: p.get('openNow') === '1', bool: [], select: {}, has: {} }
+  for (const [k, v] of p) {
+    if (k.startsWith('f_') && v === '1') filters.bool.push(k.slice(2))
+    else if (k.startsWith('sel_') && v) filters.select[k.slice(4)] = v.split(',')
+    else if (k.startsWith('has_') && v) filters.has[k.slice(4)] = v.split(',')
+  }
+  return { words: p.get('q') ?? '', filters, read: p.get('read') === '1' }
+}
+
 /** Words a question starts or ends with that say nothing on the page it
  *  lands on: "where can I buy", "kosher", "please". Not "in", "near",
  *  "open", "best" or "now", which the page reads ("in Rittenhouse" is
@@ -175,6 +188,36 @@ export function landOn(
   // Nothing left to search ("kosher food"): the whole page.
   const count = words ? result.hits.length : own.length
   return { category, filters, read: said, count, words, href: categoryHref(slug, category.id, words, NO_FILTERS, false) }
+}
+
+/** A saved search with Filters beyond its words (chosen on its page, or
+ *  read by the AI reader), as its page will show it: the words' own
+ *  Filters and the chosen ones together. For You, which says what it finds
+ *  now in the home line's words (landSub). */
+export function savedLand(
+  listings: readonly DirectoryResource[],
+  categories: readonly CategoryConfig[],
+  category: CategoryConfig,
+  href: string,
+  options: AskOptions & { slug: string },
+): CategoryLand {
+  const { words, filters, read } = hrefFilters(href)
+  const own = listings.filter((l) => l.category === category.id)
+  if (read) return { category, filters, read: true, count: withFilters(own, category, filters, options.now ?? null).length, words, href }
+  const land = landOn(listings, categories, category, words, options)
+  const merged: LandFilters = {
+    openNow: land.filters.openNow || filters.openNow,
+    bool: [...new Set([...land.filters.bool, ...filters.bool])],
+    select: { ...land.filters.select },
+    has: { ...land.filters.has },
+  }
+  for (const [k, v] of Object.entries(filters.select)) merged.select[k] = [...new Set([...(merged.select[k] ?? []), ...v])]
+  for (const [k, v] of Object.entries(filters.has)) merged.has[k] = [...new Set([...(merged.has[k] ?? []), ...v])]
+  // What the words find, narrowed by every Filter; the whole page when
+  // nothing is typed.
+  const found = words ? new Set(searchAsk(own, categories, land.words, { ...options, categoryId: category.id }).hits.map((h) => h.item.id)) : null
+  const base = found ? own.filter((l) => found.has(l.id)) : own
+  return { category, filters: merged, read: land.read, count: withFilters(base, category, merged, options.now ?? null).length, words, href }
 }
 
 /** A question the AI reader read (see questionReader.ts), on one of the

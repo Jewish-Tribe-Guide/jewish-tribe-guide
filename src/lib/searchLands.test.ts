@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { DirectoryResource } from '@/types'
 import { makeCategory, makeListing } from '@/test/providerFixtures'
 import { searchAsk } from './askSearch'
-import { boxWords, searchLines, timesLine, withFilters, type LinesContext } from './searchLands'
+import { boxWords, categoryHref, hrefFilters, landSub, savedLand, searchLines, timesLine, withFilters, type LinesContext } from './searchLands'
 import { itemCounts, listingHas } from './itemFilter'
 
 // ── Where Enter goes (canvas page "lands", Oct 13): one test per row of its
@@ -171,5 +171,32 @@ describe('timesLine', () => {
     expect(timesLine('shabbos', z)).toBe('Candles Friday 6:01 PM · Havdalah Saturday 6:59 PM')
     expect(timesLine('Sunset', z)).toBe('Sunset today 6:24 PM')
     expect(timesLine('candles', null)).toBeNull()
+  })
+})
+
+// You (Oct 14): a saved search with Filters beyond its words says what its
+// page would show, in the home line's words.
+describe('savedLand — a saved search with its own Filters', () => {
+  const options = { now: NOW, slug: 'philly' }
+
+  it('reads an address back into its words and Filters', () => {
+    const href = categoryHref('philly', 'restaurant', 'grill', { openNow: true, bool: ['kids'], select: { t: ['Meat'] }, has: {} }, false)
+    expect(hrefFilters(href)).toEqual({ words: 'grill', filters: { openNow: true, bool: ['kids'], select: { t: ['Meat'] }, has: {} }, read: false })
+  })
+
+  it('the words’ own Filters and the chosen ones together: "challah" with Wine is one store', () => {
+    const land = savedLand(listings, categories, grocery, '/philly/grocery?q=challah&has_m=Wine', options)
+    expect(land.count).toBe(1)
+    expect(landSub(land)).toBe('1 with Challah and Wine')
+  })
+
+  it('a Filter with no words: the whole page, narrowed', () => {
+    expect(landSub(savedLand(listings, categories, food, '/philly/restaurant?sel_t=Dairy', options))).toBe('1 Dairy')
+  })
+
+  it('read by the AI reader: its Filters are all of it, the words aren’t searched again', () => {
+    const land = savedLand(listings, categories, grocery, '/philly/grocery?q=something+for+kiddush&has_m=Wine&read=1', options)
+    expect(land.count).toBe(1)
+    expect(landSub(land)).toBe('1 with Wine')
   })
 })

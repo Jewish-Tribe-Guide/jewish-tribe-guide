@@ -109,8 +109,10 @@ const getHoverCapableSnapshot = () => window.matchMedia(HOVER_QUERY).matches
 const getHoverCapableServerSnapshot = () => false
 
 export type SwipeAction = {
-  id: 'save' | 'share'
-  /** The caption under the circle — "Save"/"Saved", "Share"/"Copied!". */
+  /** `remove` takes a row off a list of the visitor's own (You). */
+  id: 'save' | 'share' | 'remove'
+  /** The caption under the circle — "Save"/"Saved", "Share"/"Copied!",
+   *  "Remove". */
   label: string
   /** The caption plus the listing's name. Every row in a list has a "Save",
    *  so the caption alone doesn't say which listing it acts on. */
@@ -124,15 +126,24 @@ export type SwipeAction = {
 const SHARE_COLOR = '#0f172a'
 const SAVE_COLOR = '#2563eb'
 const SAVED_COLOR = '#64748b'
+const REMOVE_COLOR = '#b91c1c'
 
 function actionColor(action: SwipeAction) {
   if (action.id === 'share') return SHARE_COLOR
+  if (action.id === 'remove') return REMOVE_COLOR
   return action.active ? SAVED_COLOR : SAVE_COLOR
 }
 
 function ActionGlyph({ action }: { action: SwipeAction }) {
   // Filled once saved, as the bookmark is everywhere.
   if (action.id === 'save') return <BookmarkIcon filled={action.active} className="h-4 w-4" />
+  if (action.id === 'remove') {
+    return (
+      <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" className="h-4 w-4">
+        <path d="M18 6 6 18M6 6l12 12" />
+      </svg>
+    )
+  }
   return <ExternalIcon className="h-4 w-4" />
 }
 

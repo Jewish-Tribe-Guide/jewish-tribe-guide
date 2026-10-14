@@ -116,7 +116,8 @@ describe('mapQueryString', () => {
 
   // The Pinned, Browse and What changed pages own their paths; a category
   // can't take them.
-  it('reserves the Pinned, Browse and What changed pages’ slugs', () => {
+  it('reserves the You, Pinned, Browse and What changed pages’ slugs', () => {
+    expect(slugRejectionReason('you')).toMatch(/reserved/)
     expect(slugRejectionReason('pinned')).toMatch(/reserved/)
     expect(slugRejectionReason('browse')).toMatch(/reserved/)
     expect(slugRejectionReason('changes')).toMatch(/reserved/)

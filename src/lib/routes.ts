@@ -53,7 +53,9 @@ export const RESERVED_SLUGS = new Set([
   'all',
   'map',
   'feedback',
-  // The visitor's pinned places (the Today home's "All N").
+  // The visitor's saved places and searches (the You tab), and its old
+  // address, which goes there now.
+  'you',
   'pinned',
   // Every category, grouped (the Browse tab).
   'browse',
@@ -169,8 +171,8 @@ export const routes = {
   home: (community: string) => `/${community}`,
   map: (community: string) => `/${community}/map`,
   feedback: (community: string) => `/${community}/feedback`,
-  /** The visitor's pinned places, grouped by category (see PinnedPlaces). */
-  pinned: (community: string) => `/${community}/pinned`,
+  /** You: the visitor's saved places and searches (see YouScreen). */
+  you: (community: string) => `/${community}/you`,
   /** Every category in the admin's groups: the Browse tab (see BrowseList). */
   browse: (community: string) => `/${community}/browse`,
   /** Places added, edited or taken out, by day (see whatChanged.ts). */

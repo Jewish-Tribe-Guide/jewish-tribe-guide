@@ -150,8 +150,15 @@ const nextConfig: NextConfig = {
   // /inbox keeps its redirect: it has no per-community split (one
   // hospital-facing queue) and no standalone page of its own, so the old
   // bare bookmark still needs somewhere real to land.
+  // /<community>/pinned became You (Oct 14, saved places and searches): an
+  // old link or a phone's bookmark lands there. Here, not in a page, so it's
+  // a real 308 before anything renders (see proxy.ts on why a page's own
+  // redirect can end up a JavaScript one under Cache Components).
   async redirects() {
-    return [{ source: '/inbox', destination: '/philly/inbox', permanent: true }];
+    return [
+      { source: '/inbox', destination: '/philly/inbox', permanent: true },
+      { source: '/:community/pinned', destination: '/:community/you', permanent: true },
+    ];
   },
 };
 

@@ -1,5 +1,5 @@
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test'
-import { categoryWithListings, categoryWithMapPoints, defaultCommunity } from './helpers'
+import { categoryWithListings, categoryWithMapPoints, defaultCommunity, defaultCommunitySlug } from './helpers'
 
 // A more patient version of helpers.ts' dismissLocationPrompt: that one is a
 // single point-in-time check (`isVisible()`, no retry), which assumes the
@@ -146,5 +146,33 @@ test.describe('saved places', () => {
 
     const pinnedChip = page.getByRole('button', { name: /^Saved\s*1$/ }).and(page.locator(':visible'))
     await expect(pinnedChip).toBeVisible()
+  })
+
+  // A search saved from a home line is on You, saying what it finds now,
+  // and opens its page with the words in the box and the bookmark filled.
+  test('a search saved from a home line is on You, and opens its page', async ({ page, request }) => {
+    const community = await defaultCommunity(page)
+    const { category } = await categoryWithListings(request, community)
+
+    await page.goto(`/${community}`)
+    await dismissLocationPromptIfItAppears(page)
+    await page.getByRole('textbox', { name: 'Search resources' }).fill(category.pluralLabel)
+    const save = page.getByRole('button', { name: new RegExp(`^Save “.+” in ${category.pluralLabel}$`) }).first()
+    await save.click()
+    await expect(save).toHaveAttribute('aria-pressed', 'true')
+
+    await page.goto(`/${community}/you`)
+    await dismissLocationPromptIfItAppears(page)
+    const searches = page.getByTestId('you-searches')
+    await expect(searches).toContainText(category.pluralLabel)
+    await searches.getByRole('link').first().click()
+    await expect(page).toHaveURL(new RegExp(`/${community}/${category.id}`))
+  })
+
+  test('the old Pinned page goes to You', async ({ request }) => {
+    const community = await defaultCommunitySlug(request)
+    const res = await request.get(`/${community}/pinned`, { maxRedirects: 0 })
+    expect(res.status()).toBe(308)
+    expect(res.headers()['location']).toBe(`/${community}/you`)
   })
 })

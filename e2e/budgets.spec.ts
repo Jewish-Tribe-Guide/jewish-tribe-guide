@@ -122,6 +122,18 @@ test.describe('home screen weight', () => {
     expect(kb(js), 'initial JavaScript, gzipped').toBeLessThan(400)
   })
 
+  // You (Oct 14) asks saved searches again with the home's own search
+  // (useHomeSearch), so it carries the home's search code: held to the
+  // home's ceiling, not one of its own.
+  test('the You page’s initial JavaScript stays under the home’s ceiling', async ({ page, request }, testInfo) => {
+    const community = await defaultCommunitySlug(request)
+    const loaded = await load(page, `/${community}/you`)
+
+    const js = sum(loaded.filter(isScript))
+    console.log(`[budget:${testInfo.project.name}] you js=${kb(js)}KB`)
+    expect(kb(js), 'initial JavaScript, gzipped').toBeLessThan(400)
+  })
+
   test('images stay light: none over 150 KB, and the total under 600 KB', async ({ page, request }, testInfo) => {
     const community = await defaultCommunitySlug(request)
     const images = (await load(page, `/${community}`)).filter(isImage)
