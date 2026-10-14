@@ -70,6 +70,21 @@ describe('backForwardNavigation', () => {
     vi.useRealTimers()
   })
 
+  // The user, Oct 13: Back to home, then a search from there, and the page
+  // the search went to came up blank. A link's pushState comes after the
+  // new screen's first render, so the flag from the Back was still up. A
+  // screen whose address isn't yet its own came by a link.
+  it('a screen not at its own address yet came by a link, even right after a back/forward', async () => {
+    const { didArriveViaBackForward } = await freshModule()
+    window.history.replaceState(null, '', '/philly')
+    window.dispatchEvent(new PopStateEvent('popstate'))
+    expect(didArriveViaBackForward('restaurant')).toBe(false)
+
+    // Back/forward onto the screen itself: the address is already its own.
+    window.history.replaceState(null, '', '/philly/restaurant')
+    expect(didArriveViaBackForward('restaurant')).toBe(true)
+  })
+
   it('does not clear back/forward status on a replaceState call (only pushState)', async () => {
     stubNavigationType('back_forward')
     const { didArriveViaBackForward } = await freshModule()

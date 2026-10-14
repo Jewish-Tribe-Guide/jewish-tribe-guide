@@ -58,7 +58,7 @@ export function itemCounts(items: readonly DirectoryResource[], key: string): { 
   return [...counts.values()].sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag))
 }
 
-/** The items a search names, by item field, each with the word that named
+/** The items a search names, by item field, each with the words that named
  *  it: "challah" is Has: Challah, under the name its listings use. Only an
  *  item said by its name ("bread" is a kind, and several items). Only one
  *  some listing the search found has. What the Filters sheet shows ticked
@@ -68,14 +68,21 @@ export function searchItems(category: CategoryConfig, items: readonly DirectoryR
   const hits = [...result.hits, ...result.noHours]
   const used = new Set<string>()
   const own = items.filter((i) => i.category === category.id)
+  const terms = result.terms
   for (const field of itemFields(category)) {
     const counts = itemCounts(own, field.key)
-    for (const term of result.terms) {
-      if (used.has(term)) continue
-      const best = counts.find(({ tag }) => namesItem([term], tag, { kinds: false }) && hits.some((h) => listingHas(h.item, field.key, [tag])))
-      if (!best) continue
-      out.set(field.key, (out.get(field.key) ?? new Map()).set(best.tag, term))
-      used.add(term)
+    // The longest run of words first: "chalav yisroel milk" is Chalav
+    // Yisroel Milk, one item said in three words (the user, Oct 13: it
+    // found the store and ticked nothing).
+    for (let size = terms.length; size >= 1; size--) {
+      for (let i = 0; i + size <= terms.length; i++) {
+        const span = terms.slice(i, i + size)
+        if (span.some((t) => used.has(t))) continue
+        const best = counts.find(({ tag }) => namesItem(span, tag, { kinds: false }) && hits.some((h) => listingHas(h.item, field.key, [tag])))
+        if (!best) continue
+        out.set(field.key, (out.get(field.key) ?? new Map()).set(best.tag, span.join(' ')))
+        for (const t of span) used.add(t)
+      }
     }
   }
   return out

@@ -8,7 +8,7 @@ import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
 import { nearMiss, openState, searchAsk, type AskResult } from '@/lib/askSearch'
 import { answerFor, eruvAnswer, metaAnswer, timesAnswer, type Answer } from '@/lib/askAnswer'
-import { minyanLine, namedListings, searchLines, timesLine, type SearchLine } from '@/lib/searchLands'
+import { minyanLine, namedListings, searchLines, timesLine, type LinesContext, type SearchLine } from '@/lib/searchLands'
 import SearchLines from '@/components/home/SearchLines'
 import { haversineMiles, milesText } from '@/lib/geo'
 import type { CategoryConfig } from '@/lib/categories'
@@ -237,30 +237,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
   // Typing shows where it could go, each line with what you'd find there;
   // Enter goes to the first. Nothing is answered here: the home used to put
   // a sentence, places and categories under the box, out of nowhere, and
-  // testers didn't trust it. The question reader (questionReader.ts) reads a
-  // question our own search doesn't follow, after a pause or on Enter, and
-  // its reading decides the lines: the page it opens has that reading in its
-  // Filters. Never a place's own name.
-  const reader = useReading(communitySlug)
-  const readerPlacesHere = useMemo(() => readerPlaces(listings ?? [], communitySlug), [listings, communitySlug])
-  const namesAPlace = !!q && namedListings(listings ?? [], q).length > 0
-  const readable = !!asked && !namesAPlace && needsReading(asked.result)
-  const reading = readable ? reader.readingFor(q) : null
-  // Only a reading that names a kind of place, and doesn't lose the one our
-  // own parser is sure of (see readingLoses), decides the lines.
-  const todayFound = !!asked && (asked.result.hits.length > 0 || asked.result.noHours.length > 0)
-  const useReadingLines = !!reading && readingAnswers(reading.reading) && !(todayFound && readingLoses(q, reading.reading, categories ?? []))
-  const sharedQuestion = !!initialQuery && q === initialQuery.trim()
-  const own = asked ? ownFrom(asked.result, readerPlacesHere) : null
-  useEffect(() => {
-    if (!readable || !own) return
-    const timer = setTimeout(() => reader.ask(q, own), sharedQuestion ? 0 : 1000)
-    return () => clearTimeout(timer)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [readable, q])
-  const readingNow = !!q && reader.isReading(q)
-  const readerAnswered = reader.answered(q)
-
+  // testers didn't trust it.
   const placeSub = (item: DirectoryResource, category: CategoryConfig) => {
     const now = schedule ? new Date(schedule.now) : null
     const open = now ? openState(item, category, now) : null
@@ -277,7 +254,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
   // The home's own cards the words name that aren't a kind of place with
   // listings (Patient & Family Support, a form): a line that opens them.
   const otherCards = (filtered ?? []).filter((c) => !categories?.some((cat) => cat.id === c.id && cat.kind === 'listing'))
-  const linesFor = (text: string, result: AskResult, answer: Answer | null): SearchLine[] =>
+  const linesFor = (text: string, result: AskResult, answer: Answer | null, reading: LinesContext['reading'] = null): SearchLine[] =>
     listings && categories
       ? searchLines(text, {
           slug: communitySlug,
@@ -285,7 +262,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
           listings,
           result,
           options: { coords, now: new Date(schedule?.now ?? 0), places },
-          reading: text === q && useReadingLines ? reading!.reading : null,
+          reading,
           minyanSub: result.query.minyan && answer ? minyanLine(answer.rows[0], answer.text) : null,
           minyanDay: result.query.minyan && answer?.rows[0]?.tomorrow && schedule ? schedule.tomorrowKey : null,
           timesSub: result.query.times ? (timesLine(result.query.times, zmanim.data) ?? (zmanim.status === 'error' ? null : 'Looking up the times…')) : null,
@@ -293,7 +270,39 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
           placeSub,
         })
       : []
-  const exact = asked ? linesFor(q, asked.result, asked.answer) : []
+  // Our own search's lines.
+  const ownLines = asked ? linesFor(q, asked.result, asked.answer) : []
+
+  // The question reader (questionReader.ts) reads only what our own search
+  // didn't understand: nothing found, or only the words found as text
+  // ("Food · 2 for “something to drink”"). Its reading then decides the
+  // lines, and the page it opens has that reading in its Filters. A
+  // question our search did understand ("kosher wine", "food open now") is
+  // never sent: the AI answered it differently from one try to the next,
+  // and Enter waited for it (the user, Oct 13: "super inconsistent", "why
+  // is AI reading the question when it's already showing the right
+  // answer"). Never a place's own name.
+  const reader = useReading(communitySlug)
+  const readerPlacesHere = useMemo(() => readerPlaces(listings ?? [], communitySlug), [listings, communitySlug])
+  const namesAPlace = !!q && namedListings(listings ?? [], q).length > 0
+  const readable = !!asked && !namesAPlace && needsReading(asked.result) && (ownLines.length === 0 || !!ownLines[0].loose)
+  const reading = readable ? reader.readingFor(q) : null
+  // Only a reading that names a kind of place, and doesn't lose the one our
+  // own parser is sure of (see readingLoses), decides the lines.
+  const todayFound = !!asked && (asked.result.hits.length > 0 || asked.result.noHours.length > 0)
+  const useReadingLines = !!reading && readingAnswers(reading.reading) && !(todayFound && readingLoses(q, reading.reading, categories ?? []))
+  const sharedQuestion = !!initialQuery && q === initialQuery.trim()
+  const own = asked ? ownFrom(asked.result, readerPlacesHere) : null
+  useEffect(() => {
+    if (!readable || !own) return
+    const timer = setTimeout(() => reader.ask(q, own), sharedQuestion ? 0 : 1000)
+    return () => clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [readable, q])
+  const readingNow = !!q && reader.isReading(q)
+  const readerAnswered = reader.answered(q)
+
+  const exact = asked && useReadingLines ? linesFor(q, asked.result, asked.answer, reading!.reading) : ownLines
   // Nothing as asked: the closest question that does find something, with
   // a word or two left out ("packaged pretzels" → pretzels; see nearMiss),
   // each line saying what was left out. A reading, once it comes, has the
@@ -303,9 +312,11 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
     ? linesFor(miss.kept, miss.result, null).map((line) => ({ ...line, sub: `${line.sub} · nothing for “${miss.dropped}”` }))
     : exact
 
-  // Enter (or a "Try asking" tapped): the first line. A question still
-  // being read waits for its reading; nothing anywhere stays here and says
-  // so (nothingFor), with where to ask.
+  // Enter (or a "Try asking" tapped): the first line, as shown, at once.
+  // It waits only for a question being read (readable: our own search
+  // found nothing, or only the words as text), and says it's reading;
+  // nothing anywhere stays here and says so (nothingFor), with where to
+  // ask.
   const router = useRouter()
   const [nothingFor, setNothingFor] = useState<string | null>(null)
   const [waitingFor, setWaitingFor] = useState<string | null>(null)
@@ -323,9 +334,9 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
   }
   const submit = () => {
     if (!q || !listings || !schedule) return
-    // A question our own search doesn't follow waits for its reading.
-    if (lines[0] && !readingNow && !(readable && !reading)) return goTo(lines[0], q)
-    if (readable && own && !reading) {
+    const toRead = readable && !reading && !readerAnswered
+    if (lines[0] && !readingNow && !toRead) return goTo(lines[0], q)
+    if (toRead && own) {
       reader.ask(q, own)
       return setWaitingFor(q)
     }

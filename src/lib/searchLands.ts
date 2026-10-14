@@ -48,6 +48,9 @@ export type SearchLine = {
   listing?: DirectoryResource
   /** A home card's id ("support"), for a line that opens it. */
   cardId?: string
+  /** Found by the words alone, not understood: "Food · 2 for “something
+   *  to drink”". The only line the AI reader is asked to do better on. */
+  loose?: boolean
 }
 
 /** A category page's filters, as its address holds them (see
@@ -167,7 +170,7 @@ export function landOn(
   // Everything the words asked is a filter (a taught word or a pick-list
   // value is already out of the terms): the line can say what it found
   // ("10 open now with Challah") rather than "10 for …".
-  const covered = new Set([...searchItems(category, own, result).values()].flatMap((m) => [...m.values()]))
+  const covered = new Set([...searchItems(category, own, result).values()].flatMap((m) => [...m.values()].flatMap((said) => said.split(' '))))
   const said = result.terms.every((t) => covered.has(t)) && !result.anchor && !result.place
   // Nothing left to search ("kosher food"): the whole page.
   const count = words ? result.hits.length : own.length
@@ -360,6 +363,7 @@ export function searchLines(raw: string, ctx: LinesContext): SearchLine[] {
     sub: landSub(land),
     href: land.href,
     categoryId: land.category.id,
+    ...(land.read ? {} : { loose: true }),
   }))
 
   // The home's other cards the words name ("support", "map", "volunteer"),

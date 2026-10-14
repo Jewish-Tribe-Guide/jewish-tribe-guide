@@ -193,7 +193,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // navigation — a clicked link, a shared URL, typing an address — is
   // exactly the case that SHOULD still hydrate from it, since that's what
   // makes a filtered link shareable in the first place.
-  const [arrivedViaBackForward] = useState(() => didArriveViaBackForward())
+  const [arrivedViaBackForward] = useState(() => didArriveViaBackForward(category.id))
   const [search, setSearch] = useState(arrivedViaBackForward ? '' : (initialSearch ?? ''))
   const [boolFilters, setBoolFilters] = useState<Record<string, boolean>>({})
   // Multi-select: each key maps to the set of chosen values (empty = no filter).
@@ -393,7 +393,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   useEffect(() => {
     if (hasActivatedBeforeRef.current && hiddenAtRef.current !== window.location.pathname) {
       const params = Object.fromEntries(new URLSearchParams(window.location.search))
-      if (didArriveViaBackForward() || !carriesSearch(category, params)) clearFiltersRef.current!()
+      if (didArriveViaBackForward(category.id) || !carriesSearch(category, params)) clearFiltersRef.current!()
       else fromAddressRef.current!(params)
     }
     hasActivatedBeforeRef.current = true

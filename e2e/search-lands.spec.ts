@@ -116,6 +116,48 @@ test('a second search to a page already visited lands on that search, not the wh
   expect(new URL(page.url()).searchParams.get('q')).toBe(item)
 })
 
+// The user, Oct 13: "going in and out … seems to break it". Back to home,
+// then a search to a page not yet opened, and it came up blank: the page
+// took the Back just before for its own arrival.
+test('Back to home, then a search to another page: that page has the search', async ({ page, request }) => {
+  const community = await defaultCommunity(page)
+  const found = await itemOnAListing(request, community)
+  test.skip(!found, 'no listing has an item')
+  const { category, item } = found!
+  // A kind of place no prompt goes to, so the search's page is a new one.
+  const other = ((await categories(request, community)) as Cat[]).find((c) => c.kind === 'listing' && c.id !== category.id && !['restaurant', 'synagogue'].includes(c.id))
+  test.skip(!other, 'only one kind of place')
+
+  await homeBox(page, community)
+  const card = page.locator(`a[href="/${community}/${other!.id}"]`).filter({ visible: true }).first()
+  test.skip((await card.count()) === 0, `no link to ${other!.id} on home`)
+  await card.click()
+  await page.waitForURL((url) => url.pathname === `/${community}/${other!.id}`)
+
+  await page.goBack()
+  await page.waitForURL((url) => url.pathname === `/${community}`)
+  // Straight from Back: a "Try asking" tapped (nothing typed first), or
+  // the item typed and Enter at once.
+  const prompt = page.getByTestId('search-prompts').filter({ visible: true }).getByRole('button').first()
+  if (await prompt.count()) {
+    await prompt.click()
+    await page.waitForURL((url) => url.pathname !== `/${community}`)
+    const q = new URL(page.url()).searchParams.get('q')
+    if (q) await expect(page.getByRole('searchbox').filter({ visible: true }).first()).toHaveValue(q)
+    await page.waitForTimeout(800)
+    expect(new URL(page.url()).searchParams.get('q')).toBe(q)
+    return
+  }
+  const again = page.getByRole('textbox', { name: 'Search resources' }).filter({ visible: true })
+  await again.fill(item)
+  await again.press('Enter')
+  await page.waitForURL((url) => url.pathname !== `/${community}`)
+  test.skip(!page.url().includes(`/${category.id}?`), `"${item}" goes elsewhere first`)
+  await expect(page.getByRole('searchbox').filter({ visible: true }).first()).toHaveValue(item)
+  await page.waitForTimeout(800)
+  expect(new URL(page.url()).searchParams.get('q')).toBe(item)
+})
+
 test('a minyan: Minyanim by time, the words in its box, no sentence over the list', async ({ page, request }) => {
   const community = await defaultCommunity(page)
   const shuls = ((await categories(request, community)) as Cat[]).find((c) => c.detailFields?.some((f) => f.type === 'minyanim'))

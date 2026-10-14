@@ -229,7 +229,9 @@ describe('Landing', () => {
     const box = screen.getAllByLabelText('Search resources')[0]!
 
     await user.type(box, 'where can I buy cholov yisroel milk')
-    expect(lineTexts()[0]).toBe('Grocery Stores1 for “cholov yisroel milk”')
+    // Chalav Yisroel Milk, an item in three words, is understood: the line
+    // says so, and the AI isn't asked (the user, Oct 13).
+    expect(lineTexts()[0]).toBe('Grocery Stores1 with Chalav Yisroel Milk')
     await user.keyboard('{Enter}')
     expect(mockRouter.push).toHaveBeenCalledWith('/test-community/grocery?q=cholov+yisroel+milk')
 
@@ -373,6 +375,37 @@ describe('Landing', () => {
   // A question only the reader follows: its reading decides the page, and
   // the page gets the reading as its Filters (read=1: the words aren't
   // searched again there).
+  // The user, Oct 13: "kosher wine" from home was "super inconsistent",
+  // and Enter waited for the AI though the line already showed the answer.
+  // A question our own search understood (its first line says what it
+  // found) is never sent to the reader, and Enter goes at once.
+  it('a question our own search understood isn’t sent to the reader: Enter goes where its line says, at once', async () => {
+    const user = userEvent.setup()
+    mockRouter.push.mockClear()
+    const { askReader } = await import('@/lib/askReader')
+    vi.mocked(askReader).mockClear()
+    readerMock.answer = { ok: true, reading: { categories: [{ id: 'restaurant' }] } }
+    const grocery = makeCategory({ id: 'grocery', label: 'Grocery', pluralLabel: 'Grocery', detailFields: [{ key: 'm', label: 'Kosher items', type: 'tags' }] })
+    // A Food place whose type is "Wine Bar": "wine" there isn't an item,
+    // so the question would once have gone to the AI.
+    const food = makeCategory({ id: 'restaurant', label: 'Food', pluralLabel: 'Food', detailFields: [{ key: 't', label: 'Type', type: 'select', filterable: true, options: [{ value: 'Wine Bar', label: 'Wine Bar' }] }] })
+    try {
+      renderLanding(undefined, { content: { categories: [grocery, food] } }, [
+        makeListing({ id: 'g1', category: 'grocery', name: 'ShopRite', m: ['Wine'] }),
+        makeListing({ id: 'g2', category: 'grocery', name: 'Acme', m: ['Wine'] }),
+        makeListing({ id: 'f1', category: 'restaurant', name: 'Bistro', t: 'Wine Bar' }),
+      ])
+      await user.type(screen.getAllByLabelText('Search resources')[0]!, 'kosher wine')
+      expect(lineTexts()[0]).toBe('Grocery2 with Wine')
+      await user.keyboard('{Enter}')
+      expect(mockRouter.push).toHaveBeenCalledWith('/test-community/grocery?q=wine')
+      await new Promise((r) => setTimeout(r, 1200))
+      expect(askReader).not.toHaveBeenCalled()
+    } finally {
+      readerMock.answer = { ok: false, reason: 'off' }
+    }
+  })
+
   it('a question the reader reads lands with its reading in the Filters', async () => {
     const user = userEvent.setup()
     mockRouter.push.mockClear()
