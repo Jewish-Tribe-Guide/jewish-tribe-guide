@@ -7,6 +7,7 @@ import { routes } from '@/lib/routes'
 import AskTheGroup from '@/components/home/AskTheGroup'
 import { categoryQuestion } from '@/lib/shareAnswer'
 import type { CategoryConfig } from '@/lib/categories'
+import type { ReactNode } from 'react'
 
 // ── A category page's search: asking comes first ─────────────────────────────
 // The one search box on the page, limited to this category and saying so
@@ -39,9 +40,12 @@ type Props = {
   onSubmit?: () => void
   /** The search found nothing here: where to ask instead. */
   foundNothing?: boolean
+  /** The bookmark that saves this search (SaveButton), beside the ✕ while
+   *  something is typed. */
+  save?: ReactNode
 }
 
-export default function CategoryAsk({ category, search, onSearch, scope, reading = false, onSubmit, foundNothing = false }: Props) {
+export default function CategoryAsk({ category, search, onSearch, scope, reading = false, onSubmit, foundNothing = false, save }: Props) {
   const communitySlug = useOptionalCommunitySlug()
   const categories = useCategories() ?? [category]
   const q = search.trim()
@@ -93,6 +97,12 @@ export default function CategoryAsk({ category, search, onSearch, scope, reading
           enterKeyHint="search"
           className="min-w-0 flex-1 bg-transparent text-[15.5px] text-ink placeholder:text-slate-400 focus:outline-none [&::-webkit-search-cancel-button]:hidden"
         />
+        {search && save && (
+          <>
+            {save}
+            <span aria-hidden="true" className="h-5 w-px shrink-0 bg-slate-200" />
+          </>
+        )}
         {search && (
           <button
             type="button"

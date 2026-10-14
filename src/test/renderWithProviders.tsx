@@ -5,6 +5,8 @@ import type { CommunityContent } from '@/lib/loadCommunityContent'
 import { CommunityProvider } from '@/lib/communityContext'
 import { ContentProvider } from '@/lib/contentContext'
 import { PinnedProvider } from '@/lib/pinnedContext'
+import { SavedSearchesProvider } from '@/lib/savedSearchesContext'
+import { UndoToastProvider } from '@/components/UndoToast'
 import { makeCommunity, makeContent } from './providerFixtures'
 
 // ── Renders a component inside the same provider stack the real app wraps it
@@ -40,7 +42,8 @@ export function renderWithProviders(ui: ReactElement, options: Overrides & Omit<
   const resolvedContent = makeContent(content)
   const resolvedCommunities = communities ?? [resolvedCommunity]
 
-  // PinnedProvider — matches SiteChrome's own real nesting (it wraps the
+  // UndoToastProvider, PinnedProvider and SavedSearchesProvider — matches
+  // SiteChrome's own real nesting (it wraps the
   // whole app in one), added when GenericListingCard grew a Pin action that
   // calls usePinned() unconditionally. Not LocationProvider: useOptionalLocation()
   // already tolerates its absence by returning null, which is what real
@@ -49,7 +52,11 @@ export function renderWithProviders(ui: ReactElement, options: Overrides & Omit<
   const wrap = (node: ReactElement) => (
     <CommunityProvider community={resolvedCommunity} communities={resolvedCommunities}>
       <ContentProvider content={resolvedContent}>
-        <PinnedProvider>{node}</PinnedProvider>
+        <UndoToastProvider>
+          <PinnedProvider>
+            <SavedSearchesProvider>{node}</SavedSearchesProvider>
+          </PinnedProvider>
+        </UndoToastProvider>
       </ContentProvider>
     </CommunityProvider>
   )

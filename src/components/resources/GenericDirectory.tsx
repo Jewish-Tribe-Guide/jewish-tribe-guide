@@ -48,6 +48,10 @@ import { mapQueryString, routes } from '@/lib/routes'
 import QuestionCard, { useAskedPlaces } from './QuestionCard'
 import { parseQuestionCard, pickQuestion } from '@/lib/questionCards'
 import { ui } from '@/lib/uiConfig'
+import SaveButton from '@/components/SaveButton'
+import { makeSavedSearch } from '@/lib/savedSearches'
+import { useSavedSearches } from '@/lib/savedSearchesContext'
+import { categoryHref } from '@/lib/searchLands'
 import { useOptionalLocation } from '@/lib/locationContext'
 import { useCategories } from '@/lib/useCategories'
 import { didArriveViaBackForward } from '@/lib/backForwardNavigation'
@@ -1374,6 +1378,41 @@ export default function GenericDirectory({ category, items, anchorLabel, address
       return { ...prev, [key]: on ? cur.filter((x) => !sameItem(x, tag)) : [...cur, tag] }
     })
   }
+  // ── Save this search (Oct 13, canvas page "you", board YouSave) ──
+  // The bookmark in the box, filled while this is a saved search: the words
+  // and the Filters chosen beyond them, as the address that opens it again.
+  // Filters the words tick (searchBools/searchSelects/searchHas, open now)
+  // aren't added: the words bring them back, so "challah" here is the same
+  // search as "challah" saved from a home line.
+  const savedSearches = useSavedSearches()
+  const typedWords = search.trim()
+  const thisSearch =
+    !typedWords || !communitySlug
+      ? null
+      : minyanimView
+        ? makeSavedSearch({ words: typedWords, kind: 'minyanim', categoryId: category.id, href: `${routes.slug(communitySlug, category.id)}?davening=1&q=${encodeURIComponent(typedWords)}` })
+        : makeSavedSearch({
+            words: typedWords,
+            kind: 'category',
+            categoryId: category.id,
+            href: categoryHref(
+              communitySlug,
+              category.id,
+              typedWords,
+              {
+                openNow,
+                bool: Object.keys(boolFilters).filter((k) => boolFilters[k]),
+                select: Object.fromEntries(Object.entries(selectFilters).filter(([, v]) => v.length)),
+                has: Object.fromEntries(Object.entries(hasFilters).filter(([, v]) => v.length)),
+              },
+              landedSearch !== null && search === landedSearch,
+            ),
+          })
+  const searchSave =
+    ui.map.pins && savedSearches && thisSearch ? (
+      <SaveButton plain saved={savedSearches.isSaved(thisSearch.key)} onToggle={() => savedSearches.toggle(thisSearch)} name={`“${typedWords}” in ${category.pluralLabel}`} />
+    ) : undefined
+
   // The sheet's Clear all clears what it shows, the search's filter words
   // too; the empty list's "Clear filters" (clearFilters) keeps the search.
   // A question read into the Filters (landedSearch) goes with them: it's
@@ -1790,6 +1829,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
                   else if (readable && own) reader.ask(search, own)
                 }}
                 foundNothing={!minyanimView && searchFoundNothing && !reader.isReading(search)}
+                save={searchSave}
               />
             </div>
           )}

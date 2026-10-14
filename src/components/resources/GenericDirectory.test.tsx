@@ -3,6 +3,7 @@ import { Activity, forwardRef, useContext, useImperativeHandle, useState, type R
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { makeSavedSearch } from '@/lib/savedSearches'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { mockRouter } from '@/test/nextNavigationMock'
 import { makeCategory, makeListing } from '@/test/providerFixtures'
@@ -2674,6 +2675,32 @@ describe('GenericDirectory — Has', () => {
     rerenderWithProviders(page({ q: question, read: '1', has_m: 'Wine' }))
     await new Promise((r) => setTimeout(r, 400))
     expect(onParamsChange).not.toHaveBeenCalledWith(expect.objectContaining({ read: null }), expect.anything())
+  })
+
+  // The bookmark in the box (canvas page "you", board YouSave): filled while
+  // this is a saved search. "challah" saved from a home line is the same
+  // search as "challah" in this box, its Has: Challah coming from the word;
+  // a Filter chosen beyond the words makes it another.
+  it('the box’s bookmark is filled for a search saved from home, and a Filter beyond the words makes it another', async () => {
+    const user = userEvent.setup()
+    const path = `/test-community/${grocery.id}`
+    localStorage.setItem('jpc:saved-searches', JSON.stringify([makeSavedSearch({ words: 'challah', kind: 'category', categoryId: grocery.id, href: `${path}?q=challah` })]))
+    renderWithProviders(<GenericDirectory category={grocery} items={stores} {...handlers} initialSearch="challah" />)
+
+    const save = () => screen.getByRole('button', { name: `Save “challah” in ${grocery.pluralLabel}` })
+    expect(save()).toHaveAttribute('aria-pressed', 'true')
+
+    const sheet = await openFilters(user)
+    await user.click(sheet.getByRole('button', { name: /^Wine/ }))
+    await user.click(sheet.getByRole('button', { name: /^Show/ }))
+    expect(save()).toHaveAttribute('aria-pressed', 'false')
+
+    await user.click(save())
+    expect(save()).toHaveAttribute('aria-pressed', 'true')
+    const saved = JSON.parse(localStorage.getItem('jpc:saved-searches')!)
+    expect(saved).toHaveLength(2)
+    expect(saved[1]).toMatchObject({ words: 'challah', href: `${path}?q=challah&has_m=Wine`, filtered: true })
+    localStorage.clear()
   })
 
   // Any capitals: "has_m=pinot" is the listings' "Pinot", one chip, ticked.

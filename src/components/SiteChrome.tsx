@@ -12,6 +12,7 @@ import ContentFailureNotice from '@/components/ContentFailureNotice'
 import { LocationProvider, useLocation } from '@/lib/locationContext'
 import { PinnedProvider } from '@/lib/pinnedContext'
 import { UndoToastProvider } from '@/components/UndoToast'
+import { SavedSearchesProvider } from '@/lib/savedSearchesContext'
 import { DroppedPinsProvider } from '@/lib/droppedPinsContext'
 import { HeaderCollapseProvider, ScreenHeaderProvider } from '@/lib/headerVisibility'
 import { useSiteNavigation } from '@/lib/useSiteNavigation'
@@ -160,13 +161,15 @@ export default function SiteChrome({
     <LocationProvider>
       <UndoToastProvider>
         <PinnedProvider>
-          <DroppedPinsProvider>
-            <HeaderCollapseProvider>
-              <ScreenHeaderProvider>
-                <Chrome year={year}>{children}</Chrome>
-              </ScreenHeaderProvider>
-            </HeaderCollapseProvider>
-          </DroppedPinsProvider>
+          <SavedSearchesProvider>
+            <DroppedPinsProvider>
+              <HeaderCollapseProvider>
+                <ScreenHeaderProvider>
+                  <Chrome year={year}>{children}</Chrome>
+                </ScreenHeaderProvider>
+              </HeaderCollapseProvider>
+            </DroppedPinsProvider>
+          </SavedSearchesProvider>
         </PinnedProvider>
       </UndoToastProvider>
     </LocationProvider>

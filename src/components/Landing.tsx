@@ -400,7 +400,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
       <AskTheGroup query={q} {...askGroup} />
     </div>
   )
-  const linesNode = q && !foundNothing && <SearchLines lines={lines} categories={categories} reading={readingNow || waitingFor === q} onPick={(line) => goTo(line, q)} />
+  const linesNode = q && !foundNothing && <SearchLines lines={lines} categories={categories} typed={q} reading={readingNow || waitingFor === q} onPick={(line) => goTo(line, q)} />
 
   // Capture searches that come up empty — the most actionable signal for what
   // content to add next. Only counts once data has loaded, so a slow load never
