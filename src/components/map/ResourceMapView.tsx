@@ -45,6 +45,7 @@ import { useNow } from '@/lib/useNow'
 import { ui } from '@/lib/uiConfig'
 import { ArrowLeftIcon, ChevronLeftIcon, CloseIcon, ExpandIcon, CollapseIcon, BookmarkIcon, PinIcon, SlidersIcon } from '@/components/icons'
 import { categoryTint, getCategoryColor, HOSPITAL_COLOR, HOSPITAL_ICON } from '@/lib/categoryColor'
+import { CategoryGlyph } from '@/lib/categoryIcons'
 import LocationControl, { type LocationControls } from '@/components/home/LocationControl'
 import { usePinned } from '@/lib/pinnedContext'
 import { CURRENT_LOCATION_LABEL } from '@/lib/useLiveLocation'
@@ -1378,11 +1379,16 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
     setPinnedSelected(true)
     setSidebarCollapsed(false)
   }
-  // The All chip: every place, and no eruv lines — All is the map as it
-  // opens, and the lines over every pin aren't that (Oct 15).
+  // The All chip: every place. It never touches the eruv lines. With the
+  // lines on, a lit All goes off like any other chip, leaving the lines
+  // alone; with them off it stays lit, since the map is never empty (the
+  // user, Oct 15).
   const showAll = () => {
-    if (eruvimOn) eruvimOff(showAllPlaces)
-    else showAllPlaces()
+    if (!allChipsOn) return showAllPlaces()
+    if (!eruvimOn) return
+    setSelected(new Set())
+    setPinnedSelected(false)
+    setSidebarCollapsed(false)
   }
   // If Pinned was the ONLY thing narrowing the map (no categories checked —
   // see togglePinnedSelected's own "narrow to just this one" branch) and the
@@ -1749,11 +1755,10 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // its status's colour (eruvLayer.ts). Tapping a line or a name opens that
   // eruv's listing where a place opens. Off to begin with; there only when
   // the community has an Eruv page and an eruv with a map. All of them or
-  // none (the user, Oct 13), not one by one. An Eruv chip that works like
-  // Saved (Oct 15): from everything, a tap is the lines alone, which the
-  // map couldn't show before since a chip had to be on; a category tapped
-  // then adds its pins. All never draws them. The switch in Filters is the
-  // plain on/off.
+  // none (the user, Oct 13), not one by one. A layer, not a place filter, so
+  // a round button on the map like Google Maps' Layers rather than a chip
+  // (Oct 15): from everything, a tap is the lines alone; with categories
+  // picked, the lines go over them. All never draws them.
   const eruvCategory = (categories ?? []).find((c) => c.kind === 'eruv') ?? null
   const eruvStatuses = useEruvStatuses(countCommunity ?? '', !!countCommunity && !!eruvCategory)
   const eruvData = eruvStatuses?.available ? eruvStatuses : null
@@ -1824,8 +1829,8 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
     if (!eruvimOn) return setEruvimOn(true)
     eruvimOff(effectiveSelected.size === 0 && !pinnedSelected ? showAllPlaces : undefined)
   }
-  // The chip: from everything, the lines alone.
-  const tapEruvChip = () => {
+  // The map button: from everything, the lines alone.
+  const tapEruvButton = () => {
     if (eruvimOn) return toggleEruvim()
     if (allChipsOn) {
       setSelected(new Set())
@@ -1886,7 +1891,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
     : topOpenNow.onFor.length > 0
       ? `On for ${andNames(topOpenNow.onFor)} only.`
       : null
-  const filtersOn = filterCount(filters, showingCategories) + (eruvimOn ? 1 : 0)
+  const filtersOn = filterCount(filters, showingCategories)
   const filtersButton = (
     <button
       type="button"
@@ -1902,30 +1907,27 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
       {filtersOn > 0 && <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-white px-1 text-[11px] text-primary">{filtersOn}</span>}
     </button>
   )
-  // Filters, then the Eruv chip, before the categories: the outlines on
-  // the map explained where people look (the user, Oct 13). Always there
-  // once there's a line to draw, off like Saved off, so the lines are a
-  // tap away (Oct 15).
+  const leadingChips = filtersButton
+  // The Eruv button: bottom-right on the map, above the live-location
+  // button on a phone and above zoom on a computer, so every chip in the row
+  // is a place filter (the user, Oct 15). There once there's a line to draw.
+  // Off, white with the eruv's icon in its colour; on, filled.
   const eruvColor = colorById.get(eruvCategory?.id ?? '') ?? '#64748b'
-  const eruvLinesChip = eruvimWithLines.length > 0 && (
+  const eruvButton = eruvimWithLines.length > 0 && (
     <button
       type="button"
-      onClick={tapEruvChip}
+      onClick={tapEruvButton}
       aria-pressed={eruvimOn}
-      data-testid="map-eruv-lines-chip"
-      className={`flex shrink-0 cursor-pointer items-center rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors ${
-        eruvimOn ? 'border-transparent text-white' : 'border-slate-300 bg-white hover:bg-slate-50'
+      aria-label="Eruv lines"
+      title="Eruv lines"
+      data-testid="map-eruv-button"
+      className={`flex h-12 w-12 cursor-pointer items-center justify-center rounded-full shadow-md ring-1 ring-slate-900/10 transition-colors desktop:h-10 desktop:w-10 ${
+        eruvimOn ? 'text-white' : 'bg-white hover:bg-slate-50 active:bg-slate-100'
       }`}
       style={eruvimOn ? { backgroundColor: eruvColor } : { color: eruvColor }}
     >
-      Eruv
+      <CategoryGlyph categoryId="eruv" icon={eruvCategory?.icon ?? ''} className="h-6 w-6 desktop:h-5 desktop:w-5" />
     </button>
-  )
-  const leadingChips = (
-    <>
-      {filtersButton}
-      {eruvLinesChip}
-    </>
   )
 
   // No line of chips for the filters someone chose themselves (the user,
@@ -1971,12 +1973,8 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
       onOpenNow={onSheetOpenNow}
       onBoolean={onSheetBoolean}
       onSelect={onSheetSelect}
-      eruvLines={eruvimWithLines.length > 0 ? { on: eruvimOn, onToggle: toggleEruvim } : null}
-      onClearAll={() => {
-        setOwnFilters({})
-        if (eruvimOn) toggleEruvim()
-      }}
-      anyOn={hasFilters || eruvimOn}
+      onClearAll={() => setOwnFilters({})}
+      anyOn={hasFilters}
       count={visiblePoints.length}
       doneLabel={visiblePoints.length === 0 && mapEruvim.length > 0 ? `Show ${mapEruvim.length} ${mapEruvim.length === 1 ? 'eruv' : 'eruvim'}` : undefined}
     />
@@ -2355,6 +2353,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                 onSelectEruv={openEruv}
                 selectedEruvId={openEruvId}
                 frameEruvim={mapEruvim.length > 0 && visiblePoints.length === 0}
+                cornerControl={isMobile ? undefined : eruvButton}
               />
 
               {/* ── Fullscreen toggle (desktop only) — the map starts as a
@@ -2669,6 +2668,10 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                     <path d="M12 2 19 21 12 17 5 21z" />
                   </svg>
                 </button>
+              )}
+              {isMobile && eruvButton && (
+                // Above the live-location button, where it's there.
+                <div className={`absolute right-3 z-10 desktop:hidden ${ui.map.liveTracking ? 'bottom-[8.5rem]' : 'bottom-[4.75rem]'}`}>{eruvButton}</div>
               )}
               {/* ── Mobile nearby list — a draggable bottom sheet over the
                       map instead of the desktop Map/Nearby toggle; see

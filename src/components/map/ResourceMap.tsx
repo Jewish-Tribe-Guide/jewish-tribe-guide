@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { loadGoogleMaps, MAPS_API_KEY, MAPS_MAP_ID, mapsAuthFailed, onMapsAuthFailure } from '@/lib/loadGoogleMaps'
 import { destinationQuery, directionsUrl, type LatLng } from '@/lib/googleMapsLinks'
@@ -146,6 +146,9 @@ type Props = {
   /** The eruvim are all the map shows (no places): framed on them, as the
    *  places would be. */
   frameEruvim?: boolean
+  /** A control for the map's bottom-right corner. Google stacks it above its
+   *  own zoom buttons, where its Layers button sits, wherever those land. */
+  cornerControl?: ReactNode
 }
 
 const DEFAULT_CENTER = community.mapCenter
@@ -478,7 +481,7 @@ function buildUserDot(): HTMLElement {
 /** The interactive Google map: one advanced marker per point, a distinct "you
  *  are here" marker for the visitor, an info window on click, and a viewport
  *  auto-fit to whatever points are currently shown. */
-export default function ResourceMap({ points, userLocation, directionsOrigin, follow = true, onResumeFollow, onManualDrag, fallbackCenter = DEFAULT_CENTER, onViewListing, onSelectPoint, onDeselectPoint, onBackgroundClick, onMapLongPress, onLongPressPoint, searchActive, selectedId, frameToken, obscuredBottomPx = 0, obscuredTopPx = 0, zoomRadiusMiles, eruvim, onSelectEruv, selectedEruvId = null, frameEruvim = false }: Props) {
+export default function ResourceMap({ points, userLocation, directionsOrigin, follow = true, onResumeFollow, onManualDrag, fallbackCenter = DEFAULT_CENTER, onViewListing, onSelectPoint, onDeselectPoint, onBackgroundClick, onMapLongPress, onLongPressPoint, searchActive, selectedId, frameToken, obscuredBottomPx = 0, obscuredTopPx = 0, zoomRadiusMiles, eruvim, onSelectEruv, selectedEruvId = null, frameEruvim = false, cornerControl }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<google.maps.Map | null>(null)
   const markersRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([])
@@ -493,6 +496,9 @@ export default function ResourceMap({ points, userLocation, directionsOrigin, fo
   const userMarkerRef = useRef<google.maps.marker.AdvancedMarkerElement | null>(null)
   const infoWindowRef = useRef<google.maps.InfoWindow | null>(null)
   const [ready, setReady] = useState(false)
+  // The box Google placed in its bottom-right controls; cornerControl renders
+  // into it.
+  const [cornerBox, setCornerBox] = useState<HTMLDivElement | null>(null)
   const [authFailed, setAuthFailed] = useState(mapsAuthFailed())
   // Right-click's Save/Saved menu — see the marker's 'contextmenu' listener
   // below for how this opens. `point` carries whatever pinned state it had
@@ -606,6 +612,12 @@ export default function ResourceMap({ points, userLocation, directionsOrigin, fo
           fullscreenControl: false,
           clickableIcons: false,
         })
+        const corner = document.createElement('div')
+        // Google's own controls sit 10px in from the edge; this lines the
+        // corner control up with the zoom buttons under it.
+        corner.style.margin = '0 10px 8px 0'
+        mapRef.current.controls[google.maps.ControlPosition.RIGHT_BOTTOM].push(corner)
+        setCornerBox(corner)
         infoWindowRef.current = new google.maps.InfoWindow()
         // Click-away to dismiss: tapping empty map closes the open info window
         // and collapses the mobile sheet (marker taps fire 'gmp-click' and
@@ -1239,6 +1251,7 @@ export default function ResourceMap({ points, userLocation, directionsOrigin, fo
         className="w-full min-h-0 flex-1 overscroll-x-none rounded-2xl select-none"
         style={{ WebkitTouchCallout: 'none' }}
       />
+      {ready && cornerBox && cornerControl && createPortal(cornerControl, cornerBox)}
       {ready && userLocation && (
         <button
           onClick={centerOnMe}

@@ -46,8 +46,6 @@ type Props = {
   count: number
   /** What the map shows when it isn't places: "Show 5 eruvim". */
   doneLabel?: string
-  /** Eruv lines on the map, all or none; null where there are none. */
-  eruvLines?: { on: boolean; onToggle: () => void } | null
 }
 
 export default function MapFiltersSheet(props: Props) {
@@ -64,7 +62,7 @@ export default function MapFiltersSheet(props: Props) {
   )
 }
 
-function Body({ top, onTopOpenNow, sections, onOpenNow, onBoolean, onSelect, onClearAll, anyOn, onClose, count, doneLabel, eruvLines }: Props) {
+function Body({ top, onTopOpenNow, sections, onOpenNow, onBoolean, onSelect, onClearAll, anyOn, onClose, count, doneLabel }: Props) {
   return (
     <div className="space-y-4" data-testid="map-filters">
       {/* Always takes its line, as on a category page's sheet: appearing on
@@ -76,19 +74,13 @@ function Body({ top, onTopOpenNow, sections, onOpenNow, onBoolean, onSelect, onC
       </div>
       {/* Headed like each category's own section below it, so it reads as
           Open now for every category rather than for the first one (the
-          user, Oct 10). Eruv lines under it: not a filter of one category
-          but of the whole map, and a heading of its own was one too many
-          (the user, Oct 13). */}
-      {(top.shown || eruvLines) && (
+          user, Oct 10). The eruv lines are the map's Eruv button, not a
+          filter (the user, Oct 15). */}
+      {top.shown && (
         <section aria-label="All categories" className="space-y-3" data-testid="map-filters-open-all">
           <h3 className="text-[17px] font-extrabold text-ink">All categories</h3>
-          {top.shown && <SwitchRow label="Open now" on={top.on} onToggle={onTopOpenNow} />}
-          {top.shown && top.note && <p className="-mt-2 text-[13px] text-muted">{top.note}</p>}
-          {eruvLines && (
-            <div data-testid="map-filters-eruv-lines">
-              <SwitchRow label="Eruv lines" on={eruvLines.on} onToggle={eruvLines.onToggle} />
-            </div>
-          )}
+          <SwitchRow label="Open now" on={top.on} onToggle={onTopOpenNow} />
+          {top.note && <p className="-mt-2 text-[13px] text-muted">{top.note}</p>}
         </section>
       )}
       {sections.length === 0 && <p className="text-[15px] text-muted">Nothing showing has filters. Turn on a category above.</p>}
