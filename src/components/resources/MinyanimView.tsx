@@ -371,7 +371,9 @@ function Showing({ count, onShowing }: { count: number; onShowing: (count: numbe
   return null
 }
 
-function MinyanRow({
+/** One minyan: its time, its shul, the tefillah and how far. Also a
+ *  hotel's minyanim within a walk (WalkList). */
+export function MinyanRow({
   slot,
   far,
   kind,

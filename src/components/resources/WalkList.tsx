@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { Fragment, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { DirectoryResource } from '@/types'
 import type { CategoryConfig, CategoryField } from '@/lib/categories'
 import { useCategories } from '@/lib/useCategories'
@@ -25,6 +25,11 @@ import {
 import type { LatLng } from '@/lib/geo'
 import { routesThatHold, type Routed, type WalkRoute } from '@/lib/walkRoutes'
 import { NextMinyans, NextMinyansContext, useNextMinyan } from './nextMinyans'
+import { MinyanRow } from './MinyanimView'
+import { isMinyanim, TEFILLAH_LABELS } from '@/lib/davening'
+import { minyanimAhead } from '@/lib/minyanimFilters'
+import { clockTime } from '@/lib/upcomingDavening'
+import { useMinyanSchedule } from '@/lib/useMinyanSchedule'
 import { Card } from './listingParts'
 import { WalkOnMapContext } from './walkOnMap'
 
@@ -125,6 +130,9 @@ export function usePlaces(categoryIds: readonly string[]): Record<string, Direct
   return Object.fromEntries(categoryIds.map((id) => [id, have[id] ?? null]))
 }
 
+/** A kind's Minyanim line's id beside its own: one open at a time. */
+const MINYANIM_SUFFIX = ':minyanim'
+
 /** Nearest first by the walk, then by the miles. */
 const byNearest = (a: WalkRow, b: WalkRow) => a.minutes - b.minutes || a.miles - b.miles
 
@@ -168,27 +176,29 @@ export default function WalkLists({ lists, from, fromLabel, fromItem }: Props) {
   // the tap that opened it: Back to a listing brings it back with the kind
   // still open (its state is kept while hidden), and its places must come
   // back with it (Oct 6). Off the map when the listing closes or hides.
-  const openWalk = shown.find((s) => s.target.id === openId)?.walk
-  const openPlaces = openId ? places[openId] : null
+  // A kind's Minyanim line is its shuls on the map, as its own line is.
+  const openKind = openId?.replace(MINYANIM_SUFFIX, '') ?? null
+  const openWalk = shown.find((s) => s.target.id === openKind)?.walk
+  const openPlaces = openKind ? places[openKind] : null
   const maxMinutes = openWalk?.maxMinutes
-  const openRouted = openId ? routedOf.get(openId) : undefined
+  const openRouted = openKind ? routedOf.get(openKind) : undefined
   useEffect(() => {
     if (!show) return
-    if (!openId || !Array.isArray(openPlaces) || maxMinutes === undefined) {
+    if (!openKind || !Array.isArray(openPlaces) || maxMinutes === undefined) {
       show(null)
       return
     }
     const rows = walkGroups({ lat, lng }, openPlaces, maxMinutes, null, openRouted)
       .flatMap((g) => g.rows)
       .sort(byNearest)
-    show({ categoryId: openId, places: rows.map((r) => r.item) })
+    show({ categoryId: openKind, places: rows.map((r) => r.item) })
     return () => {
       show(null)
       // A row opened by a click never sees the pointer leave: its pin
       // stays lit when Back brings the listing back.
       if (highlight && rows.some((r) => r.item.id === highlight.get())) highlight.set(null)
     }
-  }, [show, highlight, openId, openPlaces, openRouted, maxMinutes, lat, lng])
+  }, [show, highlight, openKind, openPlaces, openRouted, maxMinutes, lat, lng])
   if (shown.length === 0) return null
   // Along the streets once any walk here is; a straight line before that.
   const reach = shown.flatMap(({ walk, target }) => {
@@ -207,19 +217,37 @@ export default function WalkLists({ lists, from, fromLabel, fromItem }: Props) {
       footer={footer}
     >
       <ul className="divide-y divide-slate-100">
-        {shown.map(({ walk, target }) => (
-          <WalkList
-            key={target.id}
-            walk={walk}
-            target={target}
-            places={places[target.id]}
-            routed={routedOf.get(target.id)}
-            from={from}
-            fromItem={fromItem}
-            open={openId === target.id}
-            onToggle={() => setOpenId(openId === target.id ? null : target.id)}
-          />
-        ))}
+        {shown.map(({ walk, target }) => {
+          const list = places[target.id]
+          const minyanimId = `${target.id}${MINYANIM_SUFFIX}`
+          return (
+            <Fragment key={target.id}>
+              <WalkList
+                walk={walk}
+                target={target}
+                places={list}
+                routed={routedOf.get(target.id)}
+                from={from}
+                fromItem={fromItem}
+                open={openId === target.id}
+                onToggle={() => setOpenId(openId === target.id ? null : target.id)}
+              />
+              {/* Its shuls' minyanim by time, a line of its own (the user,
+                  Oct 15: "two lists, keep it simple"). */}
+              {isShuls(target) && Array.isArray(list) && (
+                <WalkMinyanim
+                  walk={walk}
+                  target={target}
+                  places={list}
+                  routed={routedOf.get(target.id)}
+                  from={from}
+                  open={openId === minyanimId}
+                  onToggle={() => setOpenId(openId === minyanimId ? null : minyanimId)}
+                />
+              )}
+            </Fragment>
+          )
+        })}
       </ul>
     </Card>
   )
@@ -299,6 +327,101 @@ function WalkList({
               <NextMinyans enabled={shuls} items={places}>
                 <ListBody walk={walk} target={target} places={places} routed={routed} from={from} fromItem={fromItem} />
               </NextMinyans>
+            </div>
+          )}
+        </>
+      ) : (
+        <div className="py-2.5">
+          {title}
+          {sub}
+        </div>
+      )}
+    </li>
+  )
+}
+
+/** A shul kind's minyanim within the walk, by time (Oct 15): what's left
+ *  today, or tomorrow's when nothing is, each with its walk. For a weekday,
+ *  when the time matters more than which shul; the kind's own line is for
+ *  choosing a shul. Not there when no shul in the walk lists its times. */
+function WalkMinyanim({
+  walk,
+  target,
+  places,
+  routed,
+  from,
+  open,
+  onToggle,
+}: {
+  walk: WalkListSetting
+  target: CategoryConfig
+  places: DirectoryResource[]
+  routed?: Routed
+  from: LatLng
+  open: boolean
+  onToggle: () => void
+}) {
+  const community = useCommunitySlug()
+  const onMap = useContext(WalkOnMapContext)
+  const field = target.detailFields.find((f) => f.type === 'minyanim')
+  const rows = walkGroups(from, places, walk.maxMinutes, null, routed).flatMap((g) => g.rows)
+  const shuls = field ? rows.filter((r) => isMinyanim(r.item[field.key]) && (r.item[field.key] as unknown[]).length > 0).map((r) => r.item) : []
+  // Null until the page has hydrated (see useNow): the line waits.
+  const schedule = useMinyanSchedule(null, shuls)
+  if (shuls.length === 0) return null
+
+  const walkOf = new Map(rows.map((r) => [r.item.id, r.minutes]))
+  const byId = new Map(shuls.map((s) => [s.id, s]))
+  const ahead = schedule ? minyanimAhead(schedule) : null
+  const today = ahead?.today ?? []
+  const slots = today.length > 0 ? today : (ahead?.tomorrow ?? [])
+  const day = today.length > 0 ? schedule?.week[0] : schedule?.week[1]
+  const first = slots[0]
+  const walkText = (id: string | undefined) => (id && walkOf.has(id) ? `${walkOf.get(id)} min walk` : null)
+  const firstText = first && `${TEFILLAH_LABELS[first.tefillah]} ${clockTime(first.minutes)} at ${first.shulName}, ${walkOf.get(first.shulId ?? '')} min`
+
+  let summary: ReactNode
+  if (!ahead) summary = <span aria-hidden="true" className="mt-1 block h-4 w-2/3 animate-pulse rounded bg-slate-100" />
+  else if (today.length > 0) summary = `Next: ${firstText}`
+  else if (first) summary = `None left today. First tomorrow: ${firstText}`
+  else summary = 'No minyanim listed today or tomorrow.'
+  const title = (
+    <span className="block text-[15px] font-bold text-slate-900">{today.length > 0 ? `Minyanim · ${today.length} left today` : 'Minyanim'}</span>
+  )
+  const sub = <span className="mt-0.5 block text-[13.5px] leading-snug text-slate-600">{summary}</span>
+
+  return (
+    <li data-testid="walk-minyanim">
+      {slots.length > 0 && schedule && day ? (
+        <>
+          <button type="button" aria-expanded={open} onClick={onToggle} className="flex w-full cursor-pointer items-center gap-3 py-2.5 text-left">
+            <span className="min-w-0 flex-1">
+              {title}
+              {sub}
+            </span>
+            <ChevronIcon className={`transition-transform ${open ? '-rotate-90' : 'rotate-90'}`} />
+          </button>
+          {open && (
+            <div className="pb-2">
+              <h4 className="mt-1 mb-0.5 text-[12px] font-bold uppercase tracking-wide text-slate-500">
+                {today.length > 0 ? 'Today' : 'Tomorrow'} · {slots.length}
+              </h4>
+              <ul>
+                {slots.map((s, i) => {
+                  const shul = byId.get(s.shulId ?? '')
+                  return (
+                    <MinyanRow
+                      key={`${s.shulId}:${s.tefillah}:${s.minutes}:${i}`}
+                      slot={s}
+                      far={walkText(s.shulId)}
+                      kind={shul ? listingKind(shul, target) : ''}
+                      posting={(s.shulId && schedule.posting[s.shulId]?.[day.date]) || { kind: 'regular' }}
+                      href={shul ? routes.listing(community, target.id, listingSlug(shul)) : null}
+                      onHover={onMap ? onMap.highlight.set : undefined}
+                    />
+                  )
+                })}
+              </ul>
             </div>
           )}
         </>

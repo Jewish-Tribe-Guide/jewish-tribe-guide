@@ -1,7 +1,7 @@
 import { words } from './ask'
 import type { Tefillah } from './davening'
 import { readMinyanimSearch } from './minyanimSearch'
-import { minyanimOn } from './upcomingDavening'
+import { minyanimOn, type MinyanSlot } from './upcomingDavening'
 import { dayKeysFor, type MinyanSchedule } from './useMinyanSchedule'
 
 // ── The Minyanim view's own Filters (Oct 15, canvas "Synagogues & Minyanim
@@ -59,13 +59,27 @@ export function milesChosen(label: string | null): number | null {
   return WITHIN_CHOICES.find((c) => c.label === label)?.miles ?? null
 }
 
-/** How many minyanim are still ahead today: what the Minyanim view lists
- *  on Today with no filters of its own (a Yom Tov's unposted regular times
- *  folded away), for the Synagogues page's way in. */
-export function minyanimLeftToday(schedule: MinyanSchedule): number {
-  const day = schedule.week[0]
-  if (!day) return 0
+/** A day's minyanim (0 today, 1 tomorrow…) as the Minyanim view lists
+ *  them with no filters of its own: a Yom Tov's unposted regular times
+ *  folded away. */
+export function listedMinyanim(schedule: MinyanSchedule, dayIndex: number): MinyanSlot[] {
+  const day = schedule.week[dayIndex]
+  if (!day) return []
   const slots = minyanimOn(schedule.shuls, dayKeysFor(day), schedule.season, schedule.anchors)
-  const listed = day.yomTov ? slots.filter((s) => schedule.posting[s.shulId ?? '']?.[day.date]?.kind !== 'not-posted') : slots
-  return listed.filter((s) => s.minutes >= schedule.nowMinutes).length
+  return day.yomTov ? slots.filter((s) => schedule.posting[s.shulId ?? '']?.[day.date]?.kind !== 'not-posted') : slots
+}
+
+/** How many minyanim are still ahead today, for the Synagogues page's way
+ *  in. */
+export function minyanimLeftToday(schedule: MinyanSchedule): number {
+  return minyanimAhead(schedule).today.length
+}
+
+/** What's still ahead today, and tomorrow's for when nothing is (a hotel's
+ *  minyanim within a walk, Oct 15). */
+export function minyanimAhead(schedule: MinyanSchedule): { today: MinyanSlot[]; tomorrow: MinyanSlot[] } {
+  return {
+    today: listedMinyanim(schedule, 0).filter((s) => s.minutes >= schedule.nowMinutes),
+    tomorrow: listedMinyanim(schedule, 1),
+  }
 }

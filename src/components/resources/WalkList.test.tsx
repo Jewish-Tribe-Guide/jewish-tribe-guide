@@ -158,6 +158,65 @@ describe('A hotel’s synagogues within a walk', () => {
     })
   })
 
+  // Oct 15: the shuls' minyanim by time, a line of its own under theirs
+  // ("two lists, keep it simple"), one open at a time.
+  describe('their minyanim, by time', () => {
+    const davening = (s: DirectoryResource, ...minyanim: { tefillah: string; days: string[]; time: string }[]) => ({
+      ...s,
+      minyanim: minyanim.map((m, i) => ({ id: `${s.id}${i}`, ...m })),
+    })
+    const withMinyanim = () => [
+      davening(nearby[0], { tefillah: 'mincha', days: ['mon'], time: '6:30pm' }, { tefillah: 'shacharis', days: ['tue'], time: '7:00am' }),
+      davening(nearby[1], { tefillah: 'mincha', days: ['mon'], time: '6:20pm' }, { tefillah: 'shacharis', days: ['mon'], time: '7:00am' }),
+      nearby[2],
+      // Out of the walk: not here.
+      davening(nearby[3], { tefillah: 'maariv', days: ['mon'], time: '8:00pm' }),
+    ]
+    const at5pmMonday = () => {
+      vi.useFakeTimers({ toFake: ['Date'] })
+      vi.setSystemTime(new Date('2026-09-28T17:00:00-04:00'))
+    }
+    afterEach(() => vi.useRealTimers())
+
+    it('a line beside the shuls: how many are left today and the next, opening to them by time with each walk', async () => {
+      at5pmMonday()
+      fetchMock.mockImplementation(async () => answer(withMinyanim()))
+      open()
+      const line = await screen.findByRole('button', { name: /Minyanim · 2 left today/ })
+      expect(line).toHaveTextContent('Next: Mincha 6:20 PM at Mikveh Israel, 15 min')
+      expect(line).toHaveAttribute('aria-expanded', 'false')
+
+      await openKind(/Synagogues · 3/)
+      fireEvent.click(line)
+      const section = line.closest('[data-testid="walk-minyanim"]') as HTMLElement
+      expect(within(section).getByRole('heading', { level: 4 })).toHaveTextContent('Today · 2')
+      expect(within(section).getAllByRole('link').map((a) => a.textContent)).toEqual([
+        '6:20 PMMikveh IsraelMincha · Orthodox (Ashkenazi) · 15 min walk',
+        '6:30 PMSociety Hill SynagogueMincha · Conservative · 8 min walk',
+      ])
+      expect(within(section).getAllByRole('link')[0].getAttribute('href')).toMatch(/^\/test-community\/synagogue\/mikveh-israel/)
+      // One open at a time: the shuls' own line closed.
+      expect(screen.getByRole('button', { name: /Synagogues · 3/ })).toHaveAttribute('aria-expanded', 'false')
+    })
+
+    it('with none left today, tomorrow’s', async () => {
+      vi.useFakeTimers({ toFake: ['Date'] })
+      vi.setSystemTime(new Date('2026-09-28T21:00:00-04:00'))
+      fetchMock.mockImplementation(async () => answer(withMinyanim()))
+      open()
+      const line = await screen.findByRole('button', { name: /^Minyanim/ })
+      expect(line).toHaveTextContent('None left today. First tomorrow: Shacharis 7 AM at Society Hill Synagogue, 8 min')
+      fireEvent.click(line)
+      expect(within(line.closest('[data-testid="walk-minyanim"]') as HTMLElement).getByRole('heading', { level: 4 })).toHaveTextContent('Tomorrow · 1')
+    })
+
+    it('isn’t there when no shul in the walk lists its times', async () => {
+      open()
+      await screen.findByRole('button', { name: /Synagogues · 3/ })
+      expect(screen.queryByTestId('walk-minyanim')).not.toBeInTheDocument()
+    })
+  })
+
   it('says when there are none within the walk, and names the nearest', async () => {
     fetchMock.mockImplementation(async () => answer([nearby[3]]))
     open()
