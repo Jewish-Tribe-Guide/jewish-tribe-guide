@@ -12,8 +12,8 @@ import { metresFrom } from '@/lib/eruvShape'
 // ── The nearest eruv, on the Friday home (Oct 7, canvas board 5) ────────────
 // Erev Shabbos or Yom Tov, with a location set: the eruv whose line is
 // nearest the visitor, whether it's up, and when the guide checked.
-// Tapping it opens the Eruv page, map first, where they see their dot on
-// the eruv's own map. It doesn't say they're inside it (Oct 12: the guide
+// Tapping it opens that eruv on the Eruv page (Oct 15; it used to open the
+// list), its own map beside or behind it, where they see their dot. It doesn't say they're inside it (Oct 12: the guide
 // no longer works that out; the user: people look at the map). Nothing
 // when there's no location, no eruv within reach, or the eruv table isn't
 // there yet.
@@ -37,7 +37,7 @@ export default function YourEruv({ communitySlug, href, now }: { communitySlug: 
   if (!loaded || !nearest) return null
   const view = eruvView(nearest, new Date(now), loaded.timezone, loaded.candles)
   return (
-    <Link href={href} prefetch={false} data-wide data-testid="today-eruv" className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3.5">
+    <Link href={`${href}?item=${encodeURIComponent(nearest.id)}`} prefetch={false} data-wide data-testid="today-eruv" className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3.5">
       <span className="min-w-0 flex-1">
         <span className="block text-[11.5px] font-extrabold tracking-[0.06em] text-muted">NEAREST ERUV</span>
         <span className="mt-0.5 block text-[17px] font-extrabold text-slate-900">{nearest.name}</span>

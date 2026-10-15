@@ -89,9 +89,10 @@ describe('shareSummary: the link preview', () => {
     expect(say('shkia')).toBe("Today's sunset, worked out when you open it.")
   })
 
-  it('points an eruv question to each eruv’s own status', () => {
+  // Oct 15: not the names of Philadelphia's two eruvim, written into the code.
+  it('points an eruv question to each eruv’s own status, naming none', () => {
     const eruv = makeCategory({ id: 'eruv-information', label: 'Eruv Information', pluralLabel: 'Eruv Information', kind: 'eruv' })
-    expect(shareSummary('is the eruv up', listings, [...categories, eruv])).toMatch(/^Each eruv posts its own status: .+\. Open for the links\.$/)
+    expect(shareSummary('is the eruv up', listings, [...categories, eruv])).toBe('Whether each eruv is up this Shabbos, as its own site says.')
   })
 
   it('says so when the guide doesn’t have it', () => {

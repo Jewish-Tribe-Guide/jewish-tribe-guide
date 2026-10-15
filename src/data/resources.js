@@ -2,9 +2,8 @@
 // grocery/restaurant/hotel/mikvah/whatsappGroups arrays into Supabase (and
 // `scripts/seed-synagogues.mjs` loads the synagogues); after that, live
 // listings are served from the database, not this file. A new community
-// replaces (or clears) this starter content, then runs the seed script. The
-// `eruvim` export is the exception — it's read directly at runtime (see
-// FindResources), so edit it for any deployment.
+// replaces (or clears) this starter content, then runs the seed script.
+// Eruvim live in the eruv table (migration 074), edited from the admin.
 
 // ── Grocery Stores ────────────────────────────────────────────────────────────
 export const groceries = [
@@ -95,25 +94,6 @@ export const mikvahs = [
 
   { id: "m7", name: "Mikvah of Cheltenham", hospitalId: "temple", distance: 2.3, address: "7630 Old York Rd, Elkins Park, PA 19027", phone: "(215) 635-8940", hours: "Sun–Thu evenings by appointment; Motzei Shabbat available" },
   { id: "m8", name: "Mikvah Israel of Philadelphia", hospitalId: "temple", distance: 4.1, address: "44 N 4th St, Philadelphia, PA 19106", phone: "(215) 922-5446", hours: "Sun–Thu 8:00–10:00pm; Fri as posted; Sat night after Shabbat" },
-]
-
-// ── Eruv Information ──────────────────────────────────────────────────────────
-// Eruvim are places, not hospital attributes — every user sees the full list.
-export const eruvim = [
-  {
-    id: "university-city",
-    name: "University City Eruv",
-    area: "Penn, Drexel & West Philadelphia",
-    statusLink: "https://www.pennocp.org/eruv",
-    notes: "Covers University City — Penn, Drexel, and the surrounding West Philadelphia neighborhood — including HUP and CHOP, and connects to the Center City Eruv over the South Street Bridge. The published map is approximate — any street on the border should be treated as outside. Always verify the status right before Shabbos.",
-  },
-  {
-    id: "center-city",
-    name: "Center City Eruv",
-    area: "Center City Philadelphia",
-    statusLink: "https://www.centercityeruv.com/",
-    notes: "Covers Center City, including Jefferson, and connects to the University City Eruv over the South Street Bridge. Always verify the status right before Shabbos.",
-  },
 ]
 
 // ── Community WhatsApp Groups ─────────────────────────────────────────────────

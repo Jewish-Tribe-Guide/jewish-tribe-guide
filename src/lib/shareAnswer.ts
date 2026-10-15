@@ -4,7 +4,6 @@ import { searchAsk, type AskResult } from './askSearch'
 import type { CategoryConfig } from './categories'
 import type { Place } from './places'
 import type { DirectoryResource } from '@/types'
-import { eruvim } from '@/data/resources'
 
 export { questionFromSlug, questionSlug } from './routes'
 
@@ -75,9 +74,9 @@ export function shareSummary(
     return `Today's ${asked.times.toLowerCase()}, worked out when you open it.`
   }
   if (asked.eruv && categories.some((c) => c.kind === 'eruv')) {
-    return eruvim.length
-      ? `Each eruv posts its own status: ${eruvim.map((e) => e.name).join(' and ')}. Open for the links.`
-      : 'Where to check the eruv before Shabbos.'
+    // Not the eruvim's names: they're the community's, not this code's
+    // (until Oct 15, Philadelphia's two were written in here).
+    return 'Whether each eruv is up this Shabbos, as its own site says.'
   }
   const at = asked.openAt
   const hoursAsked = asked.openNow || asked.openToday || !!at

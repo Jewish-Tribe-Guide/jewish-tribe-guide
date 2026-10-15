@@ -4,11 +4,10 @@ import { useEffect, useState } from 'react'
 import type { ParamsOpts } from './GenericDirectory'
 import { ListingBar } from './ListingColumn'
 import { mapQueryString, routes } from '@/lib/routes'
-import type { EruvRecord } from '@/types'
 import DirectoryHeader from './DirectoryHeader'
 import { CategoryBandFrame, CategoryBandBadge } from './CategoryBandFrame'
 import { CategoryGlyph } from '@/lib/categoryIcons'
-import { ChevronRightIcon, ExternalIcon } from '@/components/icons'
+import { ChevronRightIcon } from '@/components/icons'
 import { community } from '@/community.config'
 import { useSetScreenHeader } from '@/lib/headerVisibility'
 import { useIsMobile } from '@/lib/useIsMobile'
@@ -38,12 +37,11 @@ import { useEruvMaps } from '@/lib/useEruvStatuses'
 // at an eruv picks out its row. The guide doesn't say whether someone is
 // inside an eruv (Oct 12): they see their dot on the eruv's own map. The
 // statuses come from /api/eruv, which reads each eruv's own page, and the
-// maps from /api/eruv/maps; until migration 074 is run there are none,
-// and the page shows the old list with its links.
+// maps from /api/eruv/maps. Until migration 074 is run there are none, and
+// it says so: the old list with its links (Oct 15) was Philadelphia's,
+// written into the code, and showed in every community.
 
 type Props = {
-  /** The old list, shown until the eruv table exists. */
-  eruvim: EruvRecord[]
   onUp: () => void
   /** The category's own (admin-editable) name — falls back to the historical
    *  copy while categories are still loading. */
@@ -61,29 +59,10 @@ type Props = {
 
 const ERUV_STEP = 'eruv'
 
-type Loaded = { available: false } | { available: true; timezone: string; candles: number | null; eruvim: Eruv[] }
+/** `failed`: /api/eruv didn't answer (offline, say), as against no eruvim. */
+type Loaded = { available: false; failed?: boolean } | { available: true; timezone: string; candles: number | null; eruvim: Eruv[] }
 
-function OldCard({ eruv }: { eruv: EruvRecord }) {
-  return (
-    <div className="rounded-lg border border-slate-200 bg-white px-4 py-4 shadow-sm">
-      <h2 className="text-sm font-semibold text-slate-900">{eruv.name}</h2>
-      <p className="text-xs text-muted mb-2">{eruv.area}</p>
-      <p className="text-sm text-slate-700">{eruv.notes}</p>
-
-      <a
-        href={eruv.statusLink}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="mt-3 inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-primary-dark"
-      >
-        Check status &amp; boundary map
-        <ExternalIcon />
-      </a>
-    </div>
-  )
-}
-
-export default function EruvInfo({ eruvim, onUp, title = 'Eruv Information', icon, color = '#64748b', bandImageUrl, itemId = null, onParamsChange }: Props) {
+export default function EruvInfo({ onUp, title = 'Eruv Information', icon, color = '#64748b', bandImageUrl, itemId = null, onParamsChange }: Props) {
   // Puts "‹ {title}" in SiteHeader on mobile — see GenericDirectory's
   // identical call, which this mirrors now that this screen has the same gap
   // it used to (its own mobile UpButton, no header title).
@@ -125,7 +104,7 @@ export default function EruvInfo({ eruvim, onUp, title = 'Eruv Information', ico
         if (!live) return
         setLoaded(body?.ok && body.available ? { available: true, timezone: body.timezone, candles: body.candles ?? null, eruvim: body.eruvim } : { available: false })
       })
-      .catch(() => live && setLoaded({ available: false }))
+      .catch(() => live && setLoaded({ available: false, failed: true }))
     return () => {
       live = false
     }
@@ -218,15 +197,10 @@ export default function EruvInfo({ eruvim, onUp, title = 'Eruv Information', ico
     <CategoryBandFrame color={color} imageUrl={bandImageUrl}>
       <DirectoryHeader title={title} titleInHeader banner={banner} />
 
-      {loaded && !loaded.available && (
-        <>
-          <p className="mb-4 text-sm text-muted">Check the current status of the {community.region}-area eruvim before Shabbos.</p>
-          <div className="space-y-3">
-            {eruvim.map((eruv) => (
-              <OldCard key={eruv.id} eruv={eruv} />
-            ))}
-          </div>
-        </>
+      {loaded && (!loaded.available || loaded.eruvim.length === 0) && (
+        <p className="text-sm text-muted" data-testid="eruv-none">
+          {!loaded.available && loaded.failed ? 'Couldn’t check the eruvim just now. Try again in a moment.' : 'No eruvim are listed here yet.'}
+        </p>
       )}
 
       {!loaded && <p className="text-sm text-muted" role="status">Checking each eruv…</p>}

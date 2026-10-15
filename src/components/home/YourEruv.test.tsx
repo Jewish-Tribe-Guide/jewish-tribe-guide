@@ -39,12 +39,13 @@ afterEach(() => {
 const show = () => renderWithProviders(<YourEruv communitySlug="philly" href="/philly/eruv" now={NOW} />)
 
 describe('YourEruv', () => {
-  it('the nearest eruv: its name, whether it’s up, when the guide checked; opens the Eruv page', async () => {
+  // Oct 15: it opens that eruv on the Eruv page, not the list.
+  it('the nearest eruv: its name, whether it’s up, when the guide checked; opens that eruv on the Eruv page', async () => {
     here.coords = { lat: 39.9496, lng: -75.1718 } // Rittenhouse Square
     show()
     const card = await screen.findByTestId('today-eruv')
     expect(card).toHaveTextContent('NEAREST ERUVCenter City EruvUp for this ShabbosChecked 2:55 PM · every 15 minutes until candle lighting')
-    expect(card).toHaveAttribute('href', '/philly/eruv')
+    expect(card).toHaveAttribute('href', '/philly/eruv?item=center-city')
     // Never whether they're in it (Oct 12).
     expect(card).not.toHaveTextContent(/inside|your eruv/i)
   })

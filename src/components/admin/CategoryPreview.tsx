@@ -7,7 +7,6 @@ import type { DirectoryResource, MapFilters } from '@/types'
 import type { Coords } from '@/lib/useStoredLocation'
 import { withMilesFromAddress } from '@/lib/listingTravel'
 import { community } from '@/community.config'
-import { eruvim } from '@/data/resources'
 import GenericDirectory from '@/components/resources/GenericDirectory'
 import EruvInfo from '@/components/resources/EruvInfo'
 import ZmanimCard from '@/components/ZmanimCard'
@@ -128,7 +127,6 @@ export default function CategoryPreview({
     // switch below entirely, same as 'zmanim' just after it.
     content = (
       <EruvInfo
-        eruvim={eruvim}
         onUp={onClose}
         title={category.pluralLabel}
         icon={category.icon}

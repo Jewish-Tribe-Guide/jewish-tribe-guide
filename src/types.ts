@@ -107,17 +107,6 @@ export type ZmanimData = {
   } | null
 }
 
-export type EruvRecord = {
-  id: string
-  /** Name of the eruv, e.g. "University City Eruv". */
-  name: string
-  /** Short coverage description, e.g. "Penn, Drexel & West Philadelphia". */
-  area: string
-  /** The eruv's site, where current status and the boundary map are both posted. */
-  statusLink: string
-  notes: string
-}
-
 // ── Supabase resource directory (submission + moderation pipeline) ─────────────
 
 export type ResourceStatus = 'pending' | 'approved' | 'rejected' | 'archived'

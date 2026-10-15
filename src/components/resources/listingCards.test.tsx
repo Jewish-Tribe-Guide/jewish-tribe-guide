@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, screen, within } from '@testing-library/react'
+import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { makeCategory, makeListing } from '@/test/providerFixtures'
 import { mockRouter } from '@/test/nextNavigationMock'
@@ -71,8 +71,10 @@ const hup = makeListing({
   eruv: 'uc',
 }) as DirectoryResource
 
+// The Eruv page, under an id of its own (not "eruv"), as a community may name it.
+const eruvPage = makeCategory({ id: 'eruv-information', kind: 'eruv', label: 'Eruv Information', pluralLabel: 'Eruvim' })
 const open = (item: DirectoryResource = hup) =>
-  renderWithProviders(<ListingView item={item} category={hospitals} color="#000" path="/test" foot={null} />, { content: { categories: [hospitals, shuls] } })
+  renderWithProviders(<ListingView item={item} category={hospitals} color="#000" path="/test" foot={null} />, { content: { categories: [hospitals, shuls, eruvPage] } })
 /** The parts of the page, top to bottom, by test id. */
 const order = () =>
   [...document.querySelectorAll('[data-testid="listing-view"] [data-testid]')]
@@ -186,7 +188,8 @@ describe('This Shabbos', () => {
     expect(screen.getByTestId('listing-shabbos')).toHaveTextContent('Candle lightingFriday 6:13 PM, for Test Region')
   })
 
-  it('an eruv shows its status as the Eruv page does, read from its own site, and opens that page', async () => {
+  // Oct 15: it opens that eruv, not the list, at the Eruv page's own id.
+  it('an eruv shows its status as the Eruv page does, read from its own site, and opens that eruv there', async () => {
     vi.setSystemTime(new Date('2026-10-09T19:00:00Z')) // Fri 3 PM
     vi.stubGlobal(
       'fetch',
@@ -199,17 +202,23 @@ describe('This Shabbos', () => {
     open()
     const status = await screen.findByTestId('shabbos-eruv-status')
     expect(status).toHaveTextContent('Up for this Shabbos')
-    expect(status).toHaveAttribute('href', '/test-community/eruv')
+    expect(status).toHaveAttribute('href', '/test-community/eruv-information?item=university-city')
     expect(screen.getByTestId('listing-shabbos')).toHaveTextContent('Checked 2:55 PM · every 15 minutes until candle lighting')
     expect(within(screen.getByTestId('listing-shabbos')).queryByRole('link', { name: 'This week’s status ↗' })).not.toBeInTheDocument()
   })
 
-  it('without the eruv table, an eruv links to its weekly status; what nobody has filled in says so', async () => {
+  // Oct 15: it used to link to a status page written into the code, which
+  // was Philadelphia's, in every community.
+  it('without the eruv table, an eruv is just its name; what nobody has filled in says so', async () => {
     vi.setSystemTime(new Date(2026, 9, 6, 13, 30))
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => new Response(JSON.stringify(String(url).startsWith('/api/eruv') ? { ok: true, available: false, eruvim: [] } : { ok: true, resources: [] }))))
     open()
     const card = screen.getByTestId('listing-shabbos')
-    expect(await within(card).findByRole('link', { name: 'This week’s status ↗' })).toHaveAttribute('href', 'https://www.pennocp.org/eruv')
-    expect(card).toHaveTextContent('EruvUniversity City Eruv · This week’s status ↗')
+    // Once the statuses have answered (no table): nothing comes of it.
+    await waitFor(() => expect(vi.mocked(fetch).mock.calls.some(([url]) => String(url).startsWith('/api/eruv'))).toBe(true))
+    await new Promise((r) => setTimeout(r, 20))
+    expect(card).toHaveTextContent('EruvUniversity City Eruv')
+    expect(within(card).queryByRole('link', { name: /status/ })).not.toBeInTheDocument()
     expect(card).toHaveTextContent('Kosher food insideNot in the guide yet.')
     cleanup()
     open({ ...hup, eruv: 'none' })

@@ -56,8 +56,6 @@ const ERUVIM: Eruv[] = [
   { ...base, id: 'lower-merion', name: 'Lower Merion Eruv', statusDated: true, statusPostedOn: '2026-10-02', hotline: '(610) 664-5626, option 3' },
   { ...base, id: 'elkins-park', name: 'Elkins Park Eruv', statusUrl: null, status: null, statusCheckedAt: null, hotline: '(267) 415-6760' },
 ]
-const OLD = [{ id: 'university-city', name: 'University City Eruv', area: 'Penn, Drexel', statusLink: 'https://www.pennocp.org/eruv', notes: 'Covers University City.' }]
-
 // /api/eruv, and /api/eruv/maps: Center City's own map only. A suggestion
 // posted to /api/submissions is kept, and filed.
 const posted: unknown[] = []
@@ -76,7 +74,7 @@ function answer(body: unknown) {
 function show({ isMobile = false, itemId = null as string | null, onParamsChange = undefined as ((c: Record<string, string | null>, o?: { replace?: boolean; step?: string }) => void) | undefined } = {}) {
   return renderWithProviders(
     <ForcedViewport isMobile={isMobile}>
-      <EruvInfo eruvim={OLD} onUp={() => {}} title="Eruvim" itemId={itemId} onParamsChange={onParamsChange} />
+      <EruvInfo onUp={() => {}} title="Eruvim" itemId={itemId} onParamsChange={onParamsChange} />
     </ForcedViewport>,
   )
 }
@@ -124,7 +122,7 @@ describe('EruvInfo', () => {
     const user = userEvent.setup()
     renderWithProviders(
       <ForcedViewport isMobile={false}>
-        <EruvInfo eruvim={OLD} onUp={() => {}} title="Eruvim" />
+        <EruvInfo onUp={() => {}} title="Eruvim" />
       </ForcedViewport>,
       { content: { categories: [makeCategory({ id: 'eruv', kind: 'eruv', pluralLabel: 'Eruvim' })] } },
     )
@@ -144,11 +142,24 @@ describe('EruvInfo', () => {
     expect(within(screen.getByTestId('eruv-listing')).getByRole('link', { name: '(267) 415-6760' })).toHaveAttribute('href', 'tel:2674156760')
   })
 
-  it('without the eruv table, the old list and its links', async () => {
+  // Oct 15: it used to fall back to a list written into the code, which
+  // was Philadelphia's two eruvim, in every community.
+  it('without the eruv table, or with none listed, it says so: no list written into the code', async () => {
     answer({ ok: true, available: false, eruvim: [] })
     show()
-    expect(await screen.findByRole('link', { name: /Check status/ })).toHaveAttribute('href', 'https://www.pennocp.org/eruv')
-    expect(screen.queryByTestId('eruv-row')).not.toBeInTheDocument()
+    expect(await screen.findByTestId('eruv-none')).toHaveTextContent('No eruvim are listed here yet.')
+    expect(screen.queryByRole('link')).not.toBeInTheDocument()
+    expect(document.body).not.toHaveTextContent(/University City|Center City/)
+    cleanup()
+    answer({ ok: true, available: true, timezone: 'America/New_York', candles: null, eruvim: [] })
+    show()
+    expect(await screen.findByTestId('eruv-none')).toHaveTextContent('No eruvim are listed here yet.')
+  })
+
+  it('when the statuses can’t be fetched, it says so', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => Promise.reject(new TypeError('Failed to fetch'))))
+    show()
+    expect(await screen.findByTestId('eruv-none')).toHaveTextContent('Couldn’t check the eruvim just now.')
   })
 
   it('on desktop, pointing at a row picks out its eruv on the map, and pointing at an eruv picks out its row', async () => {
@@ -279,7 +290,7 @@ describe('EruvInfo', () => {
       renderWithProviders(
         <PreviewSendProvider listing={() => {}}>
           <ForcedViewport isMobile={false}>
-            <EruvInfo eruvim={OLD} onUp={() => {}} title="Eruvim" />
+            <EruvInfo onUp={() => {}} title="Eruvim" />
           </ForcedViewport>
         </PreviewSendProvider>,
       )

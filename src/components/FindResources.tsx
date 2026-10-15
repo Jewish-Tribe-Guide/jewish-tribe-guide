@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { eruvim } from '@/data/resources'
 import ResourceLoader from '@/components/resources/ResourceLoader'
 import ListingAdd from '@/components/resources/ListingAdd'
 import ListingEditor, { type EditorStep } from '@/components/resources/ListingEditor'
@@ -314,7 +313,6 @@ export default function FindResources({
     const eruv = categories?.find((c) => c.kind === 'eruv')
     return (
       <EruvInfo
-        eruvim={eruvim}
         onUp={onUp}
         title={eruv?.pluralLabel}
         icon={eruv?.icon}
