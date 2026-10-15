@@ -19,7 +19,8 @@ import type { LatLng } from '@/lib/geo'
 import { ChevronRightIcon } from '@/components/icons'
 import CategoryIcon from '@/components/CategoryIcon'
 import SearchBox from './SearchBox'
-import { groupCardsIntoSections, resourceCards, useEntryCards } from './sections'
+import { groupCardsIntoSections, resourceCards, useEntryCards, withEruvCount } from './sections'
+import { useEruvCount } from '@/lib/useEruvStatuses'
 
 // ── The Browse tab (step 6) ──────────────────────────────────────────────────
 // Every category, in the admin's home page groups, one compact row each: its
@@ -76,9 +77,11 @@ export function BrowseList({ communitySlug, listings, schedule, zmanim, timezone
   const { navigate, openFlow } = useSiteNavigation()
   const entryCards = useEntryCards(openFlow)
 
-  const counts: Record<string, number> = {}
-  for (const l of listings ?? []) counts[l.category] = (counts[l.category] ?? 0) + 1
-  const resources = resourceCards(navigate, categories, communitySlug, listings ? counts : null)
+  const eruvCount = useEruvCount(communitySlug, !!categories?.some((c) => c.kind === 'eruv'))
+  const listingCounts: Record<string, number> = {}
+  for (const l of listings ?? []) listingCounts[l.category] = (listingCounts[l.category] ?? 0) + 1
+  const counts = withEruvCount(listings ? listingCounts : null, eruvCount)
+  const resources = resourceCards(navigate, categories, communitySlug, counts)
   const sections = resources ? groupCardsIntoSections([...entryCards, ...resources], homeSections ?? []) : null
 
   const now = schedule ? new Date(schedule.now) : null
@@ -110,7 +113,7 @@ export function BrowseList({ communitySlug, listings, schedule, zmanim, timezone
                 {section.cards.map((card) => {
                   const line = lineFor(card.id)
                   // Only where the card counts something (not a form).
-                  const n = card.count && card.id ? counts[card.id] : undefined
+                  const n = card.count && card.id ? counts?.[card.id] : undefined
                   return (
                     <li key={card.id ?? card.title}>
                       <Link href={card.href} prefetch={false} className="flex items-center gap-3 border-t border-slate-100 py-2.5 hover:bg-slate-50">

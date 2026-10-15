@@ -103,7 +103,7 @@ describe('ShabbatTimesCard', () => {
     render(<ShabbatTimesCard coords={{ lat: 1, lng: 2 }} locationLabel="Philadelphia" />, { content: { categories: [shuls, eruv] } })
 
     expect(screen.getByRole('link', { name: 'Minyanim' })).toHaveAttribute('href', '/test-community/synagogue?davening=1')
-    expect(screen.getByRole('link', { name: 'Eruv' })).toHaveAttribute('href', '/test-community/eruv-info')
+    expect(screen.getByRole('link', { name: 'Eruv' })).toHaveAttribute('href', '/test-community/eruv')
     cleanup()
 
     render(<ShabbatTimesCard coords={{ lat: 1, lng: 2 }} locationLabel="Philadelphia" />, { content: { categories: [makeCategory({ id: 'grocery' })] } })

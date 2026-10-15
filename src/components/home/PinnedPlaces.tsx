@@ -58,7 +58,7 @@ export function usePinnedPlaces(): PinnedPlace[] | null {
 /** Where a saved place opens: a listing's page, or the eruv open on the
  *  Eruv page. */
 export const placeHref = (communitySlug: string, p: PinnedPlace) =>
-  p.kind === 'eruv' ? `${routes.slug(communitySlug, p.category.id)}?item=${encodeURIComponent(p.eruv.id)}` : routes.listing(communitySlug, p.category.id, listingSlug(p.item))
+  p.kind === 'eruv' ? routes.eruv(communitySlug, p.eruv.id) : routes.listing(communitySlug, p.category.id, listingSlug(p.item))
 
 export const placeName = (p: PinnedPlace) => (p.kind === 'eruv' ? p.eruv.name : p.item.name)
 

@@ -169,7 +169,6 @@ function ShabbosField({ field, item }: { field: CategoryField; item: DirectoryRe
   const statuses = useEruvStatuses(community.slug, named)
   const live = statuses?.available && clock !== null ? statuses.eruvim.find((e) => e.name.toLowerCase() === text.toLowerCase()) : undefined
   const view = live && statuses?.available && clock !== null ? eruvView(live, new Date(clock), statuses.timezone, statuses.candles) : null
-  const page = useCategories()?.find((c) => c.kind === 'eruv')
   return (
     <Line label={field.label}>
       {text ? (
@@ -179,7 +178,7 @@ function ShabbosField({ field, item }: { field: CategoryField; item: DirectoryRe
             <>
               {' · '}
               <Link
-                href={`${routes.slug(community.slug, page?.id ?? 'eruv')}?item=${encodeURIComponent(live.id)}`}
+                href={routes.eruv(community.slug, live.id)}
                 prefetch={false}
                 className={`font-bold hover:underline ${TONE_WORDS[view.tone]}`}
                 data-testid="shabbos-eruv-status"

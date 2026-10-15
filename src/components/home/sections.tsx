@@ -603,6 +603,21 @@ export function cardCount(c: CategoryConfig, counts: Record<string, number> | nu
   return `${n} listing${n === 1 ? '' : 's'}`
 }
 
+/** "3 eruvim" for the Eruv card, as a category's says how many listings
+ *  (Oct 15), from `counts.eruv` (see withEruvCount); silent until known. */
+export function eruvCardCount(counts: Record<string, number> | null | undefined): string | undefined {
+  const n = counts?.eruv
+  if (!n) return undefined
+  return n === 1 ? '1 eruv' : `${n} eruvim`
+}
+
+/** The listing counts with the Eruv card's beside them, under its card id
+ *  (`eruv`, never a listing category's id: see categoryCards), so the
+ *  browse index counts it and sorts it as it does a category. */
+export function withEruvCount(counts: Record<string, number> | null, eruvim: number | null): Record<string, number> | null {
+  return eruvim === null ? counts : { ...(counts ?? {}), eruv: eruvim }
+}
+
 /** Resource cards: every live category (restaurants, groceries, hotels, …)
  *  plus the hand-curated pages. Returns null while categories are loading
  *  (show skeletons). */
@@ -613,7 +628,8 @@ export function resourceCards(
   // hood — see CardDef.href's own comment for why this is threaded in
   // alongside `nav` rather than derived from it.
   communitySlug: string,
-  // How many approved listings each category holds, keyed by category id —
+  // How many approved listings each category holds, keyed by category id
+  // (and how many eruvim, under `eruv`: withEruvCount) —
   // null while listings are still loading, which is why `cardCount` below
   // returns undefined rather than "0 places" for a missing entry. Threaded in
   // rather than fetched here because Landing already holds the full listing
@@ -629,7 +645,7 @@ export function resourceCards(
     title,
     id,
     icon: c.icon,
-    ...(c.kind === 'listing' ? { count: cardCount(c, counts) } : {}),
+    ...(c.kind === 'listing' ? { count: cardCount(c, counts) } : c.kind === 'eruv' ? { count: eruvCardCount(counts) } : {}),
     cardImageUrl: c.cardImageUrl,
     cardTextColor: c.cardTextColor,
     keywords,

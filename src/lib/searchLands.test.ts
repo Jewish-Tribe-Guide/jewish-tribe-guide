@@ -30,8 +30,8 @@ const food = makeCategory({
   detailFields: [{ key: 't', label: 'Type', type: 'select', filterable: true, options: [{ value: 'Meat', label: 'Meat' }, { value: 'Dairy', label: 'Dairy' }] }],
 })
 const shuls = makeCategory({ id: 'synagogue', label: 'Synagogue', pluralLabel: 'Synagogues', detailFields: [{ key: 'minyanim', label: 'Minyanim', type: 'minyanim' }] })
-const zmanim = makeCategory({ id: 'zmanim', kind: 'zmanim', label: 'Zmanim', pluralLabel: 'Prayer & Shabbat Times' })
-const eruv = makeCategory({ id: 'eruv', kind: 'eruv', label: 'Eruv', pluralLabel: 'Eruv' })
+const zmanim = makeCategory({ id: 'prayer-shabbat-times', kind: 'zmanim', label: 'Zmanim', pluralLabel: 'Prayer & Shabbat Times' })
+const eruv = makeCategory({ id: 'eruv-information', kind: 'eruv', label: 'Eruv', pluralLabel: 'Eruv' })
 const categories = [grocery, food, shuls, zmanim, eruv]
 
 const listings: DirectoryResource[] = [
@@ -123,7 +123,7 @@ describe('searchLines — where Enter goes', () => {
         'Center City Eruv · Up · Checked 1:55 PM → /philly/eruv?item=cc',
         'Eruv · Each eruv’s status this week → /philly/eruv',
       ])
-      expect(lines('is center city eruv up?', { eruvim })[0]).toMatchObject({ kind: 'eruv', eruvId: 'cc', tone: 'green', categoryId: 'eruv' })
+      expect(lines('is center city eruv up?', { eruvim })[0]).toMatchObject({ kind: 'eruv', eruvId: 'cc', tone: 'green', categoryId: 'eruv-information' })
       expect(lines('is university city eruv up', { eruvim })[0]).toMatchObject({ sub: 'Down · Checked 1:55 PM', tone: 'red' })
       expect(lines('northeast eruv', { eruvim })[0]).toMatchObject({ sub: 'No status online · Hotline (215) 555-0100', tone: 'grey' })
     })

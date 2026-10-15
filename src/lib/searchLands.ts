@@ -7,7 +7,7 @@ import { itemName } from '@/lib/itemNames'
 import { itemCounts, itemFields, listingHas, searchItems } from '@/lib/itemFilter'
 import { hoursOpenNow, businessClosure } from '@/lib/hours'
 import { listingSlug } from '@/lib/listingSlug'
-import { routes } from '@/lib/routes'
+import { fixedViewSlug, routes } from '@/lib/routes'
 import type { Reading } from '@/lib/questionReader'
 
 // ── Search takes you to the page (Oct 13) ─────────────────────────────────────
@@ -310,7 +310,7 @@ export function eruvLine(eruv: Eruv, page: CategoryConfig, slug: string, statuse
     kind: 'eruv',
     title: eruv.name,
     sub: [view.label, checked].filter(Boolean).join(' · '),
-    href: `${routes.slug(slug, page.id)}?item=${encodeURIComponent(eruv.id)}`,
+    href: routes.eruv(slug, eruv.id),
     categoryId: page.id,
     eruvId: eruv.id,
     tone: view.tone,
@@ -359,14 +359,14 @@ export function searchLines(raw: string, ctx: LinesContext): SearchLine[] {
   // A zman: the times page, with the time asked for picked out.
   const zmanim = byKind('zmanim')
   if (ask.times && zmanim) {
-    return [{ key: 'times', kind: 'times', title: zmanim.pluralLabel, sub: ctx.timesSub ?? 'Zmanim and Shabbos times', href: `${routes.slug(slug, zmanim.id)}?time=${encodeURIComponent(ask.times)}`, categoryId: zmanim.id }]
+    return [{ key: 'times', kind: 'times', title: zmanim.pluralLabel, sub: ctx.timesSub ?? 'Zmanim and Shabbos times', href: `${routes.slug(slug, fixedViewSlug(zmanim.kind) ?? zmanim.id)}?time=${encodeURIComponent(ask.times)}`, categoryId: zmanim.id }]
   }
 
   // The eruv: an eruv named ("is center city eruv up?") is that eruv,
   // with its status, then the page of them all; the eruv in general is the
   // page, with each eruv's status under it (Oct 15).
   const eruv = byKind('eruv')
-  const eruvPageLine: SearchLine | null = eruv ? { key: 'eruv', kind: 'eruv', title: eruv.pluralLabel, sub: 'Each eruv’s status this week', href: routes.slug(slug, eruv.id), categoryId: eruv.id } : null
+  const eruvPageLine: SearchLine | null = eruv ? { key: 'eruv', kind: 'eruv', title: eruv.pluralLabel, sub: 'Each eruv’s status this week', href: routes.eruv(slug), categoryId: eruv.id } : null
   const statuses = eruv ? ctx.eruvim : null
   const eruvLines = (list: readonly Eruv[]) => (eruv && statuses ? list.map((e) => eruvLine(e, eruv, slug, statuses, ctx.options.now ?? new Date(0))) : [])
   const namedEruv = statuses ? namedEruvim(statuses.eruvim, q) : []

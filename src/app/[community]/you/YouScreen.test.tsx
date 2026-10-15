@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, screen, within } from '@testing-library/react'
+import { cleanup, fireEvent, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { makeCategory, makeListing } from '@/test/providerFixtures'
@@ -12,6 +12,7 @@ import { makeSavedSearch } from '@/lib/savedSearches'
 import type { ChangeLogRow } from '@/lib/whatChanged'
 import type { Eruv } from '@/lib/eruv'
 import { clearEruvStatuses } from '@/lib/useEruvStatuses'
+import { ForcedViewport } from '@/lib/useIsMobile'
 import YouScreen from './YouScreen'
 
 vi.mock('next/navigation', () => ({
@@ -33,7 +34,7 @@ const listings = [
   makeListing({ id: 'ac', name: 'ACME', category: 'grocery', m: ['Challah'] }),
 ]
 const save = (...ids: string[]) => localStorage.setItem('jpc:pinned-listings', JSON.stringify(ids.map((id) => ({ id, categoryId: 'grocery' }))))
-const eruvPage = makeCategory({ id: 'eruv', kind: 'eruv', label: 'Eruv Information', pluralLabel: 'Eruvim' })
+const eruvPage = makeCategory({ id: 'eruv-information', kind: 'eruv', label: 'Eruv Information', pluralLabel: 'Eruvim' })
 const centerCity: Eruv = {
   id: 'center-city', name: 'Center City Eruv', covers: null, website: null, hotline: null, alertsUrl: null, statusUrl: 'https://example.org', statusDated: false,
   status: 'up', statusWords: 'The Eruv is Up!', statusPostedOn: null, statusCheckedAt: '2026-10-09T18:55:00Z', statusErrorAt: null, statusError: null,
@@ -45,17 +46,25 @@ function eruvim(list: Eruv[]) {
     String(url).startsWith('/api/eruv') ? Promise.resolve(new Response(JSON.stringify({ ok: true, available: true, timezone: 'America/New_York', candles: 18 * 60 + 12, eruvim: list }))) : real(url, init),
   )
 }
+// A finger's swipe left across a row.
+function swipe(el: HTMLElement) {
+  fireEvent.pointerDown(el, { pointerType: 'touch', clientX: 300, clientY: 100 })
+  fireEvent.pointerMove(el, { pointerType: 'touch', clientX: 150, clientY: 100 })
+  fireEvent.pointerUp(el, { pointerType: 'touch', clientX: 150, clientY: 100 })
+}
 const challah = makeSavedSearch({ words: 'challah', kind: 'category', categoryId: 'grocery', href: '/test-community/grocery?q=challah' })
 
-function show(changes: ChangeLogRow[] | null = null) {
+function show(changes: ChangeLogRow[] | null = null, { mobile = false } = {}) {
   return renderWithProviders(
-    <LocationProvider>
-      <ListingsProvider listings={listings}>
-        <ChangesProvider rows={changes}>
-          <YouScreen />
-        </ChangesProvider>
-      </ListingsProvider>
-    </LocationProvider>,
+    <ForcedViewport isMobile={mobile}>
+      <LocationProvider>
+        <ListingsProvider listings={listings}>
+          <ChangesProvider rows={changes}>
+            <YouScreen />
+          </ChangesProvider>
+        </ListingsProvider>
+      </LocationProvider>
+    </ForcedViewport>,
     { content: { categories: [grocery, eruvPage] } },
   )
 }
@@ -130,6 +139,25 @@ describe('You', () => {
     expect(document.querySelector('path[d="M9 18l6-6-6-6"]')).toBeNull()
   })
 
+  // Oct 15: "Desktop You page shouldn't have swipe." A phone swipes a row
+  // to Remove; desktop has its bookmark instead, as a listing row has no
+  // swipe there either.
+  it('a phone swipes a row to Remove; desktop doesn’t swipe at all', () => {
+    save('tj')
+    localStorage.setItem('jpc:saved-searches', JSON.stringify([challah]))
+    show(null, { mobile: true })
+    swipe(screen.getByText('Trader Joe’s'))
+    expect(screen.getByRole('button', { name: 'Remove Trader Joe’s' })).toBeInTheDocument()
+    swipe(screen.getByText('“challah”'))
+    expect(screen.getByRole('button', { name: 'Remove “challah”' })).toBeInTheDocument()
+    cleanup()
+
+    show()
+    swipe(screen.getByText('Trader Joe’s'))
+    swipe(screen.getByText('“challah”'))
+    expect(screen.queryByRole('button', { name: /^Remove / })).not.toBeInTheDocument()
+  })
+
   it('a dot and two words on a place that changed since the last look; none the first time', async () => {
     save('tj', 'ac')
     const changes: ChangeLogRow[] = [
@@ -161,7 +189,7 @@ describe('You', () => {
     const user = userEvent.setup()
     clock.at = Date.parse('2026-10-09T19:00:00Z') // Fri 3 PM in Philadelphia
     eruvim([centerCity])
-    localStorage.setItem('jpc:pinned-listings', JSON.stringify([{ id: 'tj', categoryId: 'grocery' }, { id: 'center-city', categoryId: 'eruv' }]))
+    localStorage.setItem('jpc:pinned-listings', JSON.stringify([{ id: 'tj', categoryId: 'grocery' }, { id: 'center-city', categoryId: 'eruv-information' }]))
     show()
     const places = await screen.findByTestId('you-places')
     const links = within(places).getAllByRole('link')
@@ -175,7 +203,7 @@ describe('You', () => {
 
   it('a saved eruv that’s gone is skipped', async () => {
     eruvim([])
-    localStorage.setItem('jpc:pinned-listings', JSON.stringify([{ id: 'tj', categoryId: 'grocery' }, { id: 'center-city', categoryId: 'eruv' }]))
+    localStorage.setItem('jpc:pinned-listings', JSON.stringify([{ id: 'tj', categoryId: 'grocery' }, { id: 'center-city', categoryId: 'eruv-information' }]))
     show()
     const places = await screen.findByTestId('you-places')
     expect(within(places).getAllByRole('link').map((a) => a.textContent)).toEqual([expect.stringContaining('Trader Joe’s')])

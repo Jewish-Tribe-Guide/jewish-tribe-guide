@@ -23,6 +23,10 @@ import { EruvListing, EruvStatusLine } from './EruvListing'
 import EruvMap from './EruvMap'
 import { useOptionalLocation } from '@/lib/locationContext'
 import { useEruvMaps } from '@/lib/useEruvStatuses'
+import CategoryIcon from '@/components/CategoryIcon'
+import SavedBadge from '@/components/SavedBadge'
+import { initialsOf } from '@/lib/listingRow'
+import { usePinned } from '@/lib/pinnedContext'
 
 // ── The Eruv page (Oct 7, canvas page "eruv") ───────────────────────────────
 // The eruvim's own maps, as each eruv draws them, with the visitor's dot;
@@ -166,6 +170,7 @@ export default function EruvInfo({ onUp, title = 'Eruv Information', icon, color
   // The visitor's dot, on the eruvim's own maps.
   const you = useOptionalLocation()?.coords ?? null
   const maps = useEruvMaps(slug, !!loaded?.available)
+  const { isPinned } = usePinned()
   // Desktop only: a phone has nothing to point with.
   const pointAt = (id: string) => (isMobile ? {} : { onMouseEnter: () => setPointedId(id), onMouseLeave: () => setPointedId(null), onFocus: () => setPointedId(id), onBlur: () => setPointedId(null) })
   // Beside the list where it's wide enough and not hidden, as on every
@@ -252,6 +257,12 @@ export default function EruvInfo({ onUp, title = 'Eruv Information', icon, color
                         data-pointed={pointedId === eruv.id || undefined}
                         data-testid="eruv-row"
                       >
+                        {/* Its picture, as on its listing, and on it the
+                            badge a saved place's row wears (Oct 15). */}
+                        <span className="relative mr-1 shrink-0">
+                          <CategoryIcon icon="" initials={initialsOf(eruv.name)} shape="square" color={color} className="h-10 w-10 text-base" sizePx={40} />
+                          {isPinned(eruv.id) && <SavedBadge />}
+                        </span>
                         <span className="min-w-0 flex-1">
                           <span className="block text-[15.5px] font-bold text-slate-900">{eruv.name}</span>
                           <EruvStatusLine eruv={eruv} now={now} timezone={ready.timezone} candles={ready.candles} />

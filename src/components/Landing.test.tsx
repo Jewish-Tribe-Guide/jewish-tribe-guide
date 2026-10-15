@@ -1053,7 +1053,7 @@ describe('Landing — "is the eruv up"', () => {
     await user.type(screen.getAllByLabelText('Search resources')[0]!, 'is the eruv up')
     expect(lineTexts()).toEqual(['Eruv InformationEach eruv’s status this week'])
     await user.keyboard('{Enter}')
-    expect(mockRouter.push).toHaveBeenCalledWith('/test-community/eruv-information')
+    expect(mockRouter.push).toHaveBeenCalledWith('/test-community/eruv')
   })
 
   it('doesn’t, for a community with no eruv page', async () => {

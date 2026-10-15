@@ -84,7 +84,7 @@ export default function ShabbatTimesCard({
   const actions = [
     ...(minyanCategory ? [{ label: 'Minyanim', href: `${routes.slug(communitySlug, minyanCategory.id)}?davening=1` }] : []),
     { label: 'All zmanim', href: routes.slug(communitySlug, 'zmanim') },
-    ...(eruvCategory ? [{ label: 'Eruv', href: routes.slug(communitySlug, eruvCategory.id) }] : []),
+    ...(eruvCategory ? [{ label: 'Eruv', href: routes.eruv(communitySlug) }] : []),
   ]
 
   return (

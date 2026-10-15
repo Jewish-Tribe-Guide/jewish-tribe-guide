@@ -94,11 +94,11 @@ describe('EruvInfo', () => {
   it('each eruv: whether it’s up, and when the guide checked; nothing else', async () => {
     show()
     const rows = await screen.findAllByTestId('eruv-row')
-    // One box of rows: the name, whether it's up.
+    // One box of rows: its picture (initials), the name, whether it's up.
     expect(rows.map((r) => r.textContent)).toEqual([
-      'Center City EruvUp for this ShabbosChecked 2:55 PM · every 15 minutes until candle lighting',
-      'Lower Merion EruvNot posted yet this weekChecked 2:55 PM · every 15 minutes until candle lighting',
-      'Elkins Park EruvNo status online',
+      'CCCenter City EruvUp for this ShabbosChecked 2:55 PM · every 15 minutes until candle lighting',
+      'LMLower Merion EruvNot posted yet this weekChecked 2:55 PM · every 15 minutes until candle lighting',
+      'EPElkins Park EruvNo status online',
     ])
     // Headed as a category's list is: what it is, and how many.
     expect(screen.getByTestId('list-heading')).toHaveTextContent('This Shabbos · 3 eruvim')
@@ -133,6 +133,20 @@ describe('EruvInfo', () => {
     expect(JSON.parse(localStorage.getItem('jpc:pinned-listings')!)).toEqual([{ id: 'center-city', categoryId: 'eruv' }])
     expect(within(listing).getByTestId('saved-badge')).toBeInTheDocument()
     expect(screen.getByTestId('undo-toast')).toHaveTextContent('Saved to You')
+  })
+
+  // Oct 15: "There's nothing on the eruv listing indicating that it's
+  // saved." Its row in the list now wears the badge a saved place's row does.
+  it('a saved eruv’s row wears the saved badge on its picture; the others don’t', async () => {
+    localStorage.setItem('jpc:pinned-listings', JSON.stringify([{ id: 'lower-merion', categoryId: 'eruv' }]))
+    renderWithProviders(
+      <ForcedViewport isMobile={false}>
+        <EruvInfo onUp={() => {}} title="Eruvim" />
+      </ForcedViewport>,
+      { content: { categories: [makeCategory({ id: 'eruv', kind: 'eruv', pluralLabel: 'Eruvim' })] } },
+    )
+    const rows = await screen.findAllByTestId('eruv-row')
+    expect(rows.map((r) => !!within(r).queryByTestId('saved-badge'))).toEqual([false, true, false])
   })
 
   it('a hotline dials its digits', async () => {

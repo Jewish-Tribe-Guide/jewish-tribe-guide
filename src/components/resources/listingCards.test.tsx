@@ -202,7 +202,7 @@ describe('This Shabbos', () => {
     open()
     const status = await screen.findByTestId('shabbos-eruv-status')
     expect(status).toHaveTextContent('Up for this Shabbos')
-    expect(status).toHaveAttribute('href', '/test-community/eruv-information?item=university-city')
+    expect(status).toHaveAttribute('href', '/test-community/eruv?item=university-city')
     expect(screen.getByTestId('listing-shabbos')).toHaveTextContent('Checked 2:55 PM · every 15 minutes until candle lighting')
     expect(within(screen.getByTestId('listing-shabbos')).queryByRole('link', { name: 'This week’s status ↗' })).not.toBeInTheDocument()
   })

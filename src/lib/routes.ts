@@ -46,6 +46,11 @@ export const FIXED_VIEW_KINDS: Record<string, CategoryKind> = {
   zmanim: 'zmanim',
 }
 
+/** A fixed view's own slug (`eruv`), for linking to it: never the id of the
+ *  category that gates it, which is the admin's label slugified
+ *  (`eruv-information`) and resolves as an ordinary, empty directory. */
+export const fixedViewSlug = (kind: CategoryKind): string | null => Object.keys(FIXED_VIEW_KINDS).find((slug) => FIXED_VIEW_KINDS[slug] === kind) ?? null
+
 /** Slugs a category or form may never take, because a route already owns them.
  *  Enforced when an admin creates or renames one — see assertUsableSlug. */
 export const RESERVED_SLUGS = new Set([
@@ -186,6 +191,9 @@ export const routes = {
   privacy: (community: string) => `/${community}/privacy`,
   /** A category directory or a form wizard — they share this namespace. */
   slug: (community: string, slug: string) => `/${community}/${slug}`,
+  /** The Eruv page, opened on one eruv when given: /philly/eruv?item=center-city
+   *  (see fixedViewSlug). */
+  eruv: (community: string, eruvId?: string) => `/${community}/eruv${eruvId ? `?item=${encodeURIComponent(eruvId)}` : ''}`,
   /** The third argument is normally a listing's friendly slug (see
    *  listingSlug.ts) — /philly/grocery/goldi-a1b2c3 — but any string works;
    *  resolveListing falls back to a bare id, so an older raw-id link keeps

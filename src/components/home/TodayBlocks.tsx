@@ -12,7 +12,7 @@ import { getCategoryColor } from '@/lib/categoryColor'
 import { haversineMiles, milesText, type LatLng } from '@/lib/geo'
 import { candlesToday, initialsOf, listingRowFacts, type RowFact } from '@/lib/listingRow'
 import { formatStartsIn, nextMinyansAcross, type NextMinyanLine } from '@/lib/upcomingDavening'
-import { routes } from '@/lib/routes'
+import { fixedViewSlug, routes } from '@/lib/routes'
 import { beforeCandles, itemList, openNowTitle, shabbosMoment, shoppingTitle, type ShabbosMoment } from '@/lib/todayHome'
 import type { TodayBlockId } from '@/lib/siteSettings'
 import type { CardDef } from './sections'
@@ -69,7 +69,7 @@ export default function TodayBlocks(props: Props) {
   const moment: ShabbosMoment = now === null ? { kind: 'weekday' } : shabbosMoment(zmanim, now, timezone)
   const kindLink = (kind: string) => {
     const c = categories.find((x) => x.kind === kind)
-    return c ? routes.slug(communitySlug, c.id) : null
+    return c ? routes.slug(communitySlug, fixedViewSlug(c.kind) ?? c.id) : null
   }
   const shulsHref = schedule?.linkCategoryId ? `${routes.slug(communitySlug, schedule.linkCategoryId)}?davening=1` : null
 

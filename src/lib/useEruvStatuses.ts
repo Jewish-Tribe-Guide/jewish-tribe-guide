@@ -46,6 +46,13 @@ export function useEruvStatuses(communitySlug: string, wanted = true): EruvStatu
   return data
 }
 
+/** How many eruvim the community has, for the Eruv card's count; null
+ *  until known, and without an Eruv page (`wanted` false) or the list. */
+export function useEruvCount(communitySlug: string, wanted: boolean): number | null {
+  const statuses = useEruvStatuses(communitySlug, wanted)
+  return statuses?.available ? statuses.eruvim.length : null
+}
+
 // ── Their maps (/api/eruv/maps, Oct 12) ─────────────────────────────────────
 // Each eruv's own map, as the eruv draws it, for the maps that show them:
 // the Eruv page and the Map tab's Eruvim layer. Fetched only when one of

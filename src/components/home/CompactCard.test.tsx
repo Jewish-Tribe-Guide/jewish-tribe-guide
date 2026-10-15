@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it } from 'vitest'
 import { cleanup, render, screen } from '@testing-library/react'
-import { CompactCardGrid, cardCount } from './sections'
+import { CompactCardGrid, cardCount, eruvCardCount, resourceCards, withEruvCount } from './sections'
 import type { CardDef } from './sections'
 import type { CategoryConfig } from '@/lib/categories'
 
@@ -147,5 +147,27 @@ describe('cardCount — the wording', () => {
     expect(cardCount(category(), undefined)).toBeUndefined()
     expect(cardCount(category(), {})).toBeUndefined()
     expect(cardCount(category(), { grocery: 0 })).toBeUndefined()
+  })
+})
+
+// Oct 15: the Eruv card says how many eruvim, as a category's card says how
+// many listings.
+describe('the Eruv card’s count', () => {
+  const eruv = category({ id: 'eruv-information', kind: 'eruv', pluralLabel: 'Eruv Information' })
+  const grocery = category()
+  const cards = (counts: Record<string, number> | null) => resourceCards(() => {}, [grocery, eruv], 'philly', counts)!
+  const countOf = (counts: Record<string, number> | null, id: string) => cards(counts).find((c) => c.id === id)?.count
+
+  it('"3 eruvim", "1 eruv", beside the listings’ counts', () => {
+    expect(countOf(withEruvCount({ grocery: 22 }, 3), 'eruv')).toBe('3 eruvim')
+    expect(countOf(withEruvCount({ grocery: 22 }, 3), 'grocery')).toBe('22 listings')
+    expect(countOf(withEruvCount(null, 1), 'eruv')).toBe('1 eruv')
+    expect(eruvCardCount({ eruv: 2 })).toBe('2 eruvim')
+  })
+
+  it('nothing until it’s known, or when there are none', () => {
+    expect(countOf(withEruvCount({ grocery: 22 }, null), 'eruv')).toBeUndefined()
+    expect(countOf(withEruvCount(null, 0), 'eruv')).toBeUndefined()
+    expect(withEruvCount(null, null)).toBeNull()
   })
 })

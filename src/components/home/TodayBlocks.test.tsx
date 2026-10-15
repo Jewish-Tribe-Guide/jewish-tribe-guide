@@ -29,7 +29,8 @@ const items: CategoryField = { key: 'm', label: 'Items', type: 'tags', showCount
 const grocery = makeCategory({ id: 'grocery', label: 'Grocery', pluralLabel: 'Grocery', detailFields: [hours, items] })
 const food = makeCategory({ id: 'restaurant', label: 'Food', pluralLabel: 'Food', detailFields: [hours] })
 const shuls = makeCategory({ id: 'synagogue', label: 'Synagogue', pluralLabel: 'Synagogues', detailFields: [{ key: 'minyanim', label: 'Minyanim', type: 'minyanim' }] })
-const zmanimPage = makeCategory({ id: 'zmanim', kind: 'zmanim', label: 'Zmanim', pluralLabel: 'Zmanim' })
+// Its id, like a real one, is its label slugified; its page is still /zmanim.
+const zmanimPage = makeCategory({ id: 'prayer-shabbat-times', kind: 'zmanim', label: 'Zmanim', pluralLabel: 'Zmanim' })
 const categories = [grocery, food, shuls, zmanimPage]
 const everyDay = Object.fromEntries(['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'].map((d) => [d, { open: '09:00', close: '21:00' }]))
 const centre = { lat: 39.9526, lng: -75.1652 }
@@ -121,6 +122,7 @@ describe('the Today home on a Friday afternoon', () => {
     expect(order).toEqual(['today-candles', 'today-before-candles', 'today-next-minyan'])
     expect(screen.getByTestId('today-candles')).toHaveTextContent(/Shabbos BereshitCandles 6:12 PMIn 4 hr 42 min · havdalah Saturday 7:09 PM/)
     expect(within(screen.getByTestId('today-candles')).getByRole('link', { name: 'Minyanim' })).toHaveAttribute('href', '/philly/synagogue?davening=1')
+    expect(within(screen.getByTestId('today-candles')).getByRole('link', { name: 'Zmanim' })).toHaveAttribute('href', '/philly/zmanim')
   })
 
   it('Before candles names the one store with all three, from its own list and hours', () => {

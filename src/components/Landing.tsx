@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState, ViewTransition } from 'react'
 import { track } from '@vercel/analytics'
-import { CategoryTileRow, groupCardsIntoSections, resourceCards, useEntryCards } from '@/components/home/sections'
+import { CategoryTileRow, groupCardsIntoSections, resourceCards, useEntryCards, withEruvCount } from '@/components/home/sections'
+import { useEruvCount } from '@/lib/useEruvStatuses'
 import { cardMatches } from '@/lib/cardSearch'
 import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
@@ -153,12 +154,14 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
   // own search rather than a second request — and `useMemo`'d because
   // `listings` is the whole community (several hundred rows) and this runs on
   // every keystroke in the search box otherwise.
+  // The Eruv card's count beside them (Oct 15), as a category's.
+  const eruvCount = useEruvCount(communitySlug, !!categories?.some((c) => c.kind === 'eruv'))
   const listingCounts = useMemo(() => {
-    if (!listings) return null
+    if (!listings) return withEruvCount(null, eruvCount)
     const counts: Record<string, number> = {}
     for (const l of listings) counts[l.category] = (counts[l.category] ?? 0) + 1
-    return counts
-  }, [listings])
+    return withEruvCount(counts, eruvCount)
+  }, [listings, eruvCount])
 
   const resources = resourceCards(onNavigate, categories, communitySlug, listingCounts)
   // Order is no longer alphabetical — groupCardsIntoSections (below) sorts these

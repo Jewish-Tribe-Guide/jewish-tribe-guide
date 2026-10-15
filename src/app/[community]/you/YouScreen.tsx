@@ -10,6 +10,7 @@ import { TONE_WORDS } from '@/lib/eruvTone'
 import { useNextMinyan } from '@/components/resources/nextMinyans'
 import { useActiveCommunity, useCommunityTimezone } from '@/lib/communityContext'
 import { useLocation } from '@/lib/locationContext'
+import { useIsMobile } from '@/lib/useIsMobile'
 import { usePinned } from '@/lib/pinnedContext'
 import { useSavedSearches } from '@/lib/savedSearchesContext'
 import type { SavedSearch } from '@/lib/savedSearches'
@@ -29,8 +30,10 @@ import { milesText, type LatLng } from '@/lib/geo'
 // what its home line would say now ("10 with Challah"), asked again the same
 // way (useHomeSearch); a saved eruv's, whether it's up this week and when
 // the guide checked. A blue dot and two words on a place that changed since
-// You was last opened here. Swipe a row to remove it (or, on desktop, click
-// its bookmark), with Undo; nothing reorders. Saved on this phone, no account.
+// You was last opened here. Swipe a row to remove it on a phone; on desktop,
+// which has no swipe (Oct 15, as a listing row has none), click its
+// bookmark. Either way with Undo; nothing reorders. Saved on this phone, no
+// account.
 
 export default function YouScreen() {
   const { community } = useActiveCommunity()
@@ -177,6 +180,7 @@ function PlaceRow({
   const name = placeName(place)
   const categories = useCategories()
   const shul = useNextMinyan(place.id)
+  const isMobile = useIsMobile()
   // The category row's own facts, the first that says what it's doing now
   // (open until, the next minyan) first: one line. An eruv's: whether it's
   // up, and when the guide checked.
@@ -199,6 +203,8 @@ function PlaceRow({
     <div className="group border-t border-slate-100 first:border-t-0">
       <SwipeRow
         rowId={`place:${place.id}`}
+        // A phone's swipe only: desktop removes with the bookmark.
+        enabled={isMobile}
         actions={[{ id: 'remove', label: 'Remove', ariaLabel: `Remove ${name}`, active: false, onSelect: onRemove }]}
         className="bg-white"
         contentClassName="relative flex items-center bg-white touch-pan-y desktop:group-hover:bg-slate-50"
@@ -231,10 +237,12 @@ function PlaceRow({
 
 function SearchRow({ search, sub, href, onRemove }: { search: SavedSearch; sub: string; href: string; onRemove: () => void }) {
   const name = `“${search.words}”`
+  const isMobile = useIsMobile()
   return (
     <div className="group border-t border-slate-100 first:border-t-0">
       <SwipeRow
         rowId={`search:${search.key}`}
+        enabled={isMobile}
         actions={[{ id: 'remove', label: 'Remove', ariaLabel: `Remove ${name}`, active: false, onSelect: onRemove }]}
         className="bg-white"
         contentClassName="relative flex items-center bg-white touch-pan-y desktop:group-hover:bg-slate-50"

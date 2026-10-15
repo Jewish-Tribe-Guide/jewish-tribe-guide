@@ -23,7 +23,7 @@ const pin = (...ids: [string, string][]) => localStorage.setItem(PINS_KEY, JSON.
 const grocery = makeCategory({ id: 'grocery', label: 'Grocery', pluralLabel: 'Grocery' })
 const food = makeCategory({ id: 'restaurant', label: 'Food', pluralLabel: 'Food' })
 const hospital = makeCategory({ id: 'hospital', label: 'Hospital', pluralLabel: 'Hospitals' })
-const eruvPage = makeCategory({ id: 'eruv', kind: 'eruv', label: 'Eruv Information', pluralLabel: 'Eruvim' })
+const eruvPage = makeCategory({ id: 'eruv-information', kind: 'eruv', label: 'Eruv Information', pluralLabel: 'Eruvim' })
 const categories = [hospital, grocery, food, eruvPage]
 // The admin's order: Food, then Grocery; Hospitals in no section.
 const sections = [{ id: 's1', kind: 'section', title: 'Food and Hospitality', sortOrder: 0, cardIds: ['restaurant', 'grocery'], width: 'full' }] as HomeSection[]
@@ -73,7 +73,7 @@ describe('Pinned on the Today home', () => {
   // Oct 15: a saved eruv, with whether it's up.
   it('a saved eruv: whether it’s up, opening it on the Eruv page', async () => {
     vi.stubGlobal('fetch', async () => new Response(JSON.stringify({ ok: true, available: true, timezone: 'America/New_York', candles: 18 * 60 + 12, eruvim: [centerCity] })))
-    pin(['Lunch Spot', 'restaurant'], ['center-city', 'eruv'])
+    pin(['Lunch Spot', 'restaurant'], ['center-city', 'eruv-information'])
     show(<PinnedBlock communitySlug="philly" from={centre} now={Date.parse('2026-10-09T19:00:00Z')} />)
     const block = await screen.findByTestId('today-pinned')
     const rows = within(block).getAllByRole('link')

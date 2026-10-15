@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, screen, within } from '@testing-library/react'
+import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { makeCategory, makeListing } from '@/test/providerFixtures'
 import { mockRouter } from '@/test/nextNavigationMock'
@@ -8,6 +8,7 @@ import type { CategoryField } from '@/lib/categories'
 import type { HomeSection } from '@/lib/homeSections'
 import type { MinyanSchedule } from '@/lib/useMinyanSchedule'
 import { SITE_SETTINGS_DEFAULTS } from '@/lib/siteSettings'
+import { clearEruvStatuses } from '@/lib/useEruvStatuses'
 import BrowseAll from './BrowseAll'
 
 const features = vi.hoisted(() => ({ todayHome: false, whatChanged: true }))
@@ -63,7 +64,20 @@ function show(feedbackEnabled = true) {
   })
 }
 
-afterEach(() => cleanup())
+afterEach(() => {
+  cleanup()
+  clearEruvStatuses()
+  vi.unstubAllGlobals()
+})
+
+// /api/eruv, answered with this many eruvim.
+function eruvim(n: number) {
+  vi.stubGlobal('fetch', (url: string) =>
+    String(url).startsWith('/api/eruv')
+      ? Promise.resolve(new Response(JSON.stringify({ ok: true, available: true, timezone: 'America/New_York', candles: null, eruvim: Array.from({ length: n }, (_, i) => ({ id: `e${i}`, name: `Eruv ${i}` })) })))
+      : Promise.reject(new Error(`unexpected fetch ${url}`)),
+  )
+}
 
 describe('the Browse tab', () => {
   it('every category in the admin’s groups and order, each to its page', () => {
@@ -83,6 +97,15 @@ describe('the Browse tab', () => {
     // Not the next minyan: Today leads with that.
     expect(shulRow).toHaveTextContent(/^Synagogues\d*$/)
     expect(eruvRow).toHaveTextContent(/^Eruv Information$/)
+  })
+
+  // Oct 15: "the Eruv category should show the number of eruvs like the
+  // other categories show the number of listings."
+  it('the Eruv page’s row counts its eruvim, as a category’s counts its listings', async () => {
+    eruvim(3)
+    show()
+    const eruvRow = within(screen.getByTestId('browse-group-Jewish Institutions')).getAllByRole('link')[1]
+    await waitFor(() => expect(eruvRow).toHaveTextContent(/^Eruv Information3$/))
   })
 
   it('the Eruv page’s card has its line glyph, not the emoji', () => {

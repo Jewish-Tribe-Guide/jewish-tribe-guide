@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   assertUsableSlug,
   FIXED_VIEW_KINDS,
+  fixedViewSlug,
   mapQueryString,
   parseMapQuery,
   routes,
@@ -59,6 +60,16 @@ describe('slugRejectionReason', () => {
     for (const slug of Object.keys(FIXED_VIEW_KINDS)) {
       expect(slugRejectionReason(slug), slug).toMatch(/reserved/i)
     }
+  })
+
+  // Oct 15: a saved eruv on You linked to /philly/eruv-information, its
+  // category's id, which is an empty directory; the Eruv page is /eruv.
+  it('links a fixed view by its own slug, never its category’s id', () => {
+    expect(fixedViewSlug('eruv')).toBe('eruv')
+    expect(fixedViewSlug('zmanim')).toBe('zmanim')
+    expect(fixedViewSlug('listing')).toBeNull()
+    expect(routes.eruv('philly')).toBe('/philly/eruv')
+    expect(routes.eruv('philly', 'center city')).toBe('/philly/eruv?item=center%20city')
   })
 
   // /hospitals was the old Jewish Medical Resources screen, whose only content
