@@ -206,6 +206,23 @@ export function shownMap(file: EruvLineFile, leftOut: readonly string[], hideMar
   return marks.length ? { lines: file.lines.filter(keep), marks } : { lines: file.lines.filter(keep) }
 }
 
+/** A file that sets no colour (Center City's GeoJSON) is drawn in a dark
+ *  red, as Center City draws its own. */
+export const DEFAULT_LINE_COLOR = '#b7372d'
+
+/** Its lines in the colour an admin chose (Oct 15: Northeast draws its own
+ *  in a cyan so pale it barely shows on the map). Only the lines' colour:
+ *  where they go, their widths, the shading and the markers stay theirs.
+ *  No colour chosen, the file as it is. */
+export function withLineColor(file: EruvLineFile, color: string | null | undefined): EruvLineFile {
+  return color ? { ...file, lines: file.lines.map((l) => ({ ...l, color })) } : file
+}
+
+/** The colour its lines are drawn in, when it's one: the admin's, or the
+ *  first the file sets, or the default. For the admin's colour picker. */
+export const lineColorOf = (file: EruvLineFile | null, chosen: string | null | undefined): string =>
+  chosen ?? file?.lines.find((l) => l.color)?.color ?? DEFAULT_LINE_COLOR
+
 /** The names a map file has, its lines' and its markers'. */
 export function partNames(file: EruvLineFile): string[] {
   return [...new Set([...file.lines, ...(file.marks ?? [])].map((x) => x.name).filter(Boolean))]

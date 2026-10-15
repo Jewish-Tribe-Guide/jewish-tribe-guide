@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { lineFetchUrl, missingNames, parseLineFile, partNames, sameLine, shownMap, type EruvLineFile } from './eruvLine'
+import { DEFAULT_LINE_COLOR, lineColorOf, lineFetchUrl, missingNames, parseLineFile, partNames, sameLine, shownMap, withLineColor, type EruvLineFile } from './eruvLine'
 import { labelPoint, metresFrom } from './eruvShape'
 
 // The eruvim's own map files, as published Oct 7 2026: Center City's
@@ -82,6 +82,29 @@ describe('what the guide shows of a map', () => {
     expect(missingNames(CC, CC_LEFT_OUT)).toEqual([])
     expect(missingNames(CC, ['Washington Border', 'Line 99'])).toEqual(['Line 99'])
     expect(missingNames(EP, [EP_ROUTE])).toEqual([])
+  })
+  it('its lines in a colour an admin chose (Oct 15: the Northeast’s pale cyan), and nothing else of it changed', () => {
+    expect(NE.lines[0].color).toBe('#ccffff')
+    const ours = withLineColor(NE, '#1d4ed8')
+    expect(ours.lines.map((l) => l.color)).toEqual(['#1d4ed8'])
+    // Where it goes, its width, its shading and its markers are still theirs.
+    const uncoloured = (f: typeof NE) => f.lines.map((l) => ({ ...l, color: undefined }))
+    expect(uncoloured(ours)).toEqual(uncoloured(NE))
+    expect(ours.marks).toEqual(NE.marks)
+    // Every line, Lower Merion's three colours too.
+    expect(new Set(withLineColor(LM, '#000000').lines.map((l) => l.color))).toEqual(new Set(['#000000']))
+    // The file itself isn't touched: it's what's kept, and compared.
+    expect(NE.lines[0].color).toBe('#ccffff')
+  })
+  it('no colour chosen, its own', () => {
+    expect(withLineColor(NE, null)).toBe(NE)
+    expect(withLineColor(CC, undefined)).toBe(CC)
+  })
+  it('the colour its lines are drawn in, for the picker', () => {
+    expect(lineColorOf(NE, null)).toBe('#ccffff')
+    expect(lineColorOf(NE, '#1d4ed8')).toBe('#1d4ed8')
+    expect(lineColorOf(CC, null)).toBe(DEFAULT_LINE_COLOR)
+    expect(lineColorOf(null, null)).toBe(DEFAULT_LINE_COLOR)
   })
   it('a read compares as a whole', () => {
     expect(sameLine(UC, JSON.parse(JSON.stringify(UC)))).toBe(true)

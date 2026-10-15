@@ -6,7 +6,7 @@ import { fetchJson } from '@/lib/fetchJson'
 import { withCommunity } from '@/lib/useCommunityData'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { eruvView, shortDay } from '@/lib/eruv'
-import { partNames, shownMap, type EruvLineFile } from '@/lib/eruvLine'
+import { DEFAULT_LINE_COLOR, lineColorOf, partNames, shownMap, withLineColor, type EruvLineFile } from '@/lib/eruvLine'
 import type { AdminEruv } from '@/lib/eruvStore'
 
 // ── The "Eruvim" tab (Oct 7) ────────────────────────────────────────────────
@@ -15,13 +15,16 @@ import type { AdminEruv } from '@/lib/eruvStore'
 // hotline, alerts, the status page, its map's address), and its map. The
 // guide shows each eruv's own map as the eruv draws it, read about every
 // hour (Oct 12); what's chosen here is only what to leave out of it: parts
-// by name, and its markers.
+// by name, and its markers; and, for a line that's hard to see, the colour
+// it's drawn in (Oct 15).
 
 type Loaded = { available: boolean; timezone: string; eruvim: AdminEruv[] }
 
 /** The map drawn small, as the guide shows it: each line in the eruv's
- *  colour, a left-out one dashed and grey, and its markers as dots. */
-function LinePreview({ file, leaveOut, hideMarks }: { file: EruvLineFile; leaveOut: string[]; hideMarks: boolean }) {
+ *  colour (or the one chosen), a left-out one dashed and grey, and its
+ *  markers as dots. */
+function LinePreview({ file: theirs, leaveOut, hideMarks, lineColor }: { file: EruvLineFile; leaveOut: string[]; hideMarks: boolean; lineColor: string | null }) {
+  const file = useMemo(() => withLineColor(theirs, lineColor), [theirs, lineColor])
   const shown = useMemo(() => shownMap(file, leaveOut, hideMarks), [file, leaveOut, hideMarks])
   const pts = [...file.lines.flatMap((l) => l.points), ...(file.marks ?? []).map((m) => m.at)]
   if (pts.length === 0) return null
@@ -46,7 +49,7 @@ function LinePreview({ file, leaveOut, hideMarks }: { file: EruvLineFile; leaveO
           <polygon key={`a${i}`} points={l.points.map(xy).join(' ')} fill={l.fill!.color} fillOpacity={l.fill!.opacity} stroke="none" />
         ))}
       {file.lines.map((l, i) => (
-        <polyline key={i} points={l.points.map(xy).join(' ')} fill="none" stroke={kept.has(l) ? (l.color ?? '#b7372d') : '#94a3b8'} strokeWidth={kept.has(l) ? 2 : 1.5} strokeDasharray={kept.has(l) ? undefined : '3 3'} />
+        <polyline key={i} points={l.points.map(xy).join(' ')} fill="none" stroke={kept.has(l) ? (l.color ?? DEFAULT_LINE_COLOR) : '#94a3b8'} strokeWidth={kept.has(l) ? 2 : 1.5} strokeDasharray={kept.has(l) ? undefined : '3 3'} />
       ))}
       {(shown.marks ?? []).map((m, i) => (
         <circle key={`m${i}`} cx={x(m.at[1])} cy={y(m.at[0])} r={3.5} fill={m.color ?? '#0288d1'} stroke="#fff" strokeWidth={1} />
@@ -57,7 +60,7 @@ function LinePreview({ file, leaveOut, hideMarks }: { file: EruvLineFile; leaveO
 
 const input = 'w-full rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary'
 
-type Draft = Pick<AdminEruv, 'name' | 'covers' | 'website' | 'hotline' | 'alertsUrl' | 'statusUrl' | 'statusDated' | 'lineUrl' | 'sortOrder' | 'active' | 'lineLeaveOut' | 'lineHidePoints'>
+type Draft = Pick<AdminEruv, 'name' | 'covers' | 'website' | 'hotline' | 'alertsUrl' | 'statusUrl' | 'statusDated' | 'lineUrl' | 'sortOrder' | 'active' | 'lineLeaveOut' | 'lineHidePoints' | 'lineColor'>
 const draftOf = (e: AdminEruv): Draft => ({
   name: e.name,
   covers: e.covers,
@@ -71,6 +74,7 @@ const draftOf = (e: AdminEruv): Draft => ({
   active: e.active,
   lineLeaveOut: e.lineLeaveOut,
   lineHidePoints: e.lineHidePoints,
+  lineColor: e.lineColor,
 })
 
 function Field({ label, help, children }: { label: string; help?: string; children: React.ReactNode }) {
@@ -154,7 +158,28 @@ function EruvCard({ eruv, timezone, busy, onAct, onSave }: { eruv: AdminEruv; ti
         <div className="mt-4" data-testid="eruv-map-preview">
           <p className="text-sm font-bold text-slate-800">As the guide shows it</p>
           <p className="mb-1.5 text-xs text-muted">Read {eruv.lineReadAt ? shortDay(eruv.lineReadAt, timezone) : ''}. Compare it with the eruv’s own map.</p>
-          <LinePreview file={eruv.rawLine} leaveOut={draft.lineLeaveOut} hideMarks={draft.lineHidePoints} />
+          <LinePreview file={eruv.rawLine} leaveOut={draft.lineLeaveOut} hideMarks={draft.lineHidePoints} lineColor={draft.lineColor} />
+          <div className="mt-2">
+            <div className="flex flex-wrap items-center gap-2 text-sm text-slate-700">
+              <label className="flex items-center gap-2">
+                <input
+                  type="color"
+                  className="h-8 w-11 cursor-pointer rounded border border-slate-300 bg-white p-0.5"
+                  value={lineColorOf(eruv.rawLine, draft.lineColor)}
+                  onChange={(e) => set('lineColor', e.target.value)}
+                />
+                <span className="font-semibold">Line colour</span>
+              </label>
+              {draft.lineColor ? (
+                <button type="button" onClick={() => set('lineColor', null)} className="cursor-pointer font-semibold text-primary hover:underline">
+                  Use its own
+                </button>
+              ) : (
+                <span className="text-muted">its own, from its map</span>
+              )}
+            </div>
+            <p className="mt-0.5 text-xs text-muted">For a line that’s hard to see on the map. Only the colour changes: the line itself still comes from its map.</p>
+          </div>
         </div>
       )}
       {eruv.lineMissing.length > 0 && (

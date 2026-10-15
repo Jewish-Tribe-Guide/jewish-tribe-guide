@@ -22,7 +22,7 @@ const KML = `<kml><Document>
 </Document></kml>`
 const LAST: EruvLineFile = { lines: [{ name: 'Boundary', points: [[39.9, -75.2], [39.9, -75.1]] }] }
 const source = (over: Partial<EruvMapSource> = {}): EruvMapSource => ({
-  communityId: 'philly', id: 'northeast', name: 'Northeast Eruv', lineUrl: 'https://www.google.com/maps/d/viewer?mid=abc', rawLine: null, lineLeaveOut: [], lineHidePoints: false, lineMissing: [], ...over,
+  communityId: 'philly', id: 'northeast', name: 'Northeast Eruv', lineUrl: 'https://www.google.com/maps/d/viewer?mid=abc', rawLine: null, lineLeaveOut: [], lineHidePoints: false, lineMissing: [], lineColor: null, ...over,
 })
 const call = async () => {
   const res = await GET(new Request('http://localhost/api/eruv/maps?community=philly'))
@@ -51,6 +51,13 @@ describe('GET /api/eruv/maps', () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(KML)))
     const { body } = await call()
     expect(body.maps[0].map.marks).toBeUndefined()
+  })
+
+  it('in the colour an admin chose for its lines (Oct 15)', async () => {
+    store.sources = [source({ lineColor: '#1d4ed8' })]
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(KML)))
+    const { body } = await call()
+    expect(body.maps[0].map.lines[0]).toMatchObject({ name: 'Boundary', color: '#1d4ed8', width: 5 })
   })
 
   it('their site down: the last good read, and an eruv never read is left off', async () => {

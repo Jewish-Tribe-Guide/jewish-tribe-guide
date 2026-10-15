@@ -18,7 +18,7 @@ const { runEruvLines } = await import('./eruvLineRun')
 const file = (names: string[]) =>
   JSON.stringify({ type: 'FeatureCollection', features: names.map((name, i) => ({ type: 'Feature', properties: { name }, geometry: { type: 'LineString', coordinates: [[-75.1, 39.9 + i / 100], [-75.2, 39.9 + i / 100]] } })) })
 const source = (over: Partial<EruvMapSource> = {}): EruvMapSource => ({
-  communityId: 'philly', id: 'center-city', name: 'Center City Eruv', lineUrl: 'https://example.org/map.geojson', rawLine: null, lineLeaveOut: ['Washington Border'], lineHidePoints: false, lineMissing: [], ...over,
+  communityId: 'philly', id: 'center-city', name: 'Center City Eruv', lineUrl: 'https://example.org/map.geojson', rawLine: null, lineLeaveOut: ['Washington Border'], lineHidePoints: false, lineMissing: [], lineColor: null, ...over,
 })
 const serve = (body: string, status = 200) => vi.stubGlobal('fetch', vi.fn(async () => new Response(body, { status })))
 

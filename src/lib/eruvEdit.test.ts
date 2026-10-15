@@ -18,6 +18,15 @@ describe('readEruvEdit', () => {
     expect(readEruvEdit({ lineHidePoints: true })).toEqual({ ok: true, edit: { lineHidePoints: true } })
     expect(readEruvEdit({ lineHidePoints: 'yes' })).toEqual({ ok: true, edit: { lineHidePoints: false } })
   })
+  it('a line colour: a colour, tidied, or none for its own', () => {
+    expect(readEruvEdit({ lineColor: '#1D4ED8' })).toEqual({ ok: true, edit: { lineColor: '#1d4ed8' } })
+    expect(readEruvEdit({ lineColor: ' #0af ' })).toEqual({ ok: true, edit: { lineColor: '#00aaff' } })
+    expect(readEruvEdit({ lineColor: null })).toEqual({ ok: true, edit: { lineColor: null } })
+    expect(readEruvEdit({ lineColor: '' })).toEqual({ ok: true, edit: { lineColor: null } })
+    expect(readEruvEdit({ lineColor: 'blue' })).toMatchObject({ ok: false })
+    expect(readEruvEdit({ lineColor: 'red;background:url(x)' })).toMatchObject({ ok: false })
+    expect(readEruvEdit({ lineColor: 7 })).toMatchObject({ ok: false })
+  })
   it('an emptied address is cleared', () => {
     expect(readEruvEdit({ alertsUrl: '' })).toEqual({ ok: true, edit: { alertsUrl: null } })
   })

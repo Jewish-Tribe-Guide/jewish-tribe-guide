@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, screen, within } from '@testing-library/react'
+import { cleanup, fireEvent, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { mockRouter } from '@/test/nextNavigationMock'
@@ -25,7 +25,7 @@ const NE: AdminEruv = {
     lines: [{ name: 'Boundary', points: [[40.05, -75.07], [40.07, -75.07], [40.07, -75.04], [40.05, -75.07]], color: '#ccffff', fill: { color: '#ccffff', opacity: 0.47 } }],
     marks: [{ name: 'Congregation Ahavas Torah', at: [40.068, -75.065], color: '#0288d1' }],
   },
-  lineReadAt: '2026-10-12T11:00:00Z', lineError: null, lineLeaveOut: [], lineHidePoints: false, lineMissing: [],
+  lineReadAt: '2026-10-12T11:00:00Z', lineError: null, lineLeaveOut: [], lineHidePoints: false, lineMissing: [], lineColor: null,
 }
 
 const posts: unknown[] = []
@@ -78,5 +78,45 @@ describe('EruvimManager', () => {
     serve([{ ...NE, lineLeaveOut: ['Old border'], lineMissing: ['Old border'] }])
     renderWithProviders(<EruvimManager token="t" />)
     expect(await screen.findByTestId('eruv-line-missing')).toHaveTextContent('Left out, but no longer in its map: “Old border”')
+  })
+
+  // Oct 15: Northeast's own line is #ccffff, pale enough to vanish on the
+  // map. The admin picks a colour for its line; the line still comes from
+  // its map.
+  const strokes = (card: HTMLElement) => [...within(card).getByTestId('eruv-map-preview').querySelectorAll('polyline')].map((l) => l.getAttribute('stroke'))
+
+  it('its line in its own colour until one is picked', async () => {
+    serve([NE])
+    renderWithProviders(<EruvimManager token="t" />)
+    const card = await screen.findByTestId('admin-eruv')
+    expect(within(card).getByLabelText('Line colour')).toHaveValue('#ccffff')
+    expect(within(card).getByText('its own, from its map')).toBeInTheDocument()
+    expect(strokes(card)).toEqual(['#ccffff'])
+  })
+
+  it('a colour picked shows in the preview and is saved', async () => {
+    const user = userEvent.setup()
+    serve([NE])
+    renderWithProviders(<EruvimManager token="t" />)
+    const card = await screen.findByTestId('admin-eruv')
+    fireEvent.change(within(card).getByLabelText('Line colour'), { target: { value: '#1d4ed8' } })
+    expect(strokes(card)).toEqual(['#1d4ed8'])
+    // The shading is still the eruv's own.
+    expect(within(card).getByTestId('eruv-map-preview').querySelector('polygon')).toHaveAttribute('fill', '#ccffff')
+    await user.click(within(card).getByRole('button', { name: 'Save' }))
+    expect(posts).toEqual([expect.objectContaining({ action: 'save', id: 'northeast', edit: expect.objectContaining({ lineColor: '#1d4ed8' }) })])
+  })
+
+  it('“Use its own” puts its own colour back', async () => {
+    const user = userEvent.setup()
+    serve([{ ...NE, lineColor: '#1d4ed8' }])
+    renderWithProviders(<EruvimManager token="t" />)
+    const card = await screen.findByTestId('admin-eruv')
+    expect(strokes(card)).toEqual(['#1d4ed8'])
+    await user.click(within(card).getByRole('button', { name: 'Use its own' }))
+    expect(strokes(card)).toEqual(['#ccffff'])
+    expect(within(card).getByLabelText('Line colour')).toHaveValue('#ccffff')
+    await user.click(within(card).getByRole('button', { name: 'Save' }))
+    expect(posts).toEqual([expect.objectContaining({ edit: expect.objectContaining({ lineColor: null }) })])
   })
 })

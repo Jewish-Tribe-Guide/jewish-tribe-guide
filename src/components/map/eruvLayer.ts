@@ -1,5 +1,5 @@
 import { labelPoint } from '@/lib/eruvShape'
-import type { EruvLineFile } from '@/lib/eruvLine'
+import { DEFAULT_LINE_COLOR, type EruvLineFile } from '@/lib/eruvLine'
 import type { EruvTone } from '@/lib/eruv'
 
 // ── The eruvim, drawn on a Google map (Oct 7; their own way Oct 12) ─────────
@@ -12,10 +12,6 @@ import type { EruvTone } from '@/lib/eruv'
 export type MapEruv = { id: string; name: string; tone: EruvTone; map: EruvLineFile }
 
 export const ERUV_COLOR: Record<EruvTone, string> = { green: '#15803d', amber: '#b45309', red: '#b91c1c', grey: '#475569' }
-
-/** A file that sets no colour (Center City's GeoJSON) is drawn in a dark
- *  red, as Center City draws its own. */
-const DEFAULT_LINE = '#b7372d'
 
 /** "University City" for the University City Eruv: the map is all eruvim. */
 export const mapLabel = (name: string) => name.replace(/\s+eruv$/i, '')
@@ -92,7 +88,7 @@ export function drawEruvim(map: google.maps.Map, eruvim: MapEruv[], { onSelect, 
     const d: DrawnEruv = { lines: [], areas: [], marks: [], label: null, bounds: new google.maps.LatLngBounds() }
     for (const l of e.map.lines) {
       const path = l.points.map(([lat, lng]) => ({ lat, lng }))
-      const color = l.color ?? DEFAULT_LINE
+      const color = l.color ?? DEFAULT_LINE_COLOR
       if (l.fill) {
         const area = new google.maps.Polygon({
           map,

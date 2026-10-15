@@ -21,6 +21,18 @@ function url(v: unknown): string | null | undefined {
   }
 }
 
+/** '#rrggbb', lower case, from '#rgb' or '#rrggbb'; null for none (the
+ *  eruv's own colours); undefined when it isn't a colour. */
+function lineColor(v: unknown): string | null | undefined {
+  if (v === null || v === '') return null
+  if (typeof v !== 'string') return undefined
+  const t = v.trim().toLowerCase()
+  if (!t) return null
+  const short = t.match(/^#([0-9a-f])([0-9a-f])([0-9a-f])$/)
+  if (short) return `#${short[1]}${short[1]}${short[2]}${short[2]}${short[3]}${short[3]}`
+  return /^#[0-9a-f]{6}$/.test(t) ? t : undefined
+}
+
 export function readEruvEdit(raw: unknown): { ok: true; edit: EruvEdit } | { ok: false; error: string } {
   if (!raw || typeof raw !== 'object') return { ok: false, error: 'Nothing to save.' }
   const r = raw as Record<string, unknown>
@@ -44,6 +56,11 @@ export function readEruvEdit(raw: unknown): { ok: true; edit: EruvEdit } | { ok:
     const n = Number(r.sortOrder)
     if (!Number.isFinite(n)) return { ok: false, error: 'The order must be a number.' }
     edit.sortOrder = Math.round(n)
+  }
+  if ('lineColor' in r) {
+    const v = lineColor(r.lineColor)
+    if (v === undefined) return { ok: false, error: `That isn’t a colour: ${String(r.lineColor)}` }
+    edit.lineColor = v
   }
   if ('lineLeaveOut' in r) {
     if (!Array.isArray(r.lineLeaveOut)) return { ok: false, error: 'Leave out must be a list.' }
