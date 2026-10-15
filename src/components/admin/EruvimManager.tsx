@@ -178,7 +178,7 @@ function EruvCard({ eruv, timezone, busy, onAct, onSave }: { eruv: AdminEruv; ti
                 <span className="text-muted">its own, from its map</span>
               )}
             </div>
-            <p className="mt-0.5 text-xs text-muted">For a line that’s hard to see on the map. Only the colour changes: the line itself still comes from its map.</p>
+            <p className="mt-0.5 text-xs text-muted">For a line that’s hard to see on the map. Its line is drawn in this colour with no shading inside; the line itself still comes from its map.</p>
           </div>
         </div>
       )}

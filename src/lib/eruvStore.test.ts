@@ -42,7 +42,7 @@ vi.mock('./supabase/admin', () => ({
   }),
 }))
 
-import { listEruvMapSources, listEruvimForAdmin, updateEruv } from './eruvStore'
+import { eruvMapsVersion, listEruvMapSources, listEruvimForAdmin, updateEruv } from './eruvStore'
 
 afterEach(() => {
   table.missing.clear()
@@ -94,5 +94,34 @@ describe('the eruv table after it', () => {
     expect(source.lineColor).toBe('#1d4ed8')
     await updateEruv('philly', 'northeast', { lineColor: '#1d4ed8' }, stored)
     expect(table.updates.at(-1)).toMatchObject({ line_color: '#1d4ed8' })
+  })
+})
+
+// Oct 15: a colour changed in the admin was still the old one on the map,
+// since /api/eruv/maps is kept at the CDN for an hour. The maps are asked
+// for under this fingerprint of what an admin chose about them.
+describe('eruvMapsVersion', () => {
+  it('changes with what an admin chose about a map, and only that', async () => {
+    table.rows = [{ ...NE, status: 'up', status_checked_at: '2026-10-15T10:00:00Z' }]
+    const before = await eruvMapsVersion('philly')
+    expect(before).toMatch(/^[0-9a-f]{12}$/)
+    // Its status read again (every few hours): the same maps, the same address.
+    table.rows = [{ ...NE, status: 'down', status_checked_at: '2026-10-15T13:00:00Z' }]
+    expect(await eruvMapsVersion('philly')).toBe(before)
+    for (const chosen of [{ line_color: '#1d4ed8' }, { line_leave_out: ['Old border'] }, { line_hide_points: true }, { active: false }, { line_url: 'https://www.google.com/maps/d/viewer?mid=new' }]) {
+      table.rows = [{ ...NE, ...chosen }]
+      expect(await eruvMapsVersion('philly'), JSON.stringify(chosen)).not.toBe(before)
+    }
+    // An eruv removed is a change too.
+    table.rows = []
+    expect(await eruvMapsVersion('philly')).not.toBe(before)
+  })
+
+  it('before migration 081, still one; without the table, none', async () => {
+    table.missing.add('line_color')
+    table.rows = [NE]
+    expect(await eruvMapsVersion('philly')).toMatch(/^[0-9a-f]{12}$/)
+    table.missing.add('id')
+    expect(await eruvMapsVersion('philly')).toBeNull()
   })
 })

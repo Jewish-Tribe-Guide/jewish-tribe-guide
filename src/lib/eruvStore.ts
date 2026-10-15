@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { getAdminClient } from './supabase/admin'
 import type { Eruv, EruvStatus } from './eruv'
 import type { EruvLineFile } from './eruvLine'
@@ -187,6 +188,22 @@ export async function listEruvMapSources(community?: string): Promise<EruvMapSou
     throw new Error(`Failed to load the eruv maps: ${error.message}`)
   }
   return ((data ?? []) as SourceRow[]).map(fromSourceRow)
+}
+
+/** A short fingerprint of what an admin chose about a community's maps:
+ *  which eruvim show, where each map is, what's left out, markers hidden,
+ *  their line colour. /api/eruv/maps is kept at the CDN for an hour, so the
+ *  maps are asked for under this (Oct 15: a colour changed in the admin was
+ *  still the old one on the map). An admin's change is a new address, read
+ *  fresh; nothing else is. Not the eruv's own map changing: that's the
+ *  hour. Null when it can't be read; the maps are then asked for as before. */
+export async function eruvMapsVersion(community: string): Promise<string | null> {
+  const { data, error } = await selectWithLater<Record<string, unknown>>(
+    (cols) => getAdminClient().from('eruv').select(cols).eq('community_id', community).order('id'),
+    'id, active, line_url, line_leave_out',
+  )
+  if (error || !data) return null
+  return createHash('sha1').update(JSON.stringify(data)).digest('hex').slice(0, 12)
 }
 
 export type StatusWrite =

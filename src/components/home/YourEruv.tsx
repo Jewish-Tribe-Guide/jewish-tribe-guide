@@ -25,7 +25,7 @@ export default function YourEruv({ communitySlug, href, now }: { communitySlug: 
   const you = useOptionalLocation()?.coords ?? null
   const statuses = useEruvStatuses(communitySlug, !!you)
   const loaded = statuses?.available ? statuses : null
-  const maps = useEruvMaps(communitySlug, !!loaded)
+  const maps = useEruvMaps(communitySlug, !!loaded, loaded?.mapsVersion)
 
   const nearest = useMemo(() => {
     if (!loaded || !maps || !you) return null

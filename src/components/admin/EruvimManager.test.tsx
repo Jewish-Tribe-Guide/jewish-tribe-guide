@@ -85,6 +85,8 @@ describe('EruvimManager', () => {
   // its map.
   const strokes = (card: HTMLElement) => [...within(card).getByTestId('eruv-map-preview').querySelectorAll('polyline')].map((l) => l.getAttribute('stroke'))
 
+  const shading = (card: HTMLElement) => within(card).getByTestId('eruv-map-preview').querySelector('polygon')?.getAttribute('fill-opacity')
+
   it('its line in its own colour until one is picked', async () => {
     serve([NE])
     renderWithProviders(<EruvimManager token="t" />)
@@ -92,6 +94,7 @@ describe('EruvimManager', () => {
     expect(within(card).getByLabelText('Line colour')).toHaveValue('#ccffff')
     expect(within(card).getByText('its own, from its map')).toBeInTheDocument()
     expect(strokes(card)).toEqual(['#ccffff'])
+    expect(shading(card)).toBe('0.47')
   })
 
   it('a colour picked shows in the preview and is saved', async () => {
@@ -101,8 +104,8 @@ describe('EruvimManager', () => {
     const card = await screen.findByTestId('admin-eruv')
     fireEvent.change(within(card).getByLabelText('Line colour'), { target: { value: '#1d4ed8' } })
     expect(strokes(card)).toEqual(['#1d4ed8'])
-    // The shading is still the eruv's own.
-    expect(within(card).getByTestId('eruv-map-preview').querySelector('polygon')).toHaveAttribute('fill', '#ccffff')
+    // And its pale shading no longer shows under it.
+    expect(shading(card)).toBe('0')
     await user.click(within(card).getByRole('button', { name: 'Save' }))
     expect(posts).toEqual([expect.objectContaining({ action: 'save', id: 'northeast', edit: expect.objectContaining({ lineColor: '#1d4ed8' }) })])
   })
@@ -113,8 +116,10 @@ describe('EruvimManager', () => {
     renderWithProviders(<EruvimManager token="t" />)
     const card = await screen.findByTestId('admin-eruv')
     expect(strokes(card)).toEqual(['#1d4ed8'])
+    expect(shading(card)).toBe('0')
     await user.click(within(card).getByRole('button', { name: 'Use its own' }))
     expect(strokes(card)).toEqual(['#ccffff'])
+    expect(shading(card)).toBe('0.47')
     expect(within(card).getByLabelText('Line colour')).toHaveValue('#ccffff')
     await user.click(within(card).getByRole('button', { name: 'Save' }))
     expect(posts).toEqual([expect.objectContaining({ edit: expect.objectContaining({ lineColor: null }) })])

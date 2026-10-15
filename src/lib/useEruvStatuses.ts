@@ -9,7 +9,7 @@ import type { EruvLineFile } from './eruvLine'
 // "Your eruv" ask for the same thing. Null until it arrives; `available`
 // false without migration 074, or when it can't be fetched.
 
-export type EruvStatuses = { available: false } | { available: true; timezone: string; candles: number | null; eruvim: Eruv[] }
+export type EruvStatuses = { available: false } | { available: true; timezone: string; candles: number | null; eruvim: Eruv[]; mapsVersion: string | null }
 
 const cache = new Map<string, Promise<EruvStatuses>>()
 
@@ -18,7 +18,7 @@ export function fetchEruvStatuses(communitySlug: string): Promise<EruvStatuses> 
   if (!p) {
     p = fetch(`/api/eruv?community=${encodeURIComponent(communitySlug)}`)
       .then((r) => r.json())
-      .then((b): EruvStatuses => (b?.ok && b.available ? { available: true, timezone: b.timezone, candles: b.candles ?? null, eruvim: b.eruvim } : { available: false }))
+      .then((b): EruvStatuses => (b?.ok && b.available ? { available: true, timezone: b.timezone, candles: b.candles ?? null, eruvim: b.eruvim, mapsVersion: b.mapsVersion ?? null } : { available: false }))
       .catch((): EruvStatuses => ({ available: false }))
     cache.set(communitySlug, p)
     // A failure isn't kept: the next page asks again.
@@ -57,33 +57,36 @@ export function useEruvCount(communitySlug: string, wanted: boolean): number | n
 // Each eruv's own map, as the eruv draws it, for the maps that show them:
 // the Eruv page and the Map tab's Eruvim layer. Fetched only when one of
 // them is there, and shared. Empty without any (or without migration 076).
+// Asked for under the version /api/eruv gives (eruvMapsVersion), so an
+// admin's change isn't behind the CDN's hour.
 
 export type EruvMaps = Map<string, EruvLineFile>
 
 const mapsCache = new Map<string, Promise<EruvMaps>>()
 
-export function fetchEruvMaps(communitySlug: string): Promise<EruvMaps> {
-  let p = mapsCache.get(communitySlug)
+export function fetchEruvMaps(communitySlug: string, version: string | null = null): Promise<EruvMaps> {
+  const key = `${communitySlug}|${version ?? ''}`
+  let p = mapsCache.get(key)
   if (!p) {
-    p = fetch(`/api/eruv/maps?community=${encodeURIComponent(communitySlug)}`)
+    p = fetch(`/api/eruv/maps?community=${encodeURIComponent(communitySlug)}${version ? `&v=${encodeURIComponent(version)}` : ''}`)
       .then((r) => r.json())
       .then((b): EruvMaps => new Map(b?.ok && Array.isArray(b.maps) ? (b.maps as { id: string; map: EruvLineFile }[]).map((m) => [m.id, m.map]) : []))
       .catch((): EruvMaps => new Map())
-    mapsCache.set(communitySlug, p)
-    p.then((m) => m.size === 0 && mapsCache.delete(communitySlug))
+    mapsCache.set(key, p)
+    p.then((m) => m.size === 0 && mapsCache.delete(key))
   }
   return p
 }
 
-export function useEruvMaps(communitySlug: string, wanted = true): EruvMaps | null {
+export function useEruvMaps(communitySlug: string, wanted = true, version: string | null = null): EruvMaps | null {
   const [data, setData] = useState<EruvMaps | null>(null)
   useEffect(() => {
     if (!wanted) return
     let live = true
-    fetchEruvMaps(communitySlug).then((d) => live && setData(d))
+    fetchEruvMaps(communitySlug, version).then((d) => live && setData(d))
     return () => {
       live = false
     }
-  }, [communitySlug, wanted])
+  }, [communitySlug, wanted, version])
   return data
 }

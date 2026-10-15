@@ -64,7 +64,7 @@ type Props = {
 const ERUV_STEP = 'eruv'
 
 /** `failed`: /api/eruv didn't answer (offline, say), as against no eruvim. */
-type Loaded = { available: false; failed?: boolean } | { available: true; timezone: string; candles: number | null; eruvim: Eruv[] }
+type Loaded = { available: false; failed?: boolean } | { available: true; timezone: string; candles: number | null; eruvim: Eruv[]; mapsVersion: string | null }
 
 export default function EruvInfo({ onUp, title = 'Eruv', icon, color = '#64748b', bandImageUrl, itemId = null, onParamsChange }: Props) {
   // Puts "‹ {title}" in SiteHeader on mobile — see GenericDirectory's
@@ -106,7 +106,7 @@ export default function EruvInfo({ onUp, title = 'Eruv', icon, color = '#64748b'
       .then((r) => r.json())
       .then((body) => {
         if (!live) return
-        setLoaded(body?.ok && body.available ? { available: true, timezone: body.timezone, candles: body.candles ?? null, eruvim: body.eruvim } : { available: false })
+        setLoaded(body?.ok && body.available ? { available: true, timezone: body.timezone, candles: body.candles ?? null, eruvim: body.eruvim, mapsVersion: body.mapsVersion ?? null } : { available: false })
       })
       .catch(() => live && setLoaded({ available: false, failed: true }))
     return () => {
@@ -169,7 +169,7 @@ export default function EruvInfo({ onUp, title = 'Eruv', icon, color = '#64748b'
 
   // The visitor's dot, on the eruvim's own maps.
   const you = useOptionalLocation()?.coords ?? null
-  const maps = useEruvMaps(slug, !!loaded?.available)
+  const maps = useEruvMaps(slug, !!loaded?.available, loaded?.available ? loaded.mapsVersion : null)
   const { isPinned } = usePinned()
   // Desktop only: a phone has nothing to point with.
   const pointAt = (id: string) => (isMobile ? {} : { onMouseEnter: () => setPointedId(id), onMouseLeave: () => setPointedId(null), onFocus: () => setPointedId(id), onBlur: () => setPointedId(null) })

@@ -211,11 +211,13 @@ export function shownMap(file: EruvLineFile, leftOut: readonly string[], hideMar
 export const DEFAULT_LINE_COLOR = '#b7372d'
 
 /** Its lines in the colour an admin chose (Oct 15: Northeast draws its own
- *  in a cyan so pale it barely shows on the map). Only the lines' colour:
- *  where they go, their widths, the shading and the markers stay theirs.
- *  No colour chosen, the file as it is. */
+ *  in a cyan so pale it barely shows on the map), and no shading inside:
+ *  the shading was theirs, chosen to go with their line, and stayed as a
+ *  pale wash under the new one. The shaded area stays, unseen, so tapping
+ *  inside the eruv still picks it. Where the lines go, their widths and the
+ *  markers stay theirs. No colour chosen, the file as it is. */
 export function withLineColor(file: EruvLineFile, color: string | null | undefined): EruvLineFile {
-  return color ? { ...file, lines: file.lines.map((l) => ({ ...l, color })) } : file
+  return color ? { ...file, lines: file.lines.map((l) => ({ ...l, color, ...(l.fill && { fill: { color, opacity: 0 } }) })) } : file
 }
 
 /** The colour its lines are drawn in, when it's one: the admin's, or the

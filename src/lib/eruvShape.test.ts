@@ -83,18 +83,25 @@ describe('what the guide shows of a map', () => {
     expect(missingNames(CC, ['Washington Border', 'Line 99'])).toEqual(['Line 99'])
     expect(missingNames(EP, [EP_ROUTE])).toEqual([])
   })
-  it('its lines in a colour an admin chose (Oct 15: the Northeast’s pale cyan), and nothing else of it changed', () => {
+  it('its lines in a colour an admin chose (Oct 15: the Northeast’s pale cyan), no shading, and nothing else of it changed', () => {
     expect(NE.lines[0].color).toBe('#ccffff')
     const ours = withLineColor(NE, '#1d4ed8')
     expect(ours.lines.map((l) => l.color)).toEqual(['#1d4ed8'])
-    // Where it goes, its width, its shading and its markers are still theirs.
-    const uncoloured = (f: typeof NE) => f.lines.map((l) => ({ ...l, color: undefined }))
-    expect(uncoloured(ours)).toEqual(uncoloured(NE))
+    // Its pale shading went on showing under the new line: gone, but the
+    // area stays (unseen), so tapping inside the eruv still picks it.
+    expect(NE.lines[0].fill).toEqual({ color: '#ccffff', opacity: 0.47 })
+    expect(ours.lines[0].fill).toEqual({ color: '#1d4ed8', opacity: 0 })
+    // Where it goes, its width and its markers are still theirs.
+    const unstyled = (f: typeof NE) => f.lines.map((l) => ({ ...l, color: undefined, fill: undefined }))
+    expect(unstyled(ours)).toEqual(unstyled(NE))
     expect(ours.marks).toEqual(NE.marks)
     // Every line, Lower Merion's three colours too.
     expect(new Set(withLineColor(LM, '#000000').lines.map((l) => l.color))).toEqual(new Set(['#000000']))
+    // A line with no shading isn't given any.
+    expect(withLineColor(LM, '#000000').lines.filter((l) => l.fill).length).toBe(LM.lines.filter((l) => l.fill).length)
     // The file itself isn't touched: it's what's kept, and compared.
     expect(NE.lines[0].color).toBe('#ccffff')
+    expect(NE.lines[0].fill).toEqual({ color: '#ccffff', opacity: 0.47 })
   })
   it('no colour chosen, its own', () => {
     expect(withLineColor(NE, null)).toBe(NE)

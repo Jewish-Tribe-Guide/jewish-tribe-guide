@@ -1657,7 +1657,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   const eruvCategory = (categories ?? []).find((c) => c.kind === 'eruv') ?? null
   const eruvStatuses = useEruvStatuses(countCommunity ?? '', !!countCommunity && !!eruvCategory)
   const eruvData = eruvStatuses?.available ? eruvStatuses : null
-  const eruvMaps = useEruvMaps(countCommunity ?? '', !!eruvData)
+  const eruvMaps = useEruvMaps(countCommunity ?? '', !!eruvData, eruvData?.mapsVersion)
   const eruvimWithLines = useMemo(
     () => (eruvData && eruvMaps ? eruvData.eruvim.flatMap((e) => (eruvMaps.get(e.id) ? [{ eruv: e, map: eruvMaps.get(e.id)! }] : [])) : []),
     [eruvData, eruvMaps],

@@ -15,12 +15,13 @@ const NOW = Date.parse('2026-10-09T19:00:00Z') // Fri 3 PM
 const map = (f: string) => parseLineFile(readFileSync(join(__dirname, '../../lib/__fixtures__/eruv', f), 'utf8'))
 const eruv = (id: string, name: string, status: 'up' | 'down') => ({ id, name, statusUrl: 'https://example.org/', statusDated: false, status, statusWords: 'x', statusPostedOn: null, statusCheckedAt: '2026-10-09T18:55:00Z', statusErrorAt: null, statusError: null })
 // /api/eruv, and /api/eruv/maps.
+let mapsVersion: string | undefined
 const fetchMock = vi.fn(async (url: string) =>
   new Response(
     JSON.stringify(
       String(url).startsWith('/api/eruv/maps')
         ? { ok: true, maps: [{ id: 'center-city', map: map('center-city.geojson') }, { id: 'university-city', map: map('university-city.kml') }] }
-        : { ok: true, available: true, timezone: 'America/New_York', candles: 18 * 60 + 12, eruvim: [eruv('center-city', 'Center City Eruv', 'up'), eruv('university-city', 'University City Eruv', 'down')] },
+        : { ok: true, available: true, timezone: 'America/New_York', candles: 18 * 60 + 12, mapsVersion, eruvim: [eruv('center-city', 'Center City Eruv', 'up'), eruv('university-city', 'University City Eruv', 'down')] },
     ),
   ),
 )
@@ -31,6 +32,7 @@ beforeEach(() => {
 })
 afterEach(() => {
   here.coords = null
+  mapsVersion = undefined
   cleanup()
   vi.unstubAllGlobals()
   fetchMock.mockClear()
@@ -69,5 +71,22 @@ describe('YourEruv', () => {
     await vi.waitFor(() => expect(fetchMock).toHaveBeenCalled())
     await new Promise((r) => setTimeout(r, 0))
     expect(screen.queryByTestId('today-eruv')).not.toBeInTheDocument()
+  })
+
+  // Oct 15: a colour changed in the admin was still the old one, since the
+  // maps were kept at the CDN for an hour under the same address.
+  it('asks for the maps under the version /api/eruv gives, so an admin’s change isn’t an hour behind', async () => {
+    here.coords = { lat: 39.9496, lng: -75.1718 }
+    mapsVersion = 'abc123'
+    show()
+    await screen.findByTestId('today-eruv')
+    expect(fetchMock.mock.calls.map(([u]) => String(u))).toContain('/api/eruv/maps?community=philly&v=abc123')
+  })
+
+  it('and without one, the maps as before', async () => {
+    here.coords = { lat: 39.9496, lng: -75.1718 }
+    show()
+    await screen.findByTestId('today-eruv')
+    expect(fetchMock.mock.calls.map(([u]) => String(u))).toContain('/api/eruv/maps?community=philly')
   })
 })
