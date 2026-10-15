@@ -35,8 +35,8 @@ import { countEvent } from '@/lib/countEvent'
 // the map) loads when a listing is first opened, not with every list of
 // cards: the home draws these cards for its search answers, and loading all
 // that with the home put it over its 400 KB budget (Oct 2).
-const ListingDetailModal = dynamic(() => import('./ListingDetailModal'))
-const MapPlaceDetail = dynamic(() => import('@/components/map/MapPlaceDetail'))
+const ListingDetailModal = dynamic(() => import('./ListingDetailModal'), { loading: () => null })
+const MapPlaceDetail = dynamic(() => import('@/components/map/MapPlaceDetail'), { loading: () => null })
 
 /** Save and Share are the two that belong to SCANNING a list — shortlisting
  *  as you read, sending one to someone. "Set as location" is deliberately

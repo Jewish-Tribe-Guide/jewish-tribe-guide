@@ -54,7 +54,7 @@ import { dayLine } from '@/lib/todayHome'
 
 // Only after a search finds nothing; it carries the anti-spam check, which
 // the home shouldn't load for everyone (see GenericListingCard).
-const AskTheGroup = dynamic(() => import('@/components/home/AskTheGroup'))
+const AskTheGroup = dynamic(() => import('@/components/home/AskTheGroup'), { loading: () => null })
 
 export type LandingProps = {
   onNavigate: NavigateFn

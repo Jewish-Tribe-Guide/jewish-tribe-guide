@@ -141,7 +141,7 @@ const TONE: Record<RowFact['tone'], string> = {
 
 // The edit sheet and the form fields it carries load when Edit is tapped,
 // not with every listing: they were 15 KB on the home screen's first load.
-const BoxEditSheet = dynamic(() => import('./BoxEditSheet'))
+const BoxEditSheet = dynamic(() => import('./BoxEditSheet'), { loading: () => null })
 
 export default function ListingView({ item, category, color, place = null, upvote, found = null, path, foot, onward, wide = false, onwardClassName = '', titleAs: Title = 'h2' }: Props) {
   const { community } = useActiveCommunity()

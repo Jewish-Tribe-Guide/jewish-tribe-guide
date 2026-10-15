@@ -14,7 +14,7 @@ import { ui } from '@/lib/uiConfig'
 // "+", with "Add a place" inside; a listing has Suggest an edit.
 
 // Loaded on the first tap: nobody browsing pays for the box.
-const TellUsSheet = dynamic(() => import('@/components/TellUsSheet'))
+const TellUsSheet = dynamic(() => import('@/components/TellUsSheet'), { loading: () => null })
 
 /** Screens without this "+": the Map, a category page or a listing (their
  *  own), and the site's own pages (Feedback, About, Privacy). */

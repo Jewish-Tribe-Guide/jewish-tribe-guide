@@ -18,7 +18,7 @@ import UpvoteButton from '@/components/resources/UpvoteButton'
 
 // The editor (address lookup, hours, photos) loads when editing starts, not
 // with the listing, so the Map page's code stays light.
-const ListingEditor = dynamic(() => import('@/components/resources/ListingEditor'))
+const ListingEditor = dynamic(() => import('@/components/resources/ListingEditor'), { loading: () => null })
 import type { EditorStep } from '@/components/resources/ListingEditor'
 
 type Props = {

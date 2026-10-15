@@ -16,7 +16,7 @@ import { DEFAULT_DESKTOP_NAV_ITEMS, type DesktopNavItem } from '@/lib/siteSettin
 
 // Loaded when Feedback is first opened (it carries the anti-spam check), not
 // with every page's header.
-const FeedbackForm = dynamic(() => import('@/components/FeedbackForm'))
+const FeedbackForm = dynamic(() => import('@/components/FeedbackForm'), { loading: () => null })
 
 /** How long a mega-menu stays open after the pointer leaves — same value and
  *  same reason as SectionTabs used to use: without it, the gap between the

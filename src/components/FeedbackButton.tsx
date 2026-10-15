@@ -6,7 +6,7 @@ import { useIsMobile } from '@/lib/useIsMobile'
 import { DEFAULT_FEEDBACK_BUTTON_LABEL, DEFAULT_FEEDBACK_HEADING, DEFAULT_FEEDBACK_SUCCESS_MESSAGE } from '@/lib/siteSettings'
 
 // Loaded when it's first opened, not with every page (see HeaderNav).
-const FeedbackForm = dynamic(() => import('./FeedbackForm'))
+const FeedbackForm = dynamic(() => import('./FeedbackForm'), { loading: () => null })
 
 type Props = {
   buttonLabel?: string

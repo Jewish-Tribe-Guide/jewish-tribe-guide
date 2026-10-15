@@ -19,7 +19,7 @@ import BackIconButton from '@/components/BackIconButton'
 import BodyPortal from '@/components/BodyPortal'
 
 // Loaded when editing starts (see MapPlaceDetail).
-const ListingEditor = dynamic(() => import('./ListingEditor'))
+const ListingEditor = dynamic(() => import('./ListingEditor'), { loading: () => null })
 import type { EditorStep } from './ListingEditor'
 
 type Props = {

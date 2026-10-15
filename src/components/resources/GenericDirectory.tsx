@@ -111,7 +111,7 @@ const MINYANIM_STEP = 'minyanim'
 const LISTING_STEP = 'listing'
 
 // Loaded on the first tap of "+": nobody browsing pays for the box.
-const TellUsSheet = dynamic(() => import('@/components/TellUsSheet'))
+const TellUsSheet = dynamic(() => import('@/components/TellUsSheet'), { loading: () => null })
 
 type Props = {
   category: CategoryConfig

@@ -22,7 +22,7 @@ import { Card } from './listingParts'
 // (budgets.spec counts it).
 
 // Loaded on the first tap of "Suggest an edit", for the same reason.
-const EruvEditor = dynamic(() => import('./EruvEditor'))
+const EruvEditor = dynamic(() => import('./EruvEditor'), { loading: () => null })
 
 /** "● Up for this Shabbos", and under it when the guide checked. */
 export function EruvStatusLine({ eruv, now, timezone, candles }: { eruv: Eruv; now: Date; timezone: string; candles: number | null }) {
