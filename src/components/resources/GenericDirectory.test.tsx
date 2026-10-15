@@ -2715,7 +2715,10 @@ describe('GenericDirectory — Has', () => {
     await user.click(all.getByRole('checkbox'))
     expect(screen.queryByText('Small Store')).not.toBeInTheDocument()
 
-    await user.click(all.getByRole('button', { name: 'Back to Filters' }))
+    // Back is the sheet's own, before its title ("‹ Has").
+    expect(screen.getByRole('dialog', { name: 'Has' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Back' }))
+    expect(screen.getByRole('dialog', { name: 'Filters' })).toBeInTheDocument()
     // Ticked further down the list, it stays in view with the 8.
     expect(sheet.getByRole('button', { name: /^Honey/ })).toHaveAttribute('aria-pressed', 'true')
   })

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useBodyScrollLock } from '@/lib/useBodyScrollLock'
 import { useIsMobile } from '@/lib/useIsMobile'
 import MobileSheet from './MobileSheet'
+import BackIconButton from '@/components/BackIconButton'
 // The same order as the list's own groups, so a denomination sits in the
 // same place in both.
 import { orderForPicking } from '@/lib/listGroups'
@@ -68,25 +69,56 @@ type Props = {
 
 export default function FiltersSheet(props: Props) {
   const isMobile = useIsMobile()
-  const body = <FiltersBody {...props} />
+  // "All N items", A to Z, in place of the rest of the sheet. Held here, not
+  // in the body, because it's a step inside the sheet: its name ("Has")
+  // takes the sheet's title, with Back before it, the way the "+ Add" box's
+  // own steps do. It used to sit under "Filters" as a second heading with a
+  // back chip of its own — two titles and two ways back, stacked (Oct 15).
+  const [allOf, setAllOf] = useState<string | null>(null)
+  const all = props.items?.find((i) => i.key === allOf)
+  // Closed and opened again, it starts from the whole list. Reset on the
+  // way in rather than the way out, so the phone's sheet doesn't turn back
+  // into "Filters" while it slides away.
+  const { isOpen, onClose } = props
+  const [wasOpen, setWasOpen] = useState(isOpen)
+  if (isOpen !== wasOpen) {
+    setWasOpen(isOpen)
+    if (isOpen) setAllOf(null)
+  }
+  const title = all ? all.label : 'Filters'
+  const back = all ? () => setAllOf(null) : undefined
+  const body = <FiltersBody {...props} all={all} onAll={setAllOf} />
   // Drags down to close, like the phone's other sheets (Oct 6).
   return isMobile ? (
-    <MobileSheet isOpen={props.isOpen} onClose={props.onClose} title="Filters" draggable>
+    <MobileSheet isOpen={isOpen} onClose={onClose} title={title} onBack={back} draggable>
       {body}
     </MobileSheet>
   ) : (
-    <FiltersDialog isOpen={props.isOpen} onClose={props.onClose}>
+    <FiltersDialog isOpen={isOpen} onClose={onClose} title={title} onBack={back}>
       {body}
     </FiltersDialog>
   )
 }
 
-function FiltersBody({ hasOpenNow, openNow, onOpenNow, booleans, onBoolean, selects, onSelect, items = [], onItem, onClearAll, onClose, count, units }: Props) {
+function FiltersBody({
+  hasOpenNow,
+  openNow,
+  onOpenNow,
+  booleans,
+  onBoolean,
+  selects,
+  onSelect,
+  items = [],
+  onItem,
+  onClearAll,
+  onClose,
+  count,
+  units,
+  all,
+  onAll,
+}: Props & { all: FilterItems | undefined; onAll: (key: string) => void }) {
   const anyOn = openNow || booleans.some((b) => b.on) || selects.some((s) => s.chosen.length > 0) || items.some((i) => i.chosen.length > 0)
-  // "All N items", A to Z, in place of the rest of the sheet.
-  const [allOf, setAllOf] = useState<string | null>(null)
-  const all = items.find((i) => i.key === allOf)
-  if (all) return <AllItems items={all} onItem={(tag) => onItem?.(all.key, tag)} onBack={() => setAllOf(null)} onClose={onClose} count={count} units={units} />
+  if (all) return <AllItems key={all.key} items={all} onItem={(tag) => onItem?.(all.key, tag)} onClose={onClose} count={count} units={units} />
   return (
     <div className="space-y-4">
       {/* Always takes its line, and only shows once something is on: a
@@ -127,7 +159,7 @@ function FiltersBody({ hasOpenNow, openNow, onOpenNow, booleans, onBoolean, sele
             {it.counts.length > TOP_ITEMS && (
               <button
                 type="button"
-                onClick={() => setAllOf(it.key)}
+                onClick={() => onAll(it.key)}
                 className="mt-1 flex cursor-pointer items-center gap-1 text-sm font-bold text-primary hover:underline"
               >
                 All {it.counts.length} items
@@ -157,8 +189,9 @@ function ShowButton({ count, onClose, units = ['listing', 'listings'] }: { count
 }
 
 /** Every item in one list, A to Z, with how many places have each; the box
- *  finds one. Ticking one here is the same as ticking it in the sheet. */
-function AllItems({ items, onItem, onBack, onClose, count, units }: { items: FilterItems; onItem: (tag: string) => void; onBack: () => void; onClose: () => void; count: number; units?: [string, string] }) {
+ *  finds one. Ticking one here is the same as ticking it in the sheet. Its
+ *  name and Back are the sheet's own header, so it opens on the box. */
+function AllItems({ items, onItem, onClose, count, units }: { items: FilterItems; onItem: (tag: string) => void; onClose: () => void; count: number; units?: [string, string] }) {
   const [find, setFind] = useState('')
   const wanted = find.trim().toLowerCase()
   // Opened from partway down the sheet: starts at its own top.
@@ -169,21 +202,6 @@ function AllItems({ items, onItem, onBack, onClose, count, units }: { items: Fil
   const rows = [...items.counts].sort((a, b) => a.tag.localeCompare(b.tag)).filter((c) => !wanted || c.tag.toLowerCase().includes(wanted))
   return (
     <div ref={top} className="scroll-mt-4 space-y-3" data-testid="all-items">
-      <div className="flex items-center gap-2">
-        <button
-          type="button"
-          onClick={onBack}
-          aria-label="Back to Filters"
-          className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full border border-slate-200 text-primary hover:bg-slate-50"
-        >
-          <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
-            <path d="m15 18-6-6 6-6" />
-          </svg>
-        </button>
-        <h3 className="text-[17px] font-extrabold text-ink">
-          {items.label} · {items.counts.length} items
-        </h3>
-      </div>
       <label className="flex h-11 items-center gap-2 rounded-xl border border-slate-300 px-3 focus-within:ring-2 focus-within:ring-primary/30">
         <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" className="h-4 w-4 shrink-0 text-slate-400">
           <circle cx="11" cy="11" r="8" />
@@ -283,8 +301,23 @@ export function FilterChip({
 }
 
 /** The sheet on a wider screen: a dialog over the dimmed list, closed by its
- *  ✕, the backdrop or Escape, like the page's other dialogs. */
-export function FiltersDialog({ isOpen, onClose, children, wide = false }: { isOpen: boolean; onClose: () => void; children: React.ReactNode; wide?: boolean }) {
+ *  ✕, the backdrop or Escape, like the page's other dialogs. `title` and
+ *  `onBack` are for a step inside it ("‹ Has"), as on the phone's sheet. */
+export function FiltersDialog({
+  isOpen,
+  onClose,
+  children,
+  wide = false,
+  title = 'Filters',
+  onBack,
+}: {
+  isOpen: boolean
+  onClose: () => void
+  children: React.ReactNode
+  wide?: boolean
+  title?: string
+  onBack?: () => void
+}) {
   useBodyScrollLock(isOpen)
   useEffect(() => {
     if (!isOpen) return
@@ -302,9 +335,12 @@ export function FiltersDialog({ isOpen, onClose, children, wide = false }: { isO
         if (e.target === e.currentTarget) onClose()
       }}
     >
-      <div role="dialog" aria-modal="true" aria-label="Filters" className={`dialog-in flex max-h-[76vh] w-full flex-col rounded-2xl bg-white shadow-xl ${wide ? 'max-w-xl' : 'max-w-md'}`}>
+      <div role="dialog" aria-modal="true" aria-label={title} className={`dialog-in flex max-h-[76vh] w-full flex-col rounded-2xl bg-white shadow-xl ${wide ? 'max-w-xl' : 'max-w-md'}`}>
         <div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-5 py-4">
-          <h2 className="text-lg font-extrabold text-ink">Filters</h2>
+          <div className="flex min-w-0 items-center gap-2">
+            {onBack && <BackIconButton onClick={onBack} />}
+            <h2 className="truncate text-lg font-extrabold text-ink">{title}</h2>
+          </div>
           <button
             type="button"
             onClick={onClose}
