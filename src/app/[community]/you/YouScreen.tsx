@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import CategoryIcon from '@/components/CategoryIcon'
 import SwipeRow, { SwipeRowGroup } from '@/components/SwipeRow'
+import SaveButton from '@/components/SaveButton'
 import { BookmarkIcon } from '@/components/icons'
 import { TONE, WithMinyans, hasMinyanim, milesFrom, photoOf, usePinnedPlaces, type PinnedPlace } from '@/components/home/PinnedPlaces'
 import { useNextMinyan } from '@/components/resources/nextMinyans'
@@ -144,23 +145,16 @@ function Section({ title, testId, className = '', children }: { title: string; t
   )
 }
 
-/** Desktop's way to remove a row, since a mouse can't swipe: its filled
- *  bookmark, always there at the end — not one that appears on hover, which
- *  flashed past every row the mouse crossed (Oct 15). Quieter than the
- *  bookmark's solid circle elsewhere, since every row here is saved. A
- *  click takes it off, with Undo. No chevron: the row reads as a link. */
+/** Desktop's way to remove a row, since a mouse can't swipe: the same
+ *  bookmark a listing and a search box have (SaveButton), filled, always
+ *  there at the end — not one that appears on hover, which flashed past
+ *  every row the mouse crossed (Oct 15). A click takes it off, with Undo.
+ *  No chevron: the row reads as a link. */
 function RowBookmark({ name, onRemove }: { name: string; onRemove: () => void }) {
   return (
-    <button
-      type="button"
-      onClick={onRemove}
-      aria-label={`Remove ${name}`}
-      title="Remove"
-      data-testid="you-row-bookmark"
-      className="mr-3 hidden h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full text-primary transition-colors hover:bg-primary/10 desktop:flex"
-    >
-      <BookmarkIcon filled className="h-[17px] w-[17px]" />
-    </button>
+    <span data-testid="you-row-bookmark" className="mr-3 hidden shrink-0 desktop:flex">
+      <SaveButton saved onToggle={onRemove} name={name} />
+    </span>
   )
 }
 

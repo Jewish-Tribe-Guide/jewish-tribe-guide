@@ -66,7 +66,7 @@ describe('You', () => {
     const user = userEvent.setup()
     save('ac', 'tj')
     show()
-    await user.click(screen.getByRole('button', { name: 'Remove ACME' }))
+    await user.click(screen.getByRole('button', { name: 'Save ACME' }))
     expect(within(screen.getByTestId('you-places')).queryByText('ACME')).not.toBeInTheDocument()
     expect(screen.getByTestId('undo-toast')).toHaveTextContent('Removed from You')
     await user.click(screen.getByRole('button', { name: 'Undo' }))
@@ -78,7 +78,7 @@ describe('You', () => {
     save('tj')
     localStorage.setItem('jpc:saved-searches', JSON.stringify([challah]))
     show()
-    await user.click(screen.getByRole('button', { name: 'Remove “challah”' }))
+    await user.click(screen.getByRole('button', { name: 'Save “challah”' }))
     expect(screen.queryByTestId('you-searches')).not.toBeInTheDocument()
     expect(localStorage.getItem('jpc:saved-searches')).toBeNull()
   })
@@ -86,16 +86,19 @@ describe('You', () => {
   // Oct 15: the bookmark used to appear only on hover, flashing past every
   // row the mouse crossed, with a chevron it replaced. Now desktop's bookmark
   // is always there (a phone swipes, so it's desktop-only), and no row has a
-  // chevron.
-  it('desktop’s remove is a bookmark that’s always there, not on hover, and no row has a chevron', () => {
+  // chevron. Later the same day: "why wouldn't you use the same symbol that
+  // we have on the listings and searches themselves?" So it's SaveButton,
+  // filled, not a look of its own.
+  it('desktop’s remove is the same bookmark as everywhere, always there, not on hover, and no row has a chevron', () => {
     save('tj')
     localStorage.setItem('jpc:saved-searches', JSON.stringify([challah]))
     show()
     const marks = screen.getAllByTestId('you-row-bookmark')
-    expect(marks.map((m) => m.getAttribute('aria-label'))).toEqual(['Remove Trader Joe’s', 'Remove “challah”'])
+    expect(marks.map((m) => within(m).getByTestId('save-button').getAttribute('aria-label'))).toEqual(['Save Trader Joe’s', 'Save “challah”'])
     for (const m of marks) {
+      expect(within(m).getByTestId('save-button')).toHaveAttribute('aria-pressed', 'true')
+      for (const el of [m, ...m.querySelectorAll('*')]) expect(el.getAttribute('class') ?? '').not.toMatch(/opacity-0|group-hover:/)
       expect(m.className).toMatch(/\bdesktop:flex\b/)
-      expect(m.className).not.toMatch(/opacity-0|group-hover:/)
     }
     // ChevronRightIcon's path.
     expect(document.querySelector('path[d="M9 18l6-6-6-6"]')).toBeNull()
