@@ -27,7 +27,8 @@ type Props = {
   color: string
   /** "Back to list", to the nearby list this place was picked from. Omitted
    *  by the category listing sheet, where the list is the page behind the
-   *  sheet and dragging down or tapping it away is the way back. */
+   *  sheet and dragging down or tapping it away is the way back, and by the
+   *  desktop map's sidebar, whose way back is the ← in its search box. */
   onBack?: () => void
   /** What the search that opened it matched — see PlaceDetailBody's `found`. */
   found?: SearchFound | null

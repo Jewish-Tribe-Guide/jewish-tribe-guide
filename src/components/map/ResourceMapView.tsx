@@ -1,7 +1,7 @@
 'use client'
 
 import { track } from '@vercel/analytics'
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState, type ReactNode } from 'react'
 import ResourceMap, { type MapPoint } from './ResourceMap'
 import CategoryFilter, { type FilterOption } from './CategoryFilter'
 import CategoryPickerList from './CategoryPickerList'
@@ -42,7 +42,7 @@ import { foundFor, searchAsk, type SearchFound } from '@/lib/askSearch'
 import { hoursOpenNow, businessClosure } from '@/lib/hours'
 import { useNow } from '@/lib/useNow'
 import { ui } from '@/lib/uiConfig'
-import { ChevronLeftIcon, ExpandIcon, CollapseIcon, BookmarkIcon, PinIcon, SlidersIcon } from '@/components/icons'
+import { ArrowLeftIcon, ChevronLeftIcon, CloseIcon, ExpandIcon, CollapseIcon, BookmarkIcon, PinIcon, SlidersIcon } from '@/components/icons'
 import { categoryTint, getCategoryColor, HOSPITAL_COLOR, HOSPITAL_ICON } from '@/lib/categoryColor'
 import LocationControl, { type LocationControls } from '@/components/home/LocationControl'
 import { usePinned } from '@/lib/pinnedContext'
@@ -418,12 +418,21 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setFullscreen(true)
   }, [standalone, visible])
+  // Escape steps back one level at a time (Oct 15, board "A"): a place
+  // open in the desktop sidebar goes back to the results first, the same as
+  // the ← in the search box; only then does it leave the map. The search
+  // box's own Escape (closing its suggestions) is its own level too, so it
+  // marks the event handled and nothing behind it moves.
+  const onEscape = useEffectEvent(() => {
+    if (!isMobile && desktopSelected) setDesktopSelected(null)
+    else exitFullscreen()
+  })
   useEffect(() => {
     if (!fullscreen) return
     const onKeyDown = (e: KeyboardEvent) => {
       // A dialog open over the map (the Filters sheet) closes on its own
       // Escape; the same key mustn't also close the map behind it.
-      if (e.key === 'Escape' && !document.querySelector('[role="dialog"][aria-modal="true"]')) exitFullscreen()
+      if (e.key === 'Escape' && !e.defaultPrevented && !document.querySelector('[role="dialog"][aria-modal="true"]')) onEscape()
     }
     document.addEventListener('keydown', onKeyDown)
     // Fullscreen is a fixed overlay covering the viewport — nothing behind
@@ -434,7 +443,6 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
       document.removeEventListener('keydown', onKeyDown)
       document.body.style.overflow = prevOverflow
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fullscreen])
 
   // Desktop sidebar's own width/collapse/opened-manually/drag state — see
@@ -1483,15 +1491,31 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
         }}
         className="flex items-center rounded-full border border-slate-300 bg-white px-3.5 py-2 shadow-sm focus-within:ring-2 focus-within:ring-primary"
       >
-        <svg className="h-4 w-4 shrink-0 text-slate-400" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24" aria-hidden="true">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" />
-        </svg>
+        {/* A place open in the sidebar: ← back to the results, where the
+            magnifier sits (Oct 15, board "A", as Google Maps does). It sits
+            on the panel it acts on, so it can't read as leaving the map —
+            that's the ✕ in the corner — and replaces the "‹ Back to list"
+            line that used to sit under the search. */}
+        {desktopSelected ? (
+          <button
+            type="button"
+            onClick={() => setDesktopSelected(null)}
+            aria-label="Back to results"
+            className="-my-1.5 -ml-2 flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-full text-slate-700 transition-colors hover:bg-slate-100 active:bg-slate-200"
+          >
+            <ArrowLeftIcon className="h-[18px] w-[18px]" />
+          </button>
+        ) : (
+          <svg className="h-4 w-4 shrink-0 text-slate-400" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24" aria-hidden="true">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" />
+          </svg>
+        )}
         <input
           ref={desktopSearchInputRef}
           type="text"
           autoComplete="off"
-          // Short enough to fit beside ‹ Back; "Open now" is offered once the
-          // box is clicked into (showOpenNowSuggestion).
+          // "Open now" is offered once the box is clicked into
+          // (showOpenNowSuggestion).
           placeholder="Search name, address…"
           value={input}
           onChange={(e) => setInput(e.target.value)}
@@ -1499,13 +1523,16 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
           onBlur={() => setSearchFocused(false)}
           onKeyDown={(e) => {
             if (e.key === 'Escape') {
+              e.preventDefault()
               setSearchFocused(false)
               ;(e.target as HTMLInputElement).blur()
             }
           }}
           className="min-w-0 flex-1 bg-transparent px-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none"
         />
-        {input && (
+        {/* Not while a place is open: ← is the way back then, and the
+            corner ✕ (Close map) stays the only ✕ on screen. */}
+        {input && !desktopSelected && (
           <button
             type="button"
             onClick={clearSearch}
@@ -1697,7 +1724,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
     if (eruvimOn && openEruvId) deselectPlace()
     setEruvimOn(!eruvimOn)
   }
-  const eruvDetail = (id: string, onBack: () => void) => {
+  const eruvDetail = (id: string, onBack?: () => void) => {
     const e = eruvData?.eruvim.find((x) => x.id === id)
     if (!e || !eruvData || clock === null) return null
     return <MapEruvDetail eruv={e} color={colorById.get(eruvCategory?.id ?? '') ?? '#64748b'} now={new Date(clock)} timezone={eruvData.timezone} candles={eruvData.candles} onBack={onBack} />
@@ -1994,8 +2021,10 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                   padding is part of the same scrolling content. ────────── */}
               <div className="h-16 shrink-0" />
               {ui.map.nearbyList &&
-                (desktopSelected?.filterId === ERUV_FILTER_ID && eruvDetail(desktopSelected.id.slice(ERUV_PREFIX.length), () => setDesktopSelected(null)) ? (
-                  sidebarScroll(desktopSelected.id, eruvDetail(desktopSelected.id.slice(ERUV_PREFIX.length), () => setDesktopSelected(null)))
+                // No "Back to list" in here: the ← in the search box above
+                // is the way back on a computer (Oct 15).
+                (desktopSelected?.filterId === ERUV_FILTER_ID && eruvDetail(desktopSelected.id.slice(ERUV_PREFIX.length)) ? (
+                  sidebarScroll(desktopSelected.id, eruvDetail(desktopSelected.id.slice(ERUV_PREFIX.length)))
                 ) : desktopSelected && desktopSelected.raw && desktopSelectedCategory ? (
                   sidebarScroll(
                     `place:${desktopSelected.id}`,
@@ -2003,7 +2032,6 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                       item={desktopSelected.raw}
                       category={desktopSelectedCategory}
                       color={desktopSelected.color}
-                      onBack={() => setDesktopSelected(null)}
                       found={foundOnPoint(desktopSelected.raw.id)}
                     />,
                   )
@@ -2129,24 +2157,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                 transition: isDraggingSidebar ? 'none' : 'width 200ms ease-in-out',
               }}
             >
-              {/* ‹ Back, beside the search (the user, Oct 10): the map covers
-                  the whole page on a computer, header and all, and the way
-                  out was a small corner icon people read as "smaller". It
-                  goes where the old icon did: back where the map was opened
-                  from, or home (exitFullscreen). */}
-              <div className="flex items-center gap-2">
-                {standalone && fullscreen && (
-                  <button
-                    type="button"
-                    onClick={exitFullscreen}
-                    aria-label="Back"
-                    className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-full bg-white text-slate-700 shadow-sm ring-1 ring-slate-900/10 hover:bg-slate-50"
-                  >
-                    <ChevronLeftIcon className="h-5 w-5" />
-                  </button>
-                )}
-                <div className="min-w-0 flex-1">{desktopSearchForm}</div>
-              </div>
+              {desktopSearchForm}
             </div>
           )}
 
@@ -2237,8 +2248,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                       (Escape, or tapping it again, collapses it back — or,
                       arriving from a listing's Map button, exits straight
                       back to that listing; see exitFullscreen). ─────────── */}
-              {/* Not on the map page itself, where ‹ Back by the search is
-                  the way out (Oct 10). */}
+              {/* Not on the map page itself: its way out is the ✕ below. */}
               {!standalone && (
               <button
                 onClick={() => (fullscreen ? exitFullscreen() : setFullscreen(true))}
@@ -2248,6 +2258,25 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
               >
                 {fullscreen ? <CollapseIcon className="h-4 w-4" /> : <ExpandIcon className="h-4 w-4" />}
               </button>
+              )}
+
+              {/* ── Close map (the map page, desktop) — a bare ✕ in the
+                      top-right corner, where a full-screen view's close is
+                      expected (Oct 15, board "A"). It replaced a ‹ Back
+                      beside the search, which sat on the sidebar and read as
+                      "close this panel". Away from the sidebar, it can only
+                      mean leave the map: back where it was opened from, or
+                      home (exitFullscreen). The ← in the search box is the
+                      step back within it. ─────────────────────────────── */}
+              {standalone && fullscreen && (
+                <button
+                  type="button"
+                  onClick={exitFullscreen}
+                  aria-label="Close map"
+                  className="absolute right-3 top-3 z-10 hidden h-10 w-10 cursor-pointer items-center justify-center rounded-full bg-white text-slate-700 shadow-md ring-1 ring-slate-900/10 hover:bg-slate-50 desktop:flex"
+                >
+                  <CloseIcon className="h-5 w-5" />
+                </button>
               )}
 
               {/* ── Live-tracking toggle (desktop only) — a map control, not a

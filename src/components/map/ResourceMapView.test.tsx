@@ -716,17 +716,17 @@ describe('ResourceMapView — selecting a place', () => {
     // A pin tap (the mocked ResourceMap's own "Select" button, standing in
     // for onSelectPoint) opens the detail panel but must not bump the token.
     await user.click(screen.getByRole('button', { name: 'Select Acme Grocery' }))
-    expect(await screen.findByRole('button', { name: 'Back to list' })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Back to results' })).toBeInTheDocument()
     expect(screen.getByTestId('frame-token').textContent).toBe(initialFrameToken)
 
     // Back to the list, then pick the OTHER listing from the real sidebar
     // row — that one should bump the token.
-    await user.click(screen.getByRole('button', { name: 'Back to list' }))
+    await user.click(screen.getByRole('button', { name: 'Back to results' }))
     // MobileNearbySheet stays mounted (CSS-hidden, not unmounted) even on
     // desktop, so its own copy of this row exists in the DOM too — the
     // sidebar's own row is the first of the two.
     await user.click(screen.getAllByRole('button', { name: /^Beth Shalom/ })[0]!)
-    expect(await screen.findByRole('button', { name: 'Back to list' })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Back to results' })).toBeInTheDocument()
     expect(screen.getByTestId('frame-token').textContent).not.toBe(initialFrameToken)
   })
   // Through the real component: the sidebar's edit bar is part of the
@@ -751,10 +751,9 @@ describe('ResourceMapView — selecting a place', () => {
     expect(listRegion).not.toBeNull()
     await user.click(screen.getByRole('button', { name: 'Select Acme Grocery' }))
 
-    const back = await screen.findByRole('button', { name: 'Back to list' })
-    const region = back.closest('.overscroll-contain')!
-    const sidebar = back.closest('aside')!
-    const pill = screen.getByRole('button', { name: 'Edit listing' })
+    const pill = await screen.findByRole('button', { name: 'Edit listing' })
+    const region = pill.closest('.overscroll-contain')!
+    const sidebar = pill.closest('aside')!
     expect(sidebar).toContainElement(pill)
     expect(region).toContainElement(pill)
     // And a fresh region, not the list's: a shared one carried the list's
@@ -1290,31 +1289,83 @@ describe('ResourceMapView — standalone map Escape/exit', () => {
     const onExit = vi.fn()
     renderStandalone(onExit)
 
-    expect(screen.getByRole('button', { name: 'Back' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Close map' })).toBeInTheDocument()
 
     fireEvent.keyDown(document, { key: 'Escape' })
 
     expect(onExit).toHaveBeenCalledTimes(1)
     // Still the fullscreen layout, synchronously — nothing ever flipped it to
     // the boxed one, so there's no frame for that flash to happen in.
-    expect(screen.getByRole('button', { name: 'Back' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Close map' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'View fullscreen' })).not.toBeInTheDocument()
   })
 
-  // Oct 10: the way out is ‹ Back beside the search, where people look for
-  // it; the corner icon read as "make the map smaller", and is gone here.
-  it('‹ Back beside the search (its other exit path) behaves the same way, and there’s no corner icon', async () => {
+  // Oct 15 (board "A"): the way out is a bare ✕ in the map's top-right
+  // corner. The ‹ Back that used to sit beside the search read as "close
+  // this panel", it sat on the sidebar, and it was one of three ‹ on screen.
+  it('✕ Close map in the corner (its other exit path) behaves the same way, and nothing sits beside the search', async () => {
     const user = userEvent.setup()
     const onExit = vi.fn()
     renderStandalone(onExit)
     expect(screen.queryByRole('button', { name: 'Exit fullscreen' })).not.toBeInTheDocument()
-    const back = screen.getByRole('button', { name: 'Back' })
-    expect(back.compareDocumentPosition(screen.getByPlaceholderText(/Search name, address/)) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument()
+    const close = screen.getByRole('button', { name: 'Close map' })
+    // Words for a screen reader only; on screen it's the ✕ alone.
+    expect(close).toHaveTextContent(/^$/)
+    expect(close.className).toMatch(/\bright-3\b/)
+    expect(close.className).toMatch(/\btop-3\b/)
 
-    await user.click(back)
+    await user.click(close)
 
     expect(onExit).toHaveBeenCalledTimes(1)
-    expect(screen.getByRole('button', { name: 'Back' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Close map' })).toBeInTheDocument()
+  })
+
+  // Escape steps back one level at a time: a place open in the sidebar goes
+  // back to the results, and only the next Escape leaves the map.
+  it('Escape with a place open goes back to the results first; the next one leaves the map', async () => {
+    const user = userEvent.setup()
+    const onExit = vi.fn()
+    renderStandalone(onExit)
+    await user.click(screen.getByRole('button', { name: /^Select / }))
+    expect(await screen.findByRole('button', { name: 'Back to results' })).toBeInTheDocument()
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(onExit).not.toHaveBeenCalled()
+    expect(screen.queryByRole('button', { name: 'Back to results' })).not.toBeInTheDocument()
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(onExit).toHaveBeenCalledTimes(1)
+  })
+
+  // Escape in the search box closes its suggestions; that's its level, and
+  // the map behind it stays.
+  it('Escape in the search box doesn\u2019t leave the map', async () => {
+    const user = userEvent.setup()
+    const onExit = vi.fn()
+    renderStandalone(onExit)
+    await user.click(screen.getByPlaceholderText(/Search name, address/))
+    await user.keyboard('{Escape}')
+    expect(onExit).not.toHaveBeenCalled()
+  })
+
+  // While a place is open, the ✕ in the corner is the only ✕ on screen: the
+  // search box's own clear × steps aside, its ← being the way back.
+  it('with a place open: ← in the search box, no clear ×, and no "Back to list" line', async () => {
+    const user = userEvent.setup()
+    renderStandalone(vi.fn())
+    await user.type(screen.getByPlaceholderText(/Search name, address/), 'Gro')
+    expect(screen.getByRole('button', { name: 'Clear search' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /^Select / }))
+
+    const back = await screen.findByRole('button', { name: 'Back to results' })
+    expect(back.closest('form')).toContainElement(screen.getByPlaceholderText(/Search name, address/))
+    expect(screen.queryByRole('button', { name: 'Clear search' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Back to list' })).not.toBeInTheDocument()
+
+    await user.click(back)
+    expect(screen.queryByRole('button', { name: 'Back to results' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Clear search' })).toBeInTheDocument()
   })
 
   // Regression coverage for a real, live-confirmed bug: the fullscreen
@@ -1755,7 +1806,9 @@ describe('ResourceMapView — eruv lines', () => {
     expect(within(detail).getByText('Center City Eruv')).toBeInTheDocument()
     expect(within(detail).getByText('Where Center City Eruv goes.')).toBeInTheDocument()
     expect(screen.getByTestId('eruv-selected')).toHaveTextContent('center-city')
-    fireEvent.click(within(detail).getByRole('button', { name: 'Back to list' }))
+    // The way back is the search box's ←, as for a place (Oct 15).
+    expect(within(detail).queryByRole('button', { name: 'Back to list' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Back to results' }))
     expect(screen.queryByTestId('map-eruv-detail')).not.toBeInTheDocument()
     expect(screen.getByTestId('eruv-selected')).toHaveTextContent('')
   })

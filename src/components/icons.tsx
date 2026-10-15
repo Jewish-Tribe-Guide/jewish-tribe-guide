@@ -149,11 +149,32 @@ export function MessageIcon({ className }: IconProps) {
   )
 }
 
-// Left chevron — the map place-detail panel's "Back to list" control.
+// Left chevron — the phone map sheet's "Back to list", and the desktop
+// map sidebar's edge tab (collapse).
 export function ChevronLeftIcon({ className }: IconProps) {
   return (
     <svg {...base} className={className}>
       <path d="M15 18l-6-6 6-6" />
+    </svg>
+  )
+}
+
+// Left arrow — the desktop map's "Back to results", inside the search box.
+// An arrow, not a chevron: it's a step back within the map, and the
+// chevrons left on that screen (the sidebar's edge tab) collapse things.
+export function ArrowLeftIcon({ className }: IconProps) {
+  return (
+    <svg {...base} className={className}>
+      <path d="M19 12H5M12 19l-7-7 7-7" />
+    </svg>
+  )
+}
+
+// ✕ — the desktop map page's Close map, in its top-right corner.
+export function CloseIcon({ className }: IconProps) {
+  return (
+    <svg {...base} className={className}>
+      <path d="M18 6L6 18M6 6l12 12" />
     </svg>
   )
 }
