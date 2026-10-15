@@ -40,6 +40,9 @@ export type FilterSelect = {
   label: string
   values: string[]
   chosen: string[]
+  /** Chips in the order given (the Minyanim view's Tefillah, the order a
+   *  day goes), not A to Z. */
+  ordered?: boolean
 }
 
 type Props = {
@@ -59,6 +62,8 @@ type Props = {
   onClearAll: () => void
   /** What the list holds with these filters: "Show 11 listings". */
   count: number
+  /** What the list holds, where it isn't listings: ['minyan', 'minyanim']. */
+  units?: [string, string]
 }
 
 export default function FiltersSheet(props: Props) {
@@ -76,12 +81,12 @@ export default function FiltersSheet(props: Props) {
   )
 }
 
-function FiltersBody({ hasOpenNow, openNow, onOpenNow, booleans, onBoolean, selects, onSelect, items = [], onItem, onClearAll, onClose, count }: Props) {
+function FiltersBody({ hasOpenNow, openNow, onOpenNow, booleans, onBoolean, selects, onSelect, items = [], onItem, onClearAll, onClose, count, units }: Props) {
   const anyOn = openNow || booleans.some((b) => b.on) || selects.some((s) => s.chosen.length > 0) || items.some((i) => i.chosen.length > 0)
   // "All N items", A to Z, in place of the rest of the sheet.
   const [allOf, setAllOf] = useState<string | null>(null)
   const all = items.find((i) => i.key === allOf)
-  if (all) return <AllItems items={all} onItem={(tag) => onItem?.(all.key, tag)} onBack={() => setAllOf(null)} onClose={onClose} count={count} />
+  if (all) return <AllItems items={all} onItem={(tag) => onItem?.(all.key, tag)} onBack={() => setAllOf(null)} onClose={onClose} count={count} units={units} />
   return (
     <div className="space-y-4">
       {/* Always takes its line, and only shows once something is on: a
@@ -100,7 +105,7 @@ function FiltersBody({ hasOpenNow, openNow, onOpenNow, booleans, onBoolean, sele
         <fieldset key={s.key} className="space-y-2">
           <legend className="mb-2 text-[13px] font-bold text-slate-500">{s.label}</legend>
           <div className="flex flex-wrap gap-2">
-            {orderForPicking(s.values).map((v) => (
+            {(s.ordered ? s.values : orderForPicking(s.values)).map((v) => (
               <FilterChip key={v} label={v} on={s.chosen.includes(v)} onToggle={() => onSelect(s.key, v)} />
             ))}
           </div>
@@ -134,26 +139,26 @@ function FiltersBody({ hasOpenNow, openNow, onOpenNow, booleans, onBoolean, sele
           </fieldset>
         )
       })}
-      <ShowButton count={count} onClose={onClose} />
+      <ShowButton count={count} onClose={onClose} units={units} />
     </div>
   )
 }
 
-function ShowButton({ count, onClose }: { count: number; onClose: () => void }) {
+function ShowButton({ count, onClose, units = ['listing', 'listings'] }: { count: number; onClose: () => void; units?: [string, string] }) {
   return (
     <button
       type="button"
       onClick={onClose}
       className="h-12 w-full cursor-pointer rounded-xl bg-primary text-[15.5px] font-bold text-white transition-transform active:scale-[0.99]"
     >
-      Show {count} listing{count === 1 ? '' : 's'}
+      Show {count} {count === 1 ? units[0] : units[1]}
     </button>
   )
 }
 
 /** Every item in one list, A to Z, with how many places have each; the box
  *  finds one. Ticking one here is the same as ticking it in the sheet. */
-function AllItems({ items, onItem, onBack, onClose, count }: { items: FilterItems; onItem: (tag: string) => void; onBack: () => void; onClose: () => void; count: number }) {
+function AllItems({ items, onItem, onBack, onClose, count, units }: { items: FilterItems; onItem: (tag: string) => void; onBack: () => void; onClose: () => void; count: number; units?: [string, string] }) {
   const [find, setFind] = useState('')
   const wanted = find.trim().toLowerCase()
   // Opened from partway down the sheet: starts at its own top.
@@ -208,7 +213,7 @@ function AllItems({ items, onItem, onBack, onClose, count }: { items: FilterItem
         })}
         {rows.length === 0 && <li className="py-3 text-[14px] text-slate-500">No item called “{find.trim()}”.</li>}
       </ul>
-      <ShowButton count={count} onClose={onClose} />
+      <ShowButton count={count} onClose={onClose} units={units} />
     </div>
   )
 }

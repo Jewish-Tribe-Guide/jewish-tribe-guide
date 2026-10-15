@@ -39,9 +39,11 @@ type Props = {
   onShowMap?: () => void
   /** What the list holds, where it isn't listings: ['eruv', 'eruvim']. */
   units?: [string, string]
+  /** Said after the count, quieter: the Minyanim view's "left today". */
+  suffix?: string
 }
 
-export default function ListHeading({ label, count, noun = !label, total, filters, sort, onDaveningTimes, onShowMap, units = ['listing', 'listings'] }: Props) {
+export default function ListHeading({ label, count, noun = !label, total, filters, sort, onDaveningTimes, onShowMap, units = ['listing', 'listings'], suffix }: Props) {
   const countText = noun ? `${count} ${count === 1 ? units[0] : units[1]}` : String(count)
   return (
     <div data-testid="list-heading" data-total={total} className="pb-2 pt-2">
@@ -55,6 +57,7 @@ export default function ListHeading({ label, count, noun = !label, total, filter
           ) : (
             countText
           )}
+          {suffix && <span className="font-medium text-slate-500"> {suffix}</span>}
         </h2>
         <div className="ml-auto flex items-center gap-2">
           {onDaveningTimes && (

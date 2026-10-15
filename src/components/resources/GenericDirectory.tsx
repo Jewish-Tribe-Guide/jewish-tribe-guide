@@ -13,6 +13,8 @@ import DistanceNote from './DistanceNote'
 import { NextMinyans } from './nextMinyans'
 import { CategoryBandFrame, CategoryBandBadge } from './CategoryBandFrame'
 import FiltersSheet from './FiltersSheet'
+import { TEFILLAH_CHOICES, WITHIN_CHOICES, milesChosen, tefillosChosen } from '@/lib/minyanimFilters'
+import { kindText } from '@/lib/listingView'
 import ListHeading, { ClosedGroupLine, GroupHeading } from './ListHeading'
 import { groupListings, parseGroupBy, type ListGroup } from '@/lib/listGroups'
 import { candlesToday, isVouchedFor } from '@/lib/listingRow'
@@ -497,6 +499,11 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // Next minyan card's "All davening times") arrives on it. It replaced
   // the old week-of-times dialog, which knew nothing of Yom Tov.
   const [minyanimViewOn, setMinyanimViewOn] = useState(!!openMinyanimView)
+  // The Minyanim view's own Filters (Oct 15): Tefillah, and How far, one at
+  // a time; and how many minyanim it shows, for the sheet's Show button.
+  const [minyanTefillos, setMinyanTefillos] = useState<string[]>([])
+  const [minyanWithin, setMinyanWithin] = useState<string | null>(null)
+  const [minyanimShowing, setMinyanimShowing] = useState(0)
   // Same one-way-in problem `search`/`openNow` already solve above: without
   // this, switching back to Synagogues left `?davening=1` sitting in the
   // URL, so a reload reopened the view the visitor had already left.
@@ -1420,6 +1427,8 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // what they were.
   const clearSheet = () => {
     clearFilters()
+    setMinyanTefillos([])
+    setMinyanWithin(null)
     if (landedSearch !== null && search === landedSearch) return setSearch('')
     let next = search
     for (const word of [...searchBools.values(), ...[...searchSelects.values()].flatMap((m) => [...m.values()]), ...[...searchHas.values()].flatMap((m) => [...m.values()])]) next = withoutTerms(next, word.split(' '))
@@ -1432,6 +1441,16 @@ export default function GenericDirectory({ category, items, anchorLabel, address
     return { ...f, chosen: [...new Set([...(hasFilters[f.key] ?? []), ...(searchHas.get(f.key)?.keys() ?? [])].map(spelled))] }
   })
   const sheetSelects = selectsToShow.map((sel) => ({ ...sel, chosen: [...new Set([...sel.chosen, ...(searchSelects.get(sel.key)?.keys() ?? [])])] }))
+  // The Minyanim view's own two, around the page's Denomination in the
+  // sheet: Tefillah first, How far last, as the sketch has them (Oct 15).
+  const minyanTefillahSelect = { key: '@tefillah', label: 'Tefillah', values: TEFILLAH_CHOICES.map((c) => c.label), chosen: minyanTefillos, ordered: true }
+  const minyanWithinSelect = { key: '@within', label: 'How far', values: WITHIN_CHOICES.map((c) => c.label), chosen: minyanWithin ? [minyanWithin] : [], ordered: true }
+  const onSheetSelect = (key: string, value: string) => {
+    if (key === minyanTefillahSelect.key) return setMinyanTefillos((prev) => (prev.includes(value) ? prev.filter((x) => x !== value) : [...prev, value]))
+    if (key === minyanWithinSelect.key) return setMinyanWithin((prev) => (prev === value ? null : value))
+    toggleSheetSelect(key, value)
+  }
+  const minyanFilterCount = (minyanTefillos.length > 0 ? 1 : 0) + (minyanWithin ? 1 : 0)
   // What the Filters button counts: everything the sheet shows ticked.
   const sheetFilterCount =
     filterableBooleans.filter((f) => boolFilters[f.key] || searchBools.has(f.key)).length +
@@ -1899,6 +1918,11 @@ export default function GenericDirectory({ category, items, anchorLabel, address
           search={search}
           canAdd={canEdit}
           shulText={(item) => filterableSelects.flatMap((f) => selectValues(item[f.key])).join(' · ')}
+          tefillos={tefillosChosen(minyanTefillos)}
+          withinMiles={milesChosen(minyanWithin)}
+          filters={{ active: sheetFilterCount + minyanFilterCount, onOpen: () => setFiltersOpen(true) }}
+          onShowing={setMinyanimShowing}
+          kindOf={(item) => kindText(item, category)}
         />
       ) : searchFoundNothing ? (
         // The search found nothing: the box under the search says so, with
@@ -2195,21 +2219,22 @@ export default function GenericDirectory({ category, items, anchorLabel, address
         )}
       </Suspense>
 
-      {hasActualFilters && (
+      {(hasActualFilters || minyanimView) && (
         <FiltersSheet
           isOpen={filtersOpen}
           onClose={() => setFiltersOpen(false)}
-          hasOpenNow={hasFilterableHours}
+          hasOpenNow={hasFilterableHours && !minyanimView}
           openNow={sheetOpenNow}
           onOpenNow={toggleSheetOpenNow}
           booleans={filterableBooleans.map((f) => ({ key: f.key, label: f.filterLabel ?? f.label, on: !!boolFilters[f.key] || searchBools.has(f.key) }))}
           onBoolean={toggleSheetBool}
-          selects={sheetSelects}
-          onSelect={toggleSheetSelect}
+          selects={minyanimView ? [minyanTefillahSelect, ...sheetSelects, minyanWithinSelect] : sheetSelects}
+          onSelect={onSheetSelect}
           items={sheetItems}
           onItem={toggleSheetHas}
           onClearAll={clearSheet}
-          count={filtered.length}
+          count={minyanimView ? minyanimShowing : filtered.length}
+          units={minyanimView ? ['minyan', 'minyanim'] : undefined}
         />
       )}
 

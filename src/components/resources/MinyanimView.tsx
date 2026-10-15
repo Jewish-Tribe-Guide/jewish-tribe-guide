@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import type { Tefillah } from '@/lib/davening'
 import Link from 'next/link'
 import type { DirectoryResource } from '@/types'
 import { routes } from '@/lib/routes'
@@ -15,6 +16,7 @@ import { dateText, type DateFacts, type DayPosting } from '@/lib/schedules'
 import { ChevronRightIcon } from '@/components/icons'
 import { dayIndexFor, readMinyanimSearch, shulMatches, tefillosLabel } from '@/lib/minyanimSearch'
 import AddMinyanSheet from './AddMinyanSheet'
+import ListHeading from './ListHeading'
 import AddScheduleBox from './AddScheduleBox'
 
 // ── The Synagogues page's Minyanim view (step 4, agreed Oct 1) ───────────────
@@ -62,6 +64,11 @@ export default function MinyanimView({
   canAdd = false,
   shulText = () => '',
   onDayChange,
+  tefillos = null,
+  withinMiles = null,
+  filters,
+  onShowing,
+  kindOf = () => '',
 }: {
   items: readonly DirectoryResource[]
   categoryId: string
@@ -84,6 +91,18 @@ export default function MinyanimView({
    *  back on today, wherever the visitor had been (the user's note 10,
    *  Oct 10: Back "seems to get stuck"). */
   onDayChange?: (weekday: string | null) => void
+  /** Tefillah, from the Filters sheet (minyanimFilters.ts): only these. */
+  tefillos?: readonly Tefillah[] | null
+  /** How far, from the Filters sheet: only shuls this close. */
+  withinMiles?: number | null
+  /** The heading's Filters: the page's sheet, with Tefillah and How far
+   *  added while this view is open (Oct 15). */
+  filters?: { active: number; onOpen: () => void }
+  /** How many minyanim the list shows, for the sheet's "Show 7 minyanim". */
+  onShowing?: (count: number) => void
+  /** A shul's denomination, said on each of its minyanim (Oct 15: the
+   *  list no longer groups shuls by it). */
+  kindOf?: (item: DirectoryResource) => string
 }) {
   const schedule = useMinyanSchedule(null, items)
   const { community } = useActiveCommunity()
@@ -123,6 +142,8 @@ export default function MinyanimView({
   const asked = sought?.tefillos ?? null
   const slots = minyanimOn(schedule.shuls, dayKeysFor(day), schedule.season, schedule.anchors)
     .filter((s) => (!asked || asked.includes(s.tefillah)) && (!namedIds || namedIds.has(s.shulId ?? '')))
+    // The Filters sheet's Tefillah and How far, on top of what's typed.
+    .filter((s) => (!tefillos || tefillos.includes(s.tefillah)) && (withinMiles == null || miles(s) <= withinMiles))
     .sort((a, b) =>
       // "Maariv near me": the nearest first.
       sought?.nearMe
@@ -149,6 +170,10 @@ export default function MinyanimView({
   const label = sought?.named ? tefillosLabel(asked) : 'Minyanim'
   const lead = partOfDay && !sought?.named ? partOfDay[0].toUpperCase() + partOfDay.slice(1) : `${label} ${dayWord}`
   const far = (s: MinyanSlot) => howFar(byId.get(s.shulId ?? ''))
+  const kindOfShul = (s: MinyanSlot) => {
+    const shul = byId.get(s.shulId ?? '')
+    return shul ? kindOf(shul) : ''
+  }
   // A search answers what it asked: "Mincha on Friday: first 6:23 PM at…".
   const searchedAnswer = !sought
     ? null
@@ -184,6 +209,18 @@ export default function MinyanimView({
           onDayChange?.(i === 0 ? null : days[i].weekday)
         }}
       />
+      {/* How many the list shows, with Filters beside it (Oct 15): today,
+          what's still ahead; Earlier today is folded away and not counted. */}
+      <div className="mt-2">
+        <ListHeading
+          count={upcoming.length}
+          total={upcoming.length}
+          units={['minyan', 'minyanim']}
+          suffix={isToday ? 'left today' : `on ${tabLabel(day, index)[0] === 'Shabbos' ? 'Shabbos' : dayLabel(day.weekday)}`}
+          filters={filters}
+        />
+      </div>
+      {onShowing && <Showing count={upcoming.length} onShowing={onShowing} />}
 
       {(upcoming.length === 0 || named?.length === 0) && (
         <div className="mt-3 rounded-xl bg-primary/[0.07] px-3.5 py-3" data-testid="minyanim-answer">
@@ -199,7 +236,7 @@ export default function MinyanimView({
 
       <ul className="mt-2 divide-y divide-slate-100 border-t border-slate-100" data-testid="minyanim-rows">
         {upcoming.map((s, i) => (
-          <MinyanRow key={`${s.shulId}:${s.tefillah}:${s.minutes}:${i}`} slot={s} far={howFar(byId.get(s.shulId ?? ''))} posting={postingOf(s.shulId)} href={hrefOf(s.shulId)} onHover={onHoverShul} />
+          <MinyanRow key={`${s.shulId}:${s.tefillah}:${s.minutes}:${i}`} slot={s} far={howFar(byId.get(s.shulId ?? ''))} kind={kindOfShul(s)} posting={postingOf(s.shulId)} href={hrefOf(s.shulId)} onHover={onHoverShul} />
         ))}
         {/* Adding a minyan where the minyanim are, as the list's last row
             (the user's note 2): on the day being looked at. */}
@@ -236,7 +273,7 @@ export default function MinyanimView({
           {earlier && (
             <ul className="divide-y divide-slate-100 opacity-60">
               {past.map((s, i) => (
-                <MinyanRow key={`p:${s.shulId}:${s.tefillah}:${s.minutes}:${i}`} slot={s} far={howFar(byId.get(s.shulId ?? ''))} posting={postingOf(s.shulId)} href={hrefOf(s.shulId)} onHover={onHoverShul} />
+                <MinyanRow key={`p:${s.shulId}:${s.tefillah}:${s.minutes}:${i}`} slot={s} far={howFar(byId.get(s.shulId ?? ''))} kind={kindOfShul(s)} posting={postingOf(s.shulId)} href={hrefOf(s.shulId)} onHover={onHoverShul} />
               ))}
             </ul>
           )}
@@ -300,7 +337,7 @@ export default function MinyanimView({
           {notPostedOpen && (
             <ul className="mt-1 divide-y divide-amber-200">
               {folded.map((s, i) => (
-                <MinyanRow key={`n:${s.shulId}:${s.tefillah}:${s.minutes}:${i}`} slot={s} far={howFar(byId.get(s.shulId ?? ''))} posting={postingOf(s.shulId)} href={hrefOf(s.shulId)} onHover={onHoverShul} />
+                <MinyanRow key={`n:${s.shulId}:${s.tefillah}:${s.minutes}:${i}`} slot={s} far={howFar(byId.get(s.shulId ?? ''))} kind={kindOfShul(s)} posting={postingOf(s.shulId)} href={hrefOf(s.shulId)} onHover={onHoverShul} />
               ))}
             </ul>
           )}
@@ -317,15 +354,25 @@ function whose(p: DayPosting, inSentence = false): string {
   return ''
 }
 
+/** Reports how many the list shows, after it changes: its own component,
+ *  so the effect sits below the view's early return. */
+function Showing({ count, onShowing }: { count: number; onShowing: (count: number) => void }) {
+  useEffect(() => onShowing(count), [count, onShowing])
+  return null
+}
+
 function MinyanRow({
   slot,
   far,
+  kind,
   posting,
   href,
   onHover,
 }: {
   slot: MinyanSlot
   far: string | null
+  /** The shul's denomination: "Orthodox". */
+  kind: string
   posting: DayPosting
   href: string | null
   onHover?: (shulId: string | null) => void
@@ -338,6 +385,7 @@ function MinyanRow({
           <span className="block truncate text-[15px] font-bold text-slate-900">{slot.shulName}</span>
           <span className="block text-[13.5px] text-slate-600">
             {TEFILLAH_LABELS[slot.tefillah]}
+            {kind ? ` · ${kind}` : ''}
             {slot.notes ? ` · ${slot.notes}` : ''}
             {far ? ` · ${far}` : ''}
           </span>

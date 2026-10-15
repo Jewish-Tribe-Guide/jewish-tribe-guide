@@ -57,6 +57,13 @@ export function kindField(category: CategoryConfig): CategoryField | null {
   return category.detailFields.findLast((f) => isBadge(f) && f.type === 'select' && !f.caveat && f.key !== replaced) ?? null
 }
 
+/** What kind of place this one is, by its kind field ("Orthodox"), or ''
+ *  when that says nothing: for a line that names the place already. */
+export function kindText(item: DirectoryResource, category: CategoryConfig): string {
+  const f = kindField(category)
+  return f ? optionLabels(f, item[f.key]).join(', ') : ''
+}
+
 /** "Restaurant", or the category's own name when nothing says more
  *  ("Mikvah", "WhatsApp Group"). */
 export function listingKind(item: DirectoryResource, category: CategoryConfig): string {
