@@ -437,6 +437,48 @@ body {
 .rich-text h3 {
   font-size: 1.1em;
 }
+/* About and Privacy render their body as one .rich-text-section per heading
+   (PageDocument, splitPageSections). The rules above are written for a flat
+   body, so the first section's opening heading needs the same "no rule, no
+   gap at the very top" treatment `> h2:first-child` gives a flat one. */
+.rich-text > .rich-text-section:first-child > :first-child {
+  margin-top: 0;
+}
+.rich-text > .rich-text-section:first-child > h2:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+.rich-text > .rich-text-section:last-child > :last-child {
+  margin-bottom: 0;
+}
+/* Phone only — the negation of the `desktop` variant at the top of this file.
+   Each section is a white box, like the rest of the app's content. Desktop
+   gets none of this: the sections stay unstyled blocks, so the heading's
+   margin collapses through them and the page reads as the one document it
+   always did, hairlines between sections included. */
+@media not all and (min-width: 640px) and (min-height: 640px) {
+  .rich-text-section {
+    background: white;
+    border: 1px solid var(--color-slate-200);
+    border-radius: 1rem;
+    padding: 1rem;
+    box-shadow: 0 1px 2px rgb(15 23 42 / 0.05);
+  }
+  .rich-text-section + .rich-text-section {
+    margin-top: 0.75rem;
+  }
+  .rich-text-section > :first-child {
+    margin-top: 0;
+  }
+  .rich-text-section > :last-child {
+    margin-bottom: 0;
+  }
+  /* The box is the divider now; a hairline inside it would be a second one. */
+  .rich-text-section > h2:first-child {
+    padding-top: 0;
+    border-top: 0;
+  }
+}
 .rich-text ul,
 .rich-text ol {
   margin: 1em 0;

@@ -1,4 +1,4 @@
-import UpButton from '@/components/UpButton'
+import PageDocument from '@/components/PageDocument'
 import type { Metadata } from 'next'
 import { community } from '@/community.config'
 import { listCommunities } from '@/lib/communityStore'
@@ -7,7 +7,6 @@ import { SITE_SETTINGS_DEFAULTS } from '@/lib/siteSettings'
 import { siteUrl } from '@/lib/siteUrl'
 import { routes } from '@/lib/routes'
 import { getPage } from '@/lib/pagesStore'
-import { pageBodyToHtml } from '@/lib/richText'
 
 // Self-referencing canonical — see [community]/page.tsx's comment on why
 // every screen under [community] needs one.
@@ -47,8 +46,7 @@ export async function generateMetadata(props: PageProps<'/[community]/privacy'>)
 // not the per-community DB row — this app's zmanim/hours logic reads the same
 // static value regardless of which community is browsing, so formatting a
 // timestamp with it is consistent with everything else, not a shortcut.
-export default async function PrivacyPage(props: PageProps<'/[community]/privacy'>) {
-  const { community: slug } = await props.params
+export default async function PrivacyPage() {
   const page = await getPage('privacy')
   const title = page?.title ?? 'Privacy Policy'
   const lastUpdated = page
@@ -60,30 +58,5 @@ export default async function PrivacyPage(props: PageProps<'/[community]/privacy
       })
     : null
 
-  return (
-    <main className="mx-auto max-w-2xl px-4 sm:px-6 py-12 sm:py-16">
-      {/* The same control every other second-level screen uses, saying the
-          same word — see AboutPage's own doc, including why this is
-          mobile-only. Points at this community's own home (routes.home),
-          not a bare "/", which redirects to whichever community is the
-          site's default. */}
-      <UpButton href={routes.home(slug)} label="Home" className="mb-0 desktop:hidden" />
-
-      {/* One card holding the whole document — title included. See the same
-          note on /about for why the h1 sits inside rather than above it, and
-          why the back link doesn't. */}
-      <div className="mt-5 rounded-lg border border-slate-200 bg-white p-6 shadow-sm sm:p-10">
-        <h1 className="text-[30px] font-bold leading-tight tracking-tight text-slate-900 sm:text-[34px]">
-          {title}
-        </h1>
-        {lastUpdated && <p className="mt-1.5 text-sm text-muted">Last updated: {lastUpdated}</p>}
-
-        {/* Admin-authored rich text — see the same note on /about. */}
-        <div
-          className="rich-text mt-7 text-[16px] leading-[1.75] text-slate-700"
-          dangerouslySetInnerHTML={{ __html: pageBodyToHtml(page?.body) }}
-        />
-      </div>
-    </main>
-  )
+  return <PageDocument title={title} subtitle={lastUpdated && `Last updated: ${lastUpdated}`} body={page?.body} />
 }

@@ -56,8 +56,8 @@ export default function SiteHeader({ onGoHome, location, previewSettings, hideNa
   const scrolledPastTop = useScrolledPastTop()
   const transparent = overlaid && !scrolledPastTop && !collapsed
 
-  // On mobile, a category/hospital/synagogue directory screen (the only
-  // things that ever call useSetScreenHeader — see GenericDirectory) swaps
+  // On mobile, a drill-down screen — a category directory (GenericDirectory),
+  // Zmanim, the eruv, About/Privacy (PageScreenHeader), Feedback — swaps
   // the static site name for its own "‹ {title}", the same pattern the cRc
   // Kosher app's own drill-down screens use. Desktop keeps the site name
   // instead — its persistent logo/nav is already a permanent way back to

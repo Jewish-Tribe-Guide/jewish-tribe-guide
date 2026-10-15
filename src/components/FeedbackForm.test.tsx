@@ -57,7 +57,7 @@ describe('FeedbackForm — modal variant semantics', () => {
   })
 })
 
-describe('FeedbackForm — inline variant (the mobile Feedback tab)', () => {
+describe('FeedbackForm — inline variant (the mobile /feedback page)', () => {
   it('lets the visitor send a second message after the first succeeds', async () => {
     vi.mocked(submitRequest).mockResolvedValue({ ok: true, requestId: 'r1' })
     const user = userEvent.setup()
@@ -147,5 +147,21 @@ describe('FeedbackForm — arriving from a search that found nothing', () => {
     renderWithProviders(<FeedbackForm heading="Send feedback" successMessage="Thanks!" onClose={vi.fn()} />)
     expect(await screen.findByRole('textbox', { name: /feedback/i })).toHaveValue('')
     window.history.replaceState(null, '', '/')
+  })
+})
+
+describe('FeedbackForm — inline heading when the header already names the page', () => {
+  it('keeps the heading for screen readers but does not show it', () => {
+    renderWithProviders(<FeedbackForm heading="Send feedback" successMessage="Thanks!" variant="inline" headingHidden />)
+    expect(screen.getByRole('heading', { level: 1, name: 'Send feedback' })).toHaveClass('sr-only')
+  })
+
+  it('still shows the thank-you heading after sending — that one is the message', async () => {
+    vi.mocked(submitRequest).mockResolvedValue({ ok: true, requestId: 'r1' })
+    const user = userEvent.setup()
+    renderWithProviders(<FeedbackForm heading="Send feedback" successMessage="Thanks!" variant="inline" headingHidden />)
+    await user.type(screen.getByLabelText('Your feedback'), 'A note')
+    await user.click(screen.getByRole('button', { name: 'Send feedback' }))
+    expect(await screen.findByRole('heading', { name: 'Thanks for your note!' })).not.toHaveClass('sr-only')
   })
 })

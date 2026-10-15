@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ALLOWED_TAGS, isRichText, pageBodyToHtml, plainTextToRichText, sanitizeRichText } from './richText'
+import { ALLOWED_TAGS, isRichText, pageBodyToHtml, plainTextToRichText, sanitizeRichText, splitPageSections } from './richText'
 
 // The Pages tab's WYSIWYG writes markup straight from a browser's
 // contenteditable into a column that /about and /privacy render with
@@ -171,5 +171,37 @@ describe('plain text written before the editor existed', () => {
     expect(pageBodyToHtml('')).toBe('')
     expect(pageBodyToHtml(null)).toBe('')
     expect(pageBodyToHtml(undefined)).toBe('')
+  })
+})
+
+describe('splitPageSections — one box per section on a phone', () => {
+  it('starts a new section at every top-level h2', () => {
+    expect(splitPageSections('<h2>One</h2><p>a</p><h2>Two</h2><p>b</p>')).toEqual([
+      '<h2>One</h2><p>a</p>',
+      '<h2>Two</h2><p>b</p>',
+    ])
+  })
+
+  it('keeps an intro before the first heading as its own section', () => {
+    expect(splitPageSections('<p>intro</p><h2>One</h2><p>a</p>')).toEqual(['<p>intro</p>', '<h2>One</h2><p>a</p>'])
+  })
+
+  it('leaves a body with no headings whole', () => {
+    expect(splitPageSections('<p>a</p><p>b</p>')).toEqual(['<p>a</p><p>b</p>'])
+  })
+
+  it('does not split at an h3 or at an h2 nested inside another element', () => {
+    const html = '<h2>One</h2><h3>Sub</h3><p>a<br>b</p><blockquote><h2>Quoted</h2></blockquote><p>c</p>'
+    expect(splitPageSections(html)).toEqual([html])
+  })
+
+  it('drops whitespace-only pieces and returns nothing for an empty body', () => {
+    expect(splitPageSections('\n<h2>One</h2>')).toEqual(['<h2>One</h2>'])
+    expect(splitPageSections('')).toEqual([])
+  })
+
+  it('joins back to exactly the input, so desktop renders what it always did', () => {
+    const html = pageBodyToHtml('<p>intro</p><h2>A</h2><ul><li>x</li></ul><h2>B</h2><p><a href="/privacy">p</a></p>')
+    expect(splitPageSections(html).join('')).toBe(html)
   })
 })

@@ -13,14 +13,18 @@ type Props = {
   heading: string
   successMessage: string
   /** 'modal' (default) renders the fixed-backdrop dialog used by FeedbackButton;
-   *  'inline' renders just the card content, for embedding as a full page (the
-   *  mobile Feedback tab). */
+   *  'inline' renders the same content in a white card, for embedding as a full
+   *  page (the mobile /feedback screen). */
   variant?: 'modal' | 'inline'
   /** Required for 'modal' (backdrop tap / ✕ / success "Close"); unused inline. */
   onClose?: () => void
+  /** Inline only: keep the heading for screen readers but don't show it — for
+   *  when the screen's header already names the page ("‹ Feedback"), so the
+   *  same title doesn't sit twice in a row. */
+  headingHidden?: boolean
 }
 
-export default function FeedbackForm({ heading, successMessage, variant = 'modal', onClose }: Props) {
+export default function FeedbackForm({ heading, successMessage, variant = 'modal', onClose, headingHidden = false }: Props) {
   const community = useCommunitySlug()
   const [message, setMessage] = useState('')
   const [email, setEmail] = useState('')
@@ -102,7 +106,9 @@ export default function FeedbackForm({ heading, successMessage, variant = 'modal
 
   const wrap = (children: React.ReactNode) => {
     if (variant !== 'modal') {
-      return <div className="mx-auto w-full max-w-md px-4 py-8">{children}</div>
+      // The page's own <main> already has the side gutter, so the card adds
+      // only its inner padding — this used to add a second px-4 of its own.
+      return <div className="mx-auto w-full max-w-md rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">{children}</div>
     }
     // FeedbackScreen's desktop branch renders this variant unconditionally
     // on page load, so the portal below can be reached during SSR, where
@@ -167,10 +173,12 @@ export default function FeedbackForm({ heading, successMessage, variant = 'modal
     )
   }
 
+  const showHeading = variant === 'modal' || !headingHidden
+
   return wrap(
     <>
-      <div className="flex items-start justify-between">
-        <Heading className="text-lg font-semibold text-slate-900">{heading}</Heading>
+      <div className={showHeading ? 'flex items-start justify-between' : 'contents'}>
+        <Heading className={showHeading ? 'text-lg font-semibold text-slate-900' : 'sr-only'}>{heading}</Heading>
         {variant === 'modal' && (
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600" aria-label="Close">
             &times;
@@ -178,7 +186,7 @@ export default function FeedbackForm({ heading, successMessage, variant = 'modal
         )}
       </div>
 
-        <p className="mt-2 text-xs leading-relaxed text-slate-500">
+        <p className={`${showHeading ? 'mt-2' : ''} text-xs leading-relaxed text-slate-500`}>
           For adding, fixing, or removing a specific listing, use the{' '}
           <span className="font-medium text-slate-600">Add</span>,{' '}
           <span className="font-medium text-slate-600">Edit</span>, or{' '}
