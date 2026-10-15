@@ -5,6 +5,7 @@ import { useSiteSettings } from '@/lib/useSiteSettings'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { useSiteNavigation } from '@/lib/useSiteNavigation'
 import { useSetScreenHeader } from '@/lib/headerVisibility'
+import { PAGE_COLUMN } from '@/lib/pageColumn'
 import { DEFAULT_MOBILE_TABS } from '@/lib/siteSettings'
 
 // Feedback is a real page on mobile and a modal over the home screen on
@@ -48,7 +49,7 @@ export default function FeedbackScreen() {
   }
 
   return (
-    <main className="flex flex-1 flex-col w-full max-w-4xl mx-auto px-4 pt-4 pb-24 animate-[fadeIn_180ms_ease-out]">
+    <main className={`${PAGE_COLUMN} flex flex-1 flex-col pt-4 pb-24 animate-[fadeIn_180ms_ease-out]`}>
       <FeedbackForm
         variant="inline"
         heading={settings.feedbackHeading}

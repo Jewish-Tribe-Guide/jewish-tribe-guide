@@ -106,9 +106,10 @@ export default function FeedbackForm({ heading, successMessage, variant = 'modal
 
   const wrap = (children: React.ReactNode) => {
     if (variant !== 'modal') {
-      // The page's own <main> already has the side gutter, so the card adds
-      // only its inner padding — this used to add a second px-4 of its own.
-      return <div className="mx-auto w-full max-w-md rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">{children}</div>
+      // The page's own <main> sets the gutter and the width (PAGE_COLUMN,
+      // shared with About/Privacy), so the card just fills it — it used to
+      // add a second px-4 of its own and stop at 448px.
+      return <div className="w-full rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">{children}</div>
     }
     // FeedbackScreen's desktop branch renders this variant unconditionally
     // on page load, so the portal below can be reached during SSR, where
@@ -186,15 +187,7 @@ export default function FeedbackForm({ heading, successMessage, variant = 'modal
         )}
       </div>
 
-        <p className={`${showHeading ? 'mt-2' : ''} text-xs leading-relaxed text-slate-500`}>
-          For adding, fixing, or removing a specific listing, use the{' '}
-          <span className="font-medium text-slate-600">Add</span>,{' '}
-          <span className="font-medium text-slate-600">Edit</span>, or{' '}
-          <span className="font-medium text-slate-600">Report</span> buttons
-          on that listing — those get handled fastest.
-        </p>
-
-        <form onSubmit={handleSubmit} className="mt-4 space-y-3">
+        <form onSubmit={handleSubmit} className={`${showHeading ? 'mt-4' : ''} space-y-3`}>
           <Honeypot value={honeypot} onChange={setHoneypot} />
 
           <div>
@@ -242,7 +235,7 @@ export default function FeedbackForm({ heading, successMessage, variant = 'modal
             {status === 'submitting' ? 'Sending...' : 'Send feedback'}
           </button>
 
-          <PrivacyNote />
+          <PrivacyNote short />
       </form>
     </>
   )

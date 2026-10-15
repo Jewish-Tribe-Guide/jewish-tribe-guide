@@ -165,3 +165,14 @@ describe('FeedbackForm — inline heading when the header already names the page
     expect(await screen.findByRole('heading', { name: 'Thanks for your note!' })).not.toHaveClass('sr-only')
   })
 })
+
+describe('FeedbackForm — the privacy line under the button', () => {
+  it('is the one-liner, with a "Privacy" link that opens the policy in a new tab', () => {
+    renderWithProviders(<FeedbackForm heading="Send feedback" successMessage="Thanks!" variant="inline" />)
+    expect(screen.getByText(/We only use this to reply\./)).toBeInTheDocument()
+    expect(screen.queryByText(/never for marketing/)).not.toBeInTheDocument()
+    const link = screen.getByRole('link', { name: 'Privacy' })
+    expect(link).toHaveAttribute('href', '/test-community/privacy')
+    expect(link).toHaveAttribute('target', '_blank')
+  })
+})

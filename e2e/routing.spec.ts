@@ -299,7 +299,8 @@ test.describe('URLs', () => {
     await page.goto(`/${community}/feedback`)
     await dismissLocationPrompt(page)
 
-    const link = page.getByRole('link', { name: /privacy policy/i })
+    // Feedback's note says just "Privacy" (PrivacyNote's `short`).
+    const link = page.getByRole('link', { name: /privacy/i })
     await expect(link).toBeVisible()
     await expect(link).toHaveAttribute('href', `/${community}/privacy`)
   })
