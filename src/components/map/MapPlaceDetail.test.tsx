@@ -177,7 +177,7 @@ describe('MapPlaceDetail', () => {
   // They used to sit behind a kebab next to the name, which people open
   // expecting Share and never expecting to author anything — plus a quiet
   // grey "Suggest a correction" link in the footer, now gone.
-  it('offers Edit listing and the overflow, with no kebab and no quiet correction link', async () => {
+  it('offers Edit listing and Request removal, with no ••• menu, no kebab and no quiet correction link', async () => {
     const user = (await import('@testing-library/user-event')).default.setup()
     renderWithProviders(
       <PinnedProvider>
@@ -189,17 +189,14 @@ describe('MapPlaceDetail', () => {
     expect(screen.queryByRole('button', { name: /more actions/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Suggest a correction' })).not.toBeInTheDocument()
 
-    // Share is one of the listing's own buttons now, beside Directions and
-    // Call, and Save is the bookmark at the top, so neither is in the
-    // overflow.
+    // Share is one of the listing's own buttons, beside Directions and Call,
+    // and Save is the bookmark at the top — which is why the ••• fan that
+    // used to hold them, and Request removal, is gone (Oct 15).
     expect(screen.getByRole('button', { name: 'Share' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Save Goldi Market' })).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Actions for Goldi Market' }))
-    expect(screen.queryByRole('menuitem', { name: /^(save|pin)/i })).not.toBeInTheDocument()
-    expect(screen.queryByRole('menuitem', { name: 'Share' })).not.toBeInTheDocument()
-    // Request removal is the last thing in it (Oct 11), not at the foot of
-    // the edit, and opens its own screen with the listing behind it.
-    await user.click(screen.getByRole('menuitem', { name: 'Request removal' }))
+    expect(screen.queryByRole('button', { name: 'Actions for Goldi Market' })).not.toBeInTheDocument()
+    // Request removal opens its own screen, with the listing behind it.
+    await user.click(screen.getByRole('button', { name: 'Request removal' }))
     expect(await screen.findByText('stub editor: removal')).toBeInTheDocument()
   })
 
@@ -215,7 +212,7 @@ describe('MapPlaceDetail', () => {
     const view = container.querySelector('[data-testid="listing-view"]') as HTMLElement
     const last = view.lastElementChild as HTMLElement
     expect(last).toContainElement(screen.getByRole('button', { name: 'Edit listing' }))
-    expect(last).toContainElement(screen.getByRole('button', { name: 'Actions for Goldi Market' }))
+    expect(last).toContainElement(screen.getByRole('button', { name: 'Request removal' }))
     // Its own block now: the dated strip it used to end is gone (Oct 6).
     expect(last).toHaveAttribute('data-testid', 'listing-foot')
   })
@@ -340,22 +337,32 @@ describe('MapPlaceDetail', () => {
     expect(screen.getByRole('button', { name: 'Share' })).toBeInTheDocument()
   })
 
-  // The overflow's captions are white with a text shadow, written for a dark
-  // ground. The map has no scrim, so its overflow must use `stack`, which
-  // brings its own — the desktop default would put them on a live map.
-  // Asserted here, not just in ListingActionsFan's tests, because what can
-  // break is the THREADING: MapPlaceDetail -> ListingEditBar -> the fan.
-  it('opens its overflow in the stack placement, even on desktop', async () => {
-    const user = (await import('@testing-library/user-event')).default.setup()
+  // Oct 15: a recommendation is worth giving wherever the place was found.
+  // The map passes no `upvote` of its own, so the detail supplies one, on
+  // the directory's gate: the category's setting and the site's.
+  it('offers Recommend on the map where the category takes upvotes, and not otherwise', () => {
+    const render = (upvotesEnabled: boolean) =>
+      renderWithProviders(
+        <PinnedProvider>
+          <MapPlaceDetail item={makeListing({ name: 'Goldi Market' })} category={makeCategory({ upvotesEnabled })} color="#000" onBack={() => {}} />
+        </PinnedProvider>,
+      )
+    render(true)
+    expect(screen.getByRole('button', { name: /^Recommend Goldi Market/ })).toBeInTheDocument()
+    cleanup()
+    render(false)
+    expect(screen.getByRole('button', { name: 'Edit listing' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Recommend/ })).not.toBeInTheDocument()
+  })
+
+  // The directory's sheet passes its own (wired to re-sort its list), or
+  // null where the category has upvotes off; either is used as given.
+  it('uses the host’s upvote, or none, when one is passed', () => {
     renderWithProviders(
       <PinnedProvider>
-        <MapPlaceDetail item={makeListing({ name: 'Goldi Market' })} category={makeCategory()} color="#000" onBack={() => {}} />
+        <MapPlaceDetail item={makeListing({ name: 'Goldi Market' })} category={makeCategory({ upvotesEnabled: true })} color="#000" upvote={null} />
       </PinnedProvider>,
     )
-    await user.click(screen.getByRole('button', { name: 'Actions for Goldi Market' }))
-    const menu = screen.getByRole('menu')
-    expect(menu.style.right).not.toBe('')
-    expect(menu.style.bottom).not.toBe('')
-    expect(menu.style.top).toBe('')
+    expect(screen.queryByRole('button', { name: /^Recommend/ })).not.toBeInTheDocument()
   })
 })

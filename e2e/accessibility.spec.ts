@@ -114,37 +114,6 @@ test.describe('accessibility', () => {
     }
   })
 
-  // Opened through the listing rather than off the collapsed row: the row's
-  // kebab is gone, and Pin/Share/Set-as-location now live in the fan hanging
-  // off an opened listing's edit bar (ListingActionsFan). Same popup role,
-  // same reason to check it — the ARIA-attribute rules here are what caught
-  // aria-pressed on a menuitem, and the fan renders the same menuitems.
-  test('a listing\'s actions menu, once open, has no automatically-detectable violations', async ({ page, request }) => {
-    const community = await defaultCommunity(page)
-    const { category } = await categoryWithListings(request, community)
-    await page.goto(`/${community}/${category.id}`)
-    await ready(page)
-    await dismissLocationPrompt(page)
-
-    // Derived from the row's own aria-label rather than hardcoded, same as
-    // listing-detail.spec.ts: the fan's trigger is scoped to one listing's
-    // name, and the directory has one row per listing.
-    const trigger = page.getByRole('button', { name: /^Show details for / }).first()
-    const name = (await trigger.getAttribute('aria-label'))!.replace(/^Show details for /, '')
-    await trigger.click()
-
-    await page.getByRole('button', { name: `Actions for ${name}` }).click()
-    await expect(page.getByRole('menu')).toBeVisible()
-
-    // `region` (all content inside a landmark) is switched off for this one
-    // check: the open menu is a transient popup portaled outside <main>, which
-    // is normal for a popup and not something a landmark would improve. Every
-    // other rule, including the ARIA-attribute ones that caught aria-pressed on
-    // a menuitem, still runs — and `region` still runs on every page above.
-    const results = await new AxeBuilder({ page }).disableRules(['color-contrast', 'region']).analyze()
-    expect(results.violations, JSON.stringify(results.violations, null, 2)).toEqual([])
-  })
-
   test('the “Tell us” box, once open, has no automatically-detectable violations', async ({ page, request }) => {
     const community = await defaultCommunity(page)
     const { category } = await categoryWithListings(request, community)

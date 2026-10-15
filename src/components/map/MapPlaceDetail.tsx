@@ -14,6 +14,7 @@ import { routes } from '@/lib/routes'
 import { listingSlug } from '@/lib/listingSlug'
 import { useCommunitySlug } from '@/lib/communityContext'
 import BackIconButton from '@/components/BackIconButton'
+import UpvoteButton from '@/components/resources/UpvoteButton'
 
 // The editor (address lookup, hours, photos) loads when editing starts, not
 // with the listing, so the Map page's code stays light.
@@ -30,9 +31,11 @@ type Props = {
   onBack?: () => void
   /** What the search that opened it matched — see PlaceDetailBody's `found`. */
   found?: SearchFound | null
-  /** The directory's upvote control, under the name. Upvotes rank a
-   *  category's list, so only the directory's sheet passes one; the map
-   *  has no list order for it to change. */
+  /** The upvote control, under the name. The directory's sheet passes its
+   *  own, wired to re-sort its list (`null` where the category has upvotes
+   *  off); left out — the map — this renders a plain one, on the same gate
+   *  the directory uses. A recommendation is worth giving wherever the
+   *  place was found, not only where it changes a list's order (Oct 15). */
   upvote?: ReactNode
   /** Where it is, in the row's words ("Bustleton"). */
   place?: string | null
@@ -59,11 +62,10 @@ type Props = {
  * expanded listing card does (hours, tags, badges, davening times, freeform
  * fields, caveat notes), read-only (no filter callbacks — the map has no
  * such filters of its own), plus its own header and back button, the same
- * FreshnessFooter line, and the same "Suggest an edit" bar and overflow the
+ * FreshnessFooter line, and the same Edit listing / Request removal bar the
  * directory shows, as the last thing in the content. So a place reads, and
- * can be corrected, the same whether you found it here or in the category
- * directory. The upvote shows only when the directory's sheet passes one
- * (`upvote`): upvotes rank a category's list, which the map doesn't have.
+ * can be corrected and recommended, the same whether you found it here or in
+ * the category directory.
  */
 export default function MapPlaceDetail({ item, category, color, onBack, found, upvote, place = null, onward, wide = false, onwardClassName, titleAs, onEditingChange }: Props) {
   const community = useCommunitySlug()
@@ -115,7 +117,7 @@ export default function MapPlaceDetail({ item, category, color, onBack, found, u
       setRemovalOpen(true)
     } else stepBack()
   }
-  // The ••• menu's Request removal (Oct 11): straight to that screen, one
+  // The bar's Request removal: straight to that screen, one
   // history entry, so Back returns to the listing.
   const openRemoval = () => {
     history.pushState({ ...(window.history.state ?? {}), mapSheetForm: 'edit', mapSheetRemoval: true }, '')
@@ -142,6 +144,12 @@ export default function MapPlaceDetail({ item, category, color, onBack, found, u
   const caps = resolveCapabilities(category.capabilities)
   const canEdit = ui.contributions.edit && caps.edit
   const canReport = ui.contributions.report && caps.report
+  const shownUpvote =
+    upvote !== undefined
+      ? upvote
+      : category.upvotesEnabled && ui.upvotes
+        ? <UpvoteButton variant="recommend" name={item.name} resourceId={item.id} count={item.upvotes ?? 0} />
+        : null
 
   if (formOpen) {
     return (
@@ -183,24 +191,18 @@ export default function MapPlaceDetail({ item, category, color, onBack, found, u
         found={found}
         path={listingPath}
         onward={onward}
-        upvote={upvote}
+        upvote={shownUpvote}
         wide={wide}
         onwardClassName={onwardClassName}
         titleAs={titleAs}
         foot={
-          // Suggest an edit, and the ⋯ with Pin and Set as location (Share
-          // has its own button up top). Rendered even without edit, for
-          // those two. `stack` for the fan: there's no scrim behind it to
-          // give its captions a dark ground. See ListingActionsFan's
-          // `placement`.
+          // Edit listing, and Request removal beside it. Rendered only
+          // where the listing can be edited (ListingEditBar).
           <ListingEditBar
             onEdit={canEdit ? () => openForm('edit') : undefined}
             onRequestRemoval={canEdit && canReport ? openRemoval : undefined}
             item={item}
             category={category}
-            path={listingPath}
-            fanPlacement="stack"
-            omit={['share']}
           />
         }
       />

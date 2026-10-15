@@ -863,7 +863,7 @@ function ActionButton({ action, item }: { action: ActionSpec; item: DirectoryRes
 }
 
 /** Distances everywhere measured from this place: a hospital, for the
- *  family staying near it. The same anchor as the overflow fan's Set as
+ *  family staying near it. The same anchor as the row swipe's Set as
  *  location (useListingActions), as a row under the address. Not drawn where
  *  there's no LocationProvider (the admin's preview). */
 function SetLocationRow({ item }: { item: DirectoryResource }) {

@@ -42,8 +42,8 @@ const MapPlaceDetail = dynamic(() => import('@/components/map/MapPlaceDetail'))
  *  as you read, sending one to someone. "Set as location" is deliberately
  *  not here: it re-sorts the entire directory, which is a deliberate act
  *  rather than something you do in passing, and two actions is the practical
- *  ceiling for a swipe on a phone. It lives in the fan below an opened
- *  listing instead.
+ *  ceiling for a swipe on a phone. It lives under an opened listing's
+ *  address instead (ListingView's SetLocationRow).
  *
  *  A phone's swipe only. A desktop row used to show the two on hover, over
  *  its likes; hovering a row now lights its pin on the map beside the list,
@@ -211,24 +211,22 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
   // one tick before settling into the sheet — accepted the same way the
   // other isMobile-gated layout branches in this app already are.
   const isMobile = useIsMobile()
-  // The Share path the card's own actions (and the edit bar's fan) need.
+  // The Share path the card's own swipe actions need.
   const listingPath = routes.listing(community, category.id, listingSlug(item))
   const { isPinned } = usePinned()
   const pinned = isPinned(item.id)
 
   // Save/Share for the collapsed row, revealed by a swipe on mobile. A
-  // shortcut: ListingActionsFan below an opened listing is where these are
-  // reachable by every visitor, which is what makes it safe for the card's
-  // own copies to be invisible until asked for.
+  // shortcut: the opened listing's own Save and Share buttons are where these
+  // are reachable by every visitor, which is what makes it safe for the
+  // card's own copies to be invisible until asked for.
   const cardActions = useListingActions(item, category, listingPath).filter((a) =>
     CARD_ACTION_IDS.includes(a.id),
   )
   // The mobile swipe is SwipeRow, the same one the map's nearby list uses,
   // so the gesture and the circles it reveals are identical on both. Worded
-  // the way the fan words them: "Saved", with the bookmark filled, and a tap
-  // takes it off (with Undo).
-  // where the fan's "Pinned" (a menu item, whose label is its only state
-  // cue) says what's true now.
+  // as useListingActions words them: "Saved", with the bookmark filled, and
+  // a tap takes it off (with Undo).
   const rowSwipeActions: SwipeAction[] = cardActions.map((a) => {
     const label = a.label
     return { id: a.id as SwipeAction['id'], label, ariaLabel: `${label} ${item.name}`, active: a.active, onSelect: a.onSelect }

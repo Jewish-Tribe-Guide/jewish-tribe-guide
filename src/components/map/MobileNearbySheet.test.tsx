@@ -105,11 +105,9 @@ describe('MobileNearbySheet', () => {
   // is Google Maps' own 'click' event, not a plain DOM click this
   // component's own outside-click detection could reliably order itself
   // against). Removed along with the callback props that drove them
-  // (onOutsideDismiss/onOpenChange) once the popup covered this itself: an
-  // invisible backdrop sits over the ENTIRE screen while it's open (see
-  // ListingActionsFan's own doc), so a dismissing tap never reaches Google
-  // Maps' canvas at all — collapse() simply never gets called for that tap
-  // in the first place, and there's nothing left here to guard against.
+  // (onOutsideDismiss/onOpenChange) once the popup covered this itself with
+  // a full-screen backdrop — and the popup itself is gone now too (Oct 15),
+  // so there's nothing left here to guard against.
   it('returns to the list (not the home screen) when a swipe-back fires while a place is selected', async () => {
     const user = userEvent.setup()
 

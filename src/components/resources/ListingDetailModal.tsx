@@ -134,7 +134,7 @@ export default function ListingDetailModal({
       setRemovalOpen(true)
     } else stepBack()
   }
-  // The ••• menu's Request removal (Oct 11): straight to that screen, one
+  // The edit bar's Request removal: straight to that screen, one
   // history entry, so Back returns to the listing.
   const openRemoval = () => {
     history.pushState({ ...(window.history.state ?? {}), detailModalForm: 'edit', detailModalRemoval: true }, '')
@@ -220,10 +220,8 @@ export default function ListingDetailModal({
 
   // The bar is the way IN to the form, so it has nothing to say once the
   // form is open — the dialog's own header carries Back/"Suggest an edit"
-  // from there.
-  // Not gated on canEdit — the bar carries the overflow too, and a listing
-  // that can't be edited still needs Pin/Share/Set as location. See
-  // ListingEditBar.
+  // from there. Where the listing can't be edited, ListingEditBar renders
+  // nothing of its own accord.
   const showEditBar = !formOpen
 
   return (
@@ -395,8 +393,6 @@ export default function ListingDetailModal({
               onRequestRemoval={canEdit && canReport ? openRemoval : undefined}
               item={item}
               category={category}
-              path={listingPath}
-              omit={['share']}
               className="pointer-events-auto"
             />
           </div>

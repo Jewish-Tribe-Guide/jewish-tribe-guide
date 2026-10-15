@@ -315,9 +315,9 @@ test.describe('listing detail — mobile', () => {
     const sheet = page.getByRole('dialog', { name })
     await expect(sheet).toBeVisible()
     await expect(page.getByRole('button', { name: `Hide details for ${name}` })).toBeAttached()
-    // The listing view, ending in its edit bar (or, where the category can't
-    // be edited, just the overflow the bar keeps).
-    await expect(sheet.getByRole('button', { name: `Actions for ${name}` })).toBeAttached()
+    // The listing view: Share is one of its own buttons whatever the
+    // category allows (the edit bar is left out where it can't be edited).
+    await expect(sheet.getByRole('button', { name: 'Share' }).first()).toBeAttached()
 
     // Settled at half: the open transition is 280ms, so poll rather than
     // snapshot the height mid-animation.
@@ -414,13 +414,13 @@ test.describe('listing detail — mobile', () => {
   })
 })
 
-// Request removal is in the listing's ••• menu (Oct 11), a screen of its
-// own with no Cancel: Back (and the browser's or phone's Back, and Escape
+// Request removal is a button beside Edit listing (Oct 15; a ••• menu
+// before that), opening a screen of its own with no Cancel: Back (and the browser's or phone's Back, and Escape
 // on desktop) returns to the listing. Here as well as in the unit tests
 // because those mock the history; this is the real history stack, with
 // the directory's own URL syncing running alongside it. Opens nothing that
 // writes: the confirm is never pressed.
-test('Request removal, from the ••• menu, is its own screen, and Back returns to the listing', async ({ page, request, isMobile }) => {
+test('Request removal, beside Edit, is its own screen, and Back returns to the listing', async ({ page, request, isMobile }) => {
   const community = await defaultCommunity(page)
   const { category, item } = await categoryWithHoursField(request, community)
 
@@ -435,10 +435,9 @@ test('Request removal, from the ••• menu, is its own screen, and Back retu
   await expect(name).toBeVisible()
 
   const openRemoval = async () => {
-    const more = listing.getByRole('button', { name: `Actions for ${item.name}` })
-    await more.scrollIntoViewIfNeeded()
-    await more.click()
-    await page.getByRole('menuitem', { name: 'Request removal' }).click()
+    const removal = listing.getByRole('button', { name: 'Request removal' })
+    await removal.scrollIntoViewIfNeeded()
+    await removal.click()
     await expect(page.getByRole('heading', { name: 'Request removal' })).toBeVisible()
   }
   // Offered wherever the listing can be edited (removal requests are on

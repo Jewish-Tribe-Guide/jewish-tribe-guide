@@ -165,11 +165,9 @@ describe('GenericListingCard — collapsed', () => {
   // The two tests that used to sit here — "a tap dismissing the kebab must
   // not also expand the card", on this card and on a neighbouring one — are
   // gone with the kebab itself. The behaviour they guarded is not: it belongs
-  // to the invisible backdrop every popup of listing actions uses, and it is
-  // covered where it lives now (ListingActionsFan.test.tsx, "closes on an
-  // outside tap, via its invisible backdrop" and the test below it — ported
-  // there when the kebab's own file was deleted). Deleted rather than
-  // rewritten because a card with no kebab cannot exercise any of it.
+  // to the invisible backdrop a popup of listing actions used, and went with
+  // the last such popup (the ••• fan, Oct 15). Deleted rather than rewritten
+  // because a card with no kebab cannot exercise any of it.
 
   it('does not render an upvote count when upvotes is false', () => {
     const category = makeCategory()
@@ -1164,8 +1162,9 @@ describe('GenericListingCard — the row', () => {
 // people open a ⋯ expecting Share and Save, never expecting to author
 // anything, which is exactly why Edit spent so long invisible in there.
 // Save and Share are reached by swiping the row on mobile; Edit and
-// Set-as-location live below an opened listing (the edit bar and its fan).
-// The swipe is a SHORTCUT — the fan is where every visitor can reach these,
+// Set-as-location live on an opened listing (the edit bar, the row under the
+// address). The swipe is a SHORTCUT — the opened listing's own buttons are
+// where every visitor can reach these,
 // which is what makes it safe for the card's own copies to be invisible
 // until asked for. A desktop row showed the two on hover too, until hovering
 // a row came to light its pin on the map beside the list.

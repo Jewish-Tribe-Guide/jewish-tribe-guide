@@ -9,8 +9,8 @@ import PrivacyNote from '@/components/PrivacyNote'
 
 const REASONS = ['Permanently closed', 'Duplicate listing', 'Shouldn’t be listed', 'Other'] as const
 
-/** Requesting a listing's removal — opened from the listing's ••• menu
- *  into the listing editor (ListingEditor), which shows it in place of the
+/** Requesting a listing's removal — opened from the button beside Edit
+ *  listing (ListingEditBar) into the listing editor (ListingEditor), which shows it in place of the
  *  edit's own screens, not as an accordion appended below them.
  *
  *  Removal used to be a separate "Report a problem" action in the kebab, which

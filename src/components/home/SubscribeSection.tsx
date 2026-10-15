@@ -59,9 +59,8 @@ export default function SubscribeSection({
   // getBoundingClientRect and rendered through a portal at `position: fixed`
   // — an in-flow `absolute` tooltip got clipped by this grid's own
   // `overflow-y-auto` for any row near its scrolled edge (confirmed live);
-  // `fixed` escapes that the same way ListingActionsFan's
-  // own portaled popups already do elsewhere in this app, for the same
-  // reason. `delayedHoverRef` is the pending "not hovered long enough yet"
+  // `fixed` escapes that the same way the app's other portaled popups
+  // (CommunitySwitcher, the Feedback dialog) do, for the same reason. `delayedHoverRef` is the pending "not hovered long enough yet"
   // timer; cleared on every enter/leave so a quick pass across several rows
   // doesn't leave a stale one to fire late against whatever row the pointer
   // is on by then.
@@ -347,9 +346,8 @@ export default function SubscribeSection({
                       (`overflow-y-auto`), and a tooltip positioned relative to
                       its own row got visibly clipped by that for rows near the
                       scrolled edge. `fixed`, escaping to document.body, paints
-                      in the root stacking context instead, the same fix
-                      ListingActionsFan already uses for its
-                      own popups. `-4px` above the row's own top, not flush
+                      in the root stacking context instead, the same fix the
+                      app's other portaled popups use. `-4px` above the row's own top, not flush
                       against it, so the tooltip doesn't touch the text it's
                       naming. */}
                   {tooltip && createPortal(

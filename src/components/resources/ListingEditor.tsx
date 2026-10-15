@@ -47,8 +47,8 @@ import { ChangedTag, EditorAddLine, EditorEmptyRows, EditorOpenCard, EditorRowCa
 //
 // One task per screen (the user, Oct 10), so nothing else on the list: no
 // email box, no "Reviewed by a moderator" line (the Sent screen says it),
-// and Request removal is in the listing's ••• menu, not at the foot of the
-// edit.
+// and Request removal is its own button beside Edit listing, not at the
+// foot of the edit.
 
 /** A step inside the editor, for the host's header: a row open on its own
  *  screen (or a minyan, a person in one) has a title; a row open where it
@@ -77,7 +77,7 @@ type Props = {
   sharedTurnstile?: { token: string; reset: () => void }
   onRemovalOpenChange?: (open: boolean) => void
   /** Whether the Request removal screen is showing, when the host owns it
-   *  (the ••• menu's Request removal opens it). */
+   *  (the edit bar's Request removal opens it). */
   removalOpen?: boolean
   /** A row opened (or a minyan, a person inside one): its title and the way
    *  back, for the host's header and Back; null on the list. */
@@ -617,8 +617,8 @@ export default function ListingEditor({
       {titleSlot && (!creating || stepTitle || removalOpen) && createPortal(title, titleSlot)}
       {!titleSlot && !creating && !onStep && <div className="text-base">{title}</div>}
       <div className={removalOpen ? 'hidden' : ''}>{boxScreen ?? rowScreen ?? listScreen}</div>
-      {/* Only while it's showing: it's opened from the listing's ••• menu
-          now, not swapped with the edit. */}
+      {/* Only while it's showing: it's opened from the edit bar's Request
+          removal now, not swapped with the edit. */}
       {canRequestRemoval && removalOpen && (
         <div>
           <RemovalRequest

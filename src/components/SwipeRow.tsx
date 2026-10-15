@@ -31,7 +31,8 @@ import { BookmarkIcon, ExternalIcon } from '@/components/icons'
 //
 // Deliberately a SHORTCUT, never the only route to anything it reveals. A
 // gesture is invisible and can't be reached by keyboard, so everything here
-// also lives in the overflow fan below an opened listing (ListingActionsFan).
+// is also a button on the opened listing (ListingView: Save beside the name,
+// Share among Directions and Call).
 
 /** Width of one revealed action: a circle with its caption under it, the
  *  whole column being the button. Narrower than the full-height boxes this

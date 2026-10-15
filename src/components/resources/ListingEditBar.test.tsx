@@ -17,7 +17,7 @@ describe('ListingEditBar', () => {
   const bar = (tell: ((i: typeof item) => void) | null, onEdit = vi.fn()) => {
     renderWithProviders(
       <TellAboutContext.Provider value={tell}>
-        <ListingEditBar onEdit={onEdit} item={item} category={makeCategory()} path="/philly/grocery/tj" />
+        <ListingEditBar onEdit={onEdit} item={item} category={makeCategory()} />
       </TellAboutContext.Provider>,
     )
     return onEdit
@@ -46,10 +46,34 @@ describe('ListingEditBar', () => {
   it('is outlined on a listing that is one link (a WhatsApp group), filled everywhere else', () => {
     const link = { key: 'link', label: 'Join group', type: 'url' as const, renderAs: 'row' as const, showInHeader: true }
     const groups = makeCategory({ id: 'whatsapp', hasAddress: false, detailFields: [link] })
-    renderWithProviders(<ListingEditBar onEdit={vi.fn()} item={makeListing({ address: '', link: 'https://chat.whatsapp.com/x' })} category={groups} path="/philly/whatsapp/x" />)
+    renderWithProviders(<ListingEditBar onEdit={vi.fn()} item={makeListing({ address: '', link: 'https://chat.whatsapp.com/x' })} category={groups} />)
     expect(screen.getByRole('button', { name: /Edit listing/ })).toHaveAttribute('data-quiet', 'true')
     cleanup()
     bar(null)
     expect(screen.getByRole('button', { name: /Edit listing/ })).not.toHaveAttribute('data-quiet')
+  })
+
+  // Oct 15: Save, Share and Set as location all have buttons of their own on
+  // an opened listing now, so the ••• fan held one unique thing — Request
+  // removal. It sits beside Edit as a quieter outlined pill instead.
+  it('puts Request removal beside Edit as a button of its own, with no ••• menu', () => {
+    const onRequestRemoval = vi.fn()
+    renderWithProviders(<ListingEditBar onEdit={vi.fn()} onRequestRemoval={onRequestRemoval} item={item} category={makeCategory()} />)
+    const removal = screen.getByRole('button', { name: 'Request removal' })
+    expect(removal.parentElement).toBe(screen.getByRole('button', { name: 'Edit listing' }).parentElement)
+    fireEvent.click(removal)
+    expect(onRequestRemoval).toHaveBeenCalledTimes(1)
+    expect(screen.queryByRole('button', { name: /^Actions for/ })).not.toBeInTheDocument()
+  })
+
+  it('leaves Request removal out where the category takes no reports', () => {
+    renderWithProviders(<ListingEditBar onEdit={vi.fn()} item={item} category={makeCategory()} />)
+    expect(screen.getByRole('button', { name: 'Edit listing' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Request removal' })).not.toBeInTheDocument()
+  })
+
+  it('renders nothing where the listing can’t be edited', () => {
+    const { container } = renderWithProviders(<ListingEditBar onRequestRemoval={vi.fn()} item={item} category={makeCategory()} />)
+    expect(container).toBeEmptyDOMElement()
   })
 })

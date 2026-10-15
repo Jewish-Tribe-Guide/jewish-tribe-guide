@@ -28,11 +28,10 @@ export type ListingAction = {
  *
  *  Extracted from ListingActionsMenu (the kebab, since deleted), which was the
  *  only thing that knew how to pin/share/anchor a listing, so that the same
- *  three actions can appear wherever they now need to: the collapsed card (a
- *  swipe panel on mobile, a hover-reveal on desktop) and the overflow fan
- *  hanging off every edit bar — under the directory dialog, the mobile card,
- *  and the map's place panel. Its behaviour is tested through that fan
- *  (ListingActionsFan.test.tsx), its main renderer. Duplicating the gating alone would have been a bug
+ *  three actions can appear wherever they need to — today the collapsed
+ *  card's swipe panel (the ••• fan under an opened listing, its other
+ *  renderer, went on Oct 15, each of its actions having a button of its own
+ *  there). Tested on its own (useListingActions.test.tsx). Duplicating the gating alone would have been a bug
  *  waiting to happen — `ui.map.pins`, `category.hasAddress`, a listing whose
  *  address failed to geocode, and a missing LocationProvider each suppress a
  *  different one of them. */
@@ -58,7 +57,7 @@ export function useListingActions(
 
   // Save (Pin until Oct 14). The same community-wide flag the map's Saved
   // chip respects. Shown by the row's swipe; an opened listing has its own
-  // bookmark at the top instead (SaveButton), so the fan leaves it out.
+  // bookmark at the top instead (SaveButton).
   if (ui.map.pins) {
     actions.push({
       id: 'save',

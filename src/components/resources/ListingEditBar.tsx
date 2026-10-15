@@ -4,8 +4,6 @@ import type { DirectoryResource } from '@/types'
 import type { CategoryConfig } from '@/lib/categories'
 import { PencilIcon } from '@/components/icons'
 import { mainThing } from '@/lib/listingView'
-import ListingActionsFan from './ListingActionsFan'
-import type { ListingAction } from './useListingActions'
 
 // ── The one visible way to edit an open listing ──────────────────────────
 // A full-width pill that sits BELOW the listing rather than inside it, in
@@ -22,12 +20,16 @@ import type { ListingAction } from './useListingActions'
 // site doesn't look editable at all. Anything rendered *inside* the content
 // competes with the content and loses; anything in an overflow menu is
 // found by accident. So this is neither: it's its own object, below the
-// listing, at full width, and it is the only thing in that position.
+// listing, at full width, and nothing beside it competes with it.
 //
-// Deliberately ONE action. "Request removal" is not a peer here — it's rare,
-// it sounds destructive, and giving it equal billing makes a visitor stop to
-// choose between two things instead of reading one invitation. It's last in
-// the overflow (Oct 11): at the foot of the edit it was one more thing
+// Request removal sits beside it (the user, Oct 15), as a smaller outlined
+// pill, so Edit stays the obvious one: removal is rare and sounds
+// destructive, and two equal buttons would make a visitor stop and choose.
+// It used to be last in a ••• fan here, with Share, Save and Set as location
+// — but each of those now has a button of its own on the listing (Share
+// among Directions and Call, Save beside the name, Set as my location under
+// the address), so the fan opened onto one thing that wasn't anywhere else.
+// Before the fan (Oct 11) it was at the foot of the edit, one more thing
 // beside Send.
 //
 // It opens the listing's editor itself, everywhere (the user, Oct 15: "when
@@ -49,71 +51,55 @@ import type { ListingAction } from './useListingActions'
 // somewhere above it — the dialog's backdrop closes on a click that reaches
 // it, and the directory card's row toggles itself.
 //
-// Rendered even when the listing can't be edited, as the overflow alone.
-// It used to be gated on edit wholesale, which looked harmless and wasn't:
-// this overflow is the only place Set-as-location lives, and the only route
-// to Pin/Share that a keyboard or screen reader can reach — the card's own
-// swipe and hover-reveal are deliberately pointer-only BECAUSE this exists.
-// A category with editing turned off lost all three for those visitors.
+// Nothing at all where the listing can't be edited: removal needs edit too,
+// and there's nothing else left to show.
 export default function ListingEditBar({
   onEdit,
   onRequestRemoval,
   item,
   category,
-  path,
   className = '',
-  fanPlacement = 'auto',
-  omit,
 }: {
-  /** Omitted when the listing can't be edited — the bar then renders the
-   *  overflow on its own. See above for why it never disappears outright. */
+  /** Omitted when the listing can't be edited — then nothing renders. */
   onEdit?: () => void
-  /** The overflow's Request removal: see ListingActionsFan. */
+  /** Opens the editor's Request removal screen. Omitted where the category
+   *  takes no removal requests. */
   onRequestRemoval?: () => void
   item: DirectoryResource
   category: CategoryConfig
-  /** The listing's own URL — what the overflow's Share copies. */
-  path: string
   /** Surface-specific spacing. The shape itself never varies. */
   className?: string
-  /** Passed through to the overflow — `stack` where there's no scrim behind
-   *  the bar (the map). See ListingActionsFan's own `placement` prop. */
-  fanPlacement?: 'auto' | 'stack'
-  /** Passed through to the overflow: see ListingActionsFan's `omit`. */
-  omit?: ListingAction['id'][]
 }) {
+  if (!onEdit) return null
   const quiet = mainThing(item, category) === 'join'
   return (
-    // A wide primary plus a small round overflow, not two peers. The shape
-    // is doing work: it gives the row an end-stop, so the bar sits on a base
-    // instead of dangling from the middle of the card above it — and it
-    // keeps the one action worth finding visually dominant over three that
-    // are merely useful.
-    //
-    // Without the pill the row shrinks to the overflow's own size and sits at
-    // the trailing edge (ml-auto works whether the parent is a flex strip or
-    // plain block flow). It must not stay w-full: the dialog hangs this in a
-    // pointer-events-none strip and re-enables pointers on this element, so
-    // a full-width row with nothing in most of it would swallow the clicks
-    // that are meant to reach the backdrop and close the dialog.
-    <div className={`flex items-stretch gap-2 ${onEdit ? 'w-full' : 'ml-auto w-fit'} ${className}`}>
-      {onEdit && (
+    <div className={`flex w-full items-stretch gap-2 ${className}`}>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation()
+          onEdit()
+        }}
+        className={`flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-full px-5 py-3 text-sm font-semibold transition-transform active:scale-[0.98] ${
+          quiet ? 'border border-slate-300 bg-white text-slate-900' : 'bg-primary text-white shadow-lg'
+        }`}
+        data-quiet={quiet || undefined}
+      >
+        <PencilIcon className="h-4 w-4 shrink-0" />
+        Edit listing
+      </button>
+      {onRequestRemoval && (
         <button
           type="button"
           onClick={(e) => {
             e.stopPropagation()
-            onEdit()
+            onRequestRemoval()
           }}
-          className={`flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-full px-5 py-3 text-sm font-semibold transition-transform active:scale-[0.98] ${
-            quiet ? 'border border-slate-300 bg-white text-slate-900' : 'bg-primary text-white shadow-lg'
-          }`}
-          data-quiet={quiet || undefined}
+          className="shrink-0 cursor-pointer rounded-full border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition-transform hover:bg-slate-50 active:scale-[0.98]"
         >
-          <PencilIcon className="h-4 w-4 shrink-0" />
-          Edit listing
+          Request removal
         </button>
       )}
-      <ListingActionsFan item={item} category={category} path={path} placement={fanPlacement} omit={omit} onRequestRemoval={onRequestRemoval} />
     </div>
   )
 }

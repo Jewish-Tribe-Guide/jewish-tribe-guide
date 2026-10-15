@@ -56,7 +56,7 @@ vi.mock('@/components/resources/ListingEditor', () => ({
     <div>
       <p>ListingEditor: edit</p>
       <button onClick={onClose}>stub cancel</button>
-      {/* Stands in for the ••• menu's Request removal. */}
+      {/* Stands in for the edit bar's Request removal. */}
       <button onClick={() => onRemovalOpenChange?.(true)}>stub open removal</button>
       {/* Stands in for opening one of the editor's rows. */}
       <button onClick={() => onStep?.({ title: 'Kosher', back: () => onStep(null) })}>stub open row</button>
