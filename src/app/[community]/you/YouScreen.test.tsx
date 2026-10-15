@@ -83,6 +83,24 @@ describe('You', () => {
     expect(localStorage.getItem('jpc:saved-searches')).toBeNull()
   })
 
+  // Oct 15: the bookmark used to appear only on hover, flashing past every
+  // row the mouse crossed, with a chevron it replaced. Now desktop's bookmark
+  // is always there (a phone swipes, so it's desktop-only), and no row has a
+  // chevron.
+  it('desktop’s remove is a bookmark that’s always there, not on hover, and no row has a chevron', () => {
+    save('tj')
+    localStorage.setItem('jpc:saved-searches', JSON.stringify([challah]))
+    show()
+    const marks = screen.getAllByTestId('you-row-bookmark')
+    expect(marks.map((m) => m.getAttribute('aria-label'))).toEqual(['Remove Trader Joe’s', 'Remove “challah”'])
+    for (const m of marks) {
+      expect(m.className).toMatch(/\bdesktop:flex\b/)
+      expect(m.className).not.toMatch(/opacity-0|group-hover:/)
+    }
+    // ChevronRightIcon's path.
+    expect(document.querySelector('path[d="M9 18l6-6-6-6"]')).toBeNull()
+  })
+
   it('a dot and two words on a place that changed since the last look; none the first time', async () => {
     save('tj', 'ac')
     const changes: ChangeLogRow[] = [

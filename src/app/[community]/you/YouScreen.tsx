@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import CategoryIcon from '@/components/CategoryIcon'
 import SwipeRow, { SwipeRowGroup } from '@/components/SwipeRow'
-import { BookmarkIcon, ChevronRightIcon } from '@/components/icons'
+import { BookmarkIcon } from '@/components/icons'
 import { TONE, WithMinyans, hasMinyanim, milesFrom, photoOf, usePinnedPlaces, type PinnedPlace } from '@/components/home/PinnedPlaces'
 import { useNextMinyan } from '@/components/resources/nextMinyans'
 import { useActiveCommunity, useCommunityTimezone } from '@/lib/communityContext'
@@ -29,8 +29,8 @@ import { routes } from '@/lib/routes'
 // category row's own (open until, the next minyan, how far); a search's is
 // what its home line would say now ("10 with Challah"), asked again the same
 // way (useHomeSearch). A blue dot and two words on a place that changed since
-// You was last opened here. Swipe a row to remove it (hover, on desktop),
-// with Undo; nothing reorders. Saved on this phone, no account.
+// You was last opened here. Swipe a row to remove it (or, on desktop, click
+// its bookmark), with Undo; nothing reorders. Saved on this phone, no account.
 
 export default function YouScreen() {
   const { community } = useActiveCommunity()
@@ -144,16 +144,20 @@ function Section({ title, testId, className = '', children }: { title: string; t
   )
 }
 
-/** Desktop has no swipe: the row's filled bookmark shows on hover, and a
- *  click takes it off (with Undo), as the bookmark does everywhere. */
-function HoverRemove({ name, onRemove }: { name: string; onRemove: () => void }) {
+/** Desktop's way to remove a row, since a mouse can't swipe: its filled
+ *  bookmark, always there at the end — not one that appears on hover, which
+ *  flashed past every row the mouse crossed (Oct 15). Quieter than the
+ *  bookmark's solid circle elsewhere, since every row here is saved. A
+ *  click takes it off, with Undo. No chevron: the row reads as a link. */
+function RowBookmark({ name, onRemove }: { name: string; onRemove: () => void }) {
   return (
     <button
       type="button"
       onClick={onRemove}
       aria-label={`Remove ${name}`}
       title="Remove"
-      className="mr-3 hidden h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full bg-primary text-white opacity-0 transition-opacity hover:bg-primary-dark focus-visible:opacity-100 group-hover:opacity-100 desktop:flex"
+      data-testid="you-row-bookmark"
+      className="mr-3 hidden h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full text-primary transition-colors hover:bg-primary/10 desktop:flex"
     >
       <BookmarkIcon filled className="h-[17px] w-[17px]" />
     </button>
@@ -220,9 +224,8 @@ function PlaceRow({
               ].flatMap((node, i) => (i === 0 ? [node] : [<span key={`dot${i}`}> · </span>, node]))}
             </span>
           </span>
-          <ChevronRightIcon className="h-4 w-4 shrink-0 text-slate-400 desktop:group-hover:hidden" />
         </Link>
-        <HoverRemove name={item.name} onRemove={onRemove} />
+        <RowBookmark name={item.name} onRemove={onRemove} />
       </SwipeRow>
     </div>
   )
@@ -249,9 +252,8 @@ function SearchRow({ search, sub, href, onRemove }: { search: SavedSearch; sub: 
             <span className="block truncate text-[15.5px] font-bold text-ink">{name}</span>
             {sub && <span className="mt-0.5 block truncate text-[13.5px] text-slate-500">{sub}</span>}
           </span>
-          <ChevronRightIcon className="h-4 w-4 shrink-0 text-slate-400 desktop:group-hover:hidden" />
         </Link>
-        <HoverRemove name={name} onRemove={onRemove} />
+        <RowBookmark name={name} onRemove={onRemove} />
       </SwipeRow>
     </div>
   )
