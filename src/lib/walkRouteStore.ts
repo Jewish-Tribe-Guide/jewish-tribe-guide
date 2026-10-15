@@ -1,4 +1,6 @@
+import type { DirectoryResource, ResourceRow } from '@/types'
 import { getAdminClient } from './supabase/admin'
+import { normalizeRow } from './resourceStore'
 import type { WalkRoute } from './walkRoutes'
 
 // The walks worked out along the streets (walkRoutes.ts), in the
@@ -86,4 +88,17 @@ export async function saveWalkRoutes(
   }))
   const { error } = await getAdminClient().from('walk_route').upsert(rows, { onConflict: 'from_id,to_id' })
   if (error) throw new Error(`Failed to save walks: ${error.message}`)
+}
+
+/** A category's approved listings as the table has them this moment, not
+ *  the site's cached read (walkRouteJob.ts). */
+export async function approvedListingsNow(community: string, category: string): Promise<DirectoryResource[]> {
+  const { data, error } = await getAdminClient()
+    .from('resource')
+    .select('*')
+    .eq('community_id', community)
+    .eq('status', 'approved')
+    .eq('category', category)
+  if (error) throw new Error(`Failed to load listings: ${error.message}`)
+  return ((data ?? []) as ResourceRow[]).map(normalizeRow)
 }

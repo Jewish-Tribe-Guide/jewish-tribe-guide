@@ -3,6 +3,8 @@ import { getCategoryById } from '@/lib/categoryStore'
 import { submitListingCreate, approveSubmission } from '@/lib/submissionStore'
 import { normalizeUrl } from '@/lib/validation'
 import { revalidatePublicContent } from '@/lib/revalidateContent'
+import { runWalkRoutesAfterChange } from '@/lib/walkRouteJob'
+import { after } from 'next/server'
 import { getAdminUserForCommunity } from '@/lib/adminAuth'
 import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
 import type { ResourceSubmission } from '@/types'
@@ -67,6 +69,8 @@ export async function POST(request: Request) {
     }
     // The public site caches this content; drop it so the new listing shows up.
     await revalidatePublicContent()
+    // Its walks along the streets now, not tonight (walkRouteJob.ts).
+    after(() => runWalkRoutesAfterChange(community.slug))
     return Response.json({ ok: true, listing: normalizeRow(resourceRow) })
   } catch (err) {
     console.error('[admin/listings] POST failed:', err)

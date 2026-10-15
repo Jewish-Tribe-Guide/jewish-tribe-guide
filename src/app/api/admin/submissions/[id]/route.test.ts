@@ -16,6 +16,7 @@ const m = vi.hoisted(() => ({
   listSubscribersForCategory: vi.fn(),
   sendNewListingNotification: vi.fn(),
   sendClosureNotification: vi.fn(),
+  runWalkRoutesAfterChange: vi.fn(),
   afterCallbacks: [] as Array<() => unknown>,
   ReviewEditError: class ReviewEditError extends Error {},
 }))
@@ -45,6 +46,7 @@ vi.mock('@/lib/subscriberEmail', () => ({
   sendClosureNotification: m.sendClosureNotification,
 }))
 vi.mock('@/lib/siteUrl', () => ({ siteUrl: () => 'https://site.test' }))
+vi.mock('@/lib/walkRouteJob', () => ({ runWalkRoutesAfterChange: m.runWalkRoutesAfterChange }))
 
 const { PATCH } = await import('./route')
 const ctx = { params: Promise.resolve({ id: 'sub1' }) } as never
@@ -215,6 +217,25 @@ describe('PATCH /api/admin/submissions/:id — subscriber notifications', () => 
     m.listSubscribersForCategory.mockRejectedValue(new Error('db'))
     expect((await patch({ status: 'approved' })).status).toBe(200)
     await expect(runAfter()).resolves.toBeUndefined()
+  })
+})
+
+// Oct 15: a new or moved listing's walks along the streets, worked out as
+// it's approved rather than that night, after the response.
+describe('PATCH /api/admin/submissions/:id — walks after approval', () => {
+  it('works out the community’s new walks once the response is sent', async () => {
+    await patch({ status: 'approved' })
+    expect(m.runWalkRoutesAfterChange).not.toHaveBeenCalled()
+    await runAfter()
+    expect(m.runWalkRoutesAfterChange).toHaveBeenCalledWith('ues')
+  })
+
+  it('not for a rejection, nor an eruv', async () => {
+    await patch({ status: 'rejected' })
+    m.approveSubmission.mockResolvedValue(submission('update', { target_type: 'eruv' }))
+    await patch({ status: 'approved' })
+    await runAfter()
+    expect(m.runWalkRoutesAfterChange).not.toHaveBeenCalled()
   })
 })
 

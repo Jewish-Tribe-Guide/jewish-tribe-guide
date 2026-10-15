@@ -1,4 +1,5 @@
 import { revalidatePublicContent } from '@/lib/revalidateContent'
+import { runWalkRoutesAfterChange } from '@/lib/walkRouteJob'
 import { after, type NextRequest } from 'next/server'
 import { getAdminUserForCommunity } from '@/lib/adminAuth'
 import { approveSubmission, rejectSubmission, ReviewEditError } from '@/lib/submissionStore'
@@ -155,5 +156,8 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/
 
   // The public site caches this content; drop it so the edit shows up.
   await revalidatePublicContent()
+  // A new or moved listing's walks along the streets, now rather than
+  // tonight (walkRouteJob.ts); after the response, so the admin isn't kept.
+  if (decision === 'approved' && submission.target_type !== 'eruv') after(() => runWalkRoutesAfterChange(community.slug))
   return Response.json({ ok: true, submission })
 }

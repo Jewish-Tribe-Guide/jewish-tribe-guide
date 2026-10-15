@@ -115,12 +115,15 @@ describe('A hotel’s synagogues within a walk', () => {
     expect(placeLoads()).toBe(1)
   })
 
-  it('opens a shul on its own page, and says how rough the times are', async () => {
+  it('opens a shul on its own page, with no note on how the times are worked out', async () => {
     open()
     await openKind(/Synagogues · 3/)
     const link = screen.getByRole('link', { name: /Mikveh Israel/ })
     expect(link.getAttribute('href')).toMatch(/^\/test-community\/synagogue\/mikveh-israel/)
-    expect(screen.getByTestId('walk-lists')).toHaveTextContent('Rough walking times from the hotel, in a straight line at 25 minutes a mile')
+    // Oct 15: nothing on how they're worked out, nor a credit with no
+    // street walk shown.
+    expect(screen.getByTestId('walk-lists')).not.toHaveTextContent(/straight line|Rough/)
+    expect(screen.queryByTestId('walk-credit')).not.toBeInTheDocument()
     expect(screen.getByText('Tap one for its Shabbos times.')).toBeInTheDocument()
   })
 
@@ -133,7 +136,7 @@ describe('A hotel’s synagogues within a walk', () => {
         String(url).startsWith('/api/walk-routes') ? new Response(JSON.stringify({ ok: true, routes }), { status: 200 }) : answer(nearby),
       )
 
-    it('lists each place by its walk along the streets, nearest first, and says where the times are from', async () => {
+    it('lists each place by its walk along the streets, nearest first, with only the credit those walks need', async () => {
       // Society Hill is across a highway: 8 minutes as the crow flies, 22
       // on foot. Far Away Shul has a straight path: in reach after all.
       withRoutes({ s1: route(nearby[0], 22, 0.9), s2: route(nearby[1], 14, 0.6), s3: route(nearby[2], 24, 1.0), s4: route(nearby[3], 29, 1.5) })
@@ -145,16 +148,17 @@ describe('A hotel’s synagogues within a walk', () => {
         '24 minBeth ZionOrthodox (Ashkenazi) · No davening times listed',
         '29 minFar Away ShulOrthodox (Ashkenazi) · No davening times listed',
       ])
-      expect(screen.getByTestId('walk-lists')).toHaveTextContent('Walking times from the hotel along the streets, from openrouteservice.org and © OpenStreetMap contributors.')
-      expect(screen.getByTestId('walk-lists')).not.toHaveTextContent('rough estimate')
+      // Only the credit their walks need, linked.
+      expect(screen.getByTestId('walk-credit')).toHaveTextContent('Walks: openrouteservice · © OpenStreetMap')
+      expect(within(screen.getByTestId('walk-credit')).getByRole('link', { name: '© OpenStreetMap' })).toHaveAttribute('href', 'https://www.openstreetmap.org/copyright')
     })
 
-    it('a place that moved since its walk was worked out shows the estimate, and the box says some are rough', async () => {
+    it('a place that moved since its walk was worked out shows the estimate, with nothing said about it', async () => {
       withRoutes({ s1: { ...route(nearby[0], 22, 0.9), to: milesNorth(0.1) }, s2: route(nearby[1], 14, 0.6), s3: route(nearby[2], 24, 1.0) })
       open()
       const section = await openKind(/Synagogues · 3/)
       await vi.waitFor(() => expect(within(section).getAllByRole('link', { name: /min/ })[0]).toHaveTextContent(/^8 minSociety Hill/))
-      expect(screen.getByTestId('walk-lists')).toHaveTextContent('A place added since last night is a rough estimate until then.')
+      expect(screen.getByTestId('walk-lists')).not.toHaveTextContent(/rough|estimate/i)
     })
   })
 

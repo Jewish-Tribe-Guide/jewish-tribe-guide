@@ -145,17 +145,15 @@ type Props = {
   lists: readonly WalkListSetting[]
   /** Where the listing the walk starts from is. */
   from: LatLng
-  /** What it is, in the footnote: "from the hotel". */
-  fromLabel: string
   /** The listing it starts from, for "See them on the map": the Map with
    *  it selected and the kind's places around it. */
   fromItem?: Pick<DirectoryResource, 'id' | 'category'>
 }
 
-/** One box, "Within a walk", a line a kind (Oct 6): how many, and the
- *  nearest, with the whole list a tap away. Four full lists in a row was
+/** One box, "Within a walk", a line a kind (Oct 6): how many (Oct 15: no
+ *  "Nearest"), with the whole list a tap away. Four full lists in a row was
  *  most of a hospital's page. */
-export default function WalkLists({ lists, from, fromLabel, fromItem }: Props) {
+export default function WalkLists({ lists, from, fromItem }: Props) {
   const categories = useCategories()
   // One kind open at a time: the map beside it shows one list.
   const [openId, setOpenId] = useState<string | null>(null)
@@ -203,16 +201,16 @@ export default function WalkLists({ lists, from, fromLabel, fromItem }: Props) {
     }
   }, [show, highlight, openKind, openPlaces, openRouted, maxMinutes, lat, lng])
   if (shown.length === 0) return null
-  // Along the streets once any walk here is; a straight line before that.
-  const reach = shown.flatMap(({ walk, target }) => {
-    const list = places[target.id]
-    return Array.isArray(list) ? walkGroups(from, list, walk.maxMinutes, null, routedOf.get(target.id)).flatMap((g) => g.rows) : []
-  })
-  const routedCount = reach.filter((r) => r.routed).length
-  const footer =
-    routedCount === 0
-      ? `Rough walking times from the ${fromLabel.toLowerCase()}, in a straight line at 25 minutes a mile; streets make most walks longer.`
-      : `Walking times from the ${fromLabel.toLowerCase()} along the streets, from openrouteservice.org and © OpenStreetMap contributors.${routedCount < reach.length ? ' A place added since last night is a rough estimate until then.' : ''}`
+  // No note on how the times are worked out (the user, Oct 15: "if we're
+  // not providing intuitive data that's on us to fix"). Only the credit
+  // OpenRouteService and OpenStreetMap ask for wherever their walks show.
+  const anyRouted = shown.some(({ target }) => (routedOf.get(target.id)?.size ?? 0) > 0)
+  const footer = anyRouted ? (
+    <span className="text-[11.5px] text-slate-400" data-testid="walk-credit">
+      Walks: <a href="https://openrouteservice.org/" target="_blank" rel="noopener noreferrer" className="hover:underline">openrouteservice</a> ·{' '}
+      <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer" className="hover:underline">© OpenStreetMap</a>
+    </span>
+  ) : undefined
   return (
     <Card
       title="Within a walk"

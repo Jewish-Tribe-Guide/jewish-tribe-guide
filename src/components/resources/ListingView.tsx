@@ -429,7 +429,7 @@ export default function ListingView({ item, category, color, place = null, upvot
     )
   } else if (main === 'walk') {
     const lists = parseWalkLists(category.walkList)
-    mainSection = lists.length > 0 && item.geo ? <WalkLists lists={lists} from={item.geo} fromLabel={category.label} fromItem={item} /> : null
+    mainSection = lists.length > 0 && item.geo ? <WalkLists lists={lists} from={item.geo} fromItem={item} /> : null
   }
 
   // The admin's boxes (a hospital's "Who to call", "Kosher food", Oct 6),
@@ -635,7 +635,7 @@ export default function ListingView({ item, category, color, place = null, upvot
   )
 
   const walkLists = parseWalkLists(category.walkList)
-  const walks = walkLists.length > 0 && item.geo && main !== 'walk' ? <WalkLists lists={walkLists} from={item.geo} fromLabel={category.label} fromItem={item} /> : null
+  const walks = walkLists.length > 0 && item.geo && main !== 'walk' ? <WalkLists lists={walkLists} from={item.geo} fromItem={item} /> : null
   // The Shabbos card comes right after the main thing on a Friday or Erev
   // Yom Tov, until candle lighting; the rest of the week, after the places
   // within a walk.

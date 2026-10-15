@@ -105,8 +105,7 @@ export function WalkListsEditor({
         On each of this category&rsquo;s listings, every place in the chosen category within that
         many minutes&rsquo; walk, nearest first, e.g. the synagogues near each hotel. Grouped by
         one of that category&rsquo;s choices, in its option order. Times are walked along the
-        streets, worked out each night; a place added since is a rough straight line until
-        then, and the list says which.
+        streets.
       </span>
     </section>
   )

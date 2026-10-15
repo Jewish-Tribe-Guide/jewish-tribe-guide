@@ -1,5 +1,6 @@
 import { revalidatePublicContent } from '@/lib/revalidateContent'
-import type { NextRequest } from 'next/server'
+import { runWalkRoutesAfterChange } from '@/lib/walkRouteJob'
+import { after, type NextRequest } from 'next/server'
 import { getAdminUserForCommunity } from '@/lib/adminAuth'
 import { restoreResource, hardDeleteArchivedResource } from '@/lib/resourceStore'
 import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
@@ -20,6 +21,8 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/
     }
     // The public site caches this content; drop it so the edit shows up.
     await revalidatePublicContent()
+    // Its walks along the streets now, not tonight (walkRouteJob.ts).
+    after(() => runWalkRoutesAfterChange(community.slug))
     return Response.json({ ok: true, resource })
   } catch (err) {
     console.error('[admin/archived-listings/:id] PATCH failed:', err)
