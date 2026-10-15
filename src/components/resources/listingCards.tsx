@@ -249,6 +249,7 @@ export function ShabbosCard({
   zmanim,
   candlesAt,
   onEdit,
+  footer,
 }: {
   item: DirectoryResource
   fields: readonly CategoryField[]
@@ -257,6 +258,8 @@ export function ShabbosCard({
   candlesAt: number | null
   /** The box's Edit: its fields (the eruv, kosher food inside…). */
   onEdit?: () => void
+  /** Its dated line (a FreshnessFooter, carrying its own Edit). */
+  footer?: ReactNode
 }) {
   const { community } = useActiveCommunity()
   const shuls = useCategories().find((c) => c.kind === 'listing' && c.detailFields.some((f) => f.type === 'minyanim'))
@@ -265,7 +268,7 @@ export function ShabbosCard({
   const candles = candleText(zmanim, candlesAt)
   const yomTov = candlesAt !== null && zmanim !== null && zmanim.dayOfWeek !== 5
   return (
-    <Card title={yomTov ? 'Yom Tov tonight' : 'This Shabbos'} testId="listing-shabbos" onEdit={onEdit}>
+    <Card title={yomTov ? 'Yom Tov tonight' : 'This Shabbos'} testId="listing-shabbos" footer={footer} onEdit={onEdit}>
       <div>
         {candles && (
           <Line label="Candle lighting">

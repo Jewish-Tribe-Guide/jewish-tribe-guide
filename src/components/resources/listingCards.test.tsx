@@ -216,6 +216,25 @@ describe('This Shabbos', () => {
     expect(screen.getByTestId('listing-shabbos')).toHaveTextContent('EruvNot inside an eruv')
     expect(within(screen.getByTestId('listing-shabbos')).queryByRole('link')).not.toBeInTheDocument()
   })
+
+  // Oct 15: editable, so dated, as every editable box is: its own "Confirmed"
+  // at the foot, Still right? once it's old, Edit beside it.
+  it('says when it was last confirmed, its own date, with Edit, and confirms itself alone', async () => {
+    vi.setSystemTime(new Date('2026-10-15T15:00:00Z'))
+    open({ ...hup, confirmedAt: '2026-03-01T15:00:00Z', sectionConfirmed: { eruv: '2026-09-29T15:00:00Z' } } as DirectoryResource)
+    const foot = within(screen.getByTestId('listing-shabbos')).getByTestId('freshness')
+    expect(foot).toHaveTextContent(/^Confirmed Sep 29Edit$/)
+    cleanup()
+    open({ ...hup, confirmedAt: '2026-03-01T15:00:00Z' } as DirectoryResource)
+    const card = screen.getByTestId('listing-shabbos')
+    expect(within(card).getByTestId('freshness')).toHaveTextContent(/^Confirmed Mar 1 · Still right\?YesEdit$/)
+    const fetchMock = vi.mocked(fetch)
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ ok: true, confirmedAt: '2026-10-15T15:00:00.000Z', changed: true, activityId: 1 })))
+    fireEvent.click(within(card).getByRole('button', { name: 'Yes' }))
+    expect(await within(card).findByText(/Confirmed\. Thanks/)).toBeInTheDocument()
+    const call = fetchMock.mock.calls.find(([url]) => String(url).endsWith('/confirm'))!
+    expect(JSON.parse(String((call[1] as RequestInit).body))).toEqual({ section: 'eruv' })
+  })
 })
 
 describe('Set as my location', () => {

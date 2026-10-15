@@ -641,7 +641,22 @@ export default function ListingView({ item, category, color, place = null, upvot
   // within a walk.
   const nowMinutes = now ? now.getHours() * 60 + now.getMinutes() : null
   const shabbosFirst = candlesAt !== null && nowMinutes !== null && nowMinutes < candlesAt
-  const shabbos = shabbosFields ? <ShabbosCard item={item} fields={shabbosFields} zmanim={zmanim} candlesAt={candlesAt} onEdit={editRows('Shabbos', ['shabbos'])} /> : null
+  // Its date at its foot, with Still right? and Edit (the user, Oct 15:
+  // "if it's editable then we should be having last updated and everything
+  // with it"), confirmed under its first field with something in it, the
+  // eruv usually (migration 079).
+  const editShabbos = editRows('Shabbos', ['shabbos'])
+  const shabbosKey = shabbosFields?.find((f) => isFilled(item[f.key]))?.key
+  const shabbos = shabbosFields ? (
+    <ShabbosCard
+      item={item}
+      fields={shabbosFields}
+      zmanim={zmanim}
+      candlesAt={candlesAt}
+      footer={shabbosKey ? <FreshnessFooter resourceId={item.id} confirmedAt={sectionConfirmedAt(item, shabbosKey)} section={shabbosKey} onEdit={editShabbos} /> : undefined}
+      onEdit={shabbosKey ? undefined : editShabbos}
+    />
+  ) : null
   // Among the boxes where the admin put it ("after A place to stay"), or
   // after the places within a walk, as it always went.
   const after = shabbosAfter(category)
@@ -761,6 +776,16 @@ function statusLine(
   const first = listingRowFacts(item, category, now, { candlesAt })[0]
   if (!first || first.tone === 'plain') return []
   return [{ text: first.text, tone: first.tone, strong: first.tone !== 'quiet' }]
+}
+
+/** Whether a field has anything in it, as confirm_section counts it
+ *  (migration 079): words, a list with something on it, a yes, a number. */
+function isFilled(v: unknown): boolean {
+  if (typeof v === 'string') return v.trim() !== ''
+  if (Array.isArray(v)) return v.length > 0
+  if (typeof v === 'number') return true
+  if (v && typeof v === 'object') return Object.keys(v).length > 0
+  return v === true
 }
 
 function hasAny(v: unknown): boolean {
