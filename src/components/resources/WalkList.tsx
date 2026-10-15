@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useContext, useEffect, useState, type ReactNode } from 'react'
+import { useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { DirectoryResource } from '@/types'
 import type { CategoryConfig, CategoryField } from '@/lib/categories'
 import { useCategories } from '@/lib/useCategories'
@@ -23,6 +23,7 @@ import {
   type WalkRow,
 } from '@/lib/walkList'
 import type { LatLng } from '@/lib/geo'
+import { routesThatHold, type Routed, type WalkRoute } from '@/lib/walkRoutes'
 import { NextMinyans, NextMinyansContext, useNextMinyan } from './nextMinyans'
 import { Card } from './listingParts'
 import { WalkOnMapContext } from './walkOnMap'
@@ -58,6 +59,47 @@ export function forgetLoadedPlaces() {
   loaded.clear()
 }
 
+// The walks along the streets from one listing (walkRoutes.ts), once per
+// tab as its places are. Nothing, when they can't load: every walk shows
+// its estimate, as it did before they were worked out.
+const routesLoaded = new Map<string, { at: number; routes: Promise<Record<string, WalkRoute>> }>()
+
+function loadWalkRoutes(community: string, fromId: string): Promise<Record<string, WalkRoute>> {
+  const key = `${community}:${fromId}`
+  const hit = routesLoaded.get(key)
+  if (hit && Date.now() - hit.at < FRESH_MS) return hit.routes
+  const routes = fetch(withCommunity(`/api/walk-routes?from=${encodeURIComponent(fromId)}`, community))
+    .then(async (res) => {
+      const body = await res.json()
+      const routes: unknown = res.ok && body?.ok ? body.routes : null
+      return routes && typeof routes === 'object' && !Array.isArray(routes) ? (routes as Record<string, WalkRoute>) : {}
+    })
+    .catch(() => ({}))
+  routesLoaded.set(key, { at: Date.now(), routes })
+  return routes
+}
+
+/** For tests: forget the walks loaded. */
+export function forgetLoadedWalkRoutes() {
+  routesLoaded.clear()
+}
+
+function useWalkRoutes(fromId: string | undefined): Record<string, WalkRoute> {
+  const community = useCommunitySlug()
+  const [state, setState] = useState<{ key: string; routes: Record<string, WalkRoute> }>({ key: '', routes: {} })
+  const key = fromId ? `${community}:${fromId}` : ''
+  useEffect(() => {
+    if (!fromId) return
+    let cancelled = false
+    loadWalkRoutes(community, fromId).then((routes) => !cancelled && setState({ key, routes }))
+    return () => {
+      cancelled = true
+    }
+  }, [community, fromId, key])
+  return state.key === key ? state.routes : NO_ROUTES
+}
+const NO_ROUTES: Record<string, WalkRoute> = {}
+
 /** Each category's places, by id: null while loading, 'failed' when they
  *  couldn't load. */
 export function usePlaces(categoryIds: readonly string[]): Record<string, DirectoryResource[] | 'failed' | null> {
@@ -82,6 +124,9 @@ export function usePlaces(categoryIds: readonly string[]): Record<string, Direct
   const have = state.key === key ? state.places : {}
   return Object.fromEntries(categoryIds.map((id) => [id, have[id] ?? null]))
 }
+
+/** Nearest first by the walk, then by the miles. */
+const byNearest = (a: WalkRow, b: WalkRow) => a.minutes - b.minutes || a.miles - b.miles
 
 const isShuls = (c: CategoryConfig) => c.detailFields.some((f) => f.type === 'minyanim')
 
@@ -111,6 +156,14 @@ export default function WalkLists({ lists, from, fromLabel, fromItem }: Props) {
     return target ? [{ walk, target }] : []
   })
   const places = usePlaces(shown.map((s) => s.target.id))
+  // Each kind's walks along the streets that still hold (walkRoutes.ts).
+  const stored = useWalkRoutes(fromItem?.id)
+  const { lat, lng } = from
+  const routedOf = useMemo(() => {
+    const out = new Map<string, Routed>()
+    for (const [id, list] of Object.entries(places)) if (Array.isArray(list)) out.set(id, routesThatHold(stored, { lat, lng }, list))
+    return out
+  }, [places, stored, lat, lng])
   // The open kind's places on the map, from what's open rather than from
   // the tap that opened it: Back to a listing brings it back with the kind
   // still open (its state is kept while hidden), and its places must come
@@ -118,16 +171,16 @@ export default function WalkLists({ lists, from, fromLabel, fromItem }: Props) {
   const openWalk = shown.find((s) => s.target.id === openId)?.walk
   const openPlaces = openId ? places[openId] : null
   const maxMinutes = openWalk?.maxMinutes
-  const { lat, lng } = from
+  const openRouted = openId ? routedOf.get(openId) : undefined
   useEffect(() => {
     if (!show) return
     if (!openId || !Array.isArray(openPlaces) || maxMinutes === undefined) {
       show(null)
       return
     }
-    const rows = walkGroups({ lat, lng }, openPlaces, maxMinutes)
+    const rows = walkGroups({ lat, lng }, openPlaces, maxMinutes, null, openRouted)
       .flatMap((g) => g.rows)
-      .sort((a, b) => a.miles - b.miles)
+      .sort(byNearest)
     show({ categoryId: openId, places: rows.map((r) => r.item) })
     return () => {
       show(null)
@@ -135,13 +188,23 @@ export default function WalkLists({ lists, from, fromLabel, fromItem }: Props) {
       // stays lit when Back brings the listing back.
       if (highlight && rows.some((r) => r.item.id === highlight.get())) highlight.set(null)
     }
-  }, [show, highlight, openId, openPlaces, maxMinutes, lat, lng])
+  }, [show, highlight, openId, openPlaces, openRouted, maxMinutes, lat, lng])
   if (shown.length === 0) return null
+  // Along the streets once any walk here is; a straight line before that.
+  const reach = shown.flatMap(({ walk, target }) => {
+    const list = places[target.id]
+    return Array.isArray(list) ? walkGroups(from, list, walk.maxMinutes, null, routedOf.get(target.id)).flatMap((g) => g.rows) : []
+  })
+  const routedCount = reach.filter((r) => r.routed).length
+  const footer =
+    routedCount === 0
+      ? `Rough walking times from the ${fromLabel.toLowerCase()}, in a straight line at 25 minutes a mile; streets make most walks longer.`
+      : `Walking times from the ${fromLabel.toLowerCase()} along the streets, from openrouteservice.org and © OpenStreetMap contributors.${routedCount < reach.length ? ' A place added since last night is a rough estimate until then.' : ''}`
   return (
     <Card
       title="Within a walk"
       testId="walk-lists"
-      footer={`Rough walking times from the ${fromLabel.toLowerCase()}, in a straight line at 25 minutes a mile; streets make most walks longer.`}
+      footer={footer}
     >
       <ul className="divide-y divide-slate-100">
         {shown.map(({ walk, target }) => (
@@ -150,6 +213,7 @@ export default function WalkLists({ lists, from, fromLabel, fromItem }: Props) {
             walk={walk}
             target={target}
             places={places[target.id]}
+            routed={routedOf.get(target.id)}
             from={from}
             fromItem={fromItem}
             open={openId === target.id}
@@ -167,6 +231,7 @@ function WalkList({
   walk,
   target,
   places,
+  routed,
   from,
   fromItem,
   open,
@@ -175,6 +240,8 @@ function WalkList({
   walk: WalkListSetting
   target: CategoryConfig
   places: DirectoryResource[] | 'failed' | null
+  /** Its walks along the streets that hold, by place. */
+  routed?: Routed
   from: LatLng
   fromItem?: Pick<DirectoryResource, 'id' | 'category'>
   open: boolean
@@ -183,9 +250,9 @@ function WalkList({
   const community = useCommunitySlug()
   const noun = target.pluralLabel || target.label
   const shuls = isShuls(target)
-  const rows = Array.isArray(places) ? walkGroups(from, places, walk.maxMinutes).flatMap((g) => g.rows).sort((a, b) => a.miles - b.miles) : []
+  const rows = Array.isArray(places) ? walkGroups(from, places, walk.maxMinutes, null, routed).flatMap((g) => g.rows).sort(byNearest) : []
   const nearest = rows[0]
-  const beyond = Array.isArray(places) && rows.length === 0 ? nearestBeyond(from, places, walk.maxMinutes) : null
+  const beyond = Array.isArray(places) && rows.length === 0 ? nearestBeyond(from, places, walk.maxMinutes, routed) : null
 
   let summary: ReactNode
   if (places === null) {
@@ -230,7 +297,7 @@ function WalkList({
           {open && (
             <div className="pb-2">
               <NextMinyans enabled={shuls} items={places}>
-                <ListBody walk={walk} target={target} places={places} from={from} fromItem={fromItem} />
+                <ListBody walk={walk} target={target} places={places} routed={routed} from={from} fromItem={fromItem} />
               </NextMinyans>
             </div>
           )}
@@ -249,12 +316,14 @@ function ListBody({
   walk,
   target,
   places,
+  routed,
   from,
   fromItem,
 }: {
   walk: WalkListSetting
   target: CategoryConfig
   places: DirectoryResource[]
+  routed?: Routed
   from: LatLng
   fromItem?: Pick<DirectoryResource, 'id' | 'category'>
 }) {
@@ -263,7 +332,7 @@ function ListBody({
   const minyans = useContext(NextMinyansContext)
   const noun = (target.pluralLabel || target.label).toLowerCase()
   const field = walk.groupBy ? (walkGroupFields(target).find((f) => f.key === walk.groupBy) ?? null) : null
-  const groups = walkGroups(from, places, walk.maxMinutes, field)
+  const groups = walkGroups(from, places, walk.maxMinutes, field, routed)
   const shuls = isShuls(target)
   const hoods = neighborhoodsFor(community)
   const towns = townsFrom(places)
@@ -277,7 +346,7 @@ function ListBody({
     : walkAnswer(groups, field)
 
   if (groups.length === 0) {
-    const nearest = nearestBeyond(from, places, walk.maxMinutes)
+    const nearest = nearestBeyond(from, places, walk.maxMinutes, routed)
     return (
       <p className="mt-2 text-sm leading-snug text-slate-700">
         No {noun} listed within a {walk.maxMinutes}-minute walk.

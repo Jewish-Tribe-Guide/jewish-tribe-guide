@@ -1,6 +1,7 @@
 import type { DirectoryResource } from '@/types'
 import { selectValues, type CategoryConfig, type CategoryField } from './categories'
 import { haversineMiles, MILES_PER_MINUTE, type LatLng } from './geo'
+import type { Routed } from './walkRoutes'
 
 // ── Other categories' places within a walk ──────────────────────────────────
 // On each hotel, every shul within a 30-minute walk, nearest first: someone
@@ -24,8 +25,9 @@ import { haversineMiles, MILES_PER_MINUTE, type LatLng } from './geo'
 //     …
 //
 // Every place in the category, whatever its denomination: nothing is picked
-// for the visitor. Times are rough, in a straight line (see
-// MILES_PER_MINUTE), and the list says so.
+// for the visitor. Times are along the streets where they've been worked
+// out (`routed`, walkRoutes.ts), and otherwise rough, in a straight line
+// (see MILES_PER_MINUTE); the list says which.
 
 export type WalkList = {
   categoryId: string
@@ -100,17 +102,26 @@ export function walkMinutes(from: LatLng, to: LatLng): number {
   return Math.max(1, Math.round(haversineMiles(from, to) / MILES_PER_MINUTE.walk))
 }
 
-export type WalkRow = { item: DirectoryResource; minutes: number; miles: number }
+export type WalkRow = {
+  item: DirectoryResource
+  minutes: number
+  miles: number
+  /** Worked out along the streets, rather than the straight-line estimate. */
+  routed?: boolean
+}
 export type WalkGroup = { label: string; rows: WalkRow[] }
 
 /** What a list's places don't say, for a group by a field. */
 export const DOESNT_SAY = 'Doesn’t say'
 
-/** Every place with an address, nearest first, name on a tie. */
-function byWalk(from: LatLng, places: readonly DirectoryResource[]): WalkRow[] {
+/** Every place with an address, nearest first, name on a tie: by its walk
+ *  along the streets where `routed` has it, else the estimate. */
+function byWalk(from: LatLng, places: readonly DirectoryResource[], routed?: Routed): WalkRow[] {
   return places
     .flatMap((item) => {
       if (!item.geo) return []
+      const walked = routed?.get(item.id)
+      if (walked) return [{ item, miles: walked.miles, minutes: walked.minutes, routed: true }]
       const miles = haversineMiles(from, item.geo)
       return [{ item, miles, minutes: Math.max(1, Math.round(miles / MILES_PER_MINUTE.walk)) }]
     })
@@ -119,8 +130,8 @@ function byWalk(from: LatLng, places: readonly DirectoryResource[]): WalkRow[] {
 
 /** The nearest place past the walk, for "None within 30 minutes. Nearest:
  *  …". Null when there's none with an address. */
-export function nearestBeyond(from: LatLng, places: readonly DirectoryResource[], maxMinutes: number): WalkRow | null {
-  return byWalk(from, places).find((r) => r.minutes > maxMinutes) ?? null
+export function nearestBeyond(from: LatLng, places: readonly DirectoryResource[], maxMinutes: number, routed?: Routed): WalkRow | null {
+  return byWalk(from, places, routed).find((r) => r.minutes > maxMinutes) ?? null
 }
 
 /** The places within `maxMinutes` of `from`, nearest first, as the list's
@@ -129,8 +140,14 @@ export function nearestBeyond(from: LatLng, places: readonly DirectoryResource[]
  *  group per option in the field's order (a yes/no's one: "Shabbat
  *  friendly"), then the places that don't say. Empty groups are left out,
  *  so no places gives no groups. */
-export function walkGroups(from: LatLng, places: readonly DirectoryResource[], maxMinutes: number, field?: CategoryField | null): WalkGroup[] {
-  const rows = byWalk(from, places).filter((r) => r.minutes <= maxMinutes)
+export function walkGroups(
+  from: LatLng,
+  places: readonly DirectoryResource[],
+  maxMinutes: number,
+  field?: CategoryField | null,
+  routed?: Routed,
+): WalkGroup[] {
+  const rows = byWalk(from, places, routed).filter((r) => r.minutes <= maxMinutes)
   if (field) return fieldGroups(rows, field)
   const groups =
     maxMinutes > SPLIT_MINUTES

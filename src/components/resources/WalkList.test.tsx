@@ -7,7 +7,7 @@ import { makeCategory, makeListing } from '@/test/providerFixtures'
 import { mockRouter } from '@/test/nextNavigationMock'
 import type { DirectoryResource } from '@/types'
 import ListingView from './ListingView'
-import { forgetLoadedPlaces } from './WalkList'
+import { forgetLoadedPlaces, forgetLoadedWalkRoutes } from './WalkList'
 import { WalkOnMapContext } from './walkOnMap'
 import { createHighlight } from './CategoryMap'
 
@@ -61,6 +61,7 @@ const fetchMock = vi.fn()
 const answer = (resources: DirectoryResource[]) => new Response(JSON.stringify({ ok: true, resources }), { status: 200 })
 beforeEach(() => {
   forgetLoadedPlaces()
+  forgetLoadedWalkRoutes()
   fetchMock.mockReset()
   fetchMock.mockImplementation(async () => answer(nearby))
   vi.stubGlobal('fetch', fetchMock)
@@ -120,6 +121,41 @@ describe('A hotel’s synagogues within a walk', () => {
     expect(link.getAttribute('href')).toMatch(/^\/test-community\/synagogue\/mikveh-israel/)
     expect(screen.getByTestId('walk-lists')).toHaveTextContent('Rough walking times from the hotel, in a straight line at 25 minutes a mile')
     expect(screen.getByText('Tap one for its Shabbos times.')).toBeInTheDocument()
+  })
+
+  // Oct 15: walks worked out along the streets (walkRoutes.ts) replace the
+  // straight-line estimate, while neither end has moved since.
+  describe('along the streets', () => {
+    const route = (to: DirectoryResource, minutes: number, miles: number) => ({ from: at, to: to.geo, minutes, meters: Math.round(miles * 1609.344) })
+    const withRoutes = (routes: Record<string, unknown>) =>
+      fetchMock.mockImplementation(async (url: string) =>
+        String(url).startsWith('/api/walk-routes') ? new Response(JSON.stringify({ ok: true, routes }), { status: 200 }) : answer(nearby),
+      )
+
+    it('lists each place by its walk along the streets, nearest first, and says where the times are from', async () => {
+      // Society Hill is across a highway: 8 minutes as the crow flies, 22
+      // on foot. Far Away Shul has a straight path: in reach after all.
+      withRoutes({ s1: route(nearby[0], 22, 0.9), s2: route(nearby[1], 14, 0.6), s3: route(nearby[2], 24, 1.0), s4: route(nearby[3], 29, 1.5) })
+      open()
+      const section = await openKind(/Synagogues · 4/)
+      expect(within(section).getAllByRole('link', { name: /min/ }).map((a) => a.textContent)).toEqual([
+        '14 minMikveh IsraelOrthodox (Ashkenazi) · No davening times listed',
+        '22 minSociety Hill SynagogueConservative · No davening times listed',
+        '24 minBeth ZionOrthodox (Ashkenazi) · No davening times listed',
+        '29 minFar Away ShulOrthodox (Ashkenazi) · No davening times listed',
+      ])
+      expect(screen.getByRole('button', { name: /Synagogues · 4/ })).toHaveTextContent('Nearest: Mikveh Israel, 14 min')
+      expect(screen.getByTestId('walk-lists')).toHaveTextContent('Walking times from the hotel along the streets, from openrouteservice.org and © OpenStreetMap contributors.')
+      expect(screen.getByTestId('walk-lists')).not.toHaveTextContent('rough estimate')
+    })
+
+    it('a place that moved since its walk was worked out shows the estimate, and the box says some are rough', async () => {
+      withRoutes({ s1: { ...route(nearby[0], 22, 0.9), to: milesNorth(0.1) }, s2: route(nearby[1], 14, 0.6), s3: route(nearby[2], 24, 1.0) })
+      open()
+      const section = await openKind(/Synagogues · 3/)
+      await vi.waitFor(() => expect(within(section).getAllByRole('link', { name: /min/ })[0]).toHaveTextContent(/^8 minSociety Hill/))
+      expect(screen.getByTestId('walk-lists')).toHaveTextContent('A place added since last night is a rough estimate until then.')
+    })
   })
 
   it('says when there are none within the walk, and names the nearest', async () => {
