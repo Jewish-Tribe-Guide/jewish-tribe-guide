@@ -89,6 +89,10 @@ type Props = {
    *  (/api/admin/listings, see useListingSubmit), with no challenge, and
    *  closes the editor once it's in. */
   adminSubmit?: { token: string }
+  /** Just these rows (editorRows ids), open, with Send under them: one
+   *  box's own Edit (BoxEditSheet, Oct 15), the listing's other boxes
+   *  left out. */
+  onlyRows?: readonly string[]
 }
 
 type Lookalike = { listing: DirectoryResource; reason: string }
@@ -199,6 +203,7 @@ export default function ListingEditor({
   via,
   onSent,
   adminSubmit,
+  onlyRows,
 }: Props) {
   // Adding: a blank listing stands in for `item`, so the reads below don't
   // each need a guard; `creating` switches off what only makes sense for an
@@ -229,6 +234,8 @@ export default function ListingEditor({
   const values: EditorValues = { name: draft.name, address: hasAddress ? draft.address : '', phone: hasPhone ? draft.phone : '', details }
   const rows = editorRows(category, details)
   const row = rows.find((r) => r.id === openId) ?? null
+  // A box's own Edit: its rows, in the listing's order.
+  const boxRows = onlyRows ? rows.filter((r) => onlyRows.includes(r.id)) : null
   const rowTitle = (r: EditorRow) => (r.kind === 'name' ? draft.name.trim() || 'Name' : r.title)
 
   // ── What the host's header shows ──────────────────────────────────────
@@ -581,12 +588,35 @@ export default function ListingEditor({
     </div>
   ) : null
 
+  // One box's rows, open, and Send: what its Edit opens. A row's own step
+  // (a minyan, a person) shows just that, without Send, as on the list.
+  const boxScreen = boxRows ? (
+    <div className="space-y-4" data-testid="editor-box">
+      {boxRows.map((r) => (
+        <div key={r.id} className="space-y-4" data-testid={`editor-open-${r.id}`}>
+          {boxRows.length > 1 && !child && <h3 className="text-[15px] font-extrabold text-slate-900">{rowTitle(r)}</h3>}
+          {rowBody(r)}
+        </div>
+      ))}
+      {!child && (
+        <>
+          {errors}
+          {foot(
+            <button type="button" onClick={send} disabled={nothingToSend || sender.submitting || verifying} className={SUBMIT_PILL}>
+              {sendLabel}
+            </button>,
+          )}
+        </>
+      )}
+    </div>
+  ) : null
+
   return (
     <div ref={rootRef} className="space-y-4">
       {challenged && <Honeypot value={sender.honeypot} onChange={sender.setHoneypot} />}
       {titleSlot && (!creating || stepTitle || removalOpen) && createPortal(title, titleSlot)}
       {!titleSlot && !creating && !onStep && <div className="text-base">{title}</div>}
-      <div className={removalOpen ? 'hidden' : ''}>{rowScreen ?? listScreen}</div>
+      <div className={removalOpen ? 'hidden' : ''}>{boxScreen ?? rowScreen ?? listScreen}</div>
       {/* Only while it's showing: it's opened from the listing's ••• menu
           now, not swapped with the edit. */}
       {canRequestRemoval && removalOpen && (

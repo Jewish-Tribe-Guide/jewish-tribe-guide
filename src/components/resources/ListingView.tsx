@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useContext, useId, useState, type ReactNode } from 'react'
+import { Suspense, useContext, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { track } from '@vercel/analytics'
@@ -52,7 +52,6 @@ import { usePinned } from '@/lib/pinnedContext'
 import {
   CertificateIcon,
   CheckIcon,
-  PlusIcon,
   ChevronRightIcon,
   ClockIcon,
   CrosshairIcon,
@@ -75,13 +74,14 @@ import { schedulesKey } from '@/lib/schedules'
 import WalkLists from './WalkList'
 import { SectionCard, ShabbosCard } from './listingCards'
 import { FieldsBox } from './FieldsBox'
+import { editorRows } from '@/lib/editorRows'
 import { useNextMinyan } from './nextMinyans'
 import { Card, shortDate } from './listingParts'
 import FreshnessFooter from './FreshnessFooter'
 import QuestionCard from './QuestionCard'
 import TurnstileWidget from '@/components/TurnstileWidget'
 import { useItemMarks, type ItemMarksApi } from './useItemMarks'
-import { alreadyListed, dayText, itemSuggestions, itemWording, lastSeenText, seenLabel, type ItemMark, type ItemWording } from '@/lib/itemMarks'
+import { dayText, itemWording, lastSeenText, seenLabel, type ItemMark, type ItemWording } from '@/lib/itemMarks'
 import JoinLinkCheck from './JoinLinkCheck'
 
 // ── An opened listing: the seven parts (see lib/listingView.ts) ─────────────
@@ -172,11 +172,17 @@ export default function ListingView({ item, category, color, place = null, upvot
   const canEdit = ui.contributions.edit && resolveCapabilities(category.capabilities).edit
   const [boxEdit, setBoxEdit] = useState<BoxEdit | null>(null)
   const editBox = canEdit ? (edit: BoxEdit) => setBoxEdit(edit) : undefined
+  // The whole-listing editor's rows this listing has (editorRows): a box
+  // whose Edit is one of those opens it, narrowed to that box (Oct 15).
+  const editorRowsHere = editorRows(category, item as Record<string, unknown>)
+  const rowIds = new Set(editorRowsHere.map((r) => r.id))
+  const contactTitle = editorRowsHere.find((r) => r.id === 'contact')?.title ?? 'Contact'
+  /** Edit for a box made of editor rows, or none when it has none. */
+  const editRows = (title: string, ids: readonly string[]) => {
+    const rows = ids.filter((id) => rowIds.has(id))
+    return editBox && rows.length > 0 ? () => editBox({ title, fields: [], rows }) : undefined
+  }
   const tellAbout = useContext(TellAboutContext)
-  // "Add their menu" on a place with no dishes: the box, for the menu; its
-  // do-it-yourself opens the card's own one-dish box. Where there's no box
-  // (the Map), the card keeps "+ Add the first dish".
-  const addMenu = tellAbout ? (addOne: () => void) => tellAbout(item, addOne, { menu: true }) : undefined
   const editElse = tellAbout
     ? () => {
         setBoxEdit(null)
@@ -316,7 +322,11 @@ export default function ListingView({ item, category, color, place = null, upvot
     // One box (Oct 6): who it's for, then Join with Share beside it, so the
     // listing isn't one big button over another (Suggest an edit is outlined
     // under it on these listings, ListingEditBar).
-    <Card testId="listing-join-box" footer={confirmAt?.at === 'join' ? <JoinLinkCheck item={item} joined={joined} /> : undefined}>
+    <Card
+      testId="listing-join-box"
+      footer={confirmAt?.at === 'join' ? <JoinLinkCheck item={item} joined={joined} /> : undefined}
+      onEdit={editRows(rowIds.has('about') ? 'Link and description' : contactTitle, ['contact', 'about'])}
+    >
       {joinAbout.map((f) => (
         <p key={f.key} className="whitespace-pre-line pt-2.5 text-[15.5px] leading-snug text-slate-800">{String(item[f.key]).trim()}</p>
       ))}
@@ -357,13 +367,15 @@ export default function ListingView({ item, category, color, place = null, upvot
   const named = main === 'section' ? mainCardOf(category) : null
   if (named) {
     const edit = { title: named.label, fields: [...named.fields] }
+    const dated = confirmAt?.at === 'card'
     mainSection = (
       <SectionCard
         item={item}
         title={named.label}
         fields={named.fields}
-        footer={confirmAt?.at === 'card' ? confirmLine(edit) : undefined}
+        footer={dated ? confirmLine(edit) : undefined}
         onAnswer={editBox ? (preset) => editBox({ ...edit, preset }) : undefined}
+        onEdit={editBox ? () => editBox(edit) : undefined}
       />
     )
   } else if (main === 'davening') {
@@ -378,7 +390,7 @@ export default function ListingView({ item, category, color, place = null, upvot
       />
     )
   } else if (main === 'items' && itemsF) {
-    mainSection = <ItemsCard field={itemsF} found={found} api={itemApi} menuUrl={menuUrlOf(item)} onAddMenu={addMenu} />
+    mainSection = <ItemsCard field={itemsF} found={found} api={itemApi} menuUrl={menuUrlOf(item)} onEdit={editRows(itemsF.label, ['items'])} />
   } else if (main === 'groups') {
     mainSection = (
       <GroupBoxes
@@ -411,28 +423,25 @@ export default function ListingView({ item, category, color, place = null, upvot
   // dated on its own.
   const configured = boxesOf(category)
   const placed = new Set([...configured.flatMap((b) => b.fields.map((f) => f.key)), ...(named?.fields.map((f) => f.key) ?? []), ...(shabbosFieldsOf(category) ?? []).map((f) => f.key)])
+  // Each with its editor row's id (editorRows), for its Edit.
   const boxDefs = [
-    ...configured,
-    ...category.detailFields.filter((f) => f.type === 'contacts' && f.renderAs !== 'hidden' && !placed.has(f.key)).map((f) => ({ title: f.label, fields: [f] })),
+    ...configured.map((b) => ({ ...b, row: `box:${b.title}` })),
+    ...category.detailFields
+      .filter((f) => f.type === 'contacts' && f.renderAs !== 'hidden' && !placed.has(f.key))
+      .map((f) => ({ title: f.label, fields: [f], row: `box:${f.key}` })),
   ]
   const boxes = boxDefs.map((b) => {
     const key = boxConfirmKey(item, b.fields)
+    const edit = editRows(b.title, [b.row])
+    const dated = !!key && confirmAt?.at === 'boxes'
     return (
       <FieldsBox
         key={b.title}
         item={item}
         title={b.title}
         fields={b.fields}
-        footer={
-          key && confirmAt?.at === 'boxes' ? (
-            <FreshnessFooter
-              resourceId={item.id}
-              confirmedAt={sectionConfirmedAt(item, key)}
-              section={key}
-              onEdit={editBox ? () => editBox({ title: b.title, fields: [...b.fields] }) : undefined}
-            />
-          ) : undefined
-        }
+        footer={dated ? <FreshnessFooter resourceId={item.id} confirmedAt={sectionConfirmedAt(item, key)} section={key} onEdit={edit} /> : undefined}
+        onEdit={dated ? undefined : edit}
       />
     )
   })
@@ -491,8 +500,16 @@ export default function ListingView({ item, category, color, place = null, upvot
   // user, Oct 10): someone planning where they'll be wants to see how far
   // the next thing is from there. It was a hospital's only (Oct 6).
   const showSetLocation = category.hasAddress !== false && !!item.geo
+  // Its Edit: the editor's rows for what it shows (editorRows): address,
+  // phone and links; the hours; the yes/no lines; other lists.
+  const editDetails = editRows(otherHours.length > 0 ? 'Contact and hours' : contactTitle, [
+    'contact',
+    ...otherHours.map((f) => (rowIds.has(`hours:${f.key}`) ? `hours:${f.key}` : 'hours')),
+    ...(quietBadges.length > 0 || (caveat?.title && !caveatFirst) ? ['facts'] : []),
+    ...otherTags.map((f) => `field:${f.key}`),
+  ])
   const details = ((caveat?.title && !caveatFirst) || showAddress || showSetLocation || showPhone || websiteName || otherHours.length > 0 || detailFields.length > 0 || extra.length > 0 || quietBadges.length > 0 || otherTags.length > 0) && (
-    <Card testId="listing-details" footer={googleLead && <span data-testid="listing-google">{googleLead}.</span>}>
+    <Card testId="listing-details" footer={googleLead && <span data-testid="listing-google">{googleLead}.</span>} onEdit={editDetails}>
     <div className="divide-y divide-slate-100">
       {caveat?.title && !caveatFirst && (
         <Row>
@@ -582,7 +599,7 @@ export default function ListingView({ item, category, color, place = null, upvot
   // are.
   const fromGoogle = aboutFields.some((f) => f.key === 'googleDescription') && !!item.placeId && !!item.googleFields?.includes('description')
   const about = aboutFields.length > 0 && (
-    <Card testId="listing-about" footer={fromGoogle ? 'Description from Google' : undefined}>
+    <Card testId="listing-about" footer={fromGoogle ? 'Description from Google' : undefined} onEdit={editRows('About', ['about'])}>
       <div className="space-y-3 pt-2.5">
         {aboutFields.map((f) => (
           <p key={f.key} className="whitespace-pre-line text-[15px] leading-relaxed text-slate-800">{String(item[f.key]).trim()}</p>
@@ -598,7 +615,7 @@ export default function ListingView({ item, category, color, place = null, upvot
   // within a walk.
   const nowMinutes = now ? now.getHours() * 60 + now.getMinutes() : null
   const shabbosFirst = candlesAt !== null && nowMinutes !== null && nowMinutes < candlesAt
-  const shabbos = shabbosFields ? <ShabbosCard item={item} fields={shabbosFields} zmanim={zmanim} candlesAt={candlesAt} /> : null
+  const shabbos = shabbosFields ? <ShabbosCard item={item} fields={shabbosFields} zmanim={zmanim} candlesAt={candlesAt} onEdit={editRows('Shabbos', ['shabbos'])} /> : null
   // Among the boxes where the admin put it ("after A place to stay"), or
   // after the places within a walk, as it always went.
   const after = shabbosAfter(category)
@@ -623,9 +640,9 @@ export default function ListingView({ item, category, color, place = null, upvot
           within a walk follow it (a hospital's food, shuls and hotels). */}
       {walks}
       {!shabbosFirst && !amongBoxes && shabbos}
-      {/* A place whose list has nothing on it yet: just "+ Add the first
-          item", after whatever it leads with. */}
-      {main !== 'items' && itemsF && itemApi.marks.length === 0 && itemApi.canReport && <ItemsCard field={itemsF} found={null} api={itemApi} menuUrl={menuUrlOf(item)} onAddMenu={addMenu} />}
+      {/* A place whose list has nothing on it yet: the box, empty, with its
+          Edit, after whatever it leads with. */}
+      {main !== 'items' && itemsF && itemApi.marks.length === 0 && editBox && <ItemsCard field={itemsF} found={null} api={itemApi} menuUrl={menuUrlOf(item)} onEdit={editRows(itemsF.label, ['items'])} />}
       {details}
       {about}
       {/* Part 6: the one thing this listing doesn't say yet that a tap can
@@ -917,17 +934,17 @@ function menuUrlOf(item: DirectoryResource): string | null {
  *  words).
  *
  *  A restaurant's main dishes the same way, in a dish's words ("Still
- *  served", "+ Add a dish"), with "Full menu" for the rest of the menu.
- *  With none yet, just "Add their menu" (Oct 10): the "+ Add" box for the
- *  menu, a link, a pasted menu or photos, whose do-it-yourself is one dish
- *  (`onAddMenu`, given the way to open that dish box). */
-function ItemsCard({ field, found, api, menuUrl, onAddMenu }: { field: CategoryField; found: SearchFound | null; api: ItemMarksApi; menuUrl: string | null; onAddMenu?: (addOne: () => void) => void }) {
+ *  served"), with "Full menu" for the rest of the menu.
+ *
+ *  Adding or taking one off is the box's Edit, as under every box (the
+ *  user, Oct 15: "Add a dish should just be edit"), not a row of its own:
+ *  the list in the editor's own items screen, sent for a check. */
+function ItemsCard({ field, found, api, menuUrl, onEdit }: { field: CategoryField; found: SearchFound | null; api: ItemMarksApi; menuUrl: string | null; onEdit?: () => void }) {
   const timezone = useCommunityTimezone()
   const clock = useNow()
   const say = itemWording(field)
   const [all, setAll] = useState(false)
   const [open, setOpen] = useState<string | null>(null)
-  const [adding, setAdding] = useState(false)
   const matched = new Set(found?.items.map((m) => m.tag) ?? [])
   const rows = [...api.marks]
   // What the search asked for first, so "See all" can't hide it.
@@ -937,6 +954,7 @@ function ItemsCard({ field, found, api, menuUrl, onAddMenu }: { field: CategoryF
     <Card
       title={rows.length ? `${field.label} · ${rows.length}` : field.label}
       testId="listing-items"
+      onEdit={onEdit}
       action={
         menuUrl && (
           <a href={menuUrl} target="_blank" rel="noopener noreferrer" className="shrink-0 text-[14px] font-bold text-primary hover:underline" data-testid="full-menu">
@@ -998,141 +1016,8 @@ function ItemsCard({ field, found, api, menuUrl, onAddMenu }: { field: CategoryF
           <ChevronRightIcon className={`h-4 w-4 transition-transform ${all ? '-rotate-90' : ''}`} />
         </button>
       )}
-      {/* "+ Add an item": the list's own last row (agreed Oct 1), where
-          someone who's just seen something new finds it isn't listed. */}
-      {api.canReport && onAddMenu && say.noun === 'dish' && rows.length + api.added.length === 0 && !adding ? (
-        // Plain, as "+ Add their Shabbos times" is (the user, Oct 10: the
-        // outlined pill was louder than anything else in a box).
-        <button
-          type="button"
-          onClick={() => onAddMenu(() => setAdding(true))}
-          className="mt-0.5 inline-flex cursor-pointer items-center gap-1.5 py-1 text-[14.5px] font-bold text-primary"
-          data-testid="add-their-menu"
-        >
-          <PlusIcon className="h-4 w-4" />
-          Add their menu
-        </button>
-      ) : api.canReport &&
-        (adding ? (
-          <AddItemBox
-            api={api}
-            say={say}
-            onClose={() => setAdding(false)}
-            onListed={(m) => {
-              setAdding(false)
-              setOpen(`${m.key}:${m.name}`)
-              setAll(true)
-            }}
-          />
-        ) : (
-          <button
-            type="button"
-            onClick={() => setAdding(true)}
-            className={`flex min-h-11 w-full cursor-pointer items-center gap-2 py-2.5 text-left text-[15px] font-bold text-primary ${rows.length + api.added.length > 0 ? 'mt-0.5 border-t border-slate-200' : ''}`}
-          >
-            <PlusIcon className="h-4 w-4" />
-            {rows.length ? say.add : say.addFirst}
-          </button>
-        ))}
+      {rows.length + api.added.length === 0 && <p className="pt-0.5 text-[14.5px] text-slate-700">None listed yet.</p>}
     </Card>
-  )
-}
-
-/** "What did you see here?": suggestions from the item names as it's typed,
- *  the store's own items marked (picking one is its "Still here"), a name
- *  not on the list as typed, "Not always in stock", then Add. */
-function AddItemBox({ api, say, onClose, onListed }: { api: ItemMarksApi; say: ItemWording; onClose: () => void; onListed: (m: ItemMark) => void }) {
-  const [text, setText] = useState('')
-  const [sometimes, setSometimes] = useState(false)
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const inputId = useId()
-  const name = text.trim().replace(/\s+/g, ' ')
-  const suggestions = itemSuggestions(name, api.marks, 4, { dishes: say.noun === 'dish' }).filter((x) => x.name.toLowerCase() !== name.toLowerCase())
-  const send = async (what: string) => {
-    const listed = alreadyListed(api.marks, what)
-    if (listed) {
-      api.seen(listed, 'row')
-      return onListed(listed)
-    }
-    setBusy(true)
-    setError(null)
-    const outcome = await api.add(what, sometimes)
-    setBusy(false)
-    if (outcome === 'failed') setError('That didn’t send. Please try again.')
-    else onClose()
-  }
-  const bold = (label: string) => {
-    const i = label.toLowerCase().indexOf(name.toLowerCase())
-    return i < 0 ? label : (
-      <>
-        {label.slice(0, i)}
-        <b>{label.slice(i, i + name.length)}</b>
-        {label.slice(i + name.length)}
-      </>
-    )
-  }
-  const row = 'flex min-h-11 w-full cursor-pointer items-center justify-between gap-2 border-t border-slate-100 px-3 text-left text-[15px] text-slate-900 first:border-t-0 hover:bg-slate-50'
-  return (
-    <div className="-mx-2 mt-2 rounded-xl border border-slate-300 bg-white px-2 pt-3 pb-2.5" data-testid="add-item">
-      <label htmlFor={inputId} className="text-[14px] font-bold text-slate-900">
-        {say.addPrompt}
-      </label>
-      <input
-        id={inputId}
-        autoFocus
-        value={text}
-        maxLength={60}
-        autoComplete="off"
-        onChange={(e) => setText(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' && name.length >= 2 && !busy) void send(name)
-          if (e.key === 'Escape') onClose()
-        }}
-        className="mt-2 h-11 w-full rounded-[10px] border-2 border-slate-300 px-3 text-base text-slate-900 outline-none focus:border-primary"
-      />
-      {name.length >= 2 && (suggestions.length > 0 || !alreadyListed(api.marks, name)) && (
-        <div className="mt-1.5 overflow-hidden rounded-[10px] border border-slate-200">
-          {suggestions.map((x) => (
-            <button key={x.name} type="button" disabled={busy} onClick={() => (x.listed ? void send(x.name) : setText(x.name))} className={row}>
-              <span className="py-2">
-                {bold(x.name)}
-                {x.listed && <span className="block text-[13px] text-muted">Already here · tap to say it’s {say.still.toLowerCase()}</span>}
-              </span>
-            </button>
-          ))}
-          {!suggestions.some((x) => x.name.toLowerCase() === name.toLowerCase()) && (
-            <button type="button" disabled={busy} onClick={() => void send(name)} className={`${row} bg-slate-50 text-[14.5px] text-muted`}>
-              Add “{name}” as typed
-            </button>
-          )}
-        </div>
-      )}
-      <label className="mt-2.5 flex min-h-11 cursor-pointer items-center gap-2.5 text-[15px] text-slate-900">
-        <input type="checkbox" checked={sometimes} onChange={(e) => setSometimes(e.target.checked)} className="h-5 w-5 accent-primary" />
-        {say.sometimesBox}
-      </label>
-      <div className="mt-1.5 flex items-center gap-2">
-        <button
-          type="button"
-          disabled={busy || name.length < 2}
-          onClick={() => void send(name)}
-          className="h-11 flex-1 cursor-pointer rounded-[10px] bg-primary text-[15px] font-bold text-white transition-colors hover:bg-primary-dark disabled:cursor-default disabled:opacity-45"
-        >
-          {busy ? 'Sending…' : 'Add'}
-        </button>
-        <button type="button" onClick={onClose} className="h-11 cursor-pointer px-3 text-[15px] font-bold text-slate-500 hover:text-slate-700">
-          Cancel
-        </button>
-      </div>
-      {error && (
-        <p role="alert" className="mt-2 text-[13.5px] text-red-700">
-          {error}
-        </p>
-      )}
-      <p className="mt-2 text-[13px] leading-snug text-muted">An admin checks it before everyone sees it.</p>
-      {api.challenge?.from === 'add' && busy && <TurnstileWidget key={api.challenge.attempt} onVerify={api.challenge.onVerify} />}
-    </div>
   )
 }
 

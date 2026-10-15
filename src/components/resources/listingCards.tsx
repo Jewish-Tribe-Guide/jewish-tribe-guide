@@ -37,11 +37,15 @@ export function SectionCard({
   fields: all,
   footer,
   onAnswer,
+  onEdit,
 }: {
   item: DirectoryResource
   title: string
   fields: readonly CategoryField[]
   footer?: ReactNode
+  /** The box's Edit. A dated footer (FreshnessFooter) carries its own,
+   *  so this shows only where that footer doesn't. */
+  onEdit?: () => void
   /** A card led by a yes/no nobody has answered: its Yes or No, which opens
    *  the card's edit with that answer in (Oct 10). */
   onAnswer?: (preset: Record<string, unknown>) => void
@@ -55,7 +59,7 @@ export function SectionCard({
   if (gate && item[gate.key] !== true && item[gate.key] !== false) {
     const label = gate.filterLabel ?? gate.label
     return (
-      <Card title={title} testId="listing-section">
+      <Card title={title} testId="listing-section" onEdit={onEdit}>
         <p className="text-[15px] text-slate-700">Not known yet. Is it {label}?</p>
         {onAnswer && (
           <div className="mt-2.5 flex gap-2 pb-1">
@@ -135,8 +139,9 @@ export function SectionCard({
     }
   }
   // Nothing to confirm on a card nobody has filled in.
+  const dated = parts.length > 0 && !!footer
   return (
-    <Card title={title} testId="listing-section" footer={parts.length > 0 ? footer : undefined}>
+    <Card title={title} testId="listing-section" footer={dated ? footer : undefined} onEdit={dated ? undefined : onEdit}>
       {parts.length > 0 ? parts : <p className="text-[15px] text-slate-600">{NOT_YET}</p>}
     </Card>
   )
@@ -243,12 +248,15 @@ export function ShabbosCard({
   fields,
   zmanim,
   candlesAt,
+  onEdit,
 }: {
   item: DirectoryResource
   fields: readonly CategoryField[]
   zmanim: ZmanimData | null
   /** Tonight's candle lighting, on a Friday or Erev Yom Tov. */
   candlesAt: number | null
+  /** The box's Edit: its fields (the eruv, kosher food inside…). */
+  onEdit?: () => void
 }) {
   const { community } = useActiveCommunity()
   const shuls = useCategories().find((c) => c.kind === 'listing' && c.detailFields.some((f) => f.type === 'minyanim'))
@@ -257,7 +265,7 @@ export function ShabbosCard({
   const candles = candleText(zmanim, candlesAt)
   const yomTov = candlesAt !== null && zmanim !== null && zmanim.dayOfWeek !== 5
   return (
-    <Card title={yomTov ? 'Yom Tov tonight' : 'This Shabbos'} testId="listing-shabbos">
+    <Card title={yomTov ? 'Yom Tov tonight' : 'This Shabbos'} testId="listing-shabbos" onEdit={onEdit}>
       <div>
         {candles && (
           <Line label="Candle lighting">

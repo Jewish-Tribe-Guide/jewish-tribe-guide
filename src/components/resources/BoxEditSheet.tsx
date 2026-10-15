@@ -18,6 +18,7 @@ import { useListingDraft } from './useListingDraft'
 import { useListingSubmit, useTurnstileActive } from './useListingSubmit'
 import { SUBMIT_PILL } from './submitPill'
 import MinyanBoxEditor from './MinyanBoxEditor'
+import ListingEditor, { type EditorStep } from './ListingEditor'
 
 // ── Edit, under one box of a listing (agreed Oct 10, canvas page "edits") ───
 // The box's own fields and nothing else: a mikvah section's hours and note,
@@ -40,6 +41,11 @@ export type BoxEdit = {
   writing?: MinyanWriting
   /** Values already answered in the box ("Is it Shabbat friendly?" Yes). */
   preset?: Record<string, unknown>
+  /** The whole-listing editor's rows for this box (editorRows ids), when
+   *  the box is one of those rather than a few fields: the contact box's
+   *  address and phone, the dishes, About (Oct 15). Then `fields` is
+   *  unused, and the sheet holds that editor, narrowed to these rows. */
+  rows?: readonly string[]
 }
 
 export default function BoxEditSheet({
@@ -65,9 +71,18 @@ export default function BoxEditSheet({
     stepBack.current = step?.back ?? (() => {})
     setStepTitle(step?.title ?? null)
   }, [])
+  // The editor's own steps (a person in the contacts, a dish list's
+  // screen) for the same title and Back; one with no title is the box.
+  const onEditorStep = useCallback((step: EditorStep | null) => onStep(step?.title ? { title: step.title, back: step.back } : null), [onStep])
   const title = stepTitle ?? edit?.title ?? ''
   const onBack = stepTitle ? () => stepBack.current() : undefined
-  const body = edit && <BoxEditor key={edit.title} item={item} category={category} edit={edit} onClose={onClose} onEditElse={onEditElse} onStep={onStep} />
+  const body =
+    edit &&
+    (edit.rows ? (
+      <ListingEditor key={edit.title} item={item} category={category} onlyRows={edit.rows} onClose={onClose} onStep={onEditorStep} />
+    ) : (
+      <BoxEditor key={edit.title} item={item} category={category} edit={edit} onClose={onClose} onEditElse={onEditElse} onStep={onStep} />
+    ))
   return isMobile ? (
     <MobileSheet isOpen={!!edit} onClose={onClose} title={title} onBack={onBack}>
       {body}

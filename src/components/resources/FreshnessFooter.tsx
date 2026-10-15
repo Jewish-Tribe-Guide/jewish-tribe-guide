@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useNow } from '@/lib/useNow'
 import { isStale } from '@/lib/listingView'
 import { useFetchOrPreview } from '@/lib/previewSend'
-import { shortDate } from './listingParts'
+import { EditButton, shortDate } from './listingParts'
 import { PencilIcon } from '@/components/icons'
 
 
@@ -134,10 +134,7 @@ function FreshnessStatus({ resourceId, confirmedAt: initialConfirmedAt, lead, su
         Edit
       </button>
     ) : (
-      <button type="button" onClick={onEdit} className="flex min-h-9 shrink-0 cursor-pointer items-center gap-1.5 text-[14.5px] font-bold text-primary hover:underline">
-        <PencilIcon className="h-3.5 w-3.5" />
-        Edit
-      </button>
+      <EditButton onClick={onEdit} />
     )
     return (
       <div className="flex items-center gap-2" data-testid="freshness">

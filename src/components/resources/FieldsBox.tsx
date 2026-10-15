@@ -95,14 +95,27 @@ function BoxField({ field: f, item }: { field: CategoryField; item: DirectoryRes
  *  Nothing when none of them holds anything. Two or more fields each go
  *  under their own small heading ("PANTRY", "FOOD PACKAGES"); a count
  *  beside a name when a list has more than one ("Who to call · 4"). */
-export function FieldsBox({ item, title, fields, footer }: { item: DirectoryResource; title: string; fields: readonly CategoryField[]; footer?: ReactNode }) {
+export function FieldsBox({
+  item,
+  title,
+  fields,
+  footer,
+  onEdit,
+}: {
+  item: DirectoryResource
+  title: string
+  fields: readonly CategoryField[]
+  footer?: ReactNode
+  /** The box's Edit, where its footer doesn't carry one. */
+  onEdit?: () => void
+}) {
   const filled = fields.filter((f) => hasValue(f, item[f.key]))
   if (filled.length === 0) return null
   const count = (f: CategoryField) => (f.type === 'contacts' ? readContacts(item[f.key]).length : 0)
   const headed = fields.length > 1
   const heading = !headed && count(filled[0]) > 1 ? `${title} · ${count(filled[0])}` : title
   return (
-    <Card title={heading} testId="listing-box" footer={footer}>
+    <Card title={heading} testId="listing-box" footer={footer} onEdit={onEdit}>
       {filled.map((f, i) => (
         <div key={f.key} className={headed && i > 0 ? 'mt-1 border-t border-slate-200' : ''}>
           {headed && (

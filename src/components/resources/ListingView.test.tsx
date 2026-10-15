@@ -612,7 +612,9 @@ describe('ListingView — a restaurant’s main dishes (agreed Oct 1)', () => {
     expect(card()).not.toHaveTextContent('Been there?')
     expect(within(row('Shawarma')).getByText('seen today')).toBeInTheDocument()
     expect(within(row('Falafel')).getByText('seen Oct 2')).toBeInTheDocument()
-    expect(within(card()).getByRole('button', { name: 'Add a dish' })).toBeInTheDocument()
+    // Adding one is the box's Edit (Oct 15), not a row of its own.
+    expect(within(card()).queryByRole('button', { name: /Add a dish/ })).not.toBeInTheDocument()
+    expect(within(card()).getByRole('button', { name: 'Edit' })).toBeInTheDocument()
     fireEvent.click(within(row('Falafel')).getByRole('button', { name: /Falafel/ }))
     expect(row('Falafel')).toHaveTextContent('Last seen Oct 2.')
     expect(within(row('Falafel')).getByRole('button', { name: 'Still served' })).toBeInTheDocument()
@@ -636,100 +638,102 @@ describe('ListingView — a restaurant’s main dishes (agreed Oct 1)', () => {
   })
 })
 
-describe('ListingView — add an item', () => {
+describe('ListingView — Edit under every box (Oct 15)', () => {
+  // The user, Oct 15: "a little edit under each bubble … even the add a
+  // dish should just be edit. Same everywhere." Each opens that box alone,
+  // in the editor (not the "+ Add" box's AI).
   const m: CategoryField = { key: 'm', label: 'Kosher items here', type: 'tags', renderAs: 'badge', showCountInHeader: true }
-  const grocery = makeCategory({ id: 'grocery', label: 'Grocery', detailFields: [hours, m] })
-  const tj = makeListing({ id: '0b6c4c1e-2f55-4a8e-9d57-3b7f0d6f4a21', name: 'Trader Joe’s', m: ['Challah', 'Cheddar Cheese'] })
-  const json = (body: unknown) => new Response(JSON.stringify(body), { status: 200 })
-  let fetchMock: ReturnType<typeof vi.spyOn>
-  beforeEach(() => {
-    fetchMock = vi.spyOn(globalThis, 'fetch')
+  const grocery = makeCategory({ id: 'grocery', label: 'Grocery', detailFields: [hours, website, description, m] })
+  const tj = makeListing({
+    id: '0b6c4c1e-2f55-4a8e-9d57-3b7f0d6f4a21',
+    name: 'Trader Joe’s',
+    address: '1324 Walnut St',
+    phone: '(215) 555-0100',
+    hours: { mon: { open: '09:00', close: '17:00' } },
+    m: ['Challah', 'Cheddar Cheese'],
+    googleDescription: 'A grocery.',
   })
-  afterEach(() => fetchMock.mockRestore())
+  const editsOff = { add: true, report: true, directorySearch: true, map: true, edit: false }
   const card = () => screen.getByTestId('listing-items')
-  const open = () => fireEvent.click(within(card()).getByRole('button', { name: 'Add an item' }))
-  const type = (text: string) => fireEvent.change(within(card()).getByLabelText('What did you see here?'), { target: { value: text } })
+  const editIn = (box: HTMLElement) => fireEvent.click(within(box).getByRole('button', { name: 'Edit' }))
 
-  it('is the list’s last row, and opens a box that suggests from the item names', () => {
+  it('the items: no "+ Add an item" row, Edit opens their list in the editor', () => {
     view({ item: tj, category: grocery })
-    const buttons = within(card()).getAllByRole('button')
-    expect(buttons[buttons.length - 1]).toHaveTextContent('Add an item')
-    open()
-    type('chee')
-    const box = screen.getByTestId('add-item')
-    expect(within(box).getByRole('button', { name: /Cheddar Cheese/ })).toHaveTextContent('Already here · tap to say it’s still here')
-    expect(within(box).getByRole('button', { name: 'Goat Cheese' })).toBeInTheDocument()
-    expect(within(box).getByRole('button', { name: 'Add “chee” as typed' })).toBeInTheDocument()
-    expect(box).toHaveTextContent('An admin checks it before everyone sees it.')
+    expect(within(card()).queryByRole('button', { name: /Add an item|Add the first/ })).not.toBeInTheDocument()
+    editIn(card())
+    const sheet = screen.getByRole('dialog', { name: 'Kosher items here' })
+    expect(within(sheet).getByTestId('editor-open-items')).toBeInTheDocument()
+    expect(within(sheet).getByRole('button', { name: 'No changes yet' })).toBeDisabled()
   })
 
-  it('picking an item the store has is its "Still here", not a second copy', async () => {
-    fetchMock.mockResolvedValueOnce(json({ ok: true, item: 'Cheddar Cheese', seenAt: '2026-10-09T17:30:00.000Z', previous: null, clearedGone: null, changed: true, activityId: 1 }))
+  it('every box has one: the contact box, About, the items', () => {
     view({ item: tj, category: grocery })
-    open()
-    type('chee')
-    fireEvent.click(within(screen.getByTestId('add-item')).getByRole('button', { name: /Cheddar Cheese/ }))
-    expect(fetchMock.mock.calls[0][0]).toBe(`/api/resource/${tj.id}/item`)
-    expect(await within(card()).findByText(/Thanks! Marked as seen today/)).toBeInTheDocument()
-    expect(screen.queryByTestId('add-item')).not.toBeInTheDocument()
+    for (const id of ['listing-items', 'listing-details', 'listing-about']) {
+      expect(within(screen.getByTestId(id)).getAllByRole('button', { name: 'Edit' })).toHaveLength(1)
+    }
   })
 
-  it('adds one for a check: shown to whoever added it, waiting, with no Undo (agreed Oct 1)', async () => {
-    // Even given an id to withdraw with, as the route once sent.
-    fetchMock.mockResolvedValueOnce(json({ ok: true, item: 'Goat Cheese', sometimes: true, submissionId: '9a6c4c1e-2f55-4a8e-9d57-3b7f0d6f4a99' }))
+  it('the contact box’s Edit is that box alone: its address, phone and hours, not the rest of the listing', () => {
     view({ item: tj, category: grocery })
-    open()
-    type('goat')
-    fireEvent.click(within(screen.getByTestId('add-item')).getByRole('button', { name: 'Goat Cheese' }))
-    fireEvent.click(within(card()).getByRole('checkbox', { name: 'Not always in stock' }))
-    fireEvent.click(within(card()).getByRole('button', { name: 'Add' }))
-    const added = await screen.findByTestId('listing-item-added')
-    expect(added).toHaveTextContent('Goat Cheesenot always in stockAdded by you · waiting for a check')
-    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit]
-    expect(url).toBe(`/api/resource/${tj.id}/item/add`)
-    expect(JSON.parse(String(init.body))).toMatchObject({ item: 'Goat Cheese', sometimes: true })
-    expect(within(added).queryByRole('button', { name: 'Undo' })).not.toBeInTheDocument()
+    editIn(screen.getByTestId('listing-details'))
+    const sheet = screen.getByRole('dialog', { name: 'Contact and hours' })
+    expect(within(sheet).getByLabelText('Address')).toHaveValue('1324 Walnut St')
+    expect(within(sheet).getByLabelText('Phone')).toHaveValue('(215) 555-0100')
+    expect(within(sheet).getByTestId('editor-open-hours')).toBeInTheDocument()
+    expect(within(sheet).queryByTestId('editor-open-about')).not.toBeInTheDocument()
+    expect(within(sheet).queryByTestId('editor-open-items')).not.toBeInTheDocument()
+    // Changing one thing is what Send counts.
+    fireEvent.change(within(sheet).getByLabelText('Phone'), { target: { value: '2155550199' } })
+    expect(within(sheet).getByRole('button', { name: 'Send 1 change' })).toBeEnabled()
   })
 
-  it('a place with nothing on its list yet leads with it, offering the first item; its hours are one line (agreed Oct 1)', () => {
+  it('About’s Edit is About alone', () => {
+    view({ item: tj, category: grocery })
+    editIn(screen.getByTestId('listing-about'))
+    const sheet = screen.getByRole('dialog', { name: 'About' })
+    expect(within(sheet).getByTestId('editor-open-about')).toBeInTheDocument()
+    expect(within(sheet).queryByLabelText('Address')).not.toBeInTheDocument()
+  })
+
+  it('is never the "+ Add" box: a category page’s box isn’t asked to open', () => {
+    const tell = vi.fn()
+    renderWithProviders(
+      <TellAboutContext.Provider value={tell}>
+        <ListingView item={tj} category={grocery} color="#2657bf" path="/philly/grocery/tj" foot={<p>foot</p>} />
+      </TellAboutContext.Provider>,
+    )
+    editIn(card())
+    editIn(screen.getByTestId('listing-details'))
+    expect(tell).not.toHaveBeenCalled()
+  })
+
+  it('a place with nothing on its list yet leads with the box, saying so, with Edit; its hours are one line', () => {
     view({ item: makeListing({ hours: { mon: { open: '09:00', close: '17:00' } } }), category: grocery })
-    expect(card()).toHaveTextContent(/^Kosher items here\s*Add the first item$/)
+    expect(card()).toHaveTextContent(/^Kosher items hereNone listed yet\.Edit$/)
     expect(screen.queryByTestId('listing-hours')).not.toBeInTheDocument()
     expect(screen.getByTestId('listing-details')).toHaveTextContent(/today/i)
     // The list comes before the details, as any main thing does.
     expect(card().compareDocumentPosition(screen.getByTestId('listing-details')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
-  // Oct 10: a restaurant with no dishes has just "Add their menu": the box,
-  // for the menu; its do-it-yourself opens the card's own one-dish box.
-  it('a place with no dishes offers just “Add their menu”, the box for it, one dish being its do-it-yourself', () => {
+  it('a place with no dishes: no “Add their menu”, just the box’s Edit', () => {
     const dishesCat = makeCategory({ id: 'restaurant', detailFields: [{ key: 'dishes', label: 'Main dishes', type: 'tags', renderAs: 'badge', showCountInHeader: true, countLabel: 'main dish' }] })
     const place = makeListing({ id: '7d0a7c1e-2f55-4a8e-9d57-3b7f0d6f4a21', name: 'Shtetl', category: 'restaurant' })
-    const tell = vi.fn()
-    renderWithProviders(
-      <TellAboutContext.Provider value={tell}>
-        <ListingView item={place} category={dishesCat} color="#2657bf" path="/philly/restaurant/shtetl" foot={<p>foot</p>} />
-      </TellAboutContext.Provider>,
-    )
-    expect(within(card()).queryByRole('button', { name: /Add the first/ })).not.toBeInTheDocument()
-    // Plain, as "+ Add their Shabbos times" is, not an outlined pill (Oct 10).
-    expect(within(card()).getByRole('button', { name: 'Add their menu' }).className).not.toMatch(/rounded-full|border/)
-    fireEvent.click(within(card()).getByRole('button', { name: 'Add their menu' }))
-    expect(tell).toHaveBeenCalledWith(place, expect.any(Function), { menu: true })
-    // Its do-it-yourself: the card's own box for one dish.
-    act(() => tell.mock.calls[0][1]())
-    expect(screen.getByTestId('add-item')).toBeInTheDocument()
+    view({ item: place, category: dishesCat })
+    expect(within(card()).queryByRole('button', { name: 'Add their menu' })).not.toBeInTheDocument()
+    editIn(card())
+    expect(within(screen.getByRole('dialog', { name: 'Main dishes' })).getByTestId('editor-open-items')).toBeInTheDocument()
   })
 
   it('where nobody can add to it, no empty list: the hours stay in the contact box', () => {
-    view({ item: makeListing({ hours: { mon: { open: '09:00', close: '17:00' } } }), category: { ...grocery, capabilities: { add: true, report: true, directorySearch: true, map: true, edit: false } } })
+    view({ item: makeListing({ hours: { mon: { open: '09:00', close: '17:00' } } }), category: { ...grocery, capabilities: editsOff } })
     expect(screen.queryByTestId('listing-hours')).not.toBeInTheDocument()
     expect(within(screen.getByTestId('listing-details')).getByRole('button', { name: /Today|Closed today/ })).toBeInTheDocument()
     expect(screen.queryByTestId('listing-items')).not.toBeInTheDocument()
   })
 
-  it('not offered where edits are off', () => {
-    view({ item: tj, category: { ...grocery, capabilities: { add: true, report: true, directorySearch: true, map: true, edit: false } } })
-    expect(within(card()).queryByRole('button', { name: 'Add an item' })).not.toBeInTheDocument()
+  it('no Edit anywhere where edits are off', () => {
+    view({ item: tj, category: { ...grocery, capabilities: editsOff } })
+    expect(screen.queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument()
   })
 })
