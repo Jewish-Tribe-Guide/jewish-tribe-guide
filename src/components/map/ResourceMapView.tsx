@@ -1,7 +1,7 @@
 'use client'
 
 import { track } from '@vercel/analytics'
-import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import ResourceMap, { type MapPoint } from './ResourceMap'
 import CategoryFilter, { type FilterOption } from './CategoryFilter'
 import CategoryPickerList from './CategoryPickerList'
@@ -11,6 +11,7 @@ import NearbyList from './NearbyList'
 import MapPlaceDetail from './MapPlaceDetail'
 import MobileNearbySheet, { type MobileNearbySheetHandle } from './MobileNearbySheet'
 import MapEruvDetail from './MapEruvDetail'
+import type { HostedEditor } from '@/components/resources/ListingEditor'
 import type { MapEruv } from './eruvLayer'
 import { useEruvMaps, useEruvStatuses } from '@/lib/useEruvStatuses'
 import { eruvView } from '@/lib/eruv'
@@ -380,14 +381,20 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // Also keeps selectedPointId (the marker-highlight id ResourceMap reads,
   // shared with mobile's own selection) in sync — set together, right where
   // the selection itself changes, rather than via a separate effect.
-  // Whether the sidebar's place is open in its editor. Keyed on the place's
-  // id so the flag can't outlive the place it was set for (a pin clicked
-  // mid-edit swaps the place without the editor reporting it closed).
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const desktopEditing = !isMobile && !!desktopSelected && editingId === desktopSelected.id
+  // The sidebar's place (or eruv) open in its editor: how to step back, what
+  // that step is called, and whether anything typed would be lost. Its ‹ is
+  // the ← in the search box (Oct 15). Keyed on the place's id so it can't
+  // outlive the place it was set for. Mirrored in a ref so leaveEditThen,
+  // reached through several handlers in one click, asks only once.
+  const [editor, setEditor] = useState<(HostedEditor & { id: string }) | null>(null)
+  const editorRef = useRef(editor)
+  useLayoutEffect(() => {
+    editorRef.current = editor
+  })
+  const desktopEditing = !isMobile && !!editor && editor.id === desktopSelected?.id
   const desktopSelectedId = desktopSelected?.id ?? null
-  const onPlaceEditingChange = useCallback(
-    (editing: boolean) => setEditingId(editing ? desktopSelectedId : null),
+  const onPlaceEditor = useCallback(
+    (next: HostedEditor | null) => setEditor(next && desktopSelectedId ? { ...next, id: desktopSelectedId } : null),
     [desktopSelectedId],
   )
   const setDesktopSelected = (p: SelectablePoint | null) => {
@@ -416,14 +423,32 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // only pop one of those: ✕ took you out of editing and left you on the
   // map. Unwind them first, one popstate at a time, then leave. Nothing
   // asks "discard?", the same as closing the listing dialog mid-edit.
+  const unwindEditorHistory = (then: () => void) => {
+    if (!(window.history.state as { mapSheetForm?: string } | null)?.mapSheetForm) return then()
+    window.addEventListener('popstate', () => unwindEditorHistory(then), { once: true })
+    window.history.back()
+  }
   const exitFullscreen = () => {
-    if (onExitFullscreenToListing && (window.history.state as { mapSheetForm?: string } | null)?.mapSheetForm) {
-      window.addEventListener('popstate', () => exitFullscreen(), { once: true })
-      window.history.back()
-      return
+    const leave = () => {
+      if (!standalone) setFullscreen(false)
+      onExitFullscreenToListing?.()
     }
-    if (!standalone) setFullscreen(false)
-    onExitFullscreenToListing?.()
+    if (onExitFullscreenToListing) unwindEditorHistory(leave)
+    else leave()
+  }
+  // Something else taking the sidebar mid-edit (a search, a pin, the map's
+  // background, an eruv): asks first if anything's been typed, then
+  // unwinds the editor's history entries — left behind, Back would land in
+  // an edit of whatever's showing by then — and only then does it. The ←
+  // and Escape step back without asking, as the editor's own ‹ always has;
+  // so does ✕ (exitFullscreen).
+  const leaveEditThen = (then: () => void) => {
+    const open = editorRef.current
+    if (!open) return then()
+    if (open.changed && !window.confirm('Discard your changes?')) return
+    editorRef.current = null
+    setEditor(null)
+    unwindEditorHistory(then)
   }
   // Re-forces fullscreen every time the standalone map screen becomes the
   // one on screen — not just its first mount. It stays mounted across tab
@@ -447,7 +472,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // (out of Request removal, then out of the edit), as its ‹ does — never
   // straight to the results, which dropped the edit without a word.
   const onEscape = useEffectEvent(() => {
-    if (desktopEditing) window.history.back()
+    if (desktopEditing) editor.back()
     else if (!isMobile && desktopSelected) setDesktopSelected(null)
     else exitFullscreen()
   })
@@ -507,18 +532,19 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // list/sidebar/search pick, so it stays on unless a caller opts out — see
   // the pin-tap handler passed to ResourceMap below, which is the one place
   // that does.
-  const selectPlace = (p: SelectablePoint, frame = true) => {
-    if (p.raw?.id && countCommunity) countEvent(countCommunity, 'listing_view', p.raw.id)
-    if (isMobile) nearbySheetRef.current?.selectPoint(p, frame)
-    else {
-      setDesktopSelected(p)
-      setSidebarCollapsed(false)
-      if (frame) setFrameToken((t) => t + 1)
-    }
-  }
+  const selectPlace = (p: SelectablePoint, frame = true) =>
+    leaveEditThen(() => {
+      if (p.raw?.id && countCommunity) countEvent(countCommunity, 'listing_view', p.raw.id)
+      if (isMobile) nearbySheetRef.current?.selectPoint(p, frame)
+      else {
+        setDesktopSelected(p)
+        setSidebarCollapsed(false)
+        if (frame) setFrameToken((t) => t + 1)
+      }
+    })
   const deselectPlace = () => {
     if (isMobile) nearbySheetRef.current?.deselectPoint()
-    else setDesktopSelected(null)
+    else leaveEditThen(() => setDesktopSelected(null))
   }
 
   // Press-and-hold a marker to toggle it Pinned, without opening its card —
@@ -640,7 +666,6 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
     if (!point) return
     restoredInitialPlace.current = isMobile ? 'phone' : 'desktop'
     if (retryOnPhone) setDesktopSelected(null)
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     selectPlace(point)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allPoints, standalone, initialPlaceId, isMobile])
@@ -821,27 +846,29 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // app does: picks the place directly if it's the one unambiguous match,
   // otherwise commits the query so the sheet shows the result list, dismisses
   // the dropdown, and closes the keyboard.
-  const submitSearch = () => {
-    if (searchSuggestions.length === 1) selectSuggestion(searchSuggestions[0])
-    else commitQuery(input)
-    setSearchFocused(false)
-    mobileSearchInputRef.current?.blur()
-    desktopSearchInputRef.current?.blur()
-  }
+  const submitSearch = () =>
+    leaveEditThen(() => {
+      if (searchSuggestions.length === 1) selectSuggestion(searchSuggestions[0])
+      else commitQuery(input)
+      setSearchFocused(false)
+      mobileSearchInputRef.current?.blur()
+      desktopSearchInputRef.current?.blur()
+    })
 
   // Clearing the search (the × button) resets the sheet/sidebar back to its
   // normal browsing state — same as Google Maps: the selected place/result
   // list disappears and the sheet collapses — and does NOT refocus the
   // input, so the keyboard stays down until the visitor deliberately taps
   // the search box again.
-  const clearSearch = () => {
-    clearQuery()
-    setSearchFocused(false)
-    mobileSearchInputRef.current?.blur()
-    desktopSearchInputRef.current?.blur()
-    if (isMobile) nearbySheetRef.current?.collapse()
-    else setDesktopSelected(null)
-  }
+  const clearSearch = () =>
+    leaveEditThen(() => {
+      clearQuery()
+      setSearchFocused(false)
+      mobileSearchInputRef.current?.blur()
+      desktopSearchInputRef.current?.blur()
+      if (isMobile) nearbySheetRef.current?.collapse()
+      else setDesktopSelected(null)
+    })
 
   // The committed query filters as one phrase (not per-word AND terms) —
   // except "open now", which is its own predicate (openNowActive above), not
@@ -1238,8 +1265,10 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
       // Reacting to a commit (query/filter), not a render value — there's no
       // single non-effect call site for this, since commits land via several
       // different handlers (submitSearch, toggleBoolField, toggleSelectValue, ...).
+      // Not mid-edit: a chip toggled beside the editor leaves it open (a
+      // search asks first, and has closed it by the time it commits).
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      setDesktopSelected(visiblePoints.length === 1 ? visiblePoints[0] : null)
+      if (!desktopEditing) setDesktopSelected(visiblePoints.length === 1 ? visiblePoints[0] : null)
       setSidebarCollapsed(false)
     }
     // A reading arriving is a commit too: it changes what answers.
@@ -1519,12 +1548,14 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
             magnifier sits (Oct 15, board "A", as Google Maps does). It sits
             on the panel it acts on, so it can't read as leaving the map —
             that's the ✕ in the corner — and replaces the "‹ Back to list"
-            line that used to sit under the search. */}
+            line that used to sit under the search. While editing, it's the
+            editor's ‹ too, one step back at a time like Escape: out of an
+            open row, then out of the edit, then to the results. */}
         {desktopSelected ? (
           <button
             type="button"
-            onClick={() => setDesktopSelected(null)}
-            aria-label="Back to results"
+            onClick={() => (desktopEditing ? editor.back() : setDesktopSelected(null))}
+            aria-label={desktopEditing ? editor.label : 'Back to results'}
             className="-my-1.5 -ml-2 flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-full text-slate-700 transition-colors hover:bg-slate-100 active:bg-slate-200"
           >
             <ArrowLeftIcon className="h-[18px] w-[18px]" />
@@ -1728,10 +1759,11 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
     const p: SelectablePoint = { id: `${ERUV_PREFIX}${id}`, lat: at[0], lng: at[1], name: e.name, color: colorById.get(eruvCategory?.id ?? '') ?? '#64748b', filterId: ERUV_FILTER_ID }
     // Opened where it's tapped: the map stays where the visitor put it.
     if (isMobile) nearbySheetRef.current?.selectPoint(p, false)
-    else {
-      setDesktopSelected(p)
-      setSidebarCollapsed(false)
-    }
+    else
+      leaveEditThen(() => {
+        setDesktopSelected(p)
+        setSidebarCollapsed(false)
+      })
   }
   // A link to an open eruv (?place=eruv:center-city) opens it again, with
   // the layer on, once the eruvim have arrived (their fetch outlasts the
@@ -1744,14 +1776,19 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
     openEruv(initialPlaceId.slice(ERUV_PREFIX.length))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eruvimWithLines, standalone, initialPlaceId])
+  // Turning the layer off closes the eruv open in it, so mid-edit that
+  // asks first too, and a No leaves both the layer and the edit as they were.
   const toggleEruvim = () => {
-    if (eruvimOn && openEruvId) deselectPlace()
-    setEruvimOn(!eruvimOn)
+    if (!eruvimOn || !openEruvId) return setEruvimOn(!eruvimOn)
+    leaveEditThen(() => {
+      deselectPlace()
+      setEruvimOn(false)
+    })
   }
-  const eruvDetail = (id: string, onBack?: () => void, onEditingChange?: (editing: boolean) => void) => {
+  const eruvDetail = (id: string, onBack?: () => void, onEditor?: (editor: HostedEditor | null) => void) => {
     const e = eruvData?.eruvim.find((x) => x.id === id)
     if (!e || !eruvData || clock === null) return null
-    return <MapEruvDetail eruv={e} color={colorById.get(eruvCategory?.id ?? '') ?? '#64748b'} now={new Date(clock)} timezone={eruvData.timezone} candles={eruvData.candles} onBack={onBack} onEditingChange={onEditingChange} />
+    return <MapEruvDetail eruv={e} color={colorById.get(eruvCategory?.id ?? '') ?? '#64748b'} now={new Date(clock)} timezone={eruvData.timezone} candles={eruvData.candles} onBack={onBack} onEditor={onEditor} />
   }
   // ── Filters: one button, one sheet, the chips of what's on ───────────────
   // The categories showing, in the chip row's order: the sheet's sections.
@@ -2048,7 +2085,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                 // No "Back to list" in here: the ← in the search box above
                 // is the way back on a computer (Oct 15).
                 (desktopSelected?.filterId === ERUV_FILTER_ID && eruvDetail(desktopSelected.id.slice(ERUV_PREFIX.length)) ? (
-                  sidebarScroll(desktopSelected.id, eruvDetail(desktopSelected.id.slice(ERUV_PREFIX.length), undefined, onPlaceEditingChange))
+                  sidebarScroll(desktopSelected.id, eruvDetail(desktopSelected.id.slice(ERUV_PREFIX.length), undefined, onPlaceEditor))
                 ) : desktopSelected && desktopSelected.raw && desktopSelectedCategory ? (
                   sidebarScroll(
                     `place:${desktopSelected.id}`,
@@ -2057,7 +2094,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                       category={desktopSelectedCategory}
                       color={desktopSelected.color}
                       found={foundOnPoint(desktopSelected.raw.id)}
-                      onEditingChange={onPlaceEditingChange}
+                      onEditor={onPlaceEditor}
                     />,
                   )
                 ) : (
@@ -2182,10 +2219,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                 transition: isDraggingSidebar ? 'none' : 'width 200ms ease-in-out',
               }}
             >
-              {/* Not while editing a place: its ← would be a second
-                  back beside the editor's own ‹ (Oct 15). The listing
-                  column hides its bar while editing for the same reason. */}
-              {!desktopEditing && desktopSearchForm}
+              {desktopSearchForm}
             </div>
           )}
 
@@ -2256,7 +2290,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                 // unselecting it, same as tapping its pin again would — the
                 // card goes away AND the pin stops reading as selected
                 // (collapse clears `selected`, not just the sheet's height).
-                onBackgroundClick={() => (isMobile ? nearbySheetRef.current?.collapse() : setDesktopSelected(null))}
+                onBackgroundClick={() => (isMobile ? nearbySheetRef.current?.collapse() : leaveEditThen(() => setDesktopSelected(null)))}
                 onMapLongPress={ui.map.pins ? (coords) => setPendingDropAt(coords) : undefined}
                 onLongPressPoint={ui.map.pins ? handleLongPressPoint : undefined}
                 searchActive={searchActive}
@@ -2332,9 +2366,12 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                       in the boxed state: the header is `sticky top-0` (see
                       SiteHeader.tsx) and stays visible above a boxed map, so
                       its own LocationControl pill is already reachable there
-                      and a second copy would be redundant. ─────────────────── */}
+                      and a second copy would be redundant. Ends where the
+                      chip row above it ends (right-16), not at the map's
+                      edge: the corner's own column is the ✕ (or the
+                      fullscreen toggle) alone (Oct 15). ─────────────────── */}
               {!isMobile && fullscreen && controls && (
-                <div className="absolute right-3 top-14 z-20 hidden desktop:block">
+                <div data-testid="map-location-control" className="absolute right-16 top-14 z-20 hidden desktop:block">
                   <LocationControl controls={controls} />
                 </div>
               )}

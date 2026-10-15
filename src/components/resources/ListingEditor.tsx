@@ -55,6 +55,11 @@ import { ChangedTag, EditorAddLine, EditorEmptyRows, EditorOpenCard, EditorRowCa
  *  is has none, the header keeps its own, and Back closes the row. */
 export type EditorStep = { title?: string; back: () => void }
 
+/** An editor whose host draws its way back (the desktop map's sidebar, in
+ *  its search box): one step back, what that step is called, and whether
+ *  anything's been changed and not yet sent. */
+export type HostedEditor = { back: () => void; label: string; changed: boolean }
+
 type Props = {
   /** The listing being edited. Omitted, the editor adds a new one, starting
    *  from `draft` (a Google pick, see ListingAdd) or empty. */
@@ -93,6 +98,9 @@ type Props = {
    *  box's own Edit (BoxEditSheet, Oct 15), the listing's other boxes
    *  left out. */
   onlyRows?: readonly string[]
+  /** Whether anything's been changed and not yet sent, for a host that
+   *  asks before something else takes the editor's place (the desktop map). */
+  onHasChanges?: (has: boolean) => void
 }
 
 type Lookalike = { listing: DirectoryResource; reason: string }
@@ -204,6 +212,7 @@ export default function ListingEditor({
   onSent,
   adminSubmit,
   onlyRows,
+  onHasChanges,
 }: Props) {
   // Adding: a blank listing stands in for `item`, so the reads below don't
   // each need a guard; `creating` switches off what only makes sense for an
@@ -303,6 +312,12 @@ export default function ListingEditor({
   const withIds = (list: Minyan[]) => list.map((m, i) => (m.id || !ids[i] ? m : { ...m, id: ids[i] }))
   const storedMinyanim = (key: string) => withIds(isMinyanim(item[key]) ? (item[key] as Minyan[]) : [])
   const draftMinyanim = (key: string) => withIds(isMinyanim(details[key]) ? (details[key] as Minyan[]) : [])
+
+  // Only an edit counts: an empty Add has nothing of anyone's to lose.
+  const hasChanges = !creating && !sender.done && rows.some((r) => rowChanged(r, item, values))
+  useEffect(() => {
+    onHasChanges?.(hasChanges)
+  }, [hasChanges, onHasChanges])
 
   // ── Sent ──────────────────────────────────────────────────────────────
   if (sender.done) {

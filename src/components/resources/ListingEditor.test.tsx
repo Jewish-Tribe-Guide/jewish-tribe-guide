@@ -210,6 +210,22 @@ describe('ListingEditor — what’s changed', () => {
     expect(sendButton()).toHaveTextContent('No changes yet')
   })
 
+  // For a host that asks before something else takes the editor's place
+  // (the desktop map, Oct 15): only when there's something to lose.
+  it('tells onHasChanges whether anything differs from the listing as it is', async () => {
+    const u = user()
+    const onHasChanges = vi.fn()
+    renderEditor({ onHasChanges })
+    expect(onHasChanges).toHaveBeenLastCalledWith(false)
+
+    await u.click(row('facts'))
+    await u.click(within(screen.getByTestId('editor-open-facts')).getByRole('button', { name: 'Dairy' }))
+    expect(onHasChanges).toHaveBeenLastCalledWith(true)
+
+    await u.click(within(screen.getByTestId('editor-open-facts')).getByRole('button', { name: 'Dairy' }))
+    expect(onHasChanges).toHaveBeenLastCalledWith(false)
+  })
+
   it('a hechsher’s caveat: No asks what isn’t kosher, and the row says so', async () => {
     const u = user()
     renderEditor()

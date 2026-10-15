@@ -1,9 +1,10 @@
 'use client'
 
-import { useCallback, useState } from 'react'
+import { useState } from 'react'
 import BackIconButton from '@/components/BackIconButton'
 import { EruvListing } from '@/components/resources/EruvListing'
 import type { Eruv } from '@/lib/eruv'
+import type { HostedEditor } from '@/components/resources/ListingEditor'
 
 /** An eruv opened on the guide's map: its listing, as the Eruv page shows
  *  it, in the sheet or sidebar a place opens in, with the same way back. */
@@ -14,7 +15,7 @@ export default function MapEruvDetail({
   timezone,
   candles,
   onBack,
-  onEditingChange,
+  onEditor,
 }: {
   eruv: Eruv
   color: string
@@ -22,20 +23,13 @@ export default function MapEruvDetail({
   timezone: string
   candles: number | null
   onBack?: () => void
-  /** Whether its edit form is open, for the desktop sidebar to step its
-   *  search box aside, as it does for a place's. */
-  onEditingChange?: (editing: boolean) => void
+  /** Its edit form, while open, for the desktop sidebar to step back from
+   *  with the ← in its search box, as it does for a place's. */
+  onEditor?: (editor: HostedEditor | null) => void
 }) {
   // While editing, the editor's own ‹ is the way back; a "Back to list"
   // above it would be a second one.
   const [editing, setEditing] = useState(false)
-  const reportEditing = useCallback(
-    (next: boolean) => {
-      setEditing(next)
-      onEditingChange?.(next)
-    },
-    [onEditingChange],
-  )
   return (
     <div data-testid="map-eruv-detail">
       {/* The phone's sheet only: the desktop sidebar's way back is the ←
@@ -45,7 +39,7 @@ export default function MapEruvDetail({
           <BackIconButton label="Back to list" onClick={onBack} />
         </div>
       )}
-      <EruvListing eruv={eruv} color={color} now={now} timezone={timezone} candles={candles} onEditingChange={reportEditing} />
+      <EruvListing eruv={eruv} color={color} now={now} timezone={timezone} candles={candles} onEditingChange={setEditing} onEditor={onEditor} />
     </div>
   )
 }

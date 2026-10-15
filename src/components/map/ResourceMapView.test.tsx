@@ -1243,6 +1243,16 @@ describe('ResourceMapView — the map’s own location control', () => {
     expect(screen.getByRole('button', { name: '1 Main St' })).toBeInTheDocument()
   })
 
+  // Oct 15: in the top-right corner it crowded the ✕; it ends where the
+  // chip row does, clear of the ✕ (right-3, a 10 wide button).
+  it('sits in from the corner, clear of the ✕, ending where the chip row ends', () => {
+    renderFullscreen(mapControls())
+    const control = screen.getByTestId('map-location-control')
+    expect(control).toContainElement(screen.getByRole('button', { name: 'Set location' }))
+    expect(control.className).toMatch(/\bright-16\b/)
+    expect(control.className).not.toMatch(/\bright-3\b/)
+  })
+
   it('renders nothing for a caller with no location to set (the admin preview map)', () => {
     renderFullscreen(undefined)
     expect(screen.queryByRole('button', { name: 'Set location' })).not.toBeInTheDocument()
@@ -1369,21 +1379,146 @@ describe('ResourceMapView — standalone map Escape/exit', () => {
   })
 
   // Oct 15: editing a place showed two backs side by side, the search
-  // box's ← and the editor's own ‹. While editing, the search box steps
-  // aside (as the listing column hides its bar) and the ‹ is the only one.
-  it('editing a place: the search box and its ← step aside, leaving the editor\u2019s ‹ the only back', async () => {
+  // box's ← and the editor's own ‹. Hiding the search box instead moved the
+  // way back about and took search away; now the search box stays, its ←
+  // is the only back, and it steps back one level, as Escape does.
+  it('editing a place: the search box stays, and its ← steps back one level at a time', async () => {
     const user = userEvent.setup()
     renderStandalone(vi.fn())
     await user.click(screen.getByRole('button', { name: /^Select / }))
     await user.click(await screen.findByRole('button', { name: 'Edit listing' }))
 
-    expect(screen.queryByPlaceholderText(/Search name, address/)).not.toBeInTheDocument()
+    const search = screen.getByPlaceholderText(/Search name, address/)
+    const back = await screen.findByRole('button', { name: 'Back to listing' })
+    expect(back.closest('form')).toContainElement(search)
+    // No ‹ beside "Edit listing": one arrow on screen.
+    expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Back to results' })).not.toBeInTheDocument()
-    expect(screen.getAllByRole('button', { name: 'Back' })).toHaveLength(1)
 
+    // A row open, the ← closes it and the edit stays.
+    await user.click(screen.getByTestId('editor-row-name'))
+    expect(screen.getByTestId('editor-open-name')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Back' }))
-    expect(await screen.findByRole('button', { name: 'Back to results' })).toBeInTheDocument()
+    expect(screen.queryByTestId('editor-open-name')).not.toBeInTheDocument()
+    expect(screen.getByTestId('editor-list')).toBeInTheDocument()
+
+    // Then out of the edit, to the listing; then to the results.
+    await user.click(screen.getByRole('button', { name: 'Back to listing' }))
+    expect(await screen.findByRole('button', { name: 'Edit listing' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Back to results' }))
+    expect(screen.queryByRole('button', { name: 'Edit listing' })).not.toBeInTheDocument()
     expect(screen.getByPlaceholderText(/Search name, address/)).toBeInTheDocument()
+  })
+
+  // With the search box there mid-edit, a search or another pin would drop
+  // what's been typed without a word; it asks first, and only if anything
+  // has been typed.
+  describe('leaving an edit for something else', () => {
+    function renderTwo() {
+      return renderMap(
+        <HeaderCollapseProvider>
+          <ResourceMapView onUp={vi.fn()} standalone visible />
+        </HeaderCollapseProvider>,
+        [listingWithGeo({ id: 'a1', category: 'grocery', name: 'Acme Grocery' }), listingWithGeo({ id: 'b2', category: 'grocery', name: 'Best Grocery' }), listingWithGeo({ id: 's3', category: 'synagogue', name: 'Beth Shul' })],
+        // Two, and one keeping hours, so there's an Open now to switch on.
+        [makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores', detailFields: [HOURS] }), makeCategory({ id: 'synagogue', pluralLabel: 'Synagogues' })],
+      )
+    }
+    const formState = () => (window.history.state as { mapSheetForm?: string } | null)?.mapSheetForm
+    async function editWithChange(user: ReturnType<typeof userEvent.setup>) {
+      await user.click(screen.getByRole('button', { name: 'Select Acme Grocery' }))
+      await user.click(await screen.findByRole('button', { name: 'Edit listing' }))
+      await user.click(screen.getByTestId('editor-row-name'))
+      const name = within(screen.getByTestId('editor-open-name')).getAllByRole('textbox')[0]
+      await user.clear(name)
+      await user.type(name, 'Acme Market')
+    }
+    afterEach(() => {
+      vi.restoreAllMocks()
+      window.history.replaceState(null, '', '/test-community/map')
+    })
+
+    it('another pin, with something typed: asks, and No keeps the edit', async () => {
+      const user = userEvent.setup()
+      const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
+      renderTwo()
+      await editWithChange(user)
+
+      await user.click(screen.getByRole('button', { name: 'Select Best Grocery' }))
+
+      expect(confirm).toHaveBeenCalledWith('Discard your changes?')
+      expect(screen.getByTestId('editor-open-name')).toBeInTheDocument()
+      expect(formState()).toBe('edit')
+    })
+
+    it('another pin, with something typed: Yes drops the edit and opens the pin, its history unwound', async () => {
+      const user = userEvent.setup()
+      const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true)
+      renderTwo()
+      await editWithChange(user)
+
+      await user.click(screen.getByRole('button', { name: 'Select Best Grocery' }))
+
+      expect(confirm).toHaveBeenCalledTimes(1)
+      await waitFor(() => expect(screen.getByRole('link', { name: 'Best Grocery' })).toBeInTheDocument())
+      expect(screen.queryByTestId('editor-list')).not.toBeInTheDocument()
+      expect(formState()).toBeUndefined()
+    })
+
+    it('a search, with something typed: asks, and No keeps the edit', async () => {
+      const user = userEvent.setup()
+      const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
+      renderTwo()
+      await editWithChange(user)
+
+      await user.type(screen.getByPlaceholderText(/Search name, address/), 'Best{Enter}')
+
+      expect(confirm).toHaveBeenCalledWith('Discard your changes?')
+      expect(screen.getByTestId('editor-open-name')).toBeInTheDocument()
+    })
+
+    it('nothing typed: no question, and the edit\u2019s history is unwound all the same', async () => {
+      const user = userEvent.setup()
+      const confirm = vi.spyOn(window, 'confirm')
+      renderTwo()
+      await user.click(screen.getByRole('button', { name: 'Select Acme Grocery' }))
+      await user.click(await screen.findByRole('button', { name: 'Edit listing' }))
+      expect(formState()).toBe('edit')
+
+      await user.click(screen.getByRole('button', { name: 'Select Best Grocery' }))
+
+      expect(confirm).not.toHaveBeenCalled()
+      await waitFor(() => expect(screen.getByRole('link', { name: 'Best Grocery' })).toBeInTheDocument())
+      expect(formState()).toBeUndefined()
+    })
+
+    it('the ← with something typed: no question, it\u2019s a step back, not something else', async () => {
+      const user = userEvent.setup()
+      const confirm = vi.spyOn(window, 'confirm')
+      renderTwo()
+      await editWithChange(user)
+
+      await user.click(screen.getByRole('button', { name: 'Back' }))
+      await user.click(screen.getByRole('button', { name: 'Back to listing' }))
+
+      expect(confirm).not.toHaveBeenCalled()
+      expect(await screen.findByRole('button', { name: 'Edit listing' })).toBeInTheDocument()
+    })
+
+    // A filter is a commit, which on desktop closes the open place to show
+    // the results; mid-edit it leaves the edit be (Oct 15).
+    it('a filter switched on mid-edit leaves the edit open', async () => {
+      const user = userEvent.setup()
+      renderTwo()
+      await editWithChange(user)
+
+      await user.click(screen.getByTestId('map-filters-button'))
+      await user.click(within(screen.getByTestId('map-filters-grocery')).getByRole('switch', { name: 'Open now' }))
+      expect(screen.getByTestId('map-filters-button')).toHaveAccessibleName('Filters, 1 on')
+
+      expect(screen.getByTestId('editor-open-name')).toBeInTheDocument()
+      expect(formState()).toBe('edit')
+    })
   })
 
   // Oct 15: ✕ mid-edit only closed the editor. The editor's own history
@@ -1869,9 +2004,9 @@ describe('ResourceMapView — eruv lines', () => {
     expect(screen.getByTestId('eruv-selected')).toHaveTextContent('')
   })
 
-  // As for a place (Oct 15): editing an eruv, the search box and its ←
-  // step aside, so the editor's ‹ is the only back.
-  it('editing an eruv in the sidebar: the search box steps aside, the editor\u2019s ‹ the only back', async () => {
+  // As for a place (Oct 15): editing an eruv, the search box stays and its
+  // ← is the way back, with no ‹ beside the editor's title.
+  it('editing an eruv in the sidebar: the search box stays, its ← back to the eruv', async () => {
     renderMap(<ResourceMapView onUp={() => {}} />, store, withEruvPage)
     fireEvent.click(await eruvSwitch())
     fireEvent.click(screen.getByRole('button', { name: 'Eruv Center City Eruv green' }))
@@ -1879,9 +2014,14 @@ describe('ResourceMapView — eruv lines', () => {
     fireEvent.click(within(detail).getByRole('button', { name: 'Edit listing' }))
 
     expect(await screen.findByTestId('eruv-editing')).toBeInTheDocument()
+    expect(screen.getByPlaceholderText(/Search name, address/)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Back to results' })).not.toBeInTheDocument()
-    expect(screen.queryByPlaceholderText(/Search name, address/)).not.toBeInTheDocument()
-    expect(screen.getAllByRole('button', { name: 'Back' })).toHaveLength(1)
+    expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Back to listing' }))
+    await waitFor(() => expect(screen.queryByTestId('eruv-editing')).not.toBeInTheDocument())
+    expect(screen.getByTestId('map-eruv-detail')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Back to results' })).toBeInTheDocument()
   })
 
   it('turning the lines off closes an open eruv', async () => {

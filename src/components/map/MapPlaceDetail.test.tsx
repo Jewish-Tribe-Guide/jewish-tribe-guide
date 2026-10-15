@@ -28,6 +28,7 @@ vi.mock('@/components/resources/ListingEditor', async () => {
       onRemovalOpenChange,
       removalOpen,
       onStep,
+      onHasChanges,
       sendSlot,
       titleSlot,
     }: {
@@ -36,6 +37,7 @@ vi.mock('@/components/resources/ListingEditor', async () => {
       onRemovalOpenChange?: (open: boolean) => void
       removalOpen?: boolean
       onStep?: (step: { title: string; back: () => void } | null) => void
+      onHasChanges?: (has: boolean) => void
       sendSlot?: HTMLElement | null
       titleSlot?: HTMLElement | null
     }) => (
@@ -45,6 +47,8 @@ vi.mock('@/components/resources/ListingEditor', async () => {
         {/* Stands in for opening one of the editor's rows. */}
         <button onClick={() => onStep?.({ title: 'Kosher', back: () => onStep(null) })}>stub open row</button>
         <button onClick={onClose}>stub cancel</button>
+        {/* Stands in for typing something into it. */}
+        <button onClick={() => onHasChanges?.(true)}>stub type</button>
         {/* Stands in for the editor's Request removal link, for tests that
             prove the HOST's title reacts to it. */}
         <button onClick={() => onRemovalOpenChange?.(true)}>stub open removal</button>
@@ -335,6 +339,42 @@ describe('MapPlaceDetail', () => {
     await user.click(screen.getByRole('button', { name: 'Back' }))
     expect(back).toHaveBeenCalledTimes(1)
     back.mockRestore()
+  })
+
+  // The desktop map's sidebar (Oct 15): its search box's ← is the editor's
+  // way back, so the editor's own ‹ is left out, and the host hears how to
+  // step back, what to call it, and whether anything typed would be lost.
+  it('hands its way back to a host that draws it (onEditor), and leaves out its own ‹', async () => {
+    const userEvent = (await import('@testing-library/user-event')).default
+    const user = userEvent.setup()
+    const onEditor = vi.fn()
+    const last = () => onEditor.mock.calls.at(-1)?.[0] as { back: () => void; label: string; changed: boolean } | null
+    renderWithProviders(
+      <PinnedProvider>
+        <MapPlaceDetail item={makeListing({ name: 'Goldi Market' })} category={makeCategory()} color="#000" onEditor={onEditor} />
+      </PinnedProvider>,
+    )
+    expect(last() ?? null).toBeNull()
+
+    await user.click(screen.getByRole('button', { name: 'Edit listing' }))
+    expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument()
+    expect(last()).toMatchObject({ label: 'Back to listing', changed: false })
+
+    await user.click(screen.getByRole('button', { name: 'stub type' }))
+    expect(last()).toMatchObject({ changed: true })
+
+    // A row open, it's a step inside the edit; back closes the row.
+    await user.click(screen.getByRole('button', { name: 'stub open row' }))
+    expect(last()).toMatchObject({ label: 'Back' })
+    const historyBack = vi.spyOn(window.history, 'back').mockImplementation(() => {})
+    act(() => last()!.back())
+    expect(historyBack).not.toHaveBeenCalled()
+    expect(last()).toMatchObject({ label: 'Back to listing' })
+
+    // From the edit itself, out to the listing.
+    act(() => last()!.back())
+    expect(historyBack).toHaveBeenCalledTimes(1)
+    historyBack.mockRestore()
   })
 
   // Save, Share and Set as location aren't contributions — so a category

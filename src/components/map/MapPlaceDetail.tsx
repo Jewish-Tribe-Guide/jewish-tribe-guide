@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import type { DirectoryResource } from '@/types'
 import { resolveCapabilities, type CategoryConfig } from '@/lib/categories'
 import ListingView, { type Onward } from '@/components/resources/ListingView'
@@ -18,7 +18,7 @@ import UpvoteButton from '@/components/resources/UpvoteButton'
 // The editor (address lookup, hours, photos) loads when editing starts, not
 // with the listing, so the Map page's code stays light.
 const ListingEditor = dynamic(() => import('@/components/resources/ListingEditor'), { loading: () => null })
-import type { EditorStep } from '@/components/resources/ListingEditor'
+import type { EditorStep, HostedEditor } from '@/components/resources/ListingEditor'
 
 type Props = {
   item: DirectoryResource
@@ -51,6 +51,11 @@ type Props = {
   /** Whether the editor has taken the listing's place, for a host whose
    *  own controls are about the listing (ListingColumn's back and ‹ ›). */
   onEditingChange?: (editing: boolean) => void
+  /** The desktop map's sidebar, whose ← in the search box is the editor's
+   *  way back (Oct 15): given, the editor's own ‹ is left out, and this
+   *  hears how to step back, and whether anything typed would be lost —
+   *  null when the listing is showing. */
+  onEditor?: (editor: HostedEditor | null) => void
 }
 
 /**
@@ -67,7 +72,7 @@ type Props = {
  * can be corrected and recommended, the same whether you found it here or in
  * the category directory.
  */
-export default function MapPlaceDetail({ item, category, color, onBack, found, upvote, place = null, onward, wide = false, onwardClassName, titleAs, onEditingChange }: Props) {
+export default function MapPlaceDetail({ item, category, color, onBack, found, upvote, place = null, onward, wide = false, onwardClassName, titleAs, onEditingChange, onEditor }: Props) {
   const community = useCommunitySlug()
   const listingPath = routes.listing(community, category.id, listingSlug(item))
   // Edit swaps this whole detail view for the listing-shaped editor
@@ -91,6 +96,8 @@ export default function MapPlaceDetail({ item, category, color, onBack, found, u
   // there), not out of editing altogether. It has no Cancel of its own.
   // Same as the desktop dialog (ListingDetailModal).
   const [removalOpen, setRemovalOpen] = useState(false)
+  // Whether the editor holds anything typed and not yet sent.
+  const [changed, setChanged] = useState(false)
   useEffect(() => {
     function onPopState(e: PopStateEvent) {
       const state = e.state as { mapSheetForm?: 'edit'; mapSheetRemoval?: boolean } | null
@@ -103,6 +110,7 @@ export default function MapPlaceDetail({ item, category, color, onBack, found, u
   }, [])
   const openForm = (mode: 'edit') => {
     history.pushState({ ...(window.history.state ?? {}), mapSheetForm: mode }, '')
+    setChanged(false)
     setFormOpen(mode)
   }
   // One step back: from removal to the edit, from the edit to the listing.
@@ -121,6 +129,7 @@ export default function MapPlaceDetail({ item, category, color, onBack, found, u
   // history entry, so Back returns to the listing.
   const openRemoval = () => {
     history.pushState({ ...(window.history.state ?? {}), mapSheetForm: 'edit', mapSheetRemoval: true }, '')
+    setChanged(false)
     setFormOpen('edit')
     setRemovalOpen(true)
   }
@@ -128,6 +137,21 @@ export default function MapPlaceDetail({ item, category, color, onBack, found, u
   // that, not the editor.
   const [editorStep, setEditorStep] = useState<EditorStep | null>(null)
   const back = () => (editorStep ? editorStep.back() : stepBack())
+  // Handed to a host that draws the back itself: a function that stays
+  // the same, calling whichever back is current.
+  const backRef = useRef(back)
+  useLayoutEffect(() => {
+    backRef.current = back
+  })
+  const hostedBack = useCallback(() => backRef.current(), [])
+  // Out of a row or Request removal, a step inside the edit; from the
+  // edit itself, the listing.
+  const backLabel = editorStep || removalOpen ? 'Back' : 'Back to listing'
+  useEffect(() => {
+    if (!onEditor) return
+    onEditor(formOpen ? { back: hostedBack, label: backLabel, changed } : null)
+  }, [onEditor, formOpen, hostedBack, backLabel, changed])
+  useEffect(() => () => onEditor?.(null), [onEditor])
   // Opening or closing the form swaps everything inside the parent's scroll
   // region, and that region stays mounted, so it would keep its offset: the
   // bar is the LAST thing in the listing, so the form typically opened
@@ -160,11 +184,11 @@ export default function MapPlaceDetail({ item, category, color, onBack, found, u
             already on. The editor's title goes
             in the middle of the same row, as it does between the desktop
             dialog's Back and Close; the empty third column keeps it
-            centred. */}
+            centred. Left out where the host draws the back (onEditor):
+            the desktop sidebar's ← in its search box, one arrow on screen
+            and always in the same place (Oct 15). */}
         <div className="mb-3 grid grid-cols-[1fr_auto_1fr] items-center gap-2">
-          <span>
-            <BackIconButton onClick={back} />
-          </span>
+          <span>{!onEditor && <BackIconButton onClick={back} />}</span>
           <div ref={setTitleSlot} className="min-w-0 text-center text-base" />
         </div>
         <ListingEditor
@@ -175,6 +199,7 @@ export default function MapPlaceDetail({ item, category, color, onBack, found, u
           removalOpen={removalOpen}
           onRemovalOpenChange={changeRemovalOpen}
           onStep={setEditorStep}
+          onHasChanges={setChanged}
         />
       </div>
     )

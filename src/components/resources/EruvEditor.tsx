@@ -1,6 +1,6 @@
 'use client'
 
-import { useId, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import type { Eruv } from '@/lib/eruv'
 import { ERUV_SUGGESTION_FIELDS, eruvChanges, type EruvSuggestionField } from '@/lib/eruvSuggestion'
 import { useCommunitySlug } from '@/lib/communityContext'
@@ -24,7 +24,13 @@ import { EditorSent, editorFieldLabel, editorInputClass, sendChangesLabel } from
 
 type Values = Record<EruvSuggestionField, string>
 
-export default function EruvEditor({ eruv, onClose }: { eruv: Eruv; onClose: () => void }) {
+export default function EruvEditor({ eruv, onClose, onHasChanges }: {
+  eruv: Eruv
+  onClose: () => void
+  /** Whether anything's been changed and not yet sent, for a host that
+   *  asks before something else takes the editor's place (the desktop map). */
+  onHasChanges?: (has: boolean) => void
+}) {
   const uid = useId()
   const community = useCommunitySlug()
   const [values, setValues] = useState<Values>(() => ({ covers: eruv.covers ?? '', website: eruv.website ?? '', hotline: eruv.hotline ?? '', alertsUrl: eruv.alertsUrl ?? '' }))
@@ -36,6 +42,10 @@ export default function EruvEditor({ eruv, onClose }: { eruv: Eruv; onClose: () 
   const [errors, setErrors] = useState<string[]>([])
 
   const changes = eruvChanges(eruv, Object.fromEntries(Object.entries(values).map(([k, v]) => [k, v.trim() || null]))).length
+  const hasChanges = !sent && changes > 0
+  useEffect(() => {
+    onHasChanges?.(hasChanges)
+  }, [hasChanges, onHasChanges])
   // In the admin's category Preview, Send files nothing and there's no
   // check to pass (see previewSend.tsx).
   const fetchOrPreview = useFetchOrPreview()

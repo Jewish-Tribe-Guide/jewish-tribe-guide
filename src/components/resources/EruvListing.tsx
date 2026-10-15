@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import type { HostedEditor } from './ListingEditor'
 import dynamic from 'next/dynamic'
 import { GlobeIcon, MailIcon, PencilIcon, PhoneIcon } from '@/components/icons'
 import { dialable, eruvView, type Eruv } from '@/lib/eruv'
@@ -56,10 +57,20 @@ const siteLabel = (url: string) => url.replace(/^https?:\/\//i, '').replace(/^ww
  *  turns the listing into its edit form (EruvEditor), hosted
  *  as MapPlaceDetail hosts a listing's: a ‹ and "Suggest an edit" over it,
  *  and its own step in the history, so Back (and a phone's back swipe)
- *  returns to the listing. */
-export function EruvListing(props: { eruv: Eruv; color: string; now: Date; timezone: string; candles: number | null; onEditingChange?: (editing: boolean) => void }) {
-  const { onEditingChange, ...listing } = props
+ *  returns to the listing. On the desktop map (onEditor) the ‹ is the
+ *  sidebar's: the ← in its search box, which steps back the same way. */
+export function EruvListing(props: {
+  eruv: Eruv
+  color: string
+  now: Date
+  timezone: string
+  candles: number | null
+  onEditingChange?: (editing: boolean) => void
+  onEditor?: (editor: HostedEditor | null) => void
+}) {
+  const { onEditingChange, onEditor, ...listing } = props
   const [editing, setEditing] = useState(false)
+  const [changed, setChanged] = useState(false)
   // Another eruv opened in its place starts as its listing.
   const [shownId, setShownId] = useState(props.eruv.id)
   if (shownId !== props.eruv.id) {
@@ -76,19 +87,25 @@ export function EruvListing(props: { eruv: Eruv; color: string; now: Date; timez
   }, [editing, onEditingChange])
   const openEditor = () => {
     window.history.pushState({ ...(window.history.state ?? {}), mapSheetForm: 'edit' }, '')
+    setChanged(false)
     setEditing(true)
   }
   const closeEditor = () => window.history.back()
+  useEffect(() => {
+    if (!onEditor) return
+    onEditor(editing ? { back: () => window.history.back(), label: 'Back to listing', changed } : null)
+  }, [onEditor, editing, changed])
+  useEffect(() => () => onEditor?.(null), [onEditor])
   if (editing) {
     return (
       <div data-testid="eruv-editing">
         <div className="mb-3 grid grid-cols-[1fr_auto_1fr] items-center gap-2">
-          <span>
-            <BackIconButton onClick={closeEditor} />
-          </span>
+          {/* Hosted (the desktop sidebar), the way back is its search
+              box's ←; the empty cell still keeps the title centred. */}
+          <span>{!onEditor && <BackIconButton onClick={closeEditor} />}</span>
           <h2 className="truncate text-base font-semibold text-slate-900">Edit listing</h2>
         </div>
-        <EruvEditor eruv={props.eruv} onClose={closeEditor} />
+        <EruvEditor eruv={props.eruv} onClose={closeEditor} onHasChanges={setChanged} />
       </div>
     )
   }
