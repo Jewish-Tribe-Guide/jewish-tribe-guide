@@ -55,7 +55,7 @@ describe('ListingEditBar', () => {
 
   // Oct 15: Save, Share and Set as location all have buttons of their own on
   // an opened listing now, so the ••• fan held one unique thing — Request
-  // removal. It sits beside Edit as a quieter outlined pill instead.
+  // removal. It sits beside Edit as a button of its own instead.
   it('puts Request removal beside Edit as a button of its own, with no ••• menu', () => {
     const onRequestRemoval = vi.fn()
     renderWithProviders(<ListingEditBar onEdit={vi.fn()} onRequestRemoval={onRequestRemoval} item={item} category={makeCategory()} />)
@@ -64,6 +64,22 @@ describe('ListingEditBar', () => {
     fireEvent.click(removal)
     expect(onRequestRemoval).toHaveBeenCalledTimes(1)
     expect(screen.queryByRole('button', { name: /^Actions for/ })).not.toBeInTheDocument()
+  })
+
+  // Oct 15, later: not a text pill — the user wanted it "the same size
+  // button as it was before and be a garbage can in red". So it's the old
+  // ••• trigger's 46px circle with a red bin in it, named for screen readers
+  // and on hover rather than by visible words.
+  it('draws Request removal as a round red bin, the old ••• button’s size, with no words', () => {
+    renderWithProviders(<ListingEditBar onEdit={vi.fn()} onRequestRemoval={vi.fn()} item={item} category={makeCategory()} />)
+    const removal = screen.getByRole('button', { name: 'Request removal' })
+    expect(removal.textContent).toBe('')
+    expect(removal.querySelector('svg')).not.toBeNull()
+    expect(removal).toHaveAttribute('title', 'Request removal')
+    expect(removal.className).toMatch(/\bh-\[46px\]/)
+    expect(removal.className).toMatch(/\bw-\[46px\]/)
+    expect(removal.className).toMatch(/\brounded-full\b/)
+    expect(removal.className).toMatch(/\btext-red-600\b/)
   })
 
   it('leaves Request removal out where the category takes no reports', () => {

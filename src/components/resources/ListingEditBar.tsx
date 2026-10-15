@@ -2,7 +2,7 @@
 
 import type { DirectoryResource } from '@/types'
 import type { CategoryConfig } from '@/lib/categories'
-import { PencilIcon } from '@/components/icons'
+import { PencilIcon, TrashIcon } from '@/components/icons'
 import { mainThing } from '@/lib/listingView'
 
 // ── The one visible way to edit an open listing ──────────────────────────
@@ -22,9 +22,15 @@ import { mainThing } from '@/lib/listingView'
 // found by accident. So this is neither: it's its own object, below the
 // listing, at full width, and nothing beside it competes with it.
 //
-// Request removal sits beside it (the user, Oct 15), as a smaller outlined
-// pill, so Edit stays the obvious one: removal is rare and sounds
-// destructive, and two equal buttons would make a visitor stop and choose.
+// Request removal sits beside it (the user, Oct 15) as a round button with a
+// red bin in it, the size the ••• trigger was (46px, white, shadow-lg): a
+// wide primary plus a small round end-stop, not two peers, so Edit stays the
+// obvious one. Red because it's the one thing here that takes something
+// away — the same red as the Request removal screen it opens and the admin's
+// own Delete links. It was briefly an outlined "Request removal" text pill,
+// which the user found too heavy beside Edit. With no words on it, the name
+// is in aria-label (for screen readers, and what the tests and e2e find it
+// by) and title (a hover tooltip on a desktop).
 // It used to be last in a ••• fan here, with Share, Save and Set as location
 // — but each of those now has a button of its own on the listing (Share
 // among Directions and Call, Save beside the name, Set as my location under
@@ -95,9 +101,11 @@ export default function ListingEditBar({
             e.stopPropagation()
             onRequestRemoval()
           }}
-          className="shrink-0 cursor-pointer rounded-full border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition-transform hover:bg-slate-50 active:scale-[0.98]"
+          aria-label="Request removal"
+          title="Request removal"
+          className="flex h-[46px] w-[46px] shrink-0 cursor-pointer items-center justify-center rounded-full bg-white text-red-600 shadow-lg transition-colors hover:bg-red-50 active:scale-[0.96]"
         >
-          Request removal
+          <TrashIcon className="h-5 w-5" />
         </button>
       )}
     </div>
