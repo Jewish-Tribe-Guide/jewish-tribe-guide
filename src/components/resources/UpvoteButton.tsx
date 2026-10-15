@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { getVoterToken, getMyVotedIds } from '@/lib/voteToken'
+import { getVoterToken, getMyVotedIds, noteMyVote } from '@/lib/voteToken'
 import { usePreviewSend, useFetchOrPreview } from '@/lib/previewSend'
 import { ThumbIcon } from '@/components/icons'
 
@@ -140,6 +140,7 @@ export default function UpvoteButton({
         if (!preview) {
           rememberVote(resourceId, body.voted)
           rememberCount(resourceId, body.count)
+          noteMyVote(resourceId, body.voted)
         }
       } else {
         setVoted(prevVoted)

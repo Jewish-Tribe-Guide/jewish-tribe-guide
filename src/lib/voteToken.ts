@@ -46,3 +46,22 @@ export function getMyVotedIds(): Promise<Set<string>> {
   }
   return cache
 }
+
+/** Keeps the memoized list above in step with a vote this tab just made.
+ *  Without it the list stays whatever the server said before the vote, for
+ *  as long as the tab is open, and UpvoteButton trusts it over the local
+ *  record — so on coming back to a listing you'd just upvoted, the button
+ *  read as un-voted, and tapping it to take the vote back counted UP first,
+ *  then down when the server answered (the user, Oct 15). Chained onto the
+ *  same promise, so a request still in flight gets the vote applied on top
+ *  of whatever it returns. Nothing to do if the list was never fetched: the
+ *  first fetch will come from the server after this vote. */
+export function noteMyVote(resourceId: string, voted: boolean) {
+  if (!cache) return
+  cache = cache.then((ids) => {
+    const next = new Set(ids)
+    if (voted) next.add(resourceId)
+    else next.delete(resourceId)
+    return next
+  })
+}

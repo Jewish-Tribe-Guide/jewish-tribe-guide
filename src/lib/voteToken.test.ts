@@ -115,4 +115,33 @@ describe('getMyVotedIds', () => {
 
     expect(fetchSpy).toHaveBeenCalledTimes(1)
   })
+
+  // Oct 15: the memo held the pre-vote list for the life of the tab, so a
+  // listing you'd just upvoted read as un-voted when you came back to it.
+  it('keeps the memoized list in step with a vote this tab makes, without refetching', async () => {
+    localStorage.setItem('jpc_voter_token', 'abc-123')
+    const fetchSpy = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({ ok: true, resourceIds: ['r2'] }) })
+    vi.stubGlobal('fetch', fetchSpy)
+    const { getMyVotedIds, noteMyVote } = await freshVoteToken()
+
+    await getMyVotedIds()
+    noteMyVote('r1', true)
+    expect(await getMyVotedIds()).toEqual(new Set(['r1', 'r2']))
+    noteMyVote('r2', false)
+    expect(await getMyVotedIds()).toEqual(new Set(['r1']))
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+  })
+
+  it('applies a vote on top of a list that was still being fetched when it was cast', async () => {
+    localStorage.setItem('jpc_voter_token', 'abc-123')
+    let resolveGet: (v: unknown) => void = () => {}
+    vi.stubGlobal('fetch', vi.fn(() => new Promise((r) => { resolveGet = r })))
+    const { getMyVotedIds, noteMyVote } = await freshVoteToken()
+
+    const before = getMyVotedIds()
+    noteMyVote('r1', true)
+    resolveGet({ ok: true, json: () => Promise.resolve({ ok: true, resourceIds: [] }) })
+    await before
+    expect(await getMyVotedIds()).toEqual(new Set(['r1']))
+  })
 })

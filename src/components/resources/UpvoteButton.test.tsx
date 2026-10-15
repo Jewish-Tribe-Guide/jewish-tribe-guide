@@ -13,6 +13,7 @@ import { getMyVotedIds, getVoterToken } from '@/lib/voteToken'
 vi.mock('@/lib/voteToken', () => ({
   getVoterToken: vi.fn(() => 'voter-token'),
   getMyVotedIds: vi.fn(() => Promise.resolve(new Set<string>())),
+  noteMyVote: vi.fn(),
 }))
 
 beforeEach(() => {
