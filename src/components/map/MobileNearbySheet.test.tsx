@@ -435,4 +435,17 @@ describe('MobileNearbySheet', () => {
     await user.click(screen.getByRole('button', { name: /select Goldi Market/ }))
     expect(container.querySelector('.overscroll-contain')).not.toBe(listRegion)
   })
+
+  // The Eruv chip from everything (Oct 15): the lines alone, no places. The
+  // peek says what's there, not "0 places nearby".
+  it('peeks with the eruvim when they are all the map shows', () => {
+    const eruv = (id: string) => ({ id, name: id, tone: 'green' as const, label: 'Up' })
+    const { rerender } = render(<MobileNearbySheet points={[]} userLocation={null} categories={[category]} containerHeight={600} eruvim={[eruv('a'), eruv('b')]} />)
+    expect(screen.getByText('2 eruvim — drag up')).toBeInTheDocument()
+    rerender(<MobileNearbySheet points={[]} userLocation={null} categories={[category]} containerHeight={600} eruvim={[eruv('a')]} />)
+    expect(screen.getByText('1 eruv — drag up')).toBeInTheDocument()
+    // Places over the lines: counted as ever.
+    rerender(<MobileNearbySheet points={[point]} userLocation={null} categories={[category]} containerHeight={600} eruvim={[eruv('a')]} />)
+    expect(screen.getByText('1 place nearby — drag up')).toBeInTheDocument()
+  })
 })

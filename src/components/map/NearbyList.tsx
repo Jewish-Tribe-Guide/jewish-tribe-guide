@@ -13,6 +13,8 @@ import { useCommunitySlug } from '@/lib/communityContext'
 import { useShareLink } from '@/lib/useShareLink'
 import { routes } from '@/lib/routes'
 import { listingSlug } from '@/lib/listingSlug'
+import { TONE_DOT, TONE_WORDS } from '@/lib/eruvTone'
+import type { EruvTone } from '@/lib/eruv'
 import type { MapPoint } from './ResourceMap'
 import type { DirectoryResource } from '@/types'
 
@@ -23,6 +25,8 @@ import type { DirectoryResource } from '@/types'
 type LatLng = { lat: number; lng: number }
 type InputPoint = MapPoint & { filterId: string; raw?: DirectoryResource }
 export type ScoredPoint = InputPoint & { miles: number | null }
+/** An eruv whose lines are on the map, with its status now. */
+export type NearbyEruv = { id: string; name: string; tone: EruvTone; label: string }
 
 // Hospitals are curated data — they have no directory listing to open.
 const HOSPITALS_FILTER_ID = '__hospitals__'
@@ -39,6 +43,11 @@ type Props = {
    *  instead of navigating away to the category directory. Desktop's Nearby
    *  tab leaves this unset and keeps the normal navigate-away behavior. */
   onSelectPlace?: (point: ScoredPoint) => void
+  /** The eruvim drawn on the map, listed when they're all it shows (the
+   *  Eruv chip from everything): the lines alone are a view, so the list
+   *  has what's on the map rather than "nothing to show". */
+  eruvim?: NearbyEruv[]
+  onSelectEruv?: (id: string) => void
 }
 
 function distanceLabel(miles: number): string {
@@ -47,7 +56,7 @@ function distanceLabel(miles: number): string {
   return `${(Math.round(miles * 10) / 10).toFixed(1)} mi`
 }
 
-export default function NearbyList({ points, userLocation, onViewListing, onSelectPlace }: Props) {
+export default function NearbyList({ points, userLocation, onViewListing, onSelectPlace, eruvim, onSelectEruv }: Props) {
   const { toggle } = usePinned()
 
   const sorted = useMemo<ScoredPoint[]>(() => {
@@ -66,6 +75,22 @@ export default function NearbyList({ points, userLocation, onViewListing, onSele
       return a.miles - b.miles
     })
   }, [points, userLocation])
+
+  if (sorted.length === 0 && eruvim && eruvim.length > 0) {
+    return (
+      <div className="divide-y divide-slate-100 rounded-2xl ring-1 ring-slate-900/5 bg-white overflow-hidden" data-testid="nearby-eruvim">
+        {eruvim.map((e) => (
+          <button key={e.id} type="button" onClick={() => onSelectEruv?.(e.id)} className="flex w-full cursor-pointer items-center gap-3 px-4 py-3 text-left hover:bg-slate-50">
+            <span aria-hidden="true" className={`h-2.5 w-2.5 shrink-0 rounded-full ${TONE_DOT[e.tone]}`} />
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-[15px] font-semibold text-slate-900">{e.name}</span>
+              <span className={`block text-[13px] font-semibold ${TONE_WORDS[e.tone]}`}>{e.label}</span>
+            </span>
+          </button>
+        ))}
+      </div>
+    )
+  }
 
   if (sorted.length === 0) {
     return (

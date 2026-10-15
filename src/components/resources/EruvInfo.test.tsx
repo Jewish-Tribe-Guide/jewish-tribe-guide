@@ -268,9 +268,9 @@ describe('EruvInfo', () => {
     it('Full map opens the Map tab on the eruvim alone, the open one open there', async () => {
       const user = userEvent.setup()
       show()
-      expect(await screen.findByTestId('eruv-map')).toHaveAttribute('data-full-map', '/test-community/map?eruv=1')
+      expect(await screen.findByTestId('eruv-map')).toHaveAttribute('data-full-map', '/test-community/map?eruv=only')
       await user.click((await screen.findAllByTestId('eruv-row'))[0])
-      expect(screen.getByTestId('eruv-map')).toHaveAttribute('data-full-map', '/test-community/map?eruv=1&place=eruv%3Acenter-city')
+      expect(screen.getByTestId('eruv-map')).toHaveAttribute('data-full-map', '/test-community/map?eruv=only&place=eruv%3Acenter-city')
     })
   })
 

@@ -7,7 +7,7 @@ import CategoryFilter, { type FilterOption } from './CategoryFilter'
 import CategoryPickerList from './CategoryPickerList'
 import MapFiltersSheet, { type MapFilterSection } from './MapFiltersSheet'
 import { FilterChip } from '@/components/resources/FiltersSheet'
-import NearbyList from './NearbyList'
+import NearbyList, { type NearbyEruv } from './NearbyList'
 import MapPlaceDetail from './MapPlaceDetail'
 import MobileNearbySheet, { type MobileNearbySheetHandle } from './MobileNearbySheet'
 import MapEruvDetail from './MapEruvDetail'
@@ -66,11 +66,12 @@ import type { DirectoryResource, MapFilters } from '@/types'
 // Shared by the initial useState below and the resync effect further down
 // (see its own comment) — one place for the initialSelectedCategories-vs-
 // initialCategory precedence so the two can't drift apart.
-function resolveInitialSelected(categories: string[] | undefined, category: string | undefined, pinned = false): Set<string> | null {
+function resolveInitialSelected(categories: string[] | undefined, category: string | undefined, pinned = false, eruvim: boolean | 'only' = false): Set<string> | null {
   // Arriving on the Pinned chip alone ("See them on the map" on the Pinned
-  // page): no category chip on, only the pins. Eruv lines don't narrow the
-  // places: the Eruv page's Full map is every place with the lines on.
-  if (pinned && categories === undefined && !category) return new Set()
+  // page): no category chip on, only the pins. Likewise the eruv lines
+  // alone (the Eruv page's Full map); lines that are merely on (`eruv=1`)
+  // don't narrow the places.
+  if ((pinned || eruvim === 'only') && categories === undefined && !category) return new Set()
   return categories !== undefined ? new Set(categories) : category ? new Set([category]) : null
 }
 
@@ -147,8 +148,9 @@ type Props = {
   initialSelectedCategories?: string[]
   /** The Pinned chip on, from the URL's `pinned` (see mapQueryString). */
   initialPinned?: boolean
-  /** Eruv lines on, from the URL's `eruv` (see mapQueryString). */
-  initialEruvim?: boolean
+  /** Eruv lines on, from the URL's `eruv` (see mapQueryString); 'only',
+   *  the lines with no places. */
+  initialEruvim?: boolean | 'only'
   /** Field filters (open-now / kosher / type / …) carried from the directory the
    *  visitor came from, applied to pins and shown as removable chips. */
   initialFilters?: MapFilters
@@ -693,14 +695,16 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // browser back) takes precedence over initialCategory (the single-category
   // arrival case from a directory's "Map" button).
   const [selected, setSelected] = useState<Set<string> | null>(
-    resolveInitialSelected(initialSelectedCategories, initialCategory, initialPinned),
+    resolveInitialSelected(initialSelectedCategories, initialCategory, initialPinned, initialEruvim),
   )
   // Eruv lines (see "Eruv lines" below).
   const [eruvimOn, setEruvimOn] = useState(!!initialEruvim)
   // The Pinned chip lives in PinnedContext (it outlives this screen); a link
   // that says to show the pins turns it on.
+  // The lines alone mean no pins either.
   useEffect(() => {
     if (initialPinned) setPinnedSelected(true)
+    else if (initialEruvim === 'only') setPinnedSelected(false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialPinned])
   const effectiveSelected = useMemo(
@@ -1036,7 +1040,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   const initialViewKey = [
     categoriesKey,
     initialPinned ? 'pinned' : '',
-    initialEruvim ? 'eruv' : '',
+    initialEruvim === 'only' ? 'eruv-only' : initialEruvim ? 'eruv' : '',
     initialQueryText,
     initialFiltersQuery.open ?? '',
     [...(initialFilters?.bool ?? [])].sort().join(','),
@@ -1079,7 +1083,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
     }
     appliedInitialViewKeyRef.current = initialViewKey
     applyingRenderRef.current = thisRender
-    setSelected(resolveInitialSelected(initialSelectedCategories, initialCategory, initialPinned))
+    setSelected(resolveInitialSelected(initialSelectedCategories, initialCategory, initialPinned, initialEruvim))
     // The link's Pinned too: "All" turns it on, and it outlives this screen.
     setPinnedSelected(initialPinned)
     setEruvimOn(!!initialEruvim)
@@ -1165,7 +1169,8 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
       select: written.sel ? Object.fromEntries(written.sel.split(',').map((pair) => [pair.slice(0, pair.indexOf(':')), pair.slice(pair.indexOf(':') + 1).split('|')])) : null,
       place: selectedPointId ?? null,
       pinned: pinnedSelected,
-      eruvim: eruvimOn,
+      // The lines alone say so: no `cat` would mean every category.
+      eruvim: eruvimOn && selected?.size === 0 && !pinnedSelected ? 'only' : eruvimOn,
     })
     const url = `${window.location.pathname}${qs}`
     if (url === `${window.location.pathname}${window.location.search}`) return
@@ -1290,7 +1295,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // auto-reverting mid-edit; Pinned rides along as an escape hatch exactly
   // like it does for the compact row, since the picker itself has no Pinned
   // checkbox of its own to turn off.
-  const draftNoneSelected = draftSelected.size === 0 && !pinnedSelected
+  const draftNoneSelected = draftSelected.size === 0 && !pinnedSelected && !eruvimOn
   const draftAllOn = draftSelected.size === options.length
   // Opens the picker with a fresh snapshot of what's live right now — so
   // Back (which touches nothing, see closeCategoriesPicker above) truly
@@ -1352,8 +1357,9 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
     // Unclicking the last remaining chip goes back to showing everything,
     // same as Google Maps/Too Good To Go's filter rows — there's no
     // "nothing shown" state a chip tap can land you in, so a separate
-    // Hide-all shortcut has nothing left to do.
-    if (next.size === 0 && !pinnedSelected) {
+    // Hide-all shortcut has nothing left to do. The eruv lines count as
+    // something shown: with them on, the last category off leaves them.
+    if (next.size === 0 && !pinnedSelected && !eruvimOn) {
       showAll()
       return
     }
@@ -1361,7 +1367,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   }
   // Resets every chip in the row, Pinned included — not just the real
   // categories — so "All" actually means all.
-  const showAll = () => {
+  const showAllPlaces = () => {
     // Re-tapping "All" while it's already the active filter used to still
     // build a brand-new Set — a fresh reference flows through
     // effectiveSelected → visiblePoints → ResourceMap's `points` prop, which
@@ -1372,6 +1378,12 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
     setPinnedSelected(true)
     setSidebarCollapsed(false)
   }
+  // The All chip: every place, and no eruv lines — All is the map as it
+  // opens, and the lines over every pin aren't that (Oct 15).
+  const showAll = () => {
+    if (eruvimOn) eruvimOff(showAllPlaces)
+    else showAllPlaces()
+  }
   // If Pinned was the ONLY thing narrowing the map (no categories checked —
   // see togglePinnedSelected's own "narrow to just this one" branch) and the
   // visitor unpins their last listing — possibly from somewhere else in the
@@ -1381,7 +1393,11 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // already keep for an on-screen tap; this covers the one way the same
   // "nothing selected" state can be reached from OUTSIDE a chip tap.
   useEffect(() => {
-    if (pinnedSelected && mappablePinnedCount === 0 && effectiveSelected.size === 0) showAll()
+    // With the eruv lines on, they're left showing on their own.
+    if (pinnedSelected && mappablePinnedCount === 0 && effectiveSelected.size === 0) {
+      if (eruvimOn) setPinnedSelected(false)
+      else showAll()
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mappablePinnedCount, pinnedSelected, effectiveSelected.size])
   // Same "surface the results" side effects toggling a category chip gets
@@ -1403,7 +1419,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
     const next = !pinnedSelected
     // Same revert-to-all as unclicking the last category chip — turning
     // Pinned off shouldn't be able to leave the row with nothing on.
-    if (!next && effectiveSelected.size === 0) {
+    if (!next && effectiveSelected.size === 0 && !eruvimOn) {
       showAll()
       return
     }
@@ -1729,13 +1745,15 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   )
 
   // ── Eruv lines (agreed Oct 7, canvas page "eruv", board 3) ──────────────
-  // A switch in Filters draws each eruv's own map, as the eruv draws it,
-  // under the pins, its name in its status's colour (eruvLayer.ts). Tapping
-  // a line or a name opens that eruv's listing where a place opens. Off to
-  // begin with; there only when the community has an Eruv page and an eruv
-  // with a map. All of them or none (the user, Oct 13): not a chip, since
-  // it's used now and then and "All" shouldn't draw them over the pins, and
-  // not one by one.
+  // Each eruv's own map, as the eruv draws it, under the pins, its name in
+  // its status's colour (eruvLayer.ts). Tapping a line or a name opens that
+  // eruv's listing where a place opens. Off to begin with; there only when
+  // the community has an Eruv page and an eruv with a map. All of them or
+  // none (the user, Oct 13), not one by one. An Eruv chip that works like
+  // Saved (Oct 15): from everything, a tap is the lines alone, which the
+  // map couldn't show before since a chip had to be on; a category tapped
+  // then adds its pins. All never draws them. The switch in Filters is the
+  // plain on/off.
   const eruvCategory = (categories ?? []).find((c) => c.kind === 'eruv') ?? null
   const eruvStatuses = useEruvStatuses(countCommunity ?? '', !!countCommunity && !!eruvCategory)
   const eruvData = eruvStatuses?.available ? eruvStatuses : null
@@ -1748,6 +1766,17 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
     () => (eruvimOn && eruvData && clock !== null ? eruvimWithLines.map(({ eruv: e, map }) => ({ id: e.id, name: e.name, tone: eruvView(e, new Date(clock), eruvData.timezone, eruvData.candles).tone, map })) : []),
     // Each tick makes a new list, but the map redraws only when a line or
     // a status's colour changes (eruvDrawKey).
+    [eruvimOn, eruvData, eruvimWithLines, clock],
+  )
+  // The list's rows when the lines are all the map shows (NearbyList).
+  const listedEruvim = useMemo<NearbyEruv[]>(
+    () =>
+      eruvimOn && eruvData && clock !== null
+        ? eruvimWithLines.map(({ eruv: e }) => {
+            const v = eruvView(e, new Date(clock), eruvData.timezone, eruvData.candles)
+            return { id: e.id, name: e.name, tone: v.tone, label: v.label }
+          })
+        : [],
     [eruvimOn, eruvData, eruvimWithLines, clock],
   )
   const openEruvId = selectedPointId?.startsWith(ERUV_PREFIX) ? selectedPointId.slice(ERUV_PREFIX.length) : null
@@ -1778,12 +1807,32 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   }, [eruvimWithLines, standalone, initialPlaceId])
   // Turning the layer off closes the eruv open in it, so mid-edit that
   // asks first too, and a No leaves both the layer and the edit as they were.
-  const toggleEruvim = () => {
-    if (!eruvimOn || !openEruvId) return setEruvimOn(!eruvimOn)
+  const eruvimOff = (then?: () => void) => {
+    if (!openEruvId) {
+      setEruvimOn(false)
+      return then?.()
+    }
     leaveEditThen(() => {
       deselectPlace()
       setEruvimOn(false)
+      then?.()
     })
+  }
+  // Off with nothing else on goes back to everything, as the last category
+  // chip off does: the map is never empty.
+  const toggleEruvim = () => {
+    if (!eruvimOn) return setEruvimOn(true)
+    eruvimOff(effectiveSelected.size === 0 && !pinnedSelected ? showAllPlaces : undefined)
+  }
+  // The chip: from everything, the lines alone.
+  const tapEruvChip = () => {
+    if (eruvimOn) return toggleEruvim()
+    if (allChipsOn) {
+      setSelected(new Set())
+      setPinnedSelected(false)
+    }
+    setEruvimOn(true)
+    setSidebarCollapsed(false)
   }
   const eruvDetail = (id: string, onBack?: () => void, onEditor?: (editor: HostedEditor | null) => void) => {
     const e = eruvData?.eruvim.find((x) => x.id === id)
@@ -1853,22 +1902,23 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
       {filtersOn > 0 && <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-white px-1 text-[11px] text-primary">{filtersOn}</span>}
     </button>
   )
-  // Filters, then, while the lines are on, an "Eruv" chip, before the
-  // categories: the outlines on the map explained where people look, and a
-  // tap from off (the user, Oct 13). Off, it's only in Filters.
-  const eruvLinesChip = eruvimOn && eruvimWithLines.length > 0 && (
+  // Filters, then the Eruv chip, before the categories: the outlines on
+  // the map explained where people look (the user, Oct 13). Always there
+  // once there's a line to draw, off like Saved off, so the lines are a
+  // tap away (Oct 15).
+  const eruvColor = colorById.get(eruvCategory?.id ?? '') ?? '#64748b'
+  const eruvLinesChip = eruvimWithLines.length > 0 && (
     <button
       type="button"
-      onClick={toggleEruvim}
-      aria-label="Eruv lines on. Turn off"
+      onClick={tapEruvChip}
+      aria-pressed={eruvimOn}
       data-testid="map-eruv-lines-chip"
-      className="flex shrink-0 cursor-pointer items-center gap-1 rounded-full border border-transparent py-1 pl-2.5 pr-2 text-xs font-medium text-white"
-      style={{ backgroundColor: colorById.get(eruvCategory?.id ?? '') ?? '#64748b' }}
+      className={`flex shrink-0 cursor-pointer items-center rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors ${
+        eruvimOn ? 'border-transparent text-white' : 'border-slate-300 bg-white hover:bg-slate-50'
+      }`}
+      style={eruvimOn ? { backgroundColor: eruvColor } : { color: eruvColor }}
     >
       Eruv
-      <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" className="h-3 w-3">
-        <path d="M6 6l12 12M18 6 6 18" />
-      </svg>
     </button>
   )
   const leadingChips = (
@@ -2101,7 +2151,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                   sidebarScroll(
                     'list',
                     <>
-                      {activeLocation && (
+                      {activeLocation && visiblePoints.length > 0 && (
                         <p className="mb-2 px-1 text-xs text-slate-400">
                           Sorted by distance from your location{tracking ? ', updating live as you move.' : '.'}
                         </p>
@@ -2111,6 +2161,8 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                         userLocation={activeLocation}
                         onViewListing={onViewListing}
                         onSelectPlace={selectPlace}
+                        eruvim={listedEruvim}
+                        onSelectEruv={openEruv}
                       />
                     </>,
                   )
@@ -2636,6 +2688,8 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                   }}
                   onHeightChange={setSheetHeightPx}
                   renderOther={(p, back) => (p.filterId === ERUV_FILTER_ID ? eruvDetail(p.id.slice(ERUV_PREFIX.length), back) : null)}
+                  eruvim={listedEruvim}
+                  onSelectEruv={openEruv}
                 />
               )}
           </div>
@@ -2646,7 +2700,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
               is turned off (ui.map.nearbyList), since NearbyList otherwise
               already shows this same message inline (mobile sheet / desktop
               sidebar). ───────────────────────────────────────────────────── */}
-      {!loading && !ui.map.nearbyList && visiblePoints.length === 0 && (
+      {!loading && !ui.map.nearbyList && visiblePoints.length === 0 && mapEruvim.length === 0 && (
         <p className="mt-3 text-center text-sm text-slate-500">
           {activeTerms.length > 0 || hasFilters
             ? 'No places match every filter. Try removing one.'

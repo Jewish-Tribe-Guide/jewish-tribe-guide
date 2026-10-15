@@ -1967,13 +1967,13 @@ describe('ResourceMapView — eruv lines', () => {
     return within(await screen.findByTestId('map-filters-eruv-lines')).getByRole('switch', { name: 'Eruv lines' })
   }
 
-  it('a switch in Filters draws every eruv with a line, all or none; off to begin with; a chip beside All only while on', async () => {
+  it('a switch in Filters draws every eruv with a line, all or none; off to begin with; the Eruv chip says which', async () => {
     renderMap(<ResourceMapView onUp={() => {}} />, store, withEruvPage)
     const toggle = await eruvSwitch()
     expect(toggle).toHaveAttribute('aria-checked', 'false')
     expect(screen.getByTestId('eruv-count')).toHaveTextContent('0')
-    // Off, nothing of it in the chip row.
-    expect(screen.queryByTestId('map-eruv-lines-chip')).not.toBeInTheDocument()
+    // Off, the chip is there to turn them on, as Saved is.
+    expect(screen.getByTestId('map-eruv-lines-chip')).toHaveAttribute('aria-pressed', 'false')
     fireEvent.click(toggle)
     expect(toggle).toHaveAttribute('aria-checked', 'true')
     // Not Elkins Park: it has no map to draw.
@@ -1981,12 +1981,114 @@ describe('ResourceMapView — eruv lines', () => {
     expect(screen.getByRole('button', { name: 'Eruv Center City Eruv green' })).toBeInTheDocument()
     // Nothing picks one eruv from another.
     expect(screen.queryByTestId('map-filters-__eruv__')).not.toBeInTheDocument()
-    // Counted as on, and a chip beside All while on, a tap from off.
     expect(screen.getByTestId('map-filters-button')).toHaveAccessibleName('Filters, 1 on')
     expect(screen.getByTestId('map-eruv-lines-chip')).toHaveTextContent(/^Eruv$/)
+    expect(screen.getByTestId('map-eruv-lines-chip')).toHaveAttribute('aria-pressed', 'true')
+    // A tap turns them off, the places staying, and the chip stays.
     fireEvent.click(screen.getByTestId('map-eruv-lines-chip'))
     expect(screen.getByTestId('eruv-count')).toHaveTextContent('0')
-    expect(screen.queryByTestId('map-eruv-lines-chip')).not.toBeInTheDocument()
+    expect(screen.getByTestId('point-count')).toHaveTextContent('1')
+    expect(screen.getByTestId('map-eruv-lines-chip')).toHaveAttribute('aria-pressed', 'false')
+  })
+
+  // Oct 15: the map can't be empty, and the lines count. Before, the lines
+  // only ever came over places: seeing an eruv meant All or some chip on
+  // under it. The Eruv chip now acts as Saved does.
+  describe('the Eruv chip, as Saved', () => {
+    const twoKinds = [
+      makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' }),
+      makeCategory({ id: 'synagogue', pluralLabel: 'Synagogues' }),
+      makeCategory({ id: 'eruv', label: 'Eruv', pluralLabel: 'Eruvim', kind: 'eruv' }),
+    ]
+    const places = [
+      makeListing({ id: 'g1', name: 'Grocer', category: 'grocery', geo: { lat: 39.95, lng: -75.16 } }),
+      makeListing({ id: 's1', name: 'Shul', category: 'synagogue', geo: { lat: 39.95, lng: -75.17 } }),
+    ]
+    const chip = () => screen.getByTestId('map-eruv-lines-chip')
+
+    it('from All, a tap is the lines alone, listed where the places were', async () => {
+      renderMap(<ResourceMapView onUp={() => {}} />, places, twoKinds)
+      fireEvent.click(await screen.findByTestId('map-eruv-lines-chip'))
+      expect(chip()).toHaveAttribute('aria-pressed', 'true')
+      expect(screen.getByTestId('point-count')).toHaveTextContent('0')
+      expect(screen.getByTestId('eruv-count')).toHaveTextContent('2')
+      expect(screen.getByTestId('eruv-framed')).toHaveTextContent('yes')
+      expect(screen.getByRole('button', { name: 'All' })).toHaveAttribute('aria-pressed', 'false')
+      // Not "nothing to show": the eruvim, each opening its listing.
+      // The sidebar's (the phone's sheet has the same).
+      const list = screen.getAllByTestId('nearby-eruvim')[0]
+      expect(within(list).getByText('University City Eruv')).toBeInTheDocument()
+      fireEvent.click(within(list).getByText('Center City Eruv'))
+      expect(screen.getByTestId('map-eruv-detail')).toBeInTheDocument()
+      expect(screen.getByTestId('eruv-selected')).toHaveTextContent('center-city')
+    })
+
+    it('a category then adds its pins; off again leaves the lines; Eruv off from there is All', async () => {
+      renderMap(<ResourceMapView onUp={() => {}} />, places, twoKinds)
+      fireEvent.click(await screen.findByTestId('map-eruv-lines-chip'))
+      fireEvent.click(screen.getByRole('button', { name: /Grocery Stores/ }))
+      expect(screen.getByTestId('point-count')).toHaveTextContent('1')
+      expect(screen.getByTestId('eruv-count')).toHaveTextContent('2')
+      // The last category off: the lines are still something to show.
+      fireEvent.click(screen.getByRole('button', { name: /Grocery Stores/ }))
+      expect(screen.getByTestId('point-count')).toHaveTextContent('0')
+      expect(screen.getByTestId('eruv-count')).toHaveTextContent('2')
+      expect(chip()).toHaveAttribute('aria-pressed', 'true')
+      // Eruv off with nothing else on: back to everything.
+      fireEvent.click(chip())
+      expect(screen.getByTestId('eruv-count')).toHaveTextContent('0')
+      expect(screen.getByTestId('point-count')).toHaveTextContent('2')
+      expect(screen.getByRole('button', { name: 'All' })).toHaveAttribute('aria-pressed', 'true')
+    })
+
+    it('Eruv off with a category on keeps that category', async () => {
+      renderMap(<ResourceMapView onUp={() => {}} />, places, twoKinds)
+      fireEvent.click(await screen.findByTestId('map-eruv-lines-chip'))
+      fireEvent.click(screen.getByRole('button', { name: /Grocery Stores/ }))
+      fireEvent.click(chip())
+      expect(screen.getByTestId('eruv-count')).toHaveTextContent('0')
+      expect(screen.getByTestId('point-count')).toHaveTextContent('1')
+    })
+
+    it('All never draws the lines', async () => {
+      renderMap(<ResourceMapView onUp={() => {}} />, places, twoKinds)
+      fireEvent.click(await screen.findByTestId('map-eruv-lines-chip'))
+      fireEvent.click(screen.getByRole('button', { name: 'All' }))
+      expect(screen.getByTestId('eruv-count')).toHaveTextContent('0')
+      expect(screen.getByTestId('point-count')).toHaveTextContent('2')
+      expect(chip()).toHaveAttribute('aria-pressed', 'false')
+      expect(screen.getByRole('button', { name: 'All' })).toHaveAttribute('aria-pressed', 'true')
+    })
+
+    it('the Eruv page’s Full map opens on the lines alone', async () => {
+      renderMap(<ResourceMapView onUp={() => {}} initialEruvim="only" />, places, twoKinds)
+      await screen.findByTestId('map-eruv-lines-chip')
+      expect(chip()).toHaveAttribute('aria-pressed', 'true')
+      expect(screen.getByTestId('point-count')).toHaveTextContent('0')
+      expect(screen.getByTestId('eruv-count')).toHaveTextContent('2')
+    })
+
+    describe('in the address bar (standalone)', () => {
+      afterEach(() => window.history.replaceState(null, '', '/test-community/map'))
+
+      it('says the lines alone as eruv=only, and a category over them as cat + eruv=1', async () => {
+        renderMap(
+          <HeaderCollapseProvider>
+            <ResourceMapView onUp={vi.fn()} standalone visible />
+          </HeaderCollapseProvider>,
+          places,
+          twoKinds,
+        )
+        fireEvent.click(await screen.findByTestId('map-eruv-lines-chip'))
+        let params = new URLSearchParams(window.location.search)
+        expect(params.get('eruv')).toBe('only')
+        expect(params.has('cat')).toBe(false)
+        fireEvent.click(screen.getByRole('button', { name: /Grocery Stores/ }))
+        params = new URLSearchParams(window.location.search)
+        expect(params.get('cat')).toBe('grocery')
+        expect(params.get('eruv')).toBe('1')
+      })
+    })
   })
 
   it('tapping an eruv opens its listing where a place opens, picked out, with a way back', async () => {

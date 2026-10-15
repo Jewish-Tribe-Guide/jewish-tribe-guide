@@ -163,6 +163,14 @@ describe('parseMapQuery', () => {
     expect(parse('eruv=center-city,university-city').eruvim).toBe(true)
   })
 
+  // The lines alone: no `cat` already means every category, so it's said
+  // on the eruv itself.
+  it('round-trips the eruv lines alone, apart from the lines over every place', () => {
+    expect(mapQueryString({ eruvim: 'only' })).toBe('?eruv=only')
+    expect(parse('eruv=only').eruvim).toBe('only')
+    expect(parse('eruv=1').eruvim).toBe(true)
+  })
+
   // Open now per category (the map's Filters sheet, see mapFilters.ts), and
   // switches and picks written category.key.
   it('round-trips Open now for some categories, and filters with their category', () => {

@@ -168,4 +168,39 @@ describe('NearbyList row swipe (desktop trackpad)', () => {
     )
     expect(screen.getAllByTestId('saved-badge')).toHaveLength(1)
   })
+
+  // The Eruv chip from everything (Oct 15): with the lines alone on the map,
+  // the list has the eruvim, not "nothing to show"; a row opens its eruv.
+  it('lists the eruvim, each with its status, when they are all the map shows', () => {
+    const onSelectEruv = vi.fn()
+    renderWithProviders(
+      <PinnedProvider>
+        <NearbyList
+          points={[]}
+          userLocation={null}
+          onViewListing={vi.fn()}
+          eruvim={[
+            { id: 'center-city', name: 'Center City Eruv', tone: 'green', label: 'Up' },
+            { id: 'university-city', name: 'University City Eruv', tone: 'red', label: 'Down' },
+          ]}
+          onSelectEruv={onSelectEruv}
+        />
+      </PinnedProvider>,
+    )
+    const list = screen.getByTestId('nearby-eruvim')
+    expect(list).toHaveTextContent('Center City EruvUp')
+    expect(list).toHaveTextContent('University City EruvDown')
+    fireEvent.click(screen.getByText('University City Eruv'))
+    expect(onSelectEruv).toHaveBeenCalledWith('university-city')
+  })
+
+  it('lists places over the eruvim when there are any', () => {
+    renderWithProviders(
+      <PinnedProvider>
+        <NearbyList points={[makePoint()]} userLocation={null} onViewListing={vi.fn()} eruvim={[{ id: 'center-city', name: 'Center City Eruv', tone: 'green', label: 'Up' }]} />
+      </PinnedProvider>,
+    )
+    expect(screen.getByText('Test Grocery')).toBeInTheDocument()
+    expect(screen.queryByTestId('nearby-eruvim')).not.toBeInTheDocument()
+  })
 })

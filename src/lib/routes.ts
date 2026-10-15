@@ -222,13 +222,15 @@ export function mapQueryString(state: {
   place?: string | null
   /** The Pinned chip is on (the visitor's pinned places; see pinned.ts). */
   pinned?: boolean
-  /** Eruv lines on (Filters' switch), over whatever places show. */
-  eruvim?: boolean
+  /** Eruv lines on, over whatever places show; 'only' — the lines alone,
+   *  no places (the Eruv chip from everything, or the Eruv page's Full
+   *  map), which no `cat` can say since no `cat` means every category. */
+  eruvim?: boolean | 'only'
 }): string {
   const params = new URLSearchParams()
   if (state.categories?.length) params.set('cat', state.categories.join(','))
   if (state.pinned) params.set('pinned', '1')
-  if (state.eruvim) params.set('eruv', '1')
+  if (state.eruvim) params.set('eruv', state.eruvim === 'only' ? 'only' : '1')
   if (state.query) params.set('q', state.query)
   if (state.openNow) params.set('open', '1')
   else if (state.openIn?.length) params.set('open', state.openIn.join(','))
@@ -259,7 +261,7 @@ export function parseMapQuery(params: URLSearchParams): {
   select: Record<string, string[]> | null
   place: string | null
   pinned: boolean
-  eruvim: boolean
+  eruvim: boolean | 'only'
 } {
   const list = (v: string | null) => {
     const items = (v ?? '').split(',').map((s) => s.trim()).filter(Boolean)
@@ -289,6 +291,6 @@ export function parseMapQuery(params: URLSearchParams): {
     pinned: params.get('pinned') === '1',
     // Any value: links from when eruvim could be picked one by one
     // (?eruv=center-city) turn them all on.
-    eruvim: params.has('eruv'),
+    eruvim: params.get('eruv') === 'only' ? 'only' : params.has('eruv'),
   }
 }
