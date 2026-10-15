@@ -150,19 +150,19 @@ describe('cardCount — the wording', () => {
   })
 })
 
-// Oct 15: the Eruv card says how many eruvim, as a category's card says how
-// many listings.
+// Oct 15: the Eruv card says how many eruvim, in a category card's words:
+// "5 listings", not "5 eruvim".
 describe('the Eruv card’s count', () => {
   const eruv = category({ id: 'eruv-information', kind: 'eruv', pluralLabel: 'Eruv Information' })
   const grocery = category()
   const cards = (counts: Record<string, number> | null) => resourceCards(() => {}, [grocery, eruv], 'philly', counts)!
   const countOf = (counts: Record<string, number> | null, id: string) => cards(counts).find((c) => c.id === id)?.count
 
-  it('"3 eruvim", "1 eruv", beside the listings’ counts', () => {
-    expect(countOf(withEruvCount({ grocery: 22 }, 3), 'eruv')).toBe('3 eruvim')
+  it('"3 listings", "1 listing", as the categories’ counts read', () => {
+    expect(countOf(withEruvCount({ grocery: 22 }, 3), 'eruv')).toBe('3 listings')
     expect(countOf(withEruvCount({ grocery: 22 }, 3), 'grocery')).toBe('22 listings')
-    expect(countOf(withEruvCount(null, 1), 'eruv')).toBe('1 eruv')
-    expect(eruvCardCount({ eruv: 2 })).toBe('2 eruvim')
+    expect(countOf(withEruvCount(null, 1), 'eruv')).toBe('1 listing')
+    expect(eruvCardCount({ eruv: 2 })).toBe('2 listings')
   })
 
   it('nothing until it’s known, or when there are none', () => {

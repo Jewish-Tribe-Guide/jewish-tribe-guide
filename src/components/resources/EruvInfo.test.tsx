@@ -237,6 +237,19 @@ describe('EruvInfo', () => {
       expect(screen.getByTestId('eruv-map')).toHaveAttribute('data-focus', '')
     })
 
+    // Oct 15: "Eruvim" twice, the title over ‹ Eruvim. An opened listing on a
+    // computer has the top of the page, as a category's has (GenericDirectory):
+    // only its way back, the title kept for a screen reader.
+    it('on desktop, an open eruv has the top of the page: ‹ Eruvim, not the title over it too; the title returns with the list', async () => {
+      const user = userEvent.setup()
+      show()
+      await user.click((await screen.findAllByTestId('eruv-row'))[0])
+      expect(screen.getByRole('heading', { level: 1, name: 'Eruvim' })).toHaveAttribute('class', 'sr-only')
+      expect(within(screen.getByTestId('listing-column-bar')).getByRole('button', { name: 'Eruvim' })).toBeInTheDocument()
+      await user.click(screen.getByRole('button', { name: 'Eruvim' }))
+      expect(screen.getByRole('heading', { level: 1, name: 'Eruvim' })).toHaveClass('desktop:not-sr-only')
+    })
+
     it('a link to an eruv (?item=) opens it', async () => {
       show({ itemId: 'lower-merion' })
       expect(within(await screen.findByTestId('eruv-column')).getByText('Lower Merion Eruv')).toBeInTheDocument()

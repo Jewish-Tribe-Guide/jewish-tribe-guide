@@ -603,12 +603,12 @@ export function cardCount(c: CategoryConfig, counts: Record<string, number> | nu
   return `${n} listing${n === 1 ? '' : 's'}`
 }
 
-/** "3 eruvim" for the Eruv card, as a category's says how many listings
- *  (Oct 15), from `counts.eruv` (see withEruvCount); silent until known. */
+/** "3 listings" for the Eruv card, in a category card's words (Oct 15),
+ *  from `counts.eruv` (see withEruvCount); silent until known. */
 export function eruvCardCount(counts: Record<string, number> | null | undefined): string | undefined {
   const n = counts?.eruv
   if (!n) return undefined
-  return n === 1 ? '1 eruv' : `${n} eruvim`
+  return `${n} listing${n === 1 ? '' : 's'}`
 }
 
 /** The listing counts with the Eruv card's beside them, under its card id

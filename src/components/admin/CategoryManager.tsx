@@ -29,7 +29,7 @@ import { CAPABILITY_LABELS } from './categoryEditorLogic'
 const SINGLETON_KIND_LABELS = {
   map: 'Map',
   zmanim: 'Zmanim',
-  eruv: 'Eruv Information',
+  eruv: 'Eruv',
   medical: 'Jewish Medical Resources',
 } as const
 type SingletonKind = keyof typeof SINGLETON_KIND_LABELS

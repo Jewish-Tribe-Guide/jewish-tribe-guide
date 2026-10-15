@@ -66,7 +66,7 @@ const ERUV_STEP = 'eruv'
 /** `failed`: /api/eruv didn't answer (offline, say), as against no eruvim. */
 type Loaded = { available: false; failed?: boolean } | { available: true; timezone: string; candles: number | null; eruvim: Eruv[] }
 
-export default function EruvInfo({ onUp, title = 'Eruv Information', icon, color = '#64748b', bandImageUrl, itemId = null, onParamsChange }: Props) {
+export default function EruvInfo({ onUp, title = 'Eruv', icon, color = '#64748b', bandImageUrl, itemId = null, onParamsChange }: Props) {
   // Puts "‹ {title}" in SiteHeader on mobile — see GenericDirectory's
   // identical call, which this mirrors now that this screen has the same gap
   // it used to (its own mobile UpButton, no header title).
@@ -200,7 +200,10 @@ export default function EruvInfo({ onUp, title = 'Eruv Information', icon, color
 
   return (
     <CategoryBandFrame color={color} imageUrl={bandImageUrl}>
-      <DirectoryHeader title={title} titleInHeader banner={banner} />
+      {/* An open eruv has the top of the page, as a category's opened
+          listing has (GenericDirectory's deskListing): its ‹ is the way
+          back, so the title over it would say the same thing twice. */}
+      <DirectoryHeader title={title} titleInHeader banner={banner} titleOnly={column} />
 
       {loaded && (!loaded.available || loaded.eruvim.length === 0) && (
         <p className="text-sm text-muted" data-testid="eruv-none">
