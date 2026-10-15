@@ -186,42 +186,51 @@ describe('a shul’s usual times, two boxes (Oct 6)', () => {
     expect(screen.getByTestId('davening-no-weekday')).toHaveTextContent('No weekday minyan listed. Add one')
   })
 
-  // Oct 15: with the listing's box editor, an empty box has the same Edit
-  // as a full one — not "Add their Shabbos times", "Add one", "Add their
-  // times" — and it opens that box's editor, not the "+ Add" box.
-  describe('with the box editor, an empty box’s Edit is the same as a full one’s', () => {
+  // Oct 15, second pass: an empty box keeps its Add (the "+ Add" box, its
+  // AI reading a pasted schedule), even with the listing's box editor; only
+  // a box with times in it has Edit.
+  describe('with the box editor, an empty box still offers its Add, not Edit', () => {
     const withEditor = (times: unknown[]) => {
       const onEditBox = vi.fn()
+      const tell = vi.fn()
       const shul = makeListing({ id: 'k', name: 'Shul', category: 'synagogue', minyanim: times })
-      renderWithProviders(<DaveningCard item={shul} minyanim={times} category={shuls} onEditBox={onEditBox} />, { content: { categories: [shuls] } })
-      return onEditBox
+      renderWithProviders(
+        <TellAboutContext.Provider value={tell}>
+          <DaveningCard item={shul} minyanim={times} category={shuls} onEditBox={onEditBox} />
+        </TellAboutContext.Provider>,
+        { content: { categories: [shuls] } },
+      )
+      return { onEditBox, tell, shul }
     }
 
     it('Shabbos not listed', () => {
       at('2026-10-06T17:30:00-04:00')
-      const onEditBox = withEditor(lowerMerion)
+      const { onEditBox, tell, shul } = withEditor(lowerMerion)
       const shabbos = screen.getByTestId('davening-shabbos')
-      expect(shabbos).toHaveTextContent(/^Usual Shabbos timesTheir Shabbos times aren’t listed yet\.Edit$/)
-      fireEvent.click(within(shabbos).getByRole('button', { name: 'Edit' }))
-      expect(onEditBox).toHaveBeenCalledWith('shabbos', 'Usual Shabbos times')
+      expect(within(shabbos).queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument()
+      fireEvent.click(within(shabbos).getByRole('button', { name: 'Add their Shabbos times' }))
+      expect(tell).toHaveBeenCalledWith(shul, undefined, { times: true })
+      expect(onEditBox).not.toHaveBeenCalled()
+      // The full box beside it has Edit.
+      expect(within(screen.getByTestId('davening-weekday')).getByRole('button', { name: 'Edit' })).toBeInTheDocument()
     })
 
     it('no weekday minyan', () => {
       at('2026-10-06T17:30:00-04:00')
-      const onEditBox = withEditor(rodeph)
+      const { tell } = withEditor(rodeph)
       const line = screen.getByTestId('davening-no-weekday')
-      expect(within(line).queryByRole('button', { name: 'Add one' })).not.toBeInTheDocument()
-      fireEvent.click(within(line).getByRole('button', { name: 'Edit' }))
-      expect(onEditBox).toHaveBeenCalledWith('weekday', 'Usual weekday times')
+      expect(within(line).queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument()
+      fireEvent.click(within(line).getByRole('button', { name: 'Add one' }))
+      expect(tell).toHaveBeenCalledTimes(1)
     })
 
     it('no times at all', () => {
       at('2026-10-06T17:30:00-04:00')
-      const onEditBox = withEditor([])
+      const { tell } = withEditor([])
       const none = screen.getByTestId('davening-none')
-      expect(within(none).queryByRole('button', { name: /Add their times/ })).not.toBeInTheDocument()
-      fireEvent.click(within(none).getByRole('button', { name: 'Edit' }))
-      expect(onEditBox).toHaveBeenCalledWith('weekday', 'Usual weekday times')
+      expect(within(none).queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument()
+      fireEvent.click(within(none).getByRole('button', { name: 'Add their times' }))
+      expect(tell).toHaveBeenCalledTimes(1)
     })
   })
 })

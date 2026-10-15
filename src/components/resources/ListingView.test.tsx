@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, screen, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, screen, within } from '@testing-library/react'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { makeCategory, makeListing } from '@/test/providerFixtures'
 import { mockRouter } from '@/test/nextNavigationMock'
@@ -756,21 +756,41 @@ describe('ListingView — Edit under every box (Oct 15)', () => {
     expect(tell).not.toHaveBeenCalled()
   })
 
-  it('a place with nothing on its list yet leads with the box, saying so, with Edit; its hours are one line', () => {
+  // Oct 15, second pass: an empty list keeps its Add; Edit is for a list
+  // with something on it.
+  it('a place with nothing on its list yet leads with the box and its Add, which opens the list; its hours are one line', () => {
     view({ item: makeListing({ hours: { mon: { open: '09:00', close: '17:00' } } }), category: grocery })
-    expect(card()).toHaveTextContent(/^Kosher items hereNone listed yet\.Edit$/)
+    expect(card()).toHaveTextContent(/^Kosher items hereAdd the first item$/)
+    expect(within(card()).queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument()
     expect(screen.queryByTestId('listing-hours')).not.toBeInTheDocument()
     expect(screen.getByTestId('listing-details')).toHaveTextContent(/today/i)
     // The list comes before the details, as any main thing does.
     expect(card().compareDocumentPosition(screen.getByTestId('listing-details')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    fireEvent.click(within(card()).getByRole('button', { name: 'Add the first item' }))
+    expect(within(screen.getByRole('dialog', { name: 'Kosher items here' })).getByTestId('editor-open-items')).toBeInTheDocument()
   })
 
-  it('a place with no dishes: no “Add their menu”, just the box’s Edit', () => {
+  it('a place with no dishes offers “Add their menu”: the “+ Add” box for it, the list in the editor its do-it-yourself', () => {
     const dishesCat = makeCategory({ id: 'restaurant', detailFields: [{ key: 'dishes', label: 'Main dishes', type: 'tags', renderAs: 'badge', showCountInHeader: true, countLabel: 'main dish' }] })
     const place = makeListing({ id: '7d0a7c1e-2f55-4a8e-9d57-3b7f0d6f4a21', name: 'Shtetl', category: 'restaurant' })
-    view({ item: place, category: dishesCat })
-    expect(within(card()).queryByRole('button', { name: 'Add their menu' })).not.toBeInTheDocument()
-    editIn(card())
+    const tell = vi.fn()
+    renderWithProviders(
+      <TellAboutContext.Provider value={tell}>
+        <ListingView item={place} category={dishesCat} color="#2657bf" path="/philly/restaurant/shtetl" foot={<p>foot</p>} />
+      </TellAboutContext.Provider>,
+    )
+    expect(within(card()).queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument()
+    fireEvent.click(within(card()).getByRole('button', { name: 'Add their menu' }))
+    expect(tell).toHaveBeenCalledWith(place, expect.any(Function), { menu: true })
+    // Its do-it-yourself: the list, in the editor.
+    act(() => tell.mock.calls[0][1]())
+    expect(within(screen.getByRole('dialog', { name: 'Main dishes' })).getByTestId('editor-open-items')).toBeInTheDocument()
+  })
+
+  it('with no “+ Add” box (the Map), a place with no dishes offers “Add the first dish”, the list in the editor', () => {
+    const dishesCat = makeCategory({ id: 'restaurant', detailFields: [{ key: 'dishes', label: 'Main dishes', type: 'tags', renderAs: 'badge', showCountInHeader: true, countLabel: 'main dish' }] })
+    view({ item: makeListing({ id: '7d0a7c1e-2f55-4a8e-9d57-3b7f0d6f4a21', name: 'Shtetl', category: 'restaurant' }), category: dishesCat })
+    fireEvent.click(within(card()).getByRole('button', { name: 'Add the first dish' }))
     expect(within(screen.getByRole('dialog', { name: 'Main dishes' })).getByTestId('editor-open-items')).toBeInTheDocument()
   })
 

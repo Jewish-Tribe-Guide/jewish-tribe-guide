@@ -62,6 +62,7 @@ import {
   MailIcon,
   PhoneIcon,
   PinIcon,
+  PlusIcon,
   ShareIcon,
 } from '@/components/icons'
 import Chip from './Chip'
@@ -183,6 +184,19 @@ export default function ListingView({ item, category, color, place = null, upvot
     return editBox && rows.length > 0 ? () => editBox({ title, fields: [], rows }) : undefined
   }
   const tellAbout = useContext(TellAboutContext)
+  // A list with nothing on it yet keeps its Add (the user, Oct 15, second
+  // pass): a restaurant's "Add their menu" is the "+ Add" box for the menu,
+  // a link, a pasted menu or photos, its do-it-yourself the list in the
+  // editor; where there's no box (the Map), and for a store's items, "Add
+  // the first item" opens that list in the editor. A list with something on
+  // it has Edit instead.
+  const editItems = itemsF ? editRows(itemsF.label, ['items']) : undefined
+  const addItems =
+    itemsF && editItems
+      ? itemWording(itemsF).noun === 'dish' && tellAbout
+        ? { label: 'Add their menu', run: () => tellAbout(item, editItems, { menu: true }) }
+        : { label: itemWording(itemsF).addFirst, run: editItems }
+      : undefined
   const editElse = tellAbout
     ? () => {
         setBoxEdit(null)
@@ -390,7 +404,7 @@ export default function ListingView({ item, category, color, place = null, upvot
       />
     )
   } else if (main === 'items' && itemsF) {
-    mainSection = <ItemsCard field={itemsF} found={found} api={itemApi} menuUrl={menuUrlOf(item)} onEdit={editRows(itemsF.label, ['items'])} />
+    mainSection = <ItemsCard field={itemsF} found={found} api={itemApi} menuUrl={menuUrlOf(item)} onEdit={editItems} add={addItems} />
   } else if (main === 'groups') {
     mainSection = (
       <GroupBoxes
@@ -652,9 +666,9 @@ export default function ListingView({ item, category, color, place = null, upvot
           within a walk follow it (a hospital's food, shuls and hotels). */}
       {walks}
       {!shabbosFirst && !amongBoxes && shabbos}
-      {/* A place whose list has nothing on it yet: the box, empty, with its
-          Edit, after whatever it leads with. */}
-      {main !== 'items' && itemsF && itemApi.marks.length === 0 && editBox && <ItemsCard field={itemsF} found={null} api={itemApi} menuUrl={menuUrlOf(item)} onEdit={editRows(itemsF.label, ['items'])} />}
+      {/* A place whose list has nothing on it yet: the box, with its Add,
+          after whatever it leads with. */}
+      {main !== 'items' && itemsF && itemApi.marks.length === 0 && addItems && <ItemsCard field={itemsF} found={null} api={itemApi} menuUrl={menuUrlOf(item)} onEdit={editItems} add={addItems} />}
       {details}
       {about}
       {/* Part 6: the one thing this listing doesn't say yet that a tap can
@@ -951,7 +965,22 @@ function menuUrlOf(item: DirectoryResource): string | null {
  *  Adding or taking one off is the box's Edit, as under every box (the
  *  user, Oct 15: "Add a dish should just be edit"), not a row of its own:
  *  the list in the editor's own items screen, sent for a check. */
-function ItemsCard({ field, found, api, menuUrl, onEdit }: { field: CategoryField; found: SearchFound | null; api: ItemMarksApi; menuUrl: string | null; onEdit?: () => void }) {
+function ItemsCard({
+  field,
+  found,
+  api,
+  menuUrl,
+  onEdit,
+  add,
+}: {
+  field: CategoryField
+  found: SearchFound | null
+  api: ItemMarksApi
+  menuUrl: string | null
+  onEdit?: () => void
+  /** With nothing on the list yet, its Add in place of Edit. */
+  add?: { label: string; run: () => void }
+}) {
   const timezone = useCommunityTimezone()
   const clock = useNow()
   const say = itemWording(field)
@@ -966,7 +995,7 @@ function ItemsCard({ field, found, api, menuUrl, onEdit }: { field: CategoryFiel
     <Card
       title={rows.length ? `${field.label} · ${rows.length}` : field.label}
       testId="listing-items"
-      onEdit={onEdit}
+      onEdit={rows.length + api.added.length > 0 ? onEdit : undefined}
       // "All 10 items" on the same line as Edit (the user, Oct 15), not a
       // line of its own above it.
       footer={
@@ -1032,7 +1061,17 @@ function ItemsCard({ field, found, api, menuUrl, onEdit }: { field: CategoryFiel
           </li>
         ))}
       </ul>
-      {rows.length + api.added.length === 0 && <p className="pt-0.5 text-[14.5px] text-slate-700">None listed yet.</p>}
+      {rows.length + api.added.length === 0 &&
+        (add ? (
+          // Plain, as "+ Add their Shabbos times" is (the user, Oct 10: the
+          // outlined pill was louder than anything else in a box).
+          <button type="button" onClick={add.run} className="mt-0.5 inline-flex cursor-pointer items-center gap-1.5 py-1 text-[14.5px] font-bold text-primary" data-testid="items-add">
+            <PlusIcon className="h-4 w-4" />
+            {add.label}
+          </button>
+        ) : (
+          <p className="pt-0.5 text-[14.5px] text-slate-700">None listed yet.</p>
+        ))}
     </Card>
   )
 }

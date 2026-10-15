@@ -16,7 +16,7 @@ import AddScheduleBox from './AddScheduleBox'
 import UpdateTimesBox from './UpdateTimesBox'
 import { TellAboutContext } from './tellAbout'
 import DaveningTimes from './DaveningTimes'
-import { Card, EditButton } from './listingParts'
+import { Card } from './listingParts'
 import FreshnessFooter from './FreshnessFooter'
 import type { MinyanBox } from '@/lib/minyanimBox'
 
@@ -175,12 +175,6 @@ export default function DaveningCard({
     )
   }
 
-  // With a box editor (the listing's Edit, Oct 15), an empty box says so
-  // and has the same Edit as a full one, not an "Add their times" of its
-  // own: the user's "same everywhere".
-  const editWeekday = onEditBox ? () => onEditBox('weekday', 'Usual weekday times') : undefined
-  const editShabbos = onEditBox ? () => onEditBox('shabbos', 'Usual Shabbos times') : undefined
-
   const weekBox = week
     ? folded(
         'week',
@@ -201,16 +195,15 @@ export default function DaveningCard({
         </Card>,
       )
     : shab && (
-        <div key="week" className={editWeekday ? 'flex items-center gap-2 px-1' : 'px-1'} data-testid="davening-no-weekday">
-          <p className={editWeekday ? 'min-w-0 flex-1 text-[13.5px] text-muted' : 'text-[13.5px] text-muted'}>
+        <div key="week" className="px-1" data-testid="davening-no-weekday">
+          <p className="text-[13.5px] text-muted">
             No weekday minyan listed.{' '}
-            {!editWeekday && canAdd && updatingIn !== 'no-weekday' && (
+            {canAdd && updatingIn !== 'no-weekday' && (
               <button type="button" onClick={() => open('no-weekday')} className="cursor-pointer font-bold text-primary hover:underline">
                 Add one
               </button>
             )}
           </p>
-          {editWeekday && <EditButton onClick={editWeekday} />}
           {updateIn('no-weekday')}
         </div>
       )
@@ -226,9 +219,9 @@ export default function DaveningCard({
         </Card>,
       )
     : week && (
-        <Card key="shabbos" title="Usual Shabbos times" testId="davening-shabbos" onEdit={editShabbos}>
-          <p className="pt-0.5 text-[14.5px] leading-relaxed text-slate-700">Their Shabbos times aren’t listed yet.{canAdd && !editShabbos ? ' If you’ve davened there, add them.' : ''}</p>
-          {!editShabbos && canAdd && updatingIn !== 'shabbos' && (
+        <Card key="shabbos" title="Usual Shabbos times" testId="davening-shabbos">
+          <p className="pt-0.5 text-[14.5px] leading-relaxed text-slate-700">Their Shabbos times aren’t listed yet.{canAdd ? ' If you’ve davened there, add them.' : ''}</p>
+          {canAdd && updatingIn !== 'shabbos' && (
             <button type="button" onClick={() => open('shabbos')} className="mt-1.5 inline-flex cursor-pointer items-center gap-1.5 py-1 text-[14.5px] font-bold text-primary">
               <PlusIcon className="h-4 w-4" />
               Add their Shabbos times
@@ -315,9 +308,9 @@ export default function DaveningCard({
       )}
       {shabbosFirst ? [shabbosBox, weekBox] : [weekBox, shabbosBox]}
       {!week && !shab && (
-        <Card title="Davening times" testId="davening-none" onEdit={editWeekday}>
+        <Card title="Davening times" testId="davening-none">
           <p className="pt-0.5 text-[14.5px] text-slate-700">No davening times listed yet.</p>
-          {!editWeekday && canAdd && updatingIn !== 'none' && updated?.in !== 'none' && (
+          {canAdd && updatingIn !== 'none' && updated?.in !== 'none' && (
             <button type="button" onClick={() => open('none')} className="mt-1.5 inline-flex cursor-pointer items-center gap-1.5 py-1 text-[14.5px] font-bold text-primary">
               <PlusIcon className="h-4 w-4" />
               Add their times
