@@ -1121,15 +1121,19 @@ describe('GenericListingCard — the row', () => {
     })
   })
 
-  it('shows a shul’s next minyan when the list works one out', () => {
-    const item = makeListing({ id: 'shul-1' })
+  // Oct 15: shuls list like everything else; their times are the Minyanim
+  // view's and the opened listing's, not a line on every row.
+  it('has no davening line on a shul’s row, even when the list works one out', () => {
+    const item = makeListing({ id: 'shul-1', milesFromAddress: 1 })
     renderWithProviders(
-      <NextMinyansContext.Provider value={{ 'shul-1': { text: 'Mincha 6:34 PM', tone: 'minyan' } }}>
+      <NextMinyansContext.Provider value={{ 'shul-1': { text: 'Mincha 6:34 PM', tone: 'minyan', note: 'On Zoom' } }}>
         <GenericListingCard item={item} category={makeCategory()} upvotes={false} count={0} {...requiredHandlers} />
       </NextMinyansContext.Provider>,
     )
 
-    expect(within(screen.getByTestId('row-facts')).getByText('Mincha 6:34 PM')).toBeInTheDocument()
+    expect(screen.getByTestId('row-facts')).toHaveTextContent('1 mi')
+    expect(screen.queryByText('Mincha 6:34 PM')).not.toBeInTheDocument()
+    expect(screen.queryByText('On Zoom')).not.toBeInTheDocument()
   })
 
   it('shows initials for a place with no photo of its own, not the category’s icon', () => {

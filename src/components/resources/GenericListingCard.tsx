@@ -26,7 +26,6 @@ import { useListingActions, type ListingAction } from './useListingActions'
 import SwipeRow, { type SwipeAction } from '@/components/SwipeRow'
 import Chip from './Chip'
 import { initialsOf, listingRowFacts, listingRowNote, type RowFactTone, type RowNote } from '@/lib/listingRow'
-import { useNextMinyan } from './nextMinyans'
 import { ui } from '@/lib/uiConfig'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { usePinned } from '@/lib/pinnedContext'
@@ -248,17 +247,18 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
   // Open badge and no opening or closing time yet.
   const clock = useNow()
   const now = clock === null ? null : new Date(clock)
-  // The row's second line: open status, next minyan, distance, what kind of
-  // place, how many items. See lib/listingRow.ts.
-  const shul = useNextMinyan(item.id)
-  const allFacts = listingRowFacts(item, category, now, { shul, omitKey, candlesAt })
+  // The row's second line: open status, distance, what kind of place, how
+  // many items. See lib/listingRow.ts. No davening line on a shul's row
+  // (the user, Oct 15): shuls list like everything else, and the times are
+  // the Minyanim view's and the opened listing's.
+  const allFacts = listingRowFacts(item, category, now, { omitKey, candlesAt })
   const facts = allFacts.filter((f) => !f.ownLine)
   // A restaurant's dishes, on their own line; not beside what a search
   // matched here, which names the dish asked for.
   const itemsLine = found?.items.length ? null : (allFacts.find((f) => f.ownLine)?.text ?? null)
   // A category page's row: see the `place` prop.
   const pageRow = place !== undefined
-  const rowNote = listingRowNote(item, category, now, { flagUnconfirmed, shulNote: shul?.note })
+  const rowNote = listingRowNote(item, category, now, { flagUnconfirmed })
   const note = rowNote && (pageRow || rowNote.kind === 'exception') ? rowNote : null
   // Upvotes live in the opened listing now (the sheet on a phone, the dialog
   // on desktop), not on every row: a column of "👍 0" said nothing while a
