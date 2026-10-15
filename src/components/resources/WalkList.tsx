@@ -488,7 +488,6 @@ function ListBody({
           </ul>
         </div>
       ))}
-      <p className="mt-2 text-[12.5px] leading-snug text-slate-500">{shuls ? 'Tap one for its Shabbos times.' : 'Tap one to open it.'}</p>
       {/* These places aren't on this page's map, which shows its own
           category: the Map shows them around this one (Oct 6). */}
       {fromItem && !onMap && (

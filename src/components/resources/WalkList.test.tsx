@@ -124,7 +124,8 @@ describe('A hotel’s synagogues within a walk', () => {
     // street walk shown.
     expect(screen.getByTestId('walk-lists')).not.toHaveTextContent(/straight line|Rough/)
     expect(screen.queryByTestId('walk-credit')).not.toBeInTheDocument()
-    expect(screen.getByText('Tap one for its Shabbos times.')).toBeInTheDocument()
+    // No "Tap one…": a row that opens looks like one (the user, Oct 15).
+    expect(screen.getByTestId('walk-lists')).not.toHaveTextContent(/Tap one/)
   })
 
   // Oct 15: walks worked out along the streets (walkRoutes.ts) replace the

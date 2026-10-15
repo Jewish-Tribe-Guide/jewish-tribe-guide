@@ -91,6 +91,10 @@ describe('Update their times', () => {
     const shabbos = day('Shabbos')
     expect(within(shabbos).getByText('9:15 AM').className).toContain('line-through')
     expect(within(shabbos).getByText('9 AM')).toBeTruthy()
+    // Oct 15: the time looks like what to tap (blue, a pencil), with no
+    // "Tap a time to fix it" to read.
+    expect(within(shabbos).getByText('9 AM').className).toContain('text-primary')
+    expect(result).not.toHaveTextContent(/Tap a time/)
     const gone = shabbos.querySelector('[data-status="gone"]')!
     expect(gone.textContent).toContain('Mincha · 12:20 PM')
     // Sunday's is new.

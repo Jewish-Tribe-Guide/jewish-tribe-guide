@@ -264,13 +264,15 @@ describe('Set as my location', () => {
     expect(details).toHaveTextContent('The guide’s distances, from here')
   })
 
-  it('once set, says so, and a tap unsets it', () => {
+  // Oct 15: an Undo you can see, not "Tap to undo" under it.
+  it('once set, says so, with an Undo beside it', () => {
     vi.setSystemTime(new Date(2026, 9, 6, 13, 30))
     location.anchorListingId = 'hup'
     open()
-    const button = within(screen.getByTestId('listing-details')).getByRole('button', { name: 'Your location' })
-    expect(button).toHaveAttribute('aria-pressed', 'true')
-    fireEvent.click(button)
+    const details = screen.getByTestId('listing-details')
+    expect(details).toHaveTextContent('Your locationUndo')
+    expect(details).not.toHaveTextContent(/Tap to undo/)
+    fireEvent.click(within(details).getByRole('button', { name: 'Undo' }))
     expect(location.unsetListingAnchor).toHaveBeenCalled()
   })
 })

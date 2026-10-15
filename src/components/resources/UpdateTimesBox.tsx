@@ -10,6 +10,7 @@ import { clockTime } from '@/lib/upcomingDavening'
 import { PREVIEW_READ_ERROR, useFetchOrPreview } from '@/lib/previewSend'
 import { RelativeTimeFields, TimeModeToggle, useTimeModes, ZMAN_ANCHOR_ORDER } from '@/components/intake/ZmanTimeFields'
 import TurnstileWidget from '@/components/TurnstileWidget'
+import { PencilIcon } from '@/components/icons'
 import { useTurnstileActive } from './useListingSubmit'
 
 // "Update their times" on a shul's card (agreed Oct 1). The user's words:
@@ -318,7 +319,7 @@ function TimesResult({
       <p className="mt-3 text-[17px] leading-tight font-extrabold text-slate-900">{title}</p>
       {week && u.title && <p className="mt-0.5 text-[13.5px] font-semibold text-slate-700">{u.title}</p>}
       <p className="mt-1 text-[13.5px] leading-snug text-slate-600">
-        How they’ll show in the guide.{week ? ' Other weeks stay as they are.' : ''} Tap a time to fix it.
+        How they’ll show in the guide.{week ? ' Other weeks stay as they are.' : ''}
       </p>
 
       {byDay.length === 0 && <p className="mt-3 text-[13.5px] font-semibold text-caution">No times could be read from it. Add them below.</p>}
@@ -439,7 +440,10 @@ function ResultRow({ row: r, week, onEdit, onPatch }: { row: UpdateRow; week: bo
         </span>
         <span className="shrink-0 whitespace-nowrap">
           {r.status === 'changed' && r.was && <span className="mr-1.5 text-[14px] text-muted line-through">{shownTime(r.was)}</span>}
-          <b className="text-[15px] text-slate-900">{shownTime(r.time)}</b>
+          {/* Blue, with a pencil: the time is what to tap to fix it, said
+              by how it looks rather than "Tap a time to fix it" (Oct 15). */}
+          <b className="text-[15px] text-primary">{shownTime(r.time)}</b>
+          <PencilIcon className="ml-1 inline h-3.5 w-3.5 text-primary" />
         </span>
       </button>
       {r.status === 'gone' && r.keep && (

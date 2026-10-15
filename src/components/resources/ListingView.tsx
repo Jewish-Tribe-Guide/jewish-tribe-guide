@@ -872,20 +872,37 @@ function SetLocationRow({ item }: { item: DirectoryResource }) {
   const set = location.anchorListingId === item.id
   return (
     <Row icon={set ? <CheckIcon className="h-[17px] w-[17px] text-emerald-700" /> : <CrosshairIcon className="h-[17px] w-[17px]" />}>
-      <button
-        type="button"
-        aria-pressed={set}
-        onClick={() => {
-          track('listing_action', { action: set ? 'Unset location' : 'Set as location' })
-          if (set) location.unsetListingAnchor()
-          else location.setListingAnchor({ id: item.id, name: item.name, coords: item.geo! })
-        }}
-        className="cursor-pointer text-left font-semibold text-primary hover:underline"
-        data-testid="set-location"
-      >
-        {set ? 'Your location' : 'Set as my location'}
-      </button>
-      <span className="block text-[13px] text-muted">{set ? 'The guide’s distances are from here. Tap to undo.' : 'The guide’s distances, from here'}</span>
+      {/* Set, an Undo beside it rather than "Tap to undo" under it (the
+          user, Oct 15: what isn't plain is ours to fix). */}
+      {set ? (
+        <span className="flex items-baseline gap-3">
+          <span className="font-semibold text-slate-900">Your location</span>
+          <button
+            type="button"
+            onClick={() => {
+              track('listing_action', { action: 'Unset location' })
+              location.unsetListingAnchor()
+            }}
+            className="cursor-pointer text-[14px] font-semibold text-primary hover:underline"
+            data-testid="set-location"
+          >
+            Undo
+          </button>
+        </span>
+      ) : (
+        <button
+          type="button"
+          onClick={() => {
+            track('listing_action', { action: 'Set as location' })
+            location.setListingAnchor({ id: item.id, name: item.name, coords: item.geo! })
+          }}
+          className="cursor-pointer text-left font-semibold text-primary hover:underline"
+          data-testid="set-location"
+        >
+          Set as my location
+        </button>
+      )}
+      <span className="block text-[13px] text-muted">{set ? 'The guide’s distances are from here' : 'The guide’s distances, from here'}</span>
     </Row>
   )
 }
