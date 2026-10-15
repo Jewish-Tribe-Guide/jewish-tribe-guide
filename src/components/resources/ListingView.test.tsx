@@ -257,9 +257,43 @@ describe('ListingView — a network’s one link (Oct 6)', () => {
 })
 
 describe('ListingView — about', () => {
-  it('says the description is Google’s when the sync keeps it', () => {
-    view({ item: { ...judah, placeId: 'p1', googleFields: ['description'] } })
-    expect(screen.getByTestId('listing-about')).toHaveTextContent('Description from Google')
+  // Oct 15: its foot says when it was last right, on one line with Edit.
+  it('says when Google last updated it, when the sync keeps it, with Edit on the same line', () => {
+    view({ item: { ...judah, placeId: 'p1', googleFields: ['description'], googleSyncedAt: '2026-08-28T06:59:09Z' } })
+    const about = screen.getByTestId('listing-about')
+    expect(within(about).getByTestId('about-google')).toHaveTextContent('Last updated from Google, Aug 28.')
+    expect(within(about).getByTestId('about-google').parentElement!.parentElement).toContainElement(within(about).getByRole('button', { name: 'Edit' }))
+    // Google's to keep: nobody is asked whether it's right.
+    expect(about).not.toHaveTextContent(/Confirmed|Right\?/)
+  })
+
+  it('otherwise says when it was confirmed, its own date, and asks once that’s old', () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-10-15T15:00:00Z'))
+    try {
+      view({ item: { ...judah, confirmedAt: '2026-03-01T15:00:00Z', sectionConfirmed: { googleDescription: '2026-09-29T15:00:00Z' } } })
+      const foot = within(screen.getByTestId('listing-about')).getByTestId('freshness')
+      expect(foot).toHaveTextContent(/^Confirmed Sep 29Edit$/)
+      cleanup()
+      view({ item: { ...judah, confirmedAt: '2026-03-01T15:00:00Z' } })
+      expect(within(screen.getByTestId('listing-about')).getByTestId('freshness')).toHaveTextContent(/^Confirmed Mar 1 · Still right\?YesEdit$/)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('confirms About alone, under its description’s key', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(new Response(JSON.stringify({ ok: true, confirmedAt: '2026-10-15T15:00:00.000Z', changed: true, activityId: 1 })))
+    try {
+      view()
+      fireEvent.click(within(screen.getByTestId('listing-about')).getByRole('button', { name: 'Yes' }))
+      expect(await within(screen.getByTestId('listing-about')).findByText(/Confirmed\. Thanks/)).toBeInTheDocument()
+      const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+      expect(url).toBe(`/api/resource/${judah.id}/confirm`)
+      expect(JSON.parse(String(init.body))).toEqual({ section: 'googleDescription' })
+    } finally {
+      fetchMock.mockRestore()
+    }
   })
   it('says nothing about where it came from when the sync doesn’t record keeping it', () => {
     // Every Google description fetched before the sync recorded ownership
@@ -314,7 +348,10 @@ describe('ListingView — how sure', () => {
     view({ item: { ...judah, placeId: 'p1', googleSyncedAt: '2026-09-30T06:59:09Z', googleFields: ['phone', 'website'], confirmedAt: '2026-06-01T16:30:00Z' } })
     expect(screen.queryByText(/last checked/)).not.toBeInTheDocument()
     expect(within(screen.getByTestId('listing-details')).getByTestId('listing-google')).toHaveTextContent('Last updated from Google, Sep 30.')
-    expect(screen.queryByText(/Still right|Right\?/)).not.toBeInTheDocument()
+    // Asked only under About (its own date, Oct 15), never about the
+    // kosher details.
+    expect(screen.getAllByText(/Still right|Right\?/).every((el) => screen.getByTestId('listing-about').contains(el))).toBe(true)
+    expect(screen.getByTestId('listing-details')).not.toHaveTextContent(/Still right|Right\?|confirmed/i)
     expect(screen.getByTestId('listing-view').querySelector('h2')!.parentElement!.parentElement).not.toHaveTextContent(/checked|confirmed/i)
   })
 
@@ -605,6 +642,18 @@ describe('ListingView — a restaurant’s main dishes (agreed Oct 1)', () => {
   afterEach(() => vi.useRealTimers())
   const card = () => screen.getByTestId('listing-items')
   const row = (name: string) => screen.getAllByTestId('listing-item').find((li) => li.textContent?.startsWith(name))!
+
+  // Oct 15: "All 10 items" on the same line as the box's Edit.
+  it('a long list says "All N" on the same line as Edit', () => {
+    const many = makeListing({ ...served, dishes: ['Shawarma', 'Falafel', 'Hummus', 'Kebab', 'Schnitzel', 'Laffa', 'Baba ganoush'] })
+    view({ item: many, category: withDishes })
+    const all = within(card()).getByTestId('items-all')
+    expect(all).toHaveTextContent('All 7 dishes')
+    expect(all.parentElement!.parentElement).toContainElement(within(card()).getByRole('button', { name: 'Edit' }))
+    fireEvent.click(all)
+    expect(screen.getAllByTestId('listing-item')).toHaveLength(7)
+    expect(all).toHaveTextContent('Fewer')
+  })
 
   it('lead the listing, in a dish’s words, each dated by its menu until someone has seen it since', () => {
     view({ item: served, category: withDishes })

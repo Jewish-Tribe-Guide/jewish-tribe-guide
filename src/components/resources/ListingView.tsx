@@ -598,8 +598,20 @@ export default function ListingView({ item, category, color, place = null, upvot
   // marked either way, so nothing is said rather than guessing whose they
   // are.
   const fromGoogle = aboutFields.some((f) => f.key === 'googleDescription') && !!item.placeId && !!item.googleFields?.includes('description')
+  // Its foot says when it was last right (the user, Oct 15): Google's
+  // date when the sync keeps it, as the contact box says Google's ("Last
+  // updated from Google, Aug 28."); otherwise its own "Confirmed Sep 29",
+  // asked about once that's old, under its first description's key
+  // (migration 078). Edit beside either.
+  const editAbout = editRows('About', ['about'])
+  const aboutKey = aboutFields[0]?.key
+  const aboutFoot = fromGoogle ? (
+    <span data-testid="about-google">{item.googleSyncedAt ? `Last updated from Google, ${shortDate(item.googleSyncedAt, clock)}.` : 'From Google.'}</span>
+  ) : aboutKey ? (
+    <FreshnessFooter resourceId={item.id} confirmedAt={sectionConfirmedAt(item, aboutKey)} section={aboutKey} onEdit={editAbout} />
+  ) : undefined
   const about = aboutFields.length > 0 && (
-    <Card testId="listing-about" footer={fromGoogle ? 'Description from Google' : undefined} onEdit={editRows('About', ['about'])}>
+    <Card testId="listing-about" footer={aboutFoot} onEdit={fromGoogle ? editAbout : undefined}>
       <div className="space-y-3 pt-2.5">
         {aboutFields.map((f) => (
           <p key={f.key} className="whitespace-pre-line text-[15px] leading-relaxed text-slate-800">{String(item[f.key]).trim()}</p>
@@ -955,6 +967,16 @@ function ItemsCard({ field, found, api, menuUrl, onEdit }: { field: CategoryFiel
       title={rows.length ? `${field.label} · ${rows.length}` : field.label}
       testId="listing-items"
       onEdit={onEdit}
+      // "All 10 items" on the same line as Edit (the user, Oct 15), not a
+      // line of its own above it.
+      footer={
+        rows.length > ITEMS_SHOWN && (
+          <button type="button" onClick={() => setAll((v) => !v)} className="inline-flex min-h-9 cursor-pointer items-center gap-1 text-[14.5px] font-bold text-primary" data-testid="items-all">
+            {all ? 'Fewer' : `All ${rows.length} ${say.nouns}`}
+            <ChevronRightIcon className={`h-4 w-4 transition-transform ${all ? '-rotate-90' : ''}`} />
+          </button>
+        )
+      }
       action={
         menuUrl && (
           <a href={menuUrl} target="_blank" rel="noopener noreferrer" className="shrink-0 text-[14px] font-bold text-primary hover:underline" data-testid="full-menu">
@@ -1010,12 +1032,6 @@ function ItemsCard({ field, found, api, menuUrl, onEdit }: { field: CategoryFiel
           </li>
         ))}
       </ul>
-      {rows.length > ITEMS_SHOWN && (
-        <button type="button" onClick={() => setAll((v) => !v)} className="mt-1.5 inline-flex min-h-9 cursor-pointer items-center gap-1 text-[14.5px] font-bold text-primary">
-          {all ? 'Fewer' : `All ${rows.length} ${say.nouns}`}
-          <ChevronRightIcon className={`h-4 w-4 transition-transform ${all ? '-rotate-90' : ''}`} />
-        </button>
-      )}
       {rows.length + api.added.length === 0 && <p className="pt-0.5 text-[14.5px] text-slate-700">None listed yet.</p>}
     </Card>
   )
