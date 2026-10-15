@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import PageScreenHeader from '@/components/PageScreenHeader'
 import { pageBodyToHtml, splitPageSections } from '@/lib/richText'
-import { PAGE_COLUMN } from '@/lib/pageColumn'
+import { PAGE_COLUMN, PAGE_TITLE_DESKTOP } from '@/lib/pageColumn'
 
 type Props = {
   title: string
@@ -36,7 +36,7 @@ export default function PageDocument({ title, subtitle, body }: Props) {
     <main className={`${PAGE_COLUMN} pt-4 pb-12 desktop:py-16`}>
       <PageScreenHeader title={title} />
       <div className="desktop:rounded-lg desktop:border desktop:border-slate-200 desktop:bg-white desktop:p-10 desktop:shadow-sm">
-        <h1 className="sr-only desktop:not-sr-only desktop:block desktop:text-[34px] desktop:font-bold desktop:leading-tight desktop:tracking-tight desktop:text-slate-900">
+        <h1 className={`sr-only desktop:not-sr-only desktop:block ${PAGE_TITLE_DESKTOP}`}>
           {title}
         </h1>
         {subtitle && <p className="mx-0.5 text-sm text-muted desktop:mx-0 desktop:mt-1.5">{subtitle}</p>}

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, screen } from '@testing-library/react'
+import { cleanup, screen, within } from '@testing-library/react'
 import FeedbackScreen from './FeedbackScreen'
 import PageDocument from '@/components/PageDocument'
 import { renderWithProviders } from '@/test/renderWithProviders'
@@ -56,7 +56,7 @@ describe('FeedbackScreen — on a phone it is a drill-down, like About and Priva
     expect(screen.getByRole('heading', { level: 1, name: SITE_SETTINGS_DEFAULTS.feedbackHeading })).not.toHaveClass('sr-only')
   })
 
-  it('leaves the desktop header alone (it is a dialog there)', () => {
+  it('leaves the desktop header alone (nothing to go back to there)', () => {
     renderScreen(false)
     expect(screen.queryByTestId('header-back')).not.toBeInTheDocument()
   })
@@ -84,5 +84,36 @@ describe('FeedbackScreen — the same box as About and Privacy', () => {
     renderScreen(true)
     expect(screen.queryByText(/handled fastest/)).not.toBeInTheDocument()
     expect(screen.getByLabelText('Your feedback')).toBeInTheDocument()
+  })
+})
+
+// Oct 15: on a desktop, /feedback is reached by a typed or shared link (the
+// footer and the More menu open a dialog over the page being read). It used to
+// answer with that dialog over an empty <main>; now it's a page, like About
+// and Privacy.
+describe('FeedbackScreen — on a desktop it is a page', () => {
+  it('is the form in a card, not a dialog, with its title showing', () => {
+    renderScreen(false)
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Close' })).not.toBeInTheDocument()
+    const main = screen.getByRole('main')
+    const h1 = within(main).getByRole('heading', { level: 1, name: SITE_SETTINGS_DEFAULTS.feedbackHeading })
+    expect(h1).not.toHaveClass('sr-only')
+    expect(within(main).getByLabelText('Your feedback')).toBeInTheDocument()
+  })
+
+  it('in the same column as About and Privacy, with their title style', () => {
+    const { container } = renderScreen(false)
+    const feedbackMain = container.querySelector('main')!
+    const feedbackTitle = [...screen.getByRole('heading', { level: 1 }).classList].filter((c) => c.startsWith('desktop:text-'))
+    cleanup()
+    const page = renderWithProviders(<ScreenHeaderProvider><PageDocument title="About" body="<p>x</p>" /></ScreenHeaderProvider>)
+    const pageMain = page.container.querySelector('main')!
+    const pageTitle = [...screen.getByRole('heading', { level: 1 }).classList].filter((c) => c.startsWith('desktop:text-'))
+
+    expect(widthClasses(feedbackMain)).toEqual(widthClasses(pageMain))
+    expect(feedbackMain.querySelector('[class*="max-w-"]')).toBeNull()
+    expect(feedbackTitle).toEqual(pageTitle)
+    expect(feedbackTitle.length).toBeGreaterThan(0)
   })
 })

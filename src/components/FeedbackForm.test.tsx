@@ -17,7 +17,7 @@ vi.mock('next/navigation', () => ({
 afterEach(() => cleanup())
 
 describe('FeedbackForm — modal variant semantics', () => {
-  // The desktop /feedback page renders this modal over an empty <main>. It used
+  // Opened from the desktop footer and the header's More menu. It used
   // to be a bare fixed <div>: no role, no label, no Escape — a screen reader
   // had no idea it was a dialog and kept reading the page behind it.
   it('is a labelled, modal dialog', () => {

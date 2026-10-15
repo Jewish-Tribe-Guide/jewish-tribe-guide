@@ -8,13 +8,14 @@ import { submitRequest } from '@/lib/submitRequest'
 import PrivacyNote from '@/components/PrivacyNote'
 import type { ContactHospitalData } from '@/types'
 import { useCommunitySlug } from '@/lib/communityContext'
+import { PAGE_TITLE_DESKTOP } from '@/lib/pageColumn'
 
 type Props = {
   heading: string
   successMessage: string
-  /** 'modal' (default) renders the fixed-backdrop dialog used by FeedbackButton;
-   *  'inline' renders the same content in a white card, for embedding as a full
-   *  page (the mobile /feedback screen). */
+  /** 'modal' (default) renders the fixed-backdrop dialog used by FeedbackButton
+   *  and HeaderNav; 'inline' renders the same content in a white card, for
+   *  embedding as a full page (the /feedback screen). */
   variant?: 'modal' | 'inline'
   /** Required for 'modal' (backdrop tap / ✕ / success "Close"); unused inline. */
   onClose?: () => void
@@ -34,15 +35,12 @@ export default function FeedbackForm({ heading, successMessage, variant = 'modal
   const [error, setError] = useState('')
   const turnstileRef = useRef<TurnstileHandle>(null)
 
-  // FeedbackScreen's desktop branch renders the modal variant unconditionally
-  // on page load — not behind a click the way FeedbackButton/HeaderNav's
-  // "More" always are — so, unlike CommunitySwitcher's own portal (which
-  // only ever runs after a click, never during a server render),
-  // `createPortal(..., document.body)` below CAN be reached during SSR,
-  // where `document` doesn't exist. `mounted` delays the portal to after
-  // this component is actually running in the browser; the server (and the
-  // client's first paint, before hydration) render nothing for the modal
-  // variant instead of crashing on it.
+  // `createPortal(..., document.body)` below can't run during SSR, where
+  // `document` doesn't exist. Today the modal only ever opens behind a click
+  // (FeedbackButton, HeaderNav's "More"), but the /feedback page used to
+  // render it on page load, and a server render that reaches it would crash.
+  // `mounted` delays the portal to after this component is actually running
+  // in the browser; before that the modal variant renders nothing.
   const [mounted, setMounted] = useState(false)
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -101,20 +99,22 @@ export default function FeedbackForm({ heading, successMessage, variant = 'modal
   }, [variant, onClose])
 
   // The dialog's title is a section under the page; the inline variant IS the
-  // page (FeedbackScreen's mobile branch), so its heading is the page's h1.
+  // page (FeedbackScreen), so its heading is the page's h1.
   const Heading = variant === 'modal' ? 'h2' : 'h1'
 
   const wrap = (children: React.ReactNode) => {
     if (variant !== 'modal') {
       // The page's own <main> sets the gutter and the width (PAGE_COLUMN,
       // shared with About/Privacy), so the card just fills it — it used to
-      // add a second px-4 of its own and stop at 448px.
-      return <div className="w-full rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">{children}</div>
+      // add a second px-4 of its own and stop at 448px. On a desktop it's the
+      // pages' card too: the same corners and padding as PageDocument's.
+      return (
+        <div className="w-full rounded-2xl border border-slate-200 bg-white p-4 shadow-sm desktop:rounded-lg desktop:p-10">{children}</div>
+      )
     }
-    // FeedbackScreen's desktop branch renders this variant unconditionally
-    // on page load, so the portal below can be reached during SSR, where
-    // there's no `document` to portal into (see `mounted`'s own comment) —
-    // render nothing until this is actually running in the browser.
+    // No `document` to portal into during SSR (see `mounted`'s own
+    // comment) — render nothing until this is actually running in the
+    // browser.
     if (!mounted) return null
 
     // Portaled to <body> — opened from HeaderNav's "More" menu, which
@@ -179,7 +179,9 @@ export default function FeedbackForm({ heading, successMessage, variant = 'modal
   return wrap(
     <>
       <div className={showHeading ? 'flex items-start justify-between' : 'contents'}>
-        <Heading className={showHeading ? 'text-lg font-semibold text-slate-900' : 'sr-only'}>{heading}</Heading>
+        <Heading className={showHeading ? `text-lg font-semibold text-slate-900 ${variant === 'modal' ? '' : PAGE_TITLE_DESKTOP}` : 'sr-only'}>
+          {heading}
+        </Heading>
         {variant === 'modal' && (
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600" aria-label="Close">
             &times;
@@ -187,7 +189,7 @@ export default function FeedbackForm({ heading, successMessage, variant = 'modal
         )}
       </div>
 
-        <form onSubmit={handleSubmit} className={`${showHeading ? 'mt-4' : ''} space-y-3`}>
+        <form onSubmit={handleSubmit} className={`${showHeading ? (variant === 'modal' ? 'mt-4' : 'mt-4 desktop:mt-7') : ''} space-y-3`}>
           <Honeypot value={honeypot} onChange={setHoneypot} />
 
           <div>

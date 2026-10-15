@@ -299,8 +299,9 @@ test.describe('URLs', () => {
     await page.goto(`/${community}/feedback`)
     await dismissLocationPrompt(page)
 
-    // Feedback's note says just "Privacy" (PrivacyNote's `short`).
-    const link = page.getByRole('link', { name: /privacy/i })
+    // Feedback's note says just "Privacy" (PrivacyNote's `short`) — the
+    // same as the desktop footer's link, so look for it in the page itself.
+    const link = page.getByRole('main').getByRole('link', { name: /privacy/i })
     await expect(link).toBeVisible()
     await expect(link).toHaveAttribute('href', `/${community}/privacy`)
   })
