@@ -449,7 +449,6 @@ function ListBody({
   const noun = (target.pluralLabel || target.label).toLowerCase()
   const field = walk.groupBy ? (walkGroupFields(target).find((f) => f.key === walk.groupBy) ?? null) : null
   const groups = walkGroups(from, places, walk.maxMinutes, field, routed)
-  const shuls = isShuls(target)
   const hoods = neighborhoodsFor(community)
   const towns = townsFrom(places)
 
