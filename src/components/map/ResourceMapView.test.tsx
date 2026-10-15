@@ -244,7 +244,7 @@ describe('ResourceMapView — search autocomplete', () => {
 
     expect(input.value).toBe('')
     expect(screen.queryByText('Show only listings open right now')).not.toBeInTheDocument()
-    expect(screen.getByTestId('map-active-filters')).toHaveTextContent('Open now')
+    expect(screen.getByTestId('map-filters-button')).toHaveAccessibleName('Filters, 1 on')
   })
 })
 
@@ -1642,16 +1642,25 @@ describe('ResourceMapView — the Filters sheet', () => {
     expect(within(sheet).getByRole('button', { name: 'Show 3 places' })).toBeInTheDocument()
   })
 
-  it('shows what’s on under the categories, and a tap there switches it off', async () => {
+  // Oct 15: no line of chips repeating what was just tapped, as a category
+  // page has none. Filters turns solid with how many; the sheet says which.
+  it('a filter chosen in the sheet shows on Filters, not as a line of chips', async () => {
     const user = userEvent.setup()
     renderMap(<ResourceMapView onUp={vi.fn()} />, listings, [food, grocery, cemetery])
+    expect(screen.getByTestId('map-filters-button')).not.toHaveClass('bg-primary')
     await user.click(screen.getByTestId('map-filters-button'))
     await user.click(within(screen.getByTestId('map-filters-restaurant')).getByRole('button', { name: 'Meat' }))
     await user.click(screen.getByRole('button', { name: 'Show 3 places' }))
 
-    await user.click(within(screen.getByTestId('map-active-filters')).getByRole('button', { name: 'Meat' }))
-    expect(screen.getByTestId('point-count')).toHaveTextContent('4')
     expect(screen.queryByTestId('map-active-filters')).not.toBeInTheDocument()
+    expect(screen.getByTestId('map-filters-button')).toHaveAccessibleName('Filters, 1 on')
+    expect(screen.getByTestId('map-filters-button')).toHaveClass('bg-primary')
+
+    // Off again from the sheet.
+    await user.click(screen.getByTestId('map-filters-button'))
+    await user.click(within(screen.getByTestId('map-filters-restaurant')).getByRole('button', { name: 'Meat' }))
+    expect(screen.getByTestId('point-count')).toHaveTextContent('4')
+    expect(screen.getByTestId('map-filters-button')).toHaveAccessibleName('Filters')
   })
 
   it('Open now for everything: shown with two categories that keep hours, and it turns each one on', async () => {

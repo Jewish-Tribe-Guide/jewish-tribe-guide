@@ -32,6 +32,8 @@ test('the Map page’s Filters: a section per category, its Open now in the link
     await expect(page.getByRole('dialog', { name: 'Filters' })).toHaveCount(0)
     // Still on the map, still filtered.
     expect(new URL(page.url()).pathname).toBe(`/${community}/map`)
-    await expect(page.getByTestId('map-active-filters').filter({ visible: true })).toContainText('Open now')
+    // Shown on Filters itself, not as a line of chips (Oct 15).
+    await expect(page.getByTestId('map-filters-button').filter({ visible: true })).toHaveAccessibleName(/^Filters, \d+ on$/)
+    await expect(page.getByTestId('map-active-filters').filter({ visible: true })).toHaveCount(0)
   }
 })

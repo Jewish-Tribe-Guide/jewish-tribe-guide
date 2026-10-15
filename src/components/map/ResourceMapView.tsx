@@ -1756,11 +1756,13 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
       onClick={() => setFiltersOpen(true)}
       aria-label={filtersOn > 0 ? `Filters, ${filtersOn} on` : 'Filters'}
       data-testid="map-filters-button"
-      className="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-full border border-primary bg-white px-2.5 py-1 text-xs font-bold text-primary shadow-sm transition-colors hover:bg-primary/5 active:bg-primary/10"
+      className={`flex shrink-0 cursor-pointer items-center gap-1.5 rounded-full border border-primary px-2.5 py-1 text-xs font-bold shadow-sm transition-colors ${
+        filtersOn > 0 ? 'bg-primary text-white hover:bg-primary-dark' : 'bg-white text-primary hover:bg-primary/5 active:bg-primary/10'
+      }`}
     >
       <SlidersIcon className="h-3.5 w-3.5" />
       Filters
-      {filtersOn > 0 && <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[11px] text-white">{filtersOn}</span>}
+      {filtersOn > 0 && <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-white px-1 text-[11px] text-primary">{filtersOn}</span>}
     </button>
   )
   // Filters, then, while the lines are on, an "Eruv" chip, before the
@@ -1788,11 +1790,13 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
     </>
   )
 
-  // What's on, under the category chips, as under a category page's
-  // heading: a tap switches that one off.
-  // Read by the reader, the row starts "Read as" and adds what a reading
-  // holds beyond the Filters: its items and how far. Each is removable.
-  const onFilters = activeFilters(filters, showingCategories)
+  // No line of chips for the filters someone chose themselves (the user,
+  // Oct 15: they know what they tapped), as a category page has none under
+  // its heading: the Filters button turns solid with how many, and the
+  // sheet shows which. A question the reader read is different — nobody
+  // tapped those — so then the row says "Read as" and what it read: the
+  // Filters, its items and how far, each removable.
+  const onFilters = readByReader ? activeFilters(filters, showingCategories) : []
   const readItems = readByReader ? (applied.reading.items ?? []) : []
   const readReach = shownReach ? reachLabel(shownReach) : null
   const dropFromReading = (change: Partial<Reading>) => applied && setApplied({ ...applied, reading: { ...applied.reading, ...change } })
