@@ -591,7 +591,47 @@ const ERUV_CONTEXT = new Set([
   'shabbos', 'shabbat', 'today', 'tonight', 'week', 'weekend', 'this', 'still', 'check',
 ])
 
-const SORT_NEAREST = /\b(?:(?:sort(?:ed)?|order(?:ed)?|list(?:ed)?) )?by (?:distance|closest|nearest)\b|\b(?:nearest|closest) (?:first|ones first|on top)\b/g
+/** Whether the words say "eruv", in any spelling. With `typing`, also a
+ *  last word that's the start of one ("center city er"): for fetching the
+ *  eruvim's statuses before the word is finished. */
+export function mentionsEruv(raw: string, typing = false): boolean {
+  const ws = plainWords(raw)
+  if (ws.some((w) => ERUV_WORDS.has(fold(w)))) return true
+  const last = ws.at(-1)
+  return typing && !!last && last.length >= 2 && ['eruv', 'eiruv'].some((e) => e.startsWith(last))
+}
+
+/** The eruvim a question names (Oct 15): "is center city eruv up?" is the
+ *  Center City Eruv. parseAsk's `eruv` is a question about no eruv in
+ *  particular, so naming one used to make it a search for "center city"
+ *  among the listings, which found nothing. Named when the question says
+ *  eruv (or carry) and each of its other words, filler and "up" aside,
+ *  starts a word of the eruv's name; or, said without it, when the name is
+ *  typed from its start into its word eruv ("center city er"). */
+export function namedEruvim<T extends { name: string }>(eruvim: readonly T[], raw: string): T[] {
+  const typed = plainWords(raw)
+  if (typed.length === 0) return []
+  const said = mentionsEruv(raw) || typed.some((w) => w === 'carry' || w === 'carrying')
+  const rest = typed.filter((w) => {
+    const f = fold(w)
+    return !ERUV_WORDS.has(f) && !ERUV_CONTEXT.has(f) && !STOPWORDS.has(w) && !STOPWORDS.has(f)
+  }).map(fold)
+  return eruvim.filter((e) => {
+    const nameWords = plainWords(e.name)
+    if (said) {
+      const own = nameWords.map(fold).filter((w) => !ERUV_WORDS.has(w))
+      return rest.length > 0 && rest.every((r) => own.some((n) => n.startsWith(r)))
+    }
+    const at = nameWords.findIndex((w) => ERUV_WORDS.has(fold(w)))
+    if (at < 0) return false
+    const into = nameWords.slice(0, at).join(' ').length
+    const full = nameWords.join(' ')
+    const t = typed.join(' ')
+    return full.startsWith(t) && t.length > into + 1
+  })
+}
+
+const SORT_NEAREST =/\b(?:(?:sort(?:ed)?|order(?:ed)?|list(?:ed)?) )?by (?:distance|closest|nearest)\b|\b(?:nearest|closest) (?:first|ones first|on top)\b/g
 // "Closest pizza", "the nearest shul": the visitor's nearest, unless it says
 // nearest to what ("closest to CHOP" is a place, read elsewhere).
 const NEAREST = /\b(?:closest|nearest)\b(?! to\b)/g

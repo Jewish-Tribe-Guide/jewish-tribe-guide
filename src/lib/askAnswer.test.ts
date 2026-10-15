@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { makeCategory } from '@/test/providerFixtures'
 import type { DirectoryResource } from '@/types'
 import { nearMiss, searchAsk } from './askSearch'
-import { answerFor, eruvAnswer, hitHoursNote, metaAnswer, nearMissAnswer, timesAnswer, type AnswerSchedule } from './askAnswer'
+import { answerFor, hitHoursNote, metaAnswer, nearMissAnswer, timesAnswer, type AnswerSchedule } from './askAnswer'
 import type { ZmanimData } from '@/types'
 import type { MinyanSlot } from './upcomingDavening'
 import type { DateFacts } from './schedules'
@@ -565,17 +565,6 @@ describe('answerFor — "best", from upvotes only', () => {
   it('leaves an ordinary question alone', () => {
     const places = [pizza('a', 'A Pizza', 1), pizza('b', 'B Pizza', 4)]
     expect(say('pizza', places)).toBe('2 places have Pizza.')
-  })
-})
-
-describe('eruvAnswer', () => {
-  it('says where each eruv posts its status, since the guide can’t know', () => {
-    const answer = eruvAnswer([{ name: 'Center City Eruv', area: 'Center City', statusLink: 'https://example.org/eruv' }], '/philly/eruv')
-    expect(answer.text).toMatch(/^The guide can't say whether an eruv is up this week/)
-    expect(answer.links).toEqual([
-      { label: 'Center City Eruv', detail: 'Center City', href: 'https://example.org/eruv', external: true },
-      { label: 'More about the eruvim', href: '/philly/eruv', external: false },
-    ])
   })
 })
 

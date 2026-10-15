@@ -4,7 +4,8 @@ import { useMemo } from 'react'
 import Link from 'next/link'
 import { ChevronRightIcon } from '@/components/icons'
 import { useOptionalLocation } from '@/lib/locationContext'
-import { eruvView, type EruvTone } from '@/lib/eruv'
+import { eruvView } from '@/lib/eruv'
+import { TONE_DOT, TONE_WORDS } from '@/lib/eruvTone'
 import { useEruvMaps, useEruvStatuses } from '@/lib/useEruvStatuses'
 import { metresFrom } from '@/lib/eruvShape'
 
@@ -16,9 +17,6 @@ import { metresFrom } from '@/lib/eruvShape'
 // no longer works that out; the user: people look at the map). Nothing
 // when there's no location, no eruv within reach, or the eruv table isn't
 // there yet.
-
-const DOT: Record<EruvTone, string> = { green: 'bg-green-700', amber: 'bg-amber-700', red: 'bg-red-700', grey: 'bg-slate-500' }
-const WORDS: Record<EruvTone, string> = { green: 'text-green-700', amber: 'text-amber-700', red: 'text-red-700', grey: 'text-slate-700' }
 
 /** Further than this from every eruv's line, there's no eruv to name. */
 const REACH_M = 5_000
@@ -44,8 +42,8 @@ export default function YourEruv({ communitySlug, href, now }: { communitySlug: 
         <span className="block text-[11.5px] font-extrabold tracking-[0.06em] text-muted">NEAREST ERUV</span>
         <span className="mt-0.5 block text-[17px] font-extrabold text-slate-900">{nearest.name}</span>
         <span className="mt-1 flex items-baseline gap-2">
-          <span aria-hidden="true" className={`h-2.5 w-2.5 shrink-0 rounded-full ${DOT[view.tone]}`} />
-          <span className={`text-[15px] font-extrabold ${WORDS[view.tone]}`}>{view.label}</span>
+          <span aria-hidden="true" className={`h-2.5 w-2.5 shrink-0 rounded-full ${TONE_DOT[view.tone]}`} />
+          <span className={`text-[15px] font-extrabold ${TONE_WORDS[view.tone]}`}>{view.label}</span>
         </span>
         {view.checked && <span className="mt-0.5 block text-[13px] text-muted">{view.checked}</span>}
       </span>

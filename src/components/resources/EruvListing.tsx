@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { GlobeIcon, MailIcon, PencilIcon, PhoneIcon } from '@/components/icons'
-import { dialable, eruvView, type Eruv, type EruvTone } from '@/lib/eruv'
+import { dialable, eruvView, type Eruv } from '@/lib/eruv'
+import { TONE_DOT, TONE_WORDS } from '@/lib/eruvTone'
 import { initialsOf } from '@/lib/listingRow'
 import CategoryIcon from '@/components/CategoryIcon'
 import BackIconButton from '@/components/BackIconButton'
@@ -18,17 +19,14 @@ import { Card } from './listingParts'
 // Loaded on the first tap of "Suggest an edit", for the same reason.
 const EruvEditor = dynamic(() => import('./EruvEditor'))
 
-const DOT: Record<EruvTone, string> = { green: 'bg-green-700', amber: 'bg-amber-700', red: 'bg-red-700', grey: 'bg-slate-500' }
-const WORDS: Record<EruvTone, string> = { green: 'text-green-700', amber: 'text-amber-700', red: 'text-red-700', grey: 'text-slate-700' }
-
 /** "● Up for this Shabbos", and under it when the guide checked. */
 export function EruvStatusLine({ eruv, now, timezone, candles }: { eruv: Eruv; now: Date; timezone: string; candles: number | null }) {
   const view = eruvView(eruv, now, timezone, candles)
   return (
     <div data-testid="eruv-status" data-tone={view.tone}>
       <p className="mt-1 flex items-baseline gap-2">
-        <span aria-hidden="true" className={`h-2.5 w-2.5 shrink-0 rounded-full ${DOT[view.tone]}`} />
-        <span className={`text-[15px] font-extrabold ${WORDS[view.tone]}`}>{view.label}</span>
+        <span aria-hidden="true" className={`h-2.5 w-2.5 shrink-0 rounded-full ${TONE_DOT[view.tone]}`} />
+        <span className={`text-[15px] font-extrabold ${TONE_WORDS[view.tone]}`}>{view.label}</span>
       </p>
       {view.checked && <p className="mt-0.5 text-[13px] leading-snug text-muted">{view.checked}</p>}
     </div>

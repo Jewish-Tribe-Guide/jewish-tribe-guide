@@ -11,6 +11,7 @@ import { usePinned } from '@/lib/pinnedContext'
 import { lineSearch } from '@/lib/savedSearches'
 import { useSavedSearches } from '@/lib/savedSearchesContext'
 import { ui } from '@/lib/uiConfig'
+import { TONE_DOT } from '@/lib/eruvTone'
 
 // ── Where a search could go, while it's typed (Oct 13, canvas board 1b) ─────
 // A short list under the home box: each line somewhere to go, with what
@@ -21,6 +22,10 @@ import { ui } from '@/lib/uiConfig'
 // Each line that can be saved has a bookmark where its chevron was (Oct 13,
 // canvas page "you", board YouSave): a place's line saves the place, a kind
 // of place, Minyanim by time or a time saves the search. Filled once saved.
+//
+// An eruv's line (Oct 15) has its status dot before its status, in the
+// colours the eruv card uses: "is center city eruv up?" is answered in the
+// line itself.
 
 export default function SearchLines({
   lines,
@@ -72,7 +77,12 @@ export default function SearchLines({
               <LineIcon line={line} categories={categories} />
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-[15.5px] font-bold text-ink">{line.title}</span>
-                {line.sub && <span className={`block truncate text-[13.5px] ${i === 0 ? 'font-semibold text-blue-900' : 'text-slate-500'}`}>{line.sub}</span>}
+                {line.sub && (
+                  <span className={`flex items-center gap-1.5 text-[13.5px] ${i === 0 ? 'font-semibold text-blue-900' : 'text-slate-500'}`}>
+                    {line.tone && <span aria-hidden="true" data-testid="search-line-tone" data-tone={line.tone} className={`h-2 w-2 shrink-0 rounded-full ${TONE_DOT[line.tone]}`} />}
+                    <span className="truncate">{line.sub}</span>
+                  </span>
+                )}
               </span>
               {!lineSave(line) && (
                 <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 shrink-0 text-slate-400">

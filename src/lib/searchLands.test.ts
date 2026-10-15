@@ -4,6 +4,7 @@ import { makeCategory, makeListing } from '@/test/providerFixtures'
 import { searchAsk } from './askSearch'
 import { boxWords, categoryHref, hrefFilters, landSub, savedLand, searchLines, timesLine, withFilters, type LinesContext } from './searchLands'
 import { itemCounts, listingHas } from './itemFilter'
+import type { Eruv } from './eruv'
 
 // ── Where Enter goes (canvas page "lands", Oct 13): one test per row of its
 // table, then the pieces. Thursday 2 PM, when every store below is open.
@@ -97,6 +98,56 @@ describe('searchLines — where Enter goes', () => {
 
   it('the eruv: its page', () => {
     expect(brief('is the eruv up')).toEqual(['Eruv · Each eruv’s status this week → /philly/eruv'])
+  })
+
+  // Oct 15: "is center city eruv up?" found nothing. An eruv named is that
+  // eruv, with its status in the line; the eruv in general is the page, with
+  // each eruv's status under it.
+  describe('the eruvim, with their statuses', () => {
+    const eruvRow = (id: string, name: string, more: Partial<Eruv> = {}): Eruv => ({
+      id, name, covers: null, website: null, hotline: null, alertsUrl: null, statusUrl: `https://${id}.example/status`, statusDated: false,
+      status: 'up', statusWords: 'The eruv is up', statusPostedOn: null, statusCheckedAt: '2026-10-15T17:55:00Z', statusErrorAt: null, statusError: null, ...more,
+    })
+    const eruvim = {
+      timezone: 'America/New_York',
+      candles: null,
+      eruvim: [
+        eruvRow('cc', 'Center City Eruv'),
+        eruvRow('uc', 'University City Eruv', { status: 'down' }),
+        eruvRow('ne', 'Northeast Eruv', { statusUrl: null, hotline: '(215) 555-0100' }),
+      ],
+    }
+
+    it('one named: that eruv, its status and when it was checked, then the page', () => {
+      expect(brief('is center city eruv up?', { eruvim })).toEqual([
+        'Center City Eruv · Up · Checked 1:55 PM → /philly/eruv?item=cc',
+        'Eruv · Each eruv’s status this week → /philly/eruv',
+      ])
+      expect(lines('is center city eruv up?', { eruvim })[0]).toMatchObject({ kind: 'eruv', eruvId: 'cc', tone: 'green', categoryId: 'eruv' })
+      expect(lines('is university city eruv up', { eruvim })[0]).toMatchObject({ sub: 'Down · Checked 1:55 PM', tone: 'red' })
+      expect(lines('northeast eruv', { eruvim })[0]).toMatchObject({ sub: 'No status online · Hotline (215) 555-0100', tone: 'grey' })
+    })
+
+    it('while it’s typed', () => {
+      expect(lines('center city er', { eruvim })[0]).toMatchObject({ eruvId: 'cc' })
+      expect(lines('center city', { eruvim }).some((l) => l.eruvId)).toBe(false)
+    })
+
+    it('the eruv in general: the page, then each eruv’s status', () => {
+      expect(brief('is the eruv up', { eruvim })).toEqual([
+        'Eruv · Each eruv’s status this week → /philly/eruv',
+        'Center City Eruv · Up · Checked 1:55 PM → /philly/eruv?item=cc',
+        'University City Eruv · Down · Checked 1:55 PM → /philly/eruv?item=uc',
+        'Northeast Eruv · No status online · Hotline (215) 555-0100 → /philly/eruv?item=ne',
+      ])
+    })
+
+    it('"eruv" with other words: the Eruv page is still one of the lines', () => {
+      const found = brief('challah eruv')
+      expect(found.length).toBeGreaterThan(1)
+      expect(found.at(-1)).toBe('Eruv · Each eruv’s status this week → /philly/eruv')
+      expect(brief('store carrying challah').some((l) => l.startsWith('Eruv'))).toBe(false)
+    })
   })
 
   it('the guide itself: "how do I add" opens + Add, or the Add form of the kind named; anything else is About', () => {

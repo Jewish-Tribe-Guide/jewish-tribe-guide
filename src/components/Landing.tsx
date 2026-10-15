@@ -27,6 +27,7 @@ import SubscribeSection from '@/components/home/SubscribeSection'
 import CampaignBannerCard from '@/components/home/CampaignBannerCard'
 import { useLogSearchMiss } from '@/lib/useLogSearchMiss'
 import { useHomeSearch } from '@/lib/useHomeSearch'
+import { mentionsEruv } from '@/lib/ask'
 import { useHydrated } from '@/lib/useHydrated'
 import { useCategories } from '@/lib/useCategories'
 import { useHomeSections } from '@/lib/useHomeSections'
@@ -173,7 +174,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
   // one result. Only computed once the visitor types. Against useMinyanSchedule's
   // clock, not a fresh `new Date()` in render (which Cache Components rejects),
   // so "open now" and the next minyan agree on what now is.
-  const { schedule, zmanim, places, ask, linesFor: homeLines } = useHomeSearch(coords)
+  const { schedule, zmanim, places, ask, linesFor: homeLines } = useHomeSearch(coords, { eruv: !!q && mentionsEruv(q, true) })
   const asked = q && listings && schedule ? ask(q) : null
 
   // ── Search takes you to the page (Oct 13; see searchLands.ts) ────────────

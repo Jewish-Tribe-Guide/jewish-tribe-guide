@@ -1,13 +1,13 @@
 'use client'
 
 import { openState, searchAsk, type AskResult } from '@/lib/askSearch'
-import { answerFor, eruvAnswer, metaAnswer, timesAnswer, type Answer } from '@/lib/askAnswer'
+import { answerFor, metaAnswer, timesAnswer, type Answer } from '@/lib/askAnswer'
 import { minyanLine, searchLines, timesLine, type LinesContext, type SearchLine } from '@/lib/searchLands'
 import { haversineMiles, milesText, type LatLng } from '@/lib/geo'
 import { resolveCapabilities, type CategoryConfig } from '@/lib/categories'
 import type { DirectoryResource } from '@/types'
 import { useZmanim } from '@/lib/useZmanim'
-import { eruvim } from '@/data/resources'
+import { useEruvStatuses } from '@/lib/useEruvStatuses'
 import { routes } from '@/lib/routes'
 import { neighborhoodsFor } from '@/lib/places'
 import { answerSchedule, useMinyanSchedule } from '@/lib/useMinyanSchedule'
@@ -25,7 +25,9 @@ import { ui } from '@/lib/uiConfig'
 
 export type HomeCard = { id?: string; title: string; href?: string | null }
 
-export function useHomeSearch(coords: LatLng | null) {
+/** `eruv`: the words are about the eruv, so the eruvim and their statuses
+ *  are fetched for the lines (see mentionsEruv): not on every visit. */
+export function useHomeSearch(coords: LatLng | null, { eruv = false }: { eruv?: boolean } = {}) {
   const communitySlug = useCommunitySlug()
   const categories = useCategories()
   const listings = useAllListings()
@@ -39,6 +41,7 @@ export function useHomeSearch(coords: LatLng | null) {
   const places = neighborhoodsFor(communitySlug)
   const eruvPage = categories?.some((c) => c.kind === 'eruv') ?? false
   const zmanimPage = categories?.some((c) => c.kind === 'zmanim') ?? false
+  const eruvStatuses = useEruvStatuses(communitySlug, eruvPage && eruv)
   // The same request the minyan schedule makes (same place, so one fetch).
   const zmanim = useZmanim(coords ?? community.mapCenter)
 
@@ -72,9 +75,6 @@ export function useHomeSearch(coords: LatLng | null) {
         }),
       }
     }
-    // "Is the eruv up?": where to check, when the community has an eruv
-    // page (see eruvAnswer).
-    if (result.query.eruv && eruvPage) return { result, answer: eruvAnswer(eruvim, routes.slug(communitySlug, 'eruv')) }
     return { result, answer }
   }
 
@@ -107,6 +107,7 @@ export function useHomeSearch(coords: LatLng | null) {
           timesSub: result.query.times ? (timesLine(result.query.times, zmanim.data) ?? (zmanim.status === 'error' ? null : 'Looking up the times…')) : null,
           cards,
           placeSub,
+          eruvim: eruvStatuses?.available ? eruvStatuses : null,
         })
       : []
 

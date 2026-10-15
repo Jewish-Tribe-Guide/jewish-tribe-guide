@@ -1,7 +1,8 @@
 import type { DirectoryResource, ZmanimData } from '@/types'
 import { selectValues, type CategoryConfig } from '@/lib/categories'
 import { searchAsk, type AskOptions, type AskResult } from '@/lib/askSearch'
-import { words, type TimesAsk } from '@/lib/ask'
+import { mentionsEruv, namedEruvim, words, type TimesAsk } from '@/lib/ask'
+import { eruvView, type Eruv, type EruvTone } from '@/lib/eruv'
 import { itemName } from '@/lib/itemNames'
 import { itemCounts, itemFields, listingHas, searchItems } from '@/lib/itemFilter'
 import { hoursOpenNow, businessClosure } from '@/lib/hours'
@@ -26,7 +27,8 @@ import type { Reading } from '@/lib/questionReader'
 //   category ("challah")       → the one with the most; the other is a line
 //   a minyan                   → Minyanim by time, the words in its box
 //   a zman                     → the times page, that time picked out
-//   the eruv                   → the eruv page
+//   the eruv                   → the eruv page, each eruv's status below
+//   an eruv by name            → that eruv, its status in the line
 //   the guide itself           → About, or "+ Add" for "how do I add"
 //   nothing anywhere           → stays on home and says so
 //
@@ -48,6 +50,10 @@ export type SearchLine = {
   listing?: DirectoryResource
   /** A home card's id ("support"), for a line that opens it. */
   cardId?: string
+  /** An eruv's line: which, and its status's colour (the dot before
+   *  "Up for this Shabbos · Checked 2:55 PM"). */
+  eruvId?: string
+  tone?: EruvTone
   /** Found by the words alone, not understood: "Food · 2 for “something
    *  to drink”". The only line the AI reader is asked to do better on. */
   loose?: boolean
@@ -289,6 +295,26 @@ export type LinesContext = {
   cards?: readonly { id?: string; title: string; href?: string | null; description?: string }[]
   /** How a listing line says where it is and whether it's open. */
   placeSub?: (item: DirectoryResource, category: CategoryConfig) => string
+  /** The eruvim and their live statuses (/api/eruv), for a question about
+   *  one. Null while they load, and without any. */
+  eruvim?: { eruvim: readonly Eruv[]; timezone: string; candles: number | null } | null
+}
+
+/** An eruv's line: its status as the Eruv page says it, and when it was
+ *  checked ("Up for this Shabbos · Checked 2:55 PM"), opening that eruv. */
+export function eruvLine(eruv: Eruv, page: CategoryConfig, slug: string, statuses: { timezone: string; candles: number | null }, now: Date): SearchLine {
+  const view = eruvView(eruv, now, statuses.timezone, statuses.candles)
+  const checked = view.checked?.split(' · ')[0] ?? (view.tone === 'grey' && eruv.hotline ? `Hotline ${eruv.hotline}` : null)
+  return {
+    key: `eruv:${eruv.id}`,
+    kind: 'eruv',
+    title: eruv.name,
+    sub: [view.label, checked].filter(Boolean).join(' · '),
+    href: `${routes.slug(slug, page.id)}?item=${encodeURIComponent(eruv.id)}`,
+    categoryId: page.id,
+    eruvId: eruv.id,
+    tone: view.tone,
+  }
 }
 
 const fold = (s: string) => s.toLowerCase().replace(/['’]/g, '').trim()
@@ -336,11 +362,16 @@ export function searchLines(raw: string, ctx: LinesContext): SearchLine[] {
     return [{ key: 'times', kind: 'times', title: zmanim.pluralLabel, sub: ctx.timesSub ?? 'Zmanim and Shabbos times', href: `${routes.slug(slug, zmanim.id)}?time=${encodeURIComponent(ask.times)}`, categoryId: zmanim.id }]
   }
 
-  // The eruv.
+  // The eruv: an eruv named ("is center city eruv up?") is that eruv,
+  // with its status, then the page of them all; the eruv in general is the
+  // page, with each eruv's status under it (Oct 15).
   const eruv = byKind('eruv')
-  if (ask.eruv && eruv) {
-    return [{ key: 'eruv', kind: 'eruv', title: eruv.pluralLabel, sub: 'Each eruv’s status this week', href: routes.slug(slug, eruv.id), categoryId: eruv.id }]
-  }
+  const eruvPageLine: SearchLine | null = eruv ? { key: 'eruv', kind: 'eruv', title: eruv.pluralLabel, sub: 'Each eruv’s status this week', href: routes.slug(slug, eruv.id), categoryId: eruv.id } : null
+  const statuses = eruv ? ctx.eruvim : null
+  const eruvLines = (list: readonly Eruv[]) => (eruv && statuses ? list.map((e) => eruvLine(e, eruv, slug, statuses, ctx.options.now ?? new Date(0))) : [])
+  const namedEruv = statuses ? namedEruvim(statuses.eruvim, q) : []
+  if (namedEruv.length && eruvPageLine) return [...eruvLines(namedEruv.slice(0, 3)), eruvPageLine]
+  if (ask.eruv && eruvPageLine) return [eruvPageLine, ...eruvLines(statuses?.eruvim.slice(0, 3) ?? [])]
 
   const lines: SearchLine[] = []
 
@@ -437,6 +468,9 @@ export function searchLines(raw: string, ctx: LinesContext): SearchLine[] {
   const nameFirst = named.length > 0 && fold(named[0].name).startsWith(fold(q)) && ask.concepts.length === 0 && !lands.some((l) => l.read)
   if (nameFirst) lines.push(...placeLines, ...categoryLines.filter((_, i) => lands[i].read), ...cardLines)
   else lines.push(...categoryLines, ...cardLines, ...placeLines)
+  // Said "eruv" about something else too ("is the eruv up in philly",
+  // "hotels in the eruv"): the Eruv page is still somewhere it could go.
+  if (eruvPageLine && mentionsEruv(q) && !lines.some((l) => l.categoryId === eruvPageLine.categoryId)) lines.push(eruvPageLine)
   return lines
 }
 

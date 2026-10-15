@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { makeCategory } from '@/test/providerFixtures'
-import { conceptCategories, editDistance, initialisms, parseAsk, termMatches, termsRequired, withoutSortWords, withoutTerms, wordMatches, words } from './ask'
+import { conceptCategories, editDistance, initialisms, mentionsEruv, namedEruvim, parseAsk, termMatches, termsRequired, withoutSortWords, withoutTerms, wordMatches, words } from './ask'
 
 describe('words', () => {
   it('folds spellings so a visitor and a listing meet whichever way each spelled it', () => {
@@ -430,5 +430,50 @@ describe('withoutTerms', () => {
     expect(withoutTerms('IKC Dairy places', ['dairy'])).toBe('IKC places')
     expect(withoutTerms('dairy', ['dairy'])).toBe('')
     expect(withoutTerms('Chalav Yisroel milk', ['chalav', 'yisroel'])).toBe('milk')
+  })
+})
+
+// Oct 15: "is center city eruv up?" found nothing. parseAsk reads the eruv
+// only when every word is about the eruv, and "center city" is a
+// neighbourhood; nothing looked at the eruvim's own names.
+describe('mentionsEruv / namedEruvim — an eruv by its name', () => {
+  const eruvim = ['Center City Eruv', 'University City Eruv', 'Lower Merion Eruv', 'Northeast Eruv', 'Elkins Park Eruv'].map((name) => ({ name }))
+  const named = (q: string) => namedEruvim(eruvim, q).map((e) => e.name)
+
+  it('the eruv said, or being typed', () => {
+    expect(mentionsEruv('is the eruv up?')).toBe(true)
+    expect(mentionsEruv('Eiruv status')).toBe(true)
+    expect(mentionsEruv('center city er')).toBe(false)
+    expect(mentionsEruv('center city er', true)).toBe(true)
+    expect(mentionsEruv('e', true)).toBe(false)
+    expect(mentionsEruv('erev shabbos', true)).toBe(false)
+    // Carrying is about the eruv only once an eruv is named (below).
+    expect(mentionsEruv('store carrying challah')).toBe(false)
+  })
+
+  it('a question naming one is that one', () => {
+    expect(named('is center city eruv up?')).toEqual(['Center City Eruv'])
+    expect(named('Is the Center City eiruv up this Shabbos')).toEqual(['Center City Eruv'])
+    expect(named('university city eruv')).toEqual(['University City Eruv'])
+    expect(named('can I carry in lower merion')).toEqual(['Lower Merion Eruv'])
+  })
+
+  it('words two share are both', () => {
+    expect(named('city eruv')).toEqual(['Center City Eruv', 'University City Eruv'])
+  })
+
+  it('typed from the start of its name, once past the place into "Eruv"', () => {
+    expect(named('center city er')).toEqual(['Center City Eruv'])
+    expect(named('northeast e')).toEqual(['Northeast Eruv'])
+    // Only the place: a neighbourhood, not the eruv.
+    expect(named('center city')).toEqual([])
+    expect(named('center city ')).toEqual([])
+  })
+
+  it('names none for the eruv in general, or for words that aren’t one', () => {
+    expect(named('is the eruv up')).toEqual([])
+    expect(named('store carrying challah')).toEqual([])
+    expect(named('kosher pizza')).toEqual([])
+    expect(named('')).toEqual([])
   })
 })

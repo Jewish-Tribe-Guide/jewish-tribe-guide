@@ -1,4 +1,4 @@
-import type { DirectoryResource, EruvRecord, ZmanimData } from '@/types'
+import type { DirectoryResource, ZmanimData } from '@/types'
 import { selectValues, type CategoryConfig } from '@/lib/categories'
 import { resolvePrimaryZmanimBlock } from '@/lib/zmanim'
 import { describedByItsText, type AskHit, type DayWindow, type AskResult, type HoursWindow, type NearMiss } from '@/lib/askSearch'
@@ -735,19 +735,6 @@ export function nearMissAnswer(miss: NearMiss, raw: string, options: { coords?: 
   const closest =
     answerFor(miss.result, options)?.text ?? `Closest: ${hits.length} ${kind} with “${miss.kept}”.`
   return { text: `Nothing in the guide for “${raw}”. ${closest}`, rows: [], closest: true }
-}
-
-/** "Is the eruv up?" The guide can't know: each eruv posts its own status,
- *  and a week-old "yes" copied here would be worse than none. So the answer
- *  is where to look, each eruv with what it covers, and the guide's own
- *  page about them. */
-export function eruvAnswer(eruvim: readonly Pick<EruvRecord, 'name' | 'area' | 'statusLink'>[], pageHref: string | null): Answer {
-  const links: AnswerLink[] = eruvim.map((e) => ({ label: e.name, detail: e.area, href: e.statusLink, external: true }))
-  if (pageHref) links.push({ label: 'More about the eruvim', href: pageHref, external: false })
-  const text = eruvim.length
-    ? "The guide can't say whether an eruv is up this week: each one posts its own status. Check before Shabbos:"
-    : "The guide can't say whether an eruv is up this week. See what it has:"
-  return { text, rows: [], links }
 }
 
 /** "When is candle lighting?", "when does Shabbos end?", "shkia": straight

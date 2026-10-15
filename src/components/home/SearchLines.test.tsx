@@ -54,3 +54,20 @@ describe('SearchLines — saving from a line', () => {
     expect(screen.getAllByTestId('save-button')).toHaveLength(2)
   })
 })
+
+// Oct 15: an eruv's line answers "is it up?" in the line, with the eruv
+// card's dot and colours.
+describe('SearchLines — an eruv’s line', () => {
+  it('has its status dot, in its tone', () => {
+    const eruvLines: SearchLine[] = [
+      { key: 'eruv:cc', kind: 'eruv', title: 'Center City Eruv', sub: 'Up · Checked 1:55 PM', href: '/philly/eruv?item=cc', categoryId: 'eruv', eruvId: 'cc', tone: 'green' },
+      { key: 'eruv', kind: 'eruv', title: 'Eruv', sub: 'Each eruv’s status this week', href: '/philly/eruv', categoryId: 'eruv' },
+    ]
+    renderWithProviders(<SearchLines lines={eruvLines} categories={[]} onPick={vi.fn()} />)
+    const dots = screen.getAllByTestId('search-line-tone')
+    expect(dots).toHaveLength(1)
+    expect(dots[0]).toHaveAttribute('data-tone', 'green')
+    expect(dots[0].className).toMatch(/\bbg-green-700\b/)
+    expect(screen.getByText('Up · Checked 1:55 PM')).toBeInTheDocument()
+  })
+})
