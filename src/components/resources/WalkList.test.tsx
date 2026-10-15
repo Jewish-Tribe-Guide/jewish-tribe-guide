@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { Activity } from 'react'
+import { Activity, useCallback, useState } from 'react'
 import { cleanup, fireEvent, screen, within } from '@testing-library/react'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { makeCategory, makeListing } from '@/test/providerFixtures'
@@ -90,7 +90,8 @@ describe('A hotel’s synagogues within a walk', () => {
     const box = await screen.findByTestId('walk-lists')
     expect(within(box).getByRole('heading', { name: 'Within a walk' })).toBeInTheDocument()
     const row = await within(box).findByRole('button', { name: /Synagogues · 3/ })
-    expect(row).toHaveTextContent('Nearest: Society Hill Synagogue, 8 min')
+    // Just how many: the list says which is nearest (the user, Oct 15).
+    expect(row).toHaveTextContent(/^Synagogues · 3$/)
     expect(row).toHaveAttribute('aria-expanded', 'false')
     expect(within(box).queryByRole('link')).not.toBeInTheDocument()
 
@@ -144,7 +145,6 @@ describe('A hotel’s synagogues within a walk', () => {
         '24 minBeth ZionOrthodox (Ashkenazi) · No davening times listed',
         '29 minFar Away ShulOrthodox (Ashkenazi) · No davening times listed',
       ])
-      expect(screen.getByRole('button', { name: /Synagogues · 4/ })).toHaveTextContent('Nearest: Mikveh Israel, 14 min')
       expect(screen.getByTestId('walk-lists')).toHaveTextContent('Walking times from the hotel along the streets, from openrouteservice.org and © OpenStreetMap contributors.')
       expect(screen.getByTestId('walk-lists')).not.toHaveTextContent('rough estimate')
     })
@@ -183,10 +183,15 @@ describe('A hotel’s synagogues within a walk', () => {
       fetchMock.mockImplementation(async () => answer(withMinyanim()))
       open()
       const line = await screen.findByRole('button', { name: /Minyanim · 2 left today/ })
-      expect(line).toHaveTextContent('Next: Mincha 6:20 PM at Mikveh Israel, 15 min')
+      // Just how many: the list says which is next (the user, Oct 15).
+      expect(line).toHaveTextContent(/^Minyanim · 2 left today$/)
       expect(line).toHaveAttribute('aria-expanded', 'false')
 
+      // The shuls' own list doesn't open with "Nearest minyan": the
+      // Minyanim line has them by time.
       await openKind(/Synagogues · 3/)
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      expect(screen.queryByTestId('walk-answer')).not.toBeInTheDocument()
       fireEvent.click(line)
       const section = line.closest('[data-testid="walk-minyanim"]') as HTMLElement
       expect(within(section).getByRole('heading', { level: 4 })).toHaveTextContent('Today · 2')
@@ -205,7 +210,7 @@ describe('A hotel’s synagogues within a walk', () => {
       fetchMock.mockImplementation(async () => answer(withMinyanim()))
       open()
       const line = await screen.findByRole('button', { name: /^Minyanim/ })
-      expect(line).toHaveTextContent('None left today. First tomorrow: Shacharis 7 AM at Society Hill Synagogue, 8 min')
+      expect(line).toHaveTextContent(/^Minyanim · 1 tomorrow$/)
       fireEvent.click(line)
       expect(within(line.closest('[data-testid="walk-minyanim"]') as HTMLElement).getByRole('heading', { level: 4 })).toHaveTextContent('Tomorrow · 1')
     })
@@ -284,6 +289,39 @@ describe('Within a walk, on the map beside it', () => {
 
     fireEvent.click(within(section).getByRole('button', { name: /Synagogues · 3/ }))
     expect(show).toHaveBeenLastCalledWith(null)
+  })
+
+  // Oct 15, on the preview: hovering a shul lit no pin and a row was slow
+  // to open. The map beside the listing is the page's state, so showing
+  // places on it renders the listing again; the places shown changed on
+  // every render, so they were shown again, and again, each time clearing
+  // the pin under the pointer. A map that renders the page, as the real one
+  // does, not a function that records calls.
+  it('shows them once, with a map that renders the page, and a hovered pin stays lit', async () => {
+    const highlight = createHighlight()
+    const shows: unknown[] = []
+    function Page() {
+      const [, setShown] = useState<unknown>(null)
+      const show = useCallback((shown: unknown) => {
+        shows.push(shown)
+        // Past 20 the loop is plain: stop it here, so the test fails
+        // rather than hanging (the loop never yields to a timeout).
+        if (shows.length <= 20) setShown(shown)
+      }, [])
+      return (
+        <WalkOnMapContext.Provider value={{ show, highlight }}>
+          <ListingView item={hotel} category={hotels} color="#000" path="/test" foot={null} />
+        </WalkOnMapContext.Provider>
+      )
+    }
+    renderWithProviders(<Page />, { content: { categories: [hotels, shuls] } })
+    const section = await openKind(/Synagogues · 3/)
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(shows.filter(Boolean).length).toBe(1)
+
+    fireEvent.mouseEnter(within(section).getByRole('link', { name: /Mikveh Israel/ }))
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(highlight.get()).toBe('s2')
   })
 
   // Oct 6: a shul in the list opened, then Back. The hotel comes back as it
@@ -380,7 +418,7 @@ describe('A hospital’s places within a walk', () => {
     const box = await screen.findByTestId('walk-lists')
     await within(box).findByRole('button', { name: /Food · 2/ })
     const [foodRow, shulRow, hotelRow] = within(box).getAllByTestId('walk-list')
-    expect(foodRow).toHaveTextContent('Nearest: Insomnia Cookies, 6 min')
+    expect(foodRow).not.toHaveTextContent('Nearest: Insomnia Cookies')
     await vi.waitFor(() => expect(shulRow).toHaveTextContent('None within a 30-minute walk. Nearest: Mekor Habracha, 37 min.'))
     expect(hotelRow).toHaveTextContent('Hotels · 2')
 

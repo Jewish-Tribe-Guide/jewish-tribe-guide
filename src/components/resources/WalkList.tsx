@@ -24,11 +24,10 @@ import {
 } from '@/lib/walkList'
 import type { LatLng } from '@/lib/geo'
 import { routesThatHold, type Routed, type WalkRoute } from '@/lib/walkRoutes'
-import { NextMinyans, NextMinyansContext, useNextMinyan } from './nextMinyans'
+import { NextMinyans, useNextMinyan } from './nextMinyans'
 import { MinyanRow } from './MinyanimView'
-import { isMinyanim, TEFILLAH_LABELS } from '@/lib/davening'
+import { isMinyanim } from '@/lib/davening'
 import { minyanimAhead } from '@/lib/minyanimFilters'
-import { clockTime } from '@/lib/upcomingDavening'
 import { useMinyanSchedule } from '@/lib/useMinyanSchedule'
 import { Card } from './listingParts'
 import { WalkOnMapContext } from './walkOnMap'
@@ -104,6 +103,7 @@ function useWalkRoutes(fromId: string | undefined): Record<string, WalkRoute> {
   return state.key === key ? state.routes : NO_ROUTES
 }
 const NO_ROUTES: Record<string, WalkRoute> = {}
+const NO_PLACES: Record<string, DirectoryResource[] | 'failed'> = {}
 
 /** Each category's places, by id: null while loading, 'failed' when they
  *  couldn't load. */
@@ -126,8 +126,12 @@ export function usePlaces(categoryIds: readonly string[]): Record<string, Direct
     }
   }, [community, ids, key])
 
-  const have = state.key === key ? state.places : {}
-  return Object.fromEntries(categoryIds.map((id) => [id, have[id] ?? null]))
+  // The same object until a load lands: the walks built from it, and the
+  // map beside the listing fed from those, would otherwise change on every
+  // render, and the map's own render renders this again (the user, Oct 15:
+  // a pin that wouldn't light on hover, a row slow to open).
+  const have = state.key === key ? state.places : NO_PLACES
+  return useMemo(() => Object.fromEntries(ids.split('|').filter(Boolean).map((id) => [id, have[id] ?? null])), [have, ids])
 }
 
 /** A kind's Minyanim line's id beside its own: one open at a time. */
@@ -279,17 +283,16 @@ function WalkList({
   const noun = target.pluralLabel || target.label
   const shuls = isShuls(target)
   const rows = Array.isArray(places) ? walkGroups(from, places, walk.maxMinutes, null, routed).flatMap((g) => g.rows).sort(byNearest) : []
-  const nearest = rows[0]
   const beyond = Array.isArray(places) && rows.length === 0 ? nearestBeyond(from, places, walk.maxMinutes, routed) : null
 
-  let summary: ReactNode
+  // Under the title only what there's no list to say (the user, Oct 15:
+  // "Nearest" over a list of them, nearest first, said it twice).
+  let summary: ReactNode = null
   if (places === null) {
     summary = <span aria-hidden="true" className="mt-1 block h-4 w-2/3 animate-pulse rounded bg-slate-100" />
   } else if (places === 'failed') {
     summary = `The ${noun.toLowerCase()} nearby couldn’t load.`
-  } else if (nearest) {
-    summary = `Nearest: ${nearest.item.name}, ${nearest.minutes} min`
-  } else {
+  } else if (rows.length === 0) {
     summary = (
       <>
         None within a {walk.maxMinutes}-minute walk.
@@ -309,7 +312,7 @@ function WalkList({
   const title = (
     <span className="block text-[15px] font-bold text-slate-900">{rows.length > 0 ? `${noun} · ${rows.length}` : noun}</span>
   )
-  const sub = <span className="mt-0.5 block text-[13.5px] leading-snug text-slate-600">{summary}</span>
+  const sub = summary && <span className="mt-0.5 block text-[13.5px] leading-snug text-slate-600">{summary}</span>
 
   return (
     <li data-testid="walk-list">
@@ -376,19 +379,13 @@ function WalkMinyanim({
   const today = ahead?.today ?? []
   const slots = today.length > 0 ? today : (ahead?.tomorrow ?? [])
   const day = today.length > 0 ? schedule?.week[0] : schedule?.week[1]
-  const first = slots[0]
   const walkText = (id: string | undefined) => (id && walkOf.has(id) ? `${walkOf.get(id)} min walk` : null)
-  const firstText = first && `${TEFILLAH_LABELS[first.tefillah]} ${clockTime(first.minutes)} at ${first.shulName}, ${walkOf.get(first.shulId ?? '')} min`
 
-  let summary: ReactNode
-  if (!ahead) summary = <span aria-hidden="true" className="mt-1 block h-4 w-2/3 animate-pulse rounded bg-slate-100" />
-  else if (today.length > 0) summary = `Next: ${firstText}`
-  else if (first) summary = `None left today. First tomorrow: ${firstText}`
-  else summary = 'No minyanim listed today or tomorrow.'
-  const title = (
-    <span className="block text-[15px] font-bold text-slate-900">{today.length > 0 ? `Minyanim · ${today.length} left today` : 'Minyanim'}</span>
-  )
-  const sub = <span className="mt-0.5 block text-[13.5px] leading-snug text-slate-600">{summary}</span>
+  // Under the title only what there's no list to say, as the kind's line.
+  const summary = ahead && slots.length === 0 ? 'No minyanim listed today or tomorrow.' : null
+  const count = today.length > 0 ? ` · ${today.length} left today` : slots.length > 0 ? ` · ${slots.length} tomorrow` : ''
+  const title = <span className="block text-[15px] font-bold text-slate-900">Minyanim{count}</span>
+  const sub = summary && <span className="mt-0.5 block text-[13.5px] leading-snug text-slate-600">{summary}</span>
 
   return (
     <li data-testid="walk-minyanim">
@@ -452,7 +449,6 @@ function ListBody({
 }) {
   const onMap = useContext(WalkOnMapContext)
   const community = useCommunitySlug()
-  const minyans = useContext(NextMinyansContext)
   const noun = (target.pluralLabel || target.label).toLowerCase()
   const field = walk.groupBy ? (walkGroupFields(target).find((f) => f.key === walk.groupBy) ?? null) : null
   const groups = walkGroups(from, places, walk.maxMinutes, field, routed)
@@ -460,13 +456,10 @@ function ListBody({
   const hoods = neighborhoodsFor(community)
   const towns = townsFrom(places)
 
-  // A shul list answers with the nearest minyan; a list by a pick-list, with
-  // the nearest of its first kind (walkAnswer).
-  const rows = groups.flatMap((g) => g.rows)
-  const minyan = shuls ? rows.find((r) => minyans[r.item.id]?.tone === 'minyan') : undefined
-  const answer = minyan
-    ? `Nearest minyan: ${minyan.item.name}, ${minyan.minutes} min · ${minyans[minyan.item.id].text}.`
-    : walkAnswer(groups, field)
+  // A list by a pick-list answers with the nearest of its first kind
+  // (walkAnswer). A shul list said its nearest minyan, which the list
+  // itself shows (the user, Oct 15), and its Minyanim line has by time.
+  const answer = walkAnswer(groups, field)
 
   if (groups.length === 0) {
     const nearest = nearestBeyond(from, places, walk.maxMinutes, routed)
