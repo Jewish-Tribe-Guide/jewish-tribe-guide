@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { makeCategory, makeListing } from '@/test/providerFixtures'
 import type { DirectoryResource } from '@/types'
 import { makeCategory as category } from '@/test/providerFixtures'
-import { nearestBeyond, parseWalkList, parseWalkLists, walkAnswer, walkDistanceText, walkGroupFields, walkGroups, walkListFromKey, walkListKey, walkListTargets, walkMinutes } from './walkList'
+import { nearestBeyond, parseWalkList, parseWalkLists, walkDistanceText, walkGroupFields, walkGroups, walkListFromKey, walkListKey, walkListTargets, walkMinutes } from './walkList'
 import type { CategoryField } from './categories'
 
 // A mile due north is 1/69 of a degree of latitude, near enough.
@@ -163,15 +163,6 @@ describe('walkGroups by a field', () => {
       ['Shabbat friendly', ['Marriott']],
       ['Doesn’t say', ['Morris House']],
     ])
-  })
-
-  it('answers with the nearest of the first option, and what’s nearer when something is', () => {
-    expect(walkAnswer(walkGroups(hotel, food, 30, storeType), storeType)).toBe('Nearest restaurant: Falafel, 27 min. Nearer: Cookies, a bakery, 6 min.')
-    const restaurantsFirst = food.filter((f) => f.foodType === 'Restaurant')
-    expect(walkAnswer(walkGroups(hotel, restaurantsFirst, 30, storeType), storeType)).toBe('Nearest restaurant: Falafel, 27 min.')
-    // No restaurant within the walk, or no pick-list: no answer.
-    expect(walkAnswer(walkGroups(hotel, [food[1]], 30, storeType), storeType)).toBeNull()
-    expect(walkAnswer(walkGroups(hotel, food, 30), null)).toBeNull()
   })
 
   it('offers a category’s yes/no and pick-list badges to group by', () => {

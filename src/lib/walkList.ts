@@ -18,7 +18,6 @@ import type { Routed } from './walkRoutes'
 //     …
 //
 //   FOOD WITHIN A WALK                      (grouped by Store Type)
-//   Nearest restaurant: 20th Street Pizza, 27 min.
 //   RESTAURANT · 3
 //     27 min  20th Street Pizza           Parve · IKC
 //   BAKERY · 2
@@ -168,34 +167,6 @@ function fieldGroups(rows: WalkRow[], field: CategoryField): WalkGroup[] {
   const groups = options.map((o) => ({ label: o.label, rows: rows.filter((r) => valueOf(r.item) === o.value) }))
   groups.push({ label: DOESNT_SAY, rows: rows.filter((r) => { const v = valueOf(r.item); return v === null || !known.has(v) }) })
   return groups.filter((g) => g.rows.length > 0)
-}
-
-/** The list's answer, for a list grouped by a pick-list: the nearest of its
- *  first kind ("Nearest restaurant: 20th Street Pizza, 27 min."), and the
- *  place nearer than it when there is one, of another kind ("Nearer:
- *  Insomnia Cookies, a bakery, 6 min."). The field's first option is what
- *  the admin put first: Food's Store Type leads with Restaurant. Null when
- *  nothing of that first kind is within the walk. */
-export function walkAnswer(groups: readonly WalkGroup[], field: CategoryField | null | undefined): string | null {
-  if (!field || field.type !== 'select') return null
-  const first = field.options?.[0]
-  const lead = first && groups.find((g) => g.label === first.label)?.rows[0]
-  if (!first || !lead) return null
-  let text = `Nearest ${first.label.toLowerCase()}: ${lead.item.name}, ${lead.minutes} min.`
-  const nearer = groups
-    .filter((g) => g.label !== first.label && g.label !== DOESNT_SAY)
-    .map((g) => ({ label: g.label, row: g.rows[0] }))
-    .filter((x) => x.row && x.row.minutes < lead.minutes)
-    .sort((a, b) => a.row.minutes - b.row.minutes)[0]
-  if (nearer) text += ` Nearer: ${nearer.row.item.name}, ${withArticle(nearer.label.toLowerCase())}, ${nearer.row.minutes} min.`
-  return text
-}
-
-/** "a bakery", "an ice cream & treats" reads badly, so a plural-looking
- *  or "&" label goes without. */
-function withArticle(label: string): string {
-  if (/&|s$/.test(label)) return label
-  return `${/^[aeiou]/.test(label) ? 'an' : 'a'} ${label}`
 }
 
 /** "37 min" up to an hour's walk, then miles: "2.5 mi". */

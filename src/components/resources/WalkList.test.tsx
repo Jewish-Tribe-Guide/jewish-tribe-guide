@@ -413,7 +413,7 @@ describe('A hospital’s places within a walk', () => {
     })
   }
 
-  it('a line for each, the food opening grouped as chosen, answering with the nearest restaurant and what’s nearer', async () => {
+  it('a line for each, the food opening grouped as chosen, with no answer over it', async () => {
     openHospital()
     const box = await screen.findByTestId('walk-lists')
     await within(box).findByRole('button', { name: /Food · 2/ })
@@ -423,7 +423,9 @@ describe('A hospital’s places within a walk', () => {
     expect(hotelRow).toHaveTextContent('Hotels · 2')
 
     fireEvent.click(within(foodRow).getByRole('button', { name: /Food · 2/ }))
-    expect(within(foodRow).getByTestId('walk-answer')).toHaveTextContent('Nearest restaurant: 20th Street Pizza, 27 min. Nearer: Insomnia Cookies, a bakery, 6 min.')
+    // No "Nearest restaurant" over it: the list says it (the user, Oct 15).
+    expect(within(foodRow).queryByTestId('walk-answer')).not.toBeInTheDocument()
+    expect(foodRow).not.toHaveTextContent('Nearest restaurant')
     expect(within(foodRow).getAllByRole('heading', { level: 4 }).map((h) => h.textContent)).toEqual(['Restaurant · 1', 'Bakery · 1'])
     // The row's facts, less the Store Type it's grouped by.
     expect(within(foodRow).getByRole('link', { name: /20th Street Pizza/ })).toHaveTextContent('27 min20th Street PizzaParve')

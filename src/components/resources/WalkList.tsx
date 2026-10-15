@@ -15,7 +15,6 @@ import { listingSlug } from '@/lib/listingSlug'
 import { mapQueryString, routes } from '@/lib/routes'
 import {
   nearestBeyond,
-  walkAnswer,
   walkDistanceText,
   walkGroupFields,
   walkGroups,
@@ -456,11 +455,6 @@ function ListBody({
   const hoods = neighborhoodsFor(community)
   const towns = townsFrom(places)
 
-  // A list by a pick-list answers with the nearest of its first kind
-  // (walkAnswer). A shul list said its nearest minyan, which the list
-  // itself shows (the user, Oct 15), and its Minyanim line has by time.
-  const answer = walkAnswer(groups, field)
-
   if (groups.length === 0) {
     const nearest = nearestBeyond(from, places, walk.maxMinutes, routed)
     return (
@@ -482,11 +476,8 @@ function ListBody({
 
   return (
     <>
-      {answer && (
-        <p className="mt-2.5 rounded-lg bg-primary/[0.07] px-3 py-2 text-[14.5px] font-semibold leading-snug text-slate-900" data-testid="walk-answer">
-          {answer}
-        </p>
-      )}
+      {/* No "Nearest restaurant" or "Nearest minyan" over the list: the
+          list, nearest first, says it (the user, Oct 15). */}
       {groups.map((g) => (
         <div key={g.label}>
           <h4 className="mt-3 mb-0.5 text-[12px] font-bold uppercase tracking-wide text-slate-500">
