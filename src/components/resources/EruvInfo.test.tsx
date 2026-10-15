@@ -11,6 +11,7 @@ import { parseLineFile } from '@/lib/eruvLine'
 import { mockRouter } from '@/test/nextNavigationMock'
 import { clearEruvStatuses } from '@/lib/useEruvStatuses'
 import { PreviewSendProvider } from '@/lib/previewSend'
+import { makeCategory } from '@/test/providerFixtures'
 import EruvInfo from './EruvInfo'
 
 vi.mock('next/navigation', () => ({
@@ -115,6 +116,25 @@ describe('EruvInfo', () => {
     expect(within(listing).getByText('Center City and South Philadelphia, including Jefferson.')).toBeInTheDocument()
     expect(within(listing).getByRole('link', { name: 'centercityeruv.com' })).toHaveAttribute('href', 'https://www.centercityeruv.com/')
     expect(within(listing).getByRole('link', { name: 'Email alerts from the eruv' })).toBeInTheDocument()
+  })
+
+  // Oct 15: "Can't save eruv listings." Saved as the Eruv page's place,
+  // so You and Today find it among the eruvim.
+  it('Save on an eruv’s listing saves it, marked on its picture as any saved place is', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(
+      <ForcedViewport isMobile={false}>
+        <EruvInfo eruvim={OLD} onUp={() => {}} title="Eruvim" />
+      </ForcedViewport>,
+      { content: { categories: [makeCategory({ id: 'eruv', kind: 'eruv', pluralLabel: 'Eruvim' })] } },
+    )
+    await user.click((await screen.findAllByTestId('eruv-row'))[0])
+    const listing = screen.getByTestId('eruv-listing')
+    expect(within(listing).queryByTestId('saved-badge')).not.toBeInTheDocument()
+    await user.click(within(listing).getByRole('button', { name: 'Save Center City Eruv' }))
+    expect(JSON.parse(localStorage.getItem('jpc:pinned-listings')!)).toEqual([{ id: 'center-city', categoryId: 'eruv' }])
+    expect(within(listing).getByTestId('saved-badge')).toBeInTheDocument()
+    expect(screen.getByTestId('undo-toast')).toHaveTextContent('Saved to You')
   })
 
   it('a hotline dials its digits', async () => {

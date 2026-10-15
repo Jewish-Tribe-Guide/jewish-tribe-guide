@@ -10,6 +10,8 @@ import { LocationProvider } from '@/lib/locationContext'
 import { ChangesProvider } from '@/lib/changesContext'
 import { makeSavedSearch } from '@/lib/savedSearches'
 import type { ChangeLogRow } from '@/lib/whatChanged'
+import type { Eruv } from '@/lib/eruv'
+import { clearEruvStatuses } from '@/lib/useEruvStatuses'
 import YouScreen from './YouScreen'
 
 vi.mock('next/navigation', () => ({
@@ -18,12 +20,31 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
 }))
 
+// The time, for a test that needs one (a saved eruv's "this Shabbos").
+const clock = vi.hoisted(() => ({ at: null as number | null }))
+vi.mock('@/lib/useNow', async (actual) => {
+  const real = await actual<typeof import('@/lib/useNow')>()
+  return { ...real, useNow: () => clock.at ?? real.useNow() }
+})
+
 const grocery = makeCategory({ id: 'grocery', label: 'Grocery', pluralLabel: 'Grocery', detailFields: [{ key: 'm', label: 'Kosher items', type: 'tags' }] })
 const listings = [
   makeListing({ id: 'tj', name: 'Trader Joe’s', category: 'grocery', m: ['Challah'] }),
   makeListing({ id: 'ac', name: 'ACME', category: 'grocery', m: ['Challah'] }),
 ]
 const save = (...ids: string[]) => localStorage.setItem('jpc:pinned-listings', JSON.stringify(ids.map((id) => ({ id, categoryId: 'grocery' }))))
+const eruvPage = makeCategory({ id: 'eruv', kind: 'eruv', label: 'Eruv Information', pluralLabel: 'Eruvim' })
+const centerCity: Eruv = {
+  id: 'center-city', name: 'Center City Eruv', covers: null, website: null, hotline: null, alertsUrl: null, statusUrl: 'https://example.org', statusDated: false,
+  status: 'up', statusWords: 'The Eruv is Up!', statusPostedOn: null, statusCheckedAt: '2026-10-09T18:55:00Z', statusErrorAt: null, statusError: null,
+}
+// /api/eruv, answered; anything else as it was.
+function eruvim(list: Eruv[]) {
+  const real = globalThis.fetch
+  vi.stubGlobal('fetch', (url: string, init?: RequestInit) =>
+    String(url).startsWith('/api/eruv') ? Promise.resolve(new Response(JSON.stringify({ ok: true, available: true, timezone: 'America/New_York', candles: 18 * 60 + 12, eruvim: list }))) : real(url, init),
+  )
+}
 const challah = makeSavedSearch({ words: 'challah', kind: 'category', categoryId: 'grocery', href: '/test-community/grocery?q=challah' })
 
 function show(changes: ChangeLogRow[] | null = null) {
@@ -35,12 +56,17 @@ function show(changes: ChangeLogRow[] | null = null) {
         </ChangesProvider>
       </ListingsProvider>
     </LocationProvider>,
-    { content: { categories: [grocery] } },
+    { content: { categories: [grocery, eruvPage] } },
   )
 }
 
 beforeEach(() => localStorage.clear())
-afterEach(() => cleanup())
+afterEach(() => {
+  cleanup()
+  clock.at = null
+  clearEruvStatuses()
+  vi.unstubAllGlobals()
+})
 
 describe('You', () => {
   it('nothing saved: says how to save', () => {
@@ -127,5 +153,31 @@ describe('You', () => {
     show(changes)
     expect(await screen.findAllByTestId('you-changed-dot')).toHaveLength(1)
     expect(screen.getByText('New hours')).toBeInTheDocument()
+  })
+
+  // Oct 15: an eruv couldn't be saved; now it's saved from its listing as
+  // the Eruv page's, and You says whether it's up.
+  it('a saved eruv: whether it’s up and when the guide checked, opening it on the Eruv page; removing it says so', async () => {
+    const user = userEvent.setup()
+    clock.at = Date.parse('2026-10-09T19:00:00Z') // Fri 3 PM in Philadelphia
+    eruvim([centerCity])
+    localStorage.setItem('jpc:pinned-listings', JSON.stringify([{ id: 'tj', categoryId: 'grocery' }, { id: 'center-city', categoryId: 'eruv' }]))
+    show()
+    const places = await screen.findByTestId('you-places')
+    const links = within(places).getAllByRole('link')
+    expect(links.map((a) => a.textContent)).toEqual([expect.stringContaining('Center City EruvUp for this Shabbos · Checked 2:55 PM'), expect.stringContaining('Trader Joe’s')])
+    expect(links[0]).toHaveAttribute('href', '/test-community/eruv?item=center-city')
+    expect(within(links[0]).getByText('Up for this Shabbos')).toHaveClass('text-green-700')
+    await user.click(screen.getByRole('button', { name: 'Save Center City Eruv' }))
+    expect(within(screen.getByTestId('you-places')).queryByText('Center City Eruv')).not.toBeInTheDocument()
+    expect(screen.getByTestId('undo-toast')).toHaveTextContent('Removed from You')
+  })
+
+  it('a saved eruv that’s gone is skipped', async () => {
+    eruvim([])
+    localStorage.setItem('jpc:pinned-listings', JSON.stringify([{ id: 'tj', categoryId: 'grocery' }, { id: 'center-city', categoryId: 'eruv' }]))
+    show()
+    const places = await screen.findByTestId('you-places')
+    expect(within(places).getAllByRole('link').map((a) => a.textContent)).toEqual([expect.stringContaining('Trader Joe’s')])
   })
 })

@@ -6,6 +6,8 @@ import { makeCategory, makeListing } from '@/test/providerFixtures'
 import { mockRouter } from '@/test/nextNavigationMock'
 import { ListingsProvider } from '@/lib/listingsContext'
 import type { HomeSection } from '@/lib/homeSections'
+import type { Eruv } from '@/lib/eruv'
+import { clearEruvStatuses } from '@/lib/useEruvStatuses'
 import { PinnedBlock } from './PinnedPlaces'
 
 vi.mock('next/navigation', () => ({
@@ -21,7 +23,8 @@ const pin = (...ids: [string, string][]) => localStorage.setItem(PINS_KEY, JSON.
 const grocery = makeCategory({ id: 'grocery', label: 'Grocery', pluralLabel: 'Grocery' })
 const food = makeCategory({ id: 'restaurant', label: 'Food', pluralLabel: 'Food' })
 const hospital = makeCategory({ id: 'hospital', label: 'Hospital', pluralLabel: 'Hospitals' })
-const categories = [hospital, grocery, food]
+const eruvPage = makeCategory({ id: 'eruv', kind: 'eruv', label: 'Eruv Information', pluralLabel: 'Eruvim' })
+const categories = [hospital, grocery, food, eruvPage]
 // The admin's order: Food, then Grocery; Hospitals in no section.
 const sections = [{ id: 's1', kind: 'section', title: 'Food and Hospitality', sortOrder: 0, cardIds: ['restaurant', 'grocery'], width: 'full' }] as HomeSection[]
 const centre = { lat: 0, lng: 0 }
@@ -32,8 +35,17 @@ function show(ui: React.ReactElement) {
   return renderWithProviders(<ListingsProvider listings={listings.filter((l) => l.id !== 'Gone')}>{ui}</ListingsProvider>, { content: { categories, homeSections: sections } })
 }
 
+const centerCity: Eruv = {
+  id: 'center-city', name: 'Center City Eruv', covers: null, website: null, hotline: null, alertsUrl: null, statusUrl: 'https://example.org', statusDated: false,
+  status: 'down', statusWords: 'The Eruv is Down', statusPostedOn: null, statusCheckedAt: '2026-10-09T18:55:00Z', statusErrorAt: null, statusError: null,
+}
+
 beforeEach(() => localStorage.clear())
-afterEach(() => cleanup())
+afterEach(() => {
+  cleanup()
+  clearEruvStatuses()
+  vi.unstubAllGlobals()
+})
 
 describe('Pinned on the Today home', () => {
   it('nothing until something is pinned', () => {
@@ -56,5 +68,17 @@ describe('Pinned on the Today home', () => {
     expect(screen.getByTestId('today-pinned')).toHaveTextContent('Lunch Spot')
     expect(screen.getByTestId('today-pinned')).not.toHaveTextContent('Gone')
     expect(screen.queryByRole('link', { name: /^All/ })).not.toBeInTheDocument()
+  })
+
+  // Oct 15: a saved eruv, with whether it's up.
+  it('a saved eruv: whether it’s up, opening it on the Eruv page', async () => {
+    vi.stubGlobal('fetch', async () => new Response(JSON.stringify({ ok: true, available: true, timezone: 'America/New_York', candles: 18 * 60 + 12, eruvim: [centerCity] })))
+    pin(['Lunch Spot', 'restaurant'], ['center-city', 'eruv'])
+    show(<PinnedBlock communitySlug="philly" from={centre} now={Date.parse('2026-10-09T19:00:00Z')} />)
+    const block = await screen.findByTestId('today-pinned')
+    const rows = within(block).getAllByRole('link')
+    expect(rows.map((a) => a.textContent)).toEqual(['CCCenter City EruvEruv · Down this Shabbos', expect.stringContaining('Lunch Spot')])
+    expect(rows[0]).toHaveAttribute('href', '/philly/eruv?item=center-city')
+    expect(within(rows[0]).getByText('Down this Shabbos')).toHaveClass('text-red-700')
   })
 })

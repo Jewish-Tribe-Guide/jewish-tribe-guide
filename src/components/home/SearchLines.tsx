@@ -52,8 +52,10 @@ export default function SearchLines({
   // link (a button can't sit in a link); null for a line that saves nothing.
   const lineSave = (line: SearchLine) => {
     if (!ui.map.pins) return null
-    if (line.kind === 'listing' && line.listing && line.categoryId) {
-      const place = { id: line.listing.id, categoryId: line.categoryId }
+    // A place, or an eruv (saved as the Eruv page's: usePinnedPlaces).
+    const placeId = line.kind === 'listing' ? line.listing?.id : line.eruvId
+    if (placeId && line.categoryId) {
+      const place = { id: placeId, categoryId: line.categoryId }
       return <SaveButton plain saved={isPinned(place.id)} onToggle={() => togglePlace(place)} name={line.title} className="mr-2.5" />
     }
     const search = saved ? lineSearch(line, typed) : null

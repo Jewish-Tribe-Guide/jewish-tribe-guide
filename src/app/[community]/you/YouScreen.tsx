@@ -2,11 +2,11 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import CategoryIcon from '@/components/CategoryIcon'
 import SwipeRow, { SwipeRowGroup } from '@/components/SwipeRow'
 import SaveButton from '@/components/SaveButton'
 import { BookmarkIcon } from '@/components/icons'
-import { TONE, WithMinyans, hasMinyanim, milesFrom, photoOf, usePinnedPlaces, type PinnedPlace } from '@/components/home/PinnedPlaces'
+import { PlaceIcon, TONE, WithMinyans, eruvPlaceView, hasMinyanim, milesFrom, placeHref, placeName, usePinnedPlaces, type PinnedPlace } from '@/components/home/PinnedPlaces'
+import { TONE_WORDS } from '@/lib/eruvTone'
 import { useNextMinyan } from '@/components/resources/nextMinyans'
 import { useActiveCommunity, useCommunityTimezone } from '@/lib/communityContext'
 import { useLocation } from '@/lib/locationContext'
@@ -20,16 +20,15 @@ import { useHomeSearch } from '@/lib/useHomeSearch'
 import { landSub, savedLand } from '@/lib/searchLands'
 import { getCategoryColor } from '@/lib/categoryColor'
 import { useCategories } from '@/lib/useCategories'
-import { initialsOf, listingRowFacts } from '@/lib/listingRow'
-import { listingSlug } from '@/lib/listingSlug'
+import { listingRowFacts } from '@/lib/listingRow'
 import { milesText, type LatLng } from '@/lib/geo'
-import { routes } from '@/lib/routes'
 
 // ── You (Oct 14, canvas page "you") ──────────────────────────────────────────
 // Saved places and saved searches, each with one live fact: a place's is its
 // category row's own (open until, the next minyan, how far); a search's is
 // what its home line would say now ("10 with Challah"), asked again the same
-// way (useHomeSearch). A blue dot and two words on a place that changed since
+// way (useHomeSearch); a saved eruv's, whether it's up this week and when
+// the guide checked. A blue dot and two words on a place that changed since
 // You was last opened here. Swipe a row to remove it (or, on desktop, click
 // its bookmark), with Undo; nothing reorders. Saved on this phone, no account.
 
@@ -54,7 +53,7 @@ export default function YouScreen() {
     storeSeenAt(Date.now())
   }, [])
   const changes = useMemo(() => (changeLog ? whatChanged(changeLog, timezone) : null), [changeLog, timezone])
-  const dots = changedSince(changes, new Set((places ?? []).map((p) => p.item.id)), since ?? null)
+  const dots = changedSince(changes, new Set((places ?? []).map((p) => p.id)), since ?? null)
 
   const searches = [...(saved?.searches ?? [])].reverse()
   const now = home.schedule?.now ?? null
@@ -104,13 +103,13 @@ export default function YouScreen() {
                     <WithMinyans places={places}>
                       {places.map((p) => (
                         <PlaceRow
-                          key={p.item.id}
+                          key={p.id}
                           place={p}
                           communitySlug={community.slug}
                           from={from}
                           now={now}
-                          changed={dots.get(p.item.id) ?? null}
-                          onRemove={() => togglePlace({ id: p.item.id, categoryId: p.category.id })}
+                          changed={dots.get(p.id) ?? null}
+                          onRemove={() => togglePlace({ id: p.id, categoryId: p.category.id })}
                         />
                       ))}
                     </WithMinyans>
@@ -174,43 +173,48 @@ function PlaceRow({
   changed: string | null
   onRemove: () => void
 }) {
-  const { item, category } = place
+  const { category } = place
+  const name = placeName(place)
   const categories = useCategories()
-  const shul = useNextMinyan(item.id)
+  const shul = useNextMinyan(place.id)
   // The category row's own facts, the first that says what it's doing now
-  // (open until, the next minyan) first: one line.
-  const facts = listingRowFacts(item, category, now === null ? null : new Date(now), { shul }).filter((f) => !f.ownLine)
-  const status = hasMinyanim(category) ? (shul ? [{ text: shul.text, tone: shul.tone }] : []) : facts.filter((f) => ['open', 'caution', 'closed', 'opens'].includes(f.tone)).slice(0, 1)
-  const miles = category.hasAddress === false ? null : milesFrom(from, item)
+  // (open until, the next minyan) first: one line. An eruv's: whether it's
+  // up, and when the guide checked.
+  const eruv = place.kind === 'eruv' ? eruvPlaceView(place, now) : null
+  const status: { text: string; className: string }[] =
+    place.kind === 'eruv'
+      ? eruv
+        ? [{ text: eruv.label, className: `font-semibold ${TONE_WORDS[eruv.tone]}` }, ...(eruv.checked ? [{ text: eruv.checked.split(' · ')[0], className: '' }] : [])]
+        : []
+      : hasMinyanim(category)
+        ? shul
+          ? [{ text: shul.text, className: TONE[shul.tone] }]
+          : []
+        : listingRowFacts(place.item, category, now === null ? null : new Date(now), { shul })
+            .filter((f) => !f.ownLine && ['open', 'caution', 'closed', 'opens'].includes(f.tone))
+            .slice(0, 1)
+            .map((f) => ({ text: f.text, className: TONE[f.tone] }))
+  const miles = place.kind === 'eruv' || category.hasAddress === false ? null : milesFrom(from, place.item)
   return (
     <div className="group border-t border-slate-100 first:border-t-0">
       <SwipeRow
-        rowId={`place:${item.id}`}
-        actions={[{ id: 'remove', label: 'Remove', ariaLabel: `Remove ${item.name}`, active: false, onSelect: onRemove }]}
+        rowId={`place:${place.id}`}
+        actions={[{ id: 'remove', label: 'Remove', ariaLabel: `Remove ${name}`, active: false, onSelect: onRemove }]}
         className="bg-white"
         contentClassName="relative flex items-center bg-white touch-pan-y desktop:group-hover:bg-slate-50"
       >
-        <Link href={routes.listing(communitySlug, category.id, listingSlug(item))} prefetch={false} className="flex min-w-0 flex-1 items-center gap-3 px-3.5 py-3">
-          <CategoryIcon
-            icon={category.icon}
-            categoryId={category.id}
-            iconImageUrl={photoOf(item)}
-            initials={initialsOf(item.name)}
-            shape="square"
-            color={getCategoryColor(categories, category.id)}
-            className="h-11 w-11 text-lg"
-            sizePx={44}
-          />
+        <Link href={placeHref(communitySlug, place)} prefetch={false} className="flex min-w-0 flex-1 items-center gap-3 px-3.5 py-3">
+          <PlaceIcon place={place} color={getCategoryColor(categories, category.id)} />
           <span className="min-w-0 flex-1">
             <span className="flex items-center gap-2">
-              <span className="truncate text-[15.5px] font-bold text-ink">{item.name}</span>
+              <span className="truncate text-[15.5px] font-bold text-ink">{name}</span>
               {changed && <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full bg-primary" data-testid="you-changed-dot" />}
             </span>
             <span className="mt-0.5 block truncate text-[13.5px] text-slate-600">
               {[
                 ...(changed ? [<span key="changed" className="font-semibold text-primary">{changed}</span>] : []),
                 ...status.map((f, i) => (
-                  <span key={`s${i}`} className={TONE[f.tone]}>
+                  <span key={`s${i}`} className={f.className} data-tone={i === 0 ? eruv?.tone : undefined}>
                     {f.text}
                   </span>
                 )),
@@ -219,7 +223,7 @@ function PlaceRow({
             </span>
           </span>
         </Link>
-        <RowBookmark name={item.name} onRemove={onRemove} />
+        <RowBookmark name={name} onRemove={onRemove} />
       </SwipeRow>
     </div>
   )

@@ -70,4 +70,14 @@ describe('SearchLines — an eruv’s line', () => {
     expect(dots[0].className).toMatch(/\bbg-green-700\b/)
     expect(screen.getByText('Up · Checked 1:55 PM')).toBeInTheDocument()
   })
+
+  it('is saved as a place, the Eruv page’s, as a listing’s line is', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(
+      <SearchLines lines={[{ key: 'eruv:cc', kind: 'eruv', title: 'Center City Eruv', sub: 'Up', href: '/philly/eruv?item=cc', categoryId: 'eruv', eruvId: 'cc', tone: 'green' }]} categories={[]} onPick={vi.fn()} />,
+    )
+    await user.click(screen.getByRole('button', { name: 'Save Center City Eruv' }))
+    expect(JSON.parse(localStorage.getItem('jpc:pinned-listings')!)).toEqual([{ id: 'cc', categoryId: 'eruv' }])
+    expect(screen.getByRole('button', { name: 'Save Center City Eruv' })).toHaveAttribute('aria-pressed', 'true')
+  })
 })

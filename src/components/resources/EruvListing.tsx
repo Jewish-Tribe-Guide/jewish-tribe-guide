@@ -7,6 +7,11 @@ import { dialable, eruvView, type Eruv } from '@/lib/eruv'
 import { TONE_DOT, TONE_WORDS } from '@/lib/eruvTone'
 import { initialsOf } from '@/lib/listingRow'
 import CategoryIcon from '@/components/CategoryIcon'
+import SaveButton from '@/components/SaveButton'
+import SavedBadge from '@/components/SavedBadge'
+import { usePinned } from '@/lib/pinnedContext'
+import { useCategories } from '@/lib/useCategories'
+import { ui } from '@/lib/uiConfig'
 import BackIconButton from '@/components/BackIconButton'
 import { Card } from './listingParts'
 
@@ -46,7 +51,8 @@ const linkClass = 'font-semibold text-primary hover:underline'
 const siteLabel = (url: string) => url.replace(/^https?:\/\//i, '').replace(/^www\./i, '').replace(/\/$/, '')
 
 /** One eruv's listing: its status, where it goes, and the eruv's own
- *  site, hotline and alerts; under it, "Suggest an edit" (Oct 13), which
+ *  site, hotline and alerts; Save beside its name (Oct 15), as on any
+ *  listing, so You and Today say whether it's up; under it, "Suggest an edit" (Oct 13), which
  *  turns the listing into its edit form (EruvEditor), hosted
  *  as MapPlaceDetail hosts a listing's: a ‹ and "Suggest an edit" over it,
  *  and its own step in the history, so Back (and a phone's back swipe)
@@ -125,12 +131,23 @@ function EruvDetails({ eruv, color, now, timezone, candles }: { eruv: Eruv; colo
       </ListingRow>
     ),
   ].filter(Boolean)
+  // Saved as a place of the Eruv page's: it's found again among the
+  // eruvim (usePinnedPlaces).
+  const { isPinned, toggle } = usePinned()
+  const page = useCategories()?.find((c) => c.kind === 'eruv') ?? null
+  const saved = !!page && isPinned(eruv.id)
   return (
     <div className="space-y-3.5" data-testid="eruv-listing">
       <div className="flex items-start gap-3.5">
-        <CategoryIcon icon="" initials={initialsOf(eruv.name)} shape="square" color={color} className="h-16 w-16 shrink-0 text-2xl" sizePx={64} />
+        <span className="relative shrink-0">
+          <CategoryIcon icon="" initials={initialsOf(eruv.name)} shape="square" color={color} className="h-16 w-16 shrink-0 text-2xl" sizePx={64} />
+          {saved && <SavedBadge />}
+        </span>
         <div className="min-w-0 flex-1">
-          <h2 className="text-[22px] font-extrabold leading-tight tracking-tight text-slate-900">{eruv.name}</h2>
+          <div className="flex items-start gap-2">
+            <h2 className="min-w-0 flex-1 text-[22px] font-extrabold leading-tight tracking-tight text-slate-900">{eruv.name}</h2>
+            {ui.map.pins && page && <SaveButton saved={saved} onToggle={() => toggle({ id: eruv.id, categoryId: page.id })} name={eruv.name} />}
+          </div>
           <p className="mt-1 text-[14.5px] leading-snug text-muted">Eruv</p>
         </div>
       </div>
