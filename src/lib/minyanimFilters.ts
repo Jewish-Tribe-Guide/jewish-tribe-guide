@@ -1,4 +1,6 @@
+import { words } from './ask'
 import type { Tefillah } from './davening'
+import { readMinyanimSearch } from './minyanimSearch'
 import { minyanimOn } from './upcomingDavening'
 import { dayKeysFor, type MinyanSchedule } from './useMinyanSchedule'
 
@@ -31,6 +33,26 @@ export const WITHIN_CHOICES: readonly { label: string; miles: number }[] = [
 export function tefillosChosen(labels: readonly string[]): Tefillah[] | null {
   const chosen = TEFILLAH_CHOICES.filter((c) => labels.includes(c.label)).flatMap((c) => c.tefillos)
   return chosen.length > 0 ? [...new Set(chosen)] : null
+}
+
+/** The Tefillah chips a search ticks ("mincha", "kabbalas shabbos"), as a
+ *  word an admin taught ticks its filter everywhere else (the user, Oct 15):
+ *  each with the words unticking it takes out of the search. */
+export function typedTefillahChoices(search: string): Map<string, string> {
+  const out = new Map<string, string>()
+  const tokens = search.split(/\s+/).filter(Boolean)
+  tokens.forEach((token, i) => {
+    const said = readMinyanimSearch(token)
+    if (!said?.named || !said.tefillos) return
+    const next = tokens[i + 1]
+    for (const c of TEFILLAH_CHOICES) {
+      if (!c.tefillos.every((t) => said.tefillos!.includes(t))) continue
+      // "Kabbalas Shabbos" goes as one: left behind, "shabbos" is a day.
+      const both = c.tefillos.includes('kabbalas_shabbos') && next && /^shabb?[oa][st]$/i.test(next)
+      out.set(c.label, words(both ? `${token} ${next}` : token).join(' '))
+    }
+  })
+  return out
 }
 
 export function milesChosen(label: string | null): number | null {

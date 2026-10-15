@@ -13,7 +13,7 @@ import DistanceNote from './DistanceNote'
 import { NextMinyans } from './nextMinyans'
 import { CategoryBandFrame, CategoryBandBadge } from './CategoryBandFrame'
 import FiltersSheet from './FiltersSheet'
-import { TEFILLAH_CHOICES, WITHIN_CHOICES, milesChosen, tefillosChosen } from '@/lib/minyanimFilters'
+import { TEFILLAH_CHOICES, WITHIN_CHOICES, milesChosen, tefillosChosen, typedTefillahChoices } from '@/lib/minyanimFilters'
 import { kindText } from '@/lib/listingView'
 import ListHeading, { ClosedGroupLine, GroupHeading } from './ListHeading'
 import { groupListings, parseGroupBy, type ListGroup } from '@/lib/listGroups'
@@ -1358,6 +1358,11 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // An item said ("challah") is Has: Challah, the same way (searchItems).
   const searchHas = searchResult ? searchItems(category, items, searchResult) : new Map<string, Map<string, string>>()
   const searchOpenNow = !!searchResult?.query.openNow && hasFilterableHours
+  // A tefillah typed in the Minyanim view ("mincha") is its chip ticked,
+  // as "dairy" is Food type: Dairy (the user, Oct 15); unticking it takes
+  // the word out of the search.
+  const typedTefillos = minyanimView ? typedTefillahChoices(search) : new Map<string, string>()
+  const sheetTefillos = [...new Set([...minyanTefillos, ...typedTefillos.keys()])]
   const dropWord = (word: string) => setSearch((prev) => withoutTerms(prev, word.split(' ')))
   const sheetOpenNow = openNow || searchOpenNow
   const toggleSheetOpenNow = () => {
@@ -1431,7 +1436,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
     setMinyanWithin(null)
     if (landedSearch !== null && search === landedSearch) return setSearch('')
     let next = search
-    for (const word of [...searchBools.values(), ...[...searchSelects.values()].flatMap((m) => [...m.values()]), ...[...searchHas.values()].flatMap((m) => [...m.values()])]) next = withoutTerms(next, word.split(' '))
+    for (const word of [...searchBools.values(), ...[...searchSelects.values()].flatMap((m) => [...m.values()]), ...[...searchHas.values()].flatMap((m) => [...m.values()]), ...typedTefillos.values()]) next = withoutTerms(next, word.split(' '))
     setSearch(searchOpenNow ? withoutOpenWords(next) : next)
   }
   // Each ticked item as its listings spell it, so "has_m=wine" from an
@@ -1443,14 +1448,18 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   const sheetSelects = selectsToShow.map((sel) => ({ ...sel, chosen: [...new Set([...sel.chosen, ...(searchSelects.get(sel.key)?.keys() ?? [])])] }))
   // The Minyanim view's own two, around the page's Denomination in the
   // sheet: Tefillah first, How far last, as the sketch has them (Oct 15).
-  const minyanTefillahSelect = { key: '@tefillah', label: 'Tefillah', values: TEFILLAH_CHOICES.map((c) => c.label), chosen: minyanTefillos, ordered: true }
+  const minyanTefillahSelect = { key: '@tefillah', label: 'Tefillah', values: TEFILLAH_CHOICES.map((c) => c.label), chosen: sheetTefillos, ordered: true }
   const minyanWithinSelect = { key: '@within', label: 'How far', values: WITHIN_CHOICES.map((c) => c.label), chosen: minyanWithin ? [minyanWithin] : [], ordered: true }
   const onSheetSelect = (key: string, value: string) => {
-    if (key === minyanTefillahSelect.key) return setMinyanTefillos((prev) => (prev.includes(value) ? prev.filter((x) => x !== value) : [...prev, value]))
+    if (key === minyanTefillahSelect.key) {
+      const word = typedTefillos.get(value)
+      if (word) dropWord(word)
+      return setMinyanTefillos((prev) => (prev.includes(value) || word ? prev.filter((x) => x !== value) : [...prev, value]))
+    }
     if (key === minyanWithinSelect.key) return setMinyanWithin((prev) => (prev === value ? null : value))
     toggleSheetSelect(key, value)
   }
-  const minyanFilterCount = (minyanTefillos.length > 0 ? 1 : 0) + (minyanWithin ? 1 : 0)
+  const minyanFilterCount = (sheetTefillos.length > 0 ? 1 : 0) + (minyanWithin ? 1 : 0)
   // What the Filters button counts: everything the sheet shows ticked.
   const sheetFilterCount =
     filterableBooleans.filter((f) => boolFilters[f.key] || searchBools.has(f.key)).length +
@@ -1918,7 +1927,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
           search={search}
           canAdd={canEdit}
           shulText={(item) => filterableSelects.flatMap((f) => selectValues(item[f.key])).join(' · ')}
-          tefillos={tefillosChosen(minyanTefillos)}
+          tefillos={tefillosChosen(sheetTefillos)}
           withinMiles={milesChosen(minyanWithin)}
           filters={{ active: sheetFilterCount + minyanFilterCount, onOpen: () => setFiltersOpen(true) }}
           onShowing={setMinyanimShowing}

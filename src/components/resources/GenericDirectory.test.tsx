@@ -2304,6 +2304,35 @@ describe('GenericDirectory — each shul’s next minyan', () => {
         await user.click(within(sheet()).getByRole('button', { name: 'Clear all' }))
         expect(within(sheet()).getByRole('button', { name: 'Show 3 minyanim' })).toBeInTheDocument()
       })
+
+      // Oct 15: as "dairy" ticks Food type: Dairy, a tefillah typed ticks
+      // its chip, and unticking it takes the word out of the search.
+      it('a tefillah typed is its Tefillah chip ticked', async () => {
+        fivePm()
+        const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+        open()
+        await user.type(screen.getByRole('searchbox'), 'mincha')
+        expect(heading()).toHaveTextContent('2 minyanim left today')
+        expect(within(heading()).getByRole('button', { name: /^Filters/ })).toHaveTextContent('1')
+        await user.click(within(heading()).getByRole('button', { name: /^Filters/ }))
+        expect(within(sheet()).getByRole('button', { name: 'Mincha' })).toHaveAttribute('aria-pressed', 'true')
+
+        // Maariv beside it shows both, not neither.
+        await user.click(within(sheet()).getByRole('button', { name: 'Maariv' }))
+        expect(within(sheet()).getByRole('button', { name: 'Show 3 minyanim' })).toBeInTheDocument()
+        await user.click(within(sheet()).getByRole('button', { name: 'Mincha' }))
+        expect(screen.getByRole('searchbox')).toHaveValue('')
+        expect(within(sheet()).getByRole('button', { name: 'Mincha' })).toHaveAttribute('aria-pressed', 'false')
+        expect(within(sheet()).getByRole('button', { name: 'Show 1 minyan' })).toBeInTheDocument()
+      })
+
+      it('another day’s count doesn’t name the day: its tab says it', async () => {
+        fivePm()
+        const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+        open()
+        await user.click(screen.getAllByRole('tab')[1])
+        expect(heading()).not.toHaveTextContent(/\bon\b/)
+      })
     })
 
     it('isn’t on a page without minyanim', () => {

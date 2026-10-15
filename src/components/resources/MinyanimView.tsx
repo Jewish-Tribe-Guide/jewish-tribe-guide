@@ -141,7 +141,10 @@ export default function MinyanimView({
   }
   const asked = sought?.tefillos ?? null
   const slots = minyanimOn(schedule.shuls, dayKeysFor(day), schedule.season, schedule.anchors)
-    .filter((s) => (!asked || asked.includes(s.tefillah)) && (!namedIds || namedIds.has(s.shulId ?? '')))
+    // A tefillah named is the Tefillah chip when the page passes its own
+    // (GenericDirectory ticks it), so ticking Shacharis beside a typed
+    // "mincha" shows both; a part of the day ("morning") still narrows.
+    .filter((s) => (!asked || (tefillos && sought?.named) || asked.includes(s.tefillah)) && (!namedIds || namedIds.has(s.shulId ?? '')))
     // The Filters sheet's Tefillah and How far, on top of what's typed.
     .filter((s) => (!tefillos || tefillos.includes(s.tefillah)) && (withinMiles == null || miles(s) <= withinMiles))
     .sort((a, b) =>
@@ -216,7 +219,9 @@ export default function MinyanimView({
           count={upcoming.length}
           total={upcoming.length}
           units={['minyan', 'minyanim']}
-          suffix={isToday ? 'left today' : `on ${tabLabel(day, index)[0] === 'Shabbos' ? 'Shabbos' : dayLabel(day.weekday)}`}
+          // Another day needn't say which: its tab is picked just above
+          // (the user, Oct 15).
+          suffix={isToday ? 'left today' : undefined}
           filters={filters}
         />
       </div>
