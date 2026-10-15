@@ -218,7 +218,7 @@ export default function HeroHeading({
             <div className="mt-3">
               <SearchBox query={query} onQueryChange={onQueryChange} onSubmit={onSearchSubmit} interactive={interactive} placeholder={settings.searchPlaceholder} />
               {phonePanel}
-              <SearchPrompts prompts={prompts} onPick={pickPrompt} className="mt-2.5" oneRow />
+              <SearchPrompts prompts={prompts} onPick={pickPrompt} className="mt-2.5" oneLine />
             </div>
           )}
         </section>
@@ -244,7 +244,7 @@ export default function HeroHeading({
           <div className="mt-8 max-w-xl mx-auto">
             <SearchBox query={query} onQueryChange={onQueryChange} onSubmit={onSearchSubmit} interactive={interactive} placeholder={settings.searchPlaceholder} />
             {phonePanel}
-            <SearchPrompts prompts={prompts} onPick={pickPrompt} className="mt-3 justify-center" />
+            <SearchPrompts prompts={prompts} onPick={pickPrompt} className="mt-3 justify-center" oneLine />
           </div>
         )}
       </section>

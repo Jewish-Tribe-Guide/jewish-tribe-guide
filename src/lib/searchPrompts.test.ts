@@ -7,7 +7,7 @@ describe('candidatePrompts — questions for the moment', () => {
   it('offers the davening that comes next, by the time of day', () => {
     expect(candidatePrompts({ day: 'mon', minutes: at(7) })[0]).toBe('Next Shacharis')
     expect(candidatePrompts({ day: 'mon', minutes: at(13) })[0]).toBe('Next Mincha')
-    expect(candidatePrompts({ day: 'mon', minutes: at(19, 30) })[0]).toBe('Is there still a Maariv tonight?')
+    expect(candidatePrompts({ day: 'mon', minutes: at(19, 30) })[0]).toBe('Maariv tonight?')
     expect(candidatePrompts({ day: 'mon', minutes: at(1) })[0]).toBe('Next minyan')
   })
 

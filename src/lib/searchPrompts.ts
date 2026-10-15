@@ -22,7 +22,7 @@ export function candidatePrompts(at: { day: DayKey; minutes: number } | null): s
   // The next davening, by the time of day.
   if (minutes >= 4 * 60 && minutes < 10 * 60 + 30) out.push('Next Shacharis')
   else if (minutes >= 10 * 60 + 30 && minutes < 17 * 60) out.push('Next Mincha')
-  else if (minutes >= 17 * 60 && minutes < 23 * 60) out.push('Is there still a Maariv tonight?')
+  else if (minutes >= 17 * 60 && minutes < 23 * 60) out.push('Maariv tonight?')
   else out.push('Next minyan')
   // Friday before Shabbos: the errand everyone is on.
   if (day === 'fri' && minutes < 15 * 60) out.push('Where can I get challah?')

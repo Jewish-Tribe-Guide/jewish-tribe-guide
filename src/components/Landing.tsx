@@ -299,7 +299,9 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
       ? pickPrompts(candidatePrompts(schedule && { day: schedule.todayKey, minutes: schedule.nowMinutes }), (p) => {
           const tried = ask(p)
           return answersWell(tried.answer, tried.result.hits.length) && linesFor(p, tried.result, tried.answer).length > 0
-        })
+          // Four, so a phone has a short one to fit beside the first
+          // (SearchPrompts); a computer shows three.
+        }, 4)
       : []
   const pickPrompt = (p: string) => {
     track('search_prompt_tapped', { prompt: p })
