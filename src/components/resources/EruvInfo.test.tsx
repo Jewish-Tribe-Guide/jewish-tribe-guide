@@ -216,12 +216,12 @@ describe('EruvInfo', () => {
     })
   })
 
-  describe('Suggest an edit (Oct 13): its four things, open together', () => {
+  describe('Edit listing (Oct 13): its four things, open together', () => {
     it('the eruv’s fields filled in as they are; Send counts the changes and files them; then Sent', async () => {
       const user = userEvent.setup()
       show()
       await user.click((await screen.findAllByTestId('eruv-row'))[1])
-      await user.click(screen.getByRole('button', { name: 'Suggest an edit' }))
+      await user.click(screen.getByRole('button', { name: 'Edit listing' }))
       const form = await screen.findByTestId('eruv-suggest')
       // On a computer the editor's own ‹ is the way back: no ‹ 2 of 3 › bar.
       expect(screen.queryByTestId('listing-column-bar')).not.toBeInTheDocument()
@@ -264,7 +264,7 @@ describe('EruvInfo', () => {
         </PreviewSendProvider>,
       )
       await user.click((await screen.findAllByTestId('eruv-row'))[1])
-      await user.click(screen.getByRole('button', { name: 'Suggest an edit' }))
+      await user.click(screen.getByRole('button', { name: 'Edit listing' }))
       const form = await screen.findByTestId('eruv-suggest')
       await user.type(within(form).getByLabelText('Website'), 'lowermerioneruv.org')
       await user.click(within(form).getByRole('button', { name: 'Send 1 change' }))
@@ -278,7 +278,7 @@ describe('EruvInfo', () => {
       const user = userEvent.setup()
       show()
       await user.click((await screen.findAllByTestId('eruv-row'))[0])
-      await user.click(screen.getByRole('button', { name: 'Suggest an edit' }))
+      await user.click(screen.getByRole('button', { name: 'Edit listing' }))
       await screen.findByTestId('eruv-suggest')
       await user.click(screen.getByRole('button', { name: /back/i }))
       expect(await screen.findByTestId('eruv-listing')).toBeInTheDocument()

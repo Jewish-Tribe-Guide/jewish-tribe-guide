@@ -280,7 +280,7 @@ export default function ListingDetailModal({
           // else. The card keeps its own visual styling and nothing else.
           role="dialog"
           aria-modal="true"
-          aria-label={formOpen ? (removalOpen ? `Request removal of ${name}` : 'Suggest an edit') : name}
+          aria-label={formOpen ? (removalOpen ? `Request removal of ${name}` : 'Edit listing') : name}
         >
         <div
           // max-w-md (448px) — this went 512 (cramped, page had room to

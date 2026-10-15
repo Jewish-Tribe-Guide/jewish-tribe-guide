@@ -21,13 +21,13 @@ describe('ListingEditorScreen', () => {
     const u = userEvent.setup()
     const onClose = vi.fn()
     const item = makeListing({ id: 'sweet-box', category: 'restaurant', name: 'Sweet Box Bakery', website: 'https://shopsweetbox.com' })
-    renderWithProviders(<ListingEditorScreen heading="Suggest an edit" item={item} category={FOOD} onClose={onClose} />)
-    expect(screen.getByRole('heading', { name: 'Suggest an edit' })).toBeInTheDocument()
+    renderWithProviders(<ListingEditorScreen heading="Edit listing" item={item} category={FOOD} onClose={onClose} />)
+    expect(screen.getByRole('heading', { name: 'Edit listing' })).toBeInTheDocument()
 
     // Open where it is: the heading stays, Back closes it.
     await u.click(screen.getByTestId('editor-row-name'))
     expect(screen.getByRole('textbox', { name: 'Name' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Suggest an edit' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Edit listing' })).toBeInTheDocument()
     await u.click(screen.getByRole('button', { name: 'Back' }))
     expect(screen.queryByTestId('editor-open-name')).not.toBeInTheDocument()
     expect(onClose).not.toHaveBeenCalled()
@@ -37,7 +37,7 @@ describe('ListingEditorScreen', () => {
     await u.click(within(screen.getByTestId('editor-empty')).getByRole('button', { name: 'Main dishes' }))
     expect(screen.getByRole('heading', { name: 'Main dishes' })).toBeInTheDocument()
     await u.click(screen.getByRole('button', { name: 'Back' }))
-    expect(screen.getByRole('heading', { name: 'Suggest an edit' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Edit listing' })).toBeInTheDocument()
     expect(screen.getByTestId('editor-list')).toBeInTheDocument()
     expect(onClose).not.toHaveBeenCalled()
 

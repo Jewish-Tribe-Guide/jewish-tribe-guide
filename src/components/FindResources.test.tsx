@@ -213,7 +213,7 @@ describe('FindResources — a real listing category', () => {
     )
 
     expect(screen.getByText('ResourceLoader')).toBeInTheDocument()
-    expect(screen.getByRole('dialog', { name: 'Suggest an edit' })).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Edit listing' })).toBeInTheDocument()
     expect(screen.getByText('ListingEditor: edit')).toBeInTheDocument()
   })
 
@@ -234,7 +234,7 @@ describe('FindResources — a real listing category', () => {
     await user.click(screen.getByRole('button', { name: 'stub open row' }))
     const sheet = screen.getByRole('dialog', { name: 'Kosher' })
     await user.click(within(sheet).getByRole('button', { name: 'Back' }))
-    expect(screen.getByRole('dialog', { name: 'Suggest an edit' })).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Edit listing' })).toBeInTheDocument()
     expect(screen.getByText('ListingEditor: edit')).toBeInTheDocument()
   })
 
@@ -247,12 +247,12 @@ describe('FindResources — a real listing category', () => {
       </ForcedViewport>,
       { content: { categories: [grocery] } },
     )
-    expect(screen.getByRole('dialog', { name: 'Suggest an edit' })).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Edit listing' })).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'stub open removal' }))
 
     expect(screen.getByRole('dialog', { name: 'Request removal of Kosher Mart' })).toBeInTheDocument()
-    expect(screen.queryByRole('dialog', { name: 'Suggest an edit' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('dialog', { name: 'Edit listing' })).not.toBeInTheDocument()
   })
 
   // Report was folded into the edit form (RemovalRequest). A link shared before
@@ -297,7 +297,7 @@ describe('FindResources — a real listing category', () => {
     )
 
     expect(screen.getByText('ResourceLoader')).toBeInTheDocument()
-    expect(screen.getByRole('dialog', { name: 'Suggest an edit' })).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Edit listing' })).toBeInTheDocument()
     expect(screen.getByText('ListingEditor: edit')).toBeInTheDocument()
   })
 

@@ -486,7 +486,7 @@ describe('ListingView — details from Google', () => {
 })
 
 describe('ListingView — the one question', () => {
-  it('asks what the listing doesn’t say yet, with a tap for each answer, before Suggest an edit', () => {
+  it('asks what the listing doesn’t say yet, with a tap for each answer, before Edit listing', () => {
     const category = makeCategory({ detailFields: [{ ...t, options: [{ value: 'Meat', label: 'Meat' }, { value: 'Dairy', label: 'Dairy' }, { value: 'Parve', label: 'Parve' }] }] })
     view({ item: makeListing({ id: 'sb', name: 'Sweet Box' }), category })
     const question = screen.getByTestId('listing-question')

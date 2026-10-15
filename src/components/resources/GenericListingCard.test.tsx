@@ -625,7 +625,7 @@ describe('GenericListingCard — expanded', () => {
     // backdrop. Scoped with `within` so this can't accidentally pass on it.
     const dialog = screen.getByRole('dialog')
     expect(within(dialog).queryByRole('button', { name: /more actions for/i })).not.toBeInTheDocument()
-    expect(within(dialog).getByRole('button', { name: 'Suggest an edit' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: 'Edit listing' })).toBeInTheDocument()
   })
 
   // Desktop's Edit/Report used to close this dialog and hand off to a
@@ -646,17 +646,17 @@ describe('GenericListingCard — expanded', () => {
     )
 
     const dialog = screen.getByRole('dialog')
-    await user.click(within(dialog).getByRole('button', { name: 'Suggest an edit' }))
+    await user.click(within(dialog).getByRole('button', { name: 'Edit listing' }))
 
     expect(screen.getByText('ListingEditor stub — item=Goldi Market')).toBeInTheDocument()
     // Not bubbled — this dialog handled it itself.
     expect(requiredHandlers.onEdit).not.toHaveBeenCalled()
     // Still the SAME dialog, not a second one stacked or swapped in.
     expect(screen.getAllByRole('dialog')).toHaveLength(1)
-    expect(screen.getByRole('dialog', { name: 'Suggest an edit' })).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Edit listing' })).toBeInTheDocument()
   })
 
-  // Send floats under the dialog, in the spot the "Suggest an edit" pill
+  // Send floats under the dialog, in the spot the "Edit listing" pill
   // held: outside the scrolling card, so a long listing can't scroll it
   // away, but inside the dialog, so assistive tech still reaches it.
   it('floats the editor\'s Send under the dialog, where the edit pill was', async () => {
@@ -665,7 +665,7 @@ describe('GenericListingCard — expanded', () => {
       <GenericListingCard item={makeListing({ name: 'Goldi Market' })} category={makeCategory()} upvotes={false} count={0} defaultExpanded {...requiredHandlers} />,
     )
     const dialog = screen.getByRole('dialog')
-    await user.click(within(dialog).getByRole('button', { name: 'Suggest an edit' }))
+    await user.click(within(dialog).getByRole('button', { name: 'Edit listing' }))
 
     const sendButton = within(dialog).getByRole('button', { name: 'stub send' })
     const card = screen.getByText('ListingEditor stub — item=Goldi Market').closest('.dialog-in')!
@@ -680,7 +680,7 @@ describe('GenericListingCard — expanded', () => {
       <GenericListingCard item={makeListing({ name: 'Goldi Market' })} category={makeCategory()} upvotes={false} count={0} defaultExpanded {...requiredHandlers} />,
     )
     const dialog = screen.getByRole('dialog')
-    await user.click(within(dialog).getByRole('button', { name: 'Suggest an edit' }))
+    await user.click(within(dialog).getByRole('button', { name: 'Edit listing' }))
 
     // A chevron alone: the word isn't needed, and the site is text-heavy.
     expect(within(dialog).getByRole('button', { name: 'Back' })).toHaveTextContent(/^$/)
@@ -697,7 +697,7 @@ describe('GenericListingCard — expanded', () => {
     renderWithProviders(
       <GenericListingCard item={makeListing({ name: 'Goldi Market' })} category={makeCategory()} upvotes={false} count={0} defaultExpanded {...requiredHandlers} />,
     )
-    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Suggest an edit' }))
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Edit listing' }))
     const push = vi.spyOn(window.history, 'pushState')
     await user.click(screen.getByRole('button', { name: 'stub open removal' }))
     expect(push).toHaveBeenLastCalledWith(expect.objectContaining({ detailModalForm: 'edit', detailModalRemoval: true }), '')
@@ -710,7 +710,7 @@ describe('GenericListingCard — expanded', () => {
     act(() => {
       window.dispatchEvent(new PopStateEvent('popstate', { state: { detailModalForm: 'edit' } }))
     })
-    expect(screen.getByRole('dialog', { name: 'Suggest an edit' })).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Edit listing' })).toBeInTheDocument()
     expect(screen.getByText('ListingEditor stub — item=Goldi Market')).toBeInTheDocument()
     push.mockRestore()
     back.mockRestore()
@@ -726,13 +726,13 @@ describe('GenericListingCard — expanded', () => {
       <GenericListingCard item={item} category={category} upvotes={false} count={0} defaultExpanded {...requiredHandlers} />,
     )
 
-    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Suggest an edit' }))
-    expect(screen.getByRole('dialog', { name: 'Suggest an edit' })).toBeInTheDocument()
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Edit listing' }))
+    expect(screen.getByRole('dialog', { name: 'Edit listing' })).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'stub open removal' }))
 
     expect(screen.getByRole('dialog', { name: 'Request removal of Goldi Market' })).toBeInTheDocument()
-    expect(screen.queryByRole('dialog', { name: 'Suggest an edit' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('dialog', { name: 'Edit listing' })).not.toBeInTheDocument()
   })
 
   // ── The edit bar ──────────────────────────────────────────────────────
@@ -742,7 +742,7 @@ describe('GenericListingCard — expanded', () => {
   // which sat at the same weight as the timestamp beside it. These assert
   // the replacement is a real, labelled control on BOTH surfaces — the point
   // is its prominence, so "reachable somehow" is not what's being checked.
-  it('offers a labelled "Suggest an edit" bar in the expanded dialog, which swaps to the edit form', async () => {
+  it('offers a labelled "Edit listing" bar in the expanded dialog, which swaps to the edit form', async () => {
     const user = userEvent.setup()
     const category = makeCategory()
     const item = makeListing({ name: 'Goldi Market' })
@@ -750,9 +750,9 @@ describe('GenericListingCard — expanded', () => {
       <GenericListingCard item={item} category={category} upvotes={false} count={0} defaultExpanded {...requiredHandlers} />,
     )
 
-    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Suggest an edit' }))
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Edit listing' }))
     expect(screen.getByText('ListingEditor stub — item=Goldi Market')).toBeInTheDocument()
-    expect(screen.getByRole('dialog', { name: 'Suggest an edit' })).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Edit listing' })).toBeInTheDocument()
   })
 
   // In place, the way the desktop dialog and the map do it: the sheet stays
@@ -766,7 +766,7 @@ describe('GenericListingCard — expanded', () => {
       </ForcedViewport>,
     )
     const sheet = screen.getByRole('dialog', { name: 'Goldi Market' })
-    await user.click(within(sheet).getByRole('button', { name: 'Suggest an edit' }))
+    await user.click(within(sheet).getByRole('button', { name: 'Edit listing' }))
 
     expect(within(sheet).getByText('ListingEditor stub — item=Goldi Market')).toBeInTheDocument()
     expect(screen.getAllByRole('dialog')).toHaveLength(1)
@@ -783,7 +783,7 @@ describe('GenericListingCard — expanded', () => {
       <GenericListingCard item={makeListing()} category={makeCategory()} upvotes={false} count={0} defaultExpanded {...requiredHandlers} />,
     )
     expect(screen.queryByRole('button', { name: 'Suggest a correction' })).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Suggest an edit' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Edit listing' })).toBeInTheDocument()
   })
 
   // A category that can't be edited loses the pill and KEEPS Save. This test
@@ -811,7 +811,7 @@ describe('GenericListingCard — expanded', () => {
         </ForcedViewport>,
       )
       await Promise.resolve()
-      expect(screen.queryByRole('button', { name: 'Suggest an edit' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Edit listing' })).not.toBeInTheDocument()
 
       const save = screen.getByRole('button', { name: 'Save Goldi Market' })
       expect(save).toHaveAttribute('aria-pressed', 'false')
@@ -829,7 +829,7 @@ describe('GenericListingCard — expanded', () => {
     )
     const dialog = screen.getByRole('dialog')
     expect(within(dialog).queryByRole('button', { name: /more actions for/i })).not.toBeInTheDocument()
-    expect(within(dialog).getByRole('button', { name: 'Suggest an edit' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: 'Edit listing' })).toBeInTheDocument()
     expect(screen.queryByRole('menuitem', { name: /report/i })).not.toBeInTheDocument()
   })
 
@@ -848,7 +848,7 @@ describe('GenericListingCard — expanded', () => {
     )
 
     const dialog = screen.getByRole('dialog')
-    await user.click(within(dialog).getByRole('button', { name: 'Suggest an edit' }))
+    await user.click(within(dialog).getByRole('button', { name: 'Edit listing' }))
 
     await user.click(screen.getByRole('button', { name: /^back$/i }))
     expect(backSpy).toHaveBeenCalled()
@@ -864,7 +864,7 @@ describe('GenericListingCard — expanded', () => {
     )
 
     const dialog = screen.getByRole('dialog')
-    await user.click(within(dialog).getByRole('button', { name: 'Suggest an edit' }))
+    await user.click(within(dialog).getByRole('button', { name: 'Edit listing' }))
 
     expect(pushSpy).toHaveBeenCalledWith(expect.objectContaining({ detailModalForm: 'edit' }), '')
   })
@@ -1403,7 +1403,7 @@ describe('GenericListingCard — mobile listing sheet', () => {
     const sheet = screen.getByRole('dialog', { name: 'Goldi Market' })
     expect(sheet).toHaveAttribute('aria-modal', 'true')
     expect(within(sheet).getByTestId('listing-view')).toBeInTheDocument()
-    expect(within(sheet).getByRole('button', { name: 'Suggest an edit' })).toBeInTheDocument()
+    expect(within(sheet).getByRole('button', { name: 'Edit listing' })).toBeInTheDocument()
     expect(onExpandedChange).toHaveBeenLastCalledWith(true)
   })
 

@@ -96,7 +96,7 @@ describe('CategoryPreview', () => {
     renderWithProviders(<CategoryPreview category={FOOD} onClose={() => {}} />)
 
     await u.click(await screen.findByRole('button', { name: 'Edit Sweet Box Bakery' }))
-    expect(screen.getByRole('heading', { name: 'Suggest an edit' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Edit listing' })).toBeInTheDocument()
     await u.click(screen.getByTestId('editor-row-contact'))
     const phone = screen.getByLabelText('Phone')
     await u.clear(phone)

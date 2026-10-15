@@ -69,7 +69,7 @@ describe('FreshnessFooter', () => {
 
   // The link that used to sit beside this line is gone on purpose — see the
   // component's doc. Asserted so it can't quietly come back as a second,
-  // near-invisible door to the same form the "Suggest an edit" bar opens.
+  // near-invisible door to the same form the "Edit listing" bar opens.
   it('offers no route into the edit form of its own', () => {
     render(<FreshnessFooter resourceId="r1" confirmedAt="2026-09-01T00:00:00.000Z" />)
     expect(screen.queryByRole('button', { name: /suggest/i })).toBeNull()

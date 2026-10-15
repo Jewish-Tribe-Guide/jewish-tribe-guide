@@ -115,7 +115,7 @@ describe('MapPlaceDetail', () => {
       </PinnedProvider>,
     )
 
-    await user.click(screen.getByRole('button', { name: 'Suggest an edit' }))
+    await user.click(screen.getByRole('button', { name: 'Edit listing' }))
 
     expect(pushSpy).toHaveBeenCalledWith(expect.objectContaining({ mapSheetForm: 'edit' }), '')
   })
@@ -132,7 +132,7 @@ describe('MapPlaceDetail', () => {
       </PinnedProvider>,
     )
 
-    await user.click(screen.getByRole('button', { name: 'Suggest an edit' }))
+    await user.click(screen.getByRole('button', { name: 'Edit listing' }))
     expect(screen.getByText(/ListingEditor stub/)).toBeInTheDocument()
 
     // Simulates what a real swipe-back/browser-back delivers: a popstate
@@ -159,7 +159,7 @@ describe('MapPlaceDetail', () => {
       </PinnedProvider>,
     )
 
-    await user.click(screen.getByRole('button', { name: 'Suggest an edit' }))
+    await user.click(screen.getByRole('button', { name: 'Edit listing' }))
     await user.click(screen.getByRole('button', { name: 'stub cancel' }))
 
     expect(backSpy).toHaveBeenCalled()
@@ -171,13 +171,13 @@ describe('MapPlaceDetail', () => {
 
   // ── The edit bar ───────────────────────────────────────────────────────
 
-  // Where Edit, Share and Set as location live now: one "Suggest an edit"
+  // Where Edit, Share and Set as location live now: one "Edit listing"
   // bar at the end of the panel, with Set as location in its overflow, and
   // Save at the top beside the thumbs-up (Oct 14).
   // They used to sit behind a kebab next to the name, which people open
   // expecting Share and never expecting to author anything — plus a quiet
   // grey "Suggest a correction" link in the footer, now gone.
-  it('offers Suggest an edit and the overflow, with no kebab and no quiet correction link', async () => {
+  it('offers Edit listing and the overflow, with no kebab and no quiet correction link', async () => {
     const user = (await import('@testing-library/user-event')).default.setup()
     renderWithProviders(
       <PinnedProvider>
@@ -185,7 +185,7 @@ describe('MapPlaceDetail', () => {
       </PinnedProvider>,
     )
 
-    expect(screen.getByRole('button', { name: 'Suggest an edit' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Edit listing' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /more actions/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Suggest a correction' })).not.toBeInTheDocument()
 
@@ -214,7 +214,7 @@ describe('MapPlaceDetail', () => {
     )
     const view = container.querySelector('[data-testid="listing-view"]') as HTMLElement
     const last = view.lastElementChild as HTMLElement
-    expect(last).toContainElement(screen.getByRole('button', { name: 'Suggest an edit' }))
+    expect(last).toContainElement(screen.getByRole('button', { name: 'Edit listing' }))
     expect(last).toContainElement(screen.getByRole('button', { name: 'Actions for Goldi Market' }))
     // Its own block now: the dated strip it used to end is gone (Oct 6).
     expect(last).toHaveAttribute('data-testid', 'listing-foot')
@@ -245,7 +245,7 @@ describe('MapPlaceDetail', () => {
     writes.length = 0
     screen.getByTestId('region').scrollTop = 480
 
-    await user.click(screen.getByRole('button', { name: 'Suggest an edit' }))
+    await user.click(screen.getByRole('button', { name: 'Edit listing' }))
     expect(writes.at(-1)).toBe(0)
 
     screen.getByTestId('region').scrollTop = 480
@@ -253,7 +253,7 @@ describe('MapPlaceDetail', () => {
     act(() => {
       window.dispatchEvent(new PopStateEvent('popstate', { state: {} }))
     })
-    expect(screen.queryByRole('heading', { name: 'Suggest an edit' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Edit listing' })).not.toBeInTheDocument()
     expect(writes.at(-1)).toBe(0)
   })
 
@@ -267,7 +267,7 @@ describe('MapPlaceDetail', () => {
         <MapPlaceDetail item={makeListing({ name: 'Goldi Market' })} category={makeCategory()} color="#000" />
       </PinnedProvider>,
     )
-    await user.click(screen.getByRole('button', { name: 'Suggest an edit' }))
+    await user.click(screen.getByRole('button', { name: 'Edit listing' }))
     // A chevron alone, named for screen readers only.
     expect(screen.getByRole('button', { name: 'Back' })).toHaveTextContent(/^$/)
     const row = screen.getByRole('button', { name: 'Back' }).closest('.grid') as HTMLElement
@@ -284,7 +284,7 @@ describe('MapPlaceDetail', () => {
         <MapPlaceDetail item={makeListing({ name: 'Goldi Market' })} category={makeCategory()} color="#000" />
       </PinnedProvider>,
     )
-    await user.click(screen.getByRole('button', { name: 'Suggest an edit' }))
+    await user.click(screen.getByRole('button', { name: 'Edit listing' }))
     const push = vi.spyOn(window.history, 'pushState')
     await user.click(screen.getByRole('button', { name: 'stub open removal' }))
     expect(push).toHaveBeenLastCalledWith(expect.objectContaining({ mapSheetForm: 'edit', mapSheetRemoval: true }), '')
@@ -310,7 +310,7 @@ describe('MapPlaceDetail', () => {
         <MapPlaceDetail item={makeListing({ name: 'Goldi Market' })} category={makeCategory()} color="#000" />
       </PinnedProvider>,
     )
-    await user.click(screen.getByRole('button', { name: 'Suggest an edit' }))
+    await user.click(screen.getByRole('button', { name: 'Edit listing' }))
     await user.click(screen.getByRole('button', { name: 'stub open row' }))
     const back = vi.spyOn(window.history, 'back').mockImplementation(() => {})
     await user.click(screen.getByRole('button', { name: 'Back' }))
@@ -335,7 +335,7 @@ describe('MapPlaceDetail', () => {
         />
       </PinnedProvider>,
     )
-    expect(screen.queryByRole('button', { name: 'Suggest an edit' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Edit listing' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Save Goldi Market' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Share' })).toBeInTheDocument()
   })

@@ -234,7 +234,7 @@ export default function FindResources({
   // A row of the editor open (or a minyan, a person in one): its title,
   // and Back closes it (Oct 11).
   const [editorStep, setEditorStep] = useState<EditorStep | null>(null)
-  const editTitle = editorStep?.title ?? (removalOpen && action?.mode === 'edit' ? `Request removal of ${action.listing.name}` : 'Suggest an edit')
+  const editTitle = editorStep?.title ?? (removalOpen && action?.mode === 'edit' ? `Request removal of ${action.listing.name}` : 'Edit listing')
   const editBack = editorStep ? editorStep.back : removalOpen ? () => setRemovalOpen(false) : undefined
 
   // Adjusting state during render, not in an effect: React re-renders this

@@ -155,7 +155,7 @@ export default function CategoryPreview({
     content = (
       <ListingEditorScreen
         key={action.listing.id}
-        heading="Suggest an edit"
+        heading="Edit listing"
         item={action.listing}
         category={category}
         onClose={goToDirectory}

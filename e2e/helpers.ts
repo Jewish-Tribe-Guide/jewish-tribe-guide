@@ -282,15 +282,13 @@ export async function largestCategory(
  *  still fast when the prompt never shows, since the wait resolves the
  *  instant `state: 'visible'` is met OR the timeout is reached, not a fixed
  *  delay either way. */
-/** Opens an open listing's editor: Suggest an edit, then, on a category
- *  page where it opens the "+ Add" box about the listing (Oct 6), "Edit it
- *  yourself" there (Oct 10; "Edit the details myself" before). `scope`: where the listing's own Suggest an edit
+/** Opens an open listing's editor: its Edit listing, which opens the
+ *  editor itself everywhere (Oct 15; on a category page it used to open
+ *  the "+ Add" box first). `scope`: where the listing's own Edit listing
  *  is, when more than one could be on the page. */
 export async function openListingEditor(page: Page, scope: Page | Locator = page): Promise<void> {
-  await scope.getByRole('button', { name: 'Suggest an edit' }).filter({ visible: true }).click()
-  const yourself = page.getByRole('button', { name: 'Edit it yourself' })
-  await yourself.or(page.getByRole('heading', { name: 'Suggest an edit' })).first().waitFor()
-  if (await yourself.isVisible()) await yourself.click()
+  await scope.getByRole('button', { name: 'Edit listing' }).filter({ visible: true }).click()
+  await page.getByRole('heading', { name: 'Edit listing' }).filter({ visible: true }).first().waitFor()
 }
 
 export async function dismissLocationPrompt(page: Page): Promise<void> {

@@ -281,7 +281,7 @@ test.describe('listing detail — desktop', () => {
     await expect(column.getByRole('heading', { name: item.name, exact: true })).toBeVisible()
     const bar = column.getByTestId('listing-column-bar')
     await expect(bar).toBeVisible()
-    test.skip((await column.getByRole('button', { name: 'Suggest an edit' }).count()) === 0, `${category.id} can't be edited`)
+    test.skip((await column.getByRole('button', { name: 'Edit listing' }).count()) === 0, `${category.id} can't be edited`)
 
     await openListingEditor(page, column)
     await expect(page.getByTestId('editor-list')).toBeVisible()
@@ -443,7 +443,7 @@ test('Request removal, from the ••• menu, is its own screen, and Back retu
   }
   // Offered wherever the listing can be edited (removal requests are on
   // for every category here).
-  test.skip((await listing.getByRole('button', { name: 'Suggest an edit' }).count()) === 0, `${category.id} can't be edited`)
+  test.skip((await listing.getByRole('button', { name: 'Edit listing' }).count()) === 0, `${category.id} can't be edited`)
 
   await openRemoval()
   await expect(page.getByRole('button', { name: /^(Confirm removal request|Verifying…)$/ })).toBeVisible()
@@ -471,7 +471,7 @@ test('Back steps out of an open row of the editor, not out of editing', async ({
   const listing = isMobile ? page.getByRole('dialog', { name: item.name }) : page.getByTestId('listing-column')
   await expect(listing).toBeVisible()
   await expect(listing.getByRole('heading', { name: item.name, exact: true })).toBeVisible()
-  const suggest = listing.getByRole('button', { name: 'Suggest an edit' })
+  const suggest = listing.getByRole('button', { name: 'Edit listing' })
   test.skip((await suggest.count()) === 0, `${category.id} can't be edited`)
   await openListingEditor(page, listing)
   const list = page.getByTestId('editor-list')
@@ -511,7 +511,7 @@ test('a row’s own screen starts at its top, and Back returns to the row', asyn
     await page.getByRole('button', { name: `Show details for ${item.name}` }).first().click()
     const listing = isMobile ? page.getByRole('dialog', { name: item.name }) : page.getByTestId('listing-column')
     await expect(listing.getByRole('heading', { name: item.name, exact: true })).toBeVisible()
-    test.skip((await listing.getByRole('button', { name: 'Suggest an edit' }).count()) === 0, `${category.id} can't be edited`)
+    test.skip((await listing.getByRole('button', { name: 'Edit listing' }).count()) === 0, `${category.id} can't be edited`)
     await openListingEditor(page, listing)
     await expect(page.getByTestId('editor-list')).toBeVisible()
     // A filled row, or one under "Not on the listing yet".
@@ -559,7 +559,7 @@ test('a long note grows its box rather than scrolling inside it', async ({ page,
   await page.getByRole('button', { name: `Show details for ${item.name}` }).first().click()
   const listing = isMobile ? page.getByRole('dialog', { name: item.name }) : page.getByTestId('listing-column')
   await expect(listing.getByRole('heading', { name: item.name, exact: true })).toBeVisible()
-  test.skip((await listing.getByRole('button', { name: 'Suggest an edit' }).count()) === 0, `${category.id} can't be edited`)
+  test.skip((await listing.getByRole('button', { name: 'Edit listing' }).count()) === 0, `${category.id} can't be edited`)
   await openListingEditor(page, listing)
   await expect(page.getByTestId('editor-list')).toBeVisible()
   // Whichever row opening in place holds a note: About, or one of the

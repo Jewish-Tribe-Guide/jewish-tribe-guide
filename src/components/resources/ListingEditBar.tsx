@@ -2,11 +2,9 @@
 
 import type { DirectoryResource } from '@/types'
 import type { CategoryConfig } from '@/lib/categories'
-import { useContext } from 'react'
 import { PencilIcon } from '@/components/icons'
 import { mainThing } from '@/lib/listingView'
 import ListingActionsFan from './ListingActionsFan'
-import { TellAboutContext } from './tellAbout'
 import type { ListingAction } from './useListingActions'
 
 // ── The one visible way to edit an open listing ──────────────────────────
@@ -32,20 +30,20 @@ import type { ListingAction } from './useListingActions'
 // the overflow (Oct 11): at the foot of the edit it was one more thing
 // beside Send.
 //
-// Where the page has the "+ Add" box (TellAboutContext: a category page),
-// Suggest an edit opens it about this listing, with "Edit the details
-// myself" there for the listing-shaped editor (Oct 6: one door, the box,
-// replacing the "+" that sat beside this pill and did the same). Elsewhere
-// (the Map) it opens the editor itself.
+// It opens the listing's editor itself, everywhere (the user, Oct 15: "when
+// you click edit on a listing we should show actual edit. Not AI"). It used
+// to open the "+ Add" box about the listing on a category page, with "Edit
+// the details myself" a second step to the editor.
 //
 // On a listing that is one link (a WhatsApp group's Join, a network's
 // website), the pill is outlined rather than filled (Oct 6): the listing's
 // own big button is already right above it, and two filled pills stacked
 // read as two equal choices.
 //
-// The label is "Suggest an edit", not "Edit": the second implies authority
-// this visitor doesn't need to have, and the first is what people actually
-// think ("that's wrong") rendered as something they're allowed to do.
+// The label is "Edit listing" (Oct 15): every box above it has its own
+// plain "Edit" for that box alone, so this one says it's the whole
+// listing. It was "Suggest an edit" while it was the only way in; that an
+// admin checks it is said on the screen after Send.
 //
 // stopPropagation because every surface that shows this has a click handler
 // somewhere above it — the dialog's backdrop closes on a click that reaches
@@ -84,7 +82,6 @@ export default function ListingEditBar({
   /** Passed through to the overflow: see ListingActionsFan's `omit`. */
   omit?: ListingAction['id'][]
 }) {
-  const tellAbout = useContext(TellAboutContext)
   const quiet = mainThing(item, category) === 'join'
   return (
     // A wide primary plus a small round overflow, not two peers. The shape
@@ -105,8 +102,7 @@ export default function ListingEditBar({
           type="button"
           onClick={(e) => {
             e.stopPropagation()
-            if (tellAbout) tellAbout(item, onEdit)
-            else onEdit()
+            onEdit()
           }}
           className={`flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-full px-5 py-3 text-sm font-semibold transition-transform active:scale-[0.98] ${
             quiet ? 'border border-slate-300 bg-white text-slate-900' : 'bg-primary text-white shadow-lg'
@@ -114,7 +110,7 @@ export default function ListingEditBar({
           data-quiet={quiet || undefined}
         >
           <PencilIcon className="h-4 w-4 shrink-0" />
-          Suggest an edit
+          Edit listing
         </button>
       )}
       <ListingActionsFan item={item} category={category} path={path} placement={fanPlacement} omit={omit} onRequestRemoval={onRequestRemoval} />

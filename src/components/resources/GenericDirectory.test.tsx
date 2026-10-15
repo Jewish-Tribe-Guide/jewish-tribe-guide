@@ -117,12 +117,12 @@ vi.mock('./GenericListingCard', async () => {
   }
 })
 
-// The listing's Suggest an edit (ListingEditBar), opening the box the page
+// The listing's Edit listing (ListingEditBar), opening the box the page
 // offers, with its own editor for "Edit the details myself".
 const columnEdit = vi.fn()
 function ColumnTell({ item }: { item: DirectoryResource }) {
   const tell = useContext(TellAboutContext)
-  return tell ? <button onClick={() => tell(item, () => columnEdit(item.id))}>{`Suggest an edit to ${item.name}`}</button> : null
+  return tell ? <button onClick={() => tell(item, () => columnEdit(item.id))}>{`Edit listing to ${item.name}`}</button> : null
 }
 
 function ColumnMinyan({ id, name }: { id: string; name: string }) {
@@ -433,8 +433,8 @@ describe('GenericDirectory', () => {
   // Oct 6: on desktop the listing's own row is at the foot of a long
   // listing, out of sight, and the user couldn't find Add. Nothing passes
   // under the floating one there, so it stays, for adding anything; the
-  // listing is Suggest an edit's, which opens the box about it.
-  it('keeps the page’s Add over a listing open on desktop; Suggest an edit opens the box about the listing', async () => {
+  // listing is Edit listing's, which opens the box about it.
+  it('keeps the page’s Add over a listing open on desktop; Edit listing opens the box about the listing', async () => {
     handlers.onEdit.mockClear()
     columnEdit.mockClear()
     const item = makeListing({ name: 'Trader Joe’s' })
@@ -446,7 +446,7 @@ describe('GenericDirectory', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Add' }))
     expect(await screen.findByRole('dialog', { name: 'Add or update a place' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Close' }))
-    fireEvent.click(await screen.findByRole('button', { name: 'Suggest an edit to Trader Joe’s' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit listing to Trader Joe’s' }))
     expect(await screen.findByRole('dialog', { name: 'Update Trader Joe’s' })).toBeInTheDocument()
     // From a listing, editing it yourself, not adding a place: the
     // listing's own editor, in place, never the page's form.
@@ -461,14 +461,14 @@ describe('GenericDirectory', () => {
     expect(screen.getByRole('button', { name: 'Add' })).toBeInTheDocument()
   })
 
-  it('opens the box from Suggest an edit in a category that takes edits but no additions, and not in one that takes neither', () => {
+  it('opens the box from Edit listing in a category that takes edits but no additions, and not in one that takes neither', () => {
     const item = makeListing({ name: 'Trader Joe’s' })
     const caps = (c: object) => makeCategory({ capabilities: { ...resolveCapabilities(undefined), ...c } })
     renderWithProviders(<GenericDirectory category={caps({ add: false })} items={[item]} {...handlers} reopenItemId={item.id} />)
-    expect(screen.getByRole('button', { name: 'Suggest an edit to Trader Joe’s' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Edit listing to Trader Joe’s' })).toBeInTheDocument()
     cleanup()
     renderWithProviders(<GenericDirectory category={caps({ add: false, edit: false })} items={[item]} {...handlers} reopenItemId={item.id} />)
-    expect(screen.queryByRole('button', { name: 'Suggest an edit to Trader Joe’s' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Edit listing to Trader Joe’s' })).not.toBeInTheDocument()
   })
 
   // A bare icon circle is a mobile convention people already have a

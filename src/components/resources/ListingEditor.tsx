@@ -358,7 +358,7 @@ export default function ListingEditor({
     onRemovalOpenChange?.(open)
   }
 
-  const title = <h2 className="truncate font-semibold text-slate-900">{removalOpen ? 'Request removal' : (stepTitle ?? (creating ? '' : 'Suggest an edit'))}</h2>
+  const title = <h2 className="truncate font-semibold text-slate-900">{removalOpen ? 'Request removal' : (stepTitle ?? (creating ? '' : 'Edit listing'))}</h2>
   const photo = String(details[PHOTO_FIELD_KEY] ?? '').trim()
 
   // ── The list ──────────────────────────────────────────────────────────

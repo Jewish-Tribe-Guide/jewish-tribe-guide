@@ -15,7 +15,7 @@ const SNAP_DURATION_MS = 280
 describe('MobileSheet', () => {
   it('renders nothing when closed', () => {
     render(
-      <MobileSheet isOpen={false} onClose={vi.fn()} title="Suggest an edit">
+      <MobileSheet isOpen={false} onClose={vi.fn()} title="Edit listing">
         <p>form contents</p>
       </MobileSheet>,
     )
@@ -24,11 +24,11 @@ describe('MobileSheet', () => {
 
   it('shows the title and children when open', () => {
     render(
-      <MobileSheet isOpen onClose={vi.fn()} title="Suggest an edit">
+      <MobileSheet isOpen onClose={vi.fn()} title="Edit listing">
         <p>form contents</p>
       </MobileSheet>,
     )
-    expect(screen.getByRole('dialog', { name: 'Suggest an edit' })).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Edit listing' })).toBeInTheDocument()
     expect(screen.getByText('form contents')).toBeInTheDocument()
   })
 
@@ -36,7 +36,7 @@ describe('MobileSheet', () => {
     const user = userEvent.setup()
     const onClose = vi.fn()
     render(
-      <MobileSheet isOpen onClose={onClose} title="Suggest an edit">
+      <MobileSheet isOpen onClose={onClose} title="Edit listing">
         <p>form contents</p>
       </MobileSheet>,
     )
@@ -49,7 +49,7 @@ describe('MobileSheet', () => {
     const user = userEvent.setup()
     const onClose = vi.fn()
     render(
-      <MobileSheet isOpen onClose={onClose} title="Suggest an edit">
+      <MobileSheet isOpen onClose={onClose} title="Edit listing">
         <p>form contents</p>
       </MobileSheet>,
     )
@@ -80,7 +80,7 @@ describe('MobileSheet', () => {
     const user = userEvent.setup()
     const onClose = vi.fn()
     render(
-      <MobileSheet isOpen onClose={onClose} title="Suggest an edit">
+      <MobileSheet isOpen onClose={onClose} title="Edit listing">
         <p>form contents</p>
       </MobileSheet>,
     )
@@ -124,7 +124,7 @@ describe('MobileSheet', () => {
     const user = userEvent.setup()
     const onClose = vi.fn() // deliberately never flips `isOpen` — see doc above
     render(
-      <MobileSheet isOpen onClose={onClose} title="Suggest an edit">
+      <MobileSheet isOpen onClose={onClose} title="Edit listing">
         <p>form contents</p>
       </MobileSheet>,
     )
@@ -151,7 +151,7 @@ describe('MobileSheet', () => {
     vi.useFakeTimers()
     try {
       const { rerender } = render(
-        <MobileSheet isOpen onClose={vi.fn()} title="Suggest an edit">
+        <MobileSheet isOpen onClose={vi.fn()} title="Edit listing">
           <p>form contents</p>
         </MobileSheet>,
       )
@@ -159,7 +159,7 @@ describe('MobileSheet', () => {
       expect(sheet()?.style.transform).toBe('translateY(0)')
 
       rerender(
-        <MobileSheet isOpen={false} onClose={vi.fn()} title="Suggest an edit">
+        <MobileSheet isOpen={false} onClose={vi.fn()} title="Edit listing">
           <p>form contents</p>
         </MobileSheet>,
       )
@@ -265,7 +265,7 @@ describe('MobileSheet', () => {
 
   it('renders no drag handle unless draggable is set', () => {
     render(
-      <MobileSheet isOpen onClose={vi.fn()} title="Suggest an edit">
+      <MobileSheet isOpen onClose={vi.fn()} title="Edit listing">
         <p>form contents</p>
       </MobileSheet>,
     )
@@ -281,7 +281,7 @@ describe('MobileSheet', () => {
 
     it('opens at the half snap point', () => {
       render(
-        <MobileSheet isOpen onClose={vi.fn()} title="Suggest an edit" draggable>
+        <MobileSheet isOpen onClose={vi.fn()} title="Edit listing" draggable>
           <p>form contents</p>
         </MobileSheet>,
       )
@@ -291,7 +291,7 @@ describe('MobileSheet', () => {
 
     it('tapping the handle (no movement) toggles between half and full', () => {
       render(
-        <MobileSheet isOpen onClose={vi.fn()} title="Suggest an edit" draggable>
+        <MobileSheet isOpen onClose={vi.fn()} title="Edit listing" draggable>
           <p>form contents</p>
         </MobileSheet>,
       )
@@ -313,7 +313,7 @@ describe('MobileSheet', () => {
     // handle up should grow the sheet past `half`.
     it('dragging the handle up grows the sheet toward full', () => {
       render(
-        <MobileSheet isOpen onClose={vi.fn()} title="Suggest an edit" draggable>
+        <MobileSheet isOpen onClose={vi.fn()} title="Edit listing" draggable>
           <p>form contents</p>
         </MobileSheet>,
       )
@@ -338,12 +338,12 @@ describe('MobileSheet', () => {
     // the same way.
     it('dragging from the header title (not just the handle) also resizes the sheet', () => {
       render(
-        <MobileSheet isOpen onClose={vi.fn()} title="Suggest an edit" draggable>
+        <MobileSheet isOpen onClose={vi.fn()} title="Edit listing" draggable>
           <p>form contents</p>
         </MobileSheet>,
       )
       const sheet = document.body.querySelector('[role="dialog"]') as HTMLElement
-      const titleText = screen.getByText('Suggest an edit')
+      const titleText = screen.getByText('Edit listing')
 
       fireEvent.pointerDown(titleText, { clientY: 500 })
       fireEvent.pointerMove(titleText, { clientY: 300 })
@@ -361,7 +361,7 @@ describe('MobileSheet', () => {
       const user = userEvent.setup()
       const onClose = vi.fn()
       render(
-        <MobileSheet isOpen onClose={onClose} title="Suggest an edit" draggable>
+        <MobileSheet isOpen onClose={onClose} title="Edit listing" draggable>
           <p>form contents</p>
         </MobileSheet>,
       )
@@ -380,7 +380,7 @@ describe('MobileSheet', () => {
     // resting state, not a special setup.
     it('at half, any drag over the content resizes the sheet instead of scrolling it', () => {
       render(
-        <MobileSheet isOpen onClose={vi.fn()} title="Suggest an edit" draggable>
+        <MobileSheet isOpen onClose={vi.fn()} title="Edit listing" draggable>
           <p>form contents</p>
         </MobileSheet>,
       )
@@ -444,7 +444,7 @@ describe('MobileSheet', () => {
       const nowSpy = vi.spyOn(performance, 'now').mockImplementation(() => fakeNow)
 
       render(
-        <MobileSheet isOpen onClose={vi.fn()} title="Suggest an edit" draggable>
+        <MobileSheet isOpen onClose={vi.fn()} title="Edit listing" draggable>
           <p>form contents</p>
         </MobileSheet>,
       )
@@ -484,7 +484,7 @@ describe('MobileSheet', () => {
     // sheet. Only reachable at `full`, same as the previous test.
     it('at full, scrolling the content away from the top does not resize the sheet', () => {
       render(
-        <MobileSheet isOpen onClose={vi.fn()} title="Suggest an edit" draggable>
+        <MobileSheet isOpen onClose={vi.fn()} title="Edit listing" draggable>
           <p>form contents</p>
         </MobileSheet>,
       )
@@ -509,7 +509,7 @@ describe('MobileSheet', () => {
     // reachable at `full`, same as the previous two tests.
     it('at full, pulling down while the content is scrolled away from the top scrolls it, rather than resizing the sheet', () => {
       render(
-        <MobileSheet isOpen onClose={vi.fn()} title="Suggest an edit" draggable>
+        <MobileSheet isOpen onClose={vi.fn()} title="Edit listing" draggable>
           <p>form contents</p>
         </MobileSheet>,
       )
@@ -534,7 +534,7 @@ describe('MobileSheet', () => {
     it('dragging the handle down past the dismiss threshold closes the sheet', () => {
       const onClose = vi.fn()
       render(
-        <MobileSheet isOpen onClose={onClose} title="Suggest an edit" draggable>
+        <MobileSheet isOpen onClose={onClose} title="Edit listing" draggable>
           <p>form contents</p>
         </MobileSheet>,
       )
@@ -559,7 +559,7 @@ describe('MobileSheet', () => {
     it('dismissing mid-drag shrinks straight from wherever the drag left it, not back up to half height first', () => {
       const onClose = vi.fn()
       render(
-        <MobileSheet isOpen onClose={onClose} title="Suggest an edit" draggable>
+        <MobileSheet isOpen onClose={onClose} title="Edit listing" draggable>
           <p>form contents</p>
         </MobileSheet>,
       )
@@ -599,7 +599,7 @@ describe('MobileSheet', () => {
 
       const onClose = vi.fn()
       render(
-        <MobileSheet isOpen onClose={onClose} title="Suggest an edit" draggable>
+        <MobileSheet isOpen onClose={onClose} title="Edit listing" draggable>
           <p>form contents</p>
         </MobileSheet>,
       )
@@ -624,7 +624,7 @@ describe('MobileSheet', () => {
     it('a pointer cancel drops the drag without dismissing or changing the snap point', () => {
       const onClose = vi.fn()
       render(
-        <MobileSheet isOpen onClose={onClose} title="Suggest an edit" draggable>
+        <MobileSheet isOpen onClose={onClose} title="Edit listing" draggable>
           <p>form contents</p>
         </MobileSheet>,
       )
@@ -641,7 +641,7 @@ describe('MobileSheet', () => {
 
     it('resets to the half snap point the next time it opens, not wherever a previous open left it', () => {
       const { rerender } = render(
-        <MobileSheet isOpen onClose={vi.fn()} title="Suggest an edit" draggable>
+        <MobileSheet isOpen onClose={vi.fn()} title="Edit listing" draggable>
           <p>form contents</p>
         </MobileSheet>,
       )
@@ -653,12 +653,12 @@ describe('MobileSheet', () => {
       expect(sheet().style.height).toBe(`${FULL_PX}px`)
 
       rerender(
-        <MobileSheet isOpen={false} onClose={vi.fn()} title="Suggest an edit" draggable>
+        <MobileSheet isOpen={false} onClose={vi.fn()} title="Edit listing" draggable>
           <p>form contents</p>
         </MobileSheet>,
       )
       rerender(
-        <MobileSheet isOpen onClose={vi.fn()} title="Suggest an edit" draggable>
+        <MobileSheet isOpen onClose={vi.fn()} title="Edit listing" draggable>
           <p>form contents</p>
         </MobileSheet>,
       )
@@ -684,7 +684,7 @@ describe('MobileSheet', () => {
     // the non-draggable close button lives, so it can't be hidden there.
     it('ignores titleHidden without draggable, keeping the close button', () => {
       render(
-        <MobileSheet isOpen onClose={vi.fn()} title="Suggest an edit" titleHidden>
+        <MobileSheet isOpen onClose={vi.fn()} title="Edit listing" titleHidden>
           <p>form contents</p>
         </MobileSheet>,
       )
@@ -697,7 +697,7 @@ describe('MobileSheet', () => {
     // phone is the only place the result can be seen.
     it('pads the end of its content for the home indicator', () => {
       render(
-        <MobileSheet isOpen onClose={vi.fn()} title="Suggest an edit" draggable>
+        <MobileSheet isOpen onClose={vi.fn()} title="Edit listing" draggable>
           <p>form contents</p>
         </MobileSheet>,
       )

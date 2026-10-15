@@ -754,7 +754,7 @@ describe('ResourceMapView — selecting a place', () => {
     const back = await screen.findByRole('button', { name: 'Back to list' })
     const region = back.closest('.overscroll-contain')!
     const sidebar = back.closest('aside')!
-    const pill = screen.getByRole('button', { name: 'Suggest an edit' })
+    const pill = screen.getByRole('button', { name: 'Edit listing' })
     expect(sidebar).toContainElement(pill)
     expect(region).toContainElement(pill)
     // And a fresh region, not the list's: a shared one carried the list's

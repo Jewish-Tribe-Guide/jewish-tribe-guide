@@ -14,7 +14,7 @@ describe('ActionDialog', () => {
 
   it('shows the title and children when open', () => {
     renderDialog(true)
-    expect(screen.getByRole('dialog', { name: 'Suggest an edit' })).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Edit listing' })).toBeInTheDocument()
     expect(screen.getByText('form contents')).toBeInTheDocument()
   })
 
@@ -82,7 +82,7 @@ describe('ActionDialog', () => {
 
 function renderDialog(isOpen: boolean, onClose = vi.fn()) {
   return render(
-    <ActionDialog isOpen={isOpen} onClose={onClose} title="Suggest an edit">
+    <ActionDialog isOpen={isOpen} onClose={onClose} title="Edit listing">
       <p>form contents</p>
     </ActionDialog>,
   )

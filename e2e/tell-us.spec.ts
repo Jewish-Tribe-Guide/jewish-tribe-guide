@@ -42,13 +42,13 @@ test('the Map has no “+ Add”', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Add', exact: true })).toHaveCount(0)
 })
 
-// Oct 6: an open listing's Suggest an edit opens the box about it, its
-// "Edit it yourself" (Oct 10) leading to the editor. On a phone the page's
+// Oct 15: an open listing's Edit listing opens the editor itself, not the
+// box about it ("show actual edit. Not AI"). On a phone the page's
 // floating "+" steps aside while a listing is open (it covered the
 // listing's overflow); on desktop it stays (the listing's own row is at
 // its foot, out of sight), for adding anything. A click here fails if
 // anything covers it.
-test('an open listing’s Suggest an edit opens the box about that listing', async ({ page, request, isMobile }) => {
+test('an open listing’s Edit listing opens the editor, not the box about that listing', async ({ page, request, isMobile }) => {
   const community = await defaultCommunity(page)
   const { category } = await categoryWithListings(request, community)
   const body = await (await request.get(`/api/resources?category=${category.id}&community=${community}`)).json()
@@ -66,11 +66,8 @@ test('an open listing’s Suggest an edit opens the box about that listing', asy
     await general.getByRole('button', { name: 'Close' }).click()
     await expect(general).toBeHidden()
   }
-  await page.getByRole('button', { name: 'Suggest an edit' }).filter({ visible: true }).click()
-  const box = page.getByRole('dialog', { name: `Update ${listing.name}` })
-  await expect(box).toBeVisible()
-  await expect(box.getByRole('button', { name: 'Edit it yourself' })).toBeVisible()
-  await box.getByRole('button', { name: 'Edit it yourself' }).click()
+  await page.getByRole('button', { name: 'Edit listing' }).filter({ visible: true }).click()
   // The listing-shaped editor, which says it has nothing to send yet.
   await expect(page.getByRole('button', { name: 'No changes yet' }).filter({ visible: true })).toBeVisible()
+  await expect(page.getByRole('dialog', { name: `Update ${listing.name}` })).toHaveCount(0)
 })

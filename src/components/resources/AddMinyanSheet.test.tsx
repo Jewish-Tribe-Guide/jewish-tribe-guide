@@ -88,7 +88,7 @@ describe('+ Add a minyan (the user’s note 2)', () => {
   })
 
   // Oct 10: one minyan, one task. The whole schedule has its ways in
-  // already (the shul's Suggest an edit, "Add this week's schedule").
+  // already (the shul's Edit listing, "Add this week's schedule").
   it('is for one minyan only: no “Have their whole schedule?” under Send', () => {
     open({ shulId: 'mekor', day: aTuesday })
     expect(screen.getByRole('button', { name: 'Send for a check' })).toBeInTheDocument()

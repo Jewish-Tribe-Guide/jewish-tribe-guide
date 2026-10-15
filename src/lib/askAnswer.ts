@@ -839,7 +839,7 @@ export function metaAnswer(
   return {
     text: ctx.addTo
       ? `Anyone can add one. An admin checks it before it goes live.`
-      : 'Open the kind of place it is and tap "Add a listing", or "Suggest an edit" on one that\'s there. An admin checks each change before it goes live.',
+      : 'Open the kind of place it is and tap "Add a listing", or "Edit listing" on one that\'s there. An admin checks each change before it goes live.',
     rows: [],
     links: ctx.addTo ? [{ label: `Add a ${ctx.addTo.label.toLowerCase()} listing`, href: ctx.addTo.href, external: false }] : [],
   }

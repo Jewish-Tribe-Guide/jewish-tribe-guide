@@ -82,7 +82,7 @@ export function EruvListing(props: { eruv: Eruv; color: string; now: Date; timez
           <span>
             <BackIconButton onClick={closeEditor} />
           </span>
-          <h2 className="truncate text-base font-semibold text-slate-900">Suggest an edit</h2>
+          <h2 className="truncate text-base font-semibold text-slate-900">Edit listing</h2>
         </div>
         <EruvEditor eruv={props.eruv} onClose={closeEditor} />
       </div>
@@ -97,7 +97,7 @@ export function EruvListing(props: { eruv: Eruv; color: string; now: Date; timez
         className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-full bg-primary px-5 py-3 text-sm font-semibold text-white shadow-lg transition-transform active:scale-[0.98]"
       >
         <PencilIcon className="h-4 w-4 shrink-0" />
-        Suggest an edit
+        Edit listing
       </button>
     </div>
   )
