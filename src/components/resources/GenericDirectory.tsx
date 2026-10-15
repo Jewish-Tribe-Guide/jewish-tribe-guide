@@ -27,6 +27,7 @@ import { PlusIcon } from '@/components/icons'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { useScrollShowHide, useSetScreenHeader } from '@/lib/headerVisibility'
 import { foundFor, searchAsk } from '@/lib/askSearch'
+import { readMinyanimSearch } from '@/lib/minyanimSearch'
 import { withoutOpenWords, withoutSortWords, withoutTerms } from '@/lib/ask'
 import { neighborhoodsFor, placeName, townsFrom } from '@/lib/places'
 import { readerPlaces } from '@/lib/questionReader'
@@ -956,6 +957,20 @@ export default function GenericDirectory({ category, items, anchorLabel, address
     () => (q ? searchAsk(items, [category], searchedFor, { categoryId: category.id, places: neighborhoodsFor(communitySlug) }) : null),
     [q, items, category, searchedFor, communitySlug],
   )
+  // The Minyanim view's search, past its tefillos, days and "near me"
+  // (readMinyanimSearch), goes through that same search of the shuls: so
+  // "orthodox" there is Denomination ticked, a typo or a neighbourhood
+  // finds what it finds on the list (the user, Oct 15: the list searched
+  // well and the view didn't). It had its own name match.
+  const minyanShulWords = useMemo(() => {
+    const sought = searchingMinyanim ? readMinyanimSearch(searchedFor) : null
+    // A trailing space says the last word is finished, as typed.
+    return sought?.terms.length ? `${sought.terms.join(' ')}${/\s$/.test(searchedFor) ? ' ' : ''}` : ''
+  }, [searchingMinyanim, searchedFor])
+  const minyanShulResult = useMemo(
+    () => (minyanShulWords ? searchAsk(items, [category], minyanShulWords, { categoryId: category.id, places: neighborhoodsFor(communitySlug) }) : null),
+    [minyanShulWords, items, category, communitySlug],
+  )
   const todayMatches = useMemo(
     () => (todayResult ? new Map(todayResult.hits.map((h) => [h.item.id, foundFor(h, todayResult)])) : null),
     [todayResult],
@@ -1347,7 +1362,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // shows it ticked and the button counts it; unticking it there takes the
   // word out of the search, so the two never disagree. Nothing about it on
   // the page itself: the word is in the box already (the user, Oct 10).
-  const searchResult = typed ? todayResult : null
+  const searchResult = typed ? todayResult : minyanShulResult
   const searchBools = new Map<string, string>()
   const searchSelects = new Map<string, Map<string, string>>()
   for (const t of searchResult?.taught ?? []) {
@@ -1927,6 +1942,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
           search={search}
           canAdd={canEdit}
           shulText={(item) => filterableSelects.flatMap((f) => selectValues(item[f.key])).join(' · ')}
+          namedShuls={minyanShulResult ? minyanShulResult.hits.map((h) => h.item) : null}
           tefillos={tefillosChosen(sheetTefillos)}
           withinMiles={milesChosen(minyanWithin)}
           filters={{ active: sheetFilterCount + minyanFilterCount, onOpen: () => setFiltersOpen(true) }}

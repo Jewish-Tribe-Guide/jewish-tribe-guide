@@ -63,6 +63,7 @@ export default function MinyanimView({
   search = '',
   canAdd = false,
   shulText = () => '',
+  namedShuls,
   onDayChange,
   tefillos = null,
   withinMiles = null,
@@ -86,6 +87,10 @@ export default function MinyanimView({
   /** A shul's pick-list values ("Orthodox (Ashkenazi)"): searched, and
    *  shown when choosing a shul to add a minyan to. */
   shulText?: (item: DirectoryResource) => string
+  /** The shuls the rest of the search finds, past its tefillos, days and
+   *  "near me": GenericDirectory reads them with the page's own search, so
+   *  the two find the same shuls. Without it, names and pick-lists here. */
+  namedShuls?: readonly DirectoryResource[] | null
   /** A day tapped (its weekday; null for today), for the address: a shul
    *  opened from the list is a page of its own, and Back to the list came
    *  back on today, wherever the visitor had been (the user's note 10,
@@ -124,7 +129,7 @@ export default function MinyanimView({
   const day = days[index]
   const byId = new Map(items.map((i) => [i.id, i]))
   // The shuls the search names ("mekor", "orthodox"), or all of them.
-  const named = sought?.terms.length ? items.filter((i) => shulMatches(i, sought.terms, shulText(i))) : null
+  const named = namedShuls !== undefined ? namedShuls : sought?.terms.length ? items.filter((i) => shulMatches(i, sought.terms, shulText(i))) : null
   const namedIds = named ? new Set(named.map((i) => i.id)) : null
   // Each minyan opens its shul's own page; back returns here (?davening=1).
   const hrefOf = (id: string | undefined) => {

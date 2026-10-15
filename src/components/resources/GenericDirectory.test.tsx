@@ -2326,6 +2326,32 @@ describe('GenericDirectory — each shul’s next minyan', () => {
         expect(within(sheet()).getByRole('button', { name: 'Show 1 minyan' })).toBeInTheDocument()
       })
 
+      // Oct 15: the view's search finds shuls as the list's does (searchAsk),
+      // so a denomination typed is Denomination ticked, as there.
+      it('a denomination typed is its Denomination chip ticked, as on the list', async () => {
+        fivePm()
+        const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+        open()
+        await user.type(screen.getByRole('searchbox'), 'orthodox mincha')
+        expect(heading()).toHaveTextContent('1 minyan left today')
+        expect(within(heading()).getByRole('button', { name: /^Filters/ })).toHaveTextContent('2')
+        await user.click(within(heading()).getByRole('button', { name: /^Filters/ }))
+        expect(within(sheet()).getByRole('button', { name: 'Orthodox' })).toHaveAttribute('aria-pressed', 'true')
+        expect(within(sheet()).getByRole('button', { name: 'Mincha' })).toHaveAttribute('aria-pressed', 'true')
+
+        await user.click(within(sheet()).getByRole('button', { name: 'Orthodox' }))
+        expect(screen.getByRole('searchbox')).toHaveValue('mincha')
+        expect(within(sheet()).getByRole('button', { name: 'Show 2 minyanim' })).toBeInTheDocument()
+      })
+
+      it('a shul’s name typed finds it as the list would, a typo too', async () => {
+        fivePm()
+        const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+        open()
+        await user.type(screen.getByRole('searchbox'), 'socety hill ')
+        expect(rows()).toEqual(['6:30 PMSociety Hill SynagogueMincha · Conservative · 0.7 mi'])
+      })
+
       it('another day’s count doesn’t name the day: its tab says it', async () => {
         fivePm()
         const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
