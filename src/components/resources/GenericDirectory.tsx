@@ -457,25 +457,27 @@ export default function GenericDirectory({ category, items, anchorLabel, address
     }
     onParamsChange?.({ openNow: openNow ? '1' : null }, { replace: true })
   }, [openNow, onParamsChange])
-  // Distance is meaningless with nothing to measure from, so this tracks the
-  // anchor automatically — Popular while there's none, Distance the instant
-  // one exists — until the visitor makes an explicit choice below, which
-  // then sticks regardless of what the anchor does afterward.
+  // Distance first, always (the user, Oct 15): with no location set, the
+  // miles from the community's centre that every row already shows, which
+  // the top of the page says it's measuring from. Popular only where there
+  // is no distance at all to sort by (a category without addresses, e.g.
+  // WhatsApp groups), until the visitor makes an explicit choice below,
+  // which then sticks regardless of what the anchor does afterward.
   //
   // Deliberately not a one-time lazy initializer. A saved address (or live
   // tracking resuming) restores from localStorage in a POST-MOUNT effect —
   // see useStoredLocation — so anchorLabel is still empty on this
   // component's very first render even for a returning visitor who already
-  // has a location saved. A lazy initializer would freeze on that empty
-  // read and this screen would silently default to Popular forever; this
-  // effect re-derives the default every time anchorLabel changes instead,
-  // so the anchor arriving a beat after mount still flips it.
-  const [sortByPopular, setSortByPopular] = useState(!anchorLabel)
+  // has a location saved. This effect re-derives the default every time
+  // what there is to measure from changes instead.
+  const centerDistances = items.some((i) => i.milesFromCenter != null)
+  const canSortByDistance = !!anchorLabel || centerDistances
+  const [sortByPopular, setSortByPopular] = useState(!canSortByDistance)
   const touchedSort = useRef(false)
   useEffect(() => {
     if (touchedSort.current) return
-    setSortByPopular(!anchorLabel)
-  }, [anchorLabel])
+    setSortByPopular(!canSortByDistance)
+  }, [canSortByDistance])
   const [voteCounts, setVoteCounts] = useState<Record<string, number>>({})
   // The Filters sheet (see ListHeading and FiltersSheet).
   const [filtersOpen, setFiltersOpen] = useState(false)
@@ -1163,9 +1165,8 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // Philadelphia, so Distance sorts by those, and "Use my location" above
   // the list is there for a real one. The picker opens only when there are
   // no distances at all.
-  const centerDistances = items.some((i) => i.milesFromCenter != null)
   const selectSort = (popular: boolean) => {
-    if (!popular && !anchorLabel && !centerDistances) {
+    if (!popular && !canSortByDistance) {
       document.dispatchEvent(new CustomEvent('jpc:open-location'))
       return
     }

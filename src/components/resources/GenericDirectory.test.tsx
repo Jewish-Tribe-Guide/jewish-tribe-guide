@@ -815,8 +815,9 @@ describe('GenericDirectory', () => {
     })
 
     // Oct 10: the list already shows miles from the centre, so Distance
-    // sorts by them rather than asking for a location first.
-    it('with no location, Distance sorts by the miles from the centre the list shows', async () => {
+    // sorts by them rather than asking for a location first. Oct 15: and
+    // starts there — Distance first, location or not.
+    it('with no location, starts on Distance, by the miles from the centre the list shows', async () => {
       const user = userEvent.setup()
       const category = makeCategory({ upvotesEnabled: true })
       const openLocation = vi.fn()
@@ -827,9 +828,11 @@ describe('GenericDirectory', () => {
       ]
       renderWithProviders(<GenericDirectory category={category} items={items} {...handlers} />)
       const order = () => screen.getAllByText(/^Kosher (Far|Near)$/).map((e) => e.textContent)
-      expect(sortShows()).toBe('Popularity')
-      expect(order()).toEqual(['Kosher Far', 'Kosher Near'])
+      expect(sortShows()).toBe('Distance')
+      expect(order()).toEqual(['Kosher Near', 'Kosher Far'])
 
+      await chooseSort(user, 'Popularity')
+      expect(order()).toEqual(['Kosher Far', 'Kosher Near'])
       await chooseSort(user, 'Distance')
 
       expect(openLocation).not.toHaveBeenCalled()
@@ -1543,15 +1546,15 @@ describe('GenericDirectory — groups', () => {
 
     it('steps next/previous through what’s on screen, skipping closed groups', async () => {
       const user = userEvent.setup()
-      const many = [...shulItems, makeListing({ id: 'd', name: 'Kol Tzedek', denomination: 'Reform', milesFromCenter: 3 })]
+      const many = [...shulItems, makeListing({ id: 'd', name: 'Kol Tzedek', denomination: 'Reform', milesFromCenter: 0.1 })]
       renderWithProviders(
         <ForcedViewport isMobile>
           <GenericDirectory category={shuls} items={many} {...handlers} reopenItemId="d" />
         </ForcedViewport>,
       )
-      // With no location the list is alphabetical: Kol Tzedek, Mekor,
-      // Rodeph, Vilna. Only Reform is open, so next from Kol Tzedek is
-      // Rodeph, skipping Mekor in the closed Orthodox group.
+      // With no location the list is by miles from the centre: Kol Tzedek,
+      // Mekor, Rodeph, Vilna. Only Reform is open, so next from Kol Tzedek
+      // is Rodeph, skipping Mekor in the closed Orthodox group.
       await user.click(screen.getByRole('button', { name: 'Next listing from Kol Tzedek' }))
       expect(screen.getByText('Expanded Rodeph')).toBeInTheDocument()
       expect(screen.queryByText('Expanded Mekor')).not.toBeInTheDocument()
