@@ -6,13 +6,15 @@
  *  already heavy on text, and in a dialog it pairs with the Close ✕ in the
  *  other corner: two icons with the title between them. Same size, colour
  *  and hover circle as that ✕. Screen readers still hear "Back". A 44px tap
- *  area around the 28px circle, so it's easy to hit on a phone. */
-export default function BackIconButton({ onClick }: { onClick: () => void }) {
+ *  area around the 28px circle, so it's easy to hit on a phone. `label`
+ *  is what a screen reader hears when the step has a named destination
+ *  ("Back to list" on the phone's map sheet). */
+export default function BackIconButton({ onClick, label = 'Back' }: { onClick: () => void; label?: string }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      aria-label="Back"
+      aria-label={label}
       className="relative -m-1 inline-flex cursor-pointer items-center justify-center rounded-full p-1 text-muted transition-colors after:absolute after:-inset-2 after:content-[''] hover:bg-slate-100 hover:text-slate-700 active:bg-slate-200"
     >
       <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">

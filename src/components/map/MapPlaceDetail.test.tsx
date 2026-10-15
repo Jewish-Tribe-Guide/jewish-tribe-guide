@@ -254,6 +254,24 @@ describe('MapPlaceDetail', () => {
     expect(writes.at(-1)).toBe(0)
   })
 
+  // Oct 15: the phone sheet's way back to the list is the chevron alone,
+  // like the editor's ‹ in the same spot, not "‹ Back to list" in words.
+  it('goes back to the list with a chevron alone, named for screen readers', async () => {
+    const userEvent = (await import('@testing-library/user-event')).default
+    const user = userEvent.setup()
+    const onBack = vi.fn()
+    renderWithProviders(
+      <PinnedProvider>
+        <MapPlaceDetail item={makeListing({ name: 'Goldi Market' })} category={makeCategory()} color="#000" onBack={onBack} />
+      </PinnedProvider>,
+    )
+    const back = screen.getByRole('button', { name: 'Back to list' })
+    expect(back).toHaveTextContent(/^$/)
+    expect(screen.queryByText('Back to list')).not.toBeInTheDocument()
+    await user.click(back)
+    expect(onBack).toHaveBeenCalledTimes(1)
+  })
+
   // The row Back sits in carries the editor's title too, as the desktop
   // dialog's header does.
   it('puts the editor\'s title in the same row as Back', async () => {

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Activity, type ReactElement } from 'react'
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { makeCategory, makeCommunity, makeContent, makeListing } from '@/test/providerFixtures'
@@ -1368,6 +1368,62 @@ describe('ResourceMapView — standalone map Escape/exit', () => {
     expect(screen.getByRole('button', { name: 'Clear search' })).toBeInTheDocument()
   })
 
+  // Oct 15: editing a place showed two backs side by side, the search
+  // box's ← and the editor's own ‹. While editing, the search box steps
+  // aside (as the listing column hides its bar) and the ‹ is the only one.
+  it('editing a place: the search box and its ← step aside, leaving the editor\u2019s ‹ the only back', async () => {
+    const user = userEvent.setup()
+    renderStandalone(vi.fn())
+    await user.click(screen.getByRole('button', { name: /^Select / }))
+    await user.click(await screen.findByRole('button', { name: 'Edit listing' }))
+
+    expect(screen.queryByPlaceholderText(/Search name, address/)).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Back to results' })).not.toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: 'Back' })).toHaveLength(1)
+
+    await user.click(screen.getByRole('button', { name: 'Back' }))
+    expect(await screen.findByRole('button', { name: 'Back to results' })).toBeInTheDocument()
+    expect(screen.getByPlaceholderText(/Search name, address/)).toBeInTheDocument()
+  })
+
+  // Oct 15: ✕ mid-edit only closed the editor. The editor's own history
+  // entry was the one router.back() popped, so the visitor stayed on the
+  // map. ✕ now unwinds the editor's entries first and then leaves.
+  it('✕ mid-edit leaves the map, not just the edit', async () => {
+    const user = userEvent.setup()
+    let stateAtExit: unknown = 'not called'
+    const onExit = vi.fn(() => {
+      stateAtExit = window.history.state
+    })
+    renderStandalone(onExit)
+    await user.click(screen.getByRole('button', { name: /^Select / }))
+    await user.click(await screen.findByRole('button', { name: 'Edit listing' }))
+    expect((window.history.state as { mapSheetForm?: string } | null)?.mapSheetForm).toBe('edit')
+
+    await user.click(screen.getByRole('button', { name: 'Close map' }))
+
+    await waitFor(() => expect(onExit).toHaveBeenCalledTimes(1))
+    // Leaving from the map's own entry, so the caller's router.back() goes
+    // where the map was opened from rather than into the edit's listing.
+    expect((stateAtExit as { mapSheetForm?: string } | null)?.mapSheetForm).toBeUndefined()
+  })
+
+  // Escape mid-edit is one step back inside the editor, like its ‹, not a
+  // jump to the results that dropped the edit.
+  it('Escape mid-edit returns to the place, not the results', async () => {
+    const user = userEvent.setup()
+    const onExit = vi.fn()
+    renderStandalone(onExit)
+    await user.click(screen.getByRole('button', { name: /^Select / }))
+    await user.click(await screen.findByRole('button', { name: 'Edit listing' }))
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+
+    expect(await screen.findByRole('button', { name: 'Edit listing' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Back to results' })).toBeInTheDocument()
+    expect(onExit).not.toHaveBeenCalled()
+  })
+
   // Regression coverage for a real, live-confirmed bug: the fullscreen
   // wrapper's `fixed inset-0` positioning — the only thing that paints
   // behind env(safe-area-inset-top), the iOS status bar/notch area — used
@@ -1811,6 +1867,21 @@ describe('ResourceMapView — eruv lines', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Back to results' }))
     expect(screen.queryByTestId('map-eruv-detail')).not.toBeInTheDocument()
     expect(screen.getByTestId('eruv-selected')).toHaveTextContent('')
+  })
+
+  // As for a place (Oct 15): editing an eruv, the search box and its ←
+  // step aside, so the editor's ‹ is the only back.
+  it('editing an eruv in the sidebar: the search box steps aside, the editor\u2019s ‹ the only back', async () => {
+    renderMap(<ResourceMapView onUp={() => {}} />, store, withEruvPage)
+    fireEvent.click(await eruvSwitch())
+    fireEvent.click(screen.getByRole('button', { name: 'Eruv Center City Eruv green' }))
+    const detail = screen.getByTestId('map-eruv-detail')
+    fireEvent.click(within(detail).getByRole('button', { name: 'Edit listing' }))
+
+    expect(await screen.findByTestId('eruv-editing')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Back to results' })).not.toBeInTheDocument()
+    expect(screen.queryByPlaceholderText(/Search name, address/)).not.toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: 'Back' })).toHaveLength(1)
   })
 
   it('turning the lines off closes an open eruv', async () => {

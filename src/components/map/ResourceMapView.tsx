@@ -380,6 +380,16 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // Also keeps selectedPointId (the marker-highlight id ResourceMap reads,
   // shared with mobile's own selection) in sync — set together, right where
   // the selection itself changes, rather than via a separate effect.
+  // Whether the sidebar's place is open in its editor. Keyed on the place's
+  // id so the flag can't outlive the place it was set for (a pin clicked
+  // mid-edit swaps the place without the editor reporting it closed).
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const desktopEditing = !isMobile && !!desktopSelected && editingId === desktopSelected.id
+  const desktopSelectedId = desktopSelected?.id ?? null
+  const onPlaceEditingChange = useCallback(
+    (editing: boolean) => setEditingId(editing ? desktopSelectedId : null),
+    [desktopSelectedId],
+  )
   const setDesktopSelected = (p: SelectablePoint | null) => {
     setDesktopSelectedRaw(p)
     setSelectedPointId(p?.id)
@@ -401,7 +411,17 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // "small map" on Escape (or the fullscreen-toggle button) that a real user
   // reported seeing. Leaving `fullscreen` true keeps this screen showing its
   // real layout right up until it's replaced.
+  // Mid-edit, the place's editor has pushed history entries of its own
+  // (mapSheetForm, and mapSheetRemoval on top), so a router.back() would
+  // only pop one of those: ✕ took you out of editing and left you on the
+  // map. Unwind them first, one popstate at a time, then leave. Nothing
+  // asks "discard?", the same as closing the listing dialog mid-edit.
   const exitFullscreen = () => {
+    if (onExitFullscreenToListing && (window.history.state as { mapSheetForm?: string } | null)?.mapSheetForm) {
+      window.addEventListener('popstate', () => exitFullscreen(), { once: true })
+      window.history.back()
+      return
+    }
     if (!standalone) setFullscreen(false)
     onExitFullscreenToListing?.()
   }
@@ -423,8 +443,12 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // the ← in the search box; only then does it leave the map. The search
   // box's own Escape (closing its suggestions) is its own level too, so it
   // marks the event handled and nothing behind it moves.
+  // While a place is being edited, Escape steps back inside the editor
+  // (out of Request removal, then out of the edit), as its ‹ does — never
+  // straight to the results, which dropped the edit without a word.
   const onEscape = useEffectEvent(() => {
-    if (!isMobile && desktopSelected) setDesktopSelected(null)
+    if (desktopEditing) window.history.back()
+    else if (!isMobile && desktopSelected) setDesktopSelected(null)
     else exitFullscreen()
   })
   useEffect(() => {
@@ -1724,10 +1748,10 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
     if (eruvimOn && openEruvId) deselectPlace()
     setEruvimOn(!eruvimOn)
   }
-  const eruvDetail = (id: string, onBack?: () => void) => {
+  const eruvDetail = (id: string, onBack?: () => void, onEditingChange?: (editing: boolean) => void) => {
     const e = eruvData?.eruvim.find((x) => x.id === id)
     if (!e || !eruvData || clock === null) return null
-    return <MapEruvDetail eruv={e} color={colorById.get(eruvCategory?.id ?? '') ?? '#64748b'} now={new Date(clock)} timezone={eruvData.timezone} candles={eruvData.candles} onBack={onBack} />
+    return <MapEruvDetail eruv={e} color={colorById.get(eruvCategory?.id ?? '') ?? '#64748b'} now={new Date(clock)} timezone={eruvData.timezone} candles={eruvData.candles} onBack={onBack} onEditingChange={onEditingChange} />
   }
   // ── Filters: one button, one sheet, the chips of what's on ───────────────
   // The categories showing, in the chip row's order: the sheet's sections.
@@ -2024,7 +2048,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                 // No "Back to list" in here: the ← in the search box above
                 // is the way back on a computer (Oct 15).
                 (desktopSelected?.filterId === ERUV_FILTER_ID && eruvDetail(desktopSelected.id.slice(ERUV_PREFIX.length)) ? (
-                  sidebarScroll(desktopSelected.id, eruvDetail(desktopSelected.id.slice(ERUV_PREFIX.length)))
+                  sidebarScroll(desktopSelected.id, eruvDetail(desktopSelected.id.slice(ERUV_PREFIX.length), undefined, onPlaceEditingChange))
                 ) : desktopSelected && desktopSelected.raw && desktopSelectedCategory ? (
                   sidebarScroll(
                     `place:${desktopSelected.id}`,
@@ -2033,6 +2057,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                       category={desktopSelectedCategory}
                       color={desktopSelected.color}
                       found={foundOnPoint(desktopSelected.raw.id)}
+                      onEditingChange={onPlaceEditingChange}
                     />,
                   )
                 ) : (
@@ -2157,7 +2182,10 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                 transition: isDraggingSidebar ? 'none' : 'width 200ms ease-in-out',
               }}
             >
-              {desktopSearchForm}
+              {/* Not while editing a place: its ← would be a second
+                  back beside the editor's own ‹ (Oct 15). The listing
+                  column hides its bar while editing for the same reason. */}
+              {!desktopEditing && desktopSearchForm}
             </div>
           )}
 

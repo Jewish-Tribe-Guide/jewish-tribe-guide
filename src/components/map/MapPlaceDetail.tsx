@@ -8,7 +8,6 @@ import type { SearchFound } from '@/lib/askSearch'
 import { scrollingAncestor } from '@/lib/scrollingAncestor'
 import ListingEditBar from '@/components/resources/ListingEditBar'
 import dynamic from 'next/dynamic'
-import UpButton from '@/components/UpButton'
 import { ui } from '@/lib/uiConfig'
 import { routes } from '@/lib/routes'
 import { listingSlug } from '@/lib/listingSlug'
@@ -183,7 +182,14 @@ export default function MapPlaceDetail({ item, category, color, onBack, found, u
 
   return (
     <div ref={rootRef} className="space-y-4 pb-2">
-      {onBack && <UpButton label="Back to list" onClick={onBack} className="" />}
+      {/* The chevron alone (Oct 15), in the top-left spot the editor's ‹
+          takes, rather than "‹ Back to list" in words; screen readers
+          still hear where it goes. */}
+      {onBack && (
+        <div>
+          <BackIconButton label="Back to list" onClick={onBack} />
+        </div>
+      )}
       <ListingView
         item={item}
         category={category}
