@@ -73,6 +73,20 @@ async function load(page: Page, path: string): Promise<Loaded[]> {
   // with defaultCommunitySlug(request), never by navigating.
   expect(page.url(), 'load() must be the first navigation in this context').toBe('about:blank')
 
+  // Only what the page needs for itself, not what its links prefetch. A
+  // prefetched route's data names its client code, and the browser fetches
+  // that code on arrival: the phone home read 464 KB in full runs and 312 KB
+  // alone (Oct 16), the difference being the shuls page's code, prefetched
+  // through a desktop card's link drawn for a moment before the phone has
+  // measured itself. Whether it comes at all depends on whether the server
+  // has the target's prefetch ready, which is whatever the tests before
+  // this one happened to visit. So the router's prefetches are refused
+  // here; a real addition to the page's own bundle still counts in full.
+  await page.route(
+    (url) => url.searchParams.has('_rsc'),
+    (route) => (route.request().headers()['next-router-prefetch'] ? route.abort() : route.fallback()),
+  )
+
   await page.goto(path)
   await dismissLocationPrompt(page)
   await ready(page)
