@@ -6,10 +6,11 @@ import { useLayoutEffect, useRef, useState } from 'react'
 // first try at search, made one that works. Each fills the box and shows its
 // answer, the same as typing it.
 //
-// On a phone, two at most and on one line (the user, Oct 15): the most
-// fitting question always, then the next that fits beside it, measured on
-// the phone itself, since widths differ from phone to phone. It used to
-// show three, scrolling sideways or wrapping to a second row.
+// Always one line, the most fitting question first, then the next ones that
+// fit beside it, measured where it's shown, since widths differ: two at most
+// on a phone (the user, Oct 15; it used to show three, scrolling sideways or
+// wrapping), three on a computer (Oct 16: the third used to wrap to a
+// second line under the other two).
 export default function SearchPrompts({
   prompts,
   onPick,
@@ -19,18 +20,21 @@ export default function SearchPrompts({
   prompts: string[]
   onPick: (prompt: string) => void
   className?: string
-  /** A phone: up to two, on one line. Otherwise up to three, wrapping. */
+  /** A phone: up to two. Otherwise up to three. One line either way. */
   oneLine?: boolean
 }) {
   const row = useRef<HTMLDivElement>(null)
   // Which prompts show on one line; all of them until measured.
   const [fitting, setFitting] = useState<number[] | null>(null)
-  const offered = prompts.slice(0, oneLine ? prompts.length : 3)
+  // All of them, so a shorter one further down can take the place of one
+  // that doesn't fit.
+  const offered = prompts
+  const most = oneLine ? 2 : 3
   const key = offered.join('\n')
 
   useLayoutEffect(() => {
     const el = row.current
-    if (!oneLine || !el) return
+    if (!el) return
     const measure = () => {
       const gap = parseFloat(getComputedStyle(el).columnGap) || 0
       const label = el.querySelector<HTMLElement>('[data-prompt-label]')
@@ -38,7 +42,7 @@ export default function SearchPrompts({
       let used = (label?.offsetWidth ?? 0) + gap
       const shown: number[] = []
       chips.forEach((chip, i) => {
-        if (shown.length === 2) return
+        if (shown.length === most) return
         const width = chip.offsetWidth
         // The first always: it's the question for this moment.
         if (shown.length === 0 || used + width <= el.clientWidth) {
@@ -53,13 +57,13 @@ export default function SearchPrompts({
     const watch = new ResizeObserver(measure)
     watch.observe(el)
     return () => watch.disconnect()
-  }, [oneLine, key])
+  }, [most, key])
 
   if (offered.length === 0) return null
   return (
     <div
       ref={row}
-      className={`relative flex items-center gap-2 ${oneLine ? 'overflow-hidden whitespace-nowrap [&>*]:shrink-0' : 'flex-wrap'} ${className}`}
+      className={`relative flex items-center gap-2 overflow-hidden whitespace-nowrap [&>*]:shrink-0 ${className}`}
       data-testid="search-prompts"
     >
       <span data-prompt-label className="text-[13px] font-medium text-slate-500">
@@ -68,7 +72,8 @@ export default function SearchPrompts({
       {offered.map((p, i) => {
         // Measured where it would sit, but out of the line, unseen and out
         // of reach of a tab or a screen reader, when it doesn't fit.
-        const left = oneLine && fitting !== null && !fitting.includes(i)
+        // Before it's measured, the first `most`.
+        const left = fitting !== null ? !fitting.includes(i) : i >= most
         return (
           <button
             key={p}

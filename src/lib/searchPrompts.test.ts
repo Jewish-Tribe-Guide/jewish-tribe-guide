@@ -23,7 +23,7 @@ describe('candidatePrompts — questions for the moment', () => {
   })
 
   it('offers only questions whose answer doesn’t depend on the time, before it’s known', () => {
-    expect(candidatePrompts(null)).toEqual(['Where can I get chalav yisroel milk?', 'Kosher wine', 'Shul near me'])
+    expect(candidatePrompts(null)).toEqual(['Chalav yisroel milk', 'Kosher wine', 'Shul near me'])
   })
 })
 

@@ -32,7 +32,10 @@ export function candidatePrompts(at: { day: DayKey; minutes: number } | null): s
   return out
 }
 
-const TIMELESS = ['Where can I get chalav yisroel milk?', 'Kosher wine', 'Shul near me'] as const
+// Short, so three fit on a computer's one line (the user, Oct 16: "Where
+// can I get chalav yisroel milk?" was the one that wrapped). The search reads
+// "chalav yisroel milk" as the one item either way (itemFilter).
+const TIMELESS = ['Chalav yisroel milk', 'Kosher wine', 'Shul near me'] as const
 
 /** Whether an answer is one worth showing off: a real one, and a yes.
  *  "Nothing open right now" and "No more Maariv today" are true, but a first

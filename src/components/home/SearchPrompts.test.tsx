@@ -36,4 +36,13 @@ describe('SearchPrompts', () => {
     render(<SearchPrompts prompts={['Next Shacharis', 'Food open now', 'Kosher wine', 'Shul near me']} onPick={() => {}} />)
     expect(shown()).toEqual(['Next Shacharis', 'Food open now', 'Kosher wine'])
   })
+
+  // The user, Oct 16: on the desktop home the third wrapped to a second
+  // line. A computer keeps one line too: one that doesn't fit gives way to
+  // the next that does. Friday morning's set, in the hero's 585px row.
+  it('on a computer, one line: a third that doesn’t fit gives way to one that does', () => {
+    phone(585)
+    render(<SearchPrompts prompts={['Where can I get challah?', 'Food open now', 'Where can I get chalav yisroel milk?', 'Kosher wine']} onPick={() => {}} />)
+    expect(shown()).toEqual(['Where can I get challah?', 'Food open now', 'Kosher wine'])
+  })
 })
