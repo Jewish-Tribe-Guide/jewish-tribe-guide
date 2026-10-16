@@ -64,6 +64,7 @@ import { askReader } from '@/lib/askReader'
 import { needsReading, ownFrom, readingLoses } from '@/lib/readingSearch'
 import { withTaught } from '@/lib/askWords'
 import type { DirectoryResource, MapFilters } from '@/types'
+import { useKeptListScroll } from './useKeptListScroll'
 
 // Shared by the initial useState below and the resync effect further down
 // (see its own comment) — one place for the initialSelectedCategories-vs-
@@ -1239,6 +1240,9 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
     () => (ui.map.pins ? [...visiblePoints, ...droppedMapPoints] : visiblePoints),
     [visiblePoints, droppedMapPoints],
   )
+  // Where the sidebar's list was scrolled to, while a place is open in it.
+  const sidebarListKey = useMemo(() => visiblePoints.map((p) => p.id).join('|'), [visiblePoints])
+  const keptSidebarScroll = useKeptListScroll(sidebarListKey)
 
   // Whether a search/filter is meaningfully "active" — used to (a) gate the
   // sheet-raise/auto-select effect below to commit points instead of every
@@ -2013,7 +2017,8 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // The sidebar's scroll region. One definition for the list and the place
   // detail, so neither can lose the overscroll-contain below. Keyed on what
   // it's showing, so each starts at the top: shared, the list's scroll
-  // offset carried into a place picked from deep in it.
+  // offset carried into a place picked from deep in it. The list's offset
+  // is kept meanwhile, and put back on the way back (Oct 16).
   //
   // overscroll-contain: without it, a trackpad swipe closing a
   // NearbyList row's pin action can still bleed into the
@@ -2032,8 +2037,10 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // surface" limitation everywhere, so this screen having it
   // too, specifically here, is a smaller cost than a broken
   // row swipe.
-  const sidebarScroll = (key: string, content: ReactNode) => (
-    <div key={key} className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-3">{content}</div>
+  const sidebarScroll = (key: string, content: ReactNode, list = false) => (
+    <div key={key} ref={list ? keptSidebarScroll.ref : undefined} onScroll={list ? keptSidebarScroll.onScroll : undefined} data-testid="sidebar-scroll" className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-3">
+      {content}
+    </div>
   )
 
   return (
@@ -2177,6 +2184,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                         onHover={hover.set}
                       />
                     </>,
+                    true,
                   )
                 ))}
             </aside>

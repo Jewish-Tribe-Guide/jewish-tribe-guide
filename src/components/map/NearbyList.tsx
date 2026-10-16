@@ -277,9 +277,18 @@ function NearbyRow({ point: p, category, place, now, showCategory, canViewListin
             </span>
           ) : (
             // Nothing to say about it (a hospital, a place with no hours or
-            // badges): what kind of place, and where, as before.
+            // badges): what kind of place, and where, as before. Its kind
+            // in its pins' colour too in a mixed list, as on a row with
+            // facts: grey here, a hotel with no hours read differently
+            // from one with them (the user, Oct 16).
             <span className="block truncate text-[13.5px] text-slate-500" data-testid="nearby-facts">
-              {p.categoryLabel}
+              {showCategory && p.categoryLabel ? (
+                <span className="font-semibold" style={{ color: p.color }} data-testid="nearby-category">
+                  {p.categoryLabel}
+                </span>
+              ) : (
+                p.categoryLabel
+              )}
               {!place && p.address ? ` · ${p.address}` : ''}
             </span>
           )}

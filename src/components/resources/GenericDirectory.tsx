@@ -62,7 +62,7 @@ import { getCategoryColor } from '@/lib/categoryColor'
 import { CategoryGlyph } from '@/lib/categoryIcons'
 import { SwipeRowGroup } from '@/components/SwipeRow'
 import dynamic from 'next/dynamic'
-import { tellUsPlaceholder } from '@/lib/tellUs'
+import { tellUsLine } from '@/lib/tellUs'
 
 /** How a change to the address is recorded. `replace`: in place, no step.
  *  `step`: a step the browser's Back undoes, named in history.state so the
@@ -2227,7 +2227,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
             onClose={() => setTellOpen(false)}
             about={openItem ? { id: openItem.id, name: openItem.name } : undefined}
             category={category}
-            placeholder={tellUsPlaceholder({ times: minyanimViewOn || (!!openItem && tellTimes), menu: !!openItem && tellMenu, about: openItem ?? undefined })}
+            line={tellUsLine({ times: minyanimViewOn || (!!openItem && tellTimes), menu: !!openItem && tellMenu, about: openItem ?? undefined })}
             heading={openItem && tellTimes ? `Update ${openItem.name}’s times` : undefined}
             kind={openItem && tellMenu ? 'menu' : minyanimViewOn || (openItem && tellTimes) ? 'times' : undefined}
             yourselfLabel={openItem && tellMenu ? 'Add one dish yourself' : undefined}

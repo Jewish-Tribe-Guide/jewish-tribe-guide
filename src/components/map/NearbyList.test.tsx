@@ -275,6 +275,16 @@ describe('NearbyList — which kind of place', () => {
     expect(food.closest('[data-testid="nearby-facts"]')).toHaveTextContent(/^Food·Open/)
   })
 
+  // Oct 16: a hotel with no hours fell to the plain grey line, so only some
+  // hotels had their colour.
+  it('colours it on a row with nothing else to say too', () => {
+    const hotel = makePoint({ id: 'Loews', filterId: 'hotel', name: 'Loews', categoryLabel: 'Hotel', color: '#4338ca', address: '1200 Market St' } as Partial<MapPoint & { filterId: string }>)
+    list([point('Judah', 'restaurant', 'Food', '#0f766e'), hotel])
+    const word = screen.getAllByTestId('nearby-category').find((w) => w.textContent === 'Hotel')
+    expect(word).toHaveStyle({ color: '#4338ca' })
+    expect(word!.closest('[data-testid="nearby-facts"]')).toHaveTextContent('Hotel · 1200 Market St')
+  })
+
   it('says nothing of it when every row is the same kind', () => {
     list([point('Judah', 'restaurant', 'Food', '#0f766e'), point('Goldie', 'restaurant', 'Food', '#0f766e')])
     expect(screen.queryByTestId('nearby-category')).not.toBeInTheDocument()

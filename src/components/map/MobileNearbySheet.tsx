@@ -1,8 +1,9 @@
 'use client'
 
-import { forwardRef, useEffect, useImperativeHandle, useRef, useState, type ReactNode } from 'react'
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type ReactNode } from 'react'
 import NearbyList, { type NearbyEruv } from './NearbyList'
 import MapPlaceDetail from './MapPlaceDetail'
+import { useKeptListScroll } from './useKeptListScroll'
 import type { MapPoint } from './ResourceMap'
 import type { CategoryConfig } from '@/lib/categories'
 import type { SearchFound } from '@/lib/askSearch'
@@ -137,6 +138,17 @@ const MobileNearbySheet = forwardRef<MobileNearbySheetHandle, Props>(function Mo
   const dragRef = useRef<DragState | null>(null)
   const contentDragRef = useRef<ContentDragState | null>(null)
   const contentRef = useRef<HTMLDivElement>(null)
+  // The list's scroll, kept while a place is open (see useKeptListScroll).
+  const listKey = useMemo(() => points.map((p) => p.id).join('|'), [points])
+  const kept = useKeptListScroll(listKey)
+  const keptRef = kept.ref
+  const listRef = useCallback(
+    (el: HTMLDivElement | null) => {
+      contentRef.current = el
+      keptRef(el)
+    },
+    [keptRef],
+  )
   // requestAnimationFrame id of an in-progress momentum coast (see
   // startMomentum), or null when nothing's running — checked, not just
   // fire-and-forget, so a new touch can cancel a still-coasting scroll
@@ -162,6 +174,7 @@ const MobileNearbySheet = forwardRef<MobileNearbySheetHandle, Props>(function Mo
     full: Math.max(PEEK_PX, containerHeight - TOP_INSET_PX),
   }
   const currentHeight = dragHeight ?? heights[snap]
+  const peeked = snap === 'peek' && dragHeight === null
 
   // Report the settled (target, not mid-drag) height upward — deliberately
   // keyed off `snap`/`heights[snap]`, not the live `currentHeight`, so a
@@ -536,13 +549,14 @@ const MobileNearbySheet = forwardRef<MobileNearbySheetHandle, Props>(function Mo
   // element, each starting at the top. Shared, the list's scroll offset
   // carried straight into a place picked from deep in it, opening the
   // detail partway down. Everything that reads contentRef does so fresh at
-  // the moment it needs it, so the remount is safe — and nothing restores
-  // the list's scroll position on the way back, so there's no saved offset
-  // to lose either.
-  const scrollRegion = (key: string, content: ReactNode) => (
+  // the moment it needs it, so the remount is safe. The list's own offset
+  // is kept while a place is open, and put back on the way back (Oct 16).
+  const scrollRegion = (key: string, content: ReactNode, list = false) => (
     <div
       key={key}
-      ref={contentRef}
+      ref={list ? listRef : contentRef}
+      onScroll={list ? kept.onScroll : undefined}
+      data-testid="sheet-scroll"
       onPointerDown={onContentPointerDown}
       onPointerMove={onContentPointerMove}
       onPointerUp={onContentPointerUp}
@@ -558,8 +572,11 @@ const MobileNearbySheet = forwardRef<MobileNearbySheetHandle, Props>(function Mo
   )
 
   return (
+    // overflow-hidden: lowered, the list's element is squeezed to nothing
+    // under the handle, but its bottom padding would still poke out below.
     <div
-      className="absolute inset-x-0 bottom-0 z-20 flex flex-col rounded-t-2xl bg-white shadow-[0_-4px_24px_rgba(0,0,0,0.18)] desktop:hidden"
+      data-testid="map-sheet"
+      className="absolute inset-x-0 bottom-0 z-20 flex flex-col overflow-hidden rounded-t-2xl bg-white shadow-[0_-4px_24px_rgba(0,0,0,0.18)] desktop:hidden"
       style={{
         height: currentHeight,
         transition: dragHeight === null ? 'height 280ms cubic-bezier(0.32, 0.72, 0, 1)' : 'none',
@@ -571,16 +588,24 @@ const MobileNearbySheet = forwardRef<MobileNearbySheetHandle, Props>(function Mo
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerCancel}
         className="flex shrink-0 touch-none cursor-grab flex-col items-center gap-1.5 py-2.5 active:cursor-grabbing"
+        // Lowered, the handle is the whole sheet: its line says what's in
+        // it, and nothing of the list shows under that, cut off partway
+        // through a row (the user, Oct 16, after scrolling then closing).
+        // Not mid-drag, so dragging it up shows the list coming.
+        style={peeked ? { minHeight: PEEK_PX } : undefined}
         role="button"
         aria-label={snap === 'peek' ? 'Expand nearby list' : 'Drag to resize nearby list'}
       >
         <span className="h-1 w-9 rounded-full bg-slate-300" aria-hidden="true" />
-        {snap === 'peek' && !selected && (
-          <span className="text-xs font-medium text-slate-500">
-            {eruvim && eruvim.length > 0
-              ? // The eruvim lead the list, places or none (Oct 15).
-                `${eruvim.length} ${eruvim.length === 1 ? 'eruv' : 'eruvim'}${points.length > 0 ? ` · ${points.length} place${points.length !== 1 ? 's' : ''}` : ''} — drag up`
-              : `${points.length} place${points.length !== 1 ? 's' : ''} nearby — drag up`}
+        {snap === 'peek' && (
+          <span className="max-w-full truncate px-4 text-xs font-medium text-slate-500" data-testid="sheet-peek-line">
+            {selected
+              ? // A place open, lowered: which, since none of it shows.
+                `${selected.name} — drag up`
+              : eruvim && eruvim.length > 0
+                ? // The eruvim lead the list, places or none (Oct 15).
+                  `${eruvim.length} ${eruvim.length === 1 ? 'eruv' : 'eruvim'}${points.length > 0 ? ` · ${points.length} place${points.length !== 1 ? 's' : ''}` : ''} — drag up`
+                : `${points.length} place${points.length !== 1 ? 's' : ''} nearby — drag up`}
           </span>
         )}
       </div>
@@ -593,6 +618,7 @@ const MobileNearbySheet = forwardRef<MobileNearbySheetHandle, Props>(function Mo
         ) : (
           <NearbyList points={points} userLocation={userLocation} onViewListing={onViewListing} onSelectPlace={selectPlace} eruvim={eruvim} onSelectEruv={onSelectEruv} />
         ),
+        !selected,
       )}
     </div>
   )
