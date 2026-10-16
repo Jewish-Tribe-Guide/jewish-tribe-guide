@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { haversineMiles } from '@/lib/geo'
 import CategoryIcon from '@/components/CategoryIcon'
 import SavedBadge from '@/components/SavedBadge'
@@ -53,6 +53,10 @@ type Props = {
    *  has what's on the map rather than "nothing to show". */
   eruvim?: NearbyEruv[]
   onSelectEruv?: (id: string) => void
+  /** The row under the pointer, or null once it leaves: its pin lifts on
+   *  the map beside the list, as a category page's does (the user, Oct
+   *  16). The computer's sidebar only; a phone has no pointer to follow. */
+  onHover?: (id: string | null) => void
 }
 
 function distanceLabel(miles: number): string {
@@ -61,8 +65,16 @@ function distanceLabel(miles: number): string {
   return `${(Math.round(miles * 10) / 10).toFixed(1)} mi`
 }
 
-export default function NearbyList({ points, userLocation, onViewListing, onSelectPlace, eruvim, onSelectEruv }: Props) {
+export default function NearbyList({ points, userLocation, onViewListing, onSelectPlace, eruvim, onSelectEruv, onHover }: Props) {
   const { toggle } = usePinned()
+  // A row opened with a click unmounts the list before the pointer leaves
+  // it, so its mouseleave never comes: let go of the pin as the list goes,
+  // or it would stay lifted after Back.
+  const onHoverRef = useRef(onHover)
+  useEffect(() => {
+    onHoverRef.current = onHover
+  })
+  useEffect(() => () => onHoverRef.current?.(null), [])
   // What each row says, as a category page's row says it (the user, Oct
   // 15: the map's rows felt small beside the category pages'): where it is
   // beside the name, and the facts line, open or when it opens, then its
@@ -140,8 +152,8 @@ export default function NearbyList({ points, userLocation, onViewListing, onSele
           const canPin = p.filterId !== HOSPITALS_FILTER_ID
 
           return (
+            <div key={p.id} onMouseEnter={onHover ? () => onHover(p.id) : undefined} onMouseLeave={onHover ? () => onHover(null) : undefined}>
             <NearbyRow
-              key={p.id}
               point={p}
               category={byId.get(p.filterId) ?? null}
               place={places.get(p.id) ?? null}
@@ -152,6 +164,7 @@ export default function NearbyList({ points, userLocation, onViewListing, onSele
               onSelect={() => (onSelectPlace ? onSelectPlace(p) : onViewListing!(p.filterId, p.id))}
               onTogglePin={() => toggle({ id: p.id, categoryId: p.filterId })}
             />
+            </div>
           )
         })}
       </div>

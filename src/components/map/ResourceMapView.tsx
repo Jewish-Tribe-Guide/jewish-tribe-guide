@@ -1,8 +1,9 @@
 'use client'
 
 import { track } from '@vercel/analytics'
-import { useCallback, useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ComponentProps, type ReactNode } from 'react'
 import ResourceMap, { type MapPoint } from './ResourceMap'
+import { createHighlight, type Highlight } from './highlight'
 import CategoryFilter, { CHIP_GLYPH, CHIP_SIZE, type FilterOption } from './CategoryFilter'
 import CategoryPickerList from './CategoryPickerList'
 import MapFiltersSheet, { type MapFilterSection } from './MapFiltersSheet'
@@ -369,6 +370,10 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // passed to ResourceMap as selectedId so it can highlight the matching
   // marker, making it clear which listing on the map the sheet is showing.
   const [selectedPointId, setSelectedPointId] = useState<string | undefined>(undefined)
+  // The sidebar row under the pointer, whose pin lifts on the map (Oct 16,
+  // as a category page's map does). A store rather than state, so moving
+  // down the list redraws the map's pins and not the whole view.
+  const [hover] = useState(createHighlight)
   // Bumped only when the current selectedPointId change should reframe the
   // map's camera (a listing picked from the sheet/sidebar list) — left alone
   // for a pin tapped directly on the map, so that tap just highlights the
@@ -2169,6 +2174,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                         onSelectPlace={selectPlace}
                         eruvim={listedEruvim}
                         onSelectEruv={openEruv}
+                        onHover={hover.set}
                       />
                     </>,
                   )
@@ -2366,7 +2372,8 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
             ref={attachMapBox}
             className="relative left-1/2 flex min-h-[320px] w-screen flex-1 -translate-x-1/2 flex-col overflow-hidden desktop:left-0 desktop:min-h-0 desktop:w-auto desktop:translate-x-0"
           >
-              <ResourceMap
+              <MapWithHover
+                highlight={hover}
                 points={mapPoints}
                 userLocation={activeLocation}
                 directionsOrigin={directionsOrigin}
@@ -2806,4 +2813,13 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
       })()}
     </div>
   )
+}
+
+/** The map, with the sidebar's hovered row's pin lifted: the place open in
+ *  the sidebar first, else the row under the pointer. Reads the hover store
+ *  itself, so only the map redraws as the pointer moves down the list. A
+ *  hover never moves the map: ResourceMap frames only on frameToken. */
+function MapWithHover({ highlight, selectedId, ...props }: ComponentProps<typeof ResourceMap> & { highlight: Highlight }) {
+  const hovered = useSyncExternalStore(highlight.subscribe, highlight.get, () => null)
+  return <ResourceMap {...props} selectedId={selectedId ?? hovered ?? undefined} />
 }

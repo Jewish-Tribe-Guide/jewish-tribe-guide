@@ -67,6 +67,7 @@ vi.mock('./ResourceMap', () => ({
     selectedEruvId,
     frameEruvim,
     cornerControl,
+    selectedId,
   }: {
     points: MapPoint[]
     onSelectPoint?: (p: MapPoint) => void
@@ -78,11 +79,13 @@ vi.mock('./ResourceMap', () => ({
     selectedEruvId?: string | null
     frameEruvim?: boolean
     cornerControl?: ReactNode
+    selectedId?: string
   }) => (
     <div data-testid="resource-map">
       <div data-testid="map-corner">{cornerControl}</div>
       <p data-testid="point-count">{points.length}</p>
       <p data-testid="frame-token">{frameToken ?? 0}</p>
+      <p data-testid="lifted-pin">{selectedId ?? ''}</p>
       <p data-testid="eruv-count">{eruvim?.length ?? 0}</p>
       <p data-testid="eruv-selected">{selectedEruvId ?? ''}</p>
       <p data-testid="eruv-framed">{frameEruvim ? 'yes' : 'no'}</p>
@@ -1970,6 +1973,30 @@ describe('ResourceMapView — the Filters sheet', () => {
     await user.click(screen.getByTestId('map-filters-button'))
     expect(screen.queryByTestId('map-filters-open-all')).not.toBeInTheDocument()
     expect(within(screen.getByTestId('map-filters-restaurant')).getByRole('switch', { name: 'Open now' })).toBeInTheDocument()
+  })
+})
+
+// The user, Oct 16: as on a category page, the row under the pointer lifts
+// its pin on the map beside the list, and lets it go on leaving. It never
+// moves the map: only a click does that.
+describe('ResourceMapView — hovering a row in the sidebar', () => {
+  it('lifts that row’s pin, lets it go on leaving, and never reframes', async () => {
+    const user = userEvent.setup()
+    const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
+    renderMap(
+      <ResourceMapView onUp={vi.fn()} />,
+      [listingWithGeo({ id: 'g1', category: 'grocery', name: 'Acme Grocery' }), listingWithGeo({ id: 'g2', category: 'grocery', name: 'Bell Grocery' })],
+      [grocery],
+    )
+    await user.click(screen.getByRole('button', { name: /Grocery Stores/ }))
+    const aside = document.querySelector('aside')!
+    const frame = screen.getByTestId('frame-token').textContent
+    const row = within(aside).getByText('Bell Grocery').closest('[class*="divide-y"] > div') as HTMLElement
+    fireEvent.mouseEnter(row)
+    expect(screen.getByTestId('lifted-pin')).toHaveTextContent('g2')
+    expect(screen.getByTestId('frame-token').textContent).toBe(frame)
+    fireEvent.mouseLeave(row)
+    expect(screen.getByTestId('lifted-pin')).toHaveTextContent(/^$/)
   })
 })
 
