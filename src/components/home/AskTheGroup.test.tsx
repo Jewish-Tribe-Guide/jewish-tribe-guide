@@ -33,4 +33,11 @@ describe('Ask in a WhatsApp group', () => {
     expect(screen.queryAllByRole('link')).toEqual([])
     expect(screen.getAllByRole('button')).toHaveLength(1)
   })
+
+  // Oct 16: on a category page only that category was searched.
+  it('on a category page, says which, and offers the whole guide first', () => {
+    renderWithProviders(<AskTheGroup {...base} scope={{ label: 'Food', searchAll: '/philly/ask/rugelach' }} />)
+    expect(screen.getByTestId('ask-the-group')).toHaveTextContent(/^Nothing in Food for “rugelach”\.Search the whole guideAsk in a WhatsApp group$/)
+    expect(screen.getByRole('link', { name: 'Search the whole guide' })).toHaveAttribute('href', '/philly/ask/rugelach')
+  })
 })

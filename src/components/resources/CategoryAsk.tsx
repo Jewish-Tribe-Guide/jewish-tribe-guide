@@ -15,6 +15,13 @@ import type { ReactNode } from 'react'
 // Food" and the placeholder already say what it is, and the page reads
 // cleaner without them (the user, Oct 10).
 //
+// Not on a phone (the user, Oct 16): "in Synagogues ×" took about half the
+// box, cutting off the placeholder and leaving room for a few letters once
+// the save and clear buttons joined it. The page's title right above says
+// which category it is, and the placeholder mostly does too. Its ✕, the
+// way to the whole guide's search, is offered where it's needed instead:
+// when nothing here matched (AskTheGroup's "Search the whole guide").
+//
 // Nothing answers under it any more (Oct 13, "search takes you to the
 // page"): the list is the answer, and what the words meant is ticked in the
 // list's own Filters, with the count on its button. The sentence that used
@@ -53,7 +60,10 @@ export default function CategoryAsk({ category, search, onSearch, scope, reading
   // Shared, the link's question names this category when it doesn't
   // already, so it opens answering the same thing (agreed Oct 1).
   const sharedQ = q ? categoryQuestion(q, category, categories) : ''
-  const askGroup = foundNothing && q && communitySlug ? { nothingClose: true, sharePath: routes.ask(communitySlug, sharedQ) } : null
+  const askGroup =
+    foundNothing && q && communitySlug
+      ? { nothingClose: true, sharePath: routes.ask(communitySlug, sharedQ), scope: { label: category.pluralLabel, searchAll: routes.ask(communitySlug, q) } }
+      : null
   const plural = category.pluralLabel.toLowerCase()
   const scopeLabel = onMinyanim ? 'Minyanim' : category.pluralLabel
   const placeholder = onMinyanim
@@ -71,9 +81,10 @@ export default function CategoryAsk({ category, search, onSearch, scope, reading
           <circle cx="11" cy="11" r="8" />
           <path d="m21 21-4.3-4.3" />
         </svg>
-        {/* The search is this category's, and says so. Its ✕ asks the whole
-            guide instead, with whatever has been typed. */}
-        <span className="flex h-7 shrink-0 items-center gap-1 rounded-lg bg-primary/10 pl-2.5 pr-1 text-[13px] font-semibold text-primary">
+        {/* The search is this category's, and says so where there's
+            room. Its ✕ asks the whole guide instead, with whatever has
+            been typed. */}
+        <span className="hidden h-7 shrink-0 items-center gap-1 rounded-lg bg-primary/10 pl-2.5 pr-1 text-[13px] font-semibold text-primary sm:flex">
           in {scopeLabel}
           <Link
             href={q && communitySlug ? routes.ask(communitySlug, q) : routes.home(communitySlug ?? '')}

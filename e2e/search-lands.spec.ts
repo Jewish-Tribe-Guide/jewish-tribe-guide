@@ -219,3 +219,29 @@ test('nothing anywhere: Enter stays on home and says so, with where to ask', asy
   await expect(page.getByTestId('ask-the-group').filter({ visible: true })).toContainText('Nothing in the guide for “xqzvplk wobblefrump”.')
   expect(new URL(page.url()).pathname).toBe(`/${community}`)
 })
+
+// The user, Oct 16: "in Food ×" took about half a phone's search box, so a
+// phone doesn't show it (the page's title says Food right above). Its ✕,
+// the way to the whole guide, is in the card when nothing here matched.
+test('a category’s box: “in Food” only where there’s room, and the whole guide when nothing’s here', async ({ page, request, isMobile }) => {
+  const community = await defaultCommunity(page)
+  const { category } = await categoryWithListings(request, community)
+  await page.goto(`/${community}/${category.id}`)
+  await dismissLocationPrompt(page)
+  const box = page.getByRole('searchbox', { name: `Search ${category.pluralLabel}` }).filter({ visible: true })
+  await expect(box).toBeVisible()
+
+  const scope = page.getByText(`in ${category.pluralLabel}`, { exact: true })
+  if (isMobile) {
+    await expect(scope).not.toHaveCount(0)
+    await expect(scope.filter({ visible: true })).toHaveCount(0)
+  } else {
+    await expect(scope.filter({ visible: true })).toBeVisible()
+  }
+
+  await box.fill('xqzvplk wobblefrump')
+  const card = page.getByTestId('ask-the-group').filter({ visible: true })
+  await expect(card).toContainText(`Nothing in ${category.pluralLabel} for “xqzvplk wobblefrump”.`)
+  await card.getByRole('link', { name: 'Search the whole guide' }).click()
+  await page.waitForURL((url) => url.pathname.startsWith(`/${community}/ask/`))
+})

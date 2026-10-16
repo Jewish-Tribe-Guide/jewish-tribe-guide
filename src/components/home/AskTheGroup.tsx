@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { track } from '@vercel/analytics'
 import { askMessage } from '@/lib/shareAnswer'
 import { useShareLink } from '@/lib/useShareLink'
@@ -16,20 +17,33 @@ import { useShareLink } from '@/lib/useShareLink'
 // Nothing else (the user, Oct 10): the line explaining the share menu, "Know
 // where to find it? Add it to the guide" and "See the community's groups"
 // were distracting and little used.
+//
+// On a category page only that category was searched, so the card says so
+// ("Nothing in Food for …") and offers the rest of the guide first. That
+// used to be the ✕ on the box's "in Food", which a phone has no room for
+// (the user, Oct 16).
 
 export type AskGroupProps = {
   nothingClose: boolean
   /** The question's own page (routes.ask), sent with the question. */
   sharePath: string
+  /** A category page's search: what was searched, and the whole guide's
+   *  search for the same words. */
+  scope?: { label: string; searchAll: string }
 }
 
-export default function AskTheGroup({ query, nothingClose, sharePath, className = '' }: AskGroupProps & { query: string; className?: string }) {
+export default function AskTheGroup({ query, nothingClose, sharePath, scope, className = '' }: AskGroupProps & { query: string; className?: string }) {
   const { share, copied } = useShareLink(sharePath, query, () => askMessage(query))
   return (
     <div className={`rounded-xl border border-slate-200 bg-white px-3.5 py-3 ${className}`} data-testid="ask-the-group">
       <p className="text-[14px] font-semibold leading-snug text-ink">
-        {nothingClose ? `Nothing in the guide for “${query}”.` : 'Not what you’re looking for?'}
+        {nothingClose ? `Nothing in ${scope ? scope.label : 'the guide'} for “${query}”.` : 'Not what you’re looking for?'}
       </p>
+      {scope && (
+        <Link href={scope.searchAll} className="mt-1.5 inline-block text-[14.5px] font-bold text-primary hover:underline">
+          Search the whole guide
+        </Link>
+      )}
       <button
         type="button"
         onClick={() => {

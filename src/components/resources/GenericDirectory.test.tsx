@@ -293,7 +293,7 @@ describe('GenericDirectory', () => {
 
     await user.type(screen.getByRole('searchbox'), 'nonexistent')
 
-    expect(screen.getByTestId('ask-the-group')).toHaveTextContent('Nothing in the guide for “nonexistent”.')
+    expect(screen.getByTestId('ask-the-group')).toHaveTextContent('Nothing in Grocery Stores for “nonexistent”.')
     expect(screen.queryByText('No grocery stores match your search.')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Clear search & filters' })).not.toBeInTheDocument()
     // Nor "0 listings" with Filters and Sort for a list that isn't there.
@@ -331,12 +331,16 @@ describe('GenericDirectory', () => {
       expect(screen.getByRole('button', { name: /^Filters/ })).toHaveTextContent('1')
     })
 
-    it('found nothing: asks the group, as the home search does, and nothing else', async () => {
+    // Oct 16: only this category was searched, so the card says so, and
+    // offers the rest of the guide. That was the ✕ on "in Grocery Stores",
+    // which a phone no longer shows.
+    it('found nothing: says where it looked, offers the whole guide, and asks the group', async () => {
       const user = userEvent.setup()
       renderWithProviders(<GenericDirectory category={grocery} items={stores} {...handlers} />)
       await user.type(screen.getByRole('searchbox'), 'rugelach')
       const card = within(screen.getByTestId('ask-the-group'))
-      expect(card.getByText('Nothing in the guide for “rugelach”.')).toBeInTheDocument()
+      expect(card.getByText('Nothing in Grocery Stores for “rugelach”.')).toBeInTheDocument()
+      expect(card.getByRole('link', { name: 'Search the whole guide' })).toHaveAttribute('href', expect.stringMatching(/\/ask\/rugelach$/))
       expect(card.getByRole('button', { name: 'Ask in a WhatsApp group' })).toBeInTheDocument()
       expect(card.queryByRole('button', { name: /Know where to find it/ })).not.toBeInTheDocument()
     })
