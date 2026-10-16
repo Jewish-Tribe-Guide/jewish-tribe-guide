@@ -75,6 +75,10 @@ test('computer: Back from a place puts the sidebar’s list where it was', async
   if (await show.isVisible()) await show.click()
   const list = page.getByTestId('sidebar-scroll')
   await expect(list.getByTestId('nearby-name').first()).toBeVisible()
+  // Nor does it give sideways under a row's trackpad swipe (Oct 16). The
+  // bounce itself needs a real trackpad; this is the setting that stops it.
+  expect(await list.evaluate((el) => getComputedStyle(el).overscrollBehaviorX), 'no sideways rubber-band').toBe('none')
+  expect(await list.evaluate((el) => getComputedStyle(el).overscrollBehaviorY), 'up and down kept to the list').toBe('contain')
 
   await scrollAndOpen(page, list, 400)
   const back = page.getByRole('button', { name: 'Back to results' }).filter({ visible: true })

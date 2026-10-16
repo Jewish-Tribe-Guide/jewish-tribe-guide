@@ -753,12 +753,12 @@ describe('ResourceMapView — selecting a place', () => {
     await user.click(screen.getByRole('button', { name: /Synagogues/ }))
     // The sidebar's own row (the first of two: the mobile sheet stays
     // mounted on desktop too), not the map marker, which is outside it.
-    const listRegion = screen.getAllByRole('button', { name: /^Acme Grocery/ })[0]!.closest('.overscroll-contain')
+    const listRegion = screen.getAllByRole('button', { name: /^Acme Grocery/ })[0]!.closest('[data-testid="sidebar-scroll"]')
     expect(listRegion).not.toBeNull()
     await user.click(screen.getByRole('button', { name: 'Select Acme Grocery' }))
 
     const pill = await screen.findByRole('button', { name: 'Edit listing' })
-    const region = pill.closest('.overscroll-contain')!
+    const region = pill.closest('[data-testid="sidebar-scroll"]')!
     const sidebar = pill.closest('aside')!
     expect(sidebar).toContainElement(pill)
     expect(region).toContainElement(pill)

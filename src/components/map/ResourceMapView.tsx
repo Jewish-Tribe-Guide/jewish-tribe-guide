@@ -2015,7 +2015,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   )
 
   // The sidebar's scroll region. One definition for the list and the place
-  // detail, so neither can lose the overscroll-contain below. Keyed on what
+  // detail, so neither can lose the overscroll settings below. Keyed on what
   // it's showing, so each starts at the top: shared, the list's scroll
   // offset carried into a place picked from deep in it. The list's offset
   // is kept meanwhile, and put back on the way back (Oct 16).
@@ -2037,8 +2037,14 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // surface" limitation everywhere, so this screen having it
   // too, specifically here, is a smaller cost than a broken
   // row swipe.
+  //
+  // Sideways, none rather than contain (Oct 16): contain still let the
+  // list itself rubber-band sideways, and a scroll's sideways drift
+  // reaches it, so a row's swipe pulled "a little more of the sheet"
+  // than the row. Nothing here scrolls sideways, so there's nothing to
+  // give.
   const sidebarScroll = (key: string, content: ReactNode, list = false) => (
-    <div key={key} ref={list ? keptSidebarScroll.ref : undefined} onScroll={list ? keptSidebarScroll.onScroll : undefined} data-testid="sidebar-scroll" className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-3">
+    <div key={key} ref={list ? keptSidebarScroll.ref : undefined} onScroll={list ? keptSidebarScroll.onScroll : undefined} data-testid="sidebar-scroll" className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain overscroll-x-none px-3 pb-3">
       {content}
     </div>
   )
