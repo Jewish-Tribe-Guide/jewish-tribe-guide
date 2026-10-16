@@ -253,6 +253,15 @@ export type CategoryField = {
    *  hospital's sukkah), worked out from the Hebrew date (sukkosWindow.ts). Still
    *  edited, searched and shown to a moderator all year. */
   shownAround?: 'sukkos'
+  /** For `type: 'boolean'` in a category with minyanim: yes means the
+   *  place is a minyan that meets somewhere (an office, a hospital, a
+   *  home), not a shul (the user, Oct 16). Its row has a clock for its
+   *  picture, and its listing has none of a shul's prompts for times it
+   *  will never have ("Their Shabbos times aren't listed yet"). What the
+   *  row calls it is the field's own badge, as any yes/no field's: label
+   *  it "Minyan" and make it filterable, which also lets Filters show only
+   *  minyanim. */
+  minyanOnly?: boolean
 }
 
 /** A named, admin-defined group of optional form fields — see

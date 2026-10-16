@@ -1482,3 +1482,26 @@ describe('GenericListingCard — mobile listing sheet', () => {
     expect(mockRouter.push).not.toHaveBeenCalled()
   })
 })
+
+// Oct 16: a minyan that meets somewhere (an office, a hospital), not a
+// shul. Its category's yes/no field marked minyanOnly says so; its row has
+// a clock for its picture, where a shul has its initials.
+describe('a minyan that isn’t a shul', () => {
+  const kind = { key: 'minyanOnly', label: 'Minyan', type: 'boolean' as const, renderAs: 'badge' as const, filterable: true, minyanOnly: true }
+  const shuls = makeCategory({ id: 'synagogue', label: 'Synagogue', detailFields: [{ key: 'minyanim', label: 'Davening', type: 'minyanim' }, kind] })
+  const show = (item: ReturnType<typeof makeListing>) =>
+    renderWithProviders(<GenericListingCard item={item} category={shuls} upvotes={false} count={0} {...requiredHandlers} />, { content: { categories: [shuls] } })
+
+  it('has a clock for its picture, and its badge says what it is', () => {
+    show(makeListing({ id: 'mkt', name: 'Market Street Mincha', category: 'synagogue', minyanOnly: true }))
+    expect(screen.getByTestId('icon-glyph').querySelector('svg')).not.toBeNull()
+    expect(screen.queryByText('MS')).not.toBeInTheDocument()
+    expect(screen.getByText('Minyan')).toBeInTheDocument()
+  })
+
+  it('a shul keeps its initials', () => {
+    show(makeListing({ id: 'beth', name: 'Center City Beth Am', category: 'synagogue' }))
+    expect(screen.queryByTestId('icon-glyph')).not.toBeInTheDocument()
+    expect(screen.getByText('CC')).toBeInTheDocument()
+  })
+})

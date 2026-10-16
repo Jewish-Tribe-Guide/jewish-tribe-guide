@@ -264,6 +264,18 @@ export function FieldEditor({
         </>
       )}
 
+      {f.type === 'boolean' && (
+        <label className="flex items-center gap-1.5 text-xs text-slate-700 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={!!f.minyanOnly}
+            onChange={(e) => onChange({ minyanOnly: e.target.checked || undefined })}
+            className="rounded border-slate-300"
+          />
+          Yes means it&rsquo;s a minyan that meets somewhere, not a shul: a clock for its picture, and no asking for Shabbos times
+        </label>
+      )}
+
       {f.type === 'contacts' && (
         <label className="flex items-center gap-1.5 text-xs text-slate-700 cursor-pointer">
           <input

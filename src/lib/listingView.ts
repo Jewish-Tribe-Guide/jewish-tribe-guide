@@ -173,6 +173,13 @@ function hasHours(v: unknown): boolean {
 
 /** A place with no address has one link that is the point of it: a
  *  WhatsApp group's Join. The url field the admin put in the row. */
+/** Whether the place is a minyan that meets somewhere, not a shul: its
+ *  category's yes/no field marked minyanOnly says yes. */
+export function isMinyanOnly(item: DirectoryResource, category: CategoryConfig): boolean {
+  const field = category.detailFields.find((f) => f.type === 'boolean' && f.minyanOnly)
+  return !!field && item[field.key] === true
+}
+
 export function primaryLink(item: DirectoryResource, category: CategoryConfig): { field: CategoryField; href: string } | null {
   if (category.hasAddress !== false) return null
   const field = category.detailFields.find((f) => f.type === 'url' && f.showInHeader && String(item[f.key] ?? '').trim())

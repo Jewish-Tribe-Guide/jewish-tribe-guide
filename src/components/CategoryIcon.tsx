@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import Image from 'next/image'
 import { isOptimizableImage, storageThumbnailUrl } from '@/lib/imageHosts'
 import { CategoryGlyph } from '@/lib/categoryIcons'
@@ -46,6 +46,10 @@ type Props = {
    *  listing's initials, so a row of one category's places isn't the same
    *  icon repeated down the page. */
   initials?: string
+  /** In place of the initials: a line glyph that says what the place is,
+   *  where that's what tells it apart (a minyan that isn't a shul: a
+   *  clock). Drawn in the same darker shade the initials are. */
+  glyph?: ReactNode
 }
 
 /** The circular category avatar — a category's line icon (or, lacking one,
@@ -54,7 +58,7 @@ type Props = {
  *  list/place detail, category chips) shows a place the same way regardless
  *  of which it's using, and so the image-vs-icon-vs-emoji fallback logic
  *  exists exactly once. */
-export default function CategoryIcon({ icon, categoryId, iconImageUrl, color, className = 'h-10 w-10 text-xl', sizePx = 40, ring = true, shape = 'circle', initials }: Props) {
+export default function CategoryIcon({ icon, categoryId, iconImageUrl, color, className = 'h-10 w-10 text-xl', sizePx = 40, ring = true, shape = 'circle', initials, glyph }: Props) {
   const hasImage = !!iconImageUrl?.trim()
   // A small copy made by Supabase Storage, for an uploaded photo — see
   // storageThumbnailUrl. Falls back to the original if that request fails
@@ -85,6 +89,10 @@ export default function CategoryIcon({ icon, categoryId, iconImageUrl, color, cl
           unoptimized={useThumb || !isOptimizableImage(iconImageUrl!)}
           onError={useThumb ? () => setFailedThumb(thumb) : undefined}
         />
+      ) : glyph ? (
+        <span className="flex h-[55%] w-[55%] items-center justify-center" style={{ color: `color-mix(in oklab, ${color} 70%, #000)` }} data-testid="icon-glyph">
+          {glyph}
+        </span>
       ) : initials ? (
         // A darker shade of the category's colour: the plain colour on its
         // own light tint is too faint for small text.

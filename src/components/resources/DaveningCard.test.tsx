@@ -428,3 +428,29 @@ describe('a minyan that only runs when enough sign up (Oct 16)', () => {
     expect(within(screen.getByTestId('davening-shabbos')).getByTestId('sign-up-box')).toHaveTextContent('Shacharis 7:30 AM: check the group first')
   })
 })
+
+// Oct 16: a minyan that meets somewhere, not a shul, is its times and
+// nothing else: no asking for Shabbos times an office Mincha won't have.
+describe('a minyan that isn’t a shul', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-10-06T09:00:00-04:00'))
+  })
+  afterEach(() => vi.useRealTimers())
+  const kind = { key: 'minyanOnly', label: 'Minyan', type: 'boolean' as const, renderAs: 'badge' as const, minyanOnly: true }
+  const withKind = makeCategory({ ...shuls, detailFields: [...shuls.detailFields, kind] })
+  const mincha = [{ id: 'm', tefillah: 'mincha', days: ['mon', 'tue', 'wed', 'thu'], time: '1:15pm' }]
+
+  it('has no Shabbos box asking for its Shabbos times', () => {
+    const office = makeListing({ id: 'mkt', name: 'Market Street Mincha', category: 'synagogue', minyanim: mincha, minyanOnly: true })
+    renderWithProviders(<DaveningCard item={office} minyanim={mincha} category={withKind} />, { content: { categories: [withKind] } })
+    expect(screen.getByTestId('davening-weekday')).toHaveTextContent('1:15 PM')
+    expect(screen.queryByTestId('davening-shabbos')).not.toBeInTheDocument()
+  })
+
+  it('a shul with the same times still asks', () => {
+    const shul = makeListing({ id: 'beth', name: 'Center City Beth Am', category: 'synagogue', minyanim: mincha })
+    renderWithProviders(<DaveningCard item={shul} minyanim={mincha} category={withKind} />, { content: { categories: [withKind] } })
+    expect(screen.getByTestId('davening-shabbos')).toHaveTextContent('Their Shabbos times aren’t listed yet.')
+  })
+})

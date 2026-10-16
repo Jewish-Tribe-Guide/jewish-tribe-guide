@@ -8,7 +8,7 @@ import { geoKey, geoOrCommunityDefault, resolveAnchorTime, type AnchorTimes } fr
 import { dateText, readSchedules, regularMinyanim, scheduleDayText, sendsWeekly, thisWeeksPost, type DayPosting, type SpecialSchedule } from '@/lib/schedules'
 import { clockMinutes, noteText, SHABBOS_PART_LABELS, shabbosList, timeText, weekdayTable, type ShabbosLine } from '@/lib/weekTable'
 import { DAY_KEYS, type DayKey } from '@/lib/hours'
-import { sectionConfirmedAt } from '@/lib/listingView'
+import { isMinyanOnly, sectionConfirmedAt } from '@/lib/listingView'
 import { resolveCapabilities, type CategoryConfig } from '@/lib/categories'
 import { ui } from '@/lib/uiConfig'
 import { ChevronRightIcon, PlusIcon } from '@/components/icons'
@@ -89,6 +89,9 @@ export default function DaveningCard({
   // Every minyan here only runs when enough sign up: the box speaks for the
   // place, with no "other times" to call regular.
   const allSignUp = rows.length > 0 && rows.every((m) => m.signUp)
+  // A minyan that meets somewhere, not a shul (Oct 16): its times and
+  // nothing else; no asking for the Shabbos or weekday times it won't have.
+  const minyanOnly = !!category && isMinyanOnly(item, category)
   const season = schedule?.season ?? null
   const week = weekdayTable(rows, season)
   const shab = shabbosList(rows, season)
@@ -203,7 +206,7 @@ export default function DaveningCard({
           {updateIn('week')}
         </Card>,
       )
-    : shab && (
+    : shab && !minyanOnly && (
         <div key="week" className="px-1" data-testid="davening-no-weekday">
           <p className="text-[13.5px] text-muted">
             No weekday minyan listed.{' '}
@@ -228,7 +231,7 @@ export default function DaveningCard({
           {updateIn('shabbos-usual')}
         </Card>,
       )
-    : week && (
+    : week && !minyanOnly && (
         <Card key="shabbos" title="Usual Shabbos times" testId="davening-shabbos">
           <p className="pt-0.5 text-[14.5px] leading-relaxed text-slate-700">Their Shabbos times aren’t listed yet.{canAdd ? ' If you’ve davened there, add them.' : ''}</p>
           {canAdd && updatingIn !== 'shabbos' && (
