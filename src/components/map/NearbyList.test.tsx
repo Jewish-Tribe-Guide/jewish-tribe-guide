@@ -105,14 +105,15 @@ describe('NearbyList row swipe (desktop trackpad)', () => {
   })
 
   // Regression guard for the "requires too big a swipe" complaint: a swipe
-  // well short of half the reveal width (40 of 104px, vs. a 50%/52px line)
+  // short of half the reveal width (46 of 104px, vs. a 50%/52px line; 40%
+  // since Oct 16, when 30% was "too aggressive")
   // should still commit the row open, matching iMessage/Mail's own lower
   // reveal threshold. Fails against a half-width threshold, which would
   // leave this swipe short and snap the row back closed.
-  it('opens on a swipe well short of half the reveal width', async () => {
+  it('opens on a swipe short of half the reveal width', async () => {
     const { content } = renderRow()
 
-    fireEvent.wheel(content, { deltaX: 40, deltaY: 0 })
+    fireEvent.wheel(content, { deltaX: 46, deltaY: 0 })
     await settle()
 
     expect(content.style.transform).toBe('translateX(-104px)')

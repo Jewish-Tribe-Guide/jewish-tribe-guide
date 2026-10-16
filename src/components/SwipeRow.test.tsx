@@ -65,33 +65,41 @@ function tap(el: HTMLElement) {
 const isOpen = (name: string) => contentOf(name).style.transform === 'translateX(-104px)'
 
 describe('SwipeRow — touch', () => {
-  // 30% of the 104px strip is ~31px. 40px sits between that and half the
-  // strip, so this fails against a half-width threshold — the "needs too
-  // big a swipe" complaint the 30% was tuned to fix.
-  it('opens once a slow drag travels 30% of the strip, well short of half', () => {
+  // 40% of the 104px strip is ~42px (Oct 16: 30% was "too aggressive" on
+  // the map's list). Still well short of half: the "needs too big a swipe"
+  // complaint the 30% was first tuned for.
+  it('opens once a slow drag travels 40% of the strip, short of half', () => {
     render(<Row name="Goldi" actions={makeActions('Goldi').actions} />)
-    drag(contentOf('Goldi'), -40)
+    drag(contentOf('Goldi'), -46)
 
     expect(isOpen('Goldi')).toBe(true)
     expect(screen.getByRole('button', { name: 'Save Goldi' })).toBeInTheDocument()
   })
 
+  // 35px opened at 30%.
   it('springs back from a slow drag short of that, rather than half-opening', () => {
     render(<Row name="Goldi" actions={makeActions('Goldi').actions} />)
-    drag(contentOf('Goldi'), -20)
+    drag(contentOf('Goldi'), -35)
 
     expect(contentOf('Goldi').style.transform).toBe('')
     expect(screen.queryByRole('button', { name: 'Save Goldi' })).not.toBeInTheDocument()
   })
 
   // The other half of why iMessage/Mail feel quick: a short, fast flick is
-  // a deliberate swipe, not an aborted one. The same 20px as the test above,
-  // over 10ms instead of 300ms.
+  // a deliberate swipe, not an aborted one. 32px over 10ms.
   it('opens on a quick flick, even one short of the threshold', () => {
+    render(<Row name="Goldi" actions={makeActions('Goldi').actions} />)
+    drag(contentOf('Goldi'), -32, { ms: 10 })
+
+    expect(isOpen('Goldi')).toBe(true)
+  })
+
+  // Oct 16: a fast 20px twitch while scrolling opened the row.
+  it('does not open on a fast twitch that goes nowhere', () => {
     render(<Row name="Goldi" actions={makeActions('Goldi').actions} />)
     drag(contentOf('Goldi'), -20, { ms: 10 })
 
-    expect(isOpen('Goldi')).toBe(true)
+    expect(contentOf('Goldi').style.transform).toBe('')
   })
 
   it('closes an open row on a quick flick back', () => {
@@ -99,15 +107,24 @@ describe('SwipeRow — touch', () => {
     drag(contentOf('Goldi'), -60)
     expect(isOpen('Goldi')).toBe(true)
 
-    drag(contentOf('Goldi'), 20, { ms: 10 })
+    drag(contentOf('Goldi'), 32, { ms: 10 })
     expect(contentOf('Goldi').style.transform).toBe('')
   })
 
   // The row sits in a scrolling list, so a mostly-vertical drag must stay a
-  // scroll: it never claims the gesture, even past the 8px activation.
+  // scroll: it never claims the gesture, even past the 10px activation.
   it('ignores a mostly-vertical drag so the list can still scroll', () => {
     render(<Row name="Goldi" actions={makeActions('Goldi').actions} />)
     drag(contentOf('Goldi'), -30, { dy: 90 })
+
+    expect(contentOf('Goldi').style.transform).toBe('')
+  })
+
+  // Oct 16: a diagonal scroll, a little more sideways than down, opened
+  // rows on the map's list. Now it has to be clearly sideways.
+  it('ignores a diagonal drag only a little more sideways than up or down', () => {
+    render(<Row name="Goldi" actions={makeActions('Goldi').actions} />)
+    drag(contentOf('Goldi'), -60, { dy: 45 })
 
     expect(contentOf('Goldi').style.transform).toBe('')
   })

@@ -51,12 +51,23 @@ const ACTION_WIDTH = 52
 // well before the whole strip is out. A fraction rather than a pixel count,
 // so that reasoning holds at any strip width — which does mean narrowing the
 // strip shortened the absolute distance too.
-const OPEN_FRACTION = 0.3
+//
+// Then too far the other way (the user, Oct 16, on the map's list: the
+// swipe was "too aggressive", rows opening while scrolling): 40%, ~42px.
+const OPEN_FRACTION = 0.4
 // A fast flick commits open/closed regardless of how far the drag actually
 // got — the other half of why iMessage/Mail feel quicker: a quick flick that
 // only travels a few px still reads as a deliberate swipe, not an aborted
 // one. px/ms; ~0.5 is a brisk but ordinary flick, well below a hard fling.
 const FLICK_VELOCITY = 0.5
+// …but a flick has to go somewhere (Oct 16): a 20px twitch while scrolling
+// read as a flick and opened the row.
+const FLICK_MIN_PX = 28
+// A drag is the row's only once it's this far sideways, and clearly more
+// sideways than up or down (Oct 16): at just "more sideways than not", a
+// diagonal scroll of the map's list opened rows.
+const CLAIM_PX = 10
+const CLAIM_RATIO = 1.5
 
 // Whether a finished drag/swipe should leave the row open, given where it
 // ended up (dragXValue), where THIS gesture started (startX — 0 if it began
@@ -68,10 +79,10 @@ const FLICK_VELOCITY = 0.5
 // makes closing correspondingly harder, since the same line now sits closer
 // to the open end.
 function resolveOpenState(dragXValue: number, startX: number, velocity: number, revealWidth: number): boolean {
-  if (velocity <= -FLICK_VELOCITY) return true
-  if (velocity >= FLICK_VELOCITY) return false
-  const threshold = revealWidth * OPEN_FRACTION
   const traveled = dragXValue - startX
+  if (velocity <= -FLICK_VELOCITY && traveled <= -FLICK_MIN_PX) return true
+  if (velocity >= FLICK_VELOCITY && traveled >= FLICK_MIN_PX) return false
+  const threshold = revealWidth * OPEN_FRACTION
   return startX === 0 ? traveled < -threshold : !(traveled > threshold)
 }
 
@@ -295,7 +306,7 @@ export default function SwipeRow({
       // calls stopPropagation below, leaving any ancestor's own vertical
       // handling (the map sheet's) completely unaffected for that gesture.
       const deltaY = e.clientY - startYRef.current
-      if (Math.abs(delta) < 8 || Math.abs(delta) <= Math.abs(deltaY)) return
+      if (Math.abs(delta) < CLAIM_PX || Math.abs(delta) <= Math.abs(deltaY) * CLAIM_RATIO) return
       activeGestureRef.current = true
       setGestureLive(true)
       movedRef.current = true
