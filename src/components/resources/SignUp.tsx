@@ -6,7 +6,7 @@ import { SIGN_UP_MARK, signUpAction, type MinyanSignUp } from '@/lib/davening'
 import { useCategories } from '@/lib/useCategories'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { primaryLink } from '@/lib/listingView'
-import { loadPlaces } from './WalkList'
+import { loadPlaces } from '@/lib/loadPlaces'
 
 // ── Minyanim that only run when enough sign up (the user, Oct 16) ──────────
 // Some minyanim happen only on days ten say they're coming, in a WhatsApp

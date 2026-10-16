@@ -8,6 +8,7 @@ import { useActiveCommunity } from '@/lib/communityContext'
 import { useOptionalLocation } from '@/lib/locationContext'
 import GenericDirectory, { type ParamsOpts } from './GenericDirectory'
 import UpButton from '@/components/UpButton'
+import type { TappedMinyan } from './TappedMinyan'
 
 type Props = {
   category: CategoryConfig
@@ -25,6 +26,8 @@ type Props = {
   linkedItemId?: string | null
   /** The search that found `reopenItemId` — see GenericDirectory's own doc. */
   reopenMatch?: string | null
+  /** The minyan that opened the listing (TappedMinyan). */
+  tappedMinyan?: TappedMinyan | null
   /** Pre-fill the directory's search box (from a landing "Places" result). */
   initialSearch?: string
   /** Pre-set the "Open now" filter — see GenericDirectory's own doc. */
@@ -51,7 +54,7 @@ type Props = {
 
 // Every category renders via the generic, hint-driven card renderer (badges,
 // filters, kosher-item tags + search, and upvotes — all from category config).
-export default function ResourceLoader({ category, items, anchor, reopenItemId, linkedItemId, reopenMatch, initialSearch, initialOpenNow, initialFilters, openMinyanimView, initialDaveningDay, onUp, upLabel = 'All resources', onAdd, onEdit, onParamsChange }: Props) {
+export default function ResourceLoader({ category, items, anchor, reopenItemId, linkedItemId, reopenMatch, tappedMinyan, initialSearch, initialOpenNow, initialFilters, openMinyanimView, initialDaveningDay, onUp, upLabel = 'All resources', onAdd, onEdit, onParamsChange }: Props) {
   const title = category.pluralLabel
 
   // Extract a stable dep from the anchor object (anchor itself is re-created
@@ -115,6 +118,6 @@ export default function ResourceLoader({ category, items, anchor, reopenItemId, 
   const addressPrompt = !anchor.label && category.hasAddress !== false
 
   return (
-    <GenericDirectory category={category} items={withDistance} anchorLabel={anchorLabel} addressPrompt={addressPrompt} reopenItemId={reopenItemId} linkedItemId={linkedItemId} reopenMatch={reopenMatch} initialSearch={initialSearch} initialOpenNow={initialOpenNow} initialFilters={initialFilters} openMinyanimView={openMinyanimView} initialDaveningDay={initialDaveningDay} onUp={onUp} onAdd={onAdd} onEdit={onEdit} onParamsChange={onParamsChange} />
+    <GenericDirectory category={category} items={withDistance} anchorLabel={anchorLabel} addressPrompt={addressPrompt} reopenItemId={reopenItemId} linkedItemId={linkedItemId} reopenMatch={reopenMatch} tappedMinyan={tappedMinyan} initialSearch={initialSearch} initialOpenNow={initialOpenNow} initialFilters={initialFilters} openMinyanimView={openMinyanimView} initialDaveningDay={initialDaveningDay} onUp={onUp} onAdd={onAdd} onEdit={onEdit} onParamsChange={onParamsChange} />
   )
 }

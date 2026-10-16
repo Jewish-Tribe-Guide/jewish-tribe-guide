@@ -7,6 +7,10 @@ import type { CategoryConfig, CategoryField } from '@/lib/categories'
 import { useCategories } from '@/lib/useCategories'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { withCommunity } from '@/lib/useCommunityData'
+import { loadPlaces } from '@/lib/loadPlaces'
+
+// Where it always was, for the tests that clear it.
+export { forgetLoadedPlaces } from '@/lib/loadPlaces'
 import { useNow } from '@/lib/useNow'
 import { listingRowNote } from '@/lib/listingRow'
 import { kindField, listingFacts, listingKind } from '@/lib/listingView'
@@ -25,6 +29,7 @@ import type { LatLng } from '@/lib/geo'
 import { routesThatHold, type Routed, type WalkRoute } from '@/lib/walkRoutes'
 import { NextMinyans, useNextMinyan } from './nextMinyans'
 import { MinyanRow } from './MinyanimView'
+import { tappedMinyanParam } from './TappedMinyan'
 import { isMinyanim } from '@/lib/davening'
 import { minyanimAhead } from '@/lib/minyanimFilters'
 import { useMinyanSchedule } from '@/lib/useMinyanSchedule'
@@ -39,29 +44,8 @@ import { pointerHover } from '@/lib/pointerHover'
 // next hotel reuses them.
 
 /** Kept this long, then loaded again: a tab left open for days still sees
- *  a new shul. */
+ *  a new walk. */
 const FRESH_MS = 10 * 60 * 1000
-const loaded = new Map<string, { at: number; places: Promise<DirectoryResource[]> }>()
-
-export function loadPlaces(community: string, categoryId: string): Promise<DirectoryResource[]> {
-  const key = `${community}:${categoryId}`
-  const hit = loaded.get(key)
-  if (hit && Date.now() - hit.at < FRESH_MS) return hit.places
-  const places = fetch(withCommunity(`/api/resources?category=${encodeURIComponent(categoryId)}`, community)).then(async (res) => {
-    const body = await res.json()
-    if (!res.ok || !body.ok) throw new Error('Could not load places')
-    return body.resources as DirectoryResource[]
-  })
-  // A failure is tried again next time, not remembered.
-  places.catch(() => loaded.delete(key))
-  loaded.set(key, { at: Date.now(), places })
-  return places
-}
-
-/** For tests: forget what's been loaded. */
-export function forgetLoadedPlaces() {
-  loaded.clear()
-}
 
 // The walks along the streets from one listing (walkRoutes.ts), once per
 // tab as its places are. Nothing, when they can't load: every walk shows
@@ -411,7 +395,8 @@ function WalkMinyanim({
                       far={walkText(s.shulId)}
                       kind={shul ? listingKind(shul, target) : ''}
                       posting={(s.shulId && schedule.posting[s.shulId]?.[day.date]) || { kind: 'regular' }}
-                      href={shul ? routes.listing(community, target.id, listingSlug(shul)) : null}
+                      // Opens the shul on this minyan (TappedMinyan).
+                      href={shul ? `${routes.listing(community, target.id, listingSlug(shul))}${s.minyanId ? `?minyan=${encodeURIComponent(tappedMinyanParam(s.minyanId, day.date, s.minutes))}` : ''}` : null}
                       onHover={onMap ? onMap.highlight.set : undefined}
                     />
                   )

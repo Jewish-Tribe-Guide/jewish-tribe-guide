@@ -19,6 +19,7 @@ import DaveningTimes from './DaveningTimes'
 import { Card } from './listingParts'
 import FreshnessFooter from './FreshnessFooter'
 import { SignUpBox, SignUpMark } from './SignUp'
+import { useTappedMinyan } from './TappedMinyan'
 import type { MinyanBox } from '@/lib/minyanimBox'
 
 /** A shul's main thing (agreed Oct 6): its usual times as two boxes, “Usual
@@ -59,6 +60,9 @@ export default function DaveningCard({
   const [updated, setUpdated] = useState<{ in: string; what: 'sent' | 'confirmed' } | null>(null)
   const [unfolded, setUnfolded] = useState<Record<string, boolean>>({})
   const tellAbout = useContext(TellAboutContext)
+  // Opened from a minyan that only runs when enough sign up: the box at the
+  // top already says where (TappedMinyan), so it isn't said again here.
+  const tapped = useTappedMinyan(item.id)?.minyanId
   const schedule = useMinyanSchedule(null, [item])
   const canAdd = ui.contributions.edit && (!category || resolveCapabilities(category.capabilities).edit)
 
@@ -195,7 +199,7 @@ export default function DaveningCard({
               week.otherSeason,
             ]}
           />
-          {!allSignUp && signUpBoxes(week.signUps, false)}
+          {!allSignUp && signUpBoxes(week.signUps.filter((m) => m.id !== tapped), false)}
           {updateIn('week')}
         </Card>,
       )
@@ -220,7 +224,7 @@ export default function DaveningCard({
         <Card key="shabbos" title="Usual Shabbos times" testId="davening-shabbos" footer={foot('shabbos-usual', 'shabbos', 'Shabbos times')}>
           <ShabbosLines lines={shab.lines} anchors={anchors} today={today} />
           <Notes lines={[shab.otherSeason]} />
-          {!allSignUp && signUpBoxes([...new Set(shab.lines.filter((l) => l.row.signUp).map((l) => l.row))], false)}
+          {!allSignUp && signUpBoxes([...new Set(shab.lines.filter((l) => l.row.signUp && l.row.id !== tapped).map((l) => l.row))], false)}
           {updateIn('shabbos-usual')}
         </Card>,
       )
@@ -244,7 +248,7 @@ export default function DaveningCard({
     <div className="space-y-5" data-testid="listing-davening">
       {/* Every minyan here only runs when enough sign up: one box, on top,
           for the place, rather than one under each box of times. */}
-      {allSignUp && signUpBoxes(rows, true)}
+      {allSignUp && !rows.some((m) => m.id === tapped) && signUpBoxes(rows, true)}
       {post && (
         <Card
           title="This week’s schedule"

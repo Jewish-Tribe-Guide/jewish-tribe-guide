@@ -18,6 +18,7 @@ import { getCategoryColor } from '@/lib/categoryColor'
 import { community } from '@/community.config'
 import { useIsMobile } from '@/lib/useIsMobile'
 import type { ParamsOpts } from '@/components/resources/GenericDirectory'
+import { parseTappedMinyan } from '@/components/resources/TappedMinyan'
 
 // A pending add/edit action on a listing within the current category.
 type ListingAction =
@@ -67,6 +68,9 @@ export type FindResourcesProps = {
   /** `?match=` — the search that found `?item=`, for its listing to mark
    *  what matched. */
   searchMatch?: string | null
+  /** `?minyan=` — the minyan in Minyanim by time that opened `?item=` or
+   *  this listing's own link, for its listing to open on (TappedMinyan). */
+  searchMinyan?: string | null
   /** `?q=` */
   searchQuery?: string | null
   /** `?openNow=1` */
@@ -106,6 +110,7 @@ export default function FindResources({
   onUp,
   searchItem = null,
   searchMatch = null,
+  searchMinyan = null,
   searchQuery = null,
   searchOpenNow = null,
   searchFilters = null,
@@ -372,6 +377,7 @@ export default function FindResources({
           // phone shows it as a page of its own (see GenericDirectory).
           linkedItemId={initialItemId && !searchItem ? initialItemId : null}
           reopenMatch={searchMatch}
+          tappedMinyan={parseTappedMinyan(searchMinyan, searchItem ?? initialItemId)}
           initialSearch={initialSearch ?? undefined}
           initialOpenNow={initialOpenNow}
           initialFilters={searchFilters}

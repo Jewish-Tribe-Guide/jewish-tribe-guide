@@ -64,6 +64,7 @@ import { SwipeRowGroup } from '@/components/SwipeRow'
 import dynamic from 'next/dynamic'
 import { tellUsPlaceholder } from '@/lib/tellUs'
 import { pointerHover } from '@/lib/pointerHover'
+import { TappedMinyanContext, type TappedMinyan } from './TappedMinyan'
 
 /** How a change to the address is recorded. `replace`: in place, no step.
  *  `step`: a step the browser's Back undoes, named in history.state so the
@@ -133,6 +134,9 @@ type Props = {
    *  `?match=`). Doesn't filter this list; only marks, in that listing,
    *  what the search matched. */
   reopenMatch?: string | null
+  /** The minyan in Minyanim by time that opened a listing here, for that
+   *  listing to open on (TappedMinyan). */
+  tappedMinyan?: TappedMinyan | null
   /** Seed the search box (e.g. "cheese" from a landing "Places" result). */
   initialSearch?: string
   /** Seed the "Open now" filter — `?openNow=1`, see onParamsChange below. */
@@ -181,7 +185,7 @@ type Props = {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function GenericDirectory({ category, items, anchorLabel, addressPrompt, reopenItemId, linkedItemId = null, reopenMatch = null, initialSearch, initialOpenNow, initialFilters, openMinyanimView, initialDaveningDay, onUp, onEdit, onParamsChange }: Props) {
+export default function GenericDirectory({ category, items, anchorLabel, addressPrompt, reopenItemId, linkedItemId = null, reopenMatch = null, tappedMinyan = null, initialSearch, initialOpenNow, initialFilters, openMinyanimView, initialDaveningDay, onUp, onEdit, onParamsChange }: Props) {
   // Hands the shared header this screen's own title + "up" handler — on
   // mobile, SiteHeader shows "‹ {category.pluralLabel}" in place of the site
   // name while this is mounted, and reverts automatically on unmount (see
@@ -1745,6 +1749,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   return (
     <TellAboutContext.Provider value={canAdd || canEdit ? tellAbout : null}>
     <WalkOnMapContext.Provider value={walkOnMap}>
+    <TappedMinyanContext.Provider value={tappedMinyan}>
     <div>
       {/* Phones: where the distances on each row are measured from, when
           the visitor hasn't set a location, with the way to set one. At the
@@ -2265,6 +2270,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
       )}
 
     </div>
+    </TappedMinyanContext.Provider>
     </WalkOnMapContext.Provider>
     </TellAboutContext.Provider>
   )

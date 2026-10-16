@@ -84,6 +84,7 @@ import TurnstileWidget from '@/components/TurnstileWidget'
 import { useItemMarks, type ItemMarksApi } from './useItemMarks'
 import { dayText, itemWording, lastSeenText, seenLabel, type ItemMark, type ItemWording } from '@/lib/itemMarks'
 import JoinLinkCheck from './JoinLinkCheck'
+import { TappedMinyanBox } from './TappedMinyan'
 
 // ── An opened listing: the seven parts (see lib/listingView.ts) ─────────────
 // The phone's sheet, the map's panel, the desktop column and a listing's own
@@ -700,6 +701,7 @@ export default function ListingView({ item, category, color, place = null, upvot
     <div className="space-y-5" data-testid="listing-view">
       {who}
       {foundBox}
+      <TappedMinyanBox item={item} category={category} />
       {actions}
       {caveatFirst && (
         <section className="rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3" data-testid="listing-caveat-box">

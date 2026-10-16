@@ -225,4 +225,12 @@ describe('a minyan that only runs when enough sign up', () => {
     const maariv = rows.find((r) => r.textContent?.includes('Kesher Israel'))!
     expect(within(maariv).queryByTestId('sign-up-mark')).not.toBeInTheDocument()
   })
+
+  // …and a minyan opens its place on that minyan: its id, the day shown and
+  // the time the row worked out (TappedMinyan).
+  it('opens its place on that minyan', () => {
+    renderWithProviders(<MinyanimView items={[kesher]} categoryId="synagogue" />, { content: { categories: [shuls] } })
+    const link = within(screen.getByTestId('minyanim-rows')).getAllByRole('link')[0]
+    expect(link).toHaveAttribute('href', expect.stringMatching(/\/synagogue\/kesher-israel[^?]*\?minyan=r2~2026-10-06~1185$/))
+  })
 })

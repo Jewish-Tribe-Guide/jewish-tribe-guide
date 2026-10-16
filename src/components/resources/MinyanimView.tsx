@@ -20,6 +20,7 @@ import ListHeading from './ListHeading'
 import AddScheduleBox from './AddScheduleBox'
 import { pointerHover } from '@/lib/pointerHover'
 import { SignUpMark } from './SignUp'
+import { tappedMinyanParam } from './TappedMinyan'
 
 // ── The Synagogues page's Minyanim view (step 4, agreed Oct 1) ───────────────
 // The same page's shuls, as every minyan by time, for a day picked from the
@@ -133,10 +134,13 @@ export default function MinyanimView({
   // The shuls the search names ("mekor", "orthodox"), or all of them.
   const named = namedShuls !== undefined ? namedShuls : sought?.terms.length ? items.filter((i) => shulMatches(i, sought.terms, shulText(i))) : null
   const namedIds = named ? new Set(named.map((i) => i.id)) : null
-  // Each minyan opens its shul's own page; back returns here (?davening=1).
-  const hrefOf = (id: string | undefined) => {
-    const item = id ? byId.get(id) : undefined
-    return item ? routes.listing(community.slug, categoryId, listingSlug(item)) : null
+  // Each minyan opens its shul's own page, on that minyan (TappedMinyan);
+  // back returns here (?davening=1).
+  const hrefOf = (s: MinyanSlot) => {
+    const item = s.shulId ? byId.get(s.shulId) : undefined
+    if (!item) return null
+    const page = routes.listing(community.slug, categoryId, listingSlug(item))
+    return s.minyanId ? `${page}?minyan=${encodeURIComponent(tappedMinyanParam(s.minyanId, day.date, s.minutes))}` : page
   }
   const postingOf = (id: string | undefined): DayPosting => (id && schedule.posting[id]?.[day.date]) || { kind: 'regular' }
 
@@ -249,7 +253,7 @@ export default function MinyanimView({
 
       <ul className="mt-2 divide-y divide-slate-100 border-t border-slate-100" data-testid="minyanim-rows">
         {upcoming.map((s, i) => (
-          <MinyanRow key={`${s.shulId}:${s.tefillah}:${s.minutes}:${i}`} slot={s} far={howFar(byId.get(s.shulId ?? ''))} kind={kindOfShul(s)} posting={postingOf(s.shulId)} href={hrefOf(s.shulId)} onHover={onHoverShul} />
+          <MinyanRow key={`${s.shulId}:${s.tefillah}:${s.minutes}:${i}`} slot={s} far={howFar(byId.get(s.shulId ?? ''))} kind={kindOfShul(s)} posting={postingOf(s.shulId)} href={hrefOf(s)} onHover={onHoverShul} />
         ))}
         {/* Adding a minyan where the minyanim are, as the list's last row
             (the user's note 2): on the day being looked at. */}
@@ -286,7 +290,7 @@ export default function MinyanimView({
           {earlier && (
             <ul className="divide-y divide-slate-100 opacity-60">
               {past.map((s, i) => (
-                <MinyanRow key={`p:${s.shulId}:${s.tefillah}:${s.minutes}:${i}`} slot={s} far={howFar(byId.get(s.shulId ?? ''))} kind={kindOfShul(s)} posting={postingOf(s.shulId)} href={hrefOf(s.shulId)} onHover={onHoverShul} />
+                <MinyanRow key={`p:${s.shulId}:${s.tefillah}:${s.minutes}:${i}`} slot={s} far={howFar(byId.get(s.shulId ?? ''))} kind={kindOfShul(s)} posting={postingOf(s.shulId)} href={hrefOf(s)} onHover={onHoverShul} />
               ))}
             </ul>
           )}
@@ -350,7 +354,7 @@ export default function MinyanimView({
           {notPostedOpen && (
             <ul className="mt-1 divide-y divide-amber-200">
               {folded.map((s, i) => (
-                <MinyanRow key={`n:${s.shulId}:${s.tefillah}:${s.minutes}:${i}`} slot={s} far={howFar(byId.get(s.shulId ?? ''))} kind={kindOfShul(s)} posting={postingOf(s.shulId)} href={hrefOf(s.shulId)} onHover={onHoverShul} />
+                <MinyanRow key={`n:${s.shulId}:${s.tefillah}:${s.minutes}:${i}`} slot={s} far={howFar(byId.get(s.shulId ?? ''))} kind={kindOfShul(s)} posting={postingOf(s.shulId)} href={hrefOf(s)} onHover={onHoverShul} />
               ))}
             </ul>
           )}
