@@ -216,3 +216,31 @@ describe('a schedule of the same name merges day by day', () => {
     expect(mergeSchedule([sukkos], { ...shemini, name: 'Shabbos Bereishis' })).toHaveLength(2)
   })
 })
+
+// Oct 16: a minyan that only runs when enough sign up. A message gives its
+// time, never how it gets its ten, so a new time for it keeps it one; and
+// the same time on another day that isn't one stays its own minyan.
+describe('a minyan that only runs when enough sign up', () => {
+  const signUp = { link: 'https://chat.whatsapp.com/Late1' }
+  const schedule = (times: ReadRegularTime[]): RegularReading => ({ kind: 'schedule', complete: true, season: null, title: 'New times', startsOn: null, from: null, to: null, times })
+
+  it('a new time for it keeps it a sign-up minyan', () => {
+    const shul: Minyan[] = [
+      { id: 'r', tefillah: 'maariv', days: ['sun', 'mon'], time: '8:00pm' },
+      { id: 's', tefillah: 'shacharis', days: ['sun', 'mon'], time: '6:15am', signUp },
+    ]
+    const u = compareTimes(shul, schedule([t({ tefillah: 'maariv', days: ['sun', 'mon'], time: '8:00pm' }), t({ tefillah: 'shacharis', days: ['sun', 'mon'], time: '6:30am' })]), { season: null, newId })
+    const { minyanim } = applyUpdate(shul, [], u, { newId })
+    expect(minyanim.map((m) => `${m.tefillah} ${m.days.join(',')} ${m.time}${m.signUp ? ' sign-up' : ''}`).sort()).toEqual(['maariv sun,mon 8:00pm', 'shacharis sun,mon 6:30am sign-up'])
+  })
+
+  it('is never run together with a regular minyan at the same time', () => {
+    const shul: Minyan[] = [
+      { id: 'r', tefillah: 'maariv', days: ['sun'], time: '8:00pm' },
+      { id: 's', tefillah: 'maariv', days: ['mon'], time: '8:00pm', signUp },
+    ]
+    const u = compareTimes(shul, { ...schedule([t({ tefillah: 'shacharis', days: ['tue'], time: '7:00am' })]), complete: false }, { season: null, newId })
+    const { minyanim } = applyUpdate(shul, [], u, { newId })
+    expect(minyanim.filter((m) => m.tefillah === 'maariv').map((m) => `${m.days.join(',')}${m.signUp ? ' sign-up' : ''}`).sort()).toEqual(['mon sign-up', 'sun'])
+  })
+})

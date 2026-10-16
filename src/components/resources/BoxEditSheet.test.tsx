@@ -164,6 +164,39 @@ describe('BoxEditor, a shul’s usual Shabbos times', () => {
     expect(within(screen.getByLabelText('Tefillah')).queryByRole('option', { name: 'Kabbalas Shabbos' })).not.toBeInTheDocument()
   })
 
+  // Oct 16: whether it only runs when enough sign up, and where, under
+  // More: a WhatsApp group the guide lists, a pasted link, or a person.
+  it('a minyan that only runs when enough sign up: its group picked from the guide’s, sent with it', async () => {
+    const groups = makeCategory({ id: 'whatsapp', label: 'WhatsApp Group', hasAddress: false, detailFields: [{ key: 'link', label: 'Link', type: 'url', showInHeader: true }] })
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) =>
+      String(url).startsWith('/api/resources')
+        ? new Response(JSON.stringify({ ok: true, resources: [makeListing({ id: 'g1', name: 'Mekor Hashkama', category: 'whatsapp', link: 'https://chat.whatsapp.com/Hash' })] }), { status: 200 })
+        : new Response(JSON.stringify({ ok: true }), { status: 200 }),
+    )
+    renderWithProviders(<BoxEditSheet item={shul} category={shuls} edit={edit} onClose={vi.fn()} />, { content: { categories: [shuls, groups] } })
+    fireEvent.click(screen.getByRole('button', { name: /^Shacharis/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'More' }))
+    const ask = within(screen.getByRole('group', { name: 'Only on days enough people sign up?' }))
+    expect(ask.getByRole('button', { name: 'No' })).toHaveAttribute('aria-pressed', 'true')
+    fireEvent.click(ask.getByRole('button', { name: 'Yes' }))
+
+    // Not a web link: Done waits for one.
+    fireEvent.change(screen.getByLabelText('The group’s link'), { target: { value: 'chat.whatsapp.com/Hash' } })
+    expect(screen.getByText('Paste the whole link, starting https://')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Done' })).toBeDisabled()
+    fireEvent.change(await screen.findByLabelText('Their WhatsApp group'), { target: { value: 'https://chat.whatsapp.com/Hash' } })
+    expect(screen.getByLabelText('The group’s link')).toHaveValue('https://chat.whatsapp.com/Hash')
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }))
+
+    const list = screen.getByTestId('minyan-box-list')
+    expect(within(list).getByRole('button', { name: /^Shacharis 9:15 AM.*Sign-up/ })).toBeInTheDocument()
+    fireEvent.click(within(list).getByRole('button', { name: 'Send 1 change' }))
+    await screen.findByTestId('box-edit-sent')
+    const send = fetchMock.mock.calls.find(([url]) => String(url).startsWith('/api/submissions'))!
+    const rows = findMinyanim(JSON.parse(String(send[1]!.body))) as { id: string; signUp?: unknown }[]
+    expect(rows.find((r) => r.id === 'sh')?.signUp).toEqual({ link: 'https://chat.whatsapp.com/Hash' })
+  })
+
   it('Back from a minyan leaves it as it was', () => {
     open()
     fireEvent.click(screen.getByRole('button', { name: /^Shacharis/ }))

@@ -43,7 +43,12 @@ export type WeekRow = {
   label: string
   /** One per column, "—" where there's none. */
   cells: string[]
+  /** The same cells in parts, so a sign-up minyan's time (davening.ts) can
+   *  be marked on its own: "8 PM" and, marked, "9:45 PM". */
+  parts: WeekCellPart[][]
 }
+
+export type WeekCellPart = { text: string; signUp?: boolean }
 
 export type WeekdayTable = {
   columns: Tefillah[]
@@ -57,6 +62,9 @@ export type WeekdayTable = {
   notes: string[]
   /** "In winter, Maariv 6:30 PM, Sun–Thu.": the other season's, briefly. */
   otherSeason: string | null
+  /** The table's minyanim that only run when enough sign up, for the box
+   *  under it that says where. */
+  signUps: Minyan[]
 }
 
 /** Friday's Shacharis is a weekday's; Friday's afternoon and night are
@@ -69,26 +77,34 @@ export function weekdayTable(minyanim: readonly Minyan[], season: Season | null)
   if (now.length === 0) return null
   const columns = TEFILLAH_ORDER.filter((t) => now.some((m) => m.tefillah === t))
 
-  const cell = (day: DayKey, t: Tefillah) => {
+  /** A cell's times, regular ones first and then sign-up ones, each
+   *  kind's clock times run together ("7, 8 AM") as before. */
+  const cell = (day: DayKey, t: Tefillah): WeekCellPart[] => {
     const rows = now.filter((m) => m.tefillah === t && onWeekday(m, day))
-    if (rows.length === 0) return '—'
-    const fixed: number[] = []
-    const words: string[] = []
-    for (const m of rows) {
-      const clock = m.anchor ? null : clockMinutes(m.time)
-      if (clock === null) words.push(timeText(m))
-      else fixed.push(clock)
+    if (rows.length === 0) return [{ text: '—' }]
+    const parts: WeekCellPart[] = []
+    for (const signUp of [false, true]) {
+      const fixed: number[] = []
+      const words: string[] = []
+      for (const m of rows.filter((r) => !!r.signUp === signUp)) {
+        const clock = m.anchor ? null : clockMinutes(m.time)
+        if (clock === null) words.push(timeText(m))
+        else fixed.push(clock)
+      }
+      for (const text of [fixed.length ? joinTimes(fixed) : null, ...new Set(words)]) if (text) parts.push(signUp ? { text, signUp } : { text })
     }
-    return [fixed.length ? joinTimes(fixed) : null, ...new Set(words)].filter(Boolean).join(', ')
+    return parts
   }
 
   const rows: WeekRow[] = []
   for (const day of WEEKDAYS) {
-    const cells = columns.map((t) => cell(day, t))
+    const parts = columns.map((t) => cell(day, t))
+    const cells = parts.map((p) => p.map((x) => x.text).join(', '))
     if (cells.every((c) => c === '—')) continue
-    const same = rows.find((r) => r.cells.join('|') === cells.join('|'))
+    const key = JSON.stringify(parts)
+    const same = rows.find((r) => JSON.stringify(r.parts) === key)
     if (same) same.days.push(day)
-    else rows.push({ days: [day], label: '', cells })
+    else rows.push({ days: [day], label: '', cells, parts })
   }
   for (const r of rows) r.label = formatDays(r.days as MinyanDayKey[])
 
@@ -109,7 +125,7 @@ export function weekdayTable(minyanim: readonly Minyan[], season: Season | null)
     ? `In ${other}, ${offSeason.map((m) => `${TEFILLAH_LABELS[m.tefillah]} ${timeText(m)}, ${formatDays(m.days.filter((d) => WEEKDAYS.includes(d as DayKey) && onWeekday(m, d as DayKey)) as MinyanDayKey[])}`).join('; ')}.`
     : null
 
-  return { columns, rows, rules, notes, otherSeason: otherLine }
+  return { columns, rows, rules, notes, otherSeason: otherLine, signUps: now.filter((m) => m.signUp) }
 }
 
 export type ShabbosLine = {

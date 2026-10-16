@@ -7,7 +7,7 @@ import { itemDateFor, itemDateText, itemWording, seenAtFor } from '@/lib/itemMar
 import { itemsField } from '@/lib/listingView'
 import { community } from '@/community.config'
 import { formatOpenAtTime, termMatches, termsAsTyped, words, type MetaAsk, type MinyanAsk, type MinyanWhen, type TimesAsk } from '@/lib/ask'
-import { TEFILLAH_LABELS, type Tefillah } from '@/lib/davening'
+import { SIGN_UP_MARK, TEFILLAH_LABELS, type Tefillah } from '@/lib/davening'
 import type { MinyanSlot } from '@/lib/upcomingDavening'
 import { haversineMiles, milesText, roundMiles, type LatLng } from '@/lib/geo'
 import { dayLabel, type DayKey } from '@/lib/hours'
@@ -34,6 +34,9 @@ export type AnswerRow = {
   /** Which day, when an answer covers more than one ("Friday night" and
    *  "Shabbos" for "Shabbos minyanim"). */
   day?: string
+  /** It only runs when enough sign up (davening.ts): the answer says so
+   *  where it names it, never sounding surer than the guide is. */
+  signUp?: boolean
 }
 
 export type Answer = {
@@ -145,6 +148,7 @@ function minyanAnswer(
     shulName: s.shulName,
     miles: origin && s.shulGeo ? roundMiles(haversineMiles(origin, s.shulGeo)) : null,
     tomorrow,
+    ...(s.signUp ? { signUp: true } : {}),
   })
   // Two minyanim at the same time: the nearer shul first, since the first
   // is the one the sentence names. The schedule breaks ties by name, which
@@ -154,7 +158,7 @@ function minyanAnswer(
   const from = origin ?? center
   const away = (s: MinyanSlot) => (from && s.shulGeo ? haversineMiles(from, s.shulGeo) : Infinity)
   const byTime = (a: MinyanSlot, b: MinyanSlot) => a.minutes - b.minutes || away(a) - away(b)
-  const where = (r: AnswerRow) => `${r.shulName}${r.miles != null ? ` (${r.miles} mi)` : ''}`
+  const where = (r: AnswerRow) => `${r.shulName}${r.miles != null ? ` (${r.miles} mi)` : ''}${r.signUp ? `, ${SIGN_UP_MARK.toLowerCase()}` : ''}`
   if (ask.when) return minyanDaysAnswer(ask, ask.when, schedule, fits, toRow, byTime, where, !!origin)
   const today = schedule.today.filter(fits).sort(byTime)
   const tomorrow = schedule.tomorrow.filter(fits).sort(byTime)

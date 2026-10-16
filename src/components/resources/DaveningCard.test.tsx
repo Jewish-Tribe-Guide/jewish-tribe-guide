@@ -370,3 +370,61 @@ describe('“Update their times” on a category page', () => {
     expect(screen.queryByTestId('update-times')).not.toBeInTheDocument()
   })
 })
+
+// Oct 16: a minyan that only runs on days enough people sign up in its
+// WhatsApp group. Its time is marked where it's shown, and a box under the
+// times names it, says the shul's other times are regular, and has one
+// button to its group (or someone to text, for an invite-only group).
+describe('a minyan that only runs when enough sign up (Oct 16)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-10-06T09:00:00-04:00')) // Tue, no festival
+  })
+  afterEach(() => vi.useRealTimers())
+  const show = (times: unknown[]) => {
+    const shul = makeListing({ id: 'k', name: 'Center City Beth Am', category: 'synagogue', minyanim: times })
+    renderWithProviders(<DaveningCard item={shul} minyanim={times} category={shuls} />, { content: { categories: [shuls] } })
+  }
+  const lateMaariv = { id: 'l', tefillah: 'maariv', days: ['sun', 'mon', 'tue', 'wed', 'thu'], time: '9:45pm', signUp: { link: 'https://chat.whatsapp.com/Late1' } }
+
+  it('one of several: its time marked, and a box naming it, the rest regular, with its group’s link', () => {
+    show([...minyanim, lateMaariv])
+    const marked = screen.getAllByTestId('sign-up-time')
+    expect(marked.map((m) => m.textContent)).toEqual(['9:45 PM (check group first)', '9:45 PM (check group first)'])
+    const box = screen.getByTestId('sign-up-box')
+    expect(box).toHaveTextContent('Maariv 9:45 PM: check the group firstIt only runs on days enough people sign up. Their other times are regular.')
+    const link = within(box).getByRole('link', { name: 'Say you’re coming' })
+    expect(link).toHaveAttribute('href', 'https://chat.whatsapp.com/Late1')
+    expect(link).toHaveAttribute('target', '_blank')
+  })
+
+  it('every minyan at the place: the box speaks for the place', () => {
+    show([{ ...lateMaariv, days: ['mon', 'tue', 'wed', 'thu', 'fri'], tefillah: 'mincha', time: '1:15pm' }])
+    expect(screen.getAllByTestId('sign-up-box'), 'one box, for the place, though Friday’s Mincha is in the Shabbos box').toHaveLength(1)
+    expect(screen.getByTestId('sign-up-box')).toHaveTextContent(/^Check the group before you goIt only runs on days enough people sign up\.Say you’re coming$/)
+  })
+
+  it('an invite-only group: someone to text, the number written out', () => {
+    show([...minyanim, { ...lateMaariv, signUp: { name: 'Moshe', phone: '215-555-0142' } }])
+    const box = screen.getByTestId('sign-up-box')
+    expect(within(box).getByRole('link', { name: 'Text Moshe to be added' })).toHaveAttribute('href', 'sms:2155550142')
+    expect(box).toHaveTextContent('215-555-0142')
+  })
+
+  it('a link that isn’t a web link is never a button', () => {
+    show([...minyanim, { ...lateMaariv, signUp: { link: 'javascript:alert(1)' } }])
+    expect(within(screen.getByTestId('sign-up-box')).queryByRole('link')).not.toBeInTheDocument()
+  })
+
+  it('a regular shul has neither', () => {
+    show(minyanim)
+    expect(screen.queryByTestId('sign-up-box')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('sign-up-time')).not.toBeInTheDocument()
+  })
+
+  it('on Shabbos, the line carries the mark', () => {
+    show([...minyanim, { id: 'h', tefillah: 'shacharis', days: ['sat'], time: '7:30am', signUp: { link: 'https://chat.whatsapp.com/Hash' } }])
+    expect(screen.getByTestId('davening-shabbos-lines')).toHaveTextContent('Shacharis 7:30 AMCheck group first')
+    expect(within(screen.getByTestId('davening-shabbos')).getByTestId('sign-up-box')).toHaveTextContent('Shacharis 7:30 AM: check the group first')
+  })
+})

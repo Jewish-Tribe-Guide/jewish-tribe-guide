@@ -267,6 +267,18 @@ describe('shulRowByShul', () => {
     expect(shulRowByShul([kk], opts(10 * 60)).kk.text).toBe('Mincha 2 PM')
   })
 
+  // Oct 16: one that only runs when enough sign up says so, before its
+  // own note; the next regular one says nothing extra.
+  it('says to check the group first when the next one only runs when enough sign up', () => {
+    const signUp = { link: 'https://chat.whatsapp.com/Aa11' }
+    const rows = shulRowByShul(
+      [shul('late', [m({ days: ['mon'], tefillah: 'maariv', time: '9:45pm', notes: 'Upstairs', signUp }), m({ id: 'y', days: ['mon'], tefillah: 'mincha', time: '1:45pm' })])],
+      opts(14 * 60),
+    )
+    expect(rows.late).toEqual({ text: 'Maariv 9:45 PM', tone: 'minyan', note: 'Check group first · Upstairs' })
+    expect(shulRowByShul([shul('late', [m({ days: ['mon'], tefillah: 'mincha', time: '1:45pm' })])], opts(12 * 60)).late.note).toBeUndefined()
+  })
+
   it('says "tomorrow" once today’s are over', () => {
     expect(shulRowByShul([kk], opts(15 * 60)).kk.text).toBe('Mincha 2 PM tomorrow')
   })

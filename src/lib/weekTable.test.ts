@@ -62,7 +62,27 @@ describe('the usual weekday times, as one table', () => {
 
   it('a time in words stays in words', () => {
     const t = weekdayTable([m({ tefillah: 'mincha_maariv', days: ['sun', 'mon', 'tue', 'wed', 'thu'], time: 'Call to Confirm' })], null)!
-    expect(t.rows).toEqual([{ days: ['sun', 'mon', 'tue', 'wed', 'thu'], label: 'Sun–Thu', cells: ['Call to confirm'] }])
+    expect(t.rows).toEqual([{ days: ['sun', 'mon', 'tue', 'wed', 'thu'], label: 'Sun–Thu', cells: ['Call to confirm'], parts: [[{ text: 'Call to confirm' }]] }])
+  })
+
+  // A minyan that only runs when enough sign up (Oct 16) is marked on its
+  // own in its cell, its box under the table names it, and a day where it
+  // runs isn't merged with one where it doesn't.
+  it('keeps a sign-up minyan’s time apart, and its days apart', () => {
+    const signUp = { link: 'https://chat.whatsapp.com/Aa11' }
+    const t = weekdayTable(
+      [
+        m({ tefillah: 'maariv', days: ['sun', 'mon', 'tue', 'wed', 'thu'], time: '8:00pm' }),
+        m({ tefillah: 'maariv', days: ['mon', 'tue'], time: '9:45pm', signUp }),
+      ],
+      null,
+    )!
+    expect(t.rows.map((r) => [r.label, r.parts])).toEqual([
+      ['Sun, Wed, Thu', [[{ text: '8 PM' }]]],
+      ['Mon, Tue', [[{ text: '8 PM' }, { text: '9:45 PM', signUp: true }]]],
+    ])
+    expect(t.rows[1].cells).toEqual(['8 PM, 9:45 PM'])
+    expect(t.signUps.map((x) => x.time)).toEqual(['9:45pm'])
   })
 
   it('none for a shul that only davens on Shabbos; Friday night isn’t a weekday', () => {

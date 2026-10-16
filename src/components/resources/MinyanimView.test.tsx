@@ -200,3 +200,29 @@ describe('the Minyanim tab’s search (the user’s note 4)', () => {
   })
 })
 
+
+// Oct 16: a minyan that only runs when enough sign up is listed in time
+// order like the rest, marked, so nobody walks over without checking.
+describe('a minyan that only runs when enough sign up', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-10-06T12:00:00-04:00')) // Tue, noon
+  })
+  afterEach(() => vi.useRealTimers())
+
+  it('is marked “Check group first”; a regular one isn’t', () => {
+    const market = makeListing({
+      id: 'market',
+      name: 'Market Street Mincha',
+      category: 'synagogue',
+      minyanim: [{ id: 'm1', tefillah: 'mincha', days: ['mon', 'tue', 'wed', 'thu'], time: '1:15pm', signUp: { link: 'https://chat.whatsapp.com/Mkt' } }],
+      milesFromCenter: 0.2,
+    })
+    renderWithProviders(<MinyanimView items={[market, kesher]} categoryId="synagogue" />, { content: { categories: [shuls] } })
+    const rows = within(screen.getByTestId('minyanim-rows')).getAllByRole('listitem')
+    const mincha = rows.find((r) => r.textContent?.includes('Market Street Mincha'))!
+    expect(within(mincha).getByTestId('sign-up-mark')).toHaveTextContent('Check group first')
+    const maariv = rows.find((r) => r.textContent?.includes('Kesher Israel'))!
+    expect(within(maariv).queryByTestId('sign-up-mark')).not.toBeInTheDocument()
+  })
+})

@@ -196,6 +196,51 @@ export type Minyan = {
    *  the community's timezone (lib/season.ts), never configured; out-of-season
    *  rows are dimmed and labelled, never hidden. Absent means all year. */
   season?: Season
+  /** Set when this minyan only runs on days enough people sign up, in a
+   *  WhatsApp group or with a person (the user, Oct 16). The guide can't
+   *  know whether today's is on, so everywhere its time is shown it says
+   *  SIGN_UP_MARK, and the listing says where to sign up. Never dimmed or
+   *  hidden: it might well happen. Set per minyan, never per shul: a shul's
+   *  other times stay regular. Absent means a regular minyan. */
+  signUp?: MinyanSignUp
+}
+
+/** Where a sign-up minyan's people say they're coming: its WhatsApp
+ *  group's join link, or a person to text to be added (for a group that's
+ *  invite-only). Either may be missing; both empty still means sign-up. */
+export type MinyanSignUp = {
+  link?: string
+  name?: string
+  phone?: string
+}
+
+/** What a sign-up minyan says wherever its time is shown. Not "If 10
+ *  come": every minyan needs ten, so that doesn't say what's different
+ *  (the user, Oct 16). */
+export const SIGN_UP_MARK = 'Check group first'
+
+/** The button a sign-up minyan's box shows: its group's join link (a web
+ *  link only, since it comes from the public), or a text to its person.
+ *  Null when it has neither. */
+export function signUpAction(s: MinyanSignUp): { href: string; label: string; phone?: string } | null {
+  const link = s.link?.trim()
+  if (link && /^https?:\/\/[^\s]+$/i.test(link)) return { href: link, label: 'Say you’re coming' }
+  const digits = s.phone?.replace(/[^\d+]/g, '') ?? ''
+  if (digits.replace(/\D/g, '').length >= 7) {
+    const name = s.name?.trim()
+    return { href: `sms:${digits}`, label: name ? `Text ${name} to be added` : 'Text to be added', phone: s.phone!.trim() }
+  }
+  return null
+}
+
+/** "Sign-up: chat.whatsapp.com/Ab12", "Sign-up: text Moshe 215-555-0142",
+ *  "Sign-up": for summaries and the moderation queue, where where people
+ *  sign up is something a moderator approves like any other content. */
+export function signUpText(s: MinyanSignUp): string {
+  const link = s.link?.trim().replace(/^https?:\/\//i, '')
+  if (link) return `Sign-up: ${link}`
+  const who = [s.name?.trim(), s.phone?.trim()].filter(Boolean).join(' ')
+  return who ? `Sign-up: text ${who}` : 'Sign-up'
 }
 
 export const SEASON_LABELS: Record<Season, string> = {
@@ -415,6 +460,7 @@ export function formatMinyanimSummary(minyanim: Minyan[]): string {
         formatDays(m.days) || 'Daily',
         m.time,
         m.season && SEASON_LABELS[m.season],
+        m.signUp && signUpText(m.signUp),
         m.notes,
       ]
         .filter(Boolean)

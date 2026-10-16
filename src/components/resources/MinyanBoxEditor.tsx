@@ -7,12 +7,14 @@ import type { MinyanWriting } from '@/lib/minyanText'
 import { RelativeTimeFields, ZMAN_ANCHOR_ORDER, useTimeModes } from '@/components/intake/ZmanTimeFields'
 import { ChevronRightIcon, PlusIcon } from '@/components/icons'
 import { SUBMIT_PILL } from './submitPill'
+import { SignUpFields, signUpLinkOk } from './SignUp'
 
 // ── Edit under a shul's usual box: a list, then one minyan (Oct 10) ─────────
 // Canvas page "Minyan edit". The box's minyanim as the box reads, one row
 // each; a tap opens that one minyan on Add a minyan's screen: the tefillah,
-// its time (a clock time or from a zman), its days and a note. Time of year
-// and earliest/latest sit under More, for the few shuls that need them.
+// its time (a clock time or from a zman), its days and a note. Time of year,
+// earliest/latest and whether it only runs when enough sign up (Oct 16) sit
+// under More, for the few shuls that need them.
 // Done brings you back to the list with the change marked, and the list's
 // one button sends every change together ("Send 2 changes"): sent one at a
 // time, approving the second would undo the first, since each carries the
@@ -118,7 +120,7 @@ export default function MinyanBoxEditor({
             {g.rows.map((m) => {
               // The week's rows are under their tefillah already: the time
               // and the days. Shabbos's say which tefillah.
-              const sub = [box === 'weekday' ? formatDays(m.days) : m.days.length > 1 ? m.days.map((d) => dayLabel(d, box)).join(' and ') : null, m.season ? SEASON_LABELS[m.season] : null, noteText(m.notes)].filter(Boolean).join(' · ')
+              const sub = [box === 'weekday' ? formatDays(m.days) : m.days.length > 1 ? m.days.map((d) => dayLabel(d, box)).join(' and ') : null, m.season ? SEASON_LABELS[m.season] : null, m.signUp ? 'Sign-up' : null, noteText(m.notes)].filter(Boolean).join(' · ')
               const changed = isChanged(m)
               return (
                 <li key={m.id}>
@@ -164,7 +166,7 @@ export default function MinyanBoxEditor({
 /** One minyan: Add a minyan's screen, with Remove, and More for the rest. */
 function OneMinyan({ start, box, under, onDone, onRemove }: { start: Minyan; box: MinyanBox; under: string; onDone: (m: Minyan) => void; onRemove?: () => void }) {
   const [row, setRow] = useState<Minyan>(start)
-  const [more, setMore] = useState(!!(start.season || start.notBefore || start.notAfter))
+  const [more, setMore] = useState(!!(start.season || start.notBefore || start.notAfter || start.signUp))
   const modes = useTimeModes()
   const set = (p: Partial<Minyan>) => setRow((r) => ({ ...r, ...p }))
   const relative = !!row.anchor
@@ -272,6 +274,7 @@ function OneMinyan({ start, box, under, onDone, onRemove }: { start: Minyan; box
               </div>
             </div>
           )}
+          <SignUpFields signUp={row.signUp} onChange={(signUp) => set({ signUp })} />
           {/* Folds it away again; what's set stays set. */}
           <button type="button" onClick={() => setMore(false)} className="inline-flex cursor-pointer items-center gap-1 text-[14.5px] font-bold text-primary">
             Less
@@ -291,7 +294,7 @@ function OneMinyan({ start, box, under, onDone, onRemove }: { start: Minyan; box
             Remove this minyan
           </button>
         )}
-        <button type="button" disabled={!readable || !row.time.trim() || row.days.length === 0} onClick={() => onDone(row)} className={SUBMIT_PILL}>
+        <button type="button" disabled={!readable || !row.time.trim() || row.days.length === 0 || !signUpLinkOk(row.signUp?.link)} onClick={() => onDone(row)} className={SUBMIT_PILL}>
           Done
         </button>
       </div>

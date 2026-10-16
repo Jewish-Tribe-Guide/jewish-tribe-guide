@@ -67,6 +67,14 @@ const ask = (input: string, schedule: AnswerSchedule | null = null) =>
   answerFor(searchAsk(listings, categories, input), { schedule })
 
 describe('answerFor — minyan questions', () => {
+  // Oct 16: one that only runs when enough sign up is named with that, so
+  // the answer never sounds surer than the guide is.
+  it('names a minyan that only runs when enough sign up with “check group first”', () => {
+    const late = { ...slot(mekor, 'maariv', 21, 0), signUp: true }
+    const answer = ask('next maariv', { today: [...today.filter((s) => s.minutes !== 21 * 60), late], tomorrow, nowMinutes: 20 * 60 })
+    expect(answer?.text).toBe('Next Maariv: 9:00 PM, Mekor Habracha, check group first.')
+  })
+
   it('"next minyan at an orthodox shul": the next one at an Orthodox shul only', () => {
     // 6:00 PM: Beth Zion's 6:30 is next overall, but it's Conservative.
     const answer = ask("what's the next minyan at an orthodox shul", at(18))

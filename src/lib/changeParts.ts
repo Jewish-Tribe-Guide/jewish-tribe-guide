@@ -1,7 +1,7 @@
 import { fieldIsVisible, type CategoryConfig, type CategoryField } from './categories'
 import { listingChanges, changedHoursDays } from './listingDiff'
 import { dayLabel, fmt12, formatHoursSummary, isStructuredHours, type DayHours } from './hours'
-import { formatDays, isMinyanim, parseTimeToMinutes, SEASON_LABELS, TEFILLAH_LABELS, type Minyan } from './davening'
+import { formatDays, isMinyanim, parseTimeToMinutes, SEASON_LABELS, signUpText, TEFILLAH_LABELS, type Minyan } from './davening'
 import { readSchedules, schedulesKey } from './schedules'
 import { listingFacts, listingKind } from './listingView'
 import type { DirectoryResource, ResourceSubmission } from '@/types'
@@ -51,7 +51,7 @@ function minyanName(m: Minyan): string {
 }
 
 function minyanLine(m: Minyan, withNotes: boolean): string {
-  return [`${minyanName(m)} ${minyanTime(m.time)}`, m.season && SEASON_LABELS[m.season], withNotes && m.notes?.trim()].filter(Boolean).join(' · ')
+  return [`${minyanName(m)} ${minyanTime(m.time)}`, m.season && SEASON_LABELS[m.season], m.signUp && signUpText(m.signUp), withNotes && m.notes?.trim()].filter(Boolean).join(' · ')
 }
 
 /** Each minyan added, changed or taken off, matched by its id. */

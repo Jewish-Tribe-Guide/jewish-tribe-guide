@@ -22,7 +22,9 @@ import type { CalendarDay } from './jewishDays'
  *  ("2026-10-02"). */
 export type ScheduleDay = 'yom_tov' | 'chol_hamoed' | DayKey | string
 
-export type ScheduleMinyan = Omit<Minyan, 'days'> & { on: ScheduleDay[] }
+// No signUp: a special schedule is dated times a shul posted, and how a
+// regular minyan gets its ten (davening.ts) isn't part of what it posts.
+export type ScheduleMinyan = Omit<Minyan, 'days' | 'signUp'> & { on: ScheduleDay[] }
 
 export type SpecialSchedule = {
   id: string

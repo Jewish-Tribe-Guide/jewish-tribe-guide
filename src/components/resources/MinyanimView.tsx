@@ -7,7 +7,7 @@ import type { DirectoryResource } from '@/types'
 import { routes } from '@/lib/routes'
 import { listingSlug } from '@/lib/listingSlug'
 import { useActiveCommunity } from '@/lib/communityContext'
-import { TEFILLAH_LABELS } from '@/lib/davening'
+import { SIGN_UP_MARK, TEFILLAH_LABELS } from '@/lib/davening'
 import { milesText } from '@/lib/geo'
 import { dayLabel } from '@/lib/hours'
 import { clockTime, minyanimOn, type MinyanSlot } from '@/lib/upcomingDavening'
@@ -19,6 +19,7 @@ import AddMinyanSheet from './AddMinyanSheet'
 import ListHeading from './ListHeading'
 import AddScheduleBox from './AddScheduleBox'
 import { pointerHover } from '@/lib/pointerHover'
+import { SignUpMark } from './SignUp'
 
 // ── The Synagogues page's Minyanim view (step 4, agreed Oct 1) ───────────────
 // The same page's shuls, as every minyan by time, for a day picked from the
@@ -178,7 +179,8 @@ export default function MinyanimView({
   const dayWord = partOfDay ?? (isToday ? 'today' : `on ${tabLabel(day, index)[0] === 'Shabbos' ? 'Shabbos' : dayLabel(day.weekday)}`)
   const label = sought?.named ? tefillosLabel(asked) : 'Minyanim'
   const lead = partOfDay && !sought?.named ? partOfDay[0].toUpperCase() + partOfDay.slice(1) : `${label} ${dayWord}`
-  const far = (s: MinyanSlot) => howFar(byId.get(s.shulId ?? ''))
+  // A minyan that only runs when enough sign up says so where it's named.
+  const far = (s: MinyanSlot) => [howFar(byId.get(s.shulId ?? '')), s.signUp ? SIGN_UP_MARK.toLowerCase() : null].filter(Boolean).join(', ') || null
   const kindOfShul = (s: MinyanSlot) => {
     const shul = byId.get(s.shulId ?? '')
     return shul ? kindOf(shul) : ''
@@ -401,6 +403,9 @@ export function MinyanRow({
             {kind ? ` · ${kind}` : ''}
             {slot.notes ? ` · ${slot.notes}` : ''}
             {far ? ` · ${far}` : ''}
+            {/* Only runs when enough sign up (Oct 16): said before anyone
+                walks over. Where to sign up is in the listing it opens. */}
+            {slot.signUp && <SignUpMark className="ml-1.5 align-[1px]" />}
           </span>
           {tag && (
             <span className={`mt-0.5 block text-[13px] font-semibold ${posting.kind === 'schedule' ? 'text-green-700' : 'text-caution'}`} data-testid="minyan-whose">

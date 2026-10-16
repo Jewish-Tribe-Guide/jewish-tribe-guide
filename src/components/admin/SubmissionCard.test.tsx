@@ -127,6 +127,9 @@ const MINYAN_FIELD_VISIBILITY: Record<keyof Minyan, 'shown' | 'deliberately-hidd
   time: 'shown',
   notes: 'shown',
   season: 'shown',
+  // Where people sign up for a minyan that needs it (Oct 16): a link or a
+  // phone number from the public, shown so it isn't approved blind.
+  signUp: 'shown',
   // Bookkeeping, not content — a moderator has no use for it.
   id: 'deliberately-hidden',
   // `time` is generated from these by formatAnchorRule and kept in sync by the
@@ -147,6 +150,7 @@ const MINYAN_CHANGES: Record<string, [Partial<Minyan>, Partial<Minyan>]> = {
   time: [{ time: '7:00am' }, { time: '7:30am' }],
   notes: [{ notes: 'Upstairs' }, { notes: 'Downstairs' }],
   season: [{ season: 'winter' }, { season: 'summer' }],
+  signUp: [{ signUp: { link: 'https://chat.whatsapp.com/Aa11' } }, { signUp: { link: 'https://chat.whatsapp.com/Bb22' } }],
 }
 
 describe('moderation queue — every minyan property a moderator should see', () => {

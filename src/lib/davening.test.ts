@@ -343,3 +343,28 @@ describe('clampTimeText', () => {
     expect(clampTimeText('At Havdalah', bounds)).toBe('At Havdalah')
   })
 })
+
+// Oct 16: where a minyan that only runs when enough sign up takes its
+// sign-ups. It comes from the public, so only a web link is ever a link.
+describe('signing up for a minyan', () => {
+  it('opens the group’s link, a web link only', async () => {
+    const { signUpAction } = await import('./davening')
+    expect(signUpAction({ link: ' https://chat.whatsapp.com/Aa11 ' })).toEqual({ href: 'https://chat.whatsapp.com/Aa11', label: 'Say you’re coming' })
+    expect(signUpAction({ link: 'javascript:alert(1)' })).toBeNull()
+    expect(signUpAction({ link: 'chat.whatsapp.com/Aa11' })).toBeNull()
+  })
+
+  it('or texts the person who adds people, by name', async () => {
+    const { signUpAction } = await import('./davening')
+    expect(signUpAction({ name: 'Moshe', phone: '(215) 555-0142' })).toEqual({ href: 'sms:2155550142', label: 'Text Moshe to be added', phone: '(215) 555-0142' })
+    expect(signUpAction({ phone: '+1 215 555 0142' })?.href).toBe('sms:+12155550142')
+    expect(signUpAction({ name: 'Moshe', phone: '555' })).toBeNull()
+    expect(signUpAction({})).toBeNull()
+  })
+
+  it('says where in a summary, for the moderator', async () => {
+    const { formatMinyanimSummary } = await import('./davening')
+    expect(formatMinyanimSummary([{ id: 'a', tefillah: 'maariv', days: ['mon'], time: '9:45pm', signUp: { link: 'https://chat.whatsapp.com/Aa11' } }])).toBe('Maariv · Mon · 9:45pm · Sign-up: chat.whatsapp.com/Aa11')
+    expect(formatMinyanimSummary([{ id: 'a', tefillah: 'maariv', days: ['mon'], time: '9:45pm', signUp: { name: 'Moshe', phone: '215-555-0142' } }])).toBe('Maariv · Mon · 9:45pm · Sign-up: text Moshe 215-555-0142')
+  })
+})

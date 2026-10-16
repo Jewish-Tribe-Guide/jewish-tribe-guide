@@ -43,7 +43,7 @@ import { pointerHover } from '@/lib/pointerHover'
 const FRESH_MS = 10 * 60 * 1000
 const loaded = new Map<string, { at: number; places: Promise<DirectoryResource[]> }>()
 
-function loadPlaces(community: string, categoryId: string): Promise<DirectoryResource[]> {
+export function loadPlaces(community: string, categoryId: string): Promise<DirectoryResource[]> {
   const key = `${community}:${categoryId}`
   const hit = loaded.get(key)
   if (hit && Date.now() - hit.at < FRESH_MS) return hit.places

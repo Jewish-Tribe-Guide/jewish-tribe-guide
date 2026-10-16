@@ -333,7 +333,8 @@ type DaySlot = Omit<Minyan, 'days' | 'id'> & { day: MinyanDayKey | null; from?: 
 const other = (s: Season): Season => (s === 'winter' ? 'summer' : 'winter')
 
 function contentKey(m: Omit<Minyan, 'days' | 'id'>): string {
-  return JSON.stringify([m.tefillah, m.time, m.anchor ?? null, m.offsetMinutes ?? null, m.notBefore ?? null, m.notAfter ?? null, m.notes ?? null, m.season ?? null])
+  const signUp = m.signUp ? [m.signUp.link ?? null, m.signUp.name ?? null, m.signUp.phone ?? null] : null
+  return JSON.stringify([m.tefillah, m.time, m.anchor ?? null, m.offsetMinutes ?? null, m.notBefore ?? null, m.notAfter ?? null, m.notes ?? null, m.season ?? null, signUp])
 }
 
 /** Slots back into minyanim: the same time on several days is one minyan,
@@ -425,20 +426,23 @@ export function applyUpdate(
 
   /** The shul's time on a day comes off; one it keeps all year stays for
    *  the other season when the message is one season's. */
-  const takeOff = (r: UpdateRow) => {
+  const takeOff = (r: UpdateRow): DaySlot | null => {
     const i = slots.findIndex((s) => s.from === r.rowId && s.day === r.day)
-    if (i === -1) return false
+    if (i === -1) return null
     const s = slots[i]
     if (seasonal && !seasonOf(s)) slots[i] = { ...s, season: other(seasonal) }
     else slots = slots.filter((_, j) => j !== i)
-    return true
+    return s
   }
-  const add = (r: UpdateRow, season: Season | null) =>
+  // A sign-up minyan whose time changes is still a sign-up minyan: the
+  // message gives its new time, not how it gets its ten.
+  const add = (r: UpdateRow, season: Season | null, was?: DaySlot) =>
     slots.push({
       tefillah: r.tefillah,
       ...pickTime(r),
       ...(r.notes ? { notes: r.notes } : {}),
       ...(season ? { season } : {}),
+      ...(was?.signUp ? { signUp: was.signUp } : {}),
       day: r.day as DayKey,
     })
 
@@ -451,8 +455,9 @@ export function applyUpdate(
         if (r.status === 'new') dated.push(r)
         continue
       }
-      if (r.status === 'changed' && takeOff(r)) {
-        add(r, seasonal)
+      const was = r.status === 'changed' ? takeOff(r) : null
+      if (was) {
+        add(r, seasonal, was)
         changes.push(`Changed: ${rowText(r)}, was ${r.was}${seasonal ? ` (${seasonal})` : ''}`)
       } else if (r.status === 'new') {
         add(r, seasonal)
@@ -468,8 +473,9 @@ export function applyUpdate(
       const day = weekdayOf(r.day)
       const i = slots.findIndex((s) => s.from === r.rowId && s.day === day)
       if (i === -1) continue
+      const was = slots[i]
       slots = slots.filter((_, j) => j !== i)
-      add({ ...r, day }, null)
+      add({ ...r, day }, null, was)
       changes.push(`Every week from now: ${rowText({ ...r, day })}, was ${r.was}`)
     }
   }

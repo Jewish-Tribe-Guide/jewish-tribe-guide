@@ -1,5 +1,5 @@
 import { isOutOfSeason, type Season } from './season'
-import { parseTimeToMinutes, TEFILLAH_LABELS, type Minyan, type MinyanDayKey, type Tefillah } from './davening'
+import { parseTimeToMinutes, SIGN_UP_MARK, TEFILLAH_LABELS, type Minyan, type MinyanDayKey, type Tefillah } from './davening'
 import { geoKey, geoOrCommunityDefault, resolveAnchorTime, type AnchorTimes } from './useZmanAnchors'
 import type { LatLng } from './geo'
 import type { ScheduledMinyan } from './schedules'
@@ -59,6 +59,10 @@ type Candidate = {
   anchored?: boolean
   /** The special schedule it's from ("Sukkos 5787"). */
   schedule?: string
+  /** The minyan's own id, so a row can open its place on it. */
+  minyanId?: string
+  /** It only runs on days enough people sign up (davening.ts). */
+  signUp?: boolean
 }
 
 /**
@@ -157,6 +161,8 @@ function collectCandidates(
         notes: row.notes?.trim() || undefined,
         anchored: !!row.anchor,
         ...(row.schedule ? { schedule: row.schedule } : {}),
+        ...(row.id ? { minyanId: row.id } : {}),
+        ...(row.signUp ? { signUp: true } : {}),
       })
     }
   }
@@ -203,6 +209,10 @@ export type MinyanSlot = {
   schedule?: string
   /** The row's own note. */
   notes?: string
+  /** The minyan's own id, so the row can open its place on it. */
+  minyanId?: string
+  /** It only runs on days enough people sign up (davening.ts). */
+  signUp?: boolean
 }
 
 /**
@@ -303,11 +313,15 @@ function shulRowStatus(shul: ShulMinyanim, opts: Parameters<typeof nextUpcomingD
   const next = nextUpcomingDavening([shul], opts)
   if (next) {
     const day = next.isTomorrow ? opts.tomorrow : opts.today
-    const own = collectCandidates([shul], day, opts.season, opts.anchors).find((c) => c.minutes === next.minutes && c.notes)?.notes
+    const at = collectCandidates([shul], day, opts.season, opts.anchors).filter((c) => c.minutes === next.minutes)
+    const own = at.find((c) => c.notes)?.notes
+    // One that only runs when enough sign up says so, before anything else
+    // about it (davening.ts).
+    const signUp = at.length > 0 && at.every((c) => c.signUp)
     return {
       text: `${next.label} ${clockTime(next.minutes)}${next.isTomorrow ? ' tomorrow' : ''}`,
       tone: 'minyan',
-      note: wordedNote ?? own,
+      note: signUp ? [SIGN_UP_MARK, wordedNote ?? own].filter(Boolean).join(' · ') : (wordedNote ?? own),
     }
   }
 
