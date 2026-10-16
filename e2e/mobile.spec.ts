@@ -96,6 +96,29 @@ test.describe('mobile', () => {
     await expect(page.getByRole('button').filter({ hasText: /\w/ }).first()).toBeVisible()
   })
 
+  // The user, Oct 15: "not much room to click feedback, about, privacy on
+  // mobile". They were 23px-tall words in a row, and scrolled to the end
+  // the floating "+" sat level with Privacy. Positional, so jsdom can't see
+  // it.
+  test('Feedback, About and Privacy are each a full tap target, clear of the "+" at the page’s end', async ({ page }) => {
+    const community = await defaultCommunity(page)
+    await page.goto(`/${community}`)
+    await dismissLocationPrompt(page)
+
+    const links = page.getByRole('navigation', { name: 'About the guide' }).getByRole('link')
+    await expect(links.first()).toBeVisible()
+    await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight))
+    const add = page.getByRole('button', { name: 'Add', exact: true })
+    await expect(async () => {
+      const addBox = (await add.boundingBox())!
+      for (const link of await links.all()) {
+        const box = (await link.boundingBox())!
+        expect(box.height, `${await link.textContent()} is tall enough to tap`).toBeGreaterThanOrEqual(44)
+        expect(box.y + box.height, `${await link.textContent()} ends above the "+"`).toBeLessThanOrEqual(addBox.y)
+      }
+    }).toPass({ timeout: 5_000 })
+  })
+
   // Scroll-direction header hiding. This exists because it silently broke:
   // the scroll handler read its "previous Y" variable from inside a
   // setState updater, and React only sometimes runs an updater eagerly —

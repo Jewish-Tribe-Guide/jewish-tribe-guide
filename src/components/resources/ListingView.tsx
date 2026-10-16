@@ -129,6 +129,10 @@ type Props = {
   titleAs?: 'h1' | 'h2'
 }
 
+/** The key the contact box is confirmed under (migration 082): not a
+ *  field, since the address and phone aren't details. */
+const CONTACT_SECTION = 'contact'
+
 const TONE: Record<RowFact['tone'], string> = {
   open: 'text-emerald-700',
   caution: 'text-caution',
@@ -219,11 +223,20 @@ export default function ListingView({ item, category, color, place = null, upvot
   // user's note 9, agreed Oct 10): the one fact that does harm if missed.
   // Said there in full, so not again under the name or in the details. A
   // grocery's items are kosher items in a regular store: it stays as it was.
-  const caveatFirst = !!caveat && !!itemsF && itemWording(itemsF).noun === 'dish'
+  const isFood = !!itemsF && itemWording(itemsF).noun === 'dish'
+  const caveatFirst = !!caveat && isFood
   // A short description the admin put in the row ("Sit-down glatt kosher
   // steakhouse"): one line, under the header.
   const tagline = category.detailFields.find((f) => f.type === 'text' && f.showInHeader && f.headerMaxLength != null && String(item[f.key] ?? '').trim())
   const status = statusLine(item, category, now, shul, candlesAt)
+  const factsWithStatus = isFood && status.length > 0 && facts.length > 0
+  // Food's description goes up beside the picture, under the hours and
+  // hechsher (Oct 15); anywhere else it's under the whole header.
+  const taglineText = tagline && (
+    <p className={`${isFood ? 'mt-1' : 'mt-2.5'} text-[15px] leading-snug text-slate-800`} data-testid="listing-tagline">
+      {String(item[tagline.key]).trim()}
+    </p>
+  )
   // A place with no address is what it's for: its description, said in the
   // Join box with Join (Oct 6), not down in About.
   const joinAbout =
@@ -280,9 +293,17 @@ export default function ListingView({ item, category, color, place = null, upvot
                   <span className={part.strong ? `font-bold ${TONE[part.tone]}` : TONE[part.tone]}>{part.text}</span>
                 </span>
               ))}
+              {/* Food: the hechsher on the hours' line, "Opens Fri 4 PM ·
+                  Parve · IKC" (the user, Oct 15), a line saved. */}
+              {factsWithStatus && (
+                <>
+                  <span className="text-slate-500"> · </span>
+                  <span className="font-bold text-slate-900" data-testid="listing-facts">{facts.join(' · ')}</span>
+                </>
+              )}
             </p>
           )}
-          {facts.length > 0 && (
+          {facts.length > 0 && !factsWithStatus && (
             <p className="mt-1 text-[14.5px] font-bold text-slate-900" data-testid="listing-facts">
               {facts.join(' · ')}
             </p>
@@ -294,9 +315,10 @@ export default function ListingView({ item, category, color, place = null, upvot
               {caveat.text}
             </p>
           )}
+          {tagline && isFood && taglineText}
         </div>
       </div>
-      {tagline && <p className="mt-2.5 text-[15px] leading-snug text-slate-800">{String(item[tagline.key]).trim()}</p>}
+      {tagline && !isFood && taglineText}
     </div>
   )
 
@@ -522,8 +544,19 @@ export default function ListingView({ item, category, color, place = null, upvot
     ...(quietBadges.length > 0 || (caveat?.title && !caveatFirst) ? ['facts'] : []),
     ...otherTags.map((f) => `field:${f.key}`),
   ])
+  // Its foot: Google's date when the sync keeps it; otherwise, where it
+  // shows a way to reach the place (an address, phone, website, email or
+  // its hours), the box's own "Confirmed Sep 29 · Edit", "Still right?"
+  // once old (the user, Oct 15: what someone typed is dated the way every
+  // other box is), under the box's own key (migration 082).
+  const contactDated = !googleLead && (showAddress || showPhone || !!websiteName || extra.length > 0 || otherHours.length > 0)
+  const detailsFoot = googleLead ? (
+    <span data-testid="listing-google">{googleLead}.</span>
+  ) : contactDated ? (
+    <FreshnessFooter resourceId={item.id} confirmedAt={sectionConfirmedAt(item, CONTACT_SECTION)} section={CONTACT_SECTION} onEdit={editDetails} />
+  ) : undefined
   const details = ((caveat?.title && !caveatFirst) || showAddress || showSetLocation || showPhone || websiteName || otherHours.length > 0 || detailFields.length > 0 || extra.length > 0 || quietBadges.length > 0 || otherTags.length > 0) && (
-    <Card testId="listing-details" footer={googleLead && <span data-testid="listing-google">{googleLead}.</span>} onEdit={editDetails}>
+    <Card testId="listing-details" footer={detailsFoot} onEdit={contactDated ? undefined : editDetails}>
     <div className="divide-y divide-slate-100">
       {caveat?.title && !caveatFirst && (
         <Row>
