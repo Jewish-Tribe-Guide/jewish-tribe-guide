@@ -423,9 +423,34 @@ describe('a minyan that only runs when enough sign up (Oct 16)', () => {
   })
 
   it('on Shabbos, the line carries the mark', () => {
-    show([...minyanim, { id: 'h', tefillah: 'shacharis', days: ['sat'], time: '7:30am', signUp: { link: 'https://chat.whatsapp.com/Hash' } }])
+    show([...minyanim, { id: 's', tefillah: 'shacharis', days: ['sat'], time: '9:00am' }, { id: 'h', tefillah: 'shacharis', days: ['sat'], time: '7:30am', signUp: { link: 'https://chat.whatsapp.com/Hash' } }])
     expect(screen.getByTestId('davening-shabbos-lines')).toHaveTextContent('Shacharis 7:30 AMCheck group first')
     expect(within(screen.getByTestId('davening-shabbos')).getByTestId('sign-up-box')).toHaveTextContent('Shacharis 7:30 AM: check the group first')
+  })
+
+  // The user, Oct 16: when every minyan in a box of times is one, the box
+  // under it says so once, "All weekday times", rather than naming them all
+  // again under the table that lists them; and no time is marked.
+  it('every minyan in a box of times: “All weekday times”, and none marked', () => {
+    const group = { link: 'https://chat.whatsapp.com/Week' }
+    show([
+      { id: 'a', tefillah: 'shacharis', days: ['mon', 'tue', 'wed', 'thu', 'fri'], time: '7:00am', signUp: group },
+      { id: 'b', tefillah: 'maariv', days: ['sun', 'mon', 'tue', 'wed', 'thu'], time: '7:45pm', signUp: group },
+      { id: 'c', tefillah: 'shacharis', days: ['sat'], time: '9:00am' },
+    ])
+    const week = screen.getByTestId('davening-weekday')
+    expect(within(week).getByTestId('sign-up-box')).toHaveTextContent(/^All weekday times: check the group firstThey only run on days enough people sign up\. Their other times are regular\.Say you’re coming$/)
+    expect(screen.queryByTestId('sign-up-time')).not.toBeInTheDocument()
+    expect(within(screen.getByTestId('davening-shabbos')).queryByTestId('sign-up-box')).not.toBeInTheDocument()
+  })
+
+  it('…but each named when they sign up in different groups', () => {
+    show([
+      { id: 'a', tefillah: 'shacharis', days: ['mon', 'tue', 'wed', 'thu', 'fri'], time: '7:00am', signUp: { link: 'https://chat.whatsapp.com/One' } },
+      { id: 'b', tefillah: 'maariv', days: ['sun', 'mon', 'tue', 'wed', 'thu'], time: '7:45pm', signUp: { link: 'https://chat.whatsapp.com/Two' } },
+      { id: 'c', tefillah: 'shacharis', days: ['sat'], time: '9:00am' },
+    ])
+    expect(screen.getAllByTestId('sign-up-box').map((b) => b.querySelector('p')!.textContent)).toEqual(['Shacharis 7 AM: check the group first', 'Maariv 7:45 PM: check the group first'])
   })
 })
 

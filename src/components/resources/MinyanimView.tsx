@@ -251,15 +251,19 @@ export default function MinyanimView({
         </p>
       )}
 
-      <ul className="mt-2 divide-y divide-slate-100 border-t border-slate-100" data-testid="minyanim-rows">
+      {/* One white box, a timetable, as a place's times are (the user, Oct
+          16): straight on the grey page it looked plainer than the
+          Synagogues rows beside it. */}
+      {(upcoming.length > 0 || canAdd) && (
+      <ul className={`mt-2 ${BOX}`} data-testid="minyanim-rows">
         {upcoming.map((s, i) => (
-          <MinyanRow key={`${s.shulId}:${s.tefillah}:${s.minutes}:${i}`} slot={s} far={howFar(byId.get(s.shulId ?? ''))} kind={kindOfShul(s)} posting={postingOf(s.shulId)} href={hrefOf(s)} onHover={onHoverShul} />
+          <MinyanRow key={`${s.shulId}:${s.tefillah}:${s.minutes}:${i}`} slot={s} far={howFar(byId.get(s.shulId ?? ''))} kind={kindOfShul(s)} posting={postingOf(s.shulId)} href={hrefOf(s)} onHover={onHoverShul} inset />
         ))}
         {/* Adding a minyan where the minyanim are, as the list's last row
             (the user's note 2): on the day being looked at. */}
         {canAdd && (
           <li>
-            <button type="button" onClick={() => setAdding(true)} className="flex min-h-12 w-full cursor-pointer items-center gap-3 py-2.5 text-left hover:bg-slate-50" data-testid="add-minyan">
+            <button type="button" onClick={() => setAdding(true)} className="flex min-h-12 w-full cursor-pointer items-center gap-3 px-4 py-2.5 text-left hover:bg-slate-50" data-testid="add-minyan">
               <span className="flex w-[4.5rem] shrink-0 text-primary" aria-hidden="true">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" className="h-[18px] w-[18px]">
                   <path d="M12 5v14M5 12h14" />
@@ -270,6 +274,7 @@ export default function MinyanimView({
           </li>
         )}
       </ul>
+      )}
       {canAdd && adding && (
         <AddMinyanSheet
           isOpen
@@ -282,15 +287,15 @@ export default function MinyanimView({
         />
       )}
       {past.length > 0 && (
-        <div className="border-t border-slate-100">
+        <div className="mt-1">
           <button type="button" onClick={() => setEarlier((v) => !v)} aria-expanded={earlier} className="flex min-h-11 w-full cursor-pointer items-center gap-1 text-[14px] font-bold text-primary">
             Earlier today · {past.length}
             <ChevronRightIcon className={`h-4 w-4 transition-transform ${earlier ? '-rotate-90' : 'rotate-90'}`} />
           </button>
           {earlier && (
-            <ul className="divide-y divide-slate-100 opacity-60">
+            <ul className={`${BOX} opacity-60`}>
               {past.map((s, i) => (
-                <MinyanRow key={`p:${s.shulId}:${s.tefillah}:${s.minutes}:${i}`} slot={s} far={howFar(byId.get(s.shulId ?? ''))} kind={kindOfShul(s)} posting={postingOf(s.shulId)} href={hrefOf(s)} onHover={onHoverShul} />
+                <MinyanRow key={`p:${s.shulId}:${s.tefillah}:${s.minutes}:${i}`} slot={s} far={howFar(byId.get(s.shulId ?? ''))} kind={kindOfShul(s)} posting={postingOf(s.shulId)} href={hrefOf(s)} onHover={onHoverShul} inset />
               ))}
             </ul>
           )}
@@ -378,6 +383,9 @@ function Showing({ count, onShowing }: { count: number; onShowing: (count: numbe
   return null
 }
 
+/** Minyanim by time's rows: one white box, thin lines between. */
+const BOX = 'divide-y divide-slate-100 overflow-hidden rounded-2xl bg-white ring-1 ring-slate-900/5'
+
 /** One minyan: its time, its shul, the tefillah and how far. Also a
  *  hotel's minyanim within a walk (WalkList). */
 export function MinyanRow({
@@ -387,6 +395,7 @@ export function MinyanRow({
   posting,
   href,
   onHover,
+  inset = false,
 }: {
   slot: MinyanSlot
   far: string | null
@@ -395,6 +404,9 @@ export function MinyanRow({
   posting: DayPosting
   href: string | null
   onHover?: (shulId: string | null) => void
+  /** Padded in from the sides, in Minyanim by time's white box. A hotel's
+   *  walk list has its card's own padding. */
+  inset?: boolean
 }) {
   const tag = whose(posting)
   const body = (
@@ -420,7 +432,7 @@ export function MinyanRow({
         </span>
     </>
   )
-  const row = 'flex w-full gap-3 py-2.5 text-left hover:bg-slate-50'
+  const row = `flex w-full gap-3 py-2.5 text-left hover:bg-slate-50 ${inset ? 'px-4' : ''}`
   return (
     <li {...(onHover ? pointerHover(() => slot.shulId && onHover(slot.shulId), () => onHover(null)) : {})}>
       {href ? (

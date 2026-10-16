@@ -2,7 +2,7 @@
 
 import { useContext, useState, type ReactNode } from 'react'
 import type { DirectoryResource } from '@/types'
-import { signUpAction, TEFILLAH_LABELS, TEFILLAH_ORDER, type Minyan } from '@/lib/davening'
+import { isMinyanim, signUpAction, TEFILLAH_LABELS, TEFILLAH_ORDER, type Minyan } from '@/lib/davening'
 import { useMinyanSchedule } from '@/lib/useMinyanSchedule'
 import { geoKey, geoOrCommunityDefault, resolveAnchorTime, type AnchorTimes } from '@/lib/useZmanAnchors'
 import { dateText, readSchedules, regularMinyanim, scheduleDayText, sendsWeekly, thisWeeksPost, type DayPosting, type SpecialSchedule } from '@/lib/schedules'
@@ -63,6 +63,7 @@ export default function DaveningCard({
   // Opened from a minyan that only runs when enough sign up: the box at the
   // top already says where (TappedMinyan), so it isn't said again here.
   const tapped = useTappedMinyan(item.id)?.minyanId
+  const tappedRow = tapped && isMinyanim(minyanim) ? minyanim.find((m) => m.id === tapped) : undefined
   const schedule = useMinyanSchedule(null, [item])
   const canAdd = ui.contributions.edit && (!category || resolveCapabilities(category.capabilities).edit)
 
@@ -191,7 +192,7 @@ export default function DaveningCard({
         'week',
         'Usual weekday times',
         <Card key="week" title="Usual weekday times" testId="davening-weekday" footer={foot('week', 'weekday', 'Weekday times')}>
-          <WeekTable table={week} today={today} />
+          <WeekTable table={week} today={today} marks={!week.everySignUp} />
           <Notes
             lines={[
               ...week.rules.map((r) => {
@@ -202,7 +203,7 @@ export default function DaveningCard({
               week.otherSeason,
             ]}
           />
-          {!allSignUp && signUpBoxes(week.signUps.filter((m) => m.id !== tapped), false)}
+          {!allSignUp && signUpBoxes(week.signUps, { section: week.everySignUp ? 'All weekday times' : undefined, tapped: tappedRow })}
           {updateIn('week')}
         </Card>,
       )
@@ -225,9 +226,13 @@ export default function DaveningCard({
         'shabbos',
         'Usual Shabbos times',
         <Card key="shabbos" title="Usual Shabbos times" testId="davening-shabbos" footer={foot('shabbos-usual', 'shabbos', 'Shabbos times')}>
-          <ShabbosLines lines={shab.lines} anchors={anchors} today={today} />
+          <ShabbosLines lines={shab.lines} anchors={anchors} today={today} marks={!shab.lines.every((l) => l.row.signUp)} />
           <Notes lines={[shab.otherSeason]} />
-          {!allSignUp && signUpBoxes([...new Set(shab.lines.filter((l) => l.row.signUp && l.row.id !== tapped).map((l) => l.row))], false)}
+          {!allSignUp &&
+            signUpBoxes([...new Set(shab.lines.filter((l) => l.row.signUp).map((l) => l.row))], {
+              section: shab.lines.every((l) => l.row.signUp) ? 'All Shabbos times' : undefined,
+              tapped: tappedRow,
+            })}
           {updateIn('shabbos-usual')}
         </Card>,
       )
@@ -251,7 +256,7 @@ export default function DaveningCard({
     <div className="space-y-5" data-testid="listing-davening">
       {/* Every minyan here only runs when enough sign up: one box, on top,
           for the place, rather than one under each box of times. */}
-      {allSignUp && !rows.some((m) => m.id === tapped) && signUpBoxes(rows, true)}
+      {allSignUp && !tappedRow && signUpBoxes(rows, { place: true })}
       {post && (
         <Card
           title="This week’s schedule"
@@ -377,20 +382,40 @@ function Notes({ lines }: { lines: (string | null | undefined)[] }) {
 
 /** Under a box of times with minyanim that only run when enough sign up:
  *  which, and where to sign up. One box per place people sign up (almost
- *  always one), named as the box's times say them: "Maariv 9:45 PM". */
-function signUpBoxes(minyanim: Minyan[], allSignUp: boolean) {
+ *  always one), named as the box's times say them: "Maariv 9:45 PM"; or,
+ *  when every minyan in the box is one and they sign up in one place, the
+ *  box's `section` ("All weekday times"). `place`: every minyan at the
+ *  place is one, and one box on top speaks for it.
+ *
+ *  Opened from a minyan (`tapped`), where to sign up is already at the
+ *  top: that minyan isn't named again, and a box for the whole section
+ *  that signs up in the same place says so without the button. */
+function signUpBoxes(minyanim: Minyan[], { section, place = false, tapped }: { section?: string; place?: boolean; tapped?: Minyan }) {
+  const hrefOf = (m: Minyan) => (m.signUp && signUpAction(m.signUp)?.href) ?? ''
   const groups = new Map<string, Minyan[]>()
-  for (const m of minyanim) {
-    const key = (m.signUp && signUpAction(m.signUp)?.href) ?? ''
-    groups.set(key, [...(groups.get(key) ?? []), m])
-  }
-  return [...groups].map(([key, g]) => (
-    <SignUpBox key={key} names={[...new Set(g.map((m) => `${TEFILLAH_LABELS[m.tefillah]} ${timeText(m)}`))]} signUp={g[0].signUp!} allSignUp={allSignUp} />
-  ))
+  for (const m of minyanim) groups.set(hrefOf(m), [...(groups.get(hrefOf(m)) ?? []), m])
+  const whole = !!section && groups.size === 1
+  const tappedHref = tapped?.signUp ? hrefOf(tapped) : null
+  return [...groups].flatMap(([key, g]) => {
+    const named = whole ? g : g.filter((m) => m.id !== tapped?.id)
+    if (named.length === 0) return []
+    return [
+      <SignUpBox
+        key={key}
+        names={[...new Set(named.map((m) => `${TEFILLAH_LABELS[m.tefillah]} ${timeText(m)}`))]}
+        section={whole ? section : undefined}
+        signUp={g[0].signUp!}
+        allSignUp={place}
+        button={!(whole && key === tappedHref)}
+      />,
+    ]
+  })
 }
 
 /** The week as one small table, a column a tefillah, today's row marked. */
-function WeekTable({ table, today }: { table: NonNullable<ReturnType<typeof weekdayTable>>; today: DayKey | null }) {
+/** `marks` false when every time in it only runs when enough sign up:
+ *  the box under it says so once, for all of them. */
+function WeekTable({ table, today, marks = true }: { table: NonNullable<ReturnType<typeof weekdayTable>>; today: DayKey | null; marks?: boolean }) {
   return (
     <table className="mt-1 w-full text-[14.5px]" style={{ borderCollapse: 'separate', borderSpacing: 0 }} data-testid="davening-week-table">
       <thead>
@@ -419,7 +444,7 @@ function WeekTable({ table, today }: { table: NonNullable<ReturnType<typeof week
                       {j > 0 && ', '}
                       {/* A sign-up minyan's time, marked in the colour of
                           its mark: the box under the table says which. */}
-                      {p.signUp ? (
+                      {p.signUp && marks ? (
                         <span className="rounded bg-amber-50 px-1 text-amber-900 ring-1 ring-amber-200/70" data-testid="sign-up-time">
                           {p.text}
                           <span className="sr-only"> (check group first)</span>
@@ -453,7 +478,7 @@ function thisWeek(line: ShabbosLine, anchors: AnchorTimes | undefined, today: Da
   return `${line.part === 'friday' ? 'This Friday' : line.part === 'motzei' ? 'This Motzei Shabbos' : 'This Shabbos'} ${at}`
 }
 
-function ShabbosLines({ lines, anchors, today }: { lines: ShabbosLine[]; anchors: AnchorTimes | undefined; today: DayKey | null }) {
+function ShabbosLines({ lines, anchors, today, marks = true }: { lines: ShabbosLine[]; anchors: AnchorTimes | undefined; today: DayKey | null; marks?: boolean }) {
   return (
     <div className="divide-y divide-slate-100" data-testid="davening-shabbos-lines">
       {lines.map((l, i) => {
@@ -464,7 +489,7 @@ function ShabbosLines({ lines, anchors, today }: { lines: ShabbosLine[]; anchors
             <span className="w-[6.5rem] shrink-0 pt-0.5 text-[12px] font-extrabold tracking-wide text-muted uppercase">{first ? SHABBOS_PART_LABELS[l.part] : ''}</span>
             <span className="min-w-0 flex-1 text-[15px] leading-snug">
               <b className="font-bold text-slate-900">{TEFILLAH_LABELS[l.tefillah]}</b> <span className="text-slate-800">{l.when}</span>
-              {l.row.signUp && <SignUpMark className="ml-1.5 align-[1px]" />}
+              {l.row.signUp && marks && <SignUpMark className="ml-1.5 align-[1px]" />}
               {sub && <span className="mt-0.5 block text-[13px] text-muted">{sub}</span>}
             </span>
           </div>

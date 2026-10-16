@@ -127,6 +127,17 @@ describe('the Minyanim view (step 4)', () => {
     expect(within(screen.getByTestId('minyanim-rows')).getAllByRole('link')[0]).toHaveAttribute('href', expect.stringMatching(/^\/[^/]+\/synagogue\/mekor-habracha/))
   })
 
+  // Oct 16: the rows in one white box, a timetable, padded in from its
+  // sides; straight on the grey page they looked plainer than the
+  // Synagogues rows beside them.
+  it('lists the minyanim in one white box', () => {
+    view()
+    const box = screen.getByTestId('minyanim-rows')
+    expect(box.className).toMatch(/\bbg-white\b/)
+    expect(box.className).toMatch(/\brounded-2xl\b/)
+    expect(within(box).getAllByRole('link')[0].className).toMatch(/\bpx-4\b/)
+  })
+
   it('the days on one line: swiped on a phone, arrows on desktop, never wrapped', () => {
     view()
     expect(screen.getByRole('tablist').className).not.toContain('flex-wrap')

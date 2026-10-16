@@ -65,6 +65,9 @@ export type WeekdayTable = {
   /** The table's minyanim that only run when enough sign up, for the box
    *  under it that says where. */
   signUps: Minyan[]
+  /** Every one of them does: the box says so for the whole table, and no
+   *  time needs marking. */
+  everySignUp: boolean
 }
 
 /** Friday's Shacharis is a weekday's; Friday's afternoon and night are
@@ -125,7 +128,7 @@ export function weekdayTable(minyanim: readonly Minyan[], season: Season | null)
     ? `In ${other}, ${offSeason.map((m) => `${TEFILLAH_LABELS[m.tefillah]} ${timeText(m)}, ${formatDays(m.days.filter((d) => WEEKDAYS.includes(d as DayKey) && onWeekday(m, d as DayKey)) as MinyanDayKey[])}`).join('; ')}.`
     : null
 
-  return { columns, rows, rules, notes, otherSeason: otherLine, signUps: now.filter((m) => m.signUp) }
+  return { columns, rows, rules, notes, otherSeason: otherLine, signUps: now.filter((m) => m.signUp), everySignUp: now.every((m) => m.signUp) }
 }
 
 export type ShabbosLine = {

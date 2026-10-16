@@ -77,4 +77,27 @@ describe('the minyan you tapped', () => {
     expect(screen.queryByTestId('tapped-minyan')).not.toBeInTheDocument()
     expect(screen.getByTestId('sign-up-box')).toHaveTextContent('Maariv 9:45 PM: check the group first')
   })
+
+  // Every weekday minyan signs up in one group: the box under the times
+  // still says so for all of them, but the button is the one at the top.
+  it('in a box of times that all sign up in one place: said there, the button only at the top', () => {
+    const group = { link: 'https://chat.whatsapp.com/Week' }
+    const all = makeListing({
+      ...beth,
+      minyanim: [
+        { id: 'mi', tefillah: 'mincha', days: ['mon', 'tue', 'wed', 'thu'], time: '1:45pm', signUp: group },
+        { id: 'lm', tefillah: 'maariv', days: ['mon', 'tue', 'wed', 'thu'], time: '9:45pm', signUp: group },
+        { id: 'sh', tefillah: 'shacharis', days: ['sat'], time: '9:00am' },
+      ],
+    })
+    renderWithProviders(
+      <TappedMinyanContext.Provider value={parseTappedMinyan(tappedMinyanParam('mi', '2026-10-06', 13 * 60 + 45), 'beth')}>
+        <ListingView item={all} category={shuls} color="#2657bf" path="/philly/synagogue/beth" foot={null} />
+      </TappedMinyanContext.Provider>,
+      { content: { categories: [shuls] } },
+    )
+    expect(screen.getAllByRole('link', { name: 'Say you’re coming' })).toHaveLength(1)
+    expect(within(screen.getByTestId('tapped-minyan')).getByRole('link', { name: 'Say you’re coming' })).toBeInTheDocument()
+    expect(screen.getByTestId('sign-up-box')).toHaveTextContent(/^All weekday times: check the group first/)
+  })
 })

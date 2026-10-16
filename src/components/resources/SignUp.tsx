@@ -54,18 +54,23 @@ export function SignUpButton({ signUp }: { signUp: MinyanSignUp }) {
  * people sign up, which is almost always one.
  *
  * `names` are the minyanim as the box's own times say them ("Maariv 9:45
- * PM"); `allSignUp` says every minyan at the place is one, when there are
- * no "other times" to call regular and the box speaks for the place.
+ * PM"); `section` instead, when every minyan in the box of times is one
+ * ("All weekday times": the user, Oct 16), rather than naming them all
+ * again under the table that lists them. `allSignUp` says every minyan at
+ * the place is one, when there are no "other times" to call regular and
+ * the box speaks for the place. `button` false when the minyan tapped to
+ * open the place already has it, at the top (TappedMinyan).
  */
-export function SignUpBox({ names, signUp, allSignUp }: { names: string[]; signUp: MinyanSignUp; allSignUp: boolean }) {
-  const one = names.length === 1
+export function SignUpBox({ names, section, signUp, allSignUp, button = true }: { names: string[]; section?: string; signUp: MinyanSignUp; allSignUp: boolean; button?: boolean }) {
+  const one = !section && names.length === 1
+  const heading = allSignUp ? 'Check the group before you go' : `${section ?? names.join(', ')}: check the group first`
   return (
     <div className={`space-y-1.5 rounded-lg bg-primary/[0.07] px-3.5 py-3 ${allSignUp ? '' : 'mt-3'}`} data-testid="sign-up-box">
-      <p className="text-[15px] font-extrabold leading-snug text-ink">{allSignUp ? 'Check the group before you go' : `${names.join(', ')}: check the group first`}</p>
+      <p className="text-[15px] font-extrabold leading-snug text-ink">{heading}</p>
       <p className="text-[13.5px] leading-snug text-slate-700">
         {one || allSignUp ? 'It only runs' : 'They only run'} on days enough people sign up.{allSignUp ? '' : ' Their other times are regular.'}
       </p>
-      <SignUpButton signUp={signUp} />
+      {button && <SignUpButton signUp={signUp} />}
     </div>
   )
 }
