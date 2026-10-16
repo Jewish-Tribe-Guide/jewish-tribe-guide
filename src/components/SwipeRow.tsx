@@ -68,6 +68,9 @@ const FLICK_MIN_PX = 28
 // diagonal scroll of the map's list opened rows.
 const CLAIM_PX = 10
 const CLAIM_RATIO = 1.5
+// A trackpad's scroll is a scroll until it's paused this long: ticks
+// arrive ~every 16ms, momentum included, so this is a pause, not a tick gap.
+const SCROLL_LOCK_MS = 150
 
 // Whether a finished drag/swipe should leave the row open, given where it
 // ended up (dragXValue), where THIS gesture started (startX — 0 if it began
@@ -159,6 +162,46 @@ function ActionGlyph({ action }: { action: SwipeAction }) {
   return <ExternalIcon className="h-4 w-4" />
 }
 
+// ── Pressed, on a touch screen (Oct 16) ──────────────────────────────────
+// A row shows it's being pressed only once the finger has rested on it a
+// moment without moving, as a phone's own lists do. CSS :active lit it the
+// instant a finger touched down, before a tap could be told from a swipe or
+// a scroll, so swiping a row flashed it. The row's class styles
+// `data-pressed`; a mouse keeps its own :active, which comes with a click.
+const PRESS_DELAY_MS = 100
+const NO_TAP_HIGHLIGHT: CSSProperties = { WebkitTapHighlightColor: 'transparent' }
+const PRESS_SLOP_PX = 6
+
+function useTouchPress() {
+  const [pressed, setPressed] = useState(false)
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const start = useRef<{ x: number; y: number } | null>(null)
+  const stop = useCallback(() => {
+    if (timer.current) clearTimeout(timer.current)
+    timer.current = null
+    start.current = null
+    setPressed(false)
+  }, [])
+  useEffect(() => () => {
+    if (timer.current) clearTimeout(timer.current)
+  }, [])
+  const handlers = {
+    onPointerDown: (e: React.PointerEvent) => {
+      if (e.pointerType === 'mouse') return
+      if (timer.current) clearTimeout(timer.current)
+      start.current = { x: e.clientX, y: e.clientY }
+      timer.current = setTimeout(() => setPressed(true), PRESS_DELAY_MS)
+    },
+    onPointerMove: (e: React.PointerEvent) => {
+      const from = start.current
+      if (from && (Math.abs(e.clientX - from.x) > PRESS_SLOP_PX || Math.abs(e.clientY - from.y) > PRESS_SLOP_PX)) stop()
+    },
+    onPointerUp: stop,
+    onPointerCancel: stop,
+  }
+  return { pressed, handlers }
+}
+
 // ── One-open-at-a-time ───────────────────────────────────────────────────
 // Only one row's actions stay revealed within a list — opening a second row
 // snaps the first shut, same as iOS Mail's swipe actions. A row outside any
@@ -223,6 +266,10 @@ export default function SwipeRow({
   )
 
   const hoverCapable = useSyncExternalStore(subscribeHoverCapable, getHoverCapableSnapshot, getHoverCapableServerSnapshot)
+  const press = useTouchPress()
+  // No grey tap highlight of the browser's own either: the row's pressed
+  // look is press's, after the same pause.
+  const contentProps = { ...press.handlers, 'data-pressed': press.pressed ? '' : undefined }
 
   const [dragX, setDragX] = useState(0)
   const dragXRef = useRef(0)
@@ -251,6 +298,8 @@ export default function SwipeRow({
   // Trackpad-path equivalent of startDragXRef — see the wheel handler below.
   const wheelStartXRef = useRef(0)
   const wheelSettleTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Until when a trackpad scroll in progress keeps its ticks a scroll.
+  const scrollingUntilRef = useRef(0)
   const wrapperRef = useRef<HTMLDivElement>(null)
 
   // Keeps the row in sync when it's closed externally (another row opened,
@@ -375,7 +424,22 @@ export default function SwipeRow({
       // enough on its own to trigger the browser's back gesture — most
       // noticeable swiping right to close a row that's already open. A tiny
       // noise floor keeps genuine vertical scrolling (deltaX ~ 0) untouched.
-      if (Math.abs(e.deltaX) < 2) return
+      //
+      // Then one gesture is one thing (the user, Oct 16: a row's swipe
+      // sometimes pulled the whole list with it, and before that, rows
+      // opened while scrolling). A scroll — a tick more up-and-down than
+      // sideways — keeps the gesture a scroll until it pauses, however it
+      // drifts sideways. A swipe, once it's claimed the row, takes every
+      // tick until it settles, its up-and-down too, so the list stays put.
+      const now = e.timeStamp
+      if (!activeGestureRef.current) {
+        const vertical = Math.abs(e.deltaY) > Math.abs(e.deltaX)
+        if (vertical || now < scrollingUntilRef.current) {
+          if (vertical) scrollingUntilRef.current = now + SCROLL_LOCK_MS
+          return
+        }
+        if (Math.abs(e.deltaX) < 2) return
+      }
       e.preventDefault()
       // The first tick since the last settle is this gesture's baseline for
       // resolveOpenState's traveled-distance check.
@@ -422,7 +486,7 @@ export default function SwipeRow({
   if (!active) {
     return (
       <div className={`relative ${className}`}>
-        <div ref={contentRef} className={contentClassName} onClick={onContentClick}>
+        <div ref={contentRef} className={contentClassName} style={NO_TAP_HIGHLIGHT} onClick={onContentClick} {...contentProps}>
           {children}
         </div>
       </div>
@@ -437,6 +501,7 @@ export default function SwipeRow({
     // scoped to the row, the next card in the list covers it.
     transform: dragX ? `translateX(${dragX}px)` : undefined,
     transition: gestureLive ? 'none' : SETTLE_TRANSITION,
+    ...NO_TAP_HIGHLIGHT,
   }
 
   return (
@@ -513,6 +578,7 @@ export default function SwipeRow({
         style={contentStyle}
         onClickCapture={onContentClickCapture}
         onClick={onContentClick}
+        {...contentProps}
       >
         {children}
       </div>

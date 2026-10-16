@@ -403,7 +403,7 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
         // its own (group/tip on the cert badges).
         // relative + bg-white so this row paints OVER the swipe actions
         // behind it; without an opaque background they'd show through.
-        contentClassName={`group/row relative h-full w-full ${look === 'list' ? '' : 'rounded-lg'} bg-white px-4 py-3 hover:bg-slate-50 active:bg-slate-100 cursor-pointer transition-colors duration-200 ease-out`}
+        contentClassName={`group/row relative h-full w-full ${look === 'list' ? '' : 'rounded-lg'} bg-white px-4 py-3 hover:bg-slate-50 data-pressed:bg-slate-100 [@media(hover:hover)]:active:bg-slate-100 cursor-pointer transition-colors duration-200 ease-out`}
       >
         {/* relative: the positioning context for the absolutely-placed
             toggle below. */}

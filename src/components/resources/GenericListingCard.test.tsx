@@ -1060,6 +1060,16 @@ describe('GenericListingCard — the row', () => {
     })
     const item = makeListing({ name: 'Cambria', address: '219 S Broad St, Philadelphia, PA 19107, USA', notes: 'Reception will open the door', confirmedAt: '2026-09-01T00:00:00Z' })
 
+    // Oct 16: on a phone, :active flashed the row as a swipe began. Pressed
+    // is SwipeRow's data-pressed there, after a finger rests; a mouse keeps
+    // :active, gated to a pointer that can hover.
+    it('looks pressed by data-pressed, not a bare :active a swipe would flash', () => {
+      renderWithProviders(<GenericListingCard item={item} category={category} upvotes={false} count={0} {...requiredHandlers} place="Center City" />)
+      const row = screen.getByText('Cambria').closest('.group\\/row')!
+      expect(row.className).toContain('data-pressed:bg-slate-100')
+      expect(row.className.split(' ')).not.toContain('active:bg-slate-100')
+    })
+
     it('says where it is beside the name, in place of the address line', () => {
       renderWithProviders(<GenericListingCard item={item} category={category} upvotes={false} count={0} {...requiredHandlers} place="Center City" />)
       expect(screen.getByText('· Center City', { exact: false })).toBeInTheDocument()

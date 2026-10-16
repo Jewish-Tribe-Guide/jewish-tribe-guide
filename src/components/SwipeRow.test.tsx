@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import SwipeRow, { SwipeRowGroup, type SwipeAction } from './SwipeRow'
 
 // The TOUCH path — the one used on a phone. It had no unit tests at all
@@ -144,6 +144,37 @@ describe('SwipeRow — touch', () => {
 
     drag(contentOf('Goldi'), -10, { dy: 80 })
     expect(onAncestorMove).toHaveBeenCalled()
+  })
+})
+
+// Oct 16: the row's pressed look flashed as a swipe began. Like a phone's
+// own lists, it waits for a finger at rest.
+describe('SwipeRow — pressed, on a touch screen', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] })
+  })
+  const pressed = () => contentOf('Goldi').hasAttribute('data-pressed')
+
+  it('looks pressed once a finger rests on it, and lets go on lifting', () => {
+    render(<Row name="Goldi" actions={makeActions('Goldi').actions} />)
+    fireEvent.pointerDown(contentOf('Goldi'), { pointerType: 'touch', clientX: 300, clientY: 100 })
+    expect(pressed(), 'not the instant it touches').toBe(false)
+    act(() => vi.advanceTimersByTime(120))
+    expect(pressed()).toBe(true)
+    fireEvent.pointerUp(contentOf('Goldi'), { pointerType: 'touch', clientX: 300, clientY: 100 })
+    expect(pressed()).toBe(false)
+  })
+
+  it('never looks pressed for a swipe or a scroll', () => {
+    render(<Row name="Goldi" actions={makeActions('Goldi').actions} />)
+    for (const [dx, dy] of [[-30, 0], [0, 30]]) {
+      fireEvent.pointerDown(contentOf('Goldi'), { pointerType: 'touch', clientX: 300, clientY: 100 })
+      act(() => vi.advanceTimersByTime(40))
+      fireEvent.pointerMove(contentOf('Goldi'), { pointerType: 'touch', clientX: 300 + dx, clientY: 100 + dy })
+      act(() => vi.advanceTimersByTime(200))
+      expect(pressed()).toBe(false)
+      fireEvent.pointerUp(contentOf('Goldi'), { pointerType: 'touch', clientX: 300 + dx, clientY: 100 + dy })
+    }
   })
 })
 

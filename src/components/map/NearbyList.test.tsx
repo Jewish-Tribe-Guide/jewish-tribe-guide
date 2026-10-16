@@ -72,6 +72,24 @@ async function settle() {
 }
 
 describe('NearbyList row swipe (desktop trackpad)', () => {
+  // Oct 16: one gesture is one thing. A scroll drifting sideways stays a
+  // scroll (rows opened while scrolling); a swipe takes its up-and-down
+  // ticks too (it pulled the whole list with it).
+  it('keeps a scroll a scroll, however it drifts sideways', async () => {
+    const { content } = renderRow()
+    expect(fireEvent.wheel(content, { deltaX: 5, deltaY: 40 }), 'the list scrolls').toBe(true)
+    expect(fireEvent.wheel(content, { deltaX: 60, deltaY: 0 }), 'still the list’s').toBe(true)
+    await settle()
+    expect(content.style.transform).toBe('')
+  })
+
+  it('a swipe takes its up-and-down ticks too, so the list stays put', () => {
+    const { content } = renderRow()
+    fireEvent.wheel(content, { deltaX: 30, deltaY: 0 })
+    expect(fireEvent.wheel(content, { deltaX: 0, deltaY: 12 }), 'kept from the list').toBe(false)
+    expect(fireEvent.wheel(content, { deltaX: 1, deltaY: 3 }), 'kept from the list').toBe(false)
+  })
+
   it('opens on a leftward swipe, revealing the Save/Share strip', async () => {
     const { content } = renderRow()
     expect(content.style.transform).toBe('')
