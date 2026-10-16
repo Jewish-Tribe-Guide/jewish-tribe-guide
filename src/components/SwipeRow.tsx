@@ -5,6 +5,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
@@ -206,12 +207,49 @@ function useTouchPress() {
 // Only one row's actions stay revealed within a list — opening a second row
 // snaps the first shut, same as iOS Mail's swipe actions. A row outside any
 // group keeps its own open state instead.
-type Group = { openId: string | null; setOpenId: Dispatch<SetStateAction<string | null>> }
+//
+// And on a touch screen, a touch anywhere else puts an open row away, as
+// iPhone lists do (the user, Oct 16): a scroll starting, or a tap
+// elsewhere. A tap on another row of the same list does only that — it
+// doesn't also open that row's listing; the group notes the touch that
+// did it, so that row knows to swallow its click.
+type Dismissal = {
+  /** This touch put a row away. */
+  note: (touch: Event) => void
+  /** Forgets it, unless `touch` is the one noted. */
+  forgetUnless: (touch: Event) => void
+  /** Whether a row was just put away, forgetting it. */
+  take: () => boolean
+}
+type Group = {
+  id: string
+  openId: string | null
+  setOpenId: Dispatch<SetStateAction<string | null>>
+  dismissal: Dismissal
+}
 const SwipeRowGroupContext = createContext<Group | null>(null)
 
 export function SwipeRowGroup({ children }: { children: ReactNode }) {
+  const id = useId()
   const [openId, setOpenId] = useState<string | null>(null)
-  const value = useMemo(() => ({ openId, setOpenId }), [openId])
+  const dismissedBy = useRef<Event | null>(null)
+  const dismissal = useMemo<Dismissal>(
+    () => ({
+      note: (touch) => {
+        dismissedBy.current = touch
+      },
+      forgetUnless: (touch) => {
+        if (dismissedBy.current !== touch) dismissedBy.current = null
+      },
+      take: () => {
+        const was = dismissedBy.current !== null
+        dismissedBy.current = null
+        return was
+      },
+    }),
+    [],
+  )
+  const value = useMemo(() => ({ id, openId, setOpenId, dismissal }), [id, openId, dismissal])
   return <SwipeRowGroupContext.Provider value={value}>{children}</SwipeRowGroupContext.Provider>
 }
 
@@ -325,7 +363,25 @@ export default function SwipeRow({
     return () => document.removeEventListener('click', onDocClick, true)
   }, [active, hoverCapable, isOpen, onOpenChange])
 
+  // The touch screen's: see SwipeRowGroup. On touching down, not on the
+  // click, so a scroll that starts elsewhere puts the row away too.
+  const groupId = group?.id
+  const dismissal = group?.dismissal
+  useEffect(() => {
+    if (!active || hoverCapable || !isOpen) return
+    function onDocPointerDown(e: PointerEvent) {
+      const target = e.target as Element | null
+      if (!target || wrapperRef.current?.contains(target)) return
+      onOpenChange(false)
+      if (dismissal && groupId && target.closest(`[data-swipe-group="${CSS.escape(groupId)}"]`)) dismissal.note(e)
+    }
+    document.addEventListener('pointerdown', onDocPointerDown, true)
+    return () => document.removeEventListener('pointerdown', onDocPointerDown, true)
+  }, [active, hoverCapable, isOpen, onOpenChange, groupId, dismissal])
+
   function onPointerDown(e: React.PointerEvent) {
+    // A touch that didn't put another row away clears the note that one did.
+    dismissal?.forgetUnless(e.nativeEvent)
     // Desktop uses a trackpad swipe (the wheel handler below), not a
     // held-mouse drag.
     if (hoverCapable || !active) return
@@ -495,7 +551,8 @@ export default function SwipeRow({
     // already-open row to close it instead of firing the row's normal
     // action — same "dismiss before you can act again" rule on both touch
     // and desktop.
-    if (movedRef.current || isOpen) {
+    const dismissing = dismissal?.take() ?? false
+    if (movedRef.current || isOpen || dismissing) {
       e.preventDefault()
       e.stopPropagation()
       movedRef.current = false
@@ -546,6 +603,7 @@ export default function SwipeRow({
       // badge's hover tooltip spills past the card and clipping would cut it
       // off. Nobody hovers a badge mid-swipe.
       className={`relative overscroll-x-none touch-pan-y ${displaced ? 'overflow-hidden' : ''} ${className}`}
+      data-swipe-group={groupId}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={endDrag}

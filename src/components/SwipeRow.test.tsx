@@ -273,6 +273,65 @@ describe('SwipeRow — groups and switching it off', () => {
     expect(screen.queryByRole('button', { name: 'Save Goldi' })).not.toBeInTheDocument()
   })
 
+  // As iPhone lists do (the user, Oct 16): with a row open, a tap on
+  // another row only puts the open one away; the next tap is a tap.
+  it('a tap on another row closes the open one, and does only that', () => {
+    const onGoldi = vi.fn()
+    const onAcme = vi.fn()
+    render(
+      <SwipeRowGroup>
+        <Row name="Goldi" actions={makeActions('Goldi').actions} onTap={onGoldi} />
+        <Row name="Acme" actions={makeActions('Acme').actions} onTap={onAcme} />
+      </SwipeRowGroup>,
+    )
+    drag(contentOf('Goldi'), -60)
+    expect(isOpen('Goldi')).toBe(true)
+
+    tap(contentOf('Acme'))
+    expect(contentOf('Goldi').style.transform, 'the open row is put away').toBe('')
+    expect(onAcme, 'and the tap opened nothing').not.toHaveBeenCalled()
+
+    tap(contentOf('Acme'))
+    expect(onAcme, 'the next tap is a tap').toHaveBeenCalledTimes(1)
+    expect(onGoldi).not.toHaveBeenCalled()
+  })
+
+  it('a touch that starts a scroll elsewhere closes the open row', () => {
+    const onAcme = vi.fn()
+    render(
+      <SwipeRowGroup>
+        <Row name="Goldi" actions={makeActions('Goldi').actions} />
+        <Row name="Acme" actions={makeActions('Acme').actions} onTap={onAcme} />
+      </SwipeRowGroup>,
+    )
+    drag(contentOf('Goldi'), -60)
+    fireEvent.pointerDown(contentOf('Acme'), { pointerType: 'touch', clientX: 300, clientY: 100 })
+    fireEvent.pointerMove(contentOf('Acme'), { pointerType: 'touch', clientX: 300, clientY: 160 })
+    fireEvent.pointerCancel(contentOf('Acme'), { pointerType: 'touch' })
+    expect(contentOf('Goldi').style.transform).toBe('')
+
+    // The scroll leaves nothing behind: the next tap on that row is a tap.
+    tap(contentOf('Acme'))
+    expect(onAcme).toHaveBeenCalledTimes(1)
+  })
+
+  it('a tap outside the list closes the open row, and still does what it does', () => {
+    const onButton = vi.fn()
+    render(
+      <>
+        <SwipeRowGroup>
+          <Row name="Goldi" actions={makeActions('Goldi').actions} />
+        </SwipeRowGroup>
+        <button type="button" onClick={onButton}>Map</button>
+      </>,
+    )
+    drag(contentOf('Goldi'), -60)
+    tap(screen.getByRole('button', { name: 'Map' }))
+
+    expect(contentOf('Goldi').style.transform).toBe('')
+    expect(onButton).toHaveBeenCalledTimes(1)
+  })
+
   // For a surface that reveals these another way (the category card's
   // desktop hover row) or a row with nothing to act on (a hospital).
   it('does nothing when disabled, and lets taps straight through', () => {
