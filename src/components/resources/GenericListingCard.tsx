@@ -25,7 +25,8 @@ import type { SearchFound } from '@/lib/askSearch'
 import { useListingActions, type ListingAction } from './useListingActions'
 import SwipeRow, { type SwipeAction } from '@/components/SwipeRow'
 import Chip from './Chip'
-import { initialsOf, listingRowFacts, listingRowNote, type RowFactTone, type RowNote } from '@/lib/listingRow'
+import { initialsOf, listingRowFacts, listingRowNote, type RowNote } from '@/lib/listingRow'
+import { FACT_TONE } from './rowFactTone'
 import { ui } from '@/lib/uiConfig'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { usePinned } from '@/lib/pinnedContext'
@@ -50,16 +51,6 @@ const MapPlaceDetail = dynamic(() => import('@/components/map/MapPlaceDetail'), 
  *  and an opened listing has both one click away. */
 const CARD_ACTION_IDS: ListingAction['id'][] = ['save', 'share']
 
-// Colour only where it means something: see lib/listingRow.ts.
-const FACT_TONE: Record<RowFactTone, string> = {
-  open: 'font-medium text-green-700',
-  caution: 'font-medium text-caution',
-  closed: 'font-medium text-red-700',
-  minyan: 'font-semibold text-ink',
-  opens: 'font-medium text-slate-700',
-  quiet: 'text-slate-500',
-  plain: '',
-}
 
 const NOTE_TONE: Record<RowNote['tone'], string> = {
   caution: 'font-medium text-caution',

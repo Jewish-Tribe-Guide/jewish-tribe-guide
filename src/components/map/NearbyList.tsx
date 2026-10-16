@@ -7,8 +7,13 @@ import SavedBadge from '@/components/SavedBadge'
 import SwipeRow, { SwipeRowGroup, type SwipeAction } from '@/components/SwipeRow'
 import { CategoryGlyph } from '@/lib/categoryIcons'
 import { categoryTint } from '@/lib/categoryColor'
-import { PHOTO_FIELD_KEY } from '@/lib/categories'
+import { PHOTO_FIELD_KEY, type CategoryConfig } from '@/lib/categories'
 import { usePinned } from '@/lib/pinnedContext'
+import { useCategories } from '@/lib/useCategories'
+import { useNow } from '@/lib/useNow'
+import { listingRowFacts, type RowFact } from '@/lib/listingRow'
+import { neighborhoodsFor, placeName, townsFrom } from '@/lib/places'
+import { FACT_TONE } from '@/components/resources/rowFactTone'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { useShareLink } from '@/lib/useShareLink'
 import { routes } from '@/lib/routes'
@@ -58,6 +63,21 @@ function distanceLabel(miles: number): string {
 
 export default function NearbyList({ points, userLocation, onViewListing, onSelectPlace, eruvim, onSelectEruv }: Props) {
   const { toggle } = usePinned()
+  // What each row says, as a category page's row says it (the user, Oct
+  // 15: the map's rows felt small beside the category pages'): where it is
+  // beside the name, and the facts line, open or when it opens, then its
+  // hechsher and the like, instead of its category and a street address cut
+  // off halfway.
+  const categories = useCategories()
+  const community = useCommunitySlug()
+  const clock = useNow()
+  const byId = useMemo(() => new Map((categories ?? []).map((c) => [c.id, c])), [categories])
+  const places = useMemo(() => {
+    const listings = points.flatMap((p) => (p.raw ? [p.raw] : []))
+    const hoods = neighborhoodsFor(community)
+    const towns = townsFrom(listings)
+    return new Map(listings.map((l) => [l.id, placeName(l, hoods, towns)]))
+  }, [points, community])
 
   const sorted = useMemo<ScoredPoint[]>(() => {
     const scored = points.map((p) => ({
@@ -113,6 +133,9 @@ export default function NearbyList({ points, userLocation, onViewListing, onSele
             <NearbyRow
               key={p.id}
               point={p}
+              category={byId.get(p.filterId) ?? null}
+              place={places.get(p.id) ?? null}
+              now={clock === null ? null : new Date(clock)}
               canViewListing={canViewListing}
               canPin={canPin}
               onSelect={() => (onSelectPlace ? onSelectPlace(p) : onViewListing!(p.filterId, p.id))}
@@ -127,13 +150,26 @@ export default function NearbyList({ points, userLocation, onViewListing, onSele
 
 type RowProps = {
   point: ScoredPoint
+  /** Its category, for the facts line; null for a hospital, which has none. */
+  category: CategoryConfig | null
+  /** Where it is, in the row's words: "Bella Vista". */
+  place: string | null
+  now: Date | null
   canViewListing: boolean
   canPin: boolean
   onSelect: () => void
   onTogglePin: () => void
 }
 
-function NearbyRow({ point: p, canViewListing, canPin, onSelect, onTogglePin }: RowProps) {
+/** The row's facts, as a category page's row has them, less its distance:
+ *  this list says how far from the visitor, at the row's end. */
+function rowFacts(p: ScoredPoint, category: CategoryConfig | null, now: Date | null): RowFact[] {
+  if (!p.raw || !category) return []
+  const item = { ...p.raw, milesFromAddress: undefined, milesFromCenter: undefined }
+  return listingRowFacts(item, category, now).filter((f) => !f.ownLine)
+}
+
+function NearbyRow({ point: p, category, place, now, canViewListing, canPin, onSelect, onTogglePin }: RowProps) {
   // Sharing needs the same real directory entry pinning does — hospitals
   // (canPin false, no `raw`) have neither. listingPath is '' in that case;
   // the hook is still called unconditionally (rules of hooks), it's just
@@ -141,6 +177,7 @@ function NearbyRow({ point: p, canViewListing, canPin, onSelect, onTogglePin }: 
   const community = useCommunitySlug()
   const listingPath = canPin ? routes.listing(community, p.filterId, p.raw ? listingSlug(p.raw) : p.id) : ''
   const { share, copied } = useShareLink(listingPath, p.name)
+  const facts = rowFacts(p, category, now)
 
   const swipeActions: SwipeAction[] = [
     { id: 'share', label: copied ? 'Copied!' : 'Share', ariaLabel: `Share ${p.name}`, active: copied, onSelect: share },
@@ -161,20 +198,20 @@ function NearbyRow({ point: p, canViewListing, canPin, onSelect, onTogglePin }: 
       actions={swipeActions}
       enabled={canPin}
       className="bg-white"
-      contentClassName="relative flex items-stretch gap-2 bg-white px-4 py-3 touch-pan-y"
+      contentClassName="relative flex items-stretch gap-2 bg-white px-4 py-3.5 touch-pan-y"
     >
-      {/* Name + category + address — tappable when a directory exists.
-          Icon lives inside the button too so the whole left cluster is
-          one tap target, Google-Maps-style, not just the text. */}
+      {/* Name and where, then the facts line: tappable when a directory
+          exists. Icon lives inside the button too so the whole left cluster
+          is one tap target, Google-Maps-style, not just the text. */}
       <button
         onClick={canViewListing ? onSelect : undefined}
         disabled={!canViewListing}
         className={`flex min-w-0 flex-1 items-center gap-3 text-left ${canViewListing ? 'cursor-pointer group' : 'cursor-default'}`}
       >
         {/* Same SavedBadge the category page's card puts on its own
-            avatar (see GenericListingCard) — the right-side category
-            badge further down keeps its own separate, smaller pin overlay
-            untouched; this is purely additive on the left icon. */}
+            avatar (see GenericListingCard). The category's icon, not the
+            place's initials as on a category page: down a list of every
+            kind of place, it says which kind. 40px, as a category page's. */}
         <span className="relative shrink-0">
           <CategoryIcon
             icon={p.glyph ?? '📍'}
@@ -185,22 +222,33 @@ function NearbyRow({ point: p, canViewListing, canPin, onSelect, onTogglePin }: 
                 : p.glyphSrc) ?? undefined
             }
             color={p.color}
-            className="h-9 w-9 text-lg"
-            sizePx={36}
+            className="h-10 w-10 text-xl"
+            sizePx={40}
           />
           {p.pinned && <SavedBadge />}
         </span>
         <span className="min-w-0 flex-1">
-          <p className={`text-sm font-semibold leading-tight ${canViewListing ? 'text-slate-900 group-hover:text-blue-600 transition-colors' : 'text-slate-900'}`}>
+          <span className={`block truncate font-semibold ${canViewListing ? 'text-slate-900 group-hover:text-blue-600 transition-colors' : 'text-slate-900'}`} data-testid="nearby-name">
             {p.name}
-            {canViewListing && (
-              <span className="ml-1 text-slate-300 group-hover:text-blue-400 transition-colors text-xs">›</span>
-            )}
-          </p>
-          <p className="text-xs text-slate-400 mt-0.5 truncate">
-            {p.categoryLabel}
-            {p.address ? ` · ${p.address}` : ''}
-          </p>
+            {place && <span className="text-[13.5px] font-normal text-slate-500"> · {place}</span>}
+          </span>
+          {facts.length > 0 ? (
+            <span className="block truncate text-[13.5px] text-slate-600" data-testid="nearby-facts">
+              {facts.map((fact, i) => (
+                <span key={`${fact.text}:${i}`}>
+                  {i > 0 && <span aria-hidden="true" className="px-1 text-slate-400">·</span>}
+                  <span className={FACT_TONE[fact.tone]}>{fact.text}</span>
+                </span>
+              ))}
+            </span>
+          ) : (
+            // Nothing to say about it (a hospital, a place with no hours or
+            // badges): what kind of place, and where, as before.
+            <span className="block truncate text-[13.5px] text-slate-500" data-testid="nearby-facts">
+              {p.categoryLabel}
+              {!place && p.address ? ` · ${p.address}` : ''}
+            </span>
+          )}
         </span>
       </button>
 
@@ -220,14 +268,14 @@ function NearbyRow({ point: p, canViewListing, canPin, onSelect, onTogglePin }: 
             it, and duplicating it on this second, smaller badge too just
             repeated the same fact twice on one row. */}
         <span
-          className="flex h-6 w-6 items-center justify-center rounded-full text-xs"
+          className="flex h-7 w-7 items-center justify-center rounded-full text-xs"
           style={{ backgroundColor: categoryTint(p.color), color: p.color }}
           aria-hidden="true"
         >
-          <CategoryGlyph categoryId={p.filterId} icon={p.glyph ?? '📍'} className="h-3.5 w-3.5" />
+          <CategoryGlyph categoryId={p.filterId} icon={p.glyph ?? '📍'} className="h-4 w-4" />
         </span>
         {p.miles !== null && (
-          <span className="text-[11px] font-semibold tabular-nums" style={{ color: p.color }}>
+          <span className="text-xs font-semibold tabular-nums" style={{ color: p.color }}>
             {distanceLabel(p.miles)}
           </span>
         )}

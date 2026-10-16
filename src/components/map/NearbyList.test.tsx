@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, screen } from '@testing-library/react'
 import { PinnedProvider } from '@/lib/pinnedContext'
 import { renderWithProviders } from '@/test/renderWithProviders'
+import { makeCategory, makeListing } from '@/test/providerFixtures'
 import { mockRouter } from '@/test/nextNavigationMock'
 import type { MapPoint } from './ResourceMap'
 import NearbyList from './NearbyList'
@@ -202,5 +203,43 @@ describe('NearbyList row swipe (desktop trackpad)', () => {
     )
     expect(screen.getByText('Test Grocery')).toBeInTheDocument()
     expect(screen.queryByTestId('nearby-eruvim')).not.toBeInTheDocument()
+  })
+})
+
+// The user, Oct 15: the map's rows felt small beside a category page's
+// ("hospital listings feel pristine"). They say what a category page's row
+// says: where it is beside the name, then whether it's open and its
+// hechsher, not its category and a street address cut off halfway.
+describe('NearbyList — what a row says', () => {
+  const hours = { key: 'hours', label: 'Hours', type: 'hours' as const, renderAs: 'row' as const }
+  const cert = { key: 'kosherCert', label: 'Kosher Certification', type: 'select' as const, renderAs: 'badge' as const, filterable: true }
+  const food = makeCategory({ id: 'restaurant', label: 'Food', pluralLabel: 'Food', detailFields: [hours, cert] })
+  const everyDay = Object.fromEntries(['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'].map((d) => [d, { open: '00:00', close: '23:59' }]))
+
+  it('a listing: its name and where, then its facts line, in a category page’s sizes; no street address', () => {
+    const raw = makeListing({ id: 'judah', category: 'restaurant', name: 'Judah', address: '1 Main St, Philadelphia, PA 19103, USA', hours: everyDay, kosherCert: 'Keystone-K' })
+    renderWithProviders(
+      <PinnedProvider>
+        <NearbyList points={[makePoint({ id: 'judah', filterId: 'restaurant', name: 'Judah', categoryLabel: 'Food', address: raw.address, raw } as Partial<MapPoint & { filterId: string }>)]} userLocation={null} onViewListing={vi.fn()} />
+      </PinnedProvider>,
+      { content: { categories: [food] } },
+    )
+    const name = screen.getByTestId('nearby-name')
+    expect(name).toHaveTextContent(/^Judah/)
+    // The page's name size, not the old 14px.
+    expect(name.className).not.toMatch(/\btext-sm\b/)
+    const facts = screen.getByTestId('nearby-facts')
+    expect(facts).toHaveTextContent(/^Open( until [^·]+)?·Keystone-K$/)
+    expect(facts.className).toMatch(/text-\[13\.5px\]/)
+    expect(screen.queryByText(/1 Main St/)).not.toBeInTheDocument()
+  })
+
+  it('a hospital, with no listing behind it, still says what and where', () => {
+    renderWithProviders(
+      <PinnedProvider>
+        <NearbyList points={[makePoint({ id: 'h1', filterId: '__hospitals__', name: 'Jefferson', categoryLabel: 'Hospital', address: '111 S 11th St' } as Partial<MapPoint & { filterId: string }>)]} userLocation={null} />
+      </PinnedProvider>,
+    )
+    expect(screen.getByTestId('nearby-facts')).toHaveTextContent('Hospital · 111 S 11th St')
   })
 })
