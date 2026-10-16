@@ -78,7 +78,31 @@ describe('NearbyList row swipe (desktop trackpad)', () => {
   it('keeps a scroll a scroll, however it drifts sideways', async () => {
     const { content } = renderRow()
     expect(fireEvent.wheel(content, { deltaX: 5, deltaY: 40 }), 'the list scrolls').toBe(true)
-    expect(fireEvent.wheel(content, { deltaX: 60, deltaY: 0 }), 'still the list’s').toBe(true)
+    // Its sideways drift goes nowhere: not into the row, and not to the
+    // browser, which would take it as the start of a swipe Back.
+    expect(fireEvent.wheel(content, { deltaX: 60, deltaY: 0 }), 'kept from the browser').toBe(false)
+    expect(content.style.transform).toBe('')
+    await settle()
+    expect(content.style.transform).toBe('')
+  })
+
+  // The user, Oct 16: a swipe sometimes slid the whole page sideways. Its
+  // first tick, a little more up-and-down than sideways as fingers land,
+  // made the whole gesture a scroll, and the browser got the rest.
+  it('opens on a swipe whose first tick is a little up-and-down', async () => {
+    const { content } = renderRow()
+    expect(fireEvent.wheel(content, { deltaX: 1, deltaY: 3 }), 'the list may have its up-and-down').toBe(true)
+    expect(fireEvent.wheel(content, { deltaX: 20, deltaY: 1 }), 'kept from the browser').toBe(false)
+    expect(fireEvent.wheel(content, { deltaX: 30, deltaY: 0 }), 'kept from the browser').toBe(false)
+    await settle()
+    expect(content.style.transform).toBe('translateX(-104px)')
+  })
+
+  it('keeps every sideways tick from the browser while a gesture is undecided', async () => {
+    const { content } = renderRow()
+    expect(fireEvent.wheel(content, { deltaX: 1.5, deltaY: 0.5 }), 'too small to decide, still kept').toBe(false)
+    expect(content.style.transform, 'nor does it move the row yet').toBe('')
+    expect(fireEvent.wheel(content, { deltaX: 0, deltaY: 4 }), 'up-and-down is the list’s').toBe(true)
     await settle()
     expect(content.style.transform).toBe('')
   })

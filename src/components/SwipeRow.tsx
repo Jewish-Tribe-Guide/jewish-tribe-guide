@@ -68,9 +68,9 @@ const FLICK_MIN_PX = 28
 // diagonal scroll of the map's list opened rows.
 const CLAIM_PX = 10
 const CLAIM_RATIO = 1.5
-// A trackpad's scroll is a scroll until it's paused this long: ticks
-// arrive ~every 16ms, momentum included, so this is a pause, not a tick gap.
-const SCROLL_LOCK_MS = 150
+// A trackpad gesture ends when its ticks pause this long: they arrive
+// ~every 16ms, momentum included, so this is a pause, not a tick gap.
+const GESTURE_GAP_MS = 150
 
 // Whether a finished drag/swipe should leave the row open, given where it
 // ended up (dragXValue), where THIS gesture started (startX — 0 if it began
@@ -298,8 +298,9 @@ export default function SwipeRow({
   // Trackpad-path equivalent of startDragXRef — see the wheel handler below.
   const wheelStartXRef = useRef(0)
   const wheelSettleTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  // Until when a trackpad scroll in progress keeps its ticks a scroll.
-  const scrollingUntilRef = useRef(0)
+  // The trackpad gesture in progress: how far it's gone, and what it's
+  // become — undecided, the row's swipe, or the list's scroll.
+  const wheelGestureRef = useRef<{ x: number; y: number; last: number; mode: 'undecided' | 'row' | 'scroll' } | null>(null)
   const wrapperRef = useRef<HTMLDivElement>(null)
 
   // Keeps the row in sync when it's closed externally (another row opened,
@@ -427,18 +428,36 @@ export default function SwipeRow({
       //
       // Then one gesture is one thing (the user, Oct 16: a row's swipe
       // sometimes pulled the whole list with it, and before that, rows
-      // opened while scrolling). A scroll — a tick more up-and-down than
-      // sideways — keeps the gesture a scroll until it pauses, however it
-      // drifts sideways. A swipe, once it's claimed the row, takes every
-      // tick until it settles, its up-and-down too, so the list stays put.
+      // opened while scrolling). Like a finger's drag, a gesture is decided
+      // once it has gone CLAIM_PX: clearly sideways, it's the row's, and
+      // takes every tick until it settles, its up-and-down too, so the list
+      // stays put; otherwise it's a scroll, whose sideways drift opens
+      // nothing. Until it's decided, and all through a scroll, sideways
+      // ticks are still kept from the browser, per the paragraph above.
+      // Deciding on the first tick instead let a swipe whose fingers landed
+      // a little up-and-down count as a scroll, and its sideways ticks
+      // went on to slide the whole page toward Back (the user, Oct 16).
       const now = e.timeStamp
-      if (!activeGestureRef.current) {
-        const vertical = Math.abs(e.deltaY) > Math.abs(e.deltaX)
-        if (vertical || now < scrollingUntilRef.current) {
-          if (vertical) scrollingUntilRef.current = now + SCROLL_LOCK_MS
+      let gesture = wheelGestureRef.current
+      if (!gesture || now - gesture.last > GESTURE_GAP_MS) gesture = { x: 0, y: 0, last: now, mode: 'undecided' }
+      wheelGestureRef.current = gesture
+      gesture.last = now
+      const sideways = Math.abs(e.deltaX) > Math.abs(e.deltaY)
+      let deltaX = e.deltaX
+      if (gesture.mode !== 'row') {
+        if (gesture.mode === 'undecided') {
+          gesture.x += e.deltaX
+          gesture.y += e.deltaY
+          if (Math.abs(gesture.x) >= CLAIM_PX && Math.abs(gesture.x) > Math.abs(gesture.y) * CLAIM_RATIO) {
+            gesture.mode = 'row'
+            // The ticks held while it was undecided count toward the swipe.
+            deltaX = gesture.x
+          } else if (Math.abs(gesture.y) >= CLAIM_PX) gesture.mode = 'scroll'
+        }
+        if (gesture.mode !== 'row') {
+          if (sideways) e.preventDefault()
           return
         }
-        if (Math.abs(e.deltaX) < 2) return
       }
       e.preventDefault()
       // The first tick since the last settle is this gesture's baseline for
@@ -449,7 +468,7 @@ export default function SwipeRow({
       // Trackpad "swipe left" reports positive deltaX under macOS's default
       // natural-scrolling direction — subtracting it moves the row left, the
       // same direction the fingers moved, mirroring the touch-drag math above.
-      dragXRef.current = Math.min(0, Math.max(-revealWidth, dragXRef.current - e.deltaX))
+      dragXRef.current = Math.min(0, Math.max(-revealWidth, dragXRef.current - deltaX))
       setDragX(dragXRef.current)
       if (wheelSettleTimer.current) clearTimeout(wheelSettleTimer.current)
       // Wheel events have no discrete "end" the way pointerup does — treat a
@@ -459,12 +478,13 @@ export default function SwipeRow({
       // worth trusting the way pointermove's do), so it's distance-only.
       wheelSettleTimer.current = setTimeout(() => {
         activeGestureRef.current = false
+        wheelGestureRef.current = null
         setGestureLive(false)
         const shouldOpen = resolveOpenState(dragXRef.current, wheelStartXRef.current, 0, revealWidth)
         onOpenChange(shouldOpen)
         dragXRef.current = shouldOpen ? -revealWidth : 0
         setDragX(dragXRef.current)
-      }, 150)
+      }, GESTURE_GAP_MS)
     }
     el.addEventListener('wheel', onWheel, { passive: false })
     return () => el.removeEventListener('wheel', onWheel)
