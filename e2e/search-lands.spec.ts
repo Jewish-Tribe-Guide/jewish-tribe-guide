@@ -1,5 +1,6 @@
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test'
 import { categories, categoryWithListings, defaultCommunity, dismissLocationPrompt } from './helpers'
+import { fixedViewSlug } from '../src/lib/routes'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Search takes you to the page (Oct 13, canvas page "lands"): typing on the
@@ -184,7 +185,10 @@ test('a zman: the times page, with the time asked for picked out', async ({ page
   await typeAndWait(page, box, 'when is candle lighting')
   await box.press('Enter')
 
-  await page.waitForURL((url) => url.pathname === `/${community}/${zmanim!.id}` && url.searchParams.get('time') === 'candles')
+  // The page's own word (/zmanim), never the category's id: that's the
+  // admin's label slugified and opens an empty directory (a55b0b9). Here
+  // they happen to match, so the id passed by luck.
+  await page.waitForURL((url) => url.pathname === `/${community}/${fixedViewSlug('zmanim')}` && url.searchParams.get('time') === 'candles')
   await expect(page.locator('[data-picked="true"]').filter({ visible: true }).first()).toContainText(/Candle|Candles/)
 })
 
@@ -196,7 +200,10 @@ test('the eruv: its page', async ({ page, request }) => {
   const box = await homeBox(page, community)
   await typeAndWait(page, box, 'is the eruv up')
   await box.press('Enter')
-  await page.waitForURL((url) => url.pathname === `/${community}/${eruv!.id}`)
+  // /eruv, not the category's id (`eruv-information`), which is an empty
+  // directory: the bug a55b0b9 fixed, which this used to assert.
+  await page.waitForURL((url) => url.pathname === `/${community}/${fixedViewSlug('eruv')}`)
+  await expect(page.getByRole('heading', { level: 1 }).filter({ visible: true }).first()).toContainText(eruv!.pluralLabel)
 })
 
 test('nothing anywhere: Enter stays on home and says so, with where to ask', async ({ page }) => {
