@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { useIsDesktop } from '@/lib/useIsMobile'
 import Image from 'next/image'
 import { useCommunitySlug, useCommunityTimezone } from '@/lib/communityContext'
 import { nextUpcomingDavening } from '@/lib/upcomingDavening'
@@ -49,6 +50,7 @@ export default function DaveningTimesCard({ coords }: { coords: LatLng | null })
   // today's times without saying which day.
   const schedule = useMinyanSchedule(coords)
   const categories = useCategories()
+  const desktop = useIsDesktop()
   // Where "All davening times" lives, as useMinyanSchedule picks it.
   const linkCategoryId = categories?.find((c) => c.detailFields.some((f) => f.type === 'minyanim'))?.id
 
@@ -134,6 +136,9 @@ export default function DaveningTimesCard({ coords }: { coords: LatLng | null })
         <p className="mt-2 text-sm text-slate-600">See minyanim near you.</p>
         <Link
           href={seeAllHref}
+          // Prefetched on a computer only: a phone draws this card for a moment
+          // before it has measured itself (see useIsDesktop).
+          prefetch={desktop ? undefined : false}
           className="mt-4 inline-flex w-fit items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-ink transition-colors hover:bg-slate-50"
         >
           View Times

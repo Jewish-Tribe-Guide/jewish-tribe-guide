@@ -148,6 +148,35 @@ test.describe('home screen weight', () => {
     expect(kb(js), 'initial JavaScript, gzipped').toBeLessThan(400)
   })
 
+  // A phone's first render is the computer layout, until it has measured
+  // itself, and the computer cards' links prefetched on it: every phone home
+  // fetched the shuls page's data and ~150 KB of its code, for a card it
+  // never shows (Oct 16). load() refuses prefetches, so this watches them.
+  test('a phone prefetches nothing from the computer-only cards; a computer does', async ({ page, request, isMobile }) => {
+    const community = await defaultCommunitySlug(request)
+    const prefetched: string[] = []
+    page.on('request', (r) => {
+      if (r.headers()['next-router-prefetch']) prefetched.push(decodeURIComponent(r.url()))
+    })
+    await page.goto(`/${community}`)
+    await dismissLocationPrompt(page)
+    await ready(page)
+    const fromCards = () => prefetched.filter((u) => u.includes('davening=1'))
+
+    if (isMobile) {
+      // The page itself prefetches its own route; that's the sign this sees
+      // prefetches at all, and the cards' would have come with it.
+      await expect.poll(() => prefetched.length, 'any prefetch at all').toBeGreaterThan(0)
+      await page.waitForTimeout(1_500)
+      expect(fromCards(), 'the "View Times" card’s link, on a phone').toEqual([])
+    } else {
+      // The positive control: on a computer the card is real, and its link
+      // prefetches once it's on screen.
+      await page.getByRole('link', { name: 'View Times' }).scrollIntoViewIfNeeded()
+      await expect.poll(() => fromCards().length, 'the "View Times" card’s link, on a computer').toBeGreaterThan(0)
+    }
+  })
+
   test('images stay light: none over 150 KB, and the total under 600 KB', async ({ page, request }, testInfo) => {
     const community = await defaultCommunitySlug(request)
     const images = (await load(page, `/${community}`)).filter(isImage)
