@@ -444,8 +444,11 @@ describe('MobileNearbySheet', () => {
     expect(screen.getByText('2 eruvim — drag up')).toBeInTheDocument()
     rerender(<MobileNearbySheet points={[]} userLocation={null} categories={[category]} containerHeight={600} eruvim={[eruv('a')]} />)
     expect(screen.getByText('1 eruv — drag up')).toBeInTheDocument()
-    // Places over the lines: counted as ever.
+    // Places over the lines (Oct 15): the eruvim still lead, both counted.
     rerender(<MobileNearbySheet points={[point]} userLocation={null} categories={[category]} containerHeight={600} eruvim={[eruv('a')]} />)
+    expect(screen.getByText('1 eruv · 1 place — drag up')).toBeInTheDocument()
+    // Lines off: places as ever.
+    rerender(<MobileNearbySheet points={[point]} userLocation={null} categories={[category]} containerHeight={600} />)
     expect(screen.getByText('1 place nearby — drag up')).toBeInTheDocument()
   })
 })

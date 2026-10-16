@@ -2012,6 +2012,36 @@ describe('ResourceMapView — eruv lines', () => {
     expect(screen.getByTestId('eruv-count')).toHaveTextContent('2')
   })
 
+  // The user, Oct 15: turning the lines on should bring up their list as a
+  // category's chip brings up its places. On a computer the sidebar opened
+  // and folded itself away again at once (no places, so "nothing to list"),
+  // and the phone's sheet stayed down at its handle.
+  it('brings up the list of eruvim: the sidebar on a computer, kept open with no places', async () => {
+    renderMap(<ResourceMapView onUp={() => {}} />, places, twoKinds)
+    expect(screen.getByRole('button', { name: 'Show sidebar' })).toBeInTheDocument()
+    fireEvent.click(await eruvButton())
+    expect(screen.getByRole('button', { name: 'Hide sidebar' })).toBeInTheDocument()
+    expect(within(document.querySelector('aside')!).getByTestId('nearby-eruvim')).toHaveTextContent('Center City Eruv')
+  })
+
+  it('on a phone, raises the sheet to the eruvim, as a category chip raises it to its places', async () => {
+    renderMobileMap(<ResourceMapView onUp={() => {}} />, places, twoKinds)
+    expect(screen.getByRole('button', { name: 'Expand nearby list' })).toBeInTheDocument()
+    fireEvent.click(await eruvButton())
+    expect(screen.queryByRole('button', { name: 'Expand nearby list' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Drag to resize nearby list' })).toBeInTheDocument()
+  })
+
+  it('with a category on too, the eruvim stay at the top of the list, its places under them', async () => {
+    renderMap(<ResourceMapView onUp={() => {}} />, places, twoKinds)
+    fireEvent.click(await eruvButton())
+    fireEvent.click(screen.getByRole('button', { name: /Grocery Stores/ }))
+    const aside = document.querySelector('aside')!
+    const eruvim = within(aside).getByTestId('nearby-eruvim')
+    const grocer = within(aside).getByText('Grocer')
+    expect(eruvim.compareDocumentPosition(grocer) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
   it('draws every eruv with a line, all or none, and a tap turns them off again', async () => {
     renderMap(<ResourceMapView onUp={() => {}} />, places, twoKinds)
     fireEvent.click(await eruvButton())

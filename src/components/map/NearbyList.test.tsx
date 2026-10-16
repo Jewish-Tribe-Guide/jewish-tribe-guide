@@ -195,14 +195,18 @@ describe('NearbyList row swipe (desktop trackpad)', () => {
     expect(onSelectEruv).toHaveBeenCalledWith('university-city')
   })
 
-  it('lists places over the eruvim when there are any', () => {
+  // The user, Oct 15: picking a category with the lines on made the eruvim
+  // "disappear". They stay, first, with the places under them.
+  it('keeps the eruvim first when there are places too, the places under them', () => {
     renderWithProviders(
       <PinnedProvider>
         <NearbyList points={[makePoint()]} userLocation={null} onViewListing={vi.fn()} eruvim={[{ id: 'center-city', name: 'Center City Eruv', tone: 'green', label: 'Up' }]} />
       </PinnedProvider>,
     )
-    expect(screen.getByText('Test Grocery')).toBeInTheDocument()
-    expect(screen.queryByTestId('nearby-eruvim')).not.toBeInTheDocument()
+    const eruvim = screen.getByTestId('nearby-eruvim')
+    expect(eruvim).toHaveTextContent('Center City EruvUp')
+    const place = screen.getByText('Test Grocery')
+    expect(eruvim.compareDocumentPosition(place) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 })
 

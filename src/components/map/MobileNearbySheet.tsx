@@ -77,7 +77,7 @@ type Props = {
   /** What a selected point that isn't a listing shows (an eruv opened from
    *  the Eruvim layer), given the way back. Null for anything else. */
   renderOther?: (point: Point, back: () => void) => ReactNode
-  /** The eruvim on the map, listed when there are no places (NearbyList). */
+  /** The eruvim on the map, listed first, before any places (NearbyList). */
   eruvim?: NearbyEruv[]
   onSelectEruv?: (id: string) => void
 }
@@ -577,8 +577,9 @@ const MobileNearbySheet = forwardRef<MobileNearbySheetHandle, Props>(function Mo
         <span className="h-1 w-9 rounded-full bg-slate-300" aria-hidden="true" />
         {snap === 'peek' && !selected && (
           <span className="text-xs font-medium text-slate-500">
-            {points.length === 0 && eruvim && eruvim.length > 0
-              ? `${eruvim.length} ${eruvim.length === 1 ? 'eruv' : 'eruvim'} — drag up`
+            {eruvim && eruvim.length > 0
+              ? // The eruvim lead the list, places or none (Oct 15).
+                `${eruvim.length} ${eruvim.length === 1 ? 'eruv' : 'eruvim'}${points.length > 0 ? ` · ${points.length} place${points.length !== 1 ? 's' : ''}` : ''} — drag up`
               : `${points.length} place${points.length !== 1 ? 's' : ''} nearby — drag up`}
           </span>
         )}

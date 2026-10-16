@@ -1543,11 +1543,14 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // width; tucking it away automatically matches what the collapse arrow
   // already does on request. Only applies to the results-list case, not a
   // specific selected place (desktopSelected) — that one only goes away
-  // when the visitor explicitly backs out of it.
+  // when the visitor explicitly backs out of it. Not while the eruv lines
+  // are on: the list has the eruvim then, places or no places (the user,
+  // Oct 15: the Eruv button should bring up its list as a category does,
+  // and it was folding the sidebar straight away again).
   useEffect(() => {
-    if (isMobile || desktopSelected || !desktopNarrowed) return
+    if (isMobile || desktopSelected || !desktopNarrowed || eruvimOn) return
     if (visiblePoints.length === 0) setSidebarCollapsed(true)
-  }, [visiblePoints.length, desktopSelected, desktopNarrowed, isMobile, setSidebarCollapsed])
+  }, [visiblePoints.length, desktopSelected, desktopNarrowed, isMobile, setSidebarCollapsed, eruvimOn])
 
   // ── Desktop search box + its autocomplete dropdown — shared between the
   // two places it can render: floating directly on the map (the default
@@ -1830,7 +1833,10 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
     if (!eruvimOn) return setEruvimOn(true)
     eruvimOff(effectiveSelected.size === 0 && !pinnedSelected ? showAllPlaces : undefined)
   }
-  // The map button: from everything, the lines alone.
+  // The map button: from everything, the lines alone. On, it brings up
+  // the list, each eruv with its status, as a category's chip brings up
+  // its places (the user, Oct 15): the sidebar, or the phone's sheet to
+  // half.
   const tapEruvButton = () => {
     if (eruvimOn) return toggleEruvim()
     if (allChipsOn) {
@@ -1839,6 +1845,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
     }
     setEruvimOn(true)
     setSidebarCollapsed(false)
+    if (isMobile) nearbySheetRef.current?.raise()
   }
   const eruvDetail = (id: string, onBack?: () => void, onEditor?: (editor: HostedEditor | null) => void) => {
     const e = eruvData?.eruvim.find((x) => x.id === id)

@@ -96,21 +96,25 @@ export default function NearbyList({ points, userLocation, onViewListing, onSele
     })
   }, [points, userLocation])
 
-  if (sorted.length === 0 && eruvim && eruvim.length > 0) {
-    return (
-      <div className="divide-y divide-slate-100 rounded-2xl ring-1 ring-slate-900/5 bg-white overflow-hidden" data-testid="nearby-eruvim">
-        {eruvim.map((e) => (
-          <button key={e.id} type="button" onClick={() => onSelectEruv?.(e.id)} className="flex w-full cursor-pointer items-center gap-3 px-4 py-3 text-left hover:bg-slate-50">
-            <span aria-hidden="true" className={`h-2.5 w-2.5 shrink-0 rounded-full ${TONE_DOT[e.tone]}`} />
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-[15px] font-semibold text-slate-900">{e.name}</span>
-              <span className={`block text-[13px] font-semibold ${TONE_WORDS[e.tone]}`}>{e.label}</span>
-            </span>
-          </button>
-        ))}
-      </div>
-    )
-  }
+  // The eruvim drawn on the map, first, each with its status: whether
+  // they're up is what turning the lines on asks. They stay at the top when
+  // a category is on too, rather than giving way to its places (the user,
+  // Oct 15: they "disappear" once something else is selected).
+  const eruvRows = eruvim && eruvim.length > 0 && (
+    <div className="divide-y divide-slate-100 rounded-2xl ring-1 ring-slate-900/5 bg-white overflow-hidden" data-testid="nearby-eruvim">
+      {eruvim.map((e) => (
+        <button key={e.id} type="button" onClick={() => onSelectEruv?.(e.id)} className="flex w-full cursor-pointer items-center gap-3 px-4 py-3.5 text-left hover:bg-slate-50">
+          <span aria-hidden="true" className={`h-2.5 w-2.5 shrink-0 rounded-full ${TONE_DOT[e.tone]}`} />
+          <span className="min-w-0 flex-1">
+            <span className="block truncate font-semibold text-slate-900">{e.name}</span>
+            <span className={`block text-[13.5px] font-semibold ${TONE_WORDS[e.tone]}`}>{e.label}</span>
+          </span>
+        </button>
+      ))}
+    </div>
+  )
+
+  if (sorted.length === 0 && eruvRows) return eruvRows
 
   if (sorted.length === 0) {
     return (
@@ -123,6 +127,7 @@ export default function NearbyList({ points, userLocation, onViewListing, onSele
   return (
     // SwipeRowGroup: only one row's actions stay revealed at a time.
     <SwipeRowGroup>
+      {eruvRows && <div className="mb-3">{eruvRows}</div>}
       <div className="divide-y divide-slate-100 rounded-2xl ring-1 ring-slate-900/5 bg-white overflow-hidden">
         {sorted.map((p) => {
           const canViewListing = !!(onSelectPlace || onViewListing) && p.filterId !== HOSPITALS_FILTER_ID
