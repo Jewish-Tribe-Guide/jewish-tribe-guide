@@ -34,7 +34,14 @@ test('a question read into the map’s own Filters, shown as "Read as", and put 
   await expect.poll(() => new URL(page.url()).searchParams.get('cat')).toBe(category.id)
   await expect.poll(() => new URL(page.url()).searchParams.get('open')).toMatch(new RegExp(`^(1|${category.id})$`))
 
-  await page.getByRole('button', { name: 'Clear search' }).filter({ visible: true }).click()
+  // When only one place is open (late at night, say) the map opens it, and
+  // its search box has ← where ✕ was: back to the results first, as someone
+  // would. Without this the test passed by day and timed out at night.
+  const clear = page.getByRole('button', { name: 'Clear search' }).filter({ visible: true })
+  const back = page.getByRole('button', { name: 'Back to results' }).filter({ visible: true })
+  await expect(clear.or(back)).toBeVisible()
+  if (await back.isVisible()) await back.click()
+  await clear.click()
   await expect(page.getByTestId('map-read-as')).toHaveCount(0)
   await expect.poll(() => new URL(page.url()).searchParams.get('open')).toBeNull()
   await expect.poll(() => new URL(page.url()).searchParams.get('cat')).toBeNull()
