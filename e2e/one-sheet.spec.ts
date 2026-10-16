@@ -64,10 +64,18 @@ test('dragging across the box’s text selects it, and leaves the sheet where it
   const sheet = page.getByRole('dialog', { name: 'Add or update a place' })
   const box = sheet.getByLabel('Your message')
   await box.fill('Shacharis moved to 7:15 this week, Mincha stays at 1:45')
+  // Measured once the sheet has slid up. Measured during it, the box's
+  // corner was a spot it had already left, below the screen's edge: the
+  // drag started on the sheet, not the text, and rightly raised it (about
+  // one run in seven, Oct 16).
+  await sheet.evaluate((e) => Promise.all(e.getAnimations({ subtree: true }).map((a) => a.finished)))
   const height = await sheet.evaluate((e) => e.getBoundingClientRect().height)
 
   const at = (await box.boundingBox())!
-  await page.mouse.move(at.x + at.width - 10, at.y + at.height - 10)
+  const [x, y] = [at.x + at.width - 10, at.y + at.height - 10]
+  // The drag must start in the text, or this tests a different drag.
+  expect(await box.evaluate((b, [x, y]) => document.elementFromPoint(x, y) === b, [x, y]), 'the drag starts in the box').toBe(true)
+  await page.mouse.move(x, y)
   await page.mouse.down()
   await page.mouse.move(at.x + 10, at.y - 150, { steps: 10 })
   await page.mouse.up()
