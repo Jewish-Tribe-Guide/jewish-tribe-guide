@@ -315,6 +315,27 @@ describe('SwipeRow — groups and switching it off', () => {
     expect(onAcme).toHaveBeenCalledTimes(1)
   })
 
+  // As a phone's list does: a scroll that starts on the open row puts it
+  // away too, whether the row sees the finger move or the browser takes the
+  // touch for its scroll first.
+  it('a scroll that starts on the open row closes it', () => {
+    render(
+      <SwipeRowGroup>
+        <Row name="Goldi" actions={makeActions('Goldi').actions} />
+      </SwipeRowGroup>,
+    )
+    drag(contentOf('Goldi'), -60)
+    fireEvent.pointerDown(contentOf('Goldi'), { pointerType: 'touch', clientX: 300, clientY: 100 })
+    fireEvent.pointerMove(contentOf('Goldi'), { pointerType: 'touch', clientX: 302, clientY: 130 })
+    expect(contentOf('Goldi').style.transform).toBe('')
+
+    drag(contentOf('Goldi'), -60)
+    expect(isOpen('Goldi')).toBe(true)
+    fireEvent.pointerDown(contentOf('Goldi'), { pointerType: 'touch', clientX: 300, clientY: 100 })
+    fireEvent.pointerCancel(contentOf('Goldi'), { pointerType: 'touch' })
+    expect(contentOf('Goldi').style.transform, 'the browser took it').toBe('')
+  })
+
   it('a tap outside the list closes the open row, and still does what it does', () => {
     const onButton = vi.fn()
     render(
@@ -343,5 +364,109 @@ describe('SwipeRow — groups and switching it off', () => {
     expect(screen.queryByRole('button', { name: 'Save Goldi' })).not.toBeInTheDocument()
     tap(contentOf('Goldi'))
     expect(onTap).toHaveBeenCalled()
+  })
+})
+
+// A computer's swipe is a trackpad's (the wheel), and the same things put
+// an open row away as on a phone (the user, Oct 16): a click on another row
+// (which does only that), a click elsewhere, and a scroll.
+describe('SwipeRow — on a computer, anything else puts an open row away', () => {
+  const touchMatchMedia = window.matchMedia
+  beforeEach(() => {
+    window.matchMedia = ((query: string) => ({
+      matches: true,
+      media: query,
+      onchange: null,
+      addListener: () => {},
+      removeListener: () => {},
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      dispatchEvent: () => false,
+    })) as typeof window.matchMedia
+  })
+  afterEach(() => {
+    window.matchMedia = touchMatchMedia
+  })
+
+  /** A trackpad swipe open, then the 150ms pause that settles it. Each
+   *  gesture starts after a gap, as a real one would. */
+  async function swipeOpen(name: string) {
+    vi.setSystemTime(Date.now() + 1000)
+    fireEvent.wheel(contentOf(name), { deltaX: 100, deltaY: 0 })
+    await act(() => new Promise((r) => setTimeout(r, 200)))
+    vi.setSystemTime(Date.now() + 1000)
+    expect(isOpen(name), `${name} opens`).toBe(true)
+  }
+
+  function click(el: HTMLElement) {
+    fireEvent.pointerDown(el, { pointerType: 'mouse', button: 0 })
+    fireEvent.pointerUp(el, { pointerType: 'mouse', button: 0 })
+    fireEvent.click(el)
+  }
+
+  function List({ onGoldi, onAcme, onButton }: { onGoldi?: () => void; onAcme?: () => void; onButton?: () => void }) {
+    return (
+      <>
+        <SwipeRowGroup>
+          <Row name="Goldi" actions={makeActions('Goldi').actions} onTap={onGoldi} />
+          <Row name="Acme" actions={makeActions('Acme').actions} onTap={onAcme} />
+        </SwipeRowGroup>
+        <button type="button" onClick={onButton}>Map</button>
+      </>
+    )
+  }
+
+  it('a click on the open row closes it, and opens nothing', async () => {
+    const onGoldi = vi.fn()
+    render(<List onGoldi={onGoldi} />)
+    await swipeOpen('Goldi')
+    click(contentOf('Goldi'))
+    expect(contentOf('Goldi').style.transform).toBe('')
+    expect(onGoldi).not.toHaveBeenCalled()
+  })
+
+  it('a click on another row closes the open one, and does only that', async () => {
+    const onAcme = vi.fn()
+    render(<List onAcme={onAcme} />)
+    await swipeOpen('Goldi')
+
+    click(contentOf('Acme'))
+    expect(contentOf('Goldi').style.transform, 'the open row is put away').toBe('')
+    expect(onAcme, 'and the click opened nothing').not.toHaveBeenCalled()
+
+    click(contentOf('Acme'))
+    expect(onAcme, 'the next click is a click').toHaveBeenCalledTimes(1)
+  })
+
+  it('a click outside the list closes the open row, and still does what it does', async () => {
+    const onButton = vi.fn()
+    render(<List onButton={onButton} />)
+    await swipeOpen('Goldi')
+    click(screen.getByRole('button', { name: 'Map' }))
+    expect(contentOf('Goldi').style.transform).toBe('')
+    expect(onButton).toHaveBeenCalledTimes(1)
+  })
+
+  it('a scroll closes the open row, over another row or over itself', async () => {
+    render(<List />)
+    await swipeOpen('Goldi')
+    fireEvent.wheel(contentOf('Acme'), { deltaX: 0, deltaY: 40 })
+    expect(contentOf('Goldi').style.transform).toBe('')
+
+    await swipeOpen('Goldi')
+    fireEvent.wheel(contentOf('Goldi'), { deltaX: 1, deltaY: 12 })
+    expect(contentOf('Goldi').style.transform).toBe('')
+  })
+
+  // Only a scroll: a sideways swipe elsewhere, or a few pixels of drift,
+  // leaves it open.
+  it('a sideways swipe or a twitch is not a scroll', async () => {
+    render(<List />)
+    await swipeOpen('Goldi')
+    fireEvent.wheel(screen.getByRole('button', { name: 'Map' }), { deltaX: 40, deltaY: 6 })
+    fireEvent.wheel(screen.getByRole('button', { name: 'Map' }), { deltaX: 30, deltaY: 6 })
+    vi.setSystemTime(Date.now() + 1000)
+    fireEvent.wheel(screen.getByRole('button', { name: 'Map' }), { deltaX: 0, deltaY: 3 })
+    expect(isOpen('Goldi')).toBe(true)
   })
 })

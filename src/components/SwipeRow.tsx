@@ -208,11 +208,11 @@ function useTouchPress() {
 // snaps the first shut, same as iOS Mail's swipe actions. A row outside any
 // group keeps its own open state instead.
 //
-// And on a touch screen, a touch anywhere else puts an open row away, as
-// iPhone lists do (the user, Oct 16): a scroll starting, or a tap
-// elsewhere. A tap on another row of the same list does only that — it
-// doesn't also open that row's listing; the group notes the touch that
-// did it, so that row knows to swallow its click.
+// And anything else puts an open row away, as iPhone lists do (the user,
+// Oct 16), on a phone and a computer alike: a scroll, over the row too, or
+// a tap or click elsewhere. A tap on another row of the same list does only
+// that — it doesn't also open that row's listing; the group notes the press
+// that did it, so that row knows to swallow its click.
 type Dismissal = {
   /** This touch put a row away. */
   note: (touch: Event) => void
@@ -351,24 +351,14 @@ export default function SwipeRow({
     }
   }, [isOpen, revealWidth])
 
-  // Closes the row when a swipe has left it open and the visitor clicks
-  // anywhere else on the page — the trackpad-swipe equivalent of iOS Mail's
-  // "tap elsewhere to dismiss," since desktop has no separate tap-to-close.
-  useEffect(() => {
-    if (!active || !hoverCapable || !isOpen) return
-    function onDocClick(e: MouseEvent) {
-      if (!wrapperRef.current?.contains(e.target as Node)) onOpenChange(false)
-    }
-    document.addEventListener('click', onDocClick, true)
-    return () => document.removeEventListener('click', onDocClick, true)
-  }, [active, hoverCapable, isOpen, onOpenChange])
-
-  // The touch screen's: see SwipeRowGroup. On touching down, not on the
-  // click, so a scroll that starts elsewhere puts the row away too.
+  // Anything else puts an open row away, as iPhone lists do (the user,
+  // Oct 16), and the same on a computer (the user, the same day): see
+  // SwipeRowGroup. On pressing down, not on the click, so a scroll that
+  // starts elsewhere on a touch screen puts the row away too.
   const groupId = group?.id
   const dismissal = group?.dismissal
   useEffect(() => {
-    if (!active || hoverCapable || !isOpen) return
+    if (!active || !isOpen) return
     function onDocPointerDown(e: PointerEvent) {
       const target = e.target as Element | null
       if (!target || wrapperRef.current?.contains(target)) return
@@ -377,7 +367,26 @@ export default function SwipeRow({
     }
     document.addEventListener('pointerdown', onDocPointerDown, true)
     return () => document.removeEventListener('pointerdown', onDocPointerDown, true)
-  }, [active, hoverCapable, isOpen, onOpenChange, groupId, dismissal])
+  }, [active, isOpen, onOpenChange, groupId, dismissal])
+
+  // A computer's scroll is a wheel, with no press to see: a scroll anywhere,
+  // over this row too, puts it away. Decided per gesture as the row's own
+  // wheel handler decides one, so a sideways swipe (closing this row, or
+  // opening another) isn't taken for a scroll. Watching starts once the row
+  // is open, after its opening swipe has settled.
+  useEffect(() => {
+    if (!active || !hoverCapable || !isOpen) return
+    let gesture: { x: number; y: number; last: number } | null = null
+    function onDocWheel(e: WheelEvent) {
+      if (!gesture || e.timeStamp - gesture.last > GESTURE_GAP_MS) gesture = { x: 0, y: 0, last: e.timeStamp }
+      gesture.last = e.timeStamp
+      gesture.x += e.deltaX
+      gesture.y += e.deltaY
+      if (Math.abs(gesture.y) >= CLAIM_PX && Math.abs(gesture.y) > Math.abs(gesture.x)) onOpenChange(false)
+    }
+    document.addEventListener('wheel', onDocWheel, { capture: true, passive: true })
+    return () => document.removeEventListener('wheel', onDocWheel, { capture: true })
+  }, [active, hoverCapable, isOpen, onOpenChange])
 
   function onPointerDown(e: React.PointerEvent) {
     // A touch that didn't put another row away clears the note that one did.
@@ -412,7 +421,12 @@ export default function SwipeRow({
       // calls stopPropagation below, leaving any ancestor's own vertical
       // handling (the map sheet's) completely unaffected for that gesture.
       const deltaY = e.clientY - startYRef.current
-      if (Math.abs(delta) < CLAIM_PX || Math.abs(delta) <= Math.abs(deltaY) * CLAIM_RATIO) return
+      if (Math.abs(delta) < CLAIM_PX || Math.abs(delta) <= Math.abs(deltaY) * CLAIM_RATIO) {
+        // A scroll starting on this row, open, puts it away, as one
+        // starting anywhere else does.
+        if (isOpen && Math.abs(deltaY) >= CLAIM_PX && Math.abs(deltaY) > Math.abs(delta)) onOpenChange(false)
+        return
+      }
       activeGestureRef.current = true
       setGestureLive(true)
       movedRef.current = true
@@ -451,6 +465,10 @@ export default function SwipeRow({
       onOpenChange(shouldOpen)
       dragXRef.current = shouldOpen ? -revealWidth : 0
       setDragX(dragXRef.current)
+    } else if (e.type === 'pointercancel' && isOpen) {
+      // The browser took the touch for its own scroll, before this row
+      // saw it move far enough to tell.
+      onOpenChange(false)
     }
     activeGestureRef.current = false
     setGestureLive(false)
