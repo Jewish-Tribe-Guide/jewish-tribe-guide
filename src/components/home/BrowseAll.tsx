@@ -139,10 +139,11 @@ export function BrowseList({ communitySlug, listings, schedule, zmanim, timezone
       {/* Each link a full finger's height (44px), padded beside its words so
           the gaps between them are tappable too (the user, Oct 15: "not
           much room to click"); pulled left by its padding so the words still
-          line up with the list above. Room under them, the page's last row,
-          so the floating "+" sits below them, not beside Privacy, once
-          scrolled to the end. */}
-      <nav aria-label="About the guide" className="mt-8 border-t border-slate-200 pt-1 pb-16 text-[15px] font-bold text-primary">
+          line up with the list above. A little room under them, the page's
+          last row, so the tab bar doesn't crowd them once scrolled to the
+          end; not so much that they float (the user, Oct 15: 64px was
+          "way too far"). */}
+      <nav aria-label="About the guide" className="mt-8 border-t border-slate-200 pt-1 pb-2 text-[15px] font-bold text-primary">
         <div className="-mx-3 flex flex-wrap">
           {/* Always here, so a quiet week (no "This week" on Today) still has a
               way to the page — unless it's held back (see features.ts). */}

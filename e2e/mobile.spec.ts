@@ -97,10 +97,11 @@ test.describe('mobile', () => {
   })
 
   // The user, Oct 15: "not much room to click feedback, about, privacy on
-  // mobile". They were 23px-tall words in a row, and scrolled to the end
-  // the floating "+" sat level with Privacy. Positional, so jsdom can't see
-  // it.
-  test('Feedback, About and Privacy are each a full tap target, clear of the "+" at the page’s end', async ({ page }) => {
+  // mobile". They were 23px-tall words whose last line sat 37px over the
+  // tab bar; a first fix pushed them ~100px up ("way too far"). Each is a
+  // 44px tap target now, the words about 58px over the bar. Positional, so
+  // jsdom can't see it.
+  test('Feedback, About and Privacy are each a full tap target, near the tab bar but not crowded by it', async ({ page }) => {
     const community = await defaultCommunity(page)
     await page.goto(`/${community}`)
     await dismissLocationPrompt(page)
@@ -108,13 +109,20 @@ test.describe('mobile', () => {
     const links = page.getByRole('navigation', { name: 'About the guide' }).getByRole('link')
     await expect(links.first()).toBeVisible()
     await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight))
-    const add = page.getByRole('button', { name: 'Add', exact: true })
+    const bar = page.getByRole('navigation', { name: 'Primary' })
     await expect(async () => {
-      const addBox = (await add.boundingBox())!
+      const barTop = (await bar.boundingBox())!.y
       for (const link of await links.all()) {
-        const box = (await link.boundingBox())!
-        expect(box.height, `${await link.textContent()} is tall enough to tap`).toBeGreaterThanOrEqual(44)
-        expect(box.y + box.height, `${await link.textContent()} ends above the "+"`).toBeLessThanOrEqual(addBox.y)
+        const name = await link.textContent()
+        expect((await link.boundingBox())!.height, `${name} is tall enough to tap`).toBeGreaterThanOrEqual(44)
+        // The words themselves, not the padded box around them.
+        const wordsBottom = await link.evaluate((a) => {
+          const r = document.createRange()
+          r.selectNodeContents(a)
+          return r.getBoundingClientRect().bottom
+        })
+        expect(barTop - wordsBottom, `${name}: room over the tab bar`).toBeGreaterThanOrEqual(45)
+        expect(barTop - wordsBottom, `${name}: not floating far above it`).toBeLessThanOrEqual(75)
       }
     }).toPass({ timeout: 5_000 })
   })
