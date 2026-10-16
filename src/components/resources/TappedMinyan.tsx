@@ -17,9 +17,11 @@ import { SignUpButton } from './SignUp'
 // A minyan in Minyanim by time opens its place, where the address, the
 // directions and the other times are. It used to open at the top, leaving
 // whoever asked for "Mincha 1:45" to find it in the table. Now the place
-// opens with that minyan first, the way a search opens a listing with what
-// it matched (ListingView's "Matches your search"): the day and time, its
-// note, and, for one that only runs when enough sign up, where to sign up.
+// opens with that minyan first, in the blue of a search's "Matches your
+// search": the day and time, its note, and, for one that only runs when
+// enough sign up, where to sign up. With no label over it (the user, Oct
+// 16): having just tapped "Mincha 2 PM", "Mincha · Monday 2 PM" says why
+// it's there. A search's box needs its label; it can match what wasn't typed.
 //
 // Carried as `?minyan=<id>~<YYYY-MM-DD>~<minutes>`: the row knows the day
 // and the time it showed, which for a time set by sunset only the row
@@ -83,7 +85,6 @@ export function TappedMinyanBox({ item, category }: { item: DirectoryResource; c
   const note = noteText(minyan.notes)
   return (
     <div className="space-y-1 rounded-lg bg-primary/[0.07] px-3 py-2.5" data-testid="tapped-minyan">
-      <p className="text-[11px] font-bold uppercase tracking-wide text-primary-dark">The minyan you tapped</p>
       <p className="text-[16px] font-extrabold text-slate-900">
         {TEFILLAH_LABELS[minyan.tefillah]} · {day ? `${day} ` : ''}
         {clockTime(tapped.minutes)}

@@ -55,7 +55,7 @@ describe('the minyan you tapped', () => {
   it('opens the place on it: the day and time, and its note', () => {
     open(tappedMinyanParam('mi', '2026-10-06', 13 * 60 + 45))
     const box = screen.getByTestId('tapped-minyan')
-    expect(box).toHaveTextContent('The minyan you tappedMincha · today 1:45 PMIn the small beis midrash')
+    expect(box).toHaveTextContent(/^Mincha · today 1:45 PMIn the small beis midrash$/)
     expect(within(box).queryByRole('link')).not.toBeInTheDocument()
   })
 

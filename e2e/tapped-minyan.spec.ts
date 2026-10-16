@@ -23,6 +23,5 @@ test('a minyan tapped in Minyanim by time opens its place on that minyan', async
 
   const box = page.getByTestId('tapped-minyan').filter({ visible: true })
   await expect(box).toBeVisible()
-  await expect(box).toContainText('The minyan you tapped')
   await expect(box).toContainText(time)
 })
