@@ -62,7 +62,8 @@ import { getCategoryColor } from '@/lib/categoryColor'
 import { CategoryGlyph } from '@/lib/categoryIcons'
 import { SwipeRowGroup } from '@/components/SwipeRow'
 import dynamic from 'next/dynamic'
-import { tellUsLine } from '@/lib/tellUs'
+import { tellUsPlaceholder } from '@/lib/tellUs'
+import { pointerHover } from '@/lib/pointerHover'
 
 /** How a change to the address is recorded. `replace`: in place, no step.
  *  `step`: a step the browser's Back undoes, named in history.state so the
@@ -2026,9 +2027,9 @@ export default function GenericDirectory({ category, items, anchorLabel, address
             <Fragment key={item.id}>
             <div
               ref={setItemRowRef(item.id)}
-              // A row and its pin light up together (CategoryMap).
-              onMouseEnter={mapBeside ? () => highlight.set(item.id) : undefined}
-              onMouseLeave={mapBeside ? () => highlight.set(null) : undefined}
+              // A row and its pin light up together (CategoryMap), on the
+              // pointer moving onto it, not on scrolling past (pointerHover).
+              {...(mapBeside ? pointerHover(() => highlight.set(item.id), () => highlight.set(null)) : {})}
               className={
                 flat
                   ? // An outline, drawn over the row: a ring outside it would
@@ -2227,7 +2228,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
             onClose={() => setTellOpen(false)}
             about={openItem ? { id: openItem.id, name: openItem.name } : undefined}
             category={category}
-            line={tellUsLine({ times: minyanimViewOn || (!!openItem && tellTimes), menu: !!openItem && tellMenu, about: openItem ?? undefined })}
+            placeholder={tellUsPlaceholder({ times: minyanimViewOn || (!!openItem && tellTimes), menu: !!openItem && tellMenu, about: openItem ?? undefined })}
             heading={openItem && tellTimes ? `Update ${openItem.name}’s times` : undefined}
             kind={openItem && tellMenu ? 'menu' : minyanimViewOn || (openItem && tellTimes) ? 'times' : undefined}
             yourselfLabel={openItem && tellMenu ? 'Add one dish yourself' : undefined}

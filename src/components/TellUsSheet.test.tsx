@@ -556,15 +556,13 @@ describe('Saw something? Tell us', () => {
 
   // Oct 10 (canvas page "AI box").
   describe('the box, named for what it does, with two paths', () => {
-    // Oct 16: over the box, not inside it, and saying what's done with it.
-    it('is named for what it does, says what to do over the box, and offers doing it yourself, all at the foot', () => {
+    // Oct 16: inside it, saying too what's done with it.
+    it('is named for what it does, says what to do inside, and offers doing it yourself, all at the foot', () => {
       const edit = vi.fn()
       const line = 'Write what changed at Trader Joe’s, or paste a message about it. We’ll try to read what changes, for you to check.'
-      open({ about: { id: 'arch', name: 'Trader Joe’s' }, line, onEditYourself: edit })
+      open({ about: { id: 'arch', name: 'Trader Joe’s' }, placeholder: line, onEditYourself: edit })
       expect(screen.getByRole('dialog', { name: 'Update Trader Joe’s' })).toBeInTheDocument()
-      expect(screen.getByTestId('tell-us-line')).toHaveTextContent(line)
-      expect(screen.getByLabelText('Your message')).toHaveAccessibleDescription(line)
-      expect(screen.getByLabelText('Your message')).not.toHaveAttribute('placeholder')
+      expect(screen.getByLabelText('Your message')).toHaveAttribute('placeholder', line)
       // The photo is the box's own; then the two paths.
       expect(screen.getByRole('button', { name: 'Photo or PDF' })).toBeInTheDocument()
       expect(screen.queryByText(/or paste or drop one/)).not.toBeInTheDocument()
@@ -615,10 +613,10 @@ describe('Saw something? Tell us', () => {
     it('opens as “Add their menu”: the same box, for a menu, read as one, its do-it-yourself one dish', async () => {
       const one = vi.fn()
       respond = (url) => (url.includes('/read') ? { ok: true, photoUrls: [], proposals: [] } : {})
-      open({ about: { id: 'arch', name: 'Shtetl' }, kind: 'menu', line: 'Paste their menu or a link to it, or add photos of it. We’ll try to read the main dishes off it, for you to check.', onEditYourself: one, yourselfLabel: 'Add one dish yourself' })
+      open({ about: { id: 'arch', name: 'Shtetl' }, kind: 'menu', placeholder: 'Paste their menu or a link to it, or add photos of it. We’ll try to read the main dishes off it, for you to check.', onEditYourself: one, yourselfLabel: 'Add one dish yourself' })
       expect(screen.getByRole('dialog', { name: 'Add their menu' })).toBeInTheDocument()
       expect(screen.getByText('Shtetl')).toBeInTheDocument()
-      expect(screen.getByTestId('tell-us-line')).toHaveTextContent('We’ll try to read the main dishes off it, for you to check.')
+      expect(screen.getByLabelText('Your message')).toHaveAttribute('placeholder', expect.stringContaining('We’ll try to read the main dishes off it, for you to check.'))
       expect(screen.getByRole('button', { name: 'Photos or PDF of the menu' })).toBeInTheDocument()
       fireEvent.change(screen.getByLabelText('Your message'), { target: { value: 'shtetl.example/menu' } })
       fireEvent.click(screen.getByRole('button', { name: 'Read the menu' }))

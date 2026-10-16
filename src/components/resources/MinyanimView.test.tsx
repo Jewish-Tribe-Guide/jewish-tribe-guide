@@ -77,7 +77,7 @@ describe('the Minyanim view (step 4)', () => {
     const onHoverShul = vi.fn()
     renderWithProviders(<MinyanimView items={[mekor, kesher]} categoryId="synagogue" onHoverShul={onHoverShul} />, { content: { categories: [shuls] } })
     const [first] = within(screen.getByTestId('minyanim-rows')).getAllByRole('listitem')
-    fireEvent.mouseEnter(first)
+    fireEvent.mouseMove(first, { movementX: 2, movementY: 1 })
     expect(onHoverShul).toHaveBeenLastCalledWith('mekor')
     fireEvent.mouseLeave(first)
     expect(onHoverShul).toHaveBeenLastCalledWith(null)

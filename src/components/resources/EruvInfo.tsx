@@ -27,6 +27,7 @@ import CategoryIcon from '@/components/CategoryIcon'
 import SavedBadge from '@/components/SavedBadge'
 import { initialsOf } from '@/lib/listingRow'
 import { usePinned } from '@/lib/pinnedContext'
+import { pointerHover } from '@/lib/pointerHover'
 
 // ── The Eruv page (Oct 7, canvas page "eruv") ───────────────────────────────
 // The eruvim's own maps, as each eruv draws them, with the visitor's dot;
@@ -172,7 +173,7 @@ export default function EruvInfo({ onUp, title = 'Eruv', icon, color = '#64748b'
   const maps = useEruvMaps(slug, !!loaded?.available, loaded?.available ? loaded.mapsVersion : null)
   const { isPinned } = usePinned()
   // Desktop only: a phone has nothing to point with.
-  const pointAt = (id: string) => (isMobile ? {} : { onMouseEnter: () => setPointedId(id), onMouseLeave: () => setPointedId(null), onFocus: () => setPointedId(id), onBlur: () => setPointedId(null) })
+  const pointAt = (id: string) => (isMobile ? {} : { ...pointerHover(() => setPointedId(id), () => setPointedId(null)), onFocus: () => setPointedId(id), onBlur: () => setPointedId(null) })
   // Beside the list where it's wide enough and not hidden, as on every
   // category page (the same remembered Hide map).
   const wide = useWide()

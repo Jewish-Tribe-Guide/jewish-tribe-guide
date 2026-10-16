@@ -1071,6 +1071,9 @@ describe('GenericListingCard — the row', () => {
         <GenericListingCard item={item} category={category} upvotes={false} count={0} {...requiredHandlers} place="Center City" />,
       )
       expect(screen.getByTestId('row-note')).toHaveTextContent('“Reception will open the door”')
+      // Oct 16: in the opened listing's ink, not the grey of where it is.
+      expect(screen.getByTestId('row-note')).toHaveClass('text-slate-800')
+      expect(screen.getByTestId('row-note')).not.toHaveClass('text-slate-500')
       unmount()
 
       renderWithProviders(<GenericListingCard item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />)

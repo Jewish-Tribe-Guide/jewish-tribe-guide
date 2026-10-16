@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, screen, within } from '@testing-library/react'
+import { cleanup, fireEvent, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { ForcedViewport } from '@/lib/useIsMobile'
@@ -180,9 +180,9 @@ describe('EruvInfo', () => {
     const user = userEvent.setup()
     show()
     const [row] = await screen.findAllByTestId('eruv-row')
-    await user.hover(row)
+    fireEvent.mouseMove(row, { movementX: 2, movementY: 1 })
     expect(screen.getByTestId('eruv-map')).toHaveAttribute('data-highlight', 'center-city')
-    await user.unhover(row)
+    fireEvent.mouseLeave(row)
     expect(screen.getByTestId('eruv-map')).toHaveAttribute('data-highlight', '')
     await user.hover(screen.getByTestId('map-eruv-center-city'))
     expect(row).toHaveAttribute('data-pointed', 'true')

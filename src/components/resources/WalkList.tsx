@@ -30,6 +30,7 @@ import { minyanimAhead } from '@/lib/minyanimFilters'
 import { useMinyanSchedule } from '@/lib/useMinyanSchedule'
 import { Card } from './listingParts'
 import { WalkOnMapContext } from './walkOnMap'
+import { pointerHover } from '@/lib/pointerHover'
 
 // ── Other categories' places within a walk: a hotel's shuls, a hospital's
 // food, shuls, hotels and mikvah ─────────────────────────────────────────────
@@ -526,8 +527,7 @@ function Row({ row, target, field, place }: { row: WalkRow; target: CategoryConf
         href={routes.listing(community, target.id, listingSlug(item))}
         onClick={(e) => e.stopPropagation()}
         // Its pin, lit on the map beside the listing (walkOnMap.ts).
-        onMouseEnter={onMap ? () => onMap.highlight.set(item.id) : undefined}
-        onMouseLeave={onMap ? () => onMap.highlight.set(null) : undefined}
+        {...(onMap ? pointerHover(() => onMap.highlight.set(item.id), () => onMap.highlight.set(null)) : {})}
         className="flex items-center gap-3 py-2.5 hover:bg-slate-50"
       >
         <span className="w-[52px] shrink-0 text-[15px] font-extrabold text-slate-900">

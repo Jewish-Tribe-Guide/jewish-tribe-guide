@@ -207,14 +207,19 @@ describe('MobileSheet', () => {
       expect(await screen.findByRole('dialog', { name: 'Shtetl' })).toBeVisible()
     })
 
-    it('opens in place at full height, with no slide up and no second dimmed backdrop', async () => {
+    // Oct 16: slid up, not appearing all at once ("very aggressively"); the
+    // one under it goes out of sight only once it's covered.
+    it('slides up into its place at full height, with no second dimmed backdrop', async () => {
       const user = userEvent.setup()
       render(<Stacked />)
       await user.click(screen.getByRole('button', { name: 'Edit' }))
       const sheet = screen.getByRole('dialog', { name: 'Shabbos friendly' })
       expect(sheet.style.height).toBe(`${window.innerHeight - 76}px`)
-      expect(sheet.className).not.toContain('animate-')
+      expect(sheet.className).toContain('animate-[sheetUp')
       expect(sheet.parentElement!.className).not.toContain('bg-slate-900')
+      const under = document.querySelector<HTMLElement>('[role="dialog"][aria-label="Shtetl"]')!
+      expect(under.style.visibility).toBe('hidden')
+      expect(under.style.transition).toContain('visibility 0s linear 220ms')
     })
 
     // Found on dev: the "+ Add" box's code loading the first time hid the

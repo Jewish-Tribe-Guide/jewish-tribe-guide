@@ -1,13 +1,14 @@
-/** The "+ Add" box's line, over the box, by what it was opened for: what to
+/** The "+ Add" box's one line inside it, by what it was opened for: what to
  *  do there, never examples (the user, Oct 10: the box should say what to
  *  do; examples read as more to take in), then what the site does with it
  *  (Oct 16: with only the first half, what happened after "Read the menu"
- *  wasn't clear). The place's own name where there is one, as "Paste Mekor
+ *  wasn't clear). Inside the box, as before (Oct 16: a line over it was
+ *  tried, and taken back). The place's own name where there is one, as "Paste Mekor
  *  Habracha’s email" first did. No word "AI": the result's card says it.
  *
  *  `times`: a shul's this-week schedule, or the Minyanim view. `menu`: "Add
  *  their menu" on a place with no dishes. `about`: the listing it's about. */
-export function tellUsLine({ times = false, menu = false, about }: { times?: boolean; menu?: boolean; about?: { name: string } } = {}): string {
+export function tellUsPlaceholder({ times = false, menu = false, about }: { times?: boolean; menu?: boolean; about?: { name: string } } = {}): string {
   if (menu) return 'Paste their menu or a link to it, or add photos of it. We’ll try to read the main dishes off it, for you to check.'
   if (times) {
     const whose = about ? `${about.name}’s` : 'a shul’s'

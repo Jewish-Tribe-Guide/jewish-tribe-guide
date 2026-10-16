@@ -2016,11 +2016,10 @@ describe('GenericDirectory — the map beside the list', () => {
   })
 
   it('lights a row’s pin while the pointer is on the row', async () => {
-    const user = userEvent.setup()
     renderWithProviders(<GenericDirectory category={food} items={rows} {...handlers} />)
-    await user.hover(screen.getByText('Beta Cafe'))
+    fireEvent.mouseMove(screen.getByText('Beta Cafe'), { movementX: 2, movementY: 1 })
     expect(screen.getByText('pin lit: b')).toBeInTheDocument()
-    await user.unhover(screen.getByText('Beta Cafe'))
+    fireEvent.mouseLeave(screen.getByText('Beta Cafe'))
     expect(screen.getByText('pin lit: none')).toBeInTheDocument()
   })
 
@@ -2030,12 +2029,11 @@ describe('GenericDirectory — the map beside the list', () => {
     try {
       const shuls = makeCategory({ id: 'synagogue', detailFields: [{ key: 'minyanim', label: 'Minyanim', type: 'minyanim' }] })
       const mekor = makeListing({ id: 'mekor', name: 'Mekor Habracha', category: 'synagogue', minyanim: [{ id: 'm', tefillah: 'mincha', days: ['mon'], time: '1:30pm' }] })
-      const user = userEvent.setup()
       renderWithProviders(<GenericDirectory category={shuls} items={[mekor]} openMinyanimView {...handlers} />, { content: { categories: [shuls] } })
       const [row] = await within(await screen.findByTestId('minyanim-rows')).findAllByRole('listitem')
-      await user.hover(row)
+      fireEvent.mouseMove(row, { movementX: 2, movementY: 1 })
       expect(screen.getByText('pin lit: mekor')).toBeInTheDocument()
-      await user.unhover(row)
+      fireEvent.mouseLeave(row)
       expect(screen.getByText('pin lit: none')).toBeInTheDocument()
     } finally {
       vi.useRealTimers()

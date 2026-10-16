@@ -22,6 +22,7 @@ import { TONE_DOT, TONE_WORDS } from '@/lib/eruvTone'
 import type { EruvTone } from '@/lib/eruv'
 import type { MapPoint } from './ResourceMap'
 import type { DirectoryResource } from '@/types'
+import { pointerHover } from '@/lib/pointerHover'
 
 // Rows swipe to reveal Save/Share through SwipeRow, the one swipe
 // implementation both lists share — the gesture's tuning (thresholds, flick
@@ -152,7 +153,7 @@ export default function NearbyList({ points, userLocation, onViewListing, onSele
           const canPin = p.filterId !== HOSPITALS_FILTER_ID
 
           return (
-            <div key={p.id} onMouseEnter={onHover ? () => onHover(p.id) : undefined} onMouseLeave={onHover ? () => onHover(null) : undefined}>
+            <div key={p.id} {...(onHover ? pointerHover(() => onHover(p.id), () => onHover(null)) : {})}>
             <NearbyRow
               point={p}
               category={byId.get(p.filterId) ?? null}

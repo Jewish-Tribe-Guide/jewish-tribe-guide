@@ -49,6 +49,12 @@ type Props = {
 // it came from; the one underneath stays mounted (its scroll, its state) but
 // out of sight until it's back on top. Only the top sheet answers Escape and
 // a tap outside.
+//
+// It slides up into that place, over the one it came from, which goes out
+// of sight only once it's covered (Oct 16: appearing all at once, it came
+// up "very aggressively"). Full height over full or half, so no second
+// handle or edge shows once it's up.
+const SHEET_UP_MS = 220
 type OpenSheet = { id: string; at: number }
 let openSheets: readonly OpenSheet[] = []
 let sheetsOpened = 0
@@ -553,8 +559,10 @@ export default function MobileSheet({ isOpen, onClose, title, children, draggabl
         role="presentation"
       >
         <div
-          className={`flex w-full flex-col rounded-t-2xl ${surface ? 'bg-surface' : 'bg-white'} shadow-xl ${isClosing || over ? '' : 'animate-[sheetUp_220ms_ease-out]'} ${draggable || over ? '' : 'max-h-[85vh]'}`}
-          style={covered ? { ...style, visibility: 'hidden' } : style}
+          className={`flex w-full flex-col rounded-t-2xl ${surface ? 'bg-surface' : 'bg-white'} shadow-xl ${isClosing ? '' : 'animate-[sheetUp_220ms_ease-out]'} ${draggable || over ? '' : 'max-h-[85vh]'}`}
+          // Covered: hidden once the one over it has slid up (SHEET_UP_MS).
+          // Uncovered, back at once: a transition is read from the new style.
+          style={covered ? { ...style, visibility: 'hidden', transition: [style.transition, `visibility 0s linear ${SHEET_UP_MS}ms`].filter(Boolean).join(', ') } : style}
           role="dialog"
           aria-modal="true"
           aria-label={title}

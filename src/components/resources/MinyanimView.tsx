@@ -18,6 +18,7 @@ import { dayIndexFor, readMinyanimSearch, shulMatches, tefillosLabel } from '@/l
 import AddMinyanSheet from './AddMinyanSheet'
 import ListHeading from './ListHeading'
 import AddScheduleBox from './AddScheduleBox'
+import { pointerHover } from '@/lib/pointerHover'
 
 // ── The Synagogues page's Minyanim view (step 4, agreed Oct 1) ───────────────
 // The same page's shuls, as every minyan by time, for a day picked from the
@@ -412,7 +413,7 @@ export function MinyanRow({
   )
   const row = 'flex w-full gap-3 py-2.5 text-left hover:bg-slate-50'
   return (
-    <li onMouseEnter={onHover && slot.shulId ? () => onHover(slot.shulId!) : undefined} onMouseLeave={onHover ? () => onHover(null) : undefined}>
+    <li {...(onHover ? pointerHover(() => slot.shulId && onHover(slot.shulId), () => onHover(null)) : {})}>
       {href ? (
         <Link href={href} className={row}>
           {body}

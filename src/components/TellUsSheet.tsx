@@ -15,7 +15,7 @@ import { regularMinyanim } from '@/lib/schedules'
 import type { TimesUpdate } from '@/lib/scheduleUpdate'
 import type { PlaceRead, ReadItem } from '@/lib/messageReader'
 import TurnstileWidget from '@/components/TurnstileWidget'
-import { tellUsLine } from '@/lib/tellUs'
+import { tellUsPlaceholder } from '@/lib/tellUs'
 import ActionDialog from '@/components/resources/ActionDialog'
 import MobileSheet from '@/components/resources/MobileSheet'
 import UpdateTimesBox from '@/components/resources/UpdateTimesBox'
@@ -109,7 +109,7 @@ export default function TellUsSheet({
   onClose,
   about,
   category,
-  line = tellUsLine(),
+  placeholder = tellUsPlaceholder(),
   onEditYourself,
   yourselfLabel,
   heading,
@@ -122,8 +122,8 @@ export default function TellUsSheet({
   /** The category page it was opened from, if any: what a place found with
    *  "Find the place" is added as, without asking. */
   category?: CategoryConfig
-  /** What to do in the box, and what's done with it (tellUsLine). */
-  line?: string
+  /** What to do in the box, and what's done with it (tellUsPlaceholder). */
+  placeholder?: string
   /** From a listing: "Edit it yourself", the listing's own editor. */
   onEditYourself?: () => void
   /** What that's called, when it isn't "Edit it yourself": "Add one dish
@@ -157,7 +157,7 @@ export default function TellUsSheet({
       key={isOpen ? 'open' : 'shut'}
       about={about}
       pageCategory={category}
-      line={line}
+      placeholder={placeholder}
       onEditYourself={onEditYourself}
       yourselfLabel={yourselfLabel}
       kind={kind}
@@ -246,7 +246,7 @@ export function whyOf(p: Proposal, i: number): { head: string; line: string; act
 export function TellUsBody({
   about,
   pageCategory,
-  line,
+  placeholder,
   onEditYourself,
   yourselfLabel,
   kind,
@@ -257,7 +257,7 @@ export function TellUsBody({
 }: {
   about?: { id: string; name: string }
   pageCategory?: CategoryConfig
-  line: string
+  placeholder: string
   onEditYourself?: () => void
   yourselfLabel?: string
   kind?: TellKind
@@ -370,7 +370,6 @@ export function TellUsBody({
   // for the box itself.
   const [dragging, setDragging] = useState(0)
   const textId = useId()
-  const lineId = useId()
   const emailId = useId()
   const pending = useRef<(token: string) => void>(() => {})
 
@@ -736,14 +735,9 @@ export function TellUsBody({
         <>
           {/* What it's about, under the title, when that's a place's menu. */}
           {kind === 'menu' && about && <p className="-mt-1 text-[14px] text-muted">{about.name}</p>}
-          {/* What to do, and that it'll be read for them to check (Oct 16):
-              over the box, not as its placeholder, so it stays once they've
-              started and says what the button will do. */}
-          <p id={lineId} className="text-[14.5px] leading-snug text-slate-700" data-testid="tell-us-line">
-            {line}
-          </p>
           <div className="rounded-xl border-[1.5px] border-slate-300 bg-white focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20">
-            {/* The line over it says what to write, by place; this names it. */}
+            {/* The line inside says what to write, by place, and that it'll
+                be read for them to check (Oct 16); this names it. */}
             <label htmlFor={textId} className="sr-only">
               Your message
             </label>
@@ -753,7 +747,7 @@ export function TellUsBody({
               value={text}
               onChange={(e) => setText(e.target.value)}
               rows={5}
-              aria-describedby={lineId}
+              placeholder={placeholder}
               className="block w-full resize-none rounded-t-xl border-0 bg-transparent px-3.5 py-3 text-base text-slate-900 placeholder:text-slate-400 focus:outline-none"
             />
             {photos.length > 0 && (

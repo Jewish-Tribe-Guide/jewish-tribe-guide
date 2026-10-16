@@ -287,7 +287,7 @@ describe('Within a walk, on the map beside it', () => {
     expect(show).toHaveBeenLastCalledWith({ categoryId: 'synagogue', places: [nearby[0], nearby[1], nearby[2]] })
     expect(within(section).queryByRole('link', { name: 'See them on the map' })).not.toBeInTheDocument()
 
-    fireEvent.mouseEnter(within(section).getByRole('link', { name: /Mikveh Israel/ }))
+    fireEvent.mouseMove(within(section).getByRole('link', { name: /Mikveh Israel/ }), { movementX: 2, movementY: 1 })
     expect(highlight.get()).toBe('s2')
     fireEvent.mouseLeave(within(section).getByRole('link', { name: /Mikveh Israel/ }))
     expect(highlight.get()).toBeNull()
@@ -324,7 +324,7 @@ describe('Within a walk, on the map beside it', () => {
     await new Promise((resolve) => setTimeout(resolve, 50))
     expect(shows.filter(Boolean).length).toBe(1)
 
-    fireEvent.mouseEnter(within(section).getByRole('link', { name: /Mikveh Israel/ }))
+    fireEvent.mouseMove(within(section).getByRole('link', { name: /Mikveh Israel/ }), { movementX: 2, movementY: 1 })
     await new Promise((resolve) => setTimeout(resolve, 50))
     expect(highlight.get()).toBe('s2')
   })
@@ -349,7 +349,7 @@ describe('Within a walk, on the map beside it', () => {
     expect(show).toHaveBeenLastCalledWith({ categoryId: 'synagogue', places: [nearby[0], nearby[1], nearby[2]] })
 
     // Opened by a click: the pointer never leaves its row.
-    fireEvent.mouseEnter(screen.getByRole('link', { name: /Mikveh Israel/ }))
+    fireEvent.mouseMove(screen.getByRole('link', { name: /Mikveh Israel/ }), { movementX: 2, movementY: 1 })
     rerender(<Page mode="hidden" />)
     expect(show).toHaveBeenLastCalledWith(null)
     expect(highlight.get()).toBeNull()

@@ -1992,7 +1992,7 @@ describe('ResourceMapView — hovering a row in the sidebar', () => {
     const aside = document.querySelector('aside')!
     const frame = screen.getByTestId('frame-token').textContent
     const row = within(aside).getByText('Bell Grocery').closest('[class*="divide-y"] > div') as HTMLElement
-    fireEvent.mouseEnter(row)
+    fireEvent.mouseMove(row, { movementX: 2, movementY: 1 })
     expect(screen.getByTestId('lifted-pin')).toHaveTextContent('g2')
     expect(screen.getByTestId('frame-token').textContent).toBe(frame)
     fireEvent.mouseLeave(row)
