@@ -47,6 +47,9 @@ type Props = {
   center: LatLng
 }
 
+/** A link in the foot's row: 44px tall, padded beside its words. */
+const FOOT_LINK = 'inline-flex min-h-11 items-center px-3 hover:underline'
+
 export default function BrowseAll(props: Props) {
   const settings = useSiteSettings()
   const router = useRouter()
@@ -133,13 +136,21 @@ export function BrowseList({ communitySlug, listings, schedule, zmanim, timezone
           ))}
         </div>
       )}
-      <nav aria-label="About the guide" className="mt-8 flex flex-wrap gap-x-5 gap-y-2 border-t border-slate-200 pt-3 text-[15px] font-bold text-primary">
-        {/* Always here, so a quiet week (no "This week" on Today) still has a
-            way to the page — unless it's held back (see features.ts). */}
-        {features.whatChanged && <Link href={routes.changes(communitySlug)}>What changed</Link>}
-        {settings.feedbackEnabled && <Link href={routes.feedback(communitySlug)}>Feedback</Link>}
-        <Link href={routes.about(communitySlug)}>About</Link>
-        <Link href={routes.privacy(communitySlug)}>Privacy</Link>
+      {/* Each link a full finger's height (44px), padded beside its words so
+          the gaps between them are tappable too (the user, Oct 15: "not
+          much room to click"); pulled left by its padding so the words still
+          line up with the list above. Room under them, the page's last row,
+          so the floating "+" sits below them, not beside Privacy, once
+          scrolled to the end. */}
+      <nav aria-label="About the guide" className="mt-8 border-t border-slate-200 pt-1 pb-16 text-[15px] font-bold text-primary">
+        <div className="-mx-3 flex flex-wrap">
+          {/* Always here, so a quiet week (no "This week" on Today) still has a
+              way to the page — unless it's held back (see features.ts). */}
+          {features.whatChanged && <Link href={routes.changes(communitySlug)} className={FOOT_LINK}>What changed</Link>}
+          {settings.feedbackEnabled && <Link href={routes.feedback(communitySlug)} className={FOOT_LINK}>Feedback</Link>}
+          <Link href={routes.about(communitySlug)} className={FOOT_LINK}>About</Link>
+          <Link href={routes.privacy(communitySlug)} className={FOOT_LINK}>Privacy</Link>
+        </div>
       </nav>
     </>
   )

@@ -62,6 +62,32 @@ describe('ListingView — who and whether', () => {
     expect(screen.getAllByText(/mi from central/)).toHaveLength(1)
   })
 
+  // The user, Oct 15: on Food, "Opens Fri 4 PM · Parve · IKC" is one line,
+  // and the short description sits under it, beside the picture.
+  it('on Food, the hechsher shares the hours’ line and the description goes under it; elsewhere each keeps its own line', () => {
+    const everyDay = Object.fromEntries(['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'].map((d) => [d, { open: '11:00', close: '15:00' }]))
+    const tagline: CategoryField = { key: 'tagline', label: 'Short description', type: 'text', renderAs: 'row', showInHeader: true, headerMaxLength: 60 }
+    const dishes: CategoryField = { key: 'dishes', label: 'Main dishes', type: 'tags', renderAs: 'badge', showCountInHeader: true, countLabel: 'main dish' }
+    const item = { ...judah, hours: everyDay, tagline: 'Vegan Dine In' }
+    view({ item, category: makeCategory({ ...food, detailFields: [...food.detailFields, tagline, dishes] }) })
+    const status = screen.getByTestId('listing-status')
+    expect(status).toHaveTextContent(/ · Meat · Keystone-K$/)
+    expect(within(status).getByTestId('listing-facts')).toHaveTextContent(/^Meat · Keystone-K$/)
+    expect(screen.getAllByTestId('listing-facts')).toHaveLength(1)
+    // Under the line, in the same column beside the picture.
+    const said = screen.getByTestId('listing-tagline')
+    expect(said).toHaveTextContent('Vegan Dine In')
+    expect(said.parentElement).toBe(status.parentElement)
+
+    // A grocery: its facts on their own line, the description under the header.
+    cleanup()
+    const m: CategoryField = { key: 'm', label: 'Kosher items', type: 'tags', renderAs: 'badge', showCountInHeader: true }
+    view({ item, category: makeCategory({ ...food, detailFields: [...food.detailFields, tagline, m] }) })
+    expect(screen.getByTestId('listing-status')).not.toHaveTextContent('Keystone-K')
+    expect(screen.getByTestId('listing-facts').parentElement).toBe(screen.getByTestId('listing-status').parentElement)
+    expect(screen.getByTestId('listing-tagline').parentElement).not.toBe(screen.getByTestId('listing-status').parentElement)
+  })
+
   it('says a hechsher’s caveat under the facts, on its own; what isn’t kosher, in full, in the details', () => {
     view({ item: { ...judah, kosherPartial: true, kosherNote: 'The bar is not supervised' } })
     expect(screen.getByTestId('listing-caveat')).toHaveTextContent(/^Not everything here is kosher$/)
@@ -363,7 +389,9 @@ describe('ListingView — how sure', () => {
     // box's name said again (Oct 10).
     const box = screen.getByTestId('davening-shabbos')
     expect(within(box).getByTestId('freshness')).toHaveTextContent(/^Confirmed Sep 29Edit$/)
-    expect(screen.getAllByText(/confirmed/i)).toHaveLength(1)
+    // Once among the times; the address box's own date is about the address.
+    const contact = screen.getByTestId('listing-details')
+    expect(screen.getAllByText(/confirmed/i).filter((el) => !contact.contains(el))).toHaveLength(1)
     expect(within(box).queryByRole('button', { name: 'Update their times' })).not.toBeInTheDocument()
     fireEvent.click(within(box).getByRole('button', { name: 'Edit' }))
     const sheet = screen.getByRole('dialog', { name: 'Usual Shabbos times' })
@@ -459,16 +487,47 @@ describe('ListingView — how sure', () => {
   })
 
   it('asks nothing where nothing is the community’s to confirm', () => {
-    // A hotel that isn't Shabbat friendly: no facts, no times, no items.
+    // A hotel that isn't Shabbat friendly, with no address: no facts, no
+    // times, no items, no way to reach it.
     const shabbat: CategoryField = { key: 'shabbatFriendly', label: 'Shabbat friendly', type: 'boolean', renderAs: 'badge', filterable: true }
-    view({ item: makeListing({ shabbatFriendly: false }), category: makeCategory({ id: 'hotel', detailFields: [shabbat] }) })
+    view({ item: makeListing({ shabbatFriendly: false, address: '' }), category: makeCategory({ id: 'hotel', detailFields: [shabbat] }) })
     expect(screen.queryByTestId('freshness')).not.toBeInTheDocument()
   })
 
-  it('nor a Shabbat-friendly hotel (Oct 6): what hardly changes isn’t dated', () => {
+  it('nor a Shabbat-friendly hotel (Oct 6): what hardly changes isn’t dated, only its address is', () => {
     const shabbat: CategoryField = { key: 'shabbatFriendly', label: 'Shabbat friendly', type: 'boolean', renderAs: 'badge', filterable: true }
     view({ item: makeListing({ shabbatFriendly: true, confirmedAt: '2026-09-10T12:00:00Z' }), category: makeCategory({ id: 'hotel', detailFields: [shabbat] }) })
-    expect(screen.queryByTestId('freshness')).not.toBeInTheDocument()
+    expect(screen.getAllByTestId('freshness').every((el) => screen.getByTestId('listing-details').contains(el))).toBe(true)
+  })
+
+  // Oct 15, the user: an address, phone, website or email nobody got from
+  // Google is dated like every other box, and confirmed on its own.
+  it('the contact box, when Google doesn’t keep it, says when it was confirmed, with Edit, and Yes confirms just it', async () => {
+    const website: CategoryField = { key: 'website', label: 'Website', type: 'url', renderAs: 'row' }
+    const item = makeListing({ id: '0b6c4c1e-2f55-4a8e-9d57-3b7f0d6f4a21', phone: '215-555-0100', website: 'https://example.org', confirmedAt: '2026-08-02T12:00:00Z', sectionConfirmed: { contact: '2026-08-05T12:00:00Z' } })
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-12-20T12:00:00Z'))
+    let contact: HTMLElement
+    try {
+      view({ item, category: makeCategory({ detailFields: [website] }) })
+      contact = screen.getByTestId('listing-details')
+      expect(within(contact).getByTestId('freshness')).toHaveTextContent(/^Confirmed Aug 5 · Still right\?YesEdit$/)
+      // One Edit, in the dated line, not a second one beside it.
+      expect(within(contact).getAllByRole('button', { name: 'Edit' })).toHaveLength(1)
+    } finally {
+      vi.useRealTimers()
+    }
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ ok: true, confirmedAt: '2026-12-20T12:00:00Z' }), { status: 200 }))
+    fireEvent.click(within(contact).getByRole('button', { name: 'Yes' }))
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalled())
+    expect(JSON.parse(String(fetchMock.mock.calls[0][1]!.body))).toEqual({ section: 'contact' })
+    fetchMock.mockRestore()
+
+    // Kept by Google: Google's date instead, and no question.
+    cleanup()
+    view({ item: { ...item, placeId: 'p1', googleSyncedAt: '2026-09-30T06:59:09Z', googleFields: ['phone'] }, category: makeCategory({ detailFields: [website] }) })
+    expect(within(screen.getByTestId('listing-details')).queryByTestId('freshness')).not.toBeInTheDocument()
+    expect(within(screen.getByTestId('listing-details')).getByTestId('listing-google')).toHaveTextContent('Last updated from Google, Sep 30.')
   })
 })
 
