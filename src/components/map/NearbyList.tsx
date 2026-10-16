@@ -78,6 +78,11 @@ export default function NearbyList({ points, userLocation, onViewListing, onSele
     const towns = townsFrom(listings)
     return new Map(listings.map((l) => [l.id, placeName(l, hoods, towns)]))
   }, [points, community])
+  // Which kind of place each row is, said first on its second line, in its
+  // pins' colour, wherever the list mixes kinds (the user, Oct 16: "people
+  // will want to know which category a given listing is"). Not where it's
+  // all one: "Food" on every row of a Food list says nothing.
+  const mixed = new Set(points.map((p) => p.filterId)).size > 1
 
   const sorted = useMemo<ScoredPoint[]>(() => {
     const scored = points.map((p) => ({
@@ -141,6 +146,7 @@ export default function NearbyList({ points, userLocation, onViewListing, onSele
               category={byId.get(p.filterId) ?? null}
               place={places.get(p.id) ?? null}
               now={clock === null ? null : new Date(clock)}
+              showCategory={mixed}
               canViewListing={canViewListing}
               canPin={canPin}
               onSelect={() => (onSelectPlace ? onSelectPlace(p) : onViewListing!(p.filterId, p.id))}
@@ -160,6 +166,8 @@ type RowProps = {
   /** Where it is, in the row's words: "Bella Vista". */
   place: string | null
   now: Date | null
+  /** Say its category first on the second line (a list of several kinds). */
+  showCategory: boolean
   canViewListing: boolean
   canPin: boolean
   onSelect: () => void
@@ -174,7 +182,7 @@ function rowFacts(p: ScoredPoint, category: CategoryConfig | null, now: Date | n
   return listingRowFacts(item, category, now).filter((f) => !f.ownLine)
 }
 
-function NearbyRow({ point: p, category, place, now, canViewListing, canPin, onSelect, onTogglePin }: RowProps) {
+function NearbyRow({ point: p, category, place, now, showCategory, canViewListing, canPin, onSelect, onTogglePin }: RowProps) {
   // Sharing needs the same real directory entry pinning does — hospitals
   // (canPin false, no `raw`) have neither. listingPath is '' in that case;
   // the hook is still called unconditionally (rules of hooks), it's just
@@ -239,6 +247,14 @@ function NearbyRow({ point: p, category, place, now, canViewListing, canPin, onS
           </span>
           {facts.length > 0 ? (
             <span className="block truncate text-[13.5px] text-slate-600" data-testid="nearby-facts">
+              {showCategory && p.categoryLabel && (
+                <>
+                  <span className="font-semibold" style={{ color: p.color }} data-testid="nearby-category">
+                    {p.categoryLabel}
+                  </span>
+                  <span aria-hidden="true" className="px-1 text-slate-400">·</span>
+                </>
+              )}
               {facts.map((fact, i) => (
                 <span key={`${fact.text}:${i}`}>
                   {i > 0 && <span aria-hidden="true" className="px-1 text-slate-400">·</span>}

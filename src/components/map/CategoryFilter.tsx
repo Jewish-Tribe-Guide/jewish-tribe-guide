@@ -81,14 +81,13 @@ type Props = {
   scrollArrow?: boolean
 }
 
-/** A chip's size: compact over a phone's map; on a computer, Google Maps'
- *  own (32px tall, 14px words; the user, Oct 15: "google maps size we
- *  should follow"). For the row's own chips and the ones the map hands it
- *  (Filters, Saved, a campaign), so they stay one size. The phone's waits
- *  (agreed Oct 15, "at some point"). */
-export const CHIP_SIZE = 'px-2.5 py-1 text-xs desktop:px-3 desktop:py-[5px] desktop:text-sm'
-/** A glyph inside a chip, sized with it. */
-export const CHIP_GLYPH = 'h-3 w-3 desktop:h-4 desktop:w-4'
+/** A chip's size: Google Maps' own, 32px tall with 14px words, on a
+ *  computer and a phone alike (the user, Oct 15: "google maps size we
+ *  should follow"; Oct 16, the phone's too). For the row's own chips and
+ *  the ones the map hands it (Filters, Saved, a campaign), so they stay one
+ *  size. */
+export const CHIP_SIZE = 'px-3 py-[5px] text-sm'
+export const CHIP_GLYPH = 'h-4 w-4'
 
 /** The filter bar above the map: a chip per category that doubles as the color
  *  legend, plus an "All" shortcut. There's no "hide everything" state to
@@ -258,7 +257,7 @@ export default function CategoryFilter({
         return (
           <div key={o.id} className="relative shrink-0">
             <div
-              className={`flex items-stretch rounded-full border text-xs font-medium transition-colors desktop:text-sm ${
+              className={`flex items-stretch rounded-full border text-sm font-medium transition-colors ${
                 on ? 'border-transparent text-white' : 'border-slate-300 bg-white text-slate-500'
               }`}
               style={on ? { backgroundColor: o.color } : undefined}
@@ -266,7 +265,7 @@ export default function CategoryFilter({
               <button
                 onClick={() => onToggle(o.id)}
                 aria-pressed={selectedState}
-                className={`flex items-center gap-1 ${CHIP_SIZE} desktop:gap-1.5 ${
+                className={`flex items-center gap-1.5 ${CHIP_SIZE} ${
                   on ? 'rounded-full' : 'rounded-full hover:bg-slate-50'
                 } cursor-pointer`}
               >

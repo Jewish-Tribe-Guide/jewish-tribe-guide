@@ -8,6 +8,19 @@ import { defaultCommunity, dismissLocationPrompt } from './helpers'
 // ran to within 12px of the ✕, Set location on a line of its own under it.
 // Sizes and positions, so a real browser: jsdom lays nothing out.
 
+// Oct 16: the phone's chips too, the same size (not the map under the
+// status bar, which waits).
+test('phone map: the chips are Google Maps’ size too', async ({ page, isMobile }) => {
+  test.skip(!isMobile, 'the phone’s chip row')
+  const community = await defaultCommunity(page)
+  await page.goto(`/${community}/map`)
+  await dismissLocationPrompt(page)
+  const all = page.getByRole('button', { name: 'All', exact: true }).filter({ visible: true })
+  await expect(all).toBeVisible()
+  expect(Math.round((await all.boundingBox())!.height), 'a chip is 32px tall').toBe(32)
+  expect(await all.evaluate((el) => getComputedStyle(el).fontSize), 'its words are 14px').toBe('14px')
+})
+
 test('desktop map: Google Maps’ sizes, and the chips, Set location and ✕ on one line with room', async ({ page, isMobile }) => {
   test.skip(isMobile, 'the desktop map’s top row')
   const community = await defaultCommunity(page)

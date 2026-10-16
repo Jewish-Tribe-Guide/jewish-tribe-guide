@@ -1701,7 +1701,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   const campaignHighlighted = !!campaignOption && effectiveSelected.has(campaignOption.id) && !allChipsOn
   const campaignChip = campaignOption && (
     <div
-      className={`relative flex shrink-0 items-stretch rounded-full text-xs font-semibold transition-colors desktop:text-sm ${
+      className={`relative flex shrink-0 items-stretch rounded-full text-sm font-semibold transition-colors ${
         campaignHighlighted ? 'text-white' : 'bg-gradient-to-r from-amber-50 to-amber-100 text-amber-900'
       }`}
       style={campaignHighlighted ? { backgroundColor: campaignOption.color } : { boxShadow: 'inset 0 0 0 1.5px rgba(180,130,20,0.35)' }}
@@ -1735,7 +1735,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // Filters, before All — the visitor's own places, not one more category.
   const pinnedChip = ui.map.pins && mappablePinnedCount > 0 && (
     <div
-      className={`relative flex shrink-0 items-stretch rounded-full border text-xs font-semibold transition-colors desktop:text-sm ${
+      className={`relative flex shrink-0 items-stretch rounded-full border text-sm font-semibold transition-colors ${
         pinnedHighlighted ? 'border-transparent text-white' : 'border-slate-300 bg-white text-[#2563eb]'
       }`}
       // The same blue as the bookmark badge on a saved place's marker (see
@@ -1910,7 +1910,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
         filtersOn > 0 ? 'bg-primary text-white hover:bg-primary-dark' : 'bg-white text-primary hover:bg-primary/5 active:bg-primary/10'
       }`}
     >
-      <SlidersIcon className="h-3.5 w-3.5 desktop:h-4 desktop:w-4" />
+      <SlidersIcon className="h-4 w-4" />
       Filters
       {filtersOn > 0 && <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-white px-1 text-[11px] text-primary">{filtersOn}</span>}
     </button>

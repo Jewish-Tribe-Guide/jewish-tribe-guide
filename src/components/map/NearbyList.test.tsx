@@ -247,3 +247,36 @@ describe('NearbyList — what a row says', () => {
     expect(screen.getByTestId('nearby-facts')).toHaveTextContent('Hospital · 111 S 11th St')
   })
 })
+
+// The user, Oct 16: with several kinds of place in the list, people want to
+// know which each is. Said first on the second line, in its pins' colour;
+// not in a list of one kind, where it would say the same thing every row.
+describe('NearbyList — which kind of place', () => {
+  const hours = { key: 'hours', label: 'Hours', type: 'hours' as const, renderAs: 'row' as const }
+  const food = makeCategory({ id: 'restaurant', label: 'Food', detailFields: [hours] })
+  const grocery = makeCategory({ id: 'grocery', label: 'Grocery', detailFields: [hours] })
+  const everyDay = Object.fromEntries(['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'].map((d) => [d, { open: '00:00', close: '23:59' }]))
+  const point = (id: string, filterId: string, categoryLabel: string, color: string) =>
+    makePoint({ id, filterId, name: id, categoryLabel, color, raw: makeListing({ id, category: filterId, name: id, hours: everyDay }) } as Partial<MapPoint & { filterId: string }>)
+  const list = (points: ReturnType<typeof point>[]) =>
+    renderWithProviders(
+      <PinnedProvider>
+        <NearbyList points={points} userLocation={null} onViewListing={vi.fn()} />
+      </PinnedProvider>,
+      { content: { categories: [food, grocery] } },
+    )
+
+  it('says each row’s category first, in its colour, when the list mixes kinds', () => {
+    list([point('Judah', 'restaurant', 'Food', '#0f766e'), point('Acme', 'grocery', 'Grocery', '#be185d')])
+    const words = screen.getAllByTestId('nearby-category')
+    expect(words.map((w) => w.textContent)).toEqual(expect.arrayContaining(['Food', 'Grocery']))
+    const food = words.find((w) => w.textContent === 'Food')!
+    expect(food).toHaveStyle({ color: '#0f766e' })
+    expect(food.closest('[data-testid="nearby-facts"]')).toHaveTextContent(/^Food·Open/)
+  })
+
+  it('says nothing of it when every row is the same kind', () => {
+    list([point('Judah', 'restaurant', 'Food', '#0f766e'), point('Goldie', 'restaurant', 'Food', '#0f766e')])
+    expect(screen.queryByTestId('nearby-category')).not.toBeInTheDocument()
+  })
+})
