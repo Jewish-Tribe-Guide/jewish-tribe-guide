@@ -81,6 +81,15 @@ type Props = {
   scrollArrow?: boolean
 }
 
+/** A chip's size: compact over a phone's map; on a computer, Google Maps'
+ *  own (32px tall, 14px words; the user, Oct 15: "google maps size we
+ *  should follow"). For the row's own chips and the ones the map hands it
+ *  (Filters, Saved, a campaign), so they stay one size. The phone's waits
+ *  (agreed Oct 15, "at some point"). */
+export const CHIP_SIZE = 'px-2.5 py-1 text-xs desktop:px-3 desktop:py-[5px] desktop:text-sm'
+/** A glyph inside a chip, sized with it. */
+export const CHIP_GLYPH = 'h-3 w-3 desktop:h-4 desktop:w-4'
+
 /** The filter bar above the map: a chip per category that doubles as the color
  *  legend, plus an "All" shortcut. There's no "hide everything" state to
  *  toggle back to — unclicking the last chip resets to all (see `toggle` in
@@ -228,7 +237,7 @@ export default function CategoryFilter({
       <button
         onClick={onAll}
         aria-pressed={allOn}
-        className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors cursor-pointer ${
+        className={`shrink-0 rounded-full border ${CHIP_SIZE} font-medium transition-colors cursor-pointer ${
           allOn
             ? 'border-transparent bg-slate-700 text-white'
             : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-100'
@@ -249,7 +258,7 @@ export default function CategoryFilter({
         return (
           <div key={o.id} className="relative shrink-0">
             <div
-              className={`flex items-stretch rounded-full border text-xs font-medium transition-colors ${
+              className={`flex items-stretch rounded-full border text-xs font-medium transition-colors desktop:text-sm ${
                 on ? 'border-transparent text-white' : 'border-slate-300 bg-white text-slate-500'
               }`}
               style={on ? { backgroundColor: o.color } : undefined}
@@ -257,7 +266,7 @@ export default function CategoryFilter({
               <button
                 onClick={() => onToggle(o.id)}
                 aria-pressed={selectedState}
-                className={`flex items-center gap-1 py-1 pl-2.5 pr-2.5 ${
+                className={`flex items-center gap-1 ${CHIP_SIZE} desktop:gap-1.5 ${
                   on ? 'rounded-full' : 'rounded-full hover:bg-slate-50'
                 } cursor-pointer`}
               >
@@ -266,7 +275,7 @@ export default function CategoryFilter({
                   style={{ backgroundColor: on ? 'rgba(255,255,255,0.9)' : o.color }}
                   aria-hidden="true"
                 />
-                {o.icon && <CategoryGlyph categoryId={o.id} icon={o.icon} className="h-3 w-3 shrink-0" />}
+                {o.icon && <CategoryGlyph categoryId={o.id} icon={o.icon} className={`${CHIP_GLYPH} shrink-0`} />}
                 <span>{o.label}</span>
                 {/* How many of this category the filters leave: 73, or 5
                     with Meat, Keystone-K and Open now on. */}
@@ -280,7 +289,7 @@ export default function CategoryFilter({
       {hiddenCount > 0 && (
         <button
           onClick={onMore}
-          className="shrink-0 rounded-full border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50 cursor-pointer"
+          className={`shrink-0 rounded-full border border-slate-300 bg-white ${CHIP_SIZE} font-medium text-slate-600 hover:bg-slate-50 cursor-pointer`}
         >
           ⋯ More
         </button>

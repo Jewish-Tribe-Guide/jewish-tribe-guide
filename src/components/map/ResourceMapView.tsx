@@ -3,7 +3,7 @@
 import { track } from '@vercel/analytics'
 import { useCallback, useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import ResourceMap, { type MapPoint } from './ResourceMap'
-import CategoryFilter, { type FilterOption } from './CategoryFilter'
+import CategoryFilter, { CHIP_GLYPH, CHIP_SIZE, type FilterOption } from './CategoryFilter'
 import CategoryPickerList from './CategoryPickerList'
 import MapFiltersSheet, { type MapFilterSection } from './MapFiltersSheet'
 import { FilterChip } from '@/components/resources/FiltersSheet'
@@ -1564,7 +1564,8 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
           e.preventDefault()
           submitSearch()
         }}
-        className="flex items-center rounded-full border border-slate-300 bg-white px-3.5 py-2 shadow-sm focus-within:ring-2 focus-within:ring-primary"
+        // 48px tall, Google Maps' own search box (the user, Oct 15).
+        className="flex h-12 items-center rounded-full border border-slate-300 bg-white px-4 shadow-sm focus-within:ring-2 focus-within:ring-primary"
       >
         {/* A place open in the sidebar: ← back to the results, where the
             magnifier sits (Oct 15, board "A", as Google Maps does). It sits
@@ -1578,12 +1579,12 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
             type="button"
             onClick={() => (desktopEditing ? editor.back() : setDesktopSelected(null))}
             aria-label={desktopEditing ? editor.label : 'Back to results'}
-            className="-my-1.5 -ml-2 flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-full text-slate-700 transition-colors hover:bg-slate-100 active:bg-slate-200"
+            className="-ml-2 flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full text-slate-700 transition-colors hover:bg-slate-100 active:bg-slate-200"
           >
-            <ArrowLeftIcon className="h-[18px] w-[18px]" />
+            <ArrowLeftIcon className="h-5 w-5" />
           </button>
         ) : (
-          <svg className="h-4 w-4 shrink-0 text-slate-400" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24" aria-hidden="true">
+          <svg className="h-5 w-5 shrink-0 text-slate-400" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24" aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" />
           </svg>
         )}
@@ -1605,7 +1606,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
               ;(e.target as HTMLInputElement).blur()
             }
           }}
-          className="min-w-0 flex-1 bg-transparent px-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none"
+          className="min-w-0 flex-1 bg-transparent px-3 text-[15px] text-slate-900 placeholder:text-slate-400 focus:outline-none"
         />
         {/* Not while a place is open: ← is the way back then, and the
             corner ✕ (Close map) stays the only ✕ on screen. */}
@@ -1697,7 +1698,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   const campaignHighlighted = !!campaignOption && effectiveSelected.has(campaignOption.id) && !allChipsOn
   const campaignChip = campaignOption && (
     <div
-      className={`relative flex shrink-0 items-stretch rounded-full text-xs font-semibold transition-colors ${
+      className={`relative flex shrink-0 items-stretch rounded-full text-xs font-semibold transition-colors desktop:text-sm ${
         campaignHighlighted ? 'text-white' : 'bg-gradient-to-r from-amber-50 to-amber-100 text-amber-900'
       }`}
       style={campaignHighlighted ? { backgroundColor: campaignOption.color } : { boxShadow: 'inset 0 0 0 1.5px rgba(180,130,20,0.35)' }}
@@ -1705,7 +1706,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
       <button
         onClick={() => toggle(campaignOption.id)}
         aria-pressed={effectiveSelected.has(campaignOption.id)}
-        className={`flex items-center gap-1 py-1 pl-2.5 pr-2.5 rounded-full cursor-pointer ${campaignHighlighted ? '' : 'hover:from-amber-100 hover:to-amber-200'}`}
+        className={`flex items-center gap-1 ${CHIP_SIZE} rounded-full cursor-pointer ${campaignHighlighted ? '' : 'hover:from-amber-100 hover:to-amber-200'}`}
       >
         <span aria-hidden="true">✨</span>
         <span>{campaignOption.label}</span>
@@ -1731,7 +1732,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // Filters, before All — the visitor's own places, not one more category.
   const pinnedChip = ui.map.pins && mappablePinnedCount > 0 && (
     <div
-      className={`relative flex shrink-0 items-stretch rounded-full border text-xs font-semibold transition-colors ${
+      className={`relative flex shrink-0 items-stretch rounded-full border text-xs font-semibold transition-colors desktop:text-sm ${
         pinnedHighlighted ? 'border-transparent text-white' : 'border-slate-300 bg-white text-[#2563eb]'
       }`}
       // The same blue as the bookmark badge on a saved place's marker (see
@@ -1741,9 +1742,9 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
       <button
         onClick={togglePinnedSelected}
         aria-pressed={pinnedSelected}
-        className={`flex items-center gap-1 py-1 pl-2.5 pr-2.5 rounded-full cursor-pointer ${pinnedHighlighted ? '' : 'hover:bg-slate-50'}`}
+        className={`flex items-center gap-1 ${CHIP_SIZE} rounded-full cursor-pointer ${pinnedHighlighted ? '' : 'hover:bg-slate-50'}`}
       >
-        <BookmarkIcon filled={pinnedHighlighted} className="h-3 w-3" />
+        <BookmarkIcon filled={pinnedHighlighted} className={CHIP_GLYPH} />
         <span>Saved</span>
         <span className={pinnedHighlighted ? 'text-white/80' : ''}>{mappablePinnedCount}</span>
       </button>
@@ -1898,11 +1899,11 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
       onClick={() => setFiltersOpen(true)}
       aria-label={filtersOn > 0 ? `Filters, ${filtersOn} on` : 'Filters'}
       data-testid="map-filters-button"
-      className={`flex shrink-0 cursor-pointer items-center gap-1.5 rounded-full border border-primary px-2.5 py-1 text-xs font-bold shadow-sm transition-colors ${
+      className={`flex shrink-0 cursor-pointer items-center gap-1.5 rounded-full border border-primary ${CHIP_SIZE} font-bold shadow-sm transition-colors ${
         filtersOn > 0 ? 'bg-primary text-white hover:bg-primary-dark' : 'bg-white text-primary hover:bg-primary/5 active:bg-primary/10'
       }`}
     >
-      <SlidersIcon className="h-3.5 w-3.5" />
+      <SlidersIcon className="h-3.5 w-3.5 desktop:h-4 desktop:w-4" />
       Filters
       {filtersOn > 0 && <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-white px-1 text-[11px] text-primary">{filtersOn}</span>}
     </button>
@@ -2128,7 +2129,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                   alone would only clear it on first paint; once scrolled,
                   list rows would slide up underneath the floating bar since
                   padding is part of the same scrolling content. ────────── */}
-              <div className="h-16 shrink-0" />
+              <div className="h-[72px] shrink-0" />
               {ui.map.nearbyList &&
                 // No "Back to list" in here: the ← in the search box above
                 // is the way back on a computer (Oct 15).
@@ -2273,31 +2274,77 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
             </div>
           )}
 
-          {/* ── Floating category chips (desktop) — sits just clear of the
-                  sidebar's own right edge (its width + a 16px gap),
-                  matching how tight Google Maps' own chip row sits after
-                  its panel (see the reference screenshot) — closer than the
-                  margin left between the search box and the sidebar's edge
-                  above, which is a separate, deliberately larger gap.
-                  Tracks sidebarWidth now that it's draggable — this used to
-                  be a fixed 396px (380 + 16) on the reasoning that the
-                  sidebar could never get wider than that fixed value; now
-                  that it can, clamped with Math.max so a narrow/collapsed
-                  sidebar still leaves its original, already-tuned 396px gap
-                  rather than crowding the chips against a narrower edge.
-                  right-16 (not right-3): leaves clearance so the chip row's
-                  scroll area doesn't run under the fullscreen button, which
-                  shares this same top-right corner of the map. ────────── */}
-          {!isMobile && desktopCategoryChips && (
+          {/* ── The map's top row (desktop): the category chips, then Set
+                  location and the corner's ✕ (or the fullscreen toggle), one
+                  row (the user, Oct 15: the chips ran to within 12px of the
+                  ✕, with Set location on a line of its own under it). The
+                  chips start just clear of the sidebar's own right edge (its
+                  width + a 16px gap), as tight as Google Maps' row sits
+                  after its panel, clamped with Math.max so a narrow or
+                  collapsed sidebar keeps the already-tuned 396px; they take
+                  what's left and end 16px before Set location, so the ✕
+                  has room. Centred on the 48px search box: the chips 8px
+                  down, the buttons in a 48px-tall box. The gap between them
+                  passes clicks through to the map. ───────────────────────── */}
+          {!isMobile && (
             <div
-              className="absolute right-16 top-3 z-20 hidden pt-0.5 desktop:block"
+              data-testid="map-top-row"
+              className="pointer-events-none absolute right-3 top-3 z-20 hidden items-start gap-4 desktop:flex"
               style={{
                 left: Math.max(396, (sidebarVisible ? sidebarWidth : 0) + 16),
                 transition: isDraggingSidebar ? 'none' : 'left 200ms ease-in-out',
               }}
             >
-              {desktopCategoryChips}
-              {activeFilterRow}
+              <div data-testid="map-top-chips" className="pointer-events-auto min-w-0 flex-1 pt-2">
+                {desktopCategoryChips}
+                {activeFilterRow}
+              </div>
+              <div data-testid="map-top-corner" className="pointer-events-auto flex h-12 shrink-0 items-center gap-2">
+                {/* Address entry (fullscreen only): the map is
+                    `desktop:fixed desktop:inset-0 desktop:z-50`, painting
+                    over the site header and, with it, the only other place
+                    to type an address. Not in the boxed state: the header is
+                    `sticky top-0` (SiteHeader.tsx) and stays visible above a
+                    boxed map, its own LocationControl already reachable. */}
+                {fullscreen && controls && (
+                  <div data-testid="map-location-control">
+                    <LocationControl controls={controls} />
+                  </div>
+                )}
+                {/* Close map (the map page): a bare ✕ in the corner, where
+                    a full-screen view's close is expected (Oct 15, board
+                    "A"). It replaced a ‹ Back beside the search, which sat
+                    on the sidebar and read as "close this panel". Away from
+                    the sidebar it can only mean leave the map: back where it
+                    was opened from, or home (exitFullscreen). The ← in the
+                    search box is the step back within it. */}
+                {standalone && fullscreen && (
+                  <button
+                    type="button"
+                    onClick={exitFullscreen}
+                    aria-label="Close map"
+                    className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full bg-white text-slate-700 shadow-md ring-1 ring-slate-900/10 hover:bg-slate-50"
+                  >
+                    <CloseIcon className="h-5 w-5" />
+                  </button>
+                )}
+                {/* Fullscreen toggle: a boxed map (the admin's category
+                    preview) expands to cover the viewport; Escape or this
+                    again collapses it, or, arriving from a listing's Map
+                    button, goes straight back to that listing
+                    (exitFullscreen). Not on the map page, whose way out is
+                    the ✕. */}
+                {!standalone && (
+                  <button
+                    onClick={() => (fullscreen ? exitFullscreen() : setFullscreen(true))}
+                    aria-label={fullscreen ? 'Exit fullscreen' : 'View fullscreen'}
+                    aria-pressed={fullscreen}
+                    className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-lg bg-white text-slate-600 shadow-md ring-1 ring-slate-900/10 hover:bg-slate-50"
+                  >
+                    {fullscreen ? <CollapseIcon className="h-4 w-4" /> : <ExpandIcon className="h-4 w-4" />}
+                  </button>
+                )}
+              </div>
             </div>
           )}
 
@@ -2356,42 +2403,6 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                 cornerControl={isMobile ? undefined : eruvButton}
               />
 
-              {/* ── Fullscreen toggle (desktop only) — the map starts as a
-                      contained card; this expands it to cover the viewport
-                      (Escape, or tapping it again, collapses it back — or,
-                      arriving from a listing's Map button, exits straight
-                      back to that listing; see exitFullscreen). ─────────── */}
-              {/* Not on the map page itself: its way out is the ✕ below. */}
-              {!standalone && (
-              <button
-                onClick={() => (fullscreen ? exitFullscreen() : setFullscreen(true))}
-                aria-label={fullscreen ? 'Exit fullscreen' : 'View fullscreen'}
-                aria-pressed={fullscreen}
-                className="absolute right-3 top-3 z-10 hidden h-9 w-9 items-center justify-center rounded-lg bg-white text-slate-600 shadow-md ring-1 ring-slate-900/10 hover:bg-slate-50 cursor-pointer desktop:flex"
-              >
-                {fullscreen ? <CollapseIcon className="h-4 w-4" /> : <ExpandIcon className="h-4 w-4" />}
-              </button>
-              )}
-
-              {/* ── Close map (the map page, desktop) — a bare ✕ in the
-                      top-right corner, where a full-screen view's close is
-                      expected (Oct 15, board "A"). It replaced a ‹ Back
-                      beside the search, which sat on the sidebar and read as
-                      "close this panel". Away from the sidebar, it can only
-                      mean leave the map: back where it was opened from, or
-                      home (exitFullscreen). The ← in the search box is the
-                      step back within it. ─────────────────────────────── */}
-              {standalone && fullscreen && (
-                <button
-                  type="button"
-                  onClick={exitFullscreen}
-                  aria-label="Close map"
-                  className="absolute right-3 top-3 z-10 hidden h-10 w-10 cursor-pointer items-center justify-center rounded-full bg-white text-slate-700 shadow-md ring-1 ring-slate-900/10 hover:bg-slate-50 desktop:flex"
-                >
-                  <CloseIcon className="h-5 w-5" />
-                </button>
-              )}
-
               {/* ── Live-tracking toggle (desktop only) — a map control, not a
                       sidebar row, same as Google Maps' own "my location" button.
                       Bottom-left so it never collides with the re-center pill
@@ -2401,7 +2412,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                   onClick={() => (tracking ? stop() : handleStart())}
                   aria-label={tracking ? 'Stop tracking my location' : 'Track my location'}
                   aria-pressed={tracking}
-                  className={`absolute bottom-3 left-3 z-10 hidden h-9 w-9 items-center justify-center rounded-full shadow-md ring-1 cursor-pointer desktop:flex ${
+                  className={`absolute bottom-3 left-3 z-10 hidden h-10 w-10 items-center justify-center rounded-full shadow-md ring-1 cursor-pointer desktop:flex ${
                     tracking
                       ? 'bg-blue-600 text-white ring-blue-600 hover:bg-blue-700'
                       : 'bg-white text-slate-600 ring-slate-900/10 hover:bg-slate-50'
@@ -2410,23 +2421,6 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                   <span aria-hidden="true">📍</span>
                 </button>
               )}
-              {/* ── Address entry (desktop, fullscreen only) — necessary because
-                      the map is `desktop:fixed desktop:inset-0 desktop:z-50`,
-                      painting directly over the site header and, with it, the
-                      only other place a visitor can type an address. Not shown
-                      in the boxed state: the header is `sticky top-0` (see
-                      SiteHeader.tsx) and stays visible above a boxed map, so
-                      its own LocationControl pill is already reachable there
-                      and a second copy would be redundant. Ends where the
-                      chip row above it ends (right-16), not at the map's
-                      edge: the corner's own column is the ✕ (or the
-                      fullscreen toggle) alone (Oct 15). ─────────────────── */}
-              {!isMobile && fullscreen && controls && (
-                <div data-testid="map-location-control" className="absolute right-16 top-14 z-20 hidden desktop:block">
-                  <LocationControl controls={controls} />
-                </div>
-              )}
-
               {/* ── Floating search + filters (mobile) — laid directly over the
                       map, Google-Maps-style, instead of pushing it down. Category
                       chips sit right under the search bar as their own

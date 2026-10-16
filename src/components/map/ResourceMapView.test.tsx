@@ -275,7 +275,7 @@ describe('ResourceMapView — desktop search/filter bar position', () => {
     )
 
     const search = () => container.querySelector('[class*="left-3"][class*="top-3"]')
-    const chips = () => container.querySelector('[class*="right-16"][class*="z-20"]') as HTMLElement | null
+    const chips = () => container.querySelector('[data-testid="map-top-row"]') as HTMLElement | null
     const before = { searchClass: search()?.className, chipsLeft: chips()?.style.left }
 
     await user.click(screen.getByRole('button', { name: /Grocery Stores/ }))
@@ -347,7 +347,7 @@ describe('ResourceMapView — desktop search/filter bar position', () => {
     await user.click(screen.getByRole('button', { name: /Grocery Stores/ }))
 
     const aside = container.querySelector('aside') as HTMLElement | null
-    const chips = container.querySelector('[class*="right-16"][class*="z-20"]') as HTMLElement | null
+    const chips = container.querySelector('[data-testid="map-top-row"]') as HTMLElement | null
 
     const sidebarWidth = Number(aside?.style.width.replace('px', ''))
     const chipsLeft = Number(chips?.style.left.replace('px', ''))
@@ -1246,14 +1246,26 @@ describe('ResourceMapView — the map’s own location control', () => {
     expect(screen.getByRole('button', { name: '1 Main St' })).toBeInTheDocument()
   })
 
-  // Oct 15: in the top-right corner it crowded the ✕; it ends where the
-  // chip row does, clear of the ✕ (right-3, a 10 wide button).
-  it('sits in from the corner, clear of the ✕, ending where the chip row ends', () => {
+  // Oct 15, the user: the chips ran to within 12px of the ✕, with Set
+  // location on a line of its own under it. Now one row: the chips take
+  // what's left and end 16px before Set location, which sits just left of
+  // the corner's button.
+  it('sits on the chips’ row, just left of the corner’s button, the chips ending a gap before it', () => {
     renderFullscreen(mapControls())
     const control = screen.getByTestId('map-location-control')
     expect(control).toContainElement(screen.getByRole('button', { name: 'Set location' }))
-    expect(control.className).toMatch(/\bright-16\b/)
-    expect(control.className).not.toMatch(/\bright-3\b/)
+    const corner = screen.getByTestId('map-top-corner')
+    expect(corner).toContainElement(control)
+    expect(corner.className).toMatch(/\bshrink-0\b/)
+    // Set location first, then the corner's button.
+    expect(corner.lastElementChild).toBeInstanceOf(HTMLButtonElement)
+    expect(corner.firstElementChild).toBe(control)
+    // The same row as the chips, which shrink rather than run under it.
+    const row = screen.getByTestId('map-top-row')
+    expect(row).toContainElement(screen.getByTestId('map-top-chips'))
+    expect(row).toContainElement(corner)
+    expect(row.className).toMatch(/\bgap-4\b/)
+    expect(screen.getByTestId('map-top-chips').className).toMatch(/\bmin-w-0\b.*\bflex-1\b|\bflex-1\b.*\bmin-w-0\b/)
   })
 
   it('renders nothing for a caller with no location to set (the admin preview map)', () => {
@@ -1325,8 +1337,9 @@ describe('ResourceMapView — standalone map Escape/exit', () => {
     const close = screen.getByRole('button', { name: 'Close map' })
     // Words for a screen reader only; on screen it's the ✕ alone.
     expect(close).toHaveTextContent(/^$/)
-    expect(close.className).toMatch(/\bright-3\b/)
-    expect(close.className).toMatch(/\btop-3\b/)
+    // The corner of the map's top row, after Set location.
+    expect(screen.getByTestId('map-top-corner').lastElementChild).toBe(close)
+    expect(screen.getByTestId('map-top-row').className).toMatch(/\bright-3\b.*\btop-3\b/)
 
     await user.click(close)
 
