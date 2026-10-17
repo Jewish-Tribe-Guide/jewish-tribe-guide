@@ -4,7 +4,7 @@ The running list of what's outstanding, kept in the repo so it survives a
 change of Claude account (artifacts and Claude's own notes stay with the old
 account). Update it in the same commit as the work that changes it.
 
-Last updated: Oct 17, 2026.
+Last updated: Oct 17, 2026 (evening).
 
 ## The branch
 
@@ -23,17 +23,15 @@ old code until it's closed and reopened.
 The rule (AGENTS.md): nothing is written to the live database without a yes
 for that exact change, in the same conversation. Show the dry run first.
 
-1. **Shorter search hint.** The user said "let's shorten search" (Oct 17).
-   Live today: "Search — kosher food, mikvah, shuls, schools…", cut off on
-   phones. Proposed: "Ask: challah, pizza open now" (already set on the
-   dev/test database). It's `site_settings.search_placeholder`, also the
-   Site tab's "Search placeholder", and desktop shows it too. Needs the
-   exact wording confirmed, then a cache refresh after the write (or the
-   user changes it in Admin → Site, which refreshes on its own). Note: the
-   live site's older search may not answer "pizza open now" as well as
-   this branch does; doing it at the merge avoids that.
-2. **Philly Synagogues:** add the "Minyan" yes/no field, and rename the
+1. **Philly Synagogues:** add the "Minyan" yes/no field, and rename the
    category "Shuls & minyanim".
+2. **The hospitals' Refuah watches on the live site** (after the merge, and
+   after the hospital fields from Oct 6 are set up on the live Hospital
+   category; until then the watch has no fields to compare and files
+   nothing). Seven website watches, one per hospital, each tied to its
+   listing, on `refuah.com/hospitals/<id>` (the live listings' Refuah links
+   already point there). Added on the dev/test database Oct 17. Two of the
+   seven (Penn Presbyterian, Pennsylvania Hospital) have nothing on Refuah.
 
 ## For the user or the community
 
@@ -42,39 +40,42 @@ for that exact change, in the same conversation. Show the dry run first.
    mikvahs (Ohel Leah, Mei Shalva, Moishe Zvi), 4 restaurants (The Kosher
    Grill, Chalavita, The Brazilian BBQ, Zevi's Bakery) and CKids. Once all
    are dated, the home's trust line says "155 places · every listing dated"
-   by itself, and the sheet says "when it was last checked" instead of "if
-   and when".
+   by itself, and the sheet says "where and when it was last checked"
+   instead of "if and when".
 
 ## Getting the branch live
 
 4. **Merge `redesign/map-google-sizes` into `main`.** Until then the Keystone
-   K check and the eruv status reads don't run on the live site, so the
-   trust sheet can name only Google there.
+   K check, the eruv status reads, the Refuah watch and the "From …" dates
+   don't run on the live site, so the trust sheet can name only Google there.
 5. **Check the live database has every migration first.** Tables and columns
    through 081 are there (checked Oct 17). Not yet checked: 077 (eruv
    suggestions, a database rule) and 082 (confirming a contact box, a
    database function). Then deploy, verify, and only then any content that
    needs the new code.
 
-## To build next
-
-6. **Say where each fact came from** on every "last checked" line, not just
-   Google's: "From the Keystone K's list, Oct 12", "From centercityeruv.com,
-   1:25 PM", "From Refuah, Oct 6". Today a Keystone change approved by an
-   admin says only "Confirmed Oct 12". The trust sheet's third line becomes
-   "Every fact says where and when" once this is done.
-7. **Watch the hospitals' Refuah pages** for changes (a `website` watch, the
-   same mechanism as the Keystone K list). The hospital details were copied
-   from Refuah once, on Oct 6, and nothing reads Refuah again.
-
 ## Small open decisions
 
-8. The Try buttons under search still suggest minyanim ("Next Mincha",
-   "Next Shacharis"). Leave minyanim out, since weekday minyanim don't drive
-   this community?
-9. The "+" button covers part of the third tile in a row on the phone home.
-10. Optional: add a Google Maps key to CI, so the desktop map is tested with
-    a real map.
+6. The "+" button covers part of the third tile in a row on the phone home.
+
+## Done Oct 17
+
+- **Shorter search hint, live:** `site_settings.search_placeholder` is "Ask:
+  challah, pizza open now" on both databases (the user's yes, Oct 17; was
+  "Search — kosher food, mikvah, shuls, schools…"). The live site shows it
+  after its cache refreshes: any save in Admin, or by itself within a day.
+- **Every dated line says where it came from.** An approved change from a
+  named outside source (Keystone-K's list, Refuah) dates the listing "From
+  Keystone-K's list, Oct 12" (`details.confirmedFrom`); a person's later
+  confirmation is "Confirmed" again. Eruv lines: "From centercityeruv.com,
+  1:25 PM". Google keeps its own line. Changes approved before Oct 17 still
+  say "Confirmed".
+- **Refuah watch.** Refuah's pages build in the browser, so the watch reads
+  the public data service the page calls (`hospitals:getWithReferences`).
+  If Refuah renames that, the watch shows as not working and the admin is
+  emailed; nothing wrong is filed.
+- **Maps key in CI:** repo secrets `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` and
+  `_MAP_ID`, passed to the e2e and prod-smoke builds.
 
 ## Decided, so not to reopen
 
@@ -91,5 +92,8 @@ for that exact change, in the same conversation. Show the dry run first.
 - **Trust sheet ("How this guide stays right"):** the idea in three lines,
   each source named only once its check ran that week.
 - **Search box** on the phone home is the category pages' blue-edged box.
+- **Try asking keeps the minyan questions** (Oct 17). On a phone, up to six
+  in one row that swipes sideways, running to the screen's edge so the last
+  one shows cut off; a computer shows the three that fit.
 - **What changed / "what's happening in Philly"** stays off the phone home
   until the activity log has real traffic.
