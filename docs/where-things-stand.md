@@ -8,15 +8,22 @@ Last updated: Oct 17, 2026 (evening).
 
 ## The branch
 
-All of the redesign is on `redesign/map-google-sizes`, pushed. It is about
-580 commits ahead of `main`, which is what the live site runs (main was last
-merged Sep 14). Nothing below reaches the live site until this branch is
-merged.
+The redesign was merged into `main` on Oct 17 at 7:24 PM (#322, at
+7d5fead6) and is live. Later work is on `redesign/map-google-sizes` until
+the next merge.
 
 The user checks work on each commit's Vercel preview, on their phone. The
-preview reads the **dev/test database**, not the live one, so its numbers
-differ (150 places there, 155 live). A tab opened before a deploy keeps the
-old code until it's closed and reopened.
+preview reads the **dev/test database**, not the live one. A tab opened
+before a deploy keeps the old code until it's closed and reopened.
+
+**Preview and live look different because of their databases, not code**
+(compared table by table, Oct 17). The redesign's setup was built on the
+dev database and never copied to the live one: hospital and hotel boxes,
+Food's Main dishes and form sections, the phone tabs (You), home section
+order, category card images, WhatsApp off the map, descriptions in
+headers. Listing edits made on the preview (main dishes at six food places,
+the hospitals' Refuah contacts, two shuls' minyanim, some grocery items)
+are on dev only. Each live write needs the user's yes, dry run first.
 
 ## Waiting for a yes to change the live site
 
@@ -45,19 +52,15 @@ for that exact change, in the same conversation. Show the dry run first.
 
 ## Getting the branch live
 
-4. **Merge `redesign/map-google-sizes` into `main`.** Until then the Keystone
-   K check, the eruv status reads, the Refuah watch and the "From …" dates
-   don't run on the live site, so the trust sheet can name only Google there.
-   The live Keystone-K watch row exists (since Oct 5) but has never run:
-   `main` has neither its code nor its daily schedule. Its first live run
-   will file about 34 suggestions at once (dev's first run, Oct 17: levels
-   the guide lacks, one moved Keystone page, 4 places off the list, 10 on
-   it but not in the guide) and email the admins one digest.
-5. **Check the live database has every migration first.** Tables and columns
-   through 081 are there (checked Oct 17). Not yet checked: 077 (eruv
-   suggestions, a database rule) and 082 (confirming a contact box, a
-   database function). Then deploy, verify, and only then any content that
-   needs the new code.
+4. **Merged Oct 17.** The live Keystone-K watch's first run (07:00 UTC
+   daily) will file about 34 suggestions at once and email the admins one
+   digest. The test project's daily watch run is on `main` now too.
+5. **Check 077 and 082 on the live database, now that the code is live.**
+   Tables and columns through 081 are there. 077 (eruv suggestions, a
+   database rule) and 082 (confirming a contact box, a database function)
+   can't be seen through the API: without them a public eruv suggestion
+   fails to send and Yes under a contact box says "Didn't save". 067's
+   columns (Today) are missing too, harmless while Today is held back.
 
 ## Small open decisions
 
