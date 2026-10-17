@@ -71,12 +71,13 @@ export default function BrowseAll(props: Props) {
   )
 }
 
-/** Every category in the admin's groups, one row each, then the guide's own
- *  pages (What changed, Feedback, About, Privacy). */
-export function BrowseList({ communitySlug, listings, schedule, zmanim, timezone, coords, center }: Props) {
+/** Every card the home lists (the categories, and the forms people fill
+ *  in), in the admin's groups, and how many places each has. Null until the
+ *  categories have loaded. Shared by the Browse list and the phone home's
+ *  tiles (CategoryTiles). */
+export function useBrowseCards(communitySlug: string, listings: readonly DirectoryResource[] | null) {
   const categories = useCategories()
   const homeSections = useHomeSections()
-  const settings = useSiteSettings()
   const { navigate, openFlow } = useSiteNavigation()
   const entryCards = useEntryCards(openFlow)
 
@@ -86,6 +87,13 @@ export function BrowseList({ communitySlug, listings, schedule, zmanim, timezone
   const counts = withEruvCount(listings ? listingCounts : null, eruvCount)
   const resources = resourceCards(navigate, categories, communitySlug, counts)
   const sections = resources ? groupCardsIntoSections([...entryCards, ...resources], homeSections ?? []) : null
+  return { categories, sections, counts }
+}
+
+/** Every category in the admin's groups, one row each, then the guide's own
+ *  pages (What changed, Feedback, About, Privacy). */
+export function BrowseList({ communitySlug, listings, schedule, zmanim, timezone, coords, center }: Props) {
+  const { categories, sections, counts } = useBrowseCards(communitySlug, listings)
 
   const now = schedule ? new Date(schedule.now) : null
   const restDay = schedule !== null && shabbosMoment(zmanim, schedule.now, timezone).kind === 'shabbos'
@@ -136,23 +144,32 @@ export function BrowseList({ communitySlug, listings, schedule, zmanim, timezone
           ))}
         </div>
       )}
-      {/* Each link a full finger's height (44px), padded beside its words so
-          the gaps between them are tappable too (the user, Oct 15: "not
-          much room to click"); pulled left by its padding so the words still
-          line up with the list above. A little room under them, the page's
-          last row, so the tab bar doesn't crowd them once scrolled to the
-          end; not so much that they float (the user, Oct 15: 64px was
-          "way too far"). */}
-      <nav aria-label="About the guide" className="mt-8 border-t border-slate-200 pt-1 pb-2 text-[15px] font-bold text-primary">
-        <div className="-mx-3 flex flex-wrap">
-          {/* Always here, so a quiet week (no "This week" on Today) still has a
-              way to the page — unless it's held back (see features.ts). */}
-          {features.whatChanged && <Link href={routes.changes(communitySlug)} className={FOOT_LINK}>What changed</Link>}
-          {settings.feedbackEnabled && <Link href={routes.feedback(communitySlug)} className={FOOT_LINK}>Feedback</Link>}
-          <Link href={routes.about(communitySlug)} className={FOOT_LINK}>About</Link>
-          <Link href={routes.privacy(communitySlug)} className={FOOT_LINK}>Privacy</Link>
-        </div>
-      </nav>
+      <BrowseFoot communitySlug={communitySlug} />
     </>
+  )
+}
+
+/** The guide's own pages, under the categories: What changed, Feedback,
+ *  About and Privacy, which a phone has nowhere else.
+ *
+ *  Each link a full finger's height (44px), padded beside its words so the
+ *  gaps between them are tappable too (the user, Oct 15: "not much room to
+ *  click"); pulled left by its padding so the words still line up with the
+ *  list above. A little room under them, the page's last row, so the tab bar
+ *  doesn't crowd them once scrolled to the end; not so much that they float
+ *  (the user, Oct 15: 64px was "way too far"). */
+export function BrowseFoot({ communitySlug }: { communitySlug: string }) {
+  const settings = useSiteSettings()
+  return (
+    <nav aria-label="About the guide" className="mt-8 border-t border-slate-200 pt-1 pb-2 text-[15px] font-bold text-primary">
+      <div className="-mx-3 flex flex-wrap">
+        {/* Always here, so a quiet week (no "This week" on Today) still has a
+            way to the page — unless it's held back (see features.ts). */}
+        {features.whatChanged && <Link href={routes.changes(communitySlug)} className={FOOT_LINK}>What changed</Link>}
+        {settings.feedbackEnabled && <Link href={routes.feedback(communitySlug)} className={FOOT_LINK}>Feedback</Link>}
+        <Link href={routes.about(communitySlug)} className={FOOT_LINK}>About</Link>
+        <Link href={routes.privacy(communitySlug)} className={FOOT_LINK}>Privacy</Link>
+      </div>
+    </nav>
   )
 }

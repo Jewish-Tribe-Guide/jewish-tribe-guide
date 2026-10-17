@@ -18,7 +18,10 @@ import { useReading } from '@/lib/useReading'
 import { answersWell, candidatePrompts, pickPrompts } from '@/lib/searchPrompts'
 import HeroHeading from '@/components/home/HeroHeading'
 import TodayBlocks from '@/components/home/TodayBlocks'
-import { BrowseList } from '@/components/home/BrowseAll'
+import CategoryTiles from '@/components/home/CategoryTiles'
+import RightNow from '@/components/home/RightNow'
+import TrustBand from '@/components/home/TrustBand'
+import { trustFacts } from '@/lib/phoneHome'
 import { PinnedBlock } from '@/components/home/PinnedPlaces'
 import DaveningTimesCard from '@/components/home/DaveningTimesCard'
 import UpdateListingsCard from '@/components/home/UpdateListingsCard'
@@ -43,7 +46,7 @@ import { consumeHomeReveal } from '@/lib/homeRevealSignal'
 import { useLocation } from '@/lib/locationContext'
 import { useHeaderOverlay } from '@/lib/headerVisibility'
 import { community } from '@/community.config'
-import { useCommunitySlug } from '@/lib/communityContext'
+import { useActiveCommunity, useCommunitySlug } from '@/lib/communityContext'
 import { countEvent } from '@/lib/countEvent'
 import type { NavigateFn } from '@/types'
 import type { Flow } from '@/types'
@@ -373,28 +376,46 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
   // orders them.
   const builtInOrder = today ? allBuiltIns.filter((b) => b.kind === 'listings' || b.kind === 'subscribe') : allBuiltIns
 
-  // Mobile's own permanent list — this doubles as its whole "browse
-  // everything", not just search results, so it always renders. Browsing
-  // is the Browse tab's list (BrowseList): the admin's groups, one compact
-  // row per category, then Feedback, About and Privacy — the phone's home
-  // while Today is held back (Oct 13; it replaced the photo tiles). While
-  // something is typed, where it could go shows under the box (HeroHeading's
-  // searchPanel), and the list dims.
+  // The phone's home under the search (the user, Oct 17): Right now (what's
+  // open, or Shabbos), then every category as a tile. Both in the admin's
+  // order. While something is typed, where it could go shows under the box
+  // (HeroHeading's searchPanel): Right now steps aside and the tiles dim.
+  // Then any category without a card of its own id (the Eruv page's card
+  // has its page's), so the candles card still finds the eruv.
+  const cardOrder = allCards ? groupCardsIntoSections(allCards, homeSections ?? []).flatMap((s) => s.cards.map((c) => c.id)) : []
+  const orderedCategories = [...(categories ?? [])].sort((a, b) => rank(cardOrder, a.id) - rank(cardOrder, b.id))
+  // A place opened from the home's answers (Right now, or Today's blocks).
+  const openListing = (item: { id: string; name: string; category: string }) => {
+    track('listing_opened', { listing: item.name, category: item.category, source: 'today' })
+    countEvent(communitySlug, 'listing_view', item.id)
+    onNavigate('patient', 'find', { findView: item.category, findItemId: item.id })
+  }
   const mobileResultsNode = (
     <>
-      <div data-testid="home-browse-list" className={q ? 'opacity-40 transition-opacity' : 'transition-opacity'}>
-        <BrowseList
-          communitySlug={communitySlug}
+      {!q && (
+        <RightNow
           listings={listings}
+          categories={orderedCategories}
+          communitySlug={communitySlug}
+          timezone={timezone}
           schedule={schedule}
           zmanim={zmanim.data}
-          timezone={timezone}
-          coords={coords}
-          center={community.mapCenter}
+          from={coords ?? community.mapCenter}
+          items={settings.beforeCandleItems}
+          onOpenListing={openListing}
         />
+      )}
+      <div data-testid="home-browse-list" className={q ? 'opacity-40 transition-opacity' : 'transition-opacity'}>
+        <CategoryTiles communitySlug={communitySlug} listings={listings} />
       </div>
     </>
   )
+
+  // Who keeps the guide right, at the top of the phone's home (TrustBand):
+  // how many places, and whether Google checks them. This week's count
+  // waits for the clock.
+  const { community: activeCommunity } = useActiveCommunity()
+  const trust = useMemo(() => (listings ? trustFacts(listings, categories ?? [], schedule?.now ?? null) : null), [listings, categories, schedule?.now])
 
   // Tapping the tab bar's Home button, or the header logo, while already on
   // home doesn't remount this component — see goHome's own note — so it fires
@@ -454,11 +475,6 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
   // "Food open now", asked of the site's own search, as if typed.
   const openNowQuestion = 'Food open now'
   const openNow = today && listings && schedule && !settings.todayHidden.includes('openNow') ? { question: openNowQuestion, result: ask(openNowQuestion).result } : null
-  const openListing = (item: { id: string; name: string; category: string }) => {
-    track('listing_opened', { listing: item.name, category: item.category, source: 'today' })
-    countEvent(communitySlug, 'listing_view', item.id)
-    onNavigate('patient', 'find', { findView: item.category, findItemId: item.id })
-  }
   // What changed in the last 7 days (step 7a), against the same clock.
   const changeLog = useChangeLog()
   const week = today && changeLog && schedule ? thisWeek(whatChanged(changeLog, timezone), schedule.now) : null
@@ -549,6 +565,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
           searchPrompts={prompts}
           onPickPrompt={pickPrompt}
           today={today ? { dayLine: dayLine(schedule?.now ?? null, timezone, zmanim.data) } : undefined}
+          trust={!today && trust ? <TrustBand facts={trust} region={activeCommunity.region} communitySlug={communitySlug} /> : null}
         />
 
         {/* ── Seasonal campaign banner ─────────────────────────────────────────
@@ -891,9 +908,15 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
                 until after hydration) can guarantee. ─────────────────────── */}
         {/* On the Today home the grid's place is taken by its blocks: a
             phone sees search results here only once something is typed. */}
-        {(!today || q) && <section className="mt-12 sm:mt-14 space-y-10 desktop:hidden">{mobileResultsNode}</section>}
+        {(!today || q) && <section className="mt-5 space-y-5 desktop:hidden">{mobileResultsNode}</section>}
       </main>
       </ViewTransition>
     </>
   )
+}
+
+/** Where `id` sits in the home's card order; last when it has no card. */
+function rank(order: readonly (string | undefined)[], id: string): number {
+  const i = order.indexOf(id)
+  return i === -1 ? order.length : i
 }

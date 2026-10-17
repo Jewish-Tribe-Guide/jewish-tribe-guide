@@ -61,18 +61,18 @@ describe('HeroHeading — desktop headline vs. mobile heroTitle', () => {
     )
   })
 
-  it('mobile: heroTitle is still the one big heading — mission stays one plain, unsplit paragraph under it', () => {
-    render(<HeroHeading settings={settings} query="" onQueryChange={vi.fn()} />)
+  // The phone home (the user, Oct 17): no headline and no mission on show.
+  // heroTitle stays the page's one <h1>, for screen readers and search
+  // engines, and the trust line takes the top.
+  it('mobile: heroTitle is the page heading for screen readers only; no mission; the trust line on top', () => {
+    render(<HeroHeading settings={settings} query="" onQueryChange={vi.fn()} trust={<div data-testid="trust-stub" />} />)
 
-    // Both layouts are in the DOM; heroTitle appears as an <h1> (mobile's
-    // lead line) — never a second <h1> carrying any part of the mission.
     const h1sWithHeroTitle = screen.getAllByRole('heading', { level: 1 }).filter((h) => h.textContent === settings.heroTitle)
-    expect(h1sWithHeroTitle.length).toBe(1)
-
-    // Mobile shows the FULL, unsplit mission as a plain paragraph — desktop's
-    // separate hero fields are a desktop-only headline treatment, not a
-    // change to what mobile has always shown.
-    expect(screen.getByText(settings.mission).tagName).toBe('P')
+    expect(h1sWithHeroTitle).toHaveLength(1)
+    expect(h1sWithHeroTitle[0]).toHaveClass('sr-only')
+    expect(screen.queryByText(settings.mission)).not.toBeInTheDocument()
+    const hero = screen.getByTestId('phone-hero')
+    expect(hero.firstElementChild?.nextElementSibling).toBe(screen.getByTestId('trust-stub'))
   })
 })
 
@@ -392,7 +392,7 @@ describe('HeroHeading — the Today home', () => {
   it('the classic home is unchanged', () => {
     render(<HeroHeading settings={settings} query="" onQueryChange={vi.fn()} mapIcon="🗺️" />)
     expect(screen.queryByTestId('today-hero')).not.toBeInTheDocument()
-    expect(screen.getByText(settings.mission)).toBeInTheDocument()
+    expect(screen.getByTestId('phone-hero')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Browse Categories' })).toBeInTheDocument()
   })
 })

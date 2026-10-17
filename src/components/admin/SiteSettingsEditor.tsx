@@ -530,17 +530,17 @@ export default function SiteSettingsEditor({
           <span className="block text-xs font-medium text-slate-700 mb-1">Home screen heading</span>
           <input value={draft.heroTitle} onChange={(e) => set('heroTitle', e.target.value)} className={inputClass} />
           <span className="block text-[11px] text-muted mt-1">
-            The big heading at the top of the mobile home screen. Desktop has its own separate hero
-            headline — see the Desktop tab&rsquo;s Hero card.
+            The home page&rsquo;s title for screen readers and search engines. The phone home no longer
+            shows it: it opens with who keeps the guide up. Desktop has its own separate hero headline —
+            see the Desktop tab&rsquo;s Hero card.
           </span>
         </label>
         <label className="block">
           <span className="block text-xs font-medium text-slate-700 mb-1">Subhead</span>
           <textarea rows={2} value={draft.mission} onChange={(e) => set('mission', e.target.value)} className={inputClass} />
           <span className="block text-[11px] text-muted mt-1">
-            Shown under the home screen heading, and reused as the footer blurb and &lt;meta
-            description&gt;. Desktop has its own separate headline/subhead — see the Desktop tab&rsquo;s
-            Hero card.
+            The footer blurb and the page&rsquo;s &lt;meta description&gt;. No longer shown on the phone
+            home. Desktop has its own separate headline/subhead — see the Desktop tab&rsquo;s Hero card.
           </span>
         </label>
       </CollapsibleSection>

@@ -56,6 +56,9 @@ type Props = {
    *  the biggest thing after it, and nothing else in the hero. Null until
    *  the page knows what day it is. Undefined for the classic home. */
   today?: { dayLine: string | null }
+  /** The phone's top line, who keeps the guide right (TrustBand). The
+   *  classic home only. */
+  trust?: ReactNode
 }
 
 // The home screen's heading, mission, and the filter box + "View Map" button
@@ -63,13 +66,12 @@ type Props = {
 // markup the live home screen does, fed by a draft instead of the saved
 // settings.
 //
-// Desktop gets a full-bleed photo band instead of mobile's plain centered
-// block — mobile has to stay practical in a narrow, scroll-cost-sensitive
-// space, so it leads with `heroTitle` (the practical "what are you looking
-// for" prompt) the same way it always has, with the search box directly
-// under it; the site's actual name is already one small line in the sticky
-// header above it, and repeating it large would just spend mobile's scarcer
-// vertical space restating something already on screen.
+// Desktop gets a full-bleed photo band instead of mobile's plain block —
+// mobile has to stay practical in a narrow, scroll-cost-sensitive space, so
+// it leads with who keeps the guide right (TrustBand) and the search box
+// directly under it (Oct 17; it used to lead with `heroTitle` and the
+// mission, which a returning visitor reads past every time). The site's
+// actual name is already one small line in the sticky header above it.
 //
 // Desktop used to lead with `settings.name` here too, on the reasoning that
 // nowhere else on that layout said who this is at any size. That stopped
@@ -133,6 +135,7 @@ export default function HeroHeading({
   searchPrompts = [],
   onPickPrompt,
   today,
+  trust = null,
 }: Props) {
   const { desktopHeroHeadline: headline, desktopHeroSubhead: subhead, desktopHeroImage: heroImage } = settings
 
@@ -224,27 +227,20 @@ export default function HeroHeading({
         </section>
       )}
 
-      {/* Mobile — unchanged plain centered block. */}
+      {/* Mobile: who keeps the guide right (TrustBand), then the search
+          and what to try. No headline and no mission (the user, Oct 17):
+          the header already names the guide, and a returning visitor came
+          to find something, not to be told what this is. The title stays
+          as the page's heading for screen readers and search engines. */}
       {!today && (
-      <section className="pt-12 sm:pt-16 text-center desktop:hidden">
-        {/* leading-snug, not -tight — heroTitle is admin-editable text with
-            no length limit, so it wraps to two lines depending on what an
-            admin sets it to (e.g. "Your Guide to Jewish Philadelphia"), and
-            -tight's 1.25 line-height read as the two lines pressed together
-            rather than sitting apart, at this size/weight. Only mattered
-            once wrapping actually started happening — a single line never
-            showed it. */}
-        <h1 className="text-3xl sm:text-[40px] font-bold tracking-tight text-slate-900 leading-snug">
-          {settings.heroTitle}
-        </h1>
-        <p className="mt-3 max-w-2xl mx-auto text-[15px] sm:text-base text-slate-500">
-          {settings.mission}
-        </p>
+      <section className="pt-4 desktop:hidden" data-testid="phone-hero">
+        <h1 className="sr-only">{settings.heroTitle}</h1>
+        {trust}
         {ui.search.landing && (
-          <div className="mt-8 max-w-xl mx-auto">
+          <div className={trust ? 'mt-3' : undefined}>
             <SearchBox query={query} onQueryChange={onQueryChange} onSubmit={onSearchSubmit} interactive={interactive} placeholder={settings.searchPlaceholder} />
             {phonePanel}
-            <SearchPrompts prompts={prompts} onPick={pickPrompt} className="mt-3 justify-center" oneLine />
+            <SearchPrompts prompts={prompts} onPick={pickPrompt} className="mt-2.5" oneLine />
           </div>
         )}
       </section>

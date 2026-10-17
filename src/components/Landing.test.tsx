@@ -142,53 +142,56 @@ describe('Landing', () => {
     expect(screen.getByTestId('home-browse-list')).toBeInTheDocument()
   })
 
-  it('shows the configured hero title/mission and the category grid', () => {
+  // The phone home (the user, Oct 17): no headline and no mission at the
+  // top, but who keeps the guide right. The title stays as the page's
+  // heading, for screen readers and search engines.
+  it('mobile: leads with who keeps the guide right, not the headline and mission', () => {
     const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
-    renderLanding(undefined, {
-      content: {
-        categories: [grocery],
-        settings: { ...SITE_SETTINGS_DEFAULTS, heroTitle: 'Welcome to the directory', mission: 'Everything nearby' },
-      },
-    })
-
-    // getAllByText, not getByText: HeroHeading renders both its mobile and
-    // desktop layouts in the DOM at once (toggled by CSS, not JS — see that
-    // component's own doc), so the heading/mission text exists twice.
-    expect(screen.getAllByText('Welcome to the directory').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('Everything nearby').length).toBeGreaterThan(0)
+    renderLanding(
+      undefined,
+      { content: { categories: [grocery], settings: { ...SITE_SETTINGS_DEFAULTS, heroTitle: 'Welcome to the directory', mission: 'Everything nearby' } } },
+      [makeListing({ id: 'g1', category: 'grocery' }), makeListing({ id: 'g2', category: 'grocery' })],
+    )
+    const hero = screen.getByTestId('phone-hero')
+    expect(within(hero).getByTestId('trust-band')).toHaveTextContent('Kept up by the community2 places')
+    expect(within(hero).getByRole('heading', { level: 1, name: 'Welcome to the directory' })).toHaveClass('sr-only')
+    expect(screen.queryByText('Everything nearby')).not.toBeInTheDocument()
     expect(screen.getAllByText('Grocery Stores').length).toBeGreaterThan(0)
   })
 
-  it('mobile: browsing is the category list, in the admin\'s groups, with no tile photos to download', () => {
-    // The phone's home is the Browse tab's list (BrowseList) while the Today
-    // home is held back (Oct 13), in place of one photo tile per category.
-    const cats = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l'].map((id) =>
-      makeCategory({ id, pluralLabel: `Cat ${id}`, cardImageUrl: `https://images.unsplash.com/photo-${id}` }),
-    )
-    const section = (n: number, ids: string[]) => ({
+  // Tiles (the user, Oct 17): the list read as dull, three screens under six
+  // headings. Every category as a tile, in the admin's order, no headings;
+  // past twelve, a line of links. Still no photos to download.
+  it('mobile: browsing is tiles in the admin\'s order, twelve, then the rest as a line of links', () => {
+    const ids = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n']
+    const cats = ids.map((id) => makeCategory({ id, pluralLabel: `Cat ${id}`, cardImageUrl: `https://images.unsplash.com/photo-${id}` }))
+    const section = (n: number, cardIds: string[]) => ({
       id: `s${n}`,
       kind: 'section' as const,
       title: `Section ${n}`,
       sortOrder: n,
-      cardIds: ids,
+      cardIds,
       width: 'full' as const,
     })
-    const { container } = renderLanding(undefined, {
-      content: {
-        categories: cats,
-        homeSections: [
-          section(1, ['a', 'b', 'c', 'd']),
-          section(2, ['e', 'f', 'g', 'h']),
-          section(3, ['i', 'j', 'k', 'l']),
-        ],
+    renderLanding(
+      undefined,
+      {
+        content: {
+          categories: cats,
+          homeSections: [section(1, ['n', 'a', 'b', 'c', 'd']), section(2, ['e', 'f', 'g', 'h', 'i']), section(3, ['j', 'k', 'l', 'm'])],
+        },
       },
-    })
+      [makeListing({ id: 'p1', category: 'n' }), makeListing({ id: 'p2', category: 'n' })],
+    )
 
-    const list = within(screen.getByTestId('home-browse-list'))
-    expect(list.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)).toEqual(['Section 1', 'Section 2', 'Section 3'])
-    expect(list.getAllByRole('listitem').map((li) => li.textContent)).toEqual(cats.map((c) => expect.stringContaining(c.pluralLabel)))
-    const mobileSection = container.querySelector<HTMLElement>('.mt-12.desktop\\:hidden')!
-    expect(mobileSection.querySelectorAll('img')).toHaveLength(0)
+    const tiles = within(screen.getByTestId('category-tiles'))
+    const order = ['n', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k']
+    // Each tile: its icon, its name, and how many places when it counts any.
+    expect(tiles.getAllByRole('listitem').map((li) => li.textContent)).toEqual(order.map((id) => expect.stringMatching(new RegExp(`Cat ${id}${id === 'n' ? '2' : ''}$`))))
+    expect(tiles.queryAllByRole('heading')).toHaveLength(0)
+    expect(screen.getByText('Also:').parentElement).toHaveTextContent('Also:Cat l,Cat m')
+    expect(tiles.getByRole('link', { name: 'Cat m' })).toHaveAttribute('href', '/test-community/m')
+    expect(screen.getByTestId('home-browse-list').closest('section')!.querySelectorAll('img')).toHaveLength(0)
   })
 
   // Search takes you to the page (Oct 13): typing shows where it could go,

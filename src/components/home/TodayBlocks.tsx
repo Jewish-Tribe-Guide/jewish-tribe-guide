@@ -187,8 +187,9 @@ const milesFrom = (from: LatLng, item: DirectoryResource) => (item.geo ? haversi
 // ── The candles card ─────────────────────────────────────────────────────────
 
 /** Friday: "Candles 6:12 PM, in 4 hr 42 min". Shabbos: "Havdalah 7:09 PM".
- *  The same dark card every week; the photo above never changes. */
-function CandlesCard({ moment, now, nowMinutes, links }: { moment: Exclude<ShabbosMoment, { kind: 'weekday' }>; now: number; nowMinutes: number; links: readonly (readonly [string, string | null])[] }) {
+ *  The same dark card every week; the photo above never changes. Also the
+ *  phone home's, under Right now (RightNow). */
+export function CandlesCard({ moment, now, nowMinutes, links }: { moment: Exclude<ShabbosMoment, { kind: 'weekday' }>; now: number; nowMinutes: number; links: readonly (readonly [string, string | null])[] }) {
   const big = moment.kind === 'erev' ? `Candles ${moment.candles.time}` : moment.ends ? `${moment.yomTov ? 'Yom Tov ends' : 'Havdalah'} ${endsLabel(moment.ends, now, nowMinutes)}` : moment.yomTov ? 'Yom Tov' : 'Shabbos'
   // From the instants themselves, so it's right wherever the device is.
   const until = (iso: string | undefined) => {
@@ -239,7 +240,10 @@ function endsLabel(z: { label: string; time: string; iso?: string }, now: number
 
 // ── Before candles ───────────────────────────────────────────────────────────
 
-function BeforeCandles({ listings, categories, items, schedule, zmanim, from, communitySlug, onOpenListing }: Props) {
+export type BeforeCandlesProps = Pick<Props, 'listings' | 'categories' | 'items' | 'schedule' | 'zmanim' | 'from' | 'communitySlug' | 'onOpenListing'>
+
+/** Also the phone home's, on Friday (RightNow). */
+export function BeforeCandles({ listings, categories, items, schedule, zmanim, from, communitySlug, onOpenListing }: BeforeCandlesProps) {
   if (!listings || !schedule || items.length === 0) return null
   const now = new Date(schedule.now)
   const { rows, missing } = beforeCandles(listings, categories, items, now, from)
