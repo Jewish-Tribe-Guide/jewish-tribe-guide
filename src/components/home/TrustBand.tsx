@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { track } from '@vercel/analytics'
 import MobileSheet from '@/components/resources/MobileSheet'
+import { EDIT_LISTING_LABEL } from '@/components/resources/editListingLabel'
 import { ChevronRightIcon, PeopleIcon } from '@/components/icons'
 import { routes } from '@/lib/routes'
 import { everyListingDated, sourcesRead, sourcesSentence, trustLine, type TrustFacts } from '@/lib/phoneHome'
@@ -104,14 +105,14 @@ function TrustSheet({ open, facts, region, communitySlug, onClose }: { open: boo
           )
         )}
         <Row icon={<PeopleIcon className="h-5 w-5" />} tone="bg-primary/10 text-primary" title={sentence ? `People in ${region} fill in the rest` : `People in ${region} keep it up`}>
-          {sentence ? 'Minyan times, kosher items, Shabbos details.' : 'Everything here is added and fixed by people in the community.'} A person reviews every change before it shows.
+          {sentence ? 'Minyan times, kosher items, mikvah hours.' : 'Everything here is added and fixed by people in the community.'} A person reviews every change before it shows.
         </Row>
         {/* "when" only once every place has a date: until then some say
             "Not confirmed by anyone yet", which is the "if". "Where" since
             Oct 17: a date an outside source gave names it ("From
             Keystone-K's list, Oct 12"), and "Confirmed" is a person. */}
         <Row icon={<CalendarCheck className="h-5 w-5" />} tone="bg-[#c9a45c]/15 text-[#7a5a1c]" title={everyListingDated(facts) ? 'Every listing says where and when it was last checked' : 'Every listing says if and when it was checked'}>
-          Something wrong? Open the place and tap <strong className="font-bold text-ink">Suggest an edit</strong>.
+          Something wrong? Open the place and tap <strong className="font-bold text-ink">{EDIT_LISTING_LABEL}</strong>.
         </Row>
       </ul>
       <Link href={routes.about(communitySlug)} className="mt-4 flex min-h-11 items-center justify-between border-t border-slate-200 pt-3 text-[15px] font-semibold text-ink hover:underline">

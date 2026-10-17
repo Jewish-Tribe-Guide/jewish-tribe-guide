@@ -64,9 +64,9 @@ describe('the trust line', () => {
     await user.click(screen.getByTestId('trust-band'))
     expect(await rows()).toEqual([
       'Where there’s a source, we check itHours from Google, hechshers from Keystone-K’s list and eruv status from each eruv’s own site. Read again every day, and every 15 minutes on Friday for the eruv.',
-      'People in Philadelphia fill in the restMinyan times, kosher items, Shabbos details. A person reviews every change before it shows.',
+      'People in Philadelphia fill in the restMinyan times, kosher items, mikvah hours. A person reviews every change before it shows.',
       // 23 places say "Not confirmed by anyone yet": the "if".
-      'Every listing says if and when it was checkedSomething wrong? Open the place and tap Suggest an edit.',
+      'Every listing says if and when it was checkedSomething wrong? Open the place and tap Edit listing.',
     ])
     expect(screen.getByRole('link', { name: 'About the guide' })).toHaveAttribute('href', '/philly/about')
   })
@@ -78,7 +78,7 @@ describe('the trust line', () => {
     show({ places: 155, googleChecked: 135, checkedThisWeek: 129, dated: 155 })
     expect(screen.getByTestId('trust-band')).toHaveTextContent('Kept up by the community155 places · every listing dated')
     await user.click(screen.getByTestId('trust-band'))
-    expect((await rows()).at(-1)).toBe('Every listing says where and when it was last checkedSomething wrong? Open the place and tap Suggest an edit.')
+    expect((await rows()).at(-1)).toBe('Every listing says where and when it was last checkedSomething wrong? Open the place and tap Edit listing.')
   })
 
   // As on the live site today: a Keystone K watch set up and never run,
