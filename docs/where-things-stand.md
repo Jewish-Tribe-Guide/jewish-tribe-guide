@@ -16,14 +16,33 @@ The user checks work on each commit's Vercel preview, on their phone. The
 preview reads the **dev/test database**, not the live one. A tab opened
 before a deploy keeps the old code until it's closed and reopened.
 
-**Preview and live look different because of their databases, not code**
-(compared table by table, Oct 17). The redesign's setup was built on the
-dev database and never copied to the live one: hospital and hotel boxes,
-Food's Main dishes and form sections, the phone tabs (You), home section
-order, category card images, WhatsApp off the map, descriptions in
-headers. Listing edits made on the preview (main dishes at six food places,
-the hospitals' Refuah contacts, two shuls' minyanim, some grocery items)
-are on dev only. Each live write needs the user's yes, dry run first.
+**Preview and live differed by their databases, not code** (compared table
+by table, Oct 17). The redesign's setup was built on the dev database and
+never copied to the live one. **Copied Oct 17 with the user's yes** (group
+A, 25 rows, backup kept): hospital and hotel boxes and "Within a walk",
+Food's Main dishes, form sections and question card, WhatsApp off the map,
+descriptions in headers (WhatsApp, Networking, Cemetery), shuls not grouped
+by denomination, Grocery's "Kosher Type", phone tabs Home · Map · You and
+You in the desktop menu, the desktop home order, five category card images
+(copied into live storage). The live site shows it after any admin save
+(Admin → Site → Save) or within a day.
+
+Still different, each needing the user:
+
+- **Group B, which side is right:** Cemetery (dev renamed it "Cemetery" and
+  dropped its Cemetery/Funeral Home type; live has funeral homes), the
+  Mikvah pin colour (live blue #1544ab, dev magenta #a11956), the hero and
+  desktop wording (they differ; recommend keeping live's), the logo (live's
+  is newer; keep).
+- **Listing edits made on the preview, dev only:** main dishes and menus at
+  six food places (Charlie was a sinner, Sweet Box, Bar Bombón, HipCityVeg,
+  Say She Ate), the hospitals' Refuah contacts (the boxes stay hidden on
+  live until these are there), minyanim at Mikveh Israel and Mekor
+  Habracha, grocery items at GIANT, Costco, ShopRite and Trader Joe's,
+  levels at Lipkin's, Sweet Box and Montefiore, Ohel Leah's keilim note,
+  Hampton Inn's photo.
+- **Dev is behind live:** 12 listings are only on live (Zevi's Bakery,
+  cemeteries, schools). Dev writes need no yes.
 
 ## Waiting for a yes to change the live site
 
