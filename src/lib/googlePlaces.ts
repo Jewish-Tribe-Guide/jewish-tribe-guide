@@ -46,6 +46,12 @@ function serverKey(): string | null {
   return process.env.GOOGLE_MAPS_SERVER_KEY ?? process.env.GOOGLE_GEOCODING_API_KEY ?? null
 }
 
+/** Whether Google can be asked at all here. A lookup that comes back null
+ *  says only "not found or not asked"; this tells the two apart. */
+export function canAskGoogle(): boolean {
+  return !!serverKey()
+}
+
 // ── Field ownership ─────────────────────────────────────────────────────────
 //
 // Some listing data is curated by a person and some is whatever Google had.

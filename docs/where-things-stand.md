@@ -62,14 +62,6 @@ for that exact change, in the same conversation. Show the dry run first.
 ## Small open decisions
 
 6. The "+" button covers part of the third tile in a row on the phone home.
-7. **Keep the preview's checks current?** Scheduled jobs run only on the
-   production deployment, so on the dev/test database (what the previews
-   read) Google's check and the watches run only when someone runs them.
-   They were run by hand Oct 17, so the preview's trust sheet names Google
-   and Keystone-K until about Oct 24, then only the eruv again. A daily
-   GitHub Actions schedule against the test database would keep them; the
-   Google part costs Places calls (about what the live site's nightly run
-   costs).
 
 ## Done Oct 17
 
@@ -87,6 +79,16 @@ for that exact change, in the same conversation. Show the dry run first.
   the public data service the page calls (`hospitals:getWithReferences`).
   If Refuah renames that, the watch shows as not working and the admin is
   emailed; nothing wrong is filed.
+- **The preview's watches run daily** (the user, Oct 17: watches yes,
+  Google's check no, since it costs Places calls).
+  `.github/workflows/test-watches.yml` runs `scripts/run-test-watches.mts`
+  against the test database at 07:30 UTC: Keystone-K's list and the Refuah
+  pages, no Google calls, no emails. GitHub runs schedules only from
+  `main`, so the daily run starts with the merge. Until then the preview's
+  trust sheet names Keystone-K until about Oct 24 (run by hand Oct 17), and
+  Google's line goes when its Oct 17 run is a week old; Google's check on
+  the preview stays a by-hand thing. A new place on Keystone-K's list is
+  filed there saying "Google wasn't asked whether it's still open".
 - **Maps key in CI:** repo secrets `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` and
   `_MAP_ID`, passed to the e2e and prod-smoke builds.
 

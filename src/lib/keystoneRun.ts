@@ -10,7 +10,7 @@
 import { getAdminClient } from '@/lib/supabase/admin'
 import { sendWatchDigest, type WatchDigestItem } from '@/lib/email'
 import { submitListingCreate, submitListingDelete, submitListingUpdate } from '@/lib/submissionStore'
-import { findPlaceStatus } from '@/lib/googlePlaces'
+import { canAskGoogle, findPlaceStatus } from '@/lib/googlePlaces'
 import { WATCH_FETCH_HEADERS } from '@/lib/websiteWatch'
 import {
   KEYSTONE_WATCH_NAME,
@@ -43,6 +43,10 @@ function describe(f: WatchFinding): WatchDigestItem {
  *  new places are asked; the guide's own listings are already checked every
  *  night by the Google sync. */
 async function googleSays(f: Extract<WatchFinding, { kind: 'new' }>): Promise<{ closed: boolean; line: string }> {
+  // Run with no Google key (the test project's daily run, which leaves
+  // Google's paid calls out): said so, never "couldn't find it", so the
+  // admin checks it's open before approving.
+  if (!canAskGoogle()) return { closed: false, line: 'Google wasn\u2019t asked whether it\u2019s still open.' }
   const g = await findPlaceStatus(f.entry.name, f.entry.address)
   if (!g) return { closed: false, line: 'Google: couldn\u2019t find it.' }
   const as = g.name ? ` (as "${g.name}")` : ''

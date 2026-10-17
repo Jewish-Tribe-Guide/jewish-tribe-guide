@@ -1,0 +1,46 @@
+name: Test project watches
+
+# Runs the watches (Keystone-K's list, the hospitals' Refuah pages) once a
+# day against the TEST Supabase project, the one the Vercel previews read.
+# Vercel runs crons only on the production deployment, so without this the
+# previews' watches never run, and the trust sheet stops naming Keystone-K a
+# week after anyone ran it by hand. Not Google's nightly check, which costs
+# Places calls (the user, Oct 17). See scripts/run-test-watches.mts.
+#
+# GitHub runs a schedule only from the default branch, so the daily run
+# starts once this file is on main. It also runs on a pull request that
+# changes the script or this file, so a change is seen working first.
+
+on:
+  schedule:
+    # 07:30 UTC, half an hour after the live site's own watches.
+    - cron: '30 7 * * *'
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - scripts/run-test-watches.mts
+      - .github/workflows/test-watches.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: test-watches
+  cancel-in-progress: false
+
+jobs:
+  watches:
+    name: Run the watches on the test project
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx tsx scripts/run-test-watches.mts
+        env:
+          TEST_SUPABASE_URL: ${{ secrets.TEST_SUPABASE_URL }}
+          TEST_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.TEST_SUPABASE_SERVICE_ROLE_KEY }}

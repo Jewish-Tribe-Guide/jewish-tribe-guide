@@ -33,7 +33,8 @@ vi.mock('@/lib/submissionStore', () => ({
 const mockDigest = vi.hoisted(() => vi.fn())
 vi.mock('@/lib/email', () => ({ sendWatchDigest: mockDigest }))
 const mockGoogle = vi.hoisted(() => vi.fn())
-vi.mock('@/lib/googlePlaces', () => ({ findPlaceStatus: mockGoogle }))
+const mockCanAsk = vi.hoisted(() => vi.fn(() => true))
+vi.mock('@/lib/googlePlaces', () => ({ findPlaceStatus: mockGoogle, canAskGoogle: mockCanAsk }))
 
 const { runKeystoneWatch } = await import('./keystoneRun')
 const LIST = 'https://keystone-k.org/establishments/'
@@ -83,6 +84,7 @@ afterEach(() => {
   mockDelete.mockReset()
   mockDigest.mockReset()
   mockGoogle.mockReset()
+  mockCanAsk.mockReset().mockReturnValue(true)
 })
 
 describe('runKeystoneWatch', () => {
@@ -134,6 +136,22 @@ describe('runKeystoneWatch', () => {
     expect(mockDelete).not.toHaveBeenCalled()
     expect(mockUpdate).not.toHaveBeenCalled()
     expect(mockCreate).not.toHaveBeenCalled()
+  })
+
+  // Oct 17: the test project's daily run has no Google key, and filed
+  // Shalom Pizzeria, closed for good, saying "Google: couldn't find it".
+  // Google wasn't asked; the card says that instead.
+  it('says Google wasn’t asked, never “couldn’t find it”, where it can’t be', async () => {
+    mockCanAsk.mockReturnValue(false)
+    setDb([], [])
+    await run()
+    expect(mockGoogle).not.toHaveBeenCalled()
+    const notes = mockCreate.mock.calls.map(([, , note]) => note as string)
+    expect(notes.length).toBeGreaterThan(0)
+    for (const n of notes) {
+      expect(n).toContain('Google wasn’t asked whether it’s still open.')
+      expect(n).not.toContain('couldn’t find it')
+    }
   })
 
   // Keystone-K's list lags: Shalom Pizzeria was still on it, closed for
