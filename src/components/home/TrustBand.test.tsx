@@ -37,7 +37,7 @@ afterEach(() => {
   fetchMock.mockClear()
 })
 
-const show = (facts: { places: number; googleChecked: number; checkedThisWeek: number | null }) =>
+const show = (facts: { places: number; googleChecked: number; checkedThisWeek: number | null; dated: number }) =>
   renderWithProviders(<TrustBand facts={facts} region="Philadelphia" communitySlug="philly" />)
 
 const rows = async () => {
@@ -50,7 +50,7 @@ const rows = async () => {
 
 describe('the trust line', () => {
   it('says who keeps it, how many places, and that Google checks the hours', () => {
-    show({ places: 155, googleChecked: 135, checkedThisWeek: 129 })
+    show({ places: 155, googleChecked: 135, checkedThisWeek: 129, dated: 132 })
     expect(screen.getByTestId('trust-band')).toHaveTextContent('Kept up by the community155 places · hours checked with Google every night')
     // Nothing fetched until it's opened.
     expect(fetchMock).not.toHaveBeenCalled()
@@ -60,14 +60,25 @@ describe('the trust line', () => {
     lists = [{ label: 'Keystone-K’s list', okAt: hoursAgo(6) }]
     eruvChecked = [hoursAgo(1), null]
     const user = userEvent.setup()
-    show({ places: 155, googleChecked: 135, checkedThisWeek: 129 })
+    show({ places: 155, googleChecked: 135, checkedThisWeek: 129, dated: 132 })
     await user.click(screen.getByTestId('trust-band'))
     expect(await rows()).toEqual([
       'Where there’s a source, we check itHours from Google, hechshers from Keystone-K’s list and eruv status from each eruv’s own site. Read again every day, and every 15 minutes on Friday for the eruv.',
       'People in Philadelphia fill in the restMinyan times, kosher items, Shabbos details. A person reviews every change before it shows.',
-      'Every listing says when it was last checkedSomething wrong? Open the place and tap Suggest an edit.',
+      // 23 places say "Not confirmed by anyone yet": the "if".
+      'Every listing says if and when it was checkedSomething wrong? Open the place and tap Suggest an edit.',
     ])
     expect(screen.getByRole('link', { name: 'About the guide' })).toHaveAttribute('href', '/philly/about')
+  })
+
+  // The user, Oct 17: once every place has a date, the band says so, and
+  // the sheet drops its "if".
+  it('every place dated: the band says “every listing dated”, the sheet “when it was last checked”', async () => {
+    const user = userEvent.setup()
+    show({ places: 155, googleChecked: 135, checkedThisWeek: 129, dated: 155 })
+    expect(screen.getByTestId('trust-band')).toHaveTextContent('Kept up by the community155 places · every listing dated')
+    await user.click(screen.getByTestId('trust-band'))
+    expect((await rows()).at(-1)).toBe('Every listing says when it was last checkedSomething wrong? Open the place and tap Suggest an edit.')
   })
 
   // As on the live site today: a Keystone K watch set up and never run,
@@ -76,7 +87,7 @@ describe('the trust line', () => {
     lists = [{ label: 'Keystone-K’s list', okAt: null }]
     eruvChecked = [null]
     const user = userEvent.setup()
-    show({ places: 155, googleChecked: 135, checkedThisWeek: 129 })
+    show({ places: 155, googleChecked: 135, checkedThisWeek: 129, dated: 132 })
     await user.click(screen.getByTestId('trust-band'))
     expect((await rows())[0]).toBe('Where there’s a source, we check itHours from Google. Read again every day.')
   })
@@ -84,7 +95,7 @@ describe('the trust line', () => {
   // A community that doesn't sync with Google and reads nothing else.
   it('no source at all: people keep everything, and nothing about Google', async () => {
     const user = userEvent.setup()
-    show({ places: 3, googleChecked: 0, checkedThisWeek: 0 })
+    show({ places: 3, googleChecked: 0, checkedThisWeek: 0, dated: 0 })
     expect(screen.getByTestId('trust-band')).toHaveTextContent(/3 places$/)
     await user.click(screen.getByTestId('trust-band'))
     const r = await rows()
@@ -94,7 +105,7 @@ describe('the trust line', () => {
 
   it('the site’s own sheet: closes on Escape and on its ✕', async () => {
     const user = userEvent.setup()
-    show({ places: 3, googleChecked: 0, checkedThisWeek: 0 })
+    show({ places: 3, googleChecked: 0, checkedThisWeek: 0, dated: 0 })
     await user.click(screen.getByTestId('trust-band'))
     await user.keyboard('{Escape}')
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())

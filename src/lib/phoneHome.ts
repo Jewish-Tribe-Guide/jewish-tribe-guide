@@ -22,6 +22,9 @@ export type TrustFacts = {
   googleChecked: number
   /** Of those, checked in the last 7 days. Null before there's a clock. */
   checkedThisWeek: number | null
+  /** Places that say a date on them: confirmed by someone, or updated from
+   *  Google. The rest say "Not confirmed by anyone yet". */
+  dated: number
 }
 
 /** The trust line's numbers, from the listings the home already holds. Only
@@ -34,15 +37,22 @@ export function trustFacts(listings: readonly DirectoryResource[], categories: r
     places: places.length,
     googleChecked: synced.length,
     checkedThisWeek: now === null ? null : synced.filter((t) => t <= now && now - t < WEEK_MS).length,
+    dated: places.filter((l) => l.confirmedAt || l.googleSyncedAt).length,
   }
 }
 
-/** The line under "Kept up by the … community": "155 places · hours checked
- *  with Google every night". Google is left out where nothing is checked,
- *  and, once the clock is known, where nothing was checked this week: the
- *  nightly check has stopped, so "every night" would no longer be true. */
+/** Every place says a date on it. */
+export const everyListingDated = (facts: TrustFacts) => facts.places > 0 && facts.dated === facts.places
+
+/** The line under "Kept up by the community": "155 places · every listing
+ *  dated" (the user, Oct 17), once that's so; until then "155 places ·
+ *  hours checked with Google every night". Google is left out where nothing
+ *  is checked, and, once the clock is known, where nothing was checked this
+ *  week: the nightly check has stopped, so "every night" would no longer be
+ *  true. */
 export function trustLine(facts: TrustFacts): string {
   const places = `${facts.places} ${facts.places === 1 ? 'place' : 'places'}`
+  if (everyListingDated(facts)) return `${places} · every listing dated`
   const google = facts.googleChecked > 0 && facts.checkedThisWeek !== 0
   return google ? `${places} · hours checked with Google every night` : places
 }
