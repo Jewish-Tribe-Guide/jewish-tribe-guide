@@ -80,7 +80,7 @@ describe('the eruv on the Friday card', () => {
     here.coords = { lat: 39.9496, lng: -75.1718 } // Rittenhouse Square
     show()
     const line = await screen.findByTestId('today-eruv')
-    expect(line).toHaveTextContent(/^Center City EruvUp for this ShabbosChecked 1:25 PM$/)
+    expect(line).toHaveTextContent(/^Center City EruvUp for this ShabbosFrom example.org, 1:25 PM$/)
     expect(line).toHaveAttribute('href', '/philly/eruv?item=center-city')
   })
 

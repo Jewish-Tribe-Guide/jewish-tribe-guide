@@ -67,6 +67,36 @@ describe('FreshnessFooter', () => {
     expect(screen.getByTestId('freshness')).toHaveTextContent('Website from Google, Sep 23. Times confirmed Sep 20.')
   })
 
+  // Oct 17: every dated line says where the fact came from. An outside
+  // source that dated it is named in place of "Confirmed"; a person's later
+  // confirmation (a different date) is theirs.
+  it('names the outside source that gave the date, and only for that date', () => {
+    vi.useFakeTimers({ now: new Date('2026-10-17T12:00:00.000Z') })
+    const source = { from: 'Keystone-K’s list', at: '2026-10-12T12:00:00.000Z' }
+    render(<FreshnessFooter resourceId="r1" confirmedAt="2026-10-12T12:00:00.000Z" source={source} />)
+    expect(screen.getByTestId('freshness')).toHaveTextContent('From Keystone-K’s list, Oct 12.')
+    cleanup()
+    render(<FreshnessFooter resourceId="r1" confirmedAt="2026-10-14T12:00:00.000Z" source={source} />)
+    expect(screen.getByTestId('freshness')).toHaveTextContent('Confirmed Oct 14.')
+    cleanup()
+    render(<FreshnessFooter resourceId="r1" confirmedAt="2026-10-12T12:00:00.000Z" subject="Kosher details" ask={false} source={source} />)
+    expect(screen.getByTestId('freshness')).toHaveTextContent('Kosher details from Keystone-K’s list, Oct 12.')
+    cleanup()
+    render(<FreshnessFooter resourceId="r1" confirmedAt="2026-10-12T12:00:00.000Z" source={source} onEdit={() => {}} />)
+    expect(screen.getByTestId('freshness')).toHaveTextContent('From Keystone-K’s list, Oct 12')
+  })
+
+  it('once someone confirms it, the source is no longer said: the date is theirs', async () => {
+    vi.useFakeTimers({ now: new Date('2026-10-17T12:00:00.000Z'), toFake: ['Date'] })
+    mockFetch({ ok: true, confirmedAt: '2026-10-17T12:00:00.000Z', changed: true, activityId: 1 })
+    const at = '2026-03-01T12:00:00.000Z'
+    render(<FreshnessFooter resourceId="r1" confirmedAt={at} source={{ from: 'Refuah', at }} />)
+    expect(screen.getByTestId('freshness')).toHaveTextContent('From Refuah, Mar 1. Still right? Yes')
+    fireEvent.click(screen.getByRole('button', { name: 'Yes' }))
+    await waitFor(() => expect(screen.getByTestId('freshness')).toHaveTextContent('Confirmed. Thanks!'))
+    expect(screen.getByTestId('freshness')).not.toHaveTextContent('Refuah')
+  })
+
   // The link that used to sit beside this line is gone on purpose — see the
   // component's doc. Asserted so it can't quietly come back as a second,
   // near-invisible door to the same form the "Edit listing" bar opens.

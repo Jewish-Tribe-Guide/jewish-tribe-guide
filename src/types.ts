@@ -134,6 +134,9 @@ export type ResourceRow = {
  * A resource normalized for the display components: shared fields at the top
  * level and the category-specific `details` flattened onto it.
  */
+/** An outside source's name and the date it gave a listing. */
+export type ConfirmedFrom = { from: string; at: string }
+
 export type DirectoryResource = {
   id: string
   category: string
@@ -176,7 +179,12 @@ export type DirectoryResource = {
   googleSyncedAt?: string
   /** ISO timestamp of the last time a user confirmed the community-curated info is still accurate. */
   confirmedAt?: string
-  /** 'OPERATIONAL' | 'CLOSED_TEMPORARILY' | 'CLOSED_PERMANENTLY' from Google. */
+  /** Where `confirmedAt` came from, when an admin approved a change an
+   *  outside source made ("Keystone-K’s list", "Refuah"): `at` is the
+   *  confirmedAt it dated, so once a person confirms again (a new date) the
+   *  line says "Confirmed" again. Set only by approval (submissionStore). */
+  confirmedFrom?: ConfirmedFrom
+  /** 'OPERATIONAL'' | 'CLOSED_TEMPORARILY' | 'CLOSED_PERMANENTLY' from Google. */
   businessStatus?: 'OPERATIONAL' | 'CLOSED_TEMPORARILY' | 'CLOSED_PERMANENTLY'
   /** An admin's correction, which wins over `businessStatus` everywhere the
    *  app decides whether a place is trading — see effectiveBusinessStatus.

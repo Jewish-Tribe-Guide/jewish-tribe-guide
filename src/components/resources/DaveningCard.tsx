@@ -80,7 +80,7 @@ export default function DaveningCard({
   // Older rows keep their times as one line of text.
   if (typeof minyanim === 'string') {
     return (
-      <Card title="Davening times" testId="listing-davening" footer={<FreshnessFooter resourceId={item.id} confirmedAt={item.confirmedAt} subject="Times" />}>
+      <Card title="Davening times" testId="listing-davening" footer={<FreshnessFooter resourceId={item.id} source={item.confirmedFrom} confirmedAt={item.confirmedAt} subject="Times" />}>
         <DaveningTimes legacyText={minyanim} />
       </Card>
     )
@@ -150,13 +150,14 @@ export default function DaveningCard({
     onEditBox ? (
       <FreshnessFooter
         resourceId={item.id}
+        source={item.confirmedFrom}
         confirmedAt={sectionConfirmedAt(item, section)}
         section={section}
         onEdit={() => onEditBox(section, section === 'weekday' ? 'Usual weekday times' : 'Usual Shabbos times')}
       />
     ) : (
       <div className="flex flex-wrap items-baseline gap-x-1.5">
-        <FreshnessFooter resourceId={item.id} confirmedAt={sectionConfirmedAt(item, section)} subject={subject} section={section} />
+        <FreshnessFooter resourceId={item.id} source={item.confirmedFrom} confirmedAt={sectionConfirmedAt(item, section)} subject={subject} section={section} />
         {canAdd && updatingIn !== key && updated?.in !== key && (
           <button type="button" onClick={() => open(key)} className="cursor-pointer text-[13.5px] font-bold text-primary hover:underline">
             Update their times

@@ -24,6 +24,12 @@ export type SubmissionSource = {
   photoUrl?: string
   /** Anything said with it: the person's own note, or the reader's summary. */
   note?: string
+  /** An outside source by name, when that's what the change came from
+   *  ("Keystone-K’s list", "Refuah"): approved, the listing's date says
+   *  "From Refuah, Oct 20" instead of "Confirmed Oct 20". Not Google, whose
+   *  own line already says what it keeps and when, and never a person's
+   *  message, however it was read. */
+  named?: string
   /** Dishes read off the place's menu: its link, or null for photos of it.
    *  Approval dates them "on its menu" and keeps the link for "Full menu". */
   menu?: { url: string | null }
@@ -53,6 +59,7 @@ export function statedSource(payload: Record<string, unknown> | null | undefined
     ...(text('original') ? { original: text('original') } : {}),
     ...(text('photoUrl') ? { photoUrl: text('photoUrl') } : {}),
     ...(text('note') ? { note: text('note') } : {}),
+    ...(text('named') ? { named: (text('named') as string).trim() } : {}),
   }
 }
 
@@ -62,7 +69,7 @@ export function submissionSource(s: SourceInput): SubmissionSource {
   const note = s.note?.trim() || undefined
   const by = s.submitted_by?.name
 
-  if (by === KEYSTONE_WATCH_NAME) return { readBy: 'automatic', from: 'Keystone-K’s list', ...(note ? { original: note } : {}) }
+  if (by === KEYSTONE_WATCH_NAME) return { readBy: 'automatic', from: 'Keystone-K’s list', named: 'Keystone-K’s list', ...(note ? { original: note } : {}) }
   if (by === GOOGLE_SUBMITTER_NAME) return { readBy: 'automatic', from: 'Google', ...(note ? { original: note } : {}) }
 
   if (note && (note.includes(PASTED) || note.includes(PHOTO))) {

@@ -6,6 +6,7 @@ import { isStale } from '@/lib/listingView'
 import { useFetchOrPreview } from '@/lib/previewSend'
 import { EditButton, shortDate } from './listingParts'
 import { PencilIcon } from '@/components/icons'
+import type { ConfirmedFrom } from '@/types'
 
 
 type Props = {
@@ -26,6 +27,10 @@ type Props = {
    *  Edit, one question with two answers. The box's title isn't said again:
    *  the line is under it. */
   onEdit?: () => void
+  /** The listing's `confirmedFrom`: which outside source dated it. Said in
+   *  place of "Confirmed" ("From Keystone-K’s list, Oct 12") while the date
+   *  shown is the one it gave; a person's later confirmation is theirs. */
+  source?: ConfirmedFrom
 }
 
 // Shown at the end of every opened listing, and in a shul's times card: when
@@ -46,7 +51,7 @@ export default function FreshnessFooter(props: Props) {
   return <FreshnessStatus {...props} />
 }
 
-function FreshnessStatus({ resourceId, confirmedAt: initialConfirmedAt, lead, subject, ask = true, section, onEdit }: Props) {
+function FreshnessStatus({ resourceId, confirmedAt: initialConfirmedAt, lead, subject, ask = true, section, onEdit, source }: Props) {
   const now = useNow()
   const fetchOrPreview = useFetchOrPreview()
   const [confirmedAt, setConfirmedAt] = useState(initialConfirmedAt)
@@ -118,6 +123,8 @@ function FreshnessStatus({ resourceId, confirmedAt: initialConfirmedAt, lead, su
   }
 
   const failed = error && <span className="ml-1 text-red-600">Didn’t save. Try again.</span>
+  // Where the date shown came from, when an outside source gave it.
+  const from = source && confirmedAt && source.at === confirmedAt ? source.from : null
   const leadText = lead ? `${lead}. ` : ''
   const button = (label: string) => (
     <button onClick={confirm} disabled={loading} className="cursor-pointer font-bold text-primary hover:underline disabled:opacity-50">
@@ -140,7 +147,7 @@ function FreshnessStatus({ resourceId, confirmedAt: initialConfirmedAt, lead, su
       <div className="flex items-center gap-2" data-testid="freshness">
         <p className={`min-w-0 flex-1 text-[13.5px] leading-snug ${asking ? 'text-caution' : 'text-slate-600'}`}>
           {leadText}
-          {confirmedAt ? `Confirmed ${shortDate(confirmedAt, now)}` : 'Not confirmed yet'}
+          {confirmedAt ? `${from ? `From ${from},` : 'Confirmed'} ${shortDate(confirmedAt, now)}` : 'Not confirmed yet'}
           {asking && (confirmedAt ? ' · Still right?' : ' · Right?')}
           {failed}
         </p>
@@ -159,7 +166,7 @@ function FreshnessStatus({ resourceId, confirmedAt: initialConfirmedAt, lead, su
     return (
       <p className="text-[13.5px] leading-snug text-slate-600" data-testid="freshness">
         {leadText}
-        {confirmedAt ? `${what} last checked ${shortDate(confirmedAt, now)}.` : `${what} not checked by anyone yet.`}
+        {confirmedAt ? `${what} ${from ? `from ${from},` : 'last checked'} ${shortDate(confirmedAt, now)}.` : `${what} not checked by anyone yet.`}
       </p>
     )
   }
@@ -183,7 +190,7 @@ function FreshnessStatus({ resourceId, confirmedAt: initialConfirmedAt, lead, su
     return (
       <p className="text-[13.5px] leading-snug text-slate-600" data-testid="freshness">
         {leadText}
-        {subject ? `${subject} confirmed` : 'Confirmed'} {shortDate(confirmedAt, now)}.
+        {from ? `${subject ? `${subject} from` : 'From'} ${from},` : subject ? `${subject} confirmed` : 'Confirmed'} {shortDate(confirmedAt, now)}.
         {stale && <> Still right? {button('Yes')}</>}
         {failed}
       </p>

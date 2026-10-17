@@ -96,8 +96,8 @@ describe('EruvInfo', () => {
     const rows = await screen.findAllByTestId('eruv-row')
     // One box of rows: its picture (initials), the name, whether it's up.
     expect(rows.map((r) => r.textContent)).toEqual([
-      'CCCenter City EruvUp for this ShabbosChecked 2:55 PM · every 15 minutes until candle lighting',
-      'LMLower Merion EruvNot posted yet this weekChecked 2:55 PM · every 15 minutes until candle lighting',
+      'CCCenter City EruvUp for this ShabbosFrom example.org, 2:55 PM · every 15 minutes until candle lighting',
+      'LMLower Merion EruvNot posted yet this weekFrom example.org, 2:55 PM · every 15 minutes until candle lighting',
       'EPElkins Park EruvNo status online',
     ])
     // Headed as a category's list is: what it is, and how many.

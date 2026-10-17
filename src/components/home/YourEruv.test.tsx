@@ -46,7 +46,7 @@ describe('YourEruv', () => {
     here.coords = { lat: 39.9496, lng: -75.1718 } // Rittenhouse Square
     show()
     const card = await screen.findByTestId('today-eruv')
-    expect(card).toHaveTextContent('NEAREST ERUVCenter City EruvUp for this ShabbosChecked 2:55 PM · every 15 minutes until candle lighting')
+    expect(card).toHaveTextContent('NEAREST ERUVCenter City EruvUp for this ShabbosFrom example.org, 2:55 PM · every 15 minutes until candle lighting')
     expect(card).toHaveAttribute('href', '/philly/eruv?item=center-city')
     // Never whether they're in it (Oct 12).
     expect(card).not.toHaveTextContent(/inside|your eruv/i)

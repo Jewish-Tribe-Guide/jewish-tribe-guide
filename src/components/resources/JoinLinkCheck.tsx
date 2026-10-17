@@ -81,7 +81,7 @@ export default function JoinLinkCheck({ item, joined }: { item: DirectoryResourc
 
   const button = 'h-9 cursor-pointer rounded-full border border-slate-300 bg-white px-3.5 text-[14px] font-semibold text-slate-900 hover:bg-slate-50 disabled:cursor-default disabled:opacity-60'
 
-  if (phase === 'idle') return <FreshnessFooter resourceId={item.id} confirmedAt={item.confirmedAt} subject="Join link" />
+  if (phase === 'idle') return <FreshnessFooter resourceId={item.id} source={item.confirmedFrom} confirmedAt={item.confirmedAt} subject="Join link" />
   if (phase === 'thanks-yes') return <p className="text-[14px] text-emerald-700" role="status">Thanks! It’s marked as working.</p>
   if (phase === 'thanks-no') return <p className="text-[14px] text-emerald-700" role="status">Thanks for saying. An admin will check the link.</p>
 

@@ -10,6 +10,7 @@ import { recordActivity } from './activityStore'
 import { newListingFacts, visitorChanges, type ChangePart } from './changeParts'
 import { normalizeRow, validateSubmission } from './resourceStore'
 import { withReviewEdits } from './reviewEdits'
+import { submissionSource } from './submissionSource'
 import { listEruvimForAdmin, updateEruv } from './eruvStore'
 import type { EruvSuggestion } from './eruvSuggestion'
 import type {
@@ -794,8 +795,14 @@ function withResolvedGoogleFields(
  * Applied to a create and an edit only: an approved removal archives the
  * listing and says nothing about its details being current.
  */
-function withConfirmedNow(details: Record<string, unknown>, now: string): Record<string, unknown> {
-  return { ...details, confirmedAt: now }
+function withConfirmedNow(details: Record<string, unknown>, now: string, named?: string): Record<string, unknown> {
+  // An outside source by name (submissionSource's `named`) dates it "From
+  // Keystone-K's list, Oct 12"; anything else, "Confirmed Oct 12". Always
+  // set or cleared here, so an older source never outlives the date it gave.
+  const next: Record<string, unknown> = { ...details, confirmedAt: now }
+  if (named) next.confirmedFrom = { from: named, at: now }
+  else delete next.confirmedFrom
+  return next
 }
 
 /** Dates the grocery items this approval newly adds (details.itemSeen) and
@@ -871,13 +878,14 @@ type AppliedListing = { id: string | null; newItems: { fieldKey: string; item: s
 async function applyListing(submission: SubmissionRow): Promise<AppliedListing> {
   const supabase = getAdminClient()
   const now = new Date().toISOString()
+  const named = submissionSource(submission).named
 
   if (submission.operation === 'create') {
     const payload = submission.payload as unknown as ResourceSubmission
     payload.details = withResolvedPlaceId(payload.details, payload)
     const googleFields = await resolveGoogleFields(submission.community_id, payload, null)
     payload.details = withResolvedGoogleFields(payload.details, googleFields)
-    payload.details = withConfirmedNow(payload.details, now)
+    payload.details = withConfirmedNow(payload.details, now, named)
     const dated = await withItemDates(submission.community_id, payload.details, payload.category, null, now)
     payload.details = dated.details
     const { data: created, error } = await supabase
@@ -918,7 +926,7 @@ async function applyListing(submission: SubmissionRow): Promise<AppliedListing> 
     payload.details = withResolvedGoogleFields(payload.details, googleFields)
     payload.details = withPreservedInternals(payload.details, existingData as ResourceRow | null)
     payload.details = withClearedSyncOnNewPlaceId(payload.details, existingData as ResourceRow | null)
-    payload.details = withConfirmedNow(payload.details, now)
+    payload.details = withConfirmedNow(payload.details, now, named)
     const dated = await withItemDates(
       submission.community_id,
       payload.details,

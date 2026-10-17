@@ -229,6 +229,32 @@ describe('submissionStore (integration)', () => {
     expect(afterTyped!.details.menuUrl).toBe('https://saysheate.co/menu/')
   })
 
+  // Oct 17: a change an outside source made dates the listing "From
+  // Refuah, Oct 20"; the next approval of anyone else's change takes it off.
+  it('approving a change from a named outside source records it beside the date; the next approval clears it', async () => {
+    const category = await makeTestCategory()
+    const name = `Integration Listing ${randomUUID()}`
+    const createSub = await submitListingCreate('philly', listingPayload(category.id, name))
+    pendingSubmissionIds.push(createSub.id)
+    await approveSubmission(createSub.id)
+    const { data: created } = await getAdminClient().from('resource').select('id, details').eq('name', name).single()
+    expect(created!.details.confirmedFrom).toBeUndefined()
+
+    const fromRefuah = { ...listingPayload(category.id, name), phone: '555-0101', source: { readBy: 'ai', from: 'Refuah', named: 'Refuah' } }
+    const refuahSub = await submitListingUpdate('philly', created!.id, fromRefuah as ResourceSubmission, null, null)
+    pendingSubmissionIds.push(refuahSub.id)
+    await approveSubmission(refuahSub.id)
+    const { data: afterRefuah } = await getAdminClient().from('resource').select('details').eq('id', created!.id).single()
+    expect(afterRefuah!.details.confirmedFrom).toEqual({ from: 'Refuah', at: afterRefuah!.details.confirmedAt })
+
+    const byPerson = { ...listingPayload(category.id, name), phone: '555-0102' }
+    const personSub = await submitListingUpdate('philly', created!.id, byPerson, null, null)
+    pendingSubmissionIds.push(personSub.id)
+    await approveSubmission(personSub.id)
+    const { data: afterPerson } = await getAdminClient().from('resource').select('details').eq('id', created!.id).single()
+    expect(afterPerson!.details.confirmedFrom).toBeUndefined()
+  })
+
   it('archiving a listing (approved removal) does not stamp it confirmed', async () => {
     const category = await makeTestCategory()
     const name = `Integration Listing ${randomUUID()}`

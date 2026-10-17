@@ -83,12 +83,12 @@ describe('eruvView', () => {
   const friday3pm = at('2026-10-09T19:00:00Z')
 
   it('up, with when it was checked', () => {
-    expect(eruvView(eruv(), friday3pm, TZ, CANDLES)).toEqual({ tone: 'green', label: 'Up for this Shabbos', checked: 'Checked 2:55 PM · every 15 minutes until candle lighting' })
+    expect(eruvView(eruv(), friday3pm, TZ, CANDLES)).toEqual({ tone: 'green', label: 'Up for this Shabbos', checked: 'From centercityeruv.com, 2:55 PM · every 15 minutes until candle lighting' })
   })
 
   it('an undated up is up; a weekday says “Up” and when it was checked', () => {
     const wed = at('2026-10-07T13:30:00Z')
-    expect(eruvView(eruv({ statusCheckedAt: '2026-10-07T13:02:00Z' }), wed, TZ, null)).toEqual({ tone: 'green', label: 'Up', checked: 'Checked 9:02 AM · every 15 minutes on Fridays until candle lighting' })
+    expect(eruvView(eruv({ statusCheckedAt: '2026-10-07T13:02:00Z' }), wed, TZ, null)).toEqual({ tone: 'green', label: 'Up', checked: 'From centercityeruv.com, 9:02 AM · every 15 minutes on Fridays until candle lighting' })
   })
 
   it('an eruv that dates its posts: last week’s up is not this week’s', () => {
@@ -114,7 +114,7 @@ describe('eruvView', () => {
   })
 
   it('a check from another day says the day', () => {
-    expect(eruvView(eruv({ statusCheckedAt: '2026-10-08T13:00:00Z' }), friday3pm, TZ, CANDLES).checked).toBe('Checked Thu 9:00 AM · every 15 minutes until candle lighting')
+    expect(eruvView(eruv({ statusCheckedAt: '2026-10-08T13:00:00Z' }), friday3pm, TZ, CANDLES).checked).toBe('From centercityeruv.com, Thu 9:00 AM · every 15 minutes until candle lighting')
   })
 })
 

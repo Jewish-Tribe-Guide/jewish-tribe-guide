@@ -73,12 +73,12 @@ describe('the trust line', () => {
 
   // The user, Oct 17: once every place has a date, the band says so, and
   // the sheet drops its "if".
-  it('every place dated: the band says “every listing dated”, the sheet “when it was last checked”', async () => {
+  it('every place dated: the band says “every listing dated”, the sheet “where and when it was last checked”', async () => {
     const user = userEvent.setup()
     show({ places: 155, googleChecked: 135, checkedThisWeek: 129, dated: 155 })
     expect(screen.getByTestId('trust-band')).toHaveTextContent('Kept up by the community155 places · every listing dated')
     await user.click(screen.getByTestId('trust-band'))
-    expect((await rows()).at(-1)).toBe('Every listing says when it was last checkedSomething wrong? Open the place and tap Suggest an edit.')
+    expect((await rows()).at(-1)).toBe('Every listing says where and when it was last checkedSomething wrong? Open the place and tap Suggest an edit.')
   })
 
   // As on the live site today: a Keystone K watch set up and never run,

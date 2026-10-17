@@ -193,7 +193,7 @@ describe('You', () => {
     show()
     const places = await screen.findByTestId('you-places')
     const links = within(places).getAllByRole('link')
-    expect(links.map((a) => a.textContent)).toEqual([expect.stringContaining('Center City EruvUp for this Shabbos · Checked 2:55 PM'), expect.stringContaining('Trader Joe’s')])
+    expect(links.map((a) => a.textContent)).toEqual([expect.stringContaining('Center City EruvUp for this Shabbos · From example.org, 2:55 PM'), expect.stringContaining('Trader Joe’s')])
     expect(links[0]).toHaveAttribute('href', '/test-community/eruv?item=center-city')
     expect(within(links[0]).getByText('Up for this Shabbos')).toHaveClass('text-green-700')
     await user.click(screen.getByRole('button', { name: 'Save Center City Eruv' }))

@@ -39,9 +39,20 @@ describe('submissionSource', () => {
     expect(submissionSource(sub('Keystone-K’s list says: "Mama’s"', KEYSTONE_WATCH_NAME))).toEqual({
       readBy: 'automatic',
       from: 'Keystone-K’s list',
+      named: 'Keystone-K’s list',
       original: 'Keystone-K’s list says: "Mama’s"',
     })
     expect(submissionSource(sub('Closed on Google', GOOGLE_SUBMITTER_NAME))).toMatchObject({ readBy: 'automatic', from: 'Google' })
+  })
+
+  // Oct 17: approved, a named source dates the listing ("From Keystone-K’s
+  // list, Oct 12"). Google says its own date on its own line, so it isn't
+  // named; nor is anything a person sent, however it was read.
+  it('names an outside source for the listing’s date: Keystone-K’s list or one a filer stated, not Google or a person', () => {
+    expect(submissionSource(sub('Closed on Google', GOOGLE_SUBMITTER_NAME)).named).toBeUndefined()
+    expect(submissionSource(sub('They close early Fridays now', 'Dana')).named).toBeUndefined()
+    expect(submissionSource(sub('x', undefined, { source: { readBy: 'ai', from: 'Refuah', named: 'Refuah' } })).named).toBe('Refuah')
+    expect(submissionSource(sub('x', undefined, { source: { readBy: 'ai', from: 'a message' } })).named).toBeUndefined()
   })
 
   it('treats anything else as a person’s suggestion, with their note', () => {

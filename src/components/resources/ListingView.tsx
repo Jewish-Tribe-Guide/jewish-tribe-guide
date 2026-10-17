@@ -209,7 +209,7 @@ export default function ListingView({ item, category, color, place = null, upvot
       }
     : undefined
   const confirmLine = (edit?: BoxEdit) => (
-    <FreshnessFooter resourceId={item.id} confirmedAt={item.confirmedAt} onEdit={edit && editBox ? () => editBox(edit) : undefined} />
+    <FreshnessFooter resourceId={item.id} source={item.confirmedFrom} confirmedAt={item.confirmedAt} onEdit={edit && editBox ? () => editBox(edit) : undefined} />
   )
   const [joined, setJoined] = useState(false)
   const photo = typeof item[PHOTO_FIELD_KEY] === 'string' && (item[PHOTO_FIELD_KEY] as string).trim() ? (item[PHOTO_FIELD_KEY] as string) : undefined
@@ -477,7 +477,7 @@ export default function ListingView({ item, category, color, place = null, upvot
         item={item}
         title={b.title}
         fields={b.fields}
-        footer={dated ? <FreshnessFooter resourceId={item.id} confirmedAt={sectionConfirmedAt(item, key)} section={key} onEdit={edit} /> : undefined}
+        footer={dated ? <FreshnessFooter resourceId={item.id} source={item.confirmedFrom} confirmedAt={sectionConfirmedAt(item, key)} section={key} onEdit={edit} /> : undefined}
         onEdit={dated ? undefined : edit}
       />
     )
@@ -554,7 +554,7 @@ export default function ListingView({ item, category, color, place = null, upvot
   const detailsFoot = googleLead ? (
     <span data-testid="listing-google">{googleLead}.</span>
   ) : contactDated ? (
-    <FreshnessFooter resourceId={item.id} confirmedAt={sectionConfirmedAt(item, CONTACT_SECTION)} section={CONTACT_SECTION} onEdit={editDetails} />
+    <FreshnessFooter resourceId={item.id} source={item.confirmedFrom} confirmedAt={sectionConfirmedAt(item, CONTACT_SECTION)} section={CONTACT_SECTION} onEdit={editDetails} />
   ) : undefined
   const details = ((caveat?.title && !caveatFirst) || showAddress || showSetLocation || showPhone || websiteName || otherHours.length > 0 || detailFields.length > 0 || extra.length > 0 || quietBadges.length > 0 || otherTags.length > 0) && (
     <Card testId="listing-details" footer={detailsFoot} onEdit={contactDated ? undefined : editDetails}>
@@ -656,7 +656,7 @@ export default function ListingView({ item, category, color, place = null, upvot
   const aboutFoot = fromGoogle ? (
     <span data-testid="about-google">{item.googleSyncedAt ? `Last updated from Google, ${shortDate(item.googleSyncedAt, clock)}.` : 'From Google.'}</span>
   ) : aboutKey ? (
-    <FreshnessFooter resourceId={item.id} confirmedAt={sectionConfirmedAt(item, aboutKey)} section={aboutKey} onEdit={editAbout} />
+    <FreshnessFooter resourceId={item.id} source={item.confirmedFrom} confirmedAt={sectionConfirmedAt(item, aboutKey)} section={aboutKey} onEdit={editAbout} />
   ) : undefined
   const about = aboutFields.length > 0 && (
     <Card testId="listing-about" footer={aboutFoot} onEdit={fromGoogle ? editAbout : undefined}>
@@ -687,7 +687,7 @@ export default function ListingView({ item, category, color, place = null, upvot
       fields={shabbosFields}
       zmanim={zmanim}
       candlesAt={candlesAt}
-      footer={shabbosKey ? <FreshnessFooter resourceId={item.id} confirmedAt={sectionConfirmedAt(item, shabbosKey)} section={shabbosKey} onEdit={editShabbos} /> : undefined}
+      footer={shabbosKey ? <FreshnessFooter resourceId={item.id} source={item.confirmedFrom} confirmedAt={sectionConfirmedAt(item, shabbosKey)} section={shabbosKey} onEdit={editShabbos} /> : undefined}
       onEdit={shabbosKey ? undefined : editShabbos}
     />
   ) : null
@@ -1271,7 +1271,7 @@ function GroupBox({
   return (
     <Card
       title={group.label}
-      footer={(!!hoursF || !!onEdit) && <FreshnessFooter resourceId={item.id} confirmedAt={sectionConfirmedAt(item, group.key)} section={group.key} onEdit={onEdit} />}
+      footer={(!!hoursF || !!onEdit) && <FreshnessFooter resourceId={item.id} source={item.confirmedFrom} confirmedAt={sectionConfirmedAt(item, group.key)} section={group.key} onEdit={onEdit} />}
     >
       <div className="divide-y divide-slate-100">
         {today && shut && (

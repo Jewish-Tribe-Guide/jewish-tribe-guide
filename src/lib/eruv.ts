@@ -147,18 +147,31 @@ function timeOf(iso: string, now: Date, tz: string): string {
   return `${day} ${time}`
 }
 
-/** "Up for this Shabbos" and "Checked 2:55 PM · every 15 minutes until
- *  candle lighting". */
+/** An eruv's status page as people say it: "centercityeruv.com". */
+function siteOf(url: string): string | null {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '') || null
+  } catch {
+    return null
+  }
+}
+
+/** "Up for this Shabbos" and "From centercityeruv.com, 2:55 PM · every 15
+ *  minutes until candle lighting": where the status was read, and when
+ *  (the user, Oct 17: every "last checked" line says where the fact came
+ *  from). A read that failed says only when it was tried. */
 export function eruvView(eruv: Eruv, now: Date, tz: string, candlesToday: number | null): EruvView {
   const { date, weekday } = localParts(now, tz)
   const shabbosSide = weekday === 5 || weekday === 6
   const every = inCheckingHours(now, tz, candlesToday) ? 'every 15 minutes until candle lighting' : 'every 15 minutes on Fridays until candle lighting'
   const checkedLine = (iso: string | null) => (iso ? `Checked ${timeOf(iso, now, tz)} · ${every}` : null)
+  const site = eruv.statusUrl ? siteOf(eruv.statusUrl) : null
+  const readLine = (iso: string) => (site ? `From ${site}, ${timeOf(iso, now, tz)} · ${every}` : checkedLine(iso))
 
   if (!eruv.statusUrl) return { tone: 'grey', label: 'No status online', checked: null }
   const failedSince = eruv.statusErrorAt && (!eruv.statusCheckedAt || Date.parse(eruv.statusErrorAt) > Date.parse(eruv.statusCheckedAt))
   if (!eruv.statusCheckedAt || failedSince) return { tone: 'amber', label: 'Couldn’t read their status', checked: eruv.statusErrorAt ? checkedLine(eruv.statusErrorAt) : null }
-  const checked = checkedLine(eruv.statusCheckedAt)
+  const checked = readLine(eruv.statusCheckedAt)
   if (eruv.status === 'down') return { tone: 'red', label: shabbosSide ? 'Down this Shabbos' : 'Down', checked }
   if (eruv.status !== 'up') return { tone: 'amber', label: 'Couldn’t read their status', checked }
   if (eruv.statusDated && (!eruv.statusPostedOn || eruv.statusPostedOn < weekStart(date, weekday))) return { tone: 'amber', label: 'Not posted yet this week', checked }

@@ -107,8 +107,10 @@ function TrustSheet({ open, facts, region, communitySlug, onClose }: { open: boo
           {sentence ? 'Minyan times, kosher items, Shabbos details.' : 'Everything here is added and fixed by people in the community.'} A person reviews every change before it shows.
         </Row>
         {/* "when" only once every place has a date: until then some say
-            "Not confirmed by anyone yet", which is the "if". */}
-        <Row icon={<CalendarCheck className="h-5 w-5" />} tone="bg-[#c9a45c]/15 text-[#7a5a1c]" title={everyListingDated(facts) ? 'Every listing says when it was last checked' : 'Every listing says if and when it was checked'}>
+            "Not confirmed by anyone yet", which is the "if". "Where" since
+            Oct 17: a date an outside source gave names it ("From
+            Keystone-K's list, Oct 12"), and "Confirmed" is a person. */}
+        <Row icon={<CalendarCheck className="h-5 w-5" />} tone="bg-[#c9a45c]/15 text-[#7a5a1c]" title={everyListingDated(facts) ? 'Every listing says where and when it was last checked' : 'Every listing says if and when it was checked'}>
           Something wrong? Open the place and tap <strong className="font-bold text-ink">Suggest an edit</strong>.
         </Row>
       </ul>

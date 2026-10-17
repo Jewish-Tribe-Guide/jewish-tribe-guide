@@ -120,11 +120,11 @@ describe('searchLines — where Enter goes', () => {
 
     it('one named: that eruv, its status and when it was checked, then the page', () => {
       expect(brief('is center city eruv up?', { eruvim })).toEqual([
-        'Center City Eruv · Up · Checked 1:55 PM → /philly/eruv?item=cc',
+        'Center City Eruv · Up · From cc.example, 1:55 PM → /philly/eruv?item=cc',
         'Eruv · Each eruv’s status this week → /philly/eruv',
       ])
       expect(lines('is center city eruv up?', { eruvim })[0]).toMatchObject({ kind: 'eruv', eruvId: 'cc', tone: 'green', categoryId: 'eruv-information' })
-      expect(lines('is university city eruv up', { eruvim })[0]).toMatchObject({ sub: 'Down · Checked 1:55 PM', tone: 'red' })
+      expect(lines('is university city eruv up', { eruvim })[0]).toMatchObject({ sub: 'Down · From uc.example, 1:55 PM', tone: 'red' })
       expect(lines('northeast eruv', { eruvim })[0]).toMatchObject({ sub: 'No status online · Hotline (215) 555-0100', tone: 'grey' })
     })
 
@@ -136,8 +136,8 @@ describe('searchLines — where Enter goes', () => {
     it('the eruv in general: the page, then each eruv’s status', () => {
       expect(brief('is the eruv up', { eruvim })).toEqual([
         'Eruv · Each eruv’s status this week → /philly/eruv',
-        'Center City Eruv · Up · Checked 1:55 PM → /philly/eruv?item=cc',
-        'University City Eruv · Down · Checked 1:55 PM → /philly/eruv?item=uc',
+        'Center City Eruv · Up · From cc.example, 1:55 PM → /philly/eruv?item=cc',
+        'University City Eruv · Down · From uc.example, 1:55 PM → /philly/eruv?item=uc',
         'Northeast Eruv · No status online · Hotline (215) 555-0100 → /philly/eruv?item=ne',
       ])
     })
