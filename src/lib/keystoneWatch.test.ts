@@ -156,6 +156,20 @@ describe('compareKeystone', () => {
     expect(f.kind === 'gone' && f.details.t).toEqual(['Meat'])
   })
 
+  // Oct 17's first real run: Nothing Bundt Cakes in Springfield, off the
+  // list, was asked about as "the same business under a new name" as the
+  // Cherry Hill one, which the guide has as its own listing.
+  it('doesn’t offer a branch the guide already has as the gone place’s new name', () => {
+    const here = listing({ id: 'here', name: 'Cherry Grill', details: { kosherCert: ['Keystone-K'], k: 'https://keystone-k.org/kosher/cherry-grill/', t: ['Meat'] } })
+    const gone = listing({ id: 'gone', name: 'Cherry Grill', address: '900 Other Rd', details: { kosherCert: 'Keystone-K' } })
+    const [f] = compareKeystone(others(['cherry-grill']), [here, gone]).filter((x) => x.kind === 'gone')
+    expect(f.kind === 'gone' && f.related).toBeNull()
+    expect(findingNote(f)).not.toContain('under a new name')
+    // With no branch in the guide, the list's place is still offered.
+    const [alone] = compareKeystone(others(['cherry-grill']), [gone]).filter((x) => x.kind === 'gone')
+    expect(alone.kind === 'gone' && alone.related?.slug).toBe('cherry-grill')
+  })
+
   // A kosher guide doesn't list a place with no hechsher: when Keystone-K
   // was its only one, the suggestion is to remove the listing, not to leave
   // it showing with an empty certification.

@@ -250,11 +250,16 @@ function sameSet(a: string[], b: string[]): boolean {
 /** Every difference between Keystone-K's list and the guide. */
 export function compareKeystone(entries: KeystoneEntry[], listings: WatchedListing[]): WatchFinding[] {
   const findings: WatchFinding[] = []
-  const matched = new Set<string>()
+  // Each listing's entry first, so a place gone from the list isn't offered
+  // another branch the guide already has as its own listing: Nothing Bundt
+  // Cakes in Springfield isn't "under a new name" the Cherry Hill one, which
+  // is in the guide at its own address (Oct 17).
+  const entryOf = new Map(listings.map((l) => [l.id, entryFor(l, entries)]))
+  const matched = new Set([...entryOf.values()].filter((e): e is KeystoneEntry => !!e).map((e) => e.slug))
+  const unmatched = entries.filter((e) => !matched.has(e.slug))
 
   for (const listing of listings) {
-    const entry = entryFor(listing, entries)
-    if (entry) matched.add(entry.slug)
+    const entry = entryOf.get(listing.id) ?? null
 
     if (!entry) {
       if (listing.category !== 'restaurant' || !claimsKeystone(listing)) continue
@@ -262,7 +267,7 @@ export function compareKeystone(entries: KeystoneEntry[], listings: WatchedListi
       const certs = selectValues(details.kosherCert).filter((c) => c !== KEYSTONE_CERT)
       details.kosherCert = certs
       if (keystoneSlug(details) || /keystone-k\.org/.test(String(details.k ?? ''))) delete details.k
-      findings.push({ kind: 'gone', listing, details, related: relatedEntry(listing, entries), remove: certs.length === 0 })
+      findings.push({ kind: 'gone', listing, details, related: relatedEntry(listing, unmatched), remove: certs.length === 0 })
       continue
     }
 

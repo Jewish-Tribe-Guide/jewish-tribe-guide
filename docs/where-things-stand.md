@@ -48,6 +48,11 @@ for that exact change, in the same conversation. Show the dry run first.
 4. **Merge `redesign/map-google-sizes` into `main`.** Until then the Keystone
    K check, the eruv status reads, the Refuah watch and the "From …" dates
    don't run on the live site, so the trust sheet can name only Google there.
+   The live Keystone-K watch row exists (since Oct 5) but has never run:
+   `main` has neither its code nor its daily schedule. Its first live run
+   will file about 34 suggestions at once (dev's first run, Oct 17: levels
+   the guide lacks, one moved Keystone page, 4 places off the list, 10 on
+   it but not in the guide) and email the admins one digest.
 5. **Check the live database has every migration first.** Tables and columns
    through 081 are there (checked Oct 17). Not yet checked: 077 (eruv
    suggestions, a database rule) and 082 (confirming a contact box, a
@@ -57,6 +62,14 @@ for that exact change, in the same conversation. Show the dry run first.
 ## Small open decisions
 
 6. The "+" button covers part of the third tile in a row on the phone home.
+7. **Keep the preview's checks current?** Scheduled jobs run only on the
+   production deployment, so on the dev/test database (what the previews
+   read) Google's check and the watches run only when someone runs them.
+   They were run by hand Oct 17, so the preview's trust sheet names Google
+   and Keystone-K until about Oct 24, then only the eruv again. A daily
+   GitHub Actions schedule against the test database would keep them; the
+   Google part costs Places calls (about what the live site's nightly run
+   costs).
 
 ## Done Oct 17
 
