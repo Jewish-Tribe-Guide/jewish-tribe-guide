@@ -241,17 +241,32 @@ test.describe('category page weight', () => {
   // lazy() only fetches it when it is (next/dynamic fetched it anyway). The
   // desktop project is the positive control, so this can't pass because the
   // map is simply broken.
+  //
+  // CI builds with no Maps key (none is a repo secret), and with no key the
+  // map never asks Google for anything: it draws "The map couldn't load"
+  // instead. So the positive control there is that message, which only the
+  // map's own lazily-loaded code can draw. The Google requests are checked
+  // only where a key was built in, where they're the real cost. Before this,
+  // the test could never pass in CI (it first ran there Oct 16).
   test('a phone loads nothing from Google Maps on a category page; a desktop loads the map beside the list', async ({ page, request, isMobile }) => {
     const community = await defaultCommunitySlug(request)
     const { category } = await largestCategory(request, community)
+    const keyed = !!process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
 
     const hosts: string[] = []
     page.on('request', (r) => void hosts.push(new URL(r.url()).host))
     await load(page, `/${community}/${category.id}`)
 
     const google = hosts.filter((h) => h === 'maps.googleapis.com' || h === 'maps.gstatic.com')
-    if (isMobile) expect(google, 'a phone browsing a category page').toHaveLength(0)
-    else expect(google.length, 'a desktop draws the map beside the list').toBeGreaterThan(0)
+    const noKey = page.getByText('The map couldn’t load')
+    if (isMobile) {
+      expect(google, 'a phone browsing a category page').toHaveLength(0)
+      await expect(noKey, 'a phone draws no map, keyed or not').toHaveCount(0)
+    } else if (keyed) {
+      expect(google.length, 'a desktop draws the map beside the list').toBeGreaterThan(0)
+    } else {
+      await expect(noKey, 'a desktop draws the map beside the list (with no key, its message)').toBeVisible()
+    }
   })
 
   test('browsing loads nothing from Turnstile, which only an Add/Edit form needs', async ({ page, request }) => {
