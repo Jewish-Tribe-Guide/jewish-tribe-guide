@@ -242,12 +242,12 @@ test.describe('category page weight', () => {
   // desktop project is the positive control, so this can't pass because the
   // map is simply broken.
   //
-  // CI builds with no Maps key (none is a repo secret), and with no key the
-  // map never asks Google for anything: it draws "The map couldn't load"
-  // instead. So the positive control there is that message, which only the
-  // map's own lazily-loaded code can draw. The Google requests are checked
-  // only where a key was built in, where they're the real cost. Before this,
-  // the test could never pass in CI (it first ran there Oct 16).
+  // CI builds with the site's Maps key (a repo secret since Oct 17). A build
+  // without one (a fork, a fresh clone with no .env.local) never asks Google
+  // for anything: the map draws "The map couldn't load" instead. So the
+  // positive control there is that message, which only the map's own
+  // lazily-loaded code can draw. The Google requests are checked only where
+  // a key was built in, where they're the real cost.
   test('a phone loads nothing from Google Maps on a category page; a desktop loads the map beside the list', async ({ page, request, isMobile }) => {
     const community = await defaultCommunitySlug(request)
     const { category } = await largestCategory(request, community)
