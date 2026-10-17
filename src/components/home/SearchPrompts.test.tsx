@@ -20,15 +20,27 @@ describe('SearchPrompts', () => {
     vi.restoreAllMocks()
   })
 
-  it('on a phone, two on one line: the first, and the next that fits beside it', () => {
+  // The user, Oct 17: more on a phone, on one line that swipes sideways.
+  it('on a phone, up to six in a row that scrolls sideways, every one reachable', () => {
     phone()
-    render(<SearchPrompts oneLine prompts={['Next Shacharis', 'Where can I get chalav yisroel milk?', 'Kosher wine', 'Shul near me']} onPick={() => {}} />)
-    expect(shown()).toEqual(['Next Shacharis', 'Kosher wine'])
+    const prompts = ['Next Shacharis', 'Where can I get chalav yisroel milk?', 'Kosher wine', 'Shul near me', 'Food open now', 'Mikvah open today', 'Kosher bakery']
+    render(<SearchPrompts oneLine prompts={prompts} onPick={() => {}} />)
+    expect(shown()).toEqual(prompts.slice(0, 6))
+    for (const b of screen.getAllByRole('button')) {
+      expect(b).not.toHaveAttribute('aria-hidden')
+      expect(b).not.toHaveAttribute('tabindex', '-1')
+    }
+    expect(screen.getByTestId('search-prompts').className).toContain('overflow-x-auto')
   })
 
-  it('the first always, even when nothing fits beside it', () => {
+  it('on a phone, runs to the screen’s edges, so the last one shows cut off', () => {
+    render(<SearchPrompts oneLine prompts={['Kosher wine', 'Shul near me']} onPick={() => {}} />)
+    expect(screen.getByTestId('search-prompts').className).toMatch(/-mx-4.*px-4/)
+  })
+
+  it('on a computer, the first always, even when nothing fits beside it', () => {
     phone(300)
-    render(<SearchPrompts oneLine prompts={['Where can I get chalav yisroel milk?', 'Kosher wine']} onPick={() => {}} />)
+    render(<SearchPrompts prompts={['Where can I get chalav yisroel milk?', 'Kosher wine']} onPick={() => {}} />)
     expect(shown()).toEqual(['Where can I get chalav yisroel milk?'])
   })
 

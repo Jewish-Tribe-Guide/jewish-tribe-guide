@@ -16,6 +16,7 @@ import { readerPlaces } from '@/lib/questionReader'
 import { needsReading, ownFrom, readingAnswers, readingLoses } from '@/lib/readingSearch'
 import { useReading } from '@/lib/useReading'
 import { answersWell, candidatePrompts, pickPrompts } from '@/lib/searchPrompts'
+import { PHONE_MOST } from '@/components/home/SearchPrompts'
 import HeroHeading from '@/components/home/HeroHeading'
 import TodayBlocks from '@/components/home/TodayBlocks'
 import CategoryTiles from '@/components/home/CategoryTiles'
@@ -306,9 +307,9 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
       ? pickPrompts(candidatePrompts(schedule && { day: schedule.todayKey, minutes: schedule.nowMinutes }), (p) => {
           const tried = ask(p)
           return answersWell(tried.answer, tried.result.hits.length) && linesFor(p, tried.result, tried.answer).length > 0
-          // Four, so a phone has a short one to fit beside the first
-          // (SearchPrompts); a computer shows three.
-        }, 4)
+          // Six for a phone's row, which swipes; a computer shows the three
+          // that fit (SearchPrompts).
+        }, PHONE_MOST)
       : []
   const pickPrompt = (p: string) => {
     track('search_prompt_tapped', { prompt: p })

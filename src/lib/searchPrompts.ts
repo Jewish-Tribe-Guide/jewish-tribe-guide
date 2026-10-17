@@ -26,9 +26,15 @@ export function candidatePrompts(at: { day: DayKey; minutes: number } | null): s
   else out.push('Next minyan')
   // Friday before Shabbos: the errand everyone is on.
   if (day === 'fri' && minutes < 15 * 60) out.push('Where can I get challah?')
+  // Friday and Shabbos: the eruv.
+  if (day === 'fri' || day === 'sat') out.push('Is the eruv up?')
   // Something to eat, while there is.
   if (minutes >= 7 * 60 && minutes < 22 * 60) out.push('Food open now')
   out.push(TIMELESS[0], TIMELESS[1], 'Mikvah open today', TIMELESS[2])
+  // More for a phone's row, which swipes and holds six (SearchPrompts); a
+  // computer shows three, so it rarely gets this far.
+  if (minutes >= 11 * 60 && minutes < 22 * 60) out.push('Pizza open now')
+  out.push('Kosher bakery')
   return out
 }
 

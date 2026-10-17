@@ -22,6 +22,19 @@ describe('candidatePrompts — questions for the moment', () => {
     expect(candidatePrompts({ day: 'mon', minutes: at(23, 30) })).not.toContain('Food open now')
   })
 
+  it('offers the eruv on Friday and Shabbos only', () => {
+    expect(candidatePrompts({ day: 'fri', minutes: at(16) })).toContain('Is the eruv up?')
+    expect(candidatePrompts({ day: 'sat', minutes: at(10) })).toContain('Is the eruv up?')
+    expect(candidatePrompts({ day: 'wed', minutes: at(10) })).not.toContain('Is the eruv up?')
+  })
+
+  // A phone's row swipes and holds six (the user, Oct 17), so a weekday
+  // afternoon has more than six to pick from, before some drop out for not
+  // answering well.
+  it('offers enough for a phone’s six on an ordinary afternoon', () => {
+    expect(candidatePrompts({ day: 'tue', minutes: at(13) }).length).toBeGreaterThanOrEqual(8)
+  })
+
   it('offers only questions whose answer doesn’t depend on the time, before it’s known', () => {
     expect(candidatePrompts(null)).toEqual(['Chalav yisroel milk', 'Kosher wine', 'Shul near me'])
   })
