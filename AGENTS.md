@@ -4,6 +4,12 @@
 This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Only when a task actually touches Next.js framework mechanics — routing/`app` directory conventions, data fetching, server actions, middleware, `next.config.ts`, or other file conventions — read the matching guide in `node_modules/next/dist/docs/` first and heed its deprecation notices. Ordinary component/logic edits that don't call a Next.js API directly don't need this.
 <!-- END:nextjs-agent-rules -->
 
+# What's outstanding
+
+`docs/where-things-stand.md` is the running list of open work, decisions
+waiting on the user, and what's already decided. Read it before picking up
+redesign work, and update it in the same commit as anything that changes it.
+
 # Local admin access
 
 Default to the **local** admin console (`npm run dev`, then `http://localhost:3000/philly/admin?devToken=<DEV_ADMIN_BYPASS_SECRET>`) instead of the deployed one — the secret is in `.env.local` as `DEV_ADMIN_BYPASS_SECRET`. This hits `/api/admin/dev-login`, which signs you in instantly and works only when `NODE_ENV !== 'production'` (so it's a no-op against a real deployment — see that route's own comments). No magic-link email needed. `/admin` (no community segment, `?devToken=` works there too) is a different, standalone page — the superadmin console (`src/app/admin/page.tsx`), gated by the global `SUPERADMIN_EMAILS` list rather than any one community's `admin_email` — for cross-community actions like creating a new community. It no longer redirects to `/philly/admin`.

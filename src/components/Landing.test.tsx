@@ -162,9 +162,10 @@ describe('Landing', () => {
   // Tiles (the user, Oct 17): the list read as dull, three screens under six
   // headings. Every category as a tile, in the admin's order, no headings;
   // past twelve, a line of links. Still no photos to download.
-  // The user, Oct 17: the headings break the tiles into bite-sized groups,
-  // and this is where a phone browses, so every category is a tile.
-  it('mobile: browsing is tiles under the admin\'s group headings, every category, in its order', () => {
+  // The user, Oct 17: no group headings (under them, a group of one or two
+  // left a tile alone in a row), and this is where a phone browses, so
+  // every category is a tile, none in an "Also:" line.
+  it('mobile: browsing is one grid of tiles in the admin\'s order, every category, no headings', () => {
     const ids = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n']
     const cats = ids.map((id) => makeCategory({ id, pluralLabel: `Cat ${id}`, cardImageUrl: `https://images.unsplash.com/photo-${id}` }))
     const section = (n: number, cardIds: string[]) => ({
@@ -187,13 +188,11 @@ describe('Landing', () => {
     )
 
     const tiles = within(screen.getByTestId('category-tiles'))
-    expect(tiles.getAllByRole('heading').map((h) => h.textContent)).toEqual(['Section 1', 'Section 2', 'Section 3'])
     // Each tile: its icon, its name, and how many places when it counts any.
-    const group = (title: string) => within(tiles.getByRole('region', { name: title })).getAllByRole('listitem').map((li) => li.textContent)
-    const tile = (id: string) => expect.stringMatching(new RegExp(`Cat ${id}${id === 'n' ? '2' : ''}$`))
-    expect(group('Section 1')).toEqual(['n', 'a', 'b', 'c', 'd'].map(tile))
-    expect(group('Section 2')).toEqual(['e', 'f', 'g', 'h', 'i'].map(tile))
-    expect(group('Section 3')).toEqual(['j', 'k', 'l', 'm'].map(tile))
+    const order = ['n', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm']
+    expect(tiles.getAllByRole('listitem').map((li) => li.textContent)).toEqual(order.map((id) => expect.stringMatching(new RegExp(`Cat ${id}${id === 'n' ? '2' : ''}$`))))
+    expect(tiles.getAllByRole('list')).toHaveLength(1)
+    expect(tiles.queryAllByRole('heading')).toHaveLength(0)
     expect(screen.queryByText('Also:')).not.toBeInTheDocument()
     expect(tiles.getByRole('link', { name: 'Cat m' })).toHaveAttribute('href', '/test-community/m')
     expect(screen.getByTestId('home-browse-list').closest('section')!.querySelectorAll('img')).toHaveLength(0)

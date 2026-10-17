@@ -121,28 +121,21 @@ test.describe('on a phone', () => {
     await expect(page.getByTestId('right-now')).not.toContainText('open now')
   })
 
-  test('the categories as tiles under the admin’s group headings, each a link to its page, none left out', async ({ page }) => {
+  test('the categories as one grid of tiles, each a link to its page, none left out, no headings', async ({ page, request }) => {
     const community = await openHome(page, 'tuesday')
     const tiles = page.getByTestId('category-tiles')
     await expect(tiles.getByRole('listitem').first()).toBeVisible()
-    // Each group a heading and its tiles (the user, Oct 17).
-    const groups = tiles.locator('section')
-    expect(await groups.count()).toBeGreaterThan(0)
-    for (const group of await groups.all()) {
-      await expect(group.getByRole('heading', { level: 2 })).toBeVisible()
-      expect(await group.getByRole('listitem').count()).toBeGreaterThan(0)
-    }
+    // No group headings (the user, Oct 17), and no "Also:" line.
+    await expect(tiles.getByRole('heading')).toHaveCount(0)
     await expect(tiles).not.toContainText('Also:')
-    for (const href of await tiles.getByRole('listitem').getByRole('link').evaluateAll((as) => as.map((a) => a.getAttribute('href')))) {
-      expect(href).toMatch(new RegExp(`^/${community}/`))
-    }
-    // Three to a row, in the first group with three.
-    for (const group of await groups.all()) {
-      const tops = await group.getByRole('listitem').evaluateAll((lis) => lis.slice(0, 3).map((li) => Math.round(li.getBoundingClientRect().top)))
-      if (tops.length < 3) continue
-      expect(new Set(tops).size).toBe(1)
-      break
-    }
+    // Every category with a page has its tile.
+    const hrefs = await tiles.getByRole('listitem').getByRole('link').evaluateAll((as) => as.map((a) => a.getAttribute('href')))
+    for (const href of hrefs) expect(href).toMatch(new RegExp(`^/${community}/`))
+    const listing = (await categories(request, community)).filter((c) => c.kind === 'listing')
+    for (const c of listing) expect(hrefs).toContain(`/${community}/${c.id}`)
+    // Three to a row.
+    const tops = await tiles.getByRole('listitem').evaluateAll((lis) => lis.slice(0, 3).map((li) => Math.round(li.getBoundingClientRect().top)))
+    if (tops.length === 3) expect(new Set(tops).size).toBe(1)
   })
 
   // One search box on a phone (Oct 17): the home's had stayed the old pill
