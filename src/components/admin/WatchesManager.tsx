@@ -6,6 +6,7 @@ import { fetchJson } from '@/lib/fetchJson'
 import { withCommunity } from '@/lib/useCommunityData'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { watchHealth, type Watch } from '@/lib/watches'
+import { refuahHospitalId } from '@/lib/refuahWatch'
 
 // ── The "Watches" tab (freshness map, Oct 5) ────────────────────────────────
 // The pages the guide reads on its own every morning, whether each is still
@@ -46,11 +47,22 @@ function HealthLine({ watch, now }: { watch: Watch; now: number }) {
 }
 
 function WhatItDoes({ watch }: { watch: Watch }) {
+  const lastRead = watch.lastFiled !== null && ` Last read: ${watch.lastFiled === 0 ? 'nothing new' : `${watch.lastFiled} suggestion${watch.lastFiled === 1 ? '' : 's'}`}.`
   if (watch.kind === 'keystone_list') {
     return (
       <p className="text-xs text-muted">
         Compared with the guide every morning. Differences go to the moderation queue, quoting the list.
-        {watch.lastFiled !== null && ` Last read: ${watch.lastFiled === 0 ? 'nothing new' : `${watch.lastFiled} suggestion${watch.lastFiled === 1 ? '' : 's'}`}.`}
+        {lastRead}
+      </p>
+    )
+  }
+  // A hospital's page on Refuah is read from its data and compared with the
+  // hospital's listing (refuahWatch.ts), like Keystone-K's list.
+  if (refuahHospitalId(watch.url)) {
+    return (
+      <p className="text-xs text-muted">
+        Compared with the hospital every morning. A new contact, or a changed phone, email or website, goes to the moderation queue as from Refuah.
+        {lastRead}
       </p>
     )
   }

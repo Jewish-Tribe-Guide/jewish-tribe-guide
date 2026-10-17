@@ -89,6 +89,21 @@ describe('/api/admin/watches', () => {
     expect((await POST(req('POST', { action: 'add', url: 'x.org' }))).status).toBe(409)
   })
 
+  // Oct 17: Refuah's pages build themselves in the browser. A hospital's own
+  // page is read from its data and compared with the hospital it's tied to;
+  // a search, or a page tied to nothing, could only ever fail.
+  it('takes a Refuah hospital page only tied to a listing, and never a Refuah search', async () => {
+    const search = await POST(req('POST', { action: 'add', url: 'https://refuah.com/?q=Hospital+of+the+University+of+Pennsylvania', resourceId: SHUL }))
+    expect(search.status).toBe(400)
+    expect((await search.json()).errors[0]).toContain('hospital’s own page')
+    const loose = await POST(req('POST', { action: 'add', url: 'https://refuah.com/hospitals/jx77h9d00qztqgbbe8e0rfj1r589mgf5' }))
+    expect(loose.status).toBe(400)
+    expect((await loose.json()).errors[0]).toContain('Pick the hospital')
+    expect(m.addWatch).not.toHaveBeenCalled()
+    expect((await POST(req('POST', { action: 'add', url: 'https://refuah.com/hospitals/jx77h9d00qztqgbbe8e0rfj1r589mgf5', resourceId: SHUL }))).status).toBe(200)
+    expect(m.addWatch.mock.calls[0][1]).toMatchObject({ kind: 'website', resourceId: SHUL })
+  })
+
   it('checks, pauses and removes only this community’s watches', async () => {
     m.getWatch.mockResolvedValue(null)
     expect((await POST(req('POST', { action: 'remove', id: WATCH }))).status).toBe(404)

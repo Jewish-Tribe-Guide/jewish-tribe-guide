@@ -6,6 +6,7 @@ import { addWatch, getWatch, listWatches, removeWatch, updateWatch } from '@/lib
 import { runAndRecord } from '@/lib/watchRunner'
 import { kindForUrl, normalizeWatchUrl } from '@/lib/watches'
 import { UUID } from '@/lib/itemMarkRoutes'
+import { refuahHospitalId } from '@/lib/refuahWatch'
 
 // GET  /api/admin/watches — the "Watches" tab: every page this community's
 //      guide reads on its own (watch, migration 070), and the listings a
@@ -56,6 +57,15 @@ export async function POST(request: Request) {
       const url = normalizeWatchUrl(typeof body?.url === 'string' ? body.url : '')
       if (!url) return Response.json({ ok: false, errors: ['That isn’t a web address.'] }, { status: 400 })
       const resourceId = typeof body?.resourceId === 'string' && body.resourceId ? body.resourceId : null
+      // Refuah's pages build themselves in the browser: only a hospital's
+      // own page can be read (from its data), and only against a hospital
+      // in the guide (refuahWatch.ts).
+      if (/^https?:\/\/([\w-]+\.)?refuah\.(com|lrbcol\.org)\//i.test(url)) {
+        if (!refuahHospitalId(url)) {
+          return Response.json({ ok: false, errors: ['Use the hospital’s own page on Refuah (refuah.com/hospitals/…), not a search.'] }, { status: 400 })
+        }
+        if (!resourceId) return Response.json({ ok: false, errors: ['Pick the hospital in the guide this Refuah page is for.'] }, { status: 400 })
+      }
       if (resourceId) {
         const listings = await listApprovedResources(community.slug)
         if (!UUID.test(resourceId) || !listings.some((l) => l.id === resourceId)) {

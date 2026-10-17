@@ -79,6 +79,15 @@ describe('WatchesManager', () => {
     expect(screen.getByText(/Changed .*: worth a look/)).toBeInTheDocument()
   })
 
+  // Oct 17: a hospital's Refuah page is compared with the hospital, so it
+  // says what it files, not "checked for a change".
+  it('says a Refuah hospital page is compared with its hospital, and what it filed', async () => {
+    await renderTab([watch({ url: 'https://refuah.com/hospitals/jx77h9d00qztqgbbe8e0rfj1r589mgf5', resourceId: 'shul-1', lastFiled: 1, pageChangedAt: ago(1) })])
+    expect(screen.getByText(/Compared with the hospital every morning/)).toBeInTheDocument()
+    expect(screen.getByText(/Last read: 1 suggestion\./)).toBeInTheDocument()
+    expect(screen.queryByText(/worth a look/)).toBeNull()
+  })
+
   it('adds a page, tied to a listing picked by name', async () => {
     const created = watch({ id: 'new', url: 'https://lowermerionsynagogue.org/', label: 'Weekly times' })
     await renderTab([], { post: { watch: created } })

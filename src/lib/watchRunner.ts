@@ -1,6 +1,8 @@
 import { KEYSTONE_LIST_URL } from './keystoneWatch'
 import { runKeystoneWatch } from './keystoneRun'
 import { readWebsite } from './websiteWatch'
+import { refuahHospitalId } from './refuahWatch'
+import { runRefuahWatch } from './refuahRun'
 import { updateWatch } from './watchStore'
 import { afterRun, type Watch, type WatchOutcome } from './watches'
 
@@ -14,12 +16,16 @@ export const BUILT_IN_WATCHES: Pick<Watch, 'communityId' | 'kind' | 'url'>[] = [
   { communityId: 'philly', kind: 'keystone_list', url: KEYSTONE_LIST_URL },
 ]
 
-export async function runWatch(watch: Pick<Watch, 'communityId' | 'kind' | 'url'>): Promise<WatchOutcome> {
+export async function runWatch(watch: Pick<Watch, 'communityId' | 'kind' | 'url'> & { resourceId?: string | null }): Promise<WatchOutcome> {
   try {
     if (watch.kind === 'keystone_list') {
       const run = await runKeystoneWatch(watch.communityId, watch.url)
       return run.ok ? { ok: true, filed: run.filed } : { ok: false, error: run.error }
     }
+    // A hospital's page on Refuah builds itself in the browser, so it's read
+    // from the data it's built from, and compared with the hospital's
+    // listing (refuahWatch.ts).
+    if (refuahHospitalId(watch.url)) return await runRefuahWatch(watch.communityId, watch.url, watch.resourceId ?? null)
     return await readWebsite(watch.url)
   } catch (err) {
     // One broken watch must never stop the others, or go unrecorded.
