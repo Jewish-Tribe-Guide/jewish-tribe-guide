@@ -1,18 +1,19 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { track } from '@vercel/analytics'
-import BodyPortal from '@/components/BodyPortal'
-import { ChevronRightIcon, CloseIcon, PeopleIcon } from '@/components/icons'
+import MobileSheet from '@/components/resources/MobileSheet'
+import { ChevronRightIcon, PeopleIcon } from '@/components/icons'
 import { routes } from '@/lib/routes'
-import { trustLine, type TrustFacts } from '@/lib/phoneHome'
+import { sourcesRead, sourcesSentence, trustLine, type TrustFacts } from '@/lib/phoneHome'
+import { useEruvStatuses } from '@/lib/useEruvStatuses'
 
 // ── Who keeps the guide right (the user, Oct 17) ────────────────────────────
 // The top of the phone home, where the headline and mission were: a promise
 // with its evidence ("155 places · hours checked with Google every night").
-// Tapped, a short sheet says where the facts come from and how to check one
-// place, in front of the About page, which stays for "what is this".
+// Tapped, a short sheet says how the guide stays right, in front of the
+// About page, which stays for "what is this".
 //
 // It says hours, never "verified": Google can't check a hechsher. The last
 // change a person made isn't on it: with few edits yet, "updated 3 weeks
@@ -49,65 +50,71 @@ export default function TrustBand({ facts, region, communitySlug }: Props) {
         </span>
         <ChevronRightIcon className="h-4 w-4 shrink-0 text-slate-400" />
       </button>
-      {open && <TrustSheet facts={facts} region={region} communitySlug={communitySlug} onClose={() => setOpen(false)} />}
+      <TrustSheet open={open} facts={facts} region={region} communitySlug={communitySlug} onClose={() => setOpen(false)} />
     </>
   )
 }
 
-function TrustSheet({ facts, region, communitySlug, onClose }: { facts: TrustFacts; region: string; communitySlug: string; onClose: () => void }) {
-  const closeRef = useRef<HTMLButtonElement>(null)
+type ListRead = { label: string | null; okAt: string | null }
+let listsRead: Promise<ListRead[]> | null = null
+
+/** The outside lists the guide reads (/api/sources), once per page load;
+ *  nothing when it can't be had, so the sheet just doesn't name them. */
+function fetchListsRead(communitySlug: string): Promise<ListRead[]> {
+  listsRead ??= fetch(`/api/sources?community=${encodeURIComponent(communitySlug)}`)
+    .then((r) => r.json())
+    .then((b) => (b?.ok && Array.isArray(b.lists) ? (b.lists as ListRead[]) : []))
+    .catch(() => [])
+  return listsRead
+}
+
+/** For tests. */
+export function clearListsRead(): void {
+  listsRead = null
+}
+
+// The site's own bottom sheet, as Filters and Edit are (it was a sheet of
+// its own until Oct 17, and looked it). Three short lines (the user,
+// Oct 17: people want the idea, not each source): where there's a source,
+// the guide reads it; people fill in the rest, reviewed; every listing is
+// dated. Each source named only once it has run this week.
+function TrustSheet({ open, facts, region, communitySlug, onClose }: { open: boolean; facts: TrustFacts; region: string; communitySlug: string; onClose: () => void }) {
+  const [lists, setLists] = useState<{ lists: ListRead[]; at: number } | null>(null)
+  const eruv = useEruvStatuses(communitySlug, open)
   useEffect(() => {
-    closeRef.current?.focus()
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
+    if (!open) return
+    let live = true
+    fetchListsRead(communitySlug).then((l) => live && setLists({ lists: l, at: Date.now() }))
+    return () => {
+      live = false
     }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [onClose])
-  // Google's row only where Google checks; this week's count once known.
-  const google = facts.googleChecked > 0 && facts.checkedThisWeek !== 0
-  const thisWeek = facts.checkedThisWeek !== null ? ` ${facts.checkedThisWeek} of ${facts.places} places checked this week.` : ''
+  }, [open, communitySlug])
+  const read = lists && eruv ? sourcesRead(facts, lists.lists, eruv.available ? eruv.eruvim.map((e) => e.statusCheckedAt) : [], lists.at) : null
+  const sentence = read ? sourcesSentence(read) : null
   return (
-    <BodyPortal>
-      <div className="fixed inset-0 z-50 flex items-end justify-center desktop:items-center">
-        <div aria-hidden="true" onClick={onClose} className="absolute inset-0 bg-slate-900/45" />
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="trust-sheet-title"
-          data-testid="trust-sheet"
-          className="relative w-full max-w-lg rounded-t-2xl bg-white px-4 pt-2 pb-[calc(1.25rem+env(safe-area-inset-bottom,0px))] shadow-xl desktop:rounded-2xl desktop:pb-5"
-        >
-          <div aria-hidden="true" className="mx-auto h-1.5 w-10 rounded-full bg-slate-300 desktop:hidden" />
-          <div className="mt-2 flex items-center justify-between gap-3">
-            <h2 id="trust-sheet-title" className="text-[18px] font-extrabold text-ink">
-              How this guide is kept up
-            </h2>
-            <button ref={closeRef} type="button" onClick={onClose} aria-label="Close" className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200">
-              <CloseIcon className="h-4 w-4" />
-            </button>
-          </div>
-          <ul className="mt-3 space-y-4">
-            {google && (
-              <Row icon={<Refresh className="h-5 w-5" />} tone="bg-emerald-50 text-emerald-700" title="Hours, address and phone">
-                Checked against Google every night.{thisWeek}
-              </Row>
-            )}
-            {/* "Everything else" only after Google's row: alone, it's everything. */}
-            <Row icon={<PeopleIcon className="h-5 w-5" />} tone="bg-primary/10 text-primary" title={google ? 'Everything else' : 'Everything in the guide'}>
-              {google ? 'Hechsher, items, minyan times, Shabbos details: added' : 'Added'} and fixed by people in the {region} community, and reviewed before it shows.
+    <MobileSheet isOpen={open} onClose={onClose} title="How this guide stays right">
+      <ul className="space-y-4" data-testid="trust-sheet">
+        {read === null ? (
+          <li aria-hidden="true" className="h-14 animate-pulse rounded-xl bg-slate-100" />
+        ) : (
+          sentence && (
+            <Row icon={<ShieldCheck className="h-5 w-5" />} tone="bg-emerald-50 text-emerald-700" title="Where there’s a source, we check it">
+              {sentence}
             </Row>
-            <Row icon={<CalendarCheck className="h-5 w-5" />} tone="bg-[#c9a45c]/15 text-[#7a5a1c]" title="Every listing says when it was last confirmed">
-              See something wrong? Open the place and tap <strong className="font-bold text-ink">Suggest an edit</strong>.
-            </Row>
-          </ul>
-          <Link href={routes.about(communitySlug)} className="mt-4 flex min-h-11 items-center justify-between border-t border-slate-200 pt-3 text-[15px] font-semibold text-ink hover:underline">
-            About the guide
-            <ChevronRightIcon className="h-4 w-4 text-slate-400" />
-          </Link>
-        </div>
-      </div>
-    </BodyPortal>
+          )
+        )}
+        <Row icon={<PeopleIcon className="h-5 w-5" />} tone="bg-primary/10 text-primary" title={sentence ? `People in ${region} fill in the rest` : `People in ${region} keep it up`}>
+          {sentence ? 'Minyan times, kosher items, Shabbos details.' : 'Everything here is added and fixed by people in the community.'} A person reviews every change before it shows.
+        </Row>
+        <Row icon={<CalendarCheck className="h-5 w-5" />} tone="bg-[#c9a45c]/15 text-[#7a5a1c]" title="Every listing says when it was last checked">
+          Something wrong? Open the place and tap <strong className="font-bold text-ink">Suggest an edit</strong>.
+        </Row>
+      </ul>
+      <Link href={routes.about(communitySlug)} className="mt-4 flex min-h-11 items-center justify-between border-t border-slate-200 pt-3 text-[15px] font-semibold text-ink hover:underline">
+        About the guide
+        <ChevronRightIcon className="h-4 w-4 text-slate-400" />
+      </Link>
+    </MobileSheet>
   )
 }
 
@@ -128,15 +135,6 @@ function ShieldCheck({ className }: { className?: string }) {
     <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" className={className}>
       <path d="M12 3 5 6v5c0 4.4 3 8.3 7 10 4-1.7 7-5.6 7-10V6l-7-3Z" />
       <path d="m9 12 2 2 4-4" />
-    </svg>
-  )
-}
-
-function Refresh({ className }: { className?: string }) {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className={className}>
-      <path d="M20 11a8 8 0 1 0-2.3 5.7" />
-      <path d="M20 4v7h-7" />
     </svg>
   )
 }

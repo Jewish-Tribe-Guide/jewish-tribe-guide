@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest'
 import type { ZmanimData } from '@/types'
 import type { CategoryField } from './categories'
 import { makeCategory, makeListing } from '@/test/providerFixtures'
-import { openNowRows, rightNowDay, trustFacts, trustLine } from './phoneHome'
+import type { Eruv } from './eruv'
+import { eruvSummary, openNowRows, rightNowDay, sourcesRead, sourcesSentence, trustFacts, trustLine } from './phoneHome'
 
 const NY = 'America/New_York'
 const DAY = 24 * 60 * 60 * 1000
@@ -107,6 +108,24 @@ describe('right now, on a weekday: what’s open', () => {
     ])
   })
 
+  // The user, Oct 17: that we know what's on the shelf is the point, and a
+  // small honest number grows. Counted across every store, open or not,
+  // each item once whatever its spelling, in the admin's word for one.
+  it('a category that keeps a list of items says how many different ones it tracks instead', () => {
+    const items: CategoryField = { key: 'm', label: 'Kosher items available', type: 'tags', showCountInHeader: true, countLabel: 'kosher item' }
+    const stores = makeCategory({ id: 'grocery', detailFields: [hours, kosherType, items] })
+    const listings = [
+      place('a', 'grocery', open, { isKosher: 'Kosher Store', m: ['Challah', 'Wine'] }),
+      place('b', 'grocery', open, { isKosher: 'Kosher Items', m: ['challah ', 'Chicken'], m_sometimes: ['Brisket'] }),
+      place('c', 'grocery', shut, { m: ['Deli'] }),
+    ]
+    expect(openNowRows(listings, [stores], lunch)[0].parts).toEqual(['5 kosher items tracked'])
+    const dishes = makeCategory({ id: 'grocery', detailFields: [hours, { ...items, countLabel: 'dish' }] })
+    expect(openNowRows([place('a', 'grocery', open, { m: ['Pizza'] }), place('b', 'grocery', open, { m: ['Falafel'] })], [dishes], lunch)[0].parts).toEqual(['2 dishes tracked'])
+    // None listed yet: the pick-list's breakdown, as before.
+    expect(openNowRows([place('a', 'grocery', open, { isKosher: 'Kosher Store' })], [stores], lunch)[0].parts).toEqual(['1 kosher store'])
+  })
+
   it('at most three parts', () => {
     const four: CategoryField = { ...meatDairy, options: ['A', 'B', 'C', 'D'].map((v) => ({ value: v, label: v })) }
     const cat = makeCategory({ id: 'food', detailFields: [hours, four] })
@@ -128,5 +147,100 @@ describe('the label over Right now', () => {
 
   it('nothing before there’s a clock', () => {
     expect(rightNowDay(null, NY, null)).toBeNull()
+  })
+})
+
+describe('the eruvim, on the Friday card, for someone who hasn’t said where they are', () => {
+  // Friday Oct 16, 2026, 1:30 PM in New York; candles 6:01 PM.
+  const now = new Date('2026-10-16T13:30:00-04:00')
+  const candles = Date.parse('2026-10-16T18:01:00-04:00')
+  const checked = '2026-10-16T13:25:00-04:00'
+  const eruv = (name: string, over: Partial<Eruv> = {}): Eruv => ({
+    id: name.toLowerCase(),
+    name: `${name} Eruv`,
+    covers: null,
+    website: null,
+    hotline: null,
+    alertsUrl: null,
+    statusUrl: `https://${name.toLowerCase()}.example/`,
+    statusDated: false,
+    status: 'up',
+    statusWords: 'Up',
+    statusPostedOn: null,
+    statusCheckedAt: checked,
+    statusErrorAt: null,
+    statusError: null,
+    ...over,
+  })
+  const phoneOnly = (name: string) => eruv(name, { statusUrl: null, status: null, statusCheckedAt: null, hotline: '(215) 333-ERUV' })
+
+  it('counts them by what each status honestly is: a hotline-only eruv is “by phone”', () => {
+    const all = [eruv('Center City'), eruv('University City'), eruv('Lower Merion', { statusDated: true, statusPostedOn: '2026-10-16' }), phoneOnly('Northeast'), phoneOnly('Elkins Park')]
+    expect(eruvSummary(all, now, NY, candles)).toEqual({
+      down: null,
+      parts: [
+        { tone: 'green', text: '3 up' },
+        { tone: 'grey', text: '2 by phone' },
+      ],
+    })
+  })
+
+  it('one that’s down is named first, not counted', () => {
+    const all = [eruv('Center City'), eruv('Lower Merion', { status: 'down' }), phoneOnly('Northeast')]
+    expect(eruvSummary(all, now, NY, candles)).toEqual({
+      down: 'Lower Merion Eruv is down',
+      parts: [
+        { tone: 'green', text: '1 up' },
+        { tone: 'grey', text: '1 by phone' },
+      ],
+    })
+    expect(eruvSummary([eruv('A', { status: 'down' }), eruv('B', { status: 'down' })], now, NY, candles)?.down).toBe('A Eruv and B Eruv are down')
+  })
+
+  // Friday morning, before an eruv that dates its post has posted; and one
+  // whose page couldn't be read.
+  it('not posted yet this week, and couldn’t be read, are said as such', () => {
+    const all = [eruv('Lower Merion', { statusDated: true, statusPostedOn: '2026-10-09' }), eruv('Center City', { statusErrorAt: '2026-10-16T13:26:00-04:00', statusError: '404' })]
+    expect(eruvSummary(all, now, NY, candles)?.parts).toEqual([
+      { tone: 'amber', text: '1 not posted yet' },
+      { tone: 'amber', text: '1 couldn’t be read' },
+    ])
+  })
+
+  it('nothing without eruvim', () => {
+    expect(eruvSummary([], now, NY, candles)).toBeNull()
+  })
+})
+
+describe('how this guide stays right: the sources it read this week', () => {
+  const now = Date.parse('2026-10-16T17:30:00Z')
+  const ago = (days: number) => new Date(now - days * DAY).toISOString()
+  const facts = { places: 155, googleChecked: 135, checkedThisWeek: 129 }
+
+  it('names each source that ran this week, as the idea with its examples', () => {
+    const read = sourcesRead(facts, [{ label: 'Keystone-K’s list', okAt: ago(0.4) }], [ago(0.01), null], now)
+    expect(read).toEqual({ google: true, lists: ['Keystone-K’s list'], eruv: true })
+    expect(sourcesSentence(read)).toBe(
+      'Hours from Google, hechshers from Keystone-K’s list and eruv status from each eruv’s own site. Read again every day, and every 15 minutes on Friday for the eruv.',
+    )
+  })
+
+  // As on the live site today: the Keystone K watch is set up but has
+  // never run, and no eruv status has been read.
+  it('a check that’s set up but hasn’t run, or stopped over a week ago, claims nothing', () => {
+    const read = sourcesRead(facts, [{ label: 'Keystone-K’s list', okAt: null }, { label: 'Old list', okAt: ago(9) }], [null, ago(8)], now)
+    expect(read).toEqual({ google: true, lists: [], eruv: false })
+    expect(sourcesSentence(read)).toBe('Hours from Google. Read again every day.')
+  })
+
+  it('nothing read at all: no sentence, and Google only when it checked this week', () => {
+    expect(sourcesRead({ ...facts, checkedThisWeek: 0 }, [], [], now).google).toBe(false)
+    expect(sourcesSentence({ google: false, lists: [], eruv: false })).toBeNull()
+  })
+
+  // A phone a few minutes slow sees a check made just now as still to come.
+  it('a check a few minutes ahead of the phone’s clock still counts; a day ahead doesn’t', () => {
+    expect(sourcesRead(facts, [], [new Date(now + 3 * 60_000).toISOString()], now).eruv).toBe(true)
+    expect(sourcesRead(facts, [], [new Date(now + DAY).toISOString()], now).eruv).toBe(false)
   })
 })

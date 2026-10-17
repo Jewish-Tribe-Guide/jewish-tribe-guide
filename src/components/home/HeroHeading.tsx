@@ -238,7 +238,7 @@ export default function HeroHeading({
         {trust}
         {ui.search.landing && (
           <div className={trust ? 'mt-3' : undefined}>
-            <SearchBox query={query} onQueryChange={onQueryChange} onSubmit={onSearchSubmit} interactive={interactive} placeholder={settings.searchPlaceholder} />
+            <SearchBox query={query} onQueryChange={onQueryChange} onSubmit={onSearchSubmit} interactive={interactive} placeholder={settings.searchPlaceholder} look="box" />
             {phonePanel}
             <SearchPrompts prompts={prompts} onPick={pickPrompt} className="mt-2.5" oneLine />
           </div>

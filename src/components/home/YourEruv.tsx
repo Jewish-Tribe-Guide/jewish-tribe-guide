@@ -21,11 +21,16 @@ import { metresFrom } from '@/lib/eruvShape'
 /** Further than this from every eruv's line, there's no eruv to name. */
 const REACH_M = 5_000
 
-export default function YourEruv({ communitySlug, href, now }: { communitySlug: string; href: string; now: number }) {
+/** The eruvim with their statuses, and, where the visitor has set where
+ *  they are, the eruv whose line is nearest them (within reach). `pending`
+ *  while a set location's maps are still on their way, so a caller doesn't
+ *  show the summary and then swap it for one eruv. Also the Friday card's
+ *  eruv line (FridayEruv). */
+export function useNearestEruv(communitySlug: string, wanted = true) {
   const you = useOptionalLocation()?.coords ?? null
-  const statuses = useEruvStatuses(communitySlug, !!you)
+  const statuses = useEruvStatuses(communitySlug, wanted)
   const loaded = statuses?.available ? statuses : null
-  const maps = useEruvMaps(communitySlug, !!loaded, loaded?.mapsVersion)
+  const maps = useEruvMaps(communitySlug, !!loaded && !!you, loaded?.mapsVersion)
 
   const nearest = useMemo(() => {
     if (!loaded || !maps || !you) return null
@@ -34,6 +39,12 @@ export default function YourEruv({ communitySlug, href, now }: { communitySlug: 
     return best && best.m <= REACH_M ? best.eruv : null
   }, [loaded, maps, you])
 
+  return { statuses, loaded, nearest, pending: !!loaded && !!you && !maps }
+}
+
+export default function YourEruv({ communitySlug, href, now }: { communitySlug: string; href: string; now: number }) {
+  const you = useOptionalLocation()?.coords ?? null
+  const { loaded, nearest } = useNearestEruv(communitySlug, !!you)
   if (!loaded || !nearest) return null
   const view = eruvView(nearest, new Date(now), loaded.timezone, loaded.candles)
   return (

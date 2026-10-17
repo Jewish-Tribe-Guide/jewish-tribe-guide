@@ -30,9 +30,22 @@ const DAYS = {
   shabbos: { at: '2026-10-17T11:00:00-04:00', zmanim: { ...ZMANIM, hebrewDate: '6 Cheshvan 5787', dayOfWeek: 6, isFriday: false, isShabbos: true } },
 }
 
+// The eruvim as /api/eruv gives them, stood in for: the real route reads
+// each eruv's site as it answers, so what it says depends on the day and
+// the network. Two read from their sites, one with only a hotline.
+const ERUVIM = [
+  { id: 'center-city', name: 'Center City Eruv', hotline: null, statusUrl: 'https://example.org/', statusDated: false, status: 'up', statusWords: 'Up', statusPostedOn: null, statusCheckedAt: '2026-10-16T17:25:00Z', statusErrorAt: null, statusError: null },
+  { id: 'university-city', name: 'University City Eruv', hotline: null, statusUrl: 'https://example.org/', statusDated: false, status: 'up', statusWords: 'Up', statusPostedOn: null, statusCheckedAt: '2026-10-16T17:25:00Z', statusErrorAt: null, statusError: null },
+  { id: 'northeast', name: 'Northeast Eruv', hotline: '(215) 333-ERUV', statusUrl: null, statusDated: false, status: null, statusWords: null, statusPostedOn: null, statusCheckedAt: null, statusErrorAt: null, statusError: null },
+]
+
 async function openHome(page: Page, day: keyof typeof DAYS) {
   const community = await defaultCommunity(page)
   await page.route('**/api/zmanim?**', (route) => route.fulfill({ json: { ok: true, data: DAYS[day].zmanim } }))
+  await page.route(
+    (url) => url.pathname === '/api/eruv',
+    (route) => route.fulfill({ json: { ok: true, available: true, timezone: 'America/New_York', candles: null, eruvim: ERUVIM, mapsVersion: null } }),
+  )
   await page.clock.setFixedTime(new Date(DAYS[day].at))
   await page.goto(`/${community}`)
   await dismissLocationPrompt(page)
@@ -55,9 +68,10 @@ test.describe('on a phone', () => {
     await expect(page.getByRole('textbox', { name: 'Search resources' }).filter({ visible: true })).toBeVisible()
 
     await band.click()
-    const sheet = page.getByRole('dialog', { name: 'How this guide is kept up' })
+    const sheet = page.getByRole('dialog', { name: 'How this guide stays right' })
     await expect(sheet).toBeVisible()
-    await expect(sheet).toContainText('Every listing says when it was last confirmed')
+    await expect(sheet).toContainText('Every listing says when it was last checked')
+    await expect(sheet).toContainText('A person reviews every change before it shows')
     await expect(sheet.getByRole('link', { name: 'About the guide' })).toHaveAttribute('href', `/${community}/about`)
     await page.keyboard.press('Escape')
     await expect(sheet).toHaveCount(0)
@@ -79,16 +93,22 @@ test.describe('on a phone', () => {
     await expect(now).not.toContainText(/minyan|Mincha/i)
   })
 
-  test('Friday afternoon: the candles card and nothing “open now”', async ({ page, request }) => {
+  test('Friday afternoon: the candles card with the eruvim on it, and nothing “open now”', async ({ page, request }) => {
     const community = await openHome(page, 'friday')
     const now = page.getByTestId('right-now')
     await expect(now).toHaveAttribute('data-moment', 'erev')
     const card = page.getByTestId('today-candles')
     await expect(card).toContainText('Candles 6:01 PM')
-    // The eruv, before Shabbos: its page is on the card. It went missing
+    // The eruvim, before Shabbos: the answer on the card, in place of a
+    // button to the Eruv page (Oct 17), and the way there. It went missing
     // once, when Right now was only told about categories with a tile of
     // their own id.
-    if ((await categories(request, community)).some((c) => c.kind === 'eruv')) await expect(card.getByRole('link', { name: 'Eruv' })).toBeVisible()
+    if ((await categories(request, community)).some((c) => c.kind === 'eruv')) {
+      const eruv = card.getByTestId('today-eruv')
+      await expect(eruv).toHaveText(/^Eruvim\s*2 up\s*1 by phone$/)
+      await expect(eruv).toHaveAttribute('href', `/${community}/eruv`)
+      await expect(card.getByRole('link', { name: 'Eruv', exact: true })).toHaveCount(0)
+    }
     await expect(now).not.toContainText('open now')
   })
 
@@ -100,18 +120,46 @@ test.describe('on a phone', () => {
     await expect(page.getByTestId('right-now')).not.toContainText('open now')
   })
 
-  test('the categories as tiles, each a link to its page, with no group headings', async ({ page }) => {
+  test('the categories as tiles under the admin’s group headings, each a link to its page, none left out', async ({ page }) => {
     const community = await openHome(page, 'tuesday')
     const tiles = page.getByTestId('category-tiles')
     await expect(tiles.getByRole('listitem').first()).toBeVisible()
-    const count = await tiles.getByRole('listitem').count()
-    expect(count).toBeGreaterThan(0)
-    expect(count).toBeLessThanOrEqual(12)
-    await expect(tiles.locator('h2')).toHaveCount(0)
-    expect(await tiles.getByRole('listitem').getByRole('link').first().getAttribute('href')).toMatch(new RegExp(`^/${community}/`))
-    // Three to a row.
-    const tops = await tiles.getByRole('listitem').evaluateAll((lis) => lis.slice(0, 3).map((li) => Math.round(li.getBoundingClientRect().top)))
-    if (tops.length === 3) expect(new Set(tops).size).toBe(1)
+    // Each group a heading and its tiles (the user, Oct 17).
+    const groups = tiles.locator('section')
+    expect(await groups.count()).toBeGreaterThan(0)
+    for (const group of await groups.all()) {
+      await expect(group.getByRole('heading', { level: 2 })).toBeVisible()
+      expect(await group.getByRole('listitem').count()).toBeGreaterThan(0)
+    }
+    await expect(tiles).not.toContainText('Also:')
+    for (const href of await tiles.getByRole('listitem').getByRole('link').evaluateAll((as) => as.map((a) => a.getAttribute('href')))) {
+      expect(href).toMatch(new RegExp(`^/${community}/`))
+    }
+    // Three to a row, in the first group with three.
+    for (const group of await groups.all()) {
+      const tops = await group.getByRole('listitem').evaluateAll((lis) => lis.slice(0, 3).map((li) => Math.round(li.getBoundingClientRect().top)))
+      if (tops.length < 3) continue
+      expect(new Set(tops).size).toBe(1)
+      break
+    }
+  })
+
+  // One search box on a phone (Oct 17): the home's had stayed the old pill
+  // while every category page had the blue-edged box.
+  test('the search box looks like a category page’s', async ({ page, request }) => {
+    const community = await openHome(page, 'tuesday')
+    const look = (box: import('@playwright/test').Locator) =>
+      box.evaluate((input) => {
+        const frame = input.parentElement!
+        const st = getComputedStyle(frame)
+        return { border: st.borderTopColor, width: st.borderTopWidth, radius: st.borderTopLeftRadius, height: Math.round(frame.getBoundingClientRect().height), icon: getComputedStyle(frame.querySelector('svg')!).color }
+      })
+    const home = await look(page.getByRole('textbox', { name: 'Search resources' }).filter({ visible: true }))
+    const category = (await categories(request, community)).find((c) => c.kind === 'listing')!
+    await page.goto(`/${community}/${category.id}`)
+    await dismissLocationPrompt(page)
+    const there = await look(page.getByRole('searchbox').filter({ visible: true }).first())
+    expect(home).toEqual(there)
   })
 })
 

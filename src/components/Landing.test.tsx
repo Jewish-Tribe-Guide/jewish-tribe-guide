@@ -162,7 +162,9 @@ describe('Landing', () => {
   // Tiles (the user, Oct 17): the list read as dull, three screens under six
   // headings. Every category as a tile, in the admin's order, no headings;
   // past twelve, a line of links. Still no photos to download.
-  it('mobile: browsing is tiles in the admin\'s order, twelve, then the rest as a line of links', () => {
+  // The user, Oct 17: the headings break the tiles into bite-sized groups,
+  // and this is where a phone browses, so every category is a tile.
+  it('mobile: browsing is tiles under the admin\'s group headings, every category, in its order', () => {
     const ids = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n']
     const cats = ids.map((id) => makeCategory({ id, pluralLabel: `Cat ${id}`, cardImageUrl: `https://images.unsplash.com/photo-${id}` }))
     const section = (n: number, cardIds: string[]) => ({
@@ -185,11 +187,14 @@ describe('Landing', () => {
     )
 
     const tiles = within(screen.getByTestId('category-tiles'))
-    const order = ['n', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k']
+    expect(tiles.getAllByRole('heading').map((h) => h.textContent)).toEqual(['Section 1', 'Section 2', 'Section 3'])
     // Each tile: its icon, its name, and how many places when it counts any.
-    expect(tiles.getAllByRole('listitem').map((li) => li.textContent)).toEqual(order.map((id) => expect.stringMatching(new RegExp(`Cat ${id}${id === 'n' ? '2' : ''}$`))))
-    expect(tiles.queryAllByRole('heading')).toHaveLength(0)
-    expect(screen.getByText('Also:').parentElement).toHaveTextContent('Also:Cat l,Cat m')
+    const group = (title: string) => within(tiles.getByRole('region', { name: title })).getAllByRole('listitem').map((li) => li.textContent)
+    const tile = (id: string) => expect.stringMatching(new RegExp(`Cat ${id}${id === 'n' ? '2' : ''}$`))
+    expect(group('Section 1')).toEqual(['n', 'a', 'b', 'c', 'd'].map(tile))
+    expect(group('Section 2')).toEqual(['e', 'f', 'g', 'h', 'i'].map(tile))
+    expect(group('Section 3')).toEqual(['j', 'k', 'l', 'm'].map(tile))
+    expect(screen.queryByText('Also:')).not.toBeInTheDocument()
     expect(tiles.getByRole('link', { name: 'Cat m' })).toHaveAttribute('href', '/test-community/m')
     expect(screen.getByTestId('home-browse-list').closest('section')!.querySelectorAll('img')).toHaveLength(0)
   })

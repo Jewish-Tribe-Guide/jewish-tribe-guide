@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, screen, within } from '@testing-library/react'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { makeCategory, makeListing } from '@/test/providerFixtures'
@@ -7,6 +7,7 @@ import { mockRouter } from '@/test/nextNavigationMock'
 import type { CategoryField } from '@/lib/categories'
 import type { MinyanSchedule } from '@/lib/useMinyanSchedule'
 import type { ZmanimData } from '@/types'
+import { clearEruvStatuses } from '@/lib/useEruvStatuses'
 import RightNow from './RightNow'
 
 vi.mock('next/navigation', () => ({
@@ -34,12 +35,13 @@ const kosherType: CategoryField = {
   filterable: true,
   options: ['Kosher Store', 'Kosher Items'].map((v) => ({ value: v, label: v })),
 }
-const items: CategoryField = { key: 'm', label: 'Items', type: 'tags', showCountInHeader: true }
+const items: CategoryField = { key: 'm', label: 'Items', type: 'tags', showCountInHeader: true, countLabel: 'kosher item' }
 const shuls = makeCategory({ id: 'synagogue', label: 'Synagogue', pluralLabel: 'Synagogues', detailFields: [{ key: 'minyanim', label: 'Minyanim', type: 'minyanim' }] })
 const food = makeCategory({ id: 'restaurant', label: 'Food', pluralLabel: 'Food', detailFields: [hours, meatDairy] })
 const grocery = makeCategory({ id: 'grocery', label: 'Grocery', pluralLabel: 'Grocery', detailFields: [hours, kosherType, items] })
 const zmanimPage = makeCategory({ id: 'prayer-shabbat-times', kind: 'zmanim', label: 'Zmanim', pluralLabel: 'Zmanim' })
-const categories = [shuls, food, grocery, zmanimPage]
+const eruvPage = makeCategory({ id: 'eruv-information', kind: 'eruv', label: 'Eruv', pluralLabel: 'Eruv Information' })
+const categories = [shuls, food, grocery, zmanimPage, eruvPage]
 const everyDay = Object.fromEntries(['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'].map((d) => [d, { open: '09:00', close: '21:00' }]))
 const listings = [
   makeListing({ id: 'hip', name: 'HipCityVeg', category: 'restaurant', hours: everyDay, t: 'Parve' }),
@@ -85,9 +87,19 @@ function show(nyIso: string | null, zmanim: ZmanimData | null) {
   )
 }
 
+// /api/eruv: one eruv read from its site, one with only a hotline.
+const eruvim = [
+  { id: 'cc', name: 'Center City Eruv', hotline: null, statusUrl: 'https://example.org/', statusDated: false, status: 'up', statusWords: 'Up', statusPostedOn: null, statusCheckedAt: '2026-10-16T17:25:00Z', statusErrorAt: null, statusError: null },
+  { id: 'ne', name: 'Northeast Eruv', hotline: '(215) 333-ERUV', statusUrl: null, statusDated: false, status: null, statusWords: null, statusPostedOn: null, statusCheckedAt: null, statusErrorAt: null, statusError: null },
+]
+beforeEach(() => {
+  clearEruvStatuses()
+  vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ ok: true, available: true, timezone: NY, candles: null, eruvim }))))
+})
 afterEach(() => {
   cleanup()
   vi.useRealTimers()
+  vi.unstubAllGlobals()
 })
 
 describe('Right now', () => {
@@ -107,7 +119,7 @@ describe('Right now', () => {
     const rows = within(section).getAllByRole('link')
     expect(rows.map((r) => [r.textContent, r.getAttribute('href')])).toEqual([
       ['Food2 open now1 meat · 1 parve', '/test-community/restaurant?openNow=1'],
-      ['Grocery2 open now1 kosher store · 1 kosher items', '/test-community/grocery?openNow=1'],
+      ['Grocery2 open now3 kosher items tracked', '/test-community/grocery?openNow=1'],
     ])
     expect(section).not.toHaveTextContent(/minyan|Mincha|Candles/i)
   })
@@ -118,19 +130,26 @@ describe('Right now', () => {
     expect(screen.queryByTestId('right-now')).not.toBeInTheDocument()
   })
 
-  it('Friday afternoon: the candles card and Before candles; nothing “open now”', () => {
+  it('Friday afternoon: the candles card with the eruvim on it, and Before candles; nothing “open now”', async () => {
     at('2026-10-16T13:30:00-04:00')
     show('2026-10-16T13:30:00-04:00', { ...week, hebrewDate: '5 Cheshvan 5787', dayOfWeek: 5, isFriday: true } as ZmanimData)
     const section = screen.getByTestId('right-now')
     expect(section).toHaveAttribute('data-moment', 'erev')
-    expect(screen.getByTestId('today-candles')).toHaveTextContent('Candles 6:01 PM')
+    const card = screen.getByTestId('today-candles')
+    expect(card).toHaveTextContent('Candles 6:01 PM')
+    // The answer, in place of a button to it (the user, Oct 17).
+    const eruv = await within(card).findByTestId('today-eruv')
+    expect(eruv).toHaveTextContent('Eruvim1 up1 by phone')
+    expect(eruv).toHaveAttribute('href', '/test-community/eruv')
+    expect(within(card).getAllByRole('link').map((a) => a.textContent)).toEqual([eruv.textContent, 'Minyanim', 'Zmanim'])
     expect(screen.getByTestId('today-before-candles')).toHaveTextContent('Trader Joe’s')
     expect(section).not.toHaveTextContent('open now')
   })
 
-  it('Shabbos: the card alone, saying when it ends; nothing to buy, nothing open', () => {
+  it('Shabbos: the card alone, saying when it ends, with the eruvim; nothing to buy, nothing open', async () => {
     at('2026-10-17T11:00:00-04:00')
     show('2026-10-17T11:00:00-04:00', { ...week, hebrewDate: '6 Cheshvan 5787', dayOfWeek: 6, isShabbos: true } as ZmanimData)
+    expect(await screen.findByTestId('today-eruv')).toHaveTextContent('Eruvim1 up1 by phone')
     expect(screen.getByTestId('right-now')).toHaveAttribute('data-moment', 'shabbos')
     expect(screen.getByTestId('today-candles')).toHaveTextContent('Havdalah 6:59 PM')
     expect(screen.queryByTestId('today-before-candles')).not.toBeInTheDocument()

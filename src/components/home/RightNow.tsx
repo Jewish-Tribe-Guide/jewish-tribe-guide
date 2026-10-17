@@ -12,6 +12,7 @@ import { openNowRows, rightNowDay } from '@/lib/phoneHome'
 import { ChevronRightIcon } from '@/components/icons'
 import CategoryIcon from '@/components/CategoryIcon'
 import { BeforeCandles, CandlesCard } from './TodayBlocks'
+import FridayEruv from './FridayEruv'
 
 // ── Right now, on the phone home (the user, Oct 17) ─────────────────────────
 // The one part of the home that's different each time it's opened.
@@ -19,8 +20,10 @@ import { BeforeCandles, CandlesCard } from './TodayBlocks'
 //     (Food and Grocery on Philly's), each to its page with Open now on.
 //     Not the next minyan: weekday minyanim don't drive this community (the
 //     user, Oct 17); they're a tap away, on the Synagogues tile and search.
-//   Friday or Erev Yom Tov: the candles card and Before candles.
-//   Shabbos or Yom Tov: the card alone. Nothing open, nothing to buy.
+//   Friday or Erev Yom Tov: the candles card, with the eruv's status on it
+//     (FridayEruv), and Before candles.
+//   Shabbos or Yom Tov: the card alone, with the eruv as of candle lighting.
+//     Nothing open, nothing to buy.
 // Nothing at all when nothing's open (late at night). The candles card and
 // Before candles are the held-back Today home's (TodayBlocks).
 
@@ -53,6 +56,7 @@ export default function RightNow(props: Props) {
     const c = categories.find((x) => x.kind === kind)
     return c ? routes.slug(communitySlug, fixedViewSlug(c.kind) ?? c.id) : null
   }
+  const eruvHref = kindLink('eruv')
   const shulsHref = schedule.linkCategoryId ? `${routes.slug(communitySlug, schedule.linkCategoryId)}?davening=1` : null
 
   let body: React.ReactNode
@@ -86,9 +90,10 @@ export default function RightNow(props: Props) {
           links={[
             ['Minyanim', shulsHref],
             ['Zmanim', kindLink('zmanim')],
-            ...(moment.kind === 'erev' ? ([['Eruv', kindLink('eruv')]] as const) : []),
           ]}
-        />
+        >
+          {eruvHref && <FridayEruv communitySlug={communitySlug} href={eruvHref} now={now} />}
+        </CandlesCard>
         {moment.kind === 'erev' && (
           <div className="rounded-2xl border border-slate-200 bg-white px-3.5 py-3 empty:hidden">
             <BeforeCandles {...props} />

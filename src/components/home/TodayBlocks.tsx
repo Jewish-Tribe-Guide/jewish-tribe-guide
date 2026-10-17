@@ -189,7 +189,7 @@ const milesFrom = (from: LatLng, item: DirectoryResource) => (item.geo ? haversi
 /** Friday: "Candles 6:12 PM, in 4 hr 42 min". Shabbos: "Havdalah 7:09 PM".
  *  The same dark card every week; the photo above never changes. Also the
  *  phone home's, under Right now (RightNow). */
-export function CandlesCard({ moment, now, nowMinutes, links }: { moment: Exclude<ShabbosMoment, { kind: 'weekday' }>; now: number; nowMinutes: number; links: readonly (readonly [string, string | null])[] }) {
+export function CandlesCard({ moment, now, nowMinutes, links, children }: { moment: Exclude<ShabbosMoment, { kind: 'weekday' }>; now: number; nowMinutes: number; links: readonly (readonly [string, string | null])[]; /** Under the times, over the buttons: the phone home's eruv line. */ children?: React.ReactNode }) {
   const big = moment.kind === 'erev' ? `Candles ${moment.candles.time}` : moment.ends ? `${moment.yomTov ? 'Yom Tov ends' : 'Havdalah'} ${endsLabel(moment.ends, now, nowMinutes)}` : moment.yomTov ? 'Yom Tov' : 'Shabbos'
   // From the instants themselves, so it's right wherever the device is.
   const until = (iso: string | undefined) => {
@@ -210,6 +210,7 @@ export function CandlesCard({ moment, now, nowMinutes, links }: { moment: Exclud
       </p>
       <p className="mt-0.5 text-[28px] font-extrabold tracking-tight">{big}</p>
       {sub.filter(Boolean).length > 0 && <p className="text-[13.5px] text-slate-300">{sub.filter(Boolean).join(' · ')}</p>}
+      {children}
       {links.some(([, href]) => href) && (
         <div className="mt-3 flex gap-2">
           {links.map(([label, href]) =>
