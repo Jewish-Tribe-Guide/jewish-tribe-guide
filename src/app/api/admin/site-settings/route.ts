@@ -1,7 +1,7 @@
 import { revalidatePublicContent } from '@/lib/revalidateContent'
 import { getAdminUserForCommunity } from '@/lib/adminAuth'
-import { getSiteSettingsUncached, updateSiteSettings } from '@/lib/siteSettingsStore'
-import { MAX_MOBILE_TABS, type DesktopNavItem, type SiteSettings } from '@/lib/siteSettings'
+import { MissingTodayColumnsError, getSiteSettingsUncached, toBeforeCandleItems, updateSiteSettings } from '@/lib/siteSettingsStore'
+import { MAX_BEFORE_CANDLE_ITEMS, MAX_MOBILE_TABS, isHomeStyle, isTodayBlockId, type DesktopNavItem, type SiteSettings } from '@/lib/siteSettings'
 import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
 
 // Recursive shape check — a 'link' item needs a target, a 'more-menu' item
@@ -122,14 +122,32 @@ export async function PATCH(request: Request) {
   if (body.desktopHeroHeadline !== undefined && !body.desktopHeroHeadline.trim()) {
     return Response.json({ ok: false, errors: ['The hero headline cannot be empty.'] }, { status: 400 })
   }
-  if (body.desktopAccentColor !== undefined && !/^#[0-9a-fA-F]{6}$/.test(body.desktopAccentColor)) {
-    return Response.json({ ok: false, errors: ['The accent color must be a 6-digit hex value like #b45309.'] }, { status: 400 })
-  }
   if (body.desktopNavItems !== undefined) {
     const items = body.desktopNavItems
     if (!validDesktopNavItems(items)) {
       return Response.json({ ok: false, errors: ['The top nav needs at least one valid item.'] }, { status: 400 })
     }
+  }
+
+  if (body.homeStyle !== undefined && !isHomeStyle(body.homeStyle)) {
+    return Response.json({ ok: false, errors: ['The home page has to be Classic or Today.'] }, { status: 400 })
+  }
+  if (body.beforeCandleItems !== undefined) {
+    const items = body.beforeCandleItems
+    if (!Array.isArray(items) || items.some((i) => typeof i !== 'string')) {
+      return Response.json({ ok: false, errors: ['Before candles’ items have to be a list of names.'] }, { status: 400 })
+    }
+    if (new Set(items.map((i: string) => i.trim().toLowerCase()).filter(Boolean)).size > MAX_BEFORE_CANDLE_ITEMS) {
+      return Response.json({ ok: false, errors: [`Before candles can look for at most ${MAX_BEFORE_CANDLE_ITEMS} items.`] }, { status: 400 })
+    }
+    body.beforeCandleItems = toBeforeCandleItems(items)
+  }
+  if (body.todayHidden !== undefined) {
+    const ids = body.todayHidden
+    if (!Array.isArray(ids) || !ids.every(isTodayBlockId)) {
+      return Response.json({ ok: false, errors: ['Only the Today home’s own blocks can be turned off.'] }, { status: 400 })
+    }
+    body.todayHidden = [...new Set(ids)]
   }
 
   try {
@@ -138,6 +156,9 @@ export async function PATCH(request: Request) {
     await revalidatePublicContent()
     return Response.json({ ok: true, settings })
   } catch (err) {
+    if (err instanceof MissingTodayColumnsError) {
+      return Response.json({ ok: false, errors: [err.message] }, { status: 409 })
+    }
     console.error('[admin/site-settings] PATCH failed:', err)
     return Response.json({ ok: false, errors: ['Could not save site settings.'] }, { status: 502 })
   }

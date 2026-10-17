@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { loadGoogleMaps, MAPS_API_KEY, MAPS_MAP_ID, mapsAuthFailed, onMapsAuthFailure } from '@/lib/loadGoogleMaps'
 import { destinationQuery, directionsUrl, type LatLng } from '@/lib/googleMapsLinks'
@@ -8,7 +8,8 @@ import { haversineMiles } from '@/lib/geo'
 import { community } from '@/community.config'
 import type { DirectoryResource } from '@/types'
 import { glyphElementFor, glyphTextFor } from '@/lib/categoryIcons'
-import { PinIcon } from '@/components/icons'
+import { BookmarkIcon } from '@/components/icons'
+import { clearEruvim, drawEruvim, emphasizeEruvim, eruvDrawKey, type DrawnEruv, type MapEruv } from './eruvLayer'
 
 /** One plottable place on the map. */
 export type MapPoint = {
@@ -135,6 +136,19 @@ type Props = {
    *  which is unaffected by this) — they're just excluded from what the
    *  initial view has to include. */
   zoomRadiusMiles?: number | null
+  /** The Eruvim layer (its chip on): each eruv's line, area and name, under
+   *  the pins. Tapping a line or a name calls onSelectEruv; tapping inside
+   *  an eruv is still a tap on the map (see eruvLayer's areasClickable). */
+  eruvim?: MapEruv[]
+  onSelectEruv?: (id: string) => void
+  /** The eruv whose listing is open, picked out. */
+  selectedEruvId?: string | null
+  /** The eruvim are all the map shows (no places): framed on them, as the
+   *  places would be. */
+  frameEruvim?: boolean
+  /** A control for the map's bottom-right corner. Google stacks it above its
+   *  own zoom buttons, where its Layers button sits, wherever those land. */
+  cornerControl?: ReactNode
 }
 
 const DEFAULT_CENTER = community.mapCenter
@@ -346,8 +360,10 @@ function buildPin(p: MapPoint, isSelected: boolean): HTMLElement {
     badge.style.cssText =
       'position:absolute;top:0;right:0;width:16px;height:16px;border-radius:9999px;' +
       'background:#2563eb;border:2px solid #fff;display:flex;align-items:center;justify-content:center;' +
-      'font-size:9px;line-height:1;color:#fff'
-    badge.textContent = '📌'
+      'color:#fff'
+    // The bookmark SavedBadge draws, as markup: a marker is plain DOM.
+    badge.innerHTML =
+      '<svg viewBox="0 0 24 24" width="8" height="8" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/></svg>'
     wrap.appendChild(badge)
   }
   return wrap
@@ -465,7 +481,7 @@ function buildUserDot(): HTMLElement {
 /** The interactive Google map: one advanced marker per point, a distinct "you
  *  are here" marker for the visitor, an info window on click, and a viewport
  *  auto-fit to whatever points are currently shown. */
-export default function ResourceMap({ points, userLocation, directionsOrigin, follow = true, onResumeFollow, onManualDrag, fallbackCenter = DEFAULT_CENTER, onViewListing, onSelectPoint, onDeselectPoint, onBackgroundClick, onMapLongPress, onLongPressPoint, searchActive, selectedId, frameToken, obscuredBottomPx = 0, obscuredTopPx = 0, zoomRadiusMiles }: Props) {
+export default function ResourceMap({ points, userLocation, directionsOrigin, follow = true, onResumeFollow, onManualDrag, fallbackCenter = DEFAULT_CENTER, onViewListing, onSelectPoint, onDeselectPoint, onBackgroundClick, onMapLongPress, onLongPressPoint, searchActive, selectedId, frameToken, obscuredBottomPx = 0, obscuredTopPx = 0, zoomRadiusMiles, eruvim, onSelectEruv, selectedEruvId = null, frameEruvim = false, cornerControl }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<google.maps.Map | null>(null)
   const markersRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([])
@@ -480,8 +496,11 @@ export default function ResourceMap({ points, userLocation, directionsOrigin, fo
   const userMarkerRef = useRef<google.maps.marker.AdvancedMarkerElement | null>(null)
   const infoWindowRef = useRef<google.maps.InfoWindow | null>(null)
   const [ready, setReady] = useState(false)
+  // The box Google placed in its bottom-right controls; cornerControl renders
+  // into it.
+  const [cornerBox, setCornerBox] = useState<HTMLDivElement | null>(null)
   const [authFailed, setAuthFailed] = useState(mapsAuthFailed())
-  // Right-click's Pin/Unpin menu — see the marker's 'contextmenu' listener
+  // Right-click's Save/Saved menu — see the marker's 'contextmenu' listener
   // below for how this opens. `point` carries whatever pinned state it had
   // at the moment of the right-click; closing-and-reopening the menu after a
   // toggle (rather than patching this in place) keeps it simple, and the
@@ -521,6 +540,46 @@ export default function ResourceMap({ points, userLocation, directionsOrigin, fo
   useEffect(() => { obscuredTopPxRef.current = obscuredTopPx }, [obscuredTopPx])
   useEffect(() => { onManualDragRef.current = onManualDrag }, [onManualDrag])
   useEffect(() => { zoomRadiusMilesRef.current = zoomRadiusMiles }, [zoomRadiusMiles])
+  const onSelectEruvRef = useRef(onSelectEruv)
+  const eruvimRef = useRef(eruvim)
+  useEffect(() => { onSelectEruvRef.current = onSelectEruv }, [onSelectEruv])
+  useEffect(() => { eruvimRef.current = eruvim }, [eruvim])
+
+  // ── The Eruvim layer ─────────────────────────────────────────────────────
+  // Redrawn only when an eruv's line or status changes (eruvDrawKey), never
+  // reframed: the eruvim are a layer under whatever the map is showing.
+  const drawnEruvimRef = useRef<Map<string, DrawnEruv>>(new Map())
+  const eruvKey = eruvim?.length ? eruvDrawKey(eruvim) : ''
+  useEffect(() => {
+    const map = mapRef.current
+    if (!ready || !map) return
+    clearEruvim(drawnEruvimRef.current)
+    drawnEruvimRef.current = eruvKey
+      ? drawEruvim(map, eruvimRef.current ?? [], { onSelect: (id) => onSelectEruvRef.current?.(id), areasClickable: false })
+      : new Map()
+  }, [ready, eruvKey])
+  useEffect(() => {
+    if (ready) emphasizeEruvim(drawnEruvimRef.current, selectedEruvId)
+  }, [ready, eruvKey, selectedEruvId])
+  // Shown alone (the Eruv page's Full map, or every place switched off),
+  // the eruvim are framed, once for each set of them: a status changing
+  // colour, or the visitor moving the map, doesn't reframe it.
+  const eruvIds = eruvim?.map((e) => e.id).join(',') ?? ''
+  const framedEruvimRef = useRef('')
+  useEffect(() => {
+    const map = mapRef.current
+    if (!ready || !map || !frameEruvim || !eruvIds) {
+      if (!frameEruvim) framedEruvimRef.current = ''
+      return
+    }
+    if (framedEruvimRef.current === eruvIds) return
+    framedEruvimRef.current = eruvIds
+    const frame = new google.maps.LatLngBounds()
+    for (const d of drawnEruvimRef.current.values()) frame.union(d.bounds)
+    // After the map settles: a fit while it's still laying itself out (a
+    // phone's full-bleed map, just opened) was undone.
+    if (!frame.isEmpty()) onIdleOrTimeout(map, IDLE_FALLBACK_MS, () => map.fitBounds(frame, 24))
+  }, [ready, frameEruvim, eruvIds, eruvKey])
   // ── Initialize the map once ──────────────────────────────────────────────
   useEffect(() => {
     if (!MAPS_API_KEY || mapsAuthFailed()) return
@@ -531,7 +590,14 @@ export default function ResourceMap({ points, userLocation, directionsOrigin, fo
     // still-live one, orphaning the existing markers on the discarded map.
     if (mapRef.current) return
     let cancelled = false
-    const unsubscribe = onMapsAuthFailure(() => setAuthFailed(true))
+    // Rejected (a key not allowed here, billing off): the map shows its
+    // fallback, and it's no longer ready, so no effect below calls into
+    // Google's broken map. Placing pins on it threw, which took the whole
+    // page down to the error screen the first time a filter changed them.
+    const unsubscribe = onMapsAuthFailure(() => {
+      setAuthFailed(true)
+      setReady(false)
+    })
 
     loadGoogleMaps()
       .then(() => Promise.all([google.maps.importLibrary('maps'), google.maps.importLibrary('marker')]))
@@ -546,6 +612,12 @@ export default function ResourceMap({ points, userLocation, directionsOrigin, fo
           fullscreenControl: false,
           clickableIcons: false,
         })
+        const corner = document.createElement('div')
+        // Google's own controls sit 10px in from the edge; this lines the
+        // corner control up with the zoom buttons under it.
+        corner.style.margin = '0 10px 8px 0'
+        mapRef.current.controls[google.maps.ControlPosition.RIGHT_BOTTOM].push(corner)
+        setCornerBox(corner)
         infoWindowRef.current = new google.maps.InfoWindow()
         // Click-away to dismiss: tapping empty map closes the open info window
         // and collapses the mobile sheet (marker taps fire 'gmp-click' and
@@ -708,7 +780,7 @@ export default function ResourceMap({ points, userLocation, directionsOrigin, fo
       let longPressTimer: ReturnType<typeof setTimeout> | null = null
       let longPressFired = false
       let pressStart = { x: 0, y: 0 }
-      // Right-click already opens a proper menu with a Pin/Unpin option (see
+      // Right-click already opens a proper menu with a Save option (see
       // the 'contextmenu' listener below) — a mouse doesn't need the timer
       // too, and 500ms of held-mouse-button is a touch-native pattern with
       // no visible affordance hinting it does anything on desktop. Tracked
@@ -752,7 +824,7 @@ export default function ResourceMap({ points, userLocation, directionsOrigin, fo
       // pin here" at this exact spot. Always swallowed here, before it can
       // bubble — then, for an actual right-click specifically (not a touch
       // long-press synthesizing the same event, which already toggled the
-      // pin directly above), open a small Pin/Unpin menu at the cursor: the
+      // pin directly above), open a small Save menu at the cursor: the
       // desktop-native way to discover "there's a hidden action here" that a
       // held mouse button never was.
       marker.addEventListener('contextmenu', (e: Event) => {
@@ -886,7 +958,10 @@ export default function ResourceMap({ points, userLocation, directionsOrigin, fo
         prev.marker.zIndex = markerZIndex(prev.point, false)
       }
     }
-    if (selectedId && selectedId !== prevId) {
+    // A new selection, or the same one asked to be framed again: a row
+    // under the pointer lights a pin, and opening that same listing then
+    // asks for the map to come to it (CategoryMap's frameToken).
+    if (selectedId && (selectedId !== prevId || frameToken !== consumedFrameTokenRef.current)) {
       const current = markersByIdRef.current.get(selectedId)
       if (current) {
         current.marker.content = buildPin(current.point, true)
@@ -1107,7 +1182,7 @@ export default function ResourceMap({ points, userLocation, directionsOrigin, fo
     }
   }, [userLocation, follow, ready])
 
-  // Dismiss the right-click Pin/Unpin menu the same way any menu should: an
+  // Dismiss the right-click Save menu the same way any menu should: an
   // outside click, Escape, or the map moving out from under it (panning or
   // zooming would leave it pointing at empty space otherwise). Checked
   // against contextMenuRef, not just "was this inside the menu" — a capture-
@@ -1176,6 +1251,7 @@ export default function ResourceMap({ points, userLocation, directionsOrigin, fo
         className="w-full min-h-0 flex-1 overscroll-x-none rounded-2xl select-none"
         style={{ WebkitTouchCallout: 'none' }}
       />
+      {ready && cornerBox && cornerControl && createPortal(cornerControl, cornerBox)}
       {ready && userLocation && (
         <button
           onClick={centerOnMe}
@@ -1196,7 +1272,7 @@ export default function ResourceMap({ points, userLocation, directionsOrigin, fo
           {follow ? 'Following' : 'Re-center'}
         </button>
       )}
-      {/* Portaled to <body>, same reasoning as CheckboxDropdown's popup: this
+      {/* Portaled to <body>: this
           needs to sit above the map (a real DOM element with its own
           stacking, not something z-index inside this component can reliably
           out-rank) and be positioned by viewport coordinates, not wherever
@@ -1224,8 +1300,8 @@ export default function ResourceMap({ points, userLocation, directionsOrigin, fo
               }}
               className="flex items-center gap-1.5 whitespace-nowrap px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 cursor-pointer"
             >
-              <PinIcon filled={contextMenu.point.pinned} className="h-3 w-3 text-slate-500" />
-              {contextMenu.point.pinned ? 'Unpin' : 'Pin'}
+              <BookmarkIcon filled={contextMenu.point.pinned} className="h-3 w-3 text-slate-500" />
+              {contextMenu.point.pinned ? 'Saved' : 'Save'}
             </button>
           </div>,
           document.body,

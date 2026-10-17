@@ -103,6 +103,52 @@ test.describe('a forged token is refused too', () => {
   }
 })
 
+// The public, unauthenticated write endpoints a one-tap button calls. Each
+// refuses input it can't use before it reaches the database, which is also
+// what lets this suite call them without writing anything: every request
+// here is one the route turns away up front.
+test.describe('the one-tap write endpoints refuse what they can’t use', () => {
+  test('"Mark as current" on something that isn’t a listing id', async ({ request }) => {
+    for (const method of ['post', 'delete'] as const) {
+      const res = await request[method]('/api/resource/not-a-listing/confirm', { failOnStatusCode: false })
+      expect(res.status(), method).toBe(404)
+    }
+  })
+
+  test('a count that isn’t a listing view or an empty search', async ({ request }) => {
+    for (const data of [
+      'not json',
+      { community: 'philly', kind: 'vote', key: NO_SUCH_ID },
+      { community: 'philly', kind: 'listing_view', key: 'not-a-listing' },
+      { community: 'philly', kind: 'search_miss', key: 'someone@example.com' },
+    ]) {
+      const res = await request.post('/api/counts', { data, failOnStatusCode: false })
+      expect(res.status(), JSON.stringify(data)).toBe(400)
+    }
+  })
+})
+
+// The question reader calls OpenAI and writes what it read. A test run must
+// do neither: every test server sets QUESTION_READER=off, and this is what
+// holds it to that. If it ever answers anything else, the suite is spending.
+test('the question reader is off on a test server', async ({ request }) => {
+  const res = await request.post('/api/ask/read?community=philly', { data: { question: 'meat near me' } })
+  expect(res.status()).toBe(200)
+  expect(await res.json()).toEqual({ ok: false, reason: 'off' })
+})
+
+// /api/travel asked Google's Distance Matrix for drive and walk times, a paid
+// lookup per destination, and nothing in the app had called it for a long
+// time. It stayed reachable by anyone who found it. Removed; if it comes back
+// it should come back with a caller and this test changed on purpose.
+test('the old paid travel-time endpoint is gone', async ({ request }) => {
+  const res = await request.post('/api/travel', {
+    data: { origin: { lat: 0, lng: 0 }, destinations: [] },
+    failOnStatusCode: false,
+  })
+  expect(res.status()).toBe(404)
+})
+
 test.describe('the dev login shortcut', () => {
   // It mints a real admin session with no email round-trip. It refuses unless
   // NODE_ENV !== 'production' AND DEV_ADMIN_BYPASS_SECRET is set — and the e2e

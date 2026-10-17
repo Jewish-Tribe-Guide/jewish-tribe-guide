@@ -1,5 +1,8 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { adminTabs, superAdminTabs } from './adminNav'
+
+const features = vi.hoisted(() => ({ todayHome: false, whatChanged: false }))
+vi.mock('./features', () => ({ features }))
 
 // Real bug: the Communities tab used to render for every community's admin,
 // even though the route underneath it (and the GET /api/admin/communities it
@@ -7,6 +10,18 @@ import { adminTabs, superAdminTabs } from './adminNav'
 // "Only the site owner can create or browse other communities" instead of the
 // tab simply not being offered.
 describe('adminTabs', () => {
+  // What changed is held back from the site (features.ts): no tab for a
+  // page that isn't there, and the tab again once it's switched back on.
+  it('has a What changed tab only while What changed is switched on', () => {
+    expect(adminTabs('philly', false).find((t) => t.tab === 'changes')).toBeUndefined()
+    features.whatChanged = true
+    try {
+      expect(adminTabs('philly', false)[1]).toEqual({ tab: 'changes', href: '/philly/admin/changes', label: 'What changed' })
+    } finally {
+      features.whatChanged = false
+    }
+  })
+
   it('omits the Communities tab for an ordinary (non-superadmin) community admin', () => {
     const tabs = adminTabs('philly', false)
     expect(tabs.find((t) => t.tab === 'communities')).toBeUndefined()

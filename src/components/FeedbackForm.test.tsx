@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, screen } from '@testing-library/react'
+import { cleanup, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import FeedbackForm from './FeedbackForm'
 import { submitRequest } from '@/lib/submitRequest'
@@ -16,7 +16,48 @@ vi.mock('next/navigation', () => ({
 
 afterEach(() => cleanup())
 
-describe('FeedbackForm — inline variant (the mobile Feedback tab)', () => {
+describe('FeedbackForm — modal variant semantics', () => {
+  // Opened from the desktop footer and the header's More menu. It used
+  // to be a bare fixed <div>: no role, no label, no Escape — a screen reader
+  // had no idea it was a dialog and kept reading the page behind it.
+  it('is a labelled, modal dialog', () => {
+    renderWithProviders(<FeedbackForm heading="Send feedback" successMessage="Thanks!" onClose={vi.fn()} />)
+
+    const dialog = screen.getByRole('dialog', { name: 'Send feedback' })
+    expect(dialog).toHaveAttribute('aria-modal', 'true')
+    expect(within(dialog).getByRole('heading', { level: 2, name: 'Send feedback' })).toBeInTheDocument()
+  })
+
+  it('closes on Escape, like every other dialog here', async () => {
+    const onClose = vi.fn()
+    const user = userEvent.setup()
+    renderWithProviders(<FeedbackForm heading="Send feedback" successMessage="Thanks!" onClose={onClose} />)
+
+    await user.keyboard('{Escape}')
+
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not listen for Escape once it is unmounted', async () => {
+    const onClose = vi.fn()
+    const user = userEvent.setup()
+    const { unmount } = renderWithProviders(<FeedbackForm heading="Send feedback" successMessage="Thanks!" onClose={onClose} />)
+    unmount()
+
+    await user.keyboard('{Escape}')
+
+    expect(onClose).not.toHaveBeenCalled()
+  })
+
+  it('the inline variant is the page itself: an h1, and not a dialog', () => {
+    renderWithProviders(<FeedbackForm heading="Send feedback" successMessage="Thanks!" variant="inline" />)
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 1, name: 'Send feedback' })).toBeInTheDocument()
+  })
+})
+
+describe('FeedbackForm — inline variant (the mobile /feedback page)', () => {
   it('lets the visitor send a second message after the first succeeds', async () => {
     vi.mocked(submitRequest).mockResolvedValue({ ok: true, requestId: 'r1' })
     const user = userEvent.setup()
@@ -88,5 +129,50 @@ describe('FeedbackForm — inline variant (the mobile Feedback tab)', () => {
     const backdrop = screen.getByRole('heading', { name: 'Feedback' }).closest('.fixed.inset-0')
     expect(backdrop?.parentElement).toBe(document.body)
     expect(container.contains(backdrop)).toBe(false)
+  })
+})
+
+// "Add it to the guide", from a search that found nothing, arrives with the
+// question in the link: it's already written in.
+describe('FeedbackForm — arriving from a search that found nothing', () => {
+  it('starts with the question written in', async () => {
+    window.history.replaceState(null, '', '/philly/feedback?about=frozen%20gefilte%20fish')
+    renderWithProviders(<FeedbackForm heading="Send feedback" successMessage="Thanks!" onClose={vi.fn()} />)
+    expect(await screen.findByDisplayValue('“frozen gefilte fish” isn’t in the guide. You can find it at:', { exact: false })).toBeInTheDocument()
+    window.history.replaceState(null, '', '/')
+  })
+
+  it('starts empty otherwise', async () => {
+    window.history.replaceState(null, '', '/philly/feedback')
+    renderWithProviders(<FeedbackForm heading="Send feedback" successMessage="Thanks!" onClose={vi.fn()} />)
+    expect(await screen.findByRole('textbox', { name: /feedback/i })).toHaveValue('')
+    window.history.replaceState(null, '', '/')
+  })
+})
+
+describe('FeedbackForm — inline heading when the header already names the page', () => {
+  it('keeps the heading for screen readers but does not show it', () => {
+    renderWithProviders(<FeedbackForm heading="Send feedback" successMessage="Thanks!" variant="inline" headingHidden />)
+    expect(screen.getByRole('heading', { level: 1, name: 'Send feedback' })).toHaveClass('sr-only')
+  })
+
+  it('still shows the thank-you heading after sending — that one is the message', async () => {
+    vi.mocked(submitRequest).mockResolvedValue({ ok: true, requestId: 'r1' })
+    const user = userEvent.setup()
+    renderWithProviders(<FeedbackForm heading="Send feedback" successMessage="Thanks!" variant="inline" headingHidden />)
+    await user.type(screen.getByLabelText('Your feedback'), 'A note')
+    await user.click(screen.getByRole('button', { name: 'Send feedback' }))
+    expect(await screen.findByRole('heading', { name: 'Thanks for your note!' })).not.toHaveClass('sr-only')
+  })
+})
+
+describe('FeedbackForm — the privacy line under the button', () => {
+  it('is the one-liner, with a "Privacy" link that opens the policy in a new tab', () => {
+    renderWithProviders(<FeedbackForm heading="Send feedback" successMessage="Thanks!" variant="inline" />)
+    expect(screen.getByText(/We only use this to reply\./)).toBeInTheDocument()
+    expect(screen.queryByText(/never for marketing/)).not.toBeInTheDocument()
+    const link = screen.getByRole('link', { name: 'Privacy' })
+    expect(link).toHaveAttribute('href', '/test-community/privacy')
+    expect(link).toHaveAttribute('target', '_blank')
   })
 })

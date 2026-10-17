@@ -1,19 +1,25 @@
 import { validateSubmission, getResourceById } from '@/lib/resourceStore'
 import { getCategoryById } from '@/lib/categoryStore'
-import { resolveCapabilities } from '@/lib/categories'
+import { resolveCapabilities, isCategorySyncEligible } from '@/lib/categories'
+import { submitterDetails } from '@/lib/syncFields'
 import {
   submitListingCreate,
   submitListingUpdate,
   submitListingDelete,
+  submitEruvUpdate,
 } from '@/lib/submissionStore'
+import { listEruvim } from '@/lib/eruvStore'
+import { readEruvSuggestion } from '@/lib/eruvSuggestion'
 import { after } from 'next/server'
 import { sendSubmissionNotification } from '@/lib/email'
 import { sendSubmissionConfirmation } from '@/lib/confirmationEmail'
 import { enforceRateLimit, clientIp } from '@/lib/rateLimit'
 import { payloadTooLarge } from '@/lib/limits'
+import { SERVER_ONLY_PAYLOAD_KEYS } from '@/lib/submissionSource'
 import { isHoneypotTripped } from '@/lib/honeypot'
 import { verifyTurnstile } from '@/lib/turnstile'
 import { normalizeUrl } from '@/lib/validation'
+import { readContacts } from '@/lib/contacts'
 import { hasListingChanged } from '@/lib/listingDiff'
 import { ui } from '@/lib/uiConfig'
 import type { ResourceSubmission, SubmissionRow } from '@/types'
@@ -21,7 +27,7 @@ import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore
 
 type Body = {
   operation?: 'create' | 'update' | 'delete'
-  targetType?: 'listing' | 'category'
+  targetType?: 'listing' | 'category' | 'eruv'
   targetId?: string
   payload?: ResourceSubmission
   note?: string
@@ -30,7 +36,8 @@ type Body = {
 }
 
 // POST /api/submissions — public endpoint for proposing a change: add/edit/report
-// a listing. Everything lands in the moderation queue as `pending`; nothing goes
+// a listing, or a fix to an eruv's listing (`targetType: 'eruv'`, an update
+// only; eruvSuggestion.ts). Everything lands in the moderation queue as `pending`; nothing goes
 // live until an admin approves. (`targetType: 'category'` is rejected outright —
 // suggesting a new category is no longer a public path; feedback comes through
 // the general feedback form instead. Older `category` rows may still exist in the
@@ -76,6 +83,24 @@ export async function POST(request: Request) {
     return Response.json({ ok: false, errors: ['This action is not available.'] }, { status: 403 })
   }
 
+  if (targetType === 'eruv') {
+    if (!ui.contributions.edit) return Response.json({ ok: false, errors: ['This action is not available.'] }, { status: 403 })
+    if (operation !== 'update' || !targetId) return Response.json({ ok: false, errors: ['Unknown operation.'] }, { status: 400 })
+    const eruv = (await listEruvim(community.slug)).eruvim.find((e) => e.id === targetId)
+    if (!eruv) return Response.json({ ok: false, errors: ['Eruv not found.'] }, { status: 404 })
+    const read = readEruvSuggestion(body.payload, eruv)
+    if (!read.ok) return Response.json({ ok: false, errors: read.errors }, { status: 400 })
+    let submission: SubmissionRow
+    try {
+      submission = await submitEruvUpdate(community.slug, read.suggestion, note?.trim() || null, submittedBy)
+    } catch (err) {
+      console.error('[submissions] eruv insert failed:', err)
+      return Response.json({ ok: false, errors: ['Could not save your submission. Please try again.'] }, { status: 502 })
+    }
+    after(() => notify(submission))
+    return Response.json({ ok: true, id: submission.id })
+  }
+
   // Curated-directory gate: refuse whichever contribution paths the community
   // turned off in community.config (ui.contributions), so hiding a button can't
   // be bypassed by posting directly.
@@ -99,6 +124,11 @@ export async function POST(request: Request) {
   }
 
   const payload = body.payload as ResourceSubmission | undefined
+  // Where a suggestion came from ("Read by AI") and an admin's fixes are
+  // the site's own to say, never a visitor's (submissionSource.ts).
+  if (payload && typeof payload === 'object') {
+    for (const k of SERVER_ONLY_PAYLOAD_KEYS) delete (payload as Record<string, unknown>)[k]
+  }
   if ((operation === 'create' || operation === 'update') && !payload) {
     return Response.json({ ok: false, errors: ['Missing listing details.'] }, { status: 400 })
   }
@@ -138,6 +168,17 @@ export async function POST(request: Request) {
 
   if (payload) {
     const category = await getCategoryById(community.slug, payload.category)
+    // The app's own keys (sync state, an admin's status override, item dates)
+    // come off before anything else looks at the payload: nothing downstream
+    // would refuse them, and the moderation diff hides them.
+    if (payload.details && typeof payload.details === 'object') {
+      payload.details = submitterDetails(payload.details, {
+        operation: operation === 'create' ? 'create' : 'update',
+        fieldKeys: category?.detailFields.map((f) => f.key) ?? [],
+        syncEligible: category ? isCategorySyncEligible(category) : false,
+        storedPlaceId: existingResource?.placeId,
+      })
+    }
     // Nobody types the "https://" scheme by hand for a website field — add it
     // before validating (so a bare "example.com" isn't rejected) and before
     // storing (so the saved value is still a real, working link — the card
@@ -146,14 +187,18 @@ export async function POST(request: Request) {
     // that skips that path (e.g. a stale client, direct API use).
     if (payload.details) {
       for (const field of category?.detailFields ?? []) {
+        // A list of contacts as it was typed in the editor ("215-805-8668, "),
+        // stored tidied: each entry checked, the blank ones gone.
+        if (field.type === 'contacts' && field.key in payload.details) payload.details[field.key] = readContacts(payload.details[field.key])
         if (field.type !== 'url') continue
         const raw = payload.details[field.key]
         if (typeof raw === 'string' && raw.trim()) payload.details[field.key] = normalizeUrl(raw)
       }
     }
     const errors = validateSubmission(payload, category)
-    // The authoritative version of the same guard ListingForm.tsx already
-    // runs client-side — this one can't be bypassed by posting directly.
+    // The authoritative version of the guard the editors already apply
+    // client-side (ListingEditor and BoxEditor keep Send off until something
+    // changed) — this one can't be bypassed by posting directly.
     // Only for 'update': a 'create' has no `existingResource` to compare
     // against (hasListingChanged treats that as always "a change" anyway).
     if (operation === 'update' && !hasListingChanged(existingResource, payload, category?.detailFields ?? [])) {

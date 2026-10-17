@@ -4,6 +4,12 @@
 This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Only when a task actually touches Next.js framework mechanics — routing/`app` directory conventions, data fetching, server actions, middleware, `next.config.ts`, or other file conventions — read the matching guide in `node_modules/next/dist/docs/` first and heed its deprecation notices. Ordinary component/logic edits that don't call a Next.js API directly don't need this.
 <!-- END:nextjs-agent-rules -->
 
+# What's outstanding
+
+`docs/where-things-stand.md` is the running list of open work, decisions
+waiting on the user, and what's already decided. Read it before picking up
+redesign work, and update it in the same commit as anything that changes it.
+
 # Local admin access
 
 Default to the **local** admin console (`npm run dev`, then `http://localhost:3000/philly/admin?devToken=<DEV_ADMIN_BYPASS_SECRET>`) instead of the deployed one — the secret is in `.env.local` as `DEV_ADMIN_BYPASS_SECRET`. This hits `/api/admin/dev-login`, which signs you in instantly and works only when `NODE_ENV !== 'production'` (so it's a no-op against a real deployment — see that route's own comments). No magic-link email needed. `/admin` (no community segment, `?devToken=` works there too) is a different, standalone page — the superadmin console (`src/app/admin/page.tsx`), gated by the global `SUPERADMIN_EMAILS` list rather than any one community's `admin_email` — for cross-community actions like creating a new community. It no longer redirects to `/philly/admin`.
@@ -216,6 +222,51 @@ This is not a formality. Tests that would have passed against the broken thing h
 
 Do NOT use `git stash` to swap the old behaviour back in. Pathspec `git stash push` silently stashes nothing when the paths are untracked, and an unconditional `git stash pop` after it then pops whatever unrelated stash was on top — which has already happened here, applying someone's months-old work-in-progress into a clean tree as a merge conflict. Copy the file aside and copy it back.
 
+**Stop the dev server before running `npm run test:e2e`, and read the
+summary block, not the tail.** Two separate traps, both hit in one session
+(2026-09-24):
+
+- `test:e2e` runs `npm run build`, which shares `.next` with a running
+  `npm run dev`. With a dev server live on port 3000, `budgets.spec.ts`
+  measured the home screen's initial JS at **610 KB** against its 400 KB
+  ceiling; with the dev server stopped, the same commit measured **329 KB**.
+  Nothing warns you. The symptoms look like a real regression and are
+  wonderfully misleading — the same assertion passed on mobile and failed on
+  desktop in one run, and two other budget tests flipped between two runs of
+  identical code.
+- Playwright prints `N failed` ABOVE `N passed` in its summary. Reading the
+  last few lines of the output shows only the pass count, so a run with 13
+  failures reads as green. `npm run test:e2e` also exited 0 with failures
+  present, so the exit code is not a substitute either. Grep the whole
+  summary block: `grep -E '^\s+[0-9]+ (failed|passed|flaky|skipped)'`.
+
+**No e2e test fails on every local run any more, but two are flaky.**
+`offline.spec.ts` fails about one run in two (the service worker not taking
+control in time; see [[project-e2e-flakiness-baseline]]), and
+`server-rendering.spec.ts:127` desktop about one in four (two copies of the
+count text mid-transition). Anything else red is worth taking seriously.
+Before concluding you broke something, get a baseline:
+`git worktree add --detach <tmp> <pre-change-sha>`, `npm ci` inside it (a
+symlinked `node_modules` makes Turbopack panic with "points out of the
+filesystem root"), then diff the two failure lists.
+
+**A "standing" failure is a lead, not a fact of life.** This list used to
+be 11 tests, measured at `d8ccd8b`, and none of them were environmental.
+Six of them —
+`accessibility.spec.ts:148` (Add dialog), `budgets.spec.ts:174` and
+`csp.spec.ts:73`, on both viewports — were never environmental: `d8ccd8b`
+itself renamed the Add button to "Add a listing" and missed
+`categoryAddButton` in `e2e/helpers.ts`, so every test that opens Add failed
+to find the button. Writing them off as the baseline meant the Add dialog's
+accessibility check, the CSP check on Turnstile and the Turnstile budget ran
+against nothing for months. Four more, `pins.spec.ts:62` and `:91`, pinned
+the first listing of the alphabetically first category with any listings —
+a test fixture with no coordinates, or on the real site Cemetery, which has
+no address — and the map's Pinned chip only counts places it can plot.
+(`mobile.spec.ts:189` stopped failing on its own.) When a failure is on this list, read its error
+once in a while; "element not found" on a button is worth a grep of the
+source before it's worth a shrug.
+
 **Run `npm run test:e2e` before calling any change to routing, data loading, caching, or metadata done.** That is where the expensive mistakes have been, and every test in `e2e/` exists because something actually broke:
 
 - `/` silently stopped being an HTTP redirect and became a JavaScript one, so crawlers and WhatsApp link previews saw a blank 200. Caused by wrapping `redirect()` in a `<Suspense>` boundary for Cache Components.
@@ -234,6 +285,8 @@ None of those show up in `tsc`, `eslint`, or a passing build. Several looked fin
 - Don't use `waitForLoadState('networkidle')` — the map, zmanim and geolocation keep connections open, so it never settles. Use `ready()` from the helpers.
 - On mobile, the "Share your live location?" prompt overlays everything and intercepts clicks. Call `dismissLocationPrompt(page)` after navigating, as a real visitor would.
 - **Nothing in `e2e/` may write to the database.** The suite runs against whichever project `NEXT_PUBLIC_SUPABASE_URL` points to — the `TEST_SUPABASE_*` project in CI's required `e2e` job (and locally, see README "Using the test project for local dev too"), or real production in the separate, non-blocking `e2e-prod-smoke` CI job — so a test that submits a listing leaves a row in that project's moderation queue for a human to clear either way. `api.spec.ts` posts to the write endpoints deliberately, but only unauthenticated and only with ids that cannot exist — a pass means each one was refused before it reached the database.
+- **`e2e/budgets.spec.ts` counts what a page downloads** (initial JS gzipped, image bytes, head preloads, whether a phone fetches the desktop hero, whether browsing loads Turnstile). Every budget guards something that shipped broken while passing tsc, lint, the unit suite and a look in the browser. It counts requests and bytes, never timings — a timing assertion on a shared CI runner is what makes a suite flaky. When it fails, the message names the offending request; check whether the page really got heavier before raising a ceiling. Two traps it already hit: Playwright's `request.sizes()` reports -1/0 for chunked responses (so bytes are measured from the body), and a warm browser context defeats `loading="lazy"` (Chrome loads lazy images already in its memory cache), so use the fresh context each test already gets.
+- **The Content-Security-Policy is report-only, and `e2e/csp.spec.ts` is what makes that safe to change.** `src/lib/csp.ts` builds the policy and `next.config.ts` ships it as `Content-Security-Policy-Report-Only`, so a wrong allowlist reports instead of breaking the map or the forms. The spec loads the pages and opens the interactive states that pull in third parties (map, Add form/Turnstile) and fails on any `securitypolicyviolation` — including report-only ones. A new script or API host goes in `csp.ts`, never as an exception in the spec. What it cannot cover locally is PostHog and Sentry (both initialize only on the real production deployment), so production violations are reported to Sentry via `report-uri` — read those before enforcing. To enforce, rename the header to `Content-Security-Policy` and drop the frame-ancestors-only one. `script-src` keeps `'unsafe-inline'` on purpose: a nonce would make every page dynamic and give up prerendering, so inline-script injection is NOT stopped yet (hashes are the way to close that).
 - **Check that a new test fails.** Several here would have passed against a broken app: an offline test passes when the page is simply still online, and a "not cached" assertion passes when the header is absent for an unrelated reason. Break the thing on purpose, watch it go red, put it back.
 - **Never assert content against the raw HTML string.** A React Server Components response serializes every listing name into a `<script>`, so `expect(html).toContain(name)` passes on a page that rendered nothing — which is how the server-rendering tests came to certify the exact bug they were written to prevent. Use `serverMarkup()` from the helpers, which strips script contents.
 - **The content is client-rendered, so `<main>` is empty for a moment.** `ready()` waits for the header, and the header is part of the shell that was always there. A one-shot `innerText()` read after it caught an empty string roughly two runs in three. Use auto-retrying assertions (`await expect(locator).toContainText(...)`) instead of snapshotting text.

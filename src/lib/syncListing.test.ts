@@ -114,6 +114,48 @@ describe('syncOneListing', () => {
     expect(await syncOneListing(overridden)).toMatchObject({ flaggedClosed: false })
     expect(mockSubmitClosure).not.toHaveBeenCalled()
   })
+
+  // `description` (googleDescription) is now tracked the same way as
+  // hours/phone/website — see OWNABLE_SYNC_FIELDS' own doc — rather than the
+  // one-off `!details.googleDescription` check it used to be. These two
+  // cover the same fill-once behavior that special case had, plus the new
+  // part: recording ownership so the public page can say where it came from.
+  it('fills an empty description from Google and records ownership', async () => {
+    mockFetchPlaceSync.mockResolvedValue({ ...GOOGLE, description: 'A great bagel shop.' })
+    const builder = chainable({ data: null, error: null })
+    mockFrom.mockReturnValue(builder)
+
+    await syncOneListing(row)
+    const update = builder.update as ReturnType<typeof vi.fn>
+    expect(update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        details: expect.objectContaining({
+          googleDescription: 'A great bagel shop.',
+          googleFields: expect.arrayContaining(['description']),
+        }),
+      }),
+    )
+  })
+
+  it('never overwrites a hand-written description, even when Google offers a different one', async () => {
+    mockFetchPlaceSync.mockResolvedValue({ ...GOOGLE, description: "Google's own summary." })
+    const builder = chainable({ data: null, error: null })
+    mockFrom.mockReturnValue(builder)
+
+    const withOwnDescription = {
+      ...row,
+      details: { ...row.details, googleDescription: 'Written by the community.' },
+    }
+    await syncOneListing(withOwnDescription)
+    const update = builder.update as ReturnType<typeof vi.fn>
+    expect(update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        details: expect.objectContaining({ googleDescription: 'Written by the community.' }),
+      }),
+    )
+    const written = (update.mock.calls[0][0] as { details: Record<string, unknown> }).details
+    expect(Array.isArray(written.googleFields) ? written.googleFields : []).not.toContain('description')
+  })
 })
 
 describe('loadSyncableListing', () => {

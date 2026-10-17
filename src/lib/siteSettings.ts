@@ -65,10 +65,12 @@ export type SiteSettings = {
    *  Add/Edit/Report card, "Kept by the Community" by default). */
   desktopListingsEyebrow: string
   desktopListingsHeading: string
-  /** Desktop only — the Map card's eyebrow/heading. Used to be a hardcoded
-   *  eyebrow string plus the heading read off the 'map' home_section row's
-   *  own `title` — both are dedicated fields now, same pattern as every
-   *  other card, so home_section.title is unused for any built-in block. */
+  /** Desktop only — the Map card's eyebrow/heading, from back when the map
+   *  was embedded directly on the home screen. That card is retired (the
+   *  user's own call: the map only ever lives at its own full-screen route
+   *  now) — these two fields have no render site left, kept only because
+   *  DDL widens the DB's allowed columns, never narrows (same precedent as
+   *  a retired home_section `kind`; see homeSections.ts's own doc). */
   desktopMapEyebrow: string
   desktopMapHeading: string
   /** Desktop only — the Email Signup (SubscribeSection) card's eyebrow/
@@ -88,11 +90,48 @@ export type SiteSettings = {
   /** Desktop only — the hero band's photo. Null shows the CSS gradient
    *  placeholder instead. */
   desktopHeroImage: { url: string; alt: string } | null
-  /** Desktop only — the home screen's accent color (eyebrows, the hero
-   *  band, Update Listings/Subscribe's CTAs), as a 6-digit hex. Lighter/darker
-   *  shades used alongside it are derived from this one value. */
-  desktopAccentColor: string
+  /** Which home page visitors get: the home as it was ('classic'), or the
+   *  one that changes with the day ('today', step 6). Previewed from the Site
+   *  tab before it's saved; one save switches back. */
+  homeStyle: HomeStyle
+  /** Today's "Before candles" answer, on a Friday or Erev Yom Tov: the items
+   *  it looks for, in order. The guide can't tell which items are for
+   *  Shabbos, so an admin names them. */
+  beforeCandleItems: string[]
+  /** The Today home's blocks an admin has turned off. Each shows on the
+   *  days it's for unless it's here; their order follows the day. */
+  todayHidden: TodayBlockId[]
 }
+
+export const HOME_STYLES = ['classic', 'today'] as const
+export type HomeStyle = (typeof HOME_STYLES)[number]
+
+export function isHomeStyle(value: unknown): value is HomeStyle {
+  return (HOME_STYLES as readonly unknown[]).includes(value)
+}
+
+/** Where Before candles starts until an admin changes it. */
+export const DEFAULT_BEFORE_CANDLE_ITEMS = ['Challah', 'Wine', 'Chicken']
+
+/** The Today home's blocks, in the order they come on a Friday, each with
+ *  when it shows, for the admin's on/off list. */
+export const TODAY_BLOCKS = [
+  { id: 'candles', label: 'Today card', when: 'Candles and the countdown on Friday and Erev Yom Tov; havdalah on Shabbos and Yom Tov.' },
+  { id: 'beforeCandles', label: 'Before candles', when: 'Friday and Erev Yom Tov, until candle lighting: the nearest store open now that has the items below.' },
+  { id: 'nextMinyan', label: 'Next minyan', when: 'Every day: the next one anywhere, and the nearest shul’s.' },
+  { id: 'openNow', label: 'Open now', when: 'Weekdays: food open now, titled by the meal (“Lunch, open now”). Never on Shabbos or Yom Tov.' },
+  { id: 'pinned', label: 'Pinned', when: 'Only when the visitor has pinned something, on their device.' },
+  { id: 'changes', label: 'This week', when: 'Places added, edited or taken out in the last 7 days: the newest three, and All to What changed. Only when something changed.' },
+  { id: 'browse', label: 'Browse', when: 'The categories, in your sections; on a phone, a short row ending in All.' },
+] as const
+export type TodayBlockId = (typeof TODAY_BLOCKS)[number]['id']
+
+export function isTodayBlockId(value: unknown): value is TodayBlockId {
+  return TODAY_BLOCKS.some((b) => b.id === value)
+}
+
+/** More than this and Before candles stops being one answer. */
+export const MAX_BEFORE_CANDLE_ITEMS = 6
 
 /** One entry in the desktop header's top nav, or in the "More" panel it can
  *  nest one level of. */
@@ -120,7 +159,7 @@ export type DesktopNavItem = {
  *  pseudo-category, same gating the mobile tab bar and the old hardcoded nav
  *  already applied. 'feedback' opens the feedback modal instead of
  *  navigating. */
-export const BUILT_IN_DESKTOP_LINK_TARGETS = ['map', 'about', 'privacy', 'feedback'] as const
+export const BUILT_IN_DESKTOP_LINK_TARGETS = ['map', 'you', 'about', 'privacy', 'feedback'] as const
 export type BuiltInDesktopLinkTarget = (typeof BUILT_IN_DESKTOP_LINK_TARGETS)[number]
 
 export function isBuiltInDesktopLinkTarget(target: string): target is BuiltInDesktopLinkTarget {
@@ -132,6 +171,8 @@ export function isBuiltInDesktopLinkTarget(target: string): target is BuiltInDes
 export const DEFAULT_DESKTOP_NAV_ITEMS: DesktopNavItem[] = [
   { id: 'categories', label: 'Categories', kind: 'categories-menu' },
   { id: 'map', label: 'Map', kind: 'link', target: 'map' },
+  // Saved places and searches (Oct 14), between Map and More (board YouDesk).
+  { id: 'you', label: 'You', kind: 'link', target: 'you' },
   {
     id: 'more',
     label: 'More',
@@ -151,8 +192,9 @@ export type MobileTabConfig = {
   id: string
   /** The text under the icon. */
   label: string
-  /** Where the tab goes. The three built-in screens are 'categories', 'map',
-   *  and 'feedback'; any other value is a CardDef id (a category slug, or a
+  /** Where the tab goes. The built-in screens are 'categories' (the home),
+   *  'map', 'feedback', 'browse' (every category, grouped; with the Today
+   *  home) and 'you' (saved places and searches); any other value is a CardDef id (a category slug, or a
    *  form id like 'support') and opens exactly what tapping that card on the
    *  home screen opens. */
   target: string
@@ -161,7 +203,7 @@ export type MobileTabConfig = {
 /** The built-in targets, which behave differently from card targets: they're
  *  whole app screens rather than one category, and two of them are gated on
  *  site config (a Map category existing, feedback being enabled). */
-export const BUILT_IN_TAB_TARGETS = ['categories', 'map', 'feedback'] as const
+export const BUILT_IN_TAB_TARGETS = ['categories', 'map', 'feedback', 'browse', 'you'] as const
 export type BuiltInTabTarget = (typeof BUILT_IN_TAB_TARGETS)[number]
 
 export function isBuiltInTabTarget(target: string): target is BuiltInTabTarget {
@@ -178,6 +220,7 @@ export const MAX_MOBILE_TABS = 5
 export const DEFAULT_MOBILE_TABS: MobileTabConfig[] = [
   { id: 'categories', label: 'Categories', target: 'categories' },
   { id: 'map', label: 'Map', target: 'map' },
+  { id: 'you', label: 'You', target: 'you' },
   { id: 'feedback', label: 'Feedback', target: 'feedback' },
 ]
 
@@ -187,9 +230,8 @@ export const DEFAULT_FEEDBACK_BUTTON_LABEL = 'Have general feedback about the si
 export const DEFAULT_FEEDBACK_HEADING = 'Send feedback'
 export const DEFAULT_FEEDBACK_SUCCESS_MESSAGE = 'We appreciate your feedback and will take it into account.'
 
-export const DEFAULT_SEARCH_PLACEHOLDER = 'Search — kosher food, mikvah, shuls, schools…'
+export const DEFAULT_SEARCH_PLACEHOLDER = 'Ask a question: food, minyan times, mikvah…'
 export const DEFAULT_DESKTOP_BROWSE_EYEBROW = 'Get started'
-export const DEFAULT_DESKTOP_ACCENT_COLOR = '#b45309'
 
 // Every desktop card's default eyebrow/heading — exactly today's literal
 // strings, so nothing changes on screen until an admin edits one. See
@@ -204,19 +246,6 @@ export const DEFAULT_DESKTOP_MAP_HEADING = 'Explore the Map'
 export const DEFAULT_DESKTOP_SUBSCRIBE_EYEBROW = 'Email updates'
 export const DEFAULT_DESKTOP_SUBSCRIBE_HEADING = 'Stay in the Loop'
 export const DEFAULT_DESKTOP_JEWISH_TIMES_HEADING = 'Shabbat & Holiday Times'
-
-/** A small curated set — same idea as CategoryEditor's PIN_COLORS — so the
- *  admin picker offers a one-click palette instead of demanding a hex value
- *  from someone who's never used one. Still just a starting point: the input
- *  beside it takes any 6-digit hex. */
-export const DESKTOP_ACCENT_PRESETS = [
-  '#b45309', // amber-700 — today's default
-  '#0f766e', // teal-700
-  '#7c3aed', // violet-600
-  '#be123c', // rose-700
-  '#1d4ed8', // blue-700
-  '#166534', // green-800
-] as const
 
 // Same split HeroHeading.tsx's own splitMission() does, duplicated rather
 // than imported: that's a 'use client' component and this defaults object is
@@ -260,7 +289,9 @@ export const SITE_SETTINGS_DEFAULTS: SiteSettings = {
   desktopHeroHeadline: heroSplit.headline,
   desktopHeroSubhead: heroSplit.subhead,
   desktopHeroImage: community.heroImage,
-  desktopAccentColor: DEFAULT_DESKTOP_ACCENT_COLOR,
+  homeStyle: 'classic',
+  beforeCandleItems: DEFAULT_BEFORE_CANDLE_ITEMS,
+  todayHidden: [],
 }
 
 /** Bump when the icon RENDERING changes — the inset, the trim, the padding

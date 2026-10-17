@@ -119,6 +119,16 @@ describe('HeaderNav — Map', () => {
   })
 })
 
+// You (Oct 14, board YouDesk): between Map and More, by default.
+describe('HeaderNav — You', () => {
+  it('links to You, after Map', () => {
+    renderWithProviders(<HeaderNav />, { content: { categories: [grocery, mapCategory] } })
+    expect(screen.getByRole('link', { name: 'You' })).toHaveAttribute('href', '/test-community/you')
+    const links = screen.getAllByRole('link').map((a) => a.textContent)
+    expect(links.indexOf('You')).toBe(links.indexOf('Map') + 1)
+  })
+})
+
 describe('HeaderNav — More', () => {
   // Was right-0, sized to the panel's own fixed width rather than to where
   // its trigger sits — "More" is well clear of the viewport's right edge in
@@ -145,8 +155,8 @@ describe('HeaderNav — More', () => {
 
     await user.click(screen.getByRole('button', { name: /More/ }))
 
-    expect(screen.getByRole('link', { name: 'About' })).toHaveAttribute('href', '/about')
-    expect(screen.getByRole('link', { name: 'Privacy' })).toHaveAttribute('href', '/privacy')
+    expect(screen.getByRole('link', { name: 'About' })).toHaveAttribute('href', '/test-community/about')
+    expect(screen.getByRole('link', { name: 'Privacy' })).toHaveAttribute('href', '/test-community/privacy')
 
     // Opens the same in-place FeedbackForm modal the footer's own
     // FeedbackButton does — not a page navigation, so this component (and
@@ -186,7 +196,7 @@ describe('HeaderNav — More', () => {
     expect(screen.getByRole('link', { name: 'Find on map' })).toHaveAttribute('href', '/test-community/map')
 
     await user.click(screen.getByRole('button', { name: /More/ }))
-    expect(screen.getByRole('link', { name: 'Who we are' })).toHaveAttribute('href', '/about')
+    expect(screen.getByRole('link', { name: 'Who we are' })).toHaveAttribute('href', '/test-community/about')
   })
 
   it('hides the feedback item when an admin has turned feedback off', async () => {

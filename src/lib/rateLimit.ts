@@ -12,7 +12,8 @@ import { Redis } from '@upstash/redis'
 //     (free tier is plenty) for real coverage.
 //
 // The point of all this is cost control: every submission geocodes + emails,
-// every /api/travel call hits Google. Capping request *rate* caps the bill.
+// and several public routes call paid Google APIs. Capping request *rate*
+// caps the bill.
 
 type Decision = { ok: true } | { ok: false; retryAfter: number }
 
@@ -110,4 +111,20 @@ export async function enforceRateLimit(
     { ok: false, errors: ['Too many requests. Please slow down and try again shortly.'] },
     { status: 429, headers: { 'Retry-After': String(decision.retryAfter) } },
   )
+}
+
+/** One limit for everyone together, not per visitor: a ceiling on how often
+ *  something that costs money can happen at all (the question reader's
+ *  calls a day). Same limiter, one shared key. */
+export async function sharedLimit(name: string, opts: { limit: number; windowSec: number }): Promise<Decision> {
+  const key = `${name}:everyone`
+  if (redis) {
+    try {
+      const res = await upstashLimiter(opts.limit, opts.windowSec).limit(key)
+      return res.success ? { ok: true } : { ok: false, retryAfter: Math.max(1, Math.ceil((res.reset - Date.now()) / 1000)) }
+    } catch (err) {
+      console.error('[rateLimit] Upstash error, falling back to memory:', err)
+    }
+  }
+  return memoryDecision(key, opts.limit, opts.windowSec)
 }

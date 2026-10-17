@@ -1,36 +1,71 @@
 'use client'
 
 import { useState } from 'react'
+import { useNow } from '@/lib/useNow'
+import { isStale } from '@/lib/listingView'
+import { useFetchOrPreview } from '@/lib/previewSend'
+import { EditButton, shortDate } from './listingParts'
+import { PencilIcon } from '@/components/icons'
+import type { ConfirmedFrom } from '@/types'
 
-function timeAgo(iso: string): string {
-  const ms = Date.now() - new Date(iso).getTime()
-  const mins = Math.floor(ms / 60_000)
-  if (mins < 2) return 'just now'
-  if (mins < 60) return `${mins} minutes ago`
-  const hours = Math.floor(mins / 60)
-  if (hours < 24) return `${hours} hour${hours !== 1 ? 's' : ''} ago`
-  const days = Math.floor(hours / 24)
-  if (days < 7) return `${days} day${days !== 1 ? 's' : ''} ago`
-  const weeks = Math.floor(days / 7)
-  if (weeks < 5) return `${weeks} week${weeks !== 1 ? 's' : ''} ago`
-  const months = Math.floor(days / 30)
-  return `${months} month${months !== 1 ? 's' : ''} ago`
-}
 
 type Props = {
   resourceId: string
   confirmedAt?: string
+  /** Said first: "Phone and website from Google, Sep 30". */
+  lead?: string
+  /** What's confirmed, where it isn't the whole listing: "Times". */
+  subject?: string
+  /** False for what hardly changes: just when it was last checked, with no
+   *  "Still right?" and no button ("Kosher details last checked Aug 20"). */
+  ask?: boolean
+  /** One section's own date, not the listing's: a mikvah's women's hours
+   *  ("womenTevillah", Oct 6). */
+  section?: string
+  /** Edit, at the line's end, for a box's own editor (Oct 10): "Confirmed
+   *  Oct 4 · Edit", and once the date is old, "Still right?" with Yes and
+   *  Edit, one question with two answers. The box's title isn't said again:
+   *  the line is under it. */
+  onEdit?: () => void
+  /** The listing's `confirmedFrom`: which outside source dated it. Said in
+   *  place of "Confirmed" ("From Keystone-K’s list, Oct 12") while the date
+   *  shown is the one it gave; a person's later confirmation is theirs. */
+  source?: ConfirmedFrom
 }
 
-// Shown in the footer of every expanded listing card. Lets visitors signal that
-// the community-curated fields (kosher info, tags, hours) are still accurate —
-// separate from the Google-synced fields which don't need this.
-export default function FreshnessFooter({ resourceId, confirmedAt: initialConfirmedAt }: Props) {
+// Shown at the end of every opened listing, and in a shul's times card: when
+// someone last confirmed the listing, and a one-tap way to confirm it again.
+/** The listing's dated line (agreed Sep 30): a quiet date while the last
+ *  confirmation is recent, "Still right?" once it's ASK_AFTER_DAYS old, and
+ *  a plain "not confirmed by anyone yet" with a way to confirm when nobody
+ *  has. `lead` goes first: which of its details Google keeps, and when.
+ *  `subject` names what's confirmed where that isn't the whole listing ("Times"
+ *  in a shul's times card).
+ *
+ *  It used to carry a quiet "Suggest a correction" link opposite it too. It
+ *  sat at the same weight as the date and read as part of it; every
+ *  surface has the "Suggest an edit" bar instead (ListingEditBar). What
+ *  stays is the confirmation itself: a one-tap contribution of its own, not
+ *  a second door to the edit form. */
+export default function FreshnessFooter(props: Props) {
+  return <FreshnessStatus {...props} />
+}
+
+function FreshnessStatus({ resourceId, confirmedAt: initialConfirmedAt, lead, subject, ask = true, section, onEdit, source }: Props) {
+  const now = useNow()
+  const fetchOrPreview = useFetchOrPreview()
   const [confirmedAt, setConfirmedAt] = useState(initialConfirmedAt)
   // What confirmedAt was right before the most recent confirm — lets a
   // misclick be undone back to the prior state instead of just cleared.
   const [previousConfirmedAt, setPreviousConfirmedAt] = useState<string | undefined>(undefined)
   const [justConfirmedNow, setJustConfirmedNow] = useState(false)
+  // What the server handed back for this browser's own confirmation, sent
+  // back on undo: the stamp lets the server refuse to undo if someone else
+  // has confirmed since, and the activity id takes it back out of the log.
+  // `undoable` is false when the tap landed inside the server's cooldown
+  // (someone confirmed minutes ago): nothing changed, so there's nothing to
+  // undo, and offering Undo would restore a stamp this browser never set.
+  const [mine, setMine] = useState<{ confirmedAt: string; activityId: number | null; undoable: boolean } | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(false)
 
@@ -38,11 +73,16 @@ export default function FreshnessFooter({ resourceId, confirmedAt: initialConfir
     setLoading(true)
     setError(false)
     try {
-      const res = await fetch(`/api/resource/${resourceId}/confirm`, { method: 'POST' })
-      const json = (await res.json()) as { ok: boolean; confirmedAt?: string }
+      const res = await fetchOrPreview(
+        `/api/resource/${resourceId}/confirm`,
+        section ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ section }) } : { method: 'POST' },
+        { confirmedAt: new Date().toISOString(), changed: true, activityId: null },
+      )
+      const json = (await res.json()) as { ok: boolean; confirmedAt?: string; changed?: boolean; activityId?: number | null }
       if (json.ok && json.confirmedAt) {
         setPreviousConfirmedAt(confirmedAt)
         setConfirmedAt(json.confirmedAt)
+        setMine({ confirmedAt: json.confirmedAt, activityId: json.activityId ?? null, undoable: json.changed !== false })
         setJustConfirmedNow(true)
       } else {
         setError(true)
@@ -58,14 +98,19 @@ export default function FreshnessFooter({ resourceId, confirmedAt: initialConfir
     setLoading(true)
     setError(false)
     try {
-      const res = await fetch(`/api/resource/${resourceId}/confirm`, {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ previousConfirmedAt }),
-      })
+      const res = await fetchOrPreview(
+        `/api/resource/${resourceId}/confirm`,
+        {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ previousConfirmedAt, confirmedAt: mine?.confirmedAt, activityId: mine?.activityId, ...(section ? { section } : {}) }),
+        },
+        { confirmedAt: previousConfirmedAt ?? null },
+      )
       const json = (await res.json()) as { ok: boolean; confirmedAt?: string | null }
       if (json.ok) {
         setConfirmedAt(json.confirmedAt ?? undefined)
+        setMine(null)
         setJustConfirmedNow(false)
       } else {
         setError(true)
@@ -77,49 +122,86 @@ export default function FreshnessFooter({ resourceId, confirmedAt: initialConfir
     }
   }
 
+  const failed = error && <span className="ml-1 text-red-600">Didn’t save. Try again.</span>
+  // Where the date shown came from, when an outside source gave it.
+  const from = source && confirmedAt && source.at === confirmedAt ? source.from : null
+  const leadText = lead ? `${lead}. ` : ''
+  const button = (label: string) => (
+    <button onClick={confirm} disabled={loading} className="cursor-pointer font-bold text-primary hover:underline disabled:opacity-50">
+      {loading ? 'Saving…' : label}
+    </button>
+  )
+
+  if (onEdit && !justConfirmedNow) {
+    const asking = !confirmedAt || isStale(confirmedAt, now)
+    const pill = 'flex h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-full border border-slate-300 bg-white px-3.5 text-[14.5px] font-bold transition-colors hover:bg-slate-50 disabled:opacity-50'
+    const edit = asking ? (
+      <button type="button" onClick={onEdit} className={`${pill} text-primary`}>
+        <PencilIcon className="h-3.5 w-3.5" />
+        Edit
+      </button>
+    ) : (
+      <EditButton onClick={onEdit} />
+    )
+    return (
+      <div className="flex items-center gap-2" data-testid="freshness">
+        <p className={`min-w-0 flex-1 text-[13.5px] leading-snug ${asking ? 'text-caution' : 'text-slate-600'}`}>
+          {leadText}
+          {confirmedAt ? `${from ? `From ${from},` : 'Confirmed'} ${shortDate(confirmedAt, now)}` : 'Not confirmed yet'}
+          {asking && (confirmedAt ? ' · Still right?' : ' · Right?')}
+          {failed}
+        </p>
+        {asking && (
+          <button type="button" onClick={confirm} disabled={loading} className={`${pill} text-slate-900`}>
+            {loading ? 'Saving…' : 'Yes'}
+          </button>
+        )}
+        {edit}
+      </div>
+    )
+  }
+
+  if (!ask) {
+    const what = subject ?? 'Listing'
+    return (
+      <p className="text-[13.5px] leading-snug text-slate-600" data-testid="freshness">
+        {leadText}
+        {confirmedAt ? `${what} ${from ? `from ${from},` : 'last checked'} ${shortDate(confirmedAt, now)}.` : `${what} not checked by anyone yet.`}
+      </p>
+    )
+  }
+
   if (justConfirmedNow) {
     return (
-      <span className="text-xs text-green-600 font-medium">
-        ✓ Confirmed — thanks!{' '}
-        <button
-          onClick={undo}
-          disabled={loading}
-          className="text-slate-400 hover:text-slate-600 hover:underline cursor-pointer disabled:opacity-50 font-normal"
-        >
-          {loading ? 'Undoing…' : 'Undo'}
-        </button>
-        {error && <span className="ml-1 text-red-500">Failed — try again</span>}
-      </span>
+      <p className="text-[13.5px] leading-snug text-emerald-700" data-testid="freshness">
+        <span className="font-semibold">✓ Confirmed. Thanks!</span>{' '}
+        {mine?.undoable !== false && (
+          <button onClick={undo} disabled={loading} className="cursor-pointer text-slate-500 hover:text-slate-700 hover:underline disabled:opacity-50">
+            {loading ? 'Undoing…' : 'Undo'}
+          </button>
+        )}
+        {failed}
+      </p>
     )
   }
 
   if (confirmedAt) {
+    const stale = isStale(confirmedAt, now)
     return (
-      <span className="text-xs text-muted">
-        Confirmed {timeAgo(confirmedAt)} ·{' '}
-        <button
-          onClick={confirm}
-          disabled={loading}
-          className="text-primary hover:underline cursor-pointer disabled:opacity-50"
-        >
-          {loading ? 'Saving…' : 'Still right?'}
-        </button>
-        {error && <span className="ml-1 text-red-500">Failed — try again</span>}
-      </span>
+      <p className="text-[13.5px] leading-snug text-slate-600" data-testid="freshness">
+        {leadText}
+        {from ? `${subject ? `${subject} from` : 'From'} ${from},` : subject ? `${subject} confirmed` : 'Confirmed'} {shortDate(confirmedAt, now)}.
+        {stale && <> Still right? {button('Yes')}</>}
+        {failed}
+      </p>
     )
   }
 
   return (
-    <span className="text-xs text-muted">
-      Is this info current?{' '}
-      <button
-        onClick={confirm}
-        disabled={loading}
-        className="text-primary hover:underline cursor-pointer disabled:opacity-50"
-      >
-        {loading ? 'Saving…' : 'Mark as current'}
-      </button>
-      {error && <span className="ml-1 text-red-500">Failed — try again</span>}
-    </span>
+    <p className="text-[13.5px] leading-snug text-slate-600" data-testid="freshness">
+      {leadText}
+      {subject ? `${subject} not confirmed by anyone yet.` : 'Not confirmed by anyone yet.'} Right? {button('Yes')}
+      {failed}
+    </p>
   )
 }

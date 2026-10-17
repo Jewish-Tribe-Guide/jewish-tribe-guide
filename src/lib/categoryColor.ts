@@ -174,3 +174,12 @@ export function categoryColorUsage(
   }
   return usage
 }
+
+// red-600 pulled back the same way as the category palette above — a hospital
+// pin still needs to read as the urgent one, but at full chroma it was the
+// single loudest thing on a screen that already has a hundred and fifty pins
+// on it. Used by the map's hospital pins (ResourceMapView). Kept here, not
+// in ResourceMapView: importing it from there pulled the whole Map page, map
+// and all, into every category page's code.
+export const HOSPITAL_COLOR = '#b6302b'
+export const HOSPITAL_ICON = '🏥'

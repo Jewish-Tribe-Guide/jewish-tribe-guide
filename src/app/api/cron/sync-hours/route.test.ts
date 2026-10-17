@@ -44,6 +44,7 @@ vi.mock('@/lib/revalidateContent', () => ({ revalidatePublicContent: vi.fn() }))
 vi.mock('@/lib/categoryStore', () => ({ listCategories: vi.fn().mockResolvedValue([]) }))
 
 const { GET } = await import('./route')
+const { refreshNight } = await import('@/lib/syncListing')
 
 const ORIGINAL_ENV = { ...process.env }
 
@@ -261,5 +262,51 @@ describe('GET /api/cron/sync-hours', () => {
 
     expect(mockSubmitClosure).toHaveBeenCalledWith('philly', 'r1')
     expect(body).toMatchObject({ flaggedClosed: 1 })
+  })
+})
+
+describe('GET /api/cron/sync-hours: the full refresh once a week (fixes table, Sep 29)', () => {
+  // Asking Google for every listing's phone, hours and website every night
+  // was the whole Google bill, about $8 a month.
+  const listing = (id: string, synced: boolean) => ({ ...row, id, details: { placeId: `p-${id}`, ...(synced ? { googleSyncedAt: '2026-09-01T06:00:00Z' } : {}) } })
+
+  afterEach(() => vi.useRealTimers())
+
+  it('asks every listing only whether it’s open, except tonight’s seventh and any never synced', async () => {
+    const ids = Array.from({ length: 21 }, (_, i) => `listing-${i}`)
+    const night = 3
+    vi.useFakeTimers({ now: new Date(86_400_000 * (7 * 3000 + night) + 6 * 3_600_000) })
+    stubTable([...ids.map((id) => listing(id, true)), listing('new-one', false)])
+    mockFetchPlaceSync.mockResolvedValue(OPERATIONAL)
+
+    const body = await (await runGet()).json()
+
+    const full = mockFetchPlaceSync.mock.calls.filter(([, o]) => !o?.statusOnly).map(([placeId]) => placeId)
+    const tonight = ids.filter((id) => refreshNight(id) === night).map((id) => `p-${id}`)
+    expect(tonight.length).toBeGreaterThan(0)
+    expect(tonight.length).toBeLessThan(ids.length)
+    expect(full.sort()).toEqual([...tonight, 'p-new-one'].sort())
+    expect(mockFetchPlaceSync).toHaveBeenCalledTimes(22)
+    expect(body).toMatchObject({ ok: true, total: 22, refreshed: full.length })
+  })
+
+  it('a night’s status check leaves “Synced from Google” at the date the hours were', async () => {
+    const id = Array.from({ length: 50 }, (_, i) => `x${i}`).find((x) => refreshNight(x) !== 0)!
+    vi.useFakeTimers({ now: new Date(86_400_000 * 7 * 3000 + 6 * 3_600_000) })
+    const write = stubTable([listing(id, true)])
+    mockFetchPlaceSync.mockResolvedValue(OPERATIONAL)
+
+    await runGet()
+
+    expect(mockFetchPlaceSync).toHaveBeenCalledWith(`p-${id}`, { statusOnly: true })
+    const details = (write.update as ReturnType<typeof vi.fn>).mock.calls[0][0].details
+    expect(details.googleSyncedAt).toBe('2026-09-01T06:00:00Z')
+    expect(details.googleStatusCheckedAt).toEqual(expect.any(String))
+  })
+
+  it('spreads the listings across the week', () => {
+    const counts = Array(7).fill(0)
+    for (let i = 0; i < 700; i++) counts[refreshNight(`00000000-0000-4000-8000-${String(i).padStart(12, '0')}`)]++
+    for (const n of counts) expect(n).toBeGreaterThan(60)
   })
 })

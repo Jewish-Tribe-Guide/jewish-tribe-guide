@@ -8,9 +8,14 @@ import {
   mergeFieldsWithHidden,
   normalizeField,
   removedFieldKeys,
+  toDraft,
   validateDraft,
   type Draft,
 } from './categoryEditorLogic'
+import { groupByFromKey } from '@/lib/listGroups'
+import { questionCardFromKey } from '@/lib/questionCards'
+import { walkListFromKey } from '@/lib/walkList'
+import { listingPartsToSave } from '@/lib/listingParts'
 
 // ── The save workflow: validation, the two destructive-change confirmation
 // gates (option-rename migration, field-removal cleanup), and the actual
@@ -181,7 +186,7 @@ export function useCategorySaveWorkflow({
     setSaving(true)
     try {
       const payload = {
-        ...(isNew && { id: draft.id }),
+        ...(isNew && { id: draft.id, active: draft.active }),
         label: draft.label,
         pluralLabel: draft.pluralLabel || draft.label,
         icon: draft.icon,
@@ -224,6 +229,15 @@ export function useCategorySaveWorkflow({
             })),
           }),
         ...(pendingIdRename && { newId: pendingIdRename.newId }),
+        // Only when changed: a database without migration 059 then still
+        // saves every other edit.
+        ...(!isNew && draft.groupBy !== toDraft(initial).groupBy && { groupBy: groupByFromKey(draft.groupBy) }),
+        // The same, for migration 060.
+        ...(!isNew && draft.questionCard !== toDraft(initial).questionCard && { questionCard: questionCardFromKey(draft.questionCard) }),
+        // And for migration 061.
+        ...(!isNew && draft.walkList !== toDraft(initial).walkList && { walkList: walkListFromKey(draft.walkList).length ? walkListFromKey(draft.walkList) : null }),
+        // And for migration 066.
+        ...(!isNew && draft.listingParts !== toDraft(initial).listingParts && { listingParts: listingPartsToSave(draft.listingParts) }),
       }
       await fetchJson(
         withCommunity(isNew ? '/api/admin/categories' : `/api/admin/categories/${initial!.id}`, community),

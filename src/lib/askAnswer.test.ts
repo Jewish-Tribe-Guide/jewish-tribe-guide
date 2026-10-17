@@ -1,0 +1,784 @@
+import { describe, expect, it } from 'vitest'
+import { makeCategory } from '@/test/providerFixtures'
+import type { DirectoryResource } from '@/types'
+import { nearMiss, searchAsk } from './askSearch'
+import { answerFor, hitHoursNote, metaAnswer, nearMissAnswer, timesAnswer, type AnswerSchedule } from './askAnswer'
+import type { ZmanimData } from '@/types'
+import type { MinyanSlot } from './upcomingDavening'
+import type { DateFacts } from './schedules'
+
+const synagogue = makeCategory({
+  id: 'synagogue',
+  label: 'Synagogue',
+  pluralLabel: 'Synagogues',
+  detailFields: [{ key: 'denomination', label: 'Denomination', type: 'text' }],
+})
+const grocery = makeCategory({
+  id: 'grocery',
+  label: 'Grocery Store',
+  pluralLabel: 'Grocery Stores',
+  detailFields: [{ key: 'm', label: 'Kosher items', type: 'tags' }],
+})
+const restaurant = makeCategory({
+  id: 'restaurant',
+  label: 'Food Establishment',
+  pluralLabel: 'Food Establishments',
+  detailFields: [{ key: 'hours', label: 'Hours', type: 'hours' }],
+})
+const hospital = makeCategory({ id: 'hospital', label: 'Hospital', pluralLabel: 'Hospitals' })
+const categories = [synagogue, grocery, restaurant, hospital]
+
+function listing(category: string, id: string, name: string, lat: number, details: Record<string, unknown> = {}): DirectoryResource {
+  return { id, category, name, anchorId: 'community', distance: 0, address: '', geo: { lat, lng: -75.17 }, ...details }
+}
+
+const mekor = listing('synagogue', 'mekor', 'Mekor Habracha', 39.95, { denomination: 'Orthodox (Ashkenazi)' })
+const shtiebel = listing('synagogue', 'shtiebel', 'South Philly Shtiebel', 39.93, { denomination: 'Orthodox (Ashkenazi)' })
+const bethZion = listing('synagogue', 'bz', 'Temple Beth Zion', 39.951, { denomination: 'Conservative' })
+const shoprite = listing('grocery', 'shoprite', 'ShopRite', 39.93, { m: ['Chalav Yisroel Milk', 'Challah'] })
+const giant = listing('grocery', 'giant', 'GIANT', 39.94, { m: ['Wine'], m_sometimes: ['Challah'] })
+const hup = listing('hospital', 'hup', 'Hospital of the University of Pennsylvania', 39.9496)
+const cookies = listing('restaurant', 'cookies', 'Insomnia Cookies', 39.952)
+const listings = [mekor, shtiebel, bethZion, shoprite, giant, hup, cookies]
+const here = { lat: 39.95, lng: -75.17 }
+
+const slot = (shul: DirectoryResource, tefillah: MinyanSlot['tefillah'], h: number, m = 0): MinyanSlot => ({
+  shulId: shul.id,
+  shulName: shul.name,
+  shulGeo: shul.geo,
+  tefillah,
+  time: '',
+  minutes: h * 60 + m,
+})
+// A weekday: morning Shacharis, afternoon Mincha, evening Maariv, and a
+// combined Mincha & Maariv at the Conservative shul.
+const today = [
+  slot(mekor, 'shacharis', 7),
+  slot(shtiebel, 'shacharis', 6, 45),
+  slot(mekor, 'mincha', 13, 30),
+  slot(bethZion, 'mincha_maariv', 18, 30),
+  slot(shtiebel, 'maariv', 19, 15),
+  slot(mekor, 'maariv', 21, 0),
+].sort((a, b) => a.minutes - b.minutes)
+const tomorrow = [slot(shtiebel, 'shacharis', 6, 45), slot(mekor, 'shacharis', 7), slot(shtiebel, 'maariv', 19, 15)]
+const at = (h: number, m = 0): AnswerSchedule => ({ today, tomorrow, nowMinutes: h * 60 + m })
+
+const ask = (input: string, schedule: AnswerSchedule | null = null) =>
+  answerFor(searchAsk(listings, categories, input), { schedule })
+
+describe('answerFor — minyan questions', () => {
+  // Oct 16: one that only runs when enough sign up is named with that, so
+  // the answer never sounds surer than the guide is.
+  it('names a minyan that only runs when enough sign up with “check group first”', () => {
+    const late = { ...slot(mekor, 'maariv', 21, 0), signUp: true }
+    const answer = ask('next maariv', { today: [...today.filter((s) => s.minutes !== 21 * 60), late], tomorrow, nowMinutes: 20 * 60 })
+    expect(answer?.text).toBe('Next Maariv: 9:00 PM, Mekor Habracha, check group first.')
+  })
+
+  it('"next minyan at an orthodox shul": the next one at an Orthodox shul only', () => {
+    // 6:00 PM: Beth Zion's 6:30 is next overall, but it's Conservative.
+    const answer = ask("what's the next minyan at an orthodox shul", at(18))
+    expect(answer?.text).toBe('Next minyan: 7:15 PM, South Philly Shtiebel. 1 more today.')
+    expect(answer?.rows.map((r) => r.shulName)).toEqual(['South Philly Shtiebel', 'Mekor Habracha'])
+  })
+
+  it('"is there a maariv minyan at 6:45": yes, counting a combined Mincha & Maariv close by', () => {
+    const answer = ask('is there a maariv minyan at 6:45', at(12))
+    expect(answer?.text).toBe('Yes: Mincha & Maariv at 6:30 PM, Temple Beth Zion.')
+  })
+
+  it('"a maariv at 8": no, and the closest ones either side', () => {
+    const answer = ask('is there a maariv at 8', at(12))
+    expect(answer?.text).toBe('No Maariv at 8:00 PM in the guide. Closest: 7:15 PM and 9:00 PM.')
+  })
+
+  it('"is there still a maariv minyan tonight": yes, with how many are left', () => {
+    expect(ask('is there still a maariv minyan tonight', at(19))?.text).toBe(
+      'Next Maariv: 7:15 PM (in 15 min), South Philly Shtiebel. 1 more today.',
+    )
+  })
+
+  it('"still a maariv tonight" after the last one: no, and when tomorrow’s is', () => {
+    expect(ask('is there still a maariv tonight', at(21, 30))?.text).toBe(
+      'No more Maariv today. First tomorrow: 7:15 PM, South Philly Shtiebel.',
+    )
+  })
+
+  it('"next minyan" after the last one says minyanim, plural', () => {
+    expect(ask('next minyan', at(22))?.text).toBe('No more minyanim today. First tomorrow: 6:45 AM, South Philly Shtiebel.')
+  })
+
+  it('"upcoming minyanim": the rest of today, in time order', () => {
+    const answer = ask('can you pull up a list of upcoming minyanim', at(13))
+    expect(answer?.rows.map((r) => `${r.time} ${r.label}`)).toEqual([
+      '1:30 PM Mincha',
+      '6:30 PM Mincha & Maariv',
+      '7:15 PM Maariv',
+      '9:00 PM Maariv',
+    ])
+  })
+
+  it('names the nearer of two shuls with a minyan at the same time', () => {
+    // Reported: two 9:00 Shacharises, and the sentence named the farther one
+    // because the schedule breaks ties by name.
+    const nine = [slot(mekor, 'shacharis', 9), slot(shtiebel, 'shacharis', 9)]
+    const nearShtiebel = { lat: 39.93, lng: -75.17 }
+    const answer = answerFor(searchAsk(listings, categories, 'next minyan'), {
+      schedule: { today: nine, tomorrow: [], nowMinutes: 7 * 60 },
+      coords: nearShtiebel,
+    })
+    expect(answer?.text).toMatch(/^Next minyan: 9:00 AM, South Philly Shtiebel \(/)
+  })
+
+  it('with no location, the tie goes to the shul nearer the community’s centre, and says no distance', () => {
+    // Reported Sep 28: "next minyan" named a Cherry Hill shul 8.2 mi out,
+    // over Mekor Habracha at the same time, because ties went by name.
+    const nine = [slot(shtiebel, 'shacharis', 9), slot(mekor, 'shacharis', 9)]
+    const say = (center: { lat: number; lng: number }) =>
+      answerFor(searchAsk(listings, categories, 'next minyan'), { schedule: { today: nine, tomorrow: [], nowMinutes: 7 * 60 }, center })?.text
+    expect(say({ lat: 39.951, lng: -75.17 })).toMatch(/^Next minyan: 9:00 AM, Mekor Habracha\. /)
+    expect(say({ lat: 39.929, lng: -75.17 })).toMatch(/^Next minyan: 9:00 AM, South Philly Shtiebel\. /)
+  })
+
+  it('keeps every minyan left today, showing the first few', () => {
+    // "9 more today" was a count with nowhere to go: the list stopped at 5.
+    const many = Array.from({ length: 8 }, (_, i) => slot(mekor, 'maariv', 18, i * 5))
+    const answer = ask('next maariv', { today: many, tomorrow: [], nowMinutes: 17 * 60 })
+    expect(answer?.text).toBe('Next Maariv: 6:00 PM, Mekor Habracha. 7 more today.')
+    expect(answer?.rows).toHaveLength(8)
+    expect(answer?.shown).toBe(5)
+  })
+
+  it('reads a bare time by the tefillah: Shacharis at 7 is morning', () => {
+    // At 8 AM the next "7:00" on the clock is 7 PM; the tefillah says morning.
+    expect(ask('shacharis at 7', at(8))?.text).toBe('Yes: Shacharis at 7:00 AM, Mekor Habracha. 1 more within 15 min.')
+  })
+
+  it('reads a bare time with no tefillah as the next time the clock shows it', () => {
+    // At 8 AM, "a minyan at 7" means this evening, where 7:15 is close enough.
+    expect(ask('minyan at 7', at(8))?.text).toBe('Yes: Maariv at 7:15 PM, South Philly Shtiebel.')
+  })
+})
+
+describe('answerFor — other questions', () => {
+  it('says who has an item, and when only one place does', () => {
+    expect(ask('cholov yisroel milk')?.text).toBe('ShopRite has Chalav Yisroel Milk.')
+    expect(ask('challah')?.text).toBe('2 places have Challah (1 only sometimes).')
+  })
+
+  it('counts every place with the item, however each one words it', () => {
+    // Reported: nine stores with cheese came out as "Food & Friends has
+    // Sliced Cheeses", because only exact wordings were counted.
+    const cheeses = [
+      listing('grocery', 'c1', 'Food & Friends', 39.951, { m: ['Sliced Cheeses'] }),
+      listing('grocery', 'c2', 'Spruce Market', 39.952, { m: ['Shredded Cheese'] }),
+      listing('grocery', 'c3', 'ALDI', 39.953, { m: ['Goat Cheese'] }),
+    ]
+    const answer = answerFor(searchAsk(cheeses, categories, 'is there a place that sells cheese', { coords: here }), { coords: here })
+    expect(answer?.text).toBe('3 places have cheese. Nearest: Food & Friends, 0.1 mi.')
+  })
+
+  it('says nothing about part of what’s in the box', () => {
+    // Mid-word, "cheese st" used to answer "2 places have cheese", the same
+    // way a finished "ice cream" answered "10 places have ice" and "shabbos
+    // meals" "2 places have shabbos" (Sep 28): the last word may be done,
+    // and a sentence about the words before it is then wrong.
+    const cheeses = [
+      listing('grocery', 'g', 'GIANT', 39.99, { m: ['Cheese Sticks'] }),
+      listing('grocery', 'a', 'ALDI', 39.951, { m: ['Goat Cheese'] }),
+    ]
+    const result = searchAsk(cheeses, categories, 'cheese st', { coords: here })
+    expect(result.hits[0].item.name).toBe('GIANT')
+    expect(answerFor(result, { coords: here })).toBeNull()
+    expect(answerFor(searchAsk(cheeses, categories, 'cheese sti', { coords: here }), { coords: here })?.text).toBe('GIANT has Cheese Sticks, 2.8 mi.')
+    expect(answerFor(searchAsk(cheeses, categories, 'cheese', { coords: here }), { coords: here })?.text).toBe('2 places have cheese. Nearest: ALDI, 0.1 mi.')
+  })
+
+  it('on a category page, the phrase as typed, with its kind-of-place word', () => {
+    // "meals" means Food elsewhere; on Groceries it's part of the item.
+    const shops = [
+      listing('grocery', 's', 'ShopRite', 39.951, { m: ['Prepared Shabbos Food'] }),
+      listing('grocery', 'h', 'House of Kosher', 39.954, { m: ['Shabbos Takeout'] }),
+    ]
+    const r = searchAsk(shops, categories, 'shabbos meals', { coords: here, categoryId: 'grocery' })
+    expect(answerFor(r, { coords: here })?.text).toBe('2 places have shabbos meals. Nearest: ShopRite, 0.1 mi.')
+  })
+
+  it('"within 3 miles of HUP" with nothing there says so, and names the nearest outside it on its own', () => {
+    // Fixes table, Sep 29: from HUP no meat place is within 3 miles, and
+    // the list was just empty, with no sentence.
+    const grills = [listing('restaurant', 'g', 'Far Grill', 39.9, { t: ['Meat'] }), listing('restaurant', 'd', 'Dairy Cafe', 39.95, { t: ['Dairy'] }), hup]
+    const r = searchAsk(grills, categories, 'meat within 3 miles of hup')
+    expect(r.anchor?.name).toBe('Hospital of the University of Pennsylvania')
+    expect(r.hits).toEqual([])
+    expect(answerFor(r)?.text).toBe('Nothing within 3 miles of Hospital of the University of Pennsylvania. Nearest outside it: Far Grill, 3.4 mi.')
+    // Something within it: no "outside".
+    expect(searchAsk(grills, categories, 'meat within 5 miles of hup').outside).toBeUndefined()
+  })
+
+  it('a phrase only some places have all of is not split', () => {
+    const shops = [
+      listing('grocery', 's', 'ShopRite', 39.951, { m: ['Prepared Shabbos Food'] }),
+      listing('grocery', 'a', 'Acme', 39.954, { m: ['Shabbos Candles'] }),
+      listing('restaurant', 'r', "Rita's Italian Ice", 39.952, {}),
+      listing('restaurant', 'w', 'Water Ice Co', 39.955, {}),
+      listing('restaurant', 'b', 'Scoop Shop', 39.953, { d: 'Kosher ice cream and shakes' }),
+    ]
+    // Nobody lists ice cream here: the two named Ice don't have it.
+    expect(answerFor(searchAsk(shops, categories, 'ice cream', { coords: here }), { coords: here })).toBeNull()
+    expect(answerFor(searchAsk(shops, categories, 'shabbos meals', { coords: here }), { coords: here })).toBeNull()
+  })
+
+  it('counts only places with as good a match as the best', () => {
+    // A store with plain "Goat Cheese" doesn't have sliced goat cheese.
+    const cheeses = [
+      listing('grocery', 'f', 'Far Market', 39.99, { m: ['Sliced Goat Cheese'] }),
+      listing('grocery', 'n', 'Near Market', 39.951, { m: ['Goat Cheese'] }),
+    ]
+    // Three words need two to match, so the search does find Near Market.
+    const result = searchAsk(cheeses, categories, 'sliced goat cheese near me', { coords: here })
+    expect(result.hits).toHaveLength(2)
+    expect(answerFor(result, { coords: here })?.text).toBe('Far Market has Sliced Goat Cheese, 2.8 mi.')
+  })
+
+  it('for "open", counts the open places and says how many more are closed', () => {
+    const nineToTen = Object.fromEntries(['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'].map((d) => [d, { open: '09:00', close: '22:00' }]))
+    const shut = Object.fromEntries(['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'].map((d) => [d, null]))
+    const storeWithHours = makeCategory({
+      id: 'grocery',
+      label: 'Grocery Store',
+      pluralLabel: 'Grocery Stores',
+      detailFields: [
+        { key: 'hours', label: 'Hours', type: 'hours' },
+        { key: 'm', label: 'Kosher items', type: 'tags' },
+      ],
+    })
+    const stores = [
+      listing('grocery', 'o1', 'GIANT', 39.955, { m: ['Cheese'], hours: nineToTen }),
+      listing('grocery', 'o2', 'ShopRite', 39.99, { m: ['Mozzarella Cheese'], hours: nineToTen }),
+      listing('grocery', 'x', 'Food & Friends', 39.951, { m: ['Sliced Cheeses'], hours: { ...shut, sat: { open: '06:00', close: '08:00' } } }),
+    ]
+    const result = searchAsk(stores, [storeWithHours], 'is there a place open that sells cheese', {
+      coords: here,
+      now: new Date(2026, 8, 26, 12, 0),
+    })
+    expect(answerFor(result, { coords: here })?.text).toBe(
+      '2 open places have cheese. Nearest: GIANT, 0.3 mi, open until 10:00 PM. 1 more is closed right now.',
+    )
+  })
+
+  it('counts a food place that serves it, by its description or name, not only stores that stock it', () => {
+    // Reported: "pretzels" answered "ALDI has Pretzel Buns" over two pretzel
+    // bakeries, because only item lists counted.
+    const food = makeCategory({
+      id: 'restaurant',
+      label: 'Food',
+      pluralLabel: 'Food',
+      detailFields: [{ key: 'googleDescription', label: 'Description', type: 'textarea' }],
+    })
+    const places = [
+      listing('grocery', 'aldi', 'ALDI', 39.99, { m: ['Pretzel Buns'] }),
+      listing('restaurant', 'twisters', 'Tasty Twisters Bakery', 39.951, { googleDescription: 'Family-owned bakery crafting hand-rolled soft pretzels.' }),
+      listing('restaurant', 'pretzelco', 'Center City Pretzel Co.', 39.96),
+    ]
+    const result = searchAsk(places, [grocery, food], 'pretzels', { coords: here })
+    // The bakery is nearest, and its description counts as fully as an item.
+    expect(result.hits[0].item.name).toBe('Tasty Twisters Bakery')
+    expect(answerFor(result, { coords: here })?.text).toBe('3 places have pretzels. Nearest: Tasty Twisters Bakery, 0.1 mi.')
+  })
+
+  it('answers when one word of a place’s name is what was asked for', () => {
+    // "restaurant with pretzels": Center City Pretzel Co. is on top, but one
+    // word of its four isn't looking it up by name.
+    const food = makeCategory({ id: 'restaurant', label: 'Food', pluralLabel: 'Food' })
+    const places = [listing('restaurant', 'pc', 'Center City Pretzel Co.', 39.951)]
+    expect(answerFor(searchAsk(places, [food], 'restaurant with pretzels'))?.text).toBe('Center City Pretzel Co. has pretzels.')
+  })
+
+  it("does not say a shul 'has' what its name or denomination says", () => {
+    // Food places are described by their text and names; a shul isn't:
+    // "orthodox shtiebel" is looking for a shul, not asking who has something.
+    expect(ask('orthodox shtiebel')).toBeNull()
+  })
+
+  it('says nothing about having it when the question is a place’s own name', () => {
+    const food = makeCategory({ id: 'restaurant', label: 'Food', pluralLabel: 'Food', detailFields: [{ key: 'd', label: 'Description', type: 'textarea' }] })
+    const pizza = listing('restaurant', 'p', '20th Street Pizza', 39.95, { d: 'Kosher pizza on 20th Street.' })
+    expect(answerFor(searchAsk([pizza], [food], '20th street pizza'))).toBeNull()
+  })
+
+  it('answers when the item is the word still being typed', () => {
+    // "giant wine", before a space: the last word was set aside as still
+    // being typed, which left nothing to answer with.
+    expect(ask('giant wine')?.text).toBe('GIANT has Wine.')
+  })
+
+  it('names the closest place to the one a question is about', () => {
+    expect(ask('kosher food near HUP')?.text).toBe('Closest food establishments to Hospital of the University of Pennsylvania: Insomnia Cookies, 0.2 mi.')
+  })
+
+  it('says plainly when nothing that matches is open', () => {
+    const result = { ...searchAsk(listings, categories, 'food open now'), hits: [], closedCount: 3, noHours: [] }
+    expect(answerFor(result)?.text).toBe('Nothing open right now. 3 places match, but all are closed.')
+  })
+
+  it('says a distance limit needs a location, rather than ignoring it', () => {
+    expect(ask('challah within a 10 minute walk')?.text).toBe(
+      '2 places have Challah (1 only sometimes). Set your location to see only places within about a 10-minute walk.',
+    )
+  })
+
+  it('keeps a minyan answer to shuls within the distance asked', () => {
+    const answer = answerFor(searchAsk(listings, categories, 'maariv within a 10 minute walk'), {
+      schedule: at(19),
+      coords: { lat: 39.93, lng: -75.17 },
+    })
+    // From beside the Shtiebel, a 10-minute walk (about 0.4 mi) doesn't reach Mekor.
+    expect(answer?.rows.map((r) => r.shulName)).toEqual(['South Philly Shtiebel'])
+  })
+
+  it('says nothing rather than something vague', () => {
+    expect(ask('mekor habracha')).toBeNull()
+    expect(ask('frozen gefilte fish')).toBeNull()
+  })
+})
+
+describe('answerFor — "is there a mikvah open today"', () => {
+  const mikvah = makeCategory({
+    id: 'mikvah',
+    label: 'Mikvah',
+    pluralLabel: 'Mikvaot',
+    detailFields: [
+      { key: 'women_s_hours', label: 'Women’s Hours', type: 'hours' },
+      { key: 'men_s_hours', label: "Men's Hours", type: 'hours' },
+    ],
+  })
+  const allWeek = (open: string, close: string) =>
+    Object.fromEntries(['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'].map((d) => [d, { open, close }]))
+  const lowerMerion = listing('mikvah', 'lm', 'Lower Merion Community Mikvah', 39.95, {
+    men_s_hours: allWeek('04:30', '10:00'),
+    women_s_hours: allWeek('20:00', '22:00'),
+  })
+  const noHours = listing('mikvah', 'oh', 'Mikvah Ohel Leah', 39.96)
+  const at = (h: number) => new Date(2026, 8, 26, h, 0)
+  const answer = (input: string, h: number, places = [lowerMerion, noHours]) =>
+    answerFor(searchAsk(places, [mikvah], input, { now: at(h) }))
+
+  it("says which of its hours are open — a mikvah's men's hours are not its women's", () => {
+    // Reported: at 7 AM this came back as just the mikvah's name, with
+    // nothing to say it was the men's mikvah that was open.
+    expect(answer("is there a mikvah that's open today", 7)?.text).toBe(
+      "Lower Merion Community Mikvah: Men's open until 10:00 AM, Women’s opens 8:00 PM. 1 more has no hours listed.",
+    )
+  })
+
+  it('for "open now", names only what is open now', () => {
+    expect(answer('mikvah open now', 7)?.text).toBe(
+      "Lower Merion Community Mikvah: Men's open until 10:00 AM. 1 more has no hours listed.",
+    )
+  })
+
+  it('does not call a place with no hours closed', () => {
+    expect(answer('mikvah open today', 23)?.text).toBe('Nothing listed as open for the rest of today. 1 has no hours listed. 1 is closed.')
+  })
+
+  it('marks each result with the hours that answer the question, or none listed', () => {
+    const result = searchAsk([lowerMerion, noHours], [mikvah], 'mikvah open now', { now: at(7) })
+    expect(hitHoursNote(result.hits[0], result.query)).toEqual({ text: "Men's open until 10:00 AM", known: true })
+    expect(hitHoursNote(result.noHours[0], result.query)).toEqual({ text: 'No hours listed', known: false })
+    const plain = searchAsk([lowerMerion], [mikvah], 'mikvah', { now: at(7) })
+    expect(hitHoursNote(plain.hits[0], plain.query)).toBeNull()
+  })
+})
+
+describe('answerFor — only what the guide actually says', () => {
+  it('does not say a place has something when its item has only some of the words', () => {
+    // Reported: "chalav yisrael ice cream" answered "ShopRite has Chalav
+    // Yisroel Milk".
+    const result = searchAsk(listings, categories, 'chalav yisroel cheese ')
+    expect(result.hits.map((h) => h.item.name)).toEqual(['ShopRite']) // found, by two of the three words
+    expect(answerFor(result)).toBeNull()
+  })
+
+  it('says "besides" the place the question already knows', () => {
+    expect(ask('a better place for challah than giant')?.text).toBe('ShopRite has Challah.')
+    const wine = [
+      listing('grocery', 'g', 'GIANT', 39.94, { m: ['Wine'] }),
+      listing('grocery', 't', "Trader Joe's", 39.951, { m: ['Wine'] }),
+      listing('grocery', 'f', 'Food & Friends', 39.96, { m: ['Wine'] }),
+    ]
+    expect(answerFor(searchAsk(wine, categories, 'a better place for kosher wine than giant', { coords: here }), { coords: here })?.text).toBe(
+      "2 places besides GIANT have Wine. Nearest: Trader Joe's, 0.1 mi.",
+    )
+  })
+
+  it('names the place it measured from', () => {
+    const wine = [
+      listing('grocery', 'g', 'GIANT', 39.94, { m: ['Wine'] }),
+      listing('grocery', 't', "Trader Joe's", 39.96, { m: ['Wine'] }),
+    ]
+    const nearHup = answerFor(searchAsk([...wine, hup], categories, 'wine near HUP'))
+    expect(nearHup?.text).toBe('2 places have Wine. Nearest to Hospital of the University of Pennsylvania: GIANT, 0.7 mi.')
+    const one = answerFor(searchAsk([wine[0], hup], categories, 'wine near HUP'))
+    expect(one?.text).toBe('GIANT has Wine, 0.7 mi from Hospital of the University of Pennsylvania.')
+  })
+})
+
+describe('nearMissAnswer', () => {
+  it('says the question itself is not in the guide, then what is', () => {
+    const miss = nearMiss(listings, categories, 'packaged challah')!
+    expect(nearMissAnswer(miss, 'packaged challah').text).toBe(
+      'Nothing in the guide for “packaged challah”. 2 places have Challah (1 only sometimes).',
+    )
+  })
+})
+
+describe('answerFor — towns and neighborhoods', () => {
+  const food = makeCategory({ id: 'restaurant', label: 'Food', pluralLabel: 'Food' })
+  const at = (id: string, name: string, address: string, lat: number, lng = -75.17) => ({ ...listing('restaurant', id, name, lat), address, geo: { lat, lng } })
+  const inCherryHill = [
+    at('b', 'The Bagel Spot', '1 Rd, Cherry Hill Township, NJ 08034, USA', 39.93, -75.02),
+    at('c', 'Cherry Hill Cookies', '2 Rd, Cherry Hill Township, NJ 08034, USA', 39.92, -75.01),
+  ]
+  const pizza = at('p', '20th Street Pizza', '20th St, Philadelphia, PA 19103, USA', 39.951, -75.174)
+  const places = [{ name: 'Center City', geo: { lat: 39.9524, lng: -75.1636 }, radius: 1.3 }]
+
+  it('counts what is in a town, calling a mass-noun category "food places"', () => {
+    expect(answerFor(searchAsk(inCherryHill, [food], 'restaurants in cherry hill'))?.text).toBe('2 food places in Cherry Hill.')
+  })
+
+  it('names the one place when there is only one', () => {
+    expect(answerFor(searchAsk([inCherryHill[0]], [food], 'restaurants in cherry hill'))?.text).toBe('1 food in Cherry Hill: The Bagel Spot.')
+  })
+
+  it('asks about pizza, not about the words that said where', () => {
+    // Reported: "pizza in center city" gave no answer — "center" and "city"
+    // were counted as words the pizza place had to have.
+    expect(answerFor(searchAsk([pizza], [food], 'pizza in center city', { places }))?.text).toBe('20th Street Pizza has pizza, 0.6 mi from Center City.')
+  })
+
+  it('names where it measured from for a kind of place', () => {
+    expect(answerFor(searchAsk([pizza], [food], 'food near center city', { places }))?.text).toBe('Closest food places to Center City: 20th Street Pizza, 0.6 mi.')
+  })
+})
+
+describe('answerFor — "open now" without a location', () => {
+  it('names one open place without calling it the nearest', () => {
+    const allDay = Object.fromEntries(['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'].map((d) => [d, { open: '06:00', close: '23:00' }]))
+    const food = makeCategory({ id: 'restaurant', label: 'Food', pluralLabel: 'Food', detailFields: [{ key: 'hours', label: 'Hours', type: 'hours' }] })
+    const places = [
+      listing('restaurant', 'a', 'A Cafe', 39.95, { hours: allDay }),
+      listing('restaurant', 'b', 'B Cafe', 39.96, { hours: allDay }),
+    ]
+    const now = new Date(2026, 8, 28, 12, 0)
+    expect(answerFor(searchAsk(places, [food], 'food open now', { now }))?.text).toBe('2 food places open now, such as A Cafe (open until 11:00 PM).')
+    expect(answerFor(searchAsk(places, [food], 'food open now', { now, coords: here }), { coords: here })?.text).toBe(
+      '2 food places open now. Nearest: A Cafe, open until 11:00 PM, under 100 ft.',
+    )
+  })
+})
+
+describe('answerFor — "open after 6"', () => {
+  const allWeek = (open: string, close: string) =>
+    Object.fromEntries(['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'].map((d) => [d, { open, close }]))
+  const food = makeCategory({
+    id: 'restaurant',
+    label: 'Food',
+    pluralLabel: 'Food',
+    detailFields: [
+      { key: 't', label: 'Items', type: 'tags' },
+      { key: 'hours', label: 'Hours', type: 'hours' },
+    ],
+  })
+  const early = listing('restaurant', 'e', 'Early Bagels', 39.95, { t: ['Bagels'], hours: allWeek('06:00', '14:00') })
+  const late = listing('restaurant', 'l', 'Late Bagels', 39.96, { t: ['Bagels'], hours: allWeek('07:00', '21:00') })
+  const noon = new Date(2026, 8, 28, 12, 0)
+  const say = (q: string, places = [early, late]) => answerFor(searchAsk(places, [food], q, { now: noon }))?.text
+
+  it('says the time it read, and which places are open then', () => {
+    expect(say('food open past 6 with bagels')).toBe("Late Bagels has Bagels, open 7:00 AM–9:00 PM. 1 more isn't open then.")
+  })
+
+  it('says plainly when nothing is open then', () => {
+    expect(say('food open past 6 with bagels', [early])).toBe('Nothing open after 6:00 PM today. 1 place matches, but it isn\'t open then.')
+  })
+
+  it('names the time for a question about hours alone', () => {
+    expect(say('food open until 8')).toBe('Late Bagels: open 7:00 AM–9:00 PM.')
+    expect(say('food open at 8am')).toBe('2 food places open at 8:00 AM today, such as Early Bagels (open 6:00 AM–2:00 PM).')
+  })
+
+  it('shows each result’s hours for that time', () => {
+    const result = searchAsk([early, late], [food], 'food open at 8am', { now: noon })
+    expect(hitHoursNote(result.hits[0], result.query)).toEqual({ text: 'Open 6:00 AM–2:00 PM', known: true })
+  })
+})
+
+describe('nearMissAnswer — shown as close, not found', () => {
+  it('is marked as the closest question’s answer', () => {
+    const grocery = makeCategory({ id: 'grocery', detailFields: [{ key: 'm', label: 'Items', type: 'tags' }] })
+    const store = listing('grocery', 'g', 'Store', 39.95, { m: ['Challah'] })
+    const miss = nearMiss([store], [grocery], 'packaged challah')!
+    expect(nearMissAnswer(miss, 'packaged challah').closest).toBe(true)
+    expect(answerFor(searchAsk([store], [grocery], 'challah'))?.closest).toBeUndefined()
+  })
+})
+
+describe('answerFor — "best", from upvotes only', () => {
+  const food = makeCategory({ id: 'restaurant', label: 'Food', pluralLabel: 'Food', upvotesEnabled: true, detailFields: [{ key: 't', label: 'Items', type: 'tags' }] })
+  const shul = makeCategory({ id: 'synagogue', label: 'Synagogue', pluralLabel: 'Synagogues' })
+  const pizza = (id: string, name: string, upvotes: number) => ({ ...listing('restaurant', id, name, 39.95, { t: ['Pizza'] }), upvotes })
+  const say = (q: string, places: DirectoryResource[], cats = [food]) => answerFor(searchAsk(places, cats, q))?.text
+
+  it('names the most upvoted, when upvotes tell them apart, and lists it first', () => {
+    const places = [pizza('a', 'A Pizza', 1), pizza('b', 'B Pizza', 4), pizza('c', 'C Pizza', 0)]
+    expect(say('best pizza', places)).toBe('Most upvoted by neighbors: B Pizza, 4 upvotes. 3 places have Pizza.')
+    // Ahead of a nearer place with fewer: the ranking asked for, not the distance.
+    const near = { ...pizza('n', 'Near Pizza', 1), geo: here }
+    const far = { ...pizza('f', 'Far Pizza', 4), geo: { lat: here.lat + 0.1, lng: here.lng } }
+    expect(searchAsk([near, far], [food], 'best pizza', { coords: here }).hits[0].item.name).toBe('Far Pizza')
+    expect(searchAsk([near, far], [food], 'pizza', { coords: here }).hits[0].item.name).toBe('Near Pizza')
+  })
+
+  it('never makes a winner out of a tie', () => {
+    expect(say('best pizza', [pizza('a', 'A Pizza', 0), pizza('b', 'B Pizza', 0)])).toBe('2 places have Pizza. Not enough upvotes yet to say which is best.')
+  })
+
+  it('names a few sharing the top together', () => {
+    const places = [pizza('a', 'A Pizza', 2), pizza('b', 'B Pizza', 2), pizza('c', 'C Pizza', 0)]
+    expect(say('best pizza', places)).toBe('Most upvoted by neighbors: A Pizza and B Pizza, 2 each. 3 places have Pizza.')
+  })
+
+  it('says it doesn’t rank what neighbors can’t upvote', () => {
+    const shuls = [listing('synagogue', 's1', 'Shul One', 39.95), listing('synagogue', 's2', 'Shul Two', 39.96)]
+    expect(say('best shul', shuls, [shul])).toBe("The guide doesn't rank these.")
+  })
+
+  it('never names a winner on zero upvotes, even the only place that can be upvoted', () => {
+    const shuls = [listing('synagogue', 's1', 'Pizza Shul', 39.95)]
+    const text = say('best pizza', [pizza('a', 'A Pizza', 0), ...shuls], [food, shul])
+    expect(text).not.toMatch(/Most upvoted/)
+  })
+
+  it('keeps "better than Giant" to the places that aren’t Giant, without ranking notes', () => {
+    const places = [pizza('a', 'A Pizza', 0), pizza('b', 'B Pizza', 0), pizza('g', 'Giant Pizza', 5)]
+    expect(say('a better place for pizza than giant', places)).toBe('2 places besides Giant Pizza have Pizza.')
+    expect(say('a better place for pizza than giant', [...places, pizza('c', 'C Pizza', 2)])).toMatch(/^Most upvoted by neighbors: C Pizza, 2 upvotes\./)
+  })
+
+  it('has nothing to rank with one place', () => {
+    expect(say('best shul', [listing('synagogue', 's1', 'Shul One', 39.95)], [shul])).toBeUndefined()
+  })
+
+  it('leaves an ordinary question alone', () => {
+    const places = [pizza('a', 'A Pizza', 1), pizza('b', 'B Pizza', 4)]
+    expect(say('pizza', places)).toBe('2 places have Pizza.')
+  })
+})
+
+describe('timesAnswer', () => {
+  const week: ZmanimData = {
+    hebrewDate: '', dayOfWeek: 3, isFriday: false, isShabbos: false,
+    dailyZmanim: [{ label: 'Sunset', time: '6:52 PM' }, { label: 'Latest Shema', time: '9:48 AM' }],
+    shabbos: { candleLighting: { label: 'Friday', time: '6:34 PM', iso: '2026-10-02T18:34:00-04:00' }, havdalah: { label: 'Saturday', time: '7:36 PM' } },
+  }
+  const opts = { nowMs: Date.parse('2026-09-30T12:00:00-04:00'), pageHref: '/philly/zmanim' }
+
+  it('gives candle lighting, havdalah, or both', () => {
+    expect(timesAnswer('candles', week, opts).text).toBe('Candle lighting: Friday, 6:34 PM.')
+    expect(timesAnswer('havdalah', week, opts).text).toBe('Shabbos ends: Saturday, 7:36 PM.')
+    expect(timesAnswer('shabbos', week, opts).text).toBe('Candle lighting: Friday, 6:34 PM. Shabbos ends: Saturday, 7:36 PM.')
+    expect(timesAnswer('shabbos', week, opts).links).toEqual([{ label: 'All zmanim', href: '/philly/zmanim', external: false }])
+  })
+
+  it('gives the day’s zmanim', () => {
+    expect(timesAnswer('Sunset', week, opts).text).toBe('Sunset today: 6:52 PM.')
+    expect(timesAnswer('Latest Shema', week, opts).text).toBe('Latest Shema today: 9:48 AM.')
+  })
+
+  it('names a Yom Tov that comes first, as the Shabbos card does', () => {
+    const withYomTov: ZmanimData = {
+      ...week,
+      holidayPeriod: {
+        name: 'Sukkot',
+        begins: { label: 'Thursday', time: '6:36 PM', iso: '2026-10-01T18:36:00-04:00' },
+        candleLightings: [{ label: 'Thursday', time: '6:36 PM', iso: '2026-10-01T18:36:00-04:00' }],
+        ends: { label: 'Saturday', time: '7:36 PM' },
+      },
+    }
+    expect(timesAnswer('candles', withYomTov, opts).text).toBe('Sukkot begins Thursday, 6:36 PM. Candle lighting: Friday, 6:34 PM.')
+  })
+
+  it('gives a Yom Tov already under way its next candle lighting, not its start', () => {
+    // Reported live on the second day of Sukkos: "Sukkot begins Sat, Sep 26" — yesterday.
+    const secondDay: ZmanimData = {
+      ...week,
+      holidayPeriod: {
+        name: 'Sukkot',
+        begins: { label: 'Sat, Sep 26', time: '7:31 PM', iso: '2026-09-26T19:31:00-04:00' },
+        candleLightings: [
+          { label: 'Sat, Sep 26', time: '7:31 PM', iso: '2026-09-26T19:31:00-04:00' },
+          { label: 'Sun, Sep 27', time: '7:29 PM', iso: '2026-09-27T19:29:00-04:00' },
+        ],
+        ends: { label: 'Mon, Sep 28', time: '7:27 PM' },
+      },
+    }
+    const sundayNoon = { ...opts, nowMs: Date.parse('2026-09-27T12:00:00-04:00') }
+    expect(timesAnswer('candles', secondDay, sundayNoon).text).toBe('Sukkot candle lighting: Sun, Sep 27, 7:29 PM. Candle lighting: Friday, 6:34 PM.')
+    // A Yom Tov night that's also Friday night is said once.
+    const intoShabbos: ZmanimData = {
+      ...secondDay,
+      holidayPeriod: { ...secondDay.holidayPeriod!, candleLightings: [secondDay.holidayPeriod!.candleLightings[0], week.shabbos.candleLighting!] },
+    }
+    expect(timesAnswer('candles', intoShabbos, sundayNoon).text).toBe('Candle lighting: Friday, 6:34 PM.')
+    // After the last one, only Shabbos is left to say.
+    const mondayNoon = { ...opts, nowMs: Date.parse('2026-09-28T12:00:00-04:00') }
+    expect(timesAnswer('candles', secondDay, mondayNoon).text).toBe('Candle lighting: Friday, 6:34 PM.')
+  })
+
+  it('says it’s looking, or that it couldn’t, while there are no times', () => {
+    expect(timesAnswer('candles', null, opts).text).toBe('Looking up the times…')
+    expect(timesAnswer('candles', null, { ...opts, failed: true }).text).toBe("Couldn't load the times just now.")
+  })
+})
+
+describe('metaAnswer', () => {
+  const food = makeCategory({ id: 'restaurant', label: 'Food', pluralLabel: 'Food' })
+  const hotel = makeCategory({ id: 'hotel', label: 'Hotel', pluralLabel: 'Hotels' })
+  const eruvCat = makeCategory({ id: 'eruv', label: 'Eruv', pluralLabel: 'Eruv', kind: 'eruv' })
+  const places = [listing('restaurant', 'f1', 'A', 39.95), listing('restaurant', 'f2', 'B', 39.95), listing('hotel', 'h1', 'C', 39.95)]
+  // Hotels first here, so the answer's order is its own, most first.
+  const ctx = { listings: places, categories: [hotel, food, eruvCat], aboutHref: '/philly/about' }
+
+  it('counts what the guide has, most first, from the listings', () => {
+    const answer = metaAnswer('contents', ctx)
+    expect(answer.text).toBe("3 listings, kept by the community: 2 food places, 1 hotel. Ask about any of it, the way you'd ask a neighbor.")
+    expect(answer.links).toEqual([{ label: 'About the guide', href: '/philly/about', external: false }])
+  })
+
+  it('says who keeps it', () => {
+    expect(metaAnswer('about', ctx).text).toMatch(/^The guide is kept by the community/)
+  })
+
+  it('links straight to the Add form of the kind of place named', () => {
+    expect(metaAnswer('add', { ...ctx, addTo: { label: 'Food', href: '/philly/restaurant?form=create' } }).links).toEqual([
+      { label: 'Add a food listing', href: '/philly/restaurant?form=create', external: false },
+    ])
+    expect(metaAnswer('add', ctx).text).toMatch(/^Open the kind of place it is and tap "Add a listing"/)
+  })
+})
+
+describe('answerFor — a minyan question about a day (Sep 30)', () => {
+  // Today is Wednesday. Friday's Mincha is set by candle lighting, which
+  // the guide only knows today's sunset for.
+  const days: Record<string, MinyanSlot[]> = {
+    fri: [slot(mekor, 'shacharis', 7), { ...slot(mekor, 'mincha', 18, 10), anchored: true }, slot(shtiebel, 'kabbalas_shabbos', 18, 30), slot(mekor, 'maariv', 19, 30)],
+    sat: [slot(mekor, 'shacharis', 9), slot(mekor, 'shabbos_mussaf', 10, 30), slot(shtiebel, 'mincha', 18), slot(shtiebel, 'maariv', 19, 20)],
+    sun: [slot(mekor, 'shacharis', 8)],
+  }
+  const week = (h: number): AnswerSchedule => ({ ...at(h), todayKey: 'wed', tomorrowKey: 'thu', onDay: (d) => days[d] ?? [] })
+
+  it('"shacharis tomorrow": tomorrow’s, not the next one from now', () => {
+    expect(ask('shacharis tomorrow', week(6))?.text).toBe('Tomorrow: Shacharis 6:45 AM, South Philly Shtiebel, and 1 more.')
+  })
+
+  it('the earliest is named, and the nearest too when it’s another shul', () => {
+    // Reported Sep 28: Chabad of the Main Line at 6:45, 6.1 mi, named alone
+    // over Mekor Habracha at 6:55, 0.2 mi.
+    const nearMekor = { lat: 39.951, lng: -75.17 }
+    const answer = answerFor(searchAsk(listings, categories, 'shacharis tomorrow'), { schedule: week(6), coords: nearMekor })
+    expect(answer?.text).toBe('Tomorrow: Shacharis 6:45 AM, South Philly Shtiebel (1.5 mi), and 1 more. Nearest: Shacharis 7:00 AM, Mekor Habracha (0.1 mi).')
+    // Nearest and earliest the same shul: said once.
+    const nearShtiebel = { lat: 39.93, lng: -75.17 }
+    expect(answerFor(searchAsk(listings, categories, 'shacharis tomorrow'), { schedule: week(6), coords: nearShtiebel })?.text).not.toMatch(/Nearest/)
+  })
+
+  it('"friday night minyan": Friday’s evening, a sunset time marked as worked out, not stated', () => {
+    const answer = ask('friday night minyan', week(12))
+    expect(answer?.text).toBe(
+      'Friday night: Mincha ~6:10 PM, Mekor Habracha, and 2 more. Times set by sunset (~) are worked out from today’s and may be a minute or two off.',
+    )
+    expect(answer?.rows.map((r) => r.label)).toEqual(['Mincha', 'Kabbalas Shabbos', 'Maariv'])
+  })
+
+  it('"shabbos morning minyan" and "kabbalas shabbos"', () => {
+    expect(ask('shabbos morning minyan', week(12))?.text).toBe('Shabbos morning: Shacharis 9:00 AM, Mekor Habracha, and 1 more.')
+    const kabbalas = ask('kabbalas shabbos', week(12))
+    expect(kabbalas?.text).toBe('Friday night: Kabbalas Shabbos 6:30 PM, South Philly Shtiebel.')
+    expect(kabbalas?.rows.map((r) => r.day)).toEqual(['Friday night'])
+  })
+
+  it('"shacharis sunday at 8", and nothing listed said as nothing listed', () => {
+    expect(ask('shacharis sunday at 8', week(12))?.text).toBe('Yes: Shacharis at 8:00 AM Sunday, Mekor Habracha.')
+    expect(ask('maariv sunday', week(12))?.text).toBe('No Maariv listed for Sunday in the guide.')
+  })
+
+  it('"maariv tonight" is still the next one from now, with tomorrow’s when tonight’s are over', () => {
+    expect(ask('maariv tonight', week(22))?.text).toBe('No more Maariv today. First tomorrow: 7:15 PM, South Philly Shtiebel.')
+  })
+
+  // Step 4: the same week over Sukkos 5787. Wednesday Sep 30 is Chol
+  // HaMoed, Friday Hoshana Rabbah, Shabbos Shemini Atzeres, Sunday
+  // Simchas Torah. The Shtiebel has posted its Sukkos times; Mekor
+  // Habracha hasn't, so it has its regular ones.
+  const facts = (date: string, weekday: DateFacts['weekday'], name: string | null, yomTov = false): DateFacts => ({
+    date,
+    weekday,
+    yomTov,
+    cholHamoed: !!name && !yomTov,
+    festival: name ? 'Sukkos' : null,
+    name,
+  })
+  const sukkos: DateFacts[] = [
+    facts('2026-09-30', 'wed', 'Chol HaMoed'),
+    facts('2026-10-01', 'thu', 'Chol HaMoed'),
+    facts('2026-10-02', 'fri', 'Hoshana Rabbah'),
+    facts('2026-10-03', 'sat', 'Shemini Atzeres', true),
+    facts('2026-10-04', 'sun', 'Simchas Torah', true),
+    facts('2026-10-05', 'mon', null),
+    facts('2026-10-06', 'tue', null),
+  ]
+  const posting = Object.fromEntries(
+    [mekor, shtiebel].map((shul) => [
+      shul.id,
+      Object.fromEntries(
+        sukkos.map((d) => [d.date, !d.festival ? { kind: 'regular' } : shul === shtiebel ? { kind: 'schedule', name: 'Sukkos 5787' } : { kind: 'not-posted', festival: 'Sukkos' }]),
+      ),
+    ]),
+  ) as AnswerSchedule['posting']
+  const overSukkos = (h: number, week: DateFacts[] = sukkos): AnswerSchedule => ({ ...at(h), todayKey: 'wed', tomorrowKey: 'thu', onDay: (d) => days[d] ?? [], week, posting })
+
+  it('"mincha Hoshana Rabbah": the day the calendar names, found in the week ahead', () => {
+    const answer = ask('mincha hoshana rabbah', overSukkos(12))
+    expect(answer?.text).toBe('Hoshana Rabbah (Fri): Mincha ~6:10 PM, Mekor Habracha. Shuls that haven’t posted Sukkos times show their regular ones. Times set by sunset (~) are worked out from today’s and may be a minute or two off.')
+    expect(answer?.when).toBe('Hoshana Rabbah (Fri)')
+  })
+
+  it('on a Yom Tov, a shul’s regular times where it hasn’t posted are not given as an answer', () => {
+    // Mekor's regular Shabbos Shacharis would have been "the answer".
+    expect(ask('shacharis shemini atzeres', overSukkos(12))?.text).toBe(
+      'Shemini Atzeres (Sat): no shul has posted Shemini Atzeres times yet. The regular times of 1 shul may not apply, so they aren’t given.',
+    )
+    const mincha = ask('mincha shemini atzeres', overSukkos(12))
+    expect(mincha?.text).toBe('Shemini Atzeres (Sat): Mincha 6:00 PM, South Philly Shtiebel.')
+    expect(ask('minyan shemini atzeres', overSukkos(12))?.text).toBe(
+      'Shemini Atzeres (Sat): Mincha 6:00 PM, South Philly Shtiebel, and 1 more. 1 other shul hasn’t posted Shemini Atzeres times; their regular ones may not apply.',
+    )
+    // "Shabbos" on Shemini Atzeres is the same day, and gets the same care.
+    expect(ask('shabbos morning minyan', overSukkos(12))?.text).toBe(
+      'Shabbos morning: no shul has posted Shemini Atzeres times yet. The regular times of 1 shul may not apply, so they aren’t given.',
+    )
+  })
+
+  it('"Simchas Torah night" is the evening before; "Sukkos" every day of it this week', () => {
+    expect(ask('maariv simchat torah night', overSukkos(12))?.text).toBe('Simchas Torah night (Sat): Maariv 7:20 PM, South Philly Shtiebel.')
+    const all = ask('shacharis sukkot', overSukkos(12))
+    expect(all?.when).toBe('Chol HaMoed (today) or Chol HaMoed (tomorrow) or Hoshana Rabbah (Fri) or Shemini Atzeres (Sat) or Simchas Torah (Sun)')
+  })
+
+  it('a day not in the week ahead says so; before the calendar has arrived, no answer', () => {
+    expect(ask('mincha erev yom kippur', overSukkos(12))?.text).toBe('Erev Yom Kippur isn’t in the coming week. The guide works out davening times a week ahead.')
+    const unknown = sukkos.map((d) => ({ ...d, yomTov: null, cholHamoed: null, festival: null, name: null }))
+    expect(ask('mincha hoshana rabbah', overSukkos(12, unknown))).toBeNull()
+  })
+})

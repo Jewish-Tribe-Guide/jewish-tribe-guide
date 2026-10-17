@@ -20,12 +20,21 @@ import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState
 const HeaderCollapseContext = createContext<{
   collapsed: boolean
   setCollapsed: (collapsed: boolean) => void
+  overlaid: boolean
+  setOverlaid: (overlaid: boolean) => void
 } | null>(null)
 
 export function HeaderCollapseProvider({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false)
+  // Desktop-only: whether the home screen wants the header to render
+  // transparent over its photo hero instead of the usual solid strip — see
+  // useHeaderOverlay/useHeaderOverlaid below. Lives in this same provider
+  // (rather than a new one) so CategoryPreview, which already stacks
+  // HeaderCollapseProvider, doesn't need to gain a second provider it has no
+  // use for.
+  const [overlaid, setOverlaid] = useState(false)
   return (
-    <HeaderCollapseContext.Provider value={{ collapsed, setCollapsed }}>
+    <HeaderCollapseContext.Provider value={{ collapsed, setCollapsed, overlaid, setOverlaid }}>
       {children}
     </HeaderCollapseContext.Provider>
   )
@@ -40,6 +49,49 @@ function useHeaderCollapseContext() {
 /** Read by SiteHeader. */
 export function useHeaderCollapsed(): boolean {
   return useHeaderCollapseContext().collapsed
+}
+
+/** Called by a screen (currently only Landing) that wants the header to
+ *  render transparent over its own content — the desktop home page's photo
+ *  hero — for as long as it's mounted. Reset happens automatically on
+ *  unmount, same guarantee as useCollapseHeader just above. Pass `false` (or
+ *  omit) to leave the header alone; SiteHeader still applies its own
+ *  scrolled/not-scrolled check on top of this (see useScrolledPastTop). */
+export function useHeaderOverlay(active: boolean = false): void {
+  const { setOverlaid } = useHeaderCollapseContext()
+  useLayoutEffect(() => {
+    if (!active) return
+    setOverlaid(true)
+    return () => setOverlaid(false)
+  }, [active, setOverlaid])
+}
+
+/** Read by SiteHeader. Must not throw when no HeaderCollapseProvider is
+ *  present — unlike useHeaderCollapsed, this is read from places (e.g. a
+ *  future bare render) that may not have opted into the provider tree at
+ *  all, so it degrades to "not overlaid" instead. */
+export function useHeaderOverlaid(): boolean {
+  const ctx = useContext(HeaderCollapseContext)
+  return ctx?.overlaid ?? false
+}
+
+/** True once the page has scrolled past `threshold` — used by SiteHeader to
+ *  flip the overlaid, transparent header solid once the hero has scrolled
+ *  out of the way. Starts false (SSR-safe) and updates from a passive
+ *  scroll listener, same pattern as useScrollShowHide below. */
+export function useScrolledPastTop(threshold = 8): boolean {
+  const [scrolled, setScrolled] = useState(false)
+
+  useEffect(() => {
+    function onScroll() {
+      setScrolled(window.scrollY > threshold)
+    }
+    onScroll()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [threshold])
+
+  return scrolled
 }
 
 /** Called by a screen that wants the header collapsed for as long as it's
@@ -87,7 +139,10 @@ export function useCollapseHeader(collapse: boolean): void {
 // one — a category preview has no "up" screen to go back to anyway.
 // ─────────────────────────────────────────────────────────────────────────────
 
-type ScreenHeaderState = { title: string; onBack: () => void } | null
+/** `named`: the guide's own name goes over the title, small, for a page
+ *  someone may have arrived at from a link and not know whose it is (a
+ *  listing's own page). */
+type ScreenHeaderState = { title: string; onBack: () => void; named?: boolean } | null
 
 const ScreenHeaderContext = createContext<{
   screenHeader: ScreenHeaderState
@@ -121,7 +176,7 @@ export function useScreenHeader(): ScreenHeaderState {
  *  useSiteNavigation) every render, and depending on it directly would re-run
  *  the effect, and therefore re-render the header's context, on every render
  *  of the calling screen instead of only when the title actually changes. */
-export function useSetScreenHeader(active: boolean, title: string, onBack: () => void): void {
+export function useSetScreenHeader(active: boolean, title: string, onBack: () => void, { named = false }: { named?: boolean } = {}): void {
   const { setScreenHeader } = useContext(ScreenHeaderContext)
   const onBackRef = useRef(onBack)
   // Keeps the ref current without writing to it during render (React's
@@ -136,9 +191,9 @@ export function useSetScreenHeader(active: boolean, title: string, onBack: () =>
 
   useLayoutEffect(() => {
     if (!active) return
-    setScreenHeader({ title, onBack: () => onBackRef.current() })
+    setScreenHeader({ title, onBack: () => onBackRef.current(), named })
     return () => setScreenHeader(null)
-  }, [active, title, setScreenHeader])
+  }, [active, title, named, setScreenHeader])
 }
 
 /** Whether the header should be showing after a scroll to `y`, given the

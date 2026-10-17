@@ -13,6 +13,7 @@ import { getMyVotedIds, getVoterToken } from '@/lib/voteToken'
 vi.mock('@/lib/voteToken', () => ({
   getVoterToken: vi.fn(() => 'voter-token'),
   getMyVotedIds: vi.fn(() => Promise.resolve(new Set<string>())),
+  noteMyVote: vi.fn(),
 }))
 
 beforeEach(() => {
@@ -148,6 +149,28 @@ describe('UpvoteButton', () => {
   it('renders the compact inline variant used in a collapsed listing header', () => {
     render(<UpvoteButton resourceId="r1" count={5} variant="inline" />)
     expect(screen.getByRole('button')).toHaveTextContent('👍5')
+  })
+
+  // Reported live as unclear that it's tappable at all — it used to be
+  // plain colored text with no background or border, sitting right next to
+  // the non-interactive distance text at the exact same visual weight. A
+  // border was tried first and swapped for a filled chip (see the
+  // component's own comment) because a 1px outline at this size is easy to
+  // miss without a hover state to reinforce it.
+  it('gives the inline variant a filled background, so it reads as a button next to the (non-interactive) distance text beside it', () => {
+    render(<UpvoteButton resourceId="r1" count={5} variant="inline" />)
+    expect(screen.getByRole('button').className).toMatch(/\bbg-slate-100\b/)
+  })
+
+  it('tints the inline variant\'s background once voted, distinct from its at-rest color', () => {
+    render(<UpvoteButton resourceId="r1" count={5} variant="inline" />)
+    const before = screen.getByRole('button').className
+    localStorage.setItem('jpc_voted', JSON.stringify(['r1']))
+    cleanup()
+    render(<UpvoteButton resourceId="r1" count={5} variant="inline" />)
+    const after = screen.getByRole('button').className
+    expect(after).toMatch(/\bbg-primary\/10\b/)
+    expect(after).not.toBe(before)
   })
 
   describe('remembered count (cache-lag correction)', () => {

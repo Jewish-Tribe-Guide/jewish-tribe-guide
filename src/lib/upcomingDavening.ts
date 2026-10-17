@@ -1,15 +1,21 @@
 import { isOutOfSeason, type Season } from './season'
-import { parseTimeToMinutes, TEFILLAH_LABELS, type Minyan, type MinyanDayKey, type Tefillah } from './davening'
+import { parseTimeToMinutes, SIGN_UP_MARK, TEFILLAH_LABELS, type Minyan, type MinyanDayKey, type Tefillah } from './davening'
 import { geoKey, geoOrCommunityDefault, resolveAnchorTime, type AnchorTimes } from './useZmanAnchors'
 import type { LatLng } from './geo'
+import type { ScheduledMinyan } from './schedules'
 
 /** One shul's structured minyanim, trimmed to what this needs — a real
  *  DirectoryResource carries far more than this, and this stays independent
  *  of that type so it can be unit-tested with plain literals. */
 export type ShulMinyanim = {
+  /** The listing's id, when the caller has one — carried through to
+   *  `MinyanSlot` so an answer can open the shul it names. */
+  id?: string
   name: string
   geo?: LatLng | null
-  minyanim: Minyan[]
+  /** Its regular minyanim, with any special schedule's for the dates in
+   *  question (see withSchedules in schedules.ts). */
+  minyanim: ScheduledMinyan[]
 }
 
 export type UpcomingDavening = {
@@ -19,6 +25,13 @@ export type UpcomingDavening = {
   /** Formatted clock time, e.g. "7:14 PM" — already resolved for anchor-based
    *  rows (sunset/candle-lighting/havdalah), not the rule text. */
   time: string
+  /** `time`, as minutes since local midnight of the day it falls on (today
+   *  or tomorrow, per `isTomorrow`) — not minutes-from-now. Filled from the
+   *  same resolved candidate `time` comes from, so the two never disagree.
+   *  Feeds formatStartsIn's own "In N min"/"In N hr M min" countdown, which
+   *  needs a plain number to do arithmetic on rather than re-parsing the
+   *  formatted clock string. */
+  minutes: number
   /** True once every shul's minyanim for today have passed and this is
    *  tomorrow's earliest instead. Real weekdays only — see the module doc. */
   isTomorrow: boolean
@@ -34,11 +47,22 @@ export type UpcomingDavening = {
 }
 
 type Candidate = {
+  shulId?: string
   shulName: string
   shulGeo: LatLng | null | undefined
   tefillah: Tefillah
   minutes: number
   time: string
+  /** The row's own note ("Zoom", "Followed by bagels"). */
+  notes?: string
+  /** Set by sunset or candle lighting, not a fixed clock time. */
+  anchored?: boolean
+  /** The special schedule it's from ("Sukkos 5787"). */
+  schedule?: string
+  /** The minyan's own id, so a row can open its place on it. */
+  minyanId?: string
+  /** It only runs on days enough people sign up (davening.ts). */
+  signUp?: boolean
 }
 
 /**
@@ -111,6 +135,8 @@ function collectCandidates(
   for (const shul of shuls) {
     for (const row of shul.minyanim) {
       if (!row.days.some((d) => dayKeys.includes(d))) continue
+      // A regular minyan a special schedule replaces on this date.
+      if (row.skipDates?.some((date) => dayKeys.includes(`date:${date}` as MinyanDayKey))) continue
       if (isOutOfSeason(row.season, season)) continue
 
       let time: string | null = null
@@ -125,7 +151,19 @@ function collectCandidates(
       const minutes = parseTimeToMinutes(time)
       if (!Number.isFinite(minutes)) continue // free text ("Call to Confirm") — no number to sort by
 
-      out.push({ shulName: shul.name, shulGeo: shul.geo, tefillah: row.tefillah, minutes, time })
+      out.push({
+        shulId: shul.id,
+        shulName: shul.name,
+        shulGeo: shul.geo,
+        tefillah: row.tefillah,
+        minutes,
+        time,
+        notes: row.notes?.trim() || undefined,
+        anchored: !!row.anchor,
+        ...(row.schedule ? { schedule: row.schedule } : {}),
+        ...(row.id ? { minyanId: row.id } : {}),
+        ...(row.signUp ? { signUp: true } : {}),
+      })
     }
   }
   return out
@@ -147,9 +185,250 @@ function buildResult(candidates: Candidate[], isTomorrow: boolean): UpcomingDave
   return {
     label,
     time: group[0].time,
+    minutes: minMinutes,
     isTomorrow,
     shul: shulNames.length === 1 ? { name: shulNames[0], geo: group[0].shulGeo } : null,
     shulCount: shulNames.length,
     shulGeos: group.map((c) => c.shulGeo),
   }
+}
+
+/** One minyan on one day, resolved to a clock time. */
+export type MinyanSlot = {
+  shulId?: string
+  shulName: string
+  shulGeo: LatLng | null | undefined
+  tefillah: Tefillah
+  /** "7:14 PM", or the row's own clock text ("7:00am") for a fixed time. */
+  time: string
+  /** Minutes since local midnight of its own day. */
+  minutes: number
+  /** Set by sunset or candle lighting (see Candidate). */
+  anchored?: boolean
+  /** The special schedule it's from ("Sukkos 5787"). */
+  schedule?: string
+  /** The row's own note. */
+  notes?: string
+  /** The minyan's own id, so the row can open its place on it. */
+  minyanId?: string
+  /** It only runs on days enough people sign up (davening.ts). */
+  signUp?: boolean
+}
+
+/**
+ * Every minyan today and tomorrow that resolves to a real time, earliest
+ * first — the full list nextUpcomingDavening picks its one answer from, for a
+ * search that asks about more than the next minyan ("is there a maariv at
+ * 6:45", "upcoming minyanim"). Same rules for what counts: the day keys the
+ * caller resolved, in season, and a time that parses (see
+ * nextUpcomingDavening's own doc). Not filtered by the clock: the caller
+ * decides whether a minyan earlier today still matters to the question.
+ */
+/** Every minyan on one day, earliest first: for "Shacharis Sunday" and
+ *  "Friday night minyan". Times set by sunset are worked out from the
+ *  sunset `anchors` hold, which are today's: a day or two off, a minute or
+ *  two early or late, which the answer says (see askAnswer's minyanDays). */
+export function minyanimOn(shuls: ShulMinyanim[], day: MinyanDayKey[], season: Season | null, anchors: Record<string, AnchorTimes>): MinyanSlot[] {
+  return collectCandidates(shuls, day, season, anchors).sort((a, b) => a.minutes - b.minutes || a.shulName.localeCompare(b.shulName))
+}
+
+export function listMinyanim(
+  shuls: ShulMinyanim[],
+  opts: { today: MinyanDayKey[]; tomorrow: MinyanDayKey[]; season: Season | null; anchors: Record<string, AnchorTimes> },
+): { today: MinyanSlot[]; tomorrow: MinyanSlot[] } {
+  const sorted = (c: Candidate[]) => c.sort((a, b) => a.minutes - b.minutes || a.shulName.localeCompare(b.shulName))
+  return {
+    today: sorted(collectCandidates(shuls, opts.today, opts.season, opts.anchors)),
+    tomorrow: sorted(collectCandidates(shuls, opts.tomorrow, opts.season, opts.anchors)),
+  }
+}
+
+/** "In 12 min" / "In 1 hr 12 min" / "In 2 hr" / "Now" — a plain-language
+ *  countdown to `target` (minutes since local midnight of the day it falls
+ *  on), from `nowMinutes` (minutes since local midnight of TODAY). When
+ *  `isTomorrow`, `target` is added to 1440 first so the subtraction still
+ *  lands on a positive count regardless of how far past midnight `nowMinutes`
+ *  is — this is never called with a `target` that's actually further than 24h
+ *  out (nextUpcomingDavening never looks past tomorrow), so there's no
+ *  ">24h" case to format.
+ *
+ *  Exactly 0 minutes away reads as "Now", not "In 0 min" — the card is
+ *  naming something happening at this instant, and "In 0 min" reads as a
+ *  bug, not a countdown. */
+export function formatStartsIn(nowMinutes: number, target: number, isTomorrow: boolean): string {
+  const targetFromNow = isTomorrow ? target + 24 * 60 : target
+  const delta = Math.max(0, targetFromNow - nowMinutes)
+  if (delta === 0) return 'Now'
+  const hours = Math.floor(delta / 60)
+  const minutes = delta % 60
+  if (hours === 0) return `In ${minutes} min`
+  if (minutes === 0) return `In ${hours} hr`
+  return `In ${hours} hr ${minutes} min`
+}
+
+/** What a shul's row says about davening, its status and, when there is
+ *  one, the shul's own note for its third line. */
+export type ShulRowStatus = {
+  /** "Mincha 6:34 PM", "Shacharis 7 AM tomorrow"; or, with nothing today or
+   *  tomorrow, "Shabbos only", "Nothing today or tomorrow", "No davening
+   *  times listed". */
+  text: string
+  /** A time to go by, or a quiet "nothing soon". */
+  tone: 'minyan' | 'quiet'
+  /** The shul's own words: the note on the minyan the status names
+   *  ("Zoom"), or a minyan today with words for a time ("Mincha & Maariv
+   *  today: call to confirm", which the status skips, having no clock time
+   *  to sort by). */
+  note?: string
+}
+
+/** Each shul's row, keyed by listing id: its own next minyan by the same
+ *  rules as nextUpcomingDavening (it runs once per shul), so a row and the
+ *  home screen's davening card can't disagree about what's next. A shul
+ *  with no id is left out, and so is one whose sunset-based times haven't
+ *  arrived yet: until they do, "nothing today" might not be true. */
+export function shulRowByShul(
+  shuls: ShulMinyanim[],
+  opts: Parameters<typeof nextUpcomingDavening>[1],
+): Record<string, ShulRowStatus> {
+  const out: Record<string, ShulRowStatus> = {}
+  for (const shul of shuls) {
+    if (!shul.id) continue
+    const status = shulRowStatus(shul, opts)
+    if (status) out[shul.id] = status
+  }
+  return out
+}
+
+function shulRowStatus(shul: ShulMinyanim, opts: Parameters<typeof nextUpcomingDavening>[1]): ShulRowStatus | null {
+  const rows = shul.minyanim
+  if (rows.length === 0) return { text: 'No davening times listed', tone: 'quiet' }
+
+  const today = (row: Minyan) => row.days.some((d) => opts.today.includes(d)) && !isOutOfSeason(row.season, opts.season)
+  // Words where a time goes ("Call to confirm"): never the next minyan, so
+  // said under it.
+  const worded = rows.find((row) => today(row) && !row.anchor && row.time.trim() && !Number.isFinite(parseTimeToMinutes(row.time)))
+  const wordedNote = worded ? `${TEFILLAH_LABELS[worded.tefillah]} today: ${lowerFirst(worded.time.trim())}` : undefined
+
+  const next = nextUpcomingDavening([shul], opts)
+  if (next) {
+    const day = next.isTomorrow ? opts.tomorrow : opts.today
+    const at = collectCandidates([shul], day, opts.season, opts.anchors).filter((c) => c.minutes === next.minutes)
+    const own = at.find((c) => c.notes)?.notes
+    // One that only runs when enough sign up says so, before anything else
+    // about it (davening.ts).
+    const signUp = at.length > 0 && at.every((c) => c.signUp)
+    return {
+      text: `${next.label} ${clockTime(next.minutes)}${next.isTomorrow ? ' tomorrow' : ''}`,
+      tone: 'minyan',
+      note: signUp ? [SIGN_UP_MARK, wordedNote ?? own].filter(Boolean).join(' · ') : (wordedNote ?? own),
+    }
+  }
+
+  const anchorsReady = !!opts.anchors[geoKey(geoOrCommunityDefault(shul.geo))]
+  const soon = (row: Minyan) => row.days.some((d) => opts.today.includes(d) || opts.tomorrow.includes(d))
+  if (!anchorsReady && rows.some((row) => row.anchor && soon(row))) return null
+
+  // Only Shabbos (and Yom Tov): Shabbos days, or Friday evening's davening
+  // (Mincha, Maariv, Kabbalas Shabbos). Friday Shacharis is a weekday's.
+  const shabbosOnly = rows.every(
+    (row) =>
+      row.days.length > 0 &&
+      row.days.every((d) => d === 'sat' || d === 'yom_tov' || (d === 'fri' && row.tefillah !== 'shacharis')),
+  )
+  if (shabbosOnly) {
+    // A note every minyan shares ("Meets the first weekend of every
+    // month") says something about the shul; two different ones ("Ends at
+    // 12:15", "Ends at 7:30") belong to their own minyanim.
+    const notes = [...new Set(rows.map((row) => row.notes?.trim()).filter((n): n is string => !!n))]
+    return { text: shabbosTimes(shul, opts) ?? 'Shabbos only', tone: 'quiet', note: wordedNote ?? (notes.length === 1 ? notes[0] : undefined) }
+  }
+  return { text: 'Nothing today or tomorrow', tone: 'quiet', note: wordedNote }
+}
+
+/** A Shabbos-only shul's row says when (Oct 6): "Shabbos: Fri 6 PM, Sat
+ *  10:45 AM", the first Friday-evening minyan and the first on Shabbos,
+ *  this season's, at this week's times for a candle-lighting or sunset one.
+ *  Null when neither has a time to give (a Yom Tov-only shul, words for
+ *  times). */
+function shabbosTimes(shul: ShulMinyanim, opts: Parameters<typeof nextUpcomingDavening>[1]): string | null {
+  const first = (day: MinyanDayKey, keep: (t: Tefillah) => boolean) =>
+    collectCandidates([shul], [day], opts.season, opts.anchors)
+      .filter((c) => keep(c.tefillah))
+      .sort((a, b) => a.minutes - b.minutes)[0]
+  const fri = first('fri', (t) => t !== 'shacharis')
+  const sat = first('sat', () => true)
+  const parts = [fri && `Fri ${clockTime(fri.minutes)}`, sat && `Sat ${clockTime(sat.minutes)}`].filter(Boolean)
+  return parts.length ? `Shabbos: ${parts.join(', ')}` : null
+}
+
+/** One line of a category page's Next minyan card. */
+export type NextMinyanLine = {
+  shulId: string
+  shulName: string
+  /** "Mincha & Maariv", or "Shacharis tomorrow". */
+  label: string
+  /** "6:20 PM", in the rows' one clock style. */
+  time: string
+  /** Minutes from midnight, for saying "Friday night". */
+  minutes: number
+  tomorrow: boolean
+}
+
+/**
+ * The next few minyanim across a list of shuls, one per shul, for the
+ * Synagogues page's Next minyan card: soonest first, and on the same minute
+ * the nearer shul first (then by name), never alphabetical alone, which
+ * named a shul 8 mi away over one at 0.2 mi. Today's still to come, then
+ * tomorrow's once today's run out. Two tefillos a shul holds on the same
+ * minute read as one ("Mincha & Maariv").
+ *
+ * Null while a sunset-based time the answer depends on is still arriving:
+ * until it does, a later minyan could be named as the next one.
+ */
+export function nextMinyansAcross(
+  shuls: ShulMinyanim[],
+  opts: Parameters<typeof nextUpcomingDavening>[1],
+  milesOf: (shulId: string) => number | null | undefined,
+  limit = 2,
+): NextMinyanLine[] | null {
+  const soon = (row: Minyan) => row.days.some((d) => opts.today.includes(d) || opts.tomorrow.includes(d))
+  const waiting = shuls.some(
+    (s) => !opts.anchors[geoKey(geoOrCommunityDefault(s.geo))] && s.minyanim.some((row) => row.anchor && soon(row)),
+  )
+  if (waiting) return null
+
+  const miles = (c: Candidate) => milesOf(c.shulId ?? '') ?? Infinity
+  // Infinity - Infinity is NaN, which falls through to the name.
+  const order = (a: Candidate, b: Candidate) => a.minutes - b.minutes || miles(a) - miles(b) || a.shulName.localeCompare(b.shulName)
+
+  const out: NextMinyanLine[] = []
+  const shown = new Set<string>()
+  const take = (candidates: Candidate[], isTomorrow: boolean) => {
+    const sorted = candidates.filter((c) => c.shulId).sort(order)
+    for (const c of sorted) {
+      if (out.length >= limit) return
+      if (shown.has(c.shulId!)) continue
+      shown.add(c.shulId!)
+      const together = [...new Set(sorted.filter((o) => o.shulId === c.shulId && o.minutes === c.minutes).map((o) => o.tefillah))]
+      const label = together.map((t) => TEFILLAH_LABELS[t]).join(' & ')
+      out.push({ shulId: c.shulId!, shulName: c.shulName, label: isTomorrow ? `${label} tomorrow` : label, time: clockTime(c.minutes), minutes: c.minutes, tomorrow: isTomorrow })
+    }
+  }
+  take(collectCandidates(shuls, opts.today, opts.season, opts.anchors).filter((c) => c.minutes >= opts.nowMinutes), false)
+  take(collectCandidates(shuls, opts.tomorrow, opts.season, opts.anchors), true)
+  return out
+}
+
+// "Call to Confirm" reads mid-sentence as "call to confirm".
+const lowerFirst = (s: string) => s.toLowerCase()
+
+/** Minutes since midnight → "7 AM" / "6:34 PM". A fixed-time row stores its
+ *  own text ("7:00am"), a sunset-based one a formatted time ("6:34 PM"); a
+ *  list of rows reads better in one style. */
+export function clockTime(minutes: number): string {
+  const h = Math.floor(minutes / 60) % 24
+  const m = minutes % 60
+  const hour = h % 12 || 12
+  return `${m === 0 ? hour : `${hour}:${String(m).padStart(2, '0')}`} ${h < 12 ? 'AM' : 'PM'}`
 }

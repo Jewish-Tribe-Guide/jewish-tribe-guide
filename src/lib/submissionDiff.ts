@@ -21,8 +21,16 @@
 import type { ResourceRow, ResourceSubmission } from '@/types'
 import { isStructuredHours, formatHoursSummary } from '@/lib/hours'
 import { isMinyanim, formatMinyanimSummary } from '@/lib/davening'
+import { formatSchedulesSummary, readSchedules, schedulesKey } from '@/lib/schedules'
+import { contactsSummary } from '@/lib/contacts'
 import type { CategoryField } from '@/lib/categories'
-import { SYNC_INTERNAL_FIELDS, DIFF_ONLY_HIDDEN_FIELDS, SHOWN_WHEN_CONFIGURED } from '@/lib/syncFields'
+import { BUSINESS_STATUS_WORDS } from '@/lib/hours'
+import {
+  SYNC_INTERNAL_FIELDS,
+  DIFF_ONLY_HIDDEN_FIELDS,
+  SHOWN_WHEN_CONFIGURED,
+  SHOWN_WHEN_PROPOSED,
+} from '@/lib/syncFields'
 
 // A select/tags field stores raw option *values*, which don't always match
 // what the admin typed as the option's label (e.g. renamed since). Resolve
@@ -56,6 +64,10 @@ export function fmt(value: unknown, field?: CategoryField): string {
     return isMinyanim(value) ? formatMinyanimSummary(value) : String(value)
   }
 
+  // A list of contacts, a line an entry with every part of it, so a changed
+  // phone is a changed line (contactLine) and the rest stay context.
+  if (field?.type === 'contacts') return contactsSummary(value) || '—'
+
   if (Array.isArray(value)) return value.map((v) => resolveOptionLabel(field, v)).join(', ') || '—'
   if (field?.type === 'select') return resolveOptionLabel(field, value)
 
@@ -79,10 +91,22 @@ export function fmt(value: unknown, field?: CategoryField): string {
 // there it is content worth seeing. It is skipped only in the raw-leftover
 // loop below, for categories that never configured it — there it is nothing
 // but the sync's own fallback card subtitle.
-const SKIP = new Set<string>([
-  ...SYNC_INTERNAL_FIELDS.filter((k) => k !== SHOWN_WHEN_CONFIGURED),
+//
+// businessStatus is excluded too: it is the one internal a submission can
+// still set (from the Google place picked in the form), and a listing
+// arriving as "Permanently closed" is exactly what a moderator must see.
+export const HIDDEN_FROM_DIFF: ReadonlySet<string> = new Set<string>([
+  ...SYNC_INTERNAL_FIELDS.filter((k) => k !== SHOWN_WHEN_CONFIGURED && k !== SHOWN_WHEN_PROPOSED),
   ...DIFF_ONLY_HIDDEN_FIELDS,
 ])
+const SKIP = HIDDEN_FROM_DIFF
+
+/** businessStatus as the queue and the emails show it. Not a configured
+ *  field anywhere, so it needs its own label rather than its raw key. */
+export const BUSINESS_STATUS_LABEL = 'Business status (from Google)'
+export function formatBusinessStatus(value: unknown): string {
+  return BUSINESS_STATUS_WORDS[value as keyof typeof BUSINESS_STATUS_WORDS] ?? fmt(value)
+}
 
 const SKIP_WHEN_UNCONFIGURED = new Set<string>([SHOWN_WHEN_CONFIGURED])
 
@@ -107,13 +131,37 @@ export function flatListing(src: ResourceRow | ResourceSubmission | undefined, f
   ]
   const seen = new Set<string>()
   for (const f of fields ?? []) {
-    if (SKIP.has(f.key) || !(f.key in details)) continue
-    seen.add(f.key)
-    out.push({ key: f.key, label: f.label, value: fmt(details[f.key], f) })
+    if (SKIP.has(f.key)) continue
+    if (f.key in details) {
+      seen.add(f.key)
+      out.push({ key: f.key, label: f.label, value: fmt(details[f.key], f) })
+    }
+    // A minyanim field's special schedules, under its own label, every time
+    // in them shown (formatSchedulesSummary): they're stored beside the
+    // field, not as one of the category's own, and would otherwise reach the
+    // raw-leftover loop below as "[object Object]".
+    const sk = schedulesKey(f.key)
+    if (f.type === 'minyanim' && sk in details) {
+      seen.add(sk)
+      out.push({ key: sk, label: `${f.label}: special schedules`, value: formatSchedulesSummary(readSchedules(details[sk])) })
+    }
+    // A tags field's items that are only sometimes there, stored beside it
+    // the same way ("m_sometimes").
+    const sometimes = `${f.key}_sometimes`
+    if (f.type === 'tags' && sometimes in details) {
+      seen.add(sometimes)
+      out.push({ key: sometimes, label: `${f.label}: sometimes`, value: fmt(details[sometimes], f) })
+    }
   }
   for (const [k, v] of Object.entries(details)) {
     if (SKIP.has(k) || SKIP_WHEN_UNCONFIGURED.has(k) || seen.has(k)) continue
-    out.push({ key: k, label: k, value: fmt(v) })
+    if (k === SHOWN_WHEN_PROPOSED) {
+      out.push({ key: k, label: BUSINESS_STATUS_LABEL, value: formatBusinessStatus(v) })
+      continue
+    }
+    // Schedules beside a field the category no longer has: still read out.
+    const schedules = k.endsWith('_schedules') ? readSchedules(v) : []
+    out.push({ key: k, label: k, value: schedules.length ? formatSchedulesSummary(schedules) : fmt(v) })
   }
   return out
 }
@@ -142,7 +190,13 @@ export function diffListing(
   const after = flatListing(proposed, fields)
   const beforeByKey = new Map(before.map((r) => [r.key, r]))
   const afterByKey = new Map(after.map((r) => [r.key, r]))
-  const orderedKeys = [...after.map((r) => r.key), ...before.map((r) => r.key).filter((k) => !afterByKey.has(k))]
+  // Except businessStatus: an edit that doesn't carry one leaves the stored
+  // status alone on approval (submissionStore's withPreservedInternals), so
+  // "Open → —" would report a change that never happens.
+  const orderedKeys = [
+    ...after.map((r) => r.key),
+    ...before.map((r) => r.key).filter((k) => !afterByKey.has(k) && k !== SHOWN_WHEN_PROPOSED),
+  ]
 
   return orderedKeys.map((key) => {
     const beforeValue = beforeByKey.get(key)?.value ?? '—'

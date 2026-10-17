@@ -107,12 +107,12 @@ describe('a test budget outlasts the waits inside it', () => {
 describe('e2e content fetches go through one budgeted helper', () => {
   const HELPERS = readFileSync('e2e/helpers.ts', 'utf-8')
 
-  it('calls request.get exactly once, inside apiGet', () => {
+  it('calls request.get exactly once, inside budgetedGet', () => {
     // A helper added with a bare request.get silently opts back into the 30s
     // default and stops being covered by the ordering above.
     expect(
       [...HELPERS.matchAll(/request\.get\(/g)].length,
-      'e2e/helpers.ts should call request.get once (inside apiGet); other helpers go through it.',
+      'e2e/helpers.ts should call request.get once (inside budgetedGet); other helpers go through it.',
     ).toBe(1)
     expect(HELPERS).toMatch(/request\.get\(url,\s*\{\s*timeout:\s*API_TIMEOUT\s*\}\)/)
   })

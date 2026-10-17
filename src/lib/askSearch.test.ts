@@ -1,0 +1,634 @@
+import { describe, expect, it } from 'vitest'
+import { makeCategory } from '@/test/providerFixtures'
+import type { DirectoryResource } from '@/types'
+import { foundFor, nearMiss, searchAsk } from './askSearch'
+
+// Shaped on real Philly listings: the fields, tags and spellings are the ones
+// the guide actually has, so a phrasing that works here works on the site.
+const grocery = makeCategory({
+  id: 'grocery',
+  label: 'Grocery Store',
+  pluralLabel: 'Grocery Stores',
+  detailFields: [{ key: 'm', label: 'Kosher items', type: 'tags' }],
+})
+const restaurant = makeCategory({
+  id: 'restaurant',
+  label: 'Food Establishment',
+  pluralLabel: 'Food Establishments',
+  detailFields: [
+    { key: 't', label: 'Meat, dairy or parve', type: 'tags' },
+    { key: 'kosherCert', label: 'Hechsher', type: 'text' },
+    {
+      key: 'hours',
+      label: 'Hours',
+      type: 'hours',
+    },
+  ],
+})
+const synagogue = makeCategory({
+  id: 'synagogue',
+  label: 'Synagogue',
+  pluralLabel: 'Synagogues',
+  detailFields: [{ key: 'denomination', label: 'Denomination', type: 'text' }],
+})
+const hotel = makeCategory({
+  id: 'hotel',
+  label: 'Hotel',
+  pluralLabel: 'Hotels',
+  detailFields: [{ key: 'shabbatFriendly', label: 'Shabbat Friendly', type: 'boolean' }],
+})
+const hospital = makeCategory({ id: 'hospital', label: 'Hospital', pluralLabel: 'Hospitals' })
+const categories = [grocery, restaurant, synagogue, hotel, hospital]
+
+function listing(category: string, name: string, lat: number, lng: number, details: Record<string, unknown> = {}): DirectoryResource {
+  return { id: name, category, name, anchorId: 'community', distance: 0, address: '', geo: { lat, lng }, ...details }
+}
+
+const shoprite = listing('grocery', 'ShopRite of Garden State Pavilion', 39.93, -75.03, {
+  m: ['Prepared Shabbos Food', 'Pas Yisroel Bread', 'Chalav Yisroel Milk', 'Glatt Kosher Meat', 'Challah', 'Wine'],
+})
+const giantBroad = listing('grocery', 'GIANT', 39.938, -75.167, { m: ['Cheese Sticks', 'Wine'], m_sometimes: ['Challah'] })
+const traderJoes = listing('grocery', "Trader Joe's", 39.955, -75.16, { m: ['Challah', 'Wine', 'Chicken'] })
+const aldi = listing('grocery', 'ALDI', 39.939, -75.178, { m: ['Brie', 'Goat Cheese'] })
+const chalavita = listing('restaurant', 'Chalavita', 39.95, -75.17, { t: ['Dairy'], kosherCert: 'Keystone-K' })
+const insomnia = listing('restaurant', 'Insomnia Cookies', 39.952, -75.193, { t: ['Dairy'], kosherCert: 'Keystone-K' })
+const cherryGrill = listing('restaurant', 'Cherry Grill', 39.9, -75.0, { t: ['Meat'], kosherCert: 'Keystone-K' })
+const mekor = listing('synagogue', 'Mekor Habracha', 39.9494, -75.1661, { denomination: 'Orthodox (Ashkenazi)' })
+const shtiebel = listing('synagogue', 'South Philadelphia Shtiebel', 39.933, -75.162, { denomination: 'Orthodox (Ashkenazi)' })
+const cambria = listing('hotel', 'Cambria Hotel', 39.948, -75.164, { shabbatFriendly: true })
+const sheraton = listing('hotel', 'Sheraton Philadelphia Downtown', 39.957, -75.167, { shabbatFriendly: false })
+const hup = listing('hospital', 'Hospital of the University of Pennsylvania', 39.9496, -75.1936)
+
+const listings = [shoprite, giantBroad, traderJoes, aldi, chalavita, insomnia, cherryGrill, mekor, shtiebel, cambria, sheraton, hup]
+const names = (input: string, opts = {}) => searchAsk(listings, categories, input, opts).hits.map((h) => h.item.name)
+
+describe('searchAsk — the questions people actually typed', () => {
+  it.each([
+    ['cholov yisroel milk'],
+    ['chalav yisroel milk'],
+    ['where can I buy cholov yisroel milk'],
+    ['Where can I get chalav yisrael milk in center city?'],
+    ['CY milk'],
+    ['cholov yisroel'],
+  ])('finds the one store with Chalav Yisroel milk: %s', (input) => {
+    expect(names(input)[0]).toBe('ShopRite of Garden State Pavilion')
+  })
+
+  it('does not count a store for one word of a three-word item', () => {
+    // Chalavita's name starts with "chalav", but it has no milk for sale.
+    expect(names('cholov yisroel milk')).not.toContain('Chalavita')
+  })
+
+  it('finds every store with challah, however it is spelled', () => {
+    for (const input of ['challah', 'chala', 'where can i get challah', 'chalah']) {
+      expect(names(input).sort(), input).toEqual(['GIANT', 'ShopRite of Garden State Pavilion', "Trader Joe's"])
+    }
+  })
+
+  it('finds wine without being told it has to be kosher', () => {
+    expect(names('kosher wine').sort()).toEqual(['GIANT', 'ShopRite of Garden State Pavilion', "Trader Joe's"])
+  })
+
+  it('answers "kosher food" with the food places, not with nothing', () => {
+    expect(names('kosher food').sort()).toEqual(['Chalavita', 'Cherry Grill', 'Insomnia Cookies'])
+    expect(names('where can i eat').sort()).toEqual(['Chalavita', 'Cherry Grill', 'Insomnia Cookies'])
+  })
+
+  it('reads "food near HUP" as food, nearest the hospital first', () => {
+    const result = searchAsk(listings, categories, 'kosher food near HUP')
+    expect(result.anchor?.name).toBe('Hospital of the University of Pennsylvania')
+    expect(result.hits.map((h) => h.item.name)[0]).toBe('Insomnia Cookies')
+    expect(result.hits.every((h) => h.category.id === 'restaurant')).toBe(true)
+    expect(result.hits[0].miles).toBeLessThan(0.5)
+  })
+
+  it('reads "shul near me" as every shul, nearest the visitor first', () => {
+    const southPhilly = { lat: 39.932, lng: -75.163 }
+    expect(names('shul near me', { coords: southPhilly })).toEqual(['South Philadelphia Shtiebel', 'Mekor Habracha'])
+    expect(names('where can i daven', { coords: southPhilly })).toEqual(['South Philadelphia Shtiebel', 'Mekor Habracha'])
+  })
+
+  it('finds a kind of food within the food places', () => {
+    expect(names('meat restaurant')).toEqual(['Cherry Grill'])
+    expect(names('dairy restaurant').sort()).toEqual(['Chalavita', 'Insomnia Cookies'])
+  })
+
+  it('finds a hotel by a yes/no field it has switched on', () => {
+    expect(names('shabbos friendly hotel')).toEqual(['Cambria Hotel'])
+  })
+
+  it('finds a place by the initials people call it', () => {
+    expect(names('HUP')).toEqual(['Hospital of the University of Pennsylvania'])
+  })
+
+  it('shows results while a word is still being typed', () => {
+    expect(names('chal')).toContain('ShopRite of Garden State Pavilion')
+    expect(names('trader jo')).toEqual(["Trader Joe's"])
+  })
+
+  it('never loses results to a word that is still being typed', () => {
+    // "th" on its way to "the": not yet a filler word, and not in any listing.
+    expect(names('challah th').sort()).toEqual(['GIANT', 'ShopRite of Garden State Pavilion', "Trader Joe's"])
+    // Once a space ends it, it is a word like any other.
+    expect(names('challah zq ')).toEqual([])
+  })
+
+  it('survives a typo in a longer word', () => {
+    expect(names('chllah').sort()).toEqual(['GIANT', 'ShopRite of Garden State Pavilion', "Trader Joe's"])
+  })
+
+  it('reports which of a listing’s items matched', () => {
+    const [hit] = searchAsk(listings, categories, 'cholov yisroel milk').hits
+    expect(hit.matchedTags[0]).toBe('Chalav Yisroel Milk')
+  })
+
+  it('marks an item that is only sometimes in stock', () => {
+    const hits = searchAsk(listings, categories, 'challah').hits
+    // GIANT lists challah as a "sometimes" item; ShopRite always has it.
+    expect(hits.find((h) => h.item.name === 'GIANT')?.matched).toEqual([{ tag: 'Challah', sometimes: true }])
+    expect(hits.find((h) => h.item.name.startsWith('ShopRite'))?.matched).toEqual([{ tag: 'Challah', sometimes: false }])
+  })
+})
+
+describe('searchAsk — ranking', () => {
+  const near = { lat: 39.9496, lng: -75.1718 }
+  const farMeatMarket = listing('restaurant', "Shlomo's Kosher Meat & Fish Market", 41.2, -75.9, { t: [] })
+  const grantAveRitas = { ...listing('restaurant', "Rita's", 40.08, -75.03, { t: ['Dairy'] }), address: '1709 Grant Ave' }
+  const more = [...listings, farMeatMarket, grantAveRitas]
+
+  it('puts the nearest match first, not the one with the word in its name', () => {
+    const hits = searchAsk(more, categories, 'meat restaurant', { coords: near }).hits.map((h) => h.item.name)
+    expect(hits[0]).toBe('Cherry Grill')
+    expect(hits).toContain("Shlomo's Kosher Meat & Fish Market")
+  })
+
+  it('forgives a typo in a name or an item, never in a street name', () => {
+    // "Grant" is one letter from "giant".
+    expect(searchAsk(more, categories, 'giant').hits.map((h) => h.item.name)).toEqual(['GIANT'])
+  })
+})
+
+describe('searchAsk — "open now"', () => {
+  const allWeek = (open: string, close: string) =>
+    Object.fromEntries(['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'].map((d) => [d, { open, close }]))
+  const lateGrill = listing('restaurant', 'Late Night Grill', 39.95, -75.17, { t: ['Meat'], hours: allWeek('11:00', '23:30') })
+  const lunchGrill = listing('restaurant', 'Lunch Grill', 39.95, -75.17, { t: ['Meat'], hours: allWeek('11:00', '15:00') })
+  // "Meat Grill" in its name, so it matches better than either of the others.
+  const meatGrill = listing('restaurant', 'Meat Grill', 39.95, -75.17, { t: ['Meat'], hours: allWeek('11:00', '15:00') })
+  const places = [lateGrill, lunchGrill, meatGrill]
+  const tenPmThursday = new Date(2026, 8, 24, 22, 0)
+
+  it('lists only places open right now, however well a closed one matches', () => {
+    // Reported live: "which meat restaurants are open now" listed closed ones.
+    const result = searchAsk(places, categories, 'which meat restaurants are open now', { now: tenPmThursday })
+    expect(result.hits.map((h) => h.item.name)).toEqual(['Late Night Grill'])
+    expect(result.closedCount).toBe(2)
+  })
+
+  it('says how many matched but are closed when none is open', () => {
+    const result = searchAsk([lunchGrill, meatGrill], categories, 'meat open now', { now: tenPmThursday })
+    expect(result.hits).toEqual([])
+    expect(result.closedCount).toBe(2)
+  })
+})
+
+describe('searchAsk — "open today", and hours nobody has entered', () => {
+  const mikvah = makeCategory({
+    id: 'mikvah',
+    label: 'Mikvah',
+    pluralLabel: 'Mikvaot',
+    detailFields: [
+      { key: 'hours', label: 'Hours', type: 'hours' },
+      { key: 'women_s_hours', label: 'Women’s Hours', type: 'hours' },
+      { key: 'men_s_hours', label: "Men's Hours", type: 'hours' },
+    ],
+  })
+  const allWeek = (open: string, close: string) =>
+    Object.fromEntries(['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'].map((d) => [d, { open, close }]))
+  const noDays = Object.fromEntries(['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'].map((d) => [d, null]))
+  // Lower Merion's real shape: men's in the early morning, women's at night.
+  const both = listing('mikvah', 'Both Mikvah', 39.95, -75.17, {
+    men_s_hours: allWeek('04:30', '10:00'),
+    women_s_hours: allWeek('20:00', '22:00'),
+  })
+  const womenOnly = listing('mikvah', 'Women Mikvah', 39.96, -75.17, { women_s_hours: allWeek('20:00', '22:00') })
+  // Two of Philly's four: no hours field at all, and one saved with every day empty.
+  const none = listing('mikvah', 'No Hours Mikvah', 39.951, -75.17)
+  const empty = listing('mikvah', 'Empty Hours Mikvah', 39.952, -75.17, { hours: noDays })
+  const all = [both, womenOnly, none, empty]
+  const at = (h: number) => new Date(2026, 8, 26, h, 0)
+
+  it('counts a place that opens later today as open today', () => {
+    const result = searchAsk(all, [mikvah], "is there a mikvah that's open today", { now: at(7) })
+    expect(result.hits.map((h) => h.item.name)).toEqual(['Both Mikvah', 'Women Mikvah'])
+  })
+
+  it('says which of its hours are open now and which open later', () => {
+    const [hit] = searchAsk([both], [mikvah], 'mikvah open today', { now: at(7) }).hits
+    expect(hit.today).toEqual([
+      { label: "Men's", opens: '4:30 AM', closes: '10:00 AM', openNow: true },
+      { label: 'Women’s', opens: '8:00 PM', closes: '10:00 PM', openNow: false },
+    ])
+  })
+
+  it('drops hours already over for the day', () => {
+    const [hit] = searchAsk([both], [mikvah], 'mikvah open today', { now: at(12) }).hits
+    expect(hit.today.map((w) => w.label)).toEqual(['Women’s'])
+    expect(searchAsk(all, [mikvah], 'mikvah open today', { now: at(23) }).hits).toEqual([])
+  })
+
+  it('does not count a place with no hours saved as closed', () => {
+    const result = searchAsk(all, [mikvah], 'mikvah open now', { now: at(7) })
+    expect(result.hits.map((h) => h.item.name)).toEqual(['Both Mikvah'])
+    expect(result.closedCount).toBe(1) // Women Mikvah, which opens tonight
+    expect(result.noHours.map((h) => h.item.name).sort()).toEqual(['Empty Hours Mikvah', 'No Hours Mikvah'])
+    expect(result.noHours.every((h) => h.open === null)).toBe(true)
+  })
+
+  it('lists nothing as having no hours when the question is not about hours', () => {
+    expect(searchAsk(all, [mikvah], 'mikvah', { now: at(7) }).noHours).toEqual([])
+  })
+})
+
+describe('searchAsk — a Google description is not a kosher item list', () => {
+  it('does not find a store by a product only its Google description mentions', () => {
+    const groceryWithDescription = makeCategory({
+      id: 'grocery',
+      label: 'Grocery Store',
+      pluralLabel: 'Grocery Stores',
+      detailFields: [
+        { key: 'googleDescription', label: 'Description', type: 'textarea' },
+        { key: 'm', label: 'Kosher items', type: 'tags' },
+      ],
+    })
+    // Reported: Di Bruno Bros. answered "cheese" off Google's "imported
+    // cheeses", with no kosher cheese listed there.
+    const diBruno = listing('grocery', 'Di Bruno Bros.', 39.95, -75.17, {
+      googleDescription: 'Longstanding market-style venue offering imported cheeses, meats & specialty foods.',
+      m: ['Challah'],
+    })
+    const withCheese = listing('grocery', 'GIANT', 39.94, -75.17, { m: ['Cheese Sticks'] })
+    const hits = searchAsk([diBruno, withCheese], [groceryWithDescription], 'is there a place that sells cheese').hits
+    expect(hits.map((h) => h.item.name)).toEqual(['GIANT'])
+  })
+
+  it('still finds a restaurant by its description, where everything served is kosher', () => {
+    const restaurantWithDescription = makeCategory({
+      id: 'restaurant',
+      label: 'Food Establishment',
+      pluralLabel: 'Food Establishments',
+      detailFields: [{ key: 'googleDescription', label: 'Description', type: 'textarea' }],
+    })
+    const bakery = listing('restaurant', 'Tasty Twisters Bakery', 39.95, -75.17, {
+      googleDescription: 'Family-owned bakery crafting hand-rolled soft pretzels.',
+    })
+    expect(searchAsk([bakery], [restaurantWithDescription], 'pretzels').hits.map((h) => h.item.name)).toEqual(['Tasty Twisters Bakery'])
+  })
+})
+
+describe('searchAsk — distance and mikvah hours', () => {
+  const mikvah = makeCategory({
+    id: 'mikvah',
+    label: 'Mikvah',
+    pluralLabel: 'Mikvaot',
+    detailFields: [
+      { key: 'hours', label: 'Hours', type: 'hours' },
+      { key: 'men_s_hours', label: "Men's Hours", type: 'hours' },
+    ],
+  })
+  const allWeek = (open: string, close: string) =>
+    Object.fromEntries(['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'].map((d) => [d, { open, close }]))
+  const near = listing('mikvah', 'Near Mikvah', 39.95, -75.17, { men_s_hours: allWeek('20:00', '23:00') })
+  const far = listing('mikvah', 'Far Mikvah', 40.2, -75.17, { men_s_hours: allWeek('20:00', '23:00') })
+  const unlisted = listing('mikvah', 'No Hours Mikvah', 39.951, -75.17)
+  const nine = new Date(2026, 8, 24, 21, 0)
+  const here = { lat: 39.95, lng: -75.17 }
+
+  it("counts men's hours as opening hours, ready for when they're entered", () => {
+    const hits = searchAsk([near, far, unlisted], [mikvah], 'mikvah open tonight', { now: nine }).hits
+    expect(hits.map((h) => h.item.name).sort()).toEqual(['Far Mikvah', 'Near Mikvah'])
+  })
+
+  it('keeps only places within the distance asked, from the visitor', () => {
+    const hits = searchAsk([near, far], [mikvah], 'mikvah open tonight within a 15 minute drive of my location', {
+      now: nine,
+      coords: here,
+    }).hits
+    // Far Mikvah is about 17 miles away; 15 minutes' drive is about 6.
+    expect(hits.map((h) => h.item.name)).toEqual(['Near Mikvah'])
+  })
+
+  it('rules nothing out on distance when there is nowhere to measure from', () => {
+    const hits = searchAsk([near, far], [mikvah], 'mikvah within 1 mile', { now: nine }).hits
+    expect(hits).toHaveLength(2)
+  })
+})
+
+describe('searchAsk — what it must not do', () => {
+  it('finds nothing for an item nobody has listed, rather than something unrelated', () => {
+    // Real questions from the Kosher In Philly group that the guide has no
+    // answer for yet. "Frozen" alone, or "fish" alone, is not an answer.
+    expect(names('frozen gefilte fish')).toEqual([])
+    expect(names('bag of peeled garlic')).toEqual([])
+  })
+
+  it('returns nothing for an empty or filler-only query it cannot use', () => {
+    expect(names('')).toEqual([])
+    expect(names('   ')).toEqual([])
+  })
+
+  it('on a category page, searches only that category and ignores its own name', () => {
+    const onRestaurants = (input: string) =>
+      searchAsk(listings, categories, input, { categoryId: 'restaurant' }).hits.map((h) => h.item.name)
+    expect(onRestaurants('dairy').sort()).toEqual(['Chalavita', 'Insomnia Cookies'])
+    expect(onRestaurants('kosher food').sort()).toEqual(['Chalavita', 'Cherry Grill', 'Insomnia Cookies'])
+    expect(onRestaurants('challah')).toEqual([])
+  })
+})
+
+describe('searchAsk — the place a question is about', () => {
+  const pretzelCo = listing('restaurant', 'Center City Pretzel Co.', 39.94, -75.157)
+  const aldiPretzels = listing('grocery', 'ALDI Washington Ave', 39.938, -75.178, { m: ['Pretzel Buns'] })
+  const jefferson = listing('hospital', 'Thomas Jefferson University Hospital', 39.9496, -75.1577)
+  const places = [pretzelCo, aldiPretzels, jefferson, chalavita, insomnia]
+
+  it('does not take an item for the name of a place to be near', () => {
+    // Reported: "grocery store with pretzels" answered with the grocery
+    // closest to Center City Pretzel Co.
+    const result = searchAsk(places, categories, 'grocery store with pretzels')
+    expect(result.anchor).toBeNull()
+    expect(result.hits.map((h) => h.item.name)).toEqual(['ALDI Washington Ave'])
+  })
+
+  it('takes a name as the place when the question says near it', () => {
+    // A food place on Jefferson Street matches the word too; "near" is what
+    // says the hospital is the place.
+    const onJefferson = { ...listing('restaurant', 'Corner Cafe', 39.97, -75.16), address: '100 Jefferson St' }
+    expect(searchAsk([...places, onJefferson], categories, 'food near jefferson').anchor?.name).toBe('Thomas Jefferson University Hospital')
+  })
+
+  it('takes a name as the place when nothing of the kind asked for has that word', () => {
+    // No food place is called Jefferson, so "food jefferson" is about the hospital.
+    expect(searchAsk(places, categories, 'food jefferson').anchor?.name).toBe('Thomas Jefferson University Hospital')
+  })
+
+  // Found Sep 28–Oct 1: one word of a listing's name was enough to make it
+  // the place. "meat near me" became the closest to Shlomo's Kosher Meat &
+  // Fish Market, in Baltimore, 91 mi away, and so did "meat near
+  // rittenhouse", which our search then thought it fully understood.
+  const shlomos = listing('grocery', "Shlomo's Kosher Meat & Fish Market", 39.36, -76.71, { m: ['Glatt Kosher Meat'] })
+  const meatPlaces = [shlomos, cherryGrill, chalavita, shoprite]
+  const me = { lat: 39.95, lng: -75.17 }
+
+  it('"near me" is the visitor, never a listing with the word in its name', () => {
+    for (const q of ['meat near me', 'open meat near me within 3 miles', 'meat nearby']) {
+      const r = searchAsk(meatPlaces, categories, q, { coords: me })
+      expect(r.anchor, q).toBeNull()
+    }
+    const r = searchAsk(meatPlaces, categories, 'meat near me', { coords: me })
+    expect(r.hits.map((h) => h.item.name)).toEqual(['ShopRite of Garden State Pavilion', 'Cherry Grill', "Shlomo's Kosher Meat & Fish Market"])
+  })
+
+  it('a neighbourhood named is where, and no listing is looked for in what’s left', () => {
+    const r = searchAsk(meatPlaces, categories, 'meat near rittenhouse', { places: [{ name: 'Rittenhouse', geo: { lat: 39.9496, lng: -75.1718 }, radius: 0.6 }] })
+    expect(r.anchor).toBeNull()
+    expect(r.place?.name).toBe('Rittenhouse')
+    expect(r.terms).toEqual(['meat'])
+  })
+
+  it('words that only describe places name one only as most of its name', () => {
+    expect(searchAsk(meatPlaces, categories, 'chicken near meat').anchor).toBeNull()
+    // A word of its own in the name is still the place.
+    expect(searchAsk(meatPlaces, categories, 'food near shlomos kosher meat').anchor?.name).toBe("Shlomo's Kosher Meat & Fish Market")
+    expect(searchAsk(meatPlaces, categories, 'food near shlomos').anchor?.name).toBe("Shlomo's Kosher Meat & Fish Market")
+  })
+})
+
+describe('searchAsk — why each result is there', () => {
+  it('names the field a result matched on when no item explains it', () => {
+    // "keystone" is in the hechsher, not in any item. A food place's own
+    // text describes it, whatever lists it keeps (this one's a text field).
+    const result = searchAsk(listings, categories, 'keystone restaurants')
+    const hit = result.hits.find((h) => h.item.name === 'Chalavita')!
+    expect(hit.matched).toEqual([])
+    expect(hit.matchedFields).toEqual([{ label: 'Hechsher', text: 'Keystone-K', describes: true }])
+    expect(foundFor(hit, result)).toEqual({ terms: ['keystone'], items: [], fields: [{ label: 'Hechsher', text: 'Keystone-K', describes: true }] })
+  })
+
+  it('names a yes/no field that is switched on', () => {
+    const result = searchAsk(listings, categories, 'shabbat friendly hotel')
+    expect(result.hits[0].matchedFields).toEqual([{ label: 'Shabbat Friendly', text: '', describes: false }])
+  })
+
+  it('does not quote a field when an item already explains the match', () => {
+    const withNotes = makeCategory({
+      id: 'grocery',
+      label: 'Grocery Store',
+      pluralLabel: 'Grocery Stores',
+      detailFields: [
+        { key: 'notes', label: 'Notes', type: 'textarea' },
+        { key: 'm', label: 'Kosher items', type: 'tags' },
+      ],
+    })
+    const store = listing('grocery', 'ALDI', 39.95, -75.17, { m: ['Goat Cheese'], notes: 'Cheese is in the back.' })
+    const [hit] = searchAsk([store], [withNotes], 'goat cheese').hits
+    expect(hit.matched.map((m) => m.tag)).toEqual(['Goat Cheese'])
+    expect(hit.matchedFields).toEqual([])
+  })
+
+  it('cuts a long note down to the part around the match', () => {
+    const notes = makeCategory({
+      id: 'grocery',
+      label: 'Grocery Store',
+      pluralLabel: 'Grocery Stores',
+      detailFields: [{ key: 'notes', label: 'Notes', type: 'textarea' }],
+    })
+    const store = listing('grocery', 'Corner Store', 39.95, -75.17, {
+      notes: 'Open late most nights and closed on Sundays in the summer. Ask at the deli counter for the kosher section, which has frozen gefilte fish near the back.',
+    })
+    const [hit] = searchAsk([store], [notes], 'gefilte fish').hits
+    const text = hit.matchedFields[0].text
+    expect(text).toContain('gefilte fish')
+    expect(text.startsWith('…')).toBe(true)
+    expect(text.length).toBeLessThanOrEqual(95)
+  })
+
+  it('carries nothing into a listing found only by its name', () => {
+    const result = searchAsk(listings, categories, 'mekor habracha')
+    expect(foundFor(result.hits[0], result)).toBeNull()
+  })
+})
+
+describe('searchAsk — "than Giant" and "near" without a kind of place', () => {
+  it('leaves out the place the question already knows', () => {
+    const result = searchAsk(listings, categories, 'a better place for kosher wine than giant')
+    expect(result.hits.map((h) => h.item.name)).toEqual(expect.arrayContaining(['ShopRite of Garden State Pavilion', "Trader Joe's"]))
+    expect(result.hits.map((h) => h.item.name)).not.toContain('GIANT')
+    expect(result.excluded).toEqual(['GIANT'])
+  })
+
+  it('measures from the place named with "near", with no kind of place asked', () => {
+    // "sushi near HUP" was measured from the visitor, not HUP.
+    const result = searchAsk(listings, categories, 'wine near HUP')
+    expect(result.anchor?.name).toBe('Hospital of the University of Pennsylvania')
+    expect(result.terms).toEqual(['wine'])
+  })
+})
+
+describe('nearMiss — the closest thing when nothing matches', () => {
+  it('drops the word nothing has, keeping the one something does', () => {
+    const miss = nearMiss(listings, categories, 'packaged challah')
+    expect(miss?.kept).toBe('challah')
+    expect(miss?.dropped).toBe('packaged')
+    expect(miss?.result.hits.map((h) => h.item.name)).toContain("Trader Joe's")
+  })
+
+  it('does not count every place of a kind as close', () => {
+    // "vegan food" loosened to "food" would be every restaurant.
+    expect(nearMiss(listings, categories, 'vegan food')).toBeNull()
+  })
+
+  it('keeps where the question was about: the food nearest HUP is close', () => {
+    const miss = nearMiss(listings, categories, 'vegan food near HUP')
+    expect(miss?.result.anchor?.name).toBe('Hospital of the University of Pennsylvania')
+    expect(miss?.result.hits.length).toBeGreaterThan(0)
+  })
+
+  it('of two looser questions, keeps the one more places list as an item', () => {
+    // No store has both. Challah is listed at three, brie at one.
+    const miss = nearMiss(listings, categories, 'brie challah ')
+    expect(miss?.kept).toBe('challah')
+  })
+
+  it('finds nothing close for a word nothing has', () => {
+    expect(nearMiss(listings, categories, 'dentist')).toBeNull()
+  })
+
+  it('leaves a minyan question to the schedules', () => {
+    // Loosened, "mekor" alone would find the shul; the schedules answer a
+    // minyan question, not a looser search.
+    expect(nearMiss(listings, categories, 'mincha at mekor zzyzx ')).toBeNull()
+    expect(nearMiss(listings, categories, 'shul mekor zzyzx ')).not.toBeNull()
+  })
+})
+
+describe('searchAsk — towns and neighborhoods', () => {
+  const food = makeCategory({ id: 'restaurant', label: 'Food', pluralLabel: 'Food' })
+  const town = (name: string, address: string, lat: number, lng: number, category = 'restaurant') => ({
+    ...listing(category, name, lat, lng),
+    address,
+  })
+  const bagels = town('The Bagel Spot', '1 Haddonfield Rd, Cherry Hill Township, NJ 08034, USA', 39.93, -75.02)
+  const cookies = town('Cherry Hill Cookies', '2 Kings Hwy, Cherry Hill Township, NJ 08034, USA', 39.92, -75.01)
+  const city = town('Center Cafe', '100 Walnut St, Philadelphia, PA 19103, USA', 39.95, -75.165)
+  const cambria = town('Cambria Hotel Philadelphia Downtown - Center City', '219 S Broad St, Philadelphia, PA 19107, USA', 39.948, -75.164, 'hotel')
+  const shul = town('Mekor Habracha', '1500 Walnut St, Philadelphia, PA 19102, USA', 39.9494, -75.1661, 'synagogue')
+  const places = [{ name: 'Center City', geo: { lat: 39.9524, lng: -75.1636 }, radius: 1.3 }]
+  const all = [bagels, cookies, city, cambria, shul]
+  const cats = [food, hotel, synagogue]
+
+  it('keeps only what is inside a town the listings name', () => {
+    const result = searchAsk(all, cats, 'restaurants in cherry hill', { places })
+    expect(result.place).toMatchObject({ name: 'Cherry Hill', inside: true })
+    expect(result.hits.map((h) => h.item.name).sort()).toEqual(['Cherry Hill Cookies', 'The Bagel Spot'])
+  })
+
+  it('measures from a neighborhood, and does not search for its name', () => {
+    const result = searchAsk(all, cats, 'shul near center city', { places })
+    expect(result.place).toMatchObject({ name: 'Center City', inside: false })
+    expect(result.terms).toEqual([])
+    expect(result.hits[0].miles).toBeLessThan(0.5)
+  })
+
+  it('is not a hotel with the neighborhood in its name, when a shul was asked for', () => {
+    expect(searchAsk(all, cats, 'shul near center city', { places }).anchor).toBeNull()
+    // Even without "near": no shul is called Center City, so it's the place.
+    expect(searchAsk(all, cats, 'center city shul', { places }).place).toMatchObject({ name: 'Center City', inside: false })
+  })
+
+  it('is the listing itself when the question is a listing’s own name', () => {
+    const result = searchAsk(all, cats, 'cambria center city', { places })
+    expect(result.place).toBeNull()
+    expect(result.hits[0].item.name).toBe('Cambria Hotel Philadelphia Downtown - Center City')
+  })
+
+  it('with nothing inside, the closest to it is what is close', () => {
+    const result = searchAsk([city, shul], cats, 'food in cherry hill', { places })
+    expect(result.hits).toEqual([])
+    const miss = nearMiss([city, shul, bagels], cats, 'shul in cherry hill', { places })
+    expect(miss?.kept).toBe('near Cherry Hill')
+    expect(miss?.result.hits.map((h) => h.item.name)).toEqual(['Mekor Habracha'])
+  })
+})
+
+describe('searchAsk — "open after 6"', () => {
+  const allWeek = (open: string, close: string) =>
+    Object.fromEntries(['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'].map((d) => [d, { open, close }]))
+  const lunch = listing('restaurant', 'Lunch Grill', 39.95, -75.17, { t: ['Meat'], hours: allWeek('11:00', '15:00') })
+  const late = listing('restaurant', 'Late Grill', 39.95, -75.17, { t: ['Meat'], hours: allWeek('11:00', '23:30') })
+  const overnight = listing('restaurant', 'Night Owl Grill', 39.95, -75.17, { t: ['Meat'], hours: allWeek('18:00', '01:00') })
+  const unknown = listing('restaurant', 'No Hours Grill', 39.95, -75.17, { t: ['Meat'] })
+  const places = [lunch, late, overnight, unknown, cambria]
+  // Asked at noon: "open now" and "open after 6" must not agree by accident.
+  const noon = new Date(2026, 8, 24, 12, 0)
+  const names = (q: string) => searchAsk(places, categories, q, { now: noon }).hits.map((h) => h.item.name)
+
+  it('keeps only places open at some point after the time, whatever the hour now', () => {
+    expect(names('meat open after 6')).toEqual(['Late Grill', 'Night Owl Grill'])
+  })
+
+  it('counts a place that closes after midnight as open late, not closed', () => {
+    expect(names('meat open after 11pm')).toEqual(['Late Grill', 'Night Owl Grill'])
+    expect(names('meat open past midnight')).toEqual(['Night Owl Grill'])
+  })
+
+  it('reads until, at and before against the day’s hours', () => {
+    expect(names('meat open until 11')).toEqual(['Late Grill', 'Night Owl Grill'])
+    expect(names('meat open at 1pm')).toEqual(['Late Grill', 'Lunch Grill'])
+    expect(names('meat open before 5pm')).toEqual(['Late Grill', 'Lunch Grill'])
+  })
+
+  it('doesn’t read "at 8am" as a place to be near', () => {
+    // Reported: "bagels open at 8am" found nothing. "At" read as "at a
+    // place", the bagel bakery became where to measure from, and nothing
+    // was left to look for.
+    const bakery = listing('restaurant', 'New York Bagel Bakery', 39.95, -75.17, { t: ['Bagels'], hours: allWeek('07:00', '12:00') })
+    const cafe = listing('restaurant', 'Corner Cafe', 39.96, -75.17, { t: ['Bagels'], hours: allWeek('06:00', '10:00') })
+    const result = searchAsk([bakery, cafe], categories, 'bagels open at 8am', { now: noon })
+    expect(result.anchor).toBeNull()
+    expect(result.hits.map((h) => h.item.name)).toEqual(['Corner Cafe', 'New York Bagel Bakery'])
+  })
+
+  it('keeps a place with no hours apart, and counts the rest as not open then', () => {
+    const result = searchAsk(places, categories, 'meat open after 6', { now: noon })
+    expect(result.noHours.map((h) => h.item.name)).toEqual(['No Hours Grill'])
+    expect(result.closedCount).toBe(1)
+    expect(result.hits[0].atTime).toEqual([{ label: '', opens: '11:00 AM', closes: '11:30 PM' }])
+  })
+
+  it('answers "what’s open after 10" from every kind of place that keeps hours', () => {
+    const result = searchAsk(places, categories, "what's open after 10", { now: noon })
+    expect(result.hits.map((h) => h.item.name)).toEqual(['Late Grill', 'Night Owl Grill'])
+    // The hotel keeps no hours, so it isn't "no hours listed" either.
+    expect(result.noHours.map((h) => h.item.name)).toEqual(['No Hours Grill'])
+  })
+})
+
+describe('searchAsk — a sukkah', () => {
+  const sukkahs = makeCategory({ id: 'sukkahs', label: 'Sukkah', pluralLabel: 'Sukkahs' })
+  // What a sukkah listing is: a family and an address, nothing saying "sukkah".
+  const cohen = listing('sukkahs', 'Cohen family', 39.95, -75.17)
+  const withSukkah = listing('restaurant', 'Garden Grill', 39.95, -75.17, { t: ['Meat', 'Sukkah'] })
+
+  it('finds the sukkah listings by their category, around Sukkos', () => {
+    for (const q of ['where can I find a sukkah', 'sukkah near me', 'sukkos']) {
+      expect(searchAsk([cohen, withSukkah], [...categories, sukkahs], q).hits.map((h) => h.item.name), q).toContain('Cohen family')
+    }
+  })
+
+  it('searches for the word the rest of the year, when there’s no sukkah category', () => {
+    const result = searchAsk([withSukkah], categories, 'sukkah')
+    expect(result.categoryIds).toBeNull()
+    expect(result.hits.map((h) => h.item.name)).toEqual(['Garden Grill'])
+  })
+})

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it } from 'vitest'
 import { cleanup, render, screen } from '@testing-library/react'
-import { CompactCardGrid, cardCount } from './sections'
+import { CompactCardGrid, cardCount, eruvCardCount, resourceCards, withEruvCount } from './sections'
 import type { CardDef } from './sections'
 import type { CategoryConfig } from '@/lib/categories'
 
@@ -89,17 +89,17 @@ describe('CompactCard — the browse index row', () => {
     expect(rings[0].style.boxShadow).toContain('inset')
   })
 
-  it('shows how many places are behind a category, and nothing when it does not know', () => {
+  it('shows how many listings are behind a category, and nothing when it does not know', () => {
     render(
       <CompactCardGrid
-        cards={[card({ count: '22 places' }), card({ title: 'Map', id: 'map', icon: '🗺️' })]}
+        cards={[card({ count: '22 listings' }), card({ title: 'Map', id: 'map', icon: '🗺️' })]}
         categories={[category()]}
       />,
     )
 
-    expect(screen.getByText('22 places')).toBeTruthy()
-    // The Map pseudo-category counts nothing; it must not read "0 places".
-    expect(screen.queryByText(/0 places/)).toBeNull()
+    expect(screen.getByText('22 listings')).toBeTruthy()
+    // The Map pseudo-category counts nothing; it must not read "0 listings".
+    expect(screen.queryByText(/0 listings/)).toBeNull()
   })
 })
 
@@ -129,14 +129,14 @@ describe('CompactCardGrid — the collapse clips height, it does not unmount car
 })
 
 describe('cardCount — the wording', () => {
-  it('counts addressable categories as places', () => {
-    expect(cardCount(category(), { grocery: 22 })).toBe('22 places')
-    expect(cardCount(category(), { grocery: 1 })).toBe('1 place')
-  })
+  // One noun regardless of address — this used to split "N places" (has an
+  // address) from "N listings" (doesn't, e.g. WhatsApp Groups/Networking,
+  // where you can't "go to" one), but that made "place" the term that
+  // needed an exception. "Listing" holds up either way.
+  it('always says "listing", addressable category or not', () => {
+    expect(cardCount(category(), { grocery: 22 })).toBe('22 listings')
+    expect(cardCount(category(), { grocery: 1 })).toBe('1 listing')
 
-  it('does not call an address-less category a place', () => {
-    // WhatsApp Groups and Networking are the live cases — you can't go to one,
-    // so "19 places" would be wrong in the one word the row exists to add.
     const chat = category({ id: 'whatsapp', hasAddress: false })
     expect(cardCount(chat, { whatsapp: 19 })).toBe('19 listings')
     expect(cardCount(chat, { whatsapp: 1 })).toBe('1 listing')
@@ -147,5 +147,27 @@ describe('cardCount — the wording', () => {
     expect(cardCount(category(), undefined)).toBeUndefined()
     expect(cardCount(category(), {})).toBeUndefined()
     expect(cardCount(category(), { grocery: 0 })).toBeUndefined()
+  })
+})
+
+// Oct 15: the Eruv card says how many eruvim, in a category card's words:
+// "5 listings", not "5 eruvim".
+describe('the Eruv card’s count', () => {
+  const eruv = category({ id: 'eruv-information', kind: 'eruv', pluralLabel: 'Eruv Information' })
+  const grocery = category()
+  const cards = (counts: Record<string, number> | null) => resourceCards(() => {}, [grocery, eruv], 'philly', counts)!
+  const countOf = (counts: Record<string, number> | null, id: string) => cards(counts).find((c) => c.id === id)?.count
+
+  it('"3 listings", "1 listing", as the categories’ counts read', () => {
+    expect(countOf(withEruvCount({ grocery: 22 }, 3), 'eruv')).toBe('3 listings')
+    expect(countOf(withEruvCount({ grocery: 22 }, 3), 'grocery')).toBe('22 listings')
+    expect(countOf(withEruvCount(null, 1), 'eruv')).toBe('1 listing')
+    expect(eruvCardCount({ eruv: 2 })).toBe('2 listings')
+  })
+
+  it('nothing until it’s known, or when there are none', () => {
+    expect(countOf(withEruvCount({ grocery: 22 }, null), 'eruv')).toBeUndefined()
+    expect(countOf(withEruvCount(null, 0), 'eruv')).toBeUndefined()
+    expect(withEruvCount(null, null)).toBeNull()
   })
 })

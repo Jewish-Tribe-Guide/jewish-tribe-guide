@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
+import { useState } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import HeroHeading from './HeroHeading'
 
 afterEach(() => cleanup())
@@ -59,18 +61,73 @@ describe('HeroHeading — desktop headline vs. mobile heroTitle', () => {
     )
   })
 
-  it('mobile: heroTitle is still the one big heading — mission stays one plain, unsplit paragraph under it', () => {
-    render(<HeroHeading settings={settings} query="" onQueryChange={vi.fn()} />)
+  // The phone home (the user, Oct 17): no headline and no mission on show.
+  // heroTitle stays the page's one <h1>, for screen readers and search
+  // engines, and the trust line takes the top.
+  it('mobile: heroTitle is the page heading for screen readers only; no mission; the trust line on top', () => {
+    render(<HeroHeading settings={settings} query="" onQueryChange={vi.fn()} trust={<div data-testid="trust-stub" />} />)
 
-    // Both layouts are in the DOM; heroTitle appears as an <h1> (mobile's
-    // lead line) — never a second <h1> carrying any part of the mission.
     const h1sWithHeroTitle = screen.getAllByRole('heading', { level: 1 }).filter((h) => h.textContent === settings.heroTitle)
-    expect(h1sWithHeroTitle.length).toBe(1)
+    expect(h1sWithHeroTitle).toHaveLength(1)
+    expect(h1sWithHeroTitle[0]).toHaveClass('sr-only')
+    expect(screen.queryByText(settings.mission)).not.toBeInTheDocument()
+    const hero = screen.getByTestId('phone-hero')
+    expect(hero.firstElementChild?.nextElementSibling).toBe(screen.getByTestId('trust-stub'))
+  })
+})
 
-    // Mobile shows the FULL, unsplit mission as a plain paragraph — desktop's
-    // separate hero fields are a desktop-only headline treatment, not a
-    // change to what mobile has always shown.
-    expect(screen.getByText(settings.mission).tagName).toBe('P')
+// Desktop mockup match (Phase 3, docs/desktop-mockup-plan.md), later
+// trimmed: the mockup's own "People · Places · Community" tagline and its
+// short quote naming the community's region were both cut after review —
+// the user's own call — so this now asserts they're gone rather than
+// present. Every desktop home-screen button (including View Map) later
+// lost its icon too, the user's own call — see the plain-text assertion
+// below.
+describe('HeroHeading — Phase 3 desktop details', () => {
+  const settings = {
+    name: 'Philly Jewish Guide',
+    heroTitle: 'What are you looking for?',
+    mission: 'Your guide to Jewish Philadelphia',
+    searchPlaceholder: 'Search — kosher food, mikvah, shuls, schools…',
+    desktopHeroHeadline: 'Your guide to Jewish Philadelphia',
+    desktopHeroSubhead: '',
+    desktopHeroImage: null,
+  }
+
+  it('no longer renders the People · Places · Community tagline', () => {
+    render(<HeroHeading settings={settings} query="" onQueryChange={vi.fn()} />)
+    expect(screen.queryByText('People · Places · Community')).not.toBeInTheDocument()
+  })
+
+  it('no longer renders the "stronger Jewish [region] together" quote', () => {
+    render(<HeroHeading settings={settings} query="" onQueryChange={vi.fn()} />)
+    expect(screen.queryByText(/stronger Jewish/)).not.toBeInTheDocument()
+  })
+
+  it('the desktop View Map button renders plain text — no icon, and not the raw admin-set emoji string, next to the label', () => {
+    const { container } = render(
+      <HeroHeading settings={settings} query="" onQueryChange={vi.fn()} mapIcon="🗺️" onViewMap={vi.fn()} />,
+    )
+
+    // Scoped to the `desktop:block` section rather than asserting on every
+    // button in the document — mobile has no "View Map" button of its own
+    // any more (see the next describe block).
+    const desktopSection = container.querySelector('.desktop\\:block')
+    expect(desktopSection).not.toBeNull()
+    const desktopViewMap = Array.from(desktopSection!.querySelectorAll('button')).find((b) => b.textContent?.includes('View Map'))
+    expect(desktopViewMap).toBeTruthy()
+    expect(desktopViewMap!.textContent).not.toContain('🗺️')
+    expect(desktopViewMap!.querySelector('svg')).toBeNull()
+  })
+
+  // Mobile used to render its own "View Map" button below the search box —
+  // removed since mobile already reaches the map through its own tab
+  // (MobileTabBar), making the hero's copy redundant.
+  it('renders no "View Map" button on mobile, even when a Map category is configured', () => {
+    render(<HeroHeading settings={settings} query="" onQueryChange={vi.fn()} mapIcon="🗺️" onViewMap={vi.fn()} />)
+
+    const buttons = screen.getAllByRole('button', { name: /View Map/ })
+    expect(buttons).toHaveLength(1)
   })
 })
 
@@ -112,5 +169,230 @@ describe('HeroHeading — the photo panel', () => {
     // an <img> with an empty/missing alt (which would be its own violation).
     expect(container.querySelector('img')).toBeNull()
     expect(container.querySelector('[aria-hidden="true"] svg')).toBeTruthy()
+  })
+})
+
+// The user's own reported pain point: typing in the hero search box used to
+// scroll a visitor down to a card near the bottom of the page — nothing
+// changed where they were actually looking. HeroSearchDropdown opens right
+// under the box instead; this covers the open/close state machine
+// HeroHeading owns around it (the panel itself, where a search could go,
+// is Landing's: see SearchLines and Landing.test.tsx).
+describe('HeroHeading — the search dropdown', () => {
+  const settings = {
+    name: 'Philly Jewish Guide',
+    heroTitle: 'What are you looking for?',
+    mission: 'Your guide to Jewish Philadelphia',
+    searchPlaceholder: 'Search — kosher food, mikvah, shuls, schools…',
+    desktopHeroHeadline: 'Your guide to Jewish Philadelphia',
+    desktopHeroSubhead: '',
+    desktopHeroImage: null,
+  }
+
+  // A real controlled query (useState), same shape as Landing's own — the
+  // dropdown reopening on typing depends on a genuine query→prop round
+  // trip, which a fixed `query=""` prop can't exercise.
+  function Wrapper(props: Partial<React.ComponentProps<typeof HeroHeading>> = {}) {
+    const [query, setQuery] = useState('')
+    return (
+      <HeroHeading
+        settings={settings}
+        query={query}
+        onQueryChange={setQuery}
+        searchPanel={<p>Food</p>}
+        {...props}
+      />
+    )
+  }
+
+  // Two "Search resources" inputs exist at once (CSS-only mobile/desktop
+  // split — see the component's own doc); scoped to the desktop section
+  // the same way the "Phase 3" tests above scope their own assertions.
+  function desktopSearchInput(container: HTMLElement): HTMLInputElement {
+    const desktopSection = container.querySelector('.desktop\\:block')!
+    return desktopSection.querySelector('input')!
+  }
+  // The panel over the page, on desktop (the phone has its own copy, in
+  // the page's flow).
+  function panel(container: HTMLElement) {
+    return within(container.querySelector<HTMLElement>('.desktop\\:block')!)
+  }
+
+  it('stays closed with an empty query, and opens once there is one', async () => {
+    const user = userEvent.setup()
+    const { container } = render(<Wrapper />)
+
+    expect(panel(container).queryByText('Food')).not.toBeInTheDocument()
+    await user.type(desktopSearchInput(container), 'food')
+    expect(panel(container).getByText('Food')).toBeInTheDocument()
+  })
+
+  it('closes on Escape', async () => {
+    const user = userEvent.setup()
+    const { container } = render(<Wrapper />)
+    await user.type(desktopSearchInput(container), 'food')
+    expect(panel(container).getByText('Food')).toBeInTheDocument()
+
+    await user.keyboard('{Escape}')
+    expect(panel(container).queryByText('Food')).not.toBeInTheDocument()
+  })
+
+  it('closes on a click outside the search box', async () => {
+    const user = userEvent.setup()
+    const { container } = render(<Wrapper />)
+    await user.type(desktopSearchInput(container), 'food')
+    expect(panel(container).getByText('Food')).toBeInTheDocument()
+
+    await user.click(document.body)
+    expect(panel(container).queryByText('Food')).not.toBeInTheDocument()
+  })
+
+  // Reported via a shared answer (/philly/ask/…): it opened with the answer
+  // showing, the location prompt came up over it, and tapping "Not now"
+  // closed the answer.
+  it('stays open through a click in a dialog over the page', async () => {
+    const user = userEvent.setup()
+    const { container } = render(
+      <>
+        <Wrapper />
+        <div role="dialog" aria-modal="true">
+          <button type="button">Not now</button>
+        </div>
+      </>,
+    )
+    await user.type(desktopSearchInput(container), 'food')
+    await user.click(screen.getByRole('button', { name: 'Not now' }))
+    expect(panel(container).getByText('Food')).toBeInTheDocument()
+  })
+
+  // Escape (and "See all") close the dropdown without necessarily blurring
+  // the input — refocusing/clicking it again has to reopen the dropdown on
+  // its own, without requiring the visitor to edit the text first.
+  it('reopens on refocus after being dismissed, without needing to retype', async () => {
+    const user = userEvent.setup()
+    const { container } = render(<Wrapper />)
+    const input = desktopSearchInput(container)
+    await user.type(input, 'food')
+    await user.keyboard('{Escape}')
+    expect(panel(container).queryByText('Food')).not.toBeInTheDocument()
+
+    await user.click(input)
+    expect(panel(container).getByText('Food')).toBeInTheDocument()
+  })
+
+  it('stays hidden while there is nothing to show yet (no panel), rather than an empty box', async () => {
+    const user = userEvent.setup()
+    const { container } = render(<Wrapper searchPanel={null} />)
+    await user.type(desktopSearchInput(container), 'food')
+
+    expect(panel(container).queryByText('Food')).not.toBeInTheDocument()
+  })
+
+  it('on a phone, sits right under the box, in the page', async () => {
+    const user = userEvent.setup()
+    const { container } = render(<Wrapper />)
+    const phone = container.querySelector<HTMLElement>('section.desktop\\:hidden')!
+    expect(within(phone).queryByText('Food')).not.toBeInTheDocument()
+    await user.type(phone.querySelector('input')!, 'food')
+    expect(within(phone).getByText('Food')).toBeInTheDocument()
+  })
+})
+
+// The "community-maintained" banner (CommunityStrip) used to render here, in
+// both layouts — it's gone. Its two jobs moved elsewhere: "Add a place" is
+// now a real, persistent header button (SiteHeader.test.tsx), visible on
+// every screen rather than only this one; "suggest a correction" already had
+// a real affordance (Edit/Report on each listing) and the footer's own
+// explanation, so it needed no replacement here at all. See SiteHeader.tsx's
+// own comment on the button for the full reasoning.
+describe('HeroHeading — no community-maintained banner', () => {
+  const settings = {
+    name: 'Philly Jewish Guide',
+    heroTitle: 'What are you looking for?',
+    mission: 'mission',
+    searchPlaceholder: 'Search',
+    desktopHeroHeadline: 'Headline',
+    desktopHeroSubhead: 'subhead',
+    desktopHeroImage: null,
+  }
+
+  it('renders neither layout with the old banner copy', () => {
+    render(<HeroHeading settings={settings} query="" onQueryChange={vi.fn()} />)
+    expect(screen.queryByText(/Community-maintained\./)).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Add a place' })).not.toBeInTheDocument()
+  })
+})
+
+// Questions to tap under the empty box: the first try at search, made one
+// that works (see searchPrompts.ts).
+describe('HeroHeading — example questions', () => {
+  const settings = {
+    name: 'Philly Jewish Guide',
+    heroTitle: 'What are you looking for?',
+    mission: 'Your guide to Jewish Philadelphia',
+    searchPlaceholder: 'Ask a question',
+    desktopHeroHeadline: 'Your guide to Jewish Philadelphia',
+    desktopHeroSubhead: '',
+    desktopHeroImage: null,
+  }
+
+  // A tap goes where Enter would (Landing's onPickPrompt): the box isn't
+  // filled first.
+  it('offers them under an empty box, and a tap picks it', async () => {
+    const user = userEvent.setup()
+    const onQueryChange = vi.fn()
+    const onPickPrompt = vi.fn()
+    render(
+      <HeroHeading settings={settings} query="" onQueryChange={onQueryChange} searchPrompts={['Next Mincha', 'Kosher wine']} onPickPrompt={onPickPrompt} />,
+    )
+    await user.click(screen.getAllByRole('button', { name: 'Kosher wine' })[0])
+    expect(onPickPrompt).toHaveBeenCalledWith('Kosher wine')
+    expect(onQueryChange).not.toHaveBeenCalled()
+  })
+
+  it('shows them on the phone layout and the desktop one', () => {
+    render(<HeroHeading settings={settings} query="" onQueryChange={vi.fn()} searchPrompts={['Next Mincha']} />)
+    expect(screen.getAllByTestId('search-prompts')).toHaveLength(2)
+  })
+
+  it('hides them once something is typed: the answer is the point then', () => {
+    render(<HeroHeading settings={settings} query="wine" onQueryChange={vi.fn()} searchPrompts={['Next Mincha']} />)
+    expect(screen.queryByTestId('search-prompts')).not.toBeInTheDocument()
+  })
+
+  it('hides them in the admin preview, where there is nothing to search', () => {
+    render(<HeroHeading settings={settings} query="" onQueryChange={vi.fn()} interactive={false} searchPrompts={['Next Mincha']} />)
+    expect(screen.queryByTestId('search-prompts')).not.toBeInTheDocument()
+  })
+})
+
+// The Today home (step 6): the day as a small line over the title, the Ask
+// box the biggest thing after it, and nothing else in the hero.
+describe('HeroHeading — the Today home', () => {
+  const settings = {
+    heroTitle: 'Your Guide to Jewish Philadelphia',
+    mission: 'A guide to Jewish Philadelphia — community resources',
+    searchPlaceholder: 'Ask: challah, mincha tonight…',
+    desktopHeroHeadline: 'Your Guide to Jewish Philadelphia',
+    desktopHeroSubhead: 'kept current by you',
+    desktopHeroImage: null,
+  }
+  const dayLine = 'Tuesday, Oct 6 · 25 Tishrei · sunset 6:35 PM'
+
+  it('puts the day over the title on both devices, and drops the mission, the subhead and the Browse and Map buttons', () => {
+    render(<HeroHeading settings={settings} query="" onQueryChange={vi.fn()} mapIcon="🗺️" today={{ dayLine }} />)
+    expect(screen.getAllByText(dayLine)).toHaveLength(2)
+    expect(screen.getByTestId('today-hero')).toHaveTextContent(`${dayLine}${settings.heroTitle}`)
+    expect(screen.queryByText(settings.mission)).not.toBeInTheDocument()
+    expect(screen.queryByText(settings.desktopHeroSubhead)).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Browse Categories' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'View Map' })).not.toBeInTheDocument()
+  })
+
+  it('the classic home is unchanged', () => {
+    render(<HeroHeading settings={settings} query="" onQueryChange={vi.fn()} mapIcon="🗺️" />)
+    expect(screen.queryByTestId('today-hero')).not.toBeInTheDocument()
+    expect(screen.getByTestId('phone-hero')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Browse Categories' })).toBeInTheDocument()
   })
 })

@@ -252,7 +252,52 @@ export function FieldEditor({
             />
             Also show as a button on the collapsed card, before the arrow
           </label>
+          <label className="flex items-center gap-1.5 text-xs text-slate-700 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={!!f.linkInDetails}
+              onChange={(e) => onChange({ linkInDetails: e.target.checked || undefined })}
+              className="rounded border-slate-300"
+            />
+            On an opened listing, a line with the address and phone, not a round button
+          </label>
         </>
+      )}
+
+      {f.type === 'boolean' && (
+        <label className="flex items-center gap-1.5 text-xs text-slate-700 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={!!f.minyanOnly}
+            onChange={(e) => onChange({ minyanOnly: e.target.checked || undefined })}
+            className="rounded border-slate-300"
+          />
+          Yes means it&rsquo;s a minyan that meets somewhere, not a shul: a clock for its picture, and no asking for Shabbos times
+        </label>
+      )}
+
+      {f.type === 'contacts' && (
+        <label className="flex items-center gap-1.5 text-xs text-slate-700 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={!!f.entryFrom}
+            onChange={(e) => onChange({ entryFrom: e.target.checked || undefined })}
+            className="rounded border-slate-300"
+          />
+          Entries say where they&rsquo;re from (&ldquo;From Monsey&rdquo;), for rides
+        </label>
+      )}
+
+      {(f.type === 'text' || f.type === 'textarea') && (
+        <label className="flex items-center gap-1.5 text-xs text-slate-700 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={f.shownAround === 'sukkos'}
+            onChange={(e) => onChange({ shownAround: e.target.checked ? 'sukkos' : undefined })}
+            className="rounded border-slate-300"
+          />
+          On listings only from Rosh Hashanah to the end of Sukkos (a sukkah)
+        </label>
       )}
 
       {(f.type === 'text' || f.type === 'textarea') && (
@@ -320,11 +365,11 @@ export function FieldEditor({
               onChange={(e) => onChange({ showCountInHeader: e.target.checked })}
               className="rounded border-slate-300"
             />
-            Show a count on the collapsed card (e.g. &ldquo;12 kosher items&rdquo;)
+            Show the items on the row (e.g. &ldquo;Challah, milk, chicken +5&rdquo;)
           </label>
           {f.showCountInHeader && (
             <label className="block ml-5 mt-1 sm:w-1/2">
-              <span className={fieldLabel}>Singular word for the count (optional)</span>
+              <span className={fieldLabel}>Singular word for the count in the opened listing (optional)</span>
               <input
                 value={f.countLabel ?? ''}
                 onChange={(e) => onChange({ countLabel: e.target.value || undefined })}
@@ -338,7 +383,7 @@ export function FieldEditor({
           )}
           {f.showCountInHeader && badgeFieldOptions.length > 0 && (
             <label className="block ml-5 mt-1.5 sm:w-1/2">
-              <span className={fieldLabel}>Replaces this badge once there&rsquo;s a count (optional)</span>
+              <span className={fieldLabel}>Replaces this badge once there are items (optional)</span>
               <select
                 value={f.countReplacesKey ?? ''}
                 onChange={(e) => onChange({ countReplacesKey: e.target.value || undefined })}
@@ -350,7 +395,7 @@ export function FieldEditor({
                 ))}
               </select>
               <span className="block text-[11px] text-muted mt-0.5">
-                E.g. a &ldquo;Kosher&rdquo; badge next to a &ldquo;12 kosher items&rdquo; count says the same thing twice — pick it here and it hides once there&rsquo;s a count to show instead. Listings with no items yet still get the badge you picked.
+                E.g. a &ldquo;Kosher Items&rdquo; badge beside the items themselves says the same thing twice — pick it here and it hides once there are items to show. A value that says something the items don&rsquo;t (&ldquo;Kosher Store&rdquo;) stays. Listings with no items yet still get the badge.
               </span>
             </label>
           )}

@@ -3,6 +3,14 @@
     {
       "path": "/api/cron/sync-hours",
       "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/cron/watches",
+      "schedule": "0 7 * * *"
+    },
+    {
+      "path": "/api/cron/walk-routes",
+      "schedule": "0 8 * * *"
     }
   ]
 }

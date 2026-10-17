@@ -1,0 +1,154 @@
+'use client'
+
+import Link from 'next/link'
+import { useEffect, useState } from 'react'
+import { track } from '@vercel/analytics'
+import MobileSheet from '@/components/resources/MobileSheet'
+import { ChevronRightIcon, PeopleIcon } from '@/components/icons'
+import { routes } from '@/lib/routes'
+import { everyListingDated, sourcesRead, sourcesSentence, trustLine, type TrustFacts } from '@/lib/phoneHome'
+import { useEruvStatuses } from '@/lib/useEruvStatuses'
+
+// ── Who keeps the guide right (the user, Oct 17) ────────────────────────────
+// The top of the phone home, where the headline and mission were: a promise
+// with its evidence ("155 places · hours checked with Google every night").
+// Tapped, a short sheet says how the guide stays right, in front of the
+// About page, which stays for "what is this".
+//
+// It says hours, never "verified": Google can't check a hechsher. The last
+// change a person made isn't on it: with few edits yet, "updated 3 weeks
+// ago" would make the guide look abandoned. Once there's a steady trickle,
+// "12 fixes this month" belongs here.
+
+type Props = {
+  facts: TrustFacts
+  /** "Philadelphia", for "people in the Philadelphia community". The band
+   *  itself just says "the community": the header already names it, and
+   *  "the Philadelphia community" took two lines on a phone. */
+  region: string
+  communitySlug: string
+}
+
+export default function TrustBand({ facts, region, communitySlug }: Props) {
+  const [open, setOpen] = useState(false)
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => {
+          track('trust_opened')
+          setOpen(true)
+        }}
+        aria-haspopup="dialog"
+        data-testid="trust-band"
+        className="flex w-full cursor-pointer items-center gap-2.5 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-left hover:bg-slate-50"
+      >
+        <ShieldCheck className="h-6 w-6 shrink-0 text-emerald-700" />
+        <span className="min-w-0 flex-1">
+          <span className="block text-[14.5px] font-extrabold leading-snug text-ink">Kept up by the community</span>
+          <span className="block text-[12.5px] leading-snug text-slate-500">{trustLine(facts)}</span>
+        </span>
+        <ChevronRightIcon className="h-4 w-4 shrink-0 text-slate-400" />
+      </button>
+      <TrustSheet open={open} facts={facts} region={region} communitySlug={communitySlug} onClose={() => setOpen(false)} />
+    </>
+  )
+}
+
+type ListRead = { label: string | null; okAt: string | null }
+let listsRead: Promise<ListRead[]> | null = null
+
+/** The outside lists the guide reads (/api/sources), once per page load;
+ *  nothing when it can't be had, so the sheet just doesn't name them. */
+function fetchListsRead(communitySlug: string): Promise<ListRead[]> {
+  listsRead ??= fetch(`/api/sources?community=${encodeURIComponent(communitySlug)}`)
+    .then((r) => r.json())
+    .then((b) => (b?.ok && Array.isArray(b.lists) ? (b.lists as ListRead[]) : []))
+    .catch(() => [])
+  return listsRead
+}
+
+/** For tests. */
+export function clearListsRead(): void {
+  listsRead = null
+}
+
+// The site's own bottom sheet, as Filters and Edit are (it was a sheet of
+// its own until Oct 17, and looked it). Three short lines (the user,
+// Oct 17: people want the idea, not each source): where there's a source,
+// the guide reads it; people fill in the rest, reviewed; every listing is
+// dated. Each source named only once it has run this week.
+function TrustSheet({ open, facts, region, communitySlug, onClose }: { open: boolean; facts: TrustFacts; region: string; communitySlug: string; onClose: () => void }) {
+  const [lists, setLists] = useState<{ lists: ListRead[]; at: number } | null>(null)
+  const eruv = useEruvStatuses(communitySlug, open)
+  useEffect(() => {
+    if (!open) return
+    let live = true
+    fetchListsRead(communitySlug).then((l) => live && setLists({ lists: l, at: Date.now() }))
+    return () => {
+      live = false
+    }
+  }, [open, communitySlug])
+  const read = lists && eruv ? sourcesRead(facts, lists.lists, eruv.available ? eruv.eruvim.map((e) => e.statusCheckedAt) : [], lists.at) : null
+  const sentence = read ? sourcesSentence(read) : null
+  return (
+    <MobileSheet isOpen={open} onClose={onClose} title="How this guide stays right">
+      <ul className="space-y-4" data-testid="trust-sheet">
+        {read === null ? (
+          <li aria-hidden="true" className="h-14 animate-pulse rounded-xl bg-slate-100" />
+        ) : (
+          sentence && (
+            <Row icon={<ShieldCheck className="h-5 w-5" />} tone="bg-emerald-50 text-emerald-700" title="Where there’s a source, we check it">
+              {sentence}
+            </Row>
+          )
+        )}
+        <Row icon={<PeopleIcon className="h-5 w-5" />} tone="bg-primary/10 text-primary" title={sentence ? `People in ${region} fill in the rest` : `People in ${region} keep it up`}>
+          {sentence ? 'Minyan times, kosher items, Shabbos details.' : 'Everything here is added and fixed by people in the community.'} A person reviews every change before it shows.
+        </Row>
+        {/* "when" only once every place has a date: until then some say
+            "Not confirmed by anyone yet", which is the "if". "Where" since
+            Oct 17: a date an outside source gave names it ("From
+            Keystone-K's list, Oct 12"), and "Confirmed" is a person. */}
+        <Row icon={<CalendarCheck className="h-5 w-5" />} tone="bg-[#c9a45c]/15 text-[#7a5a1c]" title={everyListingDated(facts) ? 'Every listing says where and when it was last checked' : 'Every listing says if and when it was checked'}>
+          Something wrong? Open the place and tap <strong className="font-bold text-ink">Suggest an edit</strong>.
+        </Row>
+      </ul>
+      <Link href={routes.about(communitySlug)} className="mt-4 flex min-h-11 items-center justify-between border-t border-slate-200 pt-3 text-[15px] font-semibold text-ink hover:underline">
+        About the guide
+        <ChevronRightIcon className="h-4 w-4 text-slate-400" />
+      </Link>
+    </MobileSheet>
+  )
+}
+
+function Row({ icon, tone, title, children }: { icon: React.ReactNode; tone: string; title: string; children: React.ReactNode }) {
+  return (
+    <li className="flex items-start gap-3">
+      <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${tone}`}>{icon}</span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-[15px] font-extrabold text-ink">{title}</span>
+        <span className="block text-[14px] leading-snug text-slate-700">{children}</span>
+      </span>
+    </li>
+  )
+}
+
+function ShieldCheck({ className }: { className?: string }) {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M12 3 5 6v5c0 4.4 3 8.3 7 10 4-1.7 7-5.6 7-10V6l-7-3Z" />
+      <path d="m9 12 2 2 4-4" />
+    </svg>
+  )
+}
+
+function CalendarCheck({ className }: { className?: string }) {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <rect x="3.5" y="5" width="17" height="15" rx="2" />
+      <path d="M3.5 10h17M8 3v4M16 3v4" />
+      <path d="m9.5 15 2 2 3.5-3.5" />
+    </svg>
+  )
+}

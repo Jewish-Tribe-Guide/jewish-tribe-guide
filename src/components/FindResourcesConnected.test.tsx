@@ -39,8 +39,14 @@ vi.mock('@/components/resources/ResourceLoader', () => ({
     </div>
   ),
 }))
-vi.mock('@/components/resources/ListingForm', () => ({
-  default: ({ mode }: { mode: string }) => <p>ListingForm: {mode}</p>,
+vi.mock('@/components/resources/ListingEditor', () => ({
+  default: () => <p>ListingEditor: edit</p>,
+}))
+// Add's first step is the Google search; the real one loads the Maps SDK.
+vi.mock('@/components/intake/AddressInput', () => ({
+  default: ({ id, value, onChange }: { id?: string; value: string; onChange: (v: string) => void }) => (
+    <input id={id} value={value} onChange={(e) => onChange(e.target.value)} />
+  ),
 }))
 vi.mock('@/components/TurnstileWidget', () => ({ default: () => null }))
 
@@ -65,15 +71,17 @@ describe('FindResourcesConnected', () => {
       { content: { categories: [grocery] } },
     )
 
-    expect(screen.getByText('ListingForm: edit')).toBeInTheDocument()
+    expect(screen.getByText('ListingEditor: edit')).toBeInTheDocument()
   })
 
-  it('turns a param change (e.g. opening Add) into a real router.push, and opens the form immediately', async () => {
-    // Unlike edit/report, create has no listing id to deep-link from — see
-    // FindResources' own `deepLinkListing` comment — so this only works
-    // because router.push (pushSyncingSearchParams) updates the mocked
-    // useSearchParams() in the same render the click's local actionSubject
-    // state updates in — a real router does the same via React's batching.
+  it('opens the form immediately via local state, updating the URL through history.replaceState rather than router.push', async () => {
+    // FindResources' own actionSubject doc: opening Add/Edit/Report used to
+    // depend on router.push round-tripping back into useSearchParams() for
+    // the dialog to even render — that's a real Next.js navigation, and on
+    // an already-mounted route it re-renders everything below it (confirmed
+    // live as the listing grid visibly reloading behind the dialog). It
+    // opens through local state now, with the URL kept in sync via
+    // history.replaceState instead — no router.push, no re-render cascade.
     const user = userEvent.setup()
     const grocery = makeCategory({ id: 'grocery', kind: 'listing' })
     renderWithProviders(<FindResourcesConnected view="grocery" listings={[]} anchor={anchor} onUp={vi.fn()} />, {
@@ -82,7 +90,8 @@ describe('FindResourcesConnected', () => {
 
     await user.click(screen.getByText('Add listing'))
 
-    expect(mockRouter.push).toHaveBeenCalledWith('/philly/grocery?form=create')
-    expect(screen.getByText('ListingForm: create')).toBeInTheDocument()
+    expect(mockRouter.push).not.toHaveBeenCalled()
+    expect(window.location.search).toBe('?form=create')
+    expect(screen.getByLabelText('Find the place')).toBeInTheDocument()
   })
 })

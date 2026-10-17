@@ -43,6 +43,9 @@ type LocationContextValue = {
   /** What the directories sort by. */
   anchor: DirectoryAnchor
   coords: { lat: number; lng: number } | null
+  /** How far off the live fix may be, in metres (the phone's own figure);
+   *  null for a typed address or a listing, which are where they say. */
+  accuracyM: number | null
   liveTracking: LiveTracking
   /** Ready-to-use origin for a Maps "Directions" link — the visitor's typed
    *  address or a listing's name (anchor.label) when either is set, since
@@ -82,6 +85,7 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
   const {
     address,
     coords,
+    accuracy,
     listingId,
     setAddress,
     setCoords,
@@ -126,6 +130,7 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
       // ever showing, which reads as broken rather than as "no location set."
       anchor: { coords, label: coords ? address : '' },
       coords,
+      accuracyM: accuracy,
       liveTracking: { tracking, error: geoError, errorSilent: geoErrorSilent, resumingSilently, start, stop },
       directionsOrigin: !tracking && coords && address && address !== CURRENT_LOCATION_LABEL ? address : coords,
       anchorListingId: listingId,
@@ -159,7 +164,7 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
     // setAddress/setCoords/setAnchor are stable useCallback setters; start/stop
     // are stable closures over the same watch.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [address, coords, listingId, tracking, geoError, geoErrorSilent, resumingSilently],
+    [address, coords, accuracy, listingId, tracking, geoError, geoErrorSilent, resumingSilently],
   )
 
   return <LocationContext.Provider value={value}>{children}</LocationContext.Provider>

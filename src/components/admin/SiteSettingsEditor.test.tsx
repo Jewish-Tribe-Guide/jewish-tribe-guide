@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, screen, waitFor } from '@testing-library/react'
+import { cleanup, within, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { makeCategory, makeCommunity } from '@/test/providerFixtures'
@@ -8,6 +8,7 @@ import { mockRouter } from '@/test/nextNavigationMock'
 import { fetchJson, parseOkJson } from '@/lib/fetchJson'
 import { SITE_SETTINGS_DEFAULTS } from '@/lib/siteSettings'
 import type { HomeSection } from '@/lib/homeSections'
+import { writePreviewDraft } from '@/lib/previewDraft'
 import SiteSettingsEditor from './SiteSettingsEditor'
 
 // SiteSettingsEditor loads its own draft over the network (settings +
@@ -24,6 +25,10 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
 }))
 vi.mock('@/lib/fetchJson', () => ({ fetchJson: vi.fn(), parseOkJson: vi.fn() }))
+// The Today home is held back from the site (features.ts); its settings are
+// tested with it switched on, and once with it off.
+const features = vi.hoisted(() => ({ todayHome: true, whatChanged: true }))
+vi.mock('@/lib/features', () => ({ features }))
 vi.mock('@/lib/previewDraft', () => ({
   previewUrl: () => 'https://example.com/preview',
   writePreviewDraft: vi.fn(),
@@ -183,6 +188,76 @@ describe('SiteSettingsEditor — the Site tab', () => {
     expect(body.name).toBe('New Name')
   })
 
+  // Held back (features.ts): nothing to choose, so the section isn't there.
+  it('while the Today home is held back, the Site tab has no Home page section', async () => {
+    const user = userEvent.setup()
+    features.todayHome = false
+    try {
+      await renderEditor('site')
+      await openAllSections(user)
+      expect(screen.queryByTestId('home-style')).not.toBeInTheDocument()
+      expect(screen.queryByTestId('today-blocks')).not.toBeInTheDocument()
+      expect(screen.queryByRole('textbox', { name: /^Before candles looks for/ })).not.toBeInTheDocument()
+    } finally {
+      features.todayHome = true
+    }
+  })
+
+  // The Today home (step 6) is chosen here, tried in Preview first, and
+  // switched on or back with one save.
+  it('choosing the Today home and saving sends it; Preview shows it before then', async () => {
+    const user = userEvent.setup()
+    await renderEditor('site')
+    await openAllSections(user)
+
+    const choice = within(screen.getByTestId('home-style'))
+    expect(choice.getByRole('radio', { name: /^Classic/ })).toBeChecked()
+    await user.click(choice.getByRole('radio', { name: /^Today/ }))
+
+    await user.click(screen.getByRole('button', { name: 'Preview' }))
+    expect(vi.mocked(writePreviewDraft).mock.calls[0]![0].settings.homeStyle).toBe('today')
+    await user.click(screen.getByRole('button', { name: /close/i }))
+
+    vi.mocked(fetchJson).mockResolvedValue({ settings: { ...SITE_SETTINGS_DEFAULTS, homeStyle: 'today' } })
+    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+    await waitFor(() => expect(screen.getByText('Saved.')).toBeInTheDocument())
+    const body = JSON.parse((vi.mocked(fetchJson).mock.calls[0]![1] as RequestInit).body as string)
+    expect(body.homeStyle).toBe('today')
+  })
+
+  it('Before candles’ items are one line of names, saved as a list', async () => {
+    const user = userEvent.setup()
+    await renderEditor('site')
+    await openAllSections(user)
+    const input = screen.getByRole('textbox', { name: /^Before candles looks for/ })
+    expect(input).toHaveValue('Challah, Wine, Chicken')
+    await user.clear(input)
+    await user.type(input, 'Challah, Grape juice, ')
+    expect(input).toHaveValue('Challah, Grape juice, ')
+
+    vi.mocked(fetchJson).mockResolvedValue({ settings: { ...SITE_SETTINGS_DEFAULTS, beforeCandleItems: ['Challah', 'Grape juice'] } })
+    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+    await waitFor(() => expect(screen.getByText('Saved.')).toBeInTheDocument())
+    const body = JSON.parse((vi.mocked(fetchJson).mock.calls[0]![1] as RequestInit).body as string)
+    expect(body.beforeCandleItems).toEqual(['Challah', 'Grape juice'])
+  })
+
+  it('each Today block can be left off, and is saved as off', async () => {
+    const user = userEvent.setup()
+    await renderEditor('site')
+    await openAllSections(user)
+    const blocks = within(screen.getByTestId('today-blocks'))
+    expect(blocks.getAllByRole('checkbox').map((c) => (c as HTMLInputElement).checked)).toEqual([true, true, true, true, true, true, true])
+    await user.click(blocks.getByRole('checkbox', { name: /^Open now/ }))
+
+    vi.mocked(fetchJson).mockResolvedValue({ settings: { ...SITE_SETTINGS_DEFAULTS, todayHidden: ['openNow'] } })
+    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+    await waitFor(() => expect(screen.getByText('Saved.')).toBeInTheDocument())
+    const body = JSON.parse((vi.mocked(fetchJson).mock.calls[0]![1] as RequestInit).body as string)
+    expect(body.todayHidden).toEqual(['openNow'])
+    expect(blocks.getByRole('checkbox', { name: /^Open now/ })).not.toBeChecked()
+  })
+
   it('toggling feedback off hides the feedback sub-fields', async () => {
     const user = userEvent.setup()
     await renderEditor('site', { ...SITE_SETTINGS_DEFAULTS, feedbackEnabled: true })
@@ -244,21 +319,23 @@ describe('SiteSettingsEditor — the Desktop tab', () => {
     expect(screen.getByText('Click the preview to reposition/re-zoom it')).toBeInTheDocument()
   })
 
-  it('shows the top nav editor, hero, colors, and home screen cards sections — not Featured cards, which was removed', async () => {
+  it('shows the top nav editor, hero, and home screen cards sections — not Featured cards or Colors, which were removed', async () => {
     await renderEditor('desktop')
     expect(screen.getByText('Top nav bar')).toBeInTheDocument()
     expect(screen.getByText('Hero')).toBeInTheDocument()
-    expect(screen.getByText('Colors')).toBeInTheDocument()
     expect(screen.getByText('Home screen cards')).toBeInTheDocument()
     expect(screen.queryByText('Featured cards')).not.toBeInTheDocument()
+    // The accent colour picker changed nothing on the site (never wired up),
+    // and the redesign's one look leaves nothing for it to change.
+    expect(screen.queryByText('Colors')).not.toBeInTheDocument()
     // Mobile-only fields don't leak onto this tab.
     expect(screen.queryByText('Mobile tab bar')).not.toBeInTheDocument()
   })
 
-  it('orders Top nav bar, then Hero, then Colors, then Home screen cards', async () => {
+  it('orders Top nav bar, then Hero, then Home screen cards', async () => {
     await renderEditor('desktop')
     const headings = screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent)
-    const order = ['Top nav bar', 'Hero', 'Colors', 'Home screen cards']
+    const order = ['Top nav bar', 'Hero', 'Home screen cards']
     const indices = order.map((label) => headings.indexOf(label))
     expect(indices).toEqual([...indices].sort((a, b) => a - b))
     expect(indices.every((i) => i !== -1)).toBe(true)
@@ -281,7 +358,7 @@ describe('SiteSettingsEditor — the Desktop tab', () => {
   it('toggling a card between Full and Half width enables Save', async () => {
     const user = userEvent.setup()
     await renderEditor('desktop', SITE_SETTINGS_DEFAULTS, [
-      { id: 'map', kind: 'map', title: 'Map Card', sortOrder: 0, cardIds: [], width: 'full' },
+      { id: 'davening', kind: 'davening', title: 'Davening Times Card', sortOrder: 0, cardIds: [], width: 'full' },
     ])
     await openAllSections(user)
     expect(screen.getByRole('button', { name: 'Save changes' })).toBeDisabled()

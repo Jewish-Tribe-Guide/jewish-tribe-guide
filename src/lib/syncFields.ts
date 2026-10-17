@@ -16,6 +16,7 @@
 // added here.
 export const SYNC_INTERNAL_FIELDS = [
   'googleSyncedAt',
+  'googleStatusCheckedAt',
   'lastSyncError',
   'lastSyncFailedAt',
   'businessStatus',
@@ -25,6 +26,26 @@ export const SYNC_INTERNAL_FIELDS = [
   'googleDescription',
   'verifiedPlaceId',
   'legacyId',
+  // When each grocery item was last seen. Computed on approval from the
+  // stored row (submissionStore's withItemDates), never taken from a
+  // submission, and not something a moderator is approving.
+  'itemSeen',
+  // Items a visitor has said are gone, while an admin decides (the
+  // removal is its own submission). Set by mark_item, cleared by
+  // rejecting that removal or a later "Still here".
+  'itemGone',
+  // When an admin approved each dish from the place's own menu, and the
+  // menu it was read from (the admin's "Main dishes" tab, migration 065).
+  // An admin's, never a submitter's: an edit can't date a dish "on its menu".
+  'itemMenu',
+  'menuUrl',
+  // When each of a mikvah's sections was last confirmed (confirm_section,
+  // migration 071): a visitor's tap, never a submitter's or a moderator's.
+  'sectionConfirmed',
+  // Which outside source dated the listing (Keystone-K's list, Refuah), set
+  // on approval from the submission's server-set source. Never a
+  // submitter's: an edit can't say it came from the agency.
+  'confirmedFrom',
 ] as const
 
 /** Additionally hidden from the moderation diff, though a submitter MAY change
@@ -39,3 +60,54 @@ export const DIFF_ONLY_HIDDEN_FIELDS = ['geo', 'placeId', 'googleFields', 'googl
  *  there it IS content a moderator should see. The diff hides it only when the
  *  category never configured it — see SKIP_WHEN_UNCONFIGURED. */
 export const SHOWN_WHEN_CONFIGURED = 'googleDescription'
+
+/** The one internal a submission may still carry: picking an address reads
+ *  the place's status off Google (AddressInput → ListingForm), so a new
+ *  listing isn't published with no status at all. Shown in the moderation
+ *  diff whenever a submission carries it — see submitterDetails for when
+ *  that is. */
+export const SHOWN_WHEN_PROPOSED = 'businessStatus'
+
+const GOOGLE_BUSINESS_STATUSES: ReadonlySet<unknown> = new Set(['OPERATIONAL', 'CLOSED_TEMPORARILY', 'CLOSED_PERMANENTLY'])
+
+/**
+ * A submitter's `details` with the app's own keys taken off, for the public
+ * submissions route to file.
+ *
+ * Nothing else stood in the way. The validator checks only the category's
+ * configured fields and ignores the rest, approval keeps a stored internal
+ * only when the edit didn't supply one, and the diff hides every one of these
+ * keys — so a hand-made POST could set `businessStatusOverride`,
+ * `googleSyncedAt` or `verifiedPlaceId` on a listing, and the admin approving
+ * it would see nothing about it in the queue.
+ *
+ * Two kinds are a person's to send, and are kept:
+ * - `googleDescription` where the category configures it as a field (it is
+ *   then a real, editable Description — see SHOWN_WHEN_CONFIGURED);
+ * - `businessStatus` read off a place picked just now: a real Google status,
+ *   in a category the sync covers, with a placeId that is new — every create,
+ *   or an edit that changed the place. An edit that kept its place drops it,
+ *   and approval keeps the listing's stored status, which the sync may have
+ *   updated since the form loaded.
+ */
+export function submitterDetails(
+  details: Record<string, unknown>,
+  ctx: {
+    operation: 'create' | 'update'
+    fieldKeys: readonly string[]
+    syncEligible: boolean
+    storedPlaceId?: unknown
+  },
+): Record<string, unknown> {
+  const placeId = details.placeId
+  const pickedNewPlace =
+    typeof placeId === 'string' && placeId !== '' && (ctx.operation === 'create' || placeId !== ctx.storedPlaceId)
+  const keepStatus = ctx.syncEligible && pickedNewPlace && GOOGLE_BUSINESS_STATUSES.has(details[SHOWN_WHEN_PROPOSED])
+  const next = { ...details }
+  for (const key of SYNC_INTERNAL_FIELDS) {
+    if (key === SHOWN_WHEN_CONFIGURED && ctx.fieldKeys.includes(key)) continue
+    if (key === SHOWN_WHEN_PROPOSED && keepStatus) continue
+    delete next[key]
+  }
+  return next
+}

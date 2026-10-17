@@ -1,0 +1,295 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>Elkins Park Eruv</name>
+    <description/>
+    <Style id="icon-1325-labelson">
+      <IconStyle>
+        <scale>1.1</scale>
+        <Icon>
+          <href>https://www.gstatic.com/mapspro/images/stock/1325-poi-religious-jewish.png</href>
+        </Icon>
+      </IconStyle>
+    </Style>
+    <Style id="icon-1325-labelson-nodesc">
+      <IconStyle>
+        <scale>1.1</scale>
+        <Icon>
+          <href>https://www.gstatic.com/mapspro/images/stock/1325-poi-religious-jewish.png</href>
+        </Icon>
+      </IconStyle>
+      <BalloonStyle>
+        <text><![CDATA[<h3>$[name]</h3>]]></text>
+      </BalloonStyle>
+    </Style>
+    <Style id="icon-503-DB4436-nodesc-normal">
+      <IconStyle>
+        <color>ff3644db</color>
+        <scale>1.1</scale>
+        <Icon>
+          <href>https://www.gstatic.com/mapspro/images/stock/503-wht-blank_maps.png</href>
+        </Icon>
+        <hotSpot x="16" xunits="pixels" y="32" yunits="insetPixels"/>
+      </IconStyle>
+      <LabelStyle>
+        <scale>0</scale>
+      </LabelStyle>
+      <BalloonStyle>
+        <text><![CDATA[<h3>$[name]</h3>]]></text>
+      </BalloonStyle>
+    </Style>
+    <Style id="icon-503-DB4436-nodesc-highlight">
+      <IconStyle>
+        <color>ff3644db</color>
+        <scale>1.1</scale>
+        <Icon>
+          <href>https://www.gstatic.com/mapspro/images/stock/503-wht-blank_maps.png</href>
+        </Icon>
+        <hotSpot x="16" xunits="pixels" y="32" yunits="insetPixels"/>
+      </IconStyle>
+      <LabelStyle>
+        <scale>1.1</scale>
+      </LabelStyle>
+      <BalloonStyle>
+        <text><![CDATA[<h3>$[name]</h3>]]></text>
+      </BalloonStyle>
+    </Style>
+    <StyleMap id="icon-503-DB4436-nodesc">
+      <Pair>
+        <key>normal</key>
+        <styleUrl>#icon-503-DB4436-nodesc-normal</styleUrl>
+      </Pair>
+      <Pair>
+        <key>highlight</key>
+        <styleUrl>#icon-503-DB4436-nodesc-highlight</styleUrl>
+      </Pair>
+    </StyleMap>
+    <Style id="line-1267FF-5000-nodesc-normal">
+      <LineStyle>
+        <color>ffff6712</color>
+        <width>5</width>
+      </LineStyle>
+      <BalloonStyle>
+        <text><![CDATA[<h3>$[name]</h3>]]></text>
+      </BalloonStyle>
+    </Style>
+    <Style id="line-1267FF-5000-nodesc-highlight">
+      <LineStyle>
+        <color>ffff6712</color>
+        <width>7.5</width>
+      </LineStyle>
+      <BalloonStyle>
+        <text><![CDATA[<h3>$[name]</h3>]]></text>
+      </BalloonStyle>
+    </Style>
+    <StyleMap id="line-1267FF-5000-nodesc">
+      <Pair>
+        <key>normal</key>
+        <styleUrl>#line-1267FF-5000-nodesc-normal</styleUrl>
+      </Pair>
+      <Pair>
+        <key>highlight</key>
+        <styleUrl>#line-1267FF-5000-nodesc-highlight</styleUrl>
+      </Pair>
+    </StyleMap>
+    <Style id="line-4186F0-5000-nodesc-normal">
+      <LineStyle>
+        <color>fff08641</color>
+        <width>5</width>
+      </LineStyle>
+      <BalloonStyle>
+        <text><![CDATA[<h3>$[name]</h3>]]></text>
+      </BalloonStyle>
+    </Style>
+    <Style id="line-4186F0-5000-nodesc-highlight">
+      <LineStyle>
+        <color>fff08641</color>
+        <width>7.5</width>
+      </LineStyle>
+      <BalloonStyle>
+        <text><![CDATA[<h3>$[name]</h3>]]></text>
+      </BalloonStyle>
+    </Style>
+    <StyleMap id="line-4186F0-5000-nodesc">
+      <Pair>
+        <key>normal</key>
+        <styleUrl>#line-4186F0-5000-nodesc-normal</styleUrl>
+      </Pair>
+      <Pair>
+        <key>highlight</key>
+        <styleUrl>#line-4186F0-5000-nodesc-highlight</styleUrl>
+      </Pair>
+    </StyleMap>
+    <Folder>
+      <name>Important Streets</name>
+    </Folder>
+    <Folder>
+      <name>Homes and Eruv Boundary</name>
+      <Placemark>
+        <name>Eruv Boundary</name>
+        <styleUrl>#line-4186F0-5000-nodesc</styleUrl>
+        <LineString>
+          <tessellate>1</tessellate>
+          <coordinates>
+            -75.11114,40.06188,0
+            -75.11447,40.05995,0
+            -75.124855,40.054757,0
+            -75.128363,40.056785,0
+            -75.131716,40.058859,0
+            -75.13511,40.06111,0
+            -75.13781,40.0625,0
+            -75.13926,40.0633,0
+            -75.14313,40.06563,0
+            -75.13917,40.06959,0
+            -75.13939,40.07008,0
+            -75.13932,40.07072,0
+            -75.13893,40.07127,0
+            -75.13793,40.07165,0
+            -75.13745,40.07198,0
+            -75.13764,40.07303,0
+            -75.13737,40.0734,0
+            -75.13848,40.07413,0
+            -75.13952,40.07426,0
+            -75.14226,40.07524,0
+            -75.14742,40.07851,0
+            -75.14227,40.08387,0
+            -75.14126,40.08364,0
+            -75.1313058,40.0892986,0
+            -75.1174658,40.0817764,0
+            -75.11481,40.07977,0
+            -75.10983,40.07702,0
+            -75.1266501,40.0648814,0
+            -75.11743,40.06559,0
+            -75.1152657,40.0604439,0
+            -75.11114,40.06188,0
+          </coordinates>
+        </LineString>
+      </Placemark>
+      <Placemark>
+        <name>Young Israel of Elkins Park</name>
+        <description><![CDATA[<img src="https://lh3.googleusercontent.com/umsh/AN6v0v6wGIYdQyN7KbhriX41WiNils8AcJS4MK1waAAWjsdfTR3BQRiadZhvUftXvcwofQbISC2gOF-msYVh2R7_uPRUjCNepkRq_SyBwrLdHdQfy5P1aKcmQxhjMZ5dCkeDXISkBLO0KP7Aj2iZp1oVwQDb4rgv8WHw6tHAsOjIKa9vEvZ3NRM" height="200" width="auto" /><br><br>7715 Montgomery Ave<br>Elkins Park, PA 19027]]></description>
+        <styleUrl>#icon-1325-labelson</styleUrl>
+        <ExtendedData>
+          <Data name="gx_media_links">
+            <value>https://lh3.googleusercontent.com/umsh/AN6v0v6wGIYdQyN7KbhriX41WiNils8AcJS4MK1waAAWjsdfTR3BQRiadZhvUftXvcwofQbISC2gOF-msYVh2R7_uPRUjCNepkRq_SyBwrLdHdQfy5P1aKcmQxhjMZ5dCkeDXISkBLO0KP7Aj2iZp1oVwQDb4rgv8WHw6tHAsOjIKa9vEvZ3NRM</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -75.125738,40.0674558,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Yeshiva Gedola of Elkins Park</name>
+        <styleUrl>#icon-1325-labelson-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            -75.1184565,40.0746508,0
+          </coordinates>
+        </Point>
+      </Placemark>
+    </Folder>
+    <Folder>
+      <name>Directions from Elkins Park House to Young Israel of Elkins Park</name>
+      <Placemark>
+        <name>Directions from Elkins Park House to Young Israel of Elkins Park</name>
+        <styleUrl>#line-1267FF-5000-nodesc</styleUrl>
+        <LineString>
+          <tessellate>1</tessellate>
+          <coordinates>
+            -75.13179,40.07438,0
+            -75.1318,40.07438,0
+            -75.13183,40.07438,0
+            -75.13186,40.07437,0
+            -75.13189,40.07435,0
+            -75.13192,40.07433,0
+            -75.13195,40.07429,0
+            -75.13198,40.07425,0
+            -75.132,40.0742,0
+            -75.13201,40.07416,0
+            -75.13201,40.07413,0
+            -75.13201,40.0741,0
+            -75.132,40.07404,0
+            -75.13197,40.07397,0
+            -75.13207,40.07397,0
+            -75.1322,40.07393,0
+            -75.13227,40.07391,0
+            -75.13231,40.07389,0
+            -75.13237,40.07387,0
+            -75.13242,40.07383,0
+            -75.13245,40.0738,0
+            -75.13254,40.07367,0
+            -75.13171,40.07318,0
+            -75.13162,40.07312,0
+            -75.13002,40.0721,0
+            -75.1299,40.07207,0
+            -75.12985,40.07205,0
+            -75.12975,40.07203,0
+            -75.12964,40.07201,0
+            -75.12954,40.072,0
+            -75.12946,40.07199,0
+            -75.1293,40.07199,0
+            -75.12918,40.07198,0
+            -75.12908,40.07197,0
+            -75.129,40.07196,0
+            -75.1289,40.07193,0
+            -75.12876,40.07187,0
+            -75.12869,40.07183,0
+            -75.12862,40.07179,0
+            -75.12854,40.07174,0
+            -75.12846,40.07167,0
+            -75.12832,40.07154,0
+            -75.12828,40.07143,0
+            -75.12824,40.07133,0
+            -75.12821,40.07121,0
+            -75.12816,40.071,0
+            -75.12811,40.07075,0
+            -75.1275,40.06798,0
+            -75.12747,40.068,0
+            -75.12744,40.06801,0
+            -75.12742,40.06802,0
+            -75.12738,40.06804,0
+            -75.12728,40.06808,0
+            -75.12722,40.0681,0
+            -75.12717,40.06812,0
+            -75.12702,40.06815,0
+            -75.12695,40.06817,0
+            -75.12688,40.06818,0
+            -75.12679,40.06821,0
+            -75.12664,40.06825,0
+            -75.12654,40.06827,0
+            -75.12642,40.06831,0
+            -75.12626,40.06836,0
+            -75.12621,40.06821,0
+            -75.126,40.06742,0
+          </coordinates>
+        </LineString>
+      </Placemark>
+      <Placemark>
+        <name>Elkins Park House</name>
+        <styleUrl>#icon-503-DB4436-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            -75.1317895,40.0743842,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Young Israel of Elkins Park</name>
+        <styleUrl>#icon-503-DB4436-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            -75.1259981,40.067416,0
+          </coordinates>
+        </Point>
+      </Placemark>
+    </Folder>
+    <Folder>
+      <name>Untitled layer</name>
+    </Folder>
+    <Folder>
+      <name>Untitled layer</name>
+    </Folder>
+  </Document>
+</kml>

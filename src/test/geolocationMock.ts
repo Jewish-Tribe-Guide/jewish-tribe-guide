@@ -8,7 +8,14 @@ import { vi } from 'vitest'
 // Installed once, globally, in vitest.setup.ts (same treatment as the
 // localStorage/matchMedia polyfills there) so every jsdom test gets a safe
 // default; import emitPosition/emitError here to drive a specific test's
-// success/error path. ──
+// success/error path.
+//
+// The error-callback capture below was removed once as dead code (nothing
+// called emitError — see git history around 2026-09-22) and restored the
+// same day once useWatchPosition.test.ts actually needed it: the real
+// lesson wasn't "delete unused test infrastructure," it was "an untested
+// code path and its would-be test helper are the same gap, closed
+// together." See useWatchPosition.test.ts's own doc. ──
 
 type SuccessCb = (pos: GeolocationPosition) => void
 type ErrorCb = (err: GeolocationPositionError) => void

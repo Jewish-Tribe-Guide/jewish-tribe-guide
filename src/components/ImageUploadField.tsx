@@ -2,6 +2,7 @@
 
 import { useRef, useState } from 'react'
 import ImageCropModal from './ImageCropModal'
+import { useFetchOrPreview } from '@/lib/previewSend'
 
 const ACCEPT = 'image/png,image/jpeg,image/webp,image/gif,image/svg+xml'
 
@@ -38,11 +39,31 @@ type Props = {
    *  lives, so it needs to live somewhere that survives whatever the
    *  caller's own component does. Pass both or neither; when omitted, this
    *  component tracks it internally exactly as before (fine for a caller,
-   *  like ListingForm or CategoryFormFields, that never unmounts this field
+   *  like DetailFieldInput or CategoryFormFields, that never unmounts this field
    *  except when the photo itself is genuinely done with). */
   originalSource?: File | string | null
   onOriginalSourceChange?: (source: File | string | null) => void
   helpText?: string
+  /** The small caption under the buttons — "Click the preview to
+   *  reposition/re-zoom it" once a photo is set, or "or drag an image onto
+   *  the preview, or click it and paste one (⌘V / Ctrl+V)" before one is.
+   *  Default true (admin's logo/hero/category-icon editors keep both — see
+   *  SiteSettingsEditor's own tests). Off for the public listing editors
+   *  (DetailFieldInput, ListingEditor's photo row) specifically: confirmed with the site owner that a
+   *  visitor filling out one form field at a time doesn't need either
+   *  spelled out the way an admin configuring branding once might — Upload
+   *  image/Paste URL are already visible, self-explanatory buttons, and
+   *  drag/paste is a bonus shortcut, not something a
+   *  first-time visitor needs telling about. */
+  showRepositionHint?: boolean
+  /** Starts the "…or paste an image URL directly" row collapsed behind a
+   *  small link instead of always showing its own label + input. Default
+   *  false (admin's own uploaders keep it always visible — admins actually
+   *  use this for stock-photo links). On for the public listing editors
+   *  specifically: most visitors upload a file, and two permanently-visible
+   *  lines for an edge-case path is exactly the bulk that field didn't need
+   *  — see DetailFieldInput's own call site. */
+  collapseUrlInput?: boolean
 }
 
 /** A picture picker that isn't just a file input: paste a URL, drag a file
@@ -60,10 +81,17 @@ export default function ImageUploadField({
   originalSource: controlledOriginalSource,
   onOriginalSourceChange,
   helpText,
+  showRepositionHint = true,
+  collapseUrlInput = false,
 }: Props) {
   const [uploading, setUploading] = useState(false)
+  const fetchOrPreview = useFetchOrPreview()
   const [error, setError] = useState<string | null>(null)
   const [dragOver, setDragOver] = useState(false)
+  // Starts open unless the caller asked to collapse it (see collapseUrlInput's
+  // own doc) — once a visitor/admin clicks to reveal it, it stays open for
+  // the rest of this field's life, same as any other disclosure link.
+  const [urlInputOpen, setUrlInputOpen] = useState(!collapseUrlInput)
   // A picked/dropped/captured/pasted file waits here for the crop step (see
   // ImageCropModal) before it ever reaches `upload` — nothing is sent to the
   // server until the admin/submitter confirms how it's framed. Also doubles
@@ -108,7 +136,6 @@ export default function ImageUploadField({
     else localOriginalSourceRef.current = source
   }
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const cameraInputRef = useRef<HTMLInputElement>(null)
 
   function pickNewFile(file: File) {
     setOriginalSource(file)
@@ -124,11 +151,17 @@ export default function ImageUploadField({
       // notion of a filename) — wrap it so the upload route's multipart
       // parser sees a real file, same as the unmodified original would have.
       body.append('file', new File([file], 'photo.jpg', { type: file.type || 'image/jpeg' }))
-      const res = await fetch(uploadUrl, {
-        method: 'POST',
-        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-        body,
-      })
+      // The admin console's preview uploads nothing: the photo is shown
+      // from this browser's own copy.
+      const res = await fetchOrPreview(
+        uploadUrl,
+        {
+          method: 'POST',
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+          body,
+        },
+        () => ({ url: URL.createObjectURL(file) }),
+      )
       const json = await res.json()
       if (!res.ok || !json.ok) throw new Error(json.errors?.join(' ') || 'Upload failed.')
       onChange(json.url as string)
@@ -156,6 +189,14 @@ export default function ImageUploadField({
 
   return (
     <div>
+      {/* Preview and buttons stay side by side at every width — the buttons
+          now carry short mobile labels ("Upload"/"Camera"/"URL", see below)
+          specifically so they fit the leftover width next to the preview
+          without wrapping, rather than needing the row's full width the
+          longer labels did. An earlier version stacked the preview above
+          the buttons on narrow screens to solve that same crowding, but
+          shortening the labels keeps the picture and its buttons on one
+          line instead, which is how this looked before either change. */}
       <div className="flex items-center gap-3">
         {/* The preview doubles as the drop target — dragging a file directly
             onto the picture it's about to replace reads more naturally than
@@ -216,26 +257,68 @@ export default function ImageUploadField({
 
         <div className="flex flex-col gap-1.5">
           <div className="flex flex-wrap gap-2">
+            {/* One button, not two — a plain `<input type="file">` with no
+                `capture` attribute already opens the OS's own chooser on a
+                phone (iOS Safari: "Take Photo", "Photo Library", "Choose
+                File"; Android Chrome: "Camera", "Files"), so a separate
+                "Take photo" button offering the exact same camera option
+                was a whole extra control for what `capture` only saves —
+                skipping straight past that chooser instead of one extra
+                tap through it. Desktop has no such chooser at all, where
+                the second button did literally nothing "Upload image"
+                didn't. Confirmed live. Each label carries a short mobile
+                version and the full desktop one, swapped with
+                sm:hidden/hidden sm:inline — aria-label pins the accessible
+                name to the full phrase regardless of which one CSS is
+                currently showing, since a screen reader (or a test, which
+                doesn't load Tailwind's compiled CSS and so sees BOTH spans
+                as present) would otherwise read both back to back instead
+                of one real name. */}
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
               disabled={uploading}
+              aria-label={uploading ? 'Uploading…' : 'Upload image'}
               className="text-sm font-medium border border-slate-300 text-slate-600 rounded-md px-3 py-1.5 hover:bg-slate-50 transition-colors cursor-pointer disabled:opacity-60"
             >
-              {uploading ? 'Uploading…' : 'Upload image'}
+              {uploading ? (
+                <span aria-hidden="true">Uploading…</span>
+              ) : (
+                <>
+                  <span aria-hidden="true" className="sm:hidden">Upload</span>
+                  <span aria-hidden="true" className="hidden sm:inline">Upload image</span>
+                </>
+              )}
             </button>
-            {/* `capture` is only meaningful on a phone's camera-equipped
-                browser — desktop browsers just treat this input identically
-                to the plain one above, so there's no need to hide it behind
-                a viewport check. */}
-            <button
-              type="button"
-              onClick={() => cameraInputRef.current?.click()}
-              disabled={uploading}
-              className="text-sm font-medium border border-slate-300 text-slate-600 rounded-md px-3 py-1.5 hover:bg-slate-50 transition-colors cursor-pointer disabled:opacity-60"
-            >
-              Take photo
-            </button>
+            {/* A pasted URL is a second real way to add a photo, not a
+                lesser afterthought, so it's a real toggle button in this
+                row — same as Upload image — not a trigger that vanishes
+                once clicked with a separate "Hide" bolted on somewhere else
+                to undo it. One control, two states: click to reveal the
+                input below, click again to close it (closing never touches
+                `value` — nothing to lose, since the preview above already
+                reflects it live). Active state matches the app's existing
+                "currently selected" toggle convention (see the directory's
+                own Popularity/Distance sort buttons) rather than inventing
+                a new one. Only rendered at all when the caller asked to
+                collapse this (collapseUrlInput) — admin's own uploaders
+                keep the input permanently visible with no button here. */}
+            {collapseUrlInput && (
+              <button
+                type="button"
+                onClick={() => setUrlInputOpen((open) => !open)}
+                aria-pressed={urlInputOpen}
+                aria-label="Paste URL"
+                className={`text-sm font-medium rounded-md border px-3 py-1.5 transition-colors cursor-pointer ${
+                  urlInputOpen
+                    ? 'border-primary bg-primary text-white hover:bg-primary/90'
+                    : 'border-slate-300 text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                <span aria-hidden="true" className="sm:hidden">URL</span>
+                <span aria-hidden="true" className="hidden sm:inline">Paste URL</span>
+              </button>
+            )}
             {value.trim() && (
               <button
                 type="button"
@@ -249,11 +332,23 @@ export default function ImageUploadField({
               </button>
             )}
           </div>
-          <span className="text-[11px] text-muted">
-            {value.trim()
-              ? 'Click the preview to reposition/re-zoom it'
-              : 'or drag an image onto the preview, or click it and paste one (⌘V / Ctrl+V)'}
-          </span>
+          {/* Both hint captions are opt-out via showRepositionHint — same
+              flag now covers whichever one applies (they're mutually
+              exclusive already, based on value). Off for the public listing
+              form specifically: Upload image/Paste URL are already visible,
+              self-explanatory buttons, and drag/paste
+              (⌘V) is a bonus shortcut for someone who already knows it, not
+              something a first-time visitor needs spelled out. Admin's own
+              uploaders keep both — see the prop's own doc. */}
+          {showRepositionHint && (
+            value.trim() ? (
+              <span className="text-[11px] text-muted">Click the preview to reposition/re-zoom it</span>
+            ) : (
+              <span className="text-[11px] text-muted">
+                or drag an image onto the preview, or click it and paste one (⌘V / Ctrl+V)
+              </span>
+            )
+          )}
         </div>
 
         <input
@@ -268,43 +363,46 @@ export default function ImageUploadField({
           disabled={uploading}
           className="hidden"
         />
-        <input
-          ref={cameraInputRef}
-          type="file"
-          accept="image/*"
-          capture="environment"
-          onChange={(e) => {
-            const file = e.target.files?.[0]
-            e.target.value = ''
-            if (file) pickNewFile(file)
-          }}
-          disabled={uploading}
-          className="hidden"
-        />
       </div>
 
       {error && <span className="block text-[11px] text-red-600 mt-1">{error}</span>}
 
-      <label className="block mt-2">
-        <span className="block text-[11px] text-muted mb-1">…or paste an image URL directly</span>
-        <input
-          value={value}
-          onChange={(e) => {
-            // A manually-typed/pasted URL IS an original, every bit as much
-            // as a picked File is — see getOriginalSource's own doc for why
-            // this used to clear it instead, which was the bug. Setting it
-            // here (not just calling onChange) means a later crop's own
-            // onChange — the resulting upload URL — won't overwrite it, so
-            // "reposition" after that crop still targets THIS url, not the
-            // frame-shaped output.
-            const url = e.target.value.trim()
-            setOriginalSource(url)
-            onChange(url)
-          }}
-          placeholder="https://…"
-          className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-primary"
-        />
-      </label>
+      {/* The trigger for this (when collapsed) now lives in the button row
+          above, next to Upload image — see its own comment. */}
+      {/* Closing this (when collapseUrlInput) happens from the same "Paste
+          URL" toggle in the button row above, not a separate control here —
+          see its own comment. */}
+      {urlInputOpen && (
+        <label className="block mt-2">
+          {/* Only when this row has no toggle of its own above it (admin's
+              own uploaders, collapseUrlInput off) — the public form's
+              "Paste URL" button already says what this input is for, so
+              the caption repeating it right underneath was pure noise. The
+              input still needs an accessible name once the caption's gone
+              (aria-label below), since nothing else in the DOM labels it. */}
+          {!collapseUrlInput && (
+            <span className="block text-[11px] text-muted mb-1">…or paste an image URL directly</span>
+          )}
+          <input
+            aria-label={collapseUrlInput ? 'Image URL' : undefined}
+            value={value}
+            onChange={(e) => {
+              // A manually-typed/pasted URL IS an original, every bit as much
+              // as a picked File is — see getOriginalSource's own doc for why
+              // this used to clear it instead, which was the bug. Setting it
+              // here (not just calling onChange) means a later crop's own
+              // onChange — the resulting upload URL — won't overwrite it, so
+              // "reposition" after that crop still targets THIS url, not the
+              // frame-shaped output.
+              const url = e.target.value.trim()
+              setOriginalSource(url)
+              onChange(url)
+            }}
+            placeholder="https://…"
+            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-primary"
+          />
+        </label>
+      )}
       {helpText && <span className="block text-[11px] text-muted mt-1">{helpText}</span>}
 
       {cropSource && (

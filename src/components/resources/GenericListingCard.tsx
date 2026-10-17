@@ -1,38 +1,63 @@
 'use client'
 
-import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
+import { forwardRef, Suspense, useImperativeHandle, useRef, useState } from 'react'
+import dynamic from 'next/dynamic'
 import { track } from '@vercel/analytics'
 import type { DirectoryResource } from '@/types'
-import { PHOTO_FIELD_KEY, resolveCapabilities, selectValues, type CategoryConfig, type CategoryField } from '@/lib/categories'
-import { getOpenStatus, CLOSURE_LABELS } from '@/lib/hours'
+import { PHOTO_FIELD_KEY, resolveCapabilities, type CategoryConfig, type CategoryField } from '@/lib/categories'
 import { useNow } from '@/lib/useNow'
+import { itemDateFor, itemDateText } from '@/lib/itemMarks'
+import { isMinyanOnly, isStale } from '@/lib/listingView'
+import { community as communityConfig } from '@/community.config'
 import { getCategoryColor } from '@/lib/categoryColor'
 import { useCategories } from '@/lib/useCategories'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { routes } from '@/lib/routes'
 import { listingSlug } from '@/lib/listingSlug'
 import CategoryIcon from '@/components/CategoryIcon'
-import PinnedBadge from '@/components/PinnedBadge'
-import { PinIcon } from '@/components/icons'
+import { ClockIcon } from '@/components/icons'
+import SavedBadge from '@/components/SavedBadge'
 import UpvoteButton from './UpvoteButton'
-import FreshnessFooter from './FreshnessFooter'
-import PlaceDetailBody from './PlaceDetailBody'
-import ListingDetailModal from './ListingDetailModal'
-import ListingActionsMenu from './ListingActionsMenu'
+import MobileSheet from './MobileSheet'
+import { useListingOnward } from './listingOnward'
+import type { Onward } from './ListingView'
+import Highlight from './Highlight'
+import type { SearchFound } from '@/lib/askSearch'
+import { useListingActions, type ListingAction } from './useListingActions'
+import SwipeRow, { type SwipeAction } from '@/components/SwipeRow'
 import Chip from './Chip'
-import { PencilIcon, FlagIcon } from '@/components/icons'
-import { travelParts } from '@/lib/listingTravel'
+import { initialsOf, listingRowFacts, listingRowNote, type RowNote } from '@/lib/listingRow'
+import { FACT_TONE } from './rowFactTone'
 import { ui } from '@/lib/uiConfig'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { usePinned } from '@/lib/pinnedContext'
+import { countEvent } from '@/lib/countEvent'
 
-// How long mobile's inline accordion panel takes to open/close — the height
-// (grid-template-rows) and opacity transition below, and the delay before
-// actually unmounting it on close (see the panelMounted effect), share this
-// one value so the unmount can't fire mid-animation and cut it off. Exported
-// so GenericListingCard.test.tsx can advance fake timers by exactly this
-// much rather than a guessed duration that drifts if this one changes.
-export const MOBILE_PANEL_TRANSITION_MS = 240
+// The opened listing (its view, editor, Still right, the anti-spam check,
+// the map) loads when a listing is first opened, not with every list of
+// cards: the home draws these cards for its search answers, and loading all
+// that with the home put it over its 400 KB budget (Oct 2).
+const ListingDetailModal = dynamic(() => import('./ListingDetailModal'), { loading: () => null })
+const MapPlaceDetail = dynamic(() => import('@/components/map/MapPlaceDetail'), { loading: () => null })
+
+/** Save and Share are the two that belong to SCANNING a list — shortlisting
+ *  as you read, sending one to someone. "Set as location" is deliberately
+ *  not here: it re-sorts the entire directory, which is a deliberate act
+ *  rather than something you do in passing, and two actions is the practical
+ *  ceiling for a swipe on a phone. It lives under an opened listing's
+ *  address instead (ListingView's SetLocationRow).
+ *
+ *  A phone's swipe only. A desktop row used to show the two on hover, over
+ *  its likes; hovering a row now lights its pin on the map beside the list,
+ *  and an opened listing has both one click away. */
+const CARD_ACTION_IDS: ListingAction['id'][] = ['save', 'share']
+
+
+const NOTE_TONE: Record<RowNote['tone'], string> = {
+  caution: 'font-medium text-caution',
+  quiet: 'text-slate-500',
+  quote: 'text-slate-500',
+}
 
 // ── Card field helpers ──────────────────────────────────────────────────────────
 
@@ -48,37 +73,10 @@ function shortAddress(addr: string): string {
  *  onNavigate), which needs to close THIS card and open a SIBLING one it has
  *  no other way to reach: `expanded` is local state, and there's no shared
  *  "currently open" state to lift without every card re-rendering on every
- *  other card's open/close.
- *
- *  The measure-and-set spacer-height pairs are GenericDirectory's row-alignment
- *  mechanism — see its own alignRows doc for why this is a real per-row DOM
- *  measurement, not a heuristic guess. Two independent SEGMENTS, not one
- *  shared spacer: segment 1 is "icon/name/address/header text" (the part
- *  that actually varies — a long name, a filled-in vs. blank header field),
- *  segment 2 is "the upvote/distance row's own content" (normally the same
- *  height everywhere, but travel text can still wrap for one listing and
- *  not its row-mates). Aligning them separately is what makes the
- *  popularity/distance LINE itself land at the same height across a row —
- *  not just the badges below it — with the actual padding falling as a
- *  real gap between the address block and that line, not a single lump
- *  shoved in at the very bottom right before the badges. */
+ *  other card's open/close. */
 export type GenericListingCardHandle = {
   open: () => void
   close: () => void
-  /** Segment 1: pixel height from the card root to the upvote/distance
-   *  row, with both this card's own spacers at 0 — null when there's no
-   *  upvote/distance row to align to (falls back to measuring straight to
-   *  the badge row instead, via measureBadgeGap). */
-  measureUpvoteRowOffset: () => number | null
-  /** Segment 2: pixel height from the upvote/distance row's own bottom (or
-   *  the card root, when there's no upvote/distance row) to the badge row,
-   *  with both spacers at 0 — null when there's no badge row. */
-  measureBadgeGap: () => number | null
-  /** Sets (or clears, at 0) the spacer directly above the upvote/distance
-   *  row. */
-  setUpvoteSpacerHeight: (px: number) => void
-  /** Sets (or clears, at 0) the spacer directly above the badge row. */
-  setBadgeSpacerHeight: (px: number) => void
 }
 
 type Props = {
@@ -92,23 +90,7 @@ type Props = {
    *  single-category directory page, which already says the category once in
    *  its header. Defaults on. */
   showCategoryLabel?: boolean
-  /** Hold the distance column open with a tappable placeholder when this
-   *  listing has no distance to show.
-   *
-   *  The column used to render only when there WAS a distance, so with no
-   *  location set it wasn't empty — it was absent, and every card looked
-   *  complete. Nothing in the list hinted that distances existed, which is
-   *  why the feature went unnoticed: the only clue was a single pill at the
-   *  top of the directory, easily read as the first-load location popup the
-   *  visitor had already dismissed.
-   *
-   *  Set by the directory, which knows a location is unset AND that this
-   *  category is distance-based (`addressPrompt` — see ResourceLoader).
-   *  Off by default: cross-category lists like the landing search render this
-   *  same card with no directory around them. */
-  showDistanceSlot?: boolean
   onVote: (count: number) => void
-  onTagClick: (tag: string) => void
   /** When provided, clicking the listing's name navigates to that item's own
    *  category directory instead of expanding the card in place — used by
    *  cross-category lists (landing search) where "this row" and "its home
@@ -116,16 +98,18 @@ type Props = {
    *  unset so a name click still just expands, matching every other tap on
    *  the row. */
   onNameClick?: () => void
-  /** Click the "Open" badge → turn on the "Open now" filter. */
-  onFilterOpen: () => void
-  /** Click a boolean badge (e.g. "Kosher") → enable that boolean filter. */
-  onFilterBool: (key: string) => void
-  /** Click a select badge (e.g. cert "IKC", type "Restaurant") → add/remove it
-   *  from that field's filter (the filter always allows more than one value
-   *  chosen at once, regardless of the field's own `multiSelect` setting). */
-  onFilterSelect: (key: string, value: string) => void
   onEdit: () => void
-  onReport: () => void
+  /** Fired synchronously alongside every `setExpanded` call (the row's own
+   *  toggle, ListingDetailModal's onClose, and the imperative open()/
+   *  close() below) — lets GenericDirectory keep `?item=<id>` in sync with
+   *  whichever card is actually open. Deliberately NOT a `useEffect`
+   *  watching `expanded`: `navigateFromCard`'s close-then-open pair runs on
+   *  two different card instances in the same commit, and passive effects
+   *  fire in tree order, not call order — a card later in the list would
+   *  have its "closed" effect run AFTER an earlier card's "opened" effect,
+   *  clobbering the URL back to the wrong value. Calling this directly at
+   *  each call site preserves the actual close-then-open sequence instead. */
+  onExpandedChange?: (expanded: boolean) => void
   /** Desktop only (see ListingDetailModal's own doc comment) — arrow-key
    *  next/prev while this card's dialog is open. Wired by GenericDirectory,
    *  which is the only thing that knows the current filtered/sorted order
@@ -136,7 +120,40 @@ type Props = {
    *  inert arrow at either end instead of no arrow at all. */
   hasPrev?: boolean
   hasNext?: boolean
+  /** What a search matched on this listing (see SearchFound). Its items
+   *  show as chips on the collapsed card, so a search result says why it's
+   *  there ("Wine", "Challah · sometimes") instead of only "6 kosher
+   *  items"; with no item, the field it matched ("Hechsher: OU"). Opened,
+   *  the listing names them at the top and marks them in its item list. */
+  found?: SearchFound | null
+  /** A category page's row (see listingRow.ts): where the place is, beside
+   *  its name ("Goldie · Rittenhouse"), in place of the address line, and a
+   *  third line only for an exception. Left unset (undefined), as the home
+   *  search's mixed results do, the row keeps its address line. */
+  place?: string | null
+  /** A field the row's group heading already says, left off the row. */
+  omitKey?: string | null
+  /** Whether this category's rows say "Not confirmed by anyone yet" — see
+   *  listingRowNote. */
+  flagUnconfirmed?: boolean
+  /** Tonight's candle lighting, on a Friday or erev Yom Tov — see
+   *  listingRowFacts. */
+  candlesAt?: number | null
+  /** Likes to show beside the name, when the list is sorted by them: the
+   *  order then needs its reason. Unset when sorted any other way, where a
+   *  column of counts says nothing. */
+  likes?: number
+  /** How the row is framed: its own card (today's), or a row of one flat
+   *  list, as the canvas draws it, where GenericDirectory draws the list's
+   *  box and the lines between rows. Being tried on the preview. */
+  look?: RowLook
+  /** The page shows this listing itself (ListingColumn): in the list's
+   *  column on desktop, or as the page on a phone that arrived from a link.
+   *  The card then opens no dialog or sheet of its own. */
+  inColumn?: boolean
 }
+
+export type RowLook = 'cards' | 'list'
 
 export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(function GenericListingCard({
   item,
@@ -145,191 +162,113 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
   count,
   defaultExpanded,
   onVote,
-  onTagClick,
-  onFilterOpen,
-  onFilterBool,
-  onFilterSelect,
   onEdit,
-  onReport,
   showCategoryLabel = true,
-  showDistanceSlot = false,
   onNameClick,
   onNavigate,
   hasPrev,
   hasNext,
+  found = null,
+  onExpandedChange,
+  place,
+  omitKey = null,
+  flagUnconfirmed = false,
+  likes,
+  candlesAt = null,
+  look = 'cards',
+  inColumn = false,
 }, ref) {
   const [expanded, setExpanded] = useState(!!defaultExpanded)
-  // Mobile's inline panel (see the isMobile branch far below) animates open
-  // and closed instead of popping in/out silently — replacing the chevron
-  // that used to be the only signal this row was expandable at all (see
-  // that button's own comment).
-  //
-  // Two pieces of state, not one, because "in the DOM" and "in its open CSS
-  // state" can't be the same flag:
-  //
-  // panelMounted — whether the panel exists in the DOM at all. A closing
-  // panel still needs to be there WHILE it animates away, so this can't
-  // just flip false the instant `expanded` does (the old plain
-  // `isMobile && expanded &&` render did exactly that) — it stays mounted
-  // through the close transition and only unmounts once that's actually
-  // finished (MOBILE_PANEL_TRANSITION_MS later).
-  //
-  // panelOpen — the flag the actual grid-rows/opacity classes read. This is
-  // the one that needs the double-rAF below: if the panel mounted with
-  // panelOpen already true in the SAME commit (i.e. just used `expanded`
-  // directly), the browser never gets a frame where the closed classes are
-  // actually painted, so there's nothing for the transition to animate
-  // FROM — it would just snap straight to fully open, which is exactly the
-  // silent pop this was built to replace. Closing has no such gap:
-  // panelOpen can drop to false immediately, since the panel is already
-  // mounted and showing its open classes at that point.
-  const [panelMounted, setPanelMounted] = useState(!!defaultExpanded)
-  const [panelOpen, setPanelOpen] = useState(!!defaultExpanded)
-  useEffect(() => {
-    if (!expanded) {
-      setPanelOpen(false)
-      const timer = setTimeout(() => setPanelMounted(false), MOBILE_PANEL_TRANSITION_MS)
-      return () => clearTimeout(timer)
-    }
-    setPanelMounted(true)
-    // Double rAF: the first callback runs before the NEXT paint (still too
-    // early — same frame the mount itself lands in), the second runs after
-    // that paint has happened, i.e. once the closed state has genuinely hit
-    // the screen. A single rAF is a common enough source of flaky "it
-    // sometimes doesn't animate" bugs elsewhere that it's worth spelling
-    // out rather than risking it here.
-    let raf2 = 0
-    const raf1 = requestAnimationFrame(() => {
-      raf2 = requestAnimationFrame(() => setPanelOpen(true))
-    })
-    return () => {
-      cancelAnimationFrame(raf1)
-      cancelAnimationFrame(raf2)
-    }
-  }, [expanded])
-  // Two independent alignment segments — see GenericListingCardHandle's own
-  // doc for why this is two spacers, not one. cardRootRef anchors segment
-  // 1 (icon/name/address/header text, ending at the upvote row); the
-  // upvote row's own bottom anchors segment 2 (its own content, ending at
-  // the badge row).
+  // Once opened, the sheet keeps its content while it slides closed.
+  const [opened, setOpened] = useState(expanded)
+  if (expanded && !opened) setOpened(true)
   const cardRootRef = useRef<HTMLDivElement>(null)
-  const upvoteRowRef = useRef<HTMLDivElement>(null)
-  const badgeRowRef = useRef<HTMLDivElement>(null)
-  const upvoteSpacerRef = useRef<HTMLDivElement>(null)
-  const badgeSpacerRef = useRef<HTMLDivElement>(null)
   useImperativeHandle(ref, () => ({
-    open: () => setExpanded(true),
-    close: () => setExpanded(false),
-    measureUpvoteRowOffset: () => {
-      if (!cardRootRef.current || !upvoteRowRef.current) return null
-      return upvoteRowRef.current.getBoundingClientRect().top - cardRootRef.current.getBoundingClientRect().top
+    open: () => {
+      setExpanded(true)
+      onExpandedChange?.(true)
     },
-    measureBadgeGap: () => {
-      if (!badgeRowRef.current) return null
-      const from = upvoteRowRef.current ?? cardRootRef.current
-      if (!from) return null
-      const fromBottom = upvoteRowRef.current
-        ? upvoteRowRef.current.getBoundingClientRect().bottom
-        : from.getBoundingClientRect().top
-      return badgeRowRef.current.getBoundingClientRect().top - fromBottom
-    },
-    setUpvoteSpacerHeight: (px: number) => {
-      if (upvoteSpacerRef.current) upvoteSpacerRef.current.style.height = px > 0 ? `${px}px` : '0px'
-    },
-    setBadgeSpacerHeight: (px: number) => {
-      if (badgeSpacerRef.current) badgeSpacerRef.current.style.height = px > 0 ? `${px}px` : '0px'
+    close: () => {
+      setExpanded(false)
+      onExpandedChange?.(false)
     },
   }))
   const categories = useCategories()
   const community = useCommunitySlug()
-  // Which UI opens on click: a single-column mobile list has room to push an
-  // inline panel down; a multi-column desktop grid doesn't (expanding one
-  // card among several in a row has no sensible place to put the panel), so
-  // desktop opens the same content in ListingDetailModal instead. Same
+  // Which UI opens on click: a sheet on a phone (MobileSheet, like Add and
+  // Edit), a centered dialog on desktop (ListingDetailModal). Same
   // `expanded` state either way — just where it renders. `useIsMobile`
   // starts `false` until mount (see its own SSR-safe note), so a listing
   // reopened via `defaultExpanded` can flash as "modal open" on a phone for
-  // one tick before settling into the inline panel — accepted the same way
-  // the other isMobile-gated layout branches in this app already are.
+  // one tick before settling into the sheet — accepted the same way the
+  // other isMobile-gated layout branches in this app already are.
   const isMobile = useIsMobile()
-  // The Share path ListingActionsMenu's kebab needs.
+  // The Share path the card's own swipe actions need.
   const listingPath = routes.listing(community, category.id, listingSlug(item))
   const { isPinned } = usePinned()
   const pinned = isPinned(item.id)
+
+  // Save/Share for the collapsed row, revealed by a swipe on mobile. A
+  // shortcut: the opened listing's own Save and Share buttons are where these
+  // are reachable by every visitor, which is what makes it safe for the
+  // card's own copies to be invisible until asked for.
+  const cardActions = useListingActions(item, category, listingPath).filter((a) =>
+    CARD_ACTION_IDS.includes(a.id),
+  )
+  // The mobile swipe is SwipeRow, the same one the map's nearby list uses,
+  // so the gesture and the circles it reveals are identical on both. Worded
+  // as useListingActions words them: "Saved", with the bookmark filled, and
+  // a tap takes it off (with Undo).
+  const rowSwipeActions: SwipeAction[] = cardActions.map((a) => {
+    const label = a.label
+    return { id: a.id as SwipeAction['id'], label, ariaLabel: `${label} ${item.name}`, active: a.active, onSelect: a.onSelect }
+  })
 
   const fields = category.detailFields
   // Per-category capabilities layered under the global `ui.contributions` switches.
   const caps = resolveCapabilities(category.capabilities)
   const canEdit = ui.contributions.edit && caps.edit
-  const canReport = ui.contributions.report && caps.report
-  const hoursFields = fields.filter((f) => f.type === 'hours')
-  const badgeFields = fields.filter((f) => {
-    if (f.type === 'tags' || f.type === 'url' || f.type === 'hours' || f.type === 'minyanim' || f.type === 'image') return false
-    return (f.renderAs ?? (f.type === 'boolean' ? 'badge' : 'row')) === 'badge'
-  })
 
   // A listing is "Open" if ANY of its hours fields say so — see getOpenStatus.
-  // Against useNow rather than the render's own clock: this badge is the most
-  // time-sensitive thing on the card, and it ships inside HTML that can be
-  // served from the CDN or the service worker's cache long after it was built.
-  const { isOpen, closing, closure } = getOpenStatus(item, hoursFields.map((f) => f.key), new Date(useNow()))
-  const travel = travelParts(item)
-  const hasUpvoteRow = upvotes || travel.length > 0 || showDistanceSlot
-
-  // Its own full-width row under the icon (see that row's own comment on
-  // why), shared by mobile and desktop alike — a column squeezed into the
-  // collapsed row's corner is what this used to be on mobile, which crowded
-  // that corner out once a kebab menu needed the same spot (see this
-  // function's git history and GenericListingCard's own corner comment).
-  const renderUpvoteDistanceContent = () => (
-    <>
-      {upvotes && <UpvoteButton variant="inline" resourceId={item.id} count={count} onCountChange={onVote} />}
-      {upvotes && (travel.length > 0 || showDistanceSlot) && (
-        <span aria-hidden="true" className="text-slate-300">|</span>
-      )}
-      {travel.length > 0 ? (
-        <div className="flex flex-col items-start gap-0.5 text-xs font-medium text-slate-600 whitespace-nowrap">
-          {travel.map((t) => (
-            <span key={t.text} className="inline-flex items-center gap-1">
-              {t.kind === 'distance' && <PinIcon className="h-3 w-3 text-primary" />}
-              {t.text}
-            </span>
-          ))}
-        </div>
-      ) : showDistanceSlot ? (
-        // Muted text, not a filled pill — a gray pill here read as just
-        // another tag in the badge row below (Bakery, IKC), which is a
-        // filter/fact about the place, not a "tap this" action. Colored blue
-        // like a real action instead drew the eye too much for how minor
-        // this is on a first-glance scan of the list — muted at rest,
-        // primary on hover, same restrained treatment as this card's own
-        // Edit/Report actions just below. Same PinIcon the header's own "Set
-        // location" control uses (icons.tsx), so this reads as the same
-        // concept rather than a different symbol for the same idea, and
-        // still repeated down the list — that repetition is what teaches
-        // "every row has this", not this element's own styling.
-        //
-        // -my-2 py-2: the label itself is under the 24px WCAG-recommended
-        // tap target now that there's no pill padding doing that job.
-        // Padding grows the real hit area; the negative margin cancels it
-        // back out of the layout so the row's height doesn't shift.
-        <button
-          type="button"
-          aria-label="Set your location to see distances"
-          onClick={(e) => {
-            // The row's own handler expands the card. This tap was for the
-            // picker, not for this listing's details.
-            e.stopPropagation()
-            document.dispatchEvent(new CustomEvent('jpc:open-location'))
-          }}
-          className="-my-2 flex shrink-0 items-center gap-1 whitespace-nowrap py-2 text-xs font-medium text-muted transition-colors hover:text-primary cursor-pointer"
-        >
-          <PinIcon className="h-3 w-3" />
-          Distance
-        </button>
-      ) : null}
-    </>
-  )
+  // Against useNow rather than the render's own clock: open/closed is the
+  // most time-sensitive thing on the row, and it ships inside HTML that can
+  // be served from the CDN or the service worker's cache long after it was
+  // built. Before the page has hydrated there's no time (see useNow), so no
+  // Open badge and no opening or closing time yet.
+  const clock = useNow()
+  const now = clock === null ? null : new Date(clock)
+  // The row's second line: open status, distance, what kind of place, how
+  // many items. See lib/listingRow.ts. No davening line on a shul's row
+  // (the user, Oct 15): shuls list like everything else, and the times are
+  // the Minyanim view's and the opened listing's.
+  const allFacts = listingRowFacts(item, category, now, { omitKey, candlesAt })
+  const facts = allFacts.filter((f) => !f.ownLine)
+  // A restaurant's dishes, on their own line; not beside what a search
+  // matched here, which names the dish asked for.
+  const itemsLine = found?.items.length ? null : (allFacts.find((f) => f.ownLine)?.text ?? null)
+  // A category page's row: see the `place` prop.
+  const pageRow = place !== undefined
+  const rowNote = listingRowNote(item, category, now, { flagUnconfirmed })
+  const note = rowNote && (pageRow || rowNote.kind === 'exception') ? rowNote : null
+  // Upvotes live in the opened listing now (the sheet on a phone, the dialog
+  // on desktop), not on every row: a column of "👍 0" said nothing while a
+  // list was being scanned. Popularity still orders the list.
+  const upvote = upvotes ? <UpvoteButton variant="recommend" name={item.name} resourceId={item.id} count={count} onCountChange={onVote} /> : null
+  // The opened listing's last part: the places near it in this list, then
+  // the whole list. Opening one closes this listing first.
+  const onwardSource = useListingOnward()
+  const onward: Onward | undefined = onwardSource
+    ? {
+        items: onwardSource.items,
+        place: onwardSource.place,
+        onOpen: (other) => {
+          setExpanded(false)
+          onExpandedChange?.(false)
+          onwardSource.open(other.id)
+        },
+        seeAll: { label: onwardSource.allLabel, onClick: () => { setExpanded(false); onExpandedChange?.(false) } },
+      }
+    : undefined
 
   // url fields explicitly opted into the collapsed row (showInHeader) — a
   // quick way to reach something like a WhatsApp "Join group" link without
@@ -373,170 +312,32 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
   // Kept as inline style on an INNER element below instead, one level
   // removed from the classes doing responsive show/hide, so the two
   // display values are never fighting over the same element to begin with.
-  const headerTextClampStyle = { display: '-webkit-box', WebkitBoxOrient: 'vertical', WebkitLineClamp: 3, overflow: 'hidden' } as const
+  const headerTextClampStyle = { display: '-webkit-box', WebkitBoxOrient: 'vertical', WebkitLineClamp: 2, overflow: 'hidden' } as const
 
-  // Collapsed-row signal badges — only the ones tied to a real filter control
-  // (boolean/select fields marked `filterable`). Everything else (cert
-  // badges without a filter, all tags) only shows once expanded, inside
-  // PlaceDetailBody.
-  const headerBadges = badgeFields.filter((f) => {
-    if (!f.filterable) return false
-    return f.type === 'boolean' ? !!item[f.key] : selectValues(item[f.key]).length > 0
-  })
-  const caveatNote = (f: CategoryField): string | null => {
-    if (!f.caveat || !item[f.caveat.flagField]) return null
-    return String(item[f.caveat.noteField] ?? '').trim()
-  }
-
-  // "N {items}" on the collapsed card for a tags field an admin has opted in
-  // via showCountInHeader — a grocery category's "which kosher items does
-  // this place carry" is the motivating case, but this isn't hardcoded to
-  // kosher: tags fields are excluded from badgeFields entirely (they're meant
-  // for the expanded panel), and a field's key/label/tagGroup are all
-  // per-community admin text with nothing stable to match against — tagGroup
-  // in particular is auto-derived from the label (see categoryEditorLogic.ts)
-  // and drifts the moment someone edits it. showCountInHeader is the same
-  // explicit opt-in shape as showInHeader (text/url fields), just for tags.
-  const countHeaderField = fields.find((f) => f.type === 'tags' && f.showCountInHeader)
-  // Tags fields store two arrays — the plain key ("always") and a
-  // `_sometimes` companion (see TagsInput's green/amber toggle) — and both
-  // are real, user-authored items (PlaceDetailBody shows "sometimes" tags in
-  // their own section rather than hiding them). Missing the companion here
-  // undercounted any listing with sometimes-kosher items.
-  const countHeaderCount = countHeaderField
-    ? selectValues(item[countHeaderField.key]).length +
-      selectValues(item[countHeaderField.key + '_sometimes']).length
-    : 0
-  // An admin-chosen field (countReplacesKey — see its own doc) whose badge
-  // would otherwise repeat the same fact the count already says, e.g. a
-  // "Kosher Items" store-type badge next to a "12 kosher items" count.
-  // Suppressed from the generic badge loop below only when there's an actual
-  // count to replace it with; a listing that qualifies but has no items
-  // typed in yet still gets that other badge as before.
-  const suppressedBadgeKey = countHeaderCount > 0 ? countHeaderField?.countReplacesKey : undefined
-  const visibleHeaderBadges = suppressedBadgeKey
-    ? headerBadges.filter((f) => f.key !== suppressedBadgeKey)
-    : headerBadges
 
   const showAddress = category.hasAddress !== false && !!item.address
   const subtitleParts = [showCategoryLabel ? category.label : null, showAddress ? shortAddress(item.address!) : null].filter(Boolean)
   const subtitle = subtitleParts.length > 0 ? subtitleParts.join(' · ') : (item.googleDescription as string | undefined) || null
 
   const color = getCategoryColor(categories, category.id)
-  // Shared with ListingDetailModal's own header avatar on desktop — computed
-  // once here rather than duplicated, since it's the same "which photo (if
-  // any) represents this listing" decision either way.
-  const iconImageUrl =
-    (typeof item[PHOTO_FIELD_KEY] === 'string' && (item[PHOTO_FIELD_KEY] as string).trim()
-      ? (item[PHOTO_FIELD_KEY] as string)
-      : category.iconImageUrl) ?? undefined
+  // Closes whichever surface the listing is open in: the sheet on a phone,
+  // the dialog on desktop.
+  const close = () => {
+    setExpanded(false)
+    onExpandedChange?.(false)
+  }
+  // The listing's own photo, for the row's picture.
+  const ownPhoto =
+    typeof item[PHOTO_FIELD_KEY] === 'string' && (item[PHOTO_FIELD_KEY] as string).trim() ? (item[PHOTO_FIELD_KEY] as string) : undefined
 
-  // The chips that survive collapsed (Open/closure + filterable badges) — see
-  // the badge row's own comment further down. Pulled into a variable, not
-  // just inline JSX, because ListingDetailModal needs the identical row
-  // restated in its own header on desktop (the card behind it is obscured by
-  // the modal's backdrop), and computing it twice would be two places a
-  // badge rule could drift out of sync.
-  const badgeRow = (isOpen || closure || visibleHeaderBadges.length > 0 || countHeaderCount > 0) ? (
-    <>
-      {/* Closure outranks everything: it used to appear only once the card
-          was expanded, so a temporarily-closed shop was indistinguishable
-          from an open one in a directory list — worse, its saved hours still
-          earned it a green "Open" chip. Not a filter chip like the others;
-          there is nothing useful to filter to here. */}
-      {closure && (
-        <Chip tone={closure === 'permanent' ? 'red' : 'amber'}>{CLOSURE_LABELS[closure]}</Chip>
-      )}
-      {isOpen && (closing?.closesSoon ? (
-        <span className="relative group/tip">
-          <Chip tone="greenSolid" onClick={(e) => { e.stopPropagation(); onFilterOpen() }}>
-            Closes Soon
-          </Chip>
-          <span className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-1.5 w-max max-w-[220px] whitespace-normal rounded bg-slate-800 px-2 py-1.5 text-[11px] leading-snug text-white opacity-0 transition-opacity duration-150 group-hover/tip:opacity-100 hidden sm:block z-10">
-            Closes at {closing.closeLabel}
-          </span>
-        </span>
-      ) : (
-        <Chip tone="green" onClick={(e) => { e.stopPropagation(); onFilterOpen() }} title="Filter to places open now">
-          Open
-        </Chip>
-      ))}
-      {countHeaderCount > 0 && countHeaderField && (() => {
-        // countLabel is meant to be a clean singular noun ("kosher item"),
-        // but the fallback — a field's own `label`, just lowercased — is
-        // often already phrased as a plural ("Kosher Items available").
-        // Blindly appending "s" to that doubled up ("kosher itemss"); only
-        // add it when the noun doesn't already end in one, which covers the
-        // fallback case without needing real pluralization logic this app
-        // has no other use for.
-        const noun = countHeaderField.countLabel ?? countHeaderField.label.toLowerCase()
-        const plural = countHeaderCount === 1 || noun.endsWith('s') ? noun : `${noun}s`
-        return (
-          // Not clickable — unlike the other badges here, which each map to
-          // one filter control, the field this one might be replacing
-          // (countReplacesKey) can be boolean or select depending on the
-          // category, and there's no single filter action that's correct
-          // for both. Purely informational: it's the "there's more here"
-          // signal that pulls a shopper into expanding the card. Slate, not
-          // a color already carrying meaning elsewhere on this card (green
-          // means "open"/a positive filter state) — this badge is a fact,
-          // not a status.
-          <Chip tone="slate" title={`See which ${plural} this place has`}>
-            {/* A slate chip is deliberately quiet — it shouldn't shout the
-                way "Open" does — but that risked reading as just another
-                static fact next to Restaurant/Parve instead of an invitation
-                to expand. Bolding only the number (not recoloring the whole
-                chip) borrows the same "128 reviews" convention other
-                directory apps use for exactly this signal, without undoing
-                the color choice that was made deliberately. */}
-            <span className="font-semibold">{countHeaderCount}</span> {plural}
-          </Chip>
-        )
-      })()}
-      {visibleHeaderBadges.flatMap((f) => {
-        const values = f.type === 'select' ? selectValues(item[f.key]) : [f.filterLabel ?? f.label]
-        // Resolve each stored value to the option's CURRENT label — a
-        // renamed option's label should show up on cards immediately,
-        // without needing every listing that had it selected re-saved.
-        // Falls back to the raw value for anything renamed via
-        // resourceStore's applyFieldOptionRenames (which stores the new
-        // value directly) or a value with no matching option at all.
-        const labelFor = (v: string) => f.options?.find((opt) => opt.value === v)?.label ?? v
-        const note = caveatNote(f)
-        const amber = note !== null
-        return values.map((value) => {
-          const text = labelFor(value)
-          const btn = (
-            <Chip
-              tone={amber ? 'amber' : 'slate'}
-              onClick={(e) => {
-                e.stopPropagation()
-                if (f.type === 'boolean') onFilterBool(f.key)
-                else onFilterSelect(f.key, value)
-              }}
-              title={amber ? undefined : `Filter by ${text}`}
-            >
-              {text}
-            </Chip>
-          )
-          if (!amber) return <span key={`${f.key}:${value}`}>{btn}</span>
-          return (
-            <span key={`${f.key}:${value}`} className="relative group/tip">
-              {btn}
-              <span className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-1.5 w-max max-w-[220px] whitespace-normal rounded bg-slate-800 px-2 py-1.5 text-[11px] leading-snug text-white opacity-0 transition-opacity duration-150 group-hover/tip:opacity-100 hidden sm:block z-10">
-                {note || 'Not everything here is kosher — please verify.'}
-              </span>
-            </span>
-          )
-        })
-      })}
-    </>
-  ) : null
+  // What a search matched here, named on the row (see `found`).
+  const matchedChips = found?.items.length ? found.items : null
+  const matchedFields = !matchedChips && found?.fields.length ? found.fields : null
 
   return (
     // No `overflow-hidden`: it would clip the cert badge's hover tooltip on a
-    // collapsed card. Corners stay clean because the header and expanded panel
-    // round their own edges below. h-full: in the desktop grid (see
+    // collapsed card. Corners stay clean because the row rounds its own
+    // edges below. h-full: in the desktop grid (see
     // GenericDirectory) the wrapper div around each card is the actual grid
     // item, and a CSS grid row already stretches that wrapper to match its
     // tallest neighbor — but a plain block child doesn't inherit that height
@@ -545,25 +346,48 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
     // looking mismatched even though their invisible containers matched. A
     // no-op everywhere the card isn't a stretched grid item (mobile's single
     // column, the admin category preview).
-    <div className="h-full border border-slate-200 rounded-lg bg-white shadow-sm">
+    <div className={look === 'list' ? 'h-full bg-white' : 'h-full border border-slate-200 rounded-lg bg-white shadow-sm'}>
       {/* Not role="button"/tabIndex any more — the row also contains real
           interactive children (UpvoteButton, an external-link <a>, the
           Open/badge Chips), and an ARIA button role can't legally contain
           other interactive controls (axe's nested-interactive rule: a
           screen reader can't reliably operate one nested inside another).
-          The onClick below stays as a mouse/touch convenience — "click
+          The onContentClick below stays as a mouse/touch convenience — "click
           anywhere on the row" — but the actual accessible, keyboard-operable
           toggle is now the chevron <button> further down. It carries no
           onClick of its own; a native button's click (mouse or keyboard)
           bubbles right up to this handler, so there's exactly one place the
           toggle logic lives, not two copies to keep in sync. */}
-      <div
-        ref={cardRootRef}
-        onClick={() => {
-          setExpanded((p) => {
-            if (!p) track('listing_opened', { listing: item.name, category: category.id })
-            return !p
-          })
+      <SwipeRow
+        rowId={item.id}
+        actions={rowSwipeActions}
+        // Mobile only (see CARD_ACTION_IDS).
+        enabled={isMobile}
+        className={look === 'list' ? undefined : 'rounded-lg'}
+        contentRef={cardRootRef}
+        // SwipeRow keeps this from firing for the click a swipe ends with,
+        // and for a tap on a row whose actions are showing — that tap puts
+        // them away instead of expanding the card.
+        onContentClick={() => {
+          // The side effects deliberately sit OUTSIDE the state update, not
+          // inside an updater function. A `setExpanded((p) => { …effects…;
+          // return !p })` reads like the safe way to toggle, but React calls
+          // an updater during the render pass and may call it more than once
+          // (StrictMode does so on purpose) — so `track` could double-count,
+          // and a parent that does any state of its own in onExpandedChange
+          // gets "Cannot update a component while rendering a different
+          // component" (GenericDirectory does exactly that now, to hide its
+          // floating Add button while this card's dialog covers it).
+          // Reading `expanded` straight from the closure is correct here
+          // because this is an event handler: it runs after the last commit,
+          // so the value is current.
+          const next = !expanded
+          setExpanded(next)
+          if (next) {
+            track('listing_opened', { listing: item.name, category: category.id })
+            countEvent(community, 'listing_view', item.id)
+          }
+          onExpandedChange?.(next)
         }}
         // h-full: on desktop this row is the ENTIRE visible card (the outer
         // wrapper's own h-full — see its comment — only stretches the
@@ -575,78 +399,57 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
         // the bottom of the card: inside the visible border, past where this
         // div's own content ended, unclickable and with no hover state,
         // which is exactly what read as "the whole card isn't clickable."
-        className={`h-full w-full px-4 py-3 hover:bg-slate-50 active:bg-slate-100 transition-colors cursor-pointer ${expanded && isMobile ? 'rounded-t-lg' : 'rounded-lg'}`}
+        // group/row drives the desktop hover-reveal in the corner — named
+        // rather than bare `group` because the card already nests groups of
+        // its own (group/tip on the cert badges).
+        // relative + bg-white so this row paints OVER the swipe actions
+        // behind it; without an opaque background they'd show through.
+        contentClassName={`group/row relative h-full w-full ${look === 'list' ? '' : 'rounded-lg'} bg-white px-4 py-3 hover:bg-slate-50 data-pressed:bg-slate-100 [@media(hover:hover)]:active:bg-slate-100 cursor-pointer transition-colors duration-200 ease-out`}
       >
-        {/* items-center, not items-start, on mobile: the row's only ever
-            2 lines there (name + subtitle — headerTextFields below is
-            `hidden desktop:block`, so the 3-line case items-start exists for
-            never reaches mobile at all), and centering is what makes the
-            trailing upvote/distance/chevron column read as lined up against
-            the name+address block instead of pinned to its top corner (this
-            exact "ours looks higher than it should" complaint already
-            happened once — see fb8113f, reverted by a later desktop-grid fix
-            that reapplied items-start unconditionally). desktop:items-start
-            is for the desktop grid instead: a header text field DOES render
-            there, occasionally making this block 3 lines instead of 2, and
-            without items-start the icon (and the trailing column) drift
-            toward the middle of that taller block instead of staying
-            anchored near the name's own line. */}
-        {/* relative + pr-8: the positioning context for the absolutely-
-            placed kebab/toggle group further down, and the reserved space
-            that keeps this row's name text (and the description/upvote
-            rows below, though neither actually gets close to the edge in
-            practice) from running underneath it. Wraps this row through
-            the upvote/distance row — everything above the badge divider —
-            which is the actual "centered against the whole card" the
-            kebab is centered against; see that group's own comment for why
-            this wrapper's exact extent is what it is. */}
-        <div className="relative pr-8">
-        <div className="flex items-center desktop:items-start gap-3">
-          {/* Icon avatar — same glyph/image + tinted color as this category's
-              map pin (see getCategoryColor), so a place reads as the same
-              thing here and on the map. self-start (overriding the row's own
-              items-center on mobile, and reinforcing its own items-start on
-              desktop) keeps it pinned near the name's own line regardless of
-              how tall the block next to it gets — an avatar anchored to the
-              title reads right at any height. mt-0.5 nudges it those last
-              couple pixels: the name's own line-height leaves a little
-              leading above the visible text, so even with matching box tops
-              the glyph itself starts lower than the icon. */}
-          {/* self-start/mt-0.5 moved to this wrapper (was on CategoryIcon
-              itself) so the badge below can anchor to the same box without
-              disturbing the icon's own position in the row — see the
-              comment above for what those two classes are actually doing. */}
-          <span className="relative shrink-0 self-start mt-0.5">
+        {/* relative: the positioning context for the absolutely-placed
+            toggle below. */}
+        <div className="relative">
+        <div className="flex items-start gap-3">
+          {/* The place's own photo, or its initials in a rounded square in
+              its category's colour. Not the category's icon: down a list of
+              one category that's the same picture on every row, and tells
+              the places apart not at all. The opened listing and the map
+              keep the category's icon, where it says what kind of place
+              this is. */}
+          <span className="relative shrink-0 mt-0.5">
             <CategoryIcon
               icon={category.icon}
               categoryId={category.id}
-              iconImageUrl={iconImageUrl}
+              iconImageUrl={ownPhoto}
+              initials={initialsOf(item.name)}
+              // A minyan that isn't a shul: a clock, which says so, in
+              // place of initials (the user, Oct 16).
+              glyph={isMinyanOnly(item, category) ? <ClockIcon className="h-full w-full" /> : undefined}
+              shape="square"
               color={color}
               className="h-10 w-10 text-xl"
             />
-            {pinned && <PinnedBadge />}
+            {pinned && <SavedBadge />}
           </span>
 
-          {/* Name + subtitle + an optional one-line "what this place is" note
-              — badges get their own full-width row below (see badge row
-              further down) so they don't have to compete with the name for
-              horizontal space and wrap early. line-clamp-2, not `truncate`:
-              a directory card is narrower than the full page width once it's
-              one of several columns in the desktop grid (see GenericDirectory),
-              and a business name routinely needs a second line at that width —
-              clamping bounds it instead of letting it run to three or four and
-              throwing every card in the row wildly out of proportion with its
-              neighbors. */}
+          {/* Name, then the facts line, then where it is. One line each:
+              a long name or address truncates rather than making one row
+              twice as tall as the rest. */}
           <div className="min-w-0 flex-1">
-            <p className="font-semibold text-slate-900 line-clamp-2">
-              {onNameClick ? (
+            <div className="flex items-baseline gap-2">
+            <p className="min-w-0 flex-1 truncate font-semibold text-slate-900">
+              {pageRow ? (
+                <>
+                  {item.name}
+                  {place && <span className="font-normal text-[13.5px] text-slate-500"> · {place}</span>}
+                </>
+              ) : onNameClick ? (
                 // A span, not the whole <p>, carries the click/hover — the <p>
                 // is block-level and stretches to fill the row, which would
                 // make clicking empty space to the right of a short name (e.g.
-                // "Giant") count as clicking the name. The span sizes to just
-                // the text itself.
+                // "Giant") count as clicking the name.
                 <span
-                  className="cursor-pointer hover:underline hover:text-blue-600 transition-colors"
+                  className="cursor-pointer hover:underline hover:text-primary transition-colors"
                   onClick={(e) => { e.stopPropagation(); onNameClick() }}
                 >
                   {item.name}
@@ -655,67 +458,132 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
                 item.name
               )}
             </p>
-            {subtitle && <p className="truncate text-sm text-muted">{subtitle}</p>}
-            {/* mt-2: enough gap that this reads as its own beat after the
-                name+address fact, not a third bullet inside it — but no
-                border/section treatment, which is reserved for the hairline
-                before the badge row (a genuinely different mode: read text
-                vs. scannable chips). Hidden on mobile: on a narrow card this
-                can run to 2-3 lines. The desktop:hidden twin further down
-                renders it instead, outside this row.
-                No invisible placeholder any more when this listing left the
-                field blank — that used to reserve a category-wide guessed
-                height (see git history), which meant EVERY card in a
-                category paid for it the moment ANY listing had this field
-                filled in, whether or not that card's own row-mates did.
-                GenericDirectory's row-alignment pass (see its own alignRows
-                doc) now measures actual rendered height per row and pads
-                only the cards that fall short of their row's tallest
-                natural card — a blank field here just means less natural
-                height, exactly like a short name does, and the same real
-                measurement handles both instead of two different
-                mechanisms guessing at the same problem. */}
-            {headerTextFields.map(({ f, text }) =>
-              f.type === 'textarea' ? (
-                <p key={f.key} className="hidden desktop:block text-sm text-slate-600 mt-2">
-                  <span style={headerTextClampStyle}>{text}</span>
-                </p>
-              ) : (
-                <p key={f.key} className="hidden desktop:block truncate text-sm text-slate-600 mt-2">{text}</p>
-              ),
+            {!!likes && likes > 0 && (
+              <span className="flex shrink-0 items-center gap-1 text-[13px] font-semibold text-slate-500" aria-label={`${likes} like${likes === 1 ? '' : 's'}`}>
+                {/* The canvas's grey outline thumb, not the 👍 emoji: an
+                    emoji's own colours shouted over the row's facts. */}
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-[13px] w-[13px]" data-testid="row-likes-icon">
+                  <path d="M7 10v12" />
+                  <path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z" />
+                </svg>
+                <span aria-hidden="true">{likes}</span>
+              </span>
+            )}
+            </div>
+            {facts.length > 0 && (
+              <p className="truncate text-[13.5px] text-slate-600" data-testid="row-facts">
+                {facts.map((fact, i) => (
+                  <span key={`${fact.text}:${i}`}>
+                    {i > 0 && <span aria-hidden="true" className="px-1 text-slate-400">·</span>}
+                    <span className={FACT_TONE[fact.tone]} title={fact.title}>
+                      {fact.text}
+                    </span>
+                  </span>
+                ))}
+              </p>
+            )}
+            {itemsLine && (
+              <p className="truncate text-[13.5px] text-slate-700" data-testid="row-items">
+                {itemsLine}
+              </p>
+            )}
+            {!pageRow && subtitle && <p className="truncate text-[13px] text-muted">{subtitle}</p>}
+            {note && (
+              // The place's own description ("Vegan Fast Food") stands out a
+              // little from the lines around it: the opened listing's dark
+              // ink, a touch bigger and heavier, not the grey of where it is.
+              // It says what the place is (the user, Oct 16: "sticks out but
+              // not too much"). A grey note is the quiet kind ("Times not
+              // confirmed by anyone yet").
+              <p className={`truncate ${note.kind === 'note' ? 'text-[14px] font-medium text-slate-800' : `text-[13px] ${NOTE_TONE[note.tone]}`}`} title={note.title} data-testid="row-note">
+                {note.tone === 'caution' && (
+                  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="mr-1 inline h-3.5 w-3.5 -translate-y-px">
+                    <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3" />
+                    <path d="M12 9v4" />
+                    <path d="M12 17h.01" />
+                  </svg>
+                )}
+                {note.text}
+              </p>
+            )}
+            {/* A short note an admin opted into the row ("Sit-down glatt
+                kosher steakhouse"). Two lines at most. Left off phones for a
+                no-address category (WhatsApp groups, Networking), where it
+                was usually the longest thing on a card of otherwise just a
+                name, and one tall card buried the list. line-clamp needs
+                display:-webkit-box, which a `hidden desktop:block` on the
+                same element would override, so the clamp sits one level in. */}
+            {/* On a category page's row, the note is the third line above,
+                and only when there's no exception to say instead. */}
+            {!pageRow && headerTextFields.map(({ f, text }) => (
+              <p
+                key={f.key}
+                className={`mt-1 text-sm text-slate-600 ${category.hasAddress === false ? 'hidden desktop:block' : ''}`}
+              >
+                <span style={f.type === 'textarea' ? headerTextClampStyle : { display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {text}
+                </span>
+              </p>
+            ))}
+            {/* What a search matched here — see `found`. Chips, unlike the
+                facts line: they answer "why is this here", and a list of
+                items reads better as items. Not clickable: the row opens
+                the listing, which is where to go next. */}
+            {(matchedChips || matchedFields) && (
+              <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                {matchedChips?.map((m) => {
+                  // When someone last saw it there (agreed Oct 1), once
+                  // the page knows the time.
+                  // A dish approved from its menu since: "on its menu Oct 2".
+                  const date = clock === null ? null : itemDateFor(item, m.tag)
+                  return (
+                    <Chip key={m.tag} tone={m.sometimes || (date && isStale(date.at, clock)) ? 'amber' : 'slate'}>
+                      {m.tag}
+                      {m.sometimes ? ' · sometimes' : ''}
+                      {date ? ` · ${itemDateText(date, clock, communityConfig.timezone)}` : ''}
+                    </Chip>
+                  )
+                })}
+                {matchedFields?.map((f) =>
+                  f.text ? (
+                    <span key={f.label} className="basis-full text-xs text-slate-600">
+                      <span className="text-muted">{f.label}: </span>
+                      <Highlight text={f.text} terms={found!.terms} />
+                    </span>
+                  ) : (
+                    <Chip key={f.label} tone="slate">
+                      <Highlight text={f.label} terms={found!.terms} />
+                    </Chip>
+                  ),
+                )}
+              </div>
             )}
           </div>
 
-          {/* URL chips only now — the kebab/toggle used to live here too,
-              but centering THEM against just this row wasn't actually what
-              "centered" meant: this row is only the icon/name/address block,
-              a fraction of the card's real height once the description twin
-              and upvote/distance row below are counted too. They've moved
-              to the absolutely-positioned group after this row instead,
-              centered against the FULL pre-badge-divider block — see that
-              group's own comment. self-center here still applies (still a
-              trailing element, same Material Design reasoning), independent
-              of the avatar's own top-anchoring above. */}
-          <div className="flex items-center gap-2 shrink-0 self-center">
-            {headerUrlFields.map(({ f, href }) => (
-              <a
-                key={f.key}
-                href={href}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={(e) => e.stopPropagation()}
-                className="flex shrink-0 items-center rounded-full border border-primary px-2.5 py-1 text-xs font-medium text-primary hover:bg-primary hover:text-white transition-colors whitespace-nowrap"
-              >
-                {f.linkLabel ?? f.label}
-              </a>
-            ))}
-          </div>
+          {/* A showInHeader url field ("Join group"), reachable without
+              opening the listing. */}
+          {headerUrlFields.length > 0 && (
+            <div className="flex items-center gap-2 shrink-0 self-center">
+              {headerUrlFields.map(({ f, href }) => (
+                <a
+                  key={f.key}
+                  href={href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                  className="flex shrink-0 items-center rounded-full border border-primary px-2.5 py-1 text-xs font-medium text-primary hover:bg-primary hover:text-white transition-colors whitespace-nowrap"
+                >
+                  {f.linkLabel ?? f.label}
+                </a>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Pin / Share / "I'm here" and the toggle — absolutely positioned
-            against the relative pr-8 wrapper above (which spans this row
-            through the upvote/distance row below, stopping short of the
-            badge divider) rather than sitting inline in the row above,
+            against the relative wrapper above (which spans the name, the
+            facts line and the address) rather than sitting inline in the
+            row above,
             specifically so "centered" means centered against the CARD'S
             real header height, not just this one row's — a short card
             (name + address, no description, no upvote stat) made the two
@@ -731,12 +599,12 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
             8px — that read as adrift from the corner rather than anchored
             to it) is what makes it read as placed on purpose. top-1/2
             -translate-y-1/2 is the actual vertical centering. The
-            wrapper's own pr-8 reserves this group's width (plus the 4px
-            inset) so the name/description text never wraps under it — a
-            fixed reserve is safe here because this group's own width is
-            small and fixed (an icon-only kebab + an invisible toggle), not
-            content-driven like the URL chips above, which stay in normal
-            flex flow instead specifically because they aren't.
+            wrapper's pr-8 reserve is gone along with the kebab that needed
+            it. What's left in this corner is the invisible toggle and, on
+            desktop only, two action buttons that aren't painted until the
+            row is hovered — neither is anything for the name to collide
+            with, so the name gets those 32px back (measured 346px -> 378px
+            on a real card at phone width).
             Same negative-margin tap-target-growing trick and gap-5 spacing
             both controls already used inline here — see each one's own
             className for why. */}
@@ -774,6 +642,18 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
             // invisible spacer below for why, and why this button stays in
             // the DOM at all despite having no icon on either breakpoint
             // now.
+            // Deliberately NOT pointer-events-none, which was tried here
+            // once pr-8 came off, on the reasoning that a click landing on
+            // an invisible spacer should fall through to the name beneath
+            // it. It costs more than it sounds like: with pointer events
+            // off, hit-testing at this button's own centre returns the
+            // absolutely-positioned group around it instead, so the button
+            // stops being clickable as itself — five e2e tests that open a
+            // listing by clicking `Show details for ...` failed on exactly
+            // that, on both viewports. Nothing was gained either way: this
+            // button has no onClick, so a click here has always just
+            // bubbled to the row's handler, and the name underneath is
+            // plain text with nothing of its own to receive.
             className="-m-2.5 cursor-pointer p-2.5"
           >
             {/* No visible chevron on either breakpoint any more — this row
@@ -784,11 +664,9 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
                 hover state this button never had anyway).
                 Mobile is different — no hover to hint at it, and removing
                 the chevron there needed a real substitute, not just
-                deleting the affordance: the panel below now animates
-                open/closed (height+opacity) instead of popping in silently,
-                so the motion itself teaches "tapping this row does
-                something" the moment it happens, tied directly to the tap.
-                See the panel's own comment on that transition.
+                deleting the affordance: the listing sheet slides up from
+                the bottom on the tap, so the motion itself teaches "tapping
+                this row does something" the moment it happens.
                 The button itself stays — <button> is the actual accessible
                 toggle a keyboard/screen-reader visitor needs
                 (aria-expanded/aria-label above), it just no longer draws
@@ -797,177 +675,65 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
                 visual purpose. */}
             <span className="block h-4 w-4" aria-hidden="true" />
           </button>
-          <ListingActionsMenu
-            item={item}
-            category={category}
-            path={listingPath}
-          />
         </div>
 
-        {/* Mobile-only twin of the headerTextFields loop above — see the
-            comment there. Indented to align under the name/address (same
-            52px = icon + gap as above). Rendered before the upvote/distance
-            row below, matching desktop's own order (its version of this
-            text sits inside the name column, above where that row starts) —
-            this used to come after on mobile, which read as popularity/
-            distance outranking the description instead of following it. */}
-        {headerTextFields.map(({ f, text }) =>
-          f.type === 'textarea' ? (
-            <p key={f.key} className="desktop:hidden text-sm text-slate-600 mt-2 pl-[52px]">
-              <span style={headerTextClampStyle}>{text}</span>
-            </p>
-          ) : (
-            <p key={f.key} className="desktop:hidden truncate text-sm text-slate-600 mt-2 pl-[52px]">{text}</p>
-          ),
-        )}
-
-        {/* Upvote count + distance/travel — its own row left-aligned under
-            the icon (pl-[52px] = the 40px icon + 12px gap it sits next to
-            above), rather than a column squeezed in beside the name. A
-            column squeezed in beside the name is exactly what this used to
-            be on desktop (see git history) — fine while the card spanned the
-            page's full width, but once desktop cards became one of 2-3 grid
-            columns (see GenericDirectory) that same column left the name
-            only a third of a viewport-width's worth of room, and a longer
-            business name wrapped to three or four lines fighting it for
-            space. Its own row gives it the whole card width instead, so it
-            never competes with the name. Left-aligned under the address/
-            description, not right-aligned against the card edge — a
-            distance/upvote line reads as more of a fact about the place,
-            alongside its address, than a stat pinned to the card's corner.
-            Mobile used to get its own top-right corner instead, stacked
-            above the chevron — moved down to this same row once that corner
-            needed to fit a kebab menu too (see ListingActionsMenu and this
-            component's own corner comment); mobile has no grid to squeeze
-            columns in, so there was never anything here to protect the name
-            from either way. */}
-        {hasUpvoteRow && (
-          <>
-            {/* Segment-1 spacer — see GenericListingCardHandle's own doc.
-                Real gap here, between the address/header-text block above
-                and this row, so the popularity/distance LINE itself lands
-                at the same height across a row of cards — not just the
-                badges further down. */}
-            <div ref={upvoteSpacerRef} aria-hidden="true" />
-            <div ref={upvoteRowRef} className="flex mt-1.5 justify-start pl-[52px]">
-              <div className="flex items-center gap-2 text-xs font-medium text-slate-600">
-                {renderUpvoteDistanceContent()}
-              </div>
-            </div>
-          </>
-        )}
         </div>
+      </SwipeRow>
 
-        {/* Badge row — the only chips that survive collapsed: Open and any
-            badge tied to an actual filter control. Below the name row
-            (rather than wrapping inside the name column) so it gets the
-            whole card's width to lay out in. Flush left, same as the name —
-            it used to be indented to align under the name text rather than
-            the icon, but that reads as a stray, unexplained gap once the
-            card is narrower than the full page width (see the comment on
-            the upvote/distance row above for why "narrower than the full
-            page width" is now the normal case on desktop, not just mobile). */}
-        {badgeRow && (
-          <>
-            {/* Segment-2 spacer — usually 0 in practice, since the upvote
-                row's own content is nearly always the same height across a
-                category; catches the rare case (e.g. travel text wrapping
-                to 2 lines for one listing) segment 1 alone wouldn't. Height
-                set imperatively by GenericDirectory (see
-                setBadgeSpacerHeight), never by React state, so a measure/
-                set pass doesn't itself trigger a re-render. */}
-            <div ref={badgeSpacerRef} aria-hidden="true" />
-            <div ref={badgeRowRef} className="mt-2 pt-2 border-t border-slate-100 flex flex-wrap items-center gap-1.5">
-              {badgeRow}
-            </div>
-          </>
-        )}
-      </div>
-
-      {/* Mobile: inline accordion, pushing the rest of the list down — see
-          the isMobile note above the state declaration. Animated (height via
-          grid-template-rows, the standard trick for transitioning to/from an
-          unknown "auto" height with no JS measurement — plus opacity) rather
-          than popping in/out silently, since this is the only thing left
-          signaling "tapping this row does something" now that the chevron
-          is gone (see that button's own comment) — no hover state exists on
-          mobile to hint at it beforehand, so the motion itself has to carry
-          that job on the way in. min-h-0 on the inner div is load-bearing:
-          a grid track's default min-height is auto (its content's natural
-          size), which overrides `0fr` and defeats the whole animation
-          without it. */}
-      {isMobile && panelMounted && (
-        <div
-          className={`grid overflow-hidden transition-[grid-template-rows,opacity] ease-out ${panelOpen ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}
-          style={{ transitionDuration: `${MOBILE_PANEL_TRANSITION_MS}ms` }}
-        >
-        <div className="min-h-0 border-t border-slate-100 px-4 py-4 space-y-3 bg-slate-50 rounded-b-lg">
-          <PlaceDetailBody
-            item={item}
-            category={category}
-            onTagClick={onTagClick}
-            onFilterOpen={onFilterOpen}
-            onFilterBool={onFilterBool}
-            onFilterSelect={onFilterSelect}
-            hideOpenStatus
-            // headerBadges (the full set), not visibleHeaderBadges — a badge
-            // countReplacesKey suppressed from the collapsed row shouldn't
-            // reappear down here either. It was excluded from
-            // visibleHeaderBadges specifically so the count could take its
-            // spot, not because the badge stopped applying; showing it again
-            // once expanded reintroduces the exact "says the same thing
-            // twice" duplication the count was built to avoid, just one tap
-            // later instead of never.
-            hiddenBadgeKeys={headerBadges.map((f) => f.key)}
-            // Same reasoning as hideOpenStatus — the collapsed header above
-            // already shows the "N kosher items" count.
-            hideCountBadge
-          />
-
-          <div className="pt-2 border-t border-slate-200 space-y-2">
-            <FreshnessFooter resourceId={item.id} confirmedAt={item.confirmedAt} />
-            {/* Share used to sit here too — now only in the collapsed row's
-                own kebab (ListingActionsMenu), same place Pin/Set location
-                live, rather than duplicated in both spots. */}
-            <div className="flex gap-3">
-              {canEdit && (
-                <button onClick={onEdit} className="inline-flex items-center gap-1 text-xs text-muted hover:text-primary transition-colors cursor-pointer"><PencilIcon className="h-3.5 w-3.5" /> Edit</button>
-              )}
-              {canReport && (
-                <button onClick={onReport} className="inline-flex items-center gap-1 text-xs text-muted hover:text-red-600 transition-colors cursor-pointer"><FlagIcon className="h-3.5 w-3.5" /> Report</button>
-              )}
-            </div>
-          </div>
-        </div>
-        </div>
+      {/* Mobile: the listing opens in a sheet, the same one Add and Edit
+          use (MobileSheet), holding the same listing view the map's sheet
+          shows (MapPlaceDetail). It used to expand inline, pushing the list
+          down, with its own copy of that view; now a listing reads the same
+          wherever it's opened, and "Suggest an edit" is the last thing in
+          it, as it was at the foot of the dropdown.
+          Like Add and Edit: it's only there once tapped, opens at half,
+          pulls to full, and closes by dragging down, tapping the dimmed
+          list, or Escape. No title row: the listing's name, at the top of
+          its own view, is the title, and names the dialog for a screen
+          reader. No "Back to list" either — the list is the page behind.
+          Always mounted on mobile rather than `expanded &&`, so the sheet
+          stays on screen long enough to animate closed. */}
+      {isMobile && !inColumn && (
+        <MobileSheet isOpen={expanded} onClose={close} title={item.name} draggable titleHidden surface>
+          {/* Its own boundary (the user's note 10, Oct 10): loading it the
+              first time hid the whole page for a moment, and the page took
+              coming back for a return to it and cleared the search, so a
+              listing tapped in search results closed again. */}
+          <Suspense fallback={null}>
+            {opened && <MapPlaceDetail
+              item={item}
+              category={category}
+              color={color}
+              found={found}
+              upvote={upvote}
+              place={place ?? null}
+              onward={onward}
+            />}
+          </Suspense>
+        </MobileSheet>
       )}
 
-      {/* Desktop: same content, centered dialog instead — see ListingDetailModal. */}
-      {!isMobile && (
+      {/* Desktop: a dialog, where nothing hosts the listing itself. A
+          category page does: it opens in the list's column (ListingColumn). */}
+      {/* It draws nothing while closed, so it's only there once opened. */}
+      {/* Its own boundary too, for the same reason. */}
+      {!isMobile && !inColumn && opened && (
+        <Suspense fallback={null}>
         <ListingDetailModal
           isOpen={expanded}
-          onClose={() => setExpanded(false)}
+          onClose={close}
           item={item}
           category={category}
           color={color}
-          iconImageUrl={iconImageUrl}
           name={item.name}
-          subtitle={subtitle}
-          badgeRow={badgeRow}
-          headerBadgeKeys={headerBadges.map((f) => f.key)}
-          headerUrlFields={headerUrlFields}
-          onTagClick={onTagClick}
-          onFilterOpen={onFilterOpen}
-          onFilterBool={onFilterBool}
-          onFilterSelect={onFilterSelect}
-          onEdit={onEdit}
-          onReport={onReport}
           canEdit={canEdit}
-          canReport={canReport}
           onNavigate={onNavigate}
           hasPrev={hasPrev}
           hasNext={hasNext}
+          found={found}
+          upvote={upvote}
         />
+        </Suspense>
       )}
     </div>
   )

@@ -8,12 +8,15 @@ import { renderWithProviders } from '@/test/renderWithProviders'
 import { makeCategory, makeListing } from '@/test/providerFixtures'
 import { SITE_SETTINGS_DEFAULTS } from '@/lib/siteSettings'
 import { LocationProvider } from '@/lib/locationContext'
+import { HeaderCollapseProvider } from '@/lib/headerVisibility'
 import { ListingsProvider } from '@/lib/listingsContext'
 import type { DirectoryResource } from '@/types'
 import { resetMockIntersectionObserver, setAllIntersecting, triggerAllIntersections } from '@/test/intersectionObserverMock'
 import { mockRouter } from '@/test/nextNavigationMock'
 import { markHomeReveal } from '@/lib/homeRevealSignal'
+import { ForcedViewport } from '@/lib/useIsMobile'
 import Landing from './Landing'
+import { useLogSearchMiss } from '@/lib/useLogSearchMiss'
 
 // Card tiles now render as real <Link>s (see sections.tsx's CardDef.href),
 // which is what makes cmd/ctrl-click "open in new tab" work — that pulled
@@ -26,24 +29,48 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
 }))
 
-// HomeMap and DaveningTimesCard are mocked out — both pull in real
-// network/SDK dependencies of their own (Google Maps, the community's real
-// listings/categories aggregation) that are their own components'
-// concerns, not Landing's. What's under test here is Landing's own
-// composition/filtering logic: which cards render, whether typing narrows
-// the grid, and whether the map/davening cards appear only when the
-// community actually has the relevant pseudo-category/data.
+// DaveningTimesCard is mocked out — it pulls in its own real
+// listings/categories aggregation, its own component's concern, not
+// Landing's. What's under test here is Landing's own composition/filtering
+// logic: which cards render, whether typing narrows the grid, and whether
+// the davening card appears only when the community actually has it
+// configured.
 //
 // ShabbatTimesCard/SubscribeSection/UpdateListingsCard are NOT mocked —
 // none of them ever were, even before the old zmanim+shabbat pairs split
 // into these independent cards, so this preserves that.
 
 vi.mock('@vercel/analytics', () => ({ track: vi.fn() }))
-vi.mock('@/components/home/HomeMap', () => ({
-  default: () => <div data-testid="home-map-stub" />,
-}))
+// Pinned, not read from features.ts, so these hold on a branch that has the
+// Today home switched back on too.
+const features = vi.hoisted(() => ({ todayHome: false, whatChanged: false }))
+vi.mock('@/lib/features', () => ({ features }))
+// Recorded, not run: the tests read what the search-miss log was told.
+vi.mock('@/lib/useLogSearchMiss', () => ({ useLogSearchMiss: vi.fn() }))
+// Zmanim come from a network request; each test says what it has. Loading
+// by default, as on a page that's just opened.
+const zmanimMock = vi.hoisted(() => ({ result: { data: null as unknown, status: 'loading' as string } }))
+vi.mock('@/lib/useZmanim', () => ({ useZmanim: () => zmanimMock.result }))
+// The question reader (an AI, over the network): off unless a test reads.
+const readerMock = vi.hoisted(() => ({ answer: { ok: false, reason: 'off' } as unknown }))
+vi.mock('@/lib/askReader', () => ({ askReader: vi.fn(async () => readerMock.answer), forgetReaderAnswers: vi.fn() }))
+
+/** The lines under the home box (SearchLines), each as its text. jsdom
+ *  applies no CSS, so the phone's and the desktop's copies are both there:
+ *  the first is enough. */
+function lineTexts(): string[] {
+  const lists = screen.queryAllByTestId('search-lines')
+  return lists.length ? within(lists[0]!).getAllByRole('option').map((o) => o.textContent ?? '') : []
+}
 vi.mock('@/components/home/DaveningTimesCard', () => ({
   default: () => <div data-testid="davening-stub" />,
+}))
+// Stubbed for the same reason as DaveningTimesCard above — its own
+// admin-set-date-range gating (activeCampaignBanner) is that component's own
+// concern, not Landing's. What's under test here is Landing's own decision
+// to hide it on mobile while actively searching — see the tests below.
+vi.mock('@/components/home/CampaignBannerCard', () => ({
+  default: () => <div data-testid="campaign-banner-stub" />,
 }))
 
 afterEach(() => {
@@ -55,18 +82,6 @@ const handlers = {
   onNavigate: vi.fn(),
   onOpenFlow: vi.fn(),
   coords: null,
-  liveTracking: { tracking: false, error: null, start: vi.fn(), stop: vi.fn() },
-  controls: {
-    address: '',
-    coords: null,
-    onAddressChange: vi.fn(),
-    onCoords: vi.fn(),
-    tracking: false,
-    geoError: null,
-    geoErrorSilent: false,
-    onStartTracking: vi.fn(),
-    onStopTracking: vi.fn(),
-  },
 }
 
 // Landing now reads useLocation() directly (for the zmanim location label —
@@ -92,127 +107,344 @@ function renderLanding(
   props: Partial<ComponentProps<typeof Landing>> = {},
   options?: Parameters<typeof renderWithProviders>[1],
   // Defaults to null (the same as no provider at all — see useAllListings'
-  // own doc) so every existing call site is unaffected; only the map card's
-  // "N places across M categories" line needs real listings supplied.
+  // own doc) so every existing call site is unaffected; only tests that need
+  // real per-category listing counts (the browse grid's sort order, place
+  // search) supply this.
   listings: DirectoryResource[] | null = null,
 ): RenderResult {
   return renderWithProviders(
-    <LocationProvider>
-      <ListingsProvider listings={listings}>
-        <Landing {...handlers} {...props} />
-      </ListingsProvider>
-    </LocationProvider>,
+    // HeaderCollapseProvider: Landing now calls useHeaderOverlay (Phase 2 —
+    // transparent desktop header over the hero), which needs the same
+    // provider SiteChrome always wraps it in for real. Not asserted on
+    // directly here — see SiteHeader.test.tsx for the overlay behavior
+    // itself — just required for Landing to render at all.
+    <HeaderCollapseProvider>
+      <LocationProvider>
+        <ListingsProvider listings={listings}>
+          <Landing {...handlers} {...props} />
+        </ListingsProvider>
+      </LocationProvider>
+    </HeaderCollapseProvider>,
     options,
   )
 }
 
 describe('Landing', () => {
-  it('shows the configured hero title/mission and the category grid', () => {
-    const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
+  // The Today home is held back from the site (features.ts, Oct 13): a
+  // community whose saved setting still says Today (dev's did) gets the
+  // classic home, and the photo band's "Explore by Category".
+  it('the classic home even when the saved home is Today, while Today is held back', () => {
     renderLanding(undefined, {
-      content: {
-        categories: [grocery],
-        settings: { ...SITE_SETTINGS_DEFAULTS, heroTitle: 'Welcome to the directory', mission: 'Everything nearby' },
-      },
+      content: { categories: [makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })], settings: { ...SITE_SETTINGS_DEFAULTS, homeStyle: 'today' } },
     })
+    expect(screen.queryByTestId('today-home')).not.toBeInTheDocument()
+    expect(screen.getByTestId('browse-everything-card')).toBeInTheDocument()
+    expect(screen.getByTestId('home-browse-list')).toBeInTheDocument()
+  })
 
-    // getAllByText, not getByText: HeroHeading renders both its mobile and
-    // desktop layouts in the DOM at once (toggled by CSS, not JS — see that
-    // component's own doc), so the heading/mission text exists twice.
-    expect(screen.getAllByText('Welcome to the directory').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('Everything nearby').length).toBeGreaterThan(0)
+  // The phone home (the user, Oct 17): no headline and no mission at the
+  // top, but who keeps the guide right. The title stays as the page's
+  // heading, for screen readers and search engines.
+  it('mobile: leads with who keeps the guide right, not the headline and mission', () => {
+    const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
+    renderLanding(
+      undefined,
+      { content: { categories: [grocery], settings: { ...SITE_SETTINGS_DEFAULTS, heroTitle: 'Welcome to the directory', mission: 'Everything nearby' } } },
+      [makeListing({ id: 'g1', category: 'grocery' }), makeListing({ id: 'g2', category: 'grocery' })],
+    )
+    const hero = screen.getByTestId('phone-hero')
+    expect(within(hero).getByTestId('trust-band')).toHaveTextContent('Kept up by the community2 places')
+    expect(within(hero).getByRole('heading', { level: 1, name: 'Welcome to the directory' })).toHaveClass('sr-only')
+    expect(screen.queryByText('Everything nearby')).not.toBeInTheDocument()
     expect(screen.getAllByText('Grocery Stores').length).toBeGreaterThan(0)
   })
 
-  it('narrows the grid to matching cards when typing, and hides the rest', async () => {
+  // Tiles (the user, Oct 17): the list read as dull, three screens under six
+  // headings. Every category as a tile, in the admin's order, no headings;
+  // past twelve, a line of links. Still no photos to download.
+  // The user, Oct 17: no group headings (under them, a group of one or two
+  // left a tile alone in a row), and this is where a phone browses, so
+  // every category is a tile, none in an "Also:" line.
+  it('mobile: browsing is one grid of tiles in the admin\'s order, every category, no headings', () => {
+    const ids = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n']
+    const cats = ids.map((id) => makeCategory({ id, pluralLabel: `Cat ${id}`, cardImageUrl: `https://images.unsplash.com/photo-${id}` }))
+    const section = (n: number, cardIds: string[]) => ({
+      id: `s${n}`,
+      kind: 'section' as const,
+      title: `Section ${n}`,
+      sortOrder: n,
+      cardIds,
+      width: 'full' as const,
+    })
+    renderLanding(
+      undefined,
+      {
+        content: {
+          categories: cats,
+          homeSections: [section(1, ['n', 'a', 'b', 'c', 'd']), section(2, ['e', 'f', 'g', 'h', 'i']), section(3, ['j', 'k', 'l', 'm'])],
+        },
+      },
+      [makeListing({ id: 'p1', category: 'n' }), makeListing({ id: 'p2', category: 'n' })],
+    )
+
+    const tiles = within(screen.getByTestId('category-tiles'))
+    // Each tile: its icon, its name, and how many places when it counts any.
+    const order = ['n', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm']
+    expect(tiles.getAllByRole('listitem').map((li) => li.textContent)).toEqual(order.map((id) => expect.stringMatching(new RegExp(`Cat ${id}${id === 'n' ? '2' : ''}$`))))
+    expect(tiles.getAllByRole('list')).toHaveLength(1)
+    expect(tiles.queryAllByRole('heading')).toHaveLength(0)
+    expect(screen.queryByText('Also:')).not.toBeInTheDocument()
+    expect(tiles.getByRole('link', { name: 'Cat m' })).toHaveAttribute('href', '/test-community/m')
+    expect(screen.getByTestId('home-browse-list').closest('section')!.querySelectorAll('img')).toHaveLength(0)
+  })
+
+  // Search takes you to the page (Oct 13): typing shows where it could go,
+  // each line with what you'd find there, and nothing is answered in place.
+  it('typing shows where it could go: the kind of place named, with how many there are', async () => {
+    const user = userEvent.setup()
+    const grocery = makeCategory({ id: 'grocery', label: 'Grocery', pluralLabel: 'Grocery Stores' })
+    // A real label, not makeCategory's default "Grocery Store": search now reads
+    // a category's label to know what kind of place it is (see ask.ts).
+    const synagogue = makeCategory({ id: 'synagogue', label: 'Synagogue', pluralLabel: 'Synagogues' })
+    renderLanding(undefined, { content: { categories: [grocery, synagogue] } }, [makeListing({ id: 'g', category: 'grocery', name: 'Corner Store' })])
+    await user.type(screen.getAllByLabelText('Search resources')[0]!, 'grocery')
+
+    expect(lineTexts()).toEqual(['Grocery Stores1 listing'])
+    expect(screen.getAllByTestId('home-browse-list')[0]).toHaveClass('opacity-40')
+  })
+
+  // Two people tried the redesign prototype: one typed a question the way
+  // they would into Google, and the item is tagged "Chalav", not "Cholov".
+  // Word-for-word matching found nothing for either. Enter goes to the
+  // page, with the words in its box (less the filler it started with).
+  it('reads a question typed like into Google, and Enter goes to that kind of place with the words in its box', async () => {
+    const user = userEvent.setup()
+    mockRouter.push.mockClear()
+    const grocery = makeCategory({
+      id: 'grocery',
+      label: 'Grocery Store',
+      pluralLabel: 'Grocery Stores',
+      detailFields: [{ key: 'm', label: 'Kosher items', type: 'tags' }],
+    })
+    const food = makeCategory({ id: 'restaurant', label: 'Food Establishment', pluralLabel: 'Food Establishments' })
+    const listings = [
+      makeListing({ id: 'g1', category: 'grocery', name: 'ShopRite', m: ['Chalav Yisroel Milk'] }),
+      makeListing({ id: 'g2', category: 'grocery', name: 'Acme Grocery', m: ['Challah'] }),
+      makeListing({ id: 'f1', category: 'restaurant', name: 'Some Cafe' }),
+    ]
+    renderLanding(undefined, { content: { categories: [grocery, food] } }, listings)
+    const box = screen.getAllByLabelText('Search resources')[0]!
+
+    await user.type(box, 'where can I buy cholov yisroel milk')
+    // Chalav Yisroel Milk, an item in three words, is understood: the line
+    // says so, and the AI isn't asked (the user, Oct 13).
+    expect(lineTexts()[0]).toBe('Grocery Stores1 with Chalav Yisroel Milk')
+    await user.keyboard('{Enter}')
+    expect(mockRouter.push).toHaveBeenCalledWith('/test-community/grocery?q=cholov+yisroel+milk')
+
+    await user.clear(box)
+    await user.type(box, 'kosher food')
+    expect(lineTexts()).toEqual(['Food Establishments1 listing'])
+  })
+
+  // Reported live: mobile has no HeroSearchDropdown of its own (see
+  // HeroHeading's own doc) — typing re-filters the grid further down the
+  // page in place instead, with the campaign banner sitting in normal flow
+  // between the search box and that grid, pushing the answer further from
+  // the box the same way desktop's old "answer in a card near the bottom"
+  // problem did. Hidden here specifically while there's an active query, not
+  // as a "no promotions during search" rule — it reappears the instant the
+  // search is cleared. ForcedViewport, not the mobileSection DOM-scoping
+  // trick the test above uses: this is gated on the real `isMobile` value
+  // (Landing.tsx's own `!(isMobile && q)`), which starts false regardless of
+  // matchMedia in jsdom (see that test's own comment) and so needs forcing
+  // to exercise at all.
+  it('mobile: hides the campaign banner while actively searching, and brings it back once the search is cleared', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(
+      <ForcedViewport isMobile>
+        <HeaderCollapseProvider>
+          <LocationProvider>
+            <ListingsProvider listings={null}>
+              <Landing {...handlers} />
+            </ListingsProvider>
+          </LocationProvider>
+        </HeaderCollapseProvider>
+      </ForcedViewport>,
+      { content: { categories: [makeCategory()] } },
+    )
+    const search = screen.getAllByLabelText('Search resources')[0]!
+
+    expect(screen.getByTestId('campaign-banner-stub')).toBeInTheDocument()
+
+    await user.type(search, 'grocery')
+    expect(screen.queryByTestId('campaign-banner-stub')).not.toBeInTheDocument()
+
+    await user.clear(search)
+    expect(screen.getByTestId('campaign-banner-stub')).toBeInTheDocument()
+  })
+
+  // Desktop's own HeroSearchDropdown already opens right under the search
+  // box and paints over whatever's below it (including this banner) while
+  // there are results to show — see that component's own doc. No separate
+  // hide-while-searching rule is needed (or wanted) on top of that, so the
+  // banner stays mounted regardless of `q` here.
+  it("desktop: keeps the campaign banner mounted while searching — HeroSearchDropdown's own overlay covers it instead", async () => {
+    const user = userEvent.setup()
+    renderWithProviders(
+      <ForcedViewport isMobile={false}>
+        <HeaderCollapseProvider>
+          <LocationProvider>
+            <ListingsProvider listings={null}>
+              <Landing {...handlers} />
+            </ListingsProvider>
+          </LocationProvider>
+        </HeaderCollapseProvider>
+      </ForcedViewport>,
+      { content: { categories: [makeCategory()] } },
+    )
+
+    await user.type(screen.getAllByLabelText('Search resources')[0]!, 'grocery')
+
+    expect(screen.getByTestId('campaign-banner-stub')).toBeInTheDocument()
+  })
+
+  // Desktop used to swap this whole card for a filtered CompactCardGrid the
+  // moment there was a query — HeroSearchDropdown (opening right under the
+  // hero's own search box) replaced that job, and having this section ALSO
+  // change out from under a search read as two different things reacting to
+  // one keystroke — the user's own call, reviewing the built feature. So
+  // this now stays the plain, full category index regardless of `query`.
+  it("desktop: the category index doesn't narrow when typing — only the hero's own search dropdown does", async () => {
     const user = userEvent.setup()
     const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
     const synagogue = makeCategory({ id: 'synagogue', pluralLabel: 'Synagogues' })
     renderLanding(undefined, { content: { categories: [grocery, synagogue] } })
 
-    // getAllByLabelText, not getByLabelText: HeroHeading now renders the
-    // search box twice in the DOM (mobile's plain block and desktop's warm
-    // band), toggled with `desktop:hidden`/`hidden desktop:` classes rather
-    // than a JS branch — see that component's own doc on why. jsdom doesn't
-    // apply CSS, so both are genuinely present; either one drives the same
-    // Landing state, so the first is as good as any for a test.
+    const card = screen.getByTestId('browse-everything-card')
     await user.type(screen.getAllByLabelText('Search resources')[0]!, 'grocery')
 
-    // getAllByText, not getByText: the same result set now renders twice in
-    // the DOM once there's a query — mobile's own permanent grid section,
-    // and desktop's copy inside SearchSection's white box (see Landing's
-    // resultsNode doc on why: a single mount can't live in two different
-    // places in the tree, so this is genuine, deliberate duplication, not a
-    // bug). jsdom doesn't apply CSS, so both are visible to a query here.
-    expect(screen.getAllByText('Grocery Stores').length).toBeGreaterThan(0)
-    expect(screen.queryByText('Synagogues')).not.toBeInTheDocument()
+    expect(within(card).getByText('Grocery Stores')).toBeInTheDocument()
+    expect(within(card).getByText('Synagogues')).toBeInTheDocument()
   })
 
-  it('shows a "nothing matches" message for a query with no hits', async () => {
+  it('Enter on a search that finds nothing stays here and says so, with where to ask', async () => {
     const user = userEvent.setup()
-    renderLanding(undefined, { content: { categories: [makeCategory()] } })
+    mockRouter.push.mockClear()
+    renderLanding(undefined, { content: { categories: [makeCategory()] } }, [])
 
-    await user.type(screen.getAllByLabelText('Search resources')[0]!, 'xyznotreal')
+    await user.type(screen.getAllByLabelText('Search resources')[0]!, 'xyznotreal{Enter}')
 
-    expect(screen.getAllByText(/Nothing matches “xyznotreal”/).length).toBeGreaterThan(0)
+    expect(await screen.findAllByText('Nothing in the guide for “xyznotreal”.')).not.toHaveLength(0)
+    expect(screen.getAllByRole('button', { name: 'Ask in a WhatsApp group' }).length).toBeGreaterThan(0)
+    expect(mockRouter.push).not.toHaveBeenCalled()
   })
 
-  it('renders the map band only when the community has a Map pseudo-category, deferring HomeMap itself until scrolled near', () => {
-    const withMap = makeCategory({ id: 'map', kind: 'map', pluralLabel: 'Map' })
-    const { unmount } = renderLanding(undefined, { content: { categories: [withMap] } })
-    // The band exists (a placeholder of the same footprint), but HomeMap
-    // itself — and the Google Maps SDK it pulls in — doesn't mount until
-    // useInView says the band has actually scrolled near. See useInView's
-    // own doc comment for why this matters most on mobile, where the band
-    // is `hidden` outright and never intersects at all.
-    expect(screen.queryByTestId('home-map-stub')).not.toBeInTheDocument()
-    act(() => triggerAllIntersections())
-    expect(screen.getByTestId('home-map-stub')).toBeInTheDocument()
-    unmount()
+  // A place's name is the first line, and Enter opens its listing (board 2b)
+  // — the listing alone, no search carried along to narrow its page.
+  it("a place's name is the first line, and Enter opens its listing", async () => {
+    const user = userEvent.setup()
+    mockRouter.push.mockClear()
+    const grocery = makeCategory({ id: 'grocery', label: 'Grocery', pluralLabel: 'Grocery Stores' })
+    renderLanding(
+      undefined,
+      { content: { categories: [grocery] } },
+      [makeListing({ id: 'l1', category: 'grocery', name: 'Test Grocery' })],
+    )
 
-    renderLanding(undefined, { content: { categories: [makeCategory()] } })
-    act(() => triggerAllIntersections())
-    expect(screen.queryByTestId('home-map-stub')).not.toBeInTheDocument()
+    await user.type(screen.getAllByLabelText('Search resources')[0]!, 'test gro')
+    expect(lineTexts()[0]).toMatch(/^TGTest GroceryGrocery/)
+    await user.keyboard('{Enter}')
+
+    expect(mockRouter.push).toHaveBeenCalledWith(expect.stringMatching(/^\/test-community\/grocery\/test-grocery/))
+    expect(vi.mocked(track)).toHaveBeenCalledWith('listing_opened', { listing: 'Test Grocery', category: 'grocery', source: 'search' })
   })
 
-  describe('the map card\'s "N places across M categories" line', () => {
-    const withMap = makeCategory({ id: 'map', kind: 'map', pluralLabel: 'Map' })
-    const grocery = makeCategory({ id: 'grocery', kind: 'listing', pluralLabel: 'Grocery Stores' })
-    const synagogue = makeCategory({ id: 'synagogue', kind: 'listing', pluralLabel: 'Synagogues' })
+  // An item is its category's page, the item in its box, where the page
+  // ticks Has: Cheddar Cheese and each row says it (see GenericDirectory).
+  it('an item goes to the page of the stores that have it, the item in its box', async () => {
+    const user = userEvent.setup()
+    mockRouter.push.mockClear()
+    const grocery = makeCategory({ id: 'grocery', label: 'Grocery', pluralLabel: 'Grocery Stores', detailFields: [{ key: 'm', label: 'Kosher items', type: 'tags' }] })
+    renderLanding(
+      undefined,
+      { content: { categories: [grocery] } },
+      [makeListing({ id: 'l1', category: 'grocery', name: 'Test Grocery', m: ['Cheddar Cheese'] })],
+    )
 
-    it('counts real listings across listing-kind categories only, once they’ve loaded', () => {
-      const listings = [
-        makeListing({ id: 'l1', category: 'grocery' }),
-        makeListing({ id: 'l2', category: 'grocery' }),
-        makeListing({ id: 'l3', category: 'synagogue' }),
-        // A stray row filed under the Map pseudo-category itself — shouldn't
-        // happen in real data, but proves the count is driven by the
-        // category's own `kind`, not just whatever `listings` happens to hold.
-        makeListing({ id: 'l4', category: 'map' }),
-      ]
-      renderLanding(undefined, { content: { categories: [withMap, grocery, synagogue] } }, listings)
+    await user.type(screen.getAllByLabelText('Search resources')[0]!, 'cheddar')
+    expect(lineTexts()).toEqual(['Grocery Stores1 with Cheddar Cheese'])
+    await user.keyboard('{Enter}')
 
-      expect(
-        screen.getByText((_, el) => el?.tagName.toLowerCase() === 'p' && el.textContent === '3 places across 2 categories'),
-      ).toBeInTheDocument()
-    })
+    expect(mockRouter.push).toHaveBeenCalledWith('/test-community/grocery?q=cheddar')
+  })
 
-    it('pluralizes down to one place, one category', () => {
-      renderLanding(
-        undefined,
-        { content: { categories: [withMap, grocery] } },
-        [makeListing({ id: 'l1', category: 'grocery' })],
+  // A question only the reader follows: its reading decides the page, and
+  // the page gets the reading as its Filters (read=1: the words aren't
+  // searched again there).
+  // The user, Oct 13: "kosher wine" from home was "super inconsistent",
+  // and Enter waited for the AI though the line already showed the answer.
+  // A question our own search understood (its first line says what it
+  // found) is never sent to the reader, and Enter goes at once.
+  it('a question our own search understood isn’t sent to the reader: Enter goes where its line says, at once', async () => {
+    const user = userEvent.setup()
+    mockRouter.push.mockClear()
+    const { askReader } = await import('@/lib/askReader')
+    vi.mocked(askReader).mockClear()
+    readerMock.answer = { ok: true, reading: { categories: [{ id: 'restaurant' }] } }
+    const grocery = makeCategory({ id: 'grocery', label: 'Grocery', pluralLabel: 'Grocery', detailFields: [{ key: 'm', label: 'Kosher items', type: 'tags' }] })
+    // A Food place whose type is "Wine Bar": "wine" there isn't an item,
+    // so the question would once have gone to the AI.
+    const food = makeCategory({ id: 'restaurant', label: 'Food', pluralLabel: 'Food', detailFields: [{ key: 't', label: 'Type', type: 'select', filterable: true, options: [{ value: 'Wine Bar', label: 'Wine Bar' }] }] })
+    try {
+      renderLanding(undefined, { content: { categories: [grocery, food] } }, [
+        makeListing({ id: 'g1', category: 'grocery', name: 'ShopRite', m: ['Wine'] }),
+        makeListing({ id: 'g2', category: 'grocery', name: 'Acme', m: ['Wine'] }),
+        makeListing({ id: 'f1', category: 'restaurant', name: 'Bistro', t: 'Wine Bar' }),
+      ])
+      await user.type(screen.getAllByLabelText('Search resources')[0]!, 'kosher wine')
+      expect(lineTexts()[0]).toBe('Grocery2 with Wine')
+      await user.keyboard('{Enter}')
+      expect(mockRouter.push).toHaveBeenCalledWith('/test-community/grocery?q=wine')
+      await new Promise((r) => setTimeout(r, 1200))
+      expect(askReader).not.toHaveBeenCalled()
+    } finally {
+      readerMock.answer = { ok: false, reason: 'off' }
+    }
+  })
+
+  it('a question the reader reads lands with its reading in the Filters', async () => {
+    const user = userEvent.setup()
+    mockRouter.push.mockClear()
+    readerMock.answer = { ok: true, reading: { categories: [{ id: 'restaurant', select: { t: ['Meat'] } }] } }
+    const food = makeCategory({ id: 'restaurant', label: 'Food', pluralLabel: 'Food', detailFields: [{ key: 't', label: 'Type', type: 'select', filterable: true, options: [{ value: 'Meat', label: 'Meat' }, { value: 'Dairy', label: 'Dairy' }] }] })
+    try {
+      renderLanding(undefined, { content: { categories: [food] } }, [
+        makeListing({ id: 'm', category: 'restaurant', name: 'Grill', t: 'Meat' }),
+        makeListing({ id: 'd', category: 'restaurant', name: 'Cafe', t: 'Dairy' }),
+      ])
+      await user.type(screen.getAllByLabelText('Search resources')[0]!, 'somewhere fleishig for a sit down dinner{Enter}')
+      await vi.waitFor(() =>
+        expect(mockRouter.push).toHaveBeenCalledWith('/test-community/restaurant?q=somewhere+fleishig+for+a+sit+down+dinner&sel_t=Meat&read=1'),
       )
+    } finally {
+      readerMock.answer = { ok: false, reason: 'off' }
+    }
+  })
 
-      expect(
-        screen.getByText((_, el) => el?.tagName.toLowerCase() === 'p' && el.textContent === '1 place across 1 category'),
-      ).toBeInTheDocument()
-    })
+  // The map is retired as a home-screen card (the user's own call — it only
+  // ever lives at its own full-screen route now), so the hero's "View Map"
+  // button has one job unconditionally: navigate there. No more "scroll to
+  // an embedded band, falling back to navigation only once the admin's
+  // removed it" branching.
+  it('the hero\'s "View Map" button navigates to the full map page', async () => {
+    const user = userEvent.setup()
+    const withMap = makeCategory({ id: 'map', kind: 'map', pluralLabel: 'Map' })
+    renderLanding(undefined, { content: { categories: [withMap] } })
 
-    it('shows nothing yet while listings haven’t loaded, rather than claiming zero', () => {
-      renderLanding(undefined, { content: { categories: [withMap, grocery] } })
-      expect(screen.queryByText(/places across/)).not.toBeInTheDocument()
-    })
+    await user.click(screen.getAllByRole('button', { name: /View Map/ })[0]!)
+
+    expect(handlers.onNavigate).toHaveBeenCalledWith(null, 'map')
   })
 
   // Jewish Times (ShabbatTimesCard, not mocked) is the one remaining card
@@ -240,55 +472,103 @@ describe('Landing', () => {
     expect(screen.getByTestId('davening-stub')).toBeInTheDocument()
   })
 
-  describe('the gateway block order (Explore the map / Davening Times)', () => {
-    const withMapAndZmanim = [
-      makeCategory({ id: 'map', kind: 'map', pluralLabel: 'Map' }),
-      makeCategory({ id: 'zmanim', kind: 'zmanim', pluralLabel: 'Zmanim' }),
-    ]
-
-    it('defaults to davening before map when nothing is configured (no built-in rows at all)', () => {
-      const { container } = renderLanding(undefined, {
-        content: { categories: withMapAndZmanim, homeSections: [] },
-      })
-      // HomeMap itself doesn't mount until the band scrolls near (see
-      // useInView) — irrelevant to this test, which only cares about DOM
-      // order, so just force it in so home-map-stub is there to compare.
-      act(() => triggerAllIntersections())
-
-      const html = container.innerHTML
-      expect(html.indexOf('data-testid="davening-stub"')).toBeLessThan(html.indexOf('data-testid="home-map-stub"'))
-    })
-
-    it('follows the admin-configured order — map before davening', () => {
+  // Phase 6a of the desktop mockup rework: Davening Times, Update Listings
+  // and the new Suggest a Listing card share ONE row (the "community row")
+  // instead of each getting its own — see Landing.tsx's own community-row
+  // doc for why this is a special case rather than the generic half-width
+  // pairing every other kind goes through.
+  describe('the community row (Davening / Update Listings / Suggest a Listing)', () => {
+    it('renders all three, in order, when both Davening and Update Listings are configured', () => {
       const { container } = renderLanding(undefined, {
         content: {
-          categories: withMapAndZmanim,
+          categories: [makeCategory()],
           homeSections: [
-            { id: 'map', kind: 'map', title: 'Map Card', sortOrder: 100, cardIds: [], width: 'full' },
-            { id: 'davening', kind: 'davening', title: 'Davening Times Card', sortOrder: 200, cardIds: [], width: 'full' },
+            { id: 'davening', kind: 'davening', title: 'Davening Times Card', sortOrder: 100, cardIds: [], width: 'full' },
+            { id: 'listings', kind: 'listings', title: 'Update Listings Card', sortOrder: 200, cardIds: [], width: 'full' },
           ],
         },
       })
-      act(() => triggerAllIntersections())
 
+      const daveningStub = screen.getByTestId('davening-stub')
+      const listingsHeading = screen.getByRole('heading', { name: SITE_SETTINGS_DEFAULTS.desktopListingsHeading })
+      const suggestHeading = screen.getByRole('heading', { name: 'Suggest a Listing' })
+
+      const row = daveningStub.closest('.grid')!
+      expect(row).not.toBeNull()
+      expect(row).toContainElement(listingsHeading)
+      expect(row).toContainElement(suggestHeading)
+      expect(row).toHaveClass('min-[900px]:grid-cols-3')
+
+      // Only one shared row wrapper for all three, not one per card.
+      expect(container.querySelectorAll('.my-8').length).toBe(1)
+
+      // Document order: Davening, then Update Listings, then Suggest.
       const html = container.innerHTML
-      expect(html.indexOf('data-testid="home-map-stub"')).toBeLessThan(html.indexOf('data-testid="davening-stub"'))
+      expect(html.indexOf('data-testid="davening-stub"')).toBeLessThan(html.indexOf(SITE_SETTINGS_DEFAULTS.desktopListingsHeading))
+      expect(html.indexOf(SITE_SETTINGS_DEFAULTS.desktopListingsHeading)).toBeLessThan(html.indexOf('Suggest a Listing'))
     })
 
-    it('renders the map’s admin-editable heading, not the built-in default', () => {
+    it('renders Update Listings + Suggest (no Davening slot) once Davening is not configured', () => {
       renderLanding(undefined, {
         content: {
-          categories: withMapAndZmanim,
-          settings: { ...SITE_SETTINGS_DEFAULTS, desktopMapHeading: 'See it on the map' },
+          categories: [makeCategory()],
           homeSections: [
-            { id: 'map', kind: 'map', title: 'Map Card', sortOrder: 100, cardIds: [], width: 'full' },
+            { id: 'listings', kind: 'listings', title: 'Update Listings Card', sortOrder: 100, cardIds: [], width: 'full' },
+          ],
+        },
+      })
+
+      expect(screen.queryByTestId('davening-stub')).not.toBeInTheDocument()
+      const listingsHeading = screen.getByRole('heading', { name: SITE_SETTINGS_DEFAULTS.desktopListingsHeading })
+      const suggestHeading = screen.getByRole('heading', { name: 'Suggest a Listing' })
+
+      const row = listingsHeading.closest('.grid')!
+      expect(row).not.toBeNull()
+      expect(row).toContainElement(suggestHeading)
+      expect(row).toHaveClass('min-[740px]:grid-cols-2')
+    })
+
+    it('renders nothing for the community row when neither kind is configured', () => {
+      renderLanding(undefined, {
+        content: {
+          categories: [makeCategory()],
+          homeSections: [
+            { id: 'subscribe', kind: 'subscribe', title: 'Subscribe Card', sortOrder: 100, cardIds: [], width: 'full' },
+          ],
+        },
+      })
+
+      expect(screen.queryByTestId('davening-stub')).not.toBeInTheDocument()
+      expect(screen.queryByRole('heading', { name: SITE_SETTINGS_DEFAULTS.desktopListingsHeading })).not.toBeInTheDocument()
+      expect(screen.queryByRole('heading', { name: 'Suggest a Listing' })).not.toBeInTheDocument()
+    })
+  })
+
+  describe('the built-in cards\' admin-configured order', () => {
+    const withZmanim = [makeCategory({ id: 'zmanim', kind: 'zmanim', pluralLabel: 'Zmanim' })]
+
+    it('defaults to davening before jewishTimes when nothing is configured (no built-in rows at all)', () => {
+      renderLanding(undefined, { content: { categories: withZmanim, homeSections: [] } })
+
+      const daveningStub = screen.getByTestId('davening-stub')
+      const jewishTimesHeading = screen.getByRole('heading', { name: 'Shabbat & Holiday Times' })
+      expect(daveningStub.compareDocumentPosition(jewishTimesHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    })
+
+    it('follows the admin-configured order — jewishTimes before davening', () => {
+      renderLanding(undefined, {
+        content: {
+          categories: withZmanim,
+          homeSections: [
+            { id: 'jewishTimes', kind: 'jewishTimes', title: 'Jewish Times Card', sortOrder: 100, cardIds: [], width: 'full' },
             { id: 'davening', kind: 'davening', title: 'Davening Times Card', sortOrder: 200, cardIds: [], width: 'full' },
           ],
         },
       })
 
-      expect(screen.getByRole('heading', { name: 'See it on the map' })).toBeInTheDocument()
-      expect(screen.queryByRole('heading', { name: 'Explore the Map' })).not.toBeInTheDocument()
+      const daveningStub = screen.getByTestId('davening-stub')
+      const jewishTimesHeading = screen.getByRole('heading', { name: 'Shabbat & Holiday Times' })
+      expect(jewishTimesHeading.compareDocumentPosition(daveningStub) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     })
 
     // All-or-nothing: the admin's Home screen cards list is authoritative
@@ -300,15 +580,15 @@ describe('Landing', () => {
     it('hides a built-in card that has no row of its own, once a sibling kind is configured', () => {
       renderLanding(undefined, {
         content: {
-          categories: withMapAndZmanim,
+          categories: withZmanim,
           homeSections: [{ id: 'davening', kind: 'davening', title: 'Davening Times Card', sortOrder: 100, cardIds: [], width: 'full' }],
         },
       })
 
       expect(screen.getByTestId('davening-stub')).toBeInTheDocument()
-      // Map has no row of its own here, so it doesn't render at all —
-      // configuring one kind doesn't implicitly configure the rest.
-      expect(screen.queryByTestId('home-map-stub')).not.toBeInTheDocument()
+      // Jewish Times has no row of its own here, so it doesn't render at
+      // all — configuring one kind doesn't implicitly configure the rest.
+      expect(screen.queryByRole('heading', { name: 'Shabbat & Holiday Times' })).not.toBeInTheDocument()
     })
   })
 
@@ -316,29 +596,38 @@ describe('Landing', () => {
     const withMapAndZmanim = [
       makeCategory({ id: 'map', kind: 'map', pluralLabel: 'Map' }),
       makeCategory({ id: 'zmanim', kind: 'zmanim', pluralLabel: 'Zmanim' }),
+      // SubscribeSection self-gates on having at least one real (kind:
+      // 'listing') category to offer in its picker — without one it
+      // renders null, same as this suite's own jewishTimes/zmanim gate.
+      makeCategory({ id: 'grocery', kind: 'listing', pluralLabel: 'Grocery Stores' }),
     ]
 
+    // davening/map used to be this suite's own example pair — davening no
+    // longer generically pairs with anything (it's always pulled into the
+    // community row alongside Update Listings/Suggest a Listing instead,
+    // see Landing.tsx's own community-row doc), so these are rewritten
+    // against subscribe/jewishTimes, the pair the plan explicitly keeps
+    // pairing generically.
     it('pairs two adjacent half-width cards into one row', () => {
       const { container } = renderLanding(undefined, {
         content: {
           categories: withMapAndZmanim,
           homeSections: [
-            { id: 'davening', kind: 'davening', title: 'Davening Times Card', sortOrder: 100, cardIds: [], width: 'half' },
-            { id: 'map', kind: 'map', title: 'Map Card', sortOrder: 200, cardIds: [], width: 'half' },
+            { id: 'subscribe', kind: 'subscribe', title: 'Subscribe Card', sortOrder: 100, cardIds: [], width: 'half' },
+            { id: 'jewishTimes', kind: 'jewishTimes', title: 'Jewish Times Card', sortOrder: 200, cardIds: [], width: 'half' },
           ],
         },
       })
-      act(() => triggerAllIntersections())
 
-      // Both stubs share the same grid row — a direct parent with grid
-      // classes containing both testids, not two separate my-12 rows.
-      const daveningStub = screen.getByTestId('davening-stub')
-      const mapStub = screen.getByTestId('home-map-stub')
-      const row = daveningStub.closest('.grid')
+      // Both cards share the same grid row — a direct parent with grid
+      // classes containing both, not two separate my-8 rows.
+      const subscribeHeading = screen.getByRole('heading', { name: SITE_SETTINGS_DEFAULTS.desktopSubscribeHeading })
+      const jewishTimesHeading = screen.getByRole('heading', { name: SITE_SETTINGS_DEFAULTS.desktopJewishTimesHeading })
+      const row = subscribeHeading.closest('.grid')
       expect(row).not.toBeNull()
-      expect(row).toContainElement(mapStub)
+      expect(row).toContainElement(jewishTimesHeading)
       // Only one shared outer spacing wrapper for the pair, not one each.
-      expect(container.querySelectorAll('.my-12').length).toBe(1)
+      expect(container.querySelectorAll('.my-8').length).toBe(1)
     })
 
     it('a half-width card with no half-width neighbor falls back to its own full-width row', () => {
@@ -346,37 +635,39 @@ describe('Landing', () => {
         content: {
           categories: withMapAndZmanim,
           homeSections: [
-            { id: 'davening', kind: 'davening', title: 'Davening Times Card', sortOrder: 100, cardIds: [], width: 'half' },
-            { id: 'map', kind: 'map', title: 'Map Card', sortOrder: 200, cardIds: [], width: 'full' },
+            { id: 'subscribe', kind: 'subscribe', title: 'Subscribe Card', sortOrder: 100, cardIds: [], width: 'half' },
+            { id: 'jewishTimes', kind: 'jewishTimes', title: 'Jewish Times Card', sortOrder: 200, cardIds: [], width: 'full' },
           ],
         },
       })
-      act(() => triggerAllIntersections())
 
-      const daveningStub = screen.getByTestId('davening-stub')
+      const subscribeHeading = screen.getByRole('heading', { name: SITE_SETTINGS_DEFAULTS.desktopSubscribeHeading })
       // Not inside a grid — its own row, same as a full-width card.
-      expect(daveningStub.closest('.grid')).toBeNull()
-      expect(container.querySelectorAll('.my-12').length).toBe(2)
+      expect(subscribeHeading.closest('.grid')).toBeNull()
+      expect(container.querySelectorAll('.my-8').length).toBe(2)
     })
 
     it('a half-width card whose neighbor was gated off this render still falls back to full width', () => {
-      // davening/map both 'half', but no zmanim category — davening is
-      // JS-gated on nothing here (it self-gates on minyanim data, mocked to
-      // always render), map self-gates on `hasMap`; drop the map category so
-      // map renders nothing at all, leaving davening the only real card.
+      // subscribe/jewishTimes both 'half', but no zmanim category — subscribe
+      // is unconditional (mocked to always render), jewishTimes self-gates
+      // on zmanimCategory; drop the zmanim category so jewishTimes renders
+      // nothing at all, leaving subscribe the only real card.
       renderLanding(undefined, {
         content: {
-          categories: [makeCategory({ id: 'zmanim', kind: 'zmanim', pluralLabel: 'Zmanim' })], // no map category
+          categories: [
+            makeCategory({ id: 'map', kind: 'map', pluralLabel: 'Map' }),
+            makeCategory({ id: 'grocery', kind: 'listing', pluralLabel: 'Grocery Stores' }),
+          ], // no zmanim category
           homeSections: [
-            { id: 'davening', kind: 'davening', title: 'Davening Times Card', sortOrder: 100, cardIds: [], width: 'half' },
-            { id: 'map', kind: 'map', title: 'Map Card', sortOrder: 200, cardIds: [], width: 'half' },
+            { id: 'subscribe', kind: 'subscribe', title: 'Subscribe Card', sortOrder: 100, cardIds: [], width: 'half' },
+            { id: 'jewishTimes', kind: 'jewishTimes', title: 'Jewish Times Card', sortOrder: 200, cardIds: [], width: 'half' },
           ],
         },
       })
 
-      const daveningStub = screen.getByTestId('davening-stub')
-      expect(daveningStub.closest('.grid')).toBeNull()
-      expect(screen.queryByTestId('home-map-stub')).not.toBeInTheDocument()
+      const subscribeHeading = screen.getByRole('heading', { name: SITE_SETTINGS_DEFAULTS.desktopSubscribeHeading })
+      expect(subscribeHeading.closest('.grid')).toBeNull()
+      expect(screen.queryByRole('heading', { name: SITE_SETTINGS_DEFAULTS.desktopJewishTimesHeading })).not.toBeInTheDocument()
     })
   })
 
@@ -392,47 +683,43 @@ describe('Landing', () => {
       const synagogue = makeCategory({ id: 'synagogue', pluralLabel: 'Synagogues' })
       renderLanding(undefined, { content: { categories: [grocery, synagogue] } })
 
-      // The card's heading is `settings.heroTitle` now ("What are you
-      // looking for?" by default), not a hardcoded "Browse Everything" —
-      // see Landing.tsx's own comment on why that string is gone.
-      const heading = screen.getByRole('heading', { level: 2, name: SITE_SETTINGS_DEFAULTS.heroTitle })
+      // The card's heading is a hardcoded "Explore by Category" now (the
+      // user's own reference image), not settings.desktopBrowseHeading —
+      // see Landing.tsx's own comment on why.
+      expect(screen.getByRole('heading', { level: 2, name: 'Explore by Category' })).toBeInTheDocument()
       // Both cards render as siblings under the ONE "Browse everything"
-      // heading — not under their own admin-configured section titles
-      // ("Food and Hospitality", etc.), which is what "flat" means here.
-      const grid = heading.parentElement!
-      expect(within(grid).getByText('Grocery Stores')).toBeInTheDocument()
-      expect(within(grid).getByText('Synagogues')).toBeInTheDocument()
+      // card — not under their own admin-configured section titles ("Food
+      // and Hospitality", etc.), which is what "flat" means here.
+      const card = screen.getByTestId('browse-everything-card')
+      expect(within(card).getByText('Grocery Stores')).toBeInTheDocument()
+      expect(within(card).getByText('Synagogues')).toBeInTheDocument()
     })
 
-    // A list meant to hold every card at once (13+ real categories, growing)
-    // reads as "too many different things crammed together" the moment each
-    // row gets its own bordered box — that's the exact complaint that moved
-    // this section from CardGrid's photo tiles to CompactCardGrid in the
-    // first place. A border re-added later, even a subtle one, quietly
-    // reintroduces the same crowding at scale.
-    it('rows have no border/background at rest — only on hover, like the tab nav\'s own menu items', () => {
+    // Desktop mockup match (Phase 5, docs/desktop-mockup-plan.md) briefly
+    // gave this card a bordered box per tile — reversed again after review
+    // against the user's own reference image, which shows plain icon+label
+    // with no box, closer to CompactCard's own borderless-at-rest treatment
+    // than a card grid.
+    it('tiles have no border, at rest or on hover — just the icon and label', () => {
       const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
       renderLanding(undefined, { content: { categories: [grocery] } })
 
-      const heading = screen.getByRole('heading', { level: 2, name: SITE_SETTINGS_DEFAULTS.heroTitle })
-      const row = within(heading.parentElement!).getByText('Grocery Stores').closest('a')!
-      expect(row.className).not.toMatch(/\bborder\b/)
-      expect(row.className).not.toMatch(/\bbg-white\b/)
-      expect(row.className).toMatch(/hover:bg-slate-50/)
+      const card = screen.getByTestId('browse-everything-card')
+      const tile = within(card).getByText('Grocery Stores').closest('a')!
+      expect(tile.className).not.toMatch(/\bborder\b/)
+      expect(tile.className).toMatch(/hover:bg-slate-50/)
     })
 
-    // `settings.heroTitle` now titles the whole merged card — search sits
-    // under it as the first thing in the section, framed as "search within
-    // these categories" — not just this flat grid, so unlike the flat grid
-    // itself (still replaced by the grouped results grid while there's a
-    // query — see "narrows the grid" above), the heading no longer hides.
+    // "Explore by Category" titles the whole merged card — unlike the flat
+    // grid itself (still replaced by the grouped results grid while there's
+    // a query — see "narrows the grid" above), the heading never hides.
     it('keeps its heading as the section title while actively searching', async () => {
       const user = userEvent.setup()
       renderLanding(undefined, { content: { categories: [makeCategory({ pluralLabel: 'Grocery Stores' })] } })
 
-      expect(screen.getByRole('heading', { level: 2, name: SITE_SETTINGS_DEFAULTS.heroTitle })).toBeInTheDocument()
+      expect(screen.getByRole('heading', { level: 2, name: 'Explore by Category' })).toBeInTheDocument()
       await user.type(screen.getAllByLabelText('Search resources')[0]!, 'grocery')
-      expect(screen.getByRole('heading', { level: 2, name: SITE_SETTINGS_DEFAULTS.heroTitle })).toBeInTheDocument()
+      expect(screen.getByRole('heading', { level: 2, name: 'Explore by Category' })).toBeInTheDocument()
     })
 
     it('tracks category_opened with source "grid" on a card click', async () => {
@@ -440,10 +727,123 @@ describe('Landing', () => {
       const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
       renderLanding(undefined, { content: { categories: [grocery] } })
 
-      const heading = screen.getByRole('heading', { level: 2, name: SITE_SETTINGS_DEFAULTS.heroTitle })
-      await user.click(within(heading.parentElement!).getByText('Grocery Stores'))
+      const card = screen.getByTestId('browse-everything-card')
+      await user.click(within(card).getByText('Grocery Stores'))
 
       expect(vi.mocked(track)).toHaveBeenCalledWith('category_opened', { category: 'grocery', source: 'grid' })
+    })
+  })
+
+  // Phase 5 of the desktop mockup rework, revised twice after user review:
+  // the flat grid is a single non-scrolling, non-wrapping row by default —
+  // the first COLLAPSED_TILE_COUNT (9) cards, sorted by listing count (most
+  // to least places), plus a trailing "More" tile when there are more than
+  // that. The header row's own "View all" link is gone (the "More" tile
+  // does that job now); "Show fewer categories" there is the only way back
+  // once expanded, since there's no "More" tile to click in that state.
+  describe('the capped row + "More" tile vs. full grid', () => {
+    // Listing counts, not creation order, decide the order — deliberately
+    // NOT already-sorted category ids, so a test that accidentally read
+    // insertion order instead of the real sort would still pass by
+    // accident. cat9 (the 10th, over COLLAPSED_TILE_COUNT) gets the fewest
+    // listings, so it's the one pushed behind "More".
+    function tenCategoriesWithCounts() {
+      const categories = Array.from({ length: 10 }, (_, i) => makeCategory({ id: `cat${i}`, pluralLabel: `Category ${i}` }))
+      // Descending counts: cat0 has the most listings, cat9 the fewest.
+      const listings = categories.flatMap((c, i) =>
+        Array.from({ length: 10 - i }, (_, j) => makeListing({ id: `${c.id}-l${j}`, category: c.id! })),
+      )
+      return { categories, listings }
+    }
+
+    it('sorts by listing count (most to least), caps at 9, and shows a trailing "More" tile', () => {
+      const { categories, listings } = tenCategoriesWithCounts()
+      renderLanding(undefined, { content: { categories } }, listings)
+
+      const card = screen.getByTestId('browse-everything-card')
+      const tileLinks = within(card).getAllByRole('link', { name: /Category \d/ })
+      // Exactly the first 9, in descending-count order — cat9 (fewest
+      // listings) is the one left out, behind "More".
+      expect(tileLinks.map((l) => l.textContent)).toEqual(
+        Array.from({ length: 9 }, (_, i) => expect.stringContaining(`Category ${i}`)),
+      )
+      expect(within(card).queryByText('Category 9')).not.toBeInTheDocument()
+
+      const moreButton = within(card).getByRole('button', { name: /More/ })
+      expect(moreButton).toBeInTheDocument()
+      // Single row: no scroll container, no wrap — a plain flex row.
+      const row = tileLinks[0]!.parentElement!
+      expect(row).toHaveClass('flex')
+      expect(row).not.toHaveClass('overflow-x-auto')
+      expect(row).not.toHaveClass('flex-wrap')
+    })
+
+    it('the trailing "More" tile expands the grid to every card, no cap', async () => {
+      const user = userEvent.setup()
+      const { categories, listings } = tenCategoriesWithCounts()
+      renderLanding(undefined, { content: { categories } }, listings)
+
+      const card = screen.getByTestId('browse-everything-card')
+      await user.click(within(card).getByRole('button', { name: /More/ }))
+
+      expect(within(card).getAllByRole('link', { name: /Category \d/ }).length).toBe(10)
+      expect(within(card).queryByRole('button', { name: /More/ })).not.toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Show fewer categories' })).toHaveAttribute('aria-expanded', 'true')
+    })
+
+    it('collapses back to the capped row + "More" tile on "Show fewer categories"', async () => {
+      const user = userEvent.setup()
+      const { categories, listings } = tenCategoriesWithCounts()
+      renderLanding(undefined, { content: { categories } }, listings)
+
+      const card = screen.getByTestId('browse-everything-card')
+      await user.click(within(card).getByRole('button', { name: /More/ }))
+      await user.click(screen.getByRole('button', { name: 'Show fewer categories' }))
+
+      expect(within(card).getAllByRole('link', { name: /Category \d/ }).length).toBe(9)
+      expect(within(card).getByRole('button', { name: /More/ })).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Show fewer categories' })).not.toBeInTheDocument()
+    })
+
+    it('shows no "More" tile and no "Show fewer" control with 9 or fewer cards', () => {
+      const nine = Array.from({ length: 9 }, (_, i) => makeCategory({ id: `cat${i}`, pluralLabel: `Category ${i}` }))
+      renderLanding(undefined, { content: { categories: nine } })
+
+      expect(screen.queryByRole('button', { name: 'Show fewer categories' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /More/ })).not.toBeInTheDocument()
+    })
+
+    it('tile clicks still track category_opened with source "grid" once expanded', async () => {
+      const user = userEvent.setup()
+      const { categories, listings } = tenCategoriesWithCounts()
+      renderLanding(undefined, { content: { categories } }, listings)
+
+      const card = screen.getByTestId('browse-everything-card')
+      await user.click(within(card).getByRole('button', { name: /More/ }))
+      await user.click(within(card).getByText('Category 9'))
+
+      expect(vi.mocked(track)).toHaveBeenCalledWith('category_opened', { category: 'cat9', source: 'grid' })
+    })
+
+    // The hero's own "Browse Categories" button used to only scroll to this
+    // card, landing a visitor on the same capped 9+"More" row they'd have
+    // scrolled to on their own — defeating a button whose whole promise is
+    // "show me everything." It now expands the grid too, same as clicking
+    // "More" directly.
+    it('the hero\'s "Browse Categories" button expands the grid, not just scrolls to it', async () => {
+      // jsdom doesn't implement scrollIntoView at all (not even a no-op).
+      Element.prototype.scrollIntoView = vi.fn()
+      const user = userEvent.setup()
+      const { categories, listings } = tenCategoriesWithCounts()
+      renderLanding(undefined, { content: { categories } }, listings)
+
+      const card = screen.getByTestId('browse-everything-card')
+      expect(within(card).getByRole('button', { name: /More/ })).toBeInTheDocument()
+
+      await user.click(screen.getByRole('button', { name: 'Browse Categories' }))
+
+      expect(within(card).getAllByRole('link', { name: /Category \d/ }).length).toBe(10)
+      expect(within(card).queryByRole('button', { name: /More/ })).not.toBeInTheDocument()
     })
   })
 
@@ -539,4 +939,194 @@ describe('Landing', () => {
     })
   })
 
+})
+
+// A search that finds nothing shows what's close, then where to ask — and
+// still counts as a miss, since it is one.
+describe('Landing — when nothing matches', () => {
+  const grocery = makeCategory({ id: 'grocery', label: 'Grocery', pluralLabel: 'Grocery Stores', detailFields: [{ key: 'm', label: 'Kosher items', type: 'tags' }] })
+  const whatsapp = makeCategory({ id: 'whatsapp', label: 'WhatsApp Group', pluralLabel: 'WhatsApp Groups' })
+  const store = makeListing({ id: 'l1', category: 'grocery', name: 'Test Grocery', m: ['Pretzel Buns'] })
+
+  // The closest question that finds something, a word left out, as lines
+  // that say what was left out: never as if it were what was asked.
+  it('offers the closest search as such, and logs the question as a miss', async () => {
+    const user = userEvent.setup()
+    renderLanding(undefined, { content: { categories: [grocery, whatsapp] } }, [store])
+    await user.type(screen.getAllByLabelText('Search resources')[0]!, 'packaged pretzels')
+
+    expect(lineTexts()).toEqual(['Grocery Stores1 for “pretzels” · nothing for “packaged”'])
+    const lastCall = vi.mocked(useLogSearchMiss).mock.calls.at(-1)![0]
+    expect(lastCall).toMatchObject({ query: 'packaged pretzels' })
+  })
+
+  it('with nothing close either, Enter says so and offers only to ask (the user, Oct 10)', async () => {
+    const user = userEvent.setup()
+    renderLanding(undefined, { content: { categories: [grocery] } }, [store])
+    await user.type(screen.getAllByLabelText('Search resources')[0]!, 'dentist{Enter}')
+
+    expect(await screen.findAllByText('Nothing in the guide for “dentist”.')).not.toHaveLength(0)
+    expect(screen.queryByRole('link', { name: /Add it to the guide/ })).not.toBeInTheDocument()
+    expect(vi.mocked(useLogSearchMiss).mock.calls.at(-1)![0]).toMatchObject({ query: 'dentist', hasResults: false })
+  })
+})
+
+// The community's neighborhoods reach the home search: "food in Rittenhouse".
+describe('Landing — neighborhoods', () => {
+  it('counts only what\u2019s in the neighborhood named, and the page gets the words', async () => {
+    const user = userEvent.setup()
+    mockRouter.push.mockClear()
+    const food = makeCategory({ id: 'restaurant', label: 'Food', pluralLabel: 'Food' })
+    const near = makeListing({ id: 'n', category: 'restaurant', name: 'Square Cafe', geo: { lat: 39.9497, lng: -75.172 } })
+    const far = makeListing({ id: 'f', category: 'restaurant', name: 'Far Cafe', geo: { lat: 40.1, lng: -75.0 } })
+    renderLanding(undefined, { content: { categories: [food] }, community: { slug: 'philly' } }, [near, far])
+    await user.type(screen.getAllByLabelText('Search resources')[0]!, 'food in rittenhouse')
+    expect(lineTexts()).toEqual(['Food1 for “in rittenhouse”'])
+    await user.keyboard('{Enter}')
+    expect(mockRouter.push).toHaveBeenCalledWith('/philly/restaurant?q=in+rittenhouse')
+  })
+})
+
+// The questions under the box are only ones the guide answers well right
+// now: a tap is a first try that works.
+describe('Landing — example questions', () => {
+  const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores', detailFields: [{ key: 'm', label: 'Kosher items', type: 'tags' }] })
+
+  it('offers a question the guide answers, and a tap goes where Enter would', async () => {
+    const user = userEvent.setup()
+    mockRouter.push.mockClear()
+    const store = makeListing({ id: 'w', category: 'grocery', name: 'Wine Shop', m: ['Wine'] })
+    renderLanding(undefined, { content: { categories: [grocery] } }, [store])
+    await user.click(screen.getAllByRole('button', { name: 'Kosher wine' })[0])
+    expect(mockRouter.push).toHaveBeenCalledWith('/test-community/grocery?q=wine')
+    expect(vi.mocked(track)).toHaveBeenCalledWith('search_prompt_tapped', { prompt: 'Kosher wine' })
+  })
+
+  it('does not offer a question the guide has no answer to', () => {
+    const store = makeListing({ id: 'c', category: 'grocery', name: 'Challah Shop', m: ['Challah'] })
+    renderLanding(undefined, { content: { categories: [grocery] } }, [store])
+    expect(screen.queryByRole('button', { name: 'Kosher wine' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Chalav yisroel milk' })).not.toBeInTheDocument()
+  })
+})
+
+// A shared question (/[community]/ask/[question], see shareAnswer.ts) goes
+// where Enter would: the address is replaced, so Back doesn't land on a
+// page that leaves again.
+describe('Landing — a shared question', () => {
+  const grocery = makeCategory({ id: 'grocery', label: 'Grocery', pluralLabel: 'Grocery Stores', detailFields: [{ key: 'm', label: 'Kosher items', type: 'tags' }] })
+  const store = makeListing({ id: 'l1', category: 'grocery', name: 'Test Grocery', m: ['Challah'] })
+
+  afterEach(() => {
+    window.history.replaceState(null, '', '/')
+  })
+
+  it('goes to the page Enter would', async () => {
+    mockRouter.replace.mockClear()
+    renderLanding({ initialQuery: 'where can I get challah' }, { content: { categories: [grocery] } }, [store])
+    await vi.waitFor(() => expect(mockRouter.replace).toHaveBeenCalledWith('/test-community/grocery?q=challah'))
+  })
+
+  // The reader is off on most servers: a question to read is read once,
+  // then goes where our own search would, here nowhere.
+  it('a question the reader can’t read is asked of it once, then says it found nothing', async () => {
+    const { askReader } = await import('@/lib/askReader')
+    vi.mocked(askReader).mockClear()
+    mockRouter.replace.mockClear()
+    renderLanding({ initialQuery: 'dentist' }, { content: { categories: [grocery] } }, [store])
+    expect(await screen.findAllByText('Nothing in the guide for “dentist”.')).not.toHaveLength(0)
+    await new Promise((r) => setTimeout(r, 50))
+    expect(vi.mocked(askReader)).toHaveBeenCalledTimes(1)
+    expect(mockRouter.replace).not.toHaveBeenCalled()
+  })
+
+  it('stops naming the shared question in the address once another is asked', async () => {
+    window.history.replaceState(null, '', '/test-community/ask/dentist')
+    const user = userEvent.setup()
+    renderLanding({ initialQuery: 'dentist' }, { content: { categories: [grocery] } }, [store])
+    await user.clear(screen.getAllByLabelText('Search resources')[0]!)
+    await user.type(screen.getAllByLabelText('Search resources')[0]!, 'wine')
+    expect(window.location.pathname).toBe('/test-community')
+  })
+})
+
+describe('Landing — "is the eruv up"', () => {
+  const eruv = makeCategory({ id: 'eruv-information', label: 'Eruv Information', pluralLabel: 'Eruv Information', kind: 'eruv' })
+
+  it('goes to the eruv page', async () => {
+    const user = userEvent.setup()
+    mockRouter.push.mockClear()
+    renderLanding(undefined, { content: { categories: [makeCategory(), eruv] } }, [])
+    await user.type(screen.getAllByLabelText('Search resources')[0]!, 'is the eruv up')
+    expect(lineTexts()).toEqual(['Eruv InformationEach eruv’s status this week'])
+    await user.keyboard('{Enter}')
+    expect(mockRouter.push).toHaveBeenCalledWith('/test-community/eruv')
+  })
+
+  it('doesn’t, for a community with no eruv page', async () => {
+    const user = userEvent.setup()
+    renderLanding(undefined, { content: { categories: [makeCategory()] } }, [])
+    await user.type(screen.getAllByLabelText('Search resources')[0]!, 'is the eruv up')
+    expect(lineTexts()).not.toContainEqual(expect.stringMatching(/^Eruv/))
+  })
+})
+
+describe('Landing — Shabbos times', () => {
+  const zmanimCat = makeCategory({ id: 'zmanim', kind: 'zmanim', pluralLabel: 'Zmanim' })
+  afterEach(() => {
+    zmanimMock.result = { data: null, status: 'loading' }
+  })
+
+  it('"when is candle lighting": the time is the line, and Enter opens the times page with it picked out', async () => {
+    zmanimMock.result = {
+      status: 'ready',
+      data: {
+        hebrewDate: '', dayOfWeek: 3, isFriday: false, isShabbos: false,
+        dailyZmanim: [{ label: 'Sunset', time: '6:52 PM' }],
+        shabbos: { candleLighting: { label: 'Friday', time: '6:34 PM' }, havdalah: { label: 'Saturday', time: '7:36 PM' } },
+      },
+    }
+    const user = userEvent.setup()
+    mockRouter.push.mockClear()
+    renderLanding(undefined, { content: { categories: [makeCategory(), zmanimCat] } }, [])
+    await user.type(screen.getAllByLabelText('Search resources')[0]!, 'when is candle lighting')
+    expect(lineTexts()).toEqual(['ZmanimCandles Friday 6:34 PM'])
+    await user.keyboard('{Enter}')
+    expect(mockRouter.push).toHaveBeenCalledWith('/test-community/zmanim?time=candles')
+    await user.clear(screen.getAllByLabelText('Search resources')[0]!)
+    await user.type(screen.getAllByLabelText('Search resources')[0]!, 'shkia')
+    expect(lineTexts()).toEqual(['ZmanimSunset today 6:52 PM'])
+  })
+
+  it('says it’s looking them up while they load, rather than "nothing in the guide"', async () => {
+    const user = userEvent.setup()
+    renderLanding(undefined, { content: { categories: [makeCategory(), zmanimCat] } }, [])
+    await user.type(screen.getAllByLabelText('Search resources')[0]!, 'havdalah')
+    expect(lineTexts()).toEqual(['ZmanimLooking up the times…'])
+    expect(screen.queryByText(/Nothing in the guide/)).toBeNull()
+  })
+})
+
+describe('Landing — questions about the guide itself', () => {
+  it('"how do I add a restaurant" is its Add form, and lists no restaurants', async () => {
+    const food = makeCategory({ id: 'restaurant', label: 'Food', pluralLabel: 'Food' })
+    const user = userEvent.setup()
+    renderLanding(undefined, { content: { categories: [food] } }, [makeListing({ id: 'r1', category: 'restaurant', name: 'Some Cafe' })])
+    await user.type(screen.getAllByLabelText('Search resources')[0]!, 'how do I add a restaurant')
+    expect(lineTexts()).toEqual(['Add a food listingAnyone can add one. An admin checks it first.'])
+    expect(screen.getAllByRole('link', { name: /Add a food listing/ })[0]).toHaveAttribute('href', '/test-community/restaurant?form=create')
+  })
+
+  it('"how do I add a listing" opens + Add', async () => {
+    const user = userEvent.setup()
+    const opened = vi.fn()
+    document.addEventListener('jpc:open-add', opened)
+    try {
+      renderLanding(undefined, { content: { categories: [makeCategory()] } }, [])
+      await user.type(screen.getAllByLabelText('Search resources')[0]!, 'how do I add a listing{Enter}')
+      expect(opened).toHaveBeenCalled()
+    } finally {
+      document.removeEventListener('jpc:open-add', opened)
+    }
+  })
 })

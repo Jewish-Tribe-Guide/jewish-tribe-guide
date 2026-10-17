@@ -1,6 +1,7 @@
 import { revalidatePublicContent } from '@/lib/revalidateContent'
-import { getAdminUser } from '@/lib/adminAuth'
+import { getAdminUserForCommunity } from '@/lib/adminAuth'
 import { getAdminClient } from '@/lib/supabase/admin'
+import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
 
 // Same bucket/mechanism as the logo route (see that file's own doc) — a
 // separate route rather than a shared one because the two differ slightly
@@ -16,14 +17,19 @@ async function ensureBucket() {
   if (error && !/already exists/i.test(error.message)) throw error
 }
 
-// POST /api/admin/site-settings/hero-image — uploads an image file
-// (multipart form-data, field "file") to storage and returns its public
-// URL. Admin only. Does NOT touch site_settings itself — the editor sets
-// the returned URL on its draft, same as pasting a URL, so it's still
-// batched into the normal Save changes flow rather than taking effect
-// immediately.
+// POST /api/admin/site-settings/hero-image?community=<slug> — uploads an
+// image file (multipart form-data, field "file") to storage and returns its
+// public URL. Admin only, and community-scoped (getAdminUserForCommunity) —
+// this used to check the global-only getAdminUser, so a real admin for this
+// community but not on the site-wide SUPERADMIN_EMAILS list got a genuine
+// 401 the moment they tried to upload or reposition a photo, even though
+// every other part of the Site Settings editor worked for them. Does NOT
+// touch site_settings itself — the editor sets the returned URL on its
+// draft, same as pasting a URL, so it's still batched into the normal Save
+// changes flow rather than taking effect immediately.
 export async function POST(request: Request) {
-  const admin = await getAdminUser(request)
+  const community = await resolveCommunity(communitySlugFromRequest(request))
+  const admin = await getAdminUserForCommunity(request, community.slug)
   if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
 
   let form: FormData

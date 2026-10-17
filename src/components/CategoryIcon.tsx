@@ -1,7 +1,8 @@
 'use client'
 
+import { useState, type ReactNode } from 'react'
 import Image from 'next/image'
-import { isOptimizableImage } from '@/lib/imageHosts'
+import { isOptimizableImage, storageThumbnailUrl } from '@/lib/imageHosts'
 import { CategoryGlyph } from '@/lib/categoryIcons'
 import { categoryTint, categoryRing } from '@/lib/categoryColor'
 
@@ -38,6 +39,17 @@ type Props = {
    *  these at chip size, where a second edge next to the chip's own border
    *  is noise rather than information, passes false. */
   ring?: boolean
+  /** 'square' for a place in a directory row (rounded corners, as in the
+   *  redesign's mockups); 'circle', the default, everywhere else. */
+  shape?: 'circle' | 'square'
+  /** Shown instead of the category's icon when there's no picture: a
+   *  listing's initials, so a row of one category's places isn't the same
+   *  icon repeated down the page. */
+  initials?: string
+  /** In place of the initials: a line glyph that says what the place is,
+   *  where that's what tells it apart (a minyan that isn't a shul: a
+   *  clock). Drawn in the same darker shade the initials are. */
+  glyph?: ReactNode
 }
 
 /** The circular category avatar — a category's line icon (or, lacking one,
@@ -46,11 +58,18 @@ type Props = {
  *  list/place detail, category chips) shows a place the same way regardless
  *  of which it's using, and so the image-vs-icon-vs-emoji fallback logic
  *  exists exactly once. */
-export default function CategoryIcon({ icon, categoryId, iconImageUrl, color, className = 'h-10 w-10 text-xl', sizePx = 40, ring = true }: Props) {
+export default function CategoryIcon({ icon, categoryId, iconImageUrl, color, className = 'h-10 w-10 text-xl', sizePx = 40, ring = true, shape = 'circle', initials, glyph }: Props) {
   const hasImage = !!iconImageUrl?.trim()
+  // A small copy made by Supabase Storage, for an uploaded photo — see
+  // storageThumbnailUrl. Falls back to the original if that request fails
+  // (transformations are a plan feature, so a project without them 400s).
+  // Keyed by the URL so a different picture gets its own second chance.
+  const thumb = hasImage ? storageThumbnailUrl(iconImageUrl!, sizePx) : null
+  const [failedThumb, setFailedThumb] = useState<string | null>(null)
+  const useThumb = thumb !== null && failedThumb !== thumb
   return (
     <span
-      className={`relative flex shrink-0 items-center justify-center overflow-hidden rounded-full ${className}`}
+      className={`relative flex shrink-0 items-center justify-center overflow-hidden ${shape === 'square' ? 'rounded-xl' : 'rounded-full'} ${className}`}
       style={{ backgroundColor: categoryTint(color), color, ...(ring ? { boxShadow: categoryRing(color) } : {}) }}
       aria-hidden="true"
     >
@@ -60,13 +79,26 @@ export default function CategoryIcon({ icon, categoryId, iconImageUrl, color, cl
         // otherwise (see isOptimizableImage's own note), and that's a
         // thrown error, not a broken image icon.
         <Image
-          src={iconImageUrl!}
+          src={useThumb ? thumb : iconImageUrl!}
           alt=""
           fill
           sizes={`${sizePx}px`}
           className="object-cover"
-          unoptimized={!isOptimizableImage(iconImageUrl!)}
+          // The thumbnail is already the right size, so it never goes through
+          // Vercel's optimizer (which is the whole point).
+          unoptimized={useThumb || !isOptimizableImage(iconImageUrl!)}
+          onError={useThumb ? () => setFailedThumb(thumb) : undefined}
         />
+      ) : glyph ? (
+        <span className="flex h-[55%] w-[55%] items-center justify-center" style={{ color: `color-mix(in oklab, ${color} 70%, #000)` }} data-testid="icon-glyph">
+          {glyph}
+        </span>
+      ) : initials ? (
+        // A darker shade of the category's colour: the plain colour on its
+        // own light tint is too faint for small text.
+        <span className="text-[13px] font-extrabold tracking-tight" style={{ color: `color-mix(in oklab, ${color} 70%, #000)` }}>
+          {initials}
+        </span>
       ) : (
         // w-[55%]/h-[55%]: a line icon reads as too small relative to its
         // tinted circle at the emoji's own natural size, and too large at

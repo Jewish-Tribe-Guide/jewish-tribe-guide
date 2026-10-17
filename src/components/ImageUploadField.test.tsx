@@ -38,7 +38,7 @@ function fakeFile(name: string) {
 }
 
 // A real caller always feeds the resulting URL straight back in as the next
-// `value` (see SiteSettingsEditor, CategoryFormFields, ListingForm) — this
+// `value` (see SiteSettingsEditor, CategoryFormFields, DetailFieldInput) — this
 // wrapper does the same, which is what lets a SECOND reposition see the
 // first crop's uploaded URL as `value` at all.
 function ControlledField() {
@@ -69,9 +69,7 @@ describe('ImageUploadField', () => {
 
     render(<ControlledField />)
 
-    // "Upload image"'s hidden file input has no `capture` attribute; "Take
-    // photo"'s does — this is how the test tells the two apart.
-    const fileInput = document.querySelector('input[type="file"]:not([capture])') as HTMLInputElement
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement
     const original = fakeFile('vacation.jpg')
     await user.upload(fileInput, original)
 
@@ -116,7 +114,7 @@ describe('ImageUploadField', () => {
     expect(screen.getByText('Source: https://example.com/pasted.jpg')).toBeInTheDocument()
     await user.click(screen.getByText('Cancel crop'))
 
-    const fileInput = document.querySelector('input[type="file"]:not([capture])') as HTMLInputElement
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement
     await user.upload(fileInput, fakeFile('vacation.jpg'))
 
     await user.click(screen.getByRole('button', { name: 'Adjust photo' }))
@@ -211,7 +209,7 @@ describe('ImageUploadField', () => {
     }
     render(<CallerOwnedField />)
 
-    const fileInput = document.querySelector('input[type="file"]:not([capture])') as HTMLInputElement
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement
     await user.upload(fileInput, fakeFile('vacation.jpg'))
     await user.click(screen.getByText('Confirm crop'))
     await waitFor(() => expect(document.querySelector('img')).toHaveAttribute('src', 'https://example.com/cropped-1.jpg'))
@@ -225,5 +223,104 @@ describe('ImageUploadField', () => {
     await user.click(screen.getByRole('button', { name: 'Adjust photo' }))
 
     expect(screen.getByText('Source: file:vacation.jpg')).toBeInTheDocument()
+  })
+
+  describe('collapseUrlInput', () => {
+    it('shows the URL input immediately by default, with no toggle button at all — every admin uploader keeps this', () => {
+      render(<ImageUploadField value="" onChange={vi.fn()} uploadUrl="/api/upload" />)
+      expect(screen.getByPlaceholderText('https://…')).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Paste URL' })).not.toBeInTheDocument()
+      // No "Paste URL" toggle button exists in this (uncollapsed) mode, so
+      // the caption is the only thing that ever explains this input —
+      // it stays here.
+      expect(screen.getByText('…or paste an image URL directly')).toBeInTheDocument()
+    })
+
+    // Once there's a "Paste URL" toggle button (collapseUrlInput), it
+    // already says what the input below it is for — repeating that in a
+    // caption right underneath was pure noise. The input still needs an
+    // accessible name once the caption's gone.
+    it('drops the "…or paste an image URL directly" caption once a "Paste URL" toggle already says the same thing', async () => {
+      const user = userEvent.setup()
+      render(<ImageUploadField value="" onChange={vi.fn()} uploadUrl="/api/upload" collapseUrlInput />)
+
+      await user.click(screen.getByRole('button', { name: 'Paste URL' }))
+
+      expect(screen.queryByText('…or paste an image URL directly')).not.toBeInTheDocument()
+      expect(screen.getByRole('textbox', { name: 'Image URL' })).toBe(screen.getByPlaceholderText('https://…'))
+    })
+
+    // One persistent toggle button — not a trigger that vanishes once
+    // clicked with a separate control elsewhere to undo it (that was tried
+    // and reported live as short-sighted: it added a whole new "Hide"
+    // control that never existed anywhere else in this field, instead of
+    // just not hiding the button). Same button opens AND closes, same as
+    // any other toggle in this app.
+    it('starts the URL input collapsed behind a "Paste URL" toggle, which stays put and opens/closes it', async () => {
+      const user = userEvent.setup()
+      render(<ImageUploadField value="" onChange={vi.fn()} uploadUrl="/api/upload" collapseUrlInput />)
+
+      expect(screen.queryByPlaceholderText('https://…')).not.toBeInTheDocument()
+      const toggle = screen.getByRole('button', { name: 'Paste URL' })
+      expect(toggle).toHaveAttribute('aria-pressed', 'false')
+
+      await user.click(toggle)
+
+      expect(screen.getByPlaceholderText('https://…')).toBeInTheDocument()
+      // Still the SAME button, not replaced or removed — just now pressed.
+      expect(screen.getByRole('button', { name: 'Paste URL' })).toHaveAttribute('aria-pressed', 'true')
+
+      await user.click(screen.getByRole('button', { name: 'Paste URL' }))
+
+      expect(screen.queryByPlaceholderText('https://…')).not.toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Paste URL' })).toHaveAttribute('aria-pressed', 'false')
+    })
+
+    it('still reports a pasted URL once revealed', async () => {
+      const user = userEvent.setup()
+      function CollapsedControlledField() {
+        const [value, setValue] = useState('')
+        return <ImageUploadField value={value} onChange={setValue} uploadUrl="/api/upload" collapseUrlInput />
+      }
+      render(<CollapsedControlledField />)
+
+      await user.click(screen.getByRole('button', { name: 'Paste URL' }))
+      await user.type(screen.getByPlaceholderText('https://…'), 'https://example.com/photo.jpg')
+
+      expect(screen.getByPlaceholderText('https://…')).toHaveValue('https://example.com/photo.jpg')
+    })
+
+    it('closing the toggle does not clear whatever URL/photo is already set', async () => {
+      const user = userEvent.setup()
+      function CollapsedControlledField() {
+        const [value, setValue] = useState('https://example.com/existing.jpg')
+        return <ImageUploadField value={value} onChange={setValue} uploadUrl="/api/upload" collapseUrlInput />
+      }
+      render(<CollapsedControlledField />)
+
+      await user.click(screen.getByRole('button', { name: 'Paste URL' }))
+      expect(screen.getByPlaceholderText('https://…')).toHaveValue('https://example.com/existing.jpg')
+
+      await user.click(screen.getByRole('button', { name: 'Paste URL' }))
+
+      expect(screen.queryByPlaceholderText('https://…')).not.toBeInTheDocument()
+      expect(document.querySelector('img')).toHaveAttribute('src', 'https://example.com/existing.jpg')
+    })
+  })
+
+  // A plain `<input type="file">` with no `capture` attribute already opens
+  // the OS's own chooser on a phone (Take Photo/Photo Library/Choose File
+  // on iOS Safari, Camera/Files on Android Chrome), so a second button
+  // offering the same camera option via `capture="environment"` was a whole
+  // extra control for what `capture` only saves: skipping past that chooser
+  // instead of one extra tap through it. Desktop has no such chooser at
+  // all, where the second button did nothing "Upload image" didn't.
+  it('offers just one "Upload image" button, no separate "Take photo" — a plain file input already offers the camera on a phone', () => {
+    render(<ImageUploadField value="" onChange={vi.fn()} uploadUrl="/api/upload" />)
+
+    expect(screen.getByRole('button', { name: 'Upload image' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Take photo' })).not.toBeInTheDocument()
+    expect(document.querySelectorAll('input[type="file"]')).toHaveLength(1)
+    expect(document.querySelector('input[type="file"][capture]')).not.toBeInTheDocument()
   })
 })

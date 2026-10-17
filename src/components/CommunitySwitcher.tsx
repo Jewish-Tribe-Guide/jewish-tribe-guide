@@ -127,7 +127,7 @@ export default function CommunitySwitcher({
           // above it. The portal takes it out of that containing block.
           createPortal(
             <>
-              <div className="fixed inset-0 z-50 bg-slate-900/40" onClick={() => setOpen(false)} />
+              <div className="overlay-in fixed inset-0 z-50 bg-slate-900/40" onClick={() => setOpen(false)} />
               <div className="fixed inset-x-0 bottom-0 z-50 rounded-t-2xl bg-white pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_30px_rgb(0,0,0,0.12)]">
                 <div className="flex justify-center py-2">
                   <span className="h-1 w-9 rounded-full bg-slate-300" aria-hidden="true" />
@@ -143,7 +143,8 @@ export default function CommunitySwitcher({
         ) : (
           <div
             role="menu"
-            className="absolute left-0 top-full z-50 mt-1 w-72 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg"
+            style={{ transformOrigin: 'top left' }}
+            className="animate-[menuIn_140ms_ease-out] absolute left-0 top-full z-50 mt-1 w-72 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg"
           >
             {list}
           </div>

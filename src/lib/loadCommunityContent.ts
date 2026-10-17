@@ -3,11 +3,13 @@ import { getSiteSettings } from './siteSettingsStore'
 import { listHomeSections } from './homeSectionStore'
 import { listPublishedForms } from './formStore'
 import { listHospitals } from './hospitalStore'
+import { listCampaignBanners } from './campaignBannerStore'
 import { SITE_SETTINGS_DEFAULTS, type SiteSettings } from './siteSettings'
 import { FALLBACK_CATEGORIES } from './categoryFallback'
 import type { CategoryConfig } from './categories'
 import type { HomeSection } from './homeSections'
 import type { FormConfig } from './forms'
+import type { CampaignBanner } from './campaignBanner'
 import type { Hospital } from '@/types'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -27,7 +29,7 @@ import type { Hospital } from '@/types'
 // possible answer for someone standing in a hospital deciding where to eat.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export type ContentKey = 'categories' | 'settings' | 'homeSections' | 'forms' | 'hospitals'
+export type ContentKey = 'categories' | 'settings' | 'homeSections' | 'forms' | 'hospitals' | 'campaignBanners'
 
 export type CommunityContent = {
   categories: CategoryConfig[]
@@ -35,6 +37,7 @@ export type CommunityContent = {
   homeSections: HomeSection[]
   forms: FormConfig[]
   hospitals: Hospital[]
+  campaignBanners: CampaignBanner[]
   /** Which reads failed. Anything listed here is showing a fallback, not data,
    *  and the UI should say so rather than present it as the truth. */
   failed: ContentKey[]
@@ -59,7 +62,7 @@ async function attempt<T>(
 export async function loadCommunityContent(community: string): Promise<CommunityContent> {
   const failed: ContentKey[] = []
 
-  const [categories, settings, homeSections, forms, hospitals] = await Promise.all([
+  const [categories, settings, homeSections, forms, hospitals, campaignBanners] = await Promise.all([
     // The seeded set, so the cards never vanish entirely — the ids match the
     // real ones, so links keep working once the database is reachable again.
     attempt('categories', failed, FALLBACK_CATEGORIES, () => listCategories(community)),
@@ -67,7 +70,8 @@ export async function loadCommunityContent(community: string): Promise<Community
     attempt<HomeSection[]>('homeSections', failed, [], () => listHomeSections(community)),
     attempt<FormConfig[]>('forms', failed, [], () => listPublishedForms(community)),
     attempt<Hospital[]>('hospitals', failed, [], () => listHospitals(community)),
+    attempt<CampaignBanner[]>('campaignBanners', failed, [], () => listCampaignBanners(community)),
   ])
 
-  return { categories, settings, homeSections, forms, hospitals, failed }
+  return { categories, settings, homeSections, forms, hospitals, campaignBanners, failed }
 }

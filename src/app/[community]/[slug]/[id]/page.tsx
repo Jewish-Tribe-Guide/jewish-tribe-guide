@@ -9,6 +9,8 @@ import { SITE_SETTINGS_DEFAULTS } from '@/lib/siteSettings'
 import { listingSlug, resolveListing } from '@/lib/listingSlug'
 import { routes } from '@/lib/routes'
 import { siteUrl } from '@/lib/siteUrl'
+import { buildJsonLdScript } from '@/lib/jsonLdScript'
+import { buildListingJsonLd } from '@/lib/structuredData'
 import SlugScreen from '../SlugScreen'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -116,9 +118,25 @@ export default async function ListingPage(props: PageProps<'/[community]/[slug]/
   const resolved = await resolve(community, slug, id)
   if (!resolved) notFound()
 
+  const communities = await listCommunities().catch(() => [])
+  const settings = await getSiteSettings(community).catch(() => SITE_SETTINGS_DEFAULTS)
+  const siteName = settings.name || communities.find((c) => c.slug === community)?.name || community
+
+  // The same facts the page shows, as schema.org — see structuredData.ts.
+  const jsonLd = buildListingJsonLd({
+    item: resolved.item,
+    category: resolved.category,
+    community,
+    siteName,
+    base: siteUrl(),
+  })
+
   return (
-    <Suspense fallback={<main className="flex flex-1 flex-col" />}>
-      <SlugScreen slug={slug} kind="category" listings={resolved.listings} initialItemId={resolved.item.id} />
-    </Suspense>
+    <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: buildJsonLdScript(jsonLd) }} />
+      <Suspense fallback={<main className="flex flex-1 flex-col" />}>
+        <SlugScreen slug={slug} kind="category" listings={resolved.listings} initialItemId={resolved.item.id} />
+      </Suspense>
+    </>
   )
 }

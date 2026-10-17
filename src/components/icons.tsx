@@ -22,11 +22,12 @@ export function PencilIcon({ className }: IconProps) {
   )
 }
 
-export function FlagIcon({ className }: IconProps) {
+/** A camera, for "change this photo" on the editor's avatar. */
+export function CameraIcon({ className }: IconProps) {
   return (
     <svg {...base} className={className}>
-      <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V4s-1 1-4 1-5-2-8-2-4 1-4 1z" />
-      <line x1="4" y1="22" x2="4" y2="15" />
+      <path d="M4 8h3l2-3h6l2 3h3v11H4z" />
+      <circle cx="12" cy="13" r="3.5" />
     </svg>
   )
 }
@@ -58,6 +59,18 @@ export function PinIcon({ className, filled }: IconProps & { filled?: boolean })
     <svg {...base} fill={filled ? 'currentColor' : 'none'} className={className}>
       <path d="M12 21c-4.4-3.9-7-7.4-7-10.8A7 7 0 0 1 12 3a7 7 0 0 1 7 7.2c0 3.4-2.6 6.9-7 10.8z" />
       <circle cx="12" cy="10" r="2.6" {...(filled ? { fill: 'white', stroke: 'none' } : {})} />
+    </svg>
+  )
+}
+
+// Bookmark — Save (Oct 14: Save replaced Pin), wherever a place or a search
+// is saved, and the You tab's own mark, as Google Maps does. Filled means
+// saved. Deliberately not PinIcon's map-marker teardrop, which means "a place
+// on a map" (and "set as location").
+export function BookmarkIcon({ className, filled }: IconProps & { filled?: boolean }) {
+  return (
+    <svg viewBox="0 0 24 24" fill={filled ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+      <path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z" />
     </svg>
   )
 }
@@ -105,6 +118,17 @@ export function GridIcon({ className }: IconProps) {
   )
 }
 
+// A house — the home tab, when the grid has moved to its own Browse tab.
+export function HomeIcon({ className }: IconProps) {
+  return (
+    <svg {...base} className={className}>
+      <path d="M4 10.5 12 4l8 6.5" />
+      <path d="M6 9v11h12V9" />
+      <path d="M10 20v-5h4v5" />
+    </svg>
+  )
+}
+
 // Folded map — the mobile tab bar's "Map" tab.
 export function MapFoldIcon({ className }: IconProps) {
   return (
@@ -125,11 +149,32 @@ export function MessageIcon({ className }: IconProps) {
   )
 }
 
-// Left chevron — the map place-detail panel's "Back to list" control.
+// Left chevron — the phone map sheet's "Back to list", and the desktop
+// map sidebar's edge tab (collapse).
 export function ChevronLeftIcon({ className }: IconProps) {
   return (
     <svg {...base} className={className}>
       <path d="M15 18l-6-6 6-6" />
+    </svg>
+  )
+}
+
+// Left arrow — the desktop map's "Back to results", inside the search box.
+// An arrow, not a chevron: it's a step back within the map, and the
+// chevrons left on that screen (the sidebar's edge tab) collapse things.
+export function ArrowLeftIcon({ className }: IconProps) {
+  return (
+    <svg {...base} className={className}>
+      <path d="M19 12H5M12 19l-7-7 7-7" />
+    </svg>
+  )
+}
+
+// ✕ — the desktop map page's Close map, in its top-right corner.
+export function CloseIcon({ className }: IconProps) {
+  return (
+    <svg {...base} className={className}>
+      <path d="M18 6L6 18M6 6l12 12" />
     </svg>
   )
 }
@@ -228,6 +273,16 @@ export function CheckIcon({ className }: IconProps) {
   )
 }
 
+/** A circle struck through: closed for good, Request removal. */
+export function ClosedIcon({ className }: IconProps) {
+  return (
+    <svg {...base} className={className}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="m5.6 5.6 12.8 12.8" />
+    </svg>
+  )
+}
+
 // Three filled dots, not stroked paths like every icon above — a kebab menu
 // trigger reads as three small solid marks, not an outlined shape, so this
 // sets its own fill instead of using `base`'s stroke-only style.
@@ -237,6 +292,148 @@ export function DotsIcon({ className }: IconProps) {
       <circle cx="5" cy="12" r="2" />
       <circle cx="12" cy="12" r="2" />
       <circle cx="19" cy="12" r="2" />
+    </svg>
+  )
+}
+
+// A simple city-skyline silhouette — filled shapes, not stroked lines like
+// every icon above, since a skyline reads as solid rooftops against sky
+// rather than an outlined pictogram. A row of plain rectangle "rooftops"
+// flanking one taller, stepped tower loosely standing in for Philadelphia
+// City Hall's own silhouette, without depicting the real building closely
+// enough to need a licensed asset. Purely decorative wherever it's used
+// (HeroHeading, SiteFooter) — callers render it aria-hidden.
+export function SkylineIcon({ className }: IconProps) {
+  return (
+    <svg viewBox="0 -14 200 104" fill="currentColor" aria-hidden="true" className={className}>
+      <rect x="0" y="46" width="22" height="44" />
+      <rect x="26" y="30" width="18" height="60" />
+      <rect x="48" y="54" width="16" height="36" />
+      {/* The stepped tower, with a slim spire on top. */}
+      <rect x="86" y="10" width="28" height="80" />
+      <rect x="92" y="0" width="16" height="14" />
+      <rect x="97" y="-14" width="6" height="16" />
+      <rect x="118" y="38" width="20" height="52" />
+      <rect x="142" y="24" width="18" height="66" />
+      <rect x="164" y="50" width="16" height="40" />
+      <rect x="184" y="36" width="16" height="54" />
+    </svg>
+  )
+}
+
+// People — UpdateListingsCard's header icon (Phase 6, desktop mockup
+// rework). Two overlapping figures, not one — "kept by the community" is
+// about the group, not an individual.
+export function PeopleIcon({ className }: IconProps) {
+  return (
+    <svg {...base} className={className}>
+      <circle cx="9" cy="8" r="3" />
+      <path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6" />
+      <circle cx="17" cy="9" r="2.5" />
+      <path d="M15.5 14.2c2.6.4 4.5 2.6 4.5 5.3" />
+    </svg>
+  )
+}
+
+// A single stylized leaf — stands in for the Sukkot/schach greenery this
+// banner is themed around without depicting a real sukkah. Used both as the
+// photo placeholder's faint watermark glyph and the banner's own decorative
+// corner accent (see CampaignBannerCard's desktop block).
+export function LeafIcon({ className }: IconProps) {
+  return (
+    <svg {...base} className={className}>
+      <path d="M11 20c8 0 11-6 11-13-7 0-13 3-13 11 0-8-6-11-13-11 0 7 3 13 15 13Z" />
+      <path d="M11 20V7" />
+    </svg>
+  )
+}
+
+
+// A candle and its flame — the Shabbos card's mark (ShabbatTimesCard), in
+// gold, the colour kept for candle lighting.
+export function CandleIcon({ className }: IconProps) {
+  return (
+    <svg {...base} className={className}>
+      <path d="M12 3c1 1.2 1.5 2.1 1.5 3a1.5 1.5 0 1 1-3 0c0-.9.5-1.8 1.5-3z" />
+      <path d="M9 10.5h6V20a1 1 0 0 1-1 1h-4a1 1 0 0 1-1-1v-9.5z" />
+    </svg>
+  )
+}
+
+/** An outline thumbs-up: Recommend on an opened listing, and a row's likes. */
+export function ThumbIcon({ className }: IconProps) {
+  return (
+    <svg {...base} className={className}>
+      <path d="M7 10v12" />
+      <path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z" />
+    </svg>
+  )
+}
+
+/** A rosette with a tick: a kosher certificate link. */
+export function CertificateIcon({ className }: IconProps) {
+  return (
+    <svg {...base} className={className}>
+      <path d="M3.85 8.62a4 4 0 0 1 4.78-4.77 4 4 0 0 1 6.74 0 4 4 0 0 1 4.78 4.78 4 4 0 0 1 0 6.74 4 4 0 0 1-4.77 4.78 4 4 0 0 1-6.75 0 4 4 0 0 1-4.78-4.77 4 4 0 0 1 0-6.76Z" />
+      <path d="m9 12 2 2 4-4" />
+    </svg>
+  )
+}
+
+/** An envelope: Email. */
+export function MailIcon({ className }: IconProps) {
+  return (
+    <svg {...base} className={className}>
+      <rect width="20" height="16" x="2" y="4" rx="2" />
+      <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+    </svg>
+  )
+}
+
+/** A box with an arrow up out of it: Share. */
+export function ShareIcon({ className }: IconProps) {
+  return (
+    <svg {...base} className={className}>
+      <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+      <path d="m16 6-4-4-4 4" />
+      <path d="M12 2v13" />
+    </svg>
+  )
+}
+
+/** A person with a plus: Join a group. */
+export function JoinIcon({ className }: IconProps) {
+  return (
+    <svg {...base} className={className}>
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M19 8v6" />
+      <path d="M22 11h-6" />
+    </svg>
+  )
+}
+
+/** Filters: two sliders. The Map page's Filters button. */
+export function SlidersIcon({ className }: IconProps) {
+  return (
+    <svg className={className} fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M20 7h-9" />
+      <path d="M14 17H5" />
+      <circle cx="17" cy="17" r="3" />
+      <circle cx="7" cy="7" r="3" />
+    </svg>
+  )
+}
+
+/** A bin with a lid: Request removal, beside an opened listing's Edit. */
+export function TrashIcon({ className }: IconProps) {
+  return (
+    <svg {...base} className={className}>
+      <path d="M3 6h18" />
+      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+      <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+      <path d="M10 11v6" />
+      <path d="M14 11v6" />
     </svg>
   )
 }

@@ -2,14 +2,15 @@
 
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import FindResources, { type FindResourcesProps } from './FindResources'
+import type { ParamsOpts } from './resources/GenericDirectory'
 
 type Props = Omit<
   FindResourcesProps,
-  'searchItem' | 'searchQuery' | 'searchOpenNow' | 'searchFilters' | 'searchHospital' | 'searchForm' | 'searchDavening' | 'searchDaveningDay' | 'onParamsChange'
+  'searchItem' | 'searchMatch' | 'searchMinyan' | 'searchQuery' | 'searchOpenNow' | 'searchFilters' | 'searchForm' | 'searchDavening' | 'searchDaveningDay' | 'onParamsChange'
 >
 
 // The query-string-aware half of FindResources, split out so the plain-URL
-// case (no ?item=/?q=/?hospital=/?form= at all — the common one: a fresh
+// case (no ?item=/?q=/?form= at all — the common one: a fresh
 // visit, a crawler, a card tap) never has to call useSearchParams() to
 // render. See FindResources' own searchItem/onParamsChange doc comments —
 // this is what actually supplies them once the page has hydrated. The
@@ -22,7 +23,7 @@ export default function FindResourcesConnected(props: Props) {
   const pathname = usePathname()
   const router = useRouter()
 
-  const setParams = (changes: Record<string, string | null>, opts?: { replace?: boolean }) => {
+  const setParams = (changes: Record<string, string | null>, opts?: ParamsOpts) => {
     // window.location.search, not the closure-captured `params` above:
     // `params` is only as fresh as this component's LAST completed render,
     // and a `router.replace` navigation doesn't resolve synchronously — it's
@@ -64,10 +65,13 @@ export default function FindResourcesConnected(props: Props) {
     // GenericDirectory already holds search/openNow/filter state locally
     // (this call exists purely so the URL is shareable and survives a
     // reload — see GenericDirectory's own hydration effects for the other
-    // half of that). router.push stays for the item/form/hospital
+    // half of that). router.push stays for the item/form
     // navigations below — those DO need Next's own history/back-button
     // integration, which this sync deliberately opts out of.
     if (opts?.replace) window.history.replaceState(window.history.state, '', url)
+    // A step Back undoes, with no navigation either: the page already shows
+    // it. Named in the state so the page's own back can tell it took one.
+    else if (opts?.step) window.history.pushState({ ...window.history.state, step: opts.step }, '', url)
     else router.push(url)
   }
 
@@ -75,10 +79,11 @@ export default function FindResourcesConnected(props: Props) {
     <FindResources
       {...props}
       searchItem={params.get('item')}
+      searchMatch={params.get('match')}
+      searchMinyan={params.get('minyan')}
       searchQuery={params.get('q')}
       searchOpenNow={params.get('openNow')}
       searchFilters={Object.fromEntries(params.entries())}
-      searchHospital={params.get('hospital')}
       searchForm={params.get('form')}
       searchDavening={params.get('davening')}
       searchDaveningDay={params.get('day')}

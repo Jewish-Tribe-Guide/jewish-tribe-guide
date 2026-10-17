@@ -9,6 +9,7 @@ import { useCommunitySlug } from '@/lib/communityContext'
 import { withCommunity } from '@/lib/useCommunityData'
 import FormEditor from './FormEditor'
 import { CategoryEditor } from './CategoryEditor'
+import ListingEditorScreen from './ListingEditorScreen'
 import CategoryPreview from './CategoryPreview'
 import { CardBackgroundField, CardBandImageField, IconField } from './CategoryFormFields'
 import { getCategoryColor } from '@/lib/categoryColor'
@@ -28,7 +29,7 @@ import { CAPABILITY_LABELS } from './categoryEditorLogic'
 const SINGLETON_KIND_LABELS = {
   map: 'Map',
   zmanim: 'Zmanim',
-  eruv: 'Eruv Information',
+  eruv: 'Eruv',
   medical: 'Jewish Medical Resources',
 } as const
 type SingletonKind = keyof typeof SINGLETON_KIND_LABELS
@@ -54,6 +55,7 @@ function entryLabel(e: Entry): string {
 // 'cat:<id>', 'cat:new', or 'form:<id>' so one string covers both kinds.
 const CAT_PREFIX = 'cat:'
 const FORM_PREFIX = 'form:'
+const LISTING_PREFIX = 'listing:'
 
 export default function CategoryManager({
   token,
@@ -298,6 +300,15 @@ export default function CategoryManager({
     )
   }
 
+  if (editingId?.startsWith(LISTING_PREFIX)) {
+    const id = editingId.slice(LISTING_PREFIX.length)
+    const category = categories?.find((c) => c.id === id) ?? null
+    if (!category) return <p className="text-sm text-muted">Loading…</p>
+    return (
+      <ListingEditorScreen heading={`Add a ${category.label}`} category={category} adminSubmit={{ token }} onClose={onCloseEditor} />
+    )
+  }
+
   const missingSingletons = (Object.keys(SINGLETON_KIND_LABELS) as SingletonKind[]).filter(
     (kind) => !categories?.some((c) => c.kind === kind),
   )
@@ -355,6 +366,7 @@ export default function CategoryManager({
                 deleting={deletingId === e.data.id}
                 toggling={togglingId === e.data.id}
                 onEdit={() => onOpenEditor(`${CAT_PREFIX}${e.data.id}`)}
+                onAddListing={() => onOpenEditor(`${LISTING_PREFIX}${e.data.id}`)}
                 onAskDelete={() => setConfirmDeleteId(e.data.id)}
                 onCancelDelete={() => setConfirmDeleteId(null)}
                 onConfirmDelete={() => deleteCategory(e.data.id)}
@@ -432,6 +444,7 @@ function CategoryRow({
   deleting,
   toggling,
   onEdit,
+  onAddListing,
   onAskDelete,
   onCancelDelete,
   onConfirmDelete,
@@ -442,6 +455,7 @@ function CategoryRow({
   deleting: boolean
   toggling: boolean
   onEdit: () => void
+  onAddListing: () => void
   onAskDelete: () => void
   onCancelDelete: () => void
   onConfirmDelete: () => void
@@ -479,6 +493,13 @@ function CategoryRow({
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <VisibilityToggle active={c.active !== false} toggling={toggling} onToggle={onToggleActive} />
+          <button
+            onClick={onAddListing}
+            title="Add a listing directly — publishes immediately, no review queue. Works even while this category is hidden."
+            className="text-xs font-medium border border-slate-300 text-slate-600 rounded px-3 py-1.5 hover:bg-slate-50 transition-colors cursor-pointer"
+          >
+            + Add listing
+          </button>
           <button
             onClick={onEdit}
             className="text-xs font-medium border border-slate-300 text-slate-600 rounded px-3 py-1.5 hover:bg-slate-50 transition-colors cursor-pointer"

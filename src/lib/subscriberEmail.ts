@@ -53,6 +53,36 @@ export async function sendNewListingNotification(
   )
 }
 
+// Sent once, right after signup — the only confirmation a subscriber ever
+// gets that the form actually worked, since this app has no account/login to
+// check back on. Also the first time the address sees a "Manage your
+// subscription" link, in case the first real notification is weeks away.
+// Best-effort, same as the two notifications below and the same reasoning:
+// called from the subscribe route's after() side-effect, so a failure here
+// must never fail the signup itself.
+export async function sendSubscribeConfirmation(subscriber: Subscriber): Promise<void> {
+  if (isSandbox()) return
+
+  const categoryLine =
+    subscriber.categories && subscriber.categories.length > 0
+      ? `for the ${subscriber.categories.length} ${subscriber.categories.length === 1 ? 'category' : 'categories'} you picked`
+      : 'for every category'
+  const kinds = [
+    subscriber.notifyAdd && 'a new listing is added',
+    subscriber.notifyClosure && 'one closes',
+  ].filter((v): v is string => !!v)
+
+  await sendEmail({
+    to: subscriber.email,
+    subject: "You're subscribed",
+    html: `<div style="${BODY_STYLE}">
+      <h2 style="${HEADING_STYLE}">You're on the list.</h2>
+      <p style="${TEXT_STYLE}">You'll get an email ${categoryLine} when ${kinds.join(' or ')}.</p>
+      ${unsubscribeFooter(subscriber.unsubscribeToken)}
+    </div>`,
+  })
+}
+
 export async function sendClosureNotification(
   subscribers: Subscriber[],
   listing: { name: string },

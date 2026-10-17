@@ -1,57 +1,119 @@
 'use client'
 
 import { track } from '@vercel/analytics'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ComponentProps, type ReactNode } from 'react'
 import ResourceMap, { type MapPoint } from './ResourceMap'
-import CategoryFilter, { type FilterOption } from './CategoryFilter'
+import { createHighlight, type Highlight } from './highlight'
+import CategoryFilter, { CHIP_GLYPH, CHIP_SIZE, type FilterOption } from './CategoryFilter'
 import CategoryPickerList from './CategoryPickerList'
-import NearbyList from './NearbyList'
+import MapFiltersSheet, { type MapFilterSection } from './MapFiltersSheet'
+import { FilterChip } from '@/components/resources/FiltersSheet'
+import NearbyList, { type NearbyEruv } from './NearbyList'
 import MapPlaceDetail from './MapPlaceDetail'
 import MobileNearbySheet, { type MobileNearbySheetHandle } from './MobileNearbySheet'
+import MapEruvDetail from './MapEruvDetail'
+import type { HostedEditor } from '@/components/resources/ListingEditor'
+import type { MapEruv } from './eruvLayer'
+import { useEruvMaps, useEruvStatuses } from '@/lib/useEruvStatuses'
+import { eruvView } from '@/lib/eruv'
+import { labelPoint } from '@/lib/eruvShape'
 import { useAllListings } from '@/lib/useAllListings'
 import { useCategories } from '@/lib/useCategories'
 import { DEFAULT_CATEGORY_ICON, resolveCapabilities, selectValues } from '@/lib/categories'
+import {
+  activeFilters,
+  filterCount,
+  filterFields,
+  keepsHours,
+  openNowAll,
+  passesFields,
+  readMapFilters,
+  setOpenNowFor,
+  toggleBool,
+  toggleOpenNow,
+  toggleSelect,
+  writeMapFilters,
+  type MapFilterState,
+} from '@/lib/mapFilters'
 import { haversineMiles } from '@/lib/geo'
 import { useHospitals } from '@/lib/useHospitals'
 import { useIsMobile } from '@/lib/useIsMobile'
 import type { LatLng } from '@/lib/googleMapsLinks'
 import { listingSearchText } from '@/lib/searchListing'
+import { foundFor, searchAsk, type SearchFound } from '@/lib/askSearch'
 import { hoursOpenNow, businessClosure } from '@/lib/hours'
 import { useNow } from '@/lib/useNow'
 import { ui } from '@/lib/uiConfig'
-import { ChevronLeftIcon, ExpandIcon, CollapseIcon, PinIcon } from '@/components/icons'
-import { categoryTint, getCategoryColor } from '@/lib/categoryColor'
+import { ArrowLeftIcon, ChevronLeftIcon, CloseIcon, ExpandIcon, CollapseIcon, BookmarkIcon, PinIcon, SlidersIcon } from '@/components/icons'
+import { categoryTint, getCategoryColor, HOSPITAL_COLOR, HOSPITAL_ICON } from '@/lib/categoryColor'
+import { CategoryGlyph } from '@/lib/categoryIcons'
 import LocationControl, { type LocationControls } from '@/components/home/LocationControl'
 import { usePinned } from '@/lib/pinnedContext'
 import { CURRENT_LOCATION_LABEL } from '@/lib/useLiveLocation'
 import { useDroppedPins } from '@/lib/droppedPinsContext'
 import DroppedPinEditor from './DroppedPinEditor'
+import { useMapSidebar, SIDEBAR_MIN_WIDTH, SIDEBAR_MAX_WIDTH, SIDEBAR_SEARCH_INSET } from './useMapSidebar'
+import { useCampaignBanners } from '@/lib/contentContext'
+import { activeCampaignBanner } from '@/lib/campaignBanner'
+import { mapQueryString } from '@/lib/routes'
+import { countEvent } from '@/lib/countEvent'
+import { useOptionalCommunitySlug, useCommunityTimezone } from '@/lib/communityContext'
+import { neighborhoodsFor } from '@/lib/places'
+import { reachLabel, readerPlaces, readingFilters, readingItemsOn, readingReach, type Reading } from '@/lib/questionReader'
+import { askReader } from '@/lib/askReader'
+import { needsReading, ownFrom, readingLoses } from '@/lib/readingSearch'
+import { withTaught } from '@/lib/askWords'
 import type { DirectoryResource, MapFilters } from '@/types'
+import { useKeptListScroll } from './useKeptListScroll'
 
 // Shared by the initial useState below and the resync effect further down
 // (see its own comment) — one place for the initialSelectedCategories-vs-
 // initialCategory precedence so the two can't drift apart.
-function resolveInitialSelected(categories: string[] | undefined, category: string | undefined): Set<string> | null {
+function resolveInitialSelected(categories: string[] | undefined, category: string | undefined, pinned = false, eruvim: boolean | 'only' = false): Set<string> | null {
+  // Arriving on the Pinned chip alone ("See them on the map" on the Pinned
+  // page): no category chip on, only the pins. Likewise the eruv lines
+  // alone (the Eruv page's Full map); lines that are merely on (`eruv=1`)
+  // don't narrow the places.
+  if ((pinned || eruvim === 'only') && categories === undefined && !category) return new Set()
   return categories !== undefined ? new Set(categories) : category ? new Set([category]) : null
 }
 
 const HOSPITALS_ID = '__hospitals__'
-// red-600 pulled back the same way as the category palette (see
-// categoryColor.ts) — a hospital pin still needs to read as the urgent one,
-// but at full chroma it was the single loudest thing on a screen that already
-// has a hundred and fifty pins on it. DROPPED_PIN_COLOR below deliberately
-// stays as-is: there is only ever a handful of those, they're the visitor's
-// own transient marks, and standing out is the entire point of one.
-// Exported so HospitalsDirectory's own header band uses the identical color
-// and glyph — a hospital should read as the same "thing" on the map and on
-// its own directory page, not two independently-chosen reds.
-export const HOSPITAL_COLOR = '#b6302b'
-export const HOSPITAL_ICON = '🏥'
+
+/** The places open right now among the categories whose Open now is on.
+ *  Before the page has hydrated there's no time (see useNow): only closed
+ *  businesses are left out until there is. */
+function openNowIdsFor(
+  points: readonly { id: string; raw?: DirectoryResource | null }[],
+  filters: MapFilterState,
+  clock: number | null,
+  hoursKeysByCat: Map<string, string[]>,
+): string[] {
+  if (!Object.values(filters).some((f) => f.openNow)) return []
+  const now = clock === null ? null : new Date(clock)
+  return points
+    .filter((p) => {
+      if (!p.raw || !filters[p.raw.category]?.openNow) return false
+      // See GenericDirectory's copy of this: a closed business is never open,
+      // whatever hours it still has saved.
+      if (businessClosure(p.raw as unknown as Record<string, unknown>)) return false
+      const keys = hoursKeysByCat.get(p.raw.category)
+      return !keys?.length || now === null || keys.some((k) => hoursOpenNow(p.raw![k], now) === true)
+    })
+    .map((p) => p.id)
+}
+// The hospital pin's colour and glyph live in categoryColor.ts.
+// Re-exported here for the map's own callers.
+export { HOSPITAL_COLOR, HOSPITAL_ICON }
 // A dropped pin's marker id is prefixed with this so a click handler can
 // tell it apart from a real listing/hospital point without a separate prop
 // threaded through every consumer — see droppedMapPoints below.
 const DROPPED_PREFIX = 'dropped:'
 const DROPPED_FILTER_ID = '__dropped__'
+// An eruv opened from the Eruvim layer: not a pin, but it opens in the same
+// sheet or sidebar a place does, with the same way back (id `eruv:<id>`).
+const ERUV_FILTER_ID = '__eruv__'
+const ERUV_PREFIX = 'eruv:'
 const DROPPED_PIN_COLOR = '#D85A30'
 
 // Typing one of these in the search box searches "open now" instead of
@@ -87,6 +149,11 @@ type Props = {
    *  the visitor toggled chips on the map itself). Takes precedence over
    *  initialCategory, which only covers the single-category arrival case. */
   initialSelectedCategories?: string[]
+  /** The Pinned chip on, from the URL's `pinned` (see mapQueryString). */
+  initialPinned?: boolean
+  /** Eruv lines on, from the URL's `eruv` (see mapQueryString); 'only',
+   *  the lines with no places. */
+  initialEruvim?: boolean | 'only'
   /** Field filters (open-now / kosher / type / …) carried from the directory the
    *  visitor came from, applied to pins and shown as removable chips. */
   initialFilters?: MapFilters
@@ -95,18 +162,20 @@ type Props = {
    *  Standalone only: this is what makes a map link shareable down to the
    *  specific pin someone had open, not just the pins and filters. */
   initialPlaceId?: string
+  /** The address bar's query string these initial* props were read from
+   *  (MapScreen's useSearchParams). Lets the map tell its own address-bar
+   *  writes, echoed back by Next, from a real navigation; see
+   *  ownWritesRef below. */
+  viewSearch?: string
   /** Open a specific listing's detail card in its category directory. */
   onViewListing?: (categoryId: string, listingId: string) => void
-  /** True for the one page-level map screen (mode 'map' in page.tsx) — as
-   *  opposed to the small contained map embedded directly on the home screen
-   *  (see HomeMap), which is a separate mounted instance of this same
-   *  component and never sets this. Desktop only in effect: a standalone map
-   *  always opens (and stays) fullscreen — there's no boxed state for it —
-   *  and its exit control always navigates away via onExitFullscreenToListing
-   *  rather than collapsing in place, however the visitor got here (a
-   *  listing's own "Map" button, the mobile tab bar, browser back/forward).
-   *  The embedded home-screen map keeps its own boxed-by-default, expand-in-
-   *  place behavior untouched. */
+  /** True for the one page-level map screen (mode 'map' in page.tsx) — the
+   *  admin's category-preview map is the only other caller, and never sets
+   *  this (it stays boxed). Desktop only in effect: a standalone map always
+   *  opens (and stays) fullscreen — there's no boxed state for it — and its
+   *  exit control always navigates away via onExitFullscreenToListing rather
+   *  than collapsing in place, however the visitor got here (a listing's own
+   *  "Map" button, the mobile tab bar, browser back/forward). */
   standalone?: boolean
   /** Whether the standalone map screen is the one currently on screen (mode
    *  === 'map') — since it stays mounted across tab switches (see page.tsx),
@@ -115,19 +184,10 @@ type Props = {
    *  Ignored (and unnecessary) when `standalone` isn't set. */
   visible?: boolean
   /** Called whenever the standalone map's fullscreen exits — always
-   *  provided when `standalone` is set (either back to the listing it was
-   *  opened from, or home otherwise), since a standalone map never just
-   *  collapses to a boxed view in place. Unused by the embedded home-screen
-   *  map, whose own toggle collapses in place instead. */
+   *  provided when `standalone` is set, since a standalone map never just
+   *  collapses to a boxed view in place; it navigates away instead (see
+   *  MapScreen's own exitToPreviousScreen). */
   onExitFullscreenToListing?: () => void
-  /** Embedded home-screen map only — called when it's sitting expanded and the
-   *  viewport narrows to phone width. There's no expanded state to narrow INTO
-   *  on mobile (the whole embedded map is `hidden desktop:block` on the home screen,
-   *  and mobile reaches the map through its own tab instead), so without this
-   *  the visitor's fullscreen map would just silently vanish behind the card
-   *  grid. Hands off to the real map screen, which is where a full-viewport map
-   *  lives on mobile. */
-  onPromoteToMapScreen?: () => void
   /** The site-wide live GPS watch (see useLiveLocation), lifted to page.tsx so
    *  starting it here also updates `userLocation` everywhere else the same
    *  live coords are read (search sorting, directory distances) — not just
@@ -152,20 +212,17 @@ type Props = {
    *  address anyway (the admin category-preview map), which just means no
    *  control renders. */
   controls?: LocationControls
-  /** Embedded home-screen map only — drops this component's own boxed
-   *  border (rounded-2xl/ring) in the non-fullscreen state, because the
-   *  caller (Landing.tsx) draws a single outer card around a heading plus
-   *  this map instead, matching Browse everything's own card — see that
-   *  render site's own comment. No effect once fullscreen: that state
-   *  always manages its own chrome (`rounded-none`/`ring-0`, breaking out
-   *  to `fixed inset-0`), same as before this prop existed. Never set by
-   *  `standalone` callers, which have no outer card to defer to. */
-  borderless?: boolean
 }
 
 const NOOP_LIVE_TRACKING = { tracking: false, error: null, start: () => {}, stop: () => {} }
 
-export default function ResourceMapView({ userLocation, initialCategory, initialQuery, initialSelectedCategories, initialFilters, initialPlaceId, onViewListing, standalone, visible, onExitFullscreenToListing, onPromoteToMapScreen, liveTracking, controls, borderless }: Props) {
+/** A query string in one canonical form, "?" or not. */
+function normalizeSearch(search: string): string {
+  return new URLSearchParams(search.startsWith('?') ? search.slice(1) : search).toString()
+}
+
+export default function ResourceMapView({ userLocation, initialCategory, initialQuery, initialSelectedCategories, initialPinned = false, initialEruvim, initialFilters, initialPlaceId, viewSearch, onViewListing, standalone, visible, onExitFullscreenToListing, liveTracking, controls }: Props) {
+  const timezone = useCommunityTimezone()
   const listings = useAllListings()
   const categories = useCategories()
   // Admin-configured cap on how far a point can be from the anchor and still
@@ -290,6 +347,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // (Google-Maps-app-style) instead of opening the small info-window bubble
   // ResourceMap shows by default — desktop keeps that default.
   const isMobile = useIsMobile()
+  const countCommunity = useOptionalCommunitySlug()
   // Measured px height of the floating search+filter-chips overlay (mobile
   // only) — it sits on top of the map, not the sheet, but blocks the same
   // amount of the map visually. ResourceMap needs this too so it centers a
@@ -313,6 +371,10 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // passed to ResourceMap as selectedId so it can highlight the matching
   // marker, making it clear which listing on the map the sheet is showing.
   const [selectedPointId, setSelectedPointId] = useState<string | undefined>(undefined)
+  // The sidebar row under the pointer, whose pin lifts on the map (Oct 16,
+  // as a category page's map does). A store rather than state, so moving
+  // down the list redraws the map's pins and not the whole view.
+  const [hover] = useState(createHighlight)
   // Bumped only when the current selectedPointId change should reframe the
   // map's camera (a listing picked from the sheet/sidebar list) — left alone
   // for a pin tapped directly on the map, so that tap just highlights the
@@ -328,6 +390,22 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // Also keeps selectedPointId (the marker-highlight id ResourceMap reads,
   // shared with mobile's own selection) in sync — set together, right where
   // the selection itself changes, rather than via a separate effect.
+  // The sidebar's place (or eruv) open in its editor: how to step back, what
+  // that step is called, and whether anything typed would be lost. Its ‹ is
+  // the ← in the search box (Oct 15). Keyed on the place's id so it can't
+  // outlive the place it was set for. Mirrored in a ref so leaveEditThen,
+  // reached through several handlers in one click, asks only once.
+  const [editor, setEditor] = useState<(HostedEditor & { id: string }) | null>(null)
+  const editorRef = useRef(editor)
+  useLayoutEffect(() => {
+    editorRef.current = editor
+  })
+  const desktopEditing = !isMobile && !!editor && editor.id === desktopSelected?.id
+  const desktopSelectedId = desktopSelected?.id ?? null
+  const onPlaceEditor = useCallback(
+    (next: HostedEditor | null) => setEditor(next && desktopSelectedId ? { ...next, id: desktopSelectedId } : null),
+    [desktopSelectedId],
+  )
   const setDesktopSelected = (p: SelectablePoint | null) => {
     setDesktopSelectedRaw(p)
     setSelectedPointId(p?.id)
@@ -342,9 +420,44 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // Exiting fullscreen: a standalone map always navigates away (back to the
   // listing it was opened from, or home — see onExitFullscreenToListing);
   // the embedded home-screen map just collapses back to its boxed card.
+  // Standalone skips the setFullscreen(false) entirely — that screen has no
+  // boxed state to collapse into (see the `standalone` prop's own doc), so
+  // flipping it just rendered one frame of the embedded/boxed layout before
+  // the navigation below unmounted this component, a visible flash of a
+  // "small map" on Escape (or the fullscreen-toggle button) that a real user
+  // reported seeing. Leaving `fullscreen` true keeps this screen showing its
+  // real layout right up until it's replaced.
+  // Mid-edit, the place's editor has pushed history entries of its own
+  // (mapSheetForm, and mapSheetRemoval on top), so a router.back() would
+  // only pop one of those: ✕ took you out of editing and left you on the
+  // map. Unwind them first, one popstate at a time, then leave. Nothing
+  // asks "discard?", the same as closing the listing dialog mid-edit.
+  const unwindEditorHistory = (then: () => void) => {
+    if (!(window.history.state as { mapSheetForm?: string } | null)?.mapSheetForm) return then()
+    window.addEventListener('popstate', () => unwindEditorHistory(then), { once: true })
+    window.history.back()
+  }
   const exitFullscreen = () => {
-    setFullscreen(false)
-    onExitFullscreenToListing?.()
+    const leave = () => {
+      if (!standalone) setFullscreen(false)
+      onExitFullscreenToListing?.()
+    }
+    if (onExitFullscreenToListing) unwindEditorHistory(leave)
+    else leave()
+  }
+  // Something else taking the sidebar mid-edit (a search, a pin, the map's
+  // background, an eruv): asks first if anything's been typed, then
+  // unwinds the editor's history entries — left behind, Back would land in
+  // an edit of whatever's showing by then — and only then does it. The ←
+  // and Escape step back without asking, as the editor's own ‹ always has;
+  // so does ✕ (exitFullscreen).
+  const leaveEditThen = (then: () => void) => {
+    const open = editorRef.current
+    if (!open) return then()
+    if (open.changed && !window.confirm('Discard your changes?')) return
+    editorRef.current = null
+    setEditor(null)
+    unwindEditorHistory(then)
   }
   // Re-forces fullscreen every time the standalone map screen becomes the
   // one on screen — not just its first mount. It stays mounted across tab
@@ -359,21 +472,25 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setFullscreen(true)
   }, [standalone, visible])
-  // The mirror of the above, for the embedded home-screen map: expanded on
-  // desktop, then narrowed to phone width. `desktop:fixed` stops applying and the
-  // whole embedded map is `hidden desktop:block` on the home screen, so the visitor's
-  // full-viewport map would simply disappear behind the card grid. Hand it to
-  // the real map screen instead — the same map, on the screen mobile keeps it.
-  useEffect(() => {
-    if (standalone || !fullscreen || !isMobile || !onPromoteToMapScreen) return
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setFullscreen(false)
-    onPromoteToMapScreen()
-  }, [standalone, fullscreen, isMobile, onPromoteToMapScreen])
+  // Escape steps back one level at a time (Oct 15, board "A"): a place
+  // open in the desktop sidebar goes back to the results first, the same as
+  // the ← in the search box; only then does it leave the map. The search
+  // box's own Escape (closing its suggestions) is its own level too, so it
+  // marks the event handled and nothing behind it moves.
+  // While a place is being edited, Escape steps back inside the editor
+  // (out of Request removal, then out of the edit), as its ‹ does — never
+  // straight to the results, which dropped the edit without a word.
+  const onEscape = useEffectEvent(() => {
+    if (desktopEditing) editor.back()
+    else if (!isMobile && desktopSelected) setDesktopSelected(null)
+    else exitFullscreen()
+  })
   useEffect(() => {
     if (!fullscreen) return
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') exitFullscreen()
+      // A dialog open over the map (the Filters sheet) closes on its own
+      // Escape; the same key mustn't also close the map behind it.
+      if (e.key === 'Escape' && !e.defaultPrevented && !document.querySelector('[role="dialog"][aria-modal="true"]')) onEscape()
     }
     document.addEventListener('keydown', onKeyDown)
     // Fullscreen is a fixed overlay covering the viewport — nothing behind
@@ -384,26 +501,25 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
       document.removeEventListener('keydown', onKeyDown)
       document.body.style.overflow = prevOverflow
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fullscreen])
 
-  // Desktop-only — collapses the results sidebar down to just its edge
-  // toggle, same as Google Maps' own panel-collapse arrow, so a visitor who
-  // wants to see more of the map without losing their search/selection can
-  // tuck the panel away without clearing it. Reset to false at the points
-  // below where the panel would otherwise reopen with new content anyway
-  // (a fresh search, a newly toggled category, a newly selected place) —
-  // collapsing should hide what's already there, not swallow the next
-  // thing the visitor explicitly asks to see.
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
-  // Lets the sidebar be opened even before anything's narrowed — without
-  // this, first-time visitors land on a bare map with no visible way to
-  // browse the (already-loaded) directory at all, since the sidebar
-  // otherwise only appears once a search/category narrows things down.
-  // Independent of sidebarCollapsed (which hides a sidebar that DOES have a
-  // narrowing reason to show); see sidebarVisible/toggleSidebar below for
-  // how the two combine.
-  const [sidebarOpenedManually, setSidebarOpenedManually] = useState(false)
+  // Desktop sidebar's own width/collapse/opened-manually/drag state — see
+  // useMapSidebar's own top comment for why sidebarVisible/toggleSidebar
+  // (which need desktopNarrowed, not computable this early) stay here
+  // instead of living in that hook.
+  const {
+    sidebarWidth,
+    sidebarCollapsed,
+    setSidebarCollapsed,
+    sidebarOpenedManually,
+    setSidebarOpenedManually,
+    isDraggingSidebar,
+    onSidebarHandlePointerDown,
+    onSidebarHandlePointerMove,
+    onSidebarHandlePointerUp,
+    onSidebarHandlePointerCancel,
+    onSidebarHandleKeyDown,
+  } = useMapSidebar()
 
   // follow = map pans with every GPS tick. Turns off the moment the user
   // manually drags the map (see ResourceMap's dragstart listener), and only
@@ -425,17 +541,19 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // list/sidebar/search pick, so it stays on unless a caller opts out — see
   // the pin-tap handler passed to ResourceMap below, which is the one place
   // that does.
-  const selectPlace = (p: SelectablePoint, frame = true) => {
-    if (isMobile) nearbySheetRef.current?.selectPoint(p, frame)
-    else {
-      setDesktopSelected(p)
-      setSidebarCollapsed(false)
-      if (frame) setFrameToken((t) => t + 1)
-    }
-  }
+  const selectPlace = (p: SelectablePoint, frame = true) =>
+    leaveEditThen(() => {
+      if (p.raw?.id && countCommunity) countEvent(countCommunity, 'listing_view', p.raw.id)
+      if (isMobile) nearbySheetRef.current?.selectPoint(p, frame)
+      else {
+        setDesktopSelected(p)
+        setSidebarCollapsed(false)
+        if (frame) setFrameToken((t) => t + 1)
+      }
+    })
   const deselectPlace = () => {
     if (isMobile) nearbySheetRef.current?.deselectPoint()
-    else setDesktopSelected(null)
+    else leaveEditThen(() => setDesktopSelected(null))
   }
 
   // Press-and-hold a marker to toggle it Pinned, without opening its card —
@@ -451,34 +569,10 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
     togglePinnedListing({ id: sp.id, categoryId: sp.filterId })
   }
 
-  // Keeps the standalone map screen's own address bar in sync with which pin
-  // is open, so a map link is shareable down to the specific place someone
-  // had selected — not just the pins and filters mapQueryString already
-  // covered. Plain history.replaceState, not next/navigation's router —
-  // same choice the existing mapQuery/mapSelected/mapFilters sync above
-  // already made (see its own comment), and for the same reason: router.replace
-  // re-subscribes every useSearchParams() caller (this component now among
-  // them) to the change, and this screen's marker layer already re-renders
-  // more often than its own state actually changes — feeding that back
-  // through the router turns a harmless extra render into a real navigation
-  // each time.
-  // A plain history write has no such feedback loop: nothing subscribes to
-  // it, so it only ever affects a future cold load (initialPlaceId) or a
-  // copy-pasted address bar.
-  useEffect(() => {
-    if (!standalone) return
-    const next = new URLSearchParams(window.location.search)
-    if (selectedPointId) next.set('place', selectedPointId)
-    else next.delete('place')
-    const qs = next.toString()
-    const url = qs ? `${window.location.pathname}?${qs}` : window.location.pathname
-    if (url === `${window.location.pathname}${window.location.search}`) return
-    window.history.replaceState(window.history.state, '', url)
-  }, [selectedPointId, standalone])
   // Restoring the selection from `initialPlaceId` needs allPoints, which
   // isn't computed yet at this point in the component — see below, right
   // after allPoints itself.
-  const restoredInitialPlace = useRef(false)
+  const restoredInitialPlace = useRef<'phone' | 'desktop' | null>(null)
 
   const colorById = useMemo(() => {
     const map = new Map<string, string>()
@@ -549,21 +643,41 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
     return out
   }, [listings, categories, colorById, hospitalsData, pinnedIds])
 
+  // `pinned` (from usePinned) is every pinned listing regardless of category —
+  // it has no idea a category can be non-mappable (WhatsApp Groups, Networking:
+  // `hasAddress: false`, so `capabilities.map` is forced off — see categories.ts).
+  // `allPoints` above already excludes those (no geo, no map capability), so an
+  // entry that made it in and is still marked `pinned` is guaranteed mappable.
+  // The Pinned chip's visibility/count must be driven by THIS, not by
+  // `pinned.length` directly — otherwise pinning a WhatsApp group flips the
+  // chip on and counts a pin that can never actually appear as a marker, the
+  // same "chip with nothing behind it" bug categories.ts's own doc describes
+  // for a stale/deleted category.
+  const mappablePinnedCount = useMemo(() => allPoints.filter((p) => p.pinned).length, [allPoints])
+
   // Restores the pin `initialPlaceId` named, once it's actually in allPoints
   // (a plain state initializer would run before listings have loaded).
   // Guarded to fire only once — after that, selectedPointId and the effect
   // above are the source of truth, and re-running this on every allPoints
   // change (e.g. a live-tracking location update touching a memoized array)
   // would re-open a pin the visitor had already closed.
+  //
+  // Once more on a phone: useIsMobile starts false on every mount and is
+  // corrected a render later, so the first try can land in the desktop
+  // panel a phone never shows, and the place was simply lost (a hotel's
+  // "See them on the map", Oct 6; the same trap the commit effect below
+  // describes). Retried only while that first selection still stands.
   useEffect(() => {
-    if (restoredInitialPlace.current || !standalone || !initialPlaceId) return
+    if (!standalone || !initialPlaceId) return
+    const retryOnPhone = restoredInitialPlace.current === 'desktop' && isMobile && desktopSelected?.id === initialPlaceId
+    if (restoredInitialPlace.current && !retryOnPhone) return
     const point = allPoints.find((p) => p.id === initialPlaceId)
     if (!point) return
-    restoredInitialPlace.current = true
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+    restoredInitialPlace.current = isMobile ? 'phone' : 'desktop'
+    if (retryOnPhone) setDesktopSelected(null)
     selectPlace(point)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allPoints, standalone, initialPlaceId])
+  }, [allPoints, standalone, initialPlaceId, isMobile])
 
   const options = useMemo<FilterOption[]>(() => {
     const counts = new Map<string, number>()
@@ -588,8 +702,18 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // browser back) takes precedence over initialCategory (the single-category
   // arrival case from a directory's "Map" button).
   const [selected, setSelected] = useState<Set<string> | null>(
-    resolveInitialSelected(initialSelectedCategories, initialCategory),
+    resolveInitialSelected(initialSelectedCategories, initialCategory, initialPinned, initialEruvim),
   )
+  // Eruv lines (see "Eruv lines" below).
+  const [eruvimOn, setEruvimOn] = useState(!!initialEruvim)
+  // The Pinned chip lives in PinnedContext (it outlives this screen); a link
+  // that says to show the pins turns it on.
+  // The lines alone mean no pins either.
+  useEffect(() => {
+    if (initialPinned) setPinnedSelected(true)
+    else if (initialEruvim === 'only') setPinnedSelected(false)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialPinned])
   const effectiveSelected = useMemo(
     () => selected ?? new Set(options.map((o) => o.id)),
     [selected, options],
@@ -603,22 +727,46 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // activeTerms below); `input` (the box's live value) only drives the
   // autocomplete dropdown until then, and stays visible after a search,
   // same as the Google Maps app — it isn't cleared back to a blank box.
-  const initialQueryText = initialQuery ?? (initialFilters?.openNow ? 'open now' : '')
+  const initialQueryText = initialQuery ?? ''
   const [input, setInput] = useState(initialQueryText)
   const [committedQuery, setCommittedQuery] = useState(initialQueryText)
+
+  // ── The question reader (questionReader.ts, askReader.ts) ───────────────
+  // A committed question that isn't a place's name is also read, by an AI,
+  // into the map's own categories and Filters, and those answer it: the
+  // chips show how it was read, and any of them can be removed. Until the
+  // reading arrives, or when there's none (off, busy, failed, or it found
+  // nothing it knew), today's search answers, as it always has. `before` is
+  // what the categories and Filters were until the reading set them, put
+  // back when the search is cleared or replaced.
+  type AppliedReading = { question: string; reading: Reading; before: { selected: Set<string> | null; filters: MapFilterState | null } }
+  const [applied, setApplied] = useState<AppliedReading | null>(null)
+  const [readingNow, setReadingNow] = useState<string | null>(null)
+  const readByReader = applied !== null && applied.question === committedQuery
+  function putBackReading() {
+    if (!applied) return
+    setSelected(applied.before.selected)
+    setOwnFilters(applied.before.filters)
+    setApplied(null)
+  }
 
   const commitQuery = (raw: string) => {
     const v = raw.trim()
     if (!v) return
+    // "open now" typed is the Filters sheet's Open now for everything, not
+    // words to look for: it switches on, and the box empties.
+    if (isOpenNowWord(v)) {
+      openNowEverywhere()
+      return
+    }
+    if (v !== committedQuery) putBackReading()
     setCommittedQuery(v)
   }
   const clearQuery = () => {
+    putBackReading()
     setInput('')
     setCommittedQuery('')
   }
-  // Whether the committed query is asking for "open now" rather than a
-  // literal text match — applied as its own predicate in visiblePoints below.
-  const openNowActive = isOpenNowWord(committedQuery)
 
   // ── Search autocomplete — Google-Maps-style dropdown of matching places
   // while typing, independent of the live text-filter above (which narrows
@@ -662,6 +810,25 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
     return [...starts.sort(byRank), ...contains.sort(byRank)].slice(0, 6)
   }, [allPoints, input, activeLocation, effectiveSelected])
 
+  // "Open now" is a real, working search (see OPEN_NOW_WORDS/openNowActive)
+  // but a silent one — nothing on screen ever told a visitor typing into this
+  // box that it's a valid thing to search, the way Google Maps' own
+  // autocomplete surfaces "open now" as a suggestion the moment it could be
+  // what you're typing toward. Shown whenever the box is empty (an upfront
+  // hint, same spot Google puts it) or the typed text is still a prefix of
+  // "open now" — hidden the moment it diverges (e.g. "open pizza"), same as
+  // any other autocomplete match narrowing away.
+  const showOpenNowSuggestion = useMemo(() => {
+    const q = input.trim().toLowerCase()
+    return q.length === 0 || 'open now'.startsWith(q)
+  }, [input])
+  const selectOpenNow = () => {
+    openNowEverywhere()
+    setSearchFocused(false)
+    mobileSearchInputRef.current?.blur()
+    desktopSearchInputRef.current?.blur()
+  }
+
   // Picking a suggestion jumps straight to that place — map pin + sheet detail
   // — instead of just adding it as a narrowing text filter. Setting
   // committedQuery to the place's own name (below) still broadens the
@@ -675,6 +842,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   const suppressNextCommitEffectRef = useRef(false)
   const selectSuggestion = (p: (typeof allPoints)[number]) => {
     suppressNextCommitEffectRef.current = true
+    putBackReading()
     setInput(p.name)
     setCommittedQuery(p.name)
     setSearchFocused(false)
@@ -689,27 +857,29 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // app does: picks the place directly if it's the one unambiguous match,
   // otherwise commits the query so the sheet shows the result list, dismisses
   // the dropdown, and closes the keyboard.
-  const submitSearch = () => {
-    if (searchSuggestions.length === 1) selectSuggestion(searchSuggestions[0])
-    else commitQuery(input)
-    setSearchFocused(false)
-    mobileSearchInputRef.current?.blur()
-    desktopSearchInputRef.current?.blur()
-  }
+  const submitSearch = () =>
+    leaveEditThen(() => {
+      if (searchSuggestions.length === 1) selectSuggestion(searchSuggestions[0])
+      else commitQuery(input)
+      setSearchFocused(false)
+      mobileSearchInputRef.current?.blur()
+      desktopSearchInputRef.current?.blur()
+    })
 
   // Clearing the search (the × button) resets the sheet/sidebar back to its
   // normal browsing state — same as Google Maps: the selected place/result
   // list disappears and the sheet collapses — and does NOT refocus the
   // input, so the keyboard stays down until the visitor deliberately taps
   // the search box again.
-  const clearSearch = () => {
-    clearQuery()
-    setSearchFocused(false)
-    mobileSearchInputRef.current?.blur()
-    desktopSearchInputRef.current?.blur()
-    if (isMobile) nearbySheetRef.current?.collapse()
-    else setDesktopSelected(null)
-  }
+  const clearSearch = () =>
+    leaveEditThen(() => {
+      clearQuery()
+      setSearchFocused(false)
+      mobileSearchInputRef.current?.blur()
+      desktopSearchInputRef.current?.blur()
+      if (isMobile) nearbySheetRef.current?.collapse()
+      else setDesktopSelected(null)
+    })
 
   // The committed query filters as one phrase (not per-word AND terms) —
   // except "open now", which is its own predicate (openNowActive above), not
@@ -718,17 +888,134 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // this replaces: typing alone no longer narrows the map/list.
   const activeTerms = useMemo(() => {
     const q = stripApostrophes(committedQuery.trim().toLowerCase())
-    return q && !isOpenNowWord(q) ? [q] : []
-  }, [committedQuery])
+    return q && !isOpenNowWord(q) && !readByReader ? [q] : []
+  }, [committedQuery, readByReader])
+  // The listings the committed query answers, read as a question the same
+  // way as the home and category searches (see askSearch.ts): "where can I
+  // get cholov yisroel milk" pins the store that has it, "food" pins every
+  // food place. Null when there's no query. Hospital pins carry no listing,
+  // so they keep matching on their name (see visiblePoints).
+  // Each keeps what it matched on, for the place panel to mark it (see
+  // SearchFound), the same as a listing opened from any other search.
+  // Read by the reader, the items it read are what's looked for ("challah":
+  // the places listing it), each place marked with those it has; with none,
+  // the categories and Filters alone answer.
+  const askIds = useMemo(() => {
+    if (readByReader) {
+      const items = applied.reading.items ?? []
+      if (items.length === 0) return null
+      const terms = [...new Set(items.flatMap((i) => i.toLowerCase().split(/\s+/)))]
+      const out = new Map<string, SearchFound | null>()
+      for (const p of allPoints) {
+        const has = p.raw ? readingItemsOn(p.raw, items) : []
+        if (p.raw && has.length) out.set(p.raw.id, { terms, items: has, fields: [] })
+      }
+      return out
+    }
+    if (activeTerms.length === 0) return null
+    const raws = allPoints.flatMap((p) => (p.raw ? [p.raw] : []))
+    const result = searchAsk(raws, categories ?? [], committedQuery, { places: neighborhoodsFor(countCommunity) })
+    return new Map<string, SearchFound | null>(result.hits.map((h) => [h.item.id, foundFor(h, result)]))
+  }, [activeTerms, allPoints, categories, committedQuery, countCommunity, readByReader, applied])
+  const foundOnPoint = (id: string | undefined) => (id ? (askIds?.get(id) ?? null) : null)
+  // How far a reading reaches ("within 3 miles", "near HUP", "in Center
+  // City"), measured from where the visitor is only to about a block, so a
+  // moving location doesn't refit the map on every update.
+  const readerPlacesHere = useMemo(() => readerPlaces(listings ?? [], countCommunity ?? ''), [listings, countCommunity])
+  const meRounded = activeLocation ? `${activeLocation.lat.toFixed(3)},${activeLocation.lng.toFixed(3)}` : ''
+  const reach = useMemo(() => {
+    if (!readByReader) return null
+    const [lat, lng] = meRounded ? meRounded.split(',').map(Number) : []
+    return readingReach(applied.reading, readerPlacesHere, meRounded ? { lat, lng } : null)
+  }, [readByReader, applied, readerPlacesHere, meRounded])
 
-  // ── Field filters (kosher / type / … carried from the directory) ─────────
-  // Held as a serializable spec (also what's persisted to history). "Open
-  // now" isn't here — it's just the committed query text (see openNowActive
-  // above), so it behaves exactly like any other search instead of stacking
-  // as a separate persistent chip. Predicates below are derived once
-  // categories load.
-  const [boolFields, setBoolFields] = useState<string[]>(initialFilters?.bool ?? [])
-  const [selectFilters, setSelectFilters] = useState<Record<string, string[]>>(initialFilters?.select ?? {})
+  // ── Filters, per category (see mapFilters.ts) ────────────────────────────
+  // Read from the link (or a category page's own Map button) once the
+  // categories have loaded, since a filter belongs to one of them; the
+  // visitor's own changes replace that reading from then on. Open now is
+  // each category's own, where it keeps hours.
+  const initialFiltersQuery = {
+    open: initialFilters?.openNow ? '1' : initialFilters?.openIn?.join(',') || null,
+    is: initialFilters?.bool?.join(',') || null,
+    sel:
+      Object.entries(initialFilters?.select ?? {})
+        .filter(([, vs]) => vs.length)
+        .map(([k, vs]) => `${k}:${vs.join('|')}`)
+        .join(',') || null,
+  }
+  const filtersForCategory = initialCategory ?? (initialSelectedCategories && [...initialSelectedCategories].length === 1 ? [...initialSelectedCategories][0] : null)
+  const [ownFilters, setOwnFilters] = useState<MapFilterState | null>(null)
+  // What "no Filters of the visitor's own" falls back to: the Filters of the
+  // address this screen was opened or navigated to, kept as they were then.
+  // Not the live initial* props: those also carry this screen's own address
+  // writes echoed back (see ownWritesRef), so clearing a reading's Open now
+  // fell back to the Open now the reading had just written.
+  const [baseFilters, setBaseFilters] = useState(() => ({ query: initialFiltersQuery, forCategory: filtersForCategory }))
+  const filters = useMemo<MapFilterState>(
+    () => ownFilters ?? (categories ? readMapFilters(baseFilters.query, categories, baseFilters.forCategory) : {}),
+    [ownFilters, categories, baseFilters],
+  )
+  const hasFilters = Object.keys(filters).length > 0
+  const filtersKey = JSON.stringify(filters)
+  const updateFilters = (next: (f: MapFilterState) => MapFilterState) => setOwnFilters(next(filters))
+  const [filtersOpen, setFiltersOpen] = useState(false)
+
+  // Asks the reader about each question committed, once the categories and
+  // listings are here to tell a question from a name. The answer applies
+  // only if it's still the question in the box.
+  const readForRef = useRef<string | null>(null)
+  const committedQueryRef = useRef(committedQuery)
+  useEffect(() => {
+    committedQueryRef.current = committedQuery
+  }, [committedQuery])
+  useEffect(() => {
+    const q = committedQuery.trim()
+    if (!q) readForRef.current = null
+    if (!q || !categories || !listings || readForRef.current === q) return
+    readForRef.current = q
+    // A place's own name is looked up, not read: "giant" is every GIANT.
+    const typed = stripApostrophes(q.toLowerCase())
+    if (allPoints.some((p) => stripApostrophes(p.name.toLowerCase()).includes(typed))) return
+    // Only when our own search left something it didn't understand
+    // (needsReading), and the reading can add to what it understood, never
+    // take it away (see readingSearch.ts). The map's Filters can't hold
+    // "until 10", "today" or "other than GIANT", so for those today's
+    // search, which can, answers; nor is a reading used that lost the kind
+    // of place our parser heard, when today's search finds something.
+    const raws = allPoints.flatMap((p) => (p.raw ? [p.raw] : []))
+    const today = searchAsk(raws, categories, q, { places: neighborhoodsFor(countCommunity) })
+    if (!needsReading(today)) return
+    const own = ownFrom(today, readerPlacesHere)
+    if (own.openAt || own.openToday || own.excluding.length) return
+    const before = { selected, filters: ownFilters }
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- the request starts here; "Reading your question…" shows while it runs
+    setReadingNow(q)
+    void askReader(q, countCommunity).then((answer) => {
+      setReadingNow((now) => (now === q ? null : now))
+      if (!answer.ok || committedQueryRef.current !== q) return
+      if (readingLoses(q, answer.reading, categories) && today.hits.length > 0) return
+      // "Open now" the reading didn't carry is kept, for every kind of
+      // place it read that keeps hours.
+      // And the words an admin taught the search, as our own search read them.
+      const reading = withTaught(answer.reading, own.taught)
+      const saidNow = reading.categories.some((c) => c.openNow)
+      const hasHours = (id: string) => categories.some((x) => x.id === id && keepsHours(x))
+      // The place our own search found ("in Bala Cynwyd") is where, whatever
+      // the reading says.
+      const withNow = {
+        ...reading,
+        ...(own.openNow && !saidNow ? { categories: reading.categories.map((c) => (hasHours(c.id) ? { ...c, openNow: true } : c)) } : {}),
+        ...(own.place ? { near: own.place.name.toLowerCase(), place: own.place } : {}),
+      }
+      const { categories: ids, filters: read } = readingFilters(withNow)
+      const onMap = ids.filter((id) => options.some((o) => o.id === id))
+      if (onMap.length === 0 && !answer.reading.items?.length && !answer.reading.near) return
+      if (onMap.length) setSelected(new Set(onMap))
+      setOwnFilters(read)
+      setApplied({ question: q, reading: withNow, before })
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [committedQuery, categories, listings])
 
   // Re-applies the query-string-derived view (selected chips, search text,
   // bool/select filters) whenever a NEW navigation actually changes it — a
@@ -759,22 +1046,59 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
         : 'all'
   const initialViewKey = [
     categoriesKey,
+    initialPinned ? 'pinned' : '',
+    initialEruvim === 'only' ? 'eruv-only' : initialEruvim ? 'eruv' : '',
     initialQueryText,
+    initialFiltersQuery.open ?? '',
     [...(initialFilters?.bool ?? [])].sort().join(','),
     Object.entries(initialFilters?.select ?? {})
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([k, v]) => `${k}=${[...v].sort().join('|')}`)
       .join(';'),
   ].join('::')
-  const appliedInitialViewKeyRef = useRef(initialViewKey)
+  const appliedInitialViewKeyRef = useRef<string | null>(initialViewKey)
+  // Each render's own mark, and the render whose commit applied a link.
+  const thisRender = {}
+  const applyingRenderRef = useRef<object | null>(null)
+  // The query strings this screen wrote to its own address bar (the sync
+  // effect below), oldest first, until Next echoes each one back. Next does:
+  // history.replaceState feeds useSearchParams in this version (see
+  // node_modules/next/dist/docs, "Native History API"), so every write
+  // returns as new initial* props a moment later. Those are this screen's
+  // own state, not a navigation, and must not be re-applied: one that
+  // arrives after the visitor has moved on (tapped "Clear search" right
+  // after a reading set the categories and Open now) would put the old
+  // search back. A real navigation's address was never written here.
+  const ownWritesRef = useRef<string[]>([])
+  // Hidden (another screen showing; this one is kept mounted), nothing
+  // echoes: what it wrote and never heard back would otherwise take the
+  // next link to that address for an echo, and ignore it.
+  useEffect(
+    () => () => {
+      ownWritesRef.current = []
+    },
+    [],
+  )
   useEffect(() => {
     if (initialViewKey === appliedInitialViewKeyRef.current) return
+    const echo = viewSearch === undefined ? -1 : ownWritesRef.current.indexOf(normalizeSearch(viewSearch))
+    if (echo >= 0) {
+      // Next may skip echoing a write that a later one replaced: those go too.
+      ownWritesRef.current = ownWritesRef.current.slice(echo + 1)
+      appliedInitialViewKeyRef.current = initialViewKey
+      return
+    }
     appliedInitialViewKeyRef.current = initialViewKey
-    setSelected(resolveInitialSelected(initialSelectedCategories, initialCategory))
+    applyingRenderRef.current = thisRender
+    setSelected(resolveInitialSelected(initialSelectedCategories, initialCategory, initialPinned, initialEruvim))
+    // The link's Pinned too: "All" turns it on, and it outlives this screen.
+    setPinnedSelected(initialPinned)
+    setEruvimOn(!!initialEruvim)
     setInput(initialQueryText)
     setCommittedQuery(initialQueryText)
-    setBoolFields(initialFilters?.bool ?? [])
-    setSelectFilters(initialFilters?.select ?? {})
+    setOwnFilters(null)
+    setBaseFilters({ query: initialFiltersQuery, forCategory: filtersForCategory })
+    setApplied(null)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialViewKey])
 
@@ -787,115 +1111,84 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
     return m
   }, [categories])
 
-  // A field's display label. Searches every category (not just the one the
-  // visitor arrived from) since a filter can now also be turned on directly
-  // from the map's own category picker, for any category shown there.
-  const labelForField = (key: string): string => {
-    for (const cat of categories ?? []) {
-      const f = cat.detailFields.find((x) => x.key === key)
-      if (f) return f.filterLabel ?? f.label
-    }
-    return key
-  }
+  // "Open now" has to re-answer as the clock moves: a pin that closed at 6pm
+  // should drop off a filtered map at 6pm, not when the visitor next reloads.
+  const clock = useNow()
 
-  // Whether `key` is actually one of `categoryId`'s own declared fields —
-  // distinguishes "this listing's category doesn't have this field at all"
-  // (a Synagogue has no `isKosher` — always let it pass, see below) from
-  // "this listing's category HAS this field, but this particular listing
-  // just never had it set" (a Mikvah with no `keilim` key at all, because
-  // it was never explicitly toggled — that means no, not "doesn't apply").
-  // Only the first case gets the lenient pass; a field a listing's own
-  // category declares is checked strictly, undefined included.
-  function categoryHasField(categoryId: string, key: string): boolean {
-    return (categories ?? []).some((c) => c.id === categoryId && c.detailFields.some((f) => f.key === key))
-  }
+  // Whether a listing passes its own category's filters, bar Open now (see
+  // openNowIds below, which has the clock).
+  const passesOwnFilters = useCallback((r: DirectoryResource) => passesFields(r as unknown as Record<string, unknown>, filters[r.category]), [filters])
 
-  // Active field-level filters (bool/select), each an AND predicate — but
-  // only for listings whose own category actually has the field; a listing
-  // from an unrelated category always passes (so "Kosher" ignores shuls,
-  // etc. — see categoryHasField above). Shown on-screen not as their own
-  // removable chips but folded into the owning category's own chip (see
-  // optionsWithFilters) — this array is now purely the filtering logic, no
-  // display data.
-  const filterChips = useMemo(() => {
-    const chips: { id: string; test: (r: DirectoryResource) => boolean }[] = []
-    for (const field of boolFields) {
-      chips.push({
-        id: `b:${field}`,
-        test: (r) => !categoryHasField(r.category, field) || r[field] === true,
-      })
-    }
-    for (const [field, values] of Object.entries(selectFilters)) {
-      if (!values.length) continue
-      chips.push({
-        id: `s:${field}`,
-        // A multiSelect field stores an array (e.g. foodType: ["Restaurant",
-        // "Catering"]), not a plain string — selectValues() normalizes both
-        // shapes, so a listing tagged with several values still matches on
-        // any one of them instead of only an exact single-value match.
-        test: (r) => {
-          if (!categoryHasField(r.category, field)) return true
-          return selectValues(r[field]).some((v) => values.includes(v))
-        },
-      })
-    }
-    return chips
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [boolFields, selectFilters, categories, initialCategory])
-
-  // `options`, with each category's own active bool/select filters (if any)
-  // folded in as a display suffix — e.g. Mikvah's chip reads "Mikvah 3 ·
-  // Keilim" instead of the count alone, so an active filter shows up right on
-  // the chip it belongs to rather than as a separate row of removable pills
-  // underneath (which read as a disconnected, generically-colored "extra
-  // thing" rather than part of the category it was actually scoped to). The
-  // count itself also switches from the category's raw total to however many
-  // of its points actually pass that filter — reusing filterChips' own tests
-  // (each already a no-op for a category that doesn't own the field) rather
-  // than re-deriving the same logic a second way.
+  // Each category's chip counts what its filters leave (73, or 5 with Meat,
+  // Keystone-K and Open now on); nothing else about the chip changes.
   const optionsWithFilters = useMemo(() => {
+    if (!hasFilters) return options
+    const open = new Set(openNowIdsFor(allPoints, filters, clock, hoursKeysByCat))
     return options.map((o) => {
-      const parts: string[] = []
-      for (const key of boolFields) {
-        if (categoryHasField(o.id, key)) parts.push(labelForField(key))
-      }
-      for (const [key, values] of Object.entries(selectFilters)) {
-        if (values.length && categoryHasField(o.id, key)) parts.push(values.join('/'))
-      }
-      if (parts.length === 0) return o
-      const count = allPoints.filter(
-        (p) => p.filterId === o.id && (!p.raw || filterChips.every((c) => c.test(p.raw as DirectoryResource))),
-      ).length
-      return { ...o, count, filterSuffix: parts.join(', ') }
+      const f = filters[o.id]
+      if (!f) return o
+      const count = allPoints.filter((p) => p.filterId === o.id && (!p.raw || (passesOwnFilters(p.raw) && (!f.openNow || open.has(p.id))))).length
+      return { ...o, count }
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [options, boolFields, selectFilters, categories, allPoints, filterChips])
+  }, [options, filtersKey, allPoints, passesOwnFilters, hoursKeysByCat, clock])
 
-  // Keep the current history entry in sync with the committed query/filters/
-  // selection, so returning via browser Back restores what was actually on
-  // screen — not just the snapshot from when the map was first opened (or
-  // last touched a chip). Persists committedQuery, not the live `input`, so
-  // this doesn't fire on every keystroke.
+  // Keeps the standalone map screen's own address bar in sync with the
+  // category chips, committed search/filters, and selected pin — so a
+  // shared map link (or hitting browser Back) reopens the exact same view,
+  // the same way a category directory's own filters/search already round-
+  // trip through its URL. mapQueryString is the same builder viewMapForCategory
+  // uses for the initial navigation there, so a link built by either one
+  // reads back identically via parseMapQuery.
+  //
+  // Plain history.replaceState, not next/navigation's router: router.replace
+  // turns every write into a real navigation, and this screen's marker layer
+  // already re-renders more often than its own state actually changes. A
+  // history write is lighter, but it is NOT unobserved: in this Next version
+  // it feeds useSearchParams, so MapScreen hands it straight back as new
+  // initial* props. The resync effect above ignores those echoes
+  // (ownWritesRef); without that, a late echo put a cleared search back.
+  //
+  // Persists committedQuery, not the live `input`, so this doesn't fire on
+  // every keystroke — only once a search is actually committed.
+  //
+  // "All" (showAll) doesn't set `selected` back to null — it sets it to a
+  // Set holding every current option's id (see its own comment on why: a
+  // fresh reference has to flow through effectiveSelected either way to
+  // avoid a stale-Set bug). Left as-is here, that would spell out every
+  // category id in the URL instead of just omitting `cat` the way the
+  // pristine "nothing tapped yet" state already does — allSelected treats
+  // both the same, since they mean the same thing.
+  const allSelected = !selected || (selected.size === options.length && options.every((o) => selected.has(o.id)))
   useEffect(() => {
-    const current = window.history.state as { mode?: string } | null
-    if (current?.mode !== 'map') return
-    const anyFilter = openNowActive || boolFields.length > 0 || Object.keys(selectFilters).length > 0
-    history.replaceState(
-      {
-        ...current,
-        mapQuery: committedQuery || undefined,
-        mapSelected: selected ? Array.from(selected) : undefined,
-        mapFilters: anyFilter
-          ? {
-              openNow: openNowActive || undefined,
-              bool: boolFields.length ? boolFields : undefined,
-              select: Object.keys(selectFilters).length ? selectFilters : undefined,
-            }
-          : undefined,
-      },
-      '',
-    )
-  }, [committedQuery, selected, openNowActive, boolFields, selectFilters])
+    if (!standalone) return
+    // Not in the commit that applies a link: its state is the last view's
+    // until the next render, and writing it would put that view back over
+    // the link's address (see the re-sync above).
+    if (applyingRenderRef.current === thisRender) return
+    const written = writeMapFilters(filters, categories ?? [])
+    const qs = mapQueryString({
+      categories: allSelected ? null : Array.from(selected ?? []),
+      query: committedQuery || null,
+      openNow: written.open === '1',
+      openIn: written.open && written.open !== '1' ? written.open.split(',') : null,
+      bool: written.is ? written.is.split(',') : null,
+      select: written.sel ? Object.fromEntries(written.sel.split(',').map((pair) => [pair.slice(0, pair.indexOf(':')), pair.slice(pair.indexOf(':') + 1).split('|')])) : null,
+      place: selectedPointId ?? null,
+      pinned: pinnedSelected,
+      // The lines alone say so: no `cat` would mean every category.
+      eruvim: eruvimOn && selected?.size === 0 && !pinnedSelected ? 'only' : eruvimOn,
+    })
+    const url = `${window.location.pathname}${qs}`
+    if (url === `${window.location.pathname}${window.location.search}`) return
+    window.history.replaceState(window.history.state, '', url)
+    ownWritesRef.current = [...ownWritesRef.current, normalizeSearch(qs)].slice(-20)
+    // The view is the visitor's now, no link's: the same link again is a
+    // new navigation, even if this write never comes back as props (Next
+    // doesn't always echo one).
+    appliedInitialViewKeyRef.current = null
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [standalone, committedQuery, selected, allSelected, filtersKey, categories, selectedPointId, pinnedSelected, eruvimOn, options])
 
   // "Open now" has to re-answer as the clock moves — a pin that closed at 6pm
   // should drop off a filtered map at 6pm, not when the visitor next reloads.
@@ -907,35 +1200,35 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // unchanged result is `===` to the last one and the memo below doesn't
   // recompute at all. When the chip is off this is the empty string forever
   // and the clock reaches nothing.
-  const clock = useNow()
-  const openNowIds = useMemo(() => {
-    if (!openNowActive) return ''
-    const now = new Date(clock)
-    return allPoints
-      .filter((p) => {
-        if (!p.raw) return true
-        // See GenericDirectory's copy of this: a closed business is never open,
-        // whatever hours it still has saved.
-        if (businessClosure(p.raw as unknown as Record<string, unknown>)) return false
-        const keys = hoursKeysByCat.get(p.raw.category)
-        return !keys?.length || keys.some((k) => hoursOpenNow(p.raw![k], now) === true)
-      })
-      .map((p) => p.id)
-      .join('|')
-  }, [openNowActive, clock, allPoints, hoursKeysByCat])
+  const openNowIds = useMemo(
+    () => openNowIdsFor(allPoints, filters, clock, hoursKeysByCat).join('|'),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [filtersKey, clock, allPoints, hoursKeysByCat],
+  )
 
-  const visiblePoints = useMemo(() => {
-    const openNow = openNowActive ? new Set(openNowIds.split('|')) : null
+  const answeringPoints = useMemo(() => {
+    const openNow = new Set(openNowIds.split('|'))
     return allPoints
       // Pinned is a UNION with the category chips, not a replacement — a
       // pinned place shows up whether or not its own category chip happens
       // to be on, while an unpinned place in a selected category still
       // shows too (see the Pinned chip's own comment above).
       .filter((p) => effectiveSelected.has(p.filterId) || (pinnedSelected && p.pinned))
-      .filter((p) => activeTerms.every((t) => stripApostrophes(p.searchText).includes(t)))
-      .filter((p) => !p.raw || filterChips.every((c) => c.test(p.raw as DirectoryResource)))
-      .filter((p) => !openNow || openNow.has(p.id))
-  }, [allPoints, effectiveSelected, activeTerms, filterChips, openNowActive, openNowIds, pinnedSelected])
+      .filter((p) =>
+        askIds === null ? true : p.raw ? askIds.has(p.raw.id) : activeTerms.length > 0 && activeTerms.every((t) => stripApostrophes(p.searchText).includes(t)),
+      )
+      .filter((p) => !p.raw || passesOwnFilters(p.raw))
+      .filter((p) => !p.raw || !filters[p.raw.category]?.openNow || openNow.has(p.id))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allPoints, effectiveSelected, askIds, activeTerms, passesOwnFilters, openNowIds, pinnedSelected])
+  // Then how far a reading reaches: "within 3 miles", "in Center City".
+  // "Near HUP" alone limits nothing (see readingReach).
+  const milesFrom = (from: LatLng, p: { lat: number; lng: number }) => haversineMiles(from, { lat: p.lat, lng: p.lng })
+  const shownReach = reach
+  const visiblePoints = useMemo(
+    () => (shownReach && shownReach.miles !== null ? answeringPoints.filter((p) => milesFrom(shownReach.from, p) <= shownReach.miles!) : answeringPoints),
+    [answeringPoints, shownReach],
+  )
   // A plain `[...visiblePoints, ...droppedMapPoints]` spread inline in the
   // JSX below would build a fresh array on every ResourceMapView render —
   // including ones that don't touch either input, e.g. a background tap
@@ -947,13 +1240,16 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
     () => (ui.map.pins ? [...visiblePoints, ...droppedMapPoints] : visiblePoints),
     [visiblePoints, droppedMapPoints],
   )
+  // Where the sidebar's list was scrolled to, while a place is open in it.
+  const sidebarListKey = useMemo(() => visiblePoints.map((p) => p.id).join('|'), [visiblePoints])
+  const keptSidebarScroll = useKeptListScroll(sidebarListKey)
 
   // Whether a search/filter is meaningfully "active" — used to (a) gate the
   // sheet-raise/auto-select effect below to commit points instead of every
   // keystroke, and (b) tell ResourceMap it should refit the viewport to the
   // results even when a user location is set (which normally takes priority
   // over reframing — see ResourceMap's marker-sync effect).
-  const searchActive = !!committedQuery || filterChips.length > 0
+  const searchActive = !!committedQuery || hasFilters
 
   // Committing a search query or filter chip (not each keystroke —
   // committedQuery/filterChips only change at commit points, unlike
@@ -984,12 +1280,15 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
       // Reacting to a commit (query/filter), not a render value — there's no
       // single non-effect call site for this, since commits land via several
       // different handlers (submitSearch, toggleBoolField, toggleSelectValue, ...).
+      // Not mid-edit: a chip toggled beside the editor leaves it open (a
+      // search asks first, and has closed it by the time it commits).
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      setDesktopSelected(visiblePoints.length === 1 ? visiblePoints[0] : null)
+      if (!desktopEditing) setDesktopSelected(visiblePoints.length === 1 ? visiblePoints[0] : null)
       setSidebarCollapsed(false)
     }
+    // A reading arriving is a commit too: it changes what answers.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [committedQuery, filterChips, isMobile])
+  }, [committedQuery, filtersKey, isMobile, readByReader])
 
   // Whether every chip in the row — the real categories AND the Pinned chip,
   // when it's showing — is currently on. Mirrors CategoryFilter's own `allOn`
@@ -997,7 +1296,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // counts when it actually renders (see pinnedChip below), so a visitor
   // who's never pinned anything isn't blocked from "narrow to just this
   // one" by a chip they can't see.
-  const hasPinnedChip = ui.map.pins && pinned.length > 0
+  const hasPinnedChip = ui.map.pins && mappablePinnedCount > 0
   const allChipsOn = effectiveSelected.size === options.length && (!hasPinnedChip || pinnedSelected)
   // The full-screen category picker (mobile "More") lets a visitor uncheck
   // every box while browsing its own draft (draftSelected) — see
@@ -1006,7 +1305,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // auto-reverting mid-edit; Pinned rides along as an escape hatch exactly
   // like it does for the compact row, since the picker itself has no Pinned
   // checkbox of its own to turn off.
-  const draftNoneSelected = draftSelected.size === 0 && !pinnedSelected
+  const draftNoneSelected = draftSelected.size === 0 && !pinnedSelected && !eruvimOn
   const draftAllOn = draftSelected.size === options.length
   // Opens the picker with a fresh snapshot of what's live right now — so
   // Back (which touches nothing, see closeCategoriesPicker above) truly
@@ -1068,8 +1367,9 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
     // Unclicking the last remaining chip goes back to showing everything,
     // same as Google Maps/Too Good To Go's filter rows — there's no
     // "nothing shown" state a chip tap can land you in, so a separate
-    // Hide-all shortcut has nothing left to do.
-    if (next.size === 0 && !pinnedSelected) {
+    // Hide-all shortcut has nothing left to do. The eruv lines count as
+    // something shown: with them on, the last category off leaves them.
+    if (next.size === 0 && !pinnedSelected && !eruvimOn) {
       showAll()
       return
     }
@@ -1077,7 +1377,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   }
   // Resets every chip in the row, Pinned included — not just the real
   // categories — so "All" actually means all.
-  const showAll = () => {
+  const showAllPlaces = () => {
     // Re-tapping "All" while it's already the active filter used to still
     // build a brand-new Set — a fresh reference flows through
     // effectiveSelected → visiblePoints → ResourceMap's `points` prop, which
@@ -1086,6 +1386,17 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
     if (allChipsOn) return
     setSelected(new Set(options.map((o) => o.id)))
     setPinnedSelected(true)
+    setSidebarCollapsed(false)
+  }
+  // The All chip: every place. It never touches the eruv lines. With the
+  // lines on, a lit All goes off like any other chip, leaving the lines
+  // alone; with them off it stays lit, since the map is never empty (the
+  // user, Oct 15).
+  const showAll = () => {
+    if (!allChipsOn) return showAllPlaces()
+    if (!eruvimOn) return
+    setSelected(new Set())
+    setPinnedSelected(false)
     setSidebarCollapsed(false)
   }
   // If Pinned was the ONLY thing narrowing the map (no categories checked —
@@ -1097,9 +1408,13 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // already keep for an on-screen tap; this covers the one way the same
   // "nothing selected" state can be reached from OUTSIDE a chip tap.
   useEffect(() => {
-    if (pinnedSelected && pinned.length === 0 && effectiveSelected.size === 0) showAll()
+    // With the eruv lines on, they're left showing on their own.
+    if (pinnedSelected && mappablePinnedCount === 0 && effectiveSelected.size === 0) {
+      if (eruvimOn) setPinnedSelected(false)
+      else showAll()
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pinned.length, pinnedSelected, effectiveSelected.size])
+  }, [mappablePinnedCount, pinnedSelected, effectiveSelected.size])
   // Same "surface the results" side effects toggling a category chip gets
   // (raise the mobile sheet, drop the desktop sidebar's collapse) — without
   // them, turning Pinned on looked like it did nothing when nothing else
@@ -1119,7 +1434,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
     const next = !pinnedSelected
     // Same revert-to-all as unclicking the last category chip — turning
     // Pinned off shouldn't be able to leave the row with nothing on.
-    if (!next && effectiveSelected.size === 0) {
+    if (!next && effectiveSelected.size === 0 && !eruvimOn) {
       showAll()
       return
     }
@@ -1165,73 +1480,25 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
     setDraftSelected(draftAllOn ? new Set() : new Set(options.map((o) => o.id)))
   }
 
-  // Adds `id` to the current selection without touching anything else —
-  // including the `null` "everything shown" state, which stays `null` (not
-  // materialized into an explicit full Set) when `id` is already included,
-  // so this never turns an implicit "all" into a Set that then excludes a
-  // category added to the config later.
-  function ensureSelected(id: string) {
-    setSelected((prev) => {
-      const cur = prev ?? new Set(options.map((o) => o.id))
-      if (cur.has(id)) return prev
-      return new Set(cur).add(id)
-    })
+  // ── The Filters sheet's changes ───────────────────────────────────────────
+  // Every category showing that keeps hours: the sheet's top Open now,
+  // typing "open now", and the search's own "Open now" suggestion.
+  function openNowEverywhere() {
+    setApplied(null)
+    setInput('')
+    setCommittedQuery('')
+    updateFilters((f) => setOpenNowFor(f, categories ?? [], true))
   }
-
-  // Turning a category's OWN filter on implies wanting to see that category —
-  // same logic in both: pick a Kosher Cert for Food Establishments and it
-  // switches on even if you hadn't checked it yet, instead of silently doing
-  // nothing until you separately remember to also check the box.
-  function toggleBoolField(categoryId: string, key: string) {
-    const adding = !boolFields.includes(key)
-    setBoolFields((prev) => (prev.includes(key) ? prev.filter((f) => f !== key) : [...prev, key]))
-    if (adding) {
-      ensureSelected(categoryId)
-      track('field_filter_selected', { category: categoryId, field: key })
-    }
+  function onSheetOpenNow(categoryId: string) {
+    updateFilters((f) => toggleOpenNow(f, categoryId))
   }
-  function toggleSelectValue(categoryId: string, key: string, value: string) {
-    const adding = !(selectFilters[key] ?? []).includes(value)
-    setSelectFilters((prev) => {
-      const cur = prev[key] ?? []
-      return { ...prev, [key]: cur.includes(value) ? cur.filter((v) => v !== value) : [...cur, value] }
-    })
-    if (adding) {
-      ensureSelected(categoryId)
-      track('field_filter_selected', { category: categoryId, field: key, value })
-    }
+  function onSheetBoolean(categoryId: string, key: string) {
+    if (!filters[categoryId]?.bool?.includes(key)) track('field_filter_selected', { category: categoryId, field: key })
+    updateFilters((f) => toggleBool(f, categoryId, key))
   }
-
-  // Same idea as ensureSelected/toggleBoolField/toggleSelectValue above, but
-  // for the full-screen picker specifically — its checkboxes read from
-  // draftSelected, not the live selection (see openCategoriesPicker), so the
-  // "picking a filter implies wanting the category" side effect has to land
-  // on the draft too. Landing it on live `selected` instead left the
-  // checkbox unchecked (wrong state shown) and got silently overwritten the
-  // moment Apply committed the draft over it. The filter value itself
-  // (boolFields/selectFilters) still applies live either way — only which
-  // state the auto-select touches differs.
-  function ensureDraftSelected(id: string) {
-    setDraftSelected((prev) => (prev.has(id) ? prev : new Set(prev).add(id)))
-  }
-  function toggleBoolFieldInPicker(categoryId: string, key: string) {
-    const adding = !boolFields.includes(key)
-    setBoolFields((prev) => (prev.includes(key) ? prev.filter((f) => f !== key) : [...prev, key]))
-    if (adding) {
-      ensureDraftSelected(categoryId)
-      track('field_filter_selected', { category: categoryId, field: key })
-    }
-  }
-  function toggleSelectValueInPicker(categoryId: string, key: string, value: string) {
-    const adding = !(selectFilters[key] ?? []).includes(value)
-    setSelectFilters((prev) => {
-      const cur = prev[key] ?? []
-      return { ...prev, [key]: cur.includes(value) ? cur.filter((v) => v !== value) : [...cur, value] }
-    })
-    if (adding) {
-      ensureDraftSelected(categoryId)
-      track('field_filter_selected', { category: categoryId, field: key, value })
-    }
+  function onSheetSelect(categoryId: string, key: string, value: string) {
+    if (!filters[categoryId]?.select?.[key]?.includes(value)) track('field_filter_selected', { category: categoryId, field: key, value })
+    updateFilters((f) => toggleSelect(f, categoryId, key, value))
   }
 
   const loading = listings === null || categories === null
@@ -1247,7 +1514,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // sidebar starts bare (just the search box + quick chips), not with every
   // place already listed; the results list only appears once there's a
   // reason to show one.
-  const desktopNarrowed = selected !== null || committedQuery.length > 0 || filterChips.length > 0 || pinnedSelected
+  const desktopNarrowed = selected !== null || committedQuery.length > 0 || hasFilters || pinnedSelected
 
   // Whether the sidebar is actually on screen right now — either because
   // something narrowed the map down (a search, a category, a selected
@@ -1256,9 +1523,27 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // JSX below), so there's always a way to pull the panel out, even on a
   // freshly-loaded map with nothing narrowed yet.
   const sidebarVisible = (desktopNarrowed || !!desktopSelected || sidebarOpenedManually) && !sidebarCollapsed
+  // Keyed off sidebarVisible itself, not off desktopNarrowed/desktopSelected
+  // (which the old version branched on) — those can go stale independently
+  // of sidebarCollapsed. Concretely: select a place (sidebarCollapsed reset
+  // to false at selection time), close via this same toggle while still
+  // selected (branches into setSidebarCollapsed, so it's now true), then
+  // click the map background to deselect (desktopSelected -> null, but
+  // nothing there touches sidebarCollapsed — it's still true). Toggling
+  // again now falls into the OTHER branch (desktopNarrowed/desktopSelected
+  // are both falsy), which only ever flipped sidebarOpenedManually — never
+  // sidebarCollapsed, which was the one thing actually keeping it hidden.
+  // sidebarVisible stayed false no matter how many times you clicked
+  // "Show sidebar" after that. Always writing both flags to an explicit
+  // target state (not toggling either blind) means there's no combination
+  // of prior state this can get stuck in.
   function toggleSidebar() {
-    if (desktopNarrowed || desktopSelected) setSidebarCollapsed((c) => !c)
-    else setSidebarOpenedManually((o) => !o)
+    if (sidebarVisible) {
+      setSidebarCollapsed(true)
+    } else {
+      setSidebarCollapsed(false)
+      setSidebarOpenedManually(true)
+    }
   }
 
   // Auto-collapse the sidebar once whatever it was showing disappears —
@@ -1267,12 +1552,14 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // width; tucking it away automatically matches what the collapse arrow
   // already does on request. Only applies to the results-list case, not a
   // specific selected place (desktopSelected) — that one only goes away
-  // when the visitor explicitly backs out of it.
+  // when the visitor explicitly backs out of it. Not while the eruv lines
+  // are on: the list has the eruvim then, places or no places (the user,
+  // Oct 15: the Eruv button should bring up its list as a category does,
+  // and it was folding the sidebar straight away again).
   useEffect(() => {
-    if (isMobile || desktopSelected || !desktopNarrowed) return
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (isMobile || desktopSelected || !desktopNarrowed || eruvimOn) return
     if (visiblePoints.length === 0) setSidebarCollapsed(true)
-  }, [visiblePoints.length, desktopSelected, desktopNarrowed, isMobile])
+  }, [visiblePoints.length, desktopSelected, desktopNarrowed, isMobile, setSidebarCollapsed, eruvimOn])
 
   // ── Desktop search box + its autocomplete dropdown — shared between the
   // two places it can render: floating directly on the map (the default
@@ -1289,34 +1576,64 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
           e.preventDefault()
           submitSearch()
         }}
-        className="flex items-center rounded-full border border-slate-300 bg-white px-3.5 py-2 shadow-sm focus-within:ring-2 focus-within:ring-primary"
+        // 48px tall, Google Maps' own search box (the user, Oct 15).
+        className="flex h-12 items-center rounded-full border border-slate-300 bg-white px-4 shadow-sm focus-within:ring-2 focus-within:ring-primary"
       >
-        <svg className="h-4 w-4 shrink-0 text-slate-400" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24" aria-hidden="true">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" />
-        </svg>
+        {/* A place open in the sidebar: ← back to the results, where the
+            magnifier sits (Oct 15, board "A", as Google Maps does). It sits
+            on the panel it acts on, so it can't read as leaving the map —
+            that's the ✕ in the corner — and replaces the "‹ Back to list"
+            line that used to sit under the search. While editing, it's the
+            editor's ‹ too, one step back at a time like Escape: out of an
+            open row, then out of the edit, then to the results. */}
+        {desktopSelected ? (
+          <button
+            type="button"
+            onClick={() => (desktopEditing ? editor.back() : setDesktopSelected(null))}
+            aria-label={desktopEditing ? editor.label : 'Back to results'}
+            className="-ml-2 flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full text-slate-700 transition-colors hover:bg-slate-100 active:bg-slate-200"
+          >
+            <ArrowLeftIcon className="h-5 w-5" />
+          </button>
+        ) : (
+          <svg className="h-5 w-5 shrink-0 text-slate-400" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24" aria-hidden="true">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" />
+          </svg>
+        )}
         <input
           ref={desktopSearchInputRef}
           type="text"
           autoComplete="off"
-          placeholder="Search name, address, or 'open now'…"
+          // "Open now" is offered once the box is clicked into
+          // (showOpenNowSuggestion).
+          placeholder="Search name, address…"
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onFocus={() => setSearchFocused(true)}
           onBlur={() => setSearchFocused(false)}
           onKeyDown={(e) => {
             if (e.key === 'Escape') {
+              e.preventDefault()
               setSearchFocused(false)
               ;(e.target as HTMLInputElement).blur()
             }
           }}
-          className="min-w-0 flex-1 bg-transparent px-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none"
+          className="min-w-0 flex-1 bg-transparent px-3 text-[15px] text-slate-900 placeholder:text-slate-400 focus:outline-none"
         />
-        {input && (
+        {/* Not while a place is open: ← is the way back then, and the
+            corner ✕ (Close map) stays the only ✕ on screen. */}
+        {input && !desktopSelected && (
           <button
             type="button"
             onClick={clearSearch}
             aria-label="Clear search"
-            className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-slate-400 hover:text-slate-600 cursor-pointer"
+            // hover:bg-slate-100/active:bg-slate-200 — already rounded-full
+            // with nothing filling it; same state-layer treatment as every
+            // other icon-only button in this pass. Two independent copies of
+            // this search box exist (mobile/desktop each have their own —
+            // see this file's own doc), both missing this the same way, so
+            // this fix is applied to both rather than just the mobile one.
+            className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 active:bg-slate-200 cursor-pointer"
           >
             <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -1328,8 +1645,29 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
       {/* ── Autocomplete dropdown — same Google-Maps-style behavior as
               mobile's: matching places while typing, click one to jump
               straight to its card. ─────────────────────────────────────── */}
-      {searchFocused && searchSuggestions.length > 0 && (
+      {searchFocused && (showOpenNowSuggestion || searchSuggestions.length > 0) && (
         <div className="absolute inset-x-0 top-full z-10 mt-1 overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-lg">
+          {showOpenNowSuggestion && (
+            <button
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={selectOpenNow}
+              className="flex w-full items-center gap-3 px-3 py-2.5 text-left hover:bg-slate-50 active:bg-slate-100 cursor-pointer"
+            >
+              <span
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500"
+                aria-hidden="true"
+              >
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                  <circle cx="12" cy="12" r="9" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 7v5l3 3" />
+                </svg>
+              </span>
+              <span className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-slate-900">Open now</p>
+                <p className="truncate text-xs text-slate-400">Show only listings open right now</p>
+              </span>
+            </button>
+          )}
           {searchSuggestions.map((p) => (
             <button
               key={p.id}
@@ -1358,6 +1696,36 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
     </div>
   )
 
+  // A live seasonal campaign's category (see CampaignBannerManager), given
+  // its own distinctly-styled chip rather than just sorting into `options`
+  // by count like every other category — the whole point is that a visitor
+  // notices it's not an ordinary category. Absent entirely outside the
+  // campaign's date range (activeCampaignBanner), and also when its
+  // category currently has no points to show (nothing to filter to).
+  // Which campaign is on waits for today's date, as the home card's does.
+  const campaignBanners = useCampaignBanners()
+  const campaignClock = useNow()
+  const activeCampaign = campaignClock === null ? null : activeCampaignBanner(campaignBanners, campaignClock, timezone)
+  const campaignOption = activeCampaign ? options.find((o) => o.id === activeCampaign.categoryId) : undefined
+  const campaignHighlighted = !!campaignOption && effectiveSelected.has(campaignOption.id) && !allChipsOn
+  const campaignChip = campaignOption && (
+    <div
+      className={`relative flex shrink-0 items-stretch rounded-full text-sm font-semibold transition-colors ${
+        campaignHighlighted ? 'text-white' : 'bg-gradient-to-r from-amber-50 to-amber-100 text-amber-900'
+      }`}
+      style={campaignHighlighted ? { backgroundColor: campaignOption.color } : { boxShadow: 'inset 0 0 0 1.5px rgba(180,130,20,0.35)' }}
+    >
+      <button
+        onClick={() => toggle(campaignOption.id)}
+        aria-pressed={effectiveSelected.has(campaignOption.id)}
+        className={`flex items-center gap-1 ${CHIP_SIZE} rounded-full cursor-pointer ${campaignHighlighted ? '' : 'hover:from-amber-100 hover:to-amber-200'}`}
+      >
+        <span aria-hidden="true">✨</span>
+        <span>{campaignOption.label}</span>
+      </button>
+    </div>
+  )
+
   // A standalone toggle, not one of CategoryFilter's own chips — it narrows
   // ACROSS categories rather than toggling one, so it doesn't belong to
   // that component's select/all/none model. Rendered by CategoryFilter
@@ -1372,32 +1740,261 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // already said. The real toggle state (aria-pressed, the click handler)
   // stays keyed on `pinnedSelected` itself.
   const pinnedHighlighted = pinnedSelected && !allChipsOn
-  const pinnedChip = ui.map.pins && pinned.length > 0 && (
+  // "Saved" (Pin until Oct 14, canvas page "you", board YouMap): right after
+  // Filters, before All — the visitor's own places, not one more category.
+  const pinnedChip = ui.map.pins && mappablePinnedCount > 0 && (
     <div
-      className={`relative flex shrink-0 items-stretch rounded-full border text-xs font-medium transition-colors ${
-        pinnedHighlighted ? 'border-transparent text-white' : 'border-slate-300 bg-white text-slate-500'
+      className={`relative flex shrink-0 items-stretch rounded-full border text-sm font-semibold transition-colors ${
+        pinnedHighlighted ? 'border-transparent text-white' : 'border-slate-300 bg-white text-[#2563eb]'
       }`}
-      // Same blue as the pin badge overlaid on a pinned marker (see
-      // ResourceMap's buildPin) — Pinned isn't a real category with its own
-      // hue, but this chip should still read with exactly the same weight
-      // (size, dot, count) as one, not a lighter/different-shaped control.
+      // The same blue as the bookmark badge on a saved place's marker (see
+      // ResourceMap's buildPin).
       style={pinnedHighlighted ? { backgroundColor: '#2563eb' } : undefined}
     >
       <button
         onClick={togglePinnedSelected}
         aria-pressed={pinnedSelected}
-        className={`flex items-center gap-1 py-1 pl-2.5 pr-2.5 rounded-full cursor-pointer ${pinnedHighlighted ? '' : 'hover:bg-slate-50'}`}
+        className={`flex items-center gap-1 ${CHIP_SIZE} rounded-full cursor-pointer ${pinnedHighlighted ? '' : 'hover:bg-slate-50'}`}
       >
-        <span
-          className="inline-block h-2 w-2 rounded-full ring-1 ring-white/60"
-          style={{ backgroundColor: pinnedHighlighted ? 'rgba(255,255,255,0.9)' : '#2563eb' }}
-          aria-hidden="true"
-        />
-        <span aria-hidden="true">📌</span>
-        <span>Pinned</span>
-        <span className={pinnedHighlighted ? 'text-white/80' : 'text-slate-400'}>{pinned.length}</span>
+        <BookmarkIcon filled={pinnedHighlighted} className={CHIP_GLYPH} />
+        <span>Saved</span>
+        <span className={pinnedHighlighted ? 'text-white/80' : ''}>{mappablePinnedCount}</span>
       </button>
     </div>
+  )
+
+  // ── Eruv lines (agreed Oct 7, canvas page "eruv", board 3) ──────────────
+  // Each eruv's own map, as the eruv draws it, under the pins, its name in
+  // its status's colour (eruvLayer.ts). Tapping a line or a name opens that
+  // eruv's listing where a place opens. Off to begin with; there only when
+  // the community has an Eruv page and an eruv with a map. All of them or
+  // none (the user, Oct 13), not one by one. A layer, not a place filter, so
+  // a round button on the map like Google Maps' Layers rather than a chip
+  // (Oct 15): from everything, a tap is the lines alone; with categories
+  // picked, the lines go over them. All never draws them.
+  const eruvCategory = (categories ?? []).find((c) => c.kind === 'eruv') ?? null
+  const eruvStatuses = useEruvStatuses(countCommunity ?? '', !!countCommunity && !!eruvCategory)
+  const eruvData = eruvStatuses?.available ? eruvStatuses : null
+  const eruvMaps = useEruvMaps(countCommunity ?? '', !!eruvData, eruvData?.mapsVersion)
+  const eruvimWithLines = useMemo(
+    () => (eruvData && eruvMaps ? eruvData.eruvim.flatMap((e) => (eruvMaps.get(e.id) ? [{ eruv: e, map: eruvMaps.get(e.id)! }] : [])) : []),
+    [eruvData, eruvMaps],
+  )
+  const mapEruvim = useMemo<MapEruv[]>(
+    () => (eruvimOn && eruvData && clock !== null ? eruvimWithLines.map(({ eruv: e, map }) => ({ id: e.id, name: e.name, tone: eruvView(e, new Date(clock), eruvData.timezone, eruvData.candles).tone, map })) : []),
+    // Each tick makes a new list, but the map redraws only when a line or
+    // a status's colour changes (eruvDrawKey).
+    [eruvimOn, eruvData, eruvimWithLines, clock],
+  )
+  // The list's rows when the lines are all the map shows (NearbyList).
+  const listedEruvim = useMemo<NearbyEruv[]>(
+    () =>
+      eruvimOn && eruvData && clock !== null
+        ? eruvimWithLines.map(({ eruv: e }) => {
+            const v = eruvView(e, new Date(clock), eruvData.timezone, eruvData.candles)
+            return { id: e.id, name: e.name, tone: v.tone, label: v.label }
+          })
+        : [],
+    [eruvimOn, eruvData, eruvimWithLines, clock],
+  )
+  const openEruvId = selectedPointId?.startsWith(ERUV_PREFIX) ? selectedPointId.slice(ERUV_PREFIX.length) : null
+  const openEruv = (id: string) => {
+    const found = eruvimWithLines.find((x) => x.eruv.id === id)
+    const at = found ? (labelPoint(found.map) ?? found.map.lines[0]?.points[0]) : null
+    if (!found || !at) return
+    const e = found.eruv
+    const p: SelectablePoint = { id: `${ERUV_PREFIX}${id}`, lat: at[0], lng: at[1], name: e.name, color: colorById.get(eruvCategory?.id ?? '') ?? '#64748b', filterId: ERUV_FILTER_ID }
+    // Opened where it's tapped: the map stays where the visitor put it.
+    if (isMobile) nearbySheetRef.current?.selectPoint(p, false)
+    else
+      leaveEditThen(() => {
+        setDesktopSelected(p)
+        setSidebarCollapsed(false)
+      })
+  }
+  // A link to an open eruv (?place=eruv:center-city) opens it again, with
+  // the layer on, once the eruvim have arrived (their fetch outlasts the
+  // render a phone takes to know it's a phone; see the restore above).
+  const restoredEruv = useRef(false)
+  useEffect(() => {
+    if (!standalone || restoredEruv.current || !initialPlaceId?.startsWith(ERUV_PREFIX) || eruvimWithLines.length === 0) return
+    restoredEruv.current = true
+    setEruvimOn(true)
+    openEruv(initialPlaceId.slice(ERUV_PREFIX.length))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [eruvimWithLines, standalone, initialPlaceId])
+  // Turning the layer off closes the eruv open in it, so mid-edit that
+  // asks first too, and a No leaves both the layer and the edit as they were.
+  const eruvimOff = (then?: () => void) => {
+    if (!openEruvId) {
+      setEruvimOn(false)
+      return then?.()
+    }
+    leaveEditThen(() => {
+      deselectPlace()
+      setEruvimOn(false)
+      then?.()
+    })
+  }
+  // Off with nothing else on goes back to everything, as the last category
+  // chip off does: the map is never empty.
+  const toggleEruvim = () => {
+    if (!eruvimOn) return setEruvimOn(true)
+    eruvimOff(effectiveSelected.size === 0 && !pinnedSelected ? showAllPlaces : undefined)
+  }
+  // The map button: from everything, the lines alone. On, it brings up
+  // the list, each eruv with its status, as a category's chip brings up
+  // its places (the user, Oct 15): the sidebar, or the phone's sheet to
+  // half.
+  const tapEruvButton = () => {
+    if (eruvimOn) return toggleEruvim()
+    if (allChipsOn) {
+      setSelected(new Set())
+      setPinnedSelected(false)
+    }
+    setEruvimOn(true)
+    setSidebarCollapsed(false)
+    if (isMobile) nearbySheetRef.current?.raise()
+  }
+  const eruvDetail = (id: string, onBack?: () => void, onEditor?: (editor: HostedEditor | null) => void) => {
+    const e = eruvData?.eruvim.find((x) => x.id === id)
+    if (!e || !eruvData || clock === null) return null
+    return <MapEruvDetail eruv={e} color={colorById.get(eruvCategory?.id ?? '') ?? '#64748b'} now={new Date(clock)} timezone={eruvData.timezone} candles={eruvData.candles} onBack={onBack} onEditor={onEditor} />
+  }
+  // ── Filters: one button, one sheet, the chips of what's on ───────────────
+  // The categories showing, in the chip row's order: the sheet's sections.
+  const showingCategories = useMemo(() => {
+    const byId = new Map((categories ?? []).map((c) => [c.id, c]))
+    return options.flatMap((o) => (effectiveSelected.has(o.id) && byId.has(o.id) ? [byId.get(o.id)!] : []))
+  }, [options, effectiveSelected, categories])
+  const topOpenNow = openNowAll(filters, showingCategories)
+  const categorySections = useMemo<MapFilterSection[]>(() => {
+    return showingCategories.flatMap((c) => {
+      const f = filters[c.id] ?? {}
+      const fields = filterFields(c)
+      const catPoints = allPoints.filter((p) => p.filterId === c.id)
+      const booleans = fields.filter((x) => x.type === 'boolean').map((x) => ({ key: x.key, label: x.filterLabel ?? x.label, on: !!f.bool?.includes(x.key) }))
+      const selects = fields
+        .filter((x) => x.type === 'select')
+        .map((x) => {
+          const chosen = f.select?.[x.key] ?? []
+          // The values its places actually have, and whatever's chosen.
+          const values = [...new Set([...catPoints.flatMap((p) => (p.raw ? selectValues(p.raw[x.key]) : [])), ...chosen])].filter(Boolean)
+          return { key: x.key, label: x.filterLabel ?? x.label, values, chosen }
+        })
+        .filter((sel) => sel.values.length > 0)
+      const openNow = keepsHours(c) ? !!f.openNow : null
+      if (openNow === null && booleans.length === 0 && selects.length === 0) return []
+      const shown = optionsWithFilters.find((o) => o.id === c.id)?.count ?? catPoints.length
+      return [
+        {
+          id: c.id,
+          label: c.pluralLabel,
+          icon: c.icon,
+          color: colorById.get(c.id) ?? '#64748b',
+          note: shown === catPoints.length ? `all ${catPoints.length}` : `${shown} of ${catPoints.length}`,
+          openNow,
+          booleans,
+          selects,
+        },
+      ]
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showingCategories, filtersKey, allPoints, optionsWithFilters, colorById])
+  const filterSections = categorySections
+  const andNames = (names: string[]) => (names.length <= 1 ? names.join('') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`)
+  const topOpenNowNote = topOpenNow.on
+    ? `For ${andNames(topOpenNow.withHours.map((c) => c.pluralLabel))}.`
+    : topOpenNow.onFor.length > 0
+      ? `On for ${andNames(topOpenNow.onFor)} only.`
+      : null
+  const filtersOn = filterCount(filters, showingCategories)
+  const filtersButton = (
+    <button
+      type="button"
+      onClick={() => setFiltersOpen(true)}
+      aria-label={filtersOn > 0 ? `Filters, ${filtersOn} on` : 'Filters'}
+      data-testid="map-filters-button"
+      className={`flex shrink-0 cursor-pointer items-center gap-1.5 rounded-full border border-primary ${CHIP_SIZE} font-bold shadow-sm transition-colors ${
+        filtersOn > 0 ? 'bg-primary text-white hover:bg-primary-dark' : 'bg-white text-primary hover:bg-primary/5 active:bg-primary/10'
+      }`}
+    >
+      <SlidersIcon className="h-4 w-4" />
+      Filters
+      {filtersOn > 0 && <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-white px-1 text-[11px] text-primary">{filtersOn}</span>}
+    </button>
+  )
+  const leadingChips = filtersButton
+  // The Eruv button: bottom-right on the map, above the live-location
+  // button on a phone and above zoom on a computer, so every chip in the row
+  // is a place filter (the user, Oct 15). There once there's a line to draw.
+  // Off, white with the eruv's icon in its colour; on, filled.
+  const eruvColor = colorById.get(eruvCategory?.id ?? '') ?? '#64748b'
+  const eruvButton = eruvimWithLines.length > 0 && (
+    <button
+      type="button"
+      onClick={tapEruvButton}
+      aria-pressed={eruvimOn}
+      aria-label="Eruv lines"
+      title="Eruv lines"
+      data-testid="map-eruv-button"
+      className={`flex h-12 w-12 cursor-pointer items-center justify-center rounded-full shadow-md ring-1 ring-slate-900/10 transition-colors desktop:h-10 desktop:w-10 ${
+        eruvimOn ? 'text-white' : 'bg-white hover:bg-slate-50 active:bg-slate-100'
+      }`}
+      style={eruvimOn ? { backgroundColor: eruvColor } : { color: eruvColor }}
+    >
+      <CategoryGlyph categoryId="eruv" icon={eruvCategory?.icon ?? ''} className="h-6 w-6 desktop:h-5 desktop:w-5" />
+    </button>
+  )
+
+  // No line of chips for the filters someone chose themselves (the user,
+  // Oct 15: they know what they tapped), as a category page has none under
+  // its heading: the Filters button turns solid with how many, and the
+  // sheet shows which. A question the reader read is different — nobody
+  // tapped those — so then the row says "Read as" and what it read: the
+  // Filters, its items and how far, each removable.
+  const onFilters = readByReader ? activeFilters(filters, showingCategories) : []
+  const readItems = readByReader ? (applied.reading.items ?? []) : []
+  const readReach = shownReach ? reachLabel(shownReach) : null
+  const dropFromReading = (change: Partial<Reading>) => applied && setApplied({ ...applied, reading: { ...applied.reading, ...change } })
+  const showReadingRow = readingNow !== null && readingNow === committedQuery
+  const activeFilterRow = (onFilters.length > 0 || readItems.length > 0 || readReach || showReadingRow) && (
+    <div className="chip-scroll mt-1.5 flex items-center gap-1.5 overflow-x-auto pb-1" data-testid="map-active-filters">
+      {showReadingRow && (
+        // Only after a moment: a remembered question answers faster than that.
+        <span className="shrink-0 rounded-full bg-white/95 px-3 py-1.5 text-[13px] font-semibold text-slate-600 shadow-sm" style={{ animation: 'backdropIn 150ms ease-out 300ms both' }} role="status" data-testid="map-reading">
+          Reading your question…
+        </span>
+      )}
+      {readByReader && (
+        <span className="shrink-0 rounded-full bg-white/95 px-2 py-1 text-[12px] font-semibold text-slate-500 shadow-sm" data-testid="map-read-as">
+          Read as
+        </span>
+      )}
+      {readItems.map((item) => (
+        <FilterChip key={`item:${item}`} label={item} on onToggle={() => dropFromReading({ items: readItems.filter((i) => i !== item) })} />
+      ))}
+      {readReach && <FilterChip key="reach" label={readReach} on onToggle={() => dropFromReading({ near: null, withinMiles: null })} />}
+      {onFilters.map((a) => (
+        <FilterChip key={a.key} label={a.label} on onToggle={() => updateFilters(a.remove)} />
+      ))}
+    </div>
+  )
+  const filtersSheet = (
+    <MapFiltersSheet
+      isOpen={filtersOpen}
+      onClose={() => setFiltersOpen(false)}
+      top={{ shown: topOpenNow.shown, on: topOpenNow.on, note: topOpenNowNote }}
+      onTopOpenNow={() => updateFilters((f) => setOpenNowFor(f, topOpenNow.withHours, !topOpenNow.on))}
+      sections={filterSections}
+      onOpenNow={onSheetOpenNow}
+      onBoolean={onSheetBoolean}
+      onSelect={onSheetSelect}
+      onClearAll={() => setOwnFilters({})}
+      anyOn={hasFilters}
+      count={visiblePoints.length}
+      doneLabel={visiblePoints.length === 0 && mapEruvim.length > 0 ? `Show ${mapEruvim.length} ${mapEruvim.length === 1 ? 'eruv' : 'eruvim'}` : undefined}
+    />
   )
 
   // The category chips — sit beside the search box (not below it), so they
@@ -1409,16 +2006,47 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
       selected={effectiveSelected}
       onToggle={toggle}
       onAll={showAll}
-      categories={categories ?? []}
-      points={allPoints}
-      boolFields={boolFields}
-      onToggleBool={toggleBoolField}
-      selectFilters={selectFilters}
-      onToggleSelectValue={toggleSelectValue}
+      leadingChip={leadingChips}
+      campaignChip={campaignChip}
       pinnedChip={pinnedChip}
       pinnedOn={pinnedSelected}
       scrollArrow
     />
+  )
+
+  // The sidebar's scroll region. One definition for the list and the place
+  // detail, so neither can lose the overscroll settings below. Keyed on what
+  // it's showing, so each starts at the top: shared, the list's scroll
+  // offset carried into a place picked from deep in it. The list's offset
+  // is kept meanwhile, and put back on the way back (Oct 16).
+  //
+  // overscroll-contain: without it, a trackpad swipe closing a
+  // NearbyList row's pin action can still bleed into the
+  // browser's own swipe-to-go-back gesture once it reaches
+  // this scroll boundary, even though the row's own wheel
+  // handler already calls preventDefault (see NearbyList).
+  //
+  // This WAS removed once, on the theory that the row-level
+  // handler's own `< 2` noise-floor threshold (see NearbyList's
+  // own comment) already closed that gap on its own — tested
+  // live and it didn't: without this, the row's own swipe
+  // itself started misbehaving (the back-gesture recognizer
+  // competing with it mid-drag), which is worse than losing
+  // back-swipe over this panel. Put back; a bare Google Maps
+  // embed has this same "no back-swipe over the interactive
+  // surface" limitation everywhere, so this screen having it
+  // too, specifically here, is a smaller cost than a broken
+  // row swipe.
+  //
+  // Sideways, none rather than contain (Oct 16): contain still let the
+  // list itself rubber-band sideways, and a scroll's sideways drift
+  // reaches it, so a row's swipe pulled "a little more of the sheet"
+  // than the row. Nothing here scrolls sideways, so there's nothing to
+  // give.
+  const sidebarScroll = (key: string, content: ReactNode, list = false) => (
+    <div key={key} ref={list ? keptSidebarScroll.ref : undefined} onScroll={list ? keptSidebarScroll.onScroll : undefined} data-testid="sidebar-scroll" className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain overscroll-x-none px-3 pb-3">
+      {content}
+    </div>
   )
 
   return (
@@ -1432,8 +2060,31 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
     <div
       className={`flex flex-1 min-h-0 flex-col desktop:flex-row desktop:overflow-hidden ${
         fullscreen
-          ? 'desktop:fixed desktop:inset-0 desktop:z-50 desktop:rounded-none desktop:ring-0'
-          // desktop:isolate: boxed mode (e.g. the home-screen map band) has no
+          ? // Unprefixed (not desktop:-only) now — mobile gets this too. It
+            // used to be desktop-only on the theory that mobile was already
+            // "effectively full-bleed" via plain flex layout (see the
+            // `fullscreen` state's own doc), but plain flow content doesn't
+            // paint behind env(safe-area-inset-top) the way a fixed layer
+            // does: confirmed live as a gray gap (the page's own background
+            // showing through) above the floating search bar on a real
+            // notched phone. `fullscreen` is only ever true here for the
+            // standalone map screen on mobile — the admin's boxed
+            // category-preview map is the only other caller, and its own
+            // fullscreen TOGGLE BUTTON is `desktop:flex` (hidden on mobile),
+            // so mobile never has a way to set it true there.
+            //
+            // bottom is an explicit reservation instead of inset-0's implied
+            // 0, because unlike desktop (which has no bottom chrome to clear
+            // in fullscreen — it already covers the header entirely, see
+            // below), mobile's fixed tab bar (MobileTabBar.tsx, z-40) still
+            // needs to stay visible under this z-50 layer — reserving the
+            // exact same space `<main>`'s own padding used to reserve for it
+            // (see MapScreen.tsx) means the map's own painted area simply
+            // never reaches those pixels, so there's nothing for the tab
+            // bar's own z-index to have to win against.
+            'fixed inset-x-0 top-0 bottom-[calc(3.75rem+env(safe-area-inset-bottom))] z-50 rounded-none ring-0 desktop:inset-0'
+          // desktop:isolate: boxed mode (the admin's category-preview map,
+          // the only caller that still renders non-fullscreen) has no
           // z-index of its own on this wrapper, so without a stacking context
           // here the search box's z-40 below (ResourceMapView's own overlay,
           // meant only to sit above the map/sidebar inside this box) leaked
@@ -1445,9 +2096,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
           // establishes its own stacking context, and covering the header
           // there is a separate, intentional tradeoff — see the `controls`
           // prop's own doc above).
-          : `desktop:relative desktop:isolate desktop:h-[70vh] desktop:min-h-[420px] desktop:flex-none${
-              borderless ? '' : ' desktop:rounded-2xl desktop:ring-1 desktop:ring-slate-900/5'
-            }`
+          : 'desktop:relative desktop:isolate desktop:h-[70vh] desktop:min-h-[420px] desktop:flex-none desktop:rounded-2xl desktop:ring-1 desktop:ring-slate-900/5'
       }`}
     >
       {loading ? (
@@ -1479,9 +2128,22 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
             // its own elevation) means the map's box never changes size, so
             // that ResizeObserver never fires and nothing under it moves.
             <aside
-              className={`hidden flex-col overflow-hidden bg-white transition-[width] duration-200 ease-in-out desktop:absolute desktop:inset-y-0 desktop:left-0 desktop:z-30 desktop:flex desktop:min-h-0 desktop:shadow-xl ${
-                sidebarVisible ? 'desktop:w-[380px] desktop:border-r desktop:border-slate-200' : 'desktop:w-0'
+              className={`hidden flex-col overflow-hidden bg-white desktop:absolute desktop:inset-y-0 desktop:left-0 desktop:z-30 desktop:flex desktop:min-h-0 desktop:shadow-xl ${
+                sidebarVisible ? 'desktop:border-r desktop:border-slate-200' : ''
               }`}
+              // Width lives here, not in a `desktop:w-[...]` class, now that
+              // it's draggable (see sidebarWidth/the resize handle below) —
+              // `hidden`/`desktop:flex` above still fully suppress this on an
+              // actual mobile viewport via CSS regardless, so nothing here
+              // needs its own `desktop:` gate. Transition off entirely while
+              // actively dragging: same reasoning as MobileSheet's own
+              // dragHeight — a CSS transition retargeting on every single
+              // pointermove frame reads as laggy/rubber-banding rather than
+              // tracking the cursor.
+              style={{
+                width: sidebarVisible ? sidebarWidth : 0,
+                transition: isDraggingSidebar ? 'none' : 'width 200ms ease-in-out',
+              }}
             >
               {/* No search/chips header here anymore — the floating bar
                   (rendered once, below, positioned relative to the whole
@@ -1492,36 +2154,28 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                   alone would only clear it on first paint; once scrolled,
                   list rows would slide up underneath the floating bar since
                   padding is part of the same scrolling content. ────────── */}
-              <div className="h-16 shrink-0" />
-              {ui.map.nearbyList && (
-                // overscroll-contain: without it, a trackpad swipe closing a
-                // NearbyList row's pin action can still bleed into the
-                // browser's own swipe-to-go-back gesture once it reaches
-                // this scroll boundary, even though the row's own wheel
-                // handler already calls preventDefault (see NearbyList).
-                //
-                // This WAS removed once, on the theory that the row-level
-                // handler's own `< 2` noise-floor threshold (see NearbyList's
-                // own comment) already closed that gap on its own — tested
-                // live and it didn't: without this, the row's own swipe
-                // itself started misbehaving (the back-gesture recognizer
-                // competing with it mid-drag), which is worse than losing
-                // back-swipe over this panel. Put back; a bare Google Maps
-                // embed has this same "no back-swipe over the interactive
-                // surface" limitation everywhere, so this screen having it
-                // too, specifically here, is a smaller cost than a broken
-                // row swipe.
-                <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-3">
-                  {desktopSelected && desktopSelected.raw && desktopSelectedCategory ? (
+              <div className="h-[72px] shrink-0" />
+              {ui.map.nearbyList &&
+                // No "Back to list" in here: the ← in the search box above
+                // is the way back on a computer (Oct 15).
+                (desktopSelected?.filterId === ERUV_FILTER_ID && eruvDetail(desktopSelected.id.slice(ERUV_PREFIX.length)) ? (
+                  sidebarScroll(desktopSelected.id, eruvDetail(desktopSelected.id.slice(ERUV_PREFIX.length), undefined, onPlaceEditor))
+                ) : desktopSelected && desktopSelected.raw && desktopSelectedCategory ? (
+                  sidebarScroll(
+                    `place:${desktopSelected.id}`,
                     <MapPlaceDetail
                       item={desktopSelected.raw}
                       category={desktopSelectedCategory}
                       color={desktopSelected.color}
-                      onBack={() => setDesktopSelected(null)}
-                    />
-                  ) : (
+                      found={foundOnPoint(desktopSelected.raw.id)}
+                      onEditor={onPlaceEditor}
+                    />,
+                  )
+                ) : (
+                  sidebarScroll(
+                    'list',
                     <>
-                      {activeLocation && (
+                      {activeLocation && visiblePoints.length > 0 && (
                         <p className="mb-2 px-1 text-xs text-slate-400">
                           Sorted by distance from your location{tracking ? ', updating live as you move.' : '.'}
                         </p>
@@ -1531,12 +2185,58 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                         userLocation={activeLocation}
                         onViewListing={onViewListing}
                         onSelectPlace={selectPlace}
+                        eruvim={listedEruvim}
+                        onSelectEruv={openEruv}
+                        onHover={hover.set}
                       />
-                    </>
-                  )}
-                </div>
-              )}
+                    </>,
+                    true,
+                  )
+                ))}
             </aside>
+          )}
+
+          {/* ── Sidebar resize handle (desktop) — a thin invisible strip
+                  straddling the sidebar's own right edge, the same
+                  split-pane drag affordance most desktop apps with a
+                  resizable panel use (Claude's own sidebar included).
+                  Only rendered while the sidebar actually has a width worth
+                  dragging — collapsed (sidebarVisible false, 0px) there's
+                  nothing to grab, and the collapse toggle below already
+                  covers "bring it back".
+                  w-3 centered on the border (not flush against it, the
+                  collapse toggle's own reasoning above) — a 1px border is
+                  real but not a real target; centering a few px of
+                  cursor:col-resize hit-area on it is what makes the edge
+                  itself grabbable rather than requiring pixel-precision.
+                  bg-primary/0 hover:bg-primary/20: invisible at rest, a
+                  quiet highlight on hover/while dragging is the only
+                  feedback that this edge does something — no visible track
+                  or handle glyph, since the border itself already reads as
+                  the sidebar's edge. */}
+          {!isMobile && sidebarVisible && (
+            <div
+              onPointerDown={onSidebarHandlePointerDown}
+              onPointerMove={onSidebarHandlePointerMove}
+              onPointerUp={onSidebarHandlePointerUp}
+              onPointerCancel={onSidebarHandlePointerCancel}
+              // Real keyboard equivalent for the drag gesture (ARIA's own
+              // separator pattern calls for one), not just a courtesy —
+              // dragging with a mouse is the only way to reach this
+              // control otherwise. See useMapSidebar's own doc.
+              onKeyDown={onSidebarHandleKeyDown}
+              tabIndex={0}
+              role="separator"
+              aria-orientation="vertical"
+              aria-label="Resize sidebar"
+              aria-valuenow={Math.round(sidebarWidth)}
+              aria-valuemin={SIDEBAR_MIN_WIDTH}
+              aria-valuemax={SIDEBAR_MAX_WIDTH}
+              className={`absolute inset-y-0 z-40 hidden w-3 -translate-x-1/2 cursor-col-resize touch-none desktop:block ${
+                isDraggingSidebar ? 'bg-primary/20' : 'bg-primary/0 hover:bg-primary/20'
+              }`}
+              style={{ left: sidebarWidth }}
+            />
           )}
 
           {/* ── Sidebar collapse toggle (desktop) — sits just outside the
@@ -1549,8 +2249,9 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                   this row's own overflow-hidden (unreachable to click), and
                   even expanded it sat exactly where the results list's own
                   scrollbar renders, fighting with it. Its left offset still
-                  tracks the sidebar's width (380px open, 0 collapsed) so it
-                  slides along with the edge instead of jumping.
+                  tracks the sidebar's own current (now draggable) width, 0
+                  when collapsed, so it slides along with the edge instead
+                  of jumping.
                   Always rendered (not just once something's narrowed) — a
                   freshly-loaded map with nothing searched/selected yet
                   otherwise has no visible way to browse the directory at
@@ -1562,8 +2263,8 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
               onClick={toggleSidebar}
               aria-label={sidebarVisible ? 'Hide sidebar' : 'Show sidebar'}
               aria-pressed={!sidebarVisible}
-              style={{ left: (sidebarVisible ? 380 : 0) + 8 }}
-              className="absolute top-1/2 z-20 hidden h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-md transition-[left] duration-200 ease-in-out hover:bg-slate-50 hover:text-slate-700 cursor-pointer desktop:flex"
+              style={{ left: (sidebarVisible ? sidebarWidth : 0) + 8 }}
+              className={`absolute top-1/2 z-20 hidden h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-md ${isDraggingSidebar ? '' : 'transition-[left] duration-200 ease-in-out'} hover:bg-slate-50 hover:text-slate-700 cursor-pointer desktop:flex`}
             >
               <ChevronLeftIcon className={`h-4 w-4 transition-transform ${sidebarVisible ? '' : 'rotate-180'}`} />
             </button>
@@ -1573,35 +2274,104 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                   stacked above the sidebar in z-order (z-40 vs. the
                   sidebar's z-30) so it reads as sitting on top of the
                   sidebar's own top edge, the same way Google Maps' own
-                  search box sits over its results panel. Deliberately
-                  narrower than the sidebar (336px, not the full 368px that
-                  would put its right edge flush with the sidebar's own
-                  right edge at 380px) — flush left no visible gap between
-                  the end of the search box and the sidebar's white below
-                  it, unlike Google Maps' own search box, which leaves a
-                  real margin on both sides. left-3 + 336px = 348px, 32px
-                  short of the sidebar's 380px edge. Neither this nor the
-                  chips below ever move now — the sidebar sliding in and
-                  out underneath is what changes, not these. ───────────── */}
+                  search box sits over its results panel. Its WIDTH now
+                  tracks the sidebar's own (SIDEBAR_SEARCH_INSET narrower on
+                  each side, so it still reads as sitting flush inside the
+                  sidebar rather than spanning its full white edge to edge)
+                  — it used to stay fixed at 336px regardless, which matched
+                  the sidebar exactly at its minimum width but left a
+                  growing, disconnected strip of the sidebar's own white
+                  bare to its right the moment someone dragged the sidebar
+                  wider, undermining the "sits on top of the sidebar" idea
+                  the whole floating-search approach is built on. Same
+                  no-transition-while-dragging reasoning as the sidebar's
+                  own width below, so it tracks the cursor directly instead
+                  of visibly lagging a step behind it. Falls back to the
+                  same 336px when no sidebar is mounted at all (nothing to
+                  track yet). ────────────────────────────────────────────── */}
           {!isMobile && (
-            <div className="absolute left-3 top-3 z-40 hidden w-[336px] desktop:block">{desktopSearchForm}</div>
+            <div
+              className="absolute left-3 top-3 z-40 hidden desktop:block"
+              style={{
+                width: sidebarVisible ? sidebarWidth - SIDEBAR_SEARCH_INSET : SIDEBAR_MIN_WIDTH - SIDEBAR_SEARCH_INSET,
+                transition: isDraggingSidebar ? 'none' : 'width 200ms ease-in-out',
+              }}
+            >
+              {desktopSearchForm}
+            </div>
           )}
 
-          {/* ── Floating category chips (desktop) — fixed just clear of the
-                  sidebar's right edge (380px + a 16px gap = 396px), matching
-                  how tight Google Maps' own chip row sits after its panel
-                  (see the reference screenshot) — closer than the margin
-                  left between the search box and the sidebar's edge above,
-                  which is a separate, deliberately larger gap. Fixed, not
-                  sidebar-tracking: the search box and this gap are already
-                  sized so the sidebar can never reach far enough right to
-                  need this to get out of its way. right-16 (not right-3):
-                  leaves clearance so the chip row's scroll area doesn't run
-                  under the fullscreen button, which shares this same
-                  top-right corner of the map. ───────────────────────────── */}
-          {!isMobile && desktopCategoryChips && (
-            <div className="absolute left-[396px] right-16 top-3 z-20 hidden pt-0.5 desktop:block">
-              {desktopCategoryChips}
+          {/* ── The map's top row (desktop): the category chips, then Set
+                  location and the corner's ✕ (or the fullscreen toggle), one
+                  row (the user, Oct 15: the chips ran to within 12px of the
+                  ✕, with Set location on a line of its own under it). The
+                  chips start just clear of the sidebar's own right edge (its
+                  width + a 16px gap), as tight as Google Maps' row sits
+                  after its panel, clamped with Math.max so a narrow or
+                  collapsed sidebar keeps the already-tuned 396px; they take
+                  what's left and end 16px before Set location, so the ✕
+                  has room. Centred on the 48px search box: the chips 8px
+                  down, the buttons in a 48px-tall box. The gap between them
+                  passes clicks through to the map. ───────────────────────── */}
+          {!isMobile && (
+            <div
+              data-testid="map-top-row"
+              className="pointer-events-none absolute right-3 top-3 z-20 hidden items-start gap-4 desktop:flex"
+              style={{
+                left: Math.max(396, (sidebarVisible ? sidebarWidth : 0) + 16),
+                transition: isDraggingSidebar ? 'none' : 'left 200ms ease-in-out',
+              }}
+            >
+              <div data-testid="map-top-chips" className="pointer-events-auto min-w-0 flex-1 pt-2">
+                {desktopCategoryChips}
+                {activeFilterRow}
+              </div>
+              <div data-testid="map-top-corner" className="pointer-events-auto flex h-12 shrink-0 items-center gap-2">
+                {/* Address entry (fullscreen only): the map is
+                    `desktop:fixed desktop:inset-0 desktop:z-50`, painting
+                    over the site header and, with it, the only other place
+                    to type an address. Not in the boxed state: the header is
+                    `sticky top-0` (SiteHeader.tsx) and stays visible above a
+                    boxed map, its own LocationControl already reachable. */}
+                {fullscreen && controls && (
+                  <div data-testid="map-location-control">
+                    <LocationControl controls={controls} />
+                  </div>
+                )}
+                {/* Close map (the map page): a bare ✕ in the corner, where
+                    a full-screen view's close is expected (Oct 15, board
+                    "A"). It replaced a ‹ Back beside the search, which sat
+                    on the sidebar and read as "close this panel". Away from
+                    the sidebar it can only mean leave the map: back where it
+                    was opened from, or home (exitFullscreen). The ← in the
+                    search box is the step back within it. */}
+                {standalone && fullscreen && (
+                  <button
+                    type="button"
+                    onClick={exitFullscreen}
+                    aria-label="Close map"
+                    className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full bg-white text-slate-700 shadow-md ring-1 ring-slate-900/10 hover:bg-slate-50"
+                  >
+                    <CloseIcon className="h-5 w-5" />
+                  </button>
+                )}
+                {/* Fullscreen toggle: a boxed map (the admin's category
+                    preview) expands to cover the viewport; Escape or this
+                    again collapses it, or, arriving from a listing's Map
+                    button, goes straight back to that listing
+                    (exitFullscreen). Not on the map page, whose way out is
+                    the ✕. */}
+                {!standalone && (
+                  <button
+                    onClick={() => (fullscreen ? exitFullscreen() : setFullscreen(true))}
+                    aria-label={fullscreen ? 'Exit fullscreen' : 'View fullscreen'}
+                    aria-pressed={fullscreen}
+                    className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-lg bg-white text-slate-600 shadow-md ring-1 ring-slate-900/10 hover:bg-slate-50"
+                  >
+                    {fullscreen ? <CollapseIcon className="h-4 w-4" /> : <ExpandIcon className="h-4 w-4" />}
+                  </button>
+                )}
+              </div>
             </div>
           )}
 
@@ -1616,7 +2386,8 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
             ref={attachMapBox}
             className="relative left-1/2 flex min-h-[320px] w-screen flex-1 -translate-x-1/2 flex-col overflow-hidden desktop:left-0 desktop:min-h-0 desktop:w-auto desktop:translate-x-0"
           >
-              <ResourceMap
+              <MapWithHover
+                highlight={hover}
                 points={mapPoints}
                 userLocation={activeLocation}
                 directionsOrigin={directionsOrigin}
@@ -1644,7 +2415,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                 // unselecting it, same as tapping its pin again would — the
                 // card goes away AND the pin stops reading as selected
                 // (collapse clears `selected`, not just the sheet's height).
-                onBackgroundClick={() => (isMobile ? nearbySheetRef.current?.collapse() : setDesktopSelected(null))}
+                onBackgroundClick={() => (isMobile ? nearbySheetRef.current?.collapse() : leaveEditThen(() => setDesktopSelected(null)))}
                 onMapLongPress={ui.map.pins ? (coords) => setPendingDropAt(coords) : undefined}
                 onLongPressPoint={ui.map.pins ? handleLongPressPoint : undefined}
                 searchActive={searchActive}
@@ -1653,21 +2424,12 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                 obscuredBottomPx={isMobile ? sheetHeightPx : 0}
                 obscuredTopPx={isMobile ? topOverlayHeight : 0}
                 zoomRadiusMiles={mapZoomRadiusMiles}
+                eruvim={mapEruvim}
+                onSelectEruv={openEruv}
+                selectedEruvId={openEruvId}
+                frameEruvim={mapEruvim.length > 0 && visiblePoints.length === 0}
+                cornerControl={isMobile ? undefined : eruvButton}
               />
-
-              {/* ── Fullscreen toggle (desktop only) — the map starts as a
-                      contained card; this expands it to cover the viewport
-                      (Escape, or tapping it again, collapses it back — or,
-                      arriving from a listing's Map button, exits straight
-                      back to that listing; see exitFullscreen). ─────────── */}
-              <button
-                onClick={() => (fullscreen ? exitFullscreen() : setFullscreen(true))}
-                aria-label={fullscreen ? 'Exit fullscreen' : 'View fullscreen'}
-                aria-pressed={fullscreen}
-                className="absolute right-3 top-3 z-10 hidden h-9 w-9 items-center justify-center rounded-lg bg-white text-slate-600 shadow-md ring-1 ring-slate-900/10 hover:bg-slate-50 cursor-pointer desktop:flex"
-              >
-                {fullscreen ? <CollapseIcon className="h-4 w-4" /> : <ExpandIcon className="h-4 w-4" />}
-              </button>
 
               {/* ── Live-tracking toggle (desktop only) — a map control, not a
                       sidebar row, same as Google Maps' own "my location" button.
@@ -1678,7 +2440,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                   onClick={() => (tracking ? stop() : handleStart())}
                   aria-label={tracking ? 'Stop tracking my location' : 'Track my location'}
                   aria-pressed={tracking}
-                  className={`absolute bottom-3 left-3 z-10 hidden h-9 w-9 items-center justify-center rounded-full shadow-md ring-1 cursor-pointer desktop:flex ${
+                  className={`absolute bottom-3 left-3 z-10 hidden h-10 w-10 items-center justify-center rounded-full shadow-md ring-1 cursor-pointer desktop:flex ${
                     tracking
                       ? 'bg-blue-600 text-white ring-blue-600 hover:bg-blue-700'
                       : 'bg-white text-slate-600 ring-slate-900/10 hover:bg-slate-50'
@@ -1687,20 +2449,6 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                   <span aria-hidden="true">📍</span>
                 </button>
               )}
-              {/* ── Address entry (desktop, fullscreen only) — necessary because
-                      the map is `desktop:fixed desktop:inset-0 desktop:z-50`,
-                      painting directly over the site header and, with it, the
-                      only other place a visitor can type an address. Not shown
-                      in the boxed state: the header is `sticky top-0` (see
-                      SiteHeader.tsx) and stays visible above a boxed map, so
-                      its own LocationControl pill is already reachable there
-                      and a second copy would be redundant. ─────────────────── */}
-              {!isMobile && fullscreen && controls && (
-                <div className="absolute right-3 top-14 z-20 hidden desktop:block">
-                  <LocationControl controls={controls} />
-                </div>
-              )}
-
               {/* ── Floating search + filters (mobile) — laid directly over the
                       map, Google-Maps-style, instead of pushing it down. Category
                       chips sit right under the search bar as their own
@@ -1756,7 +2504,10 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                           type="button"
                           onClick={clearSearch}
                           aria-label="Clear search"
-                          className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-slate-400 hover:text-slate-600 cursor-pointer"
+                          // See the desktop copy of this same search box's
+                          // own doc above (hover:bg-slate-100/active:bg-slate-200)
+                          // for why this needed the fill, not just the color.
+                          className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 active:bg-slate-200 cursor-pointer"
                         >
                           <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24" aria-hidden="true">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -1774,9 +2525,9 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                             same tracking-dot swap) rather than a bespoke
                             look, just collapsed to icon-only — there's no
                             room for the pill's label in this row. Opens the
-                            same header popover as AddressPrompt, via the
+                            same header popover as DistanceNote, via the
                             TOGGLING 'jpc:toggle-location' event rather than
-                            AddressPrompt's plain "open" one — this is a
+                            DistanceNote's plain "open" one — this is a
                             standing button a visitor can tap again while the
                             popover is already up, and a second tap should
                             close it, not re-open what's already open —
@@ -1816,7 +2567,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                           (no separate "Filters" button/sheet). Ducks out of the
                           way while the autocomplete dropdown below is showing,
                           same as Google Maps swapping chips for suggestions. ── */}
-                  {options.length > 0 && !(searchFocused && searchSuggestions.length > 0) && (
+                  {options.length > 0 && !(searchFocused && (showOpenNowSuggestion || searchSuggestions.length > 0)) && (
                     <div className="mt-2">
                       <CategoryFilter
                         options={optionsWithFilters}
@@ -1826,23 +2577,41 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                         maxVisible={4}
                         resortToken={categoryResortToken}
                         onMore={openCategoriesPicker}
-                                    categories={categories ?? []}
-                        points={allPoints}
-                        boolFields={boolFields}
-                        onToggleBool={toggleBoolField}
-                        selectFilters={selectFilters}
-                        onToggleSelectValue={toggleSelectValue}
+                        leadingChip={leadingChips}
+                        campaignChip={campaignChip}
                         pinnedChip={pinnedChip}
                         pinnedOn={pinnedSelected}
                       />
+                      {activeFilterRow}
                     </div>
                   )}
 
                   {/* ── Autocomplete dropdown — Google-Maps-style: matching
                           places while typing, tap one to jump straight to its
                           card instead of just narrowing the list. ─────────── */}
-                  {searchFocused && searchSuggestions.length > 0 && (
+                  {searchFocused && (showOpenNowSuggestion || searchSuggestions.length > 0) && (
                     <div className="mt-2 overflow-hidden rounded-2xl bg-white shadow-lg ring-1 ring-slate-900/5">
+                      {showOpenNowSuggestion && (
+                        <button
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={selectOpenNow}
+                          className="flex w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-slate-50 active:bg-slate-100 cursor-pointer"
+                        >
+                          <span
+                            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500"
+                            aria-hidden="true"
+                          >
+                            <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                              <circle cx="12" cy="12" r="9" />
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M12 7v5l3 3" />
+                            </svg>
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <p className="text-sm font-semibold text-slate-900">Open now</p>
+                            <p className="truncate text-xs text-slate-400">Show only listings open right now</p>
+                          </span>
+                        </button>
+                      )}
                       {searchSuggestions.map((p) => (
                         <button
                           key={p.id}
@@ -1900,8 +2669,16 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                     setFollow(true)
                   }}
                   aria-label={!activeLocation ? 'Set your location' : follow ? 'Following your location' : 'Recenter'}
+                  // active:bg-* — press feedback for a mobile-only FAB that
+                  // otherwise gave zero visual acknowledgment of a tap before
+                  // the map itself started panning a moment later. One step
+                  // darker than each resting background (blue-700 is this
+                  // codebase's own established hover/press step for
+                  // bg-blue-600 — see e.g. ResourceMap.tsx's own recenter
+                  // pill), so which one applies has to follow the same
+                  // `activeLocation && follow` branch the resting color does.
                   className={`absolute bottom-[4.75rem] right-3 z-10 flex h-12 w-12 items-center justify-center rounded-full shadow-md ring-1 ring-slate-900/10 cursor-pointer transition-colors desktop:hidden ${
-                    activeLocation && follow ? 'bg-blue-600 text-white' : 'bg-white text-blue-600'
+                    activeLocation && follow ? 'bg-blue-600 text-white active:bg-blue-700' : 'bg-white text-blue-600 active:bg-slate-100'
                   }`}
                 >
                   <svg
@@ -1914,6 +2691,10 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                   </svg>
                 </button>
               )}
+              {isMobile && eruvButton && (
+                // Above the live-location button, where it's there.
+                <div className={`absolute right-3 z-10 desktop:hidden ${ui.map.liveTracking ? 'bottom-[8.5rem]' : 'bottom-[4.75rem]'}`}>{eruvButton}</div>
+              )}
               {/* ── Mobile nearby list — a draggable bottom sheet over the
                       map instead of the desktop Map/Nearby toggle; see
                       MobileNearbySheet for the peek/half/full snap points. ── */}
@@ -1924,12 +2705,16 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                   userLocation={activeLocation}
                   onViewListing={onViewListing}
                   categories={categories ?? []}
+                  foundOn={foundOnPoint}
                   containerHeight={mapBoxHeight}
                   onSelectionChange={(point, frame) => {
                     setSelectedPointId(point?.id)
                     if (point && frame !== false) setFrameToken((t) => t + 1)
                   }}
                   onHeightChange={setSheetHeightPx}
+                  renderOther={(p, back) => (p.filterId === ERUV_FILTER_ID ? eruvDetail(p.id.slice(ERUV_PREFIX.length), back) : null)}
+                  eruvim={listedEruvim}
+                  onSelectEruv={openEruv}
                 />
               )}
           </div>
@@ -1940,13 +2725,15 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
               is turned off (ui.map.nearbyList), since NearbyList otherwise
               already shows this same message inline (mobile sheet / desktop
               sidebar). ───────────────────────────────────────────────────── */}
-      {!loading && !ui.map.nearbyList && visiblePoints.length === 0 && (
+      {!loading && !ui.map.nearbyList && visiblePoints.length === 0 && mapEruvim.length === 0 && (
         <p className="mt-3 text-center text-sm text-slate-500">
-          {activeTerms.length > 0 || filterChips.length > 0
+          {activeTerms.length > 0 || hasFilters
             ? 'No places match every filter. Try removing one.'
             : 'No places shown. Turn on a category above to see locations.'}
         </p>
       )}
+
+      {filtersSheet}
 
       {/* ── Full-screen category picker (mobile) — the quick chip row's
               trailing "More" chip opens this, same as Google Maps expanding
@@ -1969,7 +2756,11 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
             <button
               onClick={closeCategoriesPicker}
               aria-label="Back to map"
-              className="flex h-8 w-8 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 cursor-pointer"
+              // active:bg-slate-200 — mobile-only (this full-screen picker
+              // has no desktop equivalent at all — see its own doc above),
+              // and a frequent tap with nothing marking the instant it
+              // registers before.
+              className="flex h-8 w-8 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100 active:bg-slate-200 cursor-pointer"
             >
               <ChevronLeftIcon className="h-5 w-5" />
             </button>
@@ -1996,17 +2787,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
             </p>
           )}
           <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
-            <CategoryPickerList
-              options={options}
-              categories={categories ?? []}
-              points={allPoints}
-              selected={draftSelected}
-              onToggle={toggleCategoryCheckbox}
-              boolFields={boolFields}
-              onToggleBool={toggleBoolFieldInPicker}
-              selectFilters={selectFilters}
-              onToggleSelectValue={toggleSelectValueInPicker}
-            />
+            <CategoryPickerList options={optionsWithFilters} selected={draftSelected} onToggle={toggleCategoryCheckbox} />
           </div>
         </div>
       )}
@@ -2046,4 +2827,13 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
       })()}
     </div>
   )
+}
+
+/** The map, with the sidebar's hovered row's pin lifted: the place open in
+ *  the sidebar first, else the row under the pointer. Reads the hover store
+ *  itself, so only the map redraws as the pointer moves down the list. A
+ *  hover never moves the map: ResourceMap frames only on frameToken. */
+function MapWithHover({ highlight, selectedId, ...props }: ComponentProps<typeof ResourceMap> & { highlight: Highlight }) {
+  const hovered = useSyncExternalStore(highlight.subscribe, highlight.get, () => null)
+  return <ResourceMap {...props} selectedId={selectedId ?? hovered ?? undefined} />
 }

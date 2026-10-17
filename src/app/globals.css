@@ -78,30 +78,34 @@ html {
      --color-primary-dark derives from whatever primary ends up being. */
   --color-primary: #1d4ed8;
   --color-primary-dark: color-mix(in oklab, var(--color-primary) 82%, #000);
-  /* The home screen's own warmth — eyebrows, the hero, Update Listings/
-     Subscribe's CTAs. Matches those components' own literal amber-700/800
-     exactly, now named instead of duplicated as raw Tailwind classes at
-     each call site. */
-  --color-accent: #b45309;
-  --color-accent-dark: #92400e;
-  /* A second, distinct warm color for "verify this" — kosher cert caveats,
-     the "sometimes in stock" tags, the "set location" prompt. Deliberately
-     NOT the same value as --color-accent: this app's home screen already
-     uses warm gold decoratively, and reusing that exact color for a
-     safety-relevant caveat (is this actually kosher-certified?) would dilute
-     the one thing that color is supposed to signal there. A deep rust —
-     darker and browner than home's own gold, without leaning as far toward
-     this app's real error/closed red (red-700, #b91c1c) as the oxblood and
-     brick/clay candidates this was picked over. */
+  /* "Verify this" — kosher cert caveats, the "sometimes in stock" tags, a
+     near-miss search answer. A deep rust, distinct from the ordinary amber
+     notes and from this app's real error/closed red (red-700, #b91c1c): the
+     one colour that says "check before you rely on it". */
   --color-caution: #9a3412;
-  /* Plain slate-50. Tried tinting this with a few percent of the community's
-     brand color to make the page feel less neutral; at desktop widths, where
-     a lot of the surface shows at once, it read as the whole site having gone
-     faintly blue rather than as warmth, so it's back to grey. If this gets
-     revisited, the tint needs to be well under 5% — or applied to a band
-     rather than to every screen. */
-  --color-surface: #f8fafc;
+  /* Plain slate-100, not slate-50 (#f8fafc, one step lighter — tried first,
+     see below). Cards sit on this at pure white with only a hairline border/
+     ring for separation, so the tone itself has to do real work: slate-50 is
+     only ~3/255 per channel off white, invisible on its own, and a border-
+     less card (or a washed-out monitor) read as one continuous white surface
+     with no page underneath it. slate-100 is a genuinely different grey, not
+     a brand tint — a separate, earlier attempt tinted this token toward the
+     community's brand color instead and got reverted because at desktop
+     widths, where a lot of surface shows at once, it read as the whole site
+     having gone faintly blue rather than as warmth. If THIS gets revisited,
+     go lighter/darker on the neutral scale, not back toward a brand tint. */
+  --color-surface: #f1f5f9;
   --color-muted: #64748b;
+  /* One look on phone and desktop (redesign step 2): Figtree throughout,
+     night ink for headings, the community's own blue (--color-primary) for
+     everything you can tap, and gold kept for candle lighting and the
+     Shabbos and Yom Tov times. Gold is too light to read as text on white,
+     so text in that role uses gold-dark. Amber stays the colour of notes
+     and item tags, green of "open". The desktop's own serif, teal and cream
+     are gone. */
+  --color-ink: #13243a;
+  --color-gold: #c9a45c;
+  --color-gold-dark: #7a5a1c;
 }
 
 /* Empty date inputs render their "mm/dd/yyyy" format text in the full text
@@ -185,8 +189,21 @@ body {
   to   { opacity: 1; transform: translateY(0); }
 }
 
+/* Modal enter motion: the dim backdrop fades, the panel fades and settles up
+   from a slightly smaller size. Enter-only on purpose — these overlays are
+   mounted conditionally, so an exit animation would need every one of them
+   to delay its own unmount. Reduced motion is handled by the global rule
+   near the bottom of this file. */
+@keyframes backdropIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes dialogIn {
+  from { opacity: 0; transform: scale(0.97) translateY(8px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+.overlay-in { animation: backdropIn 150ms ease-out; }
+.dialog-in  { animation: dialogIn 200ms cubic-bezier(0.32, 0.72, 0, 1); }
+
 /* A small dropdown easing open from its own anchor corner (see
-   ListingActionsMenu) — same family as fadeIn above, just a shorter, subtler
+   CommunitySwitcher, LocationControl) — same family as fadeIn above, just a shorter, subtler
    scale+opacity move sized for a compact popover rather than a full screen,
    closer to how Gmail's own overflow menus ease in instead of popping in
    instantly. transform-origin is set inline per instance (it depends on
@@ -194,6 +211,15 @@ body {
 @keyframes menuIn {
   from { opacity: 0; transform: scale(0.95) translateY(-4px); }
   to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+/* Mobile's Report sheet (see ReportSheet.tsx) easing up from the bottom
+   edge it's anchored to — a plain translateY, not menuIn's scale+opacity
+   move above, since a sheet is read as sliding up from off-screen rather
+   than growing from an anchor point. */
+@keyframes sheetUp {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
 }
 
 /* Directional slide for mobile's home <-> category navigation (see
@@ -338,7 +364,7 @@ body {
 /* prefers-reduced-motion: reduce — was only wired for the View Transition
    pseudo-elements above (the mobile slide, the desktop badge morph), which
    left every other animation in the app — fadeIn (page content, the wizard),
-   menuIn (the kebab dropdown), and the mobile listing card's accordion
+   menuIn (the small dropdowns), and the mobile listing card's accordion
    reveal (a plain CSS `transition`, not `animation`, so the old rule's
    animation-duration override wouldn't have touched it even if it had been
    written broadly enough to try) — running at full speed regardless of this
@@ -410,6 +436,48 @@ body {
 }
 .rich-text h3 {
   font-size: 1.1em;
+}
+/* About and Privacy render their body as one .rich-text-section per heading
+   (PageDocument, splitPageSections). The rules above are written for a flat
+   body, so the first section's opening heading needs the same "no rule, no
+   gap at the very top" treatment `> h2:first-child` gives a flat one. */
+.rich-text > .rich-text-section:first-child > :first-child {
+  margin-top: 0;
+}
+.rich-text > .rich-text-section:first-child > h2:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+.rich-text > .rich-text-section:last-child > :last-child {
+  margin-bottom: 0;
+}
+/* Phone only — the negation of the `desktop` variant at the top of this file.
+   Each section is a white box, like the rest of the app's content. Desktop
+   gets none of this: the sections stay unstyled blocks, so the heading's
+   margin collapses through them and the page reads as the one document it
+   always did, hairlines between sections included. */
+@media not all and (min-width: 640px) and (min-height: 640px) {
+  .rich-text-section {
+    background: white;
+    border: 1px solid var(--color-slate-200);
+    border-radius: 1rem;
+    padding: 1rem;
+    box-shadow: 0 1px 2px rgb(15 23 42 / 0.05);
+  }
+  .rich-text-section + .rich-text-section {
+    margin-top: 0.75rem;
+  }
+  .rich-text-section > :first-child {
+    margin-top: 0;
+  }
+  .rich-text-section > :last-child {
+    margin-bottom: 0;
+  }
+  /* The box is the divider now; a hairline inside it would be a second one. */
+  .rich-text-section > h2:first-child {
+    padding-top: 0;
+    border-top: 0;
+  }
 }
 .rich-text ul,
 .rich-text ol {

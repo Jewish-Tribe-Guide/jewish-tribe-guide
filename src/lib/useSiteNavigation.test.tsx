@@ -95,3 +95,26 @@ describe('useSiteNavigation — goHome', () => {
     expect(mockRouter.push).toHaveBeenCalledWith('/test-community', { transitionTypes: ['nav-back'] })
   })
 })
+
+function FindHarness() {
+  const { navigate } = useSiteNavigation()
+  return (
+    <button onClick={() => navigate('patient', 'find', { findView: 'grocery', findItemId: 'l1', findMatch: 'cheese' })}>
+      Find
+    </button>
+  )
+}
+
+describe('useSiteNavigation — opening a listing from a search', () => {
+  it('carries the search as ?match=, next to ?item=', async () => {
+    const user = userEvent.setup()
+    const community = makeCommunity({ slug: 'test-community' })
+    render(
+      <CommunityProvider community={community} communities={[community]}>
+        <FindHarness />
+      </CommunityProvider>,
+    )
+    await user.click(screen.getByRole('button', { name: 'Find' }))
+    expect(mockRouter.push).toHaveBeenCalledWith('/test-community/grocery?item=l1&match=cheese')
+  })
+})

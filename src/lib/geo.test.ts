@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { distanceMiles, haversineMiles, roundMiles, type LatLng } from './geo'
+import { distanceMiles, haversineMiles, milesText, roundMiles, type LatLng } from './geo'
 
 // Reference points around Philadelphia, where the distances are the ones the
 // directory actually sorts by.
@@ -70,5 +70,19 @@ describe('roundMiles', () => {
   // round to the same bucket and tie.
   it('collapses two distinct nearby distances to the same label', () => {
     expect(roundMiles(0.31)).toBe(roundMiles(0.34))
+  })
+})
+
+describe('milesText', () => {
+  it('a tenth of a mile and up, in miles', () => {
+    expect(milesText(2.16)).toBe('2.2 mi')
+    expect(milesText(0.06)).toBe('0.1 mi')
+  })
+  it('in feet where miles would round to nothing, never "0 mi"', () => {
+    // HipCityVeg and Bar Bombón, on the same block of Rittenhouse.
+    expect(milesText(0.04)).toBe('200 ft')
+    expect(milesText(0.02)).toBe('100 ft')
+    expect(milesText(0.005)).toBe('under 100 ft')
+    expect(milesText(0)).toBe('under 100 ft')
   })
 })

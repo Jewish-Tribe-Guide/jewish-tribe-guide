@@ -3,10 +3,12 @@
 import { useMemo } from 'react'
 import type { DirectoryResource, DirectoryAnchor } from '@/types'
 import type { CategoryConfig } from '@/lib/categories'
-import { withMilesFromAddress } from '@/lib/listingTravel'
+import { withMilesFromAddress, withMilesFromCenter } from '@/lib/listingTravel'
+import { useActiveCommunity } from '@/lib/communityContext'
 import { useOptionalLocation } from '@/lib/locationContext'
-import GenericDirectory from './GenericDirectory'
+import GenericDirectory, { type ParamsOpts } from './GenericDirectory'
 import UpButton from '@/components/UpButton'
+import type { TappedMinyan } from './TappedMinyan'
 
 type Props = {
   category: CategoryConfig
@@ -20,6 +22,12 @@ type Props = {
   anchor: DirectoryAnchor
   /** When returning from a form, re-expand this listing's card. */
   reopenItemId?: string | null
+  /** The listing the page's own link named — see GenericDirectory's. */
+  linkedItemId?: string | null
+  /** The search that found `reopenItemId` — see GenericDirectory's own doc. */
+  reopenMatch?: string | null
+  /** The minyan that opened the listing (TappedMinyan). */
+  tappedMinyan?: TappedMinyan | null
   /** Pre-fill the directory's search box (from a landing "Places" result). */
   initialSearch?: string
   /** Pre-set the "Open now" filter — see GenericDirectory's own doc. */
@@ -27,10 +35,10 @@ type Props = {
   /** Pre-set the category's own boolean/select field filters — see
    *  GenericDirectory's own doc. */
   initialFilters?: Record<string, string> | null
-  /** Mount with "All davening times" already open — see GenericDirectory's
-   *  own doc on this prop. */
-  openDaveningModal?: boolean
-  /** Mount that modal already filtered to this one day — see
+  /** Mount on the Minyanim view — see GenericDirectory's own doc on this
+   *  prop. */
+  openMinyanimView?: boolean
+  /** Open the Minyanim view on this day — see
    *  GenericDirectory's own doc on this prop. */
   initialDaveningDay?: string
   onUp: () => void
@@ -40,14 +48,13 @@ type Props = {
   upLabel?: string
   onAdd: () => void
   onEdit: (item: DirectoryResource) => void
-  onReport: (item: DirectoryResource) => void
   /** Pushes search/openNow changes into the URL — see GenericDirectory's own doc. */
-  onParamsChange?: (changes: Record<string, string | null>, opts?: { replace?: boolean }) => void
+  onParamsChange?: (changes: Record<string, string | null>, opts?: ParamsOpts) => void
 }
 
 // Every category renders via the generic, hint-driven card renderer (badges,
 // filters, kosher-item tags + search, and upvotes — all from category config).
-export default function ResourceLoader({ category, items, anchor, reopenItemId, initialSearch, initialOpenNow, initialFilters, openDaveningModal, initialDaveningDay, onUp, upLabel = 'All resources', onAdd, onEdit, onReport, onParamsChange }: Props) {
+export default function ResourceLoader({ category, items, anchor, reopenItemId, linkedItemId, reopenMatch, tappedMinyan, initialSearch, initialOpenNow, initialFilters, openMinyanimView, initialDaveningDay, onUp, upLabel = 'All resources', onAdd, onEdit, onParamsChange }: Props) {
   const title = category.pluralLabel
 
   // Extract a stable dep from the anchor object (anchor itself is re-created
@@ -60,12 +67,16 @@ export default function ResourceLoader({ category, items, anchor, reopenItemId, 
   const anchorListingId = useOptionalLocation()?.anchorListingId ?? null
 
   // Distance to the visitor's anchor: straight-line miles (haversine) from their
-  // typed address to each listing's geocoded coordinates.
+  // typed address to each listing's geocoded coordinates. With no anchor,
+  // from the community's centre instead, for display (withMilesFromCenter).
+  const { community } = useActiveCommunity()
+  const center = community.mapCenter
   const withDistance = useMemo(() => {
     if (!items) return items
     if (category.hasAddress === false) return items
+    if (!anchorCoords) return withMilesFromCenter(items, center)
     return withMilesFromAddress(items, anchorCoords, anchorListingId)
-  }, [items, anchorCoords, category.hasAddress, anchorListingId])
+  }, [items, anchorCoords, category.hasAddress, anchorListingId, center])
 
   // The listings failed to load. Said plainly, because the alternative — an
   // empty directory — is a confident, wrong answer: it tells someone there are
@@ -107,6 +118,6 @@ export default function ResourceLoader({ category, items, anchor, reopenItemId, 
   const addressPrompt = !anchor.label && category.hasAddress !== false
 
   return (
-    <GenericDirectory category={category} items={withDistance} anchorLabel={anchorLabel} addressPrompt={addressPrompt} reopenItemId={reopenItemId} initialSearch={initialSearch} initialOpenNow={initialOpenNow} initialFilters={initialFilters} openDaveningModal={openDaveningModal} initialDaveningDay={initialDaveningDay} onUp={onUp} upLabel={upLabel} onAdd={onAdd} onEdit={onEdit} onReport={onReport} onParamsChange={onParamsChange} />
+    <GenericDirectory category={category} items={withDistance} anchorLabel={anchorLabel} addressPrompt={addressPrompt} reopenItemId={reopenItemId} linkedItemId={linkedItemId} reopenMatch={reopenMatch} tappedMinyan={tappedMinyan} initialSearch={initialSearch} initialOpenNow={initialOpenNow} initialFilters={initialFilters} openMinyanimView={openMinyanimView} initialDaveningDay={initialDaveningDay} onUp={onUp} onAdd={onAdd} onEdit={onEdit} onParamsChange={onParamsChange} />
   )
 }

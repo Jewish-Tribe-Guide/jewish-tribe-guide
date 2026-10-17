@@ -1,7 +1,9 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { renderWithProviders } from '@/test/renderWithProviders'
+import { mockRouter } from '@/test/nextNavigationMock'
 import Wizard, { type Step } from './Wizard'
 
 // The step-branching, validation, and submit-vs-fail paths are the actual
@@ -10,6 +12,14 @@ import Wizard, { type Step } from './Wizard'
 // every form on the site at once.
 
 vi.mock('@vercel/analytics', () => ({ track: vi.fn() }))
+// Needed by PrivacyNote's useCommunitySlug() (communityContext.tsx), the same
+// way every other form embedding it already mocks this — see FeedbackForm.
+// test.tsx/ListingEditor.test.tsx's own identical mock.
+vi.mock('next/navigation', () => ({
+  useRouter: () => mockRouter,
+  usePathname: () => '/test-community',
+  useSearchParams: () => new URLSearchParams(),
+}))
 
 // history is a real singleton jsdom doesn't reset between tests on its own —
 // and a real submit now writes `submitted: true` to it (see goNext), so
@@ -35,7 +45,7 @@ const contactStep: Step = { id: 'contact', kind: 'contact', question: 'How can w
 function renderWizard(overrides: Partial<React.ComponentProps<typeof Wizard>> = {}) {
   const onSubmit = vi.fn().mockResolvedValue(undefined)
   const onClose = vi.fn()
-  const utils = render(
+  const utils = renderWithProviders(
     <Wizard steps={[textStep, singleStep, contactStep]} onSubmit={onSubmit} onClose={onClose} {...overrides} />,
   )
   return { ...utils, onSubmit, onClose }
@@ -81,6 +91,44 @@ describe('Wizard — step flow', () => {
     await user.click(screen.getByRole('button', { name: 'Meals' }))
 
     await waitFor(() => expect(screen.getByText('How can we reach you?')).toBeInTheDocument())
+  })
+})
+
+describe('Wizard — privacy note placement', () => {
+  // Regression guard for moving PrivacyNote from "last step" to "the name
+  // step": it should now be visible on the very first (name) question, and
+  // gone again once the visitor has moved past it to the last step (contact,
+  // in this test's step list) — not the other way around, which is what the
+  // old `isLast` condition produced. Fails against the old isLast-only
+  // check, which shows nothing here and shows it once the contact step
+  // is reached instead.
+  it('shows the note on the name step, not on the last step', async () => {
+    const user = userEvent.setup()
+    renderWizard()
+
+    expect(screen.getByText(/never for marketing/)).toBeInTheDocument()
+
+    await user.type(screen.getByRole('textbox'), 'Rivka')
+    await user.click(screen.getByRole('button', { name: /continue/i }))
+    await user.click(screen.getByRole('button', { name: 'Meals' }))
+    await waitFor(() => expect(screen.getByText('How can we reach you?')).toBeInTheDocument())
+
+    expect(screen.queryByText(/never for marketing/)).not.toBeInTheDocument()
+  })
+
+  // A custom admin-built form could, in principle, delete its 'name' step —
+  // the disclosure must still show up somewhere rather than silently
+  // disappearing, so it falls back to the last step exactly like before.
+  it('falls back to the last step when the form has no name step at all', async () => {
+    const user = userEvent.setup()
+    renderWizard({ steps: [singleStep, contactStep] })
+
+    expect(screen.queryByText(/never for marketing/)).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Meals' }))
+    await waitFor(() => expect(screen.getByText('How can we reach you?')).toBeInTheDocument())
+
+    expect(screen.getByText(/never for marketing/)).toBeInTheDocument()
   })
 })
 
@@ -239,7 +287,7 @@ describe('Wizard — branching', () => {
       when: [{ field: 'need', op: 'includes', value: 'meals' }],
     }
     const user = userEvent.setup()
-    render(
+    renderWithProviders(
       <Wizard
         steps={[singleStep, branchStep, contactStep]}
         onSubmit={vi.fn().mockResolvedValue(undefined)}

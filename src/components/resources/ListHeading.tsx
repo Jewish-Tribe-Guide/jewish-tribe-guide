@@ -1,0 +1,183 @@
+'use client'
+
+import type { ReactNode } from 'react'
+import { ClockIcon } from '@/components/icons'
+import SortMenu, { headingButton } from './SortMenu'
+
+// ── The list's own heading: what it is, how many, and how it's arranged ─────
+// "57 listings   Filters  Sort Popularity ▾". Above the list is for asking
+// (the search box, CategoryAsk); this heading is for arranging, the same
+// place on every category page: Filters, which opens the one sheet holding
+// every filter (FiltersSheet), and Sort.
+//
+// No line of chips under it for the filters that are on: the Filters
+// button turns solid blue with how many, and the sheet shows which. A word
+// typed in the search that reads as a filter ("dairy") counts there too
+// and shows ticked; the word itself is in the box (the user, Oct 10).
+//
+// Filters and Sort are outlined buttons a thumb can find, 40px tall; as
+// bold blue words they were hard to hit on a phone (the user, Oct 10).
+// 16px under them before the first card.
+
+type Props = {
+  /** The first group's name, or what closed groups are grouped by ("By
+   *  denomination"); none for one ungrouped list. */
+  label?: string
+  /** The number beside it: the first group's, or the whole list's. */
+  count: number
+  /** "14 listings" rather than a bare "14": for the whole list, not a group. */
+  noun?: boolean
+  /** How many the whole list holds, whatever the heading shows. */
+  total: number
+  /** Filters, with how many are on; absent where the category keeps none. */
+  filters?: { active: number; onOpen: () => void }
+  /** Sort, where there's more than one way to (likes on). */
+  sort?: { byPopular: boolean; onSelect: (byPopular: boolean) => void }
+  onDaveningTimes?: () => void
+  /** "Show map", at the right end, once the map beside the list has been
+   *  hidden. Only on a screen wide enough to show it. */
+  onShowMap?: () => void
+  /** What the list holds, where it isn't listings: ['eruv', 'eruvim']. */
+  units?: [string, string]
+  /** Said after the count, quieter: the Minyanim view's "left today". */
+  suffix?: string
+}
+
+export default function ListHeading({ label, count, noun = !label, total, filters, sort, onDaveningTimes, onShowMap, units = ['listing', 'listings'], suffix }: Props) {
+  const countText = noun ? `${count} ${count === 1 ? units[0] : units[1]}` : String(count)
+  return (
+    <div data-testid="list-heading" data-total={total} className="pb-2 pt-2">
+      {/* Wraps rather than running off the side of a narrow phone. */}
+      <div className="flex min-h-9 flex-wrap items-center justify-between gap-x-3">
+        <h2 className="shrink-0 text-[15px] font-bold text-ink">
+          {label ? (
+            <>
+              {label} <span className="font-medium text-slate-500">· {countText}</span>
+            </>
+          ) : (
+            countText
+          )}
+          {suffix && <span className="font-medium text-slate-500"> {suffix}</span>}
+        </h2>
+        <div className="ml-auto flex items-center gap-2">
+          {onDaveningTimes && (
+            <TextAction>
+              <button type="button" onClick={onDaveningTimes} aria-label="Minyanim by time" className="flex cursor-pointer items-center gap-1 whitespace-nowrap">
+                <ClockIcon className="h-4 w-4" />
+                {/* The words once there's room; the clock alone on the
+                    narrowest phones, so Filters never gets crowded out. */}
+                <span className="hidden min-[390px]:inline">Minyanim by time</span>
+              </button>
+            </TextAction>
+          )}
+          {filters && (
+            <button
+              type="button"
+              onClick={filters.onOpen}
+              aria-haspopup="dialog"
+              className={headingButton(filters.active > 0)}
+            >
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" className="h-3.5 w-3.5">
+                  <path d="M20 7h-9" />
+                  <path d="M14 17H5" />
+                  <circle cx="17" cy="17" r="3" />
+                  <circle cx="7" cy="7" r="3" />
+                </svg>
+                Filters
+                {filters.active > 0 && (
+                  <span className="ml-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-white px-1 text-[11px] font-bold text-primary">
+                    {filters.active}
+                  </span>
+                )}
+            </button>
+          )}
+          {sort && <SortMenu byPopular={sort.byPopular} onSelect={sort.onSelect} />}
+          {onShowMap && (
+            <span className="hidden lg:flex">
+              <TextAction>
+                <button type="button" onClick={onShowMap} className="flex cursor-pointer items-center gap-1 whitespace-nowrap">
+                  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                    <path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2z" />
+                    <path d="M9 4v14" />
+                    <path d="M15 6v14" />
+                  </svg>
+                  Show map
+                </button>
+              </TextAction>
+            </span>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/** Each open group after the first, whose heading is the list's own:
+ *  "Not open now · 16". */
+export function GroupHeading({ label, count }: { label: string; count: number }) {
+  return (
+    <h2 className="pb-2 pt-6 text-[15px] font-bold text-ink">
+      {label} <span className="font-medium text-slate-500">· {count}</span>
+    </h2>
+  )
+}
+
+/** A closed group: one line, the same size for every group whatever it
+ *  holds, with its count and nearest place. A tap opens it. */
+export function ClosedGroupLine({
+  label,
+  count,
+  nearest,
+  open,
+  onToggle,
+  controls,
+}: {
+  label: string
+  count: number
+  nearest?: string
+  open: boolean
+  onToggle: () => void
+  /** The id of the rows it opens. */
+  controls: string
+}) {
+  // A heading on the page, not a box (the user's note 10, Oct 10): boxed,
+  // a group looked like a place's card, and opening one read as opening a
+  // place. The only cards on the page are places now.
+  return (
+    <h2>
+    <button
+      type="button"
+      aria-expanded={open}
+      aria-controls={controls}
+      onClick={onToggle}
+      className="flex w-full cursor-pointer items-center gap-3 border-b border-slate-300 px-1 py-3 text-left"
+    >
+      <span className="min-w-0 flex-1">
+        <span className={`block text-[16.5px] font-extrabold ${open ? 'text-primary' : 'text-ink'}`}>
+          {label} <span className="font-medium text-slate-500">· {count}</span>
+        </span>
+        {/* Open, its rows say it themselves. */}
+        {nearest && !open && <span className="mt-0.5 block truncate text-[13px] text-slate-500">Nearest: {nearest}</span>}
+      </span>
+      <svg
+        aria-hidden="true"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        // Down while closed, up once open: it opens in place. A chevron
+        // pointing right goes to another page (“Minyanim by time”, Oct 6).
+        className={`h-[18px] w-[18px] shrink-0 transition-transform ${open ? '-rotate-90 text-primary' : 'rotate-90 text-slate-500'}`}
+      >
+        <path d="m9 18 6-6-6-6" />
+      </svg>
+    </button>
+    </h2>
+  )
+}
+
+function TextAction({ children }: { children: ReactNode }) {
+  return <span className="flex shrink-0 items-center py-1.5 text-[13.5px] font-bold text-primary">{children}</span>
+}

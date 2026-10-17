@@ -1,18 +1,30 @@
 'use client'
 
-// The pill-shaped search input itself — shared by HeroHeading's mobile hero
-// (still owns it directly) and SearchSection (desktop's own headed section,
-// now that search moved out of the hero band there — see that component's
-// doc for why). Pulled out rather than duplicated so the two only ever
-// diverge in placeholder copy, not in the input's actual behavior.
+// The pill-shaped search input itself — shared by HeroHeading's mobile and
+// desktop hero (the only place search lives now; the standalone
+// SearchSection component that used to hold a second copy on desktop has
+// been removed — see HeroHeading's own doc). Pulled out rather than
+// duplicated so both sizes only ever diverge in spacing, not in the input's
+// actual behavior.
 export default function SearchBox({
   query,
   onQueryChange,
+  onSubmit,
   interactive = true,
   placeholder,
+  onFocus,
+  // Spacing only, not the border/background/shadow — those stay fixed so
+  // every caller gets the same pill styling, but the desktop hero (Phase 3
+  // of the mockup rework) wants a taller ~48px box than mobile's default,
+  // and forking the whole component for that one difference would
+  // duplicate everything else here.
+  className = 'pl-5 pr-2 py-2',
+  look = 'pill',
 }: {
   query: string
   onQueryChange: (query: string) => void
+  /** Enter (a phone keyboard's Search key): the page reads the question. */
+  onSubmit?: () => void
   /** Admin-preview only: renders the box inert (nothing to filter in a
    *  preview) instead of driving Landing's card grid. */
   interactive?: boolean
@@ -20,16 +32,43 @@ export default function SearchBox({
    *  devices rather than split into separate mobile/desktop copies (it's
    *  describing the same search either way). */
   placeholder: string
+  /** Desktop hero only — reopens HeroSearchDropdown when a visitor refocuses
+   *  an already-typed-into box (e.g. after "See all" dismissed it), without
+   *  requiring them to edit the text first. */
+  onFocus?: () => void
+  /** Padding only — see the prop's own doc above. */
+  className?: string
+  /** 'box': the category pages' search (CategoryAsk), a blue-edged box with
+   *  a blue magnifier, for the phone home (Oct 17: one search box on every
+   *  phone page, not a pill here and a box there). Its own spacing:
+   *  `className` doesn't apply. */
+  look?: 'pill' | 'box'
 }) {
+  const box = look === 'box'
   return (
-    <div className="flex items-center rounded-full border border-slate-200 bg-white pl-5 pr-2 py-2 shadow-[0_6px_20px_rgb(0,0,0,0.06)] transition-shadow focus-within:shadow-[0_6px_24px_rgb(0,0,0,0.12)]">
-      <svg className="h-5 w-5 shrink-0 text-slate-400" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24" aria-hidden="true">
+    <div
+      className={
+        box
+          ? 'flex h-12 items-center gap-2 rounded-xl border-[1.5px] border-primary bg-white pl-3 pr-1.5 shadow-sm focus-within:ring-2 focus-within:ring-primary/30'
+          : `flex items-center rounded-full border border-slate-200 bg-white shadow-[0_6px_20px_rgb(0,0,0,0.06)] transition-shadow focus-within:shadow-[0_6px_24px_rgb(0,0,0,0.12)] ${className}`
+      }
+    >
+      <svg className={`h-5 w-5 shrink-0 ${box ? 'text-primary' : 'text-slate-400'}`} fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24" aria-hidden="true">
         <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" />
       </svg>
       <input
         type="text"
         value={query}
         onChange={(e) => interactive && onQueryChange(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && interactive) onSubmit?.()
+        }}
+        enterKeyHint="search"
+        onFocus={onFocus}
+        // Also on click, not just focus: Escape can close the dropdown
+        // without blurring the input (focus never actually leaves it), so a
+        // plain focus listener alone never re-fires on the next click.
+        onClick={onFocus}
         readOnly={!interactive}
         // "Search", not "Filter": on desktop the grid isn't on screen
         // when this is empty, so there is nothing visible to be
@@ -43,13 +82,18 @@ export default function SearchBox({
         // now owns keeping the examples current.
         placeholder={placeholder}
         aria-label="Search resources"
-        className="min-w-0 flex-1 bg-transparent px-3 text-[15px] text-slate-900 placeholder:text-slate-400 focus:outline-none"
+        className={`min-w-0 flex-1 bg-transparent text-slate-900 placeholder:text-slate-400 focus:outline-none ${box ? 'text-[15.5px]' : 'px-3 text-[15px]'}`}
       />
       {query && interactive && (
         <button
           onClick={() => onQueryChange('')}
           aria-label="Clear search"
-          className="shrink-0 rounded-full p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 cursor-pointer"
+          // active:bg-slate-200 — this button already had a hover fill with
+          // nothing past it for an actual press; one step darker matches the
+          // escalation every other state-layer button in this app uses.
+          // Shared by both the mobile and desktop hero (see this file's own
+          // top doc), so fixing it once covers both.
+          className="shrink-0 rounded-full p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 active:bg-slate-200 cursor-pointer"
         >
           ✕
         </button>

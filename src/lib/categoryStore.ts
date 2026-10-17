@@ -1,7 +1,14 @@
 import { cacheLife, cacheTag } from 'next/cache'
 import { TAGS } from './cacheTags'
 import { getAdminClient } from './supabase/admin'
+import { withAskWords } from './askWordStore'
 import { assertUsableSlug, slugify } from './routes'
+import { listCampaignBanners } from './campaignBannerStore'
+import { activeCampaignCategoryIds } from './campaignBanner'
+import { parseGroupBy, type GroupBy } from './listGroups'
+import { parseQuestionCard, type QuestionCard } from './questionCards'
+import { parseWalkLists, type WalkList } from './walkList'
+import { hasListingParts, parseListingParts, type ListingParts } from './listingParts'
 
 export { slugify }
 import {
@@ -10,6 +17,7 @@ import {
   type CategoryCapabilities,
   type CategoryConfig,
   type CategoryField,
+  type CategoryFormSection,
   type CategoryKind,
 } from './categories'
 
@@ -35,6 +43,16 @@ type CategoryRow = {
   icon_image_url: string | null
   map_zoom_radius_miles: number | null
   active: boolean
+  // Optional: undefined on a row read before this column existed (same
+  // "not migrated yet" convention as the other nullable columns above),
+  // null once migrated but never set, either way meaning "no sections".
+  form_sections?: CategoryFormSection[] | null
+  // Optional the same way: undefined before migration 059, null once
+  // migrated but never set. Either way, one ungrouped list.
+  group_by?: unknown
+  question_card?: unknown
+  walk_list?: unknown
+  listing_parts?: unknown
 }
 
 function toConfig(row: CategoryRow): CategoryConfig {
@@ -65,6 +83,11 @@ function toConfig(row: CategoryRow): CategoryConfig {
     // treat that way.
     mapZoomRadiusMiles: row.map_zoom_radius_miles ?? null,
     active: row.active !== false,
+    formSections: row.form_sections ?? undefined,
+    groupBy: parseGroupBy(row.group_by) ?? undefined,
+    questionCard: parseQuestionCard(row.question_card) ?? undefined,
+    walkList: parseWalkLists(row.walk_list).length ? parseWalkLists(row.walk_list) : undefined,
+    listingParts: hasListingParts(parseListingParts(row.listing_parts)) ? parseListingParts(row.listing_parts) : undefined,
   }
 }
 
@@ -92,12 +115,35 @@ export async function listCategoriesUncached(community: string): Promise<Categor
 // function: the directory grid, search, sitemap, and direct-URL
 // resolution), but still returned by listCategoriesUncached for the admin
 // manager to edit and re-activate.
+//
+// EXCEPT a category with a currently-live campaign banner (see
+// campaignBanner.ts's activeCampaignCategoryIds) — that reads as visible
+// here too, regardless of its own `active` flag. This is what lets a
+// dedicated seasonal category (Sukkahs, say) stay hidden the other eleven
+// months without a second admin action: set it inactive once, link a
+// campaign banner to it, and its own start/end dates are the only thing
+// that ever needs updating again. Also tags this read with
+// TAGS.campaignBanners so saving a campaign (not just a category)
+// invalidates it — otherwise a brand-new campaign's category would stay
+// invisible until this cache expired on its own.
 export async function listCategories(community: string): Promise<CategoryConfig[]> {
   'use cache'
   cacheTag(TAGS.categories(community))
+  cacheTag(TAGS.campaignBanners(community))
+  cacheTag(TAGS.askWords(community))
   cacheLife('days')
-  const categories = await listCategoriesUncached(community)
-  return categories.filter((c) => c.active !== false)
+  const [categories, banners] = await Promise.all([
+    listCategoriesUncached(community),
+    listCampaignBanners(community),
+  ])
+  const promoted = activeCampaignCategoryIds(banners, Date.now())
+  // With the words taught to the search (askWords.ts), so every search box
+  // has them. Only here: the admin's editor reads the uncached categories,
+  // and never saves these back onto one.
+  return withAskWords(
+    community,
+    categories.filter((c) => c.active !== false || promoted.has(c.id)),
+  )
 }
 
 export async function getCategoryById(community: string, id: string): Promise<CategoryConfig | null> {
@@ -148,6 +194,7 @@ export async function createCategory(community: string, input: {
   cardBandImageUrl?: string | null
   pinColor?: string | null
   iconImageUrl?: string | null
+  active?: boolean
 }): Promise<CategoryConfig> {
   const supabase = getAdminClient()
   const kind = input.kind ?? 'listing'
@@ -207,6 +254,7 @@ export async function createCategory(community: string, input: {
     card_band_image_url: input.cardBandImageUrl?.trim() || null,
     pin_color: input.pinColor?.trim() || null,
     icon_image_url: input.iconImageUrl?.trim() || null,
+    active: input.active ?? true,
   }
 
   const { data, error } = await supabase.from('category').insert(row).select('*').single()
@@ -247,6 +295,11 @@ export async function updateCategory(
     iconImageUrl?: string | null
     mapZoomRadiusMiles?: number | null
     active?: boolean
+    formSections?: CategoryFormSection[] | null
+    groupBy?: GroupBy | null
+    questionCard?: QuestionCard | null
+    walkList?: WalkList[] | null
+    listingParts?: ListingParts | null
   },
 ): Promise<CategoryConfig | null> {
   const supabase = getAdminClient()
@@ -273,6 +326,16 @@ export async function updateCategory(
   if (patch.pinColor !== undefined) row.pin_color = patch.pinColor?.trim() || null
   if (patch.iconImageUrl !== undefined) row.icon_image_url = patch.iconImageUrl?.trim() || null
   if (patch.mapZoomRadiusMiles !== undefined) row.map_zoom_radius_miles = patch.mapZoomRadiusMiles
+  if (patch.formSections !== undefined) row.form_sections = patch.formSections
+  // Only sent when the admin changed it, so every other save keeps working
+  // on a database that doesn't have the column yet (migration 059).
+  if (patch.groupBy !== undefined) row.group_by = patch.groupBy
+  // The same, for migration 060.
+  if (patch.questionCard !== undefined) row.question_card = patch.questionCard
+  // And for migration 061.
+  if (patch.walkList !== undefined) row.walk_list = patch.walkList?.length ? patch.walkList : null
+  // And for migration 066.
+  if (patch.listingParts !== undefined) row.listing_parts = patch.listingParts && hasListingParts(patch.listingParts) ? patch.listingParts : null
 
   // Scoped by community as well as id — the composite primary key means a
   // second community's identically-slugged category is a different row, and

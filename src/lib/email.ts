@@ -3,12 +3,22 @@ import type { SubmissionPayload } from './requests'
 import { PREFERRED_CONTACT_LABELS } from './requests'
 import { getCategoryById } from './categoryStore'
 import { getResourceRowById } from './resourceStore'
-import { diffLines, diffListing, isMultiline } from './submissionDiff'
+import {
+  diffLines,
+  diffListing,
+  isMultiline,
+  HIDDEN_FROM_DIFF,
+  BUSINESS_STATUS_LABEL,
+  formatBusinessStatus,
+} from './submissionDiff'
+import { SHOWN_WHEN_PROPOSED } from './syncFields'
 import { getCommunityNotifyRecipients, getReviewActionRecipients } from './communityStore'
 import { adminBase } from './adminNav'
 import { formatHoursSummary } from './hours'
 import type { ResourceSubmission, SubmissionRow, CategorySubmissionPayload } from '@/types'
 import type { CategoryField } from './categories'
+import { listEruvimForAdmin } from './eruvStore'
+import { eruvChanges, type EruvSuggestion } from './eruvSuggestion'
 
 // ── Shared utilities ──────────────────────────────────────────────────────────
 
@@ -372,7 +382,9 @@ export async function sendSubmissionNotification(submission: SubmissionRow): Pro
   let title: string
   let proposedRows: string
 
-  const DETAIL_SKIP = new Set(['geo', 'legacyId', 'placeId', 'googleSyncedAt', 'businessStatus', 'googleFields'])
+  // The queue's own set, so the two can't drift. This one used to be its own
+  // copy, and fell behind: a create's email listed googleAutofill as raw JSON.
+  const DETAIL_SKIP = HIDDEN_FROM_DIFF
 
   if (submission.target_type === 'category') {
     const payload = submission.payload as CategorySubmissionPayload
@@ -385,6 +397,20 @@ export async function sendSubmissionNotification(submission: SubmissionRow): Pro
       ${row('First listing', f?.name ?? '')}
       ${row('Address', f?.address ?? '')}
       ${row('Phone', f?.phone ?? '')}`
+  } else if (submission.target_type === 'eruv') {
+    // A fix to an eruv's listing: each row it changes, before and after,
+    // as the queue shows it (eruvSuggestion.ts).
+    const payload = submission.payload as Partial<EruvSuggestion>
+    verb = 'Suggested edit'
+    title = payload.name ?? 'an eruv'
+    subject = subjectLine(submissionRef(submission.case_number), `Eruv Edit Suggestion — ${title}`)
+    const current = await listEruvimForAdmin(submission.community_id)
+      .then(({ eruvim }) => eruvim.find((e) => e.id === payload.eruvId) ?? null)
+      .catch(() => null)
+    proposedRows = `${row('Eruv', title)}
+      ${eruvChanges(current, payload)
+        .map((c) => diffRow(c.label, c.before ?? '', c.after ?? ''))
+        .join('')}`
   } else {
     const payload = submission.payload as Partial<ResourceSubmission>
     verb =
@@ -421,6 +447,7 @@ export async function sendSubmissionNotification(submission: SubmissionRow): Pro
         // yet loaded), but it's never preferred over the field's real,
         // admin-configured label and option text.
         const field = category?.detailFields.find((f) => f.key === k)
+        if (!field && k === SHOWN_WHEN_PROPOSED) return row(BUSINESS_STATUS_LABEL, formatBusinessStatus(v))
         return row(field?.label ?? k, formatDetailValue(v, field))
       })
       .join('')
@@ -623,6 +650,106 @@ async function sendCommunityStatusChangeDigest(communitySlug: string, changes: S
       <p style="color:#334155;font-size:14px;">The daily sync saw these change. Nothing needs approving — the listings already show the new status, and it will clear itself if Google changes its mind. This is here so a mistake in the job can't go unnoticed.</p>
       <table style="border-collapse:collapse;font-size:14px;width:100%;">${rows}</table>
       ${admin ? `<p style="font-size:13px;"><a href="${admin}" style="color:#1d4ed8;">Open the admin console</a></p>` : ''}
+    </div>`,
+  })
+}
+
+/** One suggestion a watch put in the queue, for its digest below. */
+export type WatchDigestItem = { name: string; what: string }
+
+/**
+ * One email per watch run listing the suggestions it put in the moderation
+ * queue, instead of one email per suggestion: a first run can file dozens.
+ * Sent only when the run filed something, so a quiet day is silent.
+ */
+export async function sendWatchDigest(communitySlug: string, source: string, items: WatchDigestItem[]): Promise<void> {
+  if (items.length === 0) return
+  const to = await notificationRecipients(communitySlug)
+  const rows = items
+    .map(
+      (i) => `<tr>
+        <td style="padding:6px 10px;border-bottom:1px solid #e2e8f0;">${escapeHtml(i.name)}</td>
+        <td style="padding:6px 10px;border-bottom:1px solid #e2e8f0;color:#334155;">${escapeHtml(i.what)}</td>
+      </tr>`,
+    )
+    .join('')
+  const admin = adminAppUrl()
+  await sendEmail({
+    to,
+    subject: items.length === 1 ? `${source}: ${items[0].name}` : `${source}: ${items.length} suggestions to check`,
+    html: `<div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:640px;margin:0 auto;">
+      <h2 style="color:#1d4ed8;font-size:18px;">${escapeHtml(source)}</h2>
+      <p style="color:#334155;font-size:14px;">These are waiting in the moderation queue. Each one quotes what it was read from. Nothing changes until you approve it.</p>
+      <table style="border-collapse:collapse;font-size:14px;width:100%;">${rows}</table>
+      ${admin ? `<p style="font-size:13px;"><a href="${admin}" style="color:#1d4ed8;">Open the moderation queue</a></p>` : ''}
+    </div>`,
+  })
+}
+
+/** A watch that just broke, or just started working again. */
+export type WatchHealthAlert = { label: string; url: string; alert: 'broke' | 'recovered'; error?: string | null }
+
+/**
+ * Tells the admins a watch stopped working, or works again. Sent on the
+ * change only, never daily while it stays broken: the Watches tab carries
+ * the state in between. A watch that breaks quietly leaves the guide stale
+ * with a calm-looking queue, which is why this exists.
+ */
+export async function sendWatchHealthAlert(communitySlug: string, alerts: WatchHealthAlert[]): Promise<void> {
+  if (alerts.length === 0) return
+  const to = await notificationRecipients(communitySlug)
+  const broke = alerts.filter((a) => a.alert === 'broke')
+  const rows = alerts
+    .map(
+      (a) => `<tr>
+        <td style="padding:6px 10px;border-bottom:1px solid #e2e8f0;"><a href="${escapeHtml(a.url)}" style="color:#1d4ed8;">${escapeHtml(a.label)}</a></td>
+        <td style="padding:6px 10px;border-bottom:1px solid #e2e8f0;color:${a.alert === 'broke' ? '#b91c1c' : '#15803d'};">${
+          a.alert === 'broke' ? `Stopped working: ${escapeHtml(a.error ?? 'unknown error')}` : 'Working again'
+        }</td>
+      </tr>`,
+    )
+    .join('')
+  const admin = adminAppUrl()
+  await sendEmail({
+    to,
+    subject:
+      broke.length > 0
+        ? `${broke.length === 1 ? broke[0].label : `${broke.length} watches`} stopped working`
+        : `${alerts.length === 1 ? alerts[0].label : `${alerts.length} watches`} working again`,
+    html: `<div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:640px;margin:0 auto;">
+      <h2 style="color:#1d4ed8;font-size:18px;">Watches</h2>
+      <p style="color:#334155;font-size:14px;">The pages the guide reads on its own to stay current. While a watch is broken, the guide isn't hearing from that page. You'll get one email when it works again.</p>
+      <table style="border-collapse:collapse;font-size:14px;width:100%;">${rows}</table>
+      ${admin ? `<p style="font-size:13px;"><a href="${admin}/${encodeURIComponent(communitySlug)}/admin/watches" style="color:#1d4ed8;">Open the Watches tab</a></p>` : ''}
+    </div>`,
+  })
+}
+
+/**
+ * Parts an admin left out of an eruv's map that the map no longer has: the
+ * eruv renamed or redrew them, so whatever replaced them is showing. Sent
+ * once per change, not every day it lasts.
+ */
+export async function sendEruvLineAlert(communitySlug: string, eruvim: { name: string; missing: string[] }[]): Promise<void> {
+  if (eruvim.length === 0) return
+  const to = await notificationRecipients(communitySlug)
+  const rows = eruvim
+    .map(
+      (e) => `<tr>
+        <td style="padding:6px 10px;border-bottom:1px solid #e2e8f0;vertical-align:top;">${escapeHtml(e.name)}</td>
+        <td style="padding:6px 10px;border-bottom:1px solid #e2e8f0;color:#334155;">${e.missing.map((n) => `“${escapeHtml(n)}”`).join(', ')}</td>
+      </tr>`,
+    )
+    .join('')
+  const admin = adminAppUrl()
+  await sendEmail({
+    to,
+    subject: eruvim.length === 1 ? `${eruvim[0].name}: its map has changed` : `${eruvim.length} eruv maps have changed`,
+    html: `<div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:640px;margin:0 auto;">
+      <h2 style="color:#1d4ed8;font-size:18px;">Eruv maps</h2>
+      <p style="color:#334155;font-size:14px;">The guide shows each eruv's own map, without the parts you left out. These parts aren't in the eruv's map any more: it may have renamed or redrawn them, so the guide could now be showing something you meant to leave out. Check the map and choose again in the Eruvim tab.</p>
+      <table style="border-collapse:collapse;font-size:14px;width:100%;">${rows}</table>
+      ${admin ? `<p style="font-size:13px;"><a href="${admin}/${encodeURIComponent(communitySlug)}/admin/eruvim" style="color:#1d4ed8;">Open the Eruvim tab</a></p>` : ''}
     </div>`,
   })
 }

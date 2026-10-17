@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { ReactElement } from 'react'
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { Activity, type ReactElement, type ReactNode } from 'react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { makeCategory, makeCommunity, makeContent, makeListing } from '@/test/providerFixtures'
+import { resolveCapabilities } from '@/lib/categories'
 import { CommunityProvider } from '@/lib/communityContext'
 import { ContentProvider } from '@/lib/contentContext'
 import { ListingsProvider } from '@/lib/listingsContext'
@@ -13,6 +14,7 @@ import { DroppedPinsProvider } from '@/lib/droppedPinsContext'
 import { ForcedViewport } from '@/lib/useIsMobile'
 import { HeaderCollapseProvider } from '@/lib/headerVisibility'
 import type { LocationControls } from '@/components/home/LocationControl'
+import type { CampaignBanner } from '@/lib/campaignBanner'
 import type { DirectoryResource } from '@/types'
 import { track } from '@vercel/analytics'
 import { mockRouter } from '@/test/nextNavigationMock'
@@ -20,6 +22,22 @@ import type { MapPoint } from './ResourceMap'
 import ResourceMapView from './ResourceMapView'
 
 vi.mock('@vercel/analytics', () => ({ track: vi.fn() }))
+
+// The eruvim, as /api/eruv gives them, and their maps, as /api/eruv/maps
+// does: Center City's and University City's (squares), and none for
+// Elkins Park, which the layer can't draw.
+const ERUV_SQUARE = { lines: [{ name: 'Boundary', points: [[39.94, -75.17], [39.94, -75.15], [39.96, -75.15], [39.96, -75.17], [39.94, -75.17]] as [number, number][] }] }
+const eruvStatus = (id: string, name: string) => ({
+  id, name, covers: `Where ${name} goes.`, website: null, hotline: null, alertsUrl: null, statusUrl: 'https://example.org/', statusDated: false,
+  status: 'up' as const, statusWords: 'Up', statusPostedOn: null, statusCheckedAt: new Date().toISOString(), statusErrorAt: null, statusError: null,
+})
+vi.mock('@/lib/useEruvStatuses', () => ({
+  useEruvStatuses: (_slug: string, wanted: boolean) =>
+    wanted
+      ? { available: true, timezone: 'America/New_York', candles: null, eruvim: [eruvStatus('center-city', 'Center City Eruv'), eruvStatus('university-city', 'University City Eruv'), eruvStatus('elkins-park', 'Elkins Park Eruv')] }
+      : null,
+  useEruvMaps: (_slug: string, wanted: boolean) => (wanted ? new Map([['center-city', ERUV_SQUARE], ['university-city', ERUV_SQUARE]]) : null),
+}))
 
 // NearbyList's row-level Share action calls useCommunitySlug(), which pulls
 // in next/navigation's useRouter() unconditionally (see nextNavigationMock's
@@ -36,33 +54,70 @@ vi.mock('next/navigation', () => ({
 // equivalent for. Mocked to a stub exposing just enough to drive
 // ResourceMapView's own logic (filtering, search, chip selection, point
 // selection) without ever touching window.google. Same approach as
-// Landing.test.tsx's HomeMap/ZmanimStrip mocks.
+// Landing.test.tsx's DaveningTimesCard mock.
 vi.mock('./ResourceMap', () => ({
   default: ({
     points,
     onSelectPoint,
     onLongPressPoint,
+    onBackgroundClick,
     frameToken,
+    eruvim,
+    onSelectEruv,
+    selectedEruvId,
+    frameEruvim,
+    cornerControl,
+    selectedId,
   }: {
     points: MapPoint[]
     onSelectPoint?: (p: MapPoint) => void
     onLongPressPoint?: (p: MapPoint) => void
+    onBackgroundClick?: () => void
     frameToken?: number
+    eruvim?: { id: string; name: string; tone: string }[]
+    onSelectEruv?: (id: string) => void
+    selectedEruvId?: string | null
+    frameEruvim?: boolean
+    cornerControl?: ReactNode
+    selectedId?: string
   }) => (
     <div data-testid="resource-map">
+      <div data-testid="map-corner">{cornerControl}</div>
       <p data-testid="point-count">{points.length}</p>
       <p data-testid="frame-token">{frameToken ?? 0}</p>
+      <p data-testid="lifted-pin">{selectedId ?? ''}</p>
+      <p data-testid="eruv-count">{eruvim?.length ?? 0}</p>
+      <p data-testid="eruv-selected">{selectedEruvId ?? ''}</p>
+      <p data-testid="eruv-framed">{frameEruvim ? 'yes' : 'no'}</p>
+      {eruvim?.map((e) => (
+        <button key={e.id} onClick={() => onSelectEruv?.(e.id)}>
+          Eruv {e.name} {e.tone}
+        </button>
+      ))}
       {points.map((p) => (
         <div key={p.id}>
           <button onClick={() => onSelectPoint?.(p)}>Select {p.name}</button>
           <button onClick={() => onLongPressPoint?.(p)}>Long-press {p.name}</button>
         </div>
       ))}
+      <button onClick={() => onBackgroundClick?.()}>Click map background</button>
     </div>
   ),
 }))
 
-afterEach(() => cleanup())
+// localStorage.clear(): PinnedProvider/DroppedPinsProvider persist there (see
+// pinnedContext.tsx's own doc) and jsdom's localStorage is one real store
+// shared by every test in this file, not reset between them on its own. A
+// pin left behind by an earlier test (e.g. "long-pressing a point pins it")
+// silently changes `hasPinnedChip`/`allChipsOn` for every test that runs
+// after it — confirmed live: it turned a later "select just this chip" click
+// into a deselect, because "All" no longer meant the same thing "all
+// categories, no pin filter" once a stray pinned listing survived from
+// another test.
+afterEach(() => {
+  cleanup()
+  localStorage.clear()
+})
 
 // usePinned()/useDroppedPins() throw outside their providers, and
 // useAllListings() silently returns null outside ListingsProvider — which
@@ -70,14 +125,19 @@ afterEach(() => cleanup())
 // listings === null || categories === null`) — so every test needs all
 // three, unlike the CommunityProvider/ContentProvider-only components tested
 // so far.
-function renderMap(ui: ReactElement, listings: DirectoryResource[] = [], categories = [makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })]) {
+function renderMap(
+  ui: ReactElement,
+  listings: DirectoryResource[] = [],
+  categories = [makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })],
+  campaignBanners: CampaignBanner[] = [],
+) {
   return renderWithProviders(
     <PinnedProvider>
       <DroppedPinsProvider>
         <ListingsProvider listings={listings}>{ui}</ListingsProvider>
       </DroppedPinsProvider>
     </PinnedProvider>,
-    { content: { categories } },
+    { content: { categories, campaignBanners } },
   )
 }
 
@@ -86,7 +146,12 @@ function renderMap(ui: ReactElement, listings: DirectoryResource[] = [], categor
 // which jsdom's global polyfill always reports as desktop — ForcedViewport
 // (the same mechanism the admin device preview uses) short-circuits that
 // instead of fighting the polyfill.
-function renderMobileMap(ui: ReactElement, listings: DirectoryResource[] = [], categories = [makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })]) {
+function renderMobileMap(
+  ui: ReactElement,
+  listings: DirectoryResource[] = [],
+  categories = [makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })],
+  campaignBanners: CampaignBanner[] = [],
+) {
   return renderWithProviders(
     <PinnedProvider>
       <DroppedPinsProvider>
@@ -95,9 +160,11 @@ function renderMobileMap(ui: ReactElement, listings: DirectoryResource[] = [], c
         </ListingsProvider>
       </DroppedPinsProvider>
     </PinnedProvider>,
-    { content: { categories } },
+    { content: { categories, campaignBanners } },
   )
 }
+
+const HOURS = { key: 'hours', label: 'Hours', type: 'hours' as const, filterable: true }
 
 function listingWithGeo(overrides: Partial<DirectoryResource> = {}): DirectoryResource {
   return makeListing({ geo: { lat: 40, lng: -75 }, ...overrides })
@@ -143,19 +210,65 @@ describe('ResourceMapView — plotting listings', () => {
   })
 })
 
+describe('ResourceMapView — search autocomplete', () => {
+  // "Open now" is a real, working search (typing it and hitting Enter
+  // filters to only-open places) but was entirely undiscoverable — nothing
+  // on screen ever suggested it. Google Maps surfaces this kind of thing as
+  // its own row in the autocomplete dropdown; this mirrors that.
+  it('offers "Open now" as a suggestion when the search box is focused and empty', async () => {
+    const user = userEvent.setup()
+    renderMap(<ResourceMapView onUp={vi.fn()} />, [listingWithGeo({ category: 'grocery', name: 'Acme Grocery' })])
+
+    await user.click(screen.getByPlaceholderText(/Search name, address/))
+
+    expect(screen.getByText('Open now')).toBeInTheDocument()
+    expect(screen.getByText('Show only listings open right now')).toBeInTheDocument()
+  })
+
+  it('keeps offering "Open now" while the typed text is still heading toward it, and drops it once the text diverges', async () => {
+    const user = userEvent.setup()
+    renderMap(<ResourceMapView onUp={vi.fn()} />, [listingWithGeo({ category: 'grocery', name: 'Acme Grocery' })])
+
+    const input = screen.getByPlaceholderText(/Search name, address/)
+    await user.click(input)
+    await user.type(input, 'ope')
+    expect(screen.getByText('Open now')).toBeInTheDocument()
+
+    await user.type(input, 'n pizza')
+    expect(screen.queryByText('Open now')).not.toBeInTheDocument()
+  })
+
+  // It's the Filters sheet's Open now, for everything that keeps hours
+  // (agreed Sep 30), not words in the box.
+  it('clicking "Open now" switches Open now on and empties the box, closing the dropdown', async () => {
+    const user = userEvent.setup()
+    renderMap(<ResourceMapView onUp={vi.fn()} />, [listingWithGeo({ category: 'grocery', name: 'Acme Grocery' })], [makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores', detailFields: [HOURS] })])
+
+    const input = screen.getByPlaceholderText<HTMLInputElement>(/Search name, address/)
+    await user.click(input)
+    await user.click(screen.getByText('Open now'))
+
+    expect(input.value).toBe('')
+    expect(screen.queryByText('Show only listings open right now')).not.toBeInTheDocument()
+    expect(screen.getByTestId('map-filters-button')).toHaveAccessibleName('Filters, 1 on')
+  })
+})
+
 describe('ResourceMapView — desktop search/filter bar position', () => {
-  // Neither the search box nor the chips move when the sidebar opens or
-  // closes anymore — both used to shift right to dodge the sidebar (first
+  // Neither the search box nor the chips MOVE (left/top) when the sidebar
+  // opens or closes — both used to shift right to dodge the sidebar (first
   // together, then just the chips), which kept reading as things getting
-  // "pushed" every time the sidebar appeared. Instead the search box is
-  // sized narrower than the sidebar's own width, and the chips fixed well
-  // past the sidebar's edge, both with a real gap — flush edges (search box
-  // exactly as wide as the sidebar, chips starting exactly where it ends)
-  // left no visible margin anywhere, unlike Google Maps' own search box and
-  // chip row, which both sit with real breathing room around the panel (see
-  // the reference screenshots). Confirmed both fail against the old
-  // sidebar-tracking offsets, then restored.
-  it('keeps the search box and chips at the same position whether or not the sidebar is open', async () => {
+  // "pushed" every time the sidebar appeared. The search box's WIDTH is a
+  // different story: it now tracks the sidebar's own width (see
+  // SIDEBAR_SEARCH_INSET's own doc) rather than staying a fixed 336px —
+  // reported live as looking disconnected from the sidebar it visually
+  // sits on top of once the sidebar was dragged wider than that fixed
+  // value, leaving a growing bare strip of the sidebar's own white to the
+  // search box's right. The chips stay fixed well past the sidebar's own
+  // edge, with a real gap, unlike Google Maps' own chip row, which sits
+  // with more breathing room around the panel (see the reference
+  // screenshots).
+  it('keeps the search box and chips at the same LEFT position whether or not the sidebar is open', async () => {
     const user = userEvent.setup()
     const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
     const { container } = renderMap(
@@ -164,25 +277,68 @@ describe('ResourceMapView — desktop search/filter bar position', () => {
       [grocery],
     )
 
-    const search = () => container.querySelector('[class*="w-\\[336px\\]"]')
-    const chips = () => container.querySelector('[class*="right-16"][class*="z-20"]')
-    const classesBefore = [search()?.className, chips()?.className]
+    const search = () => container.querySelector('[class*="left-3"][class*="top-3"]')
+    const chips = () => container.querySelector('[data-testid="map-top-row"]') as HTMLElement | null
+    const before = { searchClass: search()?.className, chipsLeft: chips()?.style.left }
 
     await user.click(screen.getByRole('button', { name: /Grocery Stores/ }))
 
-    expect([search()?.className, chips()?.className]).toEqual(classesBefore)
+    // The search box's className (its left/top position) doesn't change —
+    // only its width (a separate inline style, asserted below) does. The
+    // chips' inline `left` (driven by sidebarWidth, not a fixed class —
+    // see that element's own doc) is what actually could have drifted here.
+    expect(search()?.className).toBe(before.searchClass)
+    expect(chips()?.style.left).toBe(before.chipsLeft)
     expect(search()?.className).toMatch(/\bleft-3\b/)
-    expect(chips()?.className).toMatch(/left-\[396px\]/)
+    expect(chips()?.style.left).toBe('396px')
+  })
+
+  // The actual feature: the search box's width TRACKS the sidebar's own
+  // (inset by SIDEBAR_SEARCH_INSET on each side, so it still reads as
+  // sitting flush inside the sidebar rather than spanning it edge to
+  // edge) — confirmed at the sidebar's default width, and confirmed AGAIN
+  // after dragging it wider, which is the exact regression reported live
+  // (the search box used to stay a fixed 336px regardless, leaving a
+  // growing bare strip of the sidebar's own white to its right).
+  it('grows the search box\'s width along with the sidebar\'s, with a consistent inset on each side', async () => {
+    const user = userEvent.setup()
+    const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
+    const { container } = renderMap(
+      <ResourceMapView onUp={vi.fn()} />,
+      [listingWithGeo({ id: 'g1', category: 'grocery', name: 'Acme Grocery' })],
+      [grocery],
+    )
+
+    await user.click(screen.getByRole('button', { name: /Grocery Stores/ }))
+
+    const aside = container.querySelector('aside') as HTMLElement
+    const search = container.querySelector('[class*="left-3"][class*="top-3"]') as HTMLElement
+    const SIDEBAR_SEARCH_INSET = 24
+
+    expect(aside.style.width).toBe('380px') // SIDEBAR_DEFAULT_WIDTH
+    expect(search.style.width).toBe(`${380 - SIDEBAR_SEARCH_INSET}px`)
+
+    // Drag the sidebar wider — the search box must widen with it, not stay
+    // put at its old width.
+    const handle = screen.getByRole('separator', { name: 'Resize sidebar' })
+    fireEvent.pointerDown(handle, { clientX: 380 })
+    fireEvent.pointerMove(handle, { clientX: 480 }) // +100px
+    fireEvent.pointerUp(handle)
+
+    expect(aside.style.width).toBe('480px')
+    expect(search.style.width).toBe(`${480 - SIDEBAR_SEARCH_INSET}px`)
   })
 
   // The invariant that actually prevents both the overlap AND the flush,
-  // no-breathing-room look: there has to be a real gap between the search
-  // box's right edge and the sidebar's own right edge, and another real gap
-  // between the sidebar's right edge and where the chips start. Widening the
-  // sidebar, or narrowing either gap, later without adjusting to match would
-  // silently reopen one of those two problems — this fails immediately if
-  // that ever drifts, instead of waiting for someone to notice it visually.
-  it('leaves a real gap on both sides of the sidebar — search box to sidebar edge, and sidebar edge to chips', async () => {
+  // no-breathing-room look for the CHIPS specifically (the search box's own
+  // gap to the sidebar is fixed by construction now — see
+  // SIDEBAR_SEARCH_INSET — so it's covered by the width test above, not a
+  // "stays >= some floor" check): there has to be a real gap between the
+  // sidebar's own right edge and where the chips start. Narrowing that gap
+  // later without adjusting to match would silently reopen the flush,
+  // no-breathing-room look — this fails immediately if that ever drifts,
+  // instead of waiting for someone to notice it visually.
+  it('leaves a real gap between the sidebar\'s right edge and the chips', async () => {
     const user = userEvent.setup()
     const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
     const { container } = renderMap(
@@ -193,17 +349,13 @@ describe('ResourceMapView — desktop search/filter bar position', () => {
 
     await user.click(screen.getByRole('button', { name: /Grocery Stores/ }))
 
-    const aside = container.querySelector('aside')
-    const search = container.querySelector('[class*="w-\\[336px\\]"]')
-    const chips = container.querySelector('[class*="right-16"][class*="z-20"]')
+    const aside = container.querySelector('aside') as HTMLElement | null
+    const chips = container.querySelector('[data-testid="map-top-row"]') as HTMLElement | null
 
-    const sidebarWidth = Number(aside?.className.match(/desktop:w-\[(\d+)px\]/)?.[1])
-    const searchLeft = Number(search?.className.match(/\bleft-(\d+)\b/)?.[1]) * 4 // Tailwind spacing unit -> px
-    const searchWidth = Number(search?.className.match(/w-\[(\d+)px\]/)?.[1])
-    const chipsLeft = Number(chips?.className.match(/left-\[(\d+)px\]/)?.[1])
+    const sidebarWidth = Number(aside?.style.width.replace('px', ''))
+    const chipsLeft = Number(chips?.style.left.replace('px', ''))
     const MIN_GAP_PX = 16
 
-    expect(sidebarWidth - (searchLeft + searchWidth)).toBeGreaterThanOrEqual(MIN_GAP_PX)
     expect(chipsLeft - sidebarWidth).toBeGreaterThanOrEqual(MIN_GAP_PX)
   })
 
@@ -228,6 +380,129 @@ describe('ResourceMapView — desktop search/filter bar position', () => {
     const aside = container.querySelector('aside')
     expect(aside?.className).toMatch(/desktop:absolute/)
     expect(aside?.className).not.toMatch(/\bshrink-0\b/)
+  })
+})
+
+describe('ResourceMapView — sidebar resize', () => {
+  async function openSidebar(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(screen.getByRole('button', { name: /Grocery Stores/ }))
+  }
+
+  it('renders no resize handle while the sidebar is collapsed', () => {
+    renderMap(
+      <ResourceMapView onUp={vi.fn()} />,
+      [listingWithGeo({ id: 'g1', category: 'grocery', name: 'Acme Grocery' })],
+      [makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })],
+    )
+    expect(screen.queryByRole('separator', { name: 'Resize sidebar' })).not.toBeInTheDocument()
+  })
+
+  it('dragging the handle resizes the sidebar, clamped to its min/max width', async () => {
+    const user = userEvent.setup()
+    const { container } = renderMap(
+      <ResourceMapView onUp={vi.fn()} />,
+      [listingWithGeo({ id: 'g1', category: 'grocery', name: 'Acme Grocery' })],
+      [makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })],
+    )
+    await openSidebar(user)
+
+    const aside = container.querySelector('aside') as HTMLElement
+    const handle = screen.getByRole('separator', { name: 'Resize sidebar' })
+    expect(aside.style.width).toBe('380px')
+
+    fireEvent.pointerDown(handle, { clientX: 380 })
+    fireEvent.pointerMove(handle, { clientX: 480 }) // +100px
+    expect(aside.style.width).toBe('480px')
+    fireEvent.pointerUp(handle)
+
+    // Dragged well past SIDEBAR_MAX_WIDTH (640) — clamps rather than
+    // growing the sidebar past a usable size.
+    fireEvent.pointerDown(handle, { clientX: 480 })
+    fireEvent.pointerMove(handle, { clientX: 2000 })
+    expect(aside.style.width).toBe('640px')
+    fireEvent.pointerUp(handle)
+
+    // Dragged well below SIDEBAR_MIN_WIDTH (360) — clamps rather than
+    // shrinking past where the floating search box would overhang it (see
+    // SIDEBAR_MIN_WIDTH's own doc).
+    fireEvent.pointerDown(handle, { clientX: 640 })
+    fireEvent.pointerMove(handle, { clientX: 0 })
+    expect(aside.style.width).toBe('360px')
+    fireEvent.pointerUp(handle)
+  })
+
+  it('persists the dragged width, and a later mount restores it', async () => {
+    const user = userEvent.setup()
+    const { unmount } = renderMap(
+      <ResourceMapView onUp={vi.fn()} />,
+      [listingWithGeo({ id: 'g1', category: 'grocery', name: 'Acme Grocery' })],
+      [makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })],
+    )
+    await openSidebar(user)
+
+    const handle = screen.getByRole('separator', { name: 'Resize sidebar' })
+    fireEvent.pointerDown(handle, { clientX: 380 })
+    fireEvent.pointerMove(handle, { clientX: 460 })
+    fireEvent.pointerUp(handle)
+    unmount()
+
+    const { container: container2 } = renderMap(
+      <ResourceMapView onUp={vi.fn()} />,
+      [listingWithGeo({ id: 'g1', category: 'grocery', name: 'Acme Grocery' })],
+      [makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })],
+    )
+    await user.click(within(container2).getByRole('button', { name: /Grocery Stores/ }))
+    const aside2 = container2.querySelector('aside') as HTMLElement
+    expect(aside2.style.width).toBe('460px')
+  })
+
+  // Same reasoning as MobileSheet's own pointerCancel coverage: the browser
+  // can take a touch over mid-gesture (most commonly an edge swipe
+  // recognized as its own back-navigation) — that should snap back to
+  // where the drag started, not leave the sidebar wherever the
+  // interrupted gesture happened to reach.
+  it('a pointer cancel snaps the width back to where the drag started, and does not persist it', async () => {
+    const user = userEvent.setup()
+    const { container } = renderMap(
+      <ResourceMapView onUp={vi.fn()} />,
+      [listingWithGeo({ id: 'g1', category: 'grocery', name: 'Acme Grocery' })],
+      [makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })],
+    )
+    await openSidebar(user)
+
+    const aside = container.querySelector('aside') as HTMLElement
+    const handle = screen.getByRole('separator', { name: 'Resize sidebar' })
+
+    fireEvent.pointerDown(handle, { clientX: 380 })
+    fireEvent.pointerMove(handle, { clientX: 500 })
+    expect(aside.style.width).toBe('500px')
+    fireEvent.pointerCancel(handle)
+
+    expect(aside.style.width).toBe('380px')
+    expect(localStorage.getItem('jpc:map-sidebar-width')).toBeNull()
+  })
+
+  it('ArrowRight/ArrowLeft on the focused handle resize it by a fixed step, and persist immediately', async () => {
+    const user = userEvent.setup()
+    const { container } = renderMap(
+      <ResourceMapView onUp={vi.fn()} />,
+      [listingWithGeo({ id: 'g1', category: 'grocery', name: 'Acme Grocery' })],
+      [makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })],
+    )
+    await openSidebar(user)
+
+    const aside = container.querySelector('aside') as HTMLElement
+    const handle = screen.getByRole('separator', { name: 'Resize sidebar' })
+    handle.focus()
+
+    fireEvent.keyDown(handle, { key: 'ArrowRight' })
+    expect(aside.style.width).toBe('396px')
+    expect(localStorage.getItem('jpc:map-sidebar-width')).toBe('396')
+
+    fireEvent.keyDown(handle, { key: 'ArrowLeft' })
+    fireEvent.keyDown(handle, { key: 'ArrowLeft' })
+    expect(aside.style.width).toBe('364px')
+    expect(localStorage.getItem('jpc:map-sidebar-width')).toBe('364')
   })
 })
 
@@ -387,6 +662,39 @@ describe('ResourceMapView — selecting a place', () => {
     expect(await screen.findByText('1 Main St')).toBeInTheDocument()
   })
 
+  // Regression: select a place (opens the sidebar), close it with the edge
+  // toggle WHILE still selected (not the detail panel's own "back" button —
+  // that clears the selection outright, this doesn't), then click the map
+  // background to deselect, then try to reopen. The toggle used to branch
+  // on desktopNarrowed/desktopSelected to decide which of two flags to
+  // flip — closing while selected set sidebarCollapsed, but deselecting via
+  // the map background never reset it, so the later reopen attempt (now
+  // routed to the other flag, sidebarOpenedManually) could never overcome
+  // it. sidebarVisible stayed false no matter how many times "Show sidebar"
+  // was clicked.
+  it('reopening the sidebar still works after closing it while a place was selected, then deselecting', async () => {
+    const user = userEvent.setup()
+    const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
+    const { container } = renderMap(
+      <ResourceMapView onUp={vi.fn()} />,
+      [listingWithGeo({ category: 'grocery', name: 'Acme Grocery', address: '1 Main St' })],
+      [grocery],
+    )
+    const asideWidth = () => (container.querySelector('aside') as HTMLElement | null)?.style.width.replace('px', '')
+
+    await user.click(screen.getByRole('button', { name: 'Select Acme Grocery' }))
+    expect(await screen.findByText('1 Main St')).toBeInTheDocument()
+    expect(asideWidth()).toBe('380')
+
+    await user.click(screen.getByRole('button', { name: 'Hide sidebar' }))
+    expect(asideWidth()).toBe('0')
+
+    await user.click(screen.getByRole('button', { name: 'Click map background' }))
+
+    await user.click(screen.getByRole('button', { name: 'Show sidebar' }))
+    expect(asideWidth()).toBe('380')
+  })
+
   // A pin tapped directly on the map is already visible right where it is —
   // reframing to fit it alongside the visitor's location would yank the view
   // they just tapped into. A listing picked from the sidebar list, on the
@@ -414,36 +722,215 @@ describe('ResourceMapView — selecting a place', () => {
     // A pin tap (the mocked ResourceMap's own "Select" button, standing in
     // for onSelectPoint) opens the detail panel but must not bump the token.
     await user.click(screen.getByRole('button', { name: 'Select Acme Grocery' }))
-    expect(await screen.findByRole('button', { name: 'Back to list' })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Back to results' })).toBeInTheDocument()
     expect(screen.getByTestId('frame-token').textContent).toBe(initialFrameToken)
 
     // Back to the list, then pick the OTHER listing from the real sidebar
     // row — that one should bump the token.
-    await user.click(screen.getByRole('button', { name: 'Back to list' }))
+    await user.click(screen.getByRole('button', { name: 'Back to results' }))
     // MobileNearbySheet stays mounted (CSS-hidden, not unmounted) even on
     // desktop, so its own copy of this row exists in the DOM too — the
     // sidebar's own row is the first of the two.
     await user.click(screen.getAllByRole('button', { name: /^Beth Shalom/ })[0]!)
-    expect(await screen.findByRole('button', { name: 'Back to list' })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Back to results' })).toBeInTheDocument()
     expect(screen.getByTestId('frame-token').textContent).not.toBe(initialFrameToken)
+  })
+  // Through the real component: the sidebar's edit bar is part of the
+  // place's content, inside the scroll region, so it's reached at the end of
+  // a long listing the way the directory's dropdown ends with it — not
+  // docked to the sidebar's bottom edge the way phase 3 had it.
+  it('ends the selected place\'s content with its edit bar, inside the sidebar\'s scroll region', async () => {
+    const user = userEvent.setup()
+    const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
+    const synagogue = makeCategory({ id: 'synagogue', pluralLabel: 'Synagogues' })
+    renderMap(
+      <ResourceMapView onUp={vi.fn()} />,
+      [listingWithGeo({ id: 'g1', category: 'grocery', name: 'Acme Grocery' }), listingWithGeo({ id: 's1', category: 'synagogue', name: 'Beth Shalom' })],
+      [grocery, synagogue],
+    )
+    // Two categories, so the sidebar lists results rather than auto-selecting.
+    await user.click(screen.getByRole('button', { name: /Grocery Stores/ }))
+    await user.click(screen.getByRole('button', { name: /Synagogues/ }))
+    // The sidebar's own row (the first of two: the mobile sheet stays
+    // mounted on desktop too), not the map marker, which is outside it.
+    const listRegion = screen.getAllByRole('button', { name: /^Acme Grocery/ })[0]!.closest('[data-testid="sidebar-scroll"]')
+    expect(listRegion).not.toBeNull()
+    await user.click(screen.getByRole('button', { name: 'Select Acme Grocery' }))
+
+    const pill = await screen.findByRole('button', { name: 'Edit listing' })
+    const region = pill.closest('[data-testid="sidebar-scroll"]')!
+    const sidebar = pill.closest('aside')!
+    expect(sidebar).toContainElement(pill)
+    expect(region).toContainElement(pill)
+    // And a fresh region, not the list's: a shared one carried the list's
+    // scroll offset into a place picked from deep in it.
+    expect(region).not.toBe(listRegion)
   })
 })
 
-describe('ResourceMapView — pinning', () => {
-  it('long-pressing a point pins it, which turns the Pinned chip on', async () => {
+describe('ResourceMapView — saving', () => {
+  // Pin used to turn its chip on, narrowing the map to the pins the moment
+  // one was added. Save doesn't (Oct 14, board YouMap): the map keeps showing
+  // everything, the saved place marked, and the Saved chip appears, off.
+  it('long-pressing a point saves it: the Saved chip appears, and the map still shows everything', async () => {
     const user = userEvent.setup()
     const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
-    renderMap(<ResourceMapView onUp={vi.fn()} />, [listingWithGeo({ id: 'g1', category: 'grocery', name: 'Acme Grocery' })], [grocery])
+    renderMap(
+      <ResourceMapView onUp={vi.fn()} />,
+      [listingWithGeo({ id: 'g1', category: 'grocery', name: 'Acme Grocery' }), listingWithGeo({ id: 'g2', category: 'grocery', name: 'Other Grocery' })],
+      [grocery],
+    )
 
-    expect(screen.queryByRole('button', { name: /^Pinned/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Saved/ })).not.toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Long-press Acme Grocery' }))
 
-    expect(await screen.findByRole('button', { name: /^Pinned/ })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: /^Saved/ })).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByRole('button', { name: 'Long-press Other Grocery' })).toBeInTheDocument()
+  })
+
+  // Real bug: a listing in a non-mappable category (WhatsApp Groups,
+  // Networking — `hasAddress: false`, which forces `capabilities.map` off
+  // via resolveCapabilities) can still be pinned from its own directory row
+  // (the card's Pin action has no capability gate), so it lands in
+  // usePinned()'s `pinned` array like any other pin. The map's Pinned chip
+  // used to read `pinned.length` directly — a raw count with no idea some
+  // pins are for categories the map never plots at all — so pinning a
+  // WhatsApp group flipped the chip on and counted a pin nothing would ever
+  // show for. It must be driven by `allPoints` instead (already excludes
+  // non-mappable categories the same way it excludes missing coordinates),
+  // same fix categories.ts's own doc describes for the "chip with nothing
+  // behind it" shape of bug.
+  //
+  // Seeded directly via the real pinned.ts storage shape (see
+  // GenericDirectory.test.tsx's "pinned listings sort first" for the same
+  // pattern) — the mocked ResourceMap only renders a Long-press button for
+  // points actually passed to it, and this listing is never one of them.
+  it('does not show the Saved chip for a save in a non-mappable category (e.g. WhatsApp Groups)', () => {
+    localStorage.setItem('jpc:pinned-listings', JSON.stringify([{ id: 'wa1', categoryId: 'whatsapp' }]))
+    // A normal mappable category alongside it — a map with only a
+    // non-mappable category would hide the whole chip row regardless of the
+    // bug, which is a false pass, not a real regression check (confirmed:
+    // this test still passed against the unfixed source until Grocery was
+    // added here). Real categories pages always have at least one mappable
+    // one, so this matches the actual scenario the bug report describes.
+    const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
+    const whatsapp = makeCategory({
+      id: 'whatsapp',
+      pluralLabel: 'WhatsApp Groups',
+      hasAddress: false,
+      capabilities: resolveCapabilities(undefined, false),
+    })
+    // Real geo on the WhatsApp listing, so this is testing the
+    // category-capability exclusion specifically, not just the pre-existing
+    // missing-coordinates one.
+    renderMap(
+      <ResourceMapView onUp={vi.fn()} />,
+      [
+        listingWithGeo({ id: 'g1', category: 'grocery', name: 'Acme Grocery' }),
+        listingWithGeo({ id: 'wa1', category: 'whatsapp', name: 'Shul Chat' }),
+      ],
+      [grocery, whatsapp],
+    )
+
+    expect(screen.queryByRole('button', { name: /^Saved/ })).not.toBeInTheDocument()
+  })
+})
+
+describe('ResourceMapView — arriving on the pins', () => {
+  // "See them on the map", on the Pinned page (?pinned=1): only the pins,
+  // with the Pinned chip on, not every place in the guide.
+  it('shows only the pinned places', () => {
+    localStorage.setItem('jpc:pinned-listings', JSON.stringify([{ id: 'g1', categoryId: 'grocery' }]))
+    const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
+    renderMap(
+      <ResourceMapView onUp={vi.fn()} initialPinned />,
+      [listingWithGeo({ id: 'g1', category: 'grocery', name: 'Acme Grocery' }), listingWithGeo({ id: 'g2', category: 'grocery', name: 'Other Grocery' })],
+      [grocery],
+    )
+    expect(screen.getByRole('button', { name: 'Long-press Acme Grocery' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Long-press Other Grocery' })).not.toBeInTheDocument()
+  })
+
+  it('without it, every place', () => {
+    localStorage.setItem('jpc:pinned-listings', JSON.stringify([{ id: 'g1', categoryId: 'grocery' }]))
+    const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
+    renderMap(
+      <ResourceMapView onUp={vi.fn()} />,
+      [listingWithGeo({ id: 'g1', category: 'grocery', name: 'Acme Grocery' }), listingWithGeo({ id: 'g2', category: 'grocery', name: 'Other Grocery' })],
+      [grocery],
+    )
+    expect(screen.getByRole('button', { name: 'Long-press Other Grocery' })).toBeInTheDocument()
+  })
+})
+
+describe('ResourceMapView — campaign chip', () => {
+  // A wide, fixed date range rather than dates relative to "today" — this
+  // only needs to always be currently active, not exercise
+  // activeCampaignBanner's own boundary logic (that's campaignBanner.test.ts's
+  // job).
+  const liveBanner: CampaignBanner = {
+    id: 'sukkah-map',
+    categoryId: 'grocery',
+    title: 'Sukkah Map',
+    subtitle: '',
+    startDate: '2000-01-01',
+    endDate: '2999-12-31',
+    destination: 'map',
+  }
+
+  it('shows the live campaign category as its own chip on desktop', () => {
+    const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
+    renderMap(
+      <ResourceMapView onUp={vi.fn()} />,
+      [listingWithGeo({ id: 'g1', category: 'grocery', name: 'Acme Grocery' })],
+      [grocery],
+      [liveBanner],
+    )
+
+    // Queried by the ✨ marker, not accessible name: aria-hidden excludes the
+    // sparkle from the button's accessible name, and the campaign category
+    // also still appears as its own ordinary chip elsewhere in the row (this
+    // is an additional distinctly-styled affordance, not a replacement) — so
+    // "Grocery Stores" alone would match two buttons.
+    const sparkle = screen.getByText('✨')
+    expect(within(sparkle.closest('button')!).getByText('Grocery Stores')).toBeInTheDocument()
+  })
+
+  // Real bug: ResourceMapView renders TWO separate <CategoryFilter> instances
+  // — one for the desktop chip row (only mounted when !isMobile), and a
+  // second, shared one under the search bar that's what actually renders on
+  // mobile. Only the desktop instance was ever passed `campaignChip`, so a
+  // live campaign's chip appeared on desktop but silently never on mobile,
+  // even with the exact same active campaign and category.
+  it('shows the live campaign category as its own chip on mobile too', () => {
+    const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
+    renderMobileMap(
+      <ResourceMapView onUp={vi.fn()} />,
+      [listingWithGeo({ id: 'g1', category: 'grocery', name: 'Acme Grocery' })],
+      [grocery],
+      [liveBanner],
+    )
+
+    // Queried by the ✨ marker, not accessible name: aria-hidden excludes the
+    // sparkle from the button's accessible name, and the campaign category
+    // also still appears as its own ordinary chip elsewhere in the row (this
+    // is an additional distinctly-styled affordance, not a replacement) — so
+    // "Grocery Stores" alone would match two buttons.
+    const sparkle = screen.getByText('✨')
+    expect(within(sparkle.closest('button')!).getByText('Grocery Stores')).toBeInTheDocument()
   })
 })
 
 describe('ResourceMapView — nested touch gestures', () => {
+  // The row's sliding content — SwipeRow's content element. Found through the
+  // row's own name, not its Pin button: the Pin/Share strip is only mounted
+  // while a row is actually swiped open (see SwipeRow), so at rest there's no
+  // Pin button to find.
+  function rowContentFor(scope: HTMLElement, name: string) {
+    return within(scope).getByText(name).closest('div.px-4') as HTMLElement
+  }
+
   // Real bug: MobileNearbySheet's content area used to capture the pointer
   // on every touchdown (an attempted fix for a different, unrelated
   // smoothness issue) — which won the race against NearbyList's own row-level
@@ -465,16 +952,14 @@ describe('ResourceMapView — nested touch gestures', () => {
     // only ancestor with this class, so it's enough to scope into the
     // sheet's own copy of the row rather than the sidebar's.
     const sheetContent = document.querySelector('.overscroll-contain') as HTMLElement
-    const pinButton = within(sheetContent).getByRole('button', { name: 'Pin Nosh Deli' })
-    // The row's draggable content div is the reveal buttons' next sibling —
-    // both are direct children of NearbyRow's own wrapper (see its return).
-    const rowContent = pinButton.parentElement!.nextElementSibling as HTMLElement
+    const rowContent = rowContentFor(sheetContent, 'Nosh Deli')
 
     fireEvent.pointerDown(rowContent, { clientX: 300 })
-    fireEvent.pointerMove(rowContent, { clientX: 190 }) // 110px left — past both the 8px activation threshold and REVEAL_WIDTH/2
+    fireEvent.pointerMove(rowContent, { clientX: 190 }) // 110px left — past both the 8px activation threshold and the open threshold
     fireEvent.pointerUp(rowContent, { clientX: 190 })
 
-    expect(rowContent.style.transform).toBe('translateX(-168px)') // REVEAL_WIDTH (84) * 2 — fully revealed
+    expect(rowContent.style.transform).toBe('translateX(-104px)') // two 52px actions — fully revealed
+    expect(within(sheetContent).getByRole('button', { name: 'Save Nosh Deli' })).toBeInTheDocument()
   })
 
   // Real bug, the other direction: a plain `abs(deltaX) >= 8` threshold
@@ -488,8 +973,7 @@ describe('ResourceMapView — nested touch gestures', () => {
     renderMap(<ResourceMapView onUp={vi.fn()} />, [listingWithGeo({ id: 'row-swipe-2', category: 'grocery', name: 'Corner Bakery' })], [grocery])
 
     const sheetContent = document.querySelector('.overscroll-contain') as HTMLElement
-    const pinButton = within(sheetContent).getByRole('button', { name: 'Pin Corner Bakery' })
-    const rowContent = pinButton.parentElement!.nextElementSibling as HTMLElement
+    const rowContent = rowContentFor(sheetContent, 'Corner Bakery')
 
     fireEvent.pointerDown(rowContent, { clientX: 300, clientY: 300 })
     // 10px left, 50px down — past the row's own 8px X threshold, but
@@ -501,7 +985,9 @@ describe('ResourceMapView — nested touch gestures', () => {
     // tests reading dragHeight mid-drag instead of the post-release snap.
     fireEvent.pointerMove(rowContent, { clientX: 290, clientY: 350 })
 
-    expect(rowContent.style.transform).toBe('translateX(0px)')
+    // No transform at all at rest — SwipeRow only sets one while displaced.
+    expect(rowContent.style.transform).toBe('')
+    expect(within(sheetContent).queryByRole('button', { name: 'Save Corner Bakery' })).not.toBeInTheDocument()
 
     fireEvent.pointerUp(rowContent, { clientX: 290, clientY: 350 })
   })
@@ -534,16 +1020,18 @@ describe('ResourceMapView — nested touch gestures', () => {
     const idleTransition = sheetEl.style.transition
     expect(idleTransition).toContain('280ms')
 
-    const pinButton = within(sheetContent).getByRole('button', { name: 'Pin Test Grocery' })
-    const rowContent = pinButton.parentElement!.nextElementSibling as HTMLElement
+    const rowContent = rowContentFor(sheetContent, 'Test Grocery')
 
     fireEvent.pointerDown(rowContent, { clientX: 300, clientY: 300 })
-    fireEvent.pointerMove(rowContent, { clientX: 190, clientY: 320 }) // 110px horizontal, 20px vertical — clearly horizontal, but a real Y component too
+    // 90px horizontal, 20px vertical — clearly horizontal, but a real Y
+    // component too. Short of the 104px strip, so the row sits at a live,
+    // unclamped position that proves it's following the finger.
+    fireEvent.pointerMove(rowContent, { clientX: 210, clientY: 320 })
 
-    expect(rowContent.style.transform).toBe('translateX(-110px)') // the row did respond
+    expect(rowContent.style.transform).toBe('translateX(-90px)') // the row did respond
     expect(sheetEl.style.transition).toBe(idleTransition) // ...but the sheet did not
 
-    fireEvent.pointerUp(rowContent, { clientX: 190, clientY: 320 })
+    fireEvent.pointerUp(rowContent, { clientX: 210, clientY: 320 })
   })
 })
 
@@ -671,14 +1159,9 @@ describe('ResourceMapView — mobile full-screen category picker', () => {
     for (const box of allCheckboxes()) expect(box).toBeChecked()
   })
 
-  // Regression test: picking one of a category's own filters (Kosher,
-  // Denomination, …) inside the picker's expanded row is documented to imply
-  // wanting that category too (see ensureDraftSelected/toggleBoolFieldInPicker
-  // in ResourceMapView) — but that side effect used to land on the LIVE
-  // selection, not the draft the checkboxes actually display, so picking a
-  // filter for an unchecked category left its box looking unchecked (wrong)
-  // and Apply would then silently drop the live change the filter had made.
-  it('picking a category’s own filter in the picker checks that category’s box too', async () => {
+  // Choosing categories only: each one's filters are in the Filters sheet
+  // (agreed Sep 30). Its rows used to expand to hold them.
+  it('the picker only chooses categories: its rows hold no filters', async () => {
     const user = userEvent.setup()
     const withFilter = manyCategories.map((c) =>
       c.id === 'grocery'
@@ -687,25 +1170,8 @@ describe('ResourceMapView — mobile full-screen category picker', () => {
     )
     renderMobileMap(<ResourceMapView onUp={vi.fn()} />, manyListings, withFilter)
     await user.click(screen.getByRole('button', { name: '⋯ More' }))
-    const groceryBox = screen.getByRole('checkbox', { name: 'Show Grocery' })
-    await user.click(groceryBox)
-    expect(groceryBox).not.toBeChecked()
-
-    // Expand Grocery's row (the chevron button sharing its row content) and
-    // pick its Kosher filter. Scoped with `expanded: false` — the compact
-    // chip row behind the picker also has a "Grocery" chip in the DOM.
-    await user.click(screen.getByRole('button', { name: /Grocery/, expanded: false }))
-    await user.click(screen.getByRole('button', { name: 'Kosher' }))
-
-    expect(groceryBox).toBeChecked()
-
-    // And Apply actually commits it to the live selection, not just the
-    // draft's own display — reopening the picker re-syncs from live state
-    // (see the "reopening after Back" test above), so Grocery staying
-    // checked there proves Apply carried the filter-triggered check through.
-    await user.click(screen.getByRole('button', { name: 'Apply' }))
-    await user.click(screen.getByRole('button', { name: '⋯ More' }))
-    expect(screen.getByRole('checkbox', { name: 'Show Grocery' })).toBeChecked()
+    expect(screen.getByRole('checkbox', { name: 'Show Grocery' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Kosher' })).not.toBeInTheDocument()
   })
 })
 
@@ -783,6 +1249,28 @@ describe('ResourceMapView — the map’s own location control', () => {
     expect(screen.getByRole('button', { name: '1 Main St' })).toBeInTheDocument()
   })
 
+  // Oct 15, the user: the chips ran to within 12px of the ✕, with Set
+  // location on a line of its own under it. Now one row: the chips take
+  // what's left and end 16px before Set location, which sits just left of
+  // the corner's button.
+  it('sits on the chips’ row, just left of the corner’s button, the chips ending a gap before it', () => {
+    renderFullscreen(mapControls())
+    const control = screen.getByTestId('map-location-control')
+    expect(control).toContainElement(screen.getByRole('button', { name: 'Set location' }))
+    const corner = screen.getByTestId('map-top-corner')
+    expect(corner).toContainElement(control)
+    expect(corner.className).toMatch(/\bshrink-0\b/)
+    // Set location first, then the corner's button.
+    expect(corner.lastElementChild).toBeInstanceOf(HTMLButtonElement)
+    expect(corner.firstElementChild).toBe(control)
+    // The same row as the chips, which shrink rather than run under it.
+    const row = screen.getByTestId('map-top-row')
+    expect(row).toContainElement(screen.getByTestId('map-top-chips'))
+    expect(row).toContainElement(corner)
+    expect(row.className).toMatch(/\bgap-4\b/)
+    expect(screen.getByTestId('map-top-chips').className).toMatch(/\bmin-w-0\b.*\bflex-1\b|\bflex-1\b.*\bmin-w-0\b/)
+  })
+
   it('renders nothing for a caller with no location to set (the admin preview map)', () => {
     renderFullscreen(undefined)
     expect(screen.queryByRole('button', { name: 'Set location' })).not.toBeInTheDocument()
@@ -804,5 +1292,983 @@ describe('ResourceMapView — the map’s own location control', () => {
       { content: { categories: [makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })] } },
     )
     expect(screen.queryByRole('button', { name: 'Set location' })).not.toBeInTheDocument()
+  })
+})
+
+// A real user reported seeing a brief flash of "some other screen of a small
+// map" on desktop after pressing Escape on the standalone /map route. Root
+// cause: exitFullscreen() called setFullscreen(false) unconditionally before
+// navigating away, which rendered one frame of the embedded/boxed map layout
+// — a state that isn't supposed to exist for this screen at all (see the
+// `standalone` prop's own doc: "a standalone map always opens (and stays)
+// fullscreen — there's no boxed state for it") — before the navigation
+// actually unmounted the component.
+describe('ResourceMapView — standalone map Escape/exit', () => {
+  function renderStandalone(onExitFullscreenToListing: () => void) {
+    return renderMap(
+      <HeaderCollapseProvider>
+        <ResourceMapView onUp={vi.fn()} standalone visible onExitFullscreenToListing={onExitFullscreenToListing} />
+      </HeaderCollapseProvider>,
+      [listingWithGeo({ category: 'grocery' })],
+    )
+  }
+
+  it('navigates away on Escape without ever dropping out of its fullscreen layout first', () => {
+    const onExit = vi.fn()
+    renderStandalone(onExit)
+
+    expect(screen.getByRole('button', { name: 'Close map' })).toBeInTheDocument()
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+
+    expect(onExit).toHaveBeenCalledTimes(1)
+    // Still the fullscreen layout, synchronously — nothing ever flipped it to
+    // the boxed one, so there's no frame for that flash to happen in.
+    expect(screen.getByRole('button', { name: 'Close map' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'View fullscreen' })).not.toBeInTheDocument()
+  })
+
+  // Oct 15 (board "A"): the way out is a bare ✕ in the map's top-right
+  // corner. The ‹ Back that used to sit beside the search read as "close
+  // this panel", it sat on the sidebar, and it was one of three ‹ on screen.
+  it('✕ Close map in the corner (its other exit path) behaves the same way, and nothing sits beside the search', async () => {
+    const user = userEvent.setup()
+    const onExit = vi.fn()
+    renderStandalone(onExit)
+    expect(screen.queryByRole('button', { name: 'Exit fullscreen' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument()
+    const close = screen.getByRole('button', { name: 'Close map' })
+    // Words for a screen reader only; on screen it's the ✕ alone.
+    expect(close).toHaveTextContent(/^$/)
+    // The corner of the map's top row, after Set location.
+    expect(screen.getByTestId('map-top-corner').lastElementChild).toBe(close)
+    expect(screen.getByTestId('map-top-row').className).toMatch(/\bright-3\b.*\btop-3\b/)
+
+    await user.click(close)
+
+    expect(onExit).toHaveBeenCalledTimes(1)
+    expect(screen.getByRole('button', { name: 'Close map' })).toBeInTheDocument()
+  })
+
+  // Escape steps back one level at a time: a place open in the sidebar goes
+  // back to the results, and only the next Escape leaves the map.
+  it('Escape with a place open goes back to the results first; the next one leaves the map', async () => {
+    const user = userEvent.setup()
+    const onExit = vi.fn()
+    renderStandalone(onExit)
+    await user.click(screen.getByRole('button', { name: /^Select / }))
+    expect(await screen.findByRole('button', { name: 'Back to results' })).toBeInTheDocument()
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(onExit).not.toHaveBeenCalled()
+    expect(screen.queryByRole('button', { name: 'Back to results' })).not.toBeInTheDocument()
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(onExit).toHaveBeenCalledTimes(1)
+  })
+
+  // Escape in the search box closes its suggestions; that's its level, and
+  // the map behind it stays.
+  it('Escape in the search box doesn\u2019t leave the map', async () => {
+    const user = userEvent.setup()
+    const onExit = vi.fn()
+    renderStandalone(onExit)
+    await user.click(screen.getByPlaceholderText(/Search name, address/))
+    await user.keyboard('{Escape}')
+    expect(onExit).not.toHaveBeenCalled()
+  })
+
+  // While a place is open, the ✕ in the corner is the only ✕ on screen: the
+  // search box's own clear × steps aside, its ← being the way back.
+  it('with a place open: ← in the search box, no clear ×, and no "Back to list" line', async () => {
+    const user = userEvent.setup()
+    renderStandalone(vi.fn())
+    await user.type(screen.getByPlaceholderText(/Search name, address/), 'Gro')
+    expect(screen.getByRole('button', { name: 'Clear search' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /^Select / }))
+
+    const back = await screen.findByRole('button', { name: 'Back to results' })
+    expect(back.closest('form')).toContainElement(screen.getByPlaceholderText(/Search name, address/))
+    expect(screen.queryByRole('button', { name: 'Clear search' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Back to list' })).not.toBeInTheDocument()
+
+    await user.click(back)
+    expect(screen.queryByRole('button', { name: 'Back to results' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Clear search' })).toBeInTheDocument()
+  })
+
+  // Oct 15: editing a place showed two backs side by side, the search
+  // box's ← and the editor's own ‹. Hiding the search box instead moved the
+  // way back about and took search away; now the search box stays, its ←
+  // is the only back, and it steps back one level, as Escape does.
+  it('editing a place: the search box stays, and its ← steps back one level at a time', async () => {
+    const user = userEvent.setup()
+    renderStandalone(vi.fn())
+    await user.click(screen.getByRole('button', { name: /^Select / }))
+    await user.click(await screen.findByRole('button', { name: 'Edit listing' }))
+
+    const search = screen.getByPlaceholderText(/Search name, address/)
+    const back = await screen.findByRole('button', { name: 'Back to listing' })
+    expect(back.closest('form')).toContainElement(search)
+    // No ‹ beside "Edit listing": one arrow on screen.
+    expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Back to results' })).not.toBeInTheDocument()
+
+    // A row open, the ← closes it and the edit stays.
+    await user.click(screen.getByTestId('editor-row-name'))
+    expect(screen.getByTestId('editor-open-name')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Back' }))
+    expect(screen.queryByTestId('editor-open-name')).not.toBeInTheDocument()
+    expect(screen.getByTestId('editor-list')).toBeInTheDocument()
+
+    // Then out of the edit, to the listing; then to the results.
+    await user.click(screen.getByRole('button', { name: 'Back to listing' }))
+    expect(await screen.findByRole('button', { name: 'Edit listing' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Back to results' }))
+    expect(screen.queryByRole('button', { name: 'Edit listing' })).not.toBeInTheDocument()
+    expect(screen.getByPlaceholderText(/Search name, address/)).toBeInTheDocument()
+  })
+
+  // With the search box there mid-edit, a search or another pin would drop
+  // what's been typed without a word; it asks first, and only if anything
+  // has been typed.
+  describe('leaving an edit for something else', () => {
+    function renderTwo() {
+      return renderMap(
+        <HeaderCollapseProvider>
+          <ResourceMapView onUp={vi.fn()} standalone visible />
+        </HeaderCollapseProvider>,
+        [listingWithGeo({ id: 'a1', category: 'grocery', name: 'Acme Grocery' }), listingWithGeo({ id: 'b2', category: 'grocery', name: 'Best Grocery' }), listingWithGeo({ id: 's3', category: 'synagogue', name: 'Beth Shul' })],
+        // Two, and one keeping hours, so there's an Open now to switch on.
+        [makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores', detailFields: [HOURS] }), makeCategory({ id: 'synagogue', pluralLabel: 'Synagogues' })],
+      )
+    }
+    const formState = () => (window.history.state as { mapSheetForm?: string } | null)?.mapSheetForm
+    async function editWithChange(user: ReturnType<typeof userEvent.setup>) {
+      await user.click(screen.getByRole('button', { name: 'Select Acme Grocery' }))
+      await user.click(await screen.findByRole('button', { name: 'Edit listing' }))
+      await user.click(screen.getByTestId('editor-row-name'))
+      const name = within(screen.getByTestId('editor-open-name')).getAllByRole('textbox')[0]
+      await user.clear(name)
+      await user.type(name, 'Acme Market')
+    }
+    afterEach(() => {
+      vi.restoreAllMocks()
+      window.history.replaceState(null, '', '/test-community/map')
+    })
+
+    it('another pin, with something typed: asks, and No keeps the edit', async () => {
+      const user = userEvent.setup()
+      const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
+      renderTwo()
+      await editWithChange(user)
+
+      await user.click(screen.getByRole('button', { name: 'Select Best Grocery' }))
+
+      expect(confirm).toHaveBeenCalledWith('Discard your changes?')
+      expect(screen.getByTestId('editor-open-name')).toBeInTheDocument()
+      expect(formState()).toBe('edit')
+    })
+
+    it('another pin, with something typed: Yes drops the edit and opens the pin, its history unwound', async () => {
+      const user = userEvent.setup()
+      const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true)
+      renderTwo()
+      await editWithChange(user)
+
+      await user.click(screen.getByRole('button', { name: 'Select Best Grocery' }))
+
+      expect(confirm).toHaveBeenCalledTimes(1)
+      await waitFor(() => expect(screen.getByRole('link', { name: 'Best Grocery' })).toBeInTheDocument())
+      expect(screen.queryByTestId('editor-list')).not.toBeInTheDocument()
+      expect(formState()).toBeUndefined()
+    })
+
+    it('a search, with something typed: asks, and No keeps the edit', async () => {
+      const user = userEvent.setup()
+      const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
+      renderTwo()
+      await editWithChange(user)
+
+      await user.type(screen.getByPlaceholderText(/Search name, address/), 'Best{Enter}')
+
+      expect(confirm).toHaveBeenCalledWith('Discard your changes?')
+      expect(screen.getByTestId('editor-open-name')).toBeInTheDocument()
+    })
+
+    it('nothing typed: no question, and the edit\u2019s history is unwound all the same', async () => {
+      const user = userEvent.setup()
+      const confirm = vi.spyOn(window, 'confirm')
+      renderTwo()
+      await user.click(screen.getByRole('button', { name: 'Select Acme Grocery' }))
+      await user.click(await screen.findByRole('button', { name: 'Edit listing' }))
+      expect(formState()).toBe('edit')
+
+      await user.click(screen.getByRole('button', { name: 'Select Best Grocery' }))
+
+      expect(confirm).not.toHaveBeenCalled()
+      await waitFor(() => expect(screen.getByRole('link', { name: 'Best Grocery' })).toBeInTheDocument())
+      expect(formState()).toBeUndefined()
+    })
+
+    it('the ← with something typed: no question, it\u2019s a step back, not something else', async () => {
+      const user = userEvent.setup()
+      const confirm = vi.spyOn(window, 'confirm')
+      renderTwo()
+      await editWithChange(user)
+
+      await user.click(screen.getByRole('button', { name: 'Back' }))
+      await user.click(screen.getByRole('button', { name: 'Back to listing' }))
+
+      expect(confirm).not.toHaveBeenCalled()
+      expect(await screen.findByRole('button', { name: 'Edit listing' })).toBeInTheDocument()
+    })
+
+    // A filter is a commit, which on desktop closes the open place to show
+    // the results; mid-edit it leaves the edit be (Oct 15).
+    it('a filter switched on mid-edit leaves the edit open', async () => {
+      const user = userEvent.setup()
+      renderTwo()
+      await editWithChange(user)
+
+      await user.click(screen.getByTestId('map-filters-button'))
+      await user.click(within(screen.getByTestId('map-filters-grocery')).getByRole('switch', { name: 'Open now' }))
+      expect(screen.getByTestId('map-filters-button')).toHaveAccessibleName('Filters, 1 on')
+
+      expect(screen.getByTestId('editor-open-name')).toBeInTheDocument()
+      expect(formState()).toBe('edit')
+    })
+  })
+
+  // Oct 15: ✕ mid-edit only closed the editor. The editor's own history
+  // entry was the one router.back() popped, so the visitor stayed on the
+  // map. ✕ now unwinds the editor's entries first and then leaves.
+  it('✕ mid-edit leaves the map, not just the edit', async () => {
+    const user = userEvent.setup()
+    let stateAtExit: unknown = 'not called'
+    const onExit = vi.fn(() => {
+      stateAtExit = window.history.state
+    })
+    renderStandalone(onExit)
+    await user.click(screen.getByRole('button', { name: /^Select / }))
+    await user.click(await screen.findByRole('button', { name: 'Edit listing' }))
+    expect((window.history.state as { mapSheetForm?: string } | null)?.mapSheetForm).toBe('edit')
+
+    await user.click(screen.getByRole('button', { name: 'Close map' }))
+
+    await waitFor(() => expect(onExit).toHaveBeenCalledTimes(1))
+    // Leaving from the map's own entry, so the caller's router.back() goes
+    // where the map was opened from rather than into the edit's listing.
+    expect((stateAtExit as { mapSheetForm?: string } | null)?.mapSheetForm).toBeUndefined()
+  })
+
+  // Escape mid-edit is one step back inside the editor, like its ‹, not a
+  // jump to the results that dropped the edit.
+  it('Escape mid-edit returns to the place, not the results', async () => {
+    const user = userEvent.setup()
+    const onExit = vi.fn()
+    renderStandalone(onExit)
+    await user.click(screen.getByRole('button', { name: /^Select / }))
+    await user.click(await screen.findByRole('button', { name: 'Edit listing' }))
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+
+    expect(await screen.findByRole('button', { name: 'Edit listing' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Back to results' })).toBeInTheDocument()
+    expect(onExit).not.toHaveBeenCalled()
+  })
+
+  // Regression coverage for a real, live-confirmed bug: the fullscreen
+  // wrapper's `fixed inset-0` positioning — the only thing that paints
+  // behind env(safe-area-inset-top), the iOS status bar/notch area — used
+  // to be `desktop:`-only, on the theory that mobile was already
+  // "effectively full-bleed" via plain flex layout (see the `fullscreen`
+  // state's own doc comment). Plain flow content doesn't extend behind the
+  // notch the way a fixed layer does, though, which showed up live as a
+  // gray gap (the page's own background) above the floating search bar on
+  // a real notched phone. `fixed` (unprefixed, so it applies on mobile too)
+  // needs its own bottom reservation there, unlike desktop — mobile's fixed
+  // tab bar has to stay clear of it, where desktop has no such bottom
+  // chrome to protect.
+  it('on mobile, the standalone map is fixed to the viewport — not just desktop — with its top flush and its bottom clearing the tab bar', () => {
+    const { container } = renderMobileMap(
+      <HeaderCollapseProvider>
+        <ResourceMapView onUp={vi.fn()} standalone visible />
+      </HeaderCollapseProvider>,
+    )
+
+    const wrapper = container.querySelector('[class*="bottom-\\[calc(3\\.75rem"]') as HTMLElement | null
+    expect(wrapper).not.toBeNull()
+    expect(wrapper!.className).toMatch(/\bfixed\b/)
+    expect(wrapper!.className).toMatch(/\btop-0\b/)
+    expect(wrapper!.className).toMatch(/\bz-50\b/)
+  })
+})
+
+// The standalone map's own address bar used to never actually update after
+// the initial load — a chip toggle, a committed search, or picking a pin all
+// left window.location exactly where it started. The mechanism meant to do
+// this (a history.replaceState effect) checked window.history.state.mode
+// === 'map', a leftover from the old hand-rolled navigation state machine
+// (see useSiteNavigation.ts's own doc — "Now the URL is the state") that
+// nothing sets any more, so the effect's body never ran. A category
+// directory's own filters/search already round-trip through its URL the
+// same way (FindResourcesConnected); this closes the same gap here, so a
+// map link is shareable down to the exact chips/search/pin someone had
+// open — see mapQueryString/parseMapQuery.
+describe('ResourceMapView — the shareable URL (standalone)', () => {
+  afterEach(() => window.history.replaceState(null, '', '/test-community/map'))
+
+  // Two categories, not one — narrowing to "just Grocery" when it's the
+  // ONLY category available is indistinguishable from "All" by set equality
+  // (see allSelected's own comment below), so a single-category fixture
+  // can't tell "wrote the chip" apart from "wrongly treated it as All".
+  function renderStandaloneWithListings() {
+    const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores', detailFields: [HOURS] })
+    const synagogue = makeCategory({ id: 'synagogue', pluralLabel: 'Synagogues' })
+    return renderMap(
+      <HeaderCollapseProvider>
+        <ResourceMapView onUp={vi.fn()} standalone visible />
+      </HeaderCollapseProvider>,
+      [
+        listingWithGeo({ id: 'g1', category: 'grocery', name: 'Acme Grocery' }),
+        listingWithGeo({ id: 's1', category: 'synagogue', name: 'Beth Shalom' }),
+      ],
+      [grocery, synagogue],
+    )
+  }
+
+  it('writes the selected category chip to the URL', async () => {
+    const user = userEvent.setup()
+    renderStandaloneWithListings()
+
+    await user.click(screen.getByRole('button', { name: /Grocery Stores/ }))
+
+    expect(new URLSearchParams(window.location.search).get('cat')).toBe('grocery')
+  })
+
+  // "All" sets `selected` to a Set holding every current option's id, not
+  // back to null (see showAll's own comment) — without allSelected treating
+  // the two the same, this would spell out `cat=grocery,synagogue` instead
+  // of just omitting the param the way the pristine "nothing tapped yet"
+  // state already does.
+  it('omits `cat` entirely once "All" is re-selected, instead of spelling out every category', async () => {
+    const user = userEvent.setup()
+    renderStandaloneWithListings()
+
+    await user.click(screen.getByRole('button', { name: /Grocery Stores/ }))
+    expect(new URLSearchParams(window.location.search).get('cat')).toBe('grocery')
+
+    await user.click(screen.getByRole('button', { name: 'All' }))
+    expect(new URLSearchParams(window.location.search).has('cat')).toBe(false)
+  })
+
+  it('writes the selected pin to the URL', async () => {
+    const user = userEvent.setup()
+    renderStandaloneWithListings()
+
+    await user.click(screen.getByRole('button', { name: 'Select Acme Grocery' }))
+
+    expect(new URLSearchParams(window.location.search).get('place')).toBe('g1')
+  })
+
+  // Typing "open now" is Open now for everything that keeps hours (see
+  // mapFilters.ts): the URL carries it as `open=1`, not also `q=open+now`.
+  it('writes a committed "open now" search to the URL as open=1, not a redundant q=', async () => {
+    const user = userEvent.setup()
+    const { container } = renderStandaloneWithListings()
+    const input = container.querySelector<HTMLInputElement>('input[placeholder^="Search name, address"]')!
+
+    await user.type(input, 'open now')
+    await user.keyboard('{Enter}')
+
+    const params = new URLSearchParams(window.location.search)
+    expect(params.get('open')).toBe('1')
+    expect(params.get('q')).toBeNull()
+  })
+})
+
+// Next feeds history.replaceState back into useSearchParams, so every
+// address this screen writes comes back a moment later as new initial*
+// props. Re-applied, a late one undid the visitor's next move: on phones,
+// "Clear search" right after a reading put the question, its category and
+// Open now straight back (e2e/map-reader.spec.ts). An echo is ignored; a
+// real navigation still applies.
+describe('ResourceMapView — its own address-bar writes coming back', () => {
+  afterEach(() => window.history.replaceState(null, '', '/test-community/map'))
+
+  function setup() {
+    const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
+    const synagogue = makeCategory({ id: 'synagogue', pluralLabel: 'Synagogues' })
+    const listings = [
+      listingWithGeo({ id: 'g1', category: 'grocery', name: 'Acme Grocery' }),
+      listingWithGeo({ id: 's1', category: 'synagogue', name: 'Beth Shalom' }),
+    ]
+    const community = makeCommunity()
+    const content = makeContent({ categories: [grocery, synagogue] })
+    const wrap = (ui: ReactElement) => (
+      <CommunityProvider community={community} communities={[community]}>
+        <ContentProvider content={content}>
+          <PinnedProvider>
+            <DroppedPinsProvider>
+              <ListingsProvider listings={listings}>
+                <HeaderCollapseProvider>{ui}</HeaderCollapseProvider>
+              </ListingsProvider>
+            </DroppedPinsProvider>
+          </PinnedProvider>
+        </ContentProvider>
+      </CommunityProvider>
+    )
+    return { wrap, ...render(wrap(<ResourceMapView onUp={vi.fn()} standalone visible viewSearch="" />)) }
+  }
+
+  it('ignores a late echo of an address it wrote itself', async () => {
+    const user = userEvent.setup()
+    const { wrap, rerender } = setup()
+    await user.click(screen.getByRole('button', { name: /Grocery Stores/ })) // writes ?cat=grocery
+    await user.click(screen.getByRole('button', { name: 'All' })) // and then moves on
+    expect(screen.getByTestId('point-count')).toHaveTextContent('2')
+
+    // The first write arrives back only now.
+    rerender(wrap(<ResourceMapView onUp={vi.fn()} standalone visible initialSelectedCategories={['grocery']} viewSearch="cat=grocery" />))
+    expect(screen.getByTestId('point-count')).toHaveTextContent('2')
+  })
+
+  it('still applies a real navigation to an address it never wrote', async () => {
+    const user = userEvent.setup()
+    const { wrap, rerender } = setup()
+    await user.click(screen.getByRole('button', { name: /Grocery Stores/ }))
+
+    rerender(wrap(<ResourceMapView onUp={vi.fn()} standalone visible initialSelectedCategories={['synagogue']} viewSearch="cat=synagogue" />))
+    expect(screen.getByTestId('point-count')).toHaveTextContent('1')
+    expect(screen.getByRole('button', { name: 'Select Beth Shalom' })).toBeInTheDocument()
+  })
+
+  // Kept mounted between visits, the screen is shown again for a link with
+  // that link's props, and its effects re-run as it's shown. Its own write
+  // never came back as props (Next doesn't always echo one), so the same
+  // link again looked like nothing new, and the commit that showed it wrote
+  // the last view back over the address: Food's Full map came back on All
+  // (the user, Oct 13).
+  it('the same link again, after the visitor changed the view, shows the link', async () => {
+    const user = userEvent.setup()
+    const { wrap, rerender } = setup()
+    const map = (mode: 'visible' | 'hidden') =>
+      wrap(
+        <Activity mode={mode}>
+          <ResourceMapView onUp={vi.fn()} standalone visible initialSelectedCategories={['grocery']} viewSearch="cat=grocery" />
+        </Activity>,
+      )
+    window.history.replaceState(null, '', '/?cat=grocery')
+    rerender(map('visible'))
+    expect(screen.getByTestId('point-count')).toHaveTextContent('1')
+    await user.click(screen.getByRole('button', { name: 'All' })) // writes, and no echo comes
+    expect(screen.getByTestId('point-count')).toHaveTextContent('2')
+    expect(window.location.search).not.toBe('?cat=grocery')
+
+    // Away, then the same link: Groceries only, Pinned off.
+    rerender(map('hidden'))
+    window.history.pushState(null, '', '/?cat=grocery')
+    rerender(map('visible'))
+    expect(window.location.search).toBe('?cat=grocery')
+    expect(screen.getByTestId('point-count')).toHaveTextContent('1')
+    expect(screen.getByRole('button', { name: 'All' })).toHaveAttribute('aria-pressed', 'false')
+  })
+})
+
+// The map's search is the same question-reading search as the home and
+// category pages (see askSearch.ts). Word for word, this question matched
+// nothing: no listing says "where", "buy" or "cholov".
+describe('ResourceMapView — search reads a question', () => {
+  it('pins only the store the question is about', async () => {
+    const user = userEvent.setup()
+    const grocery = makeCategory({
+      id: 'grocery',
+      label: 'Grocery Store',
+      pluralLabel: 'Grocery Stores',
+      detailFields: [{ key: 'm', label: 'Kosher items', type: 'tags' }],
+    })
+    const { container } = renderMap(
+      <HeaderCollapseProvider>
+        <ResourceMapView onUp={vi.fn()} standalone visible />
+      </HeaderCollapseProvider>,
+      [
+        listingWithGeo({ id: 'g1', category: 'grocery', name: 'ShopRite', m: ['Chalav Yisroel Milk'] }),
+        listingWithGeo({ id: 'g2', category: 'grocery', name: 'Acme Grocery', m: ['Challah'] }),
+      ],
+      [grocery],
+    )
+    const input = container.querySelector<HTMLInputElement>('input[placeholder^="Search name, address"]')!
+
+    await user.type(input, 'where can I buy cholov yisroel milk')
+    await user.keyboard('{Enter}')
+
+    expect(screen.getByRole('button', { name: 'Select ShopRite' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Select Acme Grocery' })).not.toBeInTheDocument()
+  })
+
+  // Opened from the map's search, a place marks what the search matched, the
+  // same as a listing opened from any other search (see PlaceDetailBody).
+  it('marks what the search matched in the place it opens', async () => {
+    const user = userEvent.setup()
+    const grocery = makeCategory({
+      id: 'grocery',
+      label: 'Grocery Store',
+      pluralLabel: 'Grocery Stores',
+      detailFields: [{ key: 'm', label: 'Kosher items', type: 'tags' }],
+    })
+    const { container } = renderMap(
+      <HeaderCollapseProvider>
+        <ResourceMapView onUp={vi.fn()} standalone visible />
+      </HeaderCollapseProvider>,
+      [listingWithGeo({ id: 'g1', category: 'grocery', name: 'ShopRite', m: ['Challah', 'Chalav Yisroel Milk'] })],
+      [grocery],
+    )
+    const input = container.querySelector<HTMLInputElement>('input[placeholder^="Search name, address"]')!
+    await user.type(input, 'cholov yisroel milk')
+    await user.keyboard('{Enter}')
+    await user.click(screen.getByRole('button', { name: 'Select ShopRite' }))
+
+    const box = await screen.findByTestId('search-found')
+    expect(box).toHaveTextContent('Chalav Yisroel Milk')
+  })
+})
+
+describe('ResourceMapView — neighborhoods', () => {
+  it("keeps the map's search to the neighborhood it names", async () => {
+    const user = userEvent.setup()
+    const shuls = makeCategory({ id: 'synagogue', label: 'Synagogue', pluralLabel: 'Synagogues' })
+    const { container } = renderWithProviders(
+      <PinnedProvider>
+        <DroppedPinsProvider>
+          <ListingsProvider
+            listings={[
+              listingWithGeo({ id: 'm', category: 'synagogue', name: 'Mekor Habracha', geo: { lat: 39.9494, lng: -75.1661 } }),
+              listingWithGeo({ id: 'x', category: 'synagogue', name: 'Far Shul', geo: { lat: 40.1, lng: -75.0 } }),
+            ]}
+          >
+            <HeaderCollapseProvider>
+              <ResourceMapView onUp={vi.fn()} standalone visible />
+            </HeaderCollapseProvider>
+          </ListingsProvider>
+        </DroppedPinsProvider>
+      </PinnedProvider>,
+      { content: { categories: [shuls], campaignBanners: [] }, community: { slug: 'philly' } },
+    )
+    const input = container.querySelector<HTMLInputElement>('input[placeholder^="Search name, address"]')!
+    await user.type(input, 'shul in center city')
+    await user.keyboard('{Enter}')
+    expect(screen.getByRole('button', { name: 'Select Mekor Habracha' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Select Far Shul' })).not.toBeInTheDocument()
+  })
+})
+
+// ── The Filters sheet (agreed Sep 30) ───────────────────────────────────────
+// The category pages' own sheet, with a section for each category showing;
+// Open now in each that keeps hours, and one for everything above them when
+// two or more do.
+describe('ResourceMapView — the Filters sheet', () => {
+  const ALWAYS = Object.fromEntries(['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'].map((d) => [d, { open: '00:00', close: '23:59' }]))
+  const food = makeCategory({
+    id: 'restaurant',
+    pluralLabel: 'Food',
+    detailFields: [HOURS, { key: 't', label: 'Food Type', type: 'select', filterable: true }],
+  })
+  const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery', detailFields: [HOURS] })
+  // Calls its Type "t" as well, as the live Cemetery category does.
+  const cemetery = makeCategory({ id: 'cemetery', pluralLabel: 'Cemeteries', detailFields: [{ key: 't', label: 'Type', type: 'select', filterable: true }] })
+  const listings = [
+    listingWithGeo({ id: 'f1', category: 'restaurant', name: 'Judah', t: ['Meat'], hours: ALWAYS }),
+    listingWithGeo({ id: 'f2', category: 'restaurant', name: 'Sweet Box', t: ['Dairy'], hours: ALWAYS }),
+    listingWithGeo({ id: 'g1', category: 'grocery', name: 'Acme', hours: ALWAYS }),
+    listingWithGeo({ id: 'c1', category: 'cemetery', name: 'Har Jehuda', t: ['Jewish'] }),
+  ]
+
+  it('opens one sheet with a section for each category showing, and a pick narrows only its own', async () => {
+    const user = userEvent.setup()
+    renderMap(<ResourceMapView onUp={vi.fn()} />, listings, [food, grocery, cemetery])
+    expect(screen.getByTestId('point-count')).toHaveTextContent('4')
+
+    await user.click(screen.getByTestId('map-filters-button'))
+    const sheet = screen.getByTestId('map-filters')
+    expect(within(sheet).getByTestId('map-filters-restaurant')).toHaveTextContent('Food')
+    expect(within(sheet).getByTestId('map-filters-cemetery')).toHaveTextContent('Cemeteries')
+    await user.click(within(screen.getByTestId('map-filters-restaurant')).getByRole('button', { name: 'Meat' }))
+
+    // Sweet Box goes; the cemetery, whose "t" is its own Type, stays.
+    expect(screen.getByTestId('point-count')).toHaveTextContent('3')
+    expect(screen.queryByRole('button', { name: 'Select Sweet Box' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Select Har Jehuda' })).toBeInTheDocument()
+    expect(screen.getByTestId('map-filters-button')).toHaveAccessibleName('Filters, 1 on')
+    expect(within(sheet).getByRole('button', { name: 'Show 3 places' })).toBeInTheDocument()
+  })
+
+  // Oct 15: no line of chips repeating what was just tapped, as a category
+  // page has none. Filters turns solid with how many; the sheet says which.
+  it('a filter chosen in the sheet shows on Filters, not as a line of chips', async () => {
+    const user = userEvent.setup()
+    renderMap(<ResourceMapView onUp={vi.fn()} />, listings, [food, grocery, cemetery])
+    expect(screen.getByTestId('map-filters-button')).not.toHaveClass('bg-primary')
+    await user.click(screen.getByTestId('map-filters-button'))
+    await user.click(within(screen.getByTestId('map-filters-restaurant')).getByRole('button', { name: 'Meat' }))
+    await user.click(screen.getByRole('button', { name: 'Show 3 places' }))
+
+    expect(screen.queryByTestId('map-active-filters')).not.toBeInTheDocument()
+    expect(screen.getByTestId('map-filters-button')).toHaveAccessibleName('Filters, 1 on')
+    expect(screen.getByTestId('map-filters-button')).toHaveClass('bg-primary')
+
+    // Off again from the sheet.
+    await user.click(screen.getByTestId('map-filters-button'))
+    await user.click(within(screen.getByTestId('map-filters-restaurant')).getByRole('button', { name: 'Meat' }))
+    expect(screen.getByTestId('point-count')).toHaveTextContent('4')
+    expect(screen.getByTestId('map-filters-button')).toHaveAccessibleName('Filters')
+  })
+
+  it('Open now for everything: shown with two categories that keep hours, and it turns each one on', async () => {
+    const user = userEvent.setup()
+    renderMap(<ResourceMapView onUp={vi.fn()} />, listings, [food, grocery, cemetery])
+    await user.click(screen.getByTestId('map-filters-button'))
+    // Headed as every category's, like the sections under it (the user, Oct 10).
+    const top = within(screen.getByRole('region', { name: 'All categories' })).getByRole('switch', { name: 'Open now' })
+    expect(within(screen.getByTestId('map-filters-open-all')).getByRole('heading', { name: 'All categories' })).toBeInTheDocument()
+    const foodSwitch = within(screen.getByTestId('map-filters-restaurant')).getByRole('switch', { name: 'Open now' })
+    const grocerySwitch = within(screen.getByTestId('map-filters-grocery')).getByRole('switch', { name: 'Open now' })
+    // A cemetery keeps no hours: no Open now of its own.
+    expect(within(screen.getByTestId('map-filters-cemetery')).queryByRole('switch')).not.toBeInTheDocument()
+
+    await user.click(foodSwitch)
+    expect(top).not.toBeChecked()
+    expect(screen.getByTestId('map-filters-open-all')).toHaveTextContent('On for Food only.')
+
+    await user.click(top)
+    expect(top).toBeChecked()
+    expect(foodSwitch).toBeChecked()
+    expect(grocerySwitch).toBeChecked()
+
+    await user.click(top)
+    expect(foodSwitch).not.toBeChecked()
+    expect(grocerySwitch).not.toBeChecked()
+  })
+
+  it('Escape closes the Filters, not the full-screen map behind them', async () => {
+    const user = userEvent.setup()
+    const exit = vi.fn()
+    renderMap(
+      <HeaderCollapseProvider>
+        <ResourceMapView onUp={vi.fn()} standalone visible onExitFullscreenToListing={exit} />
+      </HeaderCollapseProvider>,
+      listings,
+      [food, grocery, cemetery],
+    )
+    await user.click(screen.getByTestId('map-filters-button'))
+    expect(screen.getByRole('dialog', { name: 'Filters' })).toBeInTheDocument()
+    await user.keyboard('{Escape}')
+    expect(screen.queryByRole('dialog', { name: 'Filters' })).not.toBeInTheDocument()
+    expect(exit).not.toHaveBeenCalled()
+  })
+
+  it('no Open now for everything with only one category that keeps hours', async () => {
+    const user = userEvent.setup()
+    renderMap(<ResourceMapView onUp={vi.fn()} />, listings.filter((l) => l.category !== 'grocery'), [food, cemetery])
+    await user.click(screen.getByTestId('map-filters-button'))
+    expect(screen.queryByTestId('map-filters-open-all')).not.toBeInTheDocument()
+    expect(within(screen.getByTestId('map-filters-restaurant')).getByRole('switch', { name: 'Open now' })).toBeInTheDocument()
+  })
+})
+
+// The user, Oct 16: as on a category page, the row under the pointer lifts
+// its pin on the map beside the list, and lets it go on leaving. It never
+// moves the map: only a click does that.
+describe('ResourceMapView — hovering a row in the sidebar', () => {
+  it('lifts that row’s pin, lets it go on leaving, and never reframes', async () => {
+    const user = userEvent.setup()
+    const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
+    renderMap(
+      <ResourceMapView onUp={vi.fn()} />,
+      [listingWithGeo({ id: 'g1', category: 'grocery', name: 'Acme Grocery' }), listingWithGeo({ id: 'g2', category: 'grocery', name: 'Bell Grocery' })],
+      [grocery],
+    )
+    await user.click(screen.getByRole('button', { name: /Grocery Stores/ }))
+    const aside = document.querySelector('aside')!
+    const frame = screen.getByTestId('frame-token').textContent
+    const row = within(aside).getByText('Bell Grocery').closest('[class*="divide-y"] > div') as HTMLElement
+    fireEvent.mouseMove(row, { movementX: 2, movementY: 1 })
+    expect(screen.getByTestId('lifted-pin')).toHaveTextContent('g2')
+    expect(screen.getByTestId('frame-token').textContent).toBe(frame)
+    fireEvent.mouseLeave(row)
+    expect(screen.getByTestId('lifted-pin')).toHaveTextContent(/^$/)
+  })
+})
+
+describe('ResourceMapView — eruv lines', () => {
+  const withEruvPage = [makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' }), makeCategory({ id: 'eruv', label: 'Eruv', pluralLabel: 'Eruvim', kind: 'eruv' })]
+  // The chips show once there's a place to plot.
+  const store = [makeListing({ id: 'g1', name: 'Grocer', category: 'grocery', geo: { lat: 39.95, lng: -75.16 } })]
+  const twoKinds = [
+    makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' }),
+    makeCategory({ id: 'synagogue', pluralLabel: 'Synagogues' }),
+    makeCategory({ id: 'eruv', label: 'Eruv', pluralLabel: 'Eruvim', kind: 'eruv' }),
+  ]
+  const places = [
+    makeListing({ id: 'g1', name: 'Grocer', category: 'grocery', geo: { lat: 39.95, lng: -75.16 } }),
+    makeListing({ id: 's1', name: 'Shul', category: 'synagogue', geo: { lat: 39.95, lng: -75.17 } }),
+  ]
+  // The Eruv button on the map, once the eruvim have arrived.
+  const eruvButton = () => screen.findByTestId('map-eruv-button')
+  const all = () => screen.getByRole('button', { name: 'All' })
+
+  // Oct 15: a layer, so a button on the map like Google Maps' Layers, not a
+  // chip in the row with the place filters.
+  it('is a button on the map, not a chip in the row', async () => {
+    renderMap(<ResourceMapView onUp={() => {}} />, store, withEruvPage)
+    const button = await eruvButton()
+    // On a computer, in the map's own corner, above zoom.
+    expect(within(screen.getByTestId('map-corner')).getByTestId('map-eruv-button')).toBe(button)
+    expect(button).toHaveAccessibleName('Eruv lines')
+    expect(button).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByTestId('eruv-count')).toHaveTextContent('0')
+    expect(screen.queryByRole('button', { name: /^Eruv$/ })).not.toBeInTheDocument()
+  })
+
+  it('on a phone, over the map rather than in its corner', async () => {
+    renderMobileMap(<ResourceMapView onUp={() => {}} />, store, withEruvPage)
+    const button = await eruvButton()
+    expect(within(screen.getByTestId('map-corner')).queryByTestId('map-eruv-button')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Eruv$/ })).not.toBeInTheDocument()
+    fireEvent.click(button)
+    expect(screen.getByTestId('eruv-count')).toHaveTextContent('2')
+  })
+
+  // The user, Oct 15: turning the lines on should bring up their list as a
+  // category's chip brings up its places. On a computer the sidebar opened
+  // and folded itself away again at once (no places, so "nothing to list"),
+  // and the phone's sheet stayed down at its handle.
+  it('brings up the list of eruvim: the sidebar on a computer, kept open with no places', async () => {
+    renderMap(<ResourceMapView onUp={() => {}} />, places, twoKinds)
+    expect(screen.getByRole('button', { name: 'Show sidebar' })).toBeInTheDocument()
+    fireEvent.click(await eruvButton())
+    expect(screen.getByRole('button', { name: 'Hide sidebar' })).toBeInTheDocument()
+    expect(within(document.querySelector('aside')!).getByTestId('nearby-eruvim')).toHaveTextContent('Center City Eruv')
+  })
+
+  it('on a phone, raises the sheet to the eruvim, as a category chip raises it to its places', async () => {
+    renderMobileMap(<ResourceMapView onUp={() => {}} />, places, twoKinds)
+    expect(screen.getByRole('button', { name: 'Expand nearby list' })).toBeInTheDocument()
+    fireEvent.click(await eruvButton())
+    expect(screen.queryByRole('button', { name: 'Expand nearby list' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Drag to resize nearby list' })).toBeInTheDocument()
+  })
+
+  it('with a category on too, the eruvim stay at the top of the list, its places under them', async () => {
+    renderMap(<ResourceMapView onUp={() => {}} />, places, twoKinds)
+    fireEvent.click(await eruvButton())
+    fireEvent.click(screen.getByRole('button', { name: /Grocery Stores/ }))
+    const aside = document.querySelector('aside')!
+    const eruvim = within(aside).getByTestId('nearby-eruvim')
+    const grocer = within(aside).getByText('Grocer')
+    expect(eruvim.compareDocumentPosition(grocer) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('draws every eruv with a line, all or none, and a tap turns them off again', async () => {
+    renderMap(<ResourceMapView onUp={() => {}} />, places, twoKinds)
+    fireEvent.click(await eruvButton())
+    expect(screen.getByTestId('map-eruv-button')).toHaveAttribute('aria-pressed', 'true')
+    // Not Elkins Park: it has no map to draw.
+    expect(screen.getByTestId('eruv-count')).toHaveTextContent('2')
+    expect(screen.getByRole('button', { name: 'Eruv Center City Eruv green' })).toBeInTheDocument()
+    fireEvent.click(screen.getByTestId('map-eruv-button'))
+    expect(screen.getByTestId('map-eruv-button')).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByTestId('eruv-count')).toHaveTextContent('0')
+    expect(screen.getByTestId('point-count')).toHaveTextContent('2')
+  })
+
+  it('from All, a tap is the lines alone, listed where the places were', async () => {
+    renderMap(<ResourceMapView onUp={() => {}} />, places, twoKinds)
+    fireEvent.click(await eruvButton())
+    expect(screen.getByTestId('point-count')).toHaveTextContent('0')
+    expect(screen.getByTestId('eruv-count')).toHaveTextContent('2')
+    expect(screen.getByTestId('eruv-framed')).toHaveTextContent('yes')
+    expect(all()).toHaveAttribute('aria-pressed', 'false')
+    // Not "nothing to show": the eruvim, each opening its listing.
+    // The sidebar's (the phone's sheet has the same).
+    const list = screen.getAllByTestId('nearby-eruvim')[0]
+    expect(within(list).getByText('University City Eruv')).toBeInTheDocument()
+    fireEvent.click(within(list).getByText('Center City Eruv'))
+    expect(screen.getByTestId('map-eruv-detail')).toBeInTheDocument()
+    expect(screen.getByTestId('eruv-selected')).toHaveTextContent('center-city')
+  })
+
+  it('a category then adds its pins; off again leaves the lines; Eruv off from there is All', async () => {
+    renderMap(<ResourceMapView onUp={() => {}} />, places, twoKinds)
+    fireEvent.click(await eruvButton())
+    fireEvent.click(screen.getByRole('button', { name: /Grocery Stores/ }))
+    expect(screen.getByTestId('point-count')).toHaveTextContent('1')
+    expect(screen.getByTestId('eruv-count')).toHaveTextContent('2')
+    // The last category off: the lines are still something to show.
+    fireEvent.click(screen.getByRole('button', { name: /Grocery Stores/ }))
+    expect(screen.getByTestId('point-count')).toHaveTextContent('0')
+    expect(screen.getByTestId('eruv-count')).toHaveTextContent('2')
+    // Eruv off with nothing else on: back to everything.
+    fireEvent.click(screen.getByTestId('map-eruv-button'))
+    expect(screen.getByTestId('eruv-count')).toHaveTextContent('0')
+    expect(screen.getByTestId('point-count')).toHaveTextContent('2')
+    expect(all()).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('with categories picked, a tap keeps them and draws the lines over them; off keeps them too', async () => {
+    renderMap(<ResourceMapView onUp={() => {}} />, places, twoKinds)
+    await eruvButton()
+    fireEvent.click(screen.getByRole('button', { name: /Grocery Stores/ }))
+    fireEvent.click(screen.getByTestId('map-eruv-button'))
+    expect(screen.getByTestId('point-count')).toHaveTextContent('1')
+    expect(screen.getByTestId('eruv-count')).toHaveTextContent('2')
+    fireEvent.click(screen.getByTestId('map-eruv-button'))
+    expect(screen.getByTestId('eruv-count')).toHaveTextContent('0')
+    expect(screen.getByTestId('point-count')).toHaveTextContent('1')
+  })
+
+  // Oct 15 (the user): with the lines on, All is a chip like any other —
+  // a tap on it lit hides the places, leaving the lines; the map is never
+  // empty, so with the lines off it stays lit. It never touches the lines.
+  describe('All, with the lines on', () => {
+    it('dark, brings every place back under the lines', async () => {
+      renderMap(<ResourceMapView onUp={() => {}} />, places, twoKinds)
+      fireEvent.click(await eruvButton())
+      fireEvent.click(all())
+      expect(screen.getByTestId('point-count')).toHaveTextContent('2')
+      expect(screen.getByTestId('eruv-count')).toHaveTextContent('2')
+      expect(all()).toHaveAttribute('aria-pressed', 'true')
+      expect(screen.getByTestId('map-eruv-button')).toHaveAttribute('aria-pressed', 'true')
+    })
+
+    it('lit, hides the places and leaves the lines alone', async () => {
+      renderMap(<ResourceMapView onUp={() => {}} />, places, twoKinds)
+      fireEvent.click(await eruvButton())
+      fireEvent.click(all())
+      fireEvent.click(all())
+      expect(screen.getByTestId('point-count')).toHaveTextContent('0')
+      expect(screen.getByTestId('eruv-count')).toHaveTextContent('2')
+      expect(all()).toHaveAttribute('aria-pressed', 'false')
+      expect(screen.getAllByTestId('nearby-eruvim')[0]).toBeInTheDocument()
+    })
+
+    it('lit with the lines off, does nothing', async () => {
+      renderMap(<ResourceMapView onUp={() => {}} />, places, twoKinds)
+      await eruvButton()
+      fireEvent.click(all())
+      expect(screen.getByTestId('point-count')).toHaveTextContent('2')
+      expect(screen.getByTestId('eruv-count')).toHaveTextContent('0')
+      expect(all()).toHaveAttribute('aria-pressed', 'true')
+    })
+  })
+
+  // The lines are the button's now, not a filter (Oct 15).
+  describe('Filters', () => {
+    it('has no Eruv lines switch, and its count leaves the lines out', async () => {
+      renderMap(<ResourceMapView onUp={() => {}} />, store, withEruvPage)
+      fireEvent.click(await eruvButton())
+      expect(screen.getByTestId('map-filters-button')).toHaveAccessibleName('Filters')
+      fireEvent.click(screen.getByTestId('map-filters-button'))
+      const sheet = await screen.findByTestId('map-filters')
+      expect(within(sheet).queryByRole('switch', { name: 'Eruv lines' })).not.toBeInTheDocument()
+      // Nothing to clear: the lines aren't Filters'.
+      expect(within(sheet).getByRole('button', { name: 'Clear all' }).parentElement).toHaveClass('invisible')
+    })
+
+    it('Clear all leaves the lines', async () => {
+      renderMap(<ResourceMapView onUp={() => {}} />, store, withEruvPage)
+      fireEvent.click(await eruvButton())
+      fireEvent.click(screen.getByRole('button', { name: /Grocery Stores/ }))
+      fireEvent.click(screen.getByTestId('map-filters-button'))
+      fireEvent.click(within(await screen.findByTestId('map-filters')).getByRole('button', { name: 'Clear all' }))
+      expect(screen.getByTestId('eruv-count')).toHaveTextContent('2')
+    })
+  })
+
+  it('the Eruv page’s Full map opens on the lines alone', async () => {
+    renderMap(<ResourceMapView onUp={() => {}} initialEruvim="only" />, places, twoKinds)
+    expect(await eruvButton()).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByTestId('point-count')).toHaveTextContent('0')
+    expect(screen.getByTestId('eruv-count')).toHaveTextContent('2')
+  })
+
+  it('eruv=1 in a link: every place with the lines over them', async () => {
+    renderMap(<ResourceMapView onUp={() => {}} initialEruvim />, store, withEruvPage)
+    expect(await eruvButton()).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByTestId('eruv-count')).toHaveTextContent('2')
+    expect(screen.getByTestId('point-count')).toHaveTextContent('1')
+    expect(all()).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  describe('in the address bar (standalone)', () => {
+    afterEach(() => window.history.replaceState(null, '', '/test-community/map'))
+
+    it('says the lines alone as eruv=only, and a category over them as cat + eruv=1', async () => {
+      renderMap(
+        <HeaderCollapseProvider>
+          <ResourceMapView onUp={vi.fn()} standalone visible />
+        </HeaderCollapseProvider>,
+        places,
+        twoKinds,
+      )
+      fireEvent.click(await eruvButton())
+      let params = new URLSearchParams(window.location.search)
+      expect(params.get('eruv')).toBe('only')
+      expect(params.has('cat')).toBe(false)
+      fireEvent.click(screen.getByRole('button', { name: /Grocery Stores/ }))
+      params = new URLSearchParams(window.location.search)
+      expect(params.get('cat')).toBe('grocery')
+      expect(params.get('eruv')).toBe('1')
+    })
+  })
+
+  it('tapping an eruv opens its listing where a place opens, picked out, with a way back', async () => {
+    renderMap(<ResourceMapView onUp={() => {}} />, store, withEruvPage)
+    fireEvent.click(await eruvButton())
+    fireEvent.click(screen.getByRole('button', { name: 'Eruv Center City Eruv green' }))
+    const detail = screen.getByTestId('map-eruv-detail')
+    expect(within(detail).getByText('Center City Eruv')).toBeInTheDocument()
+    expect(within(detail).getByText('Where Center City Eruv goes.')).toBeInTheDocument()
+    expect(screen.getByTestId('eruv-selected')).toHaveTextContent('center-city')
+    // The way back is the search box's ←, as for a place (Oct 15).
+    expect(within(detail).queryByRole('button', { name: 'Back to list' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Back to results' }))
+    expect(screen.queryByTestId('map-eruv-detail')).not.toBeInTheDocument()
+    expect(screen.getByTestId('eruv-selected')).toHaveTextContent('')
+  })
+
+  // As for a place (Oct 15): editing an eruv, the search box stays and its
+  // ← is the way back, with no ‹ beside the editor's title.
+  it('editing an eruv in the sidebar: the search box stays, its ← back to the eruv', async () => {
+    renderMap(<ResourceMapView onUp={() => {}} />, store, withEruvPage)
+    fireEvent.click(await eruvButton())
+    fireEvent.click(screen.getByRole('button', { name: 'Eruv Center City Eruv green' }))
+    const detail = screen.getByTestId('map-eruv-detail')
+    fireEvent.click(within(detail).getByRole('button', { name: 'Edit listing' }))
+
+    expect(await screen.findByTestId('eruv-editing')).toBeInTheDocument()
+    expect(screen.getByPlaceholderText(/Search name, address/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Back to results' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Back to listing' }))
+    await waitFor(() => expect(screen.queryByTestId('eruv-editing')).not.toBeInTheDocument())
+    expect(screen.getByTestId('map-eruv-detail')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Back to results' })).toBeInTheDocument()
+  })
+
+  it('turning the lines off closes an open eruv', async () => {
+    renderMap(<ResourceMapView onUp={() => {}} />, store, withEruvPage)
+    fireEvent.click(await eruvButton())
+    fireEvent.click(screen.getByRole('button', { name: 'Eruv Center City Eruv green' }))
+    expect(screen.getByTestId('map-eruv-detail')).toBeInTheDocument()
+    fireEvent.click(screen.getByTestId('map-eruv-button'))
+    expect(screen.queryByTestId('map-eruv-detail')).not.toBeInTheDocument()
+    expect(screen.getByTestId('eruv-count')).toHaveTextContent('0')
+  })
+
+  it('no Eruv button where the community has no Eruv page', () => {
+    renderMap(<ResourceMapView onUp={() => {}} />, store)
+    expect(screen.queryByTestId('map-eruv-button')).not.toBeInTheDocument()
   })
 })

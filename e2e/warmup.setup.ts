@@ -39,7 +39,9 @@ setup('warm the content caches', async ({ page, request }) => {
   // that should already be on the page ("What are you looking for?", the
   // Update Listings card's Add button) failing with "element(s) not found"
   // — not a rendering bug, a dozen parallel tests all racing the same
-  // in-flight miss on one of these three.
+  // in-flight miss on one of these three. campaign-banners joined
+  // loadCommunityContent later and gets the same treatment up front rather
+  // than waiting to reproduce the same bug a fourth time.
   const responses = await Promise.all([
     request.get(`/api/categories?community=${community}`),
     request.get(`/api/resources?community=${community}`),
@@ -48,6 +50,7 @@ setup('warm the content caches', async ({ page, request }) => {
     request.get(`/api/home-sections?community=${community}`),
     request.get(`/api/forms?community=${community}`),
     request.get(`/api/hospitals?community=${community}`),
+    request.get(`/api/campaign-banners?community=${community}`),
   ])
 
   // A content read that's outright broken should say so here, once, rather

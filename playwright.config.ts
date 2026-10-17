@@ -117,6 +117,10 @@ export default defineConfig({
     // Its own port, so a dev server left running on 3000 doesn't get tested by
     // accident — which would silently test the wrong build.
     command: `npm run build && npx next start --port ${PORT}`,
+    // Never the question reader: a test run mustn't spend on OpenAI or write
+    // readings (see src/app/api/ask/read/route.ts). The page answers with
+    // today's search alone, as it does whenever the reader is off.
+    env: { ...(process.env as Record<string, string>), QUESTION_READER: 'off' },
     url: BASE_URL,
     reuseExistingServer: !process.env.CI,
     timeout: 180_000,

@@ -24,11 +24,31 @@ export function roundMiles(miles: number): number {
   return Math.round(miles * 10) / 10
 }
 
+/** A distance as it's written: "0.4 mi", or in feet, to the nearest hundred,
+ *  where a tenth of a mile would round to nothing ("200 ft"). Rounded to a
+ *  tenth, two places on the same block were "0 mi" apart. */
+export function milesText(miles: number): string {
+  if (miles < 0.05) {
+    const feet = Math.round((miles * 5280) / 100) * 100
+    return feet < 100 ? 'under 100 ft' : `${feet} ft`
+  }
+  return `${roundMiles(miles)} mi`
+}
+
 // Rounded to one decimal, the way distances are shown. For display only —
 // see roundMiles's own note on why sorting needs haversineMiles directly.
 export function distanceMiles(a: LatLng, b: LatLng): number {
   return roundMiles(haversineMiles(a, b))
 }
+
+// Minutes of travel to straight-line miles. The guide measures distance as
+// the crow flies, not by road (drive and walk times would be a paid Google
+// lookup per place), so these are deliberately rough: walking at about 3 mph
+// over roughly a quarter more path than the straight line, and driving at an
+// average of about 24 mph once lights, turns and parking are in. Whatever
+// uses them says "about" or "rough", never a promise. Shared by search's
+// "within a 10-minute walk" and a hotel's shuls within a walk (walkList.ts).
+export const MILES_PER_MINUTE = { walk: 1 / 25, drive: 0.4 }
 
 // Geocodes a free-text address to coordinates. Tries Google first (best
 // accuracy, when the Geocoding API is enabled on the project) and falls back to

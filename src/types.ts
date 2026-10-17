@@ -1,3 +1,4 @@
+import type { CalendarDay } from '@/lib/jewishDays'
 /** A named geographic point with a timezone. Hospitals are one kind of landmark
  *  (the patient module keeps a list of them); the type itself is generic. */
 export type Landmark = {
@@ -61,6 +62,13 @@ export type ZmanimData = {
    *  forbidden, not the lead-up or the intermediate days. Derived from
    *  `holidays` in lib/zmanim, same as `isRoshChodesh`. */
   isYomTov?: boolean
+  /** Each day from today through `daysThrough` that's part of a festival
+   *  (Yom Tov, Chol HaMoed, Erev), in order. A day in that range with no
+   *  entry is an ordinary day; past `daysThrough`, nothing is known. Absent
+   *  in an older cached payload, which callers read as "not known". */
+  days?: CalendarDay[]
+  /** The last date `days` speaks for, YYYY-MM-DD. */
+  daysThrough?: string
   /** The next Yom Tov period landing within the lookahead window (see
    *  lib/zmanim.ts's own `lookaheadDays` doc for how far ahead that is) —
    *  `null` when there isn't one, which is the common case most weeks. */
@@ -99,63 +107,6 @@ export type ZmanimData = {
   } | null
 }
 
-export type Resource = {
-  name: string
-  hospitalId: string
-  distance: number
-  notes?: string
-}
-
-export type KosherPlace = {
-  id: string
-  name: string
-  hospitalId: string
-  distance: number
-  address: string
-  phone?: string
-  isKosher: boolean
-}
-
-export type Hotel = {
-  id: string
-  name: string
-  hospitalId: string
-  distance: number
-  address: string
-  phone: string
-  shuttleAvailable: boolean
-  shabbatFriendly: boolean
-  notes?: string
-}
-
-export type MikvahEntry = {
-  id: string
-  name: string
-  hospitalId: string
-  distance: number
-  address: string
-  phone: string
-  hours: string
-}
-
-export type EruvRecord = {
-  id: string
-  /** Name of the eruv, e.g. "University City Eruv". */
-  name: string
-  /** Short coverage description, e.g. "Penn, Drexel & West Philadelphia". */
-  area: string
-  /** The eruv's site, where current status and the boundary map are both posted. */
-  statusLink: string
-  notes: string
-}
-
-export type CommunityWhatsAppGroup = {
-  id: string
-  name: string
-  description: string
-  link: string
-}
-
 // ── Supabase resource directory (submission + moderation pipeline) ─────────────
 
 export type ResourceStatus = 'pending' | 'approved' | 'rejected' | 'archived'
@@ -181,9 +132,11 @@ export type ResourceRow = {
 
 /**
  * A resource normalized for the display components: shared fields at the top
- * level and the category-specific `details` flattened onto it, so existing
- * cards (KosherPlace/Hotel/MikvahEntry shapes) keep working unchanged.
+ * level and the category-specific `details` flattened onto it.
  */
+/** An outside source's name and the date it gave a listing. */
+export type ConfirmedFrom = { from: string; at: string }
+
 export type DirectoryResource = {
   id: string
   category: string
@@ -204,6 +157,11 @@ export type DirectoryResource = {
   /** Straight-line miles from the visitor's typed address (address-anchor mode).
    *  Computed client-side from `details.geo` — see ResourceLoader. */
   milesFromAddress?: number
+  /** Straight-line miles from the community's centre (its map centre), for
+   *  a visitor who hasn't set a location — so a list still says how far out
+   *  each place is. Display only: sorting by distance still needs a real
+   *  location (see withMilesFromCenter). */
+  milesFromCenter?: number
   /** Coordinates carried over from `details.geo` (spread onto the row). */
   geo?: { lat: number; lng: number } | null
   // ── Google Places sync (carried over from `details`, set by the sync job) ──
@@ -221,7 +179,12 @@ export type DirectoryResource = {
   googleSyncedAt?: string
   /** ISO timestamp of the last time a user confirmed the community-curated info is still accurate. */
   confirmedAt?: string
-  /** 'OPERATIONAL' | 'CLOSED_TEMPORARILY' | 'CLOSED_PERMANENTLY' from Google. */
+  /** Where `confirmedAt` came from, when an admin approved a change an
+   *  outside source made ("Keystone-K’s list", "Refuah"): `at` is the
+   *  confirmedAt it dated, so once a person confirms again (a new date) the
+   *  line says "Confirmed" again. Set only by approval (submissionStore). */
+  confirmedFrom?: ConfirmedFrom
+  /** 'OPERATIONAL'' | 'CLOSED_TEMPORARILY' | 'CLOSED_PERMANENTLY' from Google. */
   businessStatus?: 'OPERATIONAL' | 'CLOSED_TEMPORARILY' | 'CLOSED_PERMANENTLY'
   /** An admin's correction, which wins over `businessStatus` everywhere the
    *  app decides whether a place is trading — see effectiveBusinessStatus.
@@ -259,7 +222,7 @@ export type ResourceSubmission = {
 // ── Moderation queue (the `submission` table) ──────────────────────────────────
 
 export type SubmissionOperation = 'create' | 'update' | 'delete'
-export type SubmissionTargetType = 'listing' | 'tag' | 'category'
+export type SubmissionTargetType = 'listing' | 'tag' | 'category' | 'eruv'
 export type SubmissionStatus = 'pending' | 'approved' | 'rejected'
 
 /** A row from the `submission` table — one proposed change awaiting review. */
@@ -296,6 +259,8 @@ export type SubmissionRow = {
 export type EnrichedSubmission = SubmissionRow & {
   current?: ResourceRow | null
   categoryLabel?: string
+  /** An eruv suggestion's eruv as it is now (eruvSuggestion.ts). */
+  currentEruv?: { name: string; covers: string | null; website: string | null; hotline: string | null; alertsUrl: string | null } | null
 }
 
 /** Payload for a `category` create submission: the proposed category + its first
@@ -315,35 +280,12 @@ export type CategorySubmissionPayload = {
   }
 }
 
-export type JewishMedicalProfessional = {
-  name: string
-  specialty: string
-}
-
-export type BikurCholimContact = {
-  name: string
-  phone: string
-}
-
-export type JewishChaplain = {
-  name: string
-  phone: string
-}
-
-export type HospitalInfo = {
-  jewishMedicalProfessionals: JewishMedicalProfessional[]
-  bikurCholim: {
-    room: string
-    contact: BikurCholimContact
-  }
-  prayerSpace: string
-  jewishChaplain: JewishChaplain
-  shabbatAccommodations: string
-}
-
-/** A hospital as stored in the DB (the `hospital` table) — a landmark plus its
- *  optional per-hospital "Jewish life" details. */
-export type Hospital = Landmark & { info?: HospitalInfo | null }
+/** A hospital as stored in the DB (the `hospital` table): a name and a place.
+ *  The volunteer form offers these as choices, and the map can pin them. It
+ *  used to carry per-hospital "Jewish life" details too, but those were only
+ *  ever made-up placeholders and have been removed; the real hospital pages
+ *  are built from the hospital listings instead. */
+export type Hospital = Landmark
 
 // ── Audience + directory anchor ────────────────────────────────────────────────
 
@@ -363,15 +305,20 @@ export type DirectoryAnchor = {
 /** Directory filters carried onto the map — applied to pins as predicates and
  *  shown as removable chips. Serializable so it survives in history state. */
 export type MapFilters = {
-  /** Show only listings open right now (by their filterable hours field). */
+  /** Show only listings open right now (by their filterable hours field),
+   *  in every category that keeps hours. */
   openNow?: boolean
-  /** Boolean field keys that must be true on the listing (e.g. `isKosher`). */
+  /** Open now in these categories only (the map's `open=food,grocery`). */
+  openIn?: string[]
+  /** Boolean field keys that must be true on the listing (e.g. `isKosher`).
+   *  On the map, `category.key` for one category's (see mapFilters.ts). */
   bool?: string[]
-  /** Select field key → allowed values; a listing matches if its value is one. */
+  /** Select field key → allowed values; a listing matches if its value is
+   *  one. On the map, keyed `category.key` the same way. */
   select?: Record<string, string[]>
 }
 
-export type AppMode = 'home' | 'find' | 'map' | 'assist' | 'volunteer' | 'community-home' | 'give' | 'feedback'
+export type AppMode = 'home' | 'find' | 'map' | 'assist' | 'volunteer' | 'community-home' | 'give' | 'feedback' | 'browse' | 'you'
 
 /** A guided form opened over the current page: 'support'/'volunteer' for the
  *  two built-in wizards, or any other form's id for an admin-created one.
@@ -393,17 +340,15 @@ export type NavigateFn = (
 ) => void
 
 // ── Intake form types ─────────────────────────────────────────────────────────
-
-export type Ride = {
-  pickup: string
-  destination: string
-  date: string
-  time: string
-  recurring: boolean
-  endDate: string
-  numberOfPassengers: string
-  notes: string
-}
+//
+// The rigid per-service shapes this section used to define (Ride, MealsData,
+// TransportationData, FamilyHousingData, the Volunteer*Details family,
+// VolunteerData, VolunteerRemovalData, VisitorsData, IntakeFormData) are gone
+// — the wizard's actual per-response data has been a plain
+// `Record<string, unknown>` for a while now (see formResponseStore.ts), and
+// nothing outside this file still imported any of them. ContactHospitalData
+// is the one survivor: it's still a real, separately-validated shape (see
+// validation.ts's validateContact) used across the response pipeline.
 
 export type ContactHospitalData = {
   fullName: string
@@ -412,112 +357,4 @@ export type ContactHospitalData = {
   preferredContact: string
   hospitalId: string
   unitFloorRoom: string
-}
-
-export type MealsData = {
-  mealsFor: string
-  numberOfPeople: string
-  startDate: string
-  endDate: string
-  mealTypes: string[]
-  dietaryRequirements: string[]
-  dietaryOther: string
-  hechsher: string
-  notes: string
-}
-
-export type TransportationData = {
-  rides: Ride[]
-}
-
-export type FamilyHousingData = {
-  housingFor: string
-  numberOfAdults: string
-  numberOfChildren: string
-  arrivalDate: string
-  departureDate: string
-  maxDistance: string
-  transportationAvailable: string
-  accommodationRequirements: string[]
-  accessibilityRequirements: string[]
-  accessibilityOther: string
-  notes: string
-}
-
-// Extra questions shown when the matching "How can you help?" box is checked —
-// not about the volunteer's general info, but what they can offer for that
-// specific service (so we can match them to a patient/family's preferences).
-export type VolunteerVisitingDetails = {
-  gender: string
-  ageGroup: string
-}
-
-export type VolunteerMealsDetails = {
-  kosherStandard: string
-}
-
-export type VolunteerTransportationDetails = {
-  maxPassengers: string
-}
-
-export type VolunteerHousingDetails = {
-  apartmentType: string
-  numberOfRooms: string
-  numberOfBeds: string
-  address: string
-  wheelchairAccessible: boolean
-  elevatorInBuilding: boolean
-  maxDays: string
-}
-
-export type VolunteerData = {
-  waysToHelp: string[]
-  waysToHelpOther: string
-  hospitals: string[]
-  availability: string[]
-  hasCar: string
-  notes: string
-  visiting: VolunteerVisitingDetails
-  meals: VolunteerMealsDetails
-  transportation: VolunteerTransportationDetails
-  housing: VolunteerHousingDetails
-}
-
-export type VolunteerRemovalData = {
-  reason: string
-}
-
-export type VisitorsData = {
-  patientName: string
-  patientAgeGroup: string
-  visitorType: string[]
-  visitorTypeOther: string
-  visitFrequency: string
-  bestTimes: string[]
-  bestTimesOther: string
-  genderPreference: string
-  startDate: string
-  additionalInfo: string
-}
-
-export type IntakeFormData = {
-  // Shared contact + hospital
-  contact: ContactHospitalData
-  // Patient
-  patientName: string
-  relationship: string
-  // Situation
-  situation: string
-  // Assistance
-  assistanceNeeded: string[]
-  // Timing
-  timing: string
-  specificDate: string
-  // Additional
-  additionalInfo: string
-  // Service sections
-  meals: MealsData
-  transportation: TransportationData
-  familyHousing: FamilyHousingData
-  visitors: VisitorsData
 }

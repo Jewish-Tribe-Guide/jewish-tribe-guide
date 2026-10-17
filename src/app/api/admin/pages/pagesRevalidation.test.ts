@@ -23,11 +23,15 @@ describe('saving a page invalidates the public route', () => {
     expect(ROUTE).toMatch(/revalidateTag\(\s*TAGS\.pages/)
   })
 
-  it("also invalidates the page's own path", () => {
+  it("also invalidates the page's own path, for every community", () => {
     expect(
-      /revalidatePath\(\s*`\/\$\{slug\}`\s*\)/.test(ROUTE),
+      /revalidatePath\(\s*routes\[slug\]\(c\.slug\)\s*\)/.test(ROUTE),
       'the tag alone has been observed not to mark the page entry — see this file’s note',
     ).toBe(true)
+    // /about and /privacy live under /[community] now — one shared `page`
+    // row, but a URL per community — so this has to loop over every
+    // community rather than revalidating a single hand-typed path.
+    expect(ROUTE).toMatch(/for \(const c of communities\)/)
   })
 
   it('derives the path from the slug rather than listing routes by hand', () => {
@@ -36,6 +40,7 @@ describe('saving a page invalidates the public route', () => {
     // route and the store share.
     for (const slug of PAGE_SLUGS) {
       expect(ROUTE).not.toContain(`revalidatePath('/${slug}')`)
+      expect(ROUTE).not.toContain(`revalidatePath(\`/${slug}\`)`)
     }
     expect(PAGE_SLUGS.length).toBeGreaterThan(1)
   })

@@ -6,6 +6,7 @@ import {
   looksLikeCommunitySlug,
 } from '@/lib/configCommunity'
 import { listCommunityVisibility } from '@/lib/communityStore'
+import { createVisibilityLoader } from '@/lib/visibilityLoader'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Redirects "/" to a community.
@@ -79,36 +80,35 @@ function redirectRoot(request: NextRequest) {
 // EVERY community, including the two live ones, just to protect the rare
 // hidden one). The cost is bounded rather than paid per-request: results are
 // cached in-process for VISIBILITY_CACHE_MS, so this is one query per cache
-// window across all traffic, not one per request — and it's skipped
+// window per instance, not one per request — and it's skipped
 // entirely for any path that isn't shaped like /<community-slug>/....
 // ─────────────────────────────────────────────────────────────────────────────
 
 const ACCESS_PARAM = 'access'
 const VISIBILITY_CACHE_MS = 30_000
+// After a failed refresh: how long before trying again. Short, so a blip heals
+// in seconds instead of holding an old (or empty) answer for a full window.
+const VISIBILITY_RETRY_MS = 5_000
 
-let visibilityCache: { at: number; bySlug: Record<string, { visible: boolean; previewToken: string }> } | null =
-  null
+// See visibilityLoader.ts. The failure policy, in one place: a failed refresh
+// keeps serving the last good answer; only a process that has NEVER loaded one
+// fails open. That last case is deliberate — getAdminClient() throws
+// synchronously on a missing Supabase env var (a real state on a fresh preview
+// deployment), and that exception once reached all the way out of the proxy
+// and broke EVERY path on the site (ERR_INVALID_RESPONSE), not just a hidden
+// community's. The one thing this gate must never do is take down traffic it
+// isn't even meant to affect. A misconfigured deployment loses the visibility
+// gate, not the site.
+const loadVisibility = createVisibilityLoader({
+  load: listCommunityVisibility,
+  empty: {} as Awaited<ReturnType<typeof listCommunityVisibility>>,
+  ttlMs: VISIBILITY_CACHE_MS,
+  retryMs: VISIBILITY_RETRY_MS,
+  onError: (err) => console.error('[proxy] community visibility refresh failed:', err),
+})
 
 async function getVisibility(slug: string) {
-  const now = Date.now()
-  if (!visibilityCache || now - visibilityCache.at > VISIBILITY_CACHE_MS) {
-    try {
-      visibilityCache = { at: now, bySlug: await listCommunityVisibility() }
-    } catch {
-      // getAdminClient() throws synchronously on a missing Supabase env var
-      // (see supabase/admin.ts) — a real thing that happens on a fresh
-      // preview deployment before its env is fully configured. That
-      // exception was reaching all the way out of the proxy uncaught,
-      // which broke EVERY path on the site (ERR_INVALID_RESPONSE), not
-      // just a hidden community's — the one thing this gate must never do
-      // is take down traffic it isn't even meant to affect. Fail open
-      // instead: treat every slug as unresolvable this cycle, same as an
-      // unknown one, and let the route render (or 404) normally. A
-      // misconfigured deployment loses the visibility gate, not the site.
-      visibilityCache = { at: now, bySlug: {} }
-    }
-  }
-  return visibilityCache.bySlug[slug] ?? null
+  return (await loadVisibility())[slug] ?? null
 }
 
 function previewCookieName(slug: string): string {

@@ -8,8 +8,7 @@ import { useIsMobile } from '@/lib/useIsMobile'
 
 type FrameProps = {
   /** The band's color — a category's own pin color (getCategoryColor), or a
-   *  fixed color for a pseudo-category with no CategoryConfig row (see
-   *  HospitalsDirectory's HOSPITAL_COLOR). */
+   *  fixed color for a pseudo-category with no CategoryConfig row. */
   color: string
   /** A photo to show muted under the color, e.g. CategoryConfig.cardImageUrl.
    *  Omit (or null) for the plain wash — most categories, and every caller
@@ -31,6 +30,16 @@ type FrameProps = {
  *  exactly 100vw, same reasoning as globals.css's html{overflow-x:hidden});
  *  the photo fills it edge to edge, while a nested max-w-6xl/px-4 column
  *  keeps `children` aligned with the rest of the page.
+ *
+ *  The `border-x` only wraps `children`, not the photo band above it — it
+ *  used to run the full height, which put a 1px slate-200 hairline down
+ *  both edges of the photo itself. Structurally that's the frame doing
+ *  exactly what its own doc says (one continuous piece), but against a
+ *  photo a 1px line at the true edge reads as the photo falling a pixel
+ *  short of "full-bleed," not as a border — confirmed against a live
+ *  deployment. The photo now runs completely clean to both edges; the
+ *  frame still continues around the header/filters/listing content below
+ *  it, just starting after the photo instead of through it.
  *
  *  `-mt-12` cancels SlugScreen's `<main>` `pt-8` (32px) plus the 16px of
  *  margin the TurnstileWidget placeholder (`my-2`, rendered ahead of every
@@ -58,25 +67,20 @@ export function CategoryBandFrame({ color, imageUrl, children }: FrameProps) {
     // Margins achieve the identical full-bleed layout without ever setting
     // a transform, so nothing downstream loses the viewport as its
     // containing block.
-    <div className="relative -mt-12 mx-[calc(50%-50vw)] border-x border-t border-slate-200">
+    <div className="relative -mt-12 mx-[calc(50%-50vw)] border-t border-slate-200">
       <div
-        className="relative h-48 overflow-hidden sm:h-56"
+        // 132px, down from 224: short enough that the list and the map
+        // beside it start above the fold on a 1440x900 screen.
+        className="relative h-[132px] overflow-hidden"
         style={!bandImage ? { backgroundColor: categoryTint(color) } : undefined}
       >
         {bandImage && (
-          <>
-            <Image src={bandImage} alt="" fill sizes="100vw" className="object-cover" unoptimized={!isOptimizableImage(bandImage)} />
-            {/* A photo's own mood varies wildly (dark, busy, unrelated
-                colors) and can bury the category color entirely — this
-                overlay is deliberately much stronger than the plain-wash
-                case (categoryTint's ~18%) so the category's own hue still
-                reads as the dominant color regardless of what's in the
-                photo underneath. */}
-            <div className="absolute inset-0" style={{ backgroundColor: `${color}73` }} />
-          </>
+          <Image src={bandImage} alt="" fill sizes="100vw" className="object-cover" unoptimized={!isOptimizableImage(bandImage)} />
         )}
       </div>
-      <div className="mx-auto max-w-6xl px-4">{children}</div>
+      <div className="border-x border-slate-200">
+        <div className="mx-auto max-w-6xl px-4">{children}</div>
+      </div>
     </div>
   )
 }

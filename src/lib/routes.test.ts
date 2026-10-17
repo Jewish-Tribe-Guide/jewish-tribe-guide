@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   assertUsableSlug,
   FIXED_VIEW_KINDS,
+  fixedViewSlug,
   mapQueryString,
   parseMapQuery,
   routes,
@@ -15,6 +16,8 @@ describe('routes', () => {
     expect(routes.feedback('philly')).toBe('/philly/feedback')
     expect(routes.slug('philly', 'grocery')).toBe('/philly/grocery')
     expect(routes.listing('philly', 'grocery', 'abc123')).toBe('/philly/grocery/abc123')
+    expect(routes.about('philly')).toBe('/philly/about')
+    expect(routes.privacy('philly')).toBe('/philly/privacy')
   })
 
   it('keeps communities apart', () => {
@@ -41,6 +44,11 @@ describe('slugRejectionReason', () => {
     expect(slugRejectionReason('admin')).toMatch(/reserved/i)
     expect(slugRejectionReason('api')).toMatch(/reserved/i)
     expect(slugRejectionReason('offline')).toMatch(/reserved/i)
+    // Both live under /[community] now (/[community]/about, /[community]/
+    // privacy) — a category with either name would shadow that screen at
+    // the same URL.
+    expect(slugRejectionReason('about')).toMatch(/reserved/i)
+    expect(slugRejectionReason('privacy')).toMatch(/reserved/i)
   })
 
   // A category named "Eruv" would slugify to exactly the word the Eruv
@@ -52,6 +60,26 @@ describe('slugRejectionReason', () => {
     for (const slug of Object.keys(FIXED_VIEW_KINDS)) {
       expect(slugRejectionReason(slug), slug).toMatch(/reserved/i)
     }
+  })
+
+  // Oct 15: a saved eruv on You linked to /philly/eruv-information, its
+  // category's id, which is an empty directory; the Eruv page is /eruv.
+  it('links a fixed view by its own slug, never its category’s id', () => {
+    expect(fixedViewSlug('eruv')).toBe('eruv')
+    expect(fixedViewSlug('zmanim')).toBe('zmanim')
+    expect(fixedViewSlug('listing')).toBeNull()
+    expect(routes.eruv('philly')).toBe('/philly/eruv')
+    expect(routes.eruv('philly', 'center city')).toBe('/philly/eruv?item=center%20city')
+  })
+
+  // /hospitals was the old Jewish Medical Resources screen, whose only content
+  // was made-up placeholder details (fake phone numbers, invented staff). It
+  // must not come back as a fixed view, and the URL stays kept for the real
+  // hospital pages.
+  it('has no hospitals fixed view, but keeps its URL reserved', () => {
+    expect(FIXED_VIEW_KINDS).not.toHaveProperty('hospitals')
+    expect(Object.values(FIXED_VIEW_KINDS)).not.toContain('medical')
+    expect(slugRejectionReason('hospitals')).toMatch(/reserved/i)
   })
 
   it('is case- and whitespace-insensitive when matching reserved slugs', () => {
@@ -96,6 +124,22 @@ describe('mapQueryString', () => {
   it('writes the selected place', () => {
     expect(mapQueryString({ place: 'abc123' })).toBe('?place=abc123')
   })
+
+  // The Pinned, Browse and What changed pages own their paths; a category
+  // can't take them.
+  it('reserves the You, Pinned, Browse and What changed pages’ slugs', () => {
+    expect(slugRejectionReason('you')).toMatch(/reserved/)
+    expect(slugRejectionReason('pinned')).toMatch(/reserved/)
+    expect(slugRejectionReason('browse')).toMatch(/reserved/)
+    expect(slugRejectionReason('changes')).toMatch(/reserved/)
+  })
+
+  // "See them on the map", on the Pinned page: the map with only the pins.
+  it('writes the Pinned chip, and reads it back', () => {
+    expect(mapQueryString({ pinned: true })).toBe('?pinned=1')
+    expect(parseMapQuery(new URLSearchParams('pinned=1')).pinned).toBe(true)
+    expect(parseMapQuery(new URLSearchParams('')).pinned).toBe(false)
+  })
 })
 
 describe('parseMapQuery', () => {
@@ -106,9 +150,40 @@ describe('parseMapQuery', () => {
       categories: ['grocery', 'restaurant'],
       query: 'bagel',
       openNow: true,
+      openIn: null,
       bool: ['isKosher'],
       select: { hechsher: ['OU', 'Star-K'] },
       place: 'abc123',
+      pinned: false,
+      eruvim: true,
+    }
+    expect(parse(mapQueryString(state))).toEqual(state)
+    expect(mapQueryString({ eruvim: true })).toBe('?eruv=1')
+    // An old link that picked eruvim one by one turns them all on.
+    expect(parse('eruv=center-city,university-city').eruvim).toBe(true)
+  })
+
+  // The lines alone: no `cat` already means every category, so it's said
+  // on the eruv itself.
+  it('round-trips the eruv lines alone, apart from the lines over every place', () => {
+    expect(mapQueryString({ eruvim: 'only' })).toBe('?eruv=only')
+    expect(parse('eruv=only').eruvim).toBe('only')
+    expect(parse('eruv=1').eruvim).toBe(true)
+  })
+
+  // Open now per category (the map's Filters sheet, see mapFilters.ts), and
+  // switches and picks written category.key.
+  it('round-trips Open now for some categories, and filters with their category', () => {
+    const state = {
+      categories: null,
+      query: null,
+      openNow: false,
+      openIn: ['grocery', 'restaurant'],
+      bool: ['mikvah.keilim'],
+      select: { 'restaurant.t': ['Meat'] },
+      place: null,
+      pinned: false,
+      eruvim: false,
     }
     expect(parse(mapQueryString(state))).toEqual(state)
   })
@@ -118,9 +193,12 @@ describe('parseMapQuery', () => {
       categories: null,
       query: null,
       openNow: false,
+      openIn: null,
       bool: null,
       select: null,
       place: null,
+      pinned: false,
+      eruvim: false,
     })
   })
 

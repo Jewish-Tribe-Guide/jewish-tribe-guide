@@ -63,13 +63,13 @@ describe('calendarDaysFor', () => {
     }
   })
 
-  it('adds Yom Tov when Hebcal says so, under Hebcal’s own name', () => {
+  it('adds Yom Tov when Hebcal says so, in the guide’s own spelling (agreed Oct 1)', () => {
     const yt = calendarDaysFor(
       ORDINARY_SATURDAY,
-      zmanim({ isRoshChodesh: false, isYomTov: true, holidays: ['Sukkot I'] }),
+      zmanim({ isRoshChodesh: false, isYomTov: true, holidays: ['Shmini Atzeret'] }),
     )
     expect(yt.dayKeys).toContain('yom_tov')
-    expect(yt.labels).toContain('Sukkot I')
+    expect(yt.labels).toContain('Shemini Atzeres')
   })
 
   it('drops Yom Tov when Hebcal says it is not', () => {

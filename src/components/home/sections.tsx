@@ -5,18 +5,16 @@ import Image from 'next/image'
 import Link from 'next/link'
 import type { CategoryConfig } from '@/lib/categories'
 import type { HomeSection } from '@/lib/homeSections'
-import type { DirectoryResource, NavigateFn } from '@/types'
+import type { NavigateFn } from '@/types'
 import { isOptimizableImage } from '@/lib/imageHosts'
-import { listingSearchText } from '@/lib/searchListing'
-import { haversineMiles } from '@/lib/geo'
-import { travelCompare } from '@/lib/listingTravel'
-import { GenericListingCard } from '@/components/resources/GenericListingCard'
+import { categoryCards } from '@/lib/cardSearch'
 import { useForm, useForms } from '@/lib/useForms'
 import { community } from '@/community.config'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { routes } from '@/lib/routes'
 import { CategoryGlyph } from '@/lib/categoryIcons'
 import CategoryIcon from '@/components/CategoryIcon'
+import { DotsIcon } from '@/components/icons'
 import { getCategoryColor } from '@/lib/categoryColor'
 import { useIsMobile } from '@/lib/useIsMobile'
 
@@ -107,6 +105,14 @@ export function Card({
       // mobile — desktop's screens are plain fades with no edge the
       // content is conceptually anchored to (see navTransitions.ts).
       transitionTypes={isMobile ? ['nav-forward'] : undefined}
+      // The home screen mounts every card in this grid at once — 10+ tiles,
+      // each one Next.js would otherwise eagerly prefetch the moment it's
+      // in the viewport — and mobile's and desktop's copies of this same
+      // grid both live in the DOM together (CSS toggles which one shows,
+      // not JS), so a single page load was firing every category route's
+      // RSC prefetch twice over. A click still navigates instantly either
+      // way; this only removes the speculative fetch nobody asked for yet.
+      prefetch={false}
     >
       <div
         className={`relative aspect-[4/3] rounded-2xl overflow-hidden ${hasImage ? 'bg-slate-100' : tint} ring-1 ring-slate-900/5 flex flex-col items-center justify-center gap-1 p-4 text-center transition-all duration-200 group-hover:shadow-lg group-hover:shadow-slate-900/10 group-hover:-translate-y-0.5 group-active:scale-[0.97] group-active:shadow-lg group-active:shadow-slate-900/10`}
@@ -134,7 +140,14 @@ export function Card({
             // Set on the first row of cards only — they're above the fold and
             // usually the largest contentful paint. Lazy-loading those delays
             // the very thing the page is measured on.
-            priority={priority}
+            //
+            // loading/fetchPriority rather than `priority`: that also adds a
+            // <link rel="preload"> to <head> with no media condition, and this
+            // grid is `desktop:hidden` — so desktop preloaded (and downloaded)
+            // tiles it never displays. An eager <img> costs a hidden copy too,
+            // which is why CardGrid keeps the count to one row.
+            loading={priority ? 'eager' : undefined}
+            fetchPriority={priority ? 'high' : undefined}
             // An admin can paste a URL from anywhere. next/image *throws* on a
             // host it wasn't configured for, so without this one pasted link
             // takes down the whole home screen — which is exactly what happened
@@ -175,10 +188,16 @@ export function CardSkeleton() {
 export function CardGrid({
   cards,
   loadingCount = 0,
+  priorityCount = 0,
   onCardClick,
 }: {
   cards: CardDef[]
   loadingCount?: number
+  /** How many leading cards to load eagerly. Per grid, not per page — the home
+   *  screen renders one grid per section, so a hard-coded 4 here meant every
+   *  section marked its first four (about ten tiles, most below the fold) as
+   *  top priority. Only the first grid on the page should pass a count. */
+  priorityCount?: number
   /** See Card's own doc — threaded straight through. */
   onCardClick?: (card: CardDef) => void
 }) {
@@ -189,9 +208,7 @@ export function CardGrid({
           key={card.id ?? card.title}
           card={card}
           tint={TINTS[i % TINTS.length]}
-          // The first row is above the fold at every breakpoint (4 cards is the
-          // widest row the grid ever renders), so those load eagerly.
-          priority={i < 4}
+          priority={i < priorityCount}
           onCardClick={onCardClick}
         />
       ))}
@@ -243,6 +260,10 @@ function CompactCard({
       // mounts on mobile (see this component's own doc), and desktop never
       // wants the slide (see navTransitions.ts), so there's no case where
       // tagging it would do anything but risk a stray whole-page crossfade.
+      // Same reasoning as Card's own prefetch={false}: a search-results list
+      // here can be a dozen-plus rows, each an eager prefetch nobody asked
+      // for yet.
+      prefetch={false}
     >
       {card.icon ? (
         // Named (desktop only — this component never mounts on mobile, see
@@ -400,13 +421,133 @@ export function CompactCardGrid({
   )
 }
 
-/** Does a card match the typed query? Every word must appear in the title or a
- *  hidden keyword (AND across words). */
-export function cardMatches(card: CardDef, query: string): boolean {
-  const tokens = query.toLowerCase().split(/\s+/).filter(Boolean)
-  if (tokens.length === 0) return true
-  const hay = [card.title, ...(card.keywords ?? [])].join(' ').toLowerCase()
-  return tokens.every((t) => hay.includes(t))
+// How many real cards show before the trailing "More" tile, collapsed —
+// matches the count in the user's own reference image (9 categories + one
+// "More" tile = 10 total). A fixed number, not a measured "however many fit"
+// — this app has one desktop breakpoint, not several to size against, and a
+// fixed count is what makes `flex-1` below reliably lay out as one
+// non-wrapping row instead of needing real layout measurement (the
+// CompactCardGrid approach) just to decide whether to show a tile.
+const COLLAPSED_TILE_COUNT = 9
+
+/** Desktop mockup match (Phase 5, docs/desktop-mockup-plan.md), revised
+ *  twice after user review — first to a horizontal-scroll row, then to
+ *  this: the "Explore by Category" card's tile grid, a bigger, friendlier
+ *  icon per category (64px, tinted per getCategoryColor, same as
+ *  CompactCard's own smaller version). No border/background on the tile
+ *  itself, at rest or on hover — just the icon and label sitting directly
+ *  on the card's own white background, the same "navigation, not a boxed
+ *  object" reasoning CompactCard's own doc gives for its rows.
+ *
+ *  Collapsed (`expanded` false) is a single row, no scrolling and no wrap —
+ *  the first `COLLAPSED_TILE_COUNT` cards (by whatever order the caller
+ *  already sorted `cards` into — Landing sorts by listing count, most to
+ *  least, matching the reference image) plus a trailing "More" tile when
+ *  there are more. `flex-1` on every tile (not a fixed width) is what
+ *  guarantees the row itself never needs to scroll or wrap: exactly
+ *  `COLLAPSED_TILE_COUNT` (+1 for "More") tiles share the row's width
+ *  evenly, however wide that ends up being, rather than each claiming a
+ *  fixed size and overflowing. Expanded is the opposite shape: EVERY card
+ *  wrapped into a `grid-cols-4 lg:grid-cols-8` grid, no "More" tile, no cap
+ *  — a real "full view". Both states are controlled by the caller
+ *  (`expanded`) rather than owned here, because the toggle that drives it
+ *  ("View all →") lives in Landing's own header row above this grid, not
+ *  beside it — CompactCardGrid can own its own "Show more" because that
+ *  button sits directly under its grid; this one can't. CompactCardGrid
+ *  itself is untouched and still used for desktop search results (Landing's
+ *  own `desktopResultsNode`, rendered below this card's header row once the
+ *  hero's search box puts something in `q`). */
+export function CategoryTileRow({
+  cards,
+  categories,
+  expanded,
+  onCardClick,
+  onExpand,
+}: {
+  /** Already in the order this should render — Landing sorts by listing
+   *  count (most to least) before passing this in; this component doesn't
+   *  re-sort. */
+  cards: CardDef[]
+  /** Resolves each card's icon-avatar tint — see getCategoryColor. */
+  categories: CategoryConfig[] | null
+  /** false: the first COLLAPSED_TILE_COUNT cards plus a trailing "More"
+   *  tile. true: every card, wrapped, no cap. */
+  expanded: boolean
+  onCardClick?: (card: CardDef) => void
+  /** Fired by the trailing "More" tile — same action as the header row's
+   *  own "View all" toggle (Landing owns the actual `expanded` state). Only
+   *  meaningful (and only rendered) when collapsed and there's a "More"
+   *  tile to click. */
+  onExpand?: () => void
+}) {
+  const visible = expanded ? cards : cards.slice(0, COLLAPSED_TILE_COUNT)
+  const hasMore = !expanded && cards.length > COLLAPSED_TILE_COUNT
+
+  const tileClassName = 'flex flex-col items-center rounded-xl px-2 py-2 text-center transition-colors hover:bg-slate-50'
+
+  return (
+    <div className={expanded ? 'grid grid-cols-4 gap-6 lg:grid-cols-8' : 'flex gap-6'}>
+      {visible.map((card) => (
+        <Link
+          key={card.id ?? card.title}
+          href={card.href}
+          className={`${tileClassName} ${expanded ? '' : 'min-w-0 flex-1'}`}
+          onClick={onCardClick ? () => onCardClick(card) : undefined}
+          // Same reasoning as Card's own prefetch={false} in this file —
+          // this row renders every category at once, expanded or not.
+          prefetch={false}
+        >
+          {card.icon ? (
+            // Named the same way CompactCard's own badge is (desktop only,
+            // matched on `category-badge-${card.id}`) so a real
+            // <ViewTransition> grows this tile's icon into the bigger one
+            // GenericDirectory shows at the top of the category page —
+            // whichever of the two (this grid or CompactCardGrid's search
+            // results) the visitor actually clicked through.
+            card.id ? (
+              <ViewTransition name={`category-badge-${card.id}`}>
+                <CategoryIcon
+                  icon={card.icon}
+                  categoryId={card.id}
+                  color={getCategoryColor(categories, card.id)}
+                  className="h-16 w-16 text-[28px]"
+                  sizePx={64}
+                />
+              </ViewTransition>
+            ) : (
+              <CategoryIcon
+                icon={card.icon}
+                categoryId={card.id}
+                color={getCategoryColor(categories, card.id ?? '')}
+                className="h-16 w-16 text-[28px]"
+                sizePx={64}
+              />
+            )
+          ) : (
+            <span className="h-16 w-16 shrink-0 rounded-full bg-slate-100" aria-hidden="true" />
+          )}
+          {/* No `truncate` — a category name like "Networking" or
+              "Hospitals" shouldn't ever end in an ellipsis on a tile with
+              room to wrap. Two lines (`leading-tight` keeps them close) is
+              the worst case; the count below stays single-line since a
+              number like "72 places" never needs to wrap. */}
+          <span className="mt-3 w-full text-balance text-base font-semibold leading-tight text-ink">{card.title}</span>
+          {card.count != null && (
+            <span className="w-full truncate text-sm text-slate-500">{card.count}</span>
+          )}
+        </Link>
+      ))}
+      {hasMore && (
+        <button type="button" onClick={onExpand} className={`${tileClassName} min-w-0 flex-1 cursor-pointer`}>
+          <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-400" aria-hidden="true">
+            <DotsIcon className="h-6 w-6" />
+          </span>
+          <span className="mt-3 w-full text-balance text-base font-semibold leading-tight text-ink">More</span>
+          <span className="w-full truncate text-sm text-slate-500">See all</span>
+        </button>
+      )}
+    </div>
+  )
 }
 
 // ── Home-screen sections ──────────────────────────────────────────────────────
@@ -444,187 +585,37 @@ export function groupCardsIntoSections(
   return grouped
 }
 
-// ── Listing (within-card) search ───────────────────────────────────────────────
-
-/** A single place that matched the landing search — e.g. a grocery store whose
- *  "cheese" tag matched "kosher cheese". */
-export type ListingHit = {
-  item: DirectoryResource
-  /** Full category config — needed to render the real listing card. */
-  category: CategoryConfig
-  /** The category's plural label, e.g. "Grocery Stores". */
-  categoryLabel: string
-  /** Tags that matched the query — used to seed the category search on tap. */
-  matchedTags: string[]
-  /** The term to pre-fill the category's own search with on tap: the matched tag
-   *  when there is one (so the place survives that page's filter), else the query. */
-  term: string
-}
-
-// Collect every string-array value from a listing (tags, _sometimes, etc.) for
-// matching and ranking. Stays decoupled from per-category field config.
-function listingTags(item: DirectoryResource): string[] {
-  const out: string[] = []
-  for (const value of Object.values(item)) {
-    if (Array.isArray(value) && value.every((x) => typeof x === 'string')) {
-      out.push(...(value as string[]))
-    }
-  }
-  return out
-}
-
-/** Find individual listings matching the query against their full search text —
- *  name, address, tags, and scalar detail fields (every query word must appear).
- *  Returns at most `limit` hits so a broad word like "kosher" can't flood the
- *  landing page. */
-export function searchListings(
-  listings: DirectoryResource[],
-  categories: CategoryConfig[],
-  query: string,
-  coords: { lat: number; lng: number } | null = null,
-  limit = 8,
-): ListingHit[] {
-  const tokens = query.toLowerCase().split(/\s+/).filter(Boolean)
-  if (tokens.length === 0) return []
-  const labelById = new Map(categories.map((c) => [c.id, c.pluralLabel]))
-  const configById = new Map(categories.map((c) => [c.id, c]))
-
-  // How many query words a tag contains — used to rank "Kosher Wine" (2) above
-  // "Glatt Kosher Meat" (1) for the query "kosher wine".
-  const score = (tag: string) => {
-    const t = tag.toLowerCase()
-    return tokens.reduce((n, tok) => n + (t.includes(tok) ? 1 : 0), 0)
-  }
-
-  const hits: ListingHit[] = []
-  for (const item of listings) {
-    const category = configById.get(item.category)
-    if (!category) continue
-    const tags = listingTags(item)
-    const hay = listingSearchText(item, category)
-    if (!tokens.every((t) => hay.includes(t))) continue
-    const matchedTags = tags
-      .filter((tag) => score(tag) > 0)
-      .sort((a, b) => score(b) - score(a) || a.length - b.length)
-      .slice(0, 3)
-    // Stamp straight-line distance the same way the directory does (see
-    // withMilesFromAddress) — unrounded, so two close-together hits don't tie
-    // and fall back to arbitrary order below: address-anchored categories
-    // only, when the listing has coordinates.
-    const withDistance =
-      coords && category.hasAddress !== false && item.geo
-        ? { ...item, milesFromAddress: haversineMiles(coords, item.geo) }
-        : item
-    hits.push({
-      item: withDistance,
-      category,
-      categoryLabel: labelById.get(item.category) ?? item.category,
-      matchedTags,
-      term: matchedTags[0] ?? query.trim(),
-    })
-  }
-  // Closest first when the visitor has a location; otherwise most-upvoted first,
-  // so the landing search doesn't fall back to arbitrary storage order.
-  hits.sort((a, b) =>
-    a.item.milesFromAddress != null || b.item.milesFromAddress != null
-      ? travelCompare(a.item, b.item)
-      : (b.item.upvotes ?? 0) - (a.item.upvotes ?? 0) || a.item.name.localeCompare(b.item.name),
-  )
-  return hits.slice(0, limit)
-}
-
-/** The "Places" results list: each hit rendered as the same card its category
- *  directory uses, so a searched place is the full listing (davening times,
- *  upvotes, filters, and all). */
-export function PlacesResults({
-  hits,
-  onOpen,
-  showDistanceSlot,
-}: {
-  hits: ListingHit[]
-  onOpen: (hit: ListingHit, action?: 'edit' | 'report') => void
-  /** No location set yet — hold each distance-based hit's distance column
-   *  open with a tappable placeholder instead of omitting it, same as
-   *  GenericDirectory's own `addressPrompt` (see GenericListingCard's
-   *  `showDistanceSlot` doc). A mixed-category list can mix distance-based
-   *  hits with ones that have no address at all (e.g. WhatsApp groups), so
-   *  this is combined per-hit with that hit's own `category.hasAddress`
-   *  rather than applied blindly to every card. */
-  showDistanceSlot?: boolean
-}) {
-  const [voteCounts, setVoteCounts] = useState<Record<string, number>>({})
-
-  return (
-    <section className="mt-10 sm:mt-12">
-      <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">
-        Places
-      </h2>
-      {/* desktop: a grid instead of a single column, same reasoning (and same
-          track-sizing pitfalls, already solved once) as GenericDirectory's
-          own listing grid — see that component's own doc for why
-          auto-fill/minmax/1fr, not a fixed column count or auto-fit. */}
-      <div className="space-y-2 desktop:space-y-0 desktop:grid desktop:gap-3 desktop:grid-cols-[repeat(auto-fill,minmax(280px,1fr))]">
-        {hits.map((hit) => (
-          <div key={hit.item.id} className="desktop:max-w-md">
-            <GenericListingCard
-              item={hit.item}
-              category={hit.category}
-              showDistanceSlot={!!showDistanceSlot && hit.category.hasAddress !== false}
-              upvotes={!!hit.category.upvotesEnabled}
-              count={voteCounts[hit.item.id] ?? hit.item.upvotes ?? 0}
-              onVote={(c) => setVoteCounts((prev) => ({ ...prev, [hit.item.id]: c }))}
-              onTagClick={(tag) => onOpen({ ...hit, term: tag })}
-              onNameClick={() => onOpen(hit)}
-              onFilterOpen={() => onOpen(hit)}
-              onFilterBool={() => onOpen(hit)}
-              onFilterSelect={() => onOpen(hit)}
-              onEdit={() => onOpen(hit, 'edit')}
-              onReport={() => onOpen(hit, 'report')}
-            />
-          </div>
-        ))}
-      </div>
-    </section>
-  )
-}
-
-// ── Card definitions ──────────────────────────────────────────────────────────
-
-// Hidden synonyms for the well-known categories — the words people type that
-// won't appear in a category's label or description. Keyed by category id.
-const CATEGORY_KEYWORDS: Record<string, string[]> = {
-  synagogue: ['shul', 'shuls', 'minyan', 'minyanim', 'davening', 'shtiebel', 'beis medrash'],
-  mikvah: ['mikveh', 'mikvaos', 'immersion'],
-  grocery: ['groceries', 'supermarket', 'market', 'food shopping'],
-  restaurant: ['restaurants', 'dining', 'eat out', 'takeout', 'bakery', 'bakeries', 'cafe', 'cafes', 'coffee', 'ice cream', 'dessert', 'sweets', 'donuts', 'pastry', 'bagel'],
-  hotel: ['hotels', 'motel', 'lodging', 'place to stay'],
-  whatsapp: ['whatsapp', 'group chat', 'community group', 'chat'],
-}
-
-// Words pulled from a category's own label + description, so newly added
-// categories are searchable without touching this file.
-function labelWords(c: CategoryConfig): string[] {
-  return `${c.pluralLabel} ${c.description}`
-    .toLowerCase()
-    .split(/[^a-z'’]+/)
-    .filter((w) => w.length >= 3)
-}
-
-/** "22 places" / "19 listings" for a category's browse-index row, or
- *  undefined when there's nothing honest to say.
+/** "22 listings" for a category's browse-index row, or undefined when
+ *  there's nothing honest to say.
  *
- *  Two nouns, picked off `hasAddress` rather than off a hardcoded list of
- *  category ids: a category whose listings have no address isn't a set of
- *  places you can go to — WhatsApp Groups and Networking are the live cases —
- *  and calling them places would be wrong in the one word the row exists to
- *  add. Any future address-less category gets the right noun for free.
+ *  One noun everywhere, deliberately — this used to split "N places" /
+ *  "N listings" off `hasAddress` (a category with no address, like
+ *  WhatsApp Groups or Networking, isn't a set of places you can go to), but
+ *  that made "place" the odd one out: a single term that works regardless
+ *  of whether the category has an address is simpler than two that have to
+ *  agree with each other everywhere they appear.
  *
  *  Undefined (not "0") when counts haven't loaded or the category has none:
  *  see CompactCard on why silence beats a zero here. */
 export function cardCount(c: CategoryConfig, counts: Record<string, number> | null | undefined): string | undefined {
   const n = counts?.[c.id]
   if (!n) return undefined
-  return `${n} ${c.hasAddress === false ? (n === 1 ? 'listing' : 'listings') : (n === 1 ? 'place' : 'places')}`
+  return `${n} listing${n === 1 ? '' : 's'}`
+}
+
+/** "3 listings" for the Eruv card, in a category card's words (Oct 15),
+ *  from `counts.eruv` (see withEruvCount); silent until known. */
+export function eruvCardCount(counts: Record<string, number> | null | undefined): string | undefined {
+  const n = counts?.eruv
+  if (!n) return undefined
+  return `${n} listing${n === 1 ? '' : 's'}`
+}
+
+/** The listing counts with the Eruv card's beside them, under its card id
+ *  (`eruv`, never a listing category's id: see categoryCards), so the
+ *  browse index counts it and sorts it as it does a category. */
+export function withEruvCount(counts: Record<string, number> | null, eruvim: number | null): Record<string, number> | null {
+  return eruvim === null ? counts : { ...(counts ?? {}), eruv: eruvim }
 }
 
 /** Resource cards: every live category (restaurants, groceries, hotels, …)
@@ -637,7 +628,8 @@ export function resourceCards(
   // hood — see CardDef.href's own comment for why this is threaded in
   // alongside `nav` rather than derived from it.
   communitySlug: string,
-  // How many approved listings each category holds, keyed by category id —
+  // How many approved listings each category holds, keyed by category id
+  // (and how many eruvim, under `eruv`: withEruvCount) —
   // null while listings are still loading, which is why `cardCount` below
   // returns undefined rather than "0 places" for a missing entry. Threaded in
   // rather than fetched here because Landing already holds the full listing
@@ -646,72 +638,20 @@ export function resourceCards(
 ): CardDef[] | null {
   if (categories === null) return null
 
-  const medical = categories.find((c) => c.kind === 'medical')
-  const zmanim = categories.find((c) => c.kind === 'zmanim')
-  const eruv = categories.find((c) => c.kind === 'eruv')
-
-  const cards = [
-    ...(medical
-      ? [{
-          title: medical.pluralLabel,
-          id: 'medical',
-          icon: medical.icon,
-          cardImageUrl: medical.cardImageUrl,
-          cardTextColor: medical.cardTextColor,
-          keywords: [
-            'hospital', 'hospitals', 'about your hospital', 'chaplain', 'rabbi', 'prayer room',
-            'prayer space', 'shabbat elevator', 'shabbos elevator', 'kosher cafeteria',
-            'jewish doctor', 'medical staff', 'bikur cholim room', 'shabbos accommodations',
-            'hup', 'penn', 'university of pennsylvania', 'jefferson', 'chop', 'childrens hospital',
-            'temple', 'einstein',
-          ],
-          go: () => nav('patient', 'find', { findView: 'hospitals' }),
-          href: routes.slug(communitySlug, 'hospitals'),
-        }]
-      : []),
-    ...categories.filter((c) => c.kind === 'listing').map((c) => ({
-      title: c.pluralLabel,
-      id: c.id,
-      icon: c.icon,
-      count: cardCount(c, counts),
-      cardImageUrl: c.cardImageUrl,
-      cardTextColor: c.cardTextColor,
-      keywords: [...new Set([...labelWords(c), ...(CATEGORY_KEYWORDS[c.id] ?? []), c.id.replaceAll('-', ' ')])],
-      go: () => nav('patient', 'find', { findView: c.id }),
-      href: routes.slug(communitySlug, c.id),
-    })),
-    ...(zmanim
-      ? [{
-          title: zmanim.pluralLabel,
-          id: 'zmanim',
-          icon: zmanim.icon,
-          cardImageUrl: zmanim.cardImageUrl,
-          cardTextColor: zmanim.cardTextColor,
-          keywords: [
-            'zmanim', 'zman', 'candle lighting', 'candles', 'havdalah', 'shabbat times', 'shabbos',
-            'shabbat', 'sunset', 'sunrise', 'shkia', 'netz', 'hebrew date', 'davening times', 'shema',
-            'mincha', 'maariv', 'shacharis', 'parsha', 'molad',
-          ],
-          go: () => nav('patient', 'find', { findView: 'zmanim' }),
-          href: routes.slug(communitySlug, 'zmanim'),
-        }]
-      : []),
-    ...(eruv
-      ? [{
-          title: eruv.pluralLabel,
-          id: 'eruv',
-          icon: eruv.icon,
-          cardImageUrl: eruv.cardImageUrl,
-          cardTextColor: eruv.cardTextColor,
-          keywords: [
-            'eruv', 'carry', 'carrying', 'eruv map', 'eruv status', 'eruv hotline', 'shabbat boundary',
-            'techum', 'stroller on shabbos',
-          ],
-          go: () => nav('patient', 'find', { findView: 'eruv' }),
-          href: routes.slug(communitySlug, 'eruv'),
-        }]
-      : []),
-  ]
+  // Which cards there are and what each answers to live in cardSearch.ts,
+  // shared with the server's re-run of missed searches; this adds how each
+  // one looks and where it goes.
+  const cards: CardDef[] = categoryCards(categories).map(({ id, view, title, keywords, category: c }) => ({
+    title,
+    id,
+    icon: c.icon,
+    ...(c.kind === 'listing' ? { count: cardCount(c, counts) } : c.kind === 'eruv' ? { count: eruvCardCount(counts) } : {}),
+    cardImageUrl: c.cardImageUrl,
+    cardTextColor: c.cardTextColor,
+    keywords,
+    go: () => nav('patient', 'find', { findView: view }),
+    href: routes.slug(communitySlug, view),
+  }))
 
   // Hospitals/Zmanim/Eruv are built above as one-off cards (they're pseudo-
   // categories, not `kind === 'listing'`), so without this they always land

@@ -2,7 +2,11 @@
 
 import Link from 'next/link'
 import FeedbackButton from './FeedbackButton'
+import { SkylineIcon } from '@/components/icons'
 import { useSiteSettings } from '@/lib/useSiteSettings'
+import { useCommunitySlug } from '@/lib/communityContext'
+import { community } from '@/community.config'
+import { routes } from '@/lib/routes'
 import type { SiteSettings } from '@/lib/siteSettings'
 
 export default function SiteFooter({
@@ -25,18 +29,33 @@ export default function SiteFooter({
 }) {
   const live = useSiteSettings()
   const settings = previewSettings ?? live
+  const communitySlug = useCommunitySlug()
 
   return (
-    <footer className="mt-16 border-t border-slate-200/80 bg-white/60">
-      <div className="mx-auto max-w-6xl px-4 sm:px-6 py-8">
+    <footer className="mt-16 border-t border-slate-200/80 bg-surface">
+      {/* desktop:max-w-7xl matches the home screen's own content container
+          (Landing.tsx/HeroHeading.tsx) so this footer's edges line up with
+          the cards above it — not the narrower max-w-6xl category/listing
+          pages still use, which the footer no longer lines up with at
+          desktop widths either way. */}
+      <div className="mx-auto max-w-6xl desktop:max-w-7xl px-4 sm:px-6 py-8">
         <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
-          <div className="max-w-md">
-            <p className="text-sm font-semibold text-slate-900">
-              {settings.name}
-            </p>
-            <p className="mt-1.5 text-sm leading-relaxed text-muted">
-              {settings.mission}
-            </p>
+          <div className="flex max-w-md items-center gap-4">
+            {/* The skyline glyph and "A more connected {region}" copy both
+                used to live in a dedicated closing strip above this
+                footer, on the desktop home screen only — removed as
+                redundant with this footer, which already runs on every
+                page. Both moved here rather than being dropped. */}
+            <SkylineIcon className="h-10 w-[86px] shrink-0 text-slate-400" />
+            <div>
+              <p className="text-sm font-semibold text-slate-900">
+                A more connected {community.region}
+              </p>
+              <p className="mt-1.5 text-sm leading-relaxed text-muted">
+                Whether you&rsquo;re a lifelong local, new to the city, or just visiting — the {settings.name} helps
+                you find what you need and feel at home.
+              </p>
+            </div>
           </div>
 
           <div className="sm:text-right">
@@ -56,9 +75,9 @@ export default function SiteFooter({
           <p className="text-xs text-slate-400">
             Community-maintained — please confirm details directly before relying
             on them. © {year} {settings.name}.{' '}
-            <Link href="/about" className="underline hover:text-slate-600">About</Link>
+            <Link href={routes.about(communitySlug)} className="underline hover:text-slate-600">About</Link>
             {' · '}
-            <Link href="/privacy" className="underline hover:text-slate-600">Privacy</Link>
+            <Link href={routes.privacy(communitySlug)} className="underline hover:text-slate-600">Privacy</Link>
           </p>
           {settings.feedbackEnabled && (
             <FeedbackButton

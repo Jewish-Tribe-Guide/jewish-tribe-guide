@@ -2,66 +2,92 @@
 
 import { useEffect, useMemo, useRef, useState, ViewTransition } from 'react'
 import { track } from '@vercel/analytics'
-import { CardGrid, CompactCardGrid, PlacesResults, cardMatches, searchListings, groupCardsIntoSections, resourceCards, useEntryCards } from '@/components/home/sections'
+import { CategoryTileRow, groupCardsIntoSections, resourceCards, useEntryCards, withEruvCount } from '@/components/home/sections'
+import { useEruvCount } from '@/lib/useEruvStatuses'
+import { cardMatches } from '@/lib/cardSearch'
+import dynamic from 'next/dynamic'
+import { useRouter } from 'next/navigation'
+import { nearMiss, type AskResult } from '@/lib/askSearch'
+import type { Answer } from '@/lib/askAnswer'
+import { namedListings, type LinesContext, type SearchLine } from '@/lib/searchLands'
+import SearchLines from '@/components/home/SearchLines'
+import { routes } from '@/lib/routes'
+import { readerPlaces } from '@/lib/questionReader'
+import { needsReading, ownFrom, readingAnswers, readingLoses } from '@/lib/readingSearch'
+import { useReading } from '@/lib/useReading'
+import { answersWell, candidatePrompts, pickPrompts } from '@/lib/searchPrompts'
+import { PHONE_MOST } from '@/components/home/SearchPrompts'
 import HeroHeading from '@/components/home/HeroHeading'
-import SearchSection from '@/components/home/SearchSection'
-import HomeMap from '@/components/home/HomeMap'
-import type { LocationControls } from '@/components/home/LocationControl'
+import TodayBlocks from '@/components/home/TodayBlocks'
+import CategoryTiles from '@/components/home/CategoryTiles'
+import RightNow from '@/components/home/RightNow'
+import TrustBand from '@/components/home/TrustBand'
+import { trustFacts } from '@/lib/phoneHome'
+import { PinnedBlock } from '@/components/home/PinnedPlaces'
 import DaveningTimesCard from '@/components/home/DaveningTimesCard'
 import UpdateListingsCard from '@/components/home/UpdateListingsCard'
+import SuggestListingCard from '@/components/home/SuggestListingCard'
 import ShabbatTimesCard from '@/components/home/ShabbatTimesCard'
 import SubscribeSection from '@/components/home/SubscribeSection'
+import CampaignBannerCard from '@/components/home/CampaignBannerCard'
 import { useLogSearchMiss } from '@/lib/useLogSearchMiss'
+import { useHomeSearch } from '@/lib/useHomeSearch'
+import { mentionsEruv } from '@/lib/ask'
+import { useHydrated } from '@/lib/useHydrated'
 import { useCategories } from '@/lib/useCategories'
 import { useHomeSections } from '@/lib/useHomeSections'
 import { BUILT_IN_BLOCKS, type HomeBlockKind } from '@/lib/homeSections'
 import { useAllListings } from '@/lib/useAllListings'
+import { useChangeLog } from '@/lib/changesContext'
+import { features } from '@/lib/features'
+import { thisWeek, whatChanged } from '@/lib/whatChanged'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { useNavTransitionProps } from '@/lib/navTransitions'
 import { consumeHomeReveal } from '@/lib/homeRevealSignal'
-import { useInView } from '@/lib/useInView'
 import { useLocation } from '@/lib/locationContext'
+import { useHeaderOverlay } from '@/lib/headerVisibility'
 import { community } from '@/community.config'
-import { useCommunitySlug } from '@/lib/communityContext'
+import { useActiveCommunity, useCommunitySlug } from '@/lib/communityContext'
+import { countEvent } from '@/lib/countEvent'
 import type { NavigateFn } from '@/types'
 import type { Flow } from '@/types'
 import { useSiteSettings } from '@/lib/useSiteSettings'
 import { ui } from '@/lib/uiConfig'
+import { useCommunityTimezone } from '@/lib/communityContext'
+import { dayLine } from '@/lib/todayHome'
+
+// Only after a search finds nothing; it carries the anti-spam check, which
+// the home shouldn't load for everyone (see GenericListingCard).
+const AskTheGroup = dynamic(() => import('@/components/home/AskTheGroup'), { loading: () => null })
 
 export type LandingProps = {
   onNavigate: NavigateFn
   /** Opens a full-screen guided form (Support / Volunteer). */
   onOpenFlow: (kind: Flow['kind'], preselect?: string[]) => void
   /** The visitor's location (from the header pill) — lets "Places" results show
-   *  distance, exactly like the category directory does. */
+   *  distance, exactly like the category directory does, and feeds the
+   *  Davening Times/Shabbat & Holiday Times cards' own nearest-location calc. */
   coords: { lat: number; lng: number } | null
-  /** The site-wide live GPS watch (see useLiveLocation) — passed through to the
-   *  embedded home-screen map so its tracking controls act on the same shared
-   *  watch as the full map page and the header pill. */
-  liveTracking: { tracking: boolean; error: string | null; start: () => void; stop: () => void }
-  /** Same controls object the header pill uses — passed through to the
-   *  embedded map so it can surface its own copy while fullscreen covers the
-   *  header (see ResourceMapView's `controls` prop). */
-  controls: LocationControls
-  /** 'map' when the visitor arrived by collapsing the fullscreen map — scrolls
-   *  the embedded map band into view so the collapse reads as zooming out of
-   *  the map rather than being dropped at the top of an unrelated page.
-   *  Desktop only in practice; mobile's home screen has no map band. */
-  scrollTo?: 'map' | null
+  /** A shared question (/philly/ask/…, see shareAnswer.ts): asked as soon as
+   *  the page is running, as if typed. */
+  initialQuery?: string
 }
 
 // ── The home screen ───────────────────────────────────────────────────────────
 // Desktop and mobile deliberately differ here (see the desktop-redesign notes):
 //
 //   Desktop — a two-column warm hero (headline + subhead + search beside a
-//   photo, see HeroHeading) → six independent, admin-orderable cards (see
+//   photo, see HeroHeading) → five independent, admin-orderable cards (see
 //   builtInOrder): Categories & Search (a flat "Browse everything" grid,
 //   full weight — every card, always visible, no hover needed), Davening
-//   Times, Update Listings ("kept by the community"), Explore the Map,
-//   Email Signup (Stay in the Loop), and Jewish Times (Shabbat & Holiday
-//   Times) — → footer. HeaderNav's "Categories" mega-menu (in SiteHeader, on
-//   every screen — this page no longer owns any category nav of its own) is
-//   a second way to reach a category, on top of the flat grid.
+//   Times, Update Listings ("kept by the community"), Email Signup (Stay in
+//   the Loop), and Jewish Times (Shabbat & Holiday Times) — → footer. The map
+//   itself lives at its own full-screen route (the hero's "View Map" button,
+//   header nav, or the mobile tab bar), never embedded here — that used to be
+//   a sixth card (BUILT_IN_BLOCKS' `'map'` kind); retired, the user's own
+//   call. HeaderNav's "Categories" mega-menu (in SiteHeader, on every screen
+//   — this page no longer owns any category nav of its own) is a second way
+//   to reach a category, on top of the flat grid.
 //
 //   Mobile — unchanged: hero + search, then the full grouped card grid inline,
 //   no map (it has its own tab for that).
@@ -70,30 +96,57 @@ export type LandingProps = {
 // surfaces Synagogues). On desktop, where the grid isn't on screen, typing
 // reveals it inline as a results list — a search that appeared to do nothing
 // would be worse than a slightly longer page.
-export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, controls, scrollTo }: LandingProps) {
+export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }: LandingProps) {
   const communitySlug = useCommunitySlug()
   const categories = useCategories()
   const homeSections = useHomeSections()
   const listings = useAllListings()
-  const [query, setQuery] = useState('')
-  // Deferred, not just observed: the embedded map costs a few hundred KB of
-  // Google Maps JS (places/main/util/common/controls/map — see
-  // loadGoogleMaps.ts), loaded the instant HomeMap mounts. Gating the mount
-  // itself on visibility, not just position, means a mobile visitor — where
-  // this whole band is `hidden` via CSS below (mobile reaches the map
-  // through its own tab instead) — never triggers that download at all: a
-  // `display:none` element never intersects, so mapInView never flips for
-  // it. Desktop still gets the map, just once the band is actually about to
-  // be seen instead of on every home-screen load regardless of scroll
-  // position.
-  const [mapBandRef, mapInView] = useInView<HTMLDivElement>()
+  // A shared question is asked once the page runs in the browser, not in the
+  // server render: its answer can depend on the visitor's clock ("open
+  // now"), which a page built ahead of time doesn't know (see useHydrated).
+  // Null until the visitor types.
+  const [typed, setQuery] = useState<string | null>(null)
+  const hydrated = useHydrated()
+  const query = typed ?? (hydrated && initialQuery ? initialQuery : '')
+  // Once they ask something else, the address stops naming the shared
+  // question: a reload or a copied link would otherwise bring it back.
+  const changeQuery = (text: string) => {
+    setQuery(text)
+    if (initialQuery && window.location.pathname !== routes.home(communitySlug)) {
+      window.history.replaceState(null, '', routes.home(communitySlug))
+    }
+  }
+  // "View all" (desktop "Explore by Category" card) — collapsed shows the
+  // first COLLAPSED_TILE_COUNT cards plus a trailing "More" tile, expanded
+  // shows every card in a full wrapped grid. Lives here, not inside
+  // CategoryTileRow itself: two different things can trigger it (the
+  // header row's own "View all" toggle, and the grid's own trailing "More"
+  // tile), so the state has to be shared rather than owned by the grid
+  // alone.
+  const [browseExpanded, setBrowseExpanded] = useState(false)
+  // The hero's "Browse Categories" button scrolls here.
+  const browseCardRef = useRef<HTMLDivElement>(null)
   const settings = useSiteSettings()
+  // The Today home (step 6), when the admin has switched it on — and it
+  // isn't held back from the site (see features.ts).
+  const today = features.todayHome && settings.homeStyle === 'today'
+  const timezone = useCommunityTimezone()
+  // Desktop only (see headerVisibility.tsx/SiteHeader): lets the header sit
+  // transparent over this screen's photo hero until scrolled past it.
+  useHeaderOverlay(true)
   const entryCards = useEntryCards(onOpenFlow)
   const isMobile = useIsMobile()
   const navTransition = useNavTransitionProps()
   const { anchor } = useLocation()
-  // The Map pseudo-category still gates whether the map shows at all.
+  // The Map pseudo-category still gates whether the map shows at all — also
+  // doubles as the hero's "View Map" button gate (mapIcon below).
   const hasMap = !!categories?.some((c) => c.kind === 'map')
+  // The Map pseudo-category's own icon — shown on the hero's "View Map"
+  // button the same way HeroHeading already accepts it. Null
+  // (not just absent) while categories haven't loaded yet or there's no Map
+  // category configured, which is what keeps the button from rendering at
+  // all (see HeroHeading's own `mapIcon != null` check).
+  const mapIcon = categories?.find((c) => c.kind === 'map')?.icon ?? null
   const zmanimCategory = categories?.find((c) => c.kind === 'zmanim')
   // Same as the real Zmanim & Shabbos category page (FindResources' own
   // locationLabel) — the visitor's typed address, or the community's region,
@@ -105,22 +158,14 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
   // own search rather than a second request — and `useMemo`'d because
   // `listings` is the whole community (several hundred rows) and this runs on
   // every keystroke in the search box otherwise.
+  // The Eruv card's count beside them (Oct 15), as a category's.
+  const eruvCount = useEruvCount(communitySlug, !!categories?.some((c) => c.kind === 'eruv'))
   const listingCounts = useMemo(() => {
-    if (!listings) return null
+    if (!listings) return withEruvCount(null, eruvCount)
     const counts: Record<string, number> = {}
     for (const l of listings) counts[l.category] = (counts[l.category] ?? 0) + 1
-    return counts
-  }, [listings])
-
-  // The map card's own "N places across M categories" line — a real fact
-  // standing in for a header that otherwise has nothing to say beside the
-  // literal word "Map". Only `kind === 'listing'` categories count toward
-  // either number: Map, Zmanim, and Eruv are pseudo-categories with no
-  // listings of their own to add up.
-  const listingCategories = categories?.filter((c) => c.kind === 'listing') ?? []
-  const totalListings = listingCounts
-    ? listingCategories.reduce((sum, c) => sum + (listingCounts[c.id] ?? 0), 0)
-    : null
+    return withEruvCount(counts, eruvCount)
+  }, [listings, eruvCount])
 
   const resources = resourceCards(onNavigate, categories, communitySlug, listingCounts)
   // Order is no longer alphabetical — groupCardsIntoSections (below) sorts these
@@ -129,39 +174,170 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
 
   const q = query.trim()
   const loading = !q && allCards === null
-  const filtered = q && allCards ? allCards.filter((c) => cardMatches(c, q)) : allCards
+  const filtered = q && allCards ? allCards.filter((c) => cardMatches(c, q, categories ?? [])) : allCards
 
-  // Individual places that match the query by name + tags (e.g. a grocery store
-  // with a "cheese" tag for "kosher cheese"). Only computed once the visitor types.
-  const placeHits = q && listings ? searchListings(listings, categories ?? [], q, coords) : []
+  // The search, read as a question (see askSearch.ts), run once: the places
+  // it finds and the answer above them (see askAnswer.ts) both come off this
+  // one result. Only computed once the visitor types. Against useMinyanSchedule's
+  // clock, not a fresh `new Date()` in render (which Cache Components rejects),
+  // so "open now" and the next minyan agree on what now is.
+  const { schedule, zmanim, places, ask, linesFor: homeLines } = useHomeSearch(coords, { eruv: !!q && mentionsEruv(q, true) })
+  const asked = q && listings && schedule ? ask(q) : null
 
-  // Tapping a place opens its category directory, pre-filtered to the matched term
-  // (so it survives that page's own search) with the place itself expanded.
-  // Edit/Report additionally carry `findAction` so the directory opens straight
-  // into that form instead of just the expanded card.
-  const openPlace = (hit: (typeof placeHits)[number], action?: 'edit' | 'report') => {
-    if (!action) track('listing_opened', { listing: hit.item.name, category: hit.item.category, source: 'search' })
-    onNavigate('patient', 'find', {
-      findView: hit.item.category,
-      findQuery: hit.term,
-      findItemId: hit.item.id,
-      ...(action ? { findAction: action } : {}),
-    })
+  // ── Search takes you to the page (Oct 13; see searchLands.ts) ────────────
+  // Typing shows where it could go, each line with what you'd find there;
+  // Enter goes to the first. Nothing is answered here: the home used to put
+  // a sentence, places and categories under the box, out of nowhere, and
+  // testers didn't trust it. The search itself is useHomeSearch's, which You
+  // asks again for a saved search.
+  // The home's own cards the words name that aren't a kind of place with
+  // listings (Patient & Family Support, a form): a line that opens them.
+  const otherCards = (filtered ?? []).filter((c) => !categories?.some((cat) => cat.id === c.id && cat.kind === 'listing'))
+  const linesFor = (text: string, result: AskResult, answer: Answer | null, reading: LinesContext['reading'] = null): SearchLine[] =>
+    homeLines(text, result, answer, reading, categories ? otherCards.map((c) => ({ id: c.id, title: c.title, href: categories.some((cat) => cat.id === c.id) ? c.href : null })) : [])
+  // Our own search's lines.
+  const ownLines = asked ? linesFor(q, asked.result, asked.answer) : []
+
+  // The question reader (questionReader.ts) reads only what our own search
+  // didn't understand: nothing found, or only the words found as text
+  // ("Food · 2 for “something to drink”"). Its reading then decides the
+  // lines, and the page it opens has that reading in its Filters. A
+  // question our search did understand ("kosher wine", "food open now") is
+  // never sent: the AI answered it differently from one try to the next,
+  // and Enter waited for it (the user, Oct 13: "super inconsistent", "why
+  // is AI reading the question when it's already showing the right
+  // answer"). Never a place's own name.
+  const reader = useReading(communitySlug)
+  const readerPlacesHere = useMemo(() => readerPlaces(listings ?? [], communitySlug), [listings, communitySlug])
+  const namesAPlace = !!q && namedListings(listings ?? [], q).length > 0
+  const readable = !!asked && !namesAPlace && needsReading(asked.result) && (ownLines.length === 0 || !!ownLines[0].loose)
+  const reading = readable ? reader.readingFor(q) : null
+  // Only a reading that names a kind of place, and doesn't lose the one our
+  // own parser is sure of (see readingLoses), decides the lines.
+  const todayFound = !!asked && (asked.result.hits.length > 0 || asked.result.noHours.length > 0)
+  const useReadingLines = !!reading && readingAnswers(reading.reading) && !(todayFound && readingLoses(q, reading.reading, categories ?? []))
+  const sharedQuestion = !!initialQuery && q === initialQuery.trim()
+  const own = asked ? ownFrom(asked.result, readerPlacesHere) : null
+  useEffect(() => {
+    if (!readable || !own) return
+    const timer = setTimeout(() => reader.ask(q, own), sharedQuestion ? 0 : 1000)
+    return () => clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [readable, q])
+  const readingNow = !!q && reader.isReading(q)
+  const readerAnswered = reader.answered(q)
+
+  const exact = asked && useReadingLines ? linesFor(q, asked.result, asked.answer, reading!.reading) : ownLines
+  // Nothing as asked: the closest question that does find something, with
+  // a word or two left out ("packaged pretzels" → pretzels; see nearMiss),
+  // each line saying what was left out. A reading, once it comes, has the
+  // lines instead when it found something.
+  const miss = asked && exact.length === 0 && listings ? nearMiss(listings, categories ?? [], q, { coords, now: new Date(schedule?.now ?? 0), places }) : null
+  const lines = miss
+    ? linesFor(miss.kept, miss.result, null).map((line) => ({ ...line, sub: `${line.sub} · nothing for “${miss.dropped}”` }))
+    : exact
+
+  // Enter (or a "Try asking" tapped): the first line, as shown, at once.
+  // It waits only for a question being read (readable: our own search
+  // found nothing, or only the words as text), and says it's reading;
+  // nothing anywhere stays here and says so (nothingFor), with where to
+  // ask.
+  const router = useRouter()
+  const [nothingFor, setNothingFor] = useState<string | null>(null)
+  const [waitingFor, setWaitingFor] = useState<string | null>(null)
+  const goTo = (line: SearchLine, text: string) => {
+    track('search_landed', { kind: line.kind, query: text })
+    if (line.listing) {
+      track('listing_opened', { listing: line.listing.name, category: line.listing.category, source: 'search' })
+      countEvent(communitySlug, 'listing_view', line.listing.id)
+    } else if (line.categoryId) {
+      track('category_opened', { category: line.categoryId, source: 'search' })
+    }
+    if (line.href) return router.push(line.href)
+    if (line.kind === 'add') return document.dispatchEvent(new CustomEvent('jpc:open-add'))
+    allCards?.find((c) => c.id === line.cardId)?.go()
   }
+  const submit = () => {
+    if (!q || !listings || !schedule) return
+    const toRead = readable && !reading && !readerAnswered
+    if (lines[0] && !readingNow && !toRead) return goTo(lines[0], q)
+    if (toRead && own) {
+      reader.ask(q, own)
+      return setWaitingFor(q)
+    }
+    if (readingNow) return setWaitingFor(q)
+    if (lines[0]) return goTo(lines[0], q)
+    setNothingFor(q)
+  }
+  // The reading Enter waited for has arrived (or couldn't be had).
+  useEffect(() => {
+    if (!waitingFor || waitingFor !== q || (!readerAnswered && !reading)) return
+    // Acting once on something that arrived from outside (the reader's
+    // answer), not state derived from props on every render.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setWaitingFor(null)
+    if (lines[0]) goTo(lines[0], q)
+    else setNothingFor(q)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [waitingFor, readingNow, readerAnswered, lines[0]?.key])
+  // A shared question (/philly/ask/…) goes where Enter would, once the page
+  // can work out where; the address is replaced, so Back doesn't return to
+  // a page that leaves again.
+  // A question to be read waits for the reader's answer (asked at once,
+  // above): it may be off, and then our own search's lines are where it
+  // goes.
+  const sharedLanded = useRef(false)
+  useEffect(() => {
+    if (sharedLanded.current || !sharedQuestion || !asked) return
+    if (readable && !reading && !readerAnswered) return
+    sharedLanded.current = true
+    const first = lines[0]
+    if (first?.href) router.replace(first.href)
+    else if (first) goTo(first, q)
+    // Once, when the shared question can first be placed.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    else setNothingFor(q)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sharedQuestion, !!asked, readerAnswered, !!reading])
+
+  // Questions to tap under the empty box (see searchPrompts.ts): each goes
+  // where it would on Enter, so only ones that go somewhere are offered.
+  const prompts =
+    !q && listings
+      ? pickPrompts(candidatePrompts(schedule && { day: schedule.todayKey, minutes: schedule.nowMinutes }), (p) => {
+          const tried = ask(p)
+          return answersWell(tried.answer, tried.result.hits.length) && linesFor(p, tried.result, tried.answer).length > 0
+          // Six for a phone's row, which swipes; a computer shows the three
+          // that fit (SearchPrompts).
+        }, PHONE_MOST)
+      : []
+  const pickPrompt = (p: string) => {
+    track('search_prompt_tapped', { prompt: p })
+    const tried = ask(p)
+    const first = linesFor(p, tried.result, tried.answer)[0]
+    if (first) goTo(first, p)
+    else changeQuery(p)
+  }
+
+  const foundNothing = !!q && nothingFor === q
+  const askGroup = foundNothing ? { nothingClose: true, sharePath: routes.ask(communitySlug, q) } : null
+  // AskTheGroup says "Nothing in the guide for …" itself.
+  const nothingNode = askGroup && (
+    <div data-testid="search-nothing">
+      <AskTheGroup query={q} {...askGroup} />
+    </div>
+  )
+  const linesNode = q && !foundNothing && <SearchLines lines={lines} categories={categories} typed={q} reading={readingNow || waitingFor === q} onPick={(line) => goTo(line, q)} />
 
   // Capture searches that come up empty — the most actionable signal for what
   // content to add next. Only counts once data has loaded, so a slow load never
   // looks like a "miss".
   useLogSearchMiss({
     query,
-    hasResults: (filtered?.length ?? 0) > 0 || placeHits.length > 0,
+    hasResults: lines.length > 0 || readingNow,
     ready: allCards !== null && listings !== null,
     source: 'Home',
   })
-
-  // Sections only exist once loading is done and there's something to group;
-  // while loading, a single flat grid of entry cards + skeletons stands in.
-  const sections = filtered ? groupCardsIntoSections(filtered, homeSections ?? []) : []
 
   // The desktop gateway's own block order (admin-editable — see
   // HomeSectionManager/DesktopTopicsManager's Home screen cards list).
@@ -187,109 +363,60 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
   const configuredBuiltIns = (homeSections ?? [])
     .filter((s): s is typeof s & { kind: Exclude<HomeBlockKind, 'section'> } => s.kind !== 'section')
     .map((s) => ({ kind: s.kind, title: s.title, width: s.width }))
-  const builtInOrder =
+  const allBuiltIns =
     configuredBuiltIns.length > 0
       ? configuredBuiltIns
-      : (['browse', 'davening', 'listings', 'map', 'subscribe', 'jewishTimes'] as const).map((kind) => ({
+      : (['browse', 'davening', 'listings', 'subscribe', 'jewishTimes'] as const).map((kind) => ({
           kind,
           title: BUILT_IN_BLOCKS[kind].title,
           width: 'full' as const,
         }))
+  // On the Today home its own blocks answer what Browse, Davening Times and
+  // Shabbat & Holiday Times did (TodayBlocks); Kept by the community,
+  // Suggest a listing and Stay in the loop stay below them, as the admin
+  // orders them.
+  const builtInOrder = today ? allBuiltIns.filter((b) => b.kind === 'listings' || b.kind === 'subscribe') : allBuiltIns
 
-  // Shared between mobile's permanent grid and desktop's search results —
-  // see below for why the two don't share one JSX node any more.
-  const noMatchesMessage = q && (filtered?.length ?? 0) === 0 && placeHits.length === 0 && (
-    <p className="text-center text-sm text-slate-500">
-      Nothing matches “{q}”. Try a different word or clear the filter.
-    </p>
-  )
-  // No location set yet — same signal GenericDirectory's own addressPrompt
-  // uses to hold each distance-based card's distance column open with a
-  // placeholder instead of omitting it outright (see PlacesResults' own doc).
-  const placesNode = placeHits.length > 0 && (
-    <PlacesResults hits={placeHits} onOpen={openPlace} showDistanceSlot={!anchor.label} />
-  )
-
-  // Mobile's own permanent grid — this doubles as its whole "browse
-  // everything", not just search results, so it always renders regardless
-  // of `q`. Full CardGrid tiles, unchanged from before. Browsing (no query)
-  // keeps the admin-configured section titles as real, large headings —
-  // useful information architecture when there's no "Places" heading next
-  // to it to clash with. Once there's a query, though, `placesNode` brings
-  // its own small-caps "Places" heading into the same list, and a section
-  // title sitting next to that read as a style mismatch — same fix as
-  // desktop's own "Categories" vs "Food and Hospitality" (see
-  // desktopResultsNode's own comment): one flat "Categories" heading,
-  // styled like "Places", over every matching card regardless of section.
+  // The phone's home under the search (the user, Oct 17): Right now (what's
+  // open, or Shabbos), then every category as a tile. Both in the admin's
+  // order. While something is typed, where it could go shows under the box
+  // (HeroHeading's searchPanel): Right now steps aside and the tiles dim.
+  // Then any category without a card of its own id (the Eruv page's card
+  // has its page's), so the candles card still finds the eruv.
+  const cardOrder = allCards ? groupCardsIntoSections(allCards, homeSections ?? []).flatMap((s) => s.cards.map((c) => c.id)) : []
+  const orderedCategories = [...(categories ?? [])].sort((a, b) => rank(cardOrder, a.id) - rank(cardOrder, b.id))
+  // A place opened from the home's answers (Right now, or Today's blocks).
+  const openListing = (item: { id: string; name: string; category: string }) => {
+    track('listing_opened', { listing: item.name, category: item.category, source: 'today' })
+    countEvent(communitySlug, 'listing_view', item.id)
+    onNavigate('patient', 'find', { findView: item.category, findItemId: item.id })
+  }
   const mobileResultsNode = (
     <>
-      {noMatchesMessage}
-      {loading ? (
-        <CardGrid cards={entryCards} loadingCount={6} />
-      ) : q ? (
-        filtered &&
-        filtered.length > 0 && (
-          <div>
-            <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">Categories</h2>
-            <CardGrid cards={filtered} />
-          </div>
-        )
-      ) : (
-        sections.map((s) => (
-          <div key={s.title}>
-            <h2 className="mb-3 text-lg font-semibold text-slate-900">{s.title}</h2>
-            <CardGrid cards={s.cards} />
-          </div>
-        ))
+      {!q && (
+        <RightNow
+          listings={listings}
+          categories={orderedCategories}
+          communitySlug={communitySlug}
+          timezone={timezone}
+          schedule={schedule}
+          zmanim={zmanim.data}
+          from={coords ?? community.mapCenter}
+          items={settings.beforeCandleItems}
+          onOpenListing={openListing}
+        />
       )}
-      {placesNode}
+      <div data-testid="home-browse-list" className={q ? 'opacity-40 transition-opacity' : 'transition-opacity'}>
+        <CategoryTiles communitySlug={communitySlug} listings={listings} />
+      </div>
     </>
   )
 
-  // Desktop's own copy, shown only once there's a query, inside
-  // SearchSection's own white box (see that component's own doc on why — a
-  // search whose answer shows up somewhere else on the page reads as
-  // disconnected). CompactCardGrid, not CardGrid: search results used to
-  // fall back to the heavier photo-tile grid mobile uses, which read as a
-  // jarring style switch from Browse everything's own small icon-avatar
-  // rows the moment you typed anything — this keeps desktop looking like
-  // desktop whether you're browsing or searching.
-  //
-  // One flat "Categories" heading over every matching card, not `sections`'
-  // own admin-configured group titles ("Food and Hospitality", etc.) — those
-  // exist to organize the tab nav's mega-menus and mobile's permanent grid,
-  // and showing one here reads as a mismatch against "Places" right below
-  // it, which is never split by category either. `filtered`, not `sections`,
-  // is the flat list this needs (the same one `sections` itself groups from).
-  const desktopResultsNode = q ? (
-    <>
-      {noMatchesMessage}
-      {filtered && filtered.length > 0 && (
-        <div>
-          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">Categories</h2>
-          <CompactCardGrid
-            cards={filtered}
-            categories={categories}
-            onCardClick={(card) => track('category_opened', { category: card.id ?? card.title, source: 'grid' })}
-          />
-        </div>
-      )}
-      {placesNode}
-    </>
-  ) : undefined
-
-  // Jump to the map band when arriving from a collapsed fullscreen map. Waits
-  // for the band to actually exist — on the first paint after navigating home
-  // it may not be rendered yet (categories still loading, so `hasMap` is false).
-  useEffect(() => {
-    if (scrollTo !== 'map') return
-    const el = mapBandRef.current
-    if (!el) return
-    el.scrollIntoView({ block: 'start' })
-    // mapBandRef comes from useInView, a useRef under the hood — stable
-    // across renders, just not visible as such to eslint across the custom
-    // hook boundary. Listed explicitly rather than suppressed.
-  }, [scrollTo, hasMap, mapBandRef])
+  // Who keeps the guide right, at the top of the phone's home (TrustBand):
+  // how many places, and whether Google checks them. This week's count
+  // waits for the clock.
+  const { community: activeCommunity } = useActiveCommunity()
+  const trust = useMemo(() => (listings ? trustFacts(listings, categories ?? [], schedule?.now ?? null) : null), [listings, categories, schedule?.now])
 
   // Tapping the tab bar's Home button, or the header logo, while already on
   // home doesn't remount this component — see goHome's own note — so it fires
@@ -343,6 +470,36 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
   // only produces a false positive here if a real back-navigation also
   // happened to be pending at that exact instant, which is what the flag
   // means in the first place.
+  // ── The Today home's blocks (TodayBlocks) ──────────────────────────────
+  // Every category, in the admin's order, for its Browse.
+  const todayCards = today && allCards ? groupCardsIntoSections(allCards, homeSections ?? []).flatMap((s) => s.cards) : null
+  // "Food open now", asked of the site's own search, as if typed.
+  const openNowQuestion = 'Food open now'
+  const openNow = today && listings && schedule && !settings.todayHidden.includes('openNow') ? { question: openNowQuestion, result: ask(openNowQuestion).result } : null
+  // What changed in the last 7 days (step 7a), against the same clock.
+  const changeLog = useChangeLog()
+  const week = today && changeLog && schedule ? thisWeek(whatChanged(changeLog, timezone), schedule.now) : null
+  const todayBlocks = today && (
+    <TodayBlocks
+      listings={listings}
+      categories={categories ?? []}
+      communitySlug={communitySlug}
+      timezone={timezone}
+      from={coords ?? community.mapCenter}
+      schedule={schedule}
+      zmanim={zmanim.data}
+      items={settings.beforeCandleItems}
+      openNow={openNow}
+      cards={todayCards}
+      onOpenListing={openListing}
+      searching={!!q}
+      pinned={<PinnedBlock communitySlug={communitySlug} from={coords ?? community.mapCenter} now={schedule?.now ?? null} />}
+      hidden={settings.todayHidden}
+      thisWeek={week}
+      region={community.region}
+    />
+  )
+
   const [backReveal, setBackReveal] = useState(false)
   const mainRef = useRef<HTMLElement>(null)
   useEffect(() => {
@@ -386,21 +543,73 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
         // element on its own, same mechanism that made the plain fadeIn
         // replay before any of this existed — the className never has to
         // change for that part to keep working.
-        className={`max-w-6xl mx-auto px-4 sm:px-6 pb-24 desktop:pb-0 ${backReveal ? 'reveal-slide-back' : 'animate-[fadeIn_180ms_ease-out]'}`}
+        className={`max-w-6xl desktop:max-w-7xl mx-auto px-4 sm:px-6 pb-24 desktop:pb-0 ${backReveal ? 'reveal-slide-back' : 'animate-[fadeIn_180ms_ease-out]'}`}
       >
         {/* ── Heading + filter ───────────────────────────────────────────────── */}
-        <HeroHeading settings={settings} query={query} onQueryChange={setQuery} />
+        <HeroHeading
+          settings={settings}
+          query={query}
+          onQueryChange={changeQuery}
+          onSearchSubmit={submit}
+          mapIcon={hasMap ? mapIcon : null}
+          onViewMap={() => onNavigate(null, 'map')}
+          onBrowseCategories={() => {
+            // Also expands the row (the same thing the "More" tile's own
+            // click does), not just a scroll — "Browse Categories" reads as
+            // "show me everything," so landing on the same capped 9+More
+            // row a visitor would've scrolled to on their own defeats the
+            // button's own promise.
+            setBrowseExpanded(true)
+            browseCardRef.current?.scrollIntoView({ block: 'start' })
+          }}
+          searchPanel={linesNode || nothingNode || null}
+          searchPrompts={prompts}
+          onPickPrompt={pickPrompt}
+          today={today ? { dayLine: dayLine(schedule?.now ?? null, timezone, zmanim.data) } : undefined}
+          trust={!today && trust ? <TrustBand facts={trust} region={activeCommunity.region} communitySlug={communitySlug} /> : null}
+        />
+
+        {/* ── Seasonal campaign banner ─────────────────────────────────────────
+                Renders nothing outside its own admin-set date range (see the
+                component's own doc). Common to both layouts — sits above the
+                desktop card stack below AND the mobile `desktop:hidden` grid
+                further down — so one element here, no isMobile branch, is a
+                banner "near the top" on both. Not part of builtInOrder/
+                cardKindContent: it isn't admin-orderable among those cards,
+                just a plain "is one active" check, same shape as
+                hasMap/zmanimCategory above.
+
+                Hidden on mobile while actively searching (`isMobile && q`):
+                mobile has no HeroSearchDropdown of its own — typing re-filters
+                the grouped grid further down the page in place, with this
+                banner sitting in normal flow between the box and that grid.
+                Desktop never has this problem (HeroSearchDropdown opens right
+                under its own search box and overlays this banner visually,
+                same as it overlays everything else below it), so it's left
+                showing there regardless of `q`. Reappears the instant the
+                search is cleared — not a "no promotions during search" rule,
+                just removing the one thing putting distance between the box
+                and its own answer. ─────────────────────────────────────── */}
+        {!(isMobile && q) && (
+          <div className="mt-8">
+            <CampaignBannerCard />
+          </div>
+        )}
+
+        {todayBlocks}
 
         {/* ── Browse everything (desktop), one card ──────────────────────────
                 `settings.heroTitle` titles the WHOLE card now, not just the
-                grid below — search sits right under that title as the first
-                thing in the section. `SearchSection` renders `bare` here (no
-                card/section shell, and no heading of its own — `hideHeading`,
-                since this card's own heading right above it already says the
-                same thing) so it mounts once, as a stable sibling of the
-                grid below, and never gets swapped out as a whole subtree
-                when `q` changes — that would unmount the input mid-keystroke
-                and drop focus.
+                grid below. No search box of its own — the hero's own search
+                box (HeroHeading) drives `query`/`setQuery`, but this card
+                doesn't react to it any more: it used to swap its whole grid
+                for a dense CompactCardGrid of search matches the moment `q`
+                was set, back when there was nowhere else on screen for a
+                search's answer to show up. HeroSearchDropdown (opening right
+                under the hero's own search box) replaced that job, so this
+                card stays the plain category index regardless of what's
+                typed — one search, one place its results appear, not two
+                things reacting to the same keystroke.
 
                 The grid itself is a flat, always-visible index of every
                 card: every real category, Patient & Family Support,
@@ -413,20 +622,11 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
                 tab row) offers the same destinations grouped by those
                 umbrella labels; this is a second, always-visible flat way to
                 reach them for anyone who doesn't think to open that menu,
-                not a replacement for it. Hidden while actively searching —
-                the grouped grid further down already serves as live search
-                results, and this card shows the search box's own `results`
-                slot instead. `source: 'grid'` on the click lets the admin
-                Metrics tab compare actual usage against HeaderNav's own
-                `source: 'header-nav'`, so keeping both isn't a permanent
-                guess.
-
-                CompactCardGrid, not CardGrid — a list meant to hold every
-                card at once got heavier with every category added and read
-                as a wall of mismatched photo tiles (real photos, flat tints,
-                still-loading placeholders, side by side). See that
-                component's own doc for why a small icon-avatar row instead
-                of a full photo tile is the fix.
+                not a replacement for it. `source: 'grid'` on the click lets
+                the admin Metrics tab compare actual usage against
+                HeaderNav's own `source: 'header-nav'` and HeroSearchDropdown's
+                own `source: 'hero-search'`, so keeping all three isn't a
+                permanent guess.
 
                 The ring-1/rounded-2xl wrapper matches the map's own
                 container below — the two are meant to read as equal "main
@@ -434,13 +634,13 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
                 Listings, Email Signup, Jewish Times) uses the same card
                 language (border, rounded-2xl) as this section, so the whole
                 stack reads as one family. */}
-        {/* ── The desktop gateway's six singleton cards — Categories &
-                Search, Davening Times, Update Listings, Map, Email Signup,
-                Jewish Times — in the admin-configured order (builtInOrder
-                above), and now optionally paired side by side (see
-                homeSections.ts's own `width` doc). Each card keeps only the
-                gating it actually needs on its own merits — Davening Times
-                self-gates on having a minyanim-bearing category at all
+        {/* ── The desktop gateway's cards — Categories & Search, Davening
+                Times, Update Listings, Map, Email Signup, Jewish Times, plus
+                the new Suggest a Listing — in the admin-configured order
+                (builtInOrder above), and now optionally paired side by side
+                (see homeSections.ts's own `width` doc). Each card keeps only
+                the gating it actually needs on its own merits — Davening
+                Times self-gates on having a minyanim-bearing category at all
                 (inside DaveningTimesCard), Jewish Times gates on a real
                 Zmanim pseudo-category existing (candle-lighting data has
                 nowhere to come from otherwise), and Update Listings/Email
@@ -454,78 +654,94 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
                 something (cardKindContent didn't return null) — a 'half'
                 card whose would-be partner is gated off that render (or is
                 itself the last card) falls back to a full-width row of its
-                own, so a lone half-width card never looks like a mistake. */}
+                own, so a lone half-width card never looks like a mistake.
+
+                Davening Times and Update Listings are the one exception to
+                that generic per-kind path: the desktop mockup (Phase 6,
+                docs/desktop-mockup-plan.md) puts them in one 3-up
+                "community" row together with Suggest a Listing (a card with
+                no `width`/kind of its own in the database — card widths
+                there are only 'full' | 'half', and kinds are fixed by a DB
+                constraint, so there's nowhere to hang a generic pairing rule
+                for a third card). See the renderedCards walk below, which
+                intercepts those two kinds specifically instead of routing
+                them through cardKindContent. */}
         {(() => {
           function cardKindContent(kind: (typeof builtInOrder)[number]['kind']): React.ReactNode {
           if (kind === 'browse') {
             // `settings.desktopBrowseEyebrow`/`desktopBrowseHeading` title
-            // the WHOLE card, not just the grid below — search sits right
-            // under that heading as the first thing in the section.
-            // `SearchSection` renders `bare` here (no card/section shell,
-            // and no heading of its own — `hideHeading`, since this card's
-            // own heading right above it already says the same thing) so it
-            // mounts once, as a stable sibling of the grid below, and never
-            // gets swapped out as a whole subtree when `q` changes — that
-            // would unmount the input mid-keystroke and drop focus.
+            // the WHOLE card — left side of the header row, with the "View
+            // all" toggle on the right. No search box of its own (see the
+            // section comment above this card) — and, since
+            // HeroSearchDropdown started giving the hero's own search box a
+            // live results panel of its own, this card no longer reacts to
+            // `query` at all: always the full, unfiltered category index,
+            // never a filtered/search-results view. It used to swap in a
+            // dense CompactCardGrid of search matches the moment `q` was
+            // set — with a real results panel opening right where a visitor
+            // is already looking, having this section ALSO change out from
+            // under them read as two different things happening for one
+            // search, not one.
             //
-            // The grid itself is a flat, always-visible index of every
-            // card. CompactCardGrid, not CardGrid — see that component's
-            // own doc for why a small icon-avatar row instead of a full
-            // photo tile is the fix for a list this long.
+            // The grid itself is a flat index of every card, sorted by
+            // listing count (most to least places) rather than the source
+            // order resourceCards/entryCards happens to build — matching
+            // the user's own reference image. Collapsed shows the first
+            // COLLAPSED_TILE_COUNT plus a trailing "More" tile (no
+            // scrolling, no wrap — see CategoryTileRow's own doc); "View
+            // all" (here or the "More" tile itself) expands it into a full
+            // wrapped grid instead.
+            const browseCards = [...(loading ? entryCards : (allCards ?? []))].sort(
+              (a, b) => (listingCounts?.[b.id ?? ''] ?? 0) - (listingCounts?.[a.id ?? ''] ?? 0),
+            )
             return (
-              <div className="hidden desktop:block rounded-2xl bg-white p-5 ring-1 ring-slate-900/5">
-                  <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-amber-700">
-                    {settings.desktopBrowseEyebrow}
-                  </p>
-                  <h2 className="mb-6 text-lg font-semibold text-slate-900">{settings.desktopBrowseHeading}</h2>
-                  <SearchSection
-                    bare
-                    hideHeading
-                    heroTitle={settings.desktopBrowseHeading}
-                    searchPlaceholder={settings.searchPlaceholder}
-                    query={query}
-                    onQueryChange={setQuery}
-                    results={!isMobile ? desktopResultsNode : undefined}
-                  />
-                  {!isMobile && !q && (
-                    <div className={ui.search.landing ? 'mt-6' : ''}>
-                      <CompactCardGrid
-                        cards={loading ? entryCards : (filtered ?? [])}
+              // scroll-mt-24 clears the sticky site header when this card is
+              // scrolled into view (the "Browse Categories" hero button).
+              <div
+                ref={browseCardRef}
+                data-testid="browse-everything-card"
+                className="hidden scroll-mt-24 desktop:block rounded-2xl bg-white px-8 pt-6 pb-3 ring-1 ring-slate-900/5"
+              >
+                  {/* Hardcoded, not settings.desktopBrowseEyebrow/Heading —
+                      the user's own reference image titles this "Explore
+                      by Category" with no small eyebrow label above it,
+                      unlike every other card on this page. The admin
+                      fields still exist (DesktopTopicsManager) but have no
+                      render site left here. "Show fewer categories" sits up
+                      here, top-right of the heading, once expanded — the
+                      user's own call, moving it back from below the grid
+                      (where the "More" tile it collapses used to be). */}
+                  <div className="flex items-center justify-between gap-4">
+                    <h2 className="text-2xl font-extrabold text-ink">Explore by Category</h2>
+                    {browseExpanded && (
+                      <button
+                        type="button"
+                        onClick={() => setBrowseExpanded(false)}
+                        aria-expanded={browseExpanded}
+                        className="shrink-0 cursor-pointer text-sm font-semibold text-ink transition-colors hover:text-primary"
+                      >
+                        Show fewer categories
+                      </button>
+                    )}
+                  </div>
+                  {!isMobile && (
+                    <div className={ui.search.landing ? 'mt-3' : ''}>
+                      <CategoryTileRow
+                        cards={browseCards}
                         categories={categories}
+                        expanded={browseExpanded}
                         onCardClick={(card) => track('category_opened', { category: card.id ?? card.title, source: 'grid' })}
+                        onExpand={() => setBrowseExpanded(true)}
                       />
                     </div>
                   )}
               </div>
             )
           }
-          if (kind === 'davening') {
-            // No outer zmanimCategory gate any more — that was this card's
-            // old shared-component sibling's requirement (ShabbatTimesCard's
-            // useZmanim), not this card's own. DaveningTimesCard already
-            // self-gates on having any minyanim-bearing category at all
-            // (returns null otherwise), which is the real requirement here.
-            return (
-              !isMobile && (
-                <DaveningTimesCard
-                  coords={coords}
-                  eyebrow={settings.desktopDaveningEyebrow}
-                  heading={settings.desktopDaveningHeading}
-                />
-              )
-            )
-          }
-          if (kind === 'listings') {
-            // Unconditional (no zmanimCategory gate) — this card has never
-            // depended on zmanim data; it was only ever gated because it
-            // used to share a component (HomeBreak) with Davening Times.
-            return !isMobile && (
-              <UpdateListingsCard
-                eyebrow={settings.desktopListingsEyebrow}
-                heading={settings.desktopListingsHeading}
-              />
-            )
-          }
+          // 'davening'/'listings' are NOT handled here any more — see the
+          // community-row special case in the renderedCards walk below,
+          // which merges them with Suggest a Listing into one row instead
+          // of each getting its own.
           if (kind === 'subscribe') {
             // Also unconditional — SubscribeSection doesn't read zmanim
             // data either; it only used to pair visually with
@@ -544,7 +760,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
           }
           if (kind === 'jewishTimes') {
             // Still a JS branch on zmanimCategory: useZmanim fetches
-            // /api/zmanim uncached, straight through to Hebcal, and hiding
+            // /api/zmanim (CDN-cached, but still a request), and hiding
             // this with CSS alone would cost every phone visitor a
             // round-trip for a card they never see (mobile has no
             // equivalent of this card at all) — same reasoning as before
@@ -560,77 +776,80 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
               )
             )
           }
-          if (kind === 'map') {
-            // The real full map screen, right on the home screen. Desktop
-            // only: mobile reaches the same map via its own tab bar entry, so
-            // it's dropped from this scroll to avoid showing it twice. Stays
-            // up while searching, unlike Browse everything above it — search
-            // results are now their own thing (see SearchSection's own
-            // `results` slot), not something this needs to make room for by
-            // disappearing; the map is independent content, not an answer to
-            // what was typed. `scroll-mt` clears the sticky site header, so scrolling
-            // this band into view (arriving from a collapsed fullscreen map)
-            // doesn't tuck its heading underneath it.
-            //
-            // The heading sits inside the same rounded-2xl/ring-1 card as the
-            // map now, matching Browse everything's own card — HomeMap passes
-            // `borderless` to ResourceMapView so the map doesn't draw its own
-            // border inside this one (see that prop's own doc for why: this
-            // component is shared with the full map screen, which still owns
-            // its border the old way). overflow-hidden here is what clips the
-            // now-borderless map's square corners to match this card's
-            // rounded ones — ResourceMapView already clips its own contents
-            // the same way internally, so this adds no new clipping behavior,
-            // just extends the same shape one level out. Not a risk to the
-            // fullscreen expand-in-place transition either: fullscreen goes
-            // `fixed inset-0`, which escapes this ancestor's overflow/rounding
-            // entirely regardless of what wraps it.
-            return hasMap && (
-              <div ref={mapBandRef} className="hidden scroll-mt-20 desktop:block overflow-hidden rounded-2xl bg-white ring-1 ring-slate-900/5">
-                  <div className="px-5 pt-5 pb-4">
-                    <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-amber-700">
-                      {settings.desktopMapEyebrow}
-                    </p>
-                    {/* Same eyebrow/heading rhythm as every other card —
-                        both admin-editable now (Desktop tab's Home screen
-                        cards), no longer a hardcoded eyebrow next to a
-                        home_section.title-driven heading. The count fades
-                        in once listings have loaded rather than reserving
-                        space for it; a header that's briefly one line
-                        shorter reads fine, a wrong number wouldn't. */}
-                    <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-1">
-                      <h2 className="text-lg font-semibold text-slate-900">{settings.desktopMapHeading}</h2>
-                      {totalListings != null && (
-                        <p className="text-sm text-slate-500">
-                          <span className="font-semibold text-slate-700">{totalListings.toLocaleString()}</span>{' '}
-                          place{totalListings === 1 ? '' : 's'} across {listingCategories.length}{' '}
-                          categor{listingCategories.length === 1 ? 'y' : 'ies'}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                  {mapInView ? (
-                    <HomeMap onNavigate={onNavigate} coords={coords} liveTracking={liveTracking} controls={controls} />
-                  ) : (
-                    // Same footprint as ResourceMapView's own embedded-mode
-                    // container (desktop:h-[70vh] desktop:min-h-[420px]) so
-                    // swapping in the real map once mapInView flips true
-                    // doesn't shift anything below it. No rounding/ring of
-                    // its own now — the wrapping card above already owns that.
-                    <div className="h-[70vh] min-h-[420px] bg-slate-100" />
-                  )}
-              </div>
-            )
-          }
+          // 'map' — the old embedded map band — is retired (the user's own
+          // call: the map lives at its own full-screen route now, reached via
+          // the hero's "View Map" button/header nav/tab bar, never embedded
+          // on the home screen). Falls through to `return null` below like
+          // any other retired kind (see BUILT_IN_BLOCKS's own doc) — a
+          // community with an old 'map' row in its home_sections just
+          // silently renders nothing for it, same as 'zmanim'/'shabbat'/
+          // 'featured' before it.
           return null
           }
 
           // Pairing happens AFTER gating (see the comment above) — build the
           // rendered, non-empty cards first, THEN walk them looking for two
           // adjacent 'half' cards to combine into one row.
-          const renderedCards = builtInOrder
-            .map(({ kind, width }) => ({ kind, width, node: cardKindContent(kind) }))
-            .filter((c): c is typeof c & { node: React.ReactElement } => Boolean(c.node))
+          //
+          // 'davening'/'listings' get a special case here rather than going
+          // through cardKindContent like every other kind: the desktop
+          // mockup (Phase 6, docs/desktop-mockup-plan.md) puts Davening
+          // Times, Update Listings and the new Suggest a Listing card in one
+          // 3-up "community" row instead of each kind getting its own row —
+          // Suggest a Listing has no `width`/kind of its own in the database
+          // (card widths there are only ever 'full' | 'half', and kinds are
+          // fixed by a DB constraint) to hang a generic pairing rule off of,
+          // so the row is built by hand at whichever of the two configured
+          // kinds the walk reaches FIRST, and the other is skipped when the
+          // walk reaches it. Their own `width` values are ignored for this
+          // row — same reasoning CardKindContent's half-pairing below has no
+          // say here either. Every other kind (Subscribe + Jewish Times
+          // still pair) goes through the normal path untouched.
+          const renderedCards: { kind: string; width: 'full' | 'half'; node: React.ReactElement }[] = []
+          let communityRowRendered = false
+          for (const { kind, width } of builtInOrder) {
+            if (kind === 'davening' || kind === 'listings') {
+              if (communityRowRendered) continue
+              communityRowRendered = true
+              const hasDavening = !today && builtInOrder.some((b) => b.kind === 'davening')
+              const hasListings = builtInOrder.some((b) => b.kind === 'listings')
+              const communityCards: React.ReactElement[] = []
+              if (hasDavening && !isMobile) {
+                communityCards.push(
+                  <DaveningTimesCard key="davening" coords={coords} />,
+                )
+              }
+              if (hasListings && !isMobile) {
+                communityCards.push(
+                  <UpdateListingsCard key="listings" eyebrow={settings.desktopListingsEyebrow} heading={settings.desktopListingsHeading} />,
+                )
+              }
+              // Suggest a Listing — always present, when the row renders at
+              // all (i.e. desktop, and at least one of the other two kinds
+              // is configured).
+              if (!isMobile) communityCards.push(<SuggestListingCard key="suggest" />)
+              if (communityCards.length === 0) continue
+
+              const communityRowClass =
+                communityCards.length === 3
+                  ? 'grid gap-5 min-[900px]:grid-cols-3'
+                  : communityCards.length === 2
+                    ? 'grid gap-5 min-[740px]:grid-cols-2'
+                    : 'grid gap-5'
+              renderedCards.push({
+                kind: 'community',
+                width: 'full',
+                node: <div className={communityRowClass}>{communityCards}</div>,
+              })
+              continue
+            }
+            const node = cardKindContent(kind)
+            // Truthy-narrowed, same as the old `.filter` predicate this
+            // replaced: cardKindContent's return type is the broader
+            // React.ReactNode (it can return `false` from an `isMobile &&`
+            // gate), but a truthy value here is always the real element.
+            if (node) renderedCards.push({ kind, width, node: node as React.ReactElement })
+          }
 
           const rows: { key: string; node: React.ReactNode }[] = []
           for (let i = 0; i < renderedCards.length; i++) {
@@ -672,7 +891,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
           }
 
           return rows.map((row) => (
-            <div key={row.key} className="my-12">
+            <div key={row.key} className="my-8">
               {row.node}
             </div>
           ))
@@ -682,14 +901,23 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
                 narrows each section's cards and hides any section left
                 empty. Desktop's own copy of this same content (styled
                 differently — see desktopResultsNode's own doc) lives inside
-                SearchSection above instead. Plain CSS `desktop:hidden`, not
-                an isMobile branch: mobile needs this correct on the very
-                first paint, with no prior interaction, which only a CSS
+                the "Browse everything" card above instead. Plain CSS
+                `desktop:hidden`, not an isMobile branch: mobile needs this
+                correct on the very first paint, with no prior interaction,
+                which only a CSS
                 media query (not a value React doesn't know for certain
                 until after hydration) can guarantee. ─────────────────────── */}
-        <section className="mt-12 sm:mt-14 space-y-10 desktop:hidden">{mobileResultsNode}</section>
+        {/* On the Today home the grid's place is taken by its blocks: a
+            phone sees search results here only once something is typed. */}
+        {(!today || q) && <section className="mt-5 space-y-5 desktop:hidden">{mobileResultsNode}</section>}
       </main>
       </ViewTransition>
     </>
   )
+}
+
+/** Where `id` sits in the home's card order; last when it has no card. */
+function rank(order: readonly (string | undefined)[], id: string): number {
+  const i = order.indexOf(id)
+  return i === -1 ? order.length : i
 }

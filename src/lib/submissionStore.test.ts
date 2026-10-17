@@ -27,8 +27,9 @@ function chainable(result: unknown) {
 }
 
 const mockFrom = vi.hoisted(() => vi.fn())
+const mockRpc = vi.hoisted(() => vi.fn())
 vi.mock('./supabase/admin', () => ({
-  getAdminClient: () => ({ from: mockFrom }),
+  getAdminClient: () => ({ from: mockFrom, rpc: mockRpc }),
 }))
 
 const mockListCategories = vi.hoisted(() => vi.fn())
@@ -56,7 +57,22 @@ vi.mock('./googlePlaces', async () => {
   return { ...actual, fetchPlaceSync: mockFetchPlaceSync }
 })
 
+// The activity log is its own store with its own tests; mocked here so an
+// approval's history rows don't land in the resource-insert assertions below
+// (several read "the last insert"), and so what gets recorded can be asserted.
+const mockRecordActivity = vi.hoisted(() => vi.fn())
+vi.mock('./activityStore', () => ({
+  recordActivity: mockRecordActivity,
+}))
+
+// The eruvim (eruvStore.ts), for an eruv suggestion's queue card and
+// approval.
+const mockListEruvimForAdmin = vi.hoisted(() => vi.fn())
+const mockUpdateEruv = vi.hoisted(() => vi.fn())
+vi.mock('./eruvStore', () => ({ listEruvimForAdmin: mockListEruvimForAdmin, updateEruv: mockUpdateEruv }))
+
 const {
+  activityForApproval,
   approveSubmission,
   getSubmissionFunnelStats,
   listPendingSubmissions,
@@ -109,6 +125,10 @@ afterEach(() => {
   mockUpsertTags.mockReset()
   mockGeocode.mockReset()
   mockFetchPlaceSync.mockReset()
+  mockRecordActivity.mockReset()
+  mockRpc.mockReset()
+  mockListEruvimForAdmin.mockReset()
+  mockUpdateEruv.mockReset()
 })
 
 // ── listPendingSubmissions: category-label resolution ───────────────────────
@@ -733,6 +753,60 @@ describe('approveSubmission: Google-sync field ownership', () => {
     expect(mockFetchPlaceSync).not.toHaveBeenCalled()
   })
 
+  // `description` (googleDescription) used to be a Google-only concept with
+  // no ownership tracking at all — these two mirror the `name` tests above,
+  // now that it's an ordinary ownable field. Matched by a fixed key, not
+  // label, unlike `website` — see useListingDraft's handlePlaceSelect
+  // on the convention.
+  it('owns a description field whose submitted value matches its autofill snapshot — no Google call needed', async () => {
+    const sub = baseSubmission({
+      operation: 'create',
+      payload: listingPayload({
+        name: '',
+        phone: '', // isolates the assertion to the description field alone
+        details: {
+          placeId: 'place-1',
+          googleDescription: "Google's editorial summary.",
+          googleAutofill: { description: "Google's editorial summary." },
+        },
+      }) as unknown as Record<string, unknown>,
+    })
+    const resourceInsertBuilder = mockCreateFlow(sub)
+    mockGetCategoryById.mockResolvedValue(
+      shulCategory({ detailFields: [{ key: 'googleDescription', label: 'Description', type: 'text' as const }] }),
+    )
+
+    await approveSubmission('sub-1')
+
+    const written = lastCallArg(resourceInsertBuilder.insert)
+    expect(written.details.googleFields).toContain('description')
+    expect(mockFetchPlaceSync).not.toHaveBeenCalled()
+  })
+
+  it('does not own a description field the submitter wrote themselves', async () => {
+    const sub = baseSubmission({
+      operation: 'create',
+      payload: listingPayload({
+        name: '',
+        phone: '',
+        details: {
+          placeId: 'place-1',
+          googleDescription: 'Written by the community, not autofilled at all.',
+        },
+      }) as unknown as Record<string, unknown>,
+    })
+    const resourceInsertBuilder = mockCreateFlow(sub)
+    mockGetCategoryById.mockResolvedValue(
+      shulCategory({ detailFields: [{ key: 'googleDescription', label: 'Description', type: 'text' as const }] }),
+    )
+    mockFetchPlaceSync.mockResolvedValue(placeSync({ description: "Google's own, different summary." }))
+
+    await approveSubmission('sub-1')
+
+    const written = lastCallArg(resourceInsertBuilder.insert)
+    expect(written.details.googleFields).not.toContain('description')
+  })
+
   it('falls back to a live Google check for a field that was never autofilled', async () => {
     const sub = baseSubmission({
       operation: 'create',
@@ -1072,6 +1146,28 @@ describe('approveSubmission: placeId vs verifiedPlaceId', () => {
     expect(mockFetchPlaceSync).not.toHaveBeenCalled()
   })
 
+  // The stadium's "Permanently closed" must not close the grill inside it.
+  it('drops the businessStatus read off that other business, too', async () => {
+    const sub = baseSubmission({
+      operation: 'create',
+      payload: listingPayload({
+        name: 'The Kosher Grill',
+        phone: '',
+        details: {
+          placeId: 'place-citizens-bank',
+          businessStatus: 'CLOSED_PERMANENTLY',
+          googleAutofill: { name: 'Citizens Bank Park' },
+        },
+      }) as unknown as Record<string, unknown>,
+    })
+    const resourceInsertBuilder = mockCreateFlow(sub)
+    mockGetCategoryById.mockResolvedValue(shulCategory)
+
+    await approveSubmission('sub-1')
+
+    expect(lastCallArg(resourceInsertBuilder.insert).details.businessStatus).toBeUndefined()
+  })
+
   it('keeps a placeId whose picked name overlaps the listing name', async () => {
     const sub = baseSubmission({
       operation: 'create',
@@ -1153,6 +1249,44 @@ describe('rejectSubmission', () => {
 
     const call = (builder.update as ReturnType<typeof vi.fn>).mock.calls[0]![0] as Record<string, unknown>
     expect('reviewed_by' in call).toBe(false)
+  })
+})
+
+describe('rejectSubmission: an item reported gone', () => {
+  const removal = (m: string[]) =>
+    baseSubmission({
+      status: 'rejected',
+      operation: 'update',
+      target_id: 'res-1',
+      payload: listingPayload({ category: 'grocery', details: { m } }) as unknown as Record<string, unknown>,
+    })
+  function mockFlow(sub: SubmissionRow) {
+    mockFrom.mockImplementation((table: string) =>
+      table === 'submission'
+        ? chainable({ data: sub, error: null })
+        : chainable({ data: { id: 'res-1', category: 'grocery', details: { m: ['Challah', 'Chicken'], itemGone: { m: { Chicken: '2026-10-01T14:00:00.000Z' } } } }, error: null }),
+    )
+    mockGetCategoryById.mockResolvedValue({ id: 'grocery', detailFields: [{ key: 'm', label: 'Kosher items', type: 'tags' }] })
+    mockRpc.mockResolvedValue({ data: null, error: null })
+  }
+
+  it('rejecting the removal keeps the item, so its warning goes', async () => {
+    mockFlow(removal(['Challah']))
+    await rejectSubmission('sub-1')
+    expect(mockRpc).toHaveBeenCalledWith('clear_item_gone', { p_id: 'res-1', p_field: 'm', p_label: 'Chicken' })
+  })
+
+  it('rejecting some other edit leaves the warning up', async () => {
+    mockFlow(removal(['Challah', 'Chicken', 'Wine']))
+    await rejectSubmission('sub-1')
+    expect(mockRpc).not.toHaveBeenCalled()
+  })
+
+  it('a failure clearing it never fails the rejection', async () => {
+    mockFlow(removal(['Challah']))
+    mockRpc.mockResolvedValue({ data: null, error: { message: 'boom' } })
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    await expect(rejectSubmission('sub-1')).resolves.toMatchObject({ status: 'rejected' })
   })
 })
 
@@ -1379,5 +1513,298 @@ describe('getSubmissionFunnelStats', () => {
   it('throws with the Supabase error message on failure', async () => {
     mockFrom.mockReturnValue(chainable({ data: null, error: { message: 'boom' } }))
     await expect(getSubmissionFunnelStats('philly')).rejects.toThrow('Failed to load submission stats: boom')
+  })
+})
+
+// ── The activity log and item dates ──────────────────────────────────────────
+
+describe('approveSubmission: activity log and grocery item dates', () => {
+  function groceryCategory() {
+    return {
+      id: 'grocery',
+      label: 'Grocery',
+      hasAddress: true,
+      detailFields: [{ key: 'm', label: 'Kosher items', type: 'tags', tagGroup: 'kosher_product' }],
+    }
+  }
+
+  function mockFlow(sub: SubmissionRow, existing: Record<string, unknown> | null = null) {
+    const submissionBuilder = chainable({ data: sub, error: null })
+    const approveBuilder = chainable({ data: { ...sub, status: 'approved' }, error: null })
+    const resourceBuilder = chainable({ data: existing ?? { id: 'res-new' }, error: null })
+    let submissionCalls = 0
+    mockFrom.mockImplementation((table: string) => {
+      if (table === 'submission') {
+        submissionCalls += 1
+        return submissionCalls === 1 ? submissionBuilder : approveBuilder
+      }
+      if (table === 'resource') return resourceBuilder
+      throw new Error(`unexpected table ${table}`)
+    })
+    mockGetCategoryById.mockResolvedValue(groceryCategory())
+    mockRecordActivity.mockResolvedValue([])
+    return resourceBuilder
+  }
+
+  it('dates every item on a new listing, and logs the listing and each item', async () => {
+    const sub = baseSubmission({
+      operation: 'create',
+      submitted_by: { email: ' Rachel@Example.com ' },
+      payload: listingPayload({ category: 'grocery', details: { m: ['Challah', 'Wine'] } }) as unknown as Record<string, unknown>,
+    })
+    const resource = mockFlow(sub)
+
+    await approveSubmission('sub-1')
+
+    const written = lastCallArg(resource.insert)
+    const seen = written.details.itemSeen as Record<string, Record<string, string>>
+    expect(Object.keys(seen.m)).toEqual(['Challah', 'Wine'])
+    expect(seen.m.Challah).toBe(written.details.confirmedAt)
+    const rows = mockRecordActivity.mock.calls[0][0]
+    expect(rows.map((r: { kind: string; item?: string }) => [r.kind, r.item ?? null])).toEqual([
+      ['listing_added', null],
+      ['item_added', 'Challah'],
+      ['item_added', 'Wine'],
+    ])
+    expect(rows[0]).toMatchObject({ community: 'philly', source: 'submission', actorEmail: 'rachel@example.com', submissionId: 'sub-1' })
+  })
+
+  it('an edit logs what it changed, as visitors read it: new values only', async () => {
+    const sub = baseSubmission({
+      operation: 'update',
+      target_id: 'res-1',
+      payload: listingPayload({ category: 'grocery', phone: '215-555-0199', details: { m: ['Challah', 'Stew meat'] } }) as unknown as Record<string, unknown>,
+    })
+    mockFlow(sub, { id: 'res-1', category: 'grocery', name: 'Test Shul', anchor_id: 'community', address: '123 Main St', phone: '215-555-0100', details: { m: ['Challah'] } })
+
+    await approveSubmission('sub-1')
+
+    const [listing] = mockRecordActivity.mock.calls[0][0]
+    expect(listing.kind).toBe('listing_edited')
+    expect(listing.changes).toEqual([
+      { key: 'phone', label: 'Phone', value: '215-555-0199' },
+      { key: 'm', label: 'Kosher items', value: 'added Stew meat' },
+    ])
+  })
+
+  it('a new place logs its short facts', async () => {
+    const sub = baseSubmission({ operation: 'create', payload: listingPayload({ category: 'grocery', details: { m: ['Challah'] } }) as unknown as Record<string, unknown> })
+    mockFlow(sub)
+
+    await approveSubmission('sub-1')
+
+    expect(mockRecordActivity.mock.calls[0][0][0]).toMatchObject({ kind: 'listing_added', changes: [{ key: 'facts', label: '', value: 'Grocery', quiet: true }] })
+  })
+
+  it('not working out what changed never fails the approval: the change says "updated"', async () => {
+    const sub = baseSubmission({ operation: 'update', target_id: 'res-1', payload: listingPayload({ category: 'grocery', details: { m: ['Challah'] } }) as unknown as Record<string, unknown> })
+    mockFlow(sub, { id: 'res-1', category: 'grocery', name: 'Test Shul', anchor_id: 'community', address: '123 Main St', phone: '215-555-0100', details: { m: ['Wine'] } })
+    mockGetCategoryById.mockRejectedValue(new Error('categories unreachable'))
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    await expect(approveSubmission('sub-1')).resolves.toMatchObject({ status: 'approved' })
+    expect(mockRecordActivity.mock.calls[0][0][0]).not.toHaveProperty('changes')
+  })
+
+  it('on an edit, dates only the items it adds, keeps the rest, and drops removed ones', async () => {
+    const sub = baseSubmission({
+      operation: 'update',
+      target_id: 'res-1',
+      payload: listingPayload({
+        category: 'grocery',
+        // A made-up date in the submission must never win.
+        details: { m: ['Challah', 'Stew meat'], itemSeen: { m: { Challah: '2099-01-01T00:00:00.000Z' } } },
+      }) as unknown as Record<string, unknown>,
+    })
+    const resource = mockFlow(sub, {
+      id: 'res-1',
+      details: { m: ['Challah', 'Wine'], itemSeen: { m: { Challah: '2026-08-11T00:00:00.000Z', Wine: '2026-08-11T00:00:00.000Z' } } },
+    })
+
+    await approveSubmission('sub-1')
+
+    const seen = lastCallArg(resource.update).details.itemSeen as Record<string, Record<string, string>>
+    expect(seen.m.Challah).toBe('2026-08-11T00:00:00.000Z')
+    expect(seen.m.Wine).toBeUndefined()
+    expect(Date.parse(seen.m['Stew meat'])).toBeGreaterThan(Date.parse('2026-09-01'))
+    const rows = mockRecordActivity.mock.calls[0][0]
+    expect(rows.map((r: { kind: string; item?: string }) => [r.kind, r.item ?? null])).toEqual([
+      ['listing_edited', null],
+      ['item_added', 'Stew meat'],
+    ])
+  })
+
+  it('drops a made-up itemSeen even when the edit dates nothing itself', async () => {
+    const sub = baseSubmission({
+      operation: 'update',
+      target_id: 'res-1',
+      payload: listingPayload({
+        category: 'grocery',
+        details: { m: ['Challah'], itemSeen: { m: { Challah: '2099-01-01T00:00:00.000Z' } } },
+      }) as unknown as Record<string, unknown>,
+    })
+    // Challah was already there, from before items had dates.
+    const resource = mockFlow(sub, { id: 'res-1', details: { m: ['Challah'] } })
+
+    await approveSubmission('sub-1')
+
+    expect(lastCallArg(resource.update).details.itemSeen).toBeUndefined()
+  })
+
+  it('keeps a "reported gone" on an item still listed, drops it with the item, and never takes one from a submission', async () => {
+    const sub = baseSubmission({
+      operation: 'update',
+      target_id: 'res-1',
+      payload: listingPayload({
+        category: 'grocery',
+        details: { m: ['Challah', 'Steak'], itemGone: { m: { Challah: '2099-01-01T00:00:00.000Z' } } },
+      }) as unknown as Record<string, unknown>,
+    })
+    const resource = mockFlow(sub, {
+      id: 'res-1',
+      details: { m: ['Challah', 'Chicken', 'Steak'], itemGone: { m: { Chicken: '2026-10-01T14:00:00.000Z', Steak: '2026-09-30T14:00:00.000Z' } } },
+    })
+
+    await approveSubmission('sub-1')
+
+    expect(lastCallArg(resource.update).details.itemGone).toEqual({ m: { Steak: '2026-09-30T14:00:00.000Z' } })
+  })
+
+  it('keeps a dish\'s "on its menu" date while the dish stays, drops it with the dish, and never takes one from a submission', async () => {
+    const sub = baseSubmission({
+      operation: 'update',
+      target_id: 'res-1',
+      payload: listingPayload({
+        category: 'grocery',
+        details: { m: ['Challah', 'Steak'], itemMenu: { m: { Challah: '2099-01-01T00:00:00.000Z' } }, menuUrl: 'https://example.com/fake' },
+      }) as unknown as Record<string, unknown>,
+    })
+    const resource = mockFlow(sub, {
+      id: 'res-1',
+      details: { m: ['Challah', 'Chicken', 'Steak'], itemMenu: { m: { Chicken: '2026-10-01T14:00:00.000Z', Steak: '2026-09-30T14:00:00.000Z' } }, menuUrl: 'https://example.com/menu' },
+    })
+
+    await approveSubmission('sub-1')
+
+    const details = lastCallArg(resource.update).details
+    expect(details.itemMenu).toEqual({ m: { Steak: '2026-09-30T14:00:00.000Z' } })
+    expect(details.menuUrl).toBe('https://example.com/menu')
+  })
+
+  // Oct 6: a mikvah section's own "Still right?" date (confirm_section) is
+  // the visitors', never an edit's: the queue doesn't show it.
+  it('keeps each section\'s confirmation date, and never takes one from a submission', async () => {
+    const sub = baseSubmission({
+      operation: 'update',
+      target_id: 'res-1',
+      payload: listingPayload({
+        category: 'mikvah',
+        details: { womenTevillah: true, sectionConfirmed: { womenTevillah: '2099-01-01T00:00:00.000Z', menTevillah: '2099-01-01T00:00:00.000Z' } },
+      }) as unknown as Record<string, unknown>,
+    })
+    const resource = mockFlow(sub, { id: 'res-1', details: { womenTevillah: true, sectionConfirmed: { womenTevillah: '2026-10-01T14:00:00.000Z' } } })
+
+    await approveSubmission('sub-1')
+
+    expect(lastCallArg(resource.update).details.sectionConfirmed).toEqual({ womenTevillah: '2026-10-01T14:00:00.000Z' })
+  })
+
+  it('drops a made-up sectionConfirmed from a listing that has none', async () => {
+    const sub = baseSubmission({
+      operation: 'update',
+      target_id: 'res-1',
+      payload: listingPayload({ category: 'mikvah', details: { womenTevillah: true, sectionConfirmed: { womenTevillah: '2099-01-01T00:00:00.000Z' } } }) as unknown as Record<string, unknown>,
+    })
+    const resource = mockFlow(sub, { id: 'res-1', details: { womenTevillah: true } })
+
+    await approveSubmission('sub-1')
+
+    expect(lastCallArg(resource.update).details.sectionConfirmed).toBeUndefined()
+  })
+
+  it('logs nothing when the approval itself fails to save', async () => {
+    const sub = baseSubmission({ operation: 'create', payload: listingPayload() as unknown as Record<string, unknown> })
+    mockFlow(sub)
+    const failing = chainable({ data: null, error: { message: 'boom' } })
+    let submissionCalls = 0
+    const resource = chainable({ data: { id: 'res-new' }, error: null })
+    mockFrom.mockImplementation((table: string) => {
+      if (table === 'submission') {
+        submissionCalls += 1
+        return submissionCalls === 1 ? chainable({ data: sub, error: null }) : failing
+      }
+      return resource
+    })
+
+    await expect(approveSubmission('sub-1')).rejects.toThrow('Failed to mark submission approved')
+    expect(mockRecordActivity).not.toHaveBeenCalled()
+  })
+})
+
+describe('activityForApproval', () => {
+  it('credits Google closure reports to Google, and a removal as a removal', () => {
+    const sub = baseSubmission({ operation: 'delete', target_id: 'res-1', submitted_by: { name: 'Google Places (automated)' } })
+    expect(activityForApproval(sub, 'res-1', [])).toEqual([
+      expect.objectContaining({ kind: 'listing_removed', source: 'google', actorEmail: null, resourceId: 'res-1' }),
+    ])
+  })
+
+  it('puts what changed on the listing row, never on a removal or an item', () => {
+    const changes = [{ key: 'phone', label: 'Phone', value: '215-555-0199' }]
+    const edit = activityForApproval(baseSubmission({ operation: 'update', target_id: 'res-1' }), 'res-1', [{ fieldKey: 'm', item: 'Wine' }], changes)
+    expect(edit.map((r) => r.changes)).toEqual([changes, undefined])
+    expect(activityForApproval(baseSubmission({ operation: 'delete', target_id: 'res-1' }), 'res-1', [], changes)[0]).not.toHaveProperty('changes')
+  })
+
+  it('leaves an edit with no email as "a neighbor" (no actor)', () => {
+    const sub = baseSubmission({ operation: 'update', target_id: 'res-1', submitted_by: { email: 'not an email' } })
+    expect(activityForApproval(sub, 'res-1', [])[0].actorEmail).toBeNull()
+  })
+})
+
+// A fix to an eruv's listing (Oct 13): read against the eruv, and applied
+// to its four rows only.
+describe('an eruv suggestion', () => {
+  const eruv = { id: 'center-city', name: 'Center City Eruv', covers: 'Center City.', website: 'https://old.example', hotline: null, alertsUrl: null, statusUrl: 'https://status.example', lineUrl: 'https://map.example' }
+  const payload = { eruvId: 'center-city', name: 'Center City Eruv', covers: 'Center City.', website: 'https://new.example', hotline: '215', alertsUrl: null }
+  const sub = baseSubmission({ operation: 'update', target_type: 'eruv', payload })
+
+  it('the queue reads it against the eruv as it is now, never as a listing', async () => {
+    const resource = chainable({ data: [], error: null })
+    mockFrom.mockImplementation((table: string) => (table === 'submission' ? chainable({ data: [sub], error: null }) : resource))
+    mockListCategories.mockResolvedValue([])
+    mockListEruvimForAdmin.mockResolvedValue({ available: true, eruvim: [eruv] })
+    const [card] = await listPendingSubmissions('philly')
+    expect(card.categoryLabel).toBe('Eruv')
+    expect(card.currentEruv).toEqual({ name: 'Center City Eruv', covers: 'Center City.', website: 'https://old.example', hotline: null, alertsUrl: null })
+    expect(resource.in).not.toHaveBeenCalled()
+  })
+
+  it('approving puts its four rows on the eruv, and nothing else of it', async () => {
+    let calls = 0
+    const approveBuilder = chainable({ data: { ...sub, status: 'approved' }, error: null })
+    mockFrom.mockImplementation((table: string) => {
+      if (table !== 'submission') throw new Error(`unexpected table ${table}`)
+      calls += 1
+      return calls === 1 ? chainable({ data: sub, error: null }) : approveBuilder
+    })
+    mockListEruvimForAdmin.mockResolvedValue({ available: true, eruvim: [eruv] })
+    mockUpdateEruv.mockResolvedValue(undefined)
+    await approveSubmission('sub-1', 'philly', 'admin@example.org')
+    expect(mockUpdateEruv).toHaveBeenCalledWith(
+      'philly',
+      'center-city',
+      { covers: 'Center City.', website: 'https://new.example', hotline: '215', alertsUrl: null },
+      { statusUrl: 'https://status.example', lineUrl: 'https://map.example' },
+    )
+    expect(approveBuilder.update).toHaveBeenCalledWith(expect.objectContaining({ status: 'approved' }))
+    expect(mockRecordActivity).not.toHaveBeenCalled()
+  })
+
+  it('an eruv that’s gone can’t be approved', async () => {
+    mockFrom.mockReturnValue(chainable({ data: sub, error: null }))
+    mockListEruvimForAdmin.mockResolvedValue({ available: true, eruvim: [] })
+    await expect(approveSubmission('sub-1')).rejects.toThrow('Eruv not found: center-city')
+    expect(mockUpdateEruv).not.toHaveBeenCalled()
   })
 })

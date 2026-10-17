@@ -38,7 +38,7 @@ export default function SlugScreen({
   initialItemId?: string
 }) {
   const { anchor } = useLocation()
-  const { goHome, viewMapForCategory } = useSiteNavigation()
+  const { goHome } = useSiteNavigation()
   const navTransition = useNavTransitionProps()
   // See navTransitions.ts's own doc — this has to be checked here, at the
   // already-mounted source of the "up" click, not baked into the
@@ -72,7 +72,6 @@ export default function SlugScreen({
     // but it did produce a visible inconsistency: forward correctly fading
     // like everything else, back still sliding. See isIOSWebKit's own doc.
     onUp: () => goHome({ transitionTypes: isMobile && !isIOSWebKit() ? ['nav-back'] : undefined }),
-    onViewMap: viewMapForCategory,
   }
 
   return (

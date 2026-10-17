@@ -9,13 +9,16 @@
 //                                  /business status for the auto-sync job.
 //
 // The legacy `/maps/api/place/*` endpoints are used (not Places API "New") for
-// consistency with geo.ts / travelTime.ts, which already call the legacy
+// consistency with geo.ts, which already calls the legacy
 // maps.googleapis.com web services with this key.
 
-import type { DayKey, StructuredHours } from './hours'
+import type { BusinessStatus, DayKey, StructuredHours } from './hours'
 import { DAY_KEYS } from './hours'
 
-export type BusinessStatus = 'OPERATIONAL' | 'CLOSED_TEMPORARILY' | 'CLOSED_PERMANENTLY'
+// BusinessStatus used to be declared here too, an identical copy of hours.ts's
+// own — nothing ever imported this one (every real consumer already imported
+// hours.ts's), so it was just a second hand-maintained union that could
+// silently drift out of sync with the one actually in use.
 
 /** What a single sync pulls back from Google for one listing. Any field may be
  *  null when Google doesn't have it (e.g. a place with no posted hours). */
@@ -30,7 +33,7 @@ export type PlaceSync = {
   address: string | null
   /** Only written when the sync owns the category's Website field — see
    *  OWNABLE_SYNC_FIELDS. Matched to a listing's own Website detail field by
-   *  label, same convention as ListingForm.tsx's intake autofill (categories
+   *  label, same convention as useListingDraft's address-pick autofill (categories
    *  predate a fixed key convention for this one). */
   website: string | null
   businessStatus: BusinessStatus | null
@@ -41,6 +44,12 @@ export type PlaceSync = {
 function serverKey(): string | null {
   // Mirror geo.ts: prefer the Maps server key, fall back to the geocoding key.
   return process.env.GOOGLE_MAPS_SERVER_KEY ?? process.env.GOOGLE_GEOCODING_API_KEY ?? null
+}
+
+/** Whether Google can be asked at all here. A lookup that comes back null
+ *  says only "not found or not asked"; this tells the two apart. */
+export function canAskGoogle(): boolean {
+  return !!serverKey()
 }
 
 // ── Field ownership ─────────────────────────────────────────────────────────
@@ -57,7 +66,7 @@ function serverKey(): string | null {
 // field is empty) → Google's, refreshed forever. Differs → the submitter's,
 // never touched. The comparison itself is cheap for the common case — the
 // form already captures what picking an address autofilled (see
-// ListingForm.tsx's `googleAutofill`), so most fields are checked against
+// useListingDraft's `googleAutofill`), so most fields are checked against
 // that for free; only a field that's new/changed AND was never autofilled
 // costs a live Google Places lookup to verify.
 //
@@ -79,9 +88,9 @@ function serverKey(): string | null {
 //     comparing stored values against Google's: an exact match means it's
 //     Google's. Anything that differed was left as the submitter's.
 
-/** Fields the sync will only write when it owns them. `businessStatus` and
- *  `googleDescription` are deliberately absent — they're Google-only concepts
- *  with no hand-curated counterpart, so they're always refreshed.
+/** Fields the sync will only write when it owns them. `businessStatus` is
+ *  deliberately absent — it's a Google-only concept with no hand-curated
+ *  counterpart, so it's always refreshed.
  *
  *  `name` is tracked per-field like the rest, deliberately: a submitter who
  *  clarifies "Giant" to "Giant (Wynnewood)" is still pointing at the same
@@ -90,8 +99,17 @@ function serverKey(): string | null {
  *
  *  `website` behaves like `phone`/`hours` (submitter-overridable, tracked),
  *  not like `address` (fill-once-when-empty) — a kosher stand's own site can
- *  legitimately differ from the parent business Google links. */
-export const OWNABLE_SYNC_FIELDS = ['name', 'hours', 'phone', 'address', 'website'] as const
+ *  legitimately differ from the parent business Google links.
+ *
+ *  `description` (stored as the listing's `googleDescription` detail, only on
+ *  categories that configure a field with that key — see useListingDraft)
+ *  used to be a Google-only concept too, always fill-once-when-empty and
+ *  never tracked. It's tracked now for the same reason `website` is: some
+ *  categories let a submitter write their own, and that shouldn't be
+ *  silently replaced by Google's editorial summary the next time it changes —
+ *  and knowing which one a listing currently has is also what lets the
+ *  public detail page say so (see PlaceDetailBody's own note). */
+export const OWNABLE_SYNC_FIELDS = ['name', 'hours', 'phone', 'address', 'website', 'description'] as const
 export type OwnableSyncField = (typeof OWNABLE_SYNC_FIELDS)[number]
 
 /** Nothing there to protect: unset, blank, or an object with no keys. Note that
@@ -193,6 +211,36 @@ export async function findPlaceId(name: string, address: string): Promise<string
   }
 }
 
+/** What Google says about a place found by name and address: its own name
+ *  for it and whether it's still open. Business status is Basic Data on
+ *  Find Place, so this costs one Find Place call and nothing more. Null when
+ *  Google can't find it, or on any failure. Server-side only. */
+export async function findPlaceStatus(
+  name: string,
+  address: string,
+): Promise<{ placeId: string; name: string | null; businessStatus: BusinessStatus | null } | null> {
+  const key = serverKey()
+  if (!key) return null
+  const input = [name, address].filter(Boolean).join(', ').trim()
+  if (!input) return null
+  try {
+    const url =
+      `https://maps.googleapis.com/maps/api/place/findplacefromtext/json` +
+      `?input=${encodeURIComponent(input)}&inputtype=textquery&fields=place_id,name,business_status&key=${key}`
+    const res = await fetch(url)
+    if (!res.ok) return null
+    const data = (await res.json()) as {
+      status: string
+      candidates?: { place_id?: string; name?: string; business_status?: string }[]
+    }
+    const c = data.status === 'OK' ? data.candidates?.[0] : undefined
+    if (!c?.place_id) return null
+    return { placeId: c.place_id, name: c.name ?? null, businessStatus: normalizeBusinessStatus(c.business_status) }
+  } catch {
+    return null
+  }
+}
+
 // ── Place Details (the recurring sync) ──────────────────────────────────────
 
 type GooglePeriodEndpoint = { day: number; time: string } // time is "HHMM"
@@ -208,18 +256,27 @@ type GooglePlaceResult = {
   website?: string
 }
 
+/** Google's fields for a full refresh, and for only asking whether the
+ *  place is still open for business. Phone, hours and website are billed
+ *  as "Contact Data" and the description as "Atmosphere Data"; the status
+ *  is Basic Data, which costs nothing extra. Asking for the contact fields
+ *  every night for every listing cost about $8 a month (Sep 2026 billing
+ *  report); asking for them once a week is under the free allowance. */
+const FULL_FIELDS = 'name,business_status,formatted_phone_number,formatted_address,opening_hours,editorial_summary,website'
+const STATUS_FIELDS = 'business_status'
+
 /**
- * Fetches current hours/phone/address/website/status for a known place id.
- * Returns null on any failure (network, bad status, place id gone) so the
- * caller can skip the listing and leave its existing data untouched.
- * Server-side only.
+ * Fetches current hours/phone/address/website/status for a known place id,
+ * or with `statusOnly` only whether it's still open for business (every
+ * other field null). Returns null on any failure (network, bad status,
+ * place id gone) so the caller can skip the listing and leave its existing
+ * data untouched. Server-side only.
  */
-export async function fetchPlaceSync(placeId: string): Promise<PlaceSync | null> {
+export async function fetchPlaceSync(placeId: string, { statusOnly = false }: { statusOnly?: boolean } = {}): Promise<PlaceSync | null> {
   const key = serverKey()
   if (!key) return null
   try {
-    const fields =
-      'name,business_status,formatted_phone_number,formatted_address,opening_hours,editorial_summary,website'
+    const fields = statusOnly ? STATUS_FIELDS : FULL_FIELDS
     const url =
       `https://maps.googleapis.com/maps/api/place/details/json` +
       `?place_id=${encodeURIComponent(placeId)}&fields=${fields}&key=${key}`

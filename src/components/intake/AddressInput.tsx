@@ -5,6 +5,7 @@ import { TextInput } from './FormControls'
 import { placesApiHoursToStructured, type StructuredHours } from '@/lib/hours'
 import { MAPS_API_KEY, mapsAuthFailed, onMapsAuthFailure } from '@/lib/loadGoogleMaps'
 import { fetchAddressSuggestions, resetAutocompleteSession, type AddressSuggestion } from '@/lib/placesAutocomplete'
+import { useCommunityCenter } from '@/lib/communityContext'
 
 /** Structured data returned when the user picks a suggestion from the autocomplete. */
 export type PlaceSelectResult = {
@@ -53,9 +54,28 @@ type Props = {
    *  For callers where the field IS the display label shown back to the
    *  visitor — e.g. the "where should distances be measured from" picker —
    *  rather than a structured address value another field depends on
-   *  (ListingForm's `address` field must stay a real address; it gets the
+   *  (a listing's `address` field must stay a real address; it gets the
    *  place's name separately via onPlaceSelect). */
   preferPlaceName?: boolean
+  /** A short note to show under a suggestion, by its Google place id — Add
+   *  uses it to mark places the guide already has ("Already in the guide")
+   *  right in the list, before anyone picks one. */
+  suggestionNote?: (placeId: string) => string | null
+  /** Lists suggestions in the page, under the input, rather than floating
+   *  over what's below it — for a screen that is just the search (Add's
+   *  first step), where a floating list would be clipped by the short
+   *  dialog around it and there's nothing underneath to cover anyway. */
+  inlineSuggestions?: boolean
+  /** For a <label htmlFor> outside the component. */
+  id?: string
+  /** The input's accessible name, where there's no visible label (the
+   *  listing editor's address row, which has a pin icon instead). */
+  ariaLabel?: string
+  autoFocus?: boolean
+  /** Look up what's already in the field as soon as it shows, as if just
+   *  typed: the "+ Add" box's Find the place, started from a name the
+   *  message reader found ("Paulie Gees"). */
+  searchOnMount?: boolean
 }
 
 // Renders our own input and dropdown over Google's Autocomplete DATA API
@@ -68,7 +88,8 @@ type Props = {
 // inline under the field like everywhere else in this app. This is that same
 // underlying API, just rendered with our own markup, so it's a normal inline
 // dropdown on every screen size.
-export default function AddressInput({ value, onChange, placeholder = 'Address or location', onCoords, onPlaceSelect, includedPrimaryTypes, disableAutocomplete, preferPlaceName }: Props) {
+export default function AddressInput({ value, onChange, placeholder = 'Address or location', onCoords, onPlaceSelect, includedPrimaryTypes, disableAutocomplete, preferPlaceName, suggestionNote, inlineSuggestions, id, ariaLabel, autoFocus, searchOnMount }: Props) {
+  const near = useCommunityCenter()
   const [authFailed, setAuthFailed] = useState(mapsAuthFailed())
   const [open, setOpen] = useState(false)
   const [suggestions, setSuggestions] = useState<AddressSuggestion[]>([])
@@ -87,6 +108,21 @@ export default function AddressInput({ value, onChange, placeholder = 'Address o
   useEffect(() => () => {
     if (debounceRef.current) clearTimeout(debounceRef.current)
   }, [])
+
+  // Once, on the first render: the value it opened with, looked up.
+  const [startQuery] = useState(() => (searchOnMount ? value.trim() : ''))
+  useEffect(() => {
+    if (!startQuery || !liveSuggestions) return
+    let live = true
+    fetchAddressSuggestions(startQuery, { includedPrimaryTypes, near }).then((results) => {
+      if (!live) return
+      setSuggestions(results)
+      setOpen(true)
+    })
+    return () => {
+      live = false
+    }
+  }, [startQuery, liveSuggestions, includedPrimaryTypes, near])
 
   // Close on any tap/click outside — same capture-phase pattern LocationControl
   // uses for its own popover, since this can render inside one.
@@ -115,7 +151,7 @@ export default function AddressInput({ value, onChange, placeholder = 'Address o
     }
     setOpen(true)
     debounceRef.current = setTimeout(async () => {
-      const results = await fetchAddressSuggestions(next, { includedPrimaryTypes })
+      const results = await fetchAddressSuggestions(next, { includedPrimaryTypes, near })
       setSuggestions(results)
     }, 200)
   }
@@ -213,6 +249,9 @@ export default function AddressInput({ value, onChange, placeholder = 'Address o
   return (
     <div ref={containerRef} className="relative w-full">
       <TextInput
+        id={id}
+        aria-label={ariaLabel}
+        autoFocus={autoFocus}
         type="text"
         autoComplete="off"
         value={value}
@@ -229,7 +268,9 @@ export default function AddressInput({ value, onChange, placeholder = 'Address o
           type="button"
           onClick={handleClear}
           aria-label="Clear"
-          className="absolute inset-y-0 right-0 flex w-9 items-center justify-center text-slate-400 hover:text-slate-600 cursor-pointer"
+          // active:text-slate-800 — same treatment as the other clear-inside-
+          // an-input buttons in this app (GenericDirectory).
+          className="absolute inset-y-0 right-0 flex w-9 items-center justify-center text-slate-400 transition-colors hover:text-slate-600 active:text-slate-800 cursor-pointer"
         >
           <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24" aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -238,7 +279,9 @@ export default function AddressInput({ value, onChange, placeholder = 'Address o
       )}
 
       {open && suggestions.length > 0 && (
-        <div className="absolute inset-x-0 top-full z-10 mt-1 overflow-hidden rounded-md border border-slate-200 bg-white shadow-lg">
+        <div
+          className={`mt-1 overflow-hidden rounded-md border border-slate-200 bg-white ${inlineSuggestions ? '' : 'absolute inset-x-0 top-full z-10 shadow-lg'}`}
+        >
           {suggestions.map((s, i) => (
             <button
               key={s.prediction.placeId}
@@ -253,6 +296,12 @@ export default function AddressInput({ value, onChange, placeholder = 'Address o
             >
               <span className="block text-slate-900">{s.mainText}</span>
               {s.secondaryText && <span className="block text-xs text-slate-400">{s.secondaryText}</span>}
+              {(() => {
+                const note = suggestionNote?.(s.prediction.placeId)
+                return note ? (
+                  <span className="mt-1 inline-block rounded-full bg-green-50 px-2 py-0.5 text-[11px] font-semibold text-green-700">{note}</span>
+                ) : null
+              })()}
             </button>
           ))}
         </div>

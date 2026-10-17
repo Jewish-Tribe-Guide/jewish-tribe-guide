@@ -1,4 +1,6 @@
+import { after } from 'next/server'
 import { createSubscriber } from '@/lib/subscriberStore'
+import { sendSubscribeConfirmation } from '@/lib/subscriberEmail'
 import { enforceRateLimit } from '@/lib/rateLimit'
 import { isHoneypotTripped } from '@/lib/honeypot'
 import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
@@ -46,11 +48,23 @@ export async function POST(request: Request) {
   const community = await resolveCommunity(communitySlugFromRequest(request))
 
   try {
-    await createSubscriber(community.slug, {
+    const subscriber = await createSubscriber(community.slug, {
       email,
       categories: Array.isArray(body.categories) ? body.categories : null,
       notifyAdd,
       notifyClosure,
+    })
+    // after(), not awaited inline — same reasoning as the decision/closure
+    // notifications this pairs with (see the submissions route): a slow or
+    // failed send must never hold up, or fail, the signup itself. The send
+    // call inside the callback is itself awaited, though — see
+    // src/test/emailScheduling.test.ts: after() keeps the invocation alive
+    // only for as long as its callback is still pending, so starting the
+    // send without awaiting it in here would let the callback resolve
+    // immediately and the platform tear the invocation down mid-send, same
+    // as never scheduling it at all.
+    after(async () => {
+      await sendSubscribeConfirmation(subscriber).catch((err) => console.error('[subscribers] confirmation email failed:', err))
     })
     return Response.json({ ok: true })
   } catch (err) {

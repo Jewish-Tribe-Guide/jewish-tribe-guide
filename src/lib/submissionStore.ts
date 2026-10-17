@@ -1,10 +1,18 @@
 import { SYNC_INTERNAL_FIELDS } from './syncFields'
 import { getAdminClient } from './supabase/admin'
 import { listCategories, createCategory, getCategoryById } from './categoryStore'
-import { isCategorySyncEligible } from './categories'
+import { isCategorySyncEligible, type CategoryConfig } from './categories'
 import { fetchPlaceSync, namesOverlap, OWNABLE_SYNC_FIELDS, type OwnableSyncField } from './googlePlaces'
 import { upsertTags } from './tagStore'
 import { geocode } from './geo'
+import { addedItems, goneItemsKept, itemFieldKeys, nextItemGone, nextItemSeen, normalizeEmail, sourceOfSubmission, type ActivityInput } from './activity'
+import { recordActivity } from './activityStore'
+import { newListingFacts, visitorChanges, type ChangePart } from './changeParts'
+import { normalizeRow, validateSubmission } from './resourceStore'
+import { withReviewEdits } from './reviewEdits'
+import { submissionSource } from './submissionSource'
+import { listEruvimForAdmin, updateEruv } from './eruvStore'
+import type { EruvSuggestion } from './eruvSuggestion'
 import type {
   ResourceRow,
   ResourceSubmission,
@@ -106,11 +114,12 @@ export async function listSubmissionsByStatus(
   const labelById = new Map(categories.map((c) => [c.id, c.label]))
   const categoryLabel = (s: SubmissionRow, current: ResourceRow | null): string | undefined => {
     if (s.target_type === 'category') return (s.payload as CategorySubmissionPayload).label
+    if (s.target_type === 'eruv') return 'Eruv'
     const slug = (s.payload as { category?: string }).category ?? current?.category
     return slug ? labelById.get(slug) ?? slug : undefined
   }
 
-  const targetIds = [...new Set(submissions.map((s) => s.target_id).filter(Boolean))] as string[]
+  const targetIds = [...new Set(submissions.filter((s) => s.target_type === 'listing').map((s) => s.target_id).filter(Boolean))] as string[]
   let byId = new Map<string, ResourceRow>()
   if (targetIds.length > 0) {
     const { data: current, error: curErr } = await supabase
@@ -122,7 +131,14 @@ export async function listSubmissionsByStatus(
     byId = new Map((current as ResourceRow[]).map((r) => [r.id, r]))
   }
 
+  // An eruv suggestion is read against the eruv as it is now.
+  const eruvById = submissions.some((s) => s.target_type === 'eruv') ? new Map((await listEruvimForAdmin(community)).eruvim.map((e) => [e.id, e])) : new Map()
+
   return submissions.map((s) => {
+    if (s.target_type === 'eruv') {
+      const e = eruvById.get((s.payload as Partial<EruvSuggestion>).eruvId ?? '')
+      return { ...s, current: null, categoryLabel: categoryLabel(s, null), currentEruv: e ? { name: e.name, covers: e.covers, website: e.website, hotline: e.hotline, alertsUrl: e.alertsUrl } : null }
+    }
     const current = s.target_id ? byId.get(s.target_id) ?? null : null
     return { ...s, current, categoryLabel: categoryLabel(s, current) }
   })
@@ -164,14 +180,18 @@ async function listingColumnsWithGeo(payload: ResourceSubmission) {
 }
 
 // Records a proposed NEW listing (operation=create, target_type=listing).
-export async function submitListingCreate(community: string, payload: ResourceSubmission): Promise<SubmissionRow> {
+export async function submitListingCreate(
+  community: string,
+  payload: ResourceSubmission,
+  note: string | null = null,
+): Promise<SubmissionRow> {
   return insertSubmission({
     community_id: community,
     operation: 'create',
     target_type: 'listing',
     target_id: null,
     payload: payload as unknown as Record<string, unknown>,
-    note: null,
+    note,
     submitted_by: payload.submittedBy ?? null,
   })
 }
@@ -190,6 +210,24 @@ export async function submitListingUpdate(
     target_type: 'listing',
     target_id: targetId,
     payload: payload as unknown as Record<string, unknown>,
+    note,
+    submitted_by: submittedBy,
+  })
+}
+
+// Records a suggested fix to an eruv's listing (eruvSuggestion.ts).
+export async function submitEruvUpdate(
+  community: string,
+  suggestion: EruvSuggestion,
+  note: string | null,
+  submittedBy: { name?: string; email?: string } | null,
+): Promise<SubmissionRow> {
+  return insertSubmission({
+    community_id: community,
+    operation: 'update',
+    target_type: 'eruv',
+    target_id: null,
+    payload: suggestion as unknown as Record<string, unknown>,
     note,
     submitted_by: submittedBy,
   })
@@ -220,6 +258,28 @@ export async function submitListingDelete(
     note,
     submitted_by: submittedBy,
   })
+}
+
+/** The "+ Add" box asks for an email once, after its last Send (agreed
+ *  Oct 5), so it's added to what that box already filed. Only to
+ *  suggestions read by AI, still waiting, with no email yet, sent within the
+ *  hour: the ids are what the box was handed back, and this can't touch
+ *  anything else. Returns how many it reached. */
+export async function attachSubmitterEmail(community: string, ids: string[], email: string): Promise<number> {
+  if (ids.length === 0) return 0
+  const since = new Date(Date.now() - 60 * 60 * 1000).toISOString()
+  const { data, error } = await getAdminClient()
+    .from('submission')
+    .update({ submitted_by: { email } })
+    .eq('community_id', community)
+    .in('id', ids)
+    .eq('status', 'pending')
+    .is('submitted_by', null)
+    .gte('created_at', since)
+    .eq('payload->source->>readBy', 'ai')
+    .select('id')
+  if (error) throw new Error(`Failed to add the email: ${error.message}`)
+  return (data ?? []).length
 }
 
 async function insertSubmission(row: {
@@ -292,7 +352,14 @@ export async function submitGoogleClosure(community: string, targetId: string): 
 // getAdminUserForCommunity at the call site), recorded alongside
 // reviewed_at so the moderation history can answer "who approved this" —
 // see the reviewed_by migration's own comment.
-export async function approveSubmission(id: string, community?: string, reviewedBy?: string): Promise<SubmissionRow> {
+/** An admin's fixes that can't be applied: not a listing, unreadable, or
+ *  leaving the listing invalid. The message is for the admin. */
+export class ReviewEditError extends Error {}
+
+// `edited`, when given: the admin's copy of the listing, fixed in the opened
+// card before approving (reviewEdits.ts). It's what goes live, and it's
+// saved on the submission with a record of what the admin changed.
+export async function approveSubmission(id: string, community?: string, reviewedBy?: string, edited?: unknown): Promise<SubmissionRow> {
   const supabase = getAdminClient()
 
   const { data: sub, error: subErr } = await supabase
@@ -307,11 +374,34 @@ export async function approveSubmission(id: string, community?: string, reviewed
     throw new Error(`Submission not found: ${id}`)
   }
 
+  let savedPayload: Record<string, unknown> | null = null
+  if (edited !== undefined) {
+    if (submission.target_type !== 'listing' || submission.operation === 'delete') {
+      throw new ReviewEditError('Only a new listing or an edit can be changed before approving.')
+    }
+    const sent = submission.payload as unknown as ResourceSubmission
+    const category = await getCategoryById(submission.community_id, sent.category)
+    const next = withReviewEdits(sent, edited, category?.detailFields ?? [], reviewedBy ?? 'an admin', new Date().toISOString())
+    if (!next) throw new ReviewEditError('Those changes couldn’t be read. Please try again.')
+    const errors = validateSubmission(next, category)
+    if (errors.length > 0) throw new ReviewEditError(errors.join(' '))
+    if (next !== sent) {
+      // Saved as the admin left it, before approval adds its own dates and
+      // Google bookkeeping to the copy it applies.
+      savedPayload = structuredClone(next) as unknown as Record<string, unknown>
+      submission.payload = next as unknown as Record<string, unknown>
+    }
+  }
+
   let affectedResourceId: string | null = null
+  let newItems: { fieldKey: string; item: string }[] = []
+  let changes: ChangePart[] | undefined
   if (submission.target_type === 'listing') {
-    affectedResourceId = await applyListing(submission)
+    ;({ id: affectedResourceId, newItems, changes } = await applyListing(submission))
   } else if (submission.target_type === 'category') {
     await applyCategory(submission)
+  } else if (submission.target_type === 'eruv' && submission.operation === 'update') {
+    await applyEruv(submission)
   } else {
     // tag handled in a later phase.
     throw new Error(`Unsupported submission target_type: ${submission.target_type}`)
@@ -323,6 +413,7 @@ export async function approveSubmission(id: string, community?: string, reviewed
       status: 'approved',
       reviewed_at: new Date().toISOString(),
       ...(reviewedBy ? { reviewed_by: reviewedBy } : {}),
+      ...(savedPayload ? { payload: savedPayload } : {}),
       // A `create` arrives with no target_id — there was nothing to point at
       // yet. Recording it now makes the submission point at the listing it
       // produced, which is what lets the caller sync that listing against
@@ -335,7 +426,47 @@ export async function approveSubmission(id: string, community?: string, reviewed
     .select('*')
     .single()
   if (error) throw new Error(`Failed to mark submission approved: ${error.message}`)
+
+  if (submission.target_type === 'listing') {
+    await recordActivity(activityForApproval(submission, affectedResourceId, newItems, changes))
+  }
   return data as SubmissionRow
+}
+
+/** An approved eruv suggestion: its four rows, as suggested, on the eruv.
+ *  Its name, status page and map are untouched. */
+async function applyEruv(submission: SubmissionRow): Promise<void> {
+  const s = submission.payload as Partial<EruvSuggestion>
+  const id = s.eruvId ?? ''
+  const eruv = (await listEruvimForAdmin(submission.community_id)).eruvim.find((e) => e.id === id)
+  if (!eruv) throw new Error(`Eruv not found: ${id}`)
+  await updateEruv(submission.community_id, id, { covers: s.covers ?? null, website: s.website ?? null, hotline: s.hotline ?? null, alertsUrl: s.alertsUrl ?? null }, { statusUrl: eruv.statusUrl, lineUrl: eruv.lineUrl })
+}
+
+const APPROVAL_KIND = { create: 'listing_added', update: 'listing_edited', delete: 'listing_removed' } as const
+
+/** The activity-log rows an approved listing submission produces: one for the
+ *  listing, plus one per grocery item it newly added (so "Challah added at
+ *  Trader Joe's" can appear on its own later). Credited to the email the
+ *  submitter gave, if any. Recorded after the approval is saved, so a failed
+ *  approval never leaves a history of something that didn't happen. */
+export function activityForApproval(
+  submission: SubmissionRow,
+  resourceId: string | null,
+  newItems: { fieldKey: string; item: string }[],
+  changes?: ChangePart[],
+): ActivityInput[] {
+  const base = {
+    community: submission.community_id,
+    resourceId,
+    source: sourceOfSubmission(submission.submitted_by),
+    actorEmail: normalizeEmail(submission.submitted_by?.email),
+    submissionId: submission.id,
+  }
+  return [
+    { ...base, kind: APPROVAL_KIND[submission.operation], ...(changes?.length && submission.operation !== 'delete' ? { changes } : {}) },
+    ...newItems.map((i) => ({ ...base, kind: 'item_added' as const, fieldKey: i.fieldKey, item: i.item })),
+  ]
 }
 
 // `community`, when given, must match — same cross-community guard as
@@ -353,7 +484,35 @@ export async function rejectSubmission(id: string, community?: string, reviewedB
   if (community) query = query.eq('community_id', community)
   const { data, error } = await query.select('*').single()
   if (error) throw new Error(`Failed to reject submission: ${error.message}`)
+  await keepReportedItems(data as SubmissionRow)
   return data as SubmissionRow
+}
+
+/** Rejecting an edit that took off an item someone said was gone ("Not
+ *  anymore") keeps the item, so its warning goes. Best-effort: a failure
+ *  here leaves the warning up, never fails the rejection. */
+async function keepReportedItems(submission: SubmissionRow): Promise<void> {
+  if (submission.target_type !== 'listing' || submission.operation !== 'update' || !submission.target_id) return
+  try {
+    const { data: row } = await getAdminClient()
+      .from('resource')
+      .select('id, category, details')
+      .eq('community_id', submission.community_id)
+      .eq('id', submission.target_id)
+      .maybeSingle<{ id: string; category: string; details: Record<string, unknown> | null }>()
+    const before = row?.details ?? null
+    if (!row || !before?.itemGone) return
+    const category = await getCategoryById(submission.community_id, row.category)
+    const keys = itemFieldKeys(category?.detailFields ?? [])
+    const proposed = (submission.payload as { details?: Record<string, unknown> } | null)?.details ?? null
+    for (const { fieldKey, item } of goneItemsKept(before, proposed, keys)) {
+      const { error } = await getAdminClient().rpc('clear_item_gone', { p_id: row.id, p_field: fieldKey, p_label: item })
+      if (error) throw new Error(error.message)
+    }
+    // The admin route that called this revalidates the public content.
+  } catch (err) {
+    console.error('[submissions] could not clear a reported-gone item:', err)
+  }
 }
 
 // ── Google-sync field ownership, decided once at approval time ─────────────
@@ -362,7 +521,7 @@ export async function rejectSubmission(id: string, community?: string, reviewedB
 // to keep refreshing name/hours/phone/website going forward. The rule: a
 // field is Google's if the value being approved matches what Google actually
 // has — checked, per field, against the free autofill snapshot the form
-// already captured when picking an address ran (see ListingForm.tsx's
+// already captured when picking an address ran (see useListingDraft's
 // `googleAutofill`), and only falling back to a live Google Places lookup
 // for a NEW or CHANGED field autofill never touched. An edit's UNCHANGED
 // fields are never re-decided at all — they simply keep whatever ownership
@@ -458,6 +617,7 @@ async function computeGoogleFields(
     if (field === 'name') return payload.name
     if (field === 'phone') return payload.phone
     if (field === 'hours') return hoursKey ? payload.details?.[hoursKey] : undefined
+    if (field === 'description') return payload.details?.googleDescription
     return websiteKey ? payload.details?.[websiteKey] : undefined
   }
   const priorOf = (field: OwnableSyncField): unknown => {
@@ -465,6 +625,7 @@ async function computeGoogleFields(
     if (field === 'name') return existing.name
     if (field === 'phone') return existing.phone
     if (field === 'hours') return hoursKey ? existing.details?.[hoursKey] : undefined
+    if (field === 'description') return existing.details?.googleDescription
     return websiteKey ? existing.details?.[websiteKey] : undefined
   }
   const priorOwned = new Set<OwnableSyncField>(
@@ -537,6 +698,9 @@ function withResolvedPlaceId(details: Record<string, unknown>, payload: Resource
   if (!pickedName || namesOverlap(pickedName, payload.name)) return details
   const next: Record<string, unknown> = { ...details, verifiedPlaceId: placeId }
   delete next.placeId
+  // The status the form read off that place is the other business's too. An
+  // edit then keeps the listing's stored one (withPreservedInternals).
+  delete next.businessStatus
   return next
 }
 
@@ -545,7 +709,7 @@ function withResolvedPlaceId(details: Record<string, unknown>, payload: Resource
  * submitter — and which therefore have to survive an edit.
  *
  * An edit's payload is built from the category's configured `detailFields`
- * only (see ListingForm's `details` initializer), so none of these are in it,
+ * only (see useListingDraft's `details` initializer), so none of these are in it,
  * and applying an update REPLACES `details` wholesale. Every approved edit was
  * therefore wiping the listing's sync state: when it last synced, what Google
  * said about it, the transition history — and an admin's business-status
@@ -567,7 +731,9 @@ function withPreservedInternals(
   const next = { ...details }
   for (const key of SUBMITTER_CANNOT_TOUCH) {
     // `in`, not a truthiness check: an edit that legitimately supplies one of
-    // these (the intake now captures businessStatus) must still win.
+    // these must still win. Only two can arrive that way — businessStatus
+    // with a newly picked place, and a configured googleDescription — since
+    // the submissions route strips the rest (syncFields' submitterDetails).
     if (!(key in next) && key in before) next[key] = before[key]
   }
   return next
@@ -620,15 +786,108 @@ function withResolvedGoogleFields(
 /** Returns the id of the listing the approval affected, so the caller can act
  *  on it — a `create` submission has no target_id until now, which left the
  *  newly published listing unreachable to anything downstream. */
-async function applyListing(submission: SubmissionRow): Promise<string | null> {
+/**
+ * Approval is a moderator vouching for a listing, so it counts as a
+ * confirmation — the same `confirmedAt` a visitor's "Mark as current" sets,
+ * which is what the "Confirmed 3 days ago" line under a listing reads.
+ * Without this an approved edit left the old stamp in place (or none), so a
+ * listing someone had just reviewed still said "Confirmed 8 months ago".
+ * Applied to a create and an edit only: an approved removal archives the
+ * listing and says nothing about its details being current.
+ */
+function withConfirmedNow(details: Record<string, unknown>, now: string, named?: string): Record<string, unknown> {
+  // An outside source by name (submissionSource's `named`) dates it "From
+  // Keystone-K's list, Oct 12"; anything else, "Confirmed Oct 12". Always
+  // set or cleared here, so an older source never outlives the date it gave.
+  const next: Record<string, unknown> = { ...details, confirmedAt: now }
+  if (named) next.confirmedFrom = { from: named, at: now }
+  else delete next.confirmedFrom
+  return next
+}
+
+/** Dates the grocery items this approval newly adds (details.itemSeen) and
+ *  returns which ones they were. A dish's menu date (itemMenu) stays with
+ *  the dish, and goes when it's taken off. Everything else on the listing keeps its
+ *  date: approving a new phone number says nothing about the challah.
+ *
+ *  `menu`: the dishes were read off the place's menu in the "+ Add" box
+ *  (the submission's server-set source, never the browser's word). Those
+ *  added are dated "on its menu" instead of "seen", and a menu link becomes
+ *  the listing's "Full menu", as the Main dishes tab's approval does. */
+async function withItemDates(
+  community: string,
+  details: Record<string, unknown>,
+  categoryId: string,
+  existing: Record<string, unknown> | null,
+  now: string,
+  menu: { url: string | null } | null = null,
+): Promise<{ details: Record<string, unknown>; newItems: { fieldKey: string; item: string }[] }> {
+  // Best-effort like the rest of the approval's extras: a category that can't
+  // be read just means no item dates this time, never a failed approval.
+  let fields: ReadonlyArray<{ key: string; type: string }> = []
+  try {
+    fields = (await getCategoryById(community, categoryId))?.detailFields ?? []
+  } catch (err) {
+    console.error('[submissions] could not read category for item dates:', err)
+  }
+  const keys = itemFieldKeys(fields)
+  const next = { ...details }
+  delete next.itemSeen
+  delete next.itemGone
+  delete next.itemMenu
+  // The menu a dish list was read from is the admin's Main dishes tab's to
+  // set, never an edit's: the queue doesn't show it, so a link sent with an
+  // edit would be approved unseen.
+  delete next.menuUrl
+  if (existing?.menuUrl !== undefined) next.menuUrl = existing.menuUrl
+  // A mikvah section's own "Still right?" date (confirm_section, Oct 6) is
+  // the visitors', like an item's: never an edit's, which the queue doesn't
+  // show.
+  delete next.sectionConfirmed
+  if (existing?.sectionConfirmed !== undefined) next.sectionConfirmed = existing.sectionConfirmed
+  if (keys.length === 0) {
+    if (existing?.itemSeen !== undefined) next.itemSeen = existing.itemSeen
+    if (existing?.itemGone !== undefined) next.itemGone = existing.itemGone
+    if (existing?.itemMenu !== undefined) next.itemMenu = existing.itemMenu
+    return { details: next, newItems: [] }
+  }
+  const newItems = addedItems(existing, details, keys)
+  const seen = nextItemSeen(existing?.itemSeen, details, keys, menu ? [] : newItems, now)
+  if (Object.keys(seen).length > 0) next.itemSeen = seen
+  const gone = nextItemGone(existing?.itemGone, details, keys)
+  if (Object.keys(gone).length > 0) next.itemGone = gone
+  // A dish's "on its menu" date stays while the dish does, as "gone" does.
+  const onMenu = nextItemSeen(existing?.itemMenu, details, keys, menu ? newItems : [], now)
+  if (Object.keys(onMenu).length > 0) next.itemMenu = onMenu
+  if (menu?.url) next.menuUrl = menu.url
+  return { details: next, newItems }
+}
+
+/** The menu a submission's dishes were read off, from its server-set source
+ *  (the "+ Add" box's send route), in a checked shape. */
+function menuOf(payload: unknown): { url: string | null } | null {
+  const menu = (payload as { source?: { menu?: unknown } } | null)?.source?.menu
+  if (!menu || typeof menu !== 'object') return null
+  const url = (menu as Record<string, unknown>).url
+  if (url === null) return { url: null }
+  return typeof url === 'string' && /^https?:\/\/\S+$/i.test(url) ? { url } : null
+}
+
+type AppliedListing = { id: string | null; newItems: { fieldKey: string; item: string }[]; changes?: ChangePart[] }
+
+async function applyListing(submission: SubmissionRow): Promise<AppliedListing> {
   const supabase = getAdminClient()
   const now = new Date().toISOString()
+  const named = submissionSource(submission).named
 
   if (submission.operation === 'create') {
     const payload = submission.payload as unknown as ResourceSubmission
     payload.details = withResolvedPlaceId(payload.details, payload)
     const googleFields = await resolveGoogleFields(submission.community_id, payload, null)
     payload.details = withResolvedGoogleFields(payload.details, googleFields)
+    payload.details = withConfirmedNow(payload.details, now, named)
+    const dated = await withItemDates(submission.community_id, payload.details, payload.category, null, now)
+    payload.details = dated.details
     const { data: created, error } = await supabase
       .from('resource')
       .insert({
@@ -642,7 +901,11 @@ async function applyListing(submission: SubmissionRow): Promise<string | null> {
       .single()
     if (error) throw new Error(`Failed to create listing: ${error.message}`)
     await growTagVocabulary(submission.community_id, payload)
-    return (created as { id: string } | null)?.id ?? null
+    const id = (created as { id: string } | null)?.id ?? null
+    const changes = await saidForVisitors(submission.community_id, payload, (category) =>
+      newListingFacts({ id: id ?? '', category: payload.category, name: payload.name, anchorId: payload.anchorId, address: payload.address ?? '', distance: 0, phone: payload.phone ?? undefined, ...payload.details }, category),
+    )
+    return { id, newItems: dated.newItems, changes }
   }
 
   if (submission.operation === 'update') {
@@ -663,6 +926,16 @@ async function applyListing(submission: SubmissionRow): Promise<string | null> {
     payload.details = withResolvedGoogleFields(payload.details, googleFields)
     payload.details = withPreservedInternals(payload.details, existingData as ResourceRow | null)
     payload.details = withClearedSyncOnNewPlaceId(payload.details, existingData as ResourceRow | null)
+    payload.details = withConfirmedNow(payload.details, now, named)
+    const dated = await withItemDates(
+      submission.community_id,
+      payload.details,
+      payload.category,
+      ((existingData as ResourceRow | null)?.details as Record<string, unknown> | undefined) ?? null,
+      now,
+      menuOf(submission.payload),
+    )
+    payload.details = dated.details
     const { error } = await supabase
       .from('resource')
       .update({ ...(await listingColumnsWithGeo(payload)), reviewed_at: now })
@@ -670,7 +943,9 @@ async function applyListing(submission: SubmissionRow): Promise<string | null> {
       .eq('id', submission.target_id)
     if (error) throw new Error(`Failed to update listing: ${error.message}`)
     await growTagVocabulary(submission.community_id, payload)
-    return submission.target_id
+    const existing = existingData ? normalizeRow(existingData as ResourceRow) : null
+    const changes = await saidForVisitors(submission.community_id, payload, (category) => visitorChanges(existing, payload, category.detailFields))
+    return { id: submission.target_id, newItems: dated.newItems, changes }
   }
 
   if (submission.operation === 'delete') {
@@ -682,10 +957,23 @@ async function applyListing(submission: SubmissionRow): Promise<string | null> {
       .eq('community_id', submission.community_id)
       .eq('id', submission.target_id)
     if (error) throw new Error(`Failed to archive listing: ${error.message}`)
-    return submission.target_id
+    return { id: submission.target_id, newItems: [] }
   }
 
-  return null
+  return { id: null, newItems: [] }
+}
+
+/** What an approval changed, as What changed says it (changeParts.ts).
+ *  Best-effort, like the log itself: a hiccup here leaves the change saying
+ *  "updated", never fails the approval. */
+async function saidForVisitors(community: string, payload: ResourceSubmission, say: (category: CategoryConfig) => ChangePart[]): Promise<ChangePart[] | undefined> {
+  try {
+    const category = await getCategoryById(community, payload.category)
+    return category ? say(category) : undefined
+  } catch (err) {
+    console.error('[activity] could not work out what changed:', err)
+    return undefined
+  }
 }
 
 // When a listing with tag fields is approved, add any newly-typed tags to the

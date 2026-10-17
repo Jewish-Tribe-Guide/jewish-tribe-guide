@@ -4,6 +4,15 @@
 import '@testing-library/jest-dom/vitest'
 import { installMockGeolocation } from './src/test/geolocationMock'
 import { installMockIntersectionObserver } from './src/test/intersectionObserverMock'
+import { beforeAll, vi } from 'vitest'
+
+// next/dynamic loads a piece's code on first render, so a test would find it
+// missing for a moment. Here it loads with the file instead; see eagerDynamic.
+vi.mock('next/dynamic', () => import('./src/test/eagerDynamic'))
+beforeAll(async () => {
+  const { dynamicLoaded } = await import('./src/test/eagerDynamic')
+  await dynamicLoaded()
+})
 
 // jsdom 30's own window.localStorage isn't reliably wired up through
 // vitest's jsdom environment on this toolchain (Node 26 also defines its own

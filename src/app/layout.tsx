@@ -9,6 +9,8 @@ import { iconVersion, SITE_SETTINGS_DEFAULTS } from '@/lib/siteSettings'
 import './globals.css'
 import { getDefaultCommunity } from '@/lib/communityStore'
 
+// The one font, on phone and desktop. (Desktop headings had a serif of their
+// own until the redesign's one look, step 2.)
 const figtree = Figtree({ subsets: ['latin'] })
 
 // Reads the admin-edited site name/mission for the tab title and meta

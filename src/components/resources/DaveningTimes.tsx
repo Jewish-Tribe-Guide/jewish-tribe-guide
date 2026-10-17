@@ -1,11 +1,11 @@
 'use client'
 
+import { useCommunityTimezone } from '@/lib/communityContext'
 import { isMinyanim, groupByTefillah, mergeSameDayTimes, SEASON_LABELS } from '@/lib/davening'
 import type { Minyan } from '@/lib/davening'
 import { useZmanAnchors, geoKey, geoOrCommunityDefault, resolveAnchorTime, anchorNoun } from '@/lib/useZmanAnchors'
 import { currentSeason, isOutOfSeason } from '@/lib/season'
 import { useNow } from '@/lib/useNow'
-import { community } from '@/community.config'
 
 // Shared davening-times display for any listing with a `minyanim`-type detail
 // field (today, just Synagogues) — used by the generic listing card so shuls
@@ -55,6 +55,7 @@ function breakOnlyAtCommas(label: string): string {
  * today appended and clearly marked, never swapped in as if it were exact.
  */
 function StructuredDaveningTimes({ minyanim, geo }: { minyanim: Minyan[]; geo?: { lat: number; lng: number } | null }) {
+  const timezone = useCommunityTimezone()
   // Pass as a single-shul array so groupByTefillah handles dedup + sort.
   const groups = groupByTefillah([{ name: '', minyanim }])
   const hasAnchorRows = minyanim.some((m) => m.anchor)
@@ -68,7 +69,10 @@ function StructuredDaveningTimes({ minyanim, geo }: { minyanim: Minyan[]; geo?: 
   // where a missing one is not. See season.ts for why the boundary is derived
   // rather than configured, and why being occasionally wrong is affordable
   // precisely because this is the only thing done with the answer.
-  const season = currentSeason(useNow(), community.timezone)
+  // Nothing is dimmed until the page has hydrated (see useNow), as for an
+  // unknown season.
+  const clock = useNow()
+  const season = clock === null ? null : currentSeason(clock, timezone)
 
   if (groups.length === 0) return null
 

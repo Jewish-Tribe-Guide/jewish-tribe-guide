@@ -1,30 +1,119 @@
 'use client'
 
-import { useEffect, useLayoutEffect, useRef, useState, ViewTransition } from 'react'
+import { Fragment, Suspense, useCallback, useEffect, useEffectEvent, useMemo, useRef, useState, ViewTransition, type ReactNode } from 'react'
 import type { DirectoryResource } from '@/types'
 import { resolveCapabilities, selectValues, bandImageFor, type CategoryConfig } from '@/lib/categories'
 import { hoursOpenNow, businessClosure } from '@/lib/hours'
 import { useNow } from '@/lib/useNow'
-import { ALL_MINYAN_DAYS, isMinyanim, type MinyanDayKey } from '@/lib/davening'
+import { isMinyanim } from '@/lib/davening'
 import type { Minyan } from '@/lib/davening'
 import DirectoryHeader from './DirectoryHeader'
+import { TellAboutContext } from './tellAbout'
+import DistanceNote from './DistanceNote'
+import { NextMinyans } from './nextMinyans'
 import { CategoryBandFrame, CategoryBandBadge } from './CategoryBandFrame'
-import CheckboxDropdown from './CheckboxDropdown'
+import FiltersSheet from './FiltersSheet'
+import { TEFILLAH_CHOICES, WITHIN_CHOICES, milesChosen, tefillosChosen, typedTefillahChoices } from '@/lib/minyanimFilters'
+import { kindText } from '@/lib/listingView'
+import ListHeading, { ClosedGroupLine, GroupHeading } from './ListHeading'
+import { groupListings, parseGroupBy, type ListGroup } from '@/lib/listGroups'
+import { candlesToday, isVouchedFor } from '@/lib/listingRow'
+import { useZmanim } from '@/lib/useZmanim'
+import { usePersistedState } from '@/lib/usePersistedState'
+import { useSharedPreference } from '@/lib/useSharedPreference'
 import { GenericListingCard, type GenericListingCardHandle } from './GenericListingCard'
-import DaveningTimesModal from '@/components/synagogues/DaveningTimesModal'
-import { PlusIcon, ClockIcon } from '@/components/icons'
+import MinyanimView from './MinyanimView'
+import { PlusIcon } from '@/components/icons'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { useScrollShowHide, useSetScreenHeader } from '@/lib/headerVisibility'
-import { listingSearchText } from '@/lib/searchListing'
+import { foundFor, searchAsk } from '@/lib/askSearch'
+import { readMinyanimSearch } from '@/lib/minyanimSearch'
+import { withoutOpenWords, withoutSortWords, withoutTerms } from '@/lib/ask'
+import { neighborhoodsFor, placeName, townsFrom } from '@/lib/places'
+import { readerPlaces } from '@/lib/questionReader'
+import { needsReading, ownFrom, readingAnswers, readingLoses } from '@/lib/readingSearch'
+import { itemCounts, itemFields, listingHas, listingItems, sameItem, searchItems } from '@/lib/itemFilter'
+import { itemName } from '@/lib/itemNames'
+import { useReading } from '@/lib/useReading'
+import { ListingOnwardContext, type ListingOnwardSource } from './listingOnward'
+import ListingColumn from './ListingColumn'
+import UpvoteButton from './UpvoteButton'
+import { useActiveCommunity, useOptionalCommunitySlug } from '@/lib/communityContext'
 import { travelCompare } from '@/lib/listingTravel'
 import { useLogSearchMiss } from '@/lib/useLogSearchMiss'
+import CategoryAsk from './CategoryAsk'
+import NextMinyanCard from './NextMinyanCard'
+import CategoryMap, { createHighlight, useWide } from './CategoryMap'
+import { WalkOnMapContext, type WalkShown } from './walkOnMap'
+import RowLookSwitch, { useRowLook } from './RowLookSwitch'
+import { useListMapSplit } from './useListMapSplit'
+import { mapQueryString, routes } from '@/lib/routes'
+import QuestionCard, { useAskedPlaces } from './QuestionCard'
+import { parseQuestionCard, pickQuestion } from '@/lib/questionCards'
 import { ui } from '@/lib/uiConfig'
+import SaveButton from '@/components/SaveButton'
+import { makeSavedSearch } from '@/lib/savedSearches'
+import { useSavedSearches } from '@/lib/savedSearchesContext'
+import { categoryHref } from '@/lib/searchLands'
 import { useOptionalLocation } from '@/lib/locationContext'
-import { usePinned } from '@/lib/pinnedContext'
 import { useCategories } from '@/lib/useCategories'
 import { didArriveViaBackForward } from '@/lib/backForwardNavigation'
 import { getCategoryColor } from '@/lib/categoryColor'
 import { CategoryGlyph } from '@/lib/categoryIcons'
+import { SwipeRowGroup } from '@/components/SwipeRow'
+import dynamic from 'next/dynamic'
+import { tellUsPlaceholder } from '@/lib/tellUs'
+import { pointerHover } from '@/lib/pointerHover'
+import { TappedMinyanContext, type TappedMinyan } from './TappedMinyan'
+
+/** How a change to the address is recorded. `replace`: in place, no step.
+ *  `step`: a step the browser's Back undoes, named in history.state so the
+ *  page's own way back can take that same step (the Minyanim view, Oct 6).
+ *  Neither: a navigation of its own. */
+export type ParamsOpts = { replace?: boolean; step?: string }
+
+/** A question the Filters were read from (`read=1`), and what it turned on
+ *  there: taken off again when the question is edited or cleared. */
+type Landed = { search: string; openNow: boolean; bool: string[]; select: Record<string, string[]>; has: Record<string, string[]> }
+
+/** The Filters an address carries: `f_<key>=1`, `sel_<key>=a,b`,
+ *  `has_<key>=Challah,Wine`. */
+function addressFilters(category: CategoryConfig, params: Record<string, string>) {
+  const bools: Record<string, boolean> = {}
+  const sels: Record<string, string[]> = {}
+  const has: Record<string, string[]> = {}
+  for (const f of category.detailFields) {
+    if (f.type === 'tags') {
+      const raw = params[`has_${f.key}`]
+      if (raw) has[f.key] = raw.split(',').map((v) => itemName(v)).filter(Boolean)
+    }
+    if (f.filterable && f.type === 'boolean' && params[`f_${f.key}`] === '1') bools[f.key] = true
+    if (f.filterable && f.type === 'select') {
+      const raw = params[`sel_${f.key}`]
+      if (raw) sels[f.key] = raw.split(',').filter(Boolean)
+    }
+  }
+  return { bools, sels, has }
+}
+
+/** Whether an address carries a search or Filters for this page. */
+function carriesSearch(category: CategoryConfig, params: Record<string, string>) {
+  const { bools, sels, has } = addressFilters(category, params)
+  return !!params.q?.trim() || params.openNow === '1' || [bools, sels, has].some((x) => Object.keys(x).length > 0)
+}
+
+/** `chosen` with `gone` taken out of it, key by key. */
+function withoutChosen(chosen: Record<string, string[]>, gone: Record<string, string[]>): Record<string, string[]> {
+  if (Object.keys(gone).length === 0) return chosen
+  const out = { ...chosen }
+  for (const [key, values] of Object.entries(gone)) out[key] = (out[key] ?? []).filter((v) => !values.some((g) => sameItem(g, v)))
+  return out
+}
+const MINYANIM_STEP = 'minyanim'
+const LISTING_STEP = 'listing'
+
+// Loaded on the first tap of "+": nobody browsing pays for the box.
+const TellUsSheet = dynamic(() => import('@/components/TellUsSheet'), { loading: () => null })
 
 type Props = {
   category: CategoryConfig
@@ -36,6 +125,18 @@ type Props = {
   addressPrompt?: boolean
   /** A listing to mount already expanded (restored after returning from a form). */
   reopenItemId?: string | null
+  /** The listing this page's own link names (/philly/food/judah-…), as
+   *  opposed to a `?item=` reopening one. On a phone it's a page of its own
+   *  until closed; on any screen, closing it takes the address back to the
+   *  category's, so a reload doesn't bring it back. */
+  linkedItemId?: string | null
+  /** The search that found `reopenItemId` elsewhere (the home search, as
+   *  `?match=`). Doesn't filter this list; only marks, in that listing,
+   *  what the search matched. */
+  reopenMatch?: string | null
+  /** The minyan in Minyanim by time that opened a listing here, for that
+   *  listing to open on (TappedMinyan). */
+  tappedMinyan?: TappedMinyan | null
   /** Seed the search box (e.g. "cheese" from a landing "Places" result). */
   initialSearch?: string
   /** Seed the "Open now" filter — `?openNow=1`, see onParamsChange below. */
@@ -49,36 +150,27 @@ type Props = {
    *  category. Extra/unrecognized keys (params for a DIFFERENT category,
    *  or `q`/`openNow` themselves) are simply ignored when read. */
   initialFilters?: Record<string, string> | null
-  /** Mount with the "All davening times" modal already open — the home
-   *  screen's DaveningTimesCard links here with `?davening=1` (see
-   *  routes.ts's own daveningTimes helper) so "See all" actually lands on
-   *  the sheet it names, instead of a bare category page the visitor then
-   *  has to find the same button on again. No-op for a category with no
-   *  minyanim field to show a modal for. */
-  openDaveningModal?: boolean
-  /** Mount the modal already filtered to this day (or days) — DaveningTimesCard
-   *  sets it to tomorrow's key when ITS OWN result is tomorrow's earliest
+  /** Mount on the Minyanim view (every minyan by time) instead of the list
+   *  of shuls: the home screen's DaveningTimesCard and Shabbos card link
+   *  here with `?davening=1`, so "All davening times" lands on what it
+   *  names, not a bare category page with the same button to find again.
+   *  No-op for a category with no minyanim field. */
+  openMinyanimView?: boolean
+  /** Open the Minyanim view on this weekday (`?day=fri`) — DaveningTimesCard
+   *  sets it to tomorrow's when ITS OWN result is tomorrow's earliest
    *  minyan (result.isTomorrow), so a visitor who followed a "tomorrow"
-   *  time here doesn't land on the modal's own "Today" default, which would
-   *  show nothing left for today and no visible reason why. Comma-separated
-   *  when tomorrow is also a secular holiday (DaveningTimesCard appends
-   *  `,holiday`), so a shul's holiday-specific minyan isn't invisible on a
-   *  view that's otherwise correctly showing tomorrow. Only ever applied on
-   *  arrival (see the `key` this feeds in FindResources.tsx) — the modal's
-   *  own day filter otherwise persists across opens by design (see
-   *  DaveningTimesModal's own doc), which this doesn't touch for the
-   *  ordinary in-page "All davening times" button. */
+   *  time here doesn't land on Today, with nothing left and no visible
+   *  reason why. Comma-separated keys are allowed (",holiday" is appended
+   *  on a secular holiday); the first that's one of the view's days wins.
+   *  Only applied on arrival (see the `key` this feeds in
+   *  FindResources.tsx). */
   initialDaveningDay?: string
   onUp: () => void
-  /** What `onUp` actually goes to — "Home" on mobile (the home grid IS the
-   *  index there), "All resources" on desktop (a separate index page). See
-   *  FindResources' upToAllResources, which this mirrors. Defaults to "All
-   *  resources" for callers (the admin's category preview) that always mean
-   *  that literally, regardless of device. */
-  upLabel?: string
-  onAdd: () => void
+  /** Unused since Oct 5: every Add on the page opens the "+ Add" box. Still
+   *  handed in by FindResources, whose `?form=create` links open the older
+   *  add (ListingAdd); both go when those links move to the box. */
+  onAdd?: () => void
   onEdit: (item: DirectoryResource) => void
-  onReport: (item: DirectoryResource) => void
   /** Pushes the search text / "Open now" toggle into the URL (`?q=`,
    *  `?openNow=`) as they change, so a search + filter combination is a
    *  shareable link — e.g. sending someone `?q=bagel&openNow=1` opens the
@@ -88,21 +180,20 @@ type Props = {
    *  item/form navigations elsewhere in this tree that deliberately push.
    *  Optional and a no-op by default, same reasoning as FindResources' own
    *  onParamsChange — nothing here is interactive before hydration anyway. */
-  onParamsChange?: (changes: Record<string, string | null>, opts?: { replace?: boolean }) => void
+  onParamsChange?: (changes: Record<string, string | null>, opts?: ParamsOpts) => void
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function GenericDirectory({ category, items, anchorLabel, addressPrompt, reopenItemId, initialSearch, initialOpenNow, initialFilters, openDaveningModal, initialDaveningDay, onUp, upLabel = 'All resources', onAdd, onEdit, onReport, onParamsChange }: Props) {
+export default function GenericDirectory({ category, items, anchorLabel, addressPrompt, reopenItemId, linkedItemId = null, reopenMatch = null, tappedMinyan = null, initialSearch, initialOpenNow, initialFilters, openMinyanimView, initialDaveningDay, onUp, onEdit, onParamsChange }: Props) {
   // Hands the shared header this screen's own title + "up" handler — on
   // mobile, SiteHeader shows "‹ {category.pluralLabel}" in place of the site
   // name while this is mounted, and reverts automatically on unmount (see
   // useSetScreenHeader's own doc). Always active: every caller of this
   // component (categories, hospitals, synagogues) is a second-level screen a
-  // visitor drilled into, never the home grid itself.
-  useSetScreenHeader(true, category.pluralLabel, onUp)
+  // visitor drilled into, never the home grid itself. Called further down,
+  // once it's known whether a listing is this screen (a phone, from a link).
 
-  const { isPinned } = usePinned()
   // Captured once, on this component's very first render — see
   // backForwardNavigation's own module doc. A visitor who presses back/
   // forward should land on a blank slate here even though the URL they're
@@ -112,17 +203,40 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // navigation — a clicked link, a shared URL, typing an address — is
   // exactly the case that SHOULD still hydrate from it, since that's what
   // makes a filtered link shareable in the first place.
-  const [arrivedViaBackForward] = useState(() => didArriveViaBackForward())
+  const [arrivedViaBackForward] = useState(() => didArriveViaBackForward(category.id))
   const [search, setSearch] = useState(arrivedViaBackForward ? '' : (initialSearch ?? ''))
   const [boolFilters, setBoolFilters] = useState<Record<string, boolean>>({})
   // Multi-select: each key maps to the set of chosen values (empty = no filter).
   const [selectFilters, setSelectFilters] = useState<Record<string, string[]>>({})
-  const [openDropdown, setOpenDropdown] = useState<string | null>(null)
+  // "Has": items in a listing's item list (`?has_<key>=Challah,Wine`; see
+  // searchLands.ts), each listing having every one ticked, always or
+  // sometimes.
+  const [hasFilters, setHasFilters] = useState<Record<string, string[]>>({})
+  // A question whose meaning is already in the Filters (`?read=1`: the AI
+  // reader read it, here or on the home search): it stays in the box, as
+  // asked, but isn't searched by again while it's unchanged, so switching
+  // one of its filters off really widens the list. Typing anything else
+  // searches as usual. And what it was read as goes with it: editing or
+  // clearing the question takes off the Filters it turned on (`landed`),
+  // and leaves the ones the visitor ticked.
+  const [landed, setLanded] = useState<Landed | null>(null)
+  const landedSearch = landed?.search ?? null
+
+  // Which card currently has its listing open — the desktop column or the
+  // mobile sheet. On a phone the floating Add button steps aside while it's
+  // up: the listing's own row (Suggest an edit, its overflow) passes under
+  // it as the sheet scrolls. On desktop nothing passes under it, so it stays
+  // (Oct 6: "not seeing the add button"), for adding anything; the listing
+  // itself is Suggest an edit's, which opens the box about it
+  // (ListingEditBar, via TellAboutContext).
+  const [openDialogItemId, setOpenDialogItemId] = useState<string | null>(null)
   const [openNow, setOpenNow] = useState(arrivedViaBackForward ? false : (initialOpenNow ?? false))
   // Drives the "Open now" filter below. Without it the filter answers for the
   // moment the page rendered, so a list narrowed to what's open at 4pm still
-  // shows those places at 10pm.
-  const now = new Date(useNow())
+  // shows those places at 10pm. Null until the page has hydrated (see
+  // useNow): nothing here guesses the time.
+  const clock = useNow()
+  const now = clock === null ? null : new Date(clock)
 
   // ── Apply a shared link's search/openNow/filters once they actually arrive ──
   // The lazy initializers above already cover the common case (this component
@@ -131,7 +245,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // yet (see FindResources' own doc on searchQuery etc.) — too late for a
   // lazy initializer to catch. Each of these applies its prop's arrival
   // exactly once, guarded by its own ref, rather than forcing a remount of
-  // this whole component the way `openDaveningModal` below still does: once
+  // this whole component the way `openMinyanimView` below still does: once
   // this component started writing search-as-you-type / toggles / filter
   // picks BACK into these same props (see the sync effects further down), a
   // remount-on-prop-change would keep firing on every one of those self
@@ -163,25 +277,27 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // before those are in scope, and duplicating the two-line filter here is
   // cheaper than reordering the whole component around it).
   const appliedInitialFiltersRef = useRef(false)
+  // The Filters an address carries, and, for a question read into them
+  // (`read=1`), that question with them.
+  const applyAddressFilters = (params: Record<string, string>) => {
+    const { bools, sels, has } = addressFilters(category, params)
+    if (Object.keys(bools).length > 0) setBoolFilters((prev) => ({ ...prev, ...bools }))
+    if (Object.keys(sels).length > 0) setSelectFilters((prev) => ({ ...prev, ...sels }))
+    if (Object.keys(has).length > 0) setHasFilters((prev) => ({ ...prev, ...has }))
+    if (params.read === '1' && params.q) {
+      setLanded({ search: params.q, openNow: params.openNow === '1', bool: Object.keys(bools), select: sels, has })
+    }
+  }
   useEffect(() => {
     if (appliedInitialFiltersRef.current || !initialFilters) return
     appliedInitialFiltersRef.current = true
     if (arrivedViaBackForward) return
-    const bools: Record<string, boolean> = {}
-    const sels: Record<string, string[]> = {}
-    for (const f of category.detailFields) {
-      if (f.filterable && f.type === 'boolean' && initialFilters[`f_${f.key}`] === '1') bools[f.key] = true
-      if (f.filterable && f.type === 'select') {
-        const raw = initialFilters[`sel_${f.key}`]
-        if (raw) sels[f.key] = raw.split(',').filter(Boolean)
-      }
-    }
     // One-time application of an external value on arrival, guarded above by
     // appliedInitialFiltersRef — not the "derive state from props on every
     // render" pattern this lint rule is otherwise right to flag.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (Object.keys(bools).length > 0) setBoolFilters((prev) => ({ ...prev, ...bools }))
-    if (Object.keys(sels).length > 0) setSelectFilters((prev) => ({ ...prev, ...sels }))
+    applyAddressFilters(initialFilters)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialFilters, category, arrivedViaBackForward])
   // Resets this screen's own search/openNow/filters to blank, both in local
   // state and (via onParamsChange) back out to the address bar — what a
@@ -200,16 +316,32 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // block's own doc above) — category/onParamsChange can be a fresh value
   // each render, and the two effects below only ever call this well after
   // it, never in the same commit, so ordinary (not layout) timing is fine.
+  // Only this screen's own state; clearFiltersRef clears the address too.
+  const blankRef = useRef<() => void>(undefined)
+  // This screen's state as an address has it (`?q=challah&has_m=Challah`).
+  const fromAddressRef = useRef<(params: Record<string, string>) => void>(undefined)
   useEffect(() => {
-    clearFiltersRef.current = () => {
+    fromAddressRef.current = (params) => {
+      blankRef.current!()
+      setSearch(params.q ?? '')
+      setOpenNow(params.openNow === '1')
+      applyAddressFilters(params)
+    }
+    blankRef.current = () => {
       setSearch('')
       setOpenNow(false)
       setBoolFilters({})
       setSelectFilters({})
-      const changes: Record<string, string | null> = { q: null, openNow: null }
+      setHasFilters({})
+      setLanded(null)
+    }
+    clearFiltersRef.current = () => {
+      blankRef.current!()
+      const changes: Record<string, string | null> = { q: null, openNow: null, read: null }
       for (const f of category.detailFields) {
         if (f.filterable && f.type === 'boolean') changes[`f_${f.key}`] = null
         if (f.filterable && f.type === 'select') changes[`sel_${f.key}`] = null
+        if (f.type === 'tags') changes[`has_${f.key}`] = null
       }
       onParamsChange?.(changes, { replace: true })
     }
@@ -252,10 +384,35 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // they're already-undefined by the time Activity reveals this screen
   // again, hydrated-once refs and all — so any later activation blanking
   // unconditionally is the right call, not just the achievable one.
+  //
+  // But effects also tear down and re-run when a Suspense boundary above
+  // hides this screen for a moment while some code loads (the user's note
+  // 10, Oct 10: a listing tapped in search results on a phone loaded its
+  // view, the search was cleared, and the listing closed again). Leaving
+  // for another screen has already changed the address by the time this
+  // screen is hidden; a pause while code loads hasn't. So it clears only
+  // when the address it was hidden at isn't this screen's own.
+  //
+  // Come back by a link that carries a search (the home search's "Grocery ·
+  // 10 with Challah" is `?q=challah`), it's that search, not a blank page:
+  // the `initialXxx` props were applied once, on the first visit, and a
+  // second search from home landed on the whole list (the user, Oct 13).
+  // Only back/forward blanks it, as on a first arrival.
   const hasActivatedBeforeRef = useRef(false)
+  const hiddenAtRef = useRef<string | null>(null)
   useEffect(() => {
-    if (hasActivatedBeforeRef.current) clearFiltersRef.current!()
+    if (hasActivatedBeforeRef.current && hiddenAtRef.current !== window.location.pathname) {
+      const params = Object.fromEntries(new URLSearchParams(window.location.search))
+      if (didArriveViaBackForward(category.id) || !carriesSearch(category, params)) clearFiltersRef.current!()
+      else fromAddressRef.current!(params)
+    }
     hasActivatedBeforeRef.current = true
+    return () => {
+      hiddenAtRef.current = window.location.pathname
+    }
+    // On each activation only (Activity re-runs it), never on a change of
+    // category: a category is its own screen.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // ── Sync search + "Open now" into the URL (see onParamsChange's own doc) ──
@@ -265,16 +422,41 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // typing doesn't fire a history replace per keystroke; `openNow` is a
   // single toggle, so it goes out immediately.
   const searchSyncedOnce = useRef(false)
+  // Read when the debounce fires, not when it was set: arriving by a link,
+  // the question can reach `search` a render before `landed` does, and
+  // `read=1` came off the address (Oct 13).
+  const landedSearchRef = useRef(landedSearch)
+  useEffect(() => {
+    landedSearchRef.current = landedSearch
+  })
   useEffect(() => {
     if (!searchSyncedOnce.current) {
       searchSyncedOnce.current = true
       return
     }
     const timer = setTimeout(() => {
-      onParamsChange?.({ q: search.trim() || null }, { replace: true })
+      const kept = landedSearchRef.current !== null && search === landedSearchRef.current
+      onParamsChange?.({ q: search.trim() || null, ...(kept ? {} : { read: null }) }, { replace: true })
     }, 300)
     return () => clearTimeout(timer)
   }, [search, onParamsChange])
+  // The question edited or cleared: the Filters it was read as come off
+  // with it (see `landed`). What's typed now is searched, and read again
+  // if it needs it.
+  useEffect(() => {
+    if (!landed || search === landed.search) return
+    const was = landed
+    // Follows the visitor's own edit of the box, once: not state derived
+    // from props.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setLanded(null)
+    if (was.openNow) setOpenNow(false)
+    if (was.bool.length) setBoolFilters((prev) => ({ ...prev, ...Object.fromEntries(was.bool.map((key) => [key, false])) }))
+    setSelectFilters((prev) => withoutChosen(prev, was.select))
+    setHasFilters((prev) => withoutChosen(prev, was.has))
+    // Only the box's own changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search])
   const openNowSyncedOnce = useRef(false)
   useEffect(() => {
     if (!openNowSyncedOnce.current) {
@@ -283,39 +465,94 @@ export default function GenericDirectory({ category, items, anchorLabel, address
     }
     onParamsChange?.({ openNow: openNow ? '1' : null }, { replace: true })
   }, [openNow, onParamsChange])
-  // Distance is meaningless with nothing to measure from, so this tracks the
-  // anchor automatically — Popular while there's none, Distance the instant
-  // one exists — until the visitor makes an explicit choice below, which
-  // then sticks regardless of what the anchor does afterward.
+  // Distance first, always (the user, Oct 15): with no location set, the
+  // miles from the community's centre that every row already shows, which
+  // the top of the page says it's measuring from. Popular only where there
+  // is no distance at all to sort by (a category without addresses, e.g.
+  // WhatsApp groups), until the visitor makes an explicit choice below,
+  // which then sticks regardless of what the anchor does afterward.
   //
   // Deliberately not a one-time lazy initializer. A saved address (or live
   // tracking resuming) restores from localStorage in a POST-MOUNT effect —
   // see useStoredLocation — so anchorLabel is still empty on this
   // component's very first render even for a returning visitor who already
-  // has a location saved. A lazy initializer would freeze on that empty
-  // read and this screen would silently default to Popular forever; this
-  // effect re-derives the default every time anchorLabel changes instead,
-  // so the anchor arriving a beat after mount still flips it.
-  const [sortByPopular, setSortByPopular] = useState(!anchorLabel)
+  // has a location saved. This effect re-derives the default every time
+  // what there is to measure from changes instead.
+  const centerDistances = items.some((i) => i.milesFromCenter != null)
+  const canSortByDistance = !!anchorLabel || centerDistances
+  const [sortByPopular, setSortByPopular] = useState(!canSortByDistance)
   const touchedSort = useRef(false)
   useEffect(() => {
     if (touchedSort.current) return
-    setSortByPopular(!anchorLabel)
-  }, [anchorLabel])
+    setSortByPopular(!canSortByDistance)
+  }, [canSortByDistance])
   const [voteCounts, setVoteCounts] = useState<Record<string, number>>({})
+  // The Filters sheet (see ListHeading and FiltersSheet).
   const [filtersOpen, setFiltersOpen] = useState(false)
   // A plain lazy initializer here would only ever see the FIRST render:
   // SlugScreen's Suspense fallback renders this tree once with the query
-  // string not yet read (openDaveningModal is undefined then, same as
+  // string not yet read (openMinyanimView is undefined then, same as
   // `initialSearch` is at that point — see FindResources' own doc), then
   // FindResourcesConnected hydrates and this same component instance
   // re-renders with the real value — too late for a lazy initializer to
   // catch. Solved the same way `initialSearch` already is: FindResources
-  // folds `openDaveningModal` into the `key` it gives ResourceLoader, so
+  // folds `openMinyanimView` into the `key` it gives ResourceLoader, so
   // the value arriving forces a fresh mount of this whole subtree instead
   // of an update to the existing one, and the lazy initializer below runs
   // again with the real value.
-  const [daveningModalOpen, setDaveningModalOpen] = useState(!!openDaveningModal)
+  // Synagogues' Minyanim view (step 4, agreed Oct 1): every minyan by time,
+  // in place of the list of shuls. `?davening=1` (the home page's and the
+  // Next minyan card's "All davening times") arrives on it. It replaced
+  // the old week-of-times dialog, which knew nothing of Yom Tov.
+  const [minyanimViewOn, setMinyanimViewOn] = useState(!!openMinyanimView)
+  // The Minyanim view's own Filters (Oct 15): Tefillah, and How far, one at
+  // a time; and how many minyanim it shows, for the sheet's Show button.
+  const [minyanTefillos, setMinyanTefillos] = useState<string[]>([])
+  const [minyanWithin, setMinyanWithin] = useState<string | null>(null)
+  const [minyanimShowing, setMinyanimShowing] = useState(0)
+  // Same one-way-in problem `search`/`openNow` already solve above: without
+  // this, switching back to Synagogues left `?davening=1` sitting in the
+  // URL, so a reload reopened the view the visitor had already left.
+  // Clears `day` alongside `davening` — a stale `?day=` with no view to
+  // pick a day in is meaningless on its own. Skips the
+  // first render for the same reason `openNowSyncedOnce` does: the initial
+  // value here is just `openMinyanimView` echoed back, and re-writing it
+  // immediately would be a pointless replace on a URL that's already
+  // correct.
+  //
+  // Only when the view opens or closes, never because onParamsChange is a
+  // new function: on Back, Next re-renders with a new one before the
+  // popstate listener below has read the address, and re-writing the
+  // still-open view's `?davening=1` then undid the Back (found Oct 6).
+  const minyanimViewSyncedOnce = useRef(false)
+  // Set when the page itself opens the view (showMinyanimView, below).
+  const openedHere = useRef(false)
+  const writeMinyanimView = useEffectEvent((on: boolean) => {
+    const step = on && openedHere.current
+    openedHere.current = false
+    onParamsChange?.(on ? { davening: '1' } : { davening: null, day: null }, step ? { step: MINYANIM_STEP } : { replace: true })
+  })
+  useEffect(() => {
+    if (!minyanimViewSyncedOnce.current) {
+      minyanimViewSyncedOnce.current = true
+      return
+    }
+    writeMinyanimView(minyanimViewOn)
+  }, [minyanimViewOn])
+  // Opened from the page, the view is a step Back undoes (Oct 6): the
+  // browser's, and on a phone a swipe. It used to replace the address, so
+  // Back left Synagogues altogether. Its own ways back (the header's ‹ on a
+  // phone, "‹ Synagogues" on a computer) take that same step when there is
+  // one, so Forward doesn't reopen it; arriving on `?davening=1`, there's
+  // none, and they just close it.
+  const showMinyanimView = () => {
+    openedHere.current = true
+    setMinyanimViewOn(true)
+  }
+  const closeMinyanimView = () => {
+    if ((window.history.state as { step?: string } | null)?.step === MINYANIM_STEP) window.history.back()
+    else setMinyanimViewOn(false)
+  }
   const isMobile = useIsMobile()
   // For getCategoryColor below — same call CompactCard makes for this same
   // category's home-screen badge, so the morph target's color matches
@@ -337,7 +574,6 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   const controlsVisible = useScrollShowHide(controlsCanStick)
 
   const fields = category.detailFields
-  const tagFields = fields.filter((f) => f.type === 'tags')
   const hoursFields = fields.filter((f) => f.type === 'hours')
   const hasFilterableHours = hoursFields.some((f) => f.filterable)
   const filterableBooleans = fields.filter((f) => f.filterable && f.type === 'boolean')
@@ -399,6 +635,24 @@ export default function GenericDirectory({ category, items, anchorLabel, address
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectFilters, onParamsChange])
 
+  const hasFiltersSyncedOnce = useRef(false)
+  useEffect(() => {
+    if (!hasFiltersSyncedOnce.current) {
+      hasFiltersSyncedOnce.current = true
+      return
+    }
+    const timer = setTimeout(() => {
+      const changes: Record<string, string | null> = {}
+      for (const f of itemFields(category)) {
+        const chosen = hasFilters[f.key] ?? []
+        changes[`has_${f.key}`] = chosen.length > 0 ? chosen.join(',') : null
+      }
+      onParamsChange?.(changes, { replace: true })
+    }, 300)
+    return () => clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasFilters, onParamsChange])
+
   // "All davening times" — only for categories with a `minyanim`-type field
   // (today, just Synagogues) and at least one listing with structured data.
   const minyanimField = fields.find((f) => f.type === 'minyanim')
@@ -410,6 +664,26 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // Per-category capabilities layered under the global `ui.*` master switches.
   const caps = resolveCapabilities(category.capabilities)
   const canAdd = ui.contributions.add && caps.add
+  // "+" opens "Saw something? Tell us" (agreed Oct 5); today's Add form is
+  // one tap inside it, "Add a place".
+  const [tellOpen, setTellOpen] = useState(false)
+  // The listing the box is about, when its Suggest an edit opened it, and
+  // what that Suggest an edit opened before: the listing's own editor, in
+  // place, for the box's "Edit the details myself" (Oct 6). Without one,
+  // the page's own edit (onEdit).
+  const [openItem, setOpenItem] = useState<DirectoryResource | null>(null)
+  const editYourself = useRef<(() => void) | null>(null)
+  const [tellTimes, setTellTimes] = useState(false)
+  const [tellMenu, setTellMenu] = useState(false)
+  const tellAbout = (item: DirectoryResource, edit?: () => void, opts?: { times?: boolean; menu?: boolean }) => {
+    editYourself.current = edit ?? null
+    setOpenItem(item)
+    setTellTimes(!!opts?.times)
+    setTellMenu(!!opts?.menu)
+    setTellOpen(true)
+  }
+  // Adding to a shul's times is an edit to the shul ("+ Add a minyan").
+  const canEdit = ui.contributions.edit && caps.edit
   const showSearch = ui.search.directory && caps.directorySearch
   const liveCount = (item: DirectoryResource) => voteCounts[item.id] ?? item.upvotes ?? 0
 
@@ -454,22 +728,92 @@ export default function GenericDirectory({ category, items, anchorLabel, address
     // in normal flow immediately above the controls bar, so it stops
     // "intersecting" at exactly the scroll position where the bar's own
     // sticky offset would engage, not a moment before or after.
-    const observer = new IntersectionObserver(([entry]) => setControlsStuck(!entry.isIntersecting), {
-      threshold: 0,
-      rootMargin: '-56px 0px 0px 0px',
-    })
-    observer.observe(sentinel)
-    return () => observer.disconnect()
+    function makeObserver() {
+      const observer = new IntersectionObserver(([entry]) => setControlsStuck(!entry.isIntersecting), {
+        threshold: 0,
+        rootMargin: '-56px 0px 0px 0px',
+      })
+      observer.observe(sentinel!)
+      return observer
+    }
+    let observer = makeObserver()
+    // Resyncing by replacing the observer alone (disconnect + a fresh
+    // `makeObserver()`) isn't enough: confirmed by hand, in real browser
+    // testing, that even a BRAND NEW IntersectionObserver's very first
+    // callback can misreport — this isn't limited to the original,
+    // mount-time instance. IntersectionObserver's callback is asynchronous
+    // by spec (scheduled some time "after layout and paint"), and nothing
+    // guarantees that delivery race resolves correctly on every instance,
+    // every time. `getBoundingClientRect()` has no such race — it's a
+    // synchronous, always-current measurement — so `resync` sets
+    // `controlsStuck` directly from it. The observer is still replaced
+    // alongside that (cheap, and worth doing so a later plain scroll isn't
+    // still checking a sentinel bound to a stale rootMargin/layout
+    // snapshot), just no longer trusted to deliver the correction itself.
+    function resync() {
+      setControlsStuck(sentinel!.getBoundingClientRect().top < 56)
+      observer.disconnect()
+      observer = makeObserver()
+    }
+    // Two separate races this bar's "docked" look (white background, the
+    // border, the shadow — all `lg:`-gated on `controlsStuck`) can lose,
+    // both confirmed by hand and both invisible on their own since neither
+    // has any effect below the `lg:` breakpoint:
+    //
+    // Mount: this component's very first observation can land against a
+    // not-yet-settled layout — content above the sentinel still streaming
+    // or hydrating in — and, once wrong, does NOT self-correct from a later
+    // legitimate layout shift, even long after that content has finished
+    // loading. `load` (or immediately, via a double rAF, if it already
+    // fired before this effect ran) is the resync point: a real signal that
+    // layout has settled, not a guessed timeout.
+    //
+    // Resize: rotating a device, or crossing the `lg:` breakpoint by
+    // resizing a browser window, reshuffles the whole page above the
+    // sentinel — the mobile address banner disappears, the desktop hero/
+    // badge appear. Debounced to the quiet period after the last event in a
+    // resize burst so it resyncs against the settled size once, not a
+    // different mid-transition layout on every intermediate event.
+    if (document.readyState === 'complete') {
+      requestAnimationFrame(() => requestAnimationFrame(resync))
+    } else {
+      window.addEventListener('load', resync, { once: true })
+    }
+    let resizeTimer: ReturnType<typeof setTimeout> | null = null
+    function handleResize() {
+      if (resizeTimer != null) clearTimeout(resizeTimer)
+      resizeTimer = setTimeout(() => {
+        resizeTimer = null
+        resync()
+      }, 150)
+    }
+    window.addEventListener('resize', handleResize)
+    return () => {
+      window.removeEventListener('resize', handleResize)
+      window.removeEventListener('load', resync)
+      if (resizeTimer != null) clearTimeout(resizeTimer)
+      observer.disconnect()
+    }
   }, [])
   const scrollItemIntoView = (id: string, behavior: ScrollBehavior) => {
+    const headerH = (document.querySelector('header')?.getBoundingClientRect().height ?? 64) + 12
+    // A listing open in the list's column (desktop): its row is hidden, so
+    // bring the column's top back into view instead, and only if the page
+    // has scrolled past it.
+    const column = listingColumnRef.current
+    if (column) {
+      const top = column.getBoundingClientRect().top
+      if (top < headerH) window.scrollTo({ top: Math.max(0, window.scrollY + top - headerH), behavior })
+      return
+    }
     const el = itemRowRefs.current.get(id)
     if (!el) return
-    const headerH = (document.querySelector('header')?.getBoundingClientRect().height ?? 64) + 12
     const controls = controlsRef.current
     const controlsH = controls && getComputedStyle(controls).position === 'sticky' ? controls.offsetHeight : 0
     const top = el.getBoundingClientRect().top + window.scrollY - headerH - controlsH
     window.scrollTo({ top: Math.max(0, top), behavior })
   }
+
 
   // Same target, but waits for the row's own position to stop moving first —
   // for a scroll fired around the same moment something else can still
@@ -489,7 +833,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
     let lastTop: number | null = null
     let stableChecks = 0
     const waitForSettled = () => {
-      const el = itemRowRefs.current.get(id)
+      const el = listingColumnRef.current ?? itemRowRefs.current.get(id)
       if (!el) {
         timer = window.setTimeout(waitForSettled, 32)
         return
@@ -519,8 +863,40 @@ export default function GenericDirectory({ category, items, anchorLabel, address
     if (handle) cardRefs.current.set(id, handle)
     else cardRefs.current.delete(id)
   }
+  // Which cards have their listing open right now, kept by each card's
+  // onExpandedChange (below). A ref, not state: the effect below reads it on
+  // Activity's reveal, where a state value from an earlier render would be
+  // exactly the stale answer this exists to avoid.
+  const openCardIdsRef = useRef(new Set<string>())
 
   useEffect(() => {
+    // A listing left open from an earlier visit closes first. Leaving a
+    // category (browser Back to home) hides this screen under <Activity>
+    // rather than unmounting it, so the card that was open stays open in
+    // the hidden tree. Coming back with a different `?item=` then opened a
+    // second dialog on top of the first — reported live on desktop: open a
+    // listing, press Back, pick another from the home search, and both were
+    // up, one over the other. Coming back with no `?item=` at all (the
+    // Categories menu) showed the old one again. This effect re-runs on
+    // Activity's reveal as well as on a new `?item=`, which covers both.
+    // Only open cards are closed: close() clears `?item=` in the URL, so
+    // calling it on every card would write the URL once per listing.
+    for (const id of [...openCardIdsRef.current]) {
+      if (id !== reopenItemId) cardRefs.current.get(id)?.close()
+    }
+    if (!reopenItemId) return
+    // Actually opens the card too, not just scrolls to it — `defaultExpanded`
+    // (below, on each card) only seeds that card's OWN expand state on ITS
+    // OWN first mount, which does nothing if this directory is already
+    // mounted from an earlier visit: Next's Cache Components keep a recent
+    // route's component tree alive via <Activity> instead of unmounting it,
+    // so navigating back into an already-open category with a NEW `?item=`
+    // (e.g. a different listing picked from the home search dropdown) left
+    // the URL pointing at the right listing but no modal actually open —
+    // confirmed live, and only a full reload (a genuine fresh mount) fixed
+    // it. Calling .open() on the genuine first-mount case (already true via
+    // defaultExpanded) is a harmless no-op.
+    cardRefs.current.get(reopenItemId)?.open()
     // Settle-aware, not a plain one-shot scrollItemIntoView — this list can
     // still reorder right after mount (distance sort landing once
     // geolocation resolves is the common case: a `?item=` deep link into a
@@ -529,9 +905,9 @@ export default function GenericDirectory({ category, items, anchorLabel, address
     // pre-reorder position, so the visitor ends up scrolled to wherever
     // that used to be — short of or past where the reopened listing
     // actually settled, off by however far the reorder moved it.
-    if (reopenItemId) return scrollItemIntoViewWhenSettled(reopenItemId, 'instant')
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []) // intentionally empty — only fire on mount
+    return scrollItemIntoViewWhenSettled(reopenItemId, 'instant')
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only reopenItemId should retrigger this; scrollItemIntoViewWhenSettled is a fresh closure every render
+  }, [reopenItemId])
 
   // Tapping a listing's "I'm here" (see SetLocationButton) re-anchors every
   // distance to it, which — for anyone not already on Distance sort — flips
@@ -567,16 +943,151 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // eslint-disable-next-line react-hooks/exhaustive-deps -- only anchorListingId should retrigger this; scrollItemIntoViewWhenSettled is a fresh closure every render
   }, [anchorListingId])
 
-  const q = search.trim().toLowerCase()
-  const tokens = q.split(/\s+/).filter(Boolean)
-  // Every word must appear somewhere in the listing's search text — name, address,
-  // tags, or scalar detail fields (AND across words). Shares listingSearchText with
-  // the landing search, so a place tapped there ("kosher cheese") survives this filter.
-  const matchesSearch = (item: DirectoryResource) => {
-    if (tokens.length === 0) return true
-    const hay = listingSearchText(item, category)
-    return tokens.every((t) => hay.includes(t))
+  // On the Minyanim tab, what's typed narrows the minyanim (MinyanimView,
+  // the user's note 4): it isn't a search of the shuls, nor a question for
+  // the reader.
+  const searchingMinyanim = hasMinyanim && minyanimViewOn
+  // What the list is searched by: the box, unless what's in it is a
+  // question already turned into the Filters (see landedSearch).
+  const searchedFor = landedSearch !== null && search === landedSearch ? '' : search
+  const q = searchingMinyanim ? '' : searchedFor.trim().toLowerCase()
+  const communitySlug = useOptionalCommunitySlug()
+  // Read as a question, the same way as the home search (see askSearch.ts),
+  // limited to this category — so a place tapped there ("where can I get
+  // cholov yisroel milk") survives this filter, and "kosher food" on the
+  // restaurant page means every restaurant rather than none.
+  // Each match keeps what it matched on (see SearchFound), for the card to
+  // say why it's here and the listing to mark it once opened.
+  const todayResult = useMemo(
+    () => (q ? searchAsk(items, [category], searchedFor, { categoryId: category.id, places: neighborhoodsFor(communitySlug) }) : null),
+    [q, items, category, searchedFor, communitySlug],
+  )
+  // The Minyanim view's search, past its tefillos, days and "near me"
+  // (readMinyanimSearch), goes through that same search of the shuls: so
+  // "orthodox" there is Denomination ticked, a typo or a neighbourhood
+  // finds what it finds on the list (the user, Oct 15: the list searched
+  // well and the view didn't). It had its own name match.
+  const minyanShulWords = useMemo(() => {
+    const sought = searchingMinyanim ? readMinyanimSearch(searchedFor) : null
+    // A trailing space says the last word is finished, as typed.
+    return sought?.terms.length ? `${sought.terms.join(' ')}${/\s$/.test(searchedFor) ? ' ' : ''}` : ''
+  }, [searchingMinyanim, searchedFor])
+  const minyanShulResult = useMemo(
+    () => (minyanShulWords ? searchAsk(items, [category], minyanShulWords, { categoryId: category.id, places: neighborhoodsFor(communitySlug) }) : null),
+    [minyanShulWords, items, category, communitySlug],
+  )
+  const todayMatches = useMemo(
+    () => (todayResult ? new Map(todayResult.hits.map((h) => [h.item.id, foundFor(h, todayResult)])) : null),
+    [todayResult],
+  )
+
+  // ── The question reader (questionReader.ts), as on the home search ──────
+  // Only when our own search left something it didn't understand
+  // (needsReading), on Enter or after a pause. Its reading of this category
+  // (Open now, its yes/nos and pick-lists, items) is switched on in the
+  // page's own Filters, where it can be seen and switched off, and the
+  // question stays in the box without being searched by again (see
+  // landedSearch). It used to narrow the list itself and show what it read
+  // as "Read as" chips above it, a second set of filters beside Filters
+  // (the user, Oct 13). Never a place's own name. When the reading is about
+  // another kind of place and today's search finds something here
+  // ("challah" on Food, read as Grocery), today's search answers: this page
+  // is about this category.
+  const reader = useReading(communitySlug)
+  // The neighbourhoods; a hospital named comes with where it is (see the route).
+  const readerPlacesHere = useMemo(() => readerPlaces(items, communitySlug ?? ''), [items, communitySlug])
+  const typedName = q.replace(/['’]/g, '')
+  const readable = !!todayResult && needsReading(todayResult) && !items.some((i) => i.name.toLowerCase().replace(/['’]/g, '').includes(typedName))
+  const own = todayResult ? ownFrom(todayResult, readerPlacesHere) : null
+  const reading = readable ? reader.readingFor(search) : null
+  const applyReading = useEffectEvent((asked: NonNullable<typeof reading>, question: string) => {
+    const { reading: r, own: mine } = asked
+    if (!readingAnswers(r, category.id)) return
+    if ((todayMatches?.size ?? 0) > 0 && readingLoses(question, r, categories ?? [category])) return
+    const here = r.categories.find((c) => c.id === category.id)
+    const openNowAdded = hasFilterableHours && !!(here?.openNow || mine.openNow) && !openNow
+    if (openNowAdded) setOpenNow(true)
+    const bools = (here?.bool ?? []).filter((key) => filterableBooleans.some((f) => f.key === key))
+    if (bools.length) setBoolFilters((prev) => ({ ...prev, ...Object.fromEntries(bools.map((key) => [key, true])) }))
+    const sels = Object.entries(here?.select ?? {}).filter(([key, v]) => v.length && filterableSelects.some((f) => f.key === key))
+    if (sels.length) setSelectFilters((prev) => ({ ...prev, ...Object.fromEntries(sels) }))
+    const field = itemFields(category)[0]
+    const hasAdded: string[] = []
+    if (field && r.items?.length) {
+      // As the listings spell it ("wine" read is their "Wine").
+      const known = new Map(itemCounts(items, field.key).map((i) => [i.tag.toLowerCase(), i.tag]))
+      const already = (hasFilters[field.key] ?? []).map((t) => t.toLowerCase())
+      for (const i of r.items) {
+        const tag = known.get(itemName(i).toLowerCase())
+        if (tag && !already.includes(tag.toLowerCase()) && !hasAdded.includes(tag)) hasAdded.push(tag)
+      }
+      if (hasAdded.length) setHasFilters((prev) => ({ ...prev, [field.key]: [...(prev[field.key] ?? []), ...hasAdded] }))
+    }
+    setLanded({
+      search: question,
+      openNow: openNowAdded,
+      bool: bools.filter((key) => !boolFilters[key]),
+      select: Object.fromEntries(sels.map(([key, v]) => [key, v.filter((x) => !(selectFilters[key] ?? []).includes(x))])),
+      has: field && hasAdded.length ? { [field.key]: hasAdded } : {},
+    })
+    onParamsChange?.({ read: '1' }, { replace: true })
+  })
+  useEffect(() => {
+    // Applied once, as a reading arrives from the reader, like a shared
+    // link's filters are on arrival (see appliedInitialFiltersRef).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (reading) applyReading(reading, search)
+    // Once per reading that arrives.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reading])
+  useEffect(() => {
+    if (!readable || !own) return
+    const timer = setTimeout(() => reader.ask(search, own), 1000)
+    return () => clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [readable, search])
+  // A minyan question typed over the list of shuls ("mincha tonight") is
+  // asked of Minyanim by time, as the home search would send it: the list
+  // of shuls has nothing to answer it with.
+  const asksMinyan = hasMinyanim && !minyanimViewOn && !!todayResult?.query.minyan
+  useEffect(() => {
+    if (!asksMinyan) return
+    const timer = setTimeout(() => setMinyanimViewOn(true), 700)
+    return () => clearTimeout(timer)
+  }, [asksMinyan])
+  // ── The order the search asks for ──
+  // "Pizza near me", "closest pizza": nearest first; "best pizza", "sort by
+  // popularity": most liked first, while it's in the box, whatever the Sort
+  // was on ("restaurant near me" came back by popularity, fixes table Sep
+  // 29). The Sort button says which (Oct 10), and picking the other order
+  // there takes the words out of the box (selectSort), so the two never
+  // disagree.
+  const askedQuery = q ? todayResult?.query : undefined
+  const askedOrder: 'nearest' | 'popular' | null = askedQuery?.nearMe ? 'nearest' : askedQuery?.best && upvotes ? 'popular' : null
+  const byPopular = askedOrder ? askedOrder === 'popular' : sortByPopular
+  const askMatches = todayMatches
+  const matchesSearch = (item: DirectoryResource) => askMatches === null || askMatches.has(item.id)
+  // A listing opened from the home search: what that search matched in it.
+  // Until that listing is closed — reopened later, it's just the listing.
+  const [closedMatchFor, setClosedMatchFor] = useState<string | null>(null)
+  const reopenKey = reopenItemId && reopenMatch ? `${reopenItemId}\n${reopenMatch}` : null
+  const reopenFound = useMemo(() => {
+    const reopened = reopenKey && items.find((i) => i.id === reopenItemId)
+    if (!reopened || !reopenMatch) return null
+    const result = searchAsk([reopened], [category], reopenMatch, { categoryId: category.id })
+    return result.hits[0] ? foundFor(result.hits[0], result) : null
+  }, [reopenKey, reopenItemId, reopenMatch, items, category])
+  // Ticked in Has, the items say why each listing is in the list
+  // ("Challah · sometimes"), as a search for them would.
+  const hasChosen = Object.entries(hasFilters).filter(([, v]) => v.length > 0)
+  const hadItems = (item: DirectoryResource) => {
+    if (hasChosen.length === 0) return null
+    const wanted = new Set(hasChosen.flatMap(([, v]) => v.map((t) => itemName(t).toLowerCase())))
+    const its = hasChosen.flatMap(([key]) => listingItems(item, key)).filter((t) => wanted.has(t.tag.toLowerCase()))
+    return its.length ? { terms: [], items: its, fields: [] } : null
   }
+  const foundOn = (item: DirectoryResource) =>
+    askMatches?.get(item.id) ?? hadItems(item) ?? (item.id === reopenItemId && closedMatchFor !== reopenKey ? reopenFound : null)
 
   const filtered = items
     .filter((item) => {
@@ -591,13 +1102,15 @@ export default function GenericDirectory({ category, items, anchorLabel, address
         // filter set if ANY of its own values is one of the chosen ones.
         if (chosen?.length && !selectValues(item[f.key]).some((v) => chosen.includes(v))) return false
       }
+      for (const [key, chosen] of Object.entries(hasFilters)) if (!listingHas(item, key, chosen)) return false
       if (openNow && hasFilterableHours) {
         // Closed businesses are never open, whatever hours they still have
         // saved — a temporarily-closed shop kept passing this filter on last
         // season's hours.
         if (businessClosure(item as unknown as Record<string, unknown>)) return false
-        // Item must be open right now according to at least one filterable hours field.
-        const isOpen = hoursFields
+        // Item must be open right now according to at least one filterable
+        // hours field; that waits for the time, as the rows do.
+        const isOpen = !now || hoursFields
           .filter((f) => f.filterable)
           .some((f) => hoursOpenNow(item[f.key], now) === true)
         if (!isOpen) return false
@@ -615,116 +1128,14 @@ export default function GenericDirectory({ category, items, anchorLabel, address
         Number(!!businessClosure(a as unknown as Record<string, unknown>)) -
         Number(!!businessClosure(b as unknown as Record<string, unknown>))
       if (closedDiff !== 0) return closedDiff
-      // Pinned listings float to the top next, ahead of popularity/distance —
-      // same tier NearbyList.tsx's own sort gives them on the map, "that's
-      // the whole point of pinning something." Still below the closed check
-      // above: a pinned-but-closed listing outranks other closed listings,
-      // not every open one.
-      const pinnedDiff = Number(isPinned(b.id)) - Number(isPinned(a.id))
-      if (pinnedDiff !== 0) return pinnedDiff
-      return upvotes && sortByPopular
+      // Saved places don't float to the top (Oct 14): the order is what Sort
+      // says. Their badge is how they stand out.
+      return upvotes && byPopular
         ? liveCount(b) - liveCount(a) || travelCompare(a, b)
-        : travelCompare(a, b)
+        : // From the centre only when Distance was chosen or asked for
+          // ("near me"); otherwise, with no location, by name.
+          travelCompare(a, b, { fromCenter: !byPopular })
     })
-
-  // Aligns each visual row's content to the same height — real per-card
-  // measurement (see GenericListingCardHandle's own doc), not a guess based
-  // on name length or anything else static. An earlier version reserved a
-  // fixed 2-line name height across an entire CATEGORY the moment any one
-  // listing's name was long enough to wrap — which put a blank gap between
-  // the name and address on every OTHER card in that category too, most of
-  // which were nowhere near the actual long-named listing and never needed
-  // it. This only ever adjusts a card that's actually sharing a row with a
-  // taller one, and never touches the name/address gap at all.
-  //
-  // Two independent spacer segments, not one — the popularity/distance LINE
-  // itself needs to land at the same height across a row (not just the
-  // badges further down it), so the single old spacer (address/header-text
-  // block → badge row) is split into segment 1 (→ upvote/distance row) and
-  // segment 2 (upvote/distance row → badge row). Segment 2 is measured and
-  // applied AFTER segment 1 is applied, not in the same pass — its "from"
-  // point is the upvote row's own rendered bottom edge, which shifts once
-  // segment 1's spacer above it changes height.
-  //
-  // Row membership is read from the DOM (itemRowRefs' own getBoundingClientRect
-  // top, rounded, grouped) rather than computed from column count — this
-  // grid's auto-fill column count depends on the container's actual pixel
-  // width, which isn't something to re-derive here when the browser has
-  // already laid it out.
-  const filteredIds = filtered.map((item) => item.id).join(',')
-  useLayoutEffect(() => {
-    function groupRows() {
-      const rows = new Map<number, string[]>()
-      for (const item of filtered) {
-        const rowEl = itemRowRefs.current.get(item.id)
-        if (!rowEl) continue
-        const top = Math.round(rowEl.getBoundingClientRect().top)
-        const existing = rows.get(top)
-        if (existing) existing.push(item.id)
-        else rows.set(top, [item.id])
-      }
-      return [...rows.values()]
-    }
-
-    function alignRows() {
-      // Reset every spacer first — a stale spacer from a previous pass
-      // (or a previous, wider layout) would otherwise inflate this pass's
-      // own reading of "natural" content height.
-      for (const item of filtered) {
-        cardRefs.current.get(item.id)?.setUpvoteSpacerHeight(0)
-        cardRefs.current.get(item.id)?.setBadgeSpacerHeight(0)
-      }
-
-      const rows = groupRows()
-
-      // Segment 1: card root → upvote/distance row. Only among cards that
-      // actually have one — a card with no upvote row has nothing to align
-      // at this segment, and gets its total height caught up entirely by
-      // segment 2 instead (measureBadgeGap falls back to the card root when
-      // there's no upvote row).
-      for (const ids of rows) {
-        if (ids.length < 2) continue
-        const heights = ids
-          .map((id) => [id, cardRefs.current.get(id)?.measureUpvoteRowOffset()] as const)
-          .filter((pair): pair is [string, number] => pair[1] !== null && pair[1] !== undefined)
-        if (heights.length < 2) continue
-        const max = Math.max(...heights.map(([, h]) => h))
-        for (const [id, h] of heights) {
-          if (max - h > 0) cardRefs.current.get(id)?.setUpvoteSpacerHeight(max - h)
-        }
-      }
-
-      // Segment 2: upvote/distance row's own bottom (or the card root, for
-      // a card with no upvote row) → badge row. Measured after segment 1 is
-      // applied, since it reads the upvote row's real rendered position.
-      for (const ids of rows) {
-        if (ids.length < 2) continue
-        const heights = ids
-          .map((id) => [id, cardRefs.current.get(id)?.measureBadgeGap()] as const)
-          .filter((pair): pair is [string, number] => pair[1] !== null && pair[1] !== undefined)
-        if (heights.length < 2) continue
-        const max = Math.max(...heights.map(([, h]) => h))
-        for (const [id, h] of heights) {
-          if (max - h > 0) cardRefs.current.get(id)?.setBadgeSpacerHeight(max - h)
-        }
-      }
-    }
-
-    alignRows()
-
-    // Column count (and therefore row membership) depends on the grid's
-    // actual pixel width, which only a real resize can change — window
-    // resize, not a ResizeObserver on any one card, is what should trigger
-    // a re-pass here.
-    window.addEventListener('resize', alignRows)
-    return () => window.removeEventListener('resize', alignRows)
-    // Re-aligns when the actual rendered SET of listings changes
-    // (filter/search/sort narrows or reorders it) — filteredIds, not
-    // filtered itself: a vote-count-only re-render produces a new array
-    // reference with the same ids in the same order, which shouldn't
-    // trigger a re-pass.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filteredIds])
 
   // fromId is the card issuing the request (arrow key pressed while ITS
   // dialog is open) — direction moves through `filtered`, the same order
@@ -734,8 +1145,8 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // doing something unrelated to what was just on screen, not as "there's
   // more."
   const navigateFromCard = (fromId: string, direction: 1 | -1) => {
-    const index = filtered.findIndex((i) => i.id === fromId)
-    const target = filtered[index + direction]
+    const index = shownItems.findIndex((i) => i.id === fromId)
+    const target = shownItems[index + direction]
     if (index === -1 || !target) return
     cardRefs.current.get(fromId)?.close()
     cardRefs.current.get(target.id)?.open()
@@ -775,51 +1186,306 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // flips it to Distance the moment an anchor lands, same as an ordinary
   // load. An explicit Popular/Distance click marks the choice as touched so
   // it sticks even if the anchor later disappears or reappears.
-  const selectSort = (byPopular: boolean) => {
-    if (!byPopular && !anchorLabel) {
+  //
+  // Distances from the community's centre count as something to sort by
+  // (the user, Oct 10): the list already shows "12 mi" from central
+  // Philadelphia, so Distance sorts by those, and "Use my location" above
+  // the list is there for a real one. The picker opens only when there are
+  // no distances at all.
+  const selectSort = (popular: boolean) => {
+    if (!popular && !canSortByDistance) {
       document.dispatchEvent(new CustomEvent('jpc:open-location'))
       return
     }
     touchedSort.current = true
-    setSortByPopular(byPopular)
+    setSortByPopular(popular)
+    if (askedOrder && (askedOrder === 'popular') !== popular) setSearch((prev) => withoutSortWords(prev, askedOrder))
   }
 
-  const searchPlaceholder =
-    tagFields.length > 0
-      ? isMobile
-        ? `Search ${category.pluralLabel.toLowerCase()} or items…`
-        : `Search ${category.pluralLabel.toLowerCase()} or kosher items (e.g. cheese)…`
-      : 'Search…'
-
-  // The toolbar row (filters + sort) only renders when there's something in it;
-  // a select needs ≥2 distinct values before it's worth showing.
-  const hasRenderedSelects = filterableSelects.some(
-    (f) => new Set(items.flatMap((item) => selectValues(item[f.key]))).size >= 2,
-  )
-  // Whether there's an actual filter control to show — as opposed to
-  // `hasFilterRow` below, which also covers the sort toggle/davening button
-  // that can appear in this same row without any filter existing at all. Gates
-  // the "Filters" toggle button itself so it doesn't show (opening onto an
-  // empty panel) for a category with upvotes/minyanim but no filterable field.
-  const hasActualFilters = filterableBooleans.length > 0 || hasRenderedSelects || hasFilterableHours
-  const hasFilterRow = hasActualFilters || !!upvotes || hasMinyanim
+  // The pick-lists worth offering in the Filters sheet: a list needs two
+  // values among this category's listings before choosing between them
+  // means anything.
+  const selectsToShow = filterableSelects.flatMap((f) => {
+    const values = Array.from(new Set(items.flatMap((item) => selectValues(item[f.key]))))
+    return values.length < 2 ? [] : [{ key: f.key, label: f.filterLabel ?? f.label, values, chosen: selectFilters[f.key] ?? [] }]
+  })
+  // Whether there's any filter at all, so a category with none (WhatsApp
+  // Groups) has no Filters button opening onto an empty sheet.
+  // "Has", for each item list some listing here has anything in.
+  const itemsToShow = itemFields(category).flatMap((f) => {
+    const counts = itemCounts(items, f.key)
+    return counts.length === 0 ? [] : [{ key: f.key, label: 'Has', counts }]
+  })
+  const hasActualFilters = filterableBooleans.length > 0 || selectsToShow.length > 0 || hasFilterableHours || itemsToShow.length > 0
+  const typed = !searchingMinyanim && search.trim() !== ''
 
   const hasActiveFilters =
-    search.trim() !== '' ||
+    typed ||
     Object.values(boolFilters).some(Boolean) ||
     Object.values(selectFilters).some((v) => v.length > 0) ||
+    Object.values(hasFilters).some((v) => v.length > 0) ||
     openNow
 
   const activeFilterCount =
     Object.values(boolFilters).filter(Boolean).length +
     Object.values(selectFilters).filter((v) => v.length > 0).length +
+    Object.values(hasFilters).filter((v) => v.length > 0).length +
     (openNow ? 1 : 0)
-  const clearAll = () => {
-    setSearch('')
+  // The search found places, and the filters hid every one of them: the
+  // answer above the list says "2 places have pizza", so an empty list has
+  // to say why, and clearing the filters alone keeps what was asked.
+  const searchMatches = typed ? items.filter(matchesSearch).length : 0
+  const hiddenByFilters = activeFilterCount > 0 && (typed ? searchMatches > 0 : items.length > 0)
+
+  // ── Groups (see listGroups.ts) ──
+  // Never a search's results: those are one list, best first.
+  const grouping = typed ? null : groupListings(filtered, category, now)
+  // Closed groups (a pick-list's, like denominations) start closed, and this
+  // browser remembers which ones were opened.
+  const openGroupsKey = `jpc:open-groups:${communitySlug ?? ''}:${category.id}`
+  const loadOpenGroups = () => {
+    try {
+      const stored: unknown = JSON.parse(localStorage.getItem(openGroupsKey) ?? '[]')
+      return Array.isArray(stored) ? stored.filter((v): v is string => typeof v === 'string') : []
+    } catch {
+      return []
+    }
+  }
+  const saveOpenGroups = useCallback(
+    (ids: string[]) => {
+      try {
+        localStorage.setItem(openGroupsKey, JSON.stringify(ids))
+      } catch {
+        // Private windows and blocked storage: the groups just start closed.
+      }
+    },
+    [openGroupsKey],
+  )
+  const [openGroupIds, setOpenGroupIds] = usePersistedState<string[]>([], loadOpenGroups, saveOpenGroups)
+  // While a filter is on, every group with a match opens (those without are
+  // gone), and one closed then is closed only for as long as those filters
+  // stay as they are; it isn't remembered.
+  const filtersKey = JSON.stringify([openNow, boolFilters, selectFilters])
+  const [closedWhileFiltered, setClosedWhileFiltered] = useState<{ key: string; ids: string[] }>({ key: '', ids: [] })
+  const closedNow = closedWhileFiltered.key === filtersKey ? closedWhileFiltered.ids : []
+  // A listing arriving open (?item=, a shared link or a reload) opens its
+  // group, until that listing is closed.
+  const [reopenClosedId, setReopenClosedId] = useState<string | null>(null)
+  // A shul opened from the Next minyan card, or a place whose pin was
+  // clicked, opens its group the same way.
+  const [revealedId, setRevealedId] = useState<string | null>(null)
+  const isGroupOpen = (g: ListGroup<DirectoryResource>) =>
+    (!!reopenItemId && reopenItemId !== reopenClosedId && g.items.some((i) => i.id === reopenItemId)) ||
+    (!!revealedId && g.items.some((i) => i.id === revealedId)) ||
+    (activeFilterCount > 0 ? !closedNow.includes(g.id) : openGroupIds.includes(g.id))
+  // From what the group shows, not what's remembered: a group held open by
+  // a listing (one just read, found from its pin, arrived by a link) used to
+  // flip its remembered state underneath and stay open, so after reading a
+  // shul and coming back its group couldn't be closed (the user, Oct 11).
+  // Closing it lets go of whatever held it.
+  const toggleGroup = (g: ListGroup<DirectoryResource>) => {
+    const open = isGroupOpen(g)
+    if (open) {
+      if (revealedId && g.items.some((i) => i.id === revealedId)) setRevealedId(null)
+      if (reopenItemId && g.items.some((i) => i.id === reopenItemId)) setReopenClosedId(reopenItemId)
+    }
+    const set = (ids: string[], on: boolean) => (on ? (ids.includes(g.id) ? ids : [...ids, g.id]) : ids.filter((x) => x !== g.id))
+    // While a filter is on the list says which are closed; otherwise which are open.
+    if (activeFilterCount > 0) setClosedWhileFiltered({ key: filtersKey, ids: set(closedNow, open) })
+    else setOpenGroupIds((ids) => set(ids, !open))
+  }
+  // ── What each row says (see listingRow.ts) ──
+  // Where each place is, beside its name: its neighbourhood or its town,
+  // whichever says it more tightly (placeName).
+  const rowPlaces = useMemo(() => {
+    const hoods = neighborhoodsFor(communitySlug)
+    const towns = townsFrom(items)
+    return new Map(items.map((i) => [i.id, category.hasAddress === false ? null : placeName(i, hoods, towns)]))
+  }, [items, communitySlug, category.hasAddress])
+  // A row leaves out what its group heading already says: seven rows under
+  // "Orthodox (Ashkenazi) · 7" needn't each say it. Search results aren't
+  // grouped, so there each row says it again.
+  const groupedBy = grouping ? parseGroupBy(category.groupBy) : null
+  const omitKey = groupedBy?.kind === 'field' ? groupedBy.key : null
+  // "Not confirmed by anyone yet" only where most of the list is vouched for
+  // (see listingRowNote).
+  const flagUnconfirmed = !!now && items.length > 0 && items.filter((i) => isVouchedFor(i, now)).length * 2 >= items.length
+
+  // Synagogues' Next minyan card, until something is typed, while some shul
+  // the list holds keeps times. Wherever it isn't, All davening times is
+  // back in the list heading, so it's never gone.
+  const showMinyanCard =
+    hasMinyanim && !typed && !minyanimViewOn && filtered.some((item) => isMinyanim(item[minyanimField!.key]) && (item[minyanimField!.key] as Minyan[]).length > 0)
+  // The Minyanim view in place of the list, typing included: its search
+  // narrows the minyanim (the user's note 4, agreed Oct 2). It used to drop
+  // back to the list of shuls.
+  const minyanimView = hasMinyanim && minyanimViewOn
+  // A line in that card opens its shul, as next/previous does, and opens
+  // the closed group it sits in until it's closed again.
+  const openListing = (id: string) => {
+    setRevealedId(id)
+    cardRefs.current.get(id)?.open()
+    scrollItemIntoViewWhenSettled(id, 'instant')
+  }
+
+  // Tonight's candle lighting, for places that shut before it on a Friday
+  // or erev Yom Tov. Fetched only where the category keeps hours, at the
+  // community's centre (candle lighting hardly moves across a city), so
+  // it's the same cached response for everyone.
+  const { community: activeCommunity } = useActiveCommunity()
+  const { data: zmanim } = useZmanim(hoursFields.length > 0 ? activeCommunity.mapCenter : null)
+  const candlesAt = candlesToday(zmanim, now)
+
+  // The listings on screen, in order: what arrow-key next/previous walks.
+  const shownItems = grouping?.closed
+    ? grouping.groups.flatMap((g) => (isGroupOpen(g) ? g.items : []))
+    : grouping
+      ? grouping.groups.flatMap((g) => g.items)
+      : filtered
+  const shownIndex = new Map(shownItems.map((item, i) => [item.id, i]))
+
+  const clearFilters = () => {
     setBoolFilters({})
     setSelectFilters({})
+    setHasFilters({})
     setOpenNow(false)
   }
+  const clearAll = () => {
+    setSearch('')
+    clearFilters()
+  }
+  const toggleBool = (key: string) => setBoolFilters((prev) => ({ ...prev, [key]: !prev[key] }))
+  // Adds or removes one value from a pick-list's chosen set.
+  const toggleSelect = (key: string, value: string) =>
+    setSelectFilters((prev) => {
+      const cur = prev[key] ?? []
+      return { ...prev, [key]: cur.includes(value) ? cur.filter((x) => x !== value) : [...cur, value] }
+    })
+  // ── What the search reads as filters ──
+  // A word an admin taught the search ("dairy" is Food type: Dairy), or
+  // "open now", narrows the list as that filter would. The Filters sheet
+  // shows it ticked and the button counts it; unticking it there takes the
+  // word out of the search, so the two never disagree. Nothing about it on
+  // the page itself: the word is in the box already (the user, Oct 10).
+  const searchResult = typed ? todayResult : minyanShulResult
+  const searchBools = new Map<string, string>()
+  const searchSelects = new Map<string, Map<string, string>>()
+  for (const t of searchResult?.taught ?? []) {
+    const field = t.categoryId === category.id && t.field ? category.detailFields.find((f) => f.key === t.field) : undefined
+    if (field?.type === 'boolean') searchBools.set(field.key, t.word)
+    else if (field?.type === 'select' && t.value !== undefined) searchSelects.set(field.key, (searchSelects.get(field.key) ?? new Map()).set(t.value, t.word))
+  }
+  // An item said ("challah") is Has: Challah, the same way (searchItems).
+  const searchHas = searchResult ? searchItems(category, items, searchResult) : new Map<string, Map<string, string>>()
+  const searchOpenNow = !!searchResult?.query.openNow && hasFilterableHours
+  // A tefillah typed in the Minyanim view ("mincha") is its chip ticked,
+  // as "dairy" is Food type: Dairy (the user, Oct 15); unticking it takes
+  // the word out of the search.
+  const typedTefillos = minyanimView ? typedTefillahChoices(search) : new Map<string, string>()
+  const sheetTefillos = [...new Set([...minyanTefillos, ...typedTefillos.keys()])]
+  const dropWord = (word: string) => setSearch((prev) => withoutTerms(prev, word.split(' ')))
+  const sheetOpenNow = openNow || searchOpenNow
+  const toggleSheetOpenNow = () => {
+    if (!sheetOpenNow) return setOpenNow(true)
+    if (searchOpenNow) setSearch((prev) => withoutOpenWords(prev))
+    setOpenNow(false)
+  }
+  const toggleSheetBool = (key: string) => {
+    const word = searchBools.get(key)
+    if (!word) return toggleBool(key)
+    dropWord(word)
+    setBoolFilters((prev) => ({ ...prev, [key]: false }))
+  }
+  const toggleSheetSelect = (key: string, value: string) => {
+    const word = searchSelects.get(key)?.get(value)
+    if (!word) return toggleSelect(key, value)
+    dropWord(word)
+    setSelectFilters((prev) => ({ ...prev, [key]: (prev[key] ?? []).filter((x) => x !== value) }))
+  }
+  const toggleSheetHas = (key: string, tag: string) => {
+    const word = searchHas.get(key)?.get(tag)
+    if (word) dropWord(word)
+    setHasFilters((prev) => {
+      const cur = prev[key] ?? []
+      const on = cur.some((x) => sameItem(x, tag)) || !!word
+      return { ...prev, [key]: on ? cur.filter((x) => !sameItem(x, tag)) : [...cur, tag] }
+    })
+  }
+  // ── Save this search (Oct 13, canvas page "you", board YouSave) ──
+  // The bookmark in the box, filled while this is a saved search: the words
+  // and the Filters chosen beyond them, as the address that opens it again.
+  // Filters the words tick (searchBools/searchSelects/searchHas, open now)
+  // aren't added: the words bring them back, so "challah" here is the same
+  // search as "challah" saved from a home line.
+  const savedSearches = useSavedSearches()
+  const typedWords = search.trim()
+  const thisSearch =
+    !typedWords || !communitySlug
+      ? null
+      : minyanimView
+        ? makeSavedSearch({ words: typedWords, kind: 'minyanim', categoryId: category.id, href: `${routes.slug(communitySlug, category.id)}?davening=1&q=${encodeURIComponent(typedWords)}` })
+        : makeSavedSearch({
+            words: typedWords,
+            kind: 'category',
+            categoryId: category.id,
+            href: categoryHref(
+              communitySlug,
+              category.id,
+              typedWords,
+              {
+                openNow,
+                bool: Object.keys(boolFilters).filter((k) => boolFilters[k]),
+                select: Object.fromEntries(Object.entries(selectFilters).filter(([, v]) => v.length)),
+                has: Object.fromEntries(Object.entries(hasFilters).filter(([, v]) => v.length)),
+              },
+              landedSearch !== null && search === landedSearch,
+            ),
+          })
+  const searchSave =
+    ui.map.pins && savedSearches && thisSearch ? (
+      <SaveButton plain saved={savedSearches.isSaved(thisSearch.key)} onToggle={() => savedSearches.toggle(thisSearch)} name={`“${typedWords}” in ${category.pluralLabel}`} />
+    ) : undefined
+
+  // The sheet's Clear all clears what it shows, the search's filter words
+  // too; the empty list's "Clear filters" (clearFilters) keeps the search.
+  // A question read into the Filters (landedSearch) goes with them: it's
+  // what they were.
+  const clearSheet = () => {
+    clearFilters()
+    setMinyanTefillos([])
+    setMinyanWithin(null)
+    if (landedSearch !== null && search === landedSearch) return setSearch('')
+    let next = search
+    for (const word of [...searchBools.values(), ...[...searchSelects.values()].flatMap((m) => [...m.values()]), ...[...searchHas.values()].flatMap((m) => [...m.values()]), ...typedTefillos.values()]) next = withoutTerms(next, word.split(' '))
+    setSearch(searchOpenNow ? withoutOpenWords(next) : next)
+  }
+  // Each ticked item as its listings spell it, so "has_m=wine" from an
+  // address ticks their "Wine" rather than adding a second chip.
+  const sheetItems = itemsToShow.map((f) => {
+    const spelled = (t: string) => f.counts.find((c) => sameItem(c.tag, t))?.tag ?? t
+    return { ...f, chosen: [...new Set([...(hasFilters[f.key] ?? []), ...(searchHas.get(f.key)?.keys() ?? [])].map(spelled))] }
+  })
+  const sheetSelects = selectsToShow.map((sel) => ({ ...sel, chosen: [...new Set([...sel.chosen, ...(searchSelects.get(sel.key)?.keys() ?? [])])] }))
+  // The Minyanim view's own two, around the page's Denomination in the
+  // sheet: Tefillah first, How far last, as the sketch has them (Oct 15).
+  const minyanTefillahSelect = { key: '@tefillah', label: 'Tefillah', values: TEFILLAH_CHOICES.map((c) => c.label), chosen: sheetTefillos, ordered: true }
+  const minyanWithinSelect = { key: '@within', label: 'How far', values: WITHIN_CHOICES.map((c) => c.label), chosen: minyanWithin ? [minyanWithin] : [], ordered: true }
+  const onSheetSelect = (key: string, value: string) => {
+    if (key === minyanTefillahSelect.key) {
+      const word = typedTefillos.get(value)
+      if (word) dropWord(word)
+      return setMinyanTefillos((prev) => (prev.includes(value) || word ? prev.filter((x) => x !== value) : [...prev, value]))
+    }
+    if (key === minyanWithinSelect.key) return setMinyanWithin((prev) => (prev === value ? null : value))
+    toggleSheetSelect(key, value)
+  }
+  const minyanFilterCount = (sheetTefillos.length > 0 ? 1 : 0) + (minyanWithin ? 1 : 0)
+  // What the Filters button counts: everything the sheet shows ticked.
+  const sheetFilterCount =
+    filterableBooleans.filter((f) => boolFilters[f.key] || searchBools.has(f.key)).length +
+    filterableSelects.filter((f) => (selectFilters[f.key]?.length ?? 0) > 0 || searchSelects.has(f.key)).length +
+    sheetItems.filter((f) => f.chosen.length > 0).length +
+    (sheetOpenNow ? 1 : 0)
 
   // Desktop-only shared-element morph target for the same icon badge
   // CompactCard shows next to this category on the home screen — that's
@@ -858,39 +1524,260 @@ export default function GenericDirectory({ category, items, anchorLabel, address
     </ViewTransition>
   ) : null
 
+  // What the list is drawn as: one section per group, each with what goes
+  // above its rows (a closed group's line, a later open group's heading)
+  // and whether its rows are showing. One section, no heading, when the
+  // list isn't grouped.
+  const sections: { key: string; above?: ReactNode; items: DirectoryResource[]; rowsId?: string; hidden?: boolean }[] = !grouping
+    ? [{ key: 'all', items: filtered }]
+    : grouping.groups.map((g, gi) => {
+        if (!grouping.closed) {
+          return { key: g.id, items: g.items, above: gi > 0 ? <GroupHeading label={g.label} count={g.items.length} /> : undefined }
+        }
+        const open = isGroupOpen(g)
+        const rowsId = `${category.id}-group-${gi}`
+        return {
+          key: g.id,
+          items: g.items,
+          rowsId,
+          // Rendered closed too, just hidden: a listing opened by a link
+          // needs its row in place to open from.
+          hidden: !open,
+          above: (
+            <ClosedGroupLine
+              label={g.label}
+              count={g.items.length}
+              nearest={g.nearest}
+              open={open}
+              onToggle={() => toggleGroup(g)}
+              controls={rowsId}
+            />
+          ),
+        }
+      })
+
+  // ── The map beside the list (see CategoryMap) ──
+  // Where the category has a map (an address and the Map capability). Below
+  // lg it's simply not there; "Hide map" gives the list the whole width,
+  // and this browser remembers it.
+  const hasMapColumn = caps.map && category.hasAddress !== false
+  // The same on every category page, including ones kept open for Back.
+  const [mapHidden, storeMapHidden] = useSharedPreference('jpc:map-hidden', (raw) => raw === '1')
+  const setMapHidden = (hidden: boolean) => storeMapHidden(hidden ? '1' : null)
+  // How the width is shared between them: draggable, and dragged far
+  // enough the map's way, hidden (useListMapSplit).
+  const { gridRef: splitRef, gridStyle: splitStyle, handleProps: splitHandle } = useListMapSplit({ onHideMap: () => setMapHidden(true) })
+  const mapBeside = hasMapColumn && !mapHidden
+  // Cards or one flat list (RowLookSwitch): being tried on the preview.
+  const [rowLook, setRowLook] = useRowLook()
+  const flat = rowLook === 'list'
+  const [highlight] = useState(createHighlight)
+  // An open listing's "Within a walk" list, opened, on the map beside it
+  // (walkOnMap.ts), where that map is on screen.
+  const [walkShown, setWalkShown] = useState<WalkShown | null>(null)
+  const wide = useWide()
+  const mapOnScreen = mapBeside && wide
+  const walkOnMap = mapOnScreen ? { show: setWalkShown, highlight } : null
+  // A pin's row, found: opened to (its group too), scrolled to, and
+  // outlined for a moment so the eye lands on it.
+  const [flashId, setFlashId] = useState<string | null>(null)
+  const flashTimer = useRef(0)
+  const findRow = (id: string) => {
+    setRevealedId(id)
+    setFlashId(id)
+    scrollItemIntoViewWhenSettled(id, 'smooth')
+    // A second click restarts the outline's time rather than ending it early.
+    window.clearTimeout(flashTimer.current)
+    flashTimer.current = window.setTimeout(() => setFlashId(null), 2500)
+  }
+  // The full Map page on the same places: this category, the search and
+  // the filters.
+  const fullMapHref = `${routes.map(activeCommunity.slug)}${mapQueryString({
+    categories: [category.id],
+    query: search.trim() || null,
+    openNow,
+    bool: Object.keys(boolFilters).filter((k) => boolFilters[k]),
+    select: Object.fromEntries(Object.entries(selectFilters).filter(([, v]) => v.length > 0)),
+  })}`
+
+  // The category's one question card (see QuestionCard), right under the
+  // place it asks about (decided Oct 4, built Oct 6: it sat after the fifth
+  // place, whichever place it asked about). The page and the card share
+  // which places this browser has been asked about, so they agree on which
+  // one is next; while a thank-you shows, the card stays under the place it
+  // thanks for. After the group lines when that place's group is shut. Not
+  // among a search's results, which are an answer.
+  const [askedPlaces, setAskedPlaces] = useAskedPlaces(category.id)
+  const [heldQuestion, setHeldQuestion] = useState<string | null>(null)
+  const questionShown = shownItems.length > 0 ? shownItems : filtered
+  const questionOn = !typed && !!parseQuestionCard(category.questionCard)
+  const questionAbout = questionOn
+    ? (heldQuestion ?? pickQuestion(category, questionShown, items, new Set(askedPlaces), (item) => rowPlaces.get(item.id) ?? null)?.item.id ?? null)
+    : null
+  const questionSpot: { section: string; id: string } | 'end' | null = (() => {
+    if (!questionAbout) return null
+    for (const section of sections) {
+      if (!section.hidden && section.items.some((item) => item.id === questionAbout)) return { section: section.key, id: questionAbout }
+    }
+    return 'end'
+  })()
+  // ── A listing opened on desktop takes the list's column (ListingColumn) ──
+  // The list stays mounted underneath, hidden, so its cards (and what's
+  // open or scrolled) are where they were when Back brings it back.
+  // A listing someone arrived at from a link is, on a phone, a page of its
+  // own rather than a sheet over a list they never saw: the listing this
+  // page was first opened with, until it's closed (agreed Sep 30). Opened
+  // from the list, a listing is the sheet as always.
+  const [pagedItemId, setPagedItemId] = useState<string | null>(linkedItemId)
+  const hostedId = openDialogItemId && (!isMobile || openDialogItemId === pagedItemId) ? openDialogItemId : null
+  const columnItem = hostedId ? (items.find((i) => i.id === hostedId) ?? null) : null
+  const phonePage = isMobile && !!columnItem
+  const listingColumnRef = useRef<HTMLDivElement>(null)
+  // Another listing in its place: the one being read closes, the other
+  // opens (its closed group too), and the page comes back up to the top of
+  // the column if it had scrolled past it.
+  const switchListing = (fromId: string, toId: string) => {
+    setRevealedId(toId)
+    cardRefs.current.get(fromId)?.close()
+    cardRefs.current.get(toId)?.open()
+    scrollItemIntoViewWhenSettled(toId, 'instant')
+  }
+  // Back to the list, at the row just read, outlined for a moment. On a
+  // phone that was the listing's own page, and from now on listings open
+  // as sheets over the list.
+  // Closes the listing whether or not its row is on screen: on the
+  // Minyanim tab there are no shul rows, and closing through the row alone
+  // left the listing stuck open (found Oct 2).
+  const closeOpenListing = (id: string) => {
+    cardRefs.current.get(id)?.close()
+    setOpenDialogItemId((prev) => (prev === id ? null : prev))
+    onParamsChange?.({ item: null, match: null }, { replace: true })
+    setPagedItemId(null)
+    // Closing the listing the address names: the address becomes the
+    // category's, as it would have been had it been opened from the list.
+    if (id === linkedItemId && window.location.pathname !== routes.slug(activeCommunity.slug, category.id)) {
+      window.history.replaceState(window.history.state, '', routes.slug(activeCommunity.slug, category.id) + window.location.search)
+    }
+  }
+  const closeColumn = (id: string) => {
+    // Opened from the page, it's a step (below): take it back, and the
+    // popstate listener closes it, so Forward doesn't reopen it.
+    if ((window.history.state as { step?: string } | null)?.step === LISTING_STEP) {
+      window.history.back()
+      return
+    }
+    closeOpenListing(id)
+    findRow(id)
+  }
+  // Back and Forward: the address says whether the Minyanim view is open,
+  // and on a computer whether a listing is (Oct 6). Next re-renders on
+  // popstate before this runs, so it reads the address, not its props.
+  const onPop = useEffectEvent(() => {
+    const params = new URLSearchParams(window.location.search)
+    setMinyanimViewOn(params.get('davening') === '1')
+    if (hostedId && !isMobile && !params.get('item')) {
+      closeOpenListing(hostedId)
+      findRow(hostedId)
+    }
+  })
+  useEffect(() => {
+    const listener = () => onPop()
+    window.addEventListener('popstate', listener)
+    return () => window.removeEventListener('popstate', listener)
+  }, [])
+  // The header's back arrow: home, or from a listing's own page, the list;
+  // in the Minyanim view, which it names, Synagogues (Oct 6: it was a second
+  // "‹ Synagogues" under the header).
+  const minyanimTitle = 'Minyanim by time'
+  useSetScreenHeader(
+    true,
+    minyanimView && !phonePage ? minyanimTitle : category.pluralLabel,
+    phonePage && columnItem ? () => closeColumn(columnItem.id) : minyanimView ? closeMinyanimView : onUp,
+    { named: phonePage },
+  )
+  // A computer's opened listing has the top of the page (Oct 6, B): the
+  // search, its examples and the "Minyanim by time" row are the list's, and
+  // come back with it; above the listing only "‹ Synagogues", as a phone's
+  // opened listing has only the header's ‹. They pushed it halfway down.
+  const deskListing = !!columnItem && !phonePage
+
+  // An opened listing's last part: the places near it in the list as it's
+  // filtered now, and the way back to all of them (ListingView's onward).
+  const onwardSource: ListingOnwardSource = {
+    items: filtered,
+    place: (item) => rowPlaces.get(item.id) ?? null,
+    open: openListing,
+    allLabel: `See all ${items.length} in ${category.pluralLabel}`,
+  }
+
+  const questionCard = questionSpot && (
+    <QuestionCard
+      category={category}
+      shown={questionShown}
+      all={items}
+      place={(item) => rowPlaces.get(item.id) ?? null}
+      onEdit={onEdit}
+      asking={{ asked: askedPlaces, setAsked: setAskedPlaces, onHeld: setHeldQuestion }}
+    />
+  )
+
+  // The list's own heading: how many, and Filters and Sort, the same place
+  // on every category page (see ListHeading). Under the search box, or at
+  // the top of the list's column where the map sits beside it.
+  // A search that found nothing has no list to count or arrange: the box
+  // under the search says so, and "0 listings · Filters · Sort" under it
+  // was only more to read. Not when filters hid what it found: then
+  // Filters is the way back.
+  const searchFoundNothing = typed && filtered.length === 0 && !hiddenByFilters
+  const listHeading = searchFoundNothing ? null : (
+      <ListHeading
+        // Open groups: the first group's heading is the list's own ("Open
+        // now · 57"), saving a line above the first place on a phone.
+        // Closed groups: what they're grouped by and the whole count.
+        label={grouping ? (grouping.closed ? grouping.title : grouping.groups[0]?.label) : undefined}
+        count={grouping && !grouping.closed ? (grouping.groups[0]?.items.length ?? 0) : filtered.length}
+        noun={!grouping || grouping.closed}
+        total={filtered.length}
+        filters={hasActualFilters ? { active: sheetFilterCount, onOpen: () => setFiltersOpen(true) } : undefined}
+        sort={upvotes ? { byPopular, onSelect: selectSort } : undefined}
+        // Only while the Next minyan card, which carries it, is gone.
+        onDaveningTimes={hasMinyanim && !showMinyanCard ? showMinyanimView : undefined}
+        onShowMap={hasMapColumn && mapHidden ? () => setMapHidden(false) : undefined}
+      />
+  )
+
   return (
+    <TellAboutContext.Provider value={canAdd || canEdit ? tellAbout : null}>
+    <WalkOnMapContext.Provider value={walkOnMap}>
+    <TappedMinyanContext.Provider value={tappedMinyan}>
     <div>
+      {/* Phones: where the distances on each row are measured from, when
+          the visitor hasn't set a location, with the way to set one. At the
+          top, above the category band, as the old banner was; desktop has
+          the same line under the title (DirectoryHeader). */}
+      {addressPrompt && !anchorLabel && !phonePage && <DistanceNote className="desktop:hidden pb-3" />}
       <CategoryBandFrame color={bandColor} imageUrl={bandImage}>
           {/* Mobile used to have its own "‹ {upLabel}" row here (UpButton,
-              desktop:hidden) alongside DirectoryHeader's desktop-only Breadcrumb.
-              It's gone now that useSetScreenHeader (above) puts the same "‹
-              {title}" control directly in SiteHeader on mobile — this component
-              no longer needs to render its own copy of it. Desktop is
-              unaffected: Breadcrumb still renders exactly as before. */}
+              desktop:hidden). It's gone now that useSetScreenHeader (above)
+              puts the same "‹ {title}" control directly in SiteHeader on
+              mobile — this component no longer needs to render its own copy
+              of it. Desktop never had an equivalent row of its own (the
+              since-removed Breadcrumb lived inside DirectoryHeader, not
+              here) and still doesn't. */}
 
+          <div hidden={phonePage}>
           <DirectoryHeader
-            title={category.pluralLabel}
-            count={filtered.length}
-            hasAddress={category.hasAddress}
+            title={minyanimView ? minyanimTitle : category.pluralLabel}
             anchorLabel={anchorLabel}
             addressPrompt={addressPrompt}
-            upLabel={upLabel}
-            onUp={onUp}
             titleInHeader
             banner={categoryBadge}
-            actions={
-              <>
-                {canAdd && (
-                  <button
-                    onClick={onAdd}
-                    className="inline-flex items-center gap-1 text-sm font-medium text-primary border border-primary rounded-md px-3 py-1.5 hover:bg-primary hover:text-white transition-colors cursor-pointer whitespace-nowrap"
-                  >
-                    <PlusIcon className="h-4 w-4" /> Add
-                  </button>
-                )}
-              </>
-            }
+            // A computer's way back from the Minyanim view: small, over the
+            // title it replaced. A phone's is the header's ‹.
+            up={minyanimView && !columnItem && !isMobile ? { label: category.pluralLabel, onClick: closeMinyanimView } : undefined}
+            titleOnly={deskListing}
           />
+          </div>
 
       {/* Controls — sticky from lg up so search/filters/sort stay reachable
           on a long list instead of scrolling away above the fold. `top-14`
@@ -908,10 +1795,21 @@ export default function GenericDirectory({ category, items, anchorLabel, address
           — an actual zero-area target can report `isIntersecting` as
           unreliably always-false in some browsers, since there's no overlap
           area to compute a ratio from. See controlsStuck's own doc for what
-          it's for. */}
-      <div ref={controlsSentinelRef} aria-hidden className="lg:h-px" />
+          it's for. Plain `h-px`, not `lg:h-px`: the observer that reads it
+          is created unconditionally regardless of viewport width, so a
+          zero-height sentinel on mobile could already latch in a wrong
+          `isIntersecting` reading there — invisible at the time, since
+          `controlsStuck`'s only visible effects are `lg:`-gated, but the
+          bad reading doesn't self-correct just because the viewport later
+          crosses into `lg:` (by rotating a device, or resizing a browser
+          window past it). The docked white background then shows up on an
+          unscrolled desktop page, sourced from a mobile-era reading that
+          was already wrong before desktop-only styling ever had a chance
+          to reveal it. */}
+      <div ref={controlsSentinelRef} aria-hidden className="h-px" />
       <div
         ref={controlsRef}
+        hidden={phonePage || deskListing}
         // The "docked" look (white background, the padding it needs, the
         // negative margin that pulls it flush against the header above, the
         // shadow, and the hide-on-scroll transform) only ever applies once
@@ -919,279 +1817,177 @@ export default function GenericDirectory({ category, items, anchorLabel, address
         // position. Applying `lg:-mt-3`/`lg:bg-white` unconditionally used to
         // pull this bar's own solid background up 12px REGARDLESS of scroll
         // position — while still sitting in normal flow, that overlapped
-        // whatever sat directly above it (DirectoryHeader's Add button),
+        // whatever sat directly above it (DirectoryHeader's title row),
         // clipping its bottom few pixels even on a page load with no
         // scrolling at all. The hide-on-scroll transform had the same bug in
         // reverse: applied unconditionally, it reacted to ANY downward
         // scroll on the page, so the bar slid away while a visitor was still
         // scrolling through content well above it — before it had ever
         // become sticky, let alone been scrolled past.
-        className={`mb-4 space-y-2 lg:sticky lg:top-14 lg:z-30 lg:transition-transform lg:duration-300 ${
-          controlsStuck
-            ? `lg:bg-white lg:pt-3 lg:pb-3 lg:-mt-3 lg:shadow-[0_6px_12px_-8px_rgba(15,23,42,0.35)] ${controlsVisible ? 'lg:translate-y-0' : 'lg:-translate-y-full'}`
+        //
+        // lg:border-x once docked: the bar's white is only a few shades off
+        // the page's own grey background, and the shadow above only reads
+        // on its bottom edge — with nothing marking the left/right edges,
+        // the two near-whites just ran together there. A thin border gives
+        // it the same framing the full-bleed results panel below already
+        // has (border-slate-200).
+        //
+        // lg:px-4 once docked, too: the search input and filter pills have
+        // no horizontal padding of their own — un-docked, they just line up
+        // flush with the grid below, which is fine there. But the moment
+        // this box gets its own visible edges (the border above), that same
+        // zero-padding reads as the search box and pills touching the frame
+        // directly, with no breathing room. The inset only appears once
+        // docked, same as the border/shadow/background it's paired with.
+        //
+        // lg:transition-all, not lg:transition-transform: the hide-on-scroll
+        // slide is the only thing that was ever animated — background,
+        // padding, margin, border and shadow all popped in/out the instant
+        // `controlsStuck` flipped, no transition at all. That's a smooth
+        // slide with several other properties snapping on top of it in the
+        // same frame, which reads as a stutter right at the moment it docks
+        // rather than one clean motion. transition-all covers all of it with
+        // the same duration, so it settles together.
+        // Not sticky where the map sits beside the list: the map stays in
+        // view instead, and the list's heading moves to the top of its
+        // column (see hasMapColumn).
+        className={`mb-4 space-y-2 ${hasMapColumn ? '' : 'lg:sticky lg:top-14 lg:z-30 lg:transition-all lg:duration-300'} ${
+          hasMapColumn
+            ? ''
+            : controlsStuck
+            ? `lg:border-x lg:border-slate-200 lg:bg-white lg:px-4 lg:pt-3 lg:pb-3 lg:-mt-3 lg:shadow-[0_6px_12px_-8px_rgba(15,23,42,0.35)] ${controlsVisible ? 'lg:translate-y-0' : 'lg:-translate-y-full'}`
             : 'lg:translate-y-0'
         }`}
       >
-        {showSearch && (
-          <div className="relative">
-            <input
-              type="text"
-              placeholder={searchPlaceholder}
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full rounded-md border border-slate-300 px-3 py-2 pr-9 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-            />
-            {search && (
-              <button
-                type="button"
-                onClick={() => setSearch('')}
-                aria-label="Clear search"
-                className="absolute inset-y-0 right-0 flex w-9 items-center justify-center text-slate-400 hover:text-slate-600 cursor-pointer"
-              >
-                <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24" aria-hidden="true">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            )}
-          </div>
-        )}
-        {showSearch && q && tagFields.length > 0 && (
-          <p className="text-xs text-muted">Showing places matching &ldquo;{search.trim()}&rdquo;</p>
-        )}
-        {hasFilterRow && (
-          <>
-            {/* ── Mobile: Filters + Map buttons, then sort toggle — all one line ── */}
-            <div className="flex items-center gap-1.5 desktop:hidden">
-              {hasActualFilters && (
-                <button
-                  onClick={() => setFiltersOpen((v) => !v)}
-                  className={[
-                    'inline-flex items-center gap-1.5 px-2.5 py-2 text-sm font-medium rounded-md border transition-colors cursor-pointer whitespace-nowrap',
-                    activeFilterCount > 0
-                      ? 'bg-primary text-white border-primary'
-                      : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50',
-                  ].join(' ')}
-                >
-                  <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                    <path d="M3 4a1 1 0 000 2h14a1 1 0 000-2H3zm3 5a1 1 0 000 2h8a1 1 0 000-2H6zm2 5a1 1 0 000 2h4a1 1 0 000-2H8z" />
-                  </svg>
-                  Filters
-                  {activeFilterCount > 0 && (
-                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white/30 text-xs font-bold">
-                      {activeFilterCount}
-                    </span>
-                  )}
-                </button>
-              )}
-              {/* No mobile Map button here (desktop keeps its own, further
-                  down) — mobile already has a persistent, always-visible way
-                  to reach the map via the bottom tab bar, so this was a
-                  second copy of the same destination. Removed rather than
-                  made "smarter" (e.g. carrying the category along
-                  automatically): a global nav element quietly behaving
-                  differently depending on where you tapped it from breaks
-                  the one thing it's supposed to guarantee — that it always
-                  means the same thing. */}
-              {category.externalLink && (
-                <a
-                  href={category.externalLink.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="ml-auto inline-flex items-center gap-1 px-2.5 py-2 text-sm font-medium rounded-md border bg-white text-slate-600 border-slate-300 hover:bg-slate-50 transition-colors whitespace-nowrap"
-                >
-                  {category.externalLink.label} ↗
-                </a>
-              )}
-              {hasMinyanim && (
-                <button
-                  onClick={() => setDaveningModalOpen(true)}
-                  aria-label="All davening times"
-                  title="All davening times"
-                  className={[
-                    'inline-flex items-center gap-1 px-2.5 py-2 text-sm font-medium rounded-md border bg-white text-slate-600 border-slate-300 hover:bg-slate-50 transition-colors cursor-pointer whitespace-nowrap',
-                    !upvotes && !category.externalLink ? 'ml-auto' : '',
-                  ].join(' ')}
-                >
-                  <ClockIcon className="h-4 w-4" />
-                  {/* Full label once the row has room — hidden below this so it
-                      never crowds Filters/Map on the narrowest phones. */}
-                  <span className="hidden min-[390px]:inline">All davening times</span>
-                </button>
-              )}
-              {upvotes && (
-                <div
-                  className={[
-                    'flex rounded-md border border-slate-300 overflow-hidden',
-                    !hasMinyanim && !category.externalLink ? 'ml-auto' : '',
-                  ].join(' ')}
-                >
-                  {[{ v: true, label: 'Popularity' }, { v: false, label: 'Distance' }].map((opt) => (
-                    <button
-                      key={opt.label}
-                      onClick={() => selectSort(opt.v)}
-                      className={[
-                        'px-2.5 py-2 text-sm font-medium transition-colors cursor-pointer whitespace-nowrap',
-                        sortByPopular === opt.v ? 'bg-primary text-white' : 'bg-white text-slate-600 hover:bg-slate-50',
-                      ].join(' ')}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-              )}
+        {/* The page's one search box, limited to this category, with
+            example searches under it and, once something is typed, the
+            sentence answering it (see CategoryAsk). */}
+        {/* Under them, Synagogues' "Minyanim by time" row. Gone once
+            anything is typed: then the search's own answer says what's next
+            (see NextMinyanCard). */}
+        <div className={showMinyanCard ? 'space-y-3' : undefined}>
+          {showSearch && (
+            <div className={hasMapColumn ? 'lg:max-w-[720px]' : undefined}>
+              <CategoryAsk
+                category={category}
+                search={search}
+                onSearch={setSearch}
+                scope={minyanimView ? 'minyanim' : undefined}
+                reading={!minyanimView && reader.isReading(search)}
+                onSubmit={() => {
+                  if (asksMinyan) setMinyanimViewOn(true)
+                  else if (readable && own) reader.ask(search, own)
+                }}
+                foundNothing={!minyanimView && searchFoundNothing && !reader.isReading(search)}
+                save={searchSave}
+              />
             </div>
-
-            {/* ── Filter controls: collapsible on mobile, always visible on desktop —
-                    one horizontally-scrolling line on both, never wrapping to a
-                    second row (a wrapped row read as broken/cut-off layout). This
-                    same row also carries the desktop versions of external
-                    link/davening/sort (their mobile versions are in the row above),
-                    so it still renders even with no actual filter — just without a
-                    mobile Filters button to open it (that's gated separately). ── */}
-            <div
-              className={[
-                'gap-2 flex-nowrap overflow-x-auto pb-1',
-                filtersOpen ? 'flex' : 'hidden',
-                'desktop:flex',
-              ].join(' ')}
-              style={{ scrollbarWidth: 'none' }}
-            >
-              {hasFilterableHours && (
-                <button
-                  onClick={() => setOpenNow((v) => !v)}
-                  className={[
-                    'inline-flex shrink-0 items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-md border transition-colors cursor-pointer whitespace-nowrap',
-                    openNow
-                      ? 'bg-green-600 text-white border-green-600'
-                      : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50',
-                  ].join(' ')}
-                >
-                  <span className={['inline-block h-2 w-2 rounded-full', openNow ? 'bg-white' : 'bg-green-500'].join(' ')} aria-hidden="true" />
-                  Open now
-                </button>
-              )}
-              {filterableBooleans.map((f) => {
-                const active = !!boolFilters[f.key]
-                return (
-                  <button
-                    key={f.key}
-                    onClick={() => setBoolFilters((prev) => ({ ...prev, [f.key]: !prev[f.key] }))}
-                    className={[
-                      'shrink-0 px-3 py-2 text-sm font-medium rounded-md border transition-colors cursor-pointer whitespace-nowrap',
-                      active ? 'bg-primary text-white border-primary' : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50',
-                    ].join(' ')}
-                  >
-                    {f.filterLabel ?? f.label}
-                  </button>
-                )
-              })}
-              {filterableSelects.map((f) => {
-                const presentValues = Array.from(new Set(items.flatMap((item) => selectValues(item[f.key])))).sort()
-                if (presentValues.length < 2) return null
-                const chosen = selectFilters[f.key] ?? []
-                const toggle = (v: string) =>
-                  setSelectFilters((prev) => {
-                    const cur = prev[f.key] ?? []
-                    return { ...prev, [f.key]: cur.includes(v) ? cur.filter((x) => x !== v) : [...cur, v] }
-                  })
-                // The filter always lets a visitor pick more than one value to
-                // filter by, regardless of whether a single listing can hold more
-                // than one value (that's `f.multiSelect`, a separate, per-listing
-                // setting — see CategoryField.multiSelect).
-                const isOpen = openDropdown === f.key
-                const label = chosen.length === 0
-                  ? `All ${f.filterLabel ?? f.label}s`
-                  : chosen.length === 1
-                  ? chosen[0]
-                  : `${chosen.length} selected`
-                return (
-                  <CheckboxDropdown
-                    key={f.key}
-                    label={label}
-                    active={chosen.length > 0}
-                    isOpen={isOpen}
-                    onToggleOpen={() => setOpenDropdown(isOpen ? null : f.key)}
-                    onClose={() => setOpenDropdown(null)}
-                    values={presentValues}
-                    chosen={chosen}
-                    onToggle={toggle}
-                  />
-                )
-              })}
-              {/* No desktop Map button either now — same reasoning as
-                  mobile's removal above: the header's own "Map" nav link
-                  (HeaderNav.tsx) is already a persistent, always-visible way
-                  to reach the map from any screen. One generic Map entry
-                  point per platform (the header link on desktop, the bottom
-                  tab on mobile), not a second copy scoped to whichever
-                  category you happen to be on. */}
-              {category.externalLink && (
-                <a
-                  href={category.externalLink.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="hidden desktop:inline-flex desktop:ml-auto shrink-0 items-center gap-1 px-3 py-2 text-sm font-medium rounded-md border bg-white text-slate-600 border-slate-300 hover:bg-slate-50 transition-colors whitespace-nowrap"
-                >
-                  {category.externalLink.label} ↗
-                </a>
-              )}
-              {hasMinyanim && (
-                <button
-                  onClick={() => setDaveningModalOpen(true)}
-                  className={[
-                    'hidden desktop:inline-flex shrink-0 items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-md border bg-white text-slate-600 border-slate-300 hover:bg-slate-50 transition-colors cursor-pointer whitespace-nowrap',
-                    !upvotes && !category.externalLink ? 'desktop:ml-auto' : '',
-                  ].join(' ')}
-                >
-                  <ClockIcon className="h-4 w-4" />
-                  All davening times
-                </button>
-              )}
-              {upvotes && (
-                <div
-                  className={[
-                    'hidden desktop:flex rounded-md border border-slate-300 overflow-hidden shrink-0',
-                    !hasMinyanim && !category.externalLink ? 'desktop:ml-auto' : '',
-                  ].join(' ')}
-                >
-                  {[{ v: true, label: 'Popularity' }, { v: false, label: 'Distance' }].map((opt) => (
-                    <button
-                      key={opt.label}
-                      onClick={() => selectSort(opt.v)}
-                      className={[
-                        'px-3 py-2 text-sm font-medium transition-colors cursor-pointer whitespace-nowrap',
-                        sortByPopular === opt.v ? 'bg-primary text-white' : 'bg-white text-slate-600 hover:bg-slate-50',
-                      ].join(' ')}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-              )}
+          )}
+          {/* "Minyanim by time", with the next minyan under it: the way in
+              to every minyan, on every screen size (Oct 6). */}
+          {showMinyanCard && (
+            <div className={hasMapColumn ? 'lg:max-w-[720px]' : undefined}>
+              <NextMinyanCard items={filtered} onDaveningTimes={showMinyanimView} />
             </div>
-          </>
-        )}
+          )}
+        </div>
+        {!hasMapColumn && !columnItem && !minyanimView && listHeading}
       </div>
 
-      {filtered.length === 0 ? (
+      <div ref={splitRef} className={mapBeside ? 'group/split lg:grid lg:items-start' : undefined} style={mapBeside ? splitStyle : undefined}>
+      <div className="min-w-0">
+      {columnItem && (
+        <div ref={listingColumnRef}>
+          {/* Each shul's next minyan, for the listing's status and the
+              shuls near it, as the list has. */}
+          <NextMinyans enabled={hasMinyanim} items={items}>
+          <ListingColumn
+            phone={phonePage}
+            item={columnItem}
+            category={category}
+            color={bandColor}
+            place={rowPlaces.get(columnItem.id) ?? null}
+            found={foundOn(columnItem)}
+            upvote={
+              upvotes ? (
+                <UpvoteButton
+                  variant="recommend"
+                  name={columnItem.name}
+                  resourceId={columnItem.id}
+                  count={liveCount(columnItem)}
+                  onCountChange={(c) => setVoteCounts((prev) => ({ ...prev, [columnItem.id]: c }))}
+                />
+              ) : undefined
+            }
+            onward={{
+              items: filtered,
+              place: (i) => rowPlaces.get(i.id) ?? null,
+              onOpen: (other) => switchListing(columnItem.id, other.id),
+              seeAll: { label: onwardSource.allLabel, onClick: () => closeColumn(columnItem.id) },
+            }}
+            backLabel={minyanimView ? minyanimTitle : category.pluralLabel}
+            onBack={() => closeColumn(columnItem.id)}
+            position={{ index: Math.max(0, shownIndex.get(columnItem.id) ?? 0), total: shownItems.length }}
+            onStep={(direction) => navigateFromCard(columnItem.id, direction)}
+            alone={!mapBeside}
+            onShowMap={hasMapColumn && mapHidden ? () => setMapHidden(false) : undefined}
+          />
+          </NextMinyans>
+        </div>
+      )}
+      <div hidden={!!columnItem}>
+      {hasMapColumn && !minyanimView && listHeading}
+      {minyanimView ? (
+        <MinyanimView
+          items={filtered}
+          categoryId={category.id}
+          initialDay={initialDaveningDay}
+          onDayChange={(day) => onParamsChange?.({ day }, { replace: true })}
+          // A minyan and its shul's pin light up together, as a shul's row does.
+          onHoverShul={mapBeside ? highlight.set : undefined}
+          search={search}
+          canAdd={canEdit}
+          shulText={(item) => filterableSelects.flatMap((f) => selectValues(item[f.key])).join(' · ')}
+          namedShuls={minyanShulResult ? minyanShulResult.hits.map((h) => h.item) : null}
+          tefillos={tefillosChosen(sheetTefillos)}
+          withinMiles={milesChosen(minyanWithin)}
+          filters={{ active: sheetFilterCount + minyanFilterCount, onOpen: () => setFiltersOpen(true) }}
+          onShowing={setMinyanimShowing}
+          kindOf={(item) => kindText(item, category)}
+        />
+      ) : searchFoundNothing ? (
+        // The search found nothing: the box under the search says so, with
+        // one way to ask (AskTheGroup). A second "No groceries match your
+        // search" with its own buttons was more to read (the user, Oct 10).
+        null
+      ) : filtered.length === 0 ? (
         <div className="text-center py-12">
           <p className="text-sm text-muted">
-            {hasActiveFilters
-              ? `No ${category.pluralLabel.toLowerCase()} match your search.`
-              : `No ${category.pluralLabel.toLowerCase()} listed yet.`}
+            {hiddenByFilters
+              ? typed
+                ? `${searchMatches} match your search, but none with these filters.`
+                : 'None with these filters.'
+              : hasActiveFilters
+                ? `No ${category.pluralLabel.toLowerCase()} match your search.`
+                : `No ${category.pluralLabel.toLowerCase()} listed yet.`}
           </p>
           <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
             {hasActiveFilters && (
               <button
-                onClick={clearAll}
+                onClick={hiddenByFilters ? clearFilters : clearAll}
                 className="text-sm font-medium text-slate-600 border border-slate-300 rounded-md px-3 py-1.5 hover:bg-slate-50 transition-colors cursor-pointer"
               >
-                Clear search &amp; filters
+                {hiddenByFilters ? 'Clear filters' : 'Clear search & filters'}
               </button>
             )}
             {canAdd && (
+              // The same box as the "+": adding looks the same however it
+              // starts (Oct 5).
               <button
-                onClick={onAdd}
+                onClick={() => {
+                  setOpenItem(null)
+                  setTellOpen(true)
+                }}
                 className="inline-flex items-center gap-1 text-sm font-medium text-primary border border-primary rounded-md px-3 py-1.5 hover:bg-primary hover:text-white transition-colors cursor-pointer"
               >
                 <PlusIcon className="h-4 w-4" /> Add {category.label.toLowerCase()}
@@ -1200,133 +1996,282 @@ export default function GenericDirectory({ category, items, anchorLabel, address
           </div>
         </div>
       ) : (
-        // sm+ (640px — matches useIsMobile's own cutover, not an arbitrary
-        // choice), not lg+: a grid instead of a single column — see
-        // GenericListingCard's isMobile split, which is what makes this
-        // safe: desktop cards open their detail in a dialog rather than
-        // expanding in place, so a card growing taller never has to fight
-        // its grid neighbors for space. Anchoring the breakpoint to `lg`
-        // (1024px) instead of this made the grid jump straight from 3
-        // columns to 1 the moment the window narrowed past 1024 — nothing
-        // in between ever got a chance to be 2, since 1024px of content
-        // width is already comfortably enough for auto-fill to reserve all
-        // 3 of its 280px tracks. Starting the grid at `sm` instead means
-        // auto-fill (see its own doc below) does the same job it already
-        // does at 3 columns, just also at the narrower widths where only 2
-        // of those tracks actually fit — a real 3 → 2 → 1 progression
-        // driven by the same mechanism, not a second one bolted on.
+        // One column on a phone. From sm up, a grid of 420px-minimum
+        // columns: one on a narrow window, two on a laptop, never three.
+        // Rows are two lines now (see listingRow.ts) and read best wide;
+        // three 280px columns squeezed a name and its facts line into a
+        // third of the page each.
         //
-        // auto-fill, not auto-fit and not a fixed grid-cols-2/xl:grid-cols-3.
+        // auto-fill, not auto-fit: auto-fit collapses empty tracks and hands
+        // their width to the cards that exist, so a category of two listings
+        // got two page-wide cards. auto-fill keeps the empty track as space
+        // at the end of the row.
         //
-        // Not fixed columns: a sparse category (Networking's 7 plain
-        // name+link cards, WhatsApp Groups' 2) doesn't know how many items
-        // it has ahead of time, and a fixed column count left short
-        // categories with cards pinned to the top-left of a max-w-6xl row.
-        //
-        // Not a definite max like 448px in place of 1fr (tried and reverted
-        // — see git history if this comes up again): how many tracks
-        // auto-fill/auto-fit even creates is computed from a track's MAX
-        // sizing function when it's definite — swap in a definite max and
-        // the browser counts columns using THAT instead of the 280px
-        // minimum, so a full 72-listing category collapsed from its normal
-        // 3-up layout down to 2 much-wider columns with dead space reserved
-        // on the right (`getComputedStyle` showed `448px 448px`, not three
-        // tracks). `1fr` is a flex value, not definite, so the count falls
-        // back to the 280px minimum, same as before any of this.
-        //
-        // Not auto-fit: auto-fit COLLAPSES a track with nothing placed in
-        // it, and a collapsed track's `1fr` share gets redistributed to
-        // whatever tracks remain — so with only 1-2 real listings, the
-        // handful of tracks that DO exist grow to split the ENTIRE row
-        // between just them, each item then sitting left-aligned in an
-        // oversized track (confirmed live: a 2-item row left a 118px gap
-        // between the cards, not the normal 12px). auto-fill reserves the
-        // SAME number of tracks a full row would (still computed from the
-        // 280px minimum) whether or not there's a card to put in each one —
-        // an unfilled trailing track keeps its normal 1fr share as empty
-        // space at the END of the row, not redistributed into the cards
-        // that do exist, so 1-2 real listings render at the exact same
-        // width and gap a full row's cards would, just followed by blank
-        // space instead of more cards. Verified live: 3 tracks reserved,
-        // each ~365px (the same width as the full 72-listing case), cards
-        // packed with the normal 12px gap between them.
-        //
-        // lg:max-w-md on each item below is a safety cap, not the mechanism
-        // doing the work here — it only matters on a viewport wide enough
-        // that even a properly-counted track's 1fr share would exceed a
-        // normal card's width.
-        <div className="space-y-2 sm:space-y-0 sm:grid sm:gap-3 sm:grid-cols-[repeat(auto-fill,minmax(280px,1fr))]">
-          {filtered.map((item, index) => (
-            // sm:max-w-md (matches the grid's own breakpoint above), no
-            // auto-margin: a 1fr track stretches to the
-            // grid's normal per-column share, which is fine once there are
-            // enough cards to fill it (the typical case) — capped here only
-            // matters when a sparse row hands one card way more than a
-            // normal card's worth of width. CSS Grid's default item
-            // alignment (justify-self: stretch) falls back to sitting at the
-            // START of an over-wide track once max-width stops it from
-            // actually filling that track — this needs nothing explicit to
-            // left-align, and previous attempts that added `mx-auto` here
-            // were undoing that default to center it instead, which is the
-            // opposite of what a normal packed-left layout looks like.
-            <div key={item.id} ref={setItemRowRef(item.id)} className="sm:max-w-md">
+        // SwipeRowGroup: only one card's swipe actions stay revealed at a
+        // time, the same rule the map's nearby list follows.
+        // NextMinyans: each shul row's next minyan (shul categories only).
+        <NextMinyans enabled={hasMinyanim} items={items}>
+        <ListingOnwardContext.Provider value={onwardSource}>
+        <SwipeRowGroup>
+        <div className={grouping?.closed ? 'space-y-2' : undefined}>
+        {sections.map((section) => (
+          <div key={section.key}>
+          {section.above}
+          <div id={section.rowsId} hidden={section.hidden} className={grouping?.closed ? 'pt-2 pb-2' : undefined}>
+        {/* The flat list is one white box with a line under each row; the
+            last row's line tucks under the box's own border (-mb-px). */}
+        <div className={flat ? 'overflow-hidden rounded-xl border border-slate-200 bg-white' : undefined} data-testid={flat ? 'flat-list' : undefined}>
+        <div
+          className={
+            flat
+              ? '-mb-px sm:grid sm:grid-cols-[repeat(auto-fill,minmax(420px,1fr))]'
+              : 'space-y-2 sm:space-y-0 sm:grid sm:gap-3 sm:grid-cols-[repeat(auto-fill,minmax(420px,1fr))]'
+          }
+        >
+          {section.items.map((item) => (
+            <Fragment key={item.id}>
+            <div
+              ref={setItemRowRef(item.id)}
+              // A row and its pin light up together (CategoryMap), on the
+              // pointer moving onto it, not on scrolling past (pointerHover).
+              {...(mapBeside ? pointerHover(() => highlight.set(item.id), () => highlight.set(null)) : {})}
+              className={
+                flat
+                  ? // An outline, drawn over the row: a ring outside it would
+                    // be cut off by the list's box.
+                    `border-b border-slate-100 ${flashId === item.id ? 'outline-2 -outline-offset-2 outline-primary/60' : ''}`
+                  : flashId === item.id
+                    ? 'rounded-xl ring-2 ring-primary/60 ring-offset-2 transition-shadow'
+                    : undefined
+              }
+            >
             <GenericListingCard
               ref={setCardRef(item.id)}
+              inColumn={!isMobile || item.id === pagedItemId}
               onNavigate={(direction) => navigateFromCard(item.id, direction)}
-              hasPrev={index > 0}
-              hasNext={index < filtered.length - 1}
+              hasPrev={(shownIndex.get(item.id) ?? 0) > 0}
+              hasNext={(shownIndex.get(item.id) ?? Infinity) < shownItems.length - 1}
               item={item}
               category={category}
               showCategoryLabel={false}
-              // Same signal the header's prompt already uses: no location set,
-              // and this category is distance-based. In the row it is the one
-              // that gets seen — the header's pill sits above the fold once.
-              showDistanceSlot={addressPrompt}
+              place={rowPlaces.get(item.id) ?? null}
+              omitKey={omitKey}
+              flagUnconfirmed={flagUnconfirmed}
+              likes={upvotes && byPopular ? liveCount(item) : undefined}
+              look={rowLook}
+              candlesAt={candlesAt}
               upvotes={upvotes}
               count={liveCount(item)}
               defaultExpanded={item.id === reopenItemId}
+              // Keeps ?item=<id> in the URL in sync with whichever card is
+              // actually open — a reload (or a shared link) lands back on
+              // the same expanded listing, same as `davening`/`day` do for
+              // the Minyanim view above. `replace`, not `push`: an
+              // expand/collapse is a one-off, not something that should
+              // pile up browser-back history entries the way opening an
+              // Add/Edit/Report form (which does use push, see
+              // FindResources' openAction) reasonably does.
+              // Except on a computer, opening one from the list (Oct 6): it
+              // has the page now, so it's a step Back undoes. Stepping to
+              // the next one replaces it, so Back doesn't walk back through
+              // every listing read.
+              found={foundOn(item)}
+              onExpandedChange={(expanded) => {
+                if (expanded) openCardIdsRef.current.add(item.id)
+                else openCardIdsRef.current.delete(item.id)
+                onParamsChange?.(
+                  { item: expanded ? item.id : null, ...(expanded ? {} : { match: null }) },
+                  // Not when the address already names it: a link, or
+                  // Forward, reopening it. (On a phone arriving from its
+                  // link, the first render still thinks it's a computer.)
+                  expanded &&
+                  !hostedId &&
+                  !isMobile &&
+                  item.id !== reopenItemId &&
+                  item.id !== linkedItemId &&
+                  new URLSearchParams(window.location.search).get('item') !== item.id
+                    ? { step: LISTING_STEP }
+                    : { replace: true },
+                )
+                if (!expanded && item.id === revealedId) setRevealedId(null)
+                if (!expanded && item.id === reopenItemId) {
+                  setClosedMatchFor(reopenKey)
+                  setReopenClosedId(item.id)
+                }
+                // See openDialogItemId's own note. Cleared by id rather
+                // than unconditionally: arrow-key next/prev closes
+                // one card and opens a sibling in the same commit, and the
+                // closing card's callback can run after the opening one's,
+                // which would otherwise clear the flag the new dialog just set.
+                setOpenDialogItemId((prev) => (expanded ? item.id : prev === item.id ? null : prev))
+              }}
               onVote={(c) => setVoteCounts((prev) => ({ ...prev, [item.id]: c }))}
-              onTagClick={setSearch}
-              onFilterOpen={() => setOpenNow((v) => !v)}
-              onFilterBool={(key) => setBoolFilters((prev) => ({ ...prev, [key]: !prev[key] }))}
-              onFilterSelect={(key, value) =>
-                setSelectFilters((prev) => {
-                  const cur = prev[key] ?? []
-                  // Add/remove this value from the filter's chosen set. Clicking
-                  // the badge again undoes it.
-                  return { ...prev, [key]: cur.includes(value) ? cur.filter((x) => x !== value) : [...cur, value] }
-                })
-              }
               onEdit={() => onEdit(item)}
-              onReport={() => onReport(item)}
             />
             </div>
+            {questionSpot !== 'end' && questionSpot?.section === section.key && questionSpot.id === item.id && (
+              <div className={flat ? 'border-b border-slate-100 p-3 sm:col-span-full' : 'sm:col-span-full'}>{questionCard}</div>
+            )}
+            </Fragment>
           ))}
         </div>
+        </div>
+          </div>
+          </div>
+        ))}
+        {questionSpot === 'end' && <div className="pt-2">{questionCard}</div>}
+        </div>
+        </SwipeRowGroup>
+        </ListingOnwardContext.Provider>
+        </NextMinyans>
       )}
+      {/* A link an admin set for what this guide doesn't list ("Other
+          Mikvahs" → mikvah.org's directory). After the last row, where
+          someone who hasn't found it here has just finished looking, and
+          under an empty list too; not in the list heading, which is for
+          arranging the list. No arrow after it (the user, Oct 10). */}
+      {category.externalLink && (
+        <p data-testid="external-link" className="mt-5 text-center text-[13.5px] text-slate-500">
+          Not listed here?{' '}
+          <a href={category.externalLink.url} target="_blank" rel="noopener noreferrer" className="font-bold text-primary hover:underline">
+            {category.externalLink.label}
+          </a>
+        </p>
+      )}
+      </div>
+      </div>
+      {/* The map, beside the list from lg up and staying in view while the
+          list scrolls. Not rendered at all below that (CategoryMap loads
+          nothing until it's wide enough). */}
+      {/* The line between list and map: drag it to share the width
+          differently, double-click it for half and half. */}
+      {mapBeside && (
+        <div
+          {...splitHandle}
+          className="group hidden cursor-col-resize touch-none items-center justify-center outline-none lg:sticky lg:top-[4.5rem] lg:flex lg:h-[min(calc(100vh-6rem),720px)]"
+        >
+          <span className="h-12 w-1.5 rounded-full bg-slate-300 transition-colors group-hover:bg-slate-500 group-focus-visible:bg-primary group-focus-visible:ring-2 group-focus-visible:ring-primary/40" />
+        </div>
+      )}
+      {mapBeside && (
+        <div className="relative hidden lg:sticky lg:top-[4.5rem] lg:block lg:h-[min(calc(100vh-6rem),720px)]">
+          <div className="h-full transition-opacity group-data-[snap=map]/split:opacity-30">
+          <CategoryMap
+            category={category}
+            items={filtered}
+            searchActive={typed || activeFilterCount > 0}
+            highlight={highlight}
+            selectedId={columnItem?.id ?? null}
+            walk={columnItem && mapOnScreen ? walkShown : null}
+            onSelect={columnItem ? (id) => switchListing(columnItem.id, id) : findRow}
+            onHide={() => setMapHidden(true)}
+            fullMapHref={fullMapHref}
+          />
+          </div>
+          {/* While the line is dragged far enough to hide the map. */}
+          <div aria-hidden="true" className="pointer-events-none absolute inset-0 hidden items-center justify-center group-data-[snap=map]/split:flex">
+            <span className="rounded-full bg-slate-900/85 px-4 py-2 text-[14px] font-semibold text-white shadow-lg">Let go to hide the map</span>
+          </div>
+        </div>
+      )}
+      </div>
       </CategoryBandFrame>
 
-      {hasMinyanim && (
-        <DaveningTimesModal
-          items={items}
-          isOpen={daveningModalOpen}
-          onClose={() => setDaveningModalOpen(false)}
-          initialDenomination={selectFilters['denomination']?.[0] ?? ''}
-          // Comma-separated (see this prop's own doc), each piece validated
-          // against the real day-key set rather than a bare cast — this
-          // came in through a URL query param, so it's untrusted input, and
-          // a garbage piece should just drop out rather than being handed
-          // to the modal as if it were a real MinyanDayKey. undefined (not
-          // an empty array) when nothing valid survives, so the modal falls
-          // back to its own "Today" default instead of an empty filter.
-          initialDayFilter={(() => {
-            const days = (initialDaveningDay ?? '')
-              .split(',')
-              .filter((d): d is MinyanDayKey => (ALL_MINYAN_DAYS as string[]).includes(d))
-            return days.length > 0 ? days : undefined
-          })()}
+      {/* The category page's Add — a floating circular button,
+          Gmail-compose-style, on both mobile and desktop now (used to be
+          mobile-only, with desktop instead carrying a toolbar button up in
+          DirectoryHeader and a site-wide "Add a listing" picker in
+          SiteHeader — both removed in favor of this one control everywhere).
+          Since Oct 5 it opens the "+ Add" box (TellUsSheet), which knows
+          this category: a place found with "Find the place" is added here
+          without asking which kind it is. Home and the other screens have
+          the site-wide "+" (SiteAddButton), which asks.
+          `bottom-[calc(3.75rem+env(safe-area-inset-bottom)+1rem)]` clears
+          MobileTabBar the same way ResourceMapView's own fixed mobile
+          panels already do — 3.75rem is that bar's own height. MobileTabBar
+          itself is `desktop:hidden` (no bottom bar to clear there), so
+          desktop gets its own, simpler `bottom-6` instead of that clearance
+          math.
+          A bare icon circle is a mobile convention (Gmail compose, Google
+          Maps) that people already have a trained reflex for — desktop
+          visitors don't have the same reflex for an icon floating in a
+          corner with no label, and this had none: just an aria-label,
+          invisible unless you already knew to hover-and-guess. Desktop gets
+          the label made visible instead, widening into a pill; mobile stays
+          the plain circle, where the label would just be redundant with the
+          reflex people already bring to the shape. */}
+      {filtered.length > 0 && !openDialogItemId && !minyanimView && <RowLookSwitch look={rowLook} onChange={setRowLook} />}
+
+      {canAdd && (!openDialogItemId || (!isMobile && columnItem)) && (
+        <button
+          onClick={() => {
+            setOpenItem(null)
+            setTellOpen(true)
+          }}
+          // Generic, not "Add {category label}" — the empty-state button
+          // further up already uses that exact phrasing, and giving this
+          // the same name would make the two indistinguishable to anything
+          // querying by accessible name (they're both in the DOM at once
+          // for an empty category, since this isn't gated on `filtered`).
+          // Kept even now that desktop shows the same words visibly —
+          // aria-label always wins for the accessible name regardless, so
+          // this keeps mobile's icon-only button correctly named without
+          // needing a second, viewport-conditional way of deriving it.
+          aria-label="Add"
+          className={`fixed right-4 bottom-[calc(3.75rem+env(safe-area-inset-bottom)+1rem)] desktop:bottom-6 z-40 flex h-14 w-14 desktop:w-auto items-center justify-center gap-2 rounded-full bg-primary px-0 desktop:px-5 text-white shadow-lg cursor-pointer active:scale-95 transition-transform`}
+        >
+          <PlusIcon className="h-6 w-6 shrink-0" />
+          <span className="hidden desktop:inline font-medium whitespace-nowrap">Add</span>
+        </button>
+      )}
+      {/* Its own boundary: loading it the first time otherwise hid the page
+          for a moment, the open listing under it included. */}
+      <Suspense fallback={null}>
+        {tellOpen && (
+          <TellUsSheet
+            isOpen
+            onClose={() => setTellOpen(false)}
+            about={openItem ? { id: openItem.id, name: openItem.name } : undefined}
+            category={category}
+            placeholder={tellUsPlaceholder({ times: minyanimViewOn || (!!openItem && tellTimes), menu: !!openItem && tellMenu, about: openItem ?? undefined })}
+            heading={openItem && tellTimes ? `Update ${openItem.name}’s times` : undefined}
+            kind={openItem && tellMenu ? 'menu' : minyanimViewOn || (openItem && tellTimes) ? 'times' : undefined}
+            yourselfLabel={openItem && tellMenu ? 'Add one dish yourself' : undefined}
+            onEditYourself={
+              openItem
+                ? () => {
+                    setTellOpen(false)
+                    if (editYourself.current) editYourself.current()
+                    else onEdit(openItem)
+                  }
+                : undefined
+            }
+          />
+        )}
+      </Suspense>
+
+      {(hasActualFilters || minyanimView) && (
+        <FiltersSheet
+          isOpen={filtersOpen}
+          onClose={() => setFiltersOpen(false)}
+          hasOpenNow={hasFilterableHours && !minyanimView}
+          openNow={sheetOpenNow}
+          onOpenNow={toggleSheetOpenNow}
+          booleans={filterableBooleans.map((f) => ({ key: f.key, label: f.filterLabel ?? f.label, on: !!boolFilters[f.key] || searchBools.has(f.key) }))}
+          onBoolean={toggleSheetBool}
+          selects={minyanimView ? [minyanTefillahSelect, ...sheetSelects, minyanWithinSelect] : sheetSelects}
+          onSelect={onSheetSelect}
+          items={sheetItems}
+          onItem={toggleSheetHas}
+          onClearAll={clearSheet}
+          count={minyanimView ? minyanimShowing : filtered.length}
+          units={minyanimView ? ['minyan', 'minyanim'] : undefined}
         />
       )}
+
     </div>
+    </TappedMinyanContext.Provider>
+    </WalkOnMapContext.Provider>
+    </TellAboutContext.Provider>
   )
 }

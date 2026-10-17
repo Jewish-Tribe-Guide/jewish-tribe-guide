@@ -2,6 +2,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { useState } from 'react'
+import { renderWithProviders } from '@/test/renderWithProviders'
 import AddressInput from './AddressInput'
 
 const mockMapsAuthFailed = vi.hoisted(() => vi.fn(() => false))
@@ -72,6 +74,45 @@ describe('AddressInput', () => {
 
     await waitFor(() => expect(screen.getByText('Test Shul')).toBeInTheDocument())
     expect(screen.getByText('Philadelphia, PA')).toBeInTheDocument()
+  })
+
+  // Oct 6: "Paulie Gee" listed Brooklyn and New York before the
+  // Philadelphia shop. Google is asked to lean toward the community's own
+  // centre, and outside a community (the admin's previews) asked as before.
+  it('asks Google to lean toward the community, and only inside one', async () => {
+    const user = userEvent.setup()
+    mockFetchAddressSuggestions.mockResolvedValue([])
+    renderWithProviders(<AddressInput value="" onChange={vi.fn()} />, { community: { mapCenter: { lat: 39.95, lng: -75.17 } } })
+    await user.type(screen.getByPlaceholderText('Address or location'), 'Paulie')
+    await waitOutDebounce()
+    await waitFor(() => expect(mockFetchAddressSuggestions).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ near: { lat: 39.95, lng: -75.17 } })))
+    cleanup()
+    mockFetchAddressSuggestions.mockClear()
+    render(<AddressInput value="" onChange={vi.fn()} />)
+    await user.type(screen.getByPlaceholderText('Address or location'), 'Paulie')
+    await waitOutDebounce()
+    await waitFor(() => expect(mockFetchAddressSuggestions).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ near: null })))
+  })
+
+  // Add marks places the guide already has right in the list, before
+  // anyone picks one.
+  it('shows suggestionNote\'s note under the suggestions it names, and nothing under the rest', async () => {
+    const user = userEvent.setup()
+    mockFetchAddressSuggestions.mockResolvedValue([
+      makeSuggestion({ placeId: 'known', mainText: 'Kosher Mart' }),
+      makeSuggestion({ placeId: 'new', mainText: 'Shalom Bagels' }),
+    ])
+    function Harness() {
+      const [value, setValue] = useState('')
+      return <AddressInput value={value} onChange={setValue} suggestionNote={(id) => (id === 'known' ? 'Already in the guide' : null)} />
+    }
+    render(<Harness />)
+    await user.type(screen.getByPlaceholderText('Address or location'), 'kosher')
+    await waitOutDebounce()
+
+    const known = await screen.findByRole('button', { name: /Kosher Mart/ })
+    expect(known).toHaveTextContent('Already in the guide')
+    expect(screen.getByRole('button', { name: /Shalom Bagels/ })).not.toHaveTextContent('Already in the guide')
   })
 
   it('clears stale coordinates the moment the user types again after a prior selection', async () => {

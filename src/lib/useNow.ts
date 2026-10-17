@@ -45,10 +45,10 @@ let timer: ReturnType<typeof setInterval> | null = null
  *  loop forever. */
 let current = Date.now()
 
-/** Fixed for the life of the module, so the server render and the hydration
- *  render agree on it. React swaps to the live snapshot immediately after
- *  hydrating, which is also what corrects a page served from the CDN or the
- *  service worker whose HTML — and whose badges — may be a day old. */
+/** When this module loaded: useToday's day for the server render and the
+ *  hydration render. Not the same moment on the two sides (see useNow), which
+ *  is harmless only because nothing renders from that day before zmanim
+ *  arrive, and they're fetched in the browser. */
 const AT_LOAD = current
 
 function broadcast() {
@@ -110,12 +110,22 @@ function subscribe(listener: () => void): () => void {
  * of letting them default to `new Date()`, and a badge re-evaluates when the
  * visitor comes back instead of staying frozen at whatever moment the page
  * happened to render.
+ *
+ * Null on the server and in the render that hydrates its HTML: the time isn't
+ * known there, so whatever depends on it waits for the browser. It used to
+ * be each side's own module-load time, meant to agree and never able to: the
+ * server's was when the page was built, often days before (pages are cached),
+ * and in a server's timezone rather than the visitor's. So a row's "Opens
+ * Wed 7 AM" in the HTML met "Closes soon · 6 PM" in the browser, React
+ * threw the server's page away and rendered it again, and the HTML had
+ * been wrong for everyone who read it without JavaScript anyway. Leaving
+ * the time out is what useHydrated does for the same reason.
  */
-export function useNow(): number {
+export function useNow(): number | null {
   return useSyncExternalStore(
     subscribe,
     () => current,
-    () => AT_LOAD,
+    () => null,
   )
 }
 

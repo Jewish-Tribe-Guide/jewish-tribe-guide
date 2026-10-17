@@ -20,6 +20,9 @@ const eslintConfig = defineConfig([
     ".next-e2e-*/**",
     "playwright-report-cache/**",
     "playwright-report-form/**",
+    // Claude Code's git worktrees: full copies of the repo (gitignored), which
+    // otherwise get linted as if they were this project's own source.
+    ".claude/**",
   ]),
 ]);
 

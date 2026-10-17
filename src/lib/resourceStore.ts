@@ -56,16 +56,19 @@ export async function listApprovedResources(
   if (error) throw new Error(`Failed to load resources: ${error.message}`)
 
   const rows = (data as ResourceRow[]).map(normalizeRow)
-  const counts = await getVoteCounts(rows.map((r) => r.id))
+  const counts = await getVoteCounts(community)
   return rows.map((r) => ({ ...r, upvotes: counts.get(r.id) ?? 0 }))
 }
 
 // Fetches a single listing by id (any status). Used to prefill the edit form.
-// `community`, when given, scopes the lookup so an id belonging to a
+// `community` is required, and scopes the lookup so an id belonging to a
 // DIFFERENT community can't be read through this function — `id` alone is a
 // real UUID primary key here (unlike category/form's composite keys), so
-// nothing else stops that on its own.
-export async function getResourceById(id: string, community?: string): Promise<DirectoryResource | null> {
+// nothing else stops that on its own. It used to be optional, which meant a
+// forgotten argument silently turned into a cross-community read; every caller
+// already passed one, so requiring it costs nothing and makes the omission a
+// compile error instead.
+export async function getResourceById(id: string, community: string): Promise<DirectoryResource | null> {
   const row = await getResourceRowById(id, community)
   return row ? normalizeRow(row) : null
 }
@@ -74,10 +77,18 @@ export async function getResourceById(id: string, community?: string): Promise<D
  *  row and drops the object itself, which is exactly what a diff needs to
  *  read — so anything comparing a listing field-by-field (the moderation
  *  queue's before/after, and the notification emails) wants the raw row. */
-export async function getResourceRowById(id: string, community?: string): Promise<ResourceRow | null> {
-  let query = getAdminClient().from('resource').select('*').eq('id', id)
-  if (community) query = query.eq('community_id', community)
-  const { data, error } = await query.maybeSingle()
+export async function getResourceRowById(id: string, community: string): Promise<ResourceRow | null> {
+  // The type already demands one; this catches an empty string or a value cast
+  // through `any`, either of which would otherwise query for community_id = ''
+  // and quietly find nothing (or, if the filter were skipped, everything).
+  if (!community) throw new Error('getResourceRowById requires a community')
+
+  const { data, error } = await getAdminClient()
+    .from('resource')
+    .select('*')
+    .eq('id', id)
+    .eq('community_id', community)
+    .maybeSingle()
 
   if (error) throw new Error(`Failed to load resource: ${error.message}`)
   return (data as ResourceRow) ?? null
@@ -285,7 +296,7 @@ export async function clearCategoryFieldData(
     let details: Record<string, unknown> | null = null
     const keysToStrip = [
       ...(opts.address ? ADDRESS_DERIVED_DETAIL_KEYS : []),
-      ...(opts.fieldKeys ?? []).flatMap((k) => [k, `${k}_sometimes`]),
+      ...(opts.fieldKeys ?? []).flatMap((k) => [k, `${k}_sometimes`, `${k}_schedules`]),
     ]
     for (const key of keysToStrip) {
       if (key in row.details) {

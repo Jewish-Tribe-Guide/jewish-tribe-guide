@@ -1,10 +1,13 @@
 import type { Metadata } from 'next'
 import HomeScreen from './HomeScreen'
 import { ListingsProvider } from '@/lib/listingsContext'
+import { ChangesProvider } from '@/lib/changesContext'
+import { listChangeLog } from '@/lib/changesStore'
 import { listApprovedResources } from '@/lib/resourceStore'
 import { listCommunities } from '@/lib/communityStore'
 import { getSiteSettings } from '@/lib/siteSettingsStore'
 import { SITE_SETTINGS_DEFAULTS } from '@/lib/siteSettings'
+import { features } from '@/lib/features'
 import { siteUrl } from '@/lib/siteUrl'
 import { routes } from '@/lib/routes'
 import { buildJsonLdScript } from '@/lib/jsonLdScript'
@@ -21,23 +24,30 @@ export async function generateMetadata(props: PageProps<'/[community]'>): Promis
   return { alternates: { canonical: `${siteUrl()}${routes.home(community)}` } }
 }
 
-// No Suspense boundary here — HomeScreen doesn't call useSearchParams()
-// itself (that's isolated inside LandingConnected, with its own narrow
-// boundary right around the one piece that needs it), so nothing in this
-// tree suspends on a Dynamic API and the whole page prerenders for real.
+// No Suspense boundary here — nothing under HomeScreen calls a Dynamic API
+// (useSearchParams et al.), so nothing in this tree suspends and the whole
+// page prerenders for real.
 export default async function HomePage(props: PageProps<'/[community]'>) {
   const { community } = await props.params
-  // The home screen's search covers every place, and the embedded map plots
-  // them all, so this is the one screen that genuinely needs the full set.
-  // Loaded here rather than fetched after hydration, so the search works on
-  // first paint. null on failure — see listingsContext.
-  const [listings, settings, communities] = await Promise.all([
+  // The home screen's search covers every place, so this is the one screen
+  // that genuinely needs the full set. Loaded here rather than fetched after
+  // hydration, so the search works on first paint. null on failure — see
+  // listingsContext.
+  const [listings, settings, communities, changes] = await Promise.all([
     listApprovedResources(community).catch((err) => {
       console.error('[home] listings failed to load:', err)
       return null
     }),
     getSiteSettings(community).catch(() => SITE_SETTINGS_DEFAULTS),
     listCommunities().catch(() => []),
+    // Today's "This week" block (step 7a). Without it, no block — and not
+    // read at all while either is held back (see features.ts).
+    features.todayHome && features.whatChanged
+      ? listChangeLog(community).catch((err) => {
+          console.error('[home] changes failed to load:', err)
+          return null
+        })
+      : null,
   ])
   // Same admin-edited-wins-over-community-row fallback as
   // [community]/layout.tsx's generateMetadata, so this never disagrees with
@@ -63,8 +73,10 @@ export default async function HomePage(props: PageProps<'/[community]'>) {
 
   return (
     <ListingsProvider listings={listings}>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdScript }} />
-      <HomeScreen />
+      <ChangesProvider rows={changes}>
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdScript }} />
+        <HomeScreen />
+      </ChangesProvider>
     </ListingsProvider>
   )
 }

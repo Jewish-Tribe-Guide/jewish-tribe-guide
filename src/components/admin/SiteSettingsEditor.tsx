@@ -16,11 +16,13 @@ import DesktopNavEditor from './DesktopNavEditor'
 import MobileTabsEditor from './MobileTabsEditor'
 import SubscriberManager from './SubscriberManager'
 import CollapsibleSection from './CollapsibleSection'
+import { features } from '@/lib/features'
 import ImageUploadField from '@/components/ImageUploadField'
 import {
   DEFAULT_MOBILE_TABS,
   DEFAULT_DESKTOP_NAV_ITEMS,
-  DESKTOP_ACCENT_PRESETS,
+  MAX_BEFORE_CANDLE_ITEMS,
+  TODAY_BLOCKS,
 } from '@/lib/siteSettings'
 
 // ── One component, three tabs — Site (shared), Desktop, Mobile — sharing a
@@ -29,8 +31,8 @@ import {
 // passes `section`). Site carries the branding shared by both devices (name,
 // mission, logo, search placeholder), the home-screen section grouping, and
 // the feedback form. Desktop carries the top nav, the home screen's cards
-// and their order, the Browse card's own eyebrow/heading, the hero band, and
-// the accent color. Mobile carries the home screen heading, the tagline, and
+// and their order, the Browse card's own eyebrow/heading, and the hero band.
+// Mobile carries the home screen heading, the tagline, and
 // the bottom tab bar. Nothing goes live until you save.
 
 const inputClass =
@@ -44,6 +46,25 @@ function sectionsEqual(a: DraftHomeSection[], b: DraftHomeSection[]): boolean {
   // disabled.
   const strip = (s: DraftHomeSection[]) => s.map(({ id, title, cardIds, width }) => ({ id, title, cardIds, width }))
   return JSON.stringify(strip(a)) === JSON.stringify(strip(b))
+}
+
+/** The items as one line, "Challah, Wine, Chicken". What was typed stays
+ *  while it still says the same list, so a comma or a space isn't swallowed
+ *  mid-word; after a Cancel or a save it's the list again. */
+function BeforeCandleItemsInput({ items, onChange }: { items: string[]; onChange: (items: string[]) => void }) {
+  const [typed, setTyped] = useState(items.join(', '))
+  const parsed = (t: string) => t.split(',').map((i) => i.trim()).filter(Boolean).slice(0, MAX_BEFORE_CANDLE_ITEMS)
+  const shown = JSON.stringify(parsed(typed)) === JSON.stringify(items) ? typed : items.join(', ')
+  return (
+    <input
+      value={shown}
+      onChange={(e) => {
+        setTyped(e.target.value)
+        onChange(parsed(e.target.value))
+      }}
+      className={inputClass}
+    />
+  )
 }
 
 export default function SiteSettingsEditor({
@@ -251,7 +272,7 @@ export default function SiteSettingsEditor({
       {isDesktop && (
         <p className="text-sm text-muted mb-4">
           Everything that exists on desktop only — the top nav, the home screen&rsquo;s cards and
-          their order, the hero band, and the accent color. Everything shared by both devices —
+          their order, and the hero band. Everything shared by both devices —
           branding, sections, search placeholder — is on the Site tab. Nothing goes live until you
           click Save changes below.
         </p>
@@ -266,6 +287,69 @@ export default function SiteSettingsEditor({
 
       {error && (
         <p className="bg-red-50 border border-red-200 rounded-md p-3 text-sm text-red-700 mb-4">{error}</p>
+      )}
+
+      {/* Held back from the site for now (see features.ts): nothing to
+          choose until the Today home is back. */}
+      {isSite && features.todayHome && (
+      <div className="mb-6 max-w-2xl">
+      <CollapsibleSection title="Home page" description="Which home page visitors get." contentClassName="p-4">
+        <fieldset data-testid="home-style">
+          <legend className="sr-only">Home page</legend>
+          {(
+            [
+              ['classic', 'Classic', 'The home page as it has been: the search, then every category.'],
+              ['today', 'Today', 'Changes with the day: the next minyan, before candles on Friday, what’s open now, your pinned places, then the categories.'],
+            ] as const
+          ).map(([value, label, help]) => (
+            <label key={value} className="flex items-start gap-2.5 py-1.5">
+              <input
+                type="radio"
+                name="home-style"
+                value={value}
+                checked={draft.homeStyle === value}
+                onChange={() => set('homeStyle', value)}
+                className="mt-1"
+              />
+              <span>
+                <span className="block text-sm font-medium text-slate-900">{label}</span>
+                <span className="block text-[12px] text-muted">{help}</span>
+              </span>
+            </label>
+          ))}
+        </fieldset>
+        <p className="mt-2 text-[12px] text-muted">
+          To try it first, pick it and press Preview: it opens the site with this choice, and nothing changes for visitors until you save. Saving Classic switches back.
+        </p>
+        <label className="mt-4 block">
+          <span className="block text-xs font-medium text-slate-700 mb-1">Before candles looks for</span>
+          <BeforeCandleItemsInput items={draft.beforeCandleItems} onChange={(items) => set('beforeCandleItems', items)} />
+          <span className="block text-[11px] text-muted mt-1">
+            On the Today home, on Friday and Erev Yom Tov: the nearest store open now whose item list has these, separated by commas, at most {MAX_BEFORE_CANDLE_ITEMS}. Each is matched to a store&rsquo;s items by its exact name.
+          </span>
+        </label>
+        <fieldset data-testid="today-blocks" className="mt-4">
+          <legend className="block text-xs font-medium text-slate-700 mb-1">On the Today home</legend>
+          <p className="text-[11px] text-muted mb-1">Under the search, each on the days it&rsquo;s for, in the order the day calls for. Untick one to leave it off.</p>
+          {TODAY_BLOCKS.map((block) => (
+            <label key={block.id} className="flex items-start gap-2.5 py-1">
+              <input
+                type="checkbox"
+                checked={!draft.todayHidden.includes(block.id)}
+                onChange={(e) =>
+                  set('todayHidden', e.target.checked ? draft.todayHidden.filter((id) => id !== block.id) : [...draft.todayHidden, block.id])
+                }
+                className="mt-1"
+              />
+              <span>
+                <span className="block text-sm font-medium text-slate-900">{block.label}</span>
+                <span className="block text-[12px] text-muted">{block.when}</span>
+              </span>
+            </label>
+          ))}
+        </fieldset>
+      </CollapsibleSection>
+      </div>
       )}
 
       {isSite && (
@@ -300,7 +384,7 @@ export default function SiteSettingsEditor({
           <ImageUploadField
             value={draft.logoUrl ?? ''}
             onChange={(url) => set('logoUrl', url || null)}
-            uploadUrl="/api/admin/site-settings/logo"
+            uploadUrl={withCommunity('/api/admin/site-settings/logo', community.slug)}
             token={token}
             shape="square"
             originalSource={logoOriginal}
@@ -373,7 +457,7 @@ export default function SiteSettingsEditor({
                 onChange={(url) =>
                   set('desktopHeroImage', url ? { url, alt: draft.desktopHeroImage?.alt ?? '' } : null)
                 }
-                uploadUrl="/api/admin/site-settings/hero-image"
+                uploadUrl={withCommunity('/api/admin/site-settings/hero-image', community.slug)}
                 token={token}
                 shape="square"
                 // Measured live against the real page (HeroHeading.tsx's
@@ -417,49 +501,8 @@ export default function SiteSettingsEditor({
       {isDesktop && (
         <div className="mt-6 max-w-2xl">
           <CollapsibleSection
-            title="Colors"
-            description="The home screen’s accent color — the eyebrows above each card, the hero band, and the Davening/Shabbat cards’ call-to-action buttons."
-            contentClassName="p-4 space-y-3"
-          >
-            <div className="flex flex-wrap items-center gap-2">
-              {DESKTOP_ACCENT_PRESETS.map((hex) => (
-                <button
-                  key={hex}
-                  type="button"
-                  onClick={() => set('desktopAccentColor', hex)}
-                  aria-label={`Use ${hex}`}
-                  aria-pressed={draft.desktopAccentColor.toLowerCase() === hex.toLowerCase()}
-                  className={`h-8 w-8 rounded-full border-2 cursor-pointer ${
-                    draft.desktopAccentColor.toLowerCase() === hex.toLowerCase() ? 'border-slate-900' : 'border-transparent'
-                  }`}
-                  style={{ backgroundColor: hex }}
-                />
-              ))}
-              <label className="flex items-center gap-2">
-                <input
-                  type="color"
-                  value={/^#[0-9a-f]{6}$/i.test(draft.desktopAccentColor) ? draft.desktopAccentColor : '#b45309'}
-                  onChange={(e) => set('desktopAccentColor', e.target.value)}
-                  className="h-8 w-8 cursor-pointer rounded border border-slate-300 p-0"
-                  aria-label="Custom color"
-                />
-                <input
-                  value={draft.desktopAccentColor}
-                  onChange={(e) => set('desktopAccentColor', e.target.value)}
-                  placeholder="#b45309"
-                  className="w-28 rounded-md border border-slate-300 px-2 py-1.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary"
-                />
-              </label>
-            </div>
-          </CollapsibleSection>
-        </div>
-      )}
-
-      {isDesktop && (
-        <div className="mt-6 max-w-2xl">
-          <CollapsibleSection
             title="Home screen cards"
-            description="Categories & Search, Davening Times, Update Listings, Map, Email Signup, and Jewish Times — the desktop home screen’s cards, in order. Rename each one’s eyebrow/heading, reorder, or remove it."
+            description="Categories & Search, Davening Times, Update Listings, Email Signup, and Jewish Times — the desktop home screen’s cards, in order. Rename each one’s eyebrow/heading, reorder, or remove it."
             contentClassName="p-4"
           >
             <DesktopTopicsManager
@@ -487,17 +530,17 @@ export default function SiteSettingsEditor({
           <span className="block text-xs font-medium text-slate-700 mb-1">Home screen heading</span>
           <input value={draft.heroTitle} onChange={(e) => set('heroTitle', e.target.value)} className={inputClass} />
           <span className="block text-[11px] text-muted mt-1">
-            The big heading at the top of the mobile home screen. Desktop has its own separate hero
-            headline — see the Desktop tab&rsquo;s Hero card.
+            The home page&rsquo;s title for screen readers and search engines. The phone home no longer
+            shows it: it opens with who keeps the guide up. Desktop has its own separate hero headline —
+            see the Desktop tab&rsquo;s Hero card.
           </span>
         </label>
         <label className="block">
           <span className="block text-xs font-medium text-slate-700 mb-1">Subhead</span>
           <textarea rows={2} value={draft.mission} onChange={(e) => set('mission', e.target.value)} className={inputClass} />
           <span className="block text-[11px] text-muted mt-1">
-            Shown under the home screen heading, and reused as the footer blurb and &lt;meta
-            description&gt;. Desktop has its own separate headline/subhead — see the Desktop tab&rsquo;s
-            Hero card.
+            The footer blurb and the page&rsquo;s &lt;meta description&gt;. No longer shown on the phone
+            home. Desktop has its own separate headline/subhead — see the Desktop tab&rsquo;s Hero card.
           </span>
         </label>
       </CollapsibleSection>

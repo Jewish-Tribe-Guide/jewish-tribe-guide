@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { travelCompare, travelParts, withMilesFromAddress } from './listingTravel'
+import { travelCompare, travelParts, withMilesFromAddress, withMilesFromCenter } from './listingTravel'
 import type { DirectoryResource } from '@/types'
 
 // This comparator decides the order of every directory. The case worth guarding
@@ -21,6 +21,15 @@ const at = (name: string, travel: Partial<DirectoryResource> = {}): DirectoryRes
 const sortedNames = (items: DirectoryResource[]) => [...items].sort(travelCompare).map((i) => i.name)
 
 describe('travelCompare', () => {
+  it('sorts by miles from the centre only when asked to (Distance chosen with no location, Oct 10)', () => {
+    const items = [
+      { id: 'a', name: 'Alpha', milesFromCenter: 5 },
+      { id: 'b', name: 'Beta', milesFromCenter: 1 },
+    ] as DirectoryResource[]
+    expect(sortedNames(items)).toEqual(['Alpha', 'Beta'])
+    expect([...items].sort((x, y) => travelCompare(x, y, { fromCenter: true })).map((i) => i.name)).toEqual(['Beta', 'Alpha'])
+  })
+
   it('puts the closest first when the visitor typed an address', () => {
     expect(
       sortedNames([
@@ -35,28 +44,12 @@ describe('travelCompare', () => {
     expect(sortedNames([at('unknown'), at('near', { milesFromAddress: 0.4 })])).toEqual(['near', 'unknown'])
   })
 
-  it('prefers miles over drive time when both are present', () => {
-    // Address mode is the live signal; drive minutes are dormant leftovers.
-    expect(
-      sortedNames([
-        at('closer-by-road', { milesFromAddress: 3, driveMinutes: 1 }),
-        at('closer-as-crow-flies', { milesFromAddress: 1, driveMinutes: 30 }),
-      ]),
-    ).toEqual(['closer-as-crow-flies', 'closer-by-road'])
-  })
-
-  it('falls back to drive time, then walk time', () => {
-    expect(sortedNames([at('b', { driveMinutes: 20 }), at('a', { driveMinutes: 5 })])).toEqual(['a', 'b'])
-    expect(sortedNames([at('b', { walkMinutes: 20 }), at('a', { walkMinutes: 5 })])).toEqual(['a', 'b'])
-  })
-
-  it('breaks a drive-time tie with walk time', () => {
-    expect(
-      sortedNames([
-        at('longer-walk', { driveMinutes: 5, walkMinutes: 40 }),
-        at('shorter-walk', { driveMinutes: 5, walkMinutes: 12 }),
-      ]),
-    ).toEqual(['shorter-walk', 'longer-walk'])
+  it('ignores the dormant drive/walk-minute fields entirely, falling back to alphabetical', () => {
+    // driveMinutes/walkMinutes are never populated on a real listing (see
+    // DirectoryResource's own comment) — this guards against a future
+    // change accidentally reviving them as a sort signal here. Without this,
+    // 'b' would sort first on its lower driveMinutes; alphabetical puts 'a' first.
+    expect(sortedNames([at('b', { driveMinutes: 1 }), at('a', { driveMinutes: 30 })])).toEqual(['a', 'b'])
   })
 
   it('falls back to alphabetical when nothing has travel data', () => {
@@ -132,27 +125,49 @@ describe('withMilesFromAddress', () => {
 })
 
 describe('travelParts', () => {
-  it('shows miles alone when the visitor typed an address', () => {
-    // No embedded emoji on `text` for distance — the caller renders PinIcon
-    // itself based on `kind`, see GenericListingCard.
-    expect(travelParts(at('x', { milesFromAddress: 0.4, driveMinutes: 5 }))).toEqual([
-      { kind: 'distance', text: '0.4 mi' },
-    ])
+  it('shows miles when the visitor typed an address', () => {
+    // No embedded emoji on `text` — the caller renders PinIcon itself, see
+    // GenericListingCard.
+    expect(travelParts(at('x', { milesFromAddress: 0.4 }))).toEqual([{ kind: 'distance', text: '0.4 mi' }])
   })
 
-  it('stacks drive and walk as separate chips so they can wrap', () => {
-    expect(travelParts(at('x', { driveMinutes: 5, walkMinutes: 18 }))).toEqual([
-      { kind: 'drive', text: '🚗 5 min' },
-      { kind: 'walk', text: '🚶 18 min' },
-    ])
+  it('shows nothing when there is no address-based distance, even if the dormant drive/walk fields are set', () => {
+    // driveMinutes/walkMinutes are never populated on a real listing (see
+    // DirectoryResource's own comment) — this guards against a future
+    // change accidentally reviving them as a display source here.
+    expect(travelParts(at('x', { driveMinutes: 5, walkMinutes: 18 }))).toEqual([])
   })
 
   it('shows nothing at all when there is nothing to show', () => {
     expect(travelParts(at('x'))).toEqual([])
   })
 
-  it('omits the half it does not have', () => {
-    expect(travelParts(at('x', { driveMinutes: 5 }))).toEqual([{ kind: 'drive', text: '🚗 5 min' }])
-    expect(travelParts(at('x', { walkMinutes: 18 }))).toEqual([{ kind: 'walk', text: '🚶 18 min' }])
+  it('falls back to the distance from the community’s centre, with no address typed', () => {
+    expect(travelParts(at('x', { milesFromCenter: 3.14 }))).toEqual([{ kind: 'distance', text: '3.1 mi' }])
+  })
+
+  it('prefers the visitor’s own distance over the centre’s', () => {
+    expect(travelParts(at('x', { milesFromAddress: 0.4, milesFromCenter: 3.1 }))).toEqual([{ kind: 'distance', text: '0.4 mi' }])
+  })
+})
+
+describe('withMilesFromCenter', () => {
+  const cityHall = { lat: 39.9526, lng: -75.1652 }
+
+  it('stamps miles from the centre on listings with coordinates, and leaves the rest alone', () => {
+    const [near, nowhere] = withMilesFromCenter([at('near', { geo: { lat: 39.9526, lng: -75.1452 } }), at('nowhere')], cityHall)
+    expect(near.milesFromCenter).toBeCloseTo(1.06, 1)
+    expect(nowhere.milesFromCenter).toBeUndefined()
+  })
+
+  // Distance from City Hall is something to read, not an order to sort by:
+  // with no location set the list stays in its own order (popularity, then
+  // name), not "nearest to the centre first".
+  it('doesn’t change the sort order', () => {
+    const items = withMilesFromCenter(
+      [at('Zeta', { geo: { lat: 39.95, lng: -75.16 } }), at('Alpha', { geo: { lat: 40.2, lng: -75.5 } })],
+      cityHall,
+    )
+    expect(sortedNames(items)).toEqual(['Alpha', 'Zeta'])
   })
 })

@@ -1,193 +1,243 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import Link from 'next/link'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import type { DirectoryResource } from '@/types'
-import { PHOTO_FIELD_KEY, resolveCapabilities, type CategoryConfig } from '@/lib/categories'
-import PlaceDetailBody from '@/components/resources/PlaceDetailBody'
-import FreshnessFooter from '@/components/resources/FreshnessFooter'
-import ListingActionsMenu from '@/components/resources/ListingActionsMenu'
-import ListingForm from '@/components/resources/ListingForm'
-import ReportListing from '@/components/resources/ReportListing'
-import CategoryIcon from '@/components/CategoryIcon'
-import PinnedBadge from '@/components/PinnedBadge'
-import { ChevronLeftIcon, PencilIcon, FlagIcon } from '@/components/icons'
+import { resolveCapabilities, type CategoryConfig } from '@/lib/categories'
+import ListingView, { type Onward } from '@/components/resources/ListingView'
+import type { SearchFound } from '@/lib/askSearch'
+import { scrollingAncestor } from '@/lib/scrollingAncestor'
+import ListingEditBar from '@/components/resources/ListingEditBar'
+import dynamic from 'next/dynamic'
 import { ui } from '@/lib/uiConfig'
 import { routes } from '@/lib/routes'
 import { listingSlug } from '@/lib/listingSlug'
 import { useCommunitySlug } from '@/lib/communityContext'
-import { usePinned } from '@/lib/pinnedContext'
+import BackIconButton from '@/components/BackIconButton'
+import UpvoteButton from '@/components/resources/UpvoteButton'
+
+// The editor (address lookup, hours, photos) loads when editing starts, not
+// with the listing, so the Map page's code stays light.
+const ListingEditor = dynamic(() => import('@/components/resources/ListingEditor'), { loading: () => null })
+import type { EditorStep, HostedEditor } from '@/components/resources/ListingEditor'
 
 type Props = {
   item: DirectoryResource
   category: CategoryConfig
   color: string
-  onBack: () => void
+  /** "Back to list", to the nearby list this place was picked from. Omitted
+   *  by the category listing sheet, where the list is the page behind the
+   *  sheet and dragging down or tapping it away is the way back, and by the
+   *  desktop map's sidebar, whose way back is the ← in its search box. */
+  onBack?: () => void
+  /** What the search that opened it matched — see PlaceDetailBody's `found`. */
+  found?: SearchFound | null
+  /** The upvote control, under the name. The directory's sheet passes its
+   *  own, wired to re-sort its list (`null` where the category has upvotes
+   *  off); left out — the map — this renders a plain one, on the same gate
+   *  the directory uses. A recommendation is worth giving wherever the
+   *  place was found, not only where it changes a list's order (Oct 15). */
+  upvote?: ReactNode
+  /** Where it is, in the row's words ("Bustleton"). */
+  place?: string | null
+  /** The places nearby in the same category, after the listing: the
+   *  category's sheet passes them; the map has its own nearby list. */
+  onward?: Onward
+  /** Drawn in the desktop column: see ListingView's `wide`. */
+  wide?: boolean
+  /** See ListingView's `onwardClassName`. */
+  onwardClassName?: string
+  /** See ListingView's `titleAs`. */
+  titleAs?: 'h1' | 'h2'
+  /** Whether the editor has taken the listing's place, for a host whose
+   *  own controls are about the listing (ListingColumn's back and ‹ ›). */
+  onEditingChange?: (editing: boolean) => void
+  /** The desktop map's sidebar, whose ← in the search box is the editor's
+   *  way back (Oct 15): given, the editor's own ‹ is left out, and this
+   *  hears how to step back, and whether anything typed would be lost —
+   *  null when the listing is showing. */
+  onEditor?: (editor: HostedEditor | null) => void
 }
 
 /**
  * Full place details shown inline in the mobile map's bottom sheet — the
  * Google-Maps-style alternative to navigating away to the category
- * directory. Renders the same `PlaceDetailBody` the category directory's
+ * directory — and, since the category list stopped expanding inline, in
+ * that list's own listing sheet on a phone too (GenericListingCard), so a
+ * listing reads the same wherever it's opened. Renders the same `PlaceDetailBody` the category directory's
  * expanded listing card does (hours, tags, badges, davening times, freeform
  * fields, caveat notes), read-only (no filter callbacks — the map has no
- * such filters of its own), plus its own header, back button, and the same
- * FreshnessFooter/Share/Edit/Report bottom section GenericListingCard shows
- * once expanded — so a place reads (and can be corrected) the same whether
- * you found it here or in the category directory. Still doesn't show
- * upvote inline: that's a directory-list affordance (ranking search
- * results against each other), which doesn't mean anything for a single
- * place already selected on the map.
+ * such filters of its own), plus its own header and back button, the same
+ * FreshnessFooter line, and the same Edit listing / Request removal bar the
+ * directory shows, as the last thing in the content. So a place reads, and
+ * can be corrected and recommended, the same whether you found it here or in
+ * the category directory.
  */
-export default function MapPlaceDetail({ item, category, color, onBack }: Props) {
+export default function MapPlaceDetail({ item, category, color, onBack, found, upvote, place = null, onward, wide = false, onwardClassName, titleAs, onEditingChange, onEditor }: Props) {
   const community = useCommunitySlug()
   const listingPath = routes.listing(community, category.id, listingSlug(item))
-  const { isPinned } = usePinned()
-  const pinned = isPinned(item.id)
-  const iconImageUrl =
-    (typeof item[PHOTO_FIELD_KEY] === 'string' && (item[PHOTO_FIELD_KEY] as string).trim()
-      ? (item[PHOTO_FIELD_KEY] as string)
-      : category.iconImageUrl) ?? undefined
-  // Edit/Report swap this whole detail view for the same forms the category
-  // directory uses (ListingForm/ReportListing), same as GenericListingCard —
-  // just scoped to this one component instead of the whole screen, since the
-  // map has no separate "form view" of its own to navigate to. Returns to
-  // this same place's detail (not the list) on cancel or submit, since
-  // that's what was on screen before Edit/Report was tapped.
+  // Edit swaps this whole detail view for the listing-shaped editor
+  // (ListingEditor), same as the desktop listing dialog —
+  // scoped to this one component, since neither sheet it lives in has a
+  // separate "form view" of its own to navigate to. Returns to this same place's
+  // detail (not the list) on cancel or submit. Requesting a removal is part
+  // of that form (see RemovalRequest), so there's no separate Report view.
   //
-  // Gets its own history entry, nested on top of the one MobileNearbySheet's
-  // selectPlace already pushed for this place — so a swipe-back/browser-back
-  // out of the form lands on this place's detail, not the list underneath
-  // it or off the map entirely. Same pattern as that one; see its own
-  // comment for why (and CategoryEditor's openPreview/closePreview, the
-  // precedent both follow).
-  const [action, setAction] = useState<'edit' | 'report' | null>(null)
+  // It gets its own history entry, nested on top of the one
+  // MobileNearbySheet's selectPlace already pushed for this place — so a
+  // swipe-back/browser-back out of the form lands on this place's detail,
+  // not the list underneath it or off the map entirely. Same pattern as
+  // that one; see its own comment for why (and CategoryEditor's
+  // openPreview/closePreview, the precedent both follow).
+  const [formOpen, setFormOpen] = useState<'edit' | null>(null)
+  const [titleSlot, setTitleSlot] = useState<HTMLElement | null>(null)
+  // The editor's Request removal screen is a step of its own, one more
+  // history entry on top of the form's — so Back and the phone's back
+  // swipe step out of removal into the edit (what was typed there still
+  // there), not out of editing altogether. It has no Cancel of its own.
+  // Same as the desktop dialog (ListingDetailModal).
+  const [removalOpen, setRemovalOpen] = useState(false)
+  // Whether the editor holds anything typed and not yet sent.
+  const [changed, setChanged] = useState(false)
   useEffect(() => {
     function onPopState(e: PopStateEvent) {
-      const state = e.state as { mapSheetForm?: 'edit' | 'report' } | null
-      setAction(state?.mapSheetForm ?? null)
+      const state = e.state as { mapSheetForm?: 'edit'; mapSheetRemoval?: boolean } | null
+      const open = state?.mapSheetForm === 'edit' ? 'edit' : null
+      setFormOpen(open)
+      setRemovalOpen(open === 'edit' && !!state?.mapSheetRemoval)
     }
     window.addEventListener('popstate', onPopState)
     return () => window.removeEventListener('popstate', onPopState)
   }, [])
-  const openAction = (mode: 'edit' | 'report') => {
+  const openForm = (mode: 'edit') => {
     history.pushState({ ...(window.history.state ?? {}), mapSheetForm: mode }, '')
-    setAction(mode)
+    setChanged(false)
+    setFormOpen(mode)
   }
-  const closeAction = () => history.back()
+  // One step back: from removal to the edit, from the edit to the listing.
+  const stepBack = () => history.back()
+  // All the way out of the form — two entries back once a removal request
+  // has been sent from its own screen.
+  const closeForm = () => (removalOpen ? history.go(-2) : history.back())
+  const changeRemovalOpen = (open: boolean) => {
+    if (open === removalOpen) return
+    if (open) {
+      history.pushState({ ...(window.history.state ?? {}), mapSheetRemoval: true }, '')
+      setRemovalOpen(true)
+    } else stepBack()
+  }
+  // The bar's Request removal: straight to that screen, one
+  // history entry, so Back returns to the listing.
+  const openRemoval = () => {
+    history.pushState({ ...(window.history.state ?? {}), mapSheetForm: 'edit', mapSheetRemoval: true }, '')
+    setChanged(false)
+    setFormOpen('edit')
+    setRemovalOpen(true)
+  }
+  // A row of the editor open (or a minyan, a person in one): Back closes
+  // that, not the editor.
+  const [editorStep, setEditorStep] = useState<EditorStep | null>(null)
+  const back = () => (editorStep ? editorStep.back() : stepBack())
+  // Handed to a host that draws the back itself: a function that stays
+  // the same, calling whichever back is current.
+  const backRef = useRef(back)
+  useLayoutEffect(() => {
+    backRef.current = back
+  })
+  const hostedBack = useCallback(() => backRef.current(), [])
+  // Out of a row or Request removal, a step inside the edit; from the
+  // edit itself, the listing.
+  const backLabel = editorStep || removalOpen ? 'Back' : 'Back to listing'
+  useEffect(() => {
+    if (!onEditor) return
+    onEditor(formOpen ? { back: hostedBack, label: backLabel, changed } : null)
+  }, [onEditor, formOpen, hostedBack, backLabel, changed])
+  useEffect(() => () => onEditor?.(null), [onEditor])
+  // Opening or closing the form swaps everything inside the parent's scroll
+  // region, and that region stays mounted, so it would keep its offset: the
+  // bar is the LAST thing in the listing, so the form typically opened
+  // scrolled to the bottom, its Back and title out of view. A layout effect,
+  // so the wrong offset never paints.
+  const rootRef = useRef<HTMLDivElement>(null)
+  useLayoutEffect(() => {
+    const region = scrollingAncestor(rootRef.current)
+    if (region) region.scrollTop = 0
+  }, [formOpen])
+  useEffect(() => {
+    onEditingChange?.(formOpen !== null)
+  }, [formOpen, onEditingChange])
   const caps = resolveCapabilities(category.capabilities)
   const canEdit = ui.contributions.edit && caps.edit
   const canReport = ui.contributions.report && caps.report
+  const shownUpvote =
+    upvote !== undefined
+      ? upvote
+      : category.upvotesEnabled && ui.upvotes
+        ? <UpvoteButton variant="recommend" name={item.name} resourceId={item.id} count={item.upvotes ?? 0} />
+        : null
 
-  if (action === 'edit') {
-    return <ListingForm category={category} mode="edit" existing={item} onUp={closeAction} onSubmitted={closeAction} />
-  }
-  if (action === 'report') {
+  if (formOpen) {
     return (
-      <ReportListing listing={item} upLabel={category.pluralLabel} onUp={closeAction} onSubmitted={closeAction} />
+      <div ref={rootRef}>
+        {/* A chevron alone (BackIconButton) rather than naming a
+            destination: unlike "Back to list", which really does go to a
+            different screen, this returns to the same place you were
+            already on. The editor's title goes
+            in the middle of the same row, as it does between the desktop
+            dialog's Back and Close; the empty third column keeps it
+            centred. Left out where the host draws the back (onEditor):
+            the desktop sidebar's ← in its search box, one arrow on screen
+            and always in the same place (Oct 15). */}
+        <div className="mb-3 grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+          <span>{!onEditor && <BackIconButton onClick={back} />}</span>
+          <div ref={setTitleSlot} className="min-w-0 text-center text-base" />
+        </div>
+        <ListingEditor
+          item={item}
+          category={category}
+          onClose={closeForm}
+          titleSlot={titleSlot}
+          removalOpen={removalOpen}
+          onRemovalOpenChange={changeRemovalOpen}
+          onStep={setEditorStep}
+          onHasChanges={setChanged}
+        />
+      </div>
     )
   }
 
   return (
-    <div className="space-y-4 pb-2">
-      <button
-        onClick={onBack}
-        className="inline-flex items-center gap-1 text-sm font-medium text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
-      >
-        <ChevronLeftIcon className="h-4 w-4" />
-        Back to list
-      </button>
-
-      {/* ── Header: icon, name, category, pin ────────────────────────────── */}
-      <div className="flex items-start gap-3">
-        {/* Same PinnedBadge GenericListingCard/NearbyList put on their own
-            avatars — self-start moved to this wrapper so the badge can
-            anchor to the same box without disturbing the icon's position. */}
-        <span className="relative shrink-0 self-start">
-          <CategoryIcon
-            icon={category.icon}
-            categoryId={category.id}
-            iconImageUrl={iconImageUrl}
-            color={color}
-            className="h-12 w-12 text-2xl"
-            sizePx={48}
+    <div ref={rootRef} className="space-y-4 pb-2">
+      {/* The chevron alone (Oct 15), in the top-left spot the editor's ‹
+          takes, rather than "‹ Back to list" in words; screen readers
+          still hear where it goes. */}
+      {onBack && (
+        <div>
+          <BackIconButton label="Back to list" onClick={onBack} />
+        </div>
+      )}
+      <ListingView
+        item={item}
+        category={category}
+        color={color}
+        place={place}
+        found={found}
+        path={listingPath}
+        onward={onward}
+        upvote={shownUpvote}
+        wide={wide}
+        onwardClassName={onwardClassName}
+        titleAs={titleAs}
+        foot={
+          // Edit listing, and Request removal beside it. Rendered only
+          // where the listing can be edited (ListingEditBar).
+          <ListingEditBar
+            onEdit={canEdit ? () => openForm('edit') : undefined}
+            onRequestRemoval={canEdit && canReport ? openRemoval : undefined}
+            item={item}
+            category={category}
           />
-          {pinned && <PinnedBadge />}
-        </span>
-        {/* min-w-0 flex-1 — the kebab used to sit right after the name
-            (back when this spot held a text-label Pin button, short and
-            meant to read as part of the name line) instead of at the row's
-            far edge. Now that it's an icon-only overflow menu, the far edge
-            is the more standard spot for it (same trailing placement the
-            directory card's own kebab already uses) — flex-1 here is what
-            pushes it there regardless of how short the name is.
-            No top padding either — self-start on the icon above already
-            puts its top edge flush with this block's, i.e. with the name's
-            first line. A pt would reintroduce exactly the few-pixel gap
-            that made the icon and the name look unaligned in the first
-            place. */}
-        <div className="min-w-0 flex-1">
-          <h2 className="text-lg font-bold leading-tight text-slate-900">
-            <Link href={listingPath} className="hover:underline">
-              {item.name}
-            </Link>
-          </h2>
-          <p className="text-sm text-muted">{category.label}</p>
-        </div>
-        {/* self-center — was self-start (the flex row's own default,
-            un-overridden) until this centered against just the name line
-            instead of the whole name+category block. Reversed to match the
-            category directory's own kebab (GenericListingCard), which
-            centers against its full header block for the same reason:
-            Material Design's own guidance is that a row's leading/trailing
-            elements center against the row as a whole, not just its first
-            line — a rule this component used to make a deliberate exception
-            to, before that same rule got applied elsewhere in the app.
-            Mocked up first (both options, side by side) before this landed.
-            Pin/Share/"Set location" all live behind this one menu now — see
-            ListingActionsMenu — so there's no separate Share button in the
-            footer below any more, and PlaceDetailBody's own address row has
-            no SetLocationButton either. */}
-        {/* mr-1 — a small trailing gap so the kebab doesn't sit flush
-            against this edge-to-edge mobile sheet's own true edge, matching
-            Spotify's own overflow-menu spacing rather than butting right up
-            against it. (Which way the dropdown itself opens is measured
-            automatically — see ListingActionsMenu's own doc.) */}
-        <ListingActionsMenu
-          item={item}
-          category={category}
-          path={listingPath}
-          className="mr-1 self-center"
-        />
-      </div>
-
-      {/* This has never had a persistent collapsed-row header the way
-          GenericListingCard's mobile accordion does — a showInHeader url
-          field (e.g. Networking's Website link) had nowhere to show at all
-          here. See the prop's own comment. */}
-      <PlaceDetailBody item={item} category={category} includeHeaderUrlFields />
-
-      <div className="pt-2 border-t border-slate-200 space-y-2">
-        <FreshnessFooter resourceId={item.id} confirmedAt={item.confirmedAt} />
-        <div className="flex gap-3">
-          {canEdit && (
-            <button
-              onClick={() => openAction('edit')}
-              className="inline-flex items-center gap-1 text-xs text-muted hover:text-primary transition-colors cursor-pointer"
-            >
-              <PencilIcon className="h-3.5 w-3.5" /> Edit
-            </button>
-          )}
-          {canReport && (
-            <button
-              onClick={() => openAction('report')}
-              className="inline-flex items-center gap-1 text-xs text-muted hover:text-red-600 transition-colors cursor-pointer"
-            >
-              <FlagIcon className="h-3.5 w-3.5" /> Report
-            </button>
-          )}
-        </div>
-      </div>
+        }
+      />
     </div>
   )
 }

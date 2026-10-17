@@ -47,3 +47,23 @@ export function useIsMobile(query = '(max-width: 639px), (max-height: 639px)'): 
 
   return forced ?? isMobile
 }
+
+/** True only once this screen has been measured and is a computer's. Not
+ *  `!useIsMobile()`, which is true on a phone too until the measuring: a
+ *  phone's first render is the computer layout (Oct 16), and a link that
+ *  prefetches on that render costs the phone the target page's code. For a
+ *  computer-only thing to do, like prefetching a computer-only card's link. */
+export function useIsDesktop(query = '(max-width: 639px), (max-height: 639px)'): boolean {
+  const forced = useContext(ForcedViewportContext)
+  const [isDesktop, setIsDesktop] = useState(false)
+
+  useEffect(() => {
+    const mql = window.matchMedia(query)
+    const update = () => setIsDesktop(!mql.matches)
+    update()
+    mql.addEventListener('change', update)
+    return () => mql.removeEventListener('change', update)
+  }, [query])
+
+  return forced === null ? isDesktop : !forced
+}

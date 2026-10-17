@@ -4,7 +4,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { track } from '@vercel/analytics'
 import { resourceCards, groupCardsIntoSections, useEntryCards } from '@/components/home/sections'
-import FeedbackForm from '@/components/FeedbackForm'
+import dynamic from 'next/dynamic'
 import { CategoryGlyph } from '@/lib/categoryIcons'
 import { useCategories } from '@/lib/useCategories'
 import { useSiteSettings } from '@/lib/useSiteSettings'
@@ -13,6 +13,10 @@ import { useCommunitySlug } from '@/lib/communityContext'
 import { useHomeSections } from '@/lib/useHomeSections'
 import { routes } from '@/lib/routes'
 import { DEFAULT_DESKTOP_NAV_ITEMS, type DesktopNavItem } from '@/lib/siteSettings'
+
+// Loaded when Feedback is first opened (it carries the anti-spam check), not
+// with every page's header.
+const FeedbackForm = dynamic(() => import('@/components/FeedbackForm'), { loading: () => null })
 
 /** How long a mega-menu stays open after the pointer leaves — same value and
  *  same reason as SectionTabs used to use: without it, the gap between the
@@ -29,8 +33,9 @@ type OpenPanel = string | null
  *  'map' with no Map category, or a category that's since been deleted). */
 function resolveHref(target: string, hrefById: Map<string, string>, communitySlug: string, hasMap: boolean): string | null {
   if (target === 'map') return hasMap ? routes.map(communitySlug) : null
-  if (target === 'about') return '/about'
-  if (target === 'privacy') return '/privacy'
+  if (target === 'you') return routes.you(communitySlug)
+  if (target === 'about') return routes.about(communitySlug)
+  if (target === 'privacy') return routes.privacy(communitySlug)
   if (target === 'feedback') return null
   return hrefById.get(target) ?? null
 }
@@ -278,6 +283,12 @@ export default function HeaderNav() {
             <Link
               key={item.id}
               href={href}
+              // Not the Map: prefetched, every desktop page downloaded the
+              // Map's code with its own (106 KB on the home, over its 400
+              // KB budget; the user, Oct 13). It loads when it's opened.
+              // Nor You, which carries the home's search to ask saved
+              // searches again.
+              prefetch={item.target === 'map' || item.target === 'you' ? false : undefined}
               className="whitespace-nowrap text-sm font-semibold text-slate-700 transition-colors hover:text-primary"
             >
               {item.label}

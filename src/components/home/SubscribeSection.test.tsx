@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { makeCategory } from '@/test/providerFixtures'
@@ -148,6 +148,66 @@ describe('SubscribeSection', () => {
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
     const body = JSON.parse(fetchMock.mock.calls[0][1].body)
     expect(body.categories).toBeNull()
+  })
+
+  // jsdom never actually lays anything out — every element's scrollWidth/
+  // clientWidth read 0 by default, real or truncated — so the "is this name
+  // actually cut off" check (handleCategoryRowEnter's own scrollWidth vs.
+  // clientWidth comparison) needs those stubbed to mean something here.
+  function stubTruncated(el: Element, isTruncated: boolean) {
+    Object.defineProperty(el, 'scrollWidth', { configurable: true, value: isTruncated ? 200 : 100 })
+    Object.defineProperty(el, 'clientWidth', { configurable: true, value: 100 })
+  }
+
+  // Regression coverage for a real tradeoff: this used to be the native
+  // `title` attribute, which every browser gates behind a ~1s hover delay
+  // with no way to shorten it — replaced with a custom tooltip that mounts
+  // after a much shorter, deliberate delay instead. An earlier version of
+  // that fix used CSS group-hover (always in the DOM, just opacity-0), which
+  // put a second copy of the row's own label text in the DOM the whole
+  // time — confirmed live as `getByText('Grocery Stores')` in the test above
+  // this one becoming ambiguous. This asserts the tooltip text genuinely
+  // isn't in the DOM until the delay elapses, and is gone again on
+  // mouse-leave — not just invisible.
+  it('shows the category tooltip after a short delay on hover, not instantly, and removes it on mouse-leave', () => {
+    vi.useFakeTimers()
+    try {
+      renderWithProviders(<SubscribeSection />, { content: { categories: [grocery] } })
+      fireEvent.click(screen.getByRole('button', { name: /All categories/ }))
+      const row = screen.getByText('Grocery Stores').closest('label')!
+      stubTruncated(row.querySelector('.truncate')!, true)
+
+      fireEvent.mouseEnter(row)
+      expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
+
+      act(() => vi.advanceTimersByTime(150))
+      expect(screen.getByRole('tooltip')).toHaveTextContent('Grocery Stores')
+
+      fireEvent.mouseLeave(row)
+      expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  // The other half of the same tradeoff: a name that already fits has
+  // nothing for a tooltip to reveal, so hovering it — even for a while —
+  // should never show one repeating text that's already fully visible.
+  it('never shows a tooltip for a category name that already fits (not actually truncated)', () => {
+    vi.useFakeTimers()
+    try {
+      renderWithProviders(<SubscribeSection />, { content: { categories: [grocery] } })
+      fireEvent.click(screen.getByRole('button', { name: /All categories/ }))
+      const row = screen.getByText('Grocery Stores').closest('label')!
+      stubTruncated(row.querySelector('.truncate')!, false)
+
+      fireEvent.mouseEnter(row)
+      act(() => vi.advanceTimersByTime(150))
+
+      expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('refuses to submit when both New listings and Closures are unchecked', async () => {

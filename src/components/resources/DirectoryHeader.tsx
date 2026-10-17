@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
-import Breadcrumb from '@/components/Breadcrumb'
-import AddressPrompt from './AddressPrompt'
+import DistanceNote from './DistanceNote'
+import { ChevronLeftIcon, PinIcon } from '@/components/icons'
 
 type Props = {
   /** The category/section title (e.g. "Synagogues", "Which hospital?"). */
@@ -8,40 +8,26 @@ type Props = {
   /** Listing count shown after a dot separator. Omit to hide the count entirely
    *  (e.g. the hospitals list, which isn't a counted directory). */
   count?: number
-  /** Same distinction the home screen's category tiles make (see
-   *  home/sections.tsx's `cardCount`): a category whose listings have no
-   *  address isn't a set of places you can go to — WhatsApp Groups and
-   *  Networking are the live cases — so the count reads "N listings" there
-   *  and "N places" everywhere else, rather than always saying "listings"
-   *  regardless of what the category actually is. Defaults to true (most
-   *  categories have addresses), matching `hasAddress !== false` elsewhere. */
-  hasAddress?: boolean
   /** Location label shown under the title once a location is set (typed address
    *  or hospital name). Takes precedence over the address prompt. */
   anchorLabel?: string
-  /** When true and no anchorLabel, show the "Set location" prompt under the title. */
+  /** When true and no anchorLabel, say where the list's distances are
+   *  measured from, with "Use my location" (DistanceNote), under the title —
+   *  desktop only; mobile's own copy is at the top of the page
+   *  (GenericDirectory). */
   addressPrompt?: boolean
   /** Right-aligned action buttons (Map, Add). Wrapped in a shrink-0 flex row. */
   actions?: ReactNode
-  /** Ancestor label for the desktop-only Breadcrumb above the heading —
-   *  mirrors the UpButton every caller already renders beside this component
-   *  ("Home" on mobile, "All resources" on desktop for most callers; see
-   *  GenericDirectory's own upLabel doc). Both this and onUp are required
-   *  together or omitted together; a caller that doesn't pass them just gets
-   *  no breadcrumb line, same as before this existed. */
-  upLabel?: string
-  onUp?: () => void
   /** True for a caller whose title is also shown in SiteHeader on mobile
    *  (GenericDirectory, via useSetScreenHeader) — visually hiding a second,
    *  identical "Food" directly under a mobile header already reading "‹
    *  Food" recovers real space with nothing lost, since the h1 role still
    *  needs to exist for a screen reader (`sr-only`, not removed) even where
-   *  it's redundant to a sighted visitor. Desktop never shows the title in
-   *  its header (Breadcrumb only names the "up" path, not this screen), so
-   *  the h1 there stays visible regardless of this prop. Left `false` for a
-   *  caller like HospitalsDirectory that still has its own mobile UpButton
-   *  instead of a header title — hiding its only visible title would leave
-   *  mobile with none at all. */
+   *  it's redundant to a sighted visitor. Desktop's header never swaps to a
+   *  per-screen title the way mobile's does, so the h1 there stays visible
+   *  regardless of this prop. Leave it `false` for a caller that has its own
+   *  mobile UpButton instead of a header title — hiding its only visible
+   *  title would leave mobile with none at all. */
   titleInHeader?: boolean
   /** Desktop-only category icon badge, shown above everything else in this
    *  header — see GenericDirectory's own doc on how this pairs (a matching
@@ -51,6 +37,12 @@ type Props = {
    *  category has no icon, or on mobile, where the home->category move
    *  already communicates hierarchy via its own directional slide instead. */
   banner?: ReactNode
+  /** A computer's way back, small, over the title: "‹ Synagogues" over
+   *  "Minyanim by time" (Oct 6). A phone's is the header's ‹. */
+  up?: { label: string; onClick: () => void }
+  /** Only the badge and, for a screen reader, the title: an opened listing
+   *  on a computer has the top of the page, with its own way back. */
+  titleOnly?: boolean
 }
 
 // Shared heading block for every directory: the title plus the location/count
@@ -58,20 +50,56 @@ type Props = {
 // rules — live in ONE place instead of being copy-pasted (and drifting) across
 // the synagogue, generic, and hospital directories.
 //
-// Mobile density: the listing count is supplementary, so it's hidden on small
-// screens (`hidden desktop:*`) to keep the header from crowding next to the
-// location label or the "Set location" prompt. The count always shows on
-// desktop.
-export default function DirectoryHeader({ title, count, hasAddress, anchorLabel, addressPrompt, actions, upLabel, onUp, titleInHeader, banner }: Props) {
-  const noun = hasAddress === false ? 'listing' : 'place'
-  const countText = count != null ? `${count} ${noun}${count !== 1 ? 's' : ''}` : null
+// Mobile density: the RESOLVED location label, the listing count, AND the
+// unset "Set location" prompt are all desktop-only now (`hidden desktop:*`).
+// The resolved address and the count don't need repeating here on mobile:
+// the address stays reachable exactly the way it always has been, one tap on
+// the header's own location pin (see LocationControl), and the count moved
+// nowhere in particular — it just isn't shown twice. The unset prompt used
+// to be the exception (a real call to action, so it kept its mobile presence
+// and grew to fill this row instead of shrinking away) — it now has its own
+// full-width, bigger `banner` variant at the very top of the mobile page
+// instead (GenericDirectory), separated from the search bar it used to sit
+// right above here. Desktop is unchanged either way: there's room, and
+// desktop's compact `inline` variant stays right here next to the title.
+export default function DirectoryHeader({ title, count, anchorLabel, addressPrompt, actions, titleInHeader, banner, up, titleOnly }: Props) {
+  const countText = count != null ? `${count} listing${count !== 1 ? 's' : ''}` : null
 
   return (
     <div>
       {banner}
-      {upLabel && onUp && <Breadcrumb upLabel={upLabel} onUp={onUp} title={title} />}
+      {/* Holds open the vertical space the desktop-only Breadcrumb used to
+          take up here (removed — it repeated the title text right below it,
+          e.g. "All resources / Grocery" directly above an h1 that already
+          said "Grocery"). Kept as a bare spacer, not deleted outright: the
+          icon badge above and the heading below read as glued together
+          without it, sized to match Breadcrumb's own box exactly (its
+          text-sm line height plus its default mb-2). mb-[0.5rem], not mb-2 —
+          same 8px margin, but a literal-value class so this element doesn't
+          also match a `.mb-2` selector meant for the row below (see this
+          component's own test). */}
+      {up ? (
+        <div className="hidden desktop:flex h-5 mb-[0.5rem] items-center" data-testid="directory-up">
+          <button type="button" onClick={up.onClick} className="-ml-1 flex cursor-pointer items-center gap-0.5 rounded-md px-1 text-sm font-bold text-primary hover:underline">
+            <ChevronLeftIcon className="h-4 w-4" />
+            {up.label}
+          </button>
+        </div>
+      ) : (
+        <div className="hidden desktop:block h-5 mb-[0.5rem]" aria-hidden="true" />
+      )}
+      {titleOnly ? (
+        <h1 className="sr-only">{title}</h1>
+      ) : (
       <div className="flex items-end justify-between gap-2 mb-2">
-        <div>
+        {/* w-full desktop:w-auto: harmless leftover from when the unset
+            the unset-location prompt below needed this column to stretch on mobile —
+            that branch is desktop-only now (see its own comment), so
+            nothing here actually needs the mobile stretch any more, but it
+            doesn't hurt the other branches either, which size to their own
+            content either way. Reverts on desktop so this stays a normal
+            auto-width flex item there, same as `actions` beside it. */}
+        <div className="w-full desktop:w-auto">
           {/* h1, not h2: this is the page's own main heading (every category
               directory, the synagogue/hospitals directories, all share this
               component) — every other top-level screen in the app (home,
@@ -81,7 +109,25 @@ export default function DirectoryHeader({ title, count, hasAddress, anchorLabel,
               h1 at all. */}
           <h1 className={`text-xl font-semibold text-slate-800 ${titleInHeader ? 'sr-only desktop:not-sr-only' : ''}`}>{title}</h1>
           {anchorLabel ? (
-            <p className="text-sm text-muted mt-0.5">
+            // desktop:flex, not shown on mobile at all — see this file's
+            // own doc above on why a resolved address no longer repeats
+            // here on mobile (it's a tap away via the header's own location
+            // pin regardless). Plain text-sm text-muted here — the
+            // text-base/font-medium/slate-600 weight bump this briefly went
+            // through was aimed at mobile, where this line used to be the
+            // only content in the row; that reasoning never applied to
+            // desktop, which still has the visible h1 and a real Add button
+            // doing the heavy lifting, so it's reverted back to how it
+            // looked before that sequence of changes.
+            <p className="hidden desktop:flex items-center gap-1 text-sm text-muted mt-0.5">
+              {/* Without this, a named-place anchor (a hospital, or an
+                  address typed as a landmark) reads as plain text right
+                  under the heading — easy to mistake for content rather
+                  than "this is where you're anchored." The unset state
+                  right below (DistanceNote) already pairs its own line
+                  with this same pin; this just matches it once a location
+                  actually is set. */}
+              <PinIcon className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
               {anchorLabel}
               {countText && (
                 <>
@@ -91,10 +137,12 @@ export default function DirectoryHeader({ title, count, hasAddress, anchorLabel,
               )}
             </p>
           ) : addressPrompt ? (
-            <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
-              <AddressPrompt />
+            // Desktop only — phones get the same line at the top of the page
+            // (GenericDirectory).
+            <div className="hidden desktop:flex items-center gap-1.5 mt-1 flex-wrap">
+              <DistanceNote />
               {countText && (
-                <span className="hidden desktop:inline text-sm text-muted">
+                <span className="text-sm text-muted">
                   <span aria-hidden="true" className="mr-1">·</span>{countText}
                 </span>
               )}
@@ -107,6 +155,7 @@ export default function DirectoryHeader({ title, count, hasAddress, anchorLabel,
         </div>
         {actions && <div className="flex items-center gap-2 shrink-0">{actions}</div>}
       </div>
+      )}
     </div>
   )
 }

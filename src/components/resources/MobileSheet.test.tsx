@@ -1,0 +1,712 @@
+// @vitest-environment jsdom
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { lazy, Suspense, useState } from 'react'
+import MobileSheet from './MobileSheet'
+
+afterEach(cleanup)
+
+// Mirrors the component's own SNAP_DURATION_MS — not imported since it isn't
+// exported (an internal implementation detail), but the closing-animation
+// timer test below needs to know it to assert the unmount timing precisely.
+const SNAP_DURATION_MS = 280
+
+describe('MobileSheet', () => {
+  it('renders nothing when closed', () => {
+    render(
+      <MobileSheet isOpen={false} onClose={vi.fn()} title="Edit listing">
+        <p>form contents</p>
+      </MobileSheet>,
+    )
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('shows the title and children when open', () => {
+    render(
+      <MobileSheet isOpen onClose={vi.fn()} title="Edit listing">
+        <p>form contents</p>
+      </MobileSheet>,
+    )
+    expect(screen.getByRole('dialog', { name: 'Edit listing' })).toBeInTheDocument()
+    expect(screen.getByText('form contents')).toBeInTheDocument()
+  })
+
+  it('closes on the header close button', async () => {
+    const user = userEvent.setup()
+    const onClose = vi.fn()
+    render(
+      <MobileSheet isOpen onClose={onClose} title="Edit listing">
+        <p>form contents</p>
+      </MobileSheet>,
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Close' }))
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('closes on a backdrop click, but not on a click inside the sheet', async () => {
+    const user = userEvent.setup()
+    const onClose = vi.fn()
+    render(
+      <MobileSheet isOpen onClose={onClose} title="Edit listing">
+        <p>form contents</p>
+      </MobileSheet>,
+    )
+
+    await user.click(screen.getByRole('dialog'))
+    expect(onClose).not.toHaveBeenCalled()
+
+    await user.click(screen.getByRole('presentation'))
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  // Found while testing note 11 (Oct 10): selecting text and letting go past
+  // the sheet's edge is a press inside and a release outside, which the
+  // browser reports as a click on the backdrop.
+  it('doesn’t close when a press inside the sheet is let go outside it', async () => {
+    const user = userEvent.setup()
+    const onClose = vi.fn()
+    render(
+      <MobileSheet isOpen onClose={onClose} title="Add or update a place">
+        <p>form contents</p>
+      </MobileSheet>,
+    )
+    await user.pointer([{ keys: '[MouseLeft>]', target: screen.getByText('form contents') }, { target: screen.getByRole('presentation') }, { keys: '[/MouseLeft]' }])
+    expect(onClose).not.toHaveBeenCalled()
+  })
+
+  it('closes on Escape', async () => {
+    const user = userEvent.setup()
+    const onClose = vi.fn()
+    render(
+      <MobileSheet isOpen onClose={onClose} title="Edit listing">
+        <p>form contents</p>
+      </MobileSheet>,
+    )
+
+    await user.keyboard('{Escape}')
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  // Regression coverage for a real, measured bug (not just "poofs away" — see
+  // the next test for that one): in the real caller (FindResources),
+  // `onClose` doesn't just flip a local boolean — it's goToCategoryList,
+  // which pushes a URL change and only comes back around to actually update
+  // this component's `isOpen` PROP once that navigation's own re-render
+  // lands. Waiting for that round trip before starting the exit transition
+  // meant the sheet visibly sat there, fully open, for however long the
+  // round trip took — confirmed live as the sheet's own transform still
+  // reading unchanged 150ms after tapping Close. A plain `vi.fn()` for
+  // `onClose` reproduces the same shape here: it never touches `isOpen` at
+  // all, so if this component were still waiting on that prop, it would
+  // still show `translateY(0)` after being clicked. It shouldn't — the exit
+  // animation has to start from the click itself, not from a prop the
+  // caller may take a while to come back around on.
+  // Drawn into <body>, not where it's rendered: a page's content rises into
+  // place with a transform as it appears, and a `fixed` sheet inside it was
+  // measured from that moving box and sat under the site header, so a tap
+  // at the top to close it hit the header's back button (BodyPortal).
+  it('is drawn straight into the page body, whatever it’s rendered inside', () => {
+    const { container } = render(
+      <div style={{ transform: 'translateY(6px)' }}>
+        <MobileSheet isOpen onClose={vi.fn()} title="Goldie">
+          <p>details</p>
+        </MobileSheet>
+      </div>,
+    )
+    const backdrop = screen.getByRole('dialog', { name: 'Goldie' }).parentElement!
+    expect(backdrop.parentElement).toBe(document.body)
+    expect(container).not.toContainElement(backdrop)
+  })
+
+  it('starts sliding closed immediately when dismissed, without waiting for the caller to update the isOpen prop', async () => {
+    const user = userEvent.setup()
+    const onClose = vi.fn() // deliberately never flips `isOpen` — see doc above
+    render(
+      <MobileSheet isOpen onClose={onClose} title="Edit listing">
+        <p>form contents</p>
+      </MobileSheet>,
+    )
+    const sheet = document.body.querySelector('[role="dialog"]') as HTMLElement
+
+    await user.click(screen.getByRole('button', { name: 'Close' }))
+
+    expect(onClose).toHaveBeenCalledTimes(1)
+    expect(sheet.style.transform).toBe('translateY(100%)')
+  })
+
+  // Regression coverage for "poofs away" instead of sliding down: this used
+  // to unmount the instant `isOpen` went false, well before any exit
+  // transition could be seen. Now it stays mounted, translated off-screen
+  // via a transition, until a timer matching that transition's own duration
+  // unmounts it — see the component's own Phase doc for why a plain
+  // isOpen boolean couldn't do this.
+  it('slides down over a moment when closed, instead of vanishing the instant isOpen goes false', () => {
+    // try/finally: a failed assertion here must not leave fake timers
+    // active for whichever test runs next in this file — that's exactly
+    // what happened once already (an assertion failure skipped the
+    // useRealTimers() call below, and the next test hung for a full 5s
+    // waiting on a real timer that fake-timer mode was intercepting).
+    vi.useFakeTimers()
+    try {
+      const { rerender } = render(
+        <MobileSheet isOpen onClose={vi.fn()} title="Edit listing">
+          <p>form contents</p>
+        </MobileSheet>,
+      )
+      const sheet = () => document.body.querySelector('[role="dialog"]') as HTMLElement | null
+      expect(sheet()?.style.transform).toBe('translateY(0)')
+
+      rerender(
+        <MobileSheet isOpen={false} onClose={vi.fn()} title="Edit listing">
+          <p>form contents</p>
+        </MobileSheet>,
+      )
+      // Still on screen right after isOpen flips, now sliding down.
+      expect(sheet()).not.toBeNull()
+      expect(sheet()?.style.transform).toBe('translateY(100%)')
+
+      act(() => { vi.advanceTimersByTime(SNAP_DURATION_MS - 1) })
+      expect(sheet()).not.toBeNull()
+
+      act(() => { vi.advanceTimersByTime(1) })
+      expect(sheet()).toBeNull()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  // Oct 10: a sheet opened from inside another takes its place, with Back
+  // to it, instead of sliding up over it.
+  describe('one sheet at a time', () => {
+    function Stacked({ onListingClose = vi.fn() }: { onListingClose?: () => void }) {
+      const [edit, setEdit] = useState(false)
+      return (
+        <>
+          <MobileSheet isOpen onClose={onListingClose} title="Shtetl" draggable surface>
+            <button type="button" onClick={() => setEdit(true)}>Edit</button>
+          </MobileSheet>
+          <MobileSheet isOpen={edit} onClose={() => setEdit(false)} title="Shabbos friendly">
+            <p>the edit</p>
+          </MobileSheet>
+        </>
+      )
+    }
+
+    it('hides the sheet underneath while another is open from it, and Back returns to it', async () => {
+      const user = userEvent.setup()
+      render(<Stacked />)
+      await user.click(screen.getByRole('button', { name: 'Edit' }))
+
+      expect(screen.getByRole('dialog', { name: 'Shabbos friendly' })).toBeVisible()
+      expect(screen.queryByRole('dialog', { name: 'Shtetl' })).not.toBeInTheDocument()
+      expect(screen.getByText('Edit', { selector: 'button' })).not.toBeVisible()
+
+      await user.click(screen.getByRole('button', { name: /back/i }))
+      expect(await screen.findByRole('dialog', { name: 'Shtetl' })).toBeVisible()
+    })
+
+    // Oct 16: slid up, not appearing all at once ("very aggressively"); the
+    // one under it goes out of sight only once it's covered.
+    it('slides up into its place at full height, with no second dimmed backdrop', async () => {
+      const user = userEvent.setup()
+      render(<Stacked />)
+      await user.click(screen.getByRole('button', { name: 'Edit' }))
+      const sheet = screen.getByRole('dialog', { name: 'Shabbos friendly' })
+      expect(sheet.style.height).toBe(`${window.innerHeight - 76}px`)
+      expect(sheet.className).toContain('animate-[sheetUp')
+      expect(sheet.parentElement!.className).not.toContain('bg-slate-900')
+      const under = document.querySelector<HTMLElement>('[role="dialog"][aria-label="Shtetl"]')!
+      expect(under.style.visibility).toBe('hidden')
+      expect(under.style.transition).toContain('visibility 0s linear 220ms')
+    })
+
+    // Found on dev: the "+ Add" box's code loading the first time hid the
+    // page for a moment, which registered its sheets again, inner first, and
+    // the listing came back over the edit opened inside it.
+    it('keeps the order they opened in when the page is hidden for a moment while code loads', async () => {
+      let loaded!: () => void
+      const Later = lazy(() => new Promise<{ default: () => null }>((r) => (loaded = () => r({ default: () => null }))))
+      function Page() {
+        const [edit, setEdit] = useState(false)
+        const [more, setMore] = useState(false)
+        return (
+          <Suspense fallback={null}>
+            <MobileSheet isOpen onClose={vi.fn()} title="Mekor" draggable surface>
+              <button type="button" onClick={() => setEdit(true)}>Edit</button>
+              <MobileSheet isOpen={edit} onClose={() => setEdit(false)} title="Usual Shabbos times">
+                <button type="button" onClick={() => setMore(true)}>Whole schedule</button>
+              </MobileSheet>
+            </MobileSheet>
+            {more && <Later />}
+          </Suspense>
+        )
+      }
+      const user = userEvent.setup()
+      render(<Page />)
+      await user.click(screen.getByRole('button', { name: 'Edit' }))
+      await user.click(screen.getByRole('button', { name: 'Whole schedule' }))
+      await act(async () => loaded())
+
+      expect(await screen.findByRole('dialog', { name: 'Usual Shabbos times' })).toBeVisible()
+      expect(screen.queryByRole('dialog', { name: 'Mekor' })).not.toBeInTheDocument()
+    })
+
+    it('Escape and a tap outside close only the top sheet', async () => {
+      const user = userEvent.setup()
+      const onListingClose = vi.fn()
+      render(<Stacked onListingClose={onListingClose} />)
+      await user.click(screen.getByRole('button', { name: 'Edit' }))
+      await user.keyboard('{Escape}')
+      expect(onListingClose).not.toHaveBeenCalled()
+      expect(await screen.findByRole('dialog', { name: 'Shtetl' })).toBeVisible()
+
+      await user.click(screen.getByRole('button', { name: 'Edit' }))
+      fireEvent.click(screen.getByRole('dialog', { name: 'Shabbos friendly' }).parentElement!)
+      expect(onListingClose).not.toHaveBeenCalled()
+    })
+  })
+
+  it('renders no drag handle unless draggable is set', () => {
+    render(
+      <MobileSheet isOpen onClose={vi.fn()} title="Edit listing">
+        <p>form contents</p>
+      </MobileSheet>,
+    )
+    expect(screen.queryByRole('button', { name: 'Drag to resize' })).not.toBeInTheDocument()
+  })
+
+  describe('draggable', () => {
+    // jsdom's window.innerHeight is 768 — heights.half = round(768*0.5) =
+    // 384, heights.full = 768 - TOP_INSET_PX(76) = 692 (see the component's
+    // own HALF_FRACTION/TOP_INSET_PX).
+    const HALF_PX = 384
+    const FULL_PX = 692
+
+    it('opens at the half snap point', () => {
+      render(
+        <MobileSheet isOpen onClose={vi.fn()} title="Edit listing" draggable>
+          <p>form contents</p>
+        </MobileSheet>,
+      )
+      const sheet = document.body.querySelector('[role="dialog"]') as HTMLElement
+      expect(sheet.style.height).toBe(`${HALF_PX}px`)
+    })
+
+    it('tapping the handle (no movement) toggles between half and full', () => {
+      render(
+        <MobileSheet isOpen onClose={vi.fn()} title="Edit listing" draggable>
+          <p>form contents</p>
+        </MobileSheet>,
+      )
+      const sheet = document.body.querySelector('[role="dialog"]') as HTMLElement
+      const handle = screen.getByRole('button', { name: 'Drag to resize' })
+
+      fireEvent.pointerDown(handle, { clientY: 100 })
+      fireEvent.pointerUp(handle, { clientY: 100 })
+      expect(sheet.style.height).toBe(`${FULL_PX}px`)
+
+      fireEvent.pointerDown(handle, { clientY: 100 })
+      fireEvent.pointerUp(handle, { clientY: 100 })
+      expect(sheet.style.height).toBe(`${HALF_PX}px`)
+    })
+
+    // Regression coverage for the actual reason this exists: a plain
+    // fixed-height sheet (what this was before) has no way to get more
+    // room for a long form short of scrolling within it. Dragging the
+    // handle up should grow the sheet past `half`.
+    it('dragging the handle up grows the sheet toward full', () => {
+      render(
+        <MobileSheet isOpen onClose={vi.fn()} title="Edit listing" draggable>
+          <p>form contents</p>
+        </MobileSheet>,
+      )
+      const sheet = document.body.querySelector('[role="dialog"]') as HTMLElement
+      const handle = screen.getByRole('button', { name: 'Drag to resize' })
+
+      fireEvent.pointerDown(handle, { clientY: 500 })
+      fireEvent.pointerMove(handle, { clientY: 300 }) // finger moves up 200px — sheet grows
+      expect(Number.parseInt(sheet.style.height)).toBe(HALF_PX + 200)
+
+      fireEvent.pointerUp(handle, { clientY: 300 })
+      // Settled above the half/full midpoint — snaps the rest of the way to full.
+      expect(sheet.style.height).toBe(`${FULL_PX}px`)
+    })
+
+    // The actual gap this whole widening closes: a bare handle bar is a
+    // real but small target, noticeably smaller than what the map's own
+    // sheet feels like to grab (it gets "grab anywhere" from a scrolled-to-
+    // top list handing its own drag off to the sheet, not from a bigger
+    // handle there either — see onHandlePointerDown's own doc). Dragging
+    // from the title text itself — not the handle — should work exactly
+    // the same way.
+    it('dragging from the header title (not just the handle) also resizes the sheet', () => {
+      render(
+        <MobileSheet isOpen onClose={vi.fn()} title="Edit listing" draggable>
+          <p>form contents</p>
+        </MobileSheet>,
+      )
+      const sheet = document.body.querySelector('[role="dialog"]') as HTMLElement
+      const titleText = screen.getByText('Edit listing')
+
+      fireEvent.pointerDown(titleText, { clientY: 500 })
+      fireEvent.pointerMove(titleText, { clientY: 300 })
+      expect(Number.parseInt(sheet.style.height)).toBe(HALF_PX + 200)
+
+      fireEvent.pointerUp(titleText, { clientY: 300 })
+      expect(sheet.style.height).toBe(`${FULL_PX}px`)
+    })
+
+    // Now that every real caller (Add/Edit/Report) opens a draggable sheet,
+    // an explicit X reads as redundant noise alongside the backdrop tap,
+    // Escape, and drag-to-dismiss the whole header already offers — see the
+    // header's own doc. Dismissing still works without it.
+    it('renders no close button — a backdrop tap still dismisses it', async () => {
+      const user = userEvent.setup()
+      const onClose = vi.fn()
+      render(
+        <MobileSheet isOpen onClose={onClose} title="Edit listing" draggable>
+          <p>form contents</p>
+        </MobileSheet>,
+      )
+
+      expect(screen.queryByRole('button', { name: 'Close' })).not.toBeInTheDocument()
+
+      await user.click(screen.getByRole('presentation'))
+      expect(onClose).toHaveBeenCalledTimes(1)
+    })
+
+    // Matches Google Maps' own bottom sheet exactly now (see
+    // onContentPointerDown's own doc): at `half`, the content has no
+    // "browse without committing to full height" case — ANY drag over it
+    // resizes the sheet, the same as dragging the handle would, never
+    // scrolls. Opens at `half` by default, so this is the sheet's normal
+    // resting state, not a special setup.
+    it('at half, any drag over the content resizes the sheet instead of scrolling it', () => {
+      render(
+        <MobileSheet isOpen onClose={vi.fn()} title="Edit listing" draggable>
+          <p>form contents</p>
+        </MobileSheet>,
+      )
+      const sheet = document.body.querySelector('[role="dialog"]') as HTMLElement
+      const content = screen.getByText('form contents').parentElement as HTMLElement
+
+      fireEvent.pointerDown(content, { clientY: 500 })
+      fireEvent.pointerMove(content, { clientY: 300 }) // finger moves up 200px — same as dragging the handle up
+      expect(Number.parseInt(sheet.style.height)).toBe(HALF_PX + 200)
+
+      fireEvent.pointerUp(content, { clientY: 300 })
+      expect(sheet.style.height).toBe(`${FULL_PX}px`)
+    })
+
+    // The user's note 11 (Oct 10): dragging a finger to select what was
+    // pasted into the box moved the sheet. A touch in a text field, or one
+    // that's selecting text, is the browser's.
+    it('a drag that starts in a text field selects in it, and doesn’t move the sheet', () => {
+      render(
+        <MobileSheet isOpen onClose={vi.fn()} title="Add or update a place" draggable>
+          <textarea aria-label="Your message" defaultValue="Shacharis 7:15" />
+        </MobileSheet>,
+      )
+      const sheet = document.body.querySelector('[role="dialog"]') as HTMLElement
+      const box = screen.getByLabelText('Your message')
+      fireEvent.pointerDown(box, { clientY: 500 })
+      fireEvent.pointerMove(box, { clientY: 300 })
+      fireEvent.pointerUp(box, { clientY: 300 })
+      expect(sheet.style.height).toBe(`${HALF_PX}px`)
+    })
+
+    it('a long-press that starts selecting text stops moving the sheet, which goes back where it was', () => {
+      render(
+        <MobileSheet isOpen onClose={vi.fn()} title="Shtetl" draggable>
+          <p>Fish and chips, schnitzel</p>
+        </MobileSheet>,
+      )
+      const sheet = document.body.querySelector('[role="dialog"]') as HTMLElement
+      const text = screen.getByText('Fish and chips, schnitzel')
+      fireEvent.pointerDown(text, { clientY: 500 })
+      fireEvent.pointerMove(text, { clientY: 480 })
+      expect(Number.parseInt(sheet.style.height)).toBe(HALF_PX + 20)
+      // The browser selected a word under the finger.
+      const selected = vi.spyOn(document, 'getSelection').mockReturnValue({ isCollapsed: false } as Selection)
+      fireEvent.pointerMove(text, { clientY: 300 })
+      fireEvent.pointerUp(text, { clientY: 300 })
+      expect(sheet.style.height).toBe(`${HALF_PX}px`)
+      selected.mockRestore()
+    })
+
+    // The actual gap request #2 closed: pulling down on the FORM itself,
+    // once it's already scrolled to the top (jsdom's scrollTop is always 0,
+    // same state as a real form that fits without scrolling, or one already
+    // scrolled all the way up), used to just rubber-band the content in
+    // place — visually read as "the page" moving. It should hand off to the
+    // sheet instead, the same way the map's own list already does. Only
+    // reachable at `full` — see the previous test for `half`, where every
+    // drag already resizes the sheet regardless of scroll position.
+    it('at full, pulling down on the content once at the scroll top drags the sheet down, instead of the content trying to scroll/bounce on its own', () => {
+      let fakeNow = 0
+      const nowSpy = vi.spyOn(performance, 'now').mockImplementation(() => fakeNow)
+
+      render(
+        <MobileSheet isOpen onClose={vi.fn()} title="Edit listing" draggable>
+          <p>form contents</p>
+        </MobileSheet>,
+      )
+      const sheet = document.body.querySelector('[role="dialog"]') as HTMLElement
+      const handle = screen.getByRole('button', { name: 'Drag to resize' })
+      const content = screen.getByText('form contents').parentElement as HTMLElement
+
+      // Tap the handle (no movement) to reach `full` first — see the handle's
+      // own "tapping toggles between half and full" test.
+      fireEvent.pointerDown(handle, { clientY: 100 })
+      fireEvent.pointerUp(handle, { clientY: 100 })
+      expect(sheet.style.height).toBe(`${FULL_PX}px`)
+
+      fireEvent.pointerDown(content, { clientY: 300 })
+      fakeNow = 50
+      // A small initial move down is the handoff itself — the sheet doesn't
+      // move yet on this same event, same as the handle's own drag start.
+      fireEvent.pointerMove(content, { clientY: 310 })
+      fakeNow = 250
+      // 100px more over 200ms — comfortably under FLING_VELOCITY, so this
+      // settles on its own merits rather than getting nudged by a flick.
+      fireEvent.pointerMove(content, { clientY: 410 })
+      expect(Number.parseInt(sheet.style.height)).toBe(FULL_PX - 100)
+
+      fireEvent.pointerUp(content, { clientY: 410 })
+      nowSpy.mockRestore()
+      // Settled well above the half/full midpoint (553 vs 518.5) — snaps
+      // back to full rather than closing OR dropping to half, same
+      // resolution the handle's own drag would reach starting from the
+      // same height.
+      expect(sheet.style.height).toBe(`${FULL_PX}px`)
+    })
+
+    // Scrolling DOWN through the content (finger moving up, away from the
+    // top) is an ordinary scroll, not a handoff — only a drag that's already
+    // AT the top and continues pulling further down should ever reach the
+    // sheet. Only reachable at `full`, same as the previous test.
+    it('at full, scrolling the content away from the top does not resize the sheet', () => {
+      render(
+        <MobileSheet isOpen onClose={vi.fn()} title="Edit listing" draggable>
+          <p>form contents</p>
+        </MobileSheet>,
+      )
+      const sheet = document.body.querySelector('[role="dialog"]') as HTMLElement
+      const handle = screen.getByRole('button', { name: 'Drag to resize' })
+      const content = screen.getByText('form contents').parentElement as HTMLElement
+
+      fireEvent.pointerDown(handle, { clientY: 100 })
+      fireEvent.pointerUp(handle, { clientY: 100 })
+      expect(sheet.style.height).toBe(`${FULL_PX}px`)
+
+      fireEvent.pointerDown(content, { clientY: 400 })
+      fireEvent.pointerMove(content, { clientY: 300 }) // finger moves up — scrolls the content down, not the sheet
+      fireEvent.pointerUp(content, { clientY: 300 })
+
+      expect(sheet.style.height).toBe(`${FULL_PX}px`)
+    })
+
+    // Once the content is already scrolled away from the top, pulling down
+    // scrolls it back toward the top first — it should NOT jump straight to
+    // resizing the sheet just because the drag direction is downward. Only
+    // reachable at `full`, same as the previous two tests.
+    it('at full, pulling down while the content is scrolled away from the top scrolls it, rather than resizing the sheet', () => {
+      render(
+        <MobileSheet isOpen onClose={vi.fn()} title="Edit listing" draggable>
+          <p>form contents</p>
+        </MobileSheet>,
+      )
+      const sheet = document.body.querySelector('[role="dialog"]') as HTMLElement
+      const handle = screen.getByRole('button', { name: 'Drag to resize' })
+      const content = screen.getByText('form contents').parentElement as HTMLElement
+
+      fireEvent.pointerDown(handle, { clientY: 100 })
+      fireEvent.pointerUp(handle, { clientY: 100 })
+      expect(sheet.style.height).toBe(`${FULL_PX}px`)
+
+      content.scrollTop = 50 // not at the top yet
+
+      fireEvent.pointerDown(content, { clientY: 300 })
+      fireEvent.pointerMove(content, { clientY: 340 }) // pulls down 40px, well short of the 50px still separating it from the top
+      fireEvent.pointerUp(content, { clientY: 340 })
+
+      expect(sheet.style.height).toBe(`${FULL_PX}px`)
+      expect(content.scrollTop).toBe(10)
+    })
+
+    it('dragging the handle down past the dismiss threshold closes the sheet', () => {
+      const onClose = vi.fn()
+      render(
+        <MobileSheet isOpen onClose={onClose} title="Edit listing" draggable>
+          <p>form contents</p>
+        </MobileSheet>,
+      )
+      const handle = screen.getByRole('button', { name: 'Drag to resize' })
+
+      // half (384) down past DISMISS_FRACTION (0.5 of half = 192).
+      fireEvent.pointerDown(handle, { clientY: 500 })
+      fireEvent.pointerMove(handle, { clientY: 700 })
+      fireEvent.pointerUp(handle, { clientY: 700 })
+
+      expect(onClose).toHaveBeenCalledTimes(1)
+    })
+
+    // Regression coverage for the actual complaint: dismissing mid-drag used
+    // to snap the sheet's height back up to `half` (its last real snap
+    // point) and only THEN start a separate transform-based slide away —
+    // a visible double-motion, not the single continuous shrink a drag
+    // release should read as. Height is the only mechanism now (see
+    // currentHeight's own doc), so a dismiss should continue shrinking
+    // from wherever the drag already had it, straight to 0 — never back up
+    // to 384 (half) first.
+    it('dismissing mid-drag shrinks straight from wherever the drag left it, not back up to half height first', () => {
+      const onClose = vi.fn()
+      render(
+        <MobileSheet isOpen onClose={onClose} title="Edit listing" draggable>
+          <p>form contents</p>
+        </MobileSheet>,
+      )
+      const sheet = document.body.querySelector('[role="dialog"]') as HTMLElement
+      const handle = screen.getByRole('button', { name: 'Drag to resize' })
+
+      // half (384) down to 100px — well past the dismiss threshold (192).
+      fireEvent.pointerDown(handle, { clientY: 500 })
+      fireEvent.pointerMove(handle, { clientY: 784 })
+      fireEvent.pointerUp(handle, { clientY: 784 })
+
+      expect(onClose).toHaveBeenCalledTimes(1)
+      // The CSS transition then carries it the rest of the way down from
+      // whatever height this is — never all the way back up to 384 first.
+      expect(sheet.style.height).toBe('0px')
+    })
+
+    it('a small drag that stays above the dismiss threshold snaps back instead of closing', () => {
+      // Real elapsed time between two synchronous fireEvent calls is near
+      // zero, which would read a small pixel delta as an enormous px/ms
+      // velocity and trigger the SAME fling-detection path a genuine fast
+      // flick does — this test is specifically about a slow drag staying
+      // under that threshold, so it needs a realistic time gap between the
+      // down and move events.
+      //
+      // A plain `mockReturnValueOnce` queue (MobileNearbySheet's own tests'
+      // approach) isn't reliable here: React's Scheduler also reads
+      // performance.now() internally during render/commit, and can consume
+      // queued values before this component's own drag handlers ever run,
+      // desyncing which call gets which number. A mutable "current time"
+      // the mock always reads from isn't order-sensitive the same way — any
+      // extra calls in between just read whatever it's currently set to,
+      // and only advancing it right before firing each event controls the
+      // one thing this test actually needs: the gap our own two calls see.
+      let fakeNow = 0
+      const nowSpy = vi.spyOn(performance, 'now').mockImplementation(() => fakeNow)
+
+      const onClose = vi.fn()
+      render(
+        <MobileSheet isOpen onClose={onClose} title="Edit listing" draggable>
+          <p>form contents</p>
+        </MobileSheet>,
+      )
+      const sheet = document.body.querySelector('[role="dialog"]') as HTMLElement
+      const handle = screen.getByRole('button', { name: 'Drag to resize' })
+
+      fireEvent.pointerDown(handle, { clientY: 500 })
+      fakeNow = 200 // 50px over 200ms — well under FLING_VELOCITY
+      fireEvent.pointerMove(handle, { clientY: 550 }) // down 50px — nowhere near the dismiss threshold
+      fireEvent.pointerUp(handle, { clientY: 550 })
+
+      nowSpy.mockRestore()
+      expect(onClose).not.toHaveBeenCalled()
+      expect(sheet.style.height).toBe(`${HALF_PX}px`)
+    })
+
+    // Same reasoning as MobileNearbySheet's own pointerCancel coverage: the
+    // browser can take a touch over mid-gesture (most commonly an edge
+    // swipe recognized as its own back-navigation) — that should drop the
+    // drag, not resolve it into a dismiss the visitor never actually
+    // completed.
+    it('a pointer cancel drops the drag without dismissing or changing the snap point', () => {
+      const onClose = vi.fn()
+      render(
+        <MobileSheet isOpen onClose={onClose} title="Edit listing" draggable>
+          <p>form contents</p>
+        </MobileSheet>,
+      )
+      const sheet = document.body.querySelector('[role="dialog"]') as HTMLElement
+      const handle = screen.getByRole('button', { name: 'Drag to resize' })
+
+      fireEvent.pointerDown(handle, { clientY: 500 })
+      fireEvent.pointerMove(handle, { clientY: 750 }) // well past the dismiss threshold, mid-drag
+      fireEvent.pointerCancel(handle)
+
+      expect(onClose).not.toHaveBeenCalled()
+      expect(sheet.style.height).toBe(`${HALF_PX}px`)
+    })
+
+    it('resets to the half snap point the next time it opens, not wherever a previous open left it', () => {
+      const { rerender } = render(
+        <MobileSheet isOpen onClose={vi.fn()} title="Edit listing" draggable>
+          <p>form contents</p>
+        </MobileSheet>,
+      )
+      const sheet = () => document.body.querySelector('[role="dialog"]') as HTMLElement
+      const handle = () => screen.getByRole('button', { name: 'Drag to resize' })
+
+      fireEvent.pointerDown(handle(), { clientY: 100 })
+      fireEvent.pointerUp(handle(), { clientY: 100 })
+      expect(sheet().style.height).toBe(`${FULL_PX}px`)
+
+      rerender(
+        <MobileSheet isOpen={false} onClose={vi.fn()} title="Edit listing" draggable>
+          <p>form contents</p>
+        </MobileSheet>,
+      )
+      rerender(
+        <MobileSheet isOpen onClose={vi.fn()} title="Edit listing" draggable>
+          <p>form contents</p>
+        </MobileSheet>,
+      )
+
+      expect(sheet().style.height).toBe(`${HALF_PX}px`)
+    })
+
+    // For content that opens with its own heading — a listing, whose name is
+    // the title. The header row goes, the handle stays (it's the one drag
+    // target left above the content), and the dialog keeps its name.
+    it('titleHidden drops the header row but keeps the handle and the dialog name', () => {
+      render(
+        <MobileSheet isOpen onClose={vi.fn()} title="Goldi Market" draggable titleHidden>
+          <h2>Goldi Market</h2>
+        </MobileSheet>,
+      )
+      expect(screen.getByRole('dialog', { name: 'Goldi Market' })).toBeInTheDocument()
+      expect(screen.getAllByRole('heading')).toHaveLength(1)
+      expect(screen.getByRole('button', { name: 'Drag to resize' })).toBeInTheDocument()
+    })
+
+    // Without drag there'd be nothing to grab and no ✕: the header is where
+    // the non-draggable close button lives, so it can't be hidden there.
+    it('ignores titleHidden without draggable, keeping the close button', () => {
+      render(
+        <MobileSheet isOpen onClose={vi.fn()} title="Edit listing" titleHidden>
+          <p>form contents</p>
+        </MobileSheet>,
+      )
+      expect(screen.getByRole('button', { name: 'Close' })).toBeInTheDocument()
+    })
+
+    // The panel runs to the screen's bottom edge, so whatever ends its
+    // content sits under an iPhone's home indicator without this. Asserted
+    // from the class because jsdom has no safe-area inset to measure; a real
+    // phone is the only place the result can be seen.
+    it('pads the end of its content for the home indicator', () => {
+      render(
+        <MobileSheet isOpen onClose={vi.fn()} title="Edit listing" draggable>
+          <p>form contents</p>
+        </MobileSheet>,
+      )
+      expect(screen.getByText('form contents').parentElement!.className).toContain('env(safe-area-inset-bottom)')
+    })
+  })
+})

@@ -1,3 +1,5 @@
+import { features } from './features'
+
 // /admin and /inbox's real, externally-visible URLs — masked via a rewrite in
 // next.config.ts onto the actual (internal) route files, since both live
 // outside /[community] and would otherwise inherit its public SiteChrome (see
@@ -26,13 +28,20 @@ export const INBOX_BASE = '/philly/inbox'
 // order didn't match the array AdminTabs actually rendered from.
 export type AdminTab =
   | 'queue'
+  | 'changes'
   | 'categories'
   | 'responses'
   | 'archived'
   | 'site'
   | 'desktop'
   | 'mobile'
+  | 'campaigns'
   | 'metrics'
+  | 'searches'
+  | 'questions'
+  | 'dishes'
+  | 'watches'
+  | 'eruvim'
   | 'team'
   | 'communities'
 
@@ -46,7 +55,22 @@ export function adminTabs(community: string, isSuperAdmin: boolean): { tab: Admi
   const base = adminBase(community)
   return [
     { tab: 'queue', href: base, label: 'Moderation queue' },
+    // Held back from the site for now (see features.ts).
+    ...(features.whatChanged ? [{ tab: 'changes' as const, href: `${base}/changes`, label: 'What changed' }] : []),
     { tab: 'metrics', href: `${base}/metrics`, label: 'Metrics' },
+    // What visitors searched for and didn't find: the seeding to-do list.
+    { tab: 'searches', href: `${base}/searches`, label: 'Missed searches' },
+    // How the AI reader read what people asked, approvable as rules.
+    { tab: 'questions', href: `${base}/questions`, label: 'Read questions' },
+    // Each food place's main dishes, read off its own menu by the AI, for
+    // an admin to approve (agreed Oct 1).
+    { tab: 'dishes', href: `${base}/dishes`, label: 'Main dishes' },
+    // The pages the guide reads on its own every morning (Keystone-K's
+    // list, shul times pages), and whether each is still working.
+    { tab: 'watches', href: `${base}/watches`, label: 'Watches' },
+    // Each eruv: its status as read from its own page, and its line,
+    // waiting here for an admin when it's new or changed (Oct 7).
+    { tab: 'eruvim', href: `${base}/eruvim`, label: 'Eruvim' },
     { tab: 'responses', href: `${base}/responses`, label: 'Responses' },
     { tab: 'archived', href: `${base}/archived`, label: 'Archived' },
     { tab: 'site', href: `${base}/site`, label: 'Site' },
@@ -59,6 +83,9 @@ export function adminTabs(community: string, isSuperAdmin: boolean): { tab: Admi
     { tab: 'desktop', href: `${base}/desktop`, label: 'Desktop' },
     { tab: 'mobile', href: `${base}/mobile`, label: 'Mobile' },
     { tab: 'categories', href: `${base}/categories`, label: 'Categories' },
+    // Seasonal promotions (a "Sukkah Map" every Sukkot, or whatever the next
+    // one-off is) — see CampaignBannerManager's own doc.
+    { tab: 'campaigns', href: `${base}/campaigns`, label: 'Campaigns' },
     // Every one of THIS community's own admins can reach this — see
     // /api/admin/team's own comment — unlike Communities below, which is
     // superadmin-only underneath.

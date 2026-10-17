@@ -12,6 +12,7 @@ function chainable(result: unknown) {
     update: vi.fn(self),
     delete: vi.fn(self),
     maybeSingle: vi.fn(() => result),
+    single: vi.fn(() => result),
     then: (resolve: (v: unknown) => void) => resolve(result),
   })
   return builder
@@ -20,6 +21,20 @@ function chainable(result: unknown) {
 // The object passed to a chainable mock's .upsert(...) on its first call.
 function upsertArg(builder: Record<string, unknown>): Record<string, unknown> {
   return (builder.upsert as ReturnType<typeof vi.fn>).mock.calls[0][0]
+}
+
+// A representative row for the write step's `.select('*').single()` —
+// createSubscriber returns whatever this resolves to (toSubscriber(row)), so
+// every success-path write result needs a real row, not `data: null`.
+const FAKE_WRITE_ROW = {
+  id: 'sub_1',
+  community_id: 'philly',
+  email: 'a@b.com',
+  categories: null,
+  notify_add: true,
+  notify_closure: true,
+  unsubscribe_token: 'tok_1',
+  created_at: '2026-01-01T00:00:00Z',
 }
 
 // createSubscriber reads the existing row first (to merge onto it), then
@@ -56,7 +71,7 @@ afterEach(() => {
 
 describe('createSubscriber', () => {
   it('a brand-new subscriber (no existing row) is written as given, lowercasing the email', async () => {
-    const { writeBuilder } = mockReadThenWrite({ data: null, error: null }, { data: null, error: null })
+    const { writeBuilder } = mockReadThenWrite({ data: null, error: null }, { data: FAKE_WRITE_ROW, error: null })
 
     await createSubscriber('philly', {
       email: 'Person@Example.com',
@@ -78,7 +93,7 @@ describe('createSubscriber', () => {
   })
 
   it('stores an empty category list as null — "all categories"', async () => {
-    const { writeBuilder } = mockReadThenWrite({ data: null, error: null }, { data: null, error: null })
+    const { writeBuilder } = mockReadThenWrite({ data: null, error: null }, { data: FAKE_WRITE_ROW, error: null })
 
     await createSubscriber('philly', { email: 'a@b.com', categories: [], notifyAdd: true, notifyClosure: true })
 
@@ -94,7 +109,7 @@ describe('createSubscriber', () => {
   it('unions categories with an existing subscription instead of replacing it', async () => {
     const { writeBuilder } = mockReadThenWrite(
       { data: { categories: ['grocery'], notify_add: true, notify_closure: false }, error: null },
-      { data: null, error: null },
+      { data: FAKE_WRITE_ROW, error: null },
     )
 
     await createSubscriber('philly', {
@@ -112,7 +127,7 @@ describe('createSubscriber', () => {
   it('collapses to "all categories" (null) the moment either side already is', async () => {
     const { writeBuilder } = mockReadThenWrite(
       { data: { categories: null, notify_add: true, notify_closure: true }, error: null },
-      { data: null, error: null },
+      { data: FAKE_WRITE_ROW, error: null },
     )
 
     await createSubscriber('philly', { email: 'a@b.com', categories: ['grocery'], notifyAdd: true, notifyClosure: true })
@@ -127,7 +142,7 @@ describe('createSubscriber', () => {
   it('OR-merges the notify flags rather than replacing them', async () => {
     const { writeBuilder } = mockReadThenWrite(
       { data: { categories: null, notify_add: false, notify_closure: true }, error: null },
-      { data: null, error: null },
+      { data: FAKE_WRITE_ROW, error: null },
     )
 
     await createSubscriber('philly', { email: 'a@b.com', categories: null, notifyAdd: true, notifyClosure: false })

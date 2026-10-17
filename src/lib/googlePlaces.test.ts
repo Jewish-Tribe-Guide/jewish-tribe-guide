@@ -45,6 +45,11 @@ describe('syncMayWrite', () => {
       expect(syncMayWrite(details, 'name', 'Some Name')).toBe(false)
     })
 
+    it('tracks description the same way as every other ownable field', () => {
+      expect(syncMayWrite({ googleFields: ['description'] }, 'description', 'Google wrote this.')).toBe(true)
+      expect(syncMayWrite({ googleFields: ['hours'] }, 'description', 'Someone wrote this by hand.')).toBe(false)
+    })
+
     it('respects a deliberately-cleared owned field: blank does not fall back to gap-filling', () => {
       // Phone isn't in googleFields, so even though it's blank, it's the
       // submitter's — someone cleared a wrong autofilled number on purpose.
@@ -63,6 +68,9 @@ describe('syncMayWrite', () => {
     it('never overwrites a value that is already present', () => {
       expect(syncMayWrite({}, 'name', 'Existing Name')).toBe(false)
       expect(syncMayWrite({}, 'hours', { mon: { open: '09:00', close: '17:00' } })).toBe(false)
+      // A row that predates ownership tracking but already has a description —
+      // the old `!details.googleDescription` fill-once behavior this replaces.
+      expect(syncMayWrite({}, 'description', 'Already has one.')).toBe(false)
     })
   })
 })
@@ -91,6 +99,17 @@ describe('nextGoogleFields', () => {
 
   it('ignores a malformed (non-array) prior value rather than throwing', () => {
     expect(nextGoogleFields({ googleFields: 'not-an-array' }, ['hours'])).toEqual(['hours'])
+  })
+
+  // `description` (googleDescription) used to be a one-off fill-once check
+  // in syncListing.ts with no ownership tracking of its own — this is what
+  // actually proves it's now a real OWNABLE_SYNC_FIELDS member: a field
+  // that isn't in that array gets filtered back out here regardless of
+  // what `written` claims, so this would still pass with a typo'd or
+  // never-added field name.
+  it('records description ownership, in canonical field order', () => {
+    expect(nextGoogleFields(null, ['description'])).toEqual(['description'])
+    expect(nextGoogleFields({ googleFields: ['phone'] }, ['description'])).toEqual(['phone', 'description'])
   })
 })
 
@@ -247,6 +266,17 @@ describe('fetchPlaceSync', () => {
     vi.stubGlobal('fetch', fetchSpy)
     expect(await fetchPlaceSync('place-123')).toBeNull()
     expect(fetchSpy).not.toHaveBeenCalled()
+  })
+
+  it('asks only for the business status when that’s all that’s wanted (no billed contact fields)', async () => {
+    const fetchSpy = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ status: 'OK', result: { business_status: 'CLOSED_TEMPORARILY' } }) })
+    vi.stubGlobal('fetch', fetchSpy)
+    const result = await fetchPlaceSync('place-123', { statusOnly: true })
+    const url = new URL(fetchSpy.mock.calls[0][0])
+    expect(url.searchParams.get('fields')).toBe('business_status')
+    expect(result).toEqual({ name: null, hours: null, phone: null, address: null, website: null, businessStatus: 'CLOSED_TEMPORARILY', description: null })
+    await fetchPlaceSync('place-123')
+    expect(new URL(fetchSpy.mock.calls[1][0]).searchParams.get('fields')).toContain('opening_hours')
   })
 
   it('maps a full successful response', async () => {

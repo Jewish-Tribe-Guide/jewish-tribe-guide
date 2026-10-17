@@ -1,7 +1,8 @@
 'use client'
 
 import { createContext, useContext, useMemo, useState } from 'react'
-import { isPinned, loadPinned, savePinned, togglePinned, type PinnedListing } from './pinned'
+import { isPinned, loadPinned, restorePinned, savePinned, togglePinned, type PinnedListing } from './pinned'
+import { useUndoToast } from '@/components/UndoToast'
 import { usePersistedState } from './usePersistedState'
 
 // The visitor's pinned-listing shortlist, shared by every screen that shows a
@@ -39,20 +40,22 @@ export function PinnedProvider({ children }: { children: React.ReactNode }) {
   // shows a pin toggle" (see the comment atop this file), not a lint fix.
   const [pinned, setPinned] = usePersistedState<PinnedListing[]>([], loadPinned, savePinned)
   const [filterActive, setFilterActive] = useState(false)
+  const toast = useUndoToast()
 
   const value = useMemo<PinnedContextValue>(
     () => ({
       pinned,
       isPinned: (id: string) => isPinned(pinned, id),
       toggle: (listing: PinnedListing) => {
-        setPinned((prev) => {
-          const wasPinned = isPinned(prev, listing.id)
-          const next = togglePinned(prev, listing)
-          // Only turn the chip ON when this pinned something new — unpinning
-          // shouldn't silently flip a filter the visitor didn't touch.
-          if (!wasPinned) setFilterActive(true)
-          return next
-        })
+        // Saving no longer turns the map's Saved chip on (Oct 14): saving a
+        // place from its listing shouldn't narrow a map the visitor hasn't
+        // opened. The map shows everything, saved places marked (YouMap).
+        setPinned((prev) => togglePinned(prev, listing))
+        // "Saved to You · Undo", or "Removed from You · Undo": tapping again
+        // to take a place off is safe because of it.
+        const at = pinned.findIndex((p) => p.id === listing.id)
+        if (at === -1) toast.show('Saved to You', () => setPinned((prev) => prev.filter((p) => p.id !== listing.id)))
+        else toast.show('Removed from You', () => setPinned((prev) => restorePinned(prev, listing, at)), false)
       },
       filterActive,
       setFilterActive,
@@ -60,7 +63,7 @@ export function PinnedProvider({ children }: { children: React.ReactNode }) {
     // setPinned is stable (it's usePersistedState's underlying useState
     // setter), but that stability isn't visible to eslint across the custom
     // hook boundary.
-    [pinned, filterActive, setPinned],
+    [pinned, filterActive, setPinned, toast],
   )
 
   return <PinnedContext.Provider value={value}>{children}</PinnedContext.Provider>

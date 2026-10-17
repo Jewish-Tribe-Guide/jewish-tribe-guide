@@ -83,6 +83,16 @@ export function isStructuredHours(v: unknown): v is StructuredHours {
   return !!v && typeof v === 'object' && !Array.isArray(v)
 }
 
+/** Whether `v` gives any day's hours. A place saved as closed every day
+ *  (almost always a form saved empty: Chalavita, The Brazilian BBQ and four
+ *  more on Sep 30) has no hours anyone can use, and says "No hours listed"
+ *  wherever it would have said "Closed" (fixes table, Sep 29). The editor
+ *  and the moderation diffs still read it as the hours it is
+ *  (isStructuredHours). */
+export function hasAnyHours(v: unknown): v is StructuredHours {
+  return isStructuredHours(v) && Object.values(v as Record<string, DayHours>).some((d) => !!d?.open && !!d?.close)
+}
+
 /** Formats "HH:MM" (24-h) to "h:mm AM/PM". */
 export function fmt12(hhmm: string): string {
   const [h, m] = hhmm.split(':').map(Number)
@@ -93,11 +103,12 @@ export function fmt12(hhmm: string): string {
 /**
  * Returns true (open), false (closed), or null (can't tell).
  *
- * Returns null when `v` is not structured hours (legacy text value or missing).
+ * Returns null when `v` is not structured hours (legacy text value or missing),
+ * or gives no day's hours at all (see hasAnyHours).
  * Returns false when today's hours are null (explicitly closed) or absent.
  */
 export function hoursOpenNow(v: unknown, now: Date = new Date()): boolean | null {
-  if (!isStructuredHours(v)) return null
+  if (!hasAnyHours(v)) return null
   const hours = v as Record<string, DayHours>
   const today = now
   const dayKey = DAY_KEYS[today.getDay()]
@@ -126,7 +137,7 @@ export function hoursClosing(
   withinMins = 60,
   now: Date = new Date(),
 ): { closesSoon: boolean; closeLabel: string } | null {
-  if (!isStructuredHours(v)) return null
+  if (!hasAnyHours(v)) return null
   const hours = v as Record<string, DayHours>
   const day = hours[DAY_KEYS[now.getDay()]]
   if (!day || !day.open || !day.close) return null
@@ -141,6 +152,35 @@ export function hoursClosing(
   }
 }
 
+/**
+ * For a place that isn't open right now, when it next opens: "4 PM" later
+ * today, "Wed 7 PM" on another day (never "tomorrow", which is ambiguous
+ * after midnight). Looks a week ahead.
+ *
+ * Null when the value isn't structured hours, or no day in the week has
+ * hours: a place saved as closed every day has no hours anyone can use, and
+ * the row says "No hours listed" for it, the same as for no hours at all.
+ */
+export function hoursNextOpening(v: unknown, now: Date = new Date()): string | null {
+  if (!isStructuredHours(v)) return null
+  const hours = v as Record<string, DayHours>
+  const nowMins = now.getHours() * 60 + now.getMinutes()
+  for (let ahead = 0; ahead < 7; ahead++) {
+    const key = DAY_KEYS[(now.getDay() + ahead) % 7]
+    const day = hours[key]
+    if (!day || !day.open || !day.close) continue
+    const [oh, om] = day.open.split(':').map(Number)
+    if (ahead === 0 && oh * 60 + om <= nowMins) continue
+    const time = fmt12(day.open).replace(/:00(?= [AP]M$)/, '')
+    return ahead === 0 ? time : `${DAY_SHORT[key]} ${time}`
+  }
+  // Today's opening already passed and nothing else all week: it opens
+  // again a week from now, the same time.
+  const today = hours[DAY_KEYS[now.getDay()]]
+  if (today?.open && today.close) return `${DAY_SHORT[DAY_KEYS[now.getDay()]]} ${fmt12(today.open).replace(/:00(?= [AP]M$)/, '')}`
+  return null
+}
+
 /** Google's own verdict on whether the business is trading at all, which
  *  outranks its posted hours. A place marked temporarily closed usually still
  *  has last season's hours saved, so reading hours alone had every one of them
@@ -151,6 +191,12 @@ export function hoursClosing(
 export type Closure = 'temporary' | 'permanent'
 
 export type BusinessStatus = 'OPERATIONAL' | 'CLOSED_TEMPORARILY' | 'CLOSED_PERMANENTLY'
+
+export const BUSINESS_STATUS_WORDS: Record<BusinessStatus, string> = {
+  OPERATIONAL: 'Open',
+  CLOSED_TEMPORARILY: 'Temporarily closed',
+  CLOSED_PERMANENTLY: 'Permanently closed',
+}
 
 /**
  * What the app should treat this listing's status as: an admin's override
@@ -192,18 +238,21 @@ export const CLOSURE_LABELS: Record<Closure, string> = {
  * never disagree about whether a place is open.
  *
  * A closed business is never open, whatever its saved hours say.
+ *
+ * With `now` null (useNow before the page has hydrated) only a closure is
+ * known: whether it's open waits for the time.
  */
 export function getOpenStatus(
   item: Record<string, unknown>,
   hoursFieldKeys: string[],
-  now: Date = new Date(),
+  now: Date | null = new Date(),
 ): {
   isOpen: boolean
   closing: { closesSoon: boolean; closeLabel: string } | null
   closure: Closure | null
 } {
   const closure = businessClosure(item)
-  if (closure) return { isOpen: false, closing: null, closure }
+  if (closure || !now) return { isOpen: false, closing: null, closure }
   const openVal = hoursFieldKeys
     .map((k) => item[k])
     .find((v) => v !== undefined && hoursOpenNow(v, now) === true && isStructuredHours(v))
@@ -234,7 +283,7 @@ export function syncedLabel(iso?: string): string | null {
 export function formatTodayHours(v: unknown, now: Date = new Date()): string | null {
   if (!v && v !== false) return null
   if (typeof v === 'string') return v || null
-  if (!isStructuredHours(v)) return null
+  if (!hasAnyHours(v)) return null
   const hours = v as Record<string, DayHours>
   const dayKey = DAY_KEYS[now.getDay()]
   const day = hours[dayKey]
@@ -252,7 +301,7 @@ export function formatWeekHours(
   v: unknown,
   now: Date = new Date(),
 ): Array<{ key: DayKey; label: string; text: string; isToday: boolean }> | null {
-  if (!isStructuredHours(v)) return null
+  if (!hasAnyHours(v)) return null
   const hours = v as Record<string, DayHours>
   const todayKey = DAY_KEYS[now.getDay()]
   return DAY_KEYS.map((key) => {

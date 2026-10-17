@@ -5,7 +5,7 @@ import userEvent from '@testing-library/user-event'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { makeCommunity } from '@/test/providerFixtures'
 import { mockRouter, resetMockRouter } from '@/test/nextNavigationMock'
-import { HeaderCollapseProvider, ScreenHeaderProvider, useSetScreenHeader } from '@/lib/headerVisibility'
+import { HeaderCollapseProvider, ScreenHeaderProvider, useCollapseHeader, useHeaderOverlay, useSetScreenHeader } from '@/lib/headerVisibility'
 import { ForcedViewport } from '@/lib/useIsMobile'
 import { SITE_SETTINGS_DEFAULTS } from '@/lib/siteSettings'
 import type { LocationControls } from '@/components/home/LocationControl'
@@ -149,6 +149,67 @@ describe('SiteHeader — several communities', () => {
   })
 })
 
+function OverlayOn() {
+  useHeaderOverlay(true)
+  return null
+}
+
+function setScrollY(y: number) {
+  Object.defineProperty(window, 'scrollY', { value: y, configurable: true })
+}
+
+describe('SiteHeader — desktop overlay (transparent over the home hero)', () => {
+  afterEach(() => setScrollY(0))
+
+  it('is transparent (desktop) when overlaid and not yet scrolled', () => {
+    setScrollY(0)
+    renderWithProviders(
+      <HeaderCollapseProvider>
+        <OverlayOn />
+        <SiteHeader onGoHome={vi.fn()} location={location()} />
+      </HeaderCollapseProvider>,
+    )
+
+    expect(screen.getByRole('banner')).toHaveClass('desktop:bg-transparent')
+  })
+
+  it('goes solid (desktop) once scrolled past the top, even while still overlaid', () => {
+    setScrollY(40)
+    renderWithProviders(
+      <HeaderCollapseProvider>
+        <OverlayOn />
+        <SiteHeader onGoHome={vi.fn()} location={location()} />
+      </HeaderCollapseProvider>,
+    )
+
+    expect(screen.getByRole('banner')).not.toHaveClass('desktop:bg-transparent')
+    expect(screen.getByRole('banner')).toHaveClass('desktop:bg-white')
+  })
+
+  it('stays solid (desktop) on a screen that never opts into the overlay', () => {
+    setScrollY(0)
+    renderWithProviders(
+      <HeaderCollapseProvider>
+        <SiteHeader onGoHome={vi.fn()} location={location()} />
+      </HeaderCollapseProvider>,
+    )
+
+    expect(screen.getByRole('banner')).not.toHaveClass('desktop:bg-transparent')
+  })
+
+  it('leaves mobile\'s own classes untouched in every state', () => {
+    setScrollY(0)
+    renderWithProviders(
+      <HeaderCollapseProvider>
+        <OverlayOn />
+        <SiteHeader onGoHome={vi.fn()} location={location()} />
+      </HeaderCollapseProvider>,
+    )
+
+    expect(screen.getByRole('banner')).toHaveClass('bg-white/90')
+  })
+})
+
 describe('SiteHeader — mobile', () => {
   // On mobile this block only ever renders on the home screen itself — every
   // other screen swaps it for the back button (showScreenHeader) or the
@@ -197,5 +258,73 @@ describe('SiteHeader — mobile', () => {
     )
 
     expect(screen.getByText('Set location')).not.toHaveClass('hidden')
+  })
+})
+
+// Regression coverage for: on the mobile map, tapping the map's own pin
+// button — which opens LocationControl's popover while the header is
+// collapsed (see that component's own doc) — visibly did nothing. The
+// popover really was opening; it just could never paint above the map's own
+// fullscreen `z-50` layer (ResourceMapView.tsx), no matter its own z-index
+// (confirmed live: not even z-index: 9999 helped). The cause was this
+// header's `viewTransitionName` — a *named* one forces Chromium to promote
+// the element to its own paint layer that wins against ordinary z-index
+// unconditionally, not just during an active transition — and it was set
+// unconditionally, including while collapsed, when the header has no
+// visible content left for a transition to protect. jsdom can't exercise
+// the paint/stacking bug itself; this asserts the one property the real fix
+// touches — see SiteHeader.tsx's own doc for how this was diagnosed.
+function Collapser() {
+  useCollapseHeader(true)
+  return null
+}
+
+describe('SiteHeader — collapsed (mobile map)', () => {
+  it('carries no view-transition-name while collapsed — a named one would win against the map\'s own z-50 layer no matter its own z-index', () => {
+    const { container } = renderWithProviders(
+      <HeaderCollapseProvider>
+        <Collapser />
+        <SiteHeader onGoHome={vi.fn()} location={location()} />
+      </HeaderCollapseProvider>,
+    )
+
+    const header = container.querySelector('header')!
+    expect(header.style.viewTransitionName).toBe('none')
+  })
+
+  it('still carries the view-transition-name when not collapsed, so the slide transition still has a stable layer to anchor to', () => {
+    const { container } = renderWithProviders(
+      <HeaderCollapseProvider>
+        <SiteHeader onGoHome={vi.fn()} location={location()} />
+      </HeaderCollapseProvider>,
+    )
+
+    const header = container.querySelector('header')!
+    expect(header.style.viewTransitionName).toBe('site-header')
+  })
+})
+
+// Regression coverage for the old desktop "Add a place" button (a category
+// picker opening ?form=create) that used to live here — removed once every
+// category page grew its own floating Add button (GenericDirectory.tsx) on
+// every viewport, so this header has no Add control of its own any more.
+describe('SiteHeader — "Add a place"', () => {
+  it('no longer renders its own Add control, on any viewport', () => {
+    renderWithProviders(
+      <HeaderCollapseProvider>
+        <SiteHeader onGoHome={vi.fn()} location={location()} />
+      </HeaderCollapseProvider>,
+    )
+    expect(screen.queryByRole('button', { name: 'Add a place' })).toBeNull()
+
+    cleanup()
+    renderWithProviders(
+      <HeaderCollapseProvider>
+        <ForcedViewport isMobile>
+          <SiteHeader onGoHome={vi.fn()} location={location()} />
+        </ForcedViewport>
+      </HeaderCollapseProvider>,
+    )
+    expect(screen.queryByRole('button', { name: 'Add a place' })).toBeNull()
   })
 })

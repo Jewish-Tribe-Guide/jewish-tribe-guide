@@ -1,0 +1,867 @@
+// @vitest-environment jsdom
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { act, cleanup, fireEvent, screen, within } from '@testing-library/react'
+import { renderWithProviders } from '@/test/renderWithProviders'
+import { makeCategory, makeListing } from '@/test/providerFixtures'
+import { mockRouter } from '@/test/nextNavigationMock'
+import type { CategoryField } from '@/lib/categories'
+import { TellAboutContext } from './tellAbout'
+import ListingView from './ListingView'
+
+vi.mock('@vercel/analytics', () => ({ track: vi.fn() }))
+vi.mock('next/navigation', () => ({
+  useRouter: () => mockRouter,
+  usePathname: () => '/test-community',
+  useSearchParams: () => new URLSearchParams(),
+}))
+// Candle lighting comes from a fetch; nothing here is about Friday.
+vi.mock('@/lib/useZmanim', () => ({ useZmanim: () => ({ data: null, status: 'idle' }) }))
+
+afterEach(() => cleanup())
+
+const hours: CategoryField = { key: 'hours', label: 'Hours', type: 'hours', renderAs: 'row' }
+const website: CategoryField = { key: 'website', label: 'Website', type: 'url', renderAs: 'row' }
+const description: CategoryField = { key: 'googleDescription', label: 'Description', type: 'textarea', renderAs: 'row' }
+const foodType: CategoryField = { key: 'foodType', label: 'Store Type', type: 'select', renderAs: 'badge', filterable: true }
+const t: CategoryField = { key: 't', label: 'Food Type', type: 'select', renderAs: 'badge', filterable: true }
+const cert: CategoryField = {
+  key: 'kosherCert',
+  label: 'Kosher Certification',
+  type: 'select',
+  renderAs: 'badge',
+  filterable: true,
+  caveat: { flagField: 'kosherPartial', noteField: 'kosherNote' },
+}
+const certLink: CategoryField = { key: 'k', label: 'Certificate', type: 'url', renderAs: 'row' }
+const food = makeCategory({ id: 'restaurant', label: 'Food', pluralLabel: 'Food', detailFields: [hours, website, description, t, cert, foodType, certLink] })
+
+const judah = makeListing({
+  id: 'judah',
+  name: 'Judah Mediterranean Grille',
+  phone: '(215) 613-6110',
+  website: 'http://judahgrill.com',
+  k: 'https://keystone-k.org/judah',
+  foodType: 'Restaurant',
+  t: ['Meat'],
+  kosherCert: 'Keystone-K',
+  milesFromCenter: 11.24,
+  googleDescription: 'Casual Middle Eastern cafe.',
+  geo: { lat: 40.0856, lng: -75.0454 },
+})
+
+const view = (props: Partial<Parameters<typeof ListingView>[0]> = {}) =>
+  renderWithProviders(<ListingView item={judah} category={food} color="#2657bf" path="/philly/restaurant/judah" foot={<p>foot</p>} {...props} />)
+
+describe('ListingView — who and whether', () => {
+  it('says what kind of place, where, and how far, then the deciding facts in the row’s words', () => {
+    view({ place: 'Bustleton' })
+    expect(screen.getByRole('heading', { name: 'Judah Mediterranean Grille' })).toBeInTheDocument()
+    expect(screen.getByText(/Restaurant · Bustleton/)).toHaveTextContent('Restaurant · Bustleton · 11.2 mi from central')
+    expect(screen.getByTestId('listing-facts')).toHaveTextContent('Meat · Keystone-K')
+    // Said once, under the name; the address row is just the address (Oct 6).
+    expect(screen.getAllByText(/mi from central/)).toHaveLength(1)
+  })
+
+  // The user, Oct 15: on Food, "Opens Fri 4 PM · Parve · IKC" is one line,
+  // and the short description sits under it, beside the picture.
+  it('on Food, the hechsher shares the hours’ line and the description goes under it; elsewhere each keeps its own line', () => {
+    const everyDay = Object.fromEntries(['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'].map((d) => [d, { open: '11:00', close: '15:00' }]))
+    const tagline: CategoryField = { key: 'tagline', label: 'Short description', type: 'text', renderAs: 'row', showInHeader: true, headerMaxLength: 60 }
+    const dishes: CategoryField = { key: 'dishes', label: 'Main dishes', type: 'tags', renderAs: 'badge', showCountInHeader: true, countLabel: 'main dish' }
+    const item = { ...judah, hours: everyDay, tagline: 'Vegan Dine In' }
+    view({ item, category: makeCategory({ ...food, detailFields: [...food.detailFields, tagline, dishes] }) })
+    const status = screen.getByTestId('listing-status')
+    expect(status).toHaveTextContent(/ · Meat · Keystone-K$/)
+    expect(within(status).getByTestId('listing-facts')).toHaveTextContent(/^Meat · Keystone-K$/)
+    expect(screen.getAllByTestId('listing-facts')).toHaveLength(1)
+    // Under the line, in the same column beside the picture.
+    const said = screen.getByTestId('listing-tagline')
+    expect(said).toHaveTextContent('Vegan Dine In')
+    expect(said.parentElement).toBe(status.parentElement)
+
+    // A grocery: its facts on their own line, the description under the header.
+    cleanup()
+    const m: CategoryField = { key: 'm', label: 'Kosher items', type: 'tags', renderAs: 'badge', showCountInHeader: true }
+    view({ item, category: makeCategory({ ...food, detailFields: [...food.detailFields, tagline, m] }) })
+    expect(screen.getByTestId('listing-status')).not.toHaveTextContent('Keystone-K')
+    expect(screen.getByTestId('listing-facts').parentElement).toBe(screen.getByTestId('listing-status').parentElement)
+    expect(screen.getByTestId('listing-tagline').parentElement).not.toBe(screen.getByTestId('listing-status').parentElement)
+  })
+
+  it('says a hechsher’s caveat under the facts, on its own; what isn’t kosher, in full, in the details', () => {
+    view({ item: { ...judah, kosherPartial: true, kosherNote: 'The bar is not supervised' } })
+    expect(screen.getByTestId('listing-caveat')).toHaveTextContent(/^Not everything here is kosher$/)
+    expect(within(screen.getByTestId('listing-details')).getByTestId('listing-caveat-note')).toHaveTextContent('The bar is not supervised')
+  })
+
+  // The user's note 9 (agreed Oct 10): on Food, what isn't kosher is its
+  // own box, first after the buttons, said once.
+  it('on Food, what isn’t kosher is its own box first after the buttons, said once', () => {
+    const dishes: CategoryField = { key: 'dishes', label: 'Main dishes', type: 'tags', renderAs: 'badge', showCountInHeader: true, countLabel: 'main dish' }
+    view({ item: { ...judah, kosherPartial: true, kosherNote: 'The bar is not supervised', dishes: ['Shawarma'] }, category: makeCategory({ ...food, detailFields: [...food.detailFields, dishes] }) })
+    const box = screen.getByTestId('listing-caveat-box')
+    expect(within(box).getByRole('heading', { name: 'What isn’t kosher' })).toBeInTheDocument()
+    expect(box).toHaveTextContent('The bar is not supervised')
+    const after = (a: Element, b: Element) => !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING)
+    expect(after(screen.getByTestId('listing-actions'), box)).toBe(true)
+    expect(after(box, screen.getByTestId('listing-items'))).toBe(true)
+    expect(screen.queryByTestId('listing-caveat')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('listing-caveat-note')).not.toBeInTheDocument()
+    expect(screen.getAllByText(/The bar is not supervised/)).toHaveLength(1)
+  })
+
+  it('a grocery’s caveat stays under the name and in the details', () => {
+    const m: CategoryField = { key: 'm', label: 'Kosher items', type: 'tags', renderAs: 'badge', showCountInHeader: true }
+    view({ item: { ...judah, kosherPartial: true, kosherNote: 'The deli is not supervised', m: ['Challah'] }, category: makeCategory({ ...food, detailFields: [...food.detailFields, m] }) })
+    expect(screen.queryByTestId('listing-caveat-box')).not.toBeInTheDocument()
+    expect(screen.getByTestId('listing-caveat')).toHaveTextContent('Not everything here is kosher')
+    expect(screen.getByTestId('listing-caveat-note')).toHaveTextContent('The deli is not supervised')
+  })
+
+  it('says what isn’t kosher once: not again in About', () => {
+    const note: CategoryField = { key: 'kosherNote', label: 'What isn’t kosher?', type: 'textarea', renderAs: 'hidden' }
+    const withNote = makeCategory({ ...food, detailFields: [...food.detailFields, note] })
+    view({ item: { ...judah, kosherPartial: true, kosherNote: 'The bar is not supervised' }, category: withNote })
+    expect(screen.getAllByText(/The bar is not supervised/)).toHaveLength(1)
+    expect(screen.getByTestId('listing-about')).not.toHaveTextContent('The bar is not supervised')
+  })
+
+  it('has no caveat line without one', () => {
+    view()
+    expect(screen.queryByTestId('listing-caveat')).not.toBeInTheDocument()
+  })
+})
+
+describe('ListingView — actions', () => {
+  it('Directions, Call, each link, then Share', () => {
+    view()
+    const labels = [...screen.getByTestId('listing-actions').querySelectorAll('a, button')].map((el) => el.textContent)
+    expect(labels).toEqual(['Directions', 'Call', 'Website', 'Certificate', 'Share'])
+  })
+})
+
+describe('ListingView — the main thing', () => {
+  it('hours never lead (Oct 6): today’s are a line of the contact box, the week a tap away, Google’s part said at its foot', () => {
+    view({ item: { ...judah, hours: { sun: { open: '11:00', close: '15:00' }, mon: { open: '11:00', close: '15:00' }, tue: { open: '11:00', close: '15:00' }, wed: { open: '11:00', close: '15:00' }, thu: { open: '11:00', close: '15:00' }, fri: { open: '11:00', close: '15:00' }, sat: { open: '11:00', close: '15:00' } }, placeId: 'p1', googleFields: ['hours', 'phone'], googleSyncedAt: '2026-09-30T06:59:09Z' } })
+    expect(screen.queryByTestId('listing-hours')).not.toBeInTheDocument()
+    const box = screen.getByTestId('listing-details')
+    const today = within(box).getByRole('button', { name: 'Today: 11:00 AM – 3:00 PM' })
+    expect(today).toHaveAttribute('aria-expanded', 'false')
+    fireEvent.click(today)
+    expect(today).toHaveAttribute('aria-expanded', 'true')
+    expect(box).toHaveTextContent('11 AM – 3 PM')
+    expect(within(box).getByTestId('listing-google')).toHaveTextContent('Last updated from Google, Sep 30.')
+  })
+
+  it('the website by name with the address and phone (Oct 6), its round button above as before', () => {
+    view()
+    const box = screen.getByTestId('listing-details')
+    const site = within(box).getByRole('link', { name: 'judahgrill.com' })
+    expect(site).toHaveAttribute('href', 'http://judahgrill.com')
+    expect(within(screen.getByTestId('listing-actions')).getByRole('link', { name: /Website/ })).toBeInTheDocument()
+  })
+
+  it('no Google line on a listing no longer matched to Google', () => {
+    view({ item: { ...judah, hours: { sun: { open: '11:00', close: '15:00' }, mon: { open: '11:00', close: '15:00' }, tue: { open: '11:00', close: '15:00' }, wed: { open: '11:00', close: '15:00' }, thu: { open: '11:00', close: '15:00' }, fri: { open: '11:00', close: '15:00' }, sat: { open: '11:00', close: '15:00' } }, googleSyncedAt: '2026-09-30T06:59:09Z', googleFields: ['hours'] } })
+    expect(screen.queryByTestId('listing-google')).not.toBeInTheDocument()
+  })
+
+  const m: CategoryField = { key: 'm', label: 'Kosher items', type: 'tags', renderAs: 'badge', showCountInHeader: true, countReplacesKey: 'isKosher' }
+  const grocery = makeCategory({ detailFields: [hours, m] })
+  const tj = makeListing({ m: ['Marshmallows', 'Cheddar Cheese', 'Stew Meat', 'Chicken', 'Challah', 'Wine', 'Beef'], m_sometimes: ['Steak', 'Turkey'] })
+
+  it('a grocery leads with its items, the not-always ones marked, six then all', () => {
+    view({ item: tj, category: grocery })
+    const card = screen.getByTestId('listing-items')
+    expect(card).toHaveTextContent('Kosher items · 9')
+    expect(within(card).getAllByRole('listitem')).toHaveLength(6)
+    fireEvent.click(within(card).getByRole('button', { name: /All 9 items/ }))
+    expect(within(card).getAllByRole('listitem')).toHaveLength(9)
+    expect(within(card).getByText('Steak').parentElement).toHaveTextContent('Steaknot always in stock')
+  })
+
+  it('what the search found goes first in the items, and is named up top', () => {
+    const found = { terms: ['cheese'], items: [{ tag: 'Cheddar Cheese', sometimes: false }], fields: [] }
+    view({ item: tj, category: grocery, found })
+    expect(screen.getByTestId('search-found')).toHaveTextContent('Cheddar Cheese')
+    expect(within(screen.getByTestId('listing-items')).getAllByRole('listitem')[0]).toHaveTextContent('Cheddar Cheese')
+  })
+
+  it('a mikvah leads with a section per audience it serves', () => {
+    const flag = (key: string, filterLabel: string): CategoryField => ({ key, label: key, filterLabel, type: 'boolean', renderAs: 'badge', filterable: true })
+    const mikvah = makeCategory({
+      id: 'mikvah',
+      label: 'Mikvah',
+      detailFields: [
+        flag('womenTevillah', 'Women’s'),
+        flag('menTevillah', 'Men’s'),
+        { key: 'women_s_notes', label: 'Notes', type: 'textarea', renderAs: 'row', audienceKey: 'womenTevillah' },
+        { key: 'men_s_notes', label: 'Notes', type: 'textarea', renderAs: 'row', audienceKey: 'menTevillah' },
+      ],
+    })
+    view({ item: makeListing({ womenTevillah: true, menTevillah: true, women_s_notes: 'By appointment', men_s_notes: 'Right-hand door' }), category: mikvah })
+    const card = screen.getByTestId('listing-groups')
+    // A box each (Oct 6).
+    expect(within(card).getAllByRole('heading', { level: 2 }).map((h) => h.textContent)).toEqual(['Women’s', 'Men’s'])
+    expect(card).toHaveTextContent('By appointment')
+    // Said once, in its section, not again in About.
+    expect(screen.queryByTestId('listing-about')).not.toBeInTheDocument()
+  })
+
+  it('a WhatsApp group: what it’s for under the name, then Join, and no Directions', () => {
+    const link: CategoryField = { key: 'link', label: 'Join group', type: 'url', renderAs: 'row', linkLabel: 'Join group', showInHeader: true }
+    const groups = makeCategory({ id: 'whatsapp', label: 'WhatsApp Group', hasAddress: false, detailFields: [{ key: 'description', label: 'Description', type: 'textarea', renderAs: 'row' }, link] })
+    view({ item: makeListing({ address: '', description: 'For people keeping kosher', link: 'https://chat.whatsapp.com/x' }), category: groups })
+    const join = screen.getByRole('link', { name: /Join the group/ })
+    expect(join).toHaveAttribute('href', 'https://chat.whatsapp.com/x')
+    expect(screen.getByText('For people keeping kosher').compareDocumentPosition(join) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(screen.queryByText('Directions')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('listing-about')).not.toBeInTheDocument()
+  })
+})
+
+describe('ListingView — a mikvah’s boxes (Oct 6)', () => {
+  const flag: CategoryField = { key: 'womenTevillah', label: 'Women', filterLabel: 'Women’s', type: 'boolean', renderAs: 'badge', filterable: true }
+  const mikvah = makeCategory({
+    id: 'mikvah',
+    detailFields: [
+      flag,
+      { key: 'women_s_hours', label: 'Hours', type: 'hours', renderAs: 'row', audienceKey: 'womenTevillah' },
+      { key: 'women_s_phone', label: 'Phone', type: 'tel', renderAs: 'row', audienceKey: 'womenTevillah' },
+      { key: 'women_s_notes', label: 'Notes', type: 'textarea', renderAs: 'row', audienceKey: 'womenTevillah' },
+    ],
+  })
+  const notes = 'On Shabbos, by appointment only. On Motzei Shabbos, open for 2 hours.'
+
+  it('today’s hours, the phone and the notes’ first sentence; the week and the rest a tap away', () => {
+    view({ item: makeListing({ womenTevillah: true, women_s_hours: { sun: { open: '20:30', close: '22:30' }, mon: { open: '20:30', close: '22:30' }, tue: { open: '20:30', close: '22:30' }, wed: { open: '20:30', close: '22:30' }, thu: { open: '20:30', close: '22:30' }, fri: { open: '20:30', close: '22:30' }, sat: { open: '20:30', close: '22:30' } }, women_s_phone: '2155551234', women_s_notes: notes }), category: mikvah })
+    const box = screen.getByTestId('listing-groups')
+    expect(box).toHaveTextContent('On Shabbos, by appointment only.')
+    expect(box).not.toHaveTextContent('Motzei Shabbos')
+    expect(within(box).getByRole('link', { name: '(215) 555-1234' })).toHaveAttribute('href', 'tel:2155551234')
+    // "More", not "Week and notes" (the user, Oct 10).
+    fireEvent.click(within(box).getByRole('button', { name: 'More' }))
+    expect(within(box).getByTestId('listing-group-more')).toHaveTextContent('On Motzei Shabbos, open for 2 hours.')
+    expect(within(box).getByRole('button', { name: /Less/ })).toHaveAttribute('aria-expanded', 'true')
+    // Opened, the week replaces today's line and the notes are said whole,
+    // once: nothing twice (Oct 6).
+    expect(within(box).queryByText(/^Today:/)).not.toBeInTheDocument()
+    expect(within(box).getAllByText(/On Shabbos, by appointment only\./)).toHaveLength(1)
+    expect(within(box).getByText(notes)).toBeInTheDocument()
+  })
+
+  it('nothing to fold when one sentence is all it says', () => {
+    view({ item: makeListing({ womenTevillah: true, women_s_notes: 'Schedule your appointment' }), category: mikvah })
+    expect(within(screen.getByTestId('listing-groups')).queryByRole('button', { name: /Week|More|The week/ })).not.toBeInTheDocument()
+  })
+})
+
+describe('ListingView — the join box (Oct 6)', () => {
+  it('who it’s for, Join and Share in one box', () => {
+    const link: CategoryField = { key: 'link', label: 'Join group', type: 'url', renderAs: 'row', linkLabel: 'Join group', showInHeader: true }
+    const groups = makeCategory({ id: 'whatsapp', label: 'WhatsApp Group', hasAddress: false, detailFields: [{ key: 'description', label: 'Description', type: 'textarea', renderAs: 'row' }, link] })
+    view({ item: makeListing({ address: '', description: 'For people keeping kosher', link: 'https://chat.whatsapp.com/x' }), category: groups })
+    const box = screen.getByTestId('listing-join-box')
+    expect(box).toHaveTextContent('For people keeping kosher')
+    // One line on a phone: the listing says WhatsApp right above it.
+    expect(within(box).getByRole('link', { name: 'Join the group' })).toBeInTheDocument()
+    expect(within(box).getByRole('button', { name: /Share/ })).toBeInTheDocument()
+    // Its link's date at the box's foot, not floating under it.
+    expect(within(box).getByTestId('freshness')).toHaveTextContent('Join link')
+  })
+})
+
+describe('ListingView — a network’s one link (Oct 6)', () => {
+  it('a blue Visit button naming the site, not a green Join', () => {
+    const w: CategoryField = { key: 'w', label: 'Website', type: 'url', renderAs: 'row', showInHeader: true }
+    const networking = makeCategory({ id: 'young-professional', label: 'Networking', hasAddress: false, detailFields: [{ key: 'd', label: 'Description', type: 'textarea', renderAs: 'row' }, w] })
+    view({ item: makeListing({ address: '', d: 'We’re here to connect you', w: 'https://www.tribe12.org/' }), category: networking })
+    const visit = within(screen.getByTestId('listing-join-box')).getByRole('link', { name: 'Visit tribe12.org' })
+    expect(visit).toHaveAttribute('href', 'https://www.tribe12.org/')
+    expect(visit.className).toMatch(/bg-primary/)
+  })
+})
+
+describe('ListingView — about', () => {
+  // Oct 15: its foot says when it was last right, on one line with Edit.
+  it('says when Google last updated it, when the sync keeps it, with Edit on the same line', () => {
+    view({ item: { ...judah, placeId: 'p1', googleFields: ['description'], googleSyncedAt: '2026-08-28T06:59:09Z' } })
+    const about = screen.getByTestId('listing-about')
+    expect(within(about).getByTestId('about-google')).toHaveTextContent('Last updated from Google, Aug 28.')
+    expect(within(about).getByTestId('about-google').parentElement!.parentElement).toContainElement(within(about).getByRole('button', { name: 'Edit' }))
+    // Google's to keep: nobody is asked whether it's right.
+    expect(about).not.toHaveTextContent(/Confirmed|Right\?/)
+  })
+
+  it('otherwise says when it was confirmed, its own date, and asks once that’s old', () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-10-15T15:00:00Z'))
+    try {
+      view({ item: { ...judah, confirmedAt: '2026-03-01T15:00:00Z', sectionConfirmed: { googleDescription: '2026-09-29T15:00:00Z' } } })
+      const foot = within(screen.getByTestId('listing-about')).getByTestId('freshness')
+      expect(foot).toHaveTextContent(/^Confirmed Sep 29Edit$/)
+      cleanup()
+      view({ item: { ...judah, confirmedAt: '2026-03-01T15:00:00Z' } })
+      expect(within(screen.getByTestId('listing-about')).getByTestId('freshness')).toHaveTextContent(/^Confirmed Mar 1 · Still right\?YesEdit$/)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('confirms About alone, under its description’s key', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(new Response(JSON.stringify({ ok: true, confirmedAt: '2026-10-15T15:00:00.000Z', changed: true, activityId: 1 })))
+    try {
+      view()
+      fireEvent.click(within(screen.getByTestId('listing-about')).getByRole('button', { name: 'Yes' }))
+      expect(await within(screen.getByTestId('listing-about')).findByText(/Confirmed\. Thanks/)).toBeInTheDocument()
+      const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+      expect(url).toBe(`/api/resource/${judah.id}/confirm`)
+      expect(JSON.parse(String(init.body))).toEqual({ section: 'googleDescription' })
+    } finally {
+      fetchMock.mockRestore()
+    }
+  })
+  it('says nothing about where it came from when the sync doesn’t record keeping it', () => {
+    // Every Google description fetched before the sync recorded ownership
+    // reads like this; calling them the community's was wrong on all 66.
+    view({ item: { ...judah, placeId: 'p1', googleFields: ['hours'] } })
+    expect(screen.getByTestId('listing-about')).not.toHaveTextContent(/Description from/)
+  })
+  it('says nothing about where it came from on a listing never matched to Google', () => {
+    view()
+    expect(screen.getByTestId('listing-about')).not.toHaveTextContent(/Description from/)
+  })
+})
+
+describe('ListingView — onward', () => {
+  const near = (id: string, name: string, lat: number) => makeListing({ id, name, geo: { lat, lng: -75.0454 }, foodType: 'Restaurant' })
+  const items = [judah, near('far', 'Far Place', 40.3), near('ritas', 'Rita’s', 40.09), near('hok', 'House of Kosher', 40.097), near('sk', 'Shtetl', 40.099)]
+
+  it('the three nearest in the category, how far each is from here, then all of them', () => {
+    const onOpen = vi.fn()
+    const seeAll = vi.fn()
+    view({ onward: { items, place: () => 'Bustleton', onOpen, seeAll: { label: 'See all 73 in Food', onClick: seeAll } } })
+    const section = screen.getByTestId('listing-onward')
+    expect(within(section).getByRole('heading')).toHaveTextContent('More food near here')
+    const rows = within(section).getAllByRole('button').slice(0, 3)
+    expect(rows.map((r) => r.textContent)).toEqual([
+      expect.stringContaining('Rita’s · Bustleton'),
+      expect.stringContaining('House of Kosher'),
+      expect.stringContaining('Shtetl'),
+    ])
+    expect(rows[0]).toHaveTextContent('0.3 mi away')
+    fireEvent.click(rows[1])
+    expect(onOpen).toHaveBeenCalledWith(expect.objectContaining({ id: 'hok' }))
+    fireEvent.click(within(section).getByRole('button', { name: 'See all 73 in Food' }))
+    expect(seeAll).toHaveBeenCalled()
+  })
+
+  it('a place on the same block is feet away, not "0 mi away"', () => {
+    view({ onward: { items: [judah, near('door', 'Next Door', 40.0862)], place: () => null, onOpen: vi.fn() } })
+    expect(within(screen.getByTestId('listing-onward')).getByRole('button')).toHaveTextContent('200 ft away')
+  })
+
+  it('nothing onward where there’s no list to go on to', () => {
+    view()
+    expect(screen.queryByTestId('listing-onward')).not.toBeInTheDocument()
+  })
+})
+
+describe('ListingView — how sure', () => {
+  // "Still right?" is asked beside the one thing that's the community's to
+  // keep (confirmPlace), not about the whole listing at its end.
+  it('Food: no question and no date on its kosher details, the certificate is the proof (Oct 6); Google’s part at the contact box’s foot', () => {
+    view({ item: { ...judah, placeId: 'p1', googleSyncedAt: '2026-09-30T06:59:09Z', googleFields: ['phone', 'website'], confirmedAt: '2026-06-01T16:30:00Z' } })
+    expect(screen.queryByText(/last checked/)).not.toBeInTheDocument()
+    expect(within(screen.getByTestId('listing-details')).getByTestId('listing-google')).toHaveTextContent('Last updated from Google, Sep 30.')
+    // Asked only under About (its own date, Oct 15), never about the
+    // kosher details.
+    expect(screen.getAllByText(/Still right|Right\?/).every((el) => screen.getByTestId('listing-about').contains(el))).toBe(true)
+    expect(screen.getByTestId('listing-details')).not.toHaveTextContent(/Still right|Right\?|confirmed/i)
+    expect(screen.getByTestId('listing-view').querySelector('h2')!.parentElement!.parentElement).not.toHaveTextContent(/checked|confirmed/i)
+  })
+
+  it('a shul says its confirmation with its times, not again at the end, and Edit opens just that box (Oct 10)', () => {
+    const shuls = makeCategory({ id: 'synagogue', detailFields: [{ key: 'minyanim', label: 'Davening', type: 'minyanim', renderAs: 'row' }] })
+    const shul = makeListing({ confirmedAt: '2026-09-29T05:56:24Z', minyanim: [{ id: 'm1', tefillah: 'shacharis', days: ['sat'], time: '9:00am' }] })
+    view({ item: shul, category: shuls })
+    // In the box the times are in, “Usual Shabbos times”, once, without the
+    // box's name said again (Oct 10).
+    const box = screen.getByTestId('davening-shabbos')
+    expect(within(box).getByTestId('freshness')).toHaveTextContent(/^Confirmed Sep 29Edit$/)
+    // Once among the times; the address box's own date is about the address.
+    const contact = screen.getByTestId('listing-details')
+    expect(screen.getAllByText(/confirmed/i).filter((el) => !contact.contains(el))).toHaveLength(1)
+    expect(within(box).queryByRole('button', { name: 'Update their times' })).not.toBeInTheDocument()
+    fireEvent.click(within(box).getByRole('button', { name: 'Edit' }))
+    const sheet = screen.getByRole('dialog', { name: 'Usual Shabbos times' })
+    expect(within(sheet).getByTestId('box-edit')).toBeInTheDocument()
+    expect(within(sheet).getByRole('button', { name: 'No changes yet' })).toBeDisabled()
+    // The box as a list, one minyan a row; a tap opens that one, with only
+    // the box's days to put it on: Friday night and Shabbos.
+    fireEvent.click(within(sheet).getByRole('button', { name: /Shacharis 9 AM/ }))
+    const one = screen.getByRole('dialog', { name: 'Shacharis' })
+    expect(within(one).getByRole('button', { name: 'Shabbos' })).toHaveAttribute('aria-pressed', 'true')
+    expect(within(one).getByRole('button', { name: 'Friday night' })).toHaveAttribute('aria-pressed', 'false')
+    expect(within(one).queryByRole('button', { name: 'Mon' })).not.toBeInTheDocument()
+    // Back is to the list.
+    fireEvent.click(within(one).getByRole('button', { name: /back/i }))
+    expect(screen.getByRole('dialog', { name: 'Usual Shabbos times' })).toBeInTheDocument()
+  })
+
+  it('a grocery’s items aren’t dated as a whole: each item carries its own date', () => {
+    const m: CategoryField = { key: 'm', label: 'Kosher items', type: 'tags', renderAs: 'badge', showCountInHeader: true }
+    view({ item: makeListing({ m: ['Challah'] }), category: makeCategory({ detailFields: [hours, m] }) })
+    expect(screen.queryByText(/checked/i)).not.toBeInTheDocument()
+  })
+
+  // Oct 6: each section on its own. One date for all three read as the last
+  // one's, and whoever uses one mikvah knows its hours, not the others'.
+  // Oct 10: always dated, with Edit, and asked once the date is old.
+  it('a mikvah dates each section in its own box, with Edit, and asks once that date is old', async () => {
+    const section = (key: string, filterLabel: string): CategoryField[] => [
+      { key, label: key, filterLabel, type: 'boolean', renderAs: 'badge', filterable: true },
+      { key: `${key}_hours`, label: 'Hours', type: 'hours', renderAs: 'row', audienceKey: key },
+    ]
+    const mikvah = makeCategory({
+      id: 'mikvah',
+      detailFields: [
+        ...section('womenTevillah', 'Women’s'),
+        ...section('menTevillah', 'Men’s'),
+        { key: 'menTevillah_phone', label: 'Men’s Phone', type: 'tel', renderAs: 'row', audienceKey: 'menTevillah' },
+        { key: 'menTevillah_notes', label: 'Men’s Notes', type: 'textarea', renderAs: 'row', audienceKey: 'menTevillah' },
+        { key: 'keilim', label: 'Keilim', type: 'boolean', renderAs: 'badge' },
+        { key: 'keilim_notes', label: 'Notes', type: 'textarea', renderAs: 'row', audienceKey: 'keilim' },
+      ],
+    })
+    const week = { mon: { open: '20:30', close: '22:30' } }
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-12-20T12:00:00Z'))
+    try {
+    view({
+      item: makeListing({
+        id: '0b6c4c1e-2f55-4a8e-9d57-3b7f0d6f4a21',
+        womenTevillah: true,
+        womenTevillah_hours: week,
+        menTevillah: true,
+        menTevillah_hours: week,
+        keilim: true,
+        keilim_notes: 'Right-hand door',
+        confirmedAt: '2026-09-02T12:00:00Z',
+        sectionConfirmed: { menTevillah: '2026-10-01T12:00:00Z' },
+      }),
+      category: mikvah,
+    })
+    const [women, men, keilim] = [...screen.getByTestId('listing-groups').querySelectorAll('section')]
+    // Old (over 90 days): asked, Yes or Edit. Recent: just the date and Edit.
+    expect(within(women).getByTestId('freshness')).toHaveTextContent(/^Confirmed Sep 2 · Still right\?YesEdit$/)
+    expect(within(men).getByTestId('freshness')).toHaveTextContent(/^Confirmed Oct 1Edit$/)
+    // A section with notes and no hours still has its Edit: hours can be added.
+    expect(within(keilim).getByRole('button', { name: 'Edit' })).toBeInTheDocument()
+
+    // Edit: the section's own fields and nothing else.
+    fireEvent.click(within(men).getByRole('button', { name: 'Edit' }))
+    const sheet = screen.getByRole('dialog', { name: 'Men’s hours' })
+    // Its hours and its note, empty or not; not an empty phone (Oct 10).
+    expect(within(sheet).getByText('Hours')).toBeInTheDocument()
+    expect(within(sheet).getByLabelText('Men’s Notes')).toHaveValue('')
+    expect(within(sheet).queryByLabelText('Men’s Phone')).not.toBeInTheDocument()
+    } finally {
+      vi.useRealTimers()
+    }
+
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ ok: true, confirmedAt: '2026-10-06T12:00:00Z' }), { status: 200 }))
+    cleanup()
+    view({
+      item: makeListing({ id: '0b6c4c1e-2f55-4a8e-9d57-3b7f0d6f4a21', womenTevillah: true, womenTevillah_hours: week }),
+      category: mikvah,
+    })
+    // Never confirmed: "Right?", Yes confirms that section.
+    expect(within(screen.getByTestId('listing-groups')).getByTestId('freshness')).toHaveTextContent(/^Not confirmed yet · Right\?YesEdit$/)
+    fireEvent.click(within(screen.getByTestId('listing-groups')).getByRole('button', { name: 'Yes' }))
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalled())
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(String(url)).toBe('/api/resource/0b6c4c1e-2f55-4a8e-9d57-3b7f0d6f4a21/confirm')
+    expect(JSON.parse(String(init!.body))).toEqual({ section: 'womenTevillah' })
+    fetchMock.mockRestore()
+  })
+
+  it('asks nothing where nothing is the community’s to confirm', () => {
+    // A hotel that isn't Shabbat friendly, with no address: no facts, no
+    // times, no items, no way to reach it.
+    const shabbat: CategoryField = { key: 'shabbatFriendly', label: 'Shabbat friendly', type: 'boolean', renderAs: 'badge', filterable: true }
+    view({ item: makeListing({ shabbatFriendly: false, address: '' }), category: makeCategory({ id: 'hotel', detailFields: [shabbat] }) })
+    expect(screen.queryByTestId('freshness')).not.toBeInTheDocument()
+  })
+
+  it('nor a Shabbat-friendly hotel (Oct 6): what hardly changes isn’t dated, only its address is', () => {
+    const shabbat: CategoryField = { key: 'shabbatFriendly', label: 'Shabbat friendly', type: 'boolean', renderAs: 'badge', filterable: true }
+    view({ item: makeListing({ shabbatFriendly: true, confirmedAt: '2026-09-10T12:00:00Z' }), category: makeCategory({ id: 'hotel', detailFields: [shabbat] }) })
+    expect(screen.getAllByTestId('freshness').every((el) => screen.getByTestId('listing-details').contains(el))).toBe(true)
+  })
+
+  // Oct 15, the user: an address, phone, website or email nobody got from
+  // Google is dated like every other box, and confirmed on its own.
+  it('the contact box, when Google doesn’t keep it, says when it was confirmed, with Edit, and Yes confirms just it', async () => {
+    const website: CategoryField = { key: 'website', label: 'Website', type: 'url', renderAs: 'row' }
+    const item = makeListing({ id: '0b6c4c1e-2f55-4a8e-9d57-3b7f0d6f4a21', phone: '215-555-0100', website: 'https://example.org', confirmedAt: '2026-08-02T12:00:00Z', sectionConfirmed: { contact: '2026-08-05T12:00:00Z' } })
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-12-20T12:00:00Z'))
+    let contact: HTMLElement
+    try {
+      view({ item, category: makeCategory({ detailFields: [website] }) })
+      contact = screen.getByTestId('listing-details')
+      expect(within(contact).getByTestId('freshness')).toHaveTextContent(/^Confirmed Aug 5 · Still right\?YesEdit$/)
+      // One Edit, in the dated line, not a second one beside it.
+      expect(within(contact).getAllByRole('button', { name: 'Edit' })).toHaveLength(1)
+    } finally {
+      vi.useRealTimers()
+    }
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ ok: true, confirmedAt: '2026-12-20T12:00:00Z' }), { status: 200 }))
+    fireEvent.click(within(contact).getByRole('button', { name: 'Yes' }))
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalled())
+    expect(JSON.parse(String(fetchMock.mock.calls[0][1]!.body))).toEqual({ section: 'contact' })
+    fetchMock.mockRestore()
+
+    // Kept by Google: Google's date instead, and no question.
+    cleanup()
+    view({ item: { ...item, placeId: 'p1', googleSyncedAt: '2026-09-30T06:59:09Z', googleFields: ['phone'] }, category: makeCategory({ detailFields: [website] }) })
+    expect(within(screen.getByTestId('listing-details')).queryByTestId('freshness')).not.toBeInTheDocument()
+    expect(within(screen.getByTestId('listing-details')).getByTestId('listing-google')).toHaveTextContent('Last updated from Google, Sep 30.')
+  })
+})
+
+describe('ListingView — a group’s join link', () => {
+  const link: CategoryField = { key: 'link', label: 'Join group', type: 'url', renderAs: 'row', linkLabel: 'Join group', showInHeader: true }
+  const groups = makeCategory({ id: 'whatsapp', label: 'WhatsApp Group', hasAddress: false, detailFields: [link] })
+  const group = makeListing({ id: 'kip', address: '', link: 'https://chat.whatsapp.com/x', confirmedAt: '2026-09-01T12:00:00Z' })
+
+  it('dates the link under Join', () => {
+    view({ item: group, category: groups })
+    expect(screen.getByTestId('freshness')).toHaveTextContent('Join link confirmed Sep 1.')
+  })
+
+  it('asks whoever tapped Join, on coming back, whether it opened the group; No reports it', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ ok: true }), { status: 200 }))
+    view({ item: group, category: groups })
+    expect(screen.queryByTestId('join-link-check')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('link', { name: /Join the group/ }))
+    fireEvent.focus(window)
+    const check = screen.getByTestId('join-link-check')
+    expect(check).toHaveTextContent('Did the link work?')
+    fireEvent.click(within(check).getByRole('button', { name: 'No, it didn’t' }))
+    expect(await screen.findByText('Thanks for saying. An admin will check the link.')).toBeInTheDocument()
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(String(url)).toContain('/api/submissions')
+    expect(JSON.parse(String(init!.body))).toMatchObject({ operation: 'delete', targetId: 'kip', note: expect.stringMatching(/join link didn’t work/) })
+    fetchMock.mockRestore()
+  })
+
+  it('Yes confirms the listing', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ ok: true }), { status: 200 }))
+    view({ item: group, category: groups })
+    fireEvent.click(screen.getByRole('link', { name: /Join the group/ }))
+    fireEvent.focus(window)
+    fireEvent.click(screen.getByRole('button', { name: 'Yes, it opened the group' }))
+    expect(await screen.findByText('Thanks! It’s marked as working.')).toBeInTheDocument()
+    expect(String(fetchMock.mock.calls[0][0])).toBe('/api/resource/kip/confirm')
+    fetchMock.mockRestore()
+  })
+})
+
+describe('ListingView — details from Google', () => {
+  it('a grocery’s hours say they’re Google’s, at the contact box’s foot', () => {
+    const m: CategoryField = { key: 'm', label: 'Kosher items', type: 'tags', renderAs: 'badge', showCountInHeader: true }
+    const grocery = makeCategory({ detailFields: [hours, m] })
+    view({
+      item: makeListing({ m: ['Challah'], hours: { fri: { open: '09:00', close: '21:00' } }, placeId: 'p1', googleSyncedAt: '2026-09-30T06:59:09Z', googleFields: ['hours'] }),
+      category: grocery,
+    })
+    expect(within(screen.getByTestId('listing-details')).getByTestId('listing-google')).toHaveTextContent('Last updated from Google, Sep 30.')
+  })
+})
+
+describe('ListingView — the one question', () => {
+  it('asks what the listing doesn’t say yet, with a tap for each answer, before Edit listing', () => {
+    const category = makeCategory({ detailFields: [{ ...t, options: [{ value: 'Meat', label: 'Meat' }, { value: 'Dairy', label: 'Dairy' }, { value: 'Parve', label: 'Parve' }] }] })
+    view({ item: makeListing({ id: 'sb', name: 'Sweet Box' }), category })
+    const question = screen.getByTestId('listing-question')
+    expect(question).toHaveTextContent('Meat, dairy or parve?')
+    expect(within(question).getAllByRole('button').map((b) => b.textContent)).toEqual(['Meat', 'Dairy', 'Parve', 'Not sure'])
+    expect(question.compareDocumentPosition(screen.getByTestId('listing-foot')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('asks nothing when there’s nothing to ask', () => {
+    view()
+    expect(screen.queryByTestId('listing-question')).not.toBeInTheDocument()
+  })
+})
+
+describe('ListingView — Still here and Not anymore, an item at a time', () => {
+  const m: CategoryField = { key: 'm', label: 'Kosher items here', type: 'tags', renderAs: 'badge', showCountInHeader: true }
+  const grocery = makeCategory({ id: 'grocery', label: 'Grocery', detailFields: [hours, m] })
+  const tj = makeListing({
+    id: '0b6c4c1e-2f55-4a8e-9d57-3b7f0d6f4a21',
+    name: 'Trader Joe’s',
+    m: ['Challah', 'Chicken', 'Wine'],
+    m_sometimes: ['Steak'],
+    itemSeen: { m: { Challah: '2026-10-09T14:00:00Z', Wine: '2026-06-01T14:00:00Z' } },
+    itemGone: { m: { Chicken: '2026-10-08T14:00:00Z' } },
+  })
+  const json = (body: unknown) => new Response(JSON.stringify(body), { status: 200 })
+  let fetchMock: ReturnType<typeof vi.spyOn>
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-10-09T17:30:00Z')) // Fri Oct 9, 1:30 PM
+    fetchMock = vi.spyOn(globalThis, 'fetch')
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+    fetchMock.mockRestore()
+  })
+  const row = (name: string) => screen.getAllByTestId('listing-item').find((li) => li.textContent?.startsWith(name))!
+
+  it('each item says when it was last seen; an old date turns amber; a reported one says so; one nobody saw says nothing', () => {
+    view({ item: tj, category: grocery })
+    // No line explaining that the items can be tapped (the user, Oct 10).
+    expect(screen.getByTestId('listing-items')).not.toHaveTextContent('Been there?')
+    expect(within(row('Challah')).getByText('seen today')).toHaveClass('text-muted')
+    expect(within(row('Wine')).getByText('seen Jun 1')).toHaveClass('text-caution')
+    expect(row('Chicken')).toHaveTextContent('Reported gone yesterday · we’ll check before taking it off')
+    expect(row('Steak')).toHaveTextContent(/^Steaknot always in stock$/)
+  })
+
+  it('tapping an item opens it; "Still here" counts at once, thanks, and Undo takes it back', async () => {
+    fetchMock.mockResolvedValueOnce(json({ ok: true, item: 'Steak', seenAt: '2026-10-09T17:30:00.000Z', previous: null, clearedGone: null, changed: true, activityId: 3 }))
+    view({ item: tj, category: grocery })
+    fireEvent.click(within(row('Steak')).getByRole('button', { name: /Steak/ }))
+    expect(row('Steak')).toHaveTextContent('No one has said yet.')
+    fireEvent.click(within(row('Steak')).getByRole('button', { name: 'Still here' }))
+    expect(await within(row('Steak')).findByRole('status')).toHaveTextContent('Thanks! Marked as seen today.')
+    expect(fetchMock.mock.calls[0][0]).toBe(`/api/resource/${tj.id}/item`)
+    expect(JSON.parse(String((fetchMock.mock.calls[0][1] as RequestInit).body))).toEqual({ field: 'm_sometimes', item: 'Steak' })
+
+    fetchMock.mockResolvedValueOnce(json({ ok: true, changed: true }))
+    fireEvent.click(within(row('Steak')).getByRole('button', { name: 'Undo' }))
+    expect(await within(row('Steak')).findByRole('button', { name: 'Still here' })).toBeInTheDocument()
+    const [url, init] = fetchMock.mock.calls[1] as [string, RequestInit]
+    expect(url).toBe(`/api/resource/${tj.id}/item`)
+    expect(init.method).toBe('DELETE')
+    expect(JSON.parse(String(init.body))).toMatchObject({ field: 'm_sometimes', item: 'Steak', seenAt: '2026-10-09T17:30:00.000Z', previous: null, activityId: 3 })
+  })
+
+  it('"Not anymore" warns at once and says an admin will check', async () => {
+    fetchMock.mockResolvedValueOnce(json({ ok: true, item: 'Wine', goneAt: '2026-10-09T17:30:00.000Z', changed: true, submissionId: '9a6c4c1e-2f55-4a8e-9d57-3b7f0d6f4a99', activityId: 4 }))
+    view({ item: tj, category: grocery })
+    fireEvent.click(within(row('Wine')).getByRole('button', { name: /Wine/ }))
+    expect(row('Wine')).toHaveTextContent('Last seen Jun 1.')
+    fireEvent.click(within(row('Wine')).getByRole('button', { name: 'Not anymore' }))
+    expect(await within(row('Wine')).findByRole('status')).toHaveTextContent('Thanks. We’ll check before taking it off.')
+    expect(fetchMock.mock.calls[0][0]).toBe(`/api/resource/${tj.id}/item/gone`)
+    // Closed again, the row carries the warning.
+    fireEvent.click(within(row('Wine')).getByRole('button', { name: /Wine/ }))
+    expect(row('Wine')).toHaveTextContent('Reported gone today · we’ll check before taking it off')
+  })
+
+  it('an item already reported isn’t reported again, and "Not anymore" isn’t offered where edits are off', () => {
+    view({ item: tj, category: { ...grocery, capabilities: { add: true, report: true, directorySearch: true, map: true, edit: false } } })
+    fireEvent.click(within(row('Challah')).getByRole('button', { name: /Challah/ }))
+    expect(within(row('Challah')).getByRole('button', { name: 'Still here' })).toBeInTheDocument()
+    expect(within(row('Challah')).queryByRole('button', { name: 'Not anymore' })).not.toBeInTheDocument()
+  })
+
+  it('the listing’s one question asks about an item only sometimes there, in its own words', async () => {
+    fetchMock.mockResolvedValueOnce(json({ ok: true, item: 'Steak', seenAt: '2026-10-09T17:30:00.000Z', previous: null, clearedGone: null, changed: true, activityId: 5 }))
+    view({ item: tj, category: grocery })
+    const q = screen.getByTestId('listing-question')
+    expect(q).toHaveTextContent('Kosher steak here today?')
+    expect(q).toHaveTextContent('Listed as not always in stock.')
+    fireEvent.click(within(q).getByRole('button', { name: 'Yes' }))
+    expect(await within(q).findByRole('status')).toHaveTextContent('Thanks! Marked as seen today.')
+    // The same answer shows on the item.
+    expect(within(row('Steak')).getByText('seen today')).toBeInTheDocument()
+  })
+})
+
+describe('ListingView — a restaurant’s main dishes (agreed Oct 1)', () => {
+  const dishes: CategoryField = { key: 'dishes', label: 'Main dishes', type: 'tags', renderAs: 'badge', showCountInHeader: true, countLabel: 'dish', expandedOnly: true }
+  const withDishes = makeCategory({ ...food, detailFields: [...food.detailFields, dishes] })
+  const served = makeListing({
+    ...judah,
+    hours: { mon: { open: '11:00', close: '21:00' } },
+    dishes: ['Shawarma', 'Falafel'],
+    itemMenu: { dishes: { Shawarma: '2026-10-02T15:00:00Z', Falafel: '2026-10-02T15:00:00Z' } },
+    itemSeen: { dishes: { Shawarma: '2026-10-09T14:00:00Z' } },
+    menuUrl: 'https://judahgrill.com/menu',
+  })
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-10-09T17:30:00Z')) // Fri Oct 9, 1:30 PM
+  })
+  afterEach(() => vi.useRealTimers())
+  const card = () => screen.getByTestId('listing-items')
+  const row = (name: string) => screen.getAllByTestId('listing-item').find((li) => li.textContent?.startsWith(name))!
+
+  // Oct 15: "All 10 items" on the same line as the box's Edit.
+  it('a long list says "All N" on the same line as Edit', () => {
+    const many = makeListing({ ...served, dishes: ['Shawarma', 'Falafel', 'Hummus', 'Kebab', 'Schnitzel', 'Laffa', 'Baba ganoush'] })
+    view({ item: many, category: withDishes })
+    const all = within(card()).getByTestId('items-all')
+    expect(all).toHaveTextContent('All 7 dishes')
+    expect(all.parentElement!.parentElement).toContainElement(within(card()).getByRole('button', { name: 'Edit' }))
+    fireEvent.click(all)
+    expect(screen.getAllByTestId('listing-item')).toHaveLength(7)
+    expect(all).toHaveTextContent('Fewer')
+  })
+
+  it('lead the listing, in a dish’s words, each dated by its menu until someone has seen it since', () => {
+    view({ item: served, category: withDishes })
+    expect(card()).toHaveTextContent('Main dishes · 2')
+    expect(card()).not.toHaveTextContent('Been there?')
+    expect(within(row('Shawarma')).getByText('seen today')).toBeInTheDocument()
+    expect(within(row('Falafel')).getByText('seen Oct 2')).toBeInTheDocument()
+    // Adding one is the box's Edit (Oct 15), not a row of its own.
+    expect(within(card()).queryByRole('button', { name: /Add a dish/ })).not.toBeInTheDocument()
+    expect(within(card()).getByRole('button', { name: 'Edit' })).toBeInTheDocument()
+    fireEvent.click(within(row('Falafel')).getByRole('button', { name: /Falafel/ }))
+    expect(row('Falafel')).toHaveTextContent('Last seen Oct 2.')
+    expect(within(row('Falafel')).getByRole('button', { name: 'Still served' })).toBeInTheDocument()
+  })
+
+  it('link the full menu they were read from, with no arrow and no line about who read them (the user, Oct 10)', () => {
+    view({ item: served, category: withDishes })
+    expect(within(card()).getByRole('link', { name: 'Full menu' })).toHaveAttribute('href', 'https://judahgrill.com/menu')
+    expect(card()).not.toHaveTextContent('guide’s AI')
+  })
+
+  it('no menu link that isn’t a web address, and no line about the AI for dishes a person added', () => {
+    view({ item: makeListing({ ...judah, dishes: ['Shawarma'], menuUrl: 'javascript:alert(1)' }), category: withDishes })
+    expect(within(card()).queryByRole('link', { name: 'Full menu' })).not.toBeInTheDocument()
+    expect(card()).not.toHaveTextContent('guide’s AI')
+  })
+
+  it('and the kosher details aren’t dated (Oct 6)', () => {
+    view({ item: served, category: withDishes })
+    expect(screen.queryByText(/Kosher details/)).not.toBeInTheDocument()
+  })
+})
+
+describe('ListingView — Edit under every box (Oct 15)', () => {
+  // The user, Oct 15: "a little edit under each bubble … even the add a
+  // dish should just be edit. Same everywhere." Each opens that box alone,
+  // in the editor (not the "+ Add" box's AI).
+  const m: CategoryField = { key: 'm', label: 'Kosher items here', type: 'tags', renderAs: 'badge', showCountInHeader: true }
+  const grocery = makeCategory({ id: 'grocery', label: 'Grocery', detailFields: [hours, website, description, m] })
+  const tj = makeListing({
+    id: '0b6c4c1e-2f55-4a8e-9d57-3b7f0d6f4a21',
+    name: 'Trader Joe’s',
+    address: '1324 Walnut St',
+    phone: '(215) 555-0100',
+    hours: { mon: { open: '09:00', close: '17:00' } },
+    m: ['Challah', 'Cheddar Cheese'],
+    googleDescription: 'A grocery.',
+  })
+  const editsOff = { add: true, report: true, directorySearch: true, map: true, edit: false }
+  const card = () => screen.getByTestId('listing-items')
+  const editIn = (box: HTMLElement) => fireEvent.click(within(box).getByRole('button', { name: 'Edit' }))
+
+  it('the items: no "+ Add an item" row, Edit opens their list in the editor', () => {
+    view({ item: tj, category: grocery })
+    expect(within(card()).queryByRole('button', { name: /Add an item|Add the first/ })).not.toBeInTheDocument()
+    editIn(card())
+    const sheet = screen.getByRole('dialog', { name: 'Kosher items here' })
+    expect(within(sheet).getByTestId('editor-open-items')).toBeInTheDocument()
+    expect(within(sheet).getByRole('button', { name: 'No changes yet' })).toBeDisabled()
+  })
+
+  it('every box has one: the contact box, About, the items', () => {
+    view({ item: tj, category: grocery })
+    for (const id of ['listing-items', 'listing-details', 'listing-about']) {
+      expect(within(screen.getByTestId(id)).getAllByRole('button', { name: 'Edit' })).toHaveLength(1)
+    }
+  })
+
+  it('the contact box’s Edit is that box alone: its address, phone and hours, not the rest of the listing', () => {
+    view({ item: tj, category: grocery })
+    editIn(screen.getByTestId('listing-details'))
+    const sheet = screen.getByRole('dialog', { name: 'Contact and hours' })
+    expect(within(sheet).getByLabelText('Address')).toHaveValue('1324 Walnut St')
+    expect(within(sheet).getByLabelText('Phone')).toHaveValue('(215) 555-0100')
+    expect(within(sheet).getByTestId('editor-open-hours')).toBeInTheDocument()
+    expect(within(sheet).queryByTestId('editor-open-about')).not.toBeInTheDocument()
+    expect(within(sheet).queryByTestId('editor-open-items')).not.toBeInTheDocument()
+    // Changing one thing is what Send counts.
+    fireEvent.change(within(sheet).getByLabelText('Phone'), { target: { value: '2155550199' } })
+    expect(within(sheet).getByRole('button', { name: 'Send 1 change' })).toBeEnabled()
+  })
+
+  it('About’s Edit is About alone', () => {
+    view({ item: tj, category: grocery })
+    editIn(screen.getByTestId('listing-about'))
+    const sheet = screen.getByRole('dialog', { name: 'About' })
+    expect(within(sheet).getByTestId('editor-open-about')).toBeInTheDocument()
+    expect(within(sheet).queryByLabelText('Address')).not.toBeInTheDocument()
+  })
+
+  it('is never the "+ Add" box: a category page’s box isn’t asked to open', () => {
+    const tell = vi.fn()
+    renderWithProviders(
+      <TellAboutContext.Provider value={tell}>
+        <ListingView item={tj} category={grocery} color="#2657bf" path="/philly/grocery/tj" foot={<p>foot</p>} />
+      </TellAboutContext.Provider>,
+    )
+    editIn(card())
+    editIn(screen.getByTestId('listing-details'))
+    expect(tell).not.toHaveBeenCalled()
+  })
+
+  // Oct 15, second pass: an empty list keeps its Add; Edit is for a list
+  // with something on it.
+  it('a place with nothing on its list yet leads with the box and its Add, which opens the list; its hours are one line', () => {
+    view({ item: makeListing({ hours: { mon: { open: '09:00', close: '17:00' } } }), category: grocery })
+    expect(card()).toHaveTextContent(/^Kosher items hereAdd the first item$/)
+    expect(within(card()).queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument()
+    expect(screen.queryByTestId('listing-hours')).not.toBeInTheDocument()
+    expect(screen.getByTestId('listing-details')).toHaveTextContent(/today/i)
+    // The list comes before the details, as any main thing does.
+    expect(card().compareDocumentPosition(screen.getByTestId('listing-details')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    fireEvent.click(within(card()).getByRole('button', { name: 'Add the first item' }))
+    expect(within(screen.getByRole('dialog', { name: 'Kosher items here' })).getByTestId('editor-open-items')).toBeInTheDocument()
+  })
+
+  it('a place with no dishes offers “Add their menu”: the “+ Add” box for it, the list in the editor its do-it-yourself', () => {
+    const dishesCat = makeCategory({ id: 'restaurant', detailFields: [{ key: 'dishes', label: 'Main dishes', type: 'tags', renderAs: 'badge', showCountInHeader: true, countLabel: 'main dish' }] })
+    const place = makeListing({ id: '7d0a7c1e-2f55-4a8e-9d57-3b7f0d6f4a21', name: 'Shtetl', category: 'restaurant' })
+    const tell = vi.fn()
+    renderWithProviders(
+      <TellAboutContext.Provider value={tell}>
+        <ListingView item={place} category={dishesCat} color="#2657bf" path="/philly/restaurant/shtetl" foot={<p>foot</p>} />
+      </TellAboutContext.Provider>,
+    )
+    expect(within(card()).queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument()
+    fireEvent.click(within(card()).getByRole('button', { name: 'Add their menu' }))
+    expect(tell).toHaveBeenCalledWith(place, expect.any(Function), { menu: true })
+    // Its do-it-yourself: the list, in the editor.
+    act(() => tell.mock.calls[0][1]())
+    expect(within(screen.getByRole('dialog', { name: 'Main dishes' })).getByTestId('editor-open-items')).toBeInTheDocument()
+  })
+
+  it('with no “+ Add” box (the Map), a place with no dishes offers “Add the first dish”, the list in the editor', () => {
+    const dishesCat = makeCategory({ id: 'restaurant', detailFields: [{ key: 'dishes', label: 'Main dishes', type: 'tags', renderAs: 'badge', showCountInHeader: true, countLabel: 'main dish' }] })
+    view({ item: makeListing({ id: '7d0a7c1e-2f55-4a8e-9d57-3b7f0d6f4a21', name: 'Shtetl', category: 'restaurant' }), category: dishesCat })
+    fireEvent.click(within(card()).getByRole('button', { name: 'Add the first dish' }))
+    expect(within(screen.getByRole('dialog', { name: 'Main dishes' })).getByTestId('editor-open-items')).toBeInTheDocument()
+  })
+
+  it('where nobody can add to it, no empty list: the hours stay in the contact box', () => {
+    view({ item: makeListing({ hours: { mon: { open: '09:00', close: '17:00' } } }), category: { ...grocery, capabilities: editsOff } })
+    expect(screen.queryByTestId('listing-hours')).not.toBeInTheDocument()
+    expect(within(screen.getByTestId('listing-details')).getByRole('button', { name: /Today|Closed today/ })).toBeInTheDocument()
+    expect(screen.queryByTestId('listing-items')).not.toBeInTheDocument()
+  })
+
+  it('no Edit anywhere where edits are off', () => {
+    view({ item: tj, category: { ...grocery, capabilities: editsOff } })
+    expect(screen.queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument()
+  })
+})

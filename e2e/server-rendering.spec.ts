@@ -1,7 +1,12 @@
+import { existsSync, readFileSync } from 'node:fs'
+import path from 'node:path'
 import { expect, test } from '@playwright/test'
 import {
   apiCallsForThisDocument,
+  categories,
+  categoryWithHoursField,
   categoryWithListings,
+  type Category,
   defaultCommunity,
   dismissLocationPrompt,
   ready,
@@ -33,15 +38,19 @@ test.describe('content is server-rendered', () => {
   // so the document shipped a shell (`/philly` had no <main> at all; a
   // category page's <main> was 42 characters of nothing).
   //
-  // Fixed by moving the actual useSearchParams() reads (Landing's `?at=map`,
-  // FindResources' `?item=`/`?q=`/`?hospital=`/`?form=`) out into their own
-  // thin wrapper components (LandingConnected, FindResourcesConnected),
-  // narrowing the Suspense boundary down to just those — everything else
-  // (the category grid, the listing rows) no longer calls a Dynamic API and
-  // prerenders for real. The wrapper's own Suspense fallback is the same
-  // component rendered with no query-string props at all, which is exactly
-  // what a plain URL with no query string looks like — so there's nothing
-  // duplicated between "what ships in the HTML" and "what the fallback is".
+  // Fixed by moving the actual useSearchParams() reads (FindResources'
+  // `?item=`/`?q=`/`?hospital=`/`?form=`) out into their own thin wrapper
+  // component (FindResourcesConnected), narrowing the Suspense boundary down
+  // to just that — everything else (the category grid, the listing rows) no
+  // longer calls a Dynamic API and prerenders for real. The wrapper's own
+  // Suspense fallback is the same component rendered with no query-string
+  // props at all, which is exactly what a plain URL with no query string
+  // looks like — so there's nothing duplicated between "what ships in the
+  // HTML" and "what the fallback is". `[community]/page.tsx` (home) needed
+  // the same fix at the time (Landing's own `?at=map`, via a
+  // LandingConnected wrapper) — that's gone now along with the embedded map
+  // band `?at=map` existed to scroll to (retired feature), so home has no
+  // Suspense boundary at all any more; see HomeScreen.tsx's own doc.
   test('a category directory ships its listings in the HTML', async ({ page, request }) => {
     const community = await defaultCommunity(page)
     const { category } = await categoryWithListings(request, community)
@@ -105,7 +114,13 @@ test.describe('content is server-rendered', () => {
 
     // Was four (site-settings, categories, hospitals, resources) before the
     // content moved to the server.
-    expect(await apiCallsForThisDocument(page)).toEqual([])
+    //
+    // Except the zmanim: a page whose listings keep hours asks for tonight's
+    // candle lighting ("Until 4 PM, before candles" on a Friday), as a shul
+    // page asks for sunset. That's the day's times, not the page's content,
+    // and it's one CDN-cached response at the community's centre.
+    const calls = await apiCallsForThisDocument(page)
+    expect(calls.filter((url) => !url.startsWith('/api/zmanim?'))).toEqual([])
   })
 
   test('no loading skeletons on a settled page', async ({ page, request }) => {
@@ -165,10 +180,114 @@ test.describe('content is server-rendered', () => {
       return
     }
 
-    // The header states the count; it should match what the API returns.
-    // "places" or "listings" depending on the category's own `hasAddress`
-    // (see DirectoryHeader's own doc) — this test doesn't care which noun,
-    // only that the number itself is right.
-    await expect(page.getByText(new RegExp(`${count}\\s+(?:listings?|places?)`))).toBeVisible()
+    // The list's heading states the count (ListHeading); it should match
+    // what the API returns. As "N listings" on an ungrouped list; a grouped
+    // one's heading names its first group ("Open now · 57"), so the whole
+    // list's count is read from data-total there instead.
+    //
+    // The visible heading only: until React swaps in the streamed content,
+    // its hidden `display: none` segments (S:0, S:1) hold copies of the same
+    // heading, and matching every copy failed this on strict mode: 4 runs in
+    // 8 when the count first moved into the heading, and about one in four
+    // with the old count under the title.
+    const heading = page.getByTestId('list-heading').filter({ visible: true })
+    await expect(heading).toHaveAttribute('data-total', String(count))
+    const text = await heading.getByRole('heading').innerText()
+    if (/listings?$/.test(text)) expect(text).toMatch(new RegExp(`(^|· )${count}\\s+listings?$`))
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// A URL no build knew — a question nobody built ahead, a listing approved
+// since the deploy — is served from a shell Next prerenders with that segment
+// left open. The community layout is in every one of those shells, so a
+// Client Component in it that reads the URL (usePathname) outside <Suspense>
+// empties all of them: the "+ Add" button did, from 8a73fed on, and `next
+// build` passed regardless. Only `next dev` said so, and only on such a URL.
+//
+// The ask page is where it shows. It reads its question inside its own
+// boundary precisely so an unbuilt question still gets the shell at once
+// (see its page.tsx); a listing's page reads its id before any boundary on
+// purpose, to answer a made-up id with a real 404, so its shell is empty
+// whatever the layout does and can't stand in for this.
+//
+// Read from the build itself because nothing over HTTP tells the two apart:
+// an empty shell only means the whole page is rendered on request instead,
+// and the HTML that comes back is the same.
+// ─────────────────────────────────────────────────────────────────────────────
+test('a question nobody built ahead still gets the site in its prerendered shell', async ({ page }) => {
+  const community = await defaultCommunity(page)
+  // Same expression as next.config.ts; the e2e build runs in this directory.
+  const distDir = path.resolve(process.env.NEXT_DIST_DIR || '.next')
+  const shell = path.join(distDir, 'server', 'app', community, 'ask', '[question].html')
+  expect(existsSync(shell), `no prerendered shell at ${shell} — has Next renamed its build output?`).toBe(true)
+
+  const markup = serverMarkup(readFileSync(shell, 'utf8'))
+  expect(markup.length, 'the shell is empty: something in the layout blocks prerendering').toBeGreaterThan(0)
+  expect(markup, 'the shell has no site header').toContain('<header')
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// A page's HTML is built ahead of time and cached for days, on a server in
+// its own timezone; the visitor opens it whenever they like. Anything on it
+// that depends on the time (a row's "Closes soon · 6 PM", the next Mincha,
+// the Try asking questions) used to be worked out on the server too, from
+// its own clock. Now the time waits for the browser (see useNow), and these
+// hold it to that.
+//
+// Two ways it went wrong. A category page's list, and an opened listing, are
+// rendered again in the browser whatever the HTML says (they read the
+// address, which a prebuilt page can't), so their HTML was only ever wrong,
+// never an error: "Opens Wed 9 AM" until the page loaded, then "Opens 9 AM".
+// Those are checked in the HTML itself. The home screen is hydrated, taken
+// over as it is, so there the two clocks disagreeing made React throw the
+// server's page away (error #418). That's checked in a browser whose clock
+// is half a day from now, so whatever was true when the page was built isn't
+// when it's opened.
+// ─────────────────────────────────────────────────────────────────────────────
+test.describe('the time is the browser’s, not the build’s', () => {
+  test('a category page’s HTML says nothing about what’s open', async ({ page, request }) => {
+    const community = await defaultCommunity(page)
+    const { category } = await categoryWithHoursField(request, community)
+    const markup = serverMarkup(await (await request.get(`/${community}/${category.id}`)).text())
+    expect(markup).not.toMatch(/Opens \w|Open until|Closes soon|No hours listed/)
+
+    // The browser says it, once it knows the time. The visible <main> only:
+    // until React swaps in the streamed content, a hidden copy is there too.
+    await page.goto(`/${community}/${category.id}`)
+    await ready(page)
+    await expect(page.locator('main').filter({ visible: true })).toContainText(/Opens \w|Open until|Closes soon|Open\b|No hours listed/)
+  })
+
+  test('a shul list’s HTML says nothing about the next minyan', async ({ page, request }) => {
+    const community = await defaultCommunity(page)
+    const all = (await categories(request, community)) as (Category & { detailFields?: { type: string }[] })[]
+    const shuls = all.find((c) => c.detailFields?.some((f) => f.type === 'minyanim'))
+    test.skip(!shuls, 'This community keeps no minyan times')
+    const markup = serverMarkup(await (await request.get(`/${community}/${shuls!.id}`)).text())
+    expect(markup).not.toMatch(/(Shacharis|Mincha|Maariv) \d|No davening times listed|Nothing today or tomorrow|Shabbos only|Shabbos: (Fri|Sat) \d/)
+  })
+
+  test('the home screen opened half a day later hydrates without React redoing it', async ({ page }) => {
+    const community = await defaultCommunity(page)
+    const errors: string[] = []
+    page.on('pageerror', (e) => errors.push(e.message))
+    page.on('console', (m) => {
+      if (m.type() === 'error') errors.push(m.text())
+    })
+    await page.clock.setFixedTime(Date.now() + 12 * 60 * 60 * 1000)
+    await page.goto(`/${community}`)
+    await ready(page)
+    // Until React has taken the page over, a mismatch hasn't been found yet.
+    // It marks each element it hydrates, or renders over a mismatch; the
+    // last one in <main> is among the last it reaches.
+    await page.waitForFunction(() => {
+      const last = document.querySelector('main')?.querySelector(':scope *:last-child')
+      return !!last && Object.keys(last).some((k) => k.startsWith('__reactFiber$'))
+    })
+    // A moment for React to report what it found, after it commits.
+    await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => setTimeout(r, 0))))
+    // Minified in a production build: #418 is text that didn't match.
+    expect(errors.filter((e) => /Minified React error #4(18|19|21|22|23|25)|hydrat/i.test(e))).toEqual([])
   })
 })

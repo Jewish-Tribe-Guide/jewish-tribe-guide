@@ -7,7 +7,19 @@
 // client code fetches them from `GET /api/categories`.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export type FieldType = 'text' | 'tel' | 'textarea' | 'number' | 'boolean' | 'select' | 'tags' | 'url' | 'hours' | 'minyanim' | 'image'
+import type { AskWord } from './askWords'
+
+export type FieldType = 'text' | 'tel' | 'textarea' | 'number' | 'boolean' | 'select' | 'tags' | 'url' | 'hours' | 'minyanim' | 'image' | 'contacts'
+
+/** The detail keys stored beside a field and edited with it: a tags
+ *  field's items that are only sometimes there ("m_sometimes"), a minyanim
+ *  field's special schedules ("minyanim_schedules", see schedules.ts).
+ *  Carried wherever the field is: an edit, the no-op check, a strip. */
+export function companionKeys(field: Pick<CategoryField, 'key' | 'type'>): string[] {
+  if (field.type === 'tags') return [`${field.key}_sometimes`]
+  if (field.type === 'minyanim') return [`${field.key}_schedules`]
+  return []
+}
 
 /** The field types offered in the editor's Type picker, most-common first. */
 export const FIELD_TYPES: { value: FieldType; label: string }[] = [
@@ -21,6 +33,7 @@ export const FIELD_TYPES: { value: FieldType; label: string }[] = [
   { value: 'tags', label: 'Tags' },
   { value: 'hours', label: 'Hours' },
   { value: 'minyanim', label: 'Davening Times (Minyanim)' },
+  { value: 'contacts', label: 'List of contacts' },
 ]
 
 /** Each type's natural display shape on a card — a `badge` (chip beside the
@@ -38,6 +51,7 @@ export const FIELD_TYPE_SHAPE: Record<FieldType, 'badge' | 'row'> = {
   number: 'row',
   hours: 'row',
   minyanim: 'row',
+  contacts: 'row',
   // Never actually rendered as a card row (see the "Photo" toggle below) —
   // this entry exists only because FIELD_TYPE_SHAPE is a Record over every
   // FieldType.
@@ -104,6 +118,10 @@ export type CategoryField = {
   showIf?: { field: string; equals: string | number | boolean }
   /** For `type: 'url'`: the button text shown on the card (e.g. "Join group"). */
   linkLabel?: string
+  /** For `type: 'url'`: on an opened listing, a line in the contact box
+   *  instead of a round button (a hospital's page on Refuah, Oct 6), so the
+   *  buttons stay every listing's Directions, Call, Website, Share. */
+  linkInDetails?: boolean
   /** For a row field: render just the value, without the "Label:" prefix. */
   hideLabel?: boolean
   // ── Presentation hints (used by the generic card renderer) ──
@@ -177,7 +195,10 @@ export type CategoryField = {
    *  lives together instead of getting split by a rule that has nothing to
    *  do with where the data came from. Purely a form-layout concern — has no
    *  bearing on `showInHeader`/card placement, or on the field's position in
-   *  the expanded panel. See ListingForm.tsx's `coreDetailFields`. */
+   *  the expanded panel. The sectioned form that laid this out (ListingForm)
+   *  is gone, and the listing editor places its rows by editorRows.ts, so
+   *  today this only marks the category's own Website field (the admin's
+   *  Website checkbox sets it; /api/admin/main-dishes' websiteOf reads it). */
   coreSection?: boolean
   /** For a badge field: when `flagField` is truthy on the listing, render this
    *  badge in amber (caution) and surface `noteField`'s free text as the
@@ -201,6 +222,59 @@ export type CategoryField = {
    *  "Phone" alone would be ambiguous next to a Men's Phone on the same
    *  listing. Ignored on fields without an audienceKey. */
   shortLabel?: string
+  /** Assigns this field to one of the category's named form sections (see
+   *  CategoryConfig.formSections) — an independently-collapsible group shown
+   *  in the intake/edit form after Basics, e.g. "Kosher details". A field
+   *  with no formSection (and no audienceKey — those keep their own
+   *  section grouping, see audienceKey above) falls into a single generic
+   *  "More details" catch-all group instead, so every category gets the same
+   *  decluttered shape even before an admin has defined any real sections.
+   *  Ignored on a coreSection field, which always renders in Basics. Only
+   *  that sectioned form (ListingForm, since deleted) read this; the listing
+   *  editor groups its rows by editorRows.ts and doesn't. */
+  formSection?: string
+  /** For `type: 'boolean'`: shows the SUBMISSION FORM's switch/state as the
+   *  logical opposite of what's actually stored — for a field whose stored
+   *  "true" is naturally a negative (e.g. `kosherPartial: true` means "not
+   *  everything here is kosher"), where the form itself should still ask the
+   *  positive, friendlier version of the question ("Everything here is
+   *  kosher?") and default to "Yes" for a listing nobody has answered this
+   *  for yet, rather than opening on a negatively-phrased "No". Purely a
+   *  form-display concern: the field's own `label` carries the positive
+   *  phrasing, the stored value and its key are untouched, and every other
+   *  reader of this field (caveat badges, showIf, filters) keeps reading the
+   *  real stored boolean exactly as before — nothing downstream needs to
+   *  know this field is asked "backwards" in the form. */
+  invertDisplay?: boolean
+  /** For `type: 'contacts'`: each entry also says where it's from ("From
+   *  Monsey"), for a hospital's rides, which families arrange from home. */
+  entryFrom?: boolean
+  /** Shown on a listing only from Rosh Hashanah to the end of Sukkos (a
+   *  hospital's sukkah), worked out from the Hebrew date (sukkosWindow.ts). Still
+   *  edited, searched and shown to a moderator all year. */
+  shownAround?: 'sukkos'
+  /** For `type: 'boolean'` in a category with minyanim: yes means the
+   *  place is a minyan that meets somewhere (an office, a hospital, a
+   *  home), not a shul (the user, Oct 16). Its row has a clock for its
+   *  picture, and its listing has none of a shul's prompts for times it
+   *  will never have ("Their Shabbos times aren't listed yet"). What the
+   *  row calls it is the field's own badge, as any yes/no field's: label
+   *  it "Minyan" and make it filterable, which also lets Filters show only
+   *  minyanim. */
+  minyanOnly?: boolean
+}
+
+/** A named, admin-defined group of optional form fields — see
+ *  CategoryField.formSection. Rendered as its own collapsible section in the
+ *  intake/edit form, in the order this array lists them; a section starts
+ *  open if any of its fields already has a value (edit only — create never
+ *  has one yet), collapsed otherwise, same as an audience section. */
+export type CategoryFormSection = {
+  key: string
+  label: string
+  /** Shown next to the label so someone can tell what's inside without
+   *  opening it, e.g. "certification, dairy/meat" under "Kosher details". */
+  description?: string
 }
 
 /** Per-category UI affordances, layered UNDER the site-wide `ui.*` master
@@ -212,7 +286,7 @@ export type CategoryCapabilities = {
   add: boolean
   /** Per-listing "Edit" button. */
   edit: boolean
-  /** Per-listing "Report" button. */
+  /** Requesting a listing's removal — offered at the foot of the edit form. */
   report: boolean
   /** The search bar on this category's directory. */
   directorySearch: boolean
@@ -350,6 +424,37 @@ export type CategoryConfig = {
    *  deleting it, keeping its listings and configuration intact for when
    *  it's turned back on. */
   active?: boolean
+  /** Named, collapsible groups for this category's optional fields — see
+   *  CategoryField.formSection and CategoryFormSection. Unset/empty means
+   *  no real sections have been defined yet: every non-core, non-audience
+   *  field falls into one generic "More details" group in the form instead
+   *  of being flatly listed. */
+  formSections?: CategoryFormSection[]
+  /** How the category page splits its list into groups (open now / not,
+   *  within 2 mi / further, a yes/no, or one closed group per pick-list
+   *  value). Unset means one list. Stored as it came from the database and
+   *  read through parseGroupBy, so an unknown shape means no groups rather
+   *  than an error — see listGroups.ts. */
+  groupBy?: unknown
+  /** The one question the category page asks in its list: a place's
+   *  missing yes/no or pick-list value, or whether a place nobody has
+   *  confirmed is still right. Unset means none. Read through
+   *  parseQuestionCard, like groupBy — see questionCards.ts. */
+  questionCard?: unknown
+  /** Other categories' places within a walk, listed on each of this
+   *  category's listings (a hotel's shuls; a hospital's food, shuls and
+   *  hotels). Unset means none. Read through parseWalkLists — see
+   *  walkList.ts. */
+  walkList?: unknown
+  /** What an admin adds to each opened listing: a named main thing,
+   *  boxes, a Shabbos card. Unset means none.
+   *  Read through parseListingParts — see listingParts.ts. */
+  listingParts?: unknown
+  /** Words an admin has taught the search to read as this category or one
+   *  of its filters ("ikc" is Kosher Cert: IKC). Not stored on the
+   *  category: listCategories adds them from question_word, so every
+   *  search box has them. See askWords.ts. */
+  askWords?: AskWord[]
 }
 
 export const DEFAULT_CATEGORY_ICON = '📋'

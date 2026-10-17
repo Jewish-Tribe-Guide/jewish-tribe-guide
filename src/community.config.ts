@@ -8,8 +8,8 @@
 //    drives the browser chrome, the PWA manifest, and the Tailwind `primary`
 //    utilities (injected as --color-primary in src/app/layout.tsx). The value
 //    in globals.css is only a build-time fallback.
-//  • Location data — hospitals in src/data/hospitals; eruvim (read at
-//    runtime) in src/data/resources.
+//  • Location data — hospitals in src/data/hospitals. (Eruvim are in the
+//    eruv table, edited from the admin.)
 //  • Initial listings — the seed arrays in src/data/resources, loaded into
 //    the database once by scripts/seed.mjs. Replace with your own content.
 //  • Logo — the StarOfDavid mark in src/components/icons.tsx, and the browser
@@ -34,7 +34,7 @@ export const community = {
   /** Longer phrasing used only in the PWA manifest description. */
   manifestDescription:
     "Connecting patients, families, and neighbors with Philadelphia's Jewish community resources",
-  /** Region/area name, used in copy such as "the {region}-area eruvim". */
+  /** Region/area name, used in copy such as "Anywhere in the {region} area". */
   region: 'Philadelphia',
   /** IANA timezone for the community — drives zmanim/candle-lighting when the
    *  visitor is located by address rather than a hospital (which carries its
@@ -72,8 +72,6 @@ export const community = {
     eruv: true,
     /** "Zmanim & Shabbos" (candle-lighting / davening times) card + page. */
     zmanim: true,
-    /** "Jewish Medical Resources" card — per-hospital Jewish life. */
-    medicalResources: true,
     /** "Patient & Family Support" request flow. */
     patientSupport: true,
     /** "Volunteer for Patients" flow. */

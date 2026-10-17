@@ -1,4 +1,4 @@
-import type { Page, APIRequestContext } from '@playwright/test'
+import type { Locator, Page, APIRequestContext } from '@playwright/test'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Shared helpers.
@@ -33,10 +33,31 @@ import type { Page, APIRequestContext } from '@playwright/test'
 // contended one, which warming cannot.
 const API_TIMEOUT = 45_000
 
+function budgetedGet(request: APIRequestContext, url: string) {
+  return request.get(url, { timeout: API_TIMEOUT })
+}
+
 async function apiGet(request: APIRequestContext, url: string): Promise<Record<string, unknown>> {
-  const res = await request.get(url, { timeout: API_TIMEOUT })
+  const res = await budgetedGet(request, url)
   if (!res.ok()) throw new Error(`GET ${url} returned ${res.status()}`)
   return (await res.json()) as Record<string, unknown>
+}
+
+/** Opens later pages in this tab with the home set to `style` (and any other
+ *  settings given), the way the admin's Preview does: a draft in
+ *  sessionStorage, read only when the URL has ?preview=1. Never a save, so
+ *  it writes nothing; and a test of one home doesn't depend on which one the
+ *  admin has chosen. Load the page with `?preview=1` after calling this. */
+export async function previewSettings(page: Page, community: string, overrides: Record<string, unknown>): Promise<void> {
+  const { settings } = (await apiGet(page.request, `/api/site-settings?community=${community}`)) as { settings: Record<string, unknown> }
+  const { sections } = (await apiGet(page.request, `/api/home-sections?community=${community}`)) as { sections: unknown[] }
+  await page.addInitScript((value) => {
+    try {
+      sessionStorage.setItem('jpc:adminPreviewDraft', value)
+    } catch {
+      // about:blank has no storage; the page itself does.
+    }
+  }, JSON.stringify({ settings: { ...settings, ...overrides }, sections }))
 }
 
 /** The community slug the site redirects "/" to. */
@@ -45,6 +66,18 @@ export async function defaultCommunity(page: Page): Promise<string> {
   if (!response) throw new Error('No response for "/"')
   const slug = new URL(page.url()).pathname.split('/').filter(Boolean)[0]
   if (!slug) throw new Error(`"/" did not redirect to a community (landed on ${page.url()})`)
+  return slug
+}
+
+/** The same slug, found by following the redirect outside the browser. For a
+ *  test measuring what a page load downloads, that load has to be the
+ *  browser's first: a visit to the home page beforehand registers the service
+ *  worker, which can then take control halfway through the measured load and
+ *  fetch every script a second time (see e2e/budgets.spec.ts). */
+export async function defaultCommunitySlug(request: APIRequestContext): Promise<string> {
+  const res = await budgetedGet(request, '/')
+  const slug = new URL(res.url()).pathname.split('/').filter(Boolean)[0]
+  if (!slug) throw new Error(`"/" did not redirect to a community (landed on ${res.url()})`)
   return slug
 }
 
@@ -82,6 +115,29 @@ export async function categoryWithListings(
   throw new Error('No listing category has any listings — cannot test a populated directory')
 }
 
+/** A listing whose opened view has four action buttons before Share:
+ *  Directions, Call and two links (listingActions in src/lib/listingView.ts,
+ *  which stops at four). For anything about how that row is laid out at its
+ *  fullest; a listing with fewer never spread across the width anyway. */
+export async function listingWithFourActions(
+  request: APIRequestContext,
+  community: string,
+): Promise<{ category: Category; item: { id: string; name: string } }> {
+  const all = await categories(request, community)
+  for (const category of all.filter((c) => c.kind === 'listing' && c.hasAddress !== false)) {
+    const fields = ((category as Category & { detailFields?: { key: string; type: string; audienceKey?: string }[] }).detailFields ?? []).filter(
+      (f) => f.type === 'url' && !f.audienceKey,
+    )
+    const body = await apiGet(request, `/api/resources?category=${category.id}&community=${community}`)
+    if (!body.ok) continue
+    for (const item of body.resources as Record<string, unknown>[]) {
+      const links = fields.filter((f) => String(item[f.key] ?? '').trim()).length
+      if (item.address && item.phone && links >= 2) return { category, item: { id: String(item.id), name: String(item.name) } }
+    }
+  }
+  throw new Error('No listing has an address, a phone and two links')
+}
+
 /** A listing-kind category that is actually distance-based — `hasAddress` is
  *  not false — and has listings. For anything asserting on distances or the
  *  location prompt, neither of which exists on a category that collects no
@@ -105,21 +161,46 @@ export async function categoryWithDistances(
   throw new Error('No distance-based listing category has any listings')
 }
 
+/** A distance-based category with at least one listing that has map
+ *  coordinates — what a distance needs. categoryWithDistances only checks
+ *  there are listings, and the first category with any may have none
+ *  geocoded. */
+export async function categoryWithGeocodedListings(
+  request: APIRequestContext,
+  community: string,
+): Promise<{ category: Category }> {
+  const all = await categories(request, community)
+  for (const category of all.filter((c) => c.kind === 'listing' && c.hasAddress !== false)) {
+    const body = await apiGet(request, `/api/resources?category=${category.id}&community=${community}`)
+    const resources = (body.resources ?? []) as { geo?: { lat: number; lng: number } | null }[]
+    if (body.ok && resources.some((r) => r.geo)) return { category }
+  }
+  throw new Error('No distance-based listing category has a geocoded listing')
+}
+
 /** A listing-kind category with an Hours-type field and at least one real
  *  listing, plus that listing itself — for tests that need to open the edit
  *  form's Hours editor on a real listing rather than an empty one. */
 export async function categoryWithHoursField(
   request: APIRequestContext,
   community: string,
+  /** `longest`: the one with the most fields first, the longest editor,
+   *  for a test that needs to scroll it. `also`: only one that has a field
+   *  of this type too, outside a mikvah-style section. */
+  { longest = false, also }: { longest?: boolean; also?: string } = {},
 ): Promise<{ category: Category; item: { id: string; name: string } }> {
   // Via categories() rather than its own inline fetch — this used to duplicate
   // that call, and the duplicate is the line CI timed out on.
   const all = (await categories(request, community)) as (Category & {
-    detailFields?: { type: string }[]
+    detailFields?: { type: string; audienceKey?: string }[]
   })[]
   const withHours = all.filter(
-    (c) => c.kind === 'listing' && c.detailFields?.some((f) => f.type === 'hours'),
+    (c) =>
+      c.kind === 'listing' &&
+      c.detailFields?.some((f) => f.type === 'hours') &&
+      (!also || c.detailFields?.some((f) => f.type === also && !f.audienceKey)),
   )
+  if (longest) withHours.sort((a, b) => (b.detailFields?.length ?? 0) - (a.detailFields?.length ?? 0))
   for (const category of withHours) {
     const body = await apiGet(request, `/api/resources?category=${category.id}&community=${community}`)
     const resources = body.resources as { id: string; name: string }[]
@@ -201,6 +282,15 @@ export async function largestCategory(
  *  still fast when the prompt never shows, since the wait resolves the
  *  instant `state: 'visible'` is met OR the timeout is reached, not a fixed
  *  delay either way. */
+/** Opens an open listing's editor: its Edit listing, which opens the
+ *  editor itself everywhere (Oct 15; on a category page it used to open
+ *  the "+ Add" box first). `scope`: where the listing's own Edit listing
+ *  is, when more than one could be on the page. */
+export async function openListingEditor(page: Page, scope: Page | Locator = page): Promise<void> {
+  await scope.getByRole('button', { name: 'Edit listing' }).filter({ visible: true }).click()
+  await page.getByRole('heading', { name: 'Edit listing' }).filter({ visible: true }).first().waitFor()
+}
+
 export async function dismissLocationPrompt(page: Page): Promise<void> {
   const notNow = page.getByRole('button', { name: 'Not now' })
   try {
@@ -210,6 +300,37 @@ export async function dismissLocationPrompt(page: Page): Promise<void> {
   }
   await notNow.click()
   await notNow.waitFor({ state: 'hidden' })
+}
+
+/** The category page's own Add control — GenericDirectory's floating
+ *  button, the same one on every viewport now (it used to be mobile-only,
+ *  with desktop instead carrying a DirectoryHeader toolbar button and a
+ *  separate SiteHeader "Add a place" picker; both were removed once every
+ *  category page grew this floating button on desktop too). Scoped to
+ *  `main` on the theory that a future site-wide Add entry point might
+ *  reuse this exact name outside it. Used wherever a test needs to open
+ *  THIS category's own Add form specifically, not just any Add entry point
+ *  on the page. */
+export function categoryAddButton(page: Page): Locator {
+  // "Add a listing" since d8ccd8b ("listing" everywhere, dropping
+  // "place"). This still said "Add a place" for a while afterwards, so every
+  // test that opens Add failed to find the button — and those failures were
+  // written off as the standing local baseline (AGENTS.md), measured at
+  // that same commit.
+  // "Add" since Oct 5: it opens the box ("Add or update a place" since
+  // Oct 10), with today's add form a few taps inside it (openAddForm).
+  return page.getByRole('main').getByRole('button', { name: 'Add', exact: true })
+}
+
+/** The add form: "+", then in the box it opens "Fill it in yourself" (which
+ *  opens "Find the place"), and "Not
+ *  on Google? Fill it in yourself" (the Google search itself needs a real
+ *  Maps key and bills per search). Lands on the category's form of
+ *  questions, in the box. */
+export async function openAddForm(page: Page): Promise<void> {
+  await categoryAddButton(page).click()
+  await page.getByRole('dialog').getByRole('button', { name: 'Fill it in yourself' }).click()
+  await page.getByRole('dialog').getByRole('button', { name: 'Not on Google? Fill it in yourself' }).click()
 }
 
 /** Waits for the page to be settled enough to assert on.

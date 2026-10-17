@@ -37,7 +37,7 @@ export type SyncOneResult =
   | { outcome: 'synced'; statusChange: StatusChange | null; flaggedClosed: boolean }
 
 // The category's Website field key, matched by label — same convention
-// ListingForm.tsx's intake autofill uses, since categories predate a fixed
+// useListingDraft's address-pick autofill uses, since categories predate a fixed
 // key convention for this field. Cached per community so a run with many
 // listings across few categories doesn't refetch the same category list once
 // per row.
@@ -73,16 +73,25 @@ export async function loadSyncableListing(resourceId: string): Promise<SyncedRow
   return typeof row.details?.placeId === 'string' && row.details.placeId ? row : null
 }
 
+/** Which night of the week (0–6, counted in whole UTC days) a listing's
+ *  full refresh falls on: from its id, so it's the same night every week
+ *  and the listings spread evenly across the week. */
+export function refreshNight(id: string): number {
+  let h = 0
+  for (const c of id) h = (h * 31 + c.charCodeAt(0)) >>> 0
+  return h % 7
+}
+
 /**
  * Refreshes one listing from Google Places and writes the result.
  *
  * Does NOT revalidate cached content — the caller decides, since the nightly
  * run does it once for a whole batch rather than once per listing.
  */
-export async function syncOneListing(row: SyncedRow): Promise<SyncOneResult> {
+export async function syncOneListing(row: SyncedRow, { statusOnly = false }: { statusOnly?: boolean } = {}): Promise<SyncOneResult> {
   const supabase = getAdminClient()
   const placeId = String(row.details.placeId)
-  const sync = await fetchPlaceSync(placeId)
+  const sync = await fetchPlaceSync(placeId, { statusOnly })
 
   if (!sync) {
     // Persisted (not just counted) so admins can see which specific
@@ -102,14 +111,18 @@ export async function syncOneListing(row: SyncedRow): Promise<SyncOneResult> {
     return { outcome: 'failed' }
   }
 
+  // Only asked whether it's still open (the nightly run, most nights): its
+  // hours and the rest weren't refreshed, so "Synced from Google · updated"
+  // keeps the date they were.
   const details: Record<string, unknown> = {
     ...row.details,
-    googleSyncedAt: new Date().toISOString(),
+    ...(statusOnly ? { googleStatusCheckedAt: new Date().toISOString() } : { googleSyncedAt: new Date().toISOString() }),
   }
   delete details.lastSyncError
   delete details.lastSyncFailedAt
 
-  // Google-only concepts with no curated counterpart — always refreshed.
+  // businessStatus is a Google-only concept with no curated counterpart —
+  // always refreshed, unlike everything below.
   //
   // The transition is recorded alongside the value: businessStatus used to be
   // simply overwritten, so there was no way to know a listing had just closed
@@ -131,8 +144,6 @@ export async function syncOneListing(row: SyncedRow): Promise<SyncOneResult> {
     }
     details.businessStatus = sync.businessStatus
   }
-  if (sync.description && !details.googleDescription) details.googleDescription = sync.description
-
   // Everything else is written only where Google owns the field: one it
   // filled itself, or one still empty. See syncMayWrite in googlePlaces.ts.
   const wrote: OwnableSyncField[] = []
@@ -165,6 +176,12 @@ export async function syncOneListing(row: SyncedRow): Promise<SyncOneResult> {
   if (sync.website && websiteKey && syncMayWrite(row.details, 'website', row.details?.[websiteKey])) {
     details[websiteKey] = sync.website
     wrote.push('website')
+  }
+  // Fixed key, unlike `website` — see useListingDraft's handlePlaceSelect
+  // for the `googleDescription` convention.
+  if (sync.description && syncMayWrite(row.details, 'description', row.details?.googleDescription)) {
+    details.googleDescription = sync.description
+    wrote.push('description')
   }
 
   details.googleFields = nextGoogleFields(row.details, wrote)

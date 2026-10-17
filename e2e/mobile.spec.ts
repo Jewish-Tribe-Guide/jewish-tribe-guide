@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { categoryWithDistances, categoryWithHoursField, defaultCommunity, dismissLocationPrompt, largestCategory } from './helpers'
+import { categoryWithGeocodedListings, categoryWithHoursField, defaultCommunity, dismissLocationPrompt, largestCategory, openListingEditor } from './helpers'
 
 // The mobile tab bar and the inline card grid only exist below the `sm`
 // breakpoint, so the desktop project can't cover them at all. Mobile is also
@@ -94,6 +94,37 @@ test.describe('mobile', () => {
 
     // Mobile has no "All categories" page — its home screen IS the index.
     await expect(page.getByRole('button').filter({ hasText: /\w/ }).first()).toBeVisible()
+  })
+
+  // The user, Oct 15: "not much room to click feedback, about, privacy on
+  // mobile". They were 23px-tall words whose last line sat 37px over the
+  // tab bar; a first fix pushed them ~100px up ("way too far"). Each is a
+  // 44px tap target now, the words about 58px over the bar. Positional, so
+  // jsdom can't see it.
+  test('Feedback, About and Privacy are each a full tap target, near the tab bar but not crowded by it', async ({ page }) => {
+    const community = await defaultCommunity(page)
+    await page.goto(`/${community}`)
+    await dismissLocationPrompt(page)
+
+    const links = page.getByRole('navigation', { name: 'About the guide' }).getByRole('link')
+    await expect(links.first()).toBeVisible()
+    await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight))
+    const bar = page.getByRole('navigation', { name: 'Primary' })
+    await expect(async () => {
+      const barTop = (await bar.boundingBox())!.y
+      for (const link of await links.all()) {
+        const name = await link.textContent()
+        expect((await link.boundingBox())!.height, `${name} is tall enough to tap`).toBeGreaterThanOrEqual(44)
+        // The words themselves, not the padded box around them.
+        const wordsBottom = await link.evaluate((a) => {
+          const r = document.createRange()
+          r.selectNodeContents(a)
+          return r.getBoundingClientRect().bottom
+        })
+        expect(barTop - wordsBottom, `${name}: room over the tab bar`).toBeGreaterThanOrEqual(45)
+        expect(barTop - wordsBottom, `${name}: not floating far above it`).toBeLessThanOrEqual(75)
+      }
+    }).toPass({ timeout: 5_000 })
   })
 
   // Scroll-direction header hiding. This exists because it silently broke:
@@ -193,9 +224,20 @@ test.describe('mobile', () => {
     await page.goto(`/${community}/${category.id}/${item.id}`)
     await dismissLocationPrompt(page)
 
-    await page.getByRole('button', { name: /edit/i }).click()
+    // Edit is its own labelled bar below the opened listing (ListingEditBar)
+    // — it used to be a row inside the kebab menu, and before that a quiet
+    // "Suggest a correction" link in the footer. Only the opened listing has
+    // one, so no scoping by name is needed here.
+    // On a category page it opens the "+ Add" box first (Oct 6); "Edit the
+    // details myself" there is the editor.
+    await openListingEditor(page)
 
-    const hoursToggle = page.getByRole('button', { name: /^Hours/ })
+    // The editor is the listing's boxes as rows (Oct 11): Hours is a row,
+    // or a line under "Not on the listing yet" for a listing with none, and
+    // opens the week where it is. (This looked for the old editor's
+    // "Today: …" line, gone since the rows rewrite.)
+    await expect(page.getByTestId('editor-list')).toBeVisible()
+    const hoursToggle = page.getByTestId('editor-row-hours').or(page.getByTestId('editor-add-hours'))
     await expect(hoursToggle).toBeVisible()
     await hoursToggle.click()
 
@@ -221,49 +263,31 @@ test.describe('mobile', () => {
     ).toBe(false)
   })
 
-  // The distance column used to render only when there WAS a distance, so with
-  // no location set it wasn't empty — it was absent, and every card looked
-  // complete. Nothing in the list said distances existed; the only hint was one
-  // pill at the top of the page, which reads like the first-load location popup
-  // the visitor already dismissed. Hence: nobody found the feature.
+  // With no location set, rows used to show a "Distance" chip with no number
+  // and the page a rust banner that read as an error. Now each row's facts
+  // line has a real distance, measured from the community's centre, and one
+  // quiet line says so, with "Use my location".
   //
-  // Here rather than in a unit test because both halves of this need real
-  // layout, which jsdom does not have: that the slot is a usable tap target,
-  // and that tapping it opens the picker instead of expanding the card.
-  test('the empty distance slot is tappable and opens the location picker', async ({ page, request }) => {
+  // Here rather than in a unit test because it needs real layout: that the
+  // link is a usable tap target on a phone.
+  test('shows distances from the centre, with a tappable "Use my location"', async ({ page, request }) => {
     const community = await defaultCommunity(page)
-    // categoryWithDistances, not categoryWithListings: the latter's first hit
-    // in the real community is `cemetery`, which collects no address, so
-    // nothing distance-related renders there at all and this failed in CI
-    // while passing against the test project's own data.
-    const { category } = await categoryWithDistances(request, community)
+    const { category } = await categoryWithGeocodedListings(request, community)
 
     await page.goto(`/${community}/${category.id}`)
     await dismissLocationPrompt(page)
 
-    const slots = page.getByRole('button', { name: 'Set your location to see distances' })
-    const slot = slots.first()
-    await expect(slot).toBeVisible()
+    // The desktop copy under the title is in the page too, hidden.
+    await expect(page.getByText(/^Distances from central /).locator('visible=true')).toBeVisible()
+    await expect(page.getByTestId('row-facts').filter({ hasText: / mi(?:\b|$)/ }).first()).toBeVisible()
 
-    // One per row — the repetition down the list is the entire point. A slot
-    // that appeared on only some rows would read as a rendering fault.
-    const rows = await page.getByRole('button', { name: /^(Show|Hide) details for / }).count()
-    expect(await slots.count(), 'every listing row should hold the slot open').toBe(rows)
+    const link = page.getByRole('button', { name: 'Use my location' })
+    // WCAG 2.5.8 wants 24x24 at least; the padding that gets it there is
+    // invisible, so it's the kind of thing a tidy-up deletes.
+    const box = (await link.boundingBox())!
+    expect(Math.round(box.height), 'tap target height').toBeGreaterThanOrEqual(24)
 
-    // WCAG 2.5.8 wants 24x24 minimum. The label itself is ~17px tall, so the
-    // button carries padding (cancelled by a negative margin) to clear it —
-    // the same trick the row's own chevron uses. Worth asserting: the padding
-    // is invisible, and deleting it looks like a tidy-up.
-    const box = (await slot.boundingBox())!
-    expect(Math.round(box.width), 'slot tap target width').toBeGreaterThanOrEqual(24)
-    expect(Math.round(box.height), 'slot tap target height').toBeGreaterThanOrEqual(24)
-
-    await slot.click()
-
-    // The picker opens...
+    await link.click()
     await expect(page.getByPlaceholder('Enter your address')).toBeVisible()
-    // ...and the tap did not also expand the listing it sat on. The row's own
-    // click handler expands the card, so the slot has to stop propagation.
-    await expect(page.getByRole('button', { name: /^Hide details for / })).toHaveCount(0)
   })
 })

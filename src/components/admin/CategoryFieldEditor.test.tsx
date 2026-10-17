@@ -125,3 +125,43 @@ describe('FieldEditor — auto-deriving a new field\'s key from its name', () =>
     expect(latestField.key).toBe('grades')
   })
 })
+
+// Oct 16: an admin marks the yes/no field that says a place is a minyan
+// that meets somewhere, not a shul. Only a yes/no field can be one.
+describe('FieldEditor — a minyan, not a shul', () => {
+  function Editor({ field, onField }: { field: CategoryField; onField: (f: CategoryField) => void }) {
+    const [f, setF] = useState(field)
+    return (
+      <FieldEditor
+        field={f}
+        index={0}
+        total={1}
+        canRequire
+        audienceOptions={[]}
+        showIfOptions={[]}
+        badgeFieldOptions={[]}
+        onChange={(patch) => setF((x) => { const next = { ...x, ...patch }; onField(next); return next })}
+        onRemove={() => {}}
+        onMove={() => {}}
+        hasCaveat={false}
+        onToggleCaveat={() => {}}
+      />
+    )
+  }
+  const label = /Yes means it’s a minyan that meets somewhere, not a shul/
+
+  it('a yes/no field can say so, and unsay it', async () => {
+    const user = userEvent.setup()
+    let latest: CategoryField | null = null
+    render(<Editor field={{ key: 'minyanOnly', label: 'Minyan', type: 'boolean', renderAs: 'badge' }} onField={(f) => (latest = f)} />)
+    await user.click(screen.getByLabelText(label))
+    expect(latest!.minyanOnly).toBe(true)
+    await user.click(screen.getByLabelText(label))
+    expect(latest!.minyanOnly).toBeUndefined()
+  })
+
+  it('any other field can’t', () => {
+    render(<Editor field={{ key: 'notes', label: 'Notes', type: 'text', renderAs: 'row' }} onField={() => {}} />)
+    expect(screen.queryByLabelText(label)).not.toBeInTheDocument()
+  })
+})

@@ -144,18 +144,104 @@ describe('listCategoriesUncached', () => {
     const [config] = await listCategoriesUncached('philly')
     expect(config.active).toBe(false)
   })
+
+  // Migration 059. Before it, the column is simply absent from the row.
+  it('reads group_by as the list’s grouping, and no grouping when absent, null or unknown', async () => {
+    const read = async (group_by: unknown) => {
+      mockFrom.mockReturnValue(chainable({ data: [{ ...rawRow, group_by }], error: null }))
+      return (await listCategoriesUncached('philly'))[0].groupBy
+    }
+    expect(await read({ kind: 'field', key: 'denomination' })).toEqual({ kind: 'field', key: 'denomination' })
+    expect(await read(undefined)).toBeUndefined()
+    expect(await read(null)).toBeUndefined()
+    expect(await read({ kind: 'colour' })).toBeUndefined()
+  })
+
+  // Migration 060, the same way.
+  it('reads question_card as the list’s question, and none when absent, null or unknown', async () => {
+    const read = async (question_card: unknown) => {
+      mockFrom.mockReturnValue(chainable({ data: [{ ...rawRow, question_card }], error: null }))
+      return (await listCategoriesUncached('philly'))[0].questionCard
+    }
+    expect(await read({ kind: 'field', key: 't' })).toEqual({ kind: 'field', key: 't' })
+    expect(await read({ kind: 'confirm' })).toEqual({ kind: 'confirm' })
+    expect(await read(undefined)).toBeUndefined()
+    expect(await read(null)).toBeUndefined()
+    expect(await read({ kind: 'poll' })).toBeUndefined()
+  })
+
+  // Migration 061, the same way.
+  it('reads walk_list as the places within a walk, and none when absent, null or unknown', async () => {
+    const read = async (walk_list: unknown) => {
+      mockFrom.mockReturnValue(chainable({ data: [{ ...rawRow, walk_list }], error: null }))
+      return (await listCategoriesUncached('philly'))[0].walkList
+    }
+    // The one list stored before there could be several reads as a list of one.
+    expect(await read({ categoryId: 'synagogue', maxMinutes: 30 })).toEqual([{ categoryId: 'synagogue', maxMinutes: 30 }])
+    expect(await read([{ categoryId: 'restaurant', maxMinutes: 30, groupBy: 'foodType' }])).toEqual([{ categoryId: 'restaurant', maxMinutes: 30, groupBy: 'foodType' }])
+    expect(await read(undefined)).toBeUndefined()
+    expect(await read(null)).toBeUndefined()
+    expect(await read({ categoryId: 'synagogue', maxMinutes: 90 })).toBeUndefined()
+  })
+
+  it('reads listing_parts, and none when absent, null or unknown', async () => {
+    const read = async (listing_parts: unknown) => {
+      mockFrom.mockReturnValue(chainable({ data: [{ ...rawRow, listing_parts }], error: null }))
+      return (await listCategoriesUncached('philly'))[0].listingParts
+    }
+    expect(await read({ shabbos: { fields: ['eruv'] } })).toEqual({ shabbos: { fields: ['eruv'] } })
+    expect(await read(undefined)).toBeUndefined()
+    expect(await read(null)).toBeUndefined()
+    expect(await read({ shabbos: 'yes' })).toBeUndefined()
+  })
 })
 
 describe('listCategories', () => {
-  it('excludes inactive categories, unlike listCategoriesUncached', async () => {
-    mockFrom.mockReturnValue(
-      chainable({
-        data: [rawRow, { ...rawRow, id: 'hidden-cat', active: false }],
-        error: null,
-      }),
+  // listCategories now also reads campaign_banner (to let a live campaign's
+  // category through despite active: false — see this function's own doc),
+  // so every test here has to answer for both tables, not just `category`.
+  function mockTables(categoryRows: unknown[], bannerRows: unknown[] = []) {
+    mockFrom.mockImplementation((table: string) =>
+      chainable({ data: table === 'campaign_banner' ? bannerRows : categoryRows, error: null }),
     )
+  }
+
+  it('excludes inactive categories, unlike listCategoriesUncached', async () => {
+    mockTables([rawRow, { ...rawRow, id: 'hidden-cat', active: false }])
     const categories = await listCategories('philly')
     expect(categories.map((c) => c.id)).toEqual(['synagogue'])
+  })
+
+  it('shows an inactive category anyway when a live campaign links to it', async () => {
+    mockTables([{ ...rawRow, id: 'sukkahs', active: false }], [
+      {
+        id: 'sukkah-map',
+        category_id: 'sukkahs',
+        title: 'Sukkah Map',
+        subtitle: '',
+        start_date: '2020-01-01',
+        end_date: '2999-01-01', // always live, regardless of when this test runs
+        destination: 'map',
+      },
+    ])
+    const categories = await listCategories('philly')
+    expect(categories.map((c) => c.id)).toEqual(['sukkahs'])
+  })
+
+  it('keeps an inactive category hidden when its campaign has not started or already ended', async () => {
+    mockTables([{ ...rawRow, id: 'sukkahs', active: false }], [
+      {
+        id: 'sukkah-map',
+        category_id: 'sukkahs',
+        title: 'Sukkah Map',
+        subtitle: '',
+        start_date: '2000-01-01',
+        end_date: '2000-01-02', // long over
+        destination: 'map',
+      },
+    ])
+    const categories = await listCategories('philly')
+    expect(categories).toEqual([])
   })
 })
 
@@ -295,8 +381,30 @@ describe('createCategory', () => {
         upvotes_enabled: false,
         icon: '📋',
         sort_order: 100,
+        active: true,
       }),
     )
+  })
+
+  // The create-time visibility toggle (CategoryEditor's isNew-only checkbox)
+  // depends on this: without it, a category can only be created active and
+  // hidden as a second, separate request — a real window where it's briefly
+  // public. See AGENTS.md's testing conventions: this failed against the
+  // pre-fix createCategory (no `active` in its input type at all, so the
+  // insert always fell through to the DB's `default true`) before the field
+  // was added to the input type and the inserted row.
+  it('passes active: false through to the inserted row when explicitly set', async () => {
+    let call = 0
+    const insertBuilder = chainable({ data: { ...rawRow, active: false }, error: null })
+    mockFrom.mockImplementation(() => {
+      call += 1
+      return call === 1 ? chainable({ data: null, error: null }) : insertBuilder
+    })
+
+    const result = await createCategory('philly', { label: 'Sukkahs', active: false })
+
+    expect(insertBuilder.insert).toHaveBeenCalledWith(expect.objectContaining({ active: false }))
+    expect(result.active).toBe(false)
   })
 })
 
@@ -319,6 +427,57 @@ describe('updateCategory', () => {
     await updateCategory('philly', 'synagogue', { label: '  New Label  ' })
 
     expect(builder.update).toHaveBeenCalledWith({ label: 'New Label' })
+  })
+
+  it('writes group_by only when the patch has a grouping, so saves work before migration 059', async () => {
+    const builder = chainable({ data: rawRow, error: null })
+    mockFrom.mockReturnValue(builder)
+
+    await updateCategory('philly', 'synagogue', { label: 'Shuls' })
+    expect(builder.update).toHaveBeenLastCalledWith({ label: 'Shuls' })
+    await updateCategory('philly', 'synagogue', { groupBy: { kind: 'open' } })
+    expect(builder.update).toHaveBeenLastCalledWith({ group_by: { kind: 'open' } })
+    await updateCategory('philly', 'synagogue', { groupBy: null })
+    expect(builder.update).toHaveBeenLastCalledWith({ group_by: null })
+  })
+
+  it('writes question_card only when the patch has a question, so saves work before migration 060', async () => {
+    const builder = chainable({ data: rawRow, error: null })
+    mockFrom.mockReturnValue(builder)
+
+    await updateCategory('philly', 'synagogue', { label: 'Shuls' })
+    expect(builder.update).toHaveBeenLastCalledWith({ label: 'Shuls' })
+    await updateCategory('philly', 'synagogue', { questionCard: { kind: 'confirm' } })
+    expect(builder.update).toHaveBeenLastCalledWith({ question_card: { kind: 'confirm' } })
+    await updateCategory('philly', 'synagogue', { questionCard: null })
+    expect(builder.update).toHaveBeenLastCalledWith({ question_card: null })
+  })
+
+  it('writes walk_list only when the patch has one, so saves work before migration 061', async () => {
+    const builder = chainable({ data: rawRow, error: null })
+    mockFrom.mockReturnValue(builder)
+
+    await updateCategory('philly', 'hotel', { label: 'Hotels' })
+    expect(builder.update).toHaveBeenLastCalledWith({ label: 'Hotels' })
+    await updateCategory('philly', 'hotel', { walkList: [{ categoryId: 'synagogue', maxMinutes: 30 }] })
+    expect(builder.update).toHaveBeenLastCalledWith({ walk_list: [{ categoryId: 'synagogue', maxMinutes: 30 }] })
+    await updateCategory('philly', 'hotel', { walkList: null })
+    expect(builder.update).toHaveBeenLastCalledWith({ walk_list: null })
+    // No lists is none, not an empty array.
+    await updateCategory('philly', 'hotel', { walkList: [] })
+    expect(builder.update).toHaveBeenLastCalledWith({ walk_list: null })
+  })
+
+  it('writes listing_parts only when the patch has them, and none as null (migration 066)', async () => {
+    const builder = chainable({ data: rawRow, error: null })
+    mockFrom.mockReturnValue(builder)
+
+    await updateCategory('philly', 'hospital', { label: 'Hospitals' })
+    expect(builder.update).toHaveBeenLastCalledWith({ label: 'Hospitals' })
+    await updateCategory('philly', 'hospital', { listingParts: { shabbos: { fields: ['eruv'] } } })
+    expect(builder.update).toHaveBeenLastCalledWith({ listing_parts: { shabbos: { fields: ['eruv'] } } })
+    await updateCategory('philly', 'hospital', { listingParts: {} })
+    expect(builder.update).toHaveBeenLastCalledWith({ listing_parts: null })
   })
 
   it('writes active when present in the patch', async () => {

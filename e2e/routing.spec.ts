@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { categories, categoryWithListings, categoryWithMapPoints, defaultCommunity, dismissLocationPrompt, serverMarkup } from './helpers'
+import { categories, categoryWithListings, categoryWithMapPoints, defaultCommunity, dismissLocationPrompt, previewSettings, serverMarkup } from './helpers'
 
 // hospitals/eruv/zmanim — see FIXED_VIEW_KINDS in src/lib/routes.ts. Kept in
 // sync by hand rather than imported: these are the literal strings the home
@@ -104,7 +104,9 @@ test.describe('URLs', () => {
     await page.goto(`/${community}/${category.id}`)
 
     // Shared links land in WhatsApp far more often than a browser address bar.
-    await expect(page).toHaveTitle(new RegExp(category.pluralLabel))
+    // As a literal: a label can hold "(" or "." (a test category renamed to
+    // "Seed (focus refresh 23157)" broke this once).
+    await expect(page).toHaveTitle(new RegExp(category.pluralLabel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))
   })
 
   test('an unknown slug 404s instead of rendering an empty page', async ({ page }) => {
@@ -142,6 +144,21 @@ test.describe('URLs', () => {
 
     await expect(page.getByRole('link', { name: 'Go home' })).toHaveAttribute('href', '/')
     await expect(page.locator('a[href="/not-a-real-community"]')).toHaveCount(0)
+  })
+
+  // A map link that names a place opens on it, on a phone too: a hotel's
+  // "See them on the map" (Oct 6). It used to be lost on a phone, where the
+  // map learns it's a phone a render after it tried to open the place.
+  test('a map link naming a place opens on that place', async ({ page, request }) => {
+    const community = await defaultCommunity(page)
+    const { category } = await categoryWithMapPoints(request, community)
+    const res = await request.get(`/api/resources?category=${category.id}&community=${community}`)
+    const place = ((await res.json()).resources as { id: string; name: string; geo?: unknown }[]).find((r) => r.geo)!
+
+    await page.goto(`/${community}/map?cat=${category.id}&place=${place.id}`)
+    await dismissLocationPrompt(page)
+
+    await expect(page.getByTestId('listing-view').getByRole('heading', { name: place.name }).first()).toBeVisible({ timeout: 10_000 })
   })
 
   test('the map carries its filters in the URL', async ({ page, request }) => {
@@ -228,11 +245,28 @@ test.describe('URLs', () => {
     test.skip(!eruv, `no eruv-kind category configured for ${community}`)
     if (!eruv) return
 
-    // The home screen has the full category index — desktop's "Browse
-    // everything" grid, mobile's own grid inline — so it's where this tile
-    // lives now that there's no separate All Categories page.
-    await page.goto(`/${community}`)
+    // The classic home screen has the full category index — desktop's
+    // "Browse everything" grid, mobile's own grid inline — so it's where this
+    // tile lives now that there's no separate All Categories page. Asked for
+    // as such: the Today home has no grid on a phone.
+    await previewSettings(page, community, { homeStyle: 'classic' })
+    await page.goto(`/${community}?preview=1`)
     await dismissLocationPrompt(page)
+    // Desktop's grid caps at a handful of tiles behind a trailing "More"
+    // tile (see CategoryTileRow) — a low-listing-count category like eruv
+    // can easily land behind it, so expand first if there's anything to
+    // expand. `.click()`'s own actionability wait covers the category data
+    // still loading; the `catch` covers there being no "More" button at all
+    // — mobile's own grid (CardGrid) has no such cap and renders none, and
+    // a community with 9 or fewer categories never shows one either.
+    // Scoped to the browse card specifically — HeaderNav's own "More" menu
+    // (desktop nav overflow) also matches a bare /More/ name and would
+    // otherwise make this a strict-mode violation.
+    await page
+      .getByTestId('browse-everything-card')
+      .getByRole('button', { name: /More/ })
+      .click({ timeout: 5000 })
+      .catch(() => {})
     // A real <a>, not a <button> — see sections.tsx's CardDef.href, added so
     // cmd/ctrl/middle-click "open in new tab" works on these tiles, which a
     // click handler alone never supports regardless of what it navigates to.
@@ -241,8 +275,9 @@ test.describe('URLs', () => {
     await expect(page).toHaveURL(`/${community}/eruv`)
   })
 
-  test('the privacy policy is a real, server-rendered top-level page', async ({ request }) => {
-    const res = await request.get('/privacy')
+  test('the privacy policy is a real, server-rendered page under its own community', async ({ page, request }) => {
+    const community = await defaultCommunity(page)
+    const res = await request.get(`/${community}/privacy`)
     expect(res.status()).toBe(200)
     // Assert the page rendered its own body, not that it contains a
     // particular phrase: the title and the section headings are admin-edited
@@ -264,9 +299,11 @@ test.describe('URLs', () => {
     await page.goto(`/${community}/feedback`)
     await dismissLocationPrompt(page)
 
-    const link = page.getByRole('link', { name: /privacy policy/i })
+    // Feedback's note says just "Privacy" (PrivacyNote's `short`) — the
+    // same as the desktop footer's link, so look for it in the page itself.
+    const link = page.getByRole('main').getByRole('link', { name: /privacy/i })
     await expect(link).toBeVisible()
-    await expect(link).toHaveAttribute('href', '/privacy')
+    await expect(link).toHaveAttribute('href', `/${community}/privacy`)
   })
 
   test('the privacy policy is linked from the footer', async ({ page, isMobile }) => {
@@ -282,7 +319,7 @@ test.describe('URLs', () => {
     await page.getByRole('link', { name: 'Privacy' }).scrollIntoViewIfNeeded()
     await page.getByRole('link', { name: 'Privacy' }).click()
 
-    await expect(page).toHaveURL('/privacy')
+    await expect(page).toHaveURL(`/${community}/privacy`)
     // By level, not by name. This asserted `name: 'Privacy Policy'` until an
     // admin renamed the page to "Privacy Policy and Terms of Use" and gave
     // its body a "Privacy Policy" section — getByRole matches accessible

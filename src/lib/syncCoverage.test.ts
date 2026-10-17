@@ -158,6 +158,55 @@ describe('getSyncCoverage', () => {
     ])
   })
 
+  // `description` (googleDescription) is reportable now the same way phone
+  // and website are — see OWNABLE_SYNC_FIELDS' own doc — but only for a
+  // category that actually configured a field with that fixed key;
+  // restaurantCategory above (no such field) never lists it, in either
+  // report, even for a listing with a hand-edited phone.
+  it('reports a hand-written description as a protected field, only for a category with that field', async () => {
+    const groceryCategory = {
+      ...restaurantCategory,
+      id: 'grocery',
+      pluralLabel: 'Grocery Stores',
+      detailFields: [
+        ...restaurantCategory.detailFields,
+        { key: 'googleDescription', label: 'Description', type: 'text' as const },
+      ],
+    }
+    mockListCategoriesUncached.mockResolvedValue([groceryCategory])
+    mockFrom.mockReturnValue(
+      chainable({
+        data: [
+          {
+            id: 'r1',
+            name: 'Kosher Mart',
+            category: 'grocery',
+            phone: null,
+            address: '1 Main St',
+            details: {
+              placeId: 'abc123',
+              googleFields: ['name', 'hours', 'phone', 'website'],
+              googleDescription: 'Written by the community.',
+            },
+            community_id: 'philly',
+          },
+        ],
+        error: null,
+      }),
+    )
+
+    const coverage = await getSyncCoverage('philly')
+    expect(coverage.protectedFields).toEqual([
+      {
+        id: 'r1',
+        name: 'Kosher Mart',
+        category: 'grocery',
+        categoryLabel: 'Grocery Stores',
+        fields: [{ field: 'description', label: 'Description', ourValue: 'Written by the community.' }],
+      },
+    ])
+  })
+
   it('does not report address as a protected field even though it is always fill-once', async () => {
     mockListCategoriesUncached.mockResolvedValue([restaurantCategory])
     mockFrom.mockReturnValue(

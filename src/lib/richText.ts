@@ -232,3 +232,32 @@ export function pageBodyToHtml(body: string | null | undefined): string {
 // Exported for the test, which asserts against the allowlist itself rather
 // than a hand-copied list that could drift from it.
 export const ALLOWED_TAGS: readonly string[] = [...ALLOWED]
+
+/** Splits sanitized page HTML (the output of `pageBodyToHtml`) into its
+ *  top-level sections, each starting at an `<h2>`, so a phone can show every
+ *  section in its own white box. Anything before the first `<h2>` is a section
+ *  of its own, and a body with no `<h2>` at all — every row that predates the
+ *  editor — comes back as one section. Only top-level headings split: an
+ *  `<h2>` inside a list or a quote stays where it is. Whitespace-only pieces
+ *  are dropped. Joining the result gives back the input, so desktop, which
+ *  shows the sections as one document, renders exactly what it did before. */
+export function splitPageSections(html: string): string[] {
+  const sections: string[] = []
+  let depth = 0
+  let start = 0
+  for (const match of html.matchAll(/<(\/?)([a-zA-Z][a-zA-Z0-9]*)[^>]*>/g)) {
+    const tag = match[2].toLowerCase()
+    if (VOID.has(tag)) continue
+    if (match[1]) {
+      depth = Math.max(0, depth - 1)
+      continue
+    }
+    if (tag === 'h2' && depth === 0 && match.index > start) {
+      sections.push(html.slice(start, match.index))
+      start = match.index
+    }
+    depth++
+  }
+  sections.push(html.slice(start))
+  return sections.filter((s) => s.trim())
+}

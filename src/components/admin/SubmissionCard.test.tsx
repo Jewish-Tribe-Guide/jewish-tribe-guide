@@ -3,10 +3,12 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { cleanup, render, screen } from '@testing-library/react'
 import type { CategoryField, FieldType } from '@/lib/categories'
 import { formatAnchorRule, type Minyan } from '@/lib/davening'
+import type { ScheduleMinyan, SpecialSchedule } from '@/lib/schedules'
+import type { ContactEntry } from '@/lib/contacts'
 import type { EnrichedSubmission, ResourceRow } from '@/types'
 import { SubmissionCard } from './SubmissionCard'
 import { makeCategory } from '@/test/providerFixtures'
-import { SYNC_INTERNAL_FIELDS, SHOWN_WHEN_CONFIGURED } from '@/lib/syncFields'
+import { SYNC_INTERNAL_FIELDS, SHOWN_WHEN_CONFIGURED, SHOWN_WHEN_PROPOSED } from '@/lib/syncFields'
 
 afterEach(() => cleanup())
 
@@ -48,6 +50,11 @@ const SAMPLES: Record<FieldType, { field: Omit<CategoryField, 'label'>; before: 
     field: { key: 'f', type: 'minyanim' },
     before: [{ id: 'm', tefillah: 'shacharis', days: ['mon'], time: '7:00am' }],
     after: [{ id: 'm', tefillah: 'shacharis', days: ['mon'], time: '7:30am' }],
+  },
+  contacts: {
+    field: { key: 'f', type: 'contacts' },
+    before: [{ name: 'Bikur Cholim of Philadelphia', phones: ['215-805-8668'] }],
+    after: [{ name: 'Bikur Cholim of Philadelphia', phones: ['215-805-8669'] }],
   },
 }
 
@@ -120,6 +127,9 @@ const MINYAN_FIELD_VISIBILITY: Record<keyof Minyan, 'shown' | 'deliberately-hidd
   time: 'shown',
   notes: 'shown',
   season: 'shown',
+  // Where people sign up for a minyan that needs it (Oct 16): a link or a
+  // phone number from the public, shown so it isn't approved blind.
+  signUp: 'shown',
   // Bookkeeping, not content — a moderator has no use for it.
   id: 'deliberately-hidden',
   // `time` is generated from these by formatAnchorRule and kept in sync by the
@@ -140,6 +150,7 @@ const MINYAN_CHANGES: Record<string, [Partial<Minyan>, Partial<Minyan>]> = {
   time: [{ time: '7:00am' }, { time: '7:30am' }],
   notes: [{ notes: 'Upstairs' }, { notes: 'Downstairs' }],
   season: [{ season: 'winter' }, { season: 'summer' }],
+  signUp: [{ signUp: { link: 'https://chat.whatsapp.com/Aa11' } }, { signUp: { link: 'https://chat.whatsapp.com/Bb22' } }],
 }
 
 describe('moderation queue — every minyan property a moderator should see', () => {
@@ -235,6 +246,48 @@ describe('read-only history card — who reviewed it', () => {
   })
 })
 
+describe('the note a suggestion came with', () => {
+  function renderCard(overrides: Partial<EnrichedSubmission>) {
+    const submission = {
+      id: 's1',
+      operation: 'update',
+      target_type: 'listing',
+      target_id: 'r1',
+      payload: { category: 'restaurant', name: 'Place', address: '', phone: '', details: {} },
+      note: null,
+      status: 'pending',
+      submitted_by: null,
+      created_at: new Date().toISOString(),
+      reviewed_at: null,
+      reviewed_by: null,
+      current: null,
+      ...overrides,
+    } as unknown as EnrichedSubmission
+    return render(<SubmissionCard submission={submission} categoriesById={new Map()} onModerate={() => {}} />)
+  }
+
+  // The admin checks a change against what it was read from. A watch's
+  // edit carried the list's words in its note and the card dropped them.
+  it('shows an edit\u2019s note, with its link clickable', () => {
+    renderCard({ note: 'Certification: "Dairy"\nhttps://keystone-k.org/kosher/new-york-bagel/' })
+    expect(screen.getByText(/Certification: "Dairy"/)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'https://keystone-k.org/kosher/new-york-bagel/' })).toHaveAttribute(
+      'href',
+      'https://keystone-k.org/kosher/new-york-bagel/',
+    )
+  })
+
+  it('shows a new listing\u2019s note', () => {
+    renderCard({ operation: 'create', target_id: null, note: 'On Keystone-K\u2019s list, not in the guide.' })
+    expect(screen.getByText(/On Keystone-K\u2019s list, not in the guide\./)).toBeInTheDocument()
+  })
+
+  it('shows no empty note box', () => {
+    renderCard({ note: null })
+    expect(screen.queryByText('Note')).not.toBeInTheDocument()
+  })
+})
+
 // Real bug, seen by a moderator: a davening-times edit rendered
 // "businessStatusBefore UNKNOWN → —" and "businessStatusChangedAt
 // 2026-08-31T… → —" under the minyanim, as though the submitter had proposed
@@ -245,7 +298,7 @@ describe('read-only history card — who reviewed it', () => {
 // bookkeeping key added there must never need a second edit here to stay
 // hidden, because the second edit is the one that gets forgotten.
 describe('the diff hides sync bookkeeping, all of it', () => {
-  for (const key of SYNC_INTERNAL_FIELDS.filter((k) => k !== SHOWN_WHEN_CONFIGURED)) {
+  for (const key of SYNC_INTERNAL_FIELDS.filter((k) => k !== SHOWN_WHEN_CONFIGURED && k !== SHOWN_WHEN_PROPOSED)) {
     it(`never shows ${key}`, () => {
       renderDiff({ key, type: 'text' }, 'INTERNAL_BEFORE', 'INTERNAL_AFTER')
       expect(screen.queryByText('INTERNAL_BEFORE')).not.toBeInTheDocument()
@@ -258,6 +311,43 @@ describe('the diff hides sync bookkeeping, all of it', () => {
   it('still shows googleDescription, which some categories offer as real content', () => {
     renderDiff({ key: SHOWN_WHEN_CONFIGURED, type: 'text' }, 'Old blurb', 'New blurb')
     expect(screen.getByText('New blurb')).toBeInTheDocument()
+  })
+})
+
+// The one internal a submission can still set — read off the Google place
+// picked in the form — so the one a forged request would reach for to mark a
+// listing closed. Hidden, a moderator approved it blind.
+describe('the diff shows a proposed businessStatus', () => {
+  function renderStatusDiff(before: Record<string, unknown>, after: Record<string, unknown>) {
+    const category = makeCategory({ id: 'grocery', detailFields: [{ key: 'note', type: 'text', label: 'Note' }] })
+    const submission = {
+      id: 's1',
+      operation: 'update',
+      target_type: 'listing',
+      target_id: 'r1',
+      payload: { category: 'grocery', name: 'Place', details: { note: 'new', ...after } },
+      note: null,
+      status: 'pending',
+      submitted_by: null,
+      created_at: new Date().toISOString(),
+      reviewed_at: null,
+      current: { id: 'r1', category: 'grocery', name: 'Place', details: { note: 'old', ...before } },
+    } as unknown as EnrichedSubmission
+    return render(<SubmissionCard submission={submission} categoriesById={new Map([['grocery', category]])} />)
+  }
+
+  it('as a change, in words, when an edit carries one', () => {
+    renderStatusDiff({ businessStatus: 'OPERATIONAL' }, { businessStatus: 'CLOSED_PERMANENTLY' })
+    expect(screen.getByText('Business status (from Google)')).toBeInTheDocument()
+    expect(screen.getByText('Open')).toHaveClass('line-through')
+    expect(screen.getByText('Permanently closed')).toHaveClass('text-green-700')
+  })
+
+  // Approval keeps the stored status when an edit doesn't carry one, so
+  // "Open → —" would report a change that never happens.
+  it('not at all when the edit leaves it out', () => {
+    renderStatusDiff({ businessStatus: 'OPERATIONAL' }, {})
+    expect(screen.queryByText('Business status (from Google)')).not.toBeInTheDocument()
   })
 })
 
@@ -303,5 +393,189 @@ describe('a multi-line field marks only the lines that changed', () => {
     // The old rendering repeated every line — once struck through, once in
     // green — which is what made a ten-minyan edit unreadable.
     expect(screen.getAllByText(/^Mincha.*12:20pm$/)).toHaveLength(1)
+  })
+})
+
+// ── A list of contacts (Oct 6: a hospital's liaisons, pantries, rides) ──────
+// Every part of an entry is classified: adding one to ContactEntry is a
+// compile error until someone decides how a moderator sees it.
+const CONTACT_FIELD_VISIBILITY: Record<keyof ContactEntry, 'shown'> = {
+  name: 'shown',
+  who: 'shown',
+  phones: 'shown',
+  email: 'shown',
+  web: 'shown',
+  note: 'shown',
+  from: 'shown',
+}
+
+describe('moderation queue — every part of a contact a moderator should see', () => {
+  const base: ContactEntry = { name: 'Chai Lifeline', who: 'Mrs. Gorelick', phones: ['732-719-1700'], email: 'a@chai.org', web: 'chailifeline.org', note: 'Call first.', from: 'Monsey' }
+  const changed: Record<keyof ContactEntry, Partial<ContactEntry>> = {
+    name: { name: 'Chai Lifeline NJ/PA' },
+    who: { who: 'Mr. Brodsky' },
+    phones: { phones: ['732-719-1700', '908-770-5145'] },
+    email: { email: 'b@chai.org' },
+    web: { web: 'chailifeline.org/pa' },
+    note: { note: 'Call before coming.' },
+    from: { from: 'Boro Park' },
+  }
+  for (const key of Object.keys(CONTACT_FIELD_VISIBILITY) as (keyof ContactEntry)[]) {
+    it(`surfaces a change to ${key}`, () => {
+      renderDiff({ key: 'rides', type: 'contacts', entryFrom: true }, [base], [{ ...base, ...changed[key] }])
+      expect(diffText()).toContain('→')
+    })
+  }
+
+  it('reads each entry as a line, never as raw data', () => {
+    renderDiff({ key: 'rides', type: 'contacts', entryFrom: true }, [], [base])
+    const text = diffText()
+    expect(text).toContain('From Monsey: Chai Lifeline · Mrs. Gorelick · (732) 719-1700 · a@chai.org · chailifeline.org · Call first.')
+    expect(text).not.toContain('[object Object]')
+    expect(text).not.toContain('{')
+  })
+
+  it('marks only the entry that changed, the others plain context', () => {
+    const others: ContactEntry[] = [{ name: 'Naomi Gorelick', phones: ['908-770-5145'] }, { name: 'Heshy Horovitz', phones: ['732-810-7700'] }]
+    renderDiff({ key: 'call', type: 'contacts' }, [base, ...others], [{ ...base, phones: ['732-719-1760'] }, ...others])
+    expect(screen.getByText(/^From Monsey: Chai Lifeline .*1700/).className).toContain('line-through')
+    expect(screen.getByText(/^From Monsey: Chai Lifeline .*1760/).className).toContain('text-green-700')
+    for (const untouched of [/^Naomi Gorelick/, /^Heshy Horovitz/]) {
+      expect(screen.getAllByText(untouched)).toHaveLength(1)
+      expect(screen.getByText(untouched).className).not.toContain('line-through')
+    }
+  })
+})
+
+// ── A shul's special schedules (step 4) ──────────────────────────────────────
+// Stored beside its minyanim field ("<key>_schedules"), not as a field of
+// their own, so the FieldType guard above can't see them. Every property of
+// a schedule and of its times is classified here instead: adding one is a
+// compile error until someone decides how a moderator sees it.
+const SCHEDULE_FIELD_VISIBILITY: Record<keyof SpecialSchedule | keyof ScheduleMinyan, 'shown' | 'deliberately-hidden'> = {
+  name: 'shown',
+  from: 'shown',
+  to: 'shown',
+  mode: 'shown',
+  minyanim: 'shown',
+  tefillah: 'shown',
+  on: 'shown',
+  time: 'shown',
+  notes: 'shown',
+  season: 'shown',
+  // Bookkeeping, not content.
+  id: 'deliberately-hidden',
+  // Set by the app when a week's times are applied, never typed by anyone:
+  // the schedule's name and dates already say which week it is (Oct 6).
+  kind: 'deliberately-hidden',
+  postedAt: 'deliberately-hidden',
+  // As for regular minyanim: `time` carries the rule's text.
+  anchor: 'deliberately-hidden',
+  offsetMinutes: 'deliberately-hidden',
+  notBefore: 'deliberately-hidden',
+  notAfter: 'deliberately-hidden',
+}
+
+const baseSchedule: SpecialSchedule = {
+  id: 's1',
+  name: 'Sukkos 5787',
+  from: '2026-09-26',
+  to: '2026-10-04',
+  mode: 'replace',
+  minyanim: [{ id: 'm1', tefillah: 'shacharis', on: ['yom_tov'], time: '9:00am' }],
+}
+const row = baseSchedule.minyanim[0]
+const SCHEDULE_CHANGES: Record<string, [SpecialSchedule, SpecialSchedule]> = {
+  name: [baseSchedule, { ...baseSchedule, name: 'Sukkos (Yom Tov days)' }],
+  from: [baseSchedule, { ...baseSchedule, from: '2026-09-25' }],
+  to: [baseSchedule, { ...baseSchedule, to: '2026-10-05' }],
+  mode: [baseSchedule, { ...baseSchedule, mode: 'add' }],
+  minyanim: [baseSchedule, { ...baseSchedule, minyanim: [...baseSchedule.minyanim, { id: 'm2', tefillah: 'mincha', on: ['yom_tov'], time: '6:35pm' }] }],
+  tefillah: [baseSchedule, { ...baseSchedule, minyanim: [{ ...row, tefillah: 'mincha' }] }],
+  on: [baseSchedule, { ...baseSchedule, minyanim: [{ ...row, on: ['yom_tov', '2026-10-02'] }] }],
+  time: [baseSchedule, { ...baseSchedule, minyanim: [{ ...row, time: '9:30am' }] }],
+  notes: [baseSchedule, { ...baseSchedule, minyanim: [{ ...row, notes: 'Yizkor about 10:45' }] }],
+  season: [baseSchedule, { ...baseSchedule, minyanim: [{ ...row, season: 'winter' }] }],
+}
+
+function renderScheduleDiff(before: SpecialSchedule[] | undefined, after: SpecialSchedule[]) {
+  const category = makeCategory({ id: 'synagogue', detailFields: [{ key: 'minyanim', label: 'Davening Times', type: 'minyanim' }] })
+  const minyanim: Minyan[] = [{ id: 'r', tefillah: 'shacharis', days: ['mon'], time: '7:00am' }]
+  const current = { id: 'r1', category: 'synagogue', name: 'Shul', details: { minyanim, ...(before ? { minyanim_schedules: before } : {}) } } as unknown as ResourceRow
+  const submission = {
+    id: 's1',
+    operation: 'update',
+    target_type: 'listing',
+    target_id: 'r1',
+    payload: { category: 'synagogue', name: 'Shul', details: { minyanim, minyanim_schedules: after } },
+    note: null,
+    status: 'pending',
+    submitted_by: null,
+    created_at: new Date().toISOString(),
+    reviewed_at: null,
+    current,
+  } as unknown as EnrichedSubmission
+  render(<SubmissionCard submission={submission} categoriesById={new Map([['synagogue', category]])} />)
+  const el = screen.getByText('Davening Times: special schedules').parentElement!
+  // A schedule is several lines, shown as a line diff: what's gone struck
+  // through, what's new in green (see the minyanim line diff above).
+  return { text: el.textContent ?? '', marked: !!el.querySelector('.line-through, .text-green-700') || (el.textContent ?? '').includes('→') }
+}
+
+describe('moderation queue — a shul’s special schedules, every time shown', () => {
+  it('a new schedule reads in full, under the times’ own label, never as raw data', () => {
+    const { text } = renderScheduleDiff(undefined, [{ ...baseSchedule, minyanim: [...baseSchedule.minyanim, { id: 'm2', tefillah: 'mincha_maariv', on: ['chol_hamoed', '2026-10-02'], time: '6:30pm', notes: 'In the sukkah' }] }])
+    expect(text).toContain('Sukkos 5787 · Sep 26 – Oct 4 · in place of the regular times')
+    expect(text).toContain('Shacharis · Yom Tov days · 9:00am')
+    expect(text).toContain('Mincha & Maariv · Chol HaMoed, Fri Oct 2 · 6:30pm · In the sukkah')
+    expect(text).not.toContain('[object Object]')
+    expect(text).not.toContain('minyanim_schedules')
+  })
+
+  for (const [key, visibility] of Object.entries(SCHEDULE_FIELD_VISIBILITY)) {
+    if (visibility !== 'shown') continue
+    it(`surfaces a change to a schedule’s ${key}`, () => {
+      const pair = SCHEDULE_CHANGES[key]
+      expect(pair, `add a SCHEDULE_CHANGES entry for "${key}"`).toBeDefined()
+      expect(renderScheduleDiff([pair[0]], [pair[1]]).marked).toBe(true)
+    })
+  }
+
+  it('an untouched schedule is unchanged', () => {
+    expect(renderScheduleDiff([baseSchedule], [baseSchedule]).marked).toBe(false)
+  })
+})
+
+// A fix to an eruv's listing (Oct 13): the queue shows each of its rows,
+// what changes struck and replaced, so it's never approved blind.
+describe('an eruv suggestion', () => {
+  it('names the eruv, and shows each row it changes, before and after', () => {
+    const submission = {
+      id: 's9',
+      operation: 'update',
+      target_type: 'eruv',
+      target_id: null,
+      payload: { eruvId: 'center-city', name: 'Center City Eruv', covers: 'Center City.', website: 'https://centercityeruv.org', hotline: '(215) 555-0100', alertsUrl: null },
+      note: null,
+      status: 'pending',
+      submitted_by: null,
+      created_at: new Date().toISOString(),
+      reviewed_at: null,
+      reviewed_by: null,
+      current: null,
+      categoryLabel: 'Eruv',
+      currentEruv: { name: 'Center City Eruv', covers: 'Center City.', website: 'https://www.centercityeruv.com/', hotline: null, alertsUrl: null },
+    } as unknown as EnrichedSubmission
+    const onOpen = () => {}
+    render(<SubmissionCard submission={submission} categoriesById={new Map()} onModerate={() => {}} onOpen={onOpen} />)
+    expect(screen.getByText('Center City Eruv')).toBeInTheDocument()
+    expect(screen.getByText('Eruv')).toBeInTheDocument()
+    const diff = screen.getByTestId('eruv-diff')
+    expect(diff).toHaveTextContent('Websitehttps://www.centercityeruv.com/ → https://centercityeruv.org')
+    expect(diff).toHaveTextContent('Hotline— → (215) 555-0100')
+    expect(screen.getByText('https://www.centercityeruv.com/')).toHaveClass('line-through')
+    // Unchanged rows read as they are, not struck.
+    expect(diff).toHaveTextContent('Where it goesCenter City.')
+    expect(screen.getByText('Center City.')).not.toHaveClass('line-through')
   })
 })

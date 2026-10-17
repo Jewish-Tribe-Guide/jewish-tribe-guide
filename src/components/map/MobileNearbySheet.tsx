@@ -1,10 +1,12 @@
 'use client'
 
-import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
-import NearbyList from './NearbyList'
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type ReactNode } from 'react'
+import NearbyList, { type NearbyEruv } from './NearbyList'
 import MapPlaceDetail from './MapPlaceDetail'
+import { useKeptListScroll } from './useKeptListScroll'
 import type { MapPoint } from './ResourceMap'
 import type { CategoryConfig } from '@/lib/categories'
+import type { SearchFound } from '@/lib/askSearch'
 import type { DirectoryResource } from '@/types'
 
 type Snap = 'peek' | 'half' | 'full'
@@ -54,6 +56,9 @@ type Props = {
    *  — same category config the directory pages use, so fields/hours/tags
    *  render identically. */
   categories: CategoryConfig[]
+  /** What the map's search matched on a listing, by id, for its detail
+   *  panel to mark (see PlaceDetailBody's `found`). */
+  foundOn?: (listingId: string | undefined) => SearchFound | null
   /** Measured px height of the map box this sheet overlays — snap points
    *  (half/full) are computed relative to it, not the viewport, since the
    *  map box itself doesn't always fill the viewport (e.g. desktop, though
@@ -70,6 +75,12 @@ type Props = {
    *  selected pin within the visible strip of map ABOVE the sheet, instead of
    *  the whole container's center (which the sheet mostly covers at half/full). */
   onHeightChange?: (px: number) => void
+  /** What a selected point that isn't a listing shows (an eruv opened from
+   *  the Eruvim layer), given the way back. Null for anything else. */
+  renderOther?: (point: Point, back: () => void) => ReactNode
+  /** The eruvim on the map, listed first, before any places (NearbyList). */
+  eruvim?: NearbyEruv[]
+  onSelectEruv?: (id: string) => void
 }
 
 export type MobileNearbySheetHandle = {
@@ -119,7 +130,7 @@ export type MobileNearbySheetHandle = {
  * is still visible underneath.
  */
 const MobileNearbySheet = forwardRef<MobileNearbySheetHandle, Props>(function MobileNearbySheet(
-  { points, userLocation, onViewListing, categories, containerHeight, onSelectionChange, onHeightChange },
+  { points, userLocation, onViewListing, categories, foundOn, containerHeight, onSelectionChange, onHeightChange, renderOther, eruvim, onSelectEruv },
   ref,
 ) {
   const [snap, setSnap] = useState<Snap>('peek')
@@ -127,6 +138,17 @@ const MobileNearbySheet = forwardRef<MobileNearbySheetHandle, Props>(function Mo
   const dragRef = useRef<DragState | null>(null)
   const contentDragRef = useRef<ContentDragState | null>(null)
   const contentRef = useRef<HTMLDivElement>(null)
+  // The list's scroll, kept while a place is open (see useKeptListScroll).
+  const listKey = useMemo(() => points.map((p) => p.id).join('|'), [points])
+  const kept = useKeptListScroll(listKey)
+  const keptRef = kept.ref
+  const listRef = useCallback(
+    (el: HTMLDivElement | null) => {
+      contentRef.current = el
+      keptRef(el)
+    },
+    [keptRef],
+  )
   // requestAnimationFrame id of an in-progress momentum coast (see
   // startMomentum), or null when nothing's running — checked, not just
   // fire-and-forget, so a new touch can cancel a still-coasting scroll
@@ -152,6 +174,7 @@ const MobileNearbySheet = forwardRef<MobileNearbySheetHandle, Props>(function Mo
     full: Math.max(PEEK_PX, containerHeight - TOP_INSET_PX),
   }
   const currentHeight = dragHeight ?? heights[snap]
+  const peeked = snap === 'peek' && dragHeight === null
 
   // Report the settled (target, not mid-drag) height upward — deliberately
   // keyed off `snap`/`heights[snap]`, not the live `currentHeight`, so a
@@ -217,14 +240,11 @@ const MobileNearbySheet = forwardRef<MobileNearbySheetHandle, Props>(function Mo
 
   function collapse() {
     // Used to need to check whether the tap it's reacting to actually just
-    // dismissed MapPlaceDetail's own kebab menu instead of genuinely tapping
+    // dismissed the place detail's popup menu instead of genuinely tapping
     // the map away — the map's background tap is Google Maps' own event,
     // not a plain DOM click, so it could fire before, after, or instead of
-    // this component's own outside-click detection. Moot now: the kebab's
-    // own invisible backdrop (see ListingActionsMenu's own doc) sits on top
-    // of the ENTIRE screen while it's open, so a tap dismissing it never
-    // reaches Google Maps' canvas at all — this collapse() simply never
-    // gets called for that tap in the first place.
+    // this component's own outside-click detection. Moot now: the place
+    // detail has no popup menu left (its ••• fan went on Oct 15).
     clearSelection()
     setSnap('peek')
   }
@@ -518,10 +538,45 @@ const MobileNearbySheet = forwardRef<MobileNearbySheetHandle, Props>(function Mo
   }
 
   const selectedCategory = selected ? categories.find((c) => c.id === selected.filterId) : undefined
+  const other = selected && !selected.raw ? (renderOther?.(selected, clearSelection) ?? null) : null
+
+  // The sheet's scroll region, as a function rather than inline JSX so the
+  // list and the place detail can't drift apart on any of this region's
+  // load-bearing details: the ref the momentum loop reads, the hand-driven
+  // pointer scrolling, touch-none.
+  //
+  // Keyed on what it's showing, so the list and each place get their own
+  // element, each starting at the top. Shared, the list's scroll offset
+  // carried straight into a place picked from deep in it, opening the
+  // detail partway down. Everything that reads contentRef does so fresh at
+  // the moment it needs it, so the remount is safe. The list's own offset
+  // is kept while a place is open, and put back on the way back (Oct 16).
+  const scrollRegion = (key: string, content: ReactNode, list = false) => (
+    <div
+      key={key}
+      ref={list ? listRef : contentRef}
+      onScroll={list ? kept.onScroll : undefined}
+      data-testid="sheet-scroll"
+      onPointerDown={onContentPointerDown}
+      onPointerMove={onContentPointerMove}
+      onPointerUp={onContentPointerUp}
+      onPointerCancel={onContentPointerCancel}
+      // touch-none unconditionally now, in every snap state — the list's
+      // own scrolling is hand-driven (see onContentPointerMove) rather
+      // than native touch-action: pan-y panning, so there's no longer a
+      // snap state where the browser needs panning permission here.
+      className="min-h-0 flex-1 touch-none overflow-y-auto overscroll-contain px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]"
+    >
+      {content}
+    </div>
+  )
 
   return (
+    // overflow-hidden: lowered, the list's element is squeezed to nothing
+    // under the handle, but its bottom padding would still poke out below.
     <div
-      className="absolute inset-x-0 bottom-0 z-20 flex flex-col rounded-t-2xl bg-white shadow-[0_-4px_24px_rgba(0,0,0,0.18)] desktop:hidden"
+      data-testid="map-sheet"
+      className="absolute inset-x-0 bottom-0 z-20 flex flex-col overflow-hidden rounded-t-2xl bg-white shadow-[0_-4px_24px_rgba(0,0,0,0.18)] desktop:hidden"
       style={{
         height: currentHeight,
         transition: dragHeight === null ? 'height 280ms cubic-bezier(0.32, 0.72, 0, 1)' : 'none',
@@ -533,39 +588,38 @@ const MobileNearbySheet = forwardRef<MobileNearbySheetHandle, Props>(function Mo
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerCancel}
         className="flex shrink-0 touch-none cursor-grab flex-col items-center gap-1.5 py-2.5 active:cursor-grabbing"
+        // Lowered, the handle is the whole sheet: its line says what's in
+        // it, and nothing of the list shows under that, cut off partway
+        // through a row (the user, Oct 16, after scrolling then closing).
+        // Not mid-drag, so dragging it up shows the list coming.
+        style={peeked ? { minHeight: PEEK_PX } : undefined}
         role="button"
         aria-label={snap === 'peek' ? 'Expand nearby list' : 'Drag to resize nearby list'}
       >
         <span className="h-1 w-9 rounded-full bg-slate-300" aria-hidden="true" />
-        {snap === 'peek' && !selected && (
-          <span className="text-xs font-medium text-slate-500">
-            {points.length} place{points.length !== 1 ? 's' : ''} nearby — drag up
+        {snap === 'peek' && (
+          <span className="max-w-full truncate px-4 text-xs font-medium text-slate-500" data-testid="sheet-peek-line">
+            {selected
+              ? // A place open, lowered: which, since none of it shows.
+                `${selected.name} — drag up`
+              : eruvim && eruvim.length > 0
+                ? // The eruvim lead the list, places or none (Oct 15).
+                  `${eruvim.length} ${eruvim.length === 1 ? 'eruv' : 'eruvim'}${points.length > 0 ? ` · ${points.length} place${points.length !== 1 ? 's' : ''}` : ''} — drag up`
+                : `${points.length} place${points.length !== 1 ? 's' : ''} nearby — drag up`}
           </span>
         )}
       </div>
-      <div
-        ref={contentRef}
-        onPointerDown={onContentPointerDown}
-        onPointerMove={onContentPointerMove}
-        onPointerUp={onContentPointerUp}
-        onPointerCancel={onContentPointerCancel}
-        // touch-none unconditionally now, in every snap state — the list's
-        // own scrolling is hand-driven (see onContentPointerMove) rather
-        // than native touch-action: pan-y panning, so there's no longer a
-        // snap state where the browser needs panning permission here.
-        className="min-h-0 flex-1 touch-none overflow-y-auto overscroll-contain px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]"
-      >
-        {selected && selected.raw && selectedCategory ? (
-          <MapPlaceDetail
-            item={selected.raw}
-            category={selectedCategory}
-            color={selected.color}
-            onBack={clearSelection}
-          />
+      {scrollRegion(
+        selected ? `place:${selected.id}` : 'list',
+        other ? (
+          other
+        ) : selected && selected.raw && selectedCategory ? (
+          <MapPlaceDetail item={selected.raw} category={selectedCategory} color={selected.color} onBack={clearSelection} found={foundOn?.(selected.raw.id) ?? null} />
         ) : (
-          <NearbyList points={points} userLocation={userLocation} onViewListing={onViewListing} onSelectPlace={selectPlace} />
-        )}
-      </div>
+          <NearbyList points={points} userLocation={userLocation} onViewListing={onViewListing} onSelectPlace={selectPlace} eruvim={eruvim} onSelectEruv={onSelectEruv} />
+        ),
+        !selected,
+      )}
     </div>
   )
 })

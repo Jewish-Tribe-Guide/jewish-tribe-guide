@@ -1,5 +1,6 @@
 'use client'
 
+import SiteAddButton from '@/components/SiteAddButton'
 import { Suspense } from 'react'
 import { usePathname } from 'next/navigation'
 import type { AppMode } from '@/types'
@@ -10,6 +11,8 @@ import LiveLocationPrompt from '@/components/LiveLocationPrompt'
 import ContentFailureNotice from '@/components/ContentFailureNotice'
 import { LocationProvider, useLocation } from '@/lib/locationContext'
 import { PinnedProvider } from '@/lib/pinnedContext'
+import { UndoToastProvider } from '@/components/UndoToast'
+import { SavedSearchesProvider } from '@/lib/savedSearchesContext'
 import { DroppedPinsProvider } from '@/lib/droppedPinsContext'
 import { HeaderCollapseProvider, ScreenHeaderProvider } from '@/lib/headerVisibility'
 import { useSiteNavigation } from '@/lib/useSiteNavigation'
@@ -37,6 +40,8 @@ function screenFromPath(pathname: string): { mode: AppMode; cardId: string | nul
   if (!first) return { mode: 'home', cardId: null }
   if (first === 'map') return { mode: 'map', cardId: null }
   if (first === 'feedback') return { mode: 'feedback', cardId: null }
+  if (first === 'browse') return { mode: 'browse', cardId: null }
+  if (first === 'you') return { mode: 'you', cardId: null }
   // Anything else is a category or form slug.
   return { mode: 'find', cardId: first }
 }
@@ -57,6 +62,8 @@ function PathAwareTabBar({ tabs, iconForTarget }: {
     if (tab.target === 'categories') goHome()
     else if (tab.target === 'map') navigate(null, 'map')
     else if (tab.target === 'feedback') navigate(null, 'feedback')
+    else if (tab.target === 'browse') navigate(null, 'browse')
+    else if (tab.target === 'you') navigate(null, 'you')
     // Anything else is a card id — a category opens its directory, a form
     // opens its wizard. Both live at the same path, so this is one call now;
     // the [slug] route decides which it is. That also retires the old guard
@@ -98,6 +105,14 @@ function Chrome({ children, year }: { children: React.ReactNode; year: number })
           a fallback has to announce itself rather than pass as data. */}
       <ContentFailureNotice />
       {children}
+      {/* Reads the path, so its own boundary for the same reason as the tab
+          bar's below: on a URL no build knew (a shared question nobody built
+          ahead) the path waits for the request, and unwrapped this one button
+          emptied that page's whole prerendered shell. Holds nothing back
+          where the path is known. */}
+      <Suspense fallback={null}>
+        <SiteAddButton />
+      </Suspense>
       {/* Desktop only, deliberately — not an oversight, and tried the other
           way once. A phone here is an app shell with a fixed bottom tab bar,
           and a document footer under one reads as a website; none of the
@@ -107,8 +122,8 @@ function Chrome({ children, year }: { children: React.ReactNode; year: number })
           was rejected because the only things left to put in it were two
           links, and folding Feedback in alongside them would bury the one
           action we actually want.
-          The consequence to keep in mind: this footer holds the only /about
-          link in the app, so About is desktop-only by the same choice.
+          On a phone, About (with Feedback) is at the foot of the home's
+          category list instead (BrowseList).
           /privacy is deliberately NOT in that position — it's linked from
           the forms that collect personal data, which is where it belongs on
           every device (see PrivacyNote). */}
@@ -146,15 +161,19 @@ export default function SiteChrome({
 }) {
   return (
     <LocationProvider>
-      <PinnedProvider>
-        <DroppedPinsProvider>
-          <HeaderCollapseProvider>
-            <ScreenHeaderProvider>
-              <Chrome year={year}>{children}</Chrome>
-            </ScreenHeaderProvider>
-          </HeaderCollapseProvider>
-        </DroppedPinsProvider>
-      </PinnedProvider>
+      <UndoToastProvider>
+        <PinnedProvider>
+          <SavedSearchesProvider>
+            <DroppedPinsProvider>
+              <HeaderCollapseProvider>
+                <ScreenHeaderProvider>
+                  <Chrome year={year}>{children}</Chrome>
+                </ScreenHeaderProvider>
+              </HeaderCollapseProvider>
+            </DroppedPinsProvider>
+          </SavedSearchesProvider>
+        </PinnedProvider>
+      </UndoToastProvider>
     </LocationProvider>
   )
 }

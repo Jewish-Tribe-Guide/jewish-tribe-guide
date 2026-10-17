@@ -42,10 +42,14 @@ import type { CategoryKind } from './categories'
  *  was ever there to resolve it. This map is what makes `/eruv` resolve to the
  *  eruv-kind category regardless of what that category's own slug is. */
 export const FIXED_VIEW_KINDS: Record<string, CategoryKind> = {
-  hospitals: 'medical',
   eruv: 'eruv',
   zmanim: 'zmanim',
 }
+
+/** A fixed view's own slug (`eruv`), for linking to it: never the id of the
+ *  category that gates it, which is the admin's label slugified
+ *  (`eruv-information`) and resolves as an ordinary, empty directory. */
+export const fixedViewSlug = (kind: CategoryKind): string | null => Object.keys(FIXED_VIEW_KINDS).find((slug) => FIXED_VIEW_KINDS[slug] === kind) ?? null
 
 /** Slugs a category or form may never take, because a route already owns them.
  *  Enforced when an admin creates or renames one — see assertUsableSlug. */
@@ -54,9 +58,21 @@ export const RESERVED_SLUGS = new Set([
   'all',
   'map',
   'feedback',
+  // The visitor's saved places and searches (the You tab), and its old
+  // address, which goes there now.
+  'you',
+  'pinned',
+  // Every category, grouped (the Browse tab).
+  'browse',
+  // What changed in the guide (step 7a).
+  'changes',
   // The fixed views above — a listing category named "Eruv" would otherwise
   // shadow the real Eruv Information screen at the same URL.
   ...Object.keys(FIXED_VIEW_KINDS),
+  // The old Jewish Medical Resources screen lived here. Its content was
+  // made-up placeholder details, so the screen is gone, but the URL stays
+  // reserved for the real hospital pages rather than going to a category.
+  'hospitals',
   // Top-level routes that would otherwise look like a community.
   'admin',
   'inbox',
@@ -64,8 +80,14 @@ export const RESERVED_SLUGS = new Set([
   // The service worker's offline fallback, and the worker itself.
   'offline',
   'sw.js',
-  // The site-wide privacy policy.
+  // The site's About and Privacy pages — community-scoped routes
+  // (/[community]/about, /[community]/privacy) even though their content
+  // is one shared row across every community. A category named either
+  // would otherwise shadow the real screen at that same URL.
+  'about',
   'privacy',
+  // A shared search answer: /[community]/ask/[question] (see shareAnswer.ts).
+  'ask',
   // Generated app icons.
   'icons',
   // Framework and metadata paths.
@@ -111,6 +133,41 @@ export function assertUsableSlug(slug: string): void {
   if (reason) throw new Error(reason)
 }
 
+// ── A shared question's URL segment ─────────────────────────────────────────
+// See shareAnswer.ts. Here rather than there so building a link doesn't pull
+// the whole search in.
+
+/** Longest question a link carries. A question longer than this isn't one
+ *  anybody shares. */
+const MAX_QUESTION_LENGTH = 100
+
+/** The question as a URL segment: lower case, words joined by hyphens,
+ *  trailing punctuation dropped. "Where can I get challah?" →
+ *  "where-can-i-get-challah". Search reads the hyphens as spaces. Lower
+ *  case so one question is one page: "…get-Challah" and "…get-challah"
+ *  were two, and on a filesystem that ignores case, one built page was
+ *  served for both. */
+export function questionSlug(question: string): string {
+  return question
+    .trim()
+    .toLowerCase()
+    .replace(/[?!.,\s]+$/, '')
+    .replace(/\s+/g, '-')
+    .slice(0, MAX_QUESTION_LENGTH)
+}
+
+/** The question back from its segment, or null when there isn't one. */
+export function questionFromSlug(segment: string): string | null {
+  let text: string
+  try {
+    text = decodeURIComponent(segment)
+  } catch {
+    return null
+  }
+  const question = text.replace(/-/g, ' ').replace(/\s+/g, ' ').trim()
+  return question && question.length <= MAX_QUESTION_LENGTH ? question : null
+}
+
 // ── URL builders ─────────────────────────────────────────────────────────────
 // Every link in the app goes through these rather than composing paths inline,
 // so the URL shape stays changeable from one file.
@@ -119,14 +176,33 @@ export const routes = {
   home: (community: string) => `/${community}`,
   map: (community: string) => `/${community}/map`,
   feedback: (community: string) => `/${community}/feedback`,
+  /** You: the visitor's saved places and searches (see YouScreen). */
+  you: (community: string) => `/${community}/you`,
+  /** Every category in the admin's groups: the Browse tab (see BrowseList). */
+  browse: (community: string) => `/${community}/browse`,
+  /** Places added, edited or taken out, by day (see whatChanged.ts). */
+  changes: (community: string) => `/${community}/changes`,
+  /** Community-agnostic content (one shared `page` row — see pagesStore.ts),
+   *  but community-scoped chrome: living under `/[community]` is what gives
+   *  these two the visiting community's own header/footer, rather than
+   *  none at all (their old top-level location, outside every layout that
+   *  supplies one). */
+  about: (community: string) => `/${community}/about`,
+  privacy: (community: string) => `/${community}/privacy`,
   /** A category directory or a form wizard — they share this namespace. */
   slug: (community: string, slug: string) => `/${community}/${slug}`,
+  /** The Eruv page, opened on one eruv when given: /philly/eruv?item=center-city
+   *  (see fixedViewSlug). */
+  eruv: (community: string, eruvId?: string) => `/${community}/eruv${eruvId ? `?item=${encodeURIComponent(eruvId)}` : ''}`,
   /** The third argument is normally a listing's friendly slug (see
    *  listingSlug.ts) — /philly/grocery/goldi-a1b2c3 — but any string works;
    *  resolveListing falls back to a bare id, so an older raw-id link keeps
    *  resolving. */
   listing: (community: string, slug: string, listingIdOrSlug: string) =>
     `/${community}/${slug}/${listingIdOrSlug}`,
+  /** A search question's own page, the link "Share" copies:
+   *  /philly/ask/challah-near-rittenhouse. See shareAnswer.ts. */
+  ask: (community: string, question: string) => `/${community}/ask/${encodeURIComponent(questionSlug(question))}`,
 }
 
 /** Serializes the map's live view into query params, so a shared map link
@@ -136,17 +212,28 @@ export function mapQueryString(state: {
   categories?: string[] | null
   query?: string | null
   openNow?: boolean
+  /** Open now in these categories only (see mapFilters.ts). */
+  openIn?: string[] | null
   bool?: string[] | null
   select?: Record<string, string[]> | null
   /** The point id of the pin currently shown in the detail panel/sheet, so
    *  the map reopens with the same place selected, not just the same pins
    *  and filters. */
   place?: string | null
+  /** The Pinned chip is on (the visitor's pinned places; see pinned.ts). */
+  pinned?: boolean
+  /** Eruv lines on, over whatever places show; 'only' — the lines alone,
+   *  no places (the Eruv chip from everything, or the Eruv page's Full
+   *  map), which no `cat` can say since no `cat` means every category. */
+  eruvim?: boolean | 'only'
 }): string {
   const params = new URLSearchParams()
   if (state.categories?.length) params.set('cat', state.categories.join(','))
+  if (state.pinned) params.set('pinned', '1')
+  if (state.eruvim) params.set('eruv', state.eruvim === 'only' ? 'only' : '1')
   if (state.query) params.set('q', state.query)
   if (state.openNow) params.set('open', '1')
+  else if (state.openIn?.length) params.set('open', state.openIn.join(','))
   if (state.bool?.length) params.set('is', state.bool.join(','))
   if (state.place) params.set('place', state.place)
   if (state.select && Object.keys(state.select).length) {
@@ -169,9 +256,12 @@ export function parseMapQuery(params: URLSearchParams): {
   categories: string[] | null
   query: string | null
   openNow: boolean
+  openIn: string[] | null
   bool: string[] | null
   select: Record<string, string[]> | null
   place: string | null
+  pinned: boolean
+  eruvim: boolean | 'only'
 } {
   const list = (v: string | null) => {
     const items = (v ?? '').split(',').map((s) => s.trim()).filter(Boolean)
@@ -194,8 +284,13 @@ export function parseMapQuery(params: URLSearchParams): {
     categories: list(params.get('cat')),
     query: params.get('q') || null,
     openNow: params.get('open') === '1',
+    openIn: params.get('open') === '1' ? null : list(params.get('open')),
     bool: list(params.get('is')),
     select,
     place: params.get('place') || null,
+    pinned: params.get('pinned') === '1',
+    // Any value: links from when eruvim could be picked one by one
+    // (?eruv=center-city) turn them all on.
+    eruvim: params.get('eruv') === 'only' ? 'only' : params.has('eruv'),
   }
 }

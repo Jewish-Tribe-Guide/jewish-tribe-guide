@@ -1,5 +1,7 @@
-// Pure logic for "pinned" listings — a visitor's personal shortlist, saved to
-// this browser only (like UpvoteButton's voter token: no accounts, no
+// Pure logic for saved places — a visitor's personal shortlist, saved to
+// this browser only. Called "pinned" in code because it was Pin until Oct 14,
+// when Save replaced it; the storage key keeps the old name so every pin
+// became a save without a migration (like UpvoteButton's voter token: no accounts, no
 // database). Kept separate from React so the storage shape and edge cases
 // (corrupt JSON, a stale localStorage entry, the cap) are testable without a
 // DOM. See pinnedContext.tsx for the provider that wraps this in state.
@@ -68,4 +70,13 @@ export function togglePinned(pins: PinnedListing[], listing: PinnedListing): Pin
   if (isPinned(pins, listing.id)) return pins.filter((p) => p.id !== listing.id)
   const withRoom = pins.length >= MAX_PINS ? pins.slice(1) : pins
   return [...withRoom, listing]
+}
+
+/** Undo of a remove: puts `listing` back where it was, so You's order
+ *  doesn't change under the visitor (no reordering, canvas board YouRemove).
+ *  Already there (undone twice) changes nothing. */
+export function restorePinned(pins: PinnedListing[], listing: PinnedListing, index: number): PinnedListing[] {
+  if (isPinned(pins, listing.id)) return pins
+  const at = Math.max(0, Math.min(index, pins.length))
+  return [...pins.slice(0, at), listing, ...pins.slice(at)]
 }

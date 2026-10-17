@@ -28,9 +28,10 @@ vi.mock('./NearbyList', () => ({
   ),
 }))
 vi.mock('./MapPlaceDetail', () => ({
-  default: ({ item, onBack }: { item: Point; onBack: () => void }) => (
+  default: ({ item, onBack, found }: { item: Point; onBack: () => void; found?: { items: { tag: string }[] } | null }) => (
     <div>
       <p>detail for {item.name}</p>
+      {found && <p>marked {found.items.map((m) => m.tag).join(', ')}</p>}
       <button onClick={onBack}>Back to list</button>
     </div>
   ),
@@ -99,17 +100,14 @@ describe('MobileNearbySheet', () => {
   })
 
   // collapse() used to carry two independent guards here, needed because a
-  // tap dismissing MapPlaceDetail's own kebab menu could otherwise ALSO
+  // tap dismissing the place detail's popup menu could otherwise ALSO
   // collapse this whole sheet in the same motion (the map's background tap
   // is Google Maps' own 'click' event, not a plain DOM click this
   // component's own outside-click detection could reliably order itself
   // against). Removed along with the callback props that drove them
-  // (onOutsideDismiss/onOpenChange) once ListingActionsMenu started
-  // covering this itself: an invisible backdrop sits over the ENTIRE
-  // screen while its menu is open (see that component's own doc), so a
-  // dismissing tap never reaches Google Maps' canvas at all — collapse()
-  // simply never gets called for that tap in the first place, and there's
-  // nothing left here to guard against or test.
+  // (onOutsideDismiss/onOpenChange) once the popup covered this itself with
+  // a full-screen backdrop — and the popup itself is gone now too (Oct 15),
+  // so there's nothing left here to guard against.
   it('returns to the list (not the home screen) when a swipe-back fires while a place is selected', async () => {
     const user = userEvent.setup()
 
@@ -397,5 +395,112 @@ describe('MobileNearbySheet', () => {
     // staying put confirms deselectPoint delegated to the browser instead
     // of also clearing its own state directly.
     expect(screen.getByText('detail for Goldi Market')).toBeInTheDocument()
+  })
+
+  // ── Where the place detail renders ─────────────────────────────────
+
+  // Inside the same hand-driven scroll region the list uses, so a long
+  // listing scrolls, and dragging it at the top resizes the sheet, exactly
+  // Opened from the map's search, the place marks what the search matched.
+  it("passes the search's matches for the selected place to its detail", async () => {
+    const user = userEvent.setup()
+    const foundOn = (id: string | undefined) =>
+      id === 'p1' ? { terms: ['wine'], items: [{ tag: 'Wine', sometimes: false }], fields: [] } : null
+    render(<MobileNearbySheet points={[point]} userLocation={null} categories={[category]} foundOn={foundOn} containerHeight={600} />)
+    await user.click(screen.getByRole('button', { name: /select Goldi Market/ }))
+    expect(screen.getByText('marked Wine')).toBeInTheDocument()
+  })
+
+  // as the list does. Its edit bar is the last thing in that content (see
+  // MapPlaceDetail), no longer docked below the region.
+  it('renders the place detail inside the scroll region the list uses', async () => {
+    const user = userEvent.setup()
+    const { container } = render(
+      <MobileNearbySheet points={[point]} userLocation={null} categories={[category]} containerHeight={600} />,
+    )
+    await user.click(screen.getByRole('button', { name: /select Goldi Market/ }))
+
+    const region = container.querySelector('.overscroll-contain')!
+    expect(region).toContainElement(screen.getByText('detail for Goldi Market'))
+  })
+
+  // Its own element, not the list's: a shared one kept the list's scroll
+  // offset, so a place picked from deep in the list opened partway down.
+  it('gives the place detail a fresh scroll region, not the list\'s', async () => {
+    const user = userEvent.setup()
+    const { container } = render(
+      <MobileNearbySheet points={[point]} userLocation={null} categories={[category]} containerHeight={600} />,
+    )
+    const listRegion = container.querySelector('.overscroll-contain')
+    await user.click(screen.getByRole('button', { name: /select Goldi Market/ }))
+    expect(container.querySelector('.overscroll-contain')).not.toBe(listRegion)
+  })
+
+  // Oct 16: Back from a place picked deep in the list landed at the top of
+  // it ("that feels like a bad experience").
+  it('puts the list back where it was scrolled when you come back from a place', async () => {
+    const user = userEvent.setup()
+    const { container } = render(<MobileNearbySheet points={[point]} userLocation={null} categories={[category]} containerHeight={600} />)
+    const list = container.querySelector('.overscroll-contain')!
+    list.scrollTop = 340
+    fireEvent.scroll(list)
+    await user.click(screen.getByRole('button', { name: /select Goldi Market/ }))
+    expect(container.querySelector('.overscroll-contain')!.scrollTop, 'the place opens at its own top').toBe(0)
+    act(() => {
+      window.dispatchEvent(new PopStateEvent('popstate', { state: {} }))
+    })
+    expect(screen.getByRole('button', { name: /select Goldi Market/ })).toBeInTheDocument()
+    expect(container.querySelector('.overscroll-contain')!.scrollTop).toBe(340)
+  })
+
+  // A new search or category is a different list: it starts at its top.
+  it('starts a different list at its top', async () => {
+    const user = userEvent.setup()
+    const other: Point = { ...point, id: 'p2', name: 'Acme', raw: makeListing({ id: 'p2', name: 'Acme' }) }
+    const { container, rerender } = render(<MobileNearbySheet points={[point]} userLocation={null} categories={[category]} containerHeight={600} />)
+    const list = container.querySelector('.overscroll-contain')!
+    list.scrollTop = 340
+    fireEvent.scroll(list)
+    await user.click(screen.getByRole('button', { name: /select Goldi Market/ }))
+    rerender(<MobileNearbySheet points={[other]} userLocation={null} categories={[category]} containerHeight={600} />)
+    act(() => {
+      window.dispatchEvent(new PopStateEvent('popstate', { state: {} }))
+    })
+    expect(container.querySelector('.overscroll-contain')!.scrollTop).toBe(0)
+  })
+
+  // Oct 16: lowered after scrolling, a row showed cut off under the line.
+  // Lowered, the handle is the whole sheet (its height; jsdom lays nothing
+  // out, so the row not showing is e2e's), and with a place open its line
+  // names the place, since none of it shows.
+  it('lowered, is only its line, and names an open place in it', async () => {
+    const user = userEvent.setup()
+    render(<MobileNearbySheet points={[point]} userLocation={null} categories={[category]} containerHeight={600} />)
+    expect(screen.getByRole('button', { name: 'Expand nearby list' })).toHaveStyle({ minHeight: '64px' })
+    await user.click(screen.getByRole('button', { name: /select Goldi Market/ }))
+    const handle = screen.getByRole('button', { name: 'Drag to resize nearby list' })
+    expect(handle.style.minHeight, 'raised, the list shows under it').toBe('')
+    for (let i = 0; i < 2; i++) {
+      // A tap on the handle: half, full, then lowered.
+      fireEvent.pointerDown(screen.getByRole('button', { name: /nearby list/ }), { clientY: 300 })
+      fireEvent.pointerUp(screen.getByRole('button', { name: /nearby list/ }))
+    }
+    expect(screen.getByTestId('sheet-peek-line')).toHaveTextContent('Goldi Market — drag up')
+  })
+
+  // The Eruv chip from everything (Oct 15): the lines alone, no places. The
+  // peek says what's there, not "0 places nearby".
+  it('peeks with the eruvim when they are all the map shows', () => {
+    const eruv = (id: string) => ({ id, name: id, tone: 'green' as const, label: 'Up' })
+    const { rerender } = render(<MobileNearbySheet points={[]} userLocation={null} categories={[category]} containerHeight={600} eruvim={[eruv('a'), eruv('b')]} />)
+    expect(screen.getByText('2 eruvim — drag up')).toBeInTheDocument()
+    rerender(<MobileNearbySheet points={[]} userLocation={null} categories={[category]} containerHeight={600} eruvim={[eruv('a')]} />)
+    expect(screen.getByText('1 eruv — drag up')).toBeInTheDocument()
+    // Places over the lines (Oct 15): the eruvim still lead, both counted.
+    rerender(<MobileNearbySheet points={[point]} userLocation={null} categories={[category]} containerHeight={600} eruvim={[eruv('a')]} />)
+    expect(screen.getByText('1 eruv · 1 place — drag up')).toBeInTheDocument()
+    // Lines off: places as ever.
+    rerender(<MobileNearbySheet points={[point]} userLocation={null} categories={[category]} containerHeight={600} />)
+    expect(screen.getByText('1 place nearby — drag up')).toBeInTheDocument()
   })
 })

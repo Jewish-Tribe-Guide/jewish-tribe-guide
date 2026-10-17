@@ -1,12 +1,12 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import type { CategoryConfig } from '@/lib/categories'
 import { useCategories } from '@/lib/useCategories'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { withCommunity } from '@/lib/useCommunityData'
 import Honeypot from '@/components/Honeypot'
-import { CheckIcon } from '@/components/icons'
 
 // ── "Stay in the loop" signup — desktop only, right after the map ──────────
 // The home screen ends at the map with nothing after it but the footer; this
@@ -30,8 +30,7 @@ export default function SubscribeSection({
 }: {
   /** Skip this section's own outer `<section>`/card shell and render just the
    *  heading + form — Landing renders this inside its own standalone card
-   *  now (own border/padding), the same reason SearchSection takes this
-   *  prop when Landing merges it into another card. */
+   *  now (own border/padding). */
   bare?: boolean
   /** settings.desktopSubscribeEyebrow/Heading — admin-editable (Desktop
    *  tab's Home screen cards). Optional with today's literal defaults
@@ -53,8 +52,60 @@ export default function SubscribeSection({
   const [error, setError] = useState<string | null>(null)
   const [done, setDone] = useState(false)
   const pickerRef = useRef<HTMLDivElement>(null)
+  // The category row tooltip (see the grid below) — a timer, not CSS
+  // group-hover, so the tooltip's own text only ever mounts once actually
+  // hovered rather than sitting in the DOM (duplicating the row's own
+  // visible label) the whole time. Position is captured at hover time via
+  // getBoundingClientRect and rendered through a portal at `position: fixed`
+  // — an in-flow `absolute` tooltip got clipped by this grid's own
+  // `overflow-y-auto` for any row near its scrolled edge (confirmed live);
+  // `fixed` escapes that the same way the app's other portaled popups
+  // (CommunitySwitcher, the Feedback dialog) do, for the same reason. `delayedHoverRef` is the pending "not hovered long enough yet"
+  // timer; cleared on every enter/leave so a quick pass across several rows
+  // doesn't leave a stale one to fire late against whatever row the pointer
+  // is on by then.
+  const [tooltip, setTooltip] = useState<{ label: string; top: number; left: number } | null>(null)
+  const delayedHoverRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const handleCategoryRowEnter = (label: string, e: React.MouseEvent<HTMLLabelElement>) => {
+    if (delayedHoverRef.current != null) clearTimeout(delayedHoverRef.current)
+    // Only for a name actually cut off by the truncate — comparing the
+    // rendered text's own scrollWidth (the width it WANTS) against its
+    // clientWidth (the width it HAS) is the standard way to detect that;
+    // a short name that fits has nothing to reveal, so it gets no tooltip
+    // at all, not one that would just repeat what's already fully visible.
+    const textEl = e.currentTarget.querySelector<HTMLElement>('.truncate')
+    if (!textEl || textEl.scrollWidth <= textEl.clientWidth) return
+    const rowEl = e.currentTarget
+    delayedHoverRef.current = setTimeout(() => {
+      const rect = rowEl.getBoundingClientRect()
+      setTooltip({ label, top: rect.top, left: rect.left })
+    }, 150)
+  }
+  const handleCategoryRowLeave = () => {
+    if (delayedHoverRef.current != null) clearTimeout(delayedHoverRef.current)
+    setTooltip(null)
+  }
 
   const eligible = (categories ?? []).filter((c: CategoryConfig) => c.kind === 'listing')
+
+  // Otherwise a pending 150ms tooltip timer started right before the picker
+  // closed (an outside click, Escape) would still fire afterward — harmless
+  // to this still-mounted component, but it'd leave a stale tooltip ready to
+  // flash immediately the next time the picker reopens, for a row that isn't
+  // actually being hovered. Also closes it on the grid's own scroll — a
+  // `fixed` tooltip has no way to follow its row once that row moves under
+  // it.
+  useEffect(() => {
+    if (!pickerOpen) {
+      if (delayedHoverRef.current != null) clearTimeout(delayedHoverRef.current)
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setTooltip(null)
+      return
+    }
+    function onScroll() { setTooltip(null) }
+    document.addEventListener('scroll', onScroll, { capture: true, passive: true })
+    return () => document.removeEventListener('scroll', onScroll, true)
+  }, [pickerOpen])
 
   // Closes on Escape or a click/tap outside the picker — same pattern as
   // HomeBreak's Add/Edit/Report dropdown (see that component's own doc).
@@ -143,9 +194,9 @@ export default function SubscribeSection({
 
   const content = (
     <>
-        {/* Same amber eyebrow every other home-screen card carries — both
+        {/* Same eyebrow every other home-screen card carries — both
             admin-editable now (Desktop tab's Home screen cards). */}
-        <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-accent">{eyebrow}</p>
+        <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-primary">{eyebrow}</p>
         <h2 className="mb-1 text-lg font-semibold text-slate-900">{heading}</h2>
 
         {done ? (
@@ -173,17 +224,15 @@ export default function SubscribeSection({
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@example.com"
                   aria-label="Email address"
-                  className="min-w-0 flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-accent"
+                  className="min-w-0 flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary"
                 />
-                {/* --color-accent, matching HomeBreak's own Add/Edit/Report
-                    buttons and this card's eyebrow — "home screen stays
-                    warm, every other screen's interactive color is blue" as
-                    a deliberate split rather than one color bleeding into
-                    the other's territory. */}
+                {/* The community's own blue, like every other button on
+                    the site. The home screen used to have a warm amber of
+                    its own; one look now (step 2), phone and desktop. */}
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="shrink-0 cursor-pointer rounded-full bg-accent px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-accent-dark disabled:opacity-60"
+                  className="shrink-0 cursor-pointer rounded-full bg-primary px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary-dark disabled:opacity-60"
                 >
                   {submitting ? 'Subscribing…' : 'Subscribe'}
                 </button>
@@ -269,13 +318,47 @@ export default function SubscribeSection({
                       </label>
                       <div className="mt-1 grid max-h-48 grid-cols-2 gap-x-3 gap-y-1 overflow-y-auto border-t border-slate-100 pt-2">
                         {eligible.map((c) => (
-                          <label key={c.id} className="flex items-center gap-2 rounded-lg px-2 py-1 text-sm text-slate-700 hover:bg-slate-50">
+                          // A custom tooltip (rendered once via the portal
+                          // below, not per-row) — not the native `title`
+                          // attribute, which every browser gates behind a
+                          // ~1s hover delay with no CSS/HTML way to shorten
+                          // it. Only actually shows for a name the truncate
+                          // really cut off — handleCategoryRowEnter checks
+                          // scrollWidth vs. clientWidth before ever
+                          // scheduling it, so a name that already fits gets
+                          // no tooltip repeating what's already visible.
+                          <label
+                            key={c.id}
+                            className="flex items-center gap-2 rounded-lg px-2 py-1 text-sm text-slate-700 hover:bg-slate-50"
+                            onMouseEnter={(e) => handleCategoryRowEnter(c.pluralLabel, e)}
+                            onMouseLeave={handleCategoryRowLeave}
+                          >
                             <input type="checkbox" checked={selected.includes(c.id)} onChange={() => toggleCategory(c.id)} />
                             <span className="truncate">{c.pluralLabel}</span>
                           </label>
                         ))}
                       </div>
                     </div>
+                  )}
+                  {/* `position: fixed` via a portal, not an in-flow
+                      `absolute` child of the row — see handleCategoryRowEnter's
+                      own doc above for why: this grid scrolls
+                      (`overflow-y-auto`), and a tooltip positioned relative to
+                      its own row got visibly clipped by that for rows near the
+                      scrolled edge. `fixed`, escaping to document.body, paints
+                      in the root stacking context instead, the same fix the
+                      app's other portaled popups use. `-4px` above the row's own top, not flush
+                      against it, so the tooltip doesn't touch the text it's
+                      naming. */}
+                  {tooltip && createPortal(
+                    <span
+                      role="tooltip"
+                      className="pointer-events-none fixed z-50 -translate-y-full whitespace-nowrap rounded-md bg-slate-900 px-2 py-1 text-xs text-white shadow-lg"
+                      style={{ top: tooltip.top - 4, left: tooltip.left }}
+                    >
+                      {tooltip.label}
+                    </span>,
+                    document.body,
                   )}
                 </div>
 

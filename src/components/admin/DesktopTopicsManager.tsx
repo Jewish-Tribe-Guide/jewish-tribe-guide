@@ -3,20 +3,25 @@
 import { BUILT_IN_BLOCKS, type DraftHomeSection, type HomeBlockKind } from '@/lib/homeSections'
 import type { SiteSettings } from '@/lib/siteSettings'
 
-// ── The desktop home screen's six singleton cards — Categories & Search,
-// Davening Times, Update Listings, Map, Email Signup, and Jewish Times —
+// ── The desktop home screen's five singleton cards — Categories & Search,
+// Davening Times, Update Listings, Email Signup, and Jewish Times —
 // reorderable and removable, same shared draft/Save pipeline as
 // HomeSectionManager's category sections (see homeSectionsDraft.ts). Each
 // row is labeled by its fixed admin name (CARD_META below), not a
 // renameable "title" the way the old 'featured'/'map'/'zmanim' blocks were
-// — none of the six has a live-rendered `title` any more (see
+// — none of the five has a live-rendered `title` any more (see
 // homeSections.ts's own doc); every one has its own dedicated eyebrow/
 // heading fields in SiteSettings instead, edited inline on its own row here.
+// 'map' used to be a sixth card here (the map embedded on the home screen) —
+// retired, the user's own call: the map only ever lives at its own
+// full-screen route now. Not offered here any more, so no admin can add it
+// back; Landing.tsx silently renders nothing for a leftover 'map' row, same
+// as any other retired kind (see BUILT_IN_BLOCKS's own doc).
 //
 // Lives under the Desktop tab, not the Site tab's plain "Home page
-// sections": mobile never shows any of these six (see Landing.tsx — all six
-// are desktop-only), so they belong with the other desktop-only settings,
-// not mixed in with the cross-device category-section list.
+// sections": mobile never shows any of these five (see Landing.tsx — all
+// five are desktop-only), so they belong with the other desktop-only
+// settings, not mixed in with the cross-device category-section list.
 //
 // `sections` (the draft prop) actually holds every home_section row —
 // carefully only ever reads/reorders the kind!=='section' subset here,
@@ -52,12 +57,6 @@ const CARD_META: CardMeta[] = [
     description: 'The Add/Edit/Report card — the actions that actually keep listings current.',
     eyebrowKey: 'desktopListingsEyebrow',
     headingKey: 'desktopListingsHeading',
-  },
-  {
-    kind: 'map',
-    description: 'The map, embedded directly on the home screen.',
-    eyebrowKey: 'desktopMapEyebrow',
-    headingKey: 'desktopMapHeading',
   },
   {
     kind: 'subscribe',

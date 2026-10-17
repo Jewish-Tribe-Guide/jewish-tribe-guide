@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { nextUpcomingDavening, type ShulMinyanim } from './upcomingDavening'
+import { formatStartsIn, nextMinyansAcross, nextUpcomingDavening, shulRowByShul, type ShulMinyanim } from './upcomingDavening'
 import type { Minyan } from './davening'
 import { geoKey } from './useZmanAnchors'
 
@@ -101,6 +101,7 @@ describe('nextUpcomingDavening', () => {
     expect(result).toEqual({
       label: 'Mincha',
       time: '2:00pm',
+      minutes: 14 * 60, // 2:00pm
       isTomorrow: false,
       shul: { name: 'Kahal Kadosh Mikveh Israel', geo: kahalKadosh.geo },
       shulCount: 1,
@@ -223,5 +224,188 @@ describe('nextUpcomingDavening', () => {
     })
     expect(result?.label).toBe('Shacharis & Mincha')
     expect(result?.shulCount).toBe(2)
+  })
+})
+
+describe('formatStartsIn', () => {
+  it('exactly at the target reads as "Now", not "In 0 min"', () => {
+    expect(formatStartsIn(13 * 60, 13 * 60, false)).toBe('Now')
+  })
+
+  it('under an hour away', () => {
+    expect(formatStartsIn(13 * 60, 13 * 60 + 12, false)).toBe('In 12 min')
+  })
+
+  it('exactly one hour away — no dangling "0 min"', () => {
+    expect(formatStartsIn(13 * 60, 14 * 60, false)).toBe('In 1 hr')
+  })
+
+  it('over an hour away, with minutes left over', () => {
+    expect(formatStartsIn(13 * 60, 14 * 60 + 12, false)).toBe('In 1 hr 12 min')
+  })
+
+  it('several hours away', () => {
+    expect(formatStartsIn(6 * 60, 8 * 60, false)).toBe('In 2 hr')
+  })
+
+  it('tomorrow — target is measured from the NEXT day\'s midnight, 24h ahead of today\'s', () => {
+    // 11pm tonight, tomorrow's minyan at 7am: 8 hours away.
+    expect(formatStartsIn(23 * 60, 7 * 60, true)).toBe('In 8 hr')
+  })
+})
+
+describe('shulRowByShul', () => {
+  const opts = (nowMinutes: number, anchors = {}) => ({ today: ['mon' as const], tomorrow: ['tue' as const], nowMinutes, season: null, anchors })
+  const kk = { ...kahalKadosh, id: 'kk' }
+  const m = (over: Partial<Minyan>): Minyan => ({ id: 'x', tefillah: 'shacharis', days: ['sat'], time: '9:00am', ...over })
+  const shul = (id: string, minyanim: Minyan[]): ShulMinyanim => ({ id, name: id, minyanim })
+
+  it('gives each shul its own next minyan, keyed by listing id, in one clock style', () => {
+    // 7:00 AM Monday: Shacharis at 7:15 is next.
+    expect(shulRowByShul([kk], opts(7 * 60))).toEqual({ kk: { text: 'Shacharis 7:15 AM', tone: 'minyan' } })
+    // 10 AM: Shacharis is over; Mincha at 2:00pm, written "2 PM".
+    expect(shulRowByShul([kk], opts(10 * 60)).kk.text).toBe('Mincha 2 PM')
+  })
+
+  // Oct 16: one that only runs when enough sign up says so, before its
+  // own note; the next regular one says nothing extra.
+  it('says to check the group first when the next one only runs when enough sign up', () => {
+    const signUp = { link: 'https://chat.whatsapp.com/Aa11' }
+    const rows = shulRowByShul(
+      [shul('late', [m({ days: ['mon'], tefillah: 'maariv', time: '9:45pm', notes: 'Upstairs', signUp }), m({ id: 'y', days: ['mon'], tefillah: 'mincha', time: '1:45pm' })])],
+      opts(14 * 60),
+    )
+    expect(rows.late).toEqual({ text: 'Maariv 9:45 PM', tone: 'minyan', note: 'Check group first · Upstairs' })
+    expect(shulRowByShul([shul('late', [m({ days: ['mon'], tefillah: 'mincha', time: '1:45pm' })])], opts(12 * 60)).late.note).toBeUndefined()
+  })
+
+  it('says "tomorrow" once today’s are over', () => {
+    expect(shulRowByShul([kk], opts(15 * 60)).kk.text).toBe('Mincha 2 PM tomorrow')
+  })
+
+  it('says what a shul with nothing today or tomorrow has instead, quietly', () => {
+    const rows = shulRowByShul(
+      [
+        shul('none', []),
+        shul('shabbos', [m({ days: ['sat'] }), m({ tefillah: 'kabbalas_shabbos', days: ['fri'], time: '6:00pm' })]),
+        shul('thursday', [m({ days: ['thu'] })]),
+        // Friday evening is erev Shabbos, whatever it's called.
+        shul('erev', [m({ days: ['sat'] }), m({ tefillah: 'mincha_maariv', days: ['fri'], time: '7:00pm' })]),
+        // Friday morning is a weekday.
+        shul('friday', [m({ days: ['fri'], time: '7:00am' })]),
+      ],
+      opts(7 * 60),
+    )
+    expect(rows).toEqual({
+      none: { text: 'No davening times listed', tone: 'quiet' },
+      // Oct 6: when, not just "Shabbos only".
+      shabbos: { text: 'Shabbos: Fri 6 PM, Sat 9 AM', tone: 'quiet' },
+      thursday: { text: 'Nothing today or tomorrow', tone: 'quiet' },
+      erev: { text: 'Shabbos: Fri 7 PM, Sat 9 AM', tone: 'quiet' },
+      friday: { text: 'Nothing today or tomorrow', tone: 'quiet' },
+    })
+  })
+
+  it('a Shabbos-only shul with only Shabbos morning says just that; one with no times to give says “Shabbos only”', () => {
+    const rows = shulRowByShul([shul('sat', [m({ time: '10:00am' })]), shul('worded', [m({ time: 'After Kiddush' })])], opts(7 * 60))
+    expect(rows.sat.text).toBe('Shabbos: Sat 10 AM')
+    expect(rows.worded.text).toBe('Shabbos only')
+  })
+
+  it('carries the note on the minyan the row names', () => {
+    const zoom = shul('zoom', [m({ days: ['mon'], time: '8:00am', notes: 'Zoom' })])
+    expect(shulRowByShul([zoom], opts(7 * 60)).zoom).toEqual({ text: 'Shacharis 8 AM', tone: 'minyan', note: 'Zoom' })
+  })
+
+  it('says a minyan today with words for a time under the next one, which skips it', () => {
+    const bnai = shul('bnai', [
+      m({ tefillah: 'mincha_maariv', days: ['mon'], time: 'Call to Confirm' }),
+      m({ days: ['tue'], time: '7:15am' }),
+    ])
+    expect(shulRowByShul([bnai], opts(15 * 60)).bnai).toEqual({
+      text: 'Shacharis 7:15 AM tomorrow',
+      tone: 'minyan',
+      note: 'Mincha & Maariv today: call to confirm',
+    })
+  })
+
+  it('gives a Shabbos-only shul the note all its minyanim share, and not two different ones', () => {
+    const monthly = shul('monthly', [m({ notes: 'Meets the first weekend of every month' })])
+    const two = shul('two', [m({ notes: 'Ends at 12:15pm' }), m({ tefillah: 'kabbalas_shabbos', days: ['fri'], time: '6:00pm', notes: 'Ends at 7:30pm' })])
+    const rows = shulRowByShul([monthly, two], opts(7 * 60))
+    expect(rows.monthly.note).toBe('Meets the first weekend of every month')
+    expect(rows.two.note).toBeUndefined()
+  })
+
+  it('says nothing yet for a shul whose sunset-based times haven’t arrived: "nothing today" may not be true', () => {
+    const sunset = shul('sunset', [m({ tefillah: 'mincha', days: ['mon'], time: '10 min before sunset', anchor: 'sunset', offsetMinutes: -10 })])
+    expect(shulRowByShul([sunset], opts(7 * 60))).toEqual({})
+  })
+
+  it('leaves out a shul with no listing id', () => {
+    const { id: _id, ...noId } = kk
+    void _id
+    expect(shulRowByShul([noId], opts(7 * 60))).toEqual({})
+  })
+})
+
+describe('nextMinyansAcross: the Synagogues page’s Next minyan card', () => {
+  const m = (over: Partial<Minyan>): Minyan => ({ id: 'x', tefillah: 'mincha', days: ['mon'], time: '6:20pm', ...over })
+  const shul = (id: string, minyanim: Minyan[], geo?: { lat: number; lng: number }): ShulMinyanim => ({ id, name: id, minyanim, geo })
+  const opts = (nowMinutes: number, anchors = {}) => ({ today: ['mon' as const], tomorrow: ['tue' as const], nowMinutes, season: null, anchors })
+  const miles: Record<string, number> = { near: 0.2, far: 8.2, mid: 5.1 }
+  const milesOf = (id: string) => miles[id]
+
+  it('names the soonest two, one line per shul', () => {
+    const lines = nextMinyansAcross(
+      [
+        shul('mid', [m({ time: '6:25pm' })]),
+        shul('near', [m({ time: '6:20pm' }), m({ id: 'y', tefillah: 'maariv', time: '8:00pm' })]),
+        shul('far', [m({ time: '7:00pm' })]),
+      ],
+      opts(17 * 60),
+      milesOf,
+    )
+    expect(lines).toEqual([
+      { shulId: 'near', shulName: 'near', label: 'Mincha', time: '6:20 PM', minutes: 18 * 60 + 20, tomorrow: false },
+      { shulId: 'mid', shulName: 'mid', label: 'Mincha', time: '6:25 PM', minutes: 18 * 60 + 25, tomorrow: false },
+    ])
+  })
+
+  it('on the same minute, names the nearer shul, whatever the alphabet says', () => {
+    // "far" sorts first by name ("f" < "n"); the nearer one still wins.
+    const lines = nextMinyansAcross([shul('far', [m({})]), shul('near', [m({})])], opts(17 * 60), milesOf, 1)
+    expect(lines?.map((l) => l.shulName)).toEqual(['near'])
+  })
+
+  it('reads two tefillos at one shul on the same minute as one line', () => {
+    const lines = nextMinyansAcross(
+      [shul('near', [m({}), m({ id: 'y', tefillah: 'maariv' })])],
+      opts(17 * 60),
+      milesOf,
+    )
+    expect(lines?.[0].label).toBe('Mincha & Maariv')
+  })
+
+  it('goes on to tomorrow once today’s run out, and says so', () => {
+    const lines = nextMinyansAcross(
+      [shul('near', [m({ time: '9:00pm', tefillah: 'maariv' }), m({ id: 'y', tefillah: 'shacharis', days: ['tue'], time: '6:45am' })]), shul('mid', [m({ id: 'z', tefillah: 'shacharis', days: ['tue'], time: '7:00am' })])],
+      opts(20 * 60),
+      milesOf,
+    )
+    expect(lines?.map((l) => `${l.time} ${l.label} · ${l.shulName}`)).toEqual(['9 PM Maariv · near', '7 AM Shacharis tomorrow · mid'])
+  })
+
+  it('waits for sunset-based times rather than naming a later minyan first', () => {
+    const geo = { lat: 40, lng: -75.2 }
+    const sunsetShul = shul('near', [m({ anchor: 'sunset', offsetMinutes: -10, time: '10 min before Sunset' })], geo)
+    const fixed = shul('far', [m({ time: '7:30pm' })])
+    expect(nextMinyansAcross([sunsetShul, fixed], opts(17 * 60), milesOf)).toBeNull()
+    const ready = { [geoKey(geo)]: { sunsetIso: '2026-09-08T18:30:00-04:00' } }
+    expect(nextMinyansAcross([sunsetShul, fixed], opts(17 * 60, ready), milesOf)?.map((l) => l.time)).toEqual(['6:20 PM', '7:30 PM'])
+  })
+
+  it('is an empty list, not null, when nothing is left today or tomorrow', () => {
+    expect(nextMinyansAcross([shul('near', [m({ days: ['sat'] })])], opts(17 * 60), milesOf)).toEqual([])
   })
 })

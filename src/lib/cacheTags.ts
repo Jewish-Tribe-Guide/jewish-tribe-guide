@@ -22,6 +22,11 @@ export const TAGS = {
   homeSections: (community: string) => `home-sections:${community}`,
   forms: (community: string) => `forms:${community}`,
   hospitals: (community: string) => `hospitals:${community}`,
+  campaignBanners: (community: string) => `campaign-banners:${community}`,
+  // The words taught to the search (askWords.ts), read with the categories.
+  askWords: (community: string) => `ask-words:${community}`,
+  /** The activity log as What changed reads it (changesStore). */
+  changes: (community: string) => `changes:${community}`,
 } as const
 
 /** Every tag whose content the admin can change for one community. A write
@@ -37,5 +42,8 @@ export function allCommunityTags(community: string): string[] {
     TAGS.homeSections(community),
     TAGS.forms(community),
     TAGS.hospitals(community),
+    TAGS.campaignBanners(community),
+    TAGS.askWords(community),
+    TAGS.changes(community),
   ]
 }

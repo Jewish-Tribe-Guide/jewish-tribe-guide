@@ -1,8 +1,13 @@
+'use client'
+
 import Link from 'next/link'
+import { useCommunitySlug } from '@/lib/communityContext'
+import { routes } from '@/lib/routes'
 
 /** The one-line "here's what happens to what you just typed" note, shown by
  *  every form that collects a name, phone, or email — the intake wizard, the
- *  feedback form, and the add/edit listing form.
+ *  feedback form, and the add/edit listing form. `short` is Feedback's
+ *  one-liner.
  *
  *  This is where the privacy policy belongs, and for a while it was the one
  *  place it wasn't: the only links to /privacy in the whole app lived in the
@@ -17,7 +22,27 @@ import Link from 'next/link'
  *  choice that isn't being offered while adding a step to the one flow we
  *  most want completed.
  */
-export default function PrivacyNote({ className = '' }: { className?: string }) {
+export default function PrivacyNote({ className = '', short = false }: { className?: string; short?: boolean }) {
+  const communitySlug = useCommunitySlug()
+  // Feedback asks for an optional email and nothing else, so the full
+  // sentence was longer than the form it sat under. The forms that take a
+  // name or a phone number keep it.
+  if (short) {
+    return (
+      <p className={`text-xs leading-relaxed text-muted ${className}`}>
+        We only use this to reply.{' '}
+        {/* New tab for the same reason as the link below. */}
+        <Link
+          href={routes.privacy(communitySlug)}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="font-medium text-blue-700 hover:underline"
+        >
+          Privacy
+        </Link>
+      </p>
+    )
+  }
   return (
     <p className={`text-xs leading-relaxed text-muted ${className}`}>
       We use what you send only to respond to it — never for marketing, and never sold. See our{' '}
@@ -25,7 +50,7 @@ export default function PrivacyNote({ className = '' }: { className?: string }) 
           part-filled form, and navigating away in place would throw the
           answers away. */}
       <Link
-        href="/privacy"
+        href={routes.privacy(communitySlug)}
         target="_blank"
         rel="noopener noreferrer"
         className="underline underline-offset-2 hover:text-slate-600"

@@ -63,6 +63,75 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
+function Many({ geos }: { geos: Array<{ lat: number; lng: number }> }) {
+  const anchors = useZmanAnchors(geos)
+  return <span data-testid="many">{geos.map((g) => anchors[geoKey(g)]?.sunsetIso ?? '—').join(' ')}</span>
+}
+
+describe('useZmanAnchors batching', () => {
+  const urls = () => (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls.map((c) => String(c[0]))
+
+  function stubBatch(failLat?: number) {
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      const points = url.includes('/batch')
+        ? new URL(url, 'http://x').searchParams.getAll('p').map((p) => p.split(',').map(Number))
+        : [[Number(new URL(url, 'http://x').searchParams.get('lat')), Number(new URL(url, 'http://x').searchParams.get('lng'))]]
+      const data = (lat: number) => ({
+        dailyZmanim: [{ label: 'Sunset', iso: `sunset@${lat}` }],
+        shabbos: { candleLighting: null, havdalah: null },
+      })
+      const results = points.map(([lat, lng]) => ({ lat, lng, ok: lat !== failLat, data: data(lat) }))
+      return { json: async () => (url.includes('/batch') ? { ok: true, results } : { ok: true, data: data(points[0][0]) }) } as unknown as Response
+    }))
+  }
+
+  it('asks for several new locations in one request', async () => {
+    stubBatch()
+    const a = freshGeo(), b = freshGeo(), c = freshGeo()
+    render(<Many geos={[a, b, c]} />)
+    await flush()
+    // Every request is a batch (never one per location). Not asserted as a
+    // count of exactly one: see the date-seeding note in the first test above.
+    expect(urls().length).toBeGreaterThan(0)
+    expect(urls().every((u) => u.includes('/api/zmanim/batch'))).toBe(true)
+    expect(urls().length).toBeLessThan(3)
+    expect(screen.getByTestId('many').textContent).toBe([a, b, c].map((g) => `sunset@${roundedLat(g.lat)}`).join(' '))
+  })
+
+  it('keeps a single new location on the plain per-location URL', async () => {
+    stubBatch()
+    render(<Many geos={[freshGeo()]} />)
+    await flush()
+    expect(urls().length).toBeGreaterThan(0)
+    expect(urls().some((u) => u.includes('/batch'))).toBe(false)
+  })
+
+  it('does not ask twice for two keys that round to the same spot', async () => {
+    stubBatch()
+    const base = freshGeo()
+    render(<Many geos={[base, { lat: base.lat + 0.001, lng: base.lng }]} />)
+    await flush()
+    expect(urls().length).toBeGreaterThan(0)
+    expect(urls().some((u) => u.includes('/batch'))).toBe(false)
+    expect(new Set(urls()).size).toBe(1)
+  })
+
+  it('one failing spot does not take the others down', async () => {
+    const a = freshGeo(), b = freshGeo()
+    stubBatch(roundedLat(b.lat))
+    render(<Many geos={[a, b]} />)
+    await flush()
+    const text = screen.getByTestId('many').textContent!
+    expect(text.startsWith('sunset@')).toBe(true)
+    expect(text.endsWith('—')).toBe(true)
+  })
+})
+
+function roundedLat(n: number) {
+  return Math.round(n * 100) / 100 + 0
+}
+
 describe('useZmanAnchors', () => {
   it('fetches once for a location and reuses it within the day', async () => {
     const geo = freshGeo()

@@ -1,0 +1,175 @@
+'use client'
+
+import Link from 'next/link'
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import type { DirectoryResource, ZmanimData } from '@/types'
+import type { CategoryConfig } from '@/lib/categories'
+import type { MinyanSchedule } from '@/lib/useMinyanSchedule'
+import { useCategories } from '@/lib/useCategories'
+import { useHomeSections } from '@/lib/useHomeSections'
+import { useSiteSettings } from '@/lib/useSiteSettings'
+import { useSiteNavigation } from '@/lib/useSiteNavigation'
+import { getCategoryColor } from '@/lib/categoryColor'
+import { browseLine, shabbosMoment } from '@/lib/todayHome'
+import { routes } from '@/lib/routes'
+import { features } from '@/lib/features'
+import { withMilesFromAddress, withMilesFromCenter } from '@/lib/listingTravel'
+import type { LatLng } from '@/lib/geo'
+import { ChevronRightIcon } from '@/components/icons'
+import CategoryIcon from '@/components/CategoryIcon'
+import SearchBox from './SearchBox'
+import { groupCardsIntoSections, resourceCards, useEntryCards, withEruvCount } from './sections'
+import { useEruvCount } from '@/lib/useEruvStatuses'
+
+// ── The Browse tab (step 6) ──────────────────────────────────────────────────
+// Every category, in the admin's home page groups, one compact row each: its
+// icon in its colour, its name, how many places, and one live line, the
+// thing its own page says first ("59 open now", "3 Shabbat friendly");
+// nothing where its page has nothing to say. Not the next minyan on the
+// Synagogues row (the user, Oct 10): one shul's time read as noise in a list
+// of categories, and Today already leads with it. Then What changed, Feedback, About and Privacy, which a phone has
+// nowhere else once the tabs are Today · Map · Browse.
+//
+// The list itself (BrowseList) is also the phone's home screen, under the
+// home's own search (Oct 13: the home is Browse while Today is held back).
+
+type Props = {
+  communitySlug: string
+  listings: readonly DirectoryResource[] | null
+  /** The clock (useMinyanSchedule's), null until the page has hydrated. */
+  schedule: MinyanSchedule | null
+  zmanim: ZmanimData | null
+  timezone: string
+  /** The visitor's location, if set; else distances are from the centre,
+   *  as on a category page. */
+  coords: LatLng | null
+  center: LatLng
+}
+
+/** A link in the foot's row: 44px tall, padded beside its words. */
+const FOOT_LINK = 'inline-flex min-h-11 items-center px-3 hover:underline'
+
+export default function BrowseAll(props: Props) {
+  const settings = useSiteSettings()
+  const router = useRouter()
+  const [query, setQuery] = useState('')
+
+  const ask = () => {
+    const q = query.trim()
+    if (q) router.push(routes.ask(props.communitySlug, q))
+  }
+
+  return (
+    <div data-testid="browse-page">
+      <h1 className="text-[28px] font-extrabold tracking-tight text-ink desktop:text-[36px]">Browse</h1>
+      <div className="mt-3">
+        <SearchBox query={query} onQueryChange={setQuery} onSubmit={ask} placeholder={settings.searchPlaceholder} />
+      </div>
+      <BrowseList {...props} />
+    </div>
+  )
+}
+
+/** Every card the home lists (the categories, and the forms people fill
+ *  in), in the admin's groups, and how many places each has. Null until the
+ *  categories have loaded. Shared by the Browse list and the phone home's
+ *  tiles (CategoryTiles). */
+export function useBrowseCards(communitySlug: string, listings: readonly DirectoryResource[] | null) {
+  const categories = useCategories()
+  const homeSections = useHomeSections()
+  const { navigate, openFlow } = useSiteNavigation()
+  const entryCards = useEntryCards(openFlow)
+
+  const eruvCount = useEruvCount(communitySlug, !!categories?.some((c) => c.kind === 'eruv'))
+  const listingCounts: Record<string, number> = {}
+  for (const l of listings ?? []) listingCounts[l.category] = (listingCounts[l.category] ?? 0) + 1
+  const counts = withEruvCount(listings ? listingCounts : null, eruvCount)
+  const resources = resourceCards(navigate, categories, communitySlug, counts)
+  const sections = resources ? groupCardsIntoSections([...entryCards, ...resources], homeSections ?? []) : null
+  return { categories, sections, counts }
+}
+
+/** Every category in the admin's groups, one row each, then the guide's own
+ *  pages (What changed, Feedback, About, Privacy). */
+export function BrowseList({ communitySlug, listings, schedule, zmanim, timezone, coords, center }: Props) {
+  const { categories, sections, counts } = useBrowseCards(communitySlug, listings)
+
+  const now = schedule ? new Date(schedule.now) : null
+  const restDay = schedule !== null && shabbosMoment(zmanim, schedule.now, timezone).kind === 'shabbos'
+  const lineFor = (id: string | undefined): string | null => {
+    const category = categories?.find((c) => c.id === id)
+    if (!category || !listings) return null
+    if (category.kind !== 'listing') return null
+    const items = listings.filter((l) => l.category === category.id)
+    // Each place's distance, as its category page measures it (for a list
+    // grouped by distance).
+    return browseLine(category, coords ? withMilesFromAddress(items, coords) : withMilesFromCenter(items, center), now, restDay)
+  }
+
+  return (
+    <>
+      {sections === null ? (
+        <div aria-hidden="true" className="mt-6 space-y-3">
+          {[0, 1, 2, 3, 4].map((i) => (
+            <div key={i} className="h-12 animate-pulse rounded-xl bg-slate-100" />
+          ))}
+        </div>
+      ) : (
+        <div className="desktop:mt-2 desktop:grid desktop:grid-cols-2 desktop:gap-x-8">
+          {sections.map((section) => (
+            <section key={section.title} data-testid={`browse-group-${section.title}`} className="mt-6">
+              <h2 className="text-[12.5px] font-extrabold uppercase tracking-[0.06em] text-slate-500">{section.title}</h2>
+              <ul className="mt-1">
+                {section.cards.map((card) => {
+                  const line = lineFor(card.id)
+                  // Only where the card counts something (not a form).
+                  const n = card.count && card.id ? counts?.[card.id] : undefined
+                  return (
+                    <li key={card.id ?? card.title}>
+                      <Link href={card.href} prefetch={false} className="flex items-center gap-3 border-t border-slate-100 py-2.5 hover:bg-slate-50">
+                        <CategoryIcon icon={card.icon ?? ''} categoryId={card.id} color={getCategoryColor((categories ?? []) as CategoryConfig[], card.id ?? '')} className="h-9 w-9 text-base" sizePx={36} />
+                        <span className="min-w-0 flex-1">
+                          <span className="block text-[16px] font-bold text-ink">{card.title}</span>
+                          {line && <span className="block truncate text-[13.5px] text-slate-600">{line}</span>}
+                        </span>
+                        {n !== undefined && <span className="shrink-0 text-[13.5px] text-slate-500">{n}</span>}
+                        <ChevronRightIcon className="h-4 w-4 shrink-0 text-slate-400" />
+                      </Link>
+                    </li>
+                  )
+                })}
+              </ul>
+            </section>
+          ))}
+        </div>
+      )}
+      <BrowseFoot communitySlug={communitySlug} />
+    </>
+  )
+}
+
+/** The guide's own pages, under the categories: What changed, Feedback,
+ *  About and Privacy, which a phone has nowhere else.
+ *
+ *  Each link a full finger's height (44px), padded beside its words so the
+ *  gaps between them are tappable too (the user, Oct 15: "not much room to
+ *  click"); pulled left by its padding so the words still line up with the
+ *  list above. A little room under them, the page's last row, so the tab bar
+ *  doesn't crowd them once scrolled to the end; not so much that they float
+ *  (the user, Oct 15: 64px was "way too far"). */
+export function BrowseFoot({ communitySlug }: { communitySlug: string }) {
+  const settings = useSiteSettings()
+  return (
+    <nav aria-label="About the guide" className="mt-8 border-t border-slate-200 pt-1 pb-2 text-[15px] font-bold text-primary">
+      <div className="-mx-3 flex flex-wrap">
+        {/* Always here, so a quiet week (no "This week" on Today) still has a
+            way to the page — unless it's held back (see features.ts). */}
+        {features.whatChanged && <Link href={routes.changes(communitySlug)} className={FOOT_LINK}>What changed</Link>}
+        {settings.feedbackEnabled && <Link href={routes.feedback(communitySlug)} className={FOOT_LINK}>Feedback</Link>}
+        <Link href={routes.about(communitySlug)} className={FOOT_LINK}>About</Link>
+        <Link href={routes.privacy(communitySlug)} className={FOOT_LINK}>Privacy</Link>
+      </div>
+    </nav>
+  )
+}

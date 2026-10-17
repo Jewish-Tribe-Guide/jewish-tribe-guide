@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { expect, test } from '@playwright/test'
+import { previewSettings } from '../e2e/helpers'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // The other half of caching.spec.ts.
@@ -131,6 +132,14 @@ test('an admin save to a static page reaches the cached /about route', async ({ 
   }
   const authHeaders = { Authorization: `Bearer ${accessToken}` }
 
+  // /about moved under /[community] (for the header/footer that comes with
+  // living there — see AboutPage's own doc) — same "/" redirect trick the
+  // site-settings test above uses to find which community this project's
+  // seed data actually uses.
+  const initialPage = await request.get('/')
+  const community = new URL(initialPage.url()).pathname.split('/').filter(Boolean)[0]
+  expect(community, 'the "/" redirect should land on a community').toBeTruthy()
+
   const beforeRes = await request.get('/api/admin/pages', { headers: authHeaders })
   expect(beforeRes.ok(), 'GET /api/admin/pages should succeed with the minted admin token').toBe(true)
   const before = await beforeRes.json()
@@ -140,7 +149,7 @@ test('an admin save to a static page reaches the cached /about route', async ({ 
   const originalBody: string = aboutPage.body
 
   const newBody = `Cache round-trip check ${Date.now()}`
-  expect(await (await request.get('/about')).text()).not.toContain(newBody)
+  expect(await (await request.get(`/${community}/about`)).text()).not.toContain(newBody)
 
   try {
     const patchRes = await request.patch('/api/admin/pages/about', {
@@ -198,7 +207,7 @@ test('an admin save to a static page reaches the cached /about route', async ({ 
     await expect
       .poll(
         async () => {
-          const res = await request.get('/about')
+          const res = await request.get(`/${community}/about`)
           const body = await res.text()
           const hit = body.includes(newBody)
           seen.push(`${res.headers()['x-nextjs-cache'] ?? 'no-header'}${hit ? '/new' : '/old'}`)
@@ -283,7 +292,11 @@ test('an already-open tab picks up an admin edit when it regains focus', async (
   // this used to navigate to the standalone All Categories page for the same
   // reason, which is gone now that "Browse everything" replaced it.
   await page.setViewportSize({ width: 390, height: 844 })
-  await page.goto(`/${community}`)
+  // The classic home, whose phone grid has every category: asked for the way
+  // the admin's Preview does it (writes nothing), so this doesn't depend on
+  // which home the admin has chosen. The Today home has no grid on a phone.
+  await previewSettings(page, community, { homeStyle: 'classic' })
+  await page.goto(`/${community}?preview=1`)
   // The location prompt overlays everything and swallows clicks (AGENTS.md
   // says the same about the mobile suite).
   const notNow = page.getByRole('button', { name: 'Not now' })

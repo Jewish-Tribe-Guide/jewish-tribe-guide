@@ -43,6 +43,7 @@ type CreateBody = {
   cardImageUrl?: string | null
   cardTextColor?: string | null
   pinColor?: string | null
+  active?: boolean
 }
 
 // POST /api/admin/categories — create a category directly (the admin equivalent
@@ -92,6 +93,7 @@ export async function POST(request: Request) {
       cardImageUrl: body.cardImageUrl,
       cardTextColor: body.cardTextColor,
       pinColor: body.pinColor,
+      active: body.active,
     })
     // The public site caches this content; drop it so the edit shows up.
     await revalidatePublicContent()

@@ -1,7 +1,9 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { getVoterToken, getMyVotedIds } from '@/lib/voteToken'
+import { getVoterToken, getMyVotedIds, noteMyVote } from '@/lib/voteToken'
+import { usePreviewSend, useFetchOrPreview } from '@/lib/previewSend'
+import { ThumbIcon } from '@/components/icons'
 
 const VOTED_KEY = 'jpc_voted'
 const COUNT_KEY = 'jpc_vote_counts'
@@ -55,6 +57,7 @@ export default function UpvoteButton({
   count: initialCount,
   onCountChange,
   variant = 'box',
+  name,
 }: {
   resourceId: string
   count: number
@@ -62,11 +65,18 @@ export default function UpvoteButton({
   onCountChange?: (count: number) => void
   /** 'box' — the bordered 👍/count tile. 'inline' — a minimal "👍 count" that
    *  sits in a row (used in the collapsed listing header). */
-  variant?: 'box' | 'inline'
+  /** `recommend`: the small outline thumbs-up beside an opened listing's
+   *  name, with the count only once there is one. */
+  variant?: 'box' | 'inline' | 'recommend'
+  /** The listing's name, for a screen reader: "Recommend Judah". */
+  name?: string
 }) {
   const [count, setCount] = useState(initialCount)
   const [voted, setVoted] = useState(false) // set from localStorage after mount (hydration-safe)
   const [busy, setBusy] = useState(false)
+  const fetchOrPreview = useFetchOrPreview()
+  // The admin console's preview: its vote isn't kept as this browser's.
+  const preview = usePreviewSend()
 
   // Fast paint from the local cache first, then correct against the server's
   // own record below — not a useSyncExternalStore candidate: this reconciles
@@ -114,17 +124,24 @@ export default function UpvoteButton({
     applyCount(prevCount + (prevVoted ? -1 : 1))
 
     try {
-      const res = await fetch('/api/votes', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ resourceId, token: getVoterToken() }),
-      })
+      const res = await fetchOrPreview(
+        '/api/votes',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ resourceId, token: getVoterToken() }),
+        },
+        { count: prevCount + (prevVoted ? -1 : 1), voted: !prevVoted },
+      )
       const body = await res.json()
       if (res.ok && body.ok) {
         applyCount(body.count)
         setVoted(body.voted)
-        rememberVote(resourceId, body.voted)
-        rememberCount(resourceId, body.count)
+        if (!preview) {
+          rememberVote(resourceId, body.voted)
+          rememberCount(resourceId, body.count)
+          noteMyVote(resourceId, body.voted)
+        }
       } else {
         setVoted(prevVoted)
         applyCount(prevCount)
@@ -146,6 +163,27 @@ export default function UpvoteButton({
 
   const title = voted ? 'Remove your upvote' : 'Upvote this place'
 
+  if (variant === 'recommend') {
+    return (
+      <button
+        type="button"
+        onClick={handleClick}
+        disabled={busy}
+        aria-pressed={voted}
+        aria-label={`Recommend${name ? ` ${name}` : ''}${count > 0 ? `, ${count} recommend${count === 1 ? 's' : ''} it` : ''}`}
+        title={voted ? 'You recommend this' : 'Recommend'}
+        className={[
+          'inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-full border text-sm font-bold transition-colors cursor-pointer disabled:opacity-60',
+          count > 0 ? 'px-3' : 'w-9',
+          voted ? 'border-primary bg-primary/10 text-primary' : 'border-slate-300 bg-white text-slate-700 hover:border-slate-400',
+        ].join(' ')}
+      >
+        <ThumbIcon className="h-4 w-4" />
+        {count > 0 && <span aria-hidden="true">{count}</span>}
+      </button>
+    )
+  }
+
   if (variant === 'inline') {
     return (
       <button
@@ -154,11 +192,20 @@ export default function UpvoteButton({
         aria-pressed={voted}
         title={title}
         className={[
-          // Negative margin + padding grows the tap area to ~32px for touch
-          // without shifting the surrounding header layout. Mobile only — desktop
-          // keeps the original compact hit area (sm:m-0 sm:p-0).
-          'inline-flex items-center gap-1 -m-2 p-2 sm:m-0 sm:p-0 text-xs font-medium whitespace-nowrap cursor-pointer transition-colors disabled:opacity-60',
-          voted ? 'text-primary' : 'text-slate-600 hover:text-primary',
+          // A filled chip, not just colored text — this used to be plain
+          // text sitting right next to the (non-interactive) distance,
+          // "👍 0 | 📍 0.3 mi", both the exact same weight. Reported live as
+          // unclear that it's tappable at all. A border was tried first, but
+          // at this text-xs size a 1px outline is easy to miss without any
+          // hover state to reinforce it (mobile, no cursor); a background
+          // fill reads as "this is a surface" without depending on someone
+          // noticing a hairline. Neutral gray at rest (not primary-colored)
+          // so it doesn't read as one more badge in the category-tag row
+          // below (Bakery, IKC) — it tints to primary only once voted.
+          'inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium whitespace-nowrap cursor-pointer transition-colors disabled:opacity-60',
+          voted
+            ? 'bg-primary/10 text-primary'
+            : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
         ].join(' ')}
       >
         <span aria-hidden="true">👍</span>

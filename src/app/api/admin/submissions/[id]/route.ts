@@ -1,7 +1,8 @@
 import { revalidatePublicContent } from '@/lib/revalidateContent'
+import { runWalkRoutesAfterChange } from '@/lib/walkRouteJob'
 import { after, type NextRequest } from 'next/server'
 import { getAdminUserForCommunity } from '@/lib/adminAuth'
-import { approveSubmission, rejectSubmission } from '@/lib/submissionStore'
+import { approveSubmission, rejectSubmission, ReviewEditError } from '@/lib/submissionStore'
 import { sendDecisionEmail } from '@/lib/confirmationEmail'
 import { sendReviewActionNotification, sendStatusChangeDigest } from '@/lib/email'
 import { loadSyncableListing, syncOneListing } from '@/lib/syncListing'
@@ -14,8 +15,10 @@ import { siteUrl } from '@/lib/siteUrl'
 import { routes } from '@/lib/routes'
 
 // PATCH /api/admin/submissions/:id
-// body: { status: 'approved' | 'rejected', reason?: string }
-// Approving APPLIES the change to the live tables. Admin only.
+// body: { status: 'approved' | 'rejected', reason?: string, payload?: listing }
+// Approving APPLIES the change to the live tables. Admin only. `payload`, with
+// an approval only: the listing as the admin fixed it in the opened card,
+// which is what goes live instead of what was sent (reviewEdits.ts).
 // A best-effort decision email is sent to the submitter if they provided one.
 export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/submissions/[id]'>) {
   const community = await resolveCommunity(communitySlugFromRequest(request))
@@ -26,9 +29,9 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/
 
   const { id } = await ctx.params
 
-  let body: { status?: string; reason?: string }
+  let body: { status?: string; reason?: string; payload?: unknown }
   try {
-    body = (await request.json()) as { status?: string; reason?: string }
+    body = (await request.json()) as { status?: string; reason?: string; payload?: unknown }
   } catch {
     return Response.json({ ok: false, errors: ['Invalid request body.'] }, { status: 400 })
   }
@@ -43,13 +46,20 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/
   const decision = body.status
   const reason = body.reason?.trim() || undefined
 
+  if (body.payload !== undefined && decision !== 'approved') {
+    return Response.json({ ok: false, errors: ['Changes can only be saved by approving.'] }, { status: 400 })
+  }
+
   let submission
   try {
     submission =
       decision === 'approved'
-        ? await approveSubmission(id, community.slug, admin.email)
+        ? await approveSubmission(id, community.slug, admin.email, body.payload)
         : await rejectSubmission(id, community.slug, admin.email)
   } catch (err) {
+    if (err instanceof ReviewEditError) {
+      return Response.json({ ok: false, errors: [err.message] }, { status: 400 })
+    }
     console.error('[admin/submissions/:id] PATCH failed:', err)
     return Response.json({ ok: false, errors: ['Could not update submission.'] }, { status: 502 })
   }
@@ -124,7 +134,8 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/
   // synced values too — but never allowed to fail the approval, which has
   // already happened by this point and must not be reported as failed because
   // Google was unreachable. It's just late instead: tonight's run picks it up.
-  if (decision === 'approved' && submission.operation !== 'delete') {
+  // Not an eruv suggestion: an eruv has no Google place.
+  if (decision === 'approved' && submission.operation !== 'delete' && submission.target_type !== 'eruv') {
     try {
       const row = await loadSyncableListing(submission.target_id ?? '')
       if (row && !row.details.googleSyncedAt) {
@@ -145,5 +156,8 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/
 
   // The public site caches this content; drop it so the edit shows up.
   await revalidatePublicContent()
+  // A new or moved listing's walks along the streets, now rather than
+  // tonight (walkRouteJob.ts); after the response, so the admin isn't kept.
+  if (decision === 'approved' && submission.target_type !== 'eruv') after(() => runWalkRoutesAfterChange(community.slug))
   return Response.json({ ok: true, submission })
 }

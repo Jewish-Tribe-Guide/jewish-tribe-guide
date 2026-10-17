@@ -112,6 +112,9 @@ export function useLiveLocation() {
 
   return {
     ...stored,
+    // How far off the phone says its fix may be, in metres, while it's the
+    // live fix being shown; null for a typed address or a listing.
+    accuracy: watch.tracking && watch.position ? watch.position.accuracy : null,
     tracking: watch.tracking,
     geoError: watch.error,
     geoErrorSilent: watch.errorSilent,
