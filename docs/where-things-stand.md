@@ -192,6 +192,16 @@ for that exact change, in the same conversation. Show the dry run first.
   last Shabbos" in grey instead of an amber "Not posted yet this week"
   (Friday and Shabbos are unchanged). A read that gets no answer is tried
   once more straight away (live failed one on Oct 17, twice).
+- **The Watches tab is grouped** (the user, Oct 18: "it's getting big and
+  there are groupings to be had"): Kosher lists (Keystone-K, Mekor), Shul
+  newsletters, Hospitals on Refuah, Menus, Other pages, always in that
+  order (`src/lib/watchGroups.ts`). Each heading gives the count and what
+  needs doing ("1 to link", "2 not working", "1 paused"). A group of more
+  than four starts closed but still shows anything not working or waiting
+  to be linked, and a row just linked or paused stays where it was. The
+  per-watch buttons are unchanged. Still open: each menu row repeats the
+  same paragraph, and on a phone a row's words squeeze into a narrow
+  column beside its buttons (both were there before the grouping).
 
 ## Done Oct 17
 

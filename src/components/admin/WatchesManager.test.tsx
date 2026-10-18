@@ -160,4 +160,47 @@ describe('WatchesManager', () => {
     expect(JSON.parse(String(init!.body))).toEqual({ action: 'ignore', id: 'n' })
     expect(await screen.findByText(/Not a shul: its emails are skipped/)).toBeInTheDocument()
   })
+
+  // Oct 18: the list had grown to one long column of menus, hospitals and
+  // newsletters. It's grouped, a long group starts closed, and a watch that
+  // needs a look shows anyway, named in its group's heading.
+  it('groups the watches, and a closed group still shows what’s broken', async () => {
+    const menus = ['Bar Bombon', 'Goldie', 'Mama’s', 'Rita’s', 'Zevi’s'].map((name, i) =>
+      watch({ id: `m${i}`, label: `${name} menu`, url: `https://m${i}.example/menu`, resourceId: 'shul-1', createdBy: 'menu links' }),
+    )
+    menus[3] = { ...menus[3], failingSince: ago(1), lastError: 'The page answered 404' }
+    await renderTab([watch({ id: 'k', kind: 'keystone_list', label: 'Keystone-K’s list' }), ...menus])
+    const [kosher, menuGroup] = screen.getAllByTestId('watch-group')
+    expect(kosher).toHaveAccessibleName('Kosher lists')
+    expect(within(kosher).getAllByTestId('watch-row')).toHaveLength(1)
+    expect(menuGroup).toHaveAccessibleName('Menus')
+    const toggle = within(menuGroup).getByRole('button', { name: /Menus.*5.*1 not working.*Show all 5/ })
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    expect(within(menuGroup).getAllByTestId('watch-row').map((r) => r.querySelector('p')!.textContent)).toEqual(['Rita’s menu'])
+    await userEvent.setup().click(toggle)
+    expect(toggle).toHaveAttribute('aria-expanded', 'true')
+    // Broken first, then by name.
+    expect(within(menuGroup).getAllByTestId('watch-row').map((r) => r.querySelector('p')!.textContent)).toEqual([
+      'Rita’s menu',
+      'Bar Bombon menu',
+      'Goldie menu',
+      'Mama’s menu',
+      'Zevi’s menu',
+    ])
+  })
+
+  it('keeps a newsletter sender in view after it’s linked, even in a closed group', async () => {
+    const linked = ['a', 'b', 'c', 'd', 'e'].map((x) => watch({ id: x, url: `mailto:${x}@shul.org`, resourceId: 'shul-1', createdBy: 'shul newsletters' }))
+    const sender = watch({ id: 'n', url: 'mailto:info@lms.org', label: 'New sender', createdBy: 'shul newsletters', active: false, lastRunAt: null, lastOkAt: null })
+    await renderTab([...linked, sender], { post: { watch: { ...sender, resourceId: 'shul-1', active: true } } })
+    const group = screen.getByRole('region', { name: 'Shul newsletters' })
+    expect(within(group).getByRole('button', { name: /6.*1 to link.*Show all 6/ })).toBeInTheDocument()
+    const row = within(group).getByTestId('watch-row')
+    const user = userEvent.setup()
+    await user.type(within(row).getByLabelText('The shul it’s from'), 'Lower Merion Synagogue')
+    await user.click(within(row).getByRole('button', { name: 'Link' }))
+    expect(await within(row).findByTestId('newsletter-watch')).toBeInTheDocument()
+    expect(within(group).getAllByTestId('watch-row')).toEqual([row])
+    expect(within(group).queryByText(/to link/)).toBeNull()
+  })
 })
