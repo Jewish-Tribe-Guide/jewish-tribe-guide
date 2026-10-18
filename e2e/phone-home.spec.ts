@@ -136,6 +136,16 @@ test.describe('on a phone', () => {
     // Three to a row.
     const tops = await tiles.getByRole('listitem').evaluateAll((lis) => lis.slice(0, 3).map((li) => Math.round(li.getBoundingClientRect().top)))
     if (tops.length === 3) expect(new Set(tops).size).toBe(1)
+    // Most places first, as the computer's grid (the user, Oct 17); a tile
+    // with no count (a form, a page) after every one with a count.
+    await expect(tiles.getByRole('listitem').first()).toContainText(/\d/)
+    const counts = await tiles.getByRole('listitem').evaluateAll((lis) =>
+      lis.map((li) => {
+        const last = (li as HTMLElement).innerText.trim().split('\n').at(-1) ?? ''
+        return /^\d+$/.test(last.trim()) ? Number(last) : -1
+      }),
+    )
+    expect(counts).toEqual([...counts].sort((a, b) => b - a))
   })
 
   // One search box on a phone (Oct 17): the home's had stayed the old pill

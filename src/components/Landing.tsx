@@ -378,8 +378,8 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
   const builtInOrder = today ? allBuiltIns.filter((b) => b.kind === 'listings' || b.kind === 'subscribe') : allBuiltIns
 
   // The phone's home under the search (the user, Oct 17): Right now (what's
-  // open, or Shabbos), then every category as a tile. Both in the admin's
-  // order. While something is typed, where it could go shows under the box
+  // open, or Shabbos), then every category as a tile, most places first
+  // (CategoryTiles). Right now in the admin's order. While something is typed, where it could go shows under the box
   // (HeroHeading's searchPanel): Right now steps aside and the tiles dim.
   // Then any category without a card of its own id (the Eruv page's card
   // has its page's), so the candles card still finds the eruv.

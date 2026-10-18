@@ -6,13 +6,24 @@ import type { CategoryConfig } from '@/lib/categories'
 import { getCategoryColor } from '@/lib/categoryColor'
 import CategoryIcon from '@/components/CategoryIcon'
 import { BrowseFoot, useBrowseCards } from './BrowseAll'
+import type { CardDef } from './sections'
+
+/** Most places first. A card that counts nothing (a form, a page) after
+ *  those that do, and ties, in the admin's order. Until the places load,
+ *  the admin's order as it is. */
+export function mostListedFirst(cards: readonly CardDef[], counts: Record<string, number> | null): CardDef[] {
+  if (!counts) return [...cards]
+  const n = (card: CardDef) => (card.count && card.id ? (counts[card.id] ?? 0) : -1)
+  return [...cards].sort((a, b) => n(b) - n(a))
+}
 
 // ── The phone home's categories, as tiles (the user, Oct 17) ────────────────
 // The list read as dull: every row alike, three screens of it. Tiles, each
 // in its own colour: the site's line glyph on its tint, its name, how many
-// places. Not the old photo tiles (stock photos, one download each). In the
-// admin's order, with no group headings: tried under them, a group of one
-// or two left tiles alone in a row (the user, on a phone: back to without).
+// places. Not the old photo tiles (stock photos, one download each). Most
+// places first, as the computer's grid (the user, Oct 17), with no group
+// headings: tried under them, a group of one or two left tiles alone in a
+// row (the user, on a phone: back to without).
 // Every category is a tile, since this is where a phone browses: no "Also:"
 // line of the ones that didn't fit.
 
@@ -27,7 +38,7 @@ export default function CategoryTiles({ communitySlug, listings }: { communitySl
       </div>
     )
   }
-  const cards = sections.flatMap((s) => s.cards)
+  const cards = mostListedFirst(sections.flatMap((s) => s.cards), counts)
   return (
     <div data-testid="category-tiles">
       <ul className="grid grid-cols-3 gap-2">
