@@ -137,6 +137,11 @@ export type ResourceRow = {
 /** An outside source's name and the date it gave a listing. */
 export type ConfirmedFrom = { from: string; at: string }
 
+/** Which kind of person dated a listing, and the date: a visitor's "Yes"
+ *  ('visitor'), or a visitor's edit an admin approved ('edit'). An admin's
+ *  own stamp carries none and says plain "Confirmed". */
+export type ConfirmedBy = { by: 'visitor' | 'edit'; at: string }
+
 export type DirectoryResource = {
   id: string
   category: string
@@ -184,6 +189,12 @@ export type DirectoryResource = {
    *  confirmedAt it dated, so once a person confirms again (a new date) the
    *  line says "Confirmed" again. Set only by approval (submissionStore). */
   confirmedFrom?: ConfirmedFrom
+  /** Who `confirmedAt` came from, when a community member gave it: "Confirmed
+   *  by a community member" (a visitor's tap, confirm_resource, migration
+   *  083) or "Updated by a community member" (a visitor's approved edit).
+   *  `at` is the confirmedAt it dated, as with confirmedFrom, so a later
+   *  admin stamp says "Confirmed" again. */
+  confirmedBy?: ConfirmedBy
   /** 'OPERATIONAL'' | 'CLOSED_TEMPORARILY' | 'CLOSED_PERMANENTLY' from Google. */
   businessStatus?: 'OPERATIONAL' | 'CLOSED_TEMPORARILY' | 'CLOSED_PERMANENTLY'
   /** An admin's correction, which wins over `businessStatus` everywhere the

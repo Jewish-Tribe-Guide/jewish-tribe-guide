@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { markTimes, submissionSource, timesIn } from './submissionSource'
+import { isCommunityEdit, markTimes, submissionSource, timesIn } from './submissionSource'
 import { KEYSTONE_WATCH_NAME } from './keystoneWatch'
 import { GOOGLE_SUBMITTER_NAME } from './activity'
 
@@ -65,6 +65,29 @@ describe('submissionSource', () => {
     expect(submissionSource(sub('x', undefined, { source: stated }))).toEqual({ readBy: 'ai', from: 'their newsletter', original: 'Mincha 6:20pm' })
     expect(submissionSource(sub('x', undefined, { source: { readBy: 'robot', from: 'y' } }))).toMatchObject({ readBy: 'person' })
     expect(submissionSource(sub('x', undefined, { source: 'ai' }))).toMatchObject({ readBy: 'person' })
+  })
+})
+
+// Oct 17: approving a visitor's edit dates the listing "Updated by a
+// community member"; an outside source's or an admin's own doesn't.
+describe('isCommunityEdit', () => {
+  const sub = (submitted_by: { name?: string; email?: string } | null, payload: Record<string, unknown> = {}, note: string | null = null) => ({ note, submitted_by, payload })
+
+  it('a visitor’s own change, typed or read by AI from what they sent', () => {
+    expect(isCommunityEdit(sub(null), 'admin@example.org')).toBe(true)
+    expect(isCommunityEdit(sub({ name: 'Dana', email: 'dana@example.org' }), 'admin@example.org')).toBe(true)
+    expect(isCommunityEdit(sub(null, {}, 'Times\n\nRead from what they pasted:\nShacharis 7'), 'admin@example.org')).toBe(true)
+    expect(isCommunityEdit(sub(null, { source: { readBy: 'ai', from: 'their photo' } }))).toBe(true)
+  })
+
+  it('not an outside source’s, named or not', () => {
+    expect(isCommunityEdit(sub({ name: KEYSTONE_WATCH_NAME }))).toBe(false)
+    expect(isCommunityEdit(sub({ name: GOOGLE_SUBMITTER_NAME }))).toBe(false)
+    expect(isCommunityEdit(sub(null, { source: { readBy: 'automatic', from: 'Refuah', named: 'Refuah' } }))).toBe(false)
+  })
+
+  it('not an admin’s own, filed under the approving admin’s email', () => {
+    expect(isCommunityEdit(sub({ name: 'Admin@Example.org', email: 'Admin@Example.org' }), 'admin@example.org')).toBe(false)
   })
 })
 

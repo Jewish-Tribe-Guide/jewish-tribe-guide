@@ -299,7 +299,7 @@ describe('ListingView — about', () => {
     try {
       view({ item: { ...judah, confirmedAt: '2026-03-01T15:00:00Z', sectionConfirmed: { googleDescription: '2026-09-29T15:00:00Z' } } })
       const foot = within(screen.getByTestId('listing-about')).getByTestId('freshness')
-      expect(foot).toHaveTextContent(/^Confirmed Sep 29Edit$/)
+      expect(foot).toHaveTextContent(/^Confirmed by a community member, Sep 29Edit$/)
       cleanup()
       view({ item: { ...judah, confirmedAt: '2026-03-01T15:00:00Z' } })
       expect(within(screen.getByTestId('listing-about')).getByTestId('freshness')).toHaveTextContent(/^Confirmed Mar 1 · Still right\?YesEdit$/)
@@ -455,7 +455,7 @@ describe('ListingView — how sure', () => {
     const [women, men, keilim] = [...screen.getByTestId('listing-groups').querySelectorAll('section')]
     // Old (over 90 days): asked, Yes or Edit. Recent: just the date and Edit.
     expect(within(women).getByTestId('freshness')).toHaveTextContent(/^Confirmed Sep 2 · Still right\?YesEdit$/)
-    expect(within(men).getByTestId('freshness')).toHaveTextContent(/^Confirmed Oct 1Edit$/)
+    expect(within(men).getByTestId('freshness')).toHaveTextContent(/^Confirmed by a community member, Oct 1Edit$/)
     // A section with notes and no hours still has its Edit: hours can be added.
     expect(within(keilim).getByRole('button', { name: 'Edit' })).toBeInTheDocument()
 
@@ -511,7 +511,7 @@ describe('ListingView — how sure', () => {
     try {
       view({ item, category: makeCategory({ detailFields: [website] }) })
       contact = screen.getByTestId('listing-details')
-      expect(within(contact).getByTestId('freshness')).toHaveTextContent(/^Confirmed Aug 5 · Still right\?YesEdit$/)
+      expect(within(contact).getByTestId('freshness')).toHaveTextContent(/^Confirmed by a community member, Aug 5 · Still right\?YesEdit$/)
       // One Edit, in the dated line, not a second one beside it.
       expect(within(contact).getAllByRole('button', { name: 'Edit' })).toHaveLength(1)
     } finally {

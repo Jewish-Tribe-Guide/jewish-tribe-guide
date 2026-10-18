@@ -11,7 +11,7 @@ import { recordActivity } from './activityStore'
 import { newListingFacts, visitorChanges, type ChangePart } from './changeParts'
 import { normalizeRow, validateSubmission } from './resourceStore'
 import { withReviewEdits } from './reviewEdits'
-import { submissionSource } from './submissionSource'
+import { isCommunityEdit, submissionSource } from './submissionSource'
 import { listEruvimForAdmin, updateEruv } from './eruvStore'
 import type { EruvSuggestion } from './eruvSuggestion'
 import type {
@@ -398,7 +398,7 @@ export async function approveSubmission(id: string, community?: string, reviewed
   let newItems: { fieldKey: string; item: string }[] = []
   let changes: ChangePart[] | undefined
   if (submission.target_type === 'listing') {
-    ;({ id: affectedResourceId, newItems, changes } = await applyListing(submission))
+    ;({ id: affectedResourceId, newItems, changes } = await applyListing(submission, reviewedBy))
   } else if (submission.target_type === 'category') {
     await applyCategory(submission)
   } else if (submission.target_type === 'eruv' && submission.operation === 'update') {
@@ -796,13 +796,17 @@ function withResolvedGoogleFields(
  * Applied to a create and an edit only: an approved removal archives the
  * listing and says nothing about its details being current.
  */
-function withConfirmedNow(details: Record<string, unknown>, now: string, named?: string): Record<string, unknown> {
+function withConfirmedNow(details: Record<string, unknown>, now: string, named?: string, community?: boolean): Record<string, unknown> {
   // An outside source by name (submissionSource's `named`) dates it "From
-  // Keystone-K's list, Oct 12"; anything else, "Confirmed Oct 12". Always
-  // set or cleared here, so an older source never outlives the date it gave.
+  // Keystone-K's list, Oct 12"; a visitor's own edit, "Updated by a
+  // community member, Oct 12" (isCommunityEdit); anything else, "Confirmed
+  // Oct 12". Always set or cleared here, so an older source or person never
+  // outlives the date they gave.
   const next: Record<string, unknown> = { ...details, confirmedAt: now }
+  delete next.confirmedFrom
+  delete next.confirmedBy
   if (named) next.confirmedFrom = { from: named, at: now }
-  else delete next.confirmedFrom
+  else if (community) next.confirmedBy = { by: 'edit', at: now }
   return next
 }
 
@@ -882,17 +886,18 @@ function menuOf(payload: unknown): { url: string | null } | null {
 
 type AppliedListing = { id: string | null; newItems: { fieldKey: string; item: string }[]; changes?: ChangePart[] }
 
-async function applyListing(submission: SubmissionRow): Promise<AppliedListing> {
+async function applyListing(submission: SubmissionRow, reviewedBy?: string): Promise<AppliedListing> {
   const supabase = getAdminClient()
   const now = new Date().toISOString()
   const named = submissionSource(submission).named
+  const community = isCommunityEdit(submission, reviewedBy)
 
   if (submission.operation === 'create') {
     const payload = submission.payload as unknown as ResourceSubmission
     payload.details = withResolvedPlaceId(payload.details, payload)
     const googleFields = await resolveGoogleFields(submission.community_id, payload, null)
     payload.details = withResolvedGoogleFields(payload.details, googleFields)
-    payload.details = withConfirmedNow(payload.details, now, named)
+    payload.details = withConfirmedNow(payload.details, now, named, community)
     const dated = await withItemDates(submission.community_id, payload.details, payload.category, null, now)
     payload.details = dated.details
     const { data: created, error } = await supabase
@@ -933,7 +938,7 @@ async function applyListing(submission: SubmissionRow): Promise<AppliedListing> 
     payload.details = withResolvedGoogleFields(payload.details, googleFields)
     payload.details = withPreservedInternals(payload.details, existingData as ResourceRow | null)
     payload.details = withClearedSyncOnNewPlaceId(payload.details, existingData as ResourceRow | null)
-    payload.details = withConfirmedNow(payload.details, now, named)
+    payload.details = withConfirmedNow(payload.details, now, named, community)
     const dated = await withItemDates(
       submission.community_id,
       payload.details,

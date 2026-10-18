@@ -86,6 +86,39 @@ describe('FreshnessFooter', () => {
     expect(screen.getByTestId('freshness')).toHaveTextContent('From Keystone-K’s list, Oct 12')
   })
 
+  // Oct 17 (the user): a visitor's Yes says "Confirmed by a community
+  // member", their approved edit "Updated by a community member", and an
+  // admin's stamp (no confirmedBy, or one from an older date) "Confirmed".
+  it('says a community member confirmed or updated it, only for the date they gave', () => {
+    vi.useFakeTimers({ now: new Date('2026-10-17T12:00:00.000Z') })
+    const at = '2026-10-12T12:00:00.000Z'
+    const visitor = { by: 'visitor' as const, at }
+    const edit = { by: 'edit' as const, at }
+    const line = () => screen.getByTestId('freshness').textContent
+    render(<FreshnessFooter resourceId="r1" confirmedAt={at} by={visitor} />)
+    expect(line()).toBe('Confirmed by a community member, Oct 12.')
+    cleanup()
+    render(<FreshnessFooter resourceId="r1" confirmedAt={at} by={edit} />)
+    expect(line()).toBe('Updated by a community member, Oct 12.')
+    cleanup()
+    render(<FreshnessFooter resourceId="r1" confirmedAt={at} by={visitor} onEdit={() => {}} />)
+    expect(line()).toContain('Confirmed by a community member, Oct 12')
+    cleanup()
+    render(<FreshnessFooter resourceId="r1" confirmedAt={at} by={edit} subject="Times" />)
+    expect(line()).toBe('Times updated by a community member, Oct 12.')
+    cleanup()
+    render(<FreshnessFooter resourceId="r1" confirmedAt={at} by={visitor} subject="Kosher details" ask={false} />)
+    expect(line()).toBe('Kosher details last checked by a community member, Oct 12.')
+    cleanup()
+    // A later date isn't theirs: an admin's stamp.
+    render(<FreshnessFooter resourceId="r1" confirmedAt="2026-10-14T12:00:00.000Z" by={visitor} />)
+    expect(line()).toBe('Confirmed Oct 14.')
+    cleanup()
+    // An outside source that gave the same date is named instead.
+    render(<FreshnessFooter resourceId="r1" confirmedAt={at} by={edit} source={{ from: 'Refuah', at }} />)
+    expect(line()).toBe('From Refuah, Oct 12.')
+  })
+
   it('once someone confirms it, the source is no longer said: the date is theirs', async () => {
     vi.useFakeTimers({ now: new Date('2026-10-17T12:00:00.000Z'), toFake: ['Date'] })
     mockFetch({ ok: true, confirmedAt: '2026-10-17T12:00:00.000Z', changed: true, activityId: 1 })

@@ -60,23 +60,26 @@ for that exact change, in the same conversation. Show the dry run first.
 
 ## For the user or the community
 
-3. **Seven live places still have no date, on purpose.** On Oct 17 (the
-   user's yes) every other approved live listing with no confirmation was
-   stamped confirmed (80 of them, `confirmedAt` 2026-10-18T00:00Z, backup in
-   that session's scratchpad), so they show "Confirmed Oct 17" and are asked
-   "Still right?" after 90 days. Held back because something is known to be
-   wrong: Shtetl, The Brazilian BBQ and Rita's at Roosevelt Mall (off
-   Keystone-K's list), New York Bagel Bakery and Rita's at 1709 Grant Ave
-   and 2124 South St (Google: closed temporarily), Sababa Falafel (bad place
-   id). Fix or remove each; until all are dated the trust line keeps "if
-   and when".
+3. **Every live place has a date** (checked Oct 17, 11 PM: 155 of 155).
+   80 were stamped confirmed on Oct 17 with the user's yes (`confirmedAt`
+   2026-10-18T00:00Z, backup in that session's scratchpad); the last
+   undated one, The Brazillian BBQ (spelled so on live, off Keystone-K's
+   list), was confirmed by someone that evening. The trust line now says
+   "every listing dated" once the live cache refreshes (any admin save).
+   Shtetl, Rita's, New York Bagel Bakery and Sababa Falafel are dated by
+   Google's sync but still have the problems that held them back (off
+   Keystone-K's list, closed temporarily, bad place id): fix or remove each.
 
 ## Getting the branch live
 
 4. **Merged Oct 17.** The live Keystone-K watch's first run (07:00 UTC
    daily) will file about 34 suggestions at once and email the admins one
    digest. The test project's daily watch run is on `main` now too.
-5. **Check 077 and 082 on the live database, now that the code is live.**
+5. **Run migration 083 (`confirmed_by_visitor`) in the SQL editor, test
+   project then live.** It makes a visitor's Yes on a whole listing say
+   "Confirmed by a community member". Safe in either order with the
+   deploy: until it runs, that Yes says plain "Confirmed" as before.
+   **Check 077 and 082 on the live database, now that the code is live.**
    Tables and columns through 081 are there. 077 (eruv suggestions, a
    database rule) and 082 (confirming a contact box, a database function)
    can't be seen through the API: without them a public eruv suggestion
@@ -97,6 +100,15 @@ for that exact change, in the same conversation. Show the dry run first.
 7. The "+" button covers part of the third tile in a row on the phone home.
 
 ## Done Oct 17
+
+- **The date line says when a community member gave it** (the user, Oct
+  17). A visitor's Yes: "Confirmed by a community member, Oct 17" (a box's
+  own date is always one; the whole listing's needs migration 083). A
+  visitor's approved edit, typed or read by AI from what they sent:
+  "Updated by a community member, Oct 17" (`details.confirmedBy`). An
+  admin's own stamp or direct add, and Google's changes: "Confirmed".
+  Keystone-K's list and Refuah keep "From …". Dates given before this
+  still say "Confirmed": past taps can't be told from admin stamps.
 
 - **A food place's menu link can be suggested.** Edit listing → Main dishes
   has a "Menu link" box (food places only; a grocery's items have none). The

@@ -92,6 +92,18 @@ export function submissionSource(s: SourceInput): SubmissionSource {
   return { readBy: 'person', from: 'a visitor', ...(note ? { note } : {}) }
 }
 
+/** Whether approving this makes the listing "Updated by a community member":
+ *  a visitor's own change, however it was read (their words, or what they
+ *  pasted or photographed, read by AI). Not an outside source's, named or
+ *  not (Keystone-K's list, Refuah, Google), and not an admin's own, filed
+ *  under the email of the admin approving it (the console's direct add). */
+export function isCommunityEdit(s: SourceInput, reviewedBy?: string): boolean {
+  const source = submissionSource(s)
+  if (source.named || source.readBy === 'automatic') return false
+  const email = s.submitted_by?.email?.trim().toLowerCase()
+  return !(email && reviewedBy && email === reviewedBy.trim().toLowerCase())
+}
+
 // ── Times in the original ──────────────────────────────────────────────────
 // The one omission check kept from the Oct 4 designs: every clock time in
 // the original is marked used (it's somewhere in the proposed listing) or

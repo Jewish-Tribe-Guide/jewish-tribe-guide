@@ -232,7 +232,7 @@ describe('This Shabbos', () => {
     vi.setSystemTime(new Date('2026-10-15T15:00:00Z'))
     open({ ...hup, confirmedAt: '2026-03-01T15:00:00Z', sectionConfirmed: { eruv: '2026-09-29T15:00:00Z' } } as DirectoryResource)
     const foot = within(screen.getByTestId('listing-shabbos')).getByTestId('freshness')
-    expect(foot).toHaveTextContent(/^Confirmed Sep 29Edit$/)
+    expect(foot).toHaveTextContent(/^Confirmed by a community member, Sep 29Edit$/)
     cleanup()
     open({ ...hup, confirmedAt: '2026-03-01T15:00:00Z' } as DirectoryResource)
     const card = screen.getByTestId('listing-shabbos')

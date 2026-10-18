@@ -268,6 +268,22 @@ describe('submissionStore (integration)', () => {
     await approveSubmission(personSub.id)
     const { data: afterPerson } = await getAdminClient().from('resource').select('details').eq('id', created!.id).single()
     expect(afterPerson!.details.confirmedFrom).toBeUndefined()
+    // A visitor's change: "Updated by a community member" (Oct 17).
+    expect(afterPerson!.details.confirmedBy).toEqual({ by: 'edit', at: afterPerson!.details.confirmedAt })
+
+    // The source's own approval carried none: "From Refuah", not a person.
+    expect(afterRefuah!.details.confirmedBy).toBeUndefined()
+
+    // An admin's own change, filed under the email of the admin approving it
+    // (the console's direct add): plain "Confirmed".
+    const admin = 'integration-admin@example.org'
+    const byAdmin = { ...listingPayload(category.id, name), phone: '555-0103' }
+    const adminSub = await submitListingUpdate('philly', created!.id, byAdmin, null, { name: admin, email: admin })
+    pendingSubmissionIds.push(adminSub.id)
+    await approveSubmission(adminSub.id, undefined, admin)
+    const { data: afterAdmin } = await getAdminClient().from('resource').select('details').eq('id', created!.id).single()
+    expect(afterAdmin!.details.confirmedBy).toBeUndefined()
+    expect(afterAdmin!.details.confirmedFrom).toBeUndefined()
   })
 
   it('archiving a listing (approved removal) does not stamp it confirmed', async () => {
