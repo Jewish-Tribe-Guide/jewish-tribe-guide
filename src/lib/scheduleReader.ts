@@ -220,14 +220,21 @@ export function asRegularTime(tefillah: Tefillah, time: string): { time: string;
 }
 
 /** The days the AI is told about: each date ahead, its weekday and what
- *  it's called ("Parashat Bereshit"), so "Shabbos Bereishis" is a date. */
-export type ReadingDays = { today: string; days: { date: string; names: string[] }[] }
+ *  it's called ("Parashat Bereshit"), so "Shabbos Bereishis" is a date.
+ *  `sentOn`, for a message sent before today (a newsletter read days
+ *  later): its "this Shabbos" is the one after it was sent, so the days
+ *  start there, and a time on a day already past is left out. */
+export type ReadingDays = { today: string; sentOn?: string; days: { date: string; names: string[] }[] }
 
-export function regularMessages(source: ScheduleSource, { today, days }: ReadingDays, shulName: string): unknown[] {
+export function regularMessages(source: ScheduleSource, { today, sentOn, days }: ReadingDays, shulName: string): unknown[] {
   const list = days.map((d) => `${d.date} (${dateText(d.date, { weekday: true })})${d.names.length ? `: ${d.names.join(', ')}` : ''}`).join('\n')
+  const sent =
+    sentOn && sentOn < today
+      ? `Today is ${today}, but the message was sent on ${sentOn} (${dateText(sentOn, { weekday: true })}): read "this Shabbos", "this week" and "tomorrow" from the day it was sent. The days from then:`
+      : `Today is ${today}. The days ahead:`
   const system = `You read a synagogue's prayer times from a message it sent, and list them exactly as given.
 
-Today is ${today}. The days ahead:
+${sent}
 ${list}
 
 First, what the message is:
@@ -282,7 +289,9 @@ const str = (v: unknown, max: number) => (typeof v === 'string' && v.trim() ? v.
  */
 export function tidyRegularReading(raw: unknown, source: ScheduleSource, { today, days }: ReadingDays, newId: () => string): RegularReading {
   const body = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {}
-  const ahead = new Set(days.map((d) => d.date))
+  // Days before today are there only to place an old message's "this
+  // Shabbos": a time on one is past.
+  const ahead = new Set(days.filter((d) => d.date >= today).map((d) => d.date))
   const yearOn = new Date(Date.parse(`${today}T12:00:00Z`) + 366 * 86_400_000).toISOString().slice(0, 10)
   const text = 'text' in source ? ` ${plain(source.text)} ` : null
   const times: ReadRegularTime[] = []
