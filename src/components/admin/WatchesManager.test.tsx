@@ -88,6 +88,12 @@ describe('WatchesManager', () => {
     expect(screen.queryByText(/worth a look/)).toBeNull()
   })
 
+  it('says Mekor Habracha’s list is compared with the guide, IKC above all, and what it filed', async () => {
+    await renderTab([watch({ url: 'https://www.mekorhabracha.org/center-city', label: 'Mekor Habracha’s list', lastFiled: 18, pageHash: null })])
+    expect(screen.getByTestId('mekor-watch')).toHaveTextContent(/Compared with the guide every morning.*IKC above all.*Last read: 18 suggestions\./)
+    expect(screen.queryByText(/Checked every morning for a change/)).toBeNull()
+  })
+
   // Oct 17: a food place's menu watch, made by the daily run, says what it
   // does and how to stop it (taking it off only brings it back tomorrow).
   it('says a menu watch is the run’s own, that the AI reads only a change, and to pause it to stop it', async () => {

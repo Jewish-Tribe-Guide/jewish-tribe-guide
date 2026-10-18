@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { isCommunityEdit, markTimes, submissionSource, timesIn } from './submissionSource'
 import { KEYSTONE_WATCH_NAME } from './keystoneWatch'
+import { MEKOR_WATCH_NAME } from './mekorWatch'
 import { GOOGLE_SUBMITTER_NAME } from './activity'
 
 const sub = (note: string | null, name?: string, payload: Record<string, unknown> = {}) => ({
@@ -43,6 +44,12 @@ describe('submissionSource', () => {
       original: 'Keystone-K’s list says: "Mama’s"',
     })
     expect(submissionSource(sub('Closed on Google', GOOGLE_SUBMITTER_NAME))).toMatchObject({ readBy: 'automatic', from: 'Google' })
+    expect(submissionSource(sub('Mekor Habracha’s kosher list says: "Joy Cafe"', MEKOR_WATCH_NAME))).toEqual({
+      readBy: 'automatic',
+      from: 'Mekor Habracha’s list',
+      named: 'Mekor Habracha',
+      original: 'Mekor Habracha’s kosher list says: "Joy Cafe"',
+    })
   })
 
   // Approved, a named source dates the listing: "Confirmed by Keystone-K,
