@@ -170,6 +170,39 @@ describe('FreshnessFooter', () => {
     })
   })
 
+  // The listing on screen came with the page, before the Yes: closing it and
+  // opening it again used to ask "Still right?" all over again (the user,
+  // Oct 18).
+  it('stays confirmed when the box is opened again from the page’s older copy', async () => {
+    const now = new Date().toISOString()
+    mockFetch({ ok: true, confirmedAt: now, changed: true, activityId: 7 }, { ok: true, confirmedAt: '2026-01-05T12:00:00.000Z', changed: true })
+    const box = (resourceId = 'r1') => <FreshnessFooter resourceId={resourceId} confirmedAt="2026-01-05T12:00:00.000Z" section="womenTevillah" onEdit={() => {}} />
+    const first = render(box())
+    fireEvent.click(screen.getByRole('button', { name: 'Yes' }))
+    await screen.findByText(/Confirmed\. Thanks!/)
+    first.unmount()
+
+    const again = render(box())
+    expect(screen.getByTestId('freshness')).not.toHaveTextContent('Still right?')
+    expect(screen.queryByRole('button', { name: 'Yes' })).toBeNull()
+    again.unmount()
+    // Only that box of that listing: another's still asks.
+    render(box('r2'))
+    expect(screen.getByTestId('freshness')).toHaveTextContent('Still right?')
+  })
+
+  it('a box opened again after an undo is back to the date it had', async () => {
+    mockFetch({ ok: true, confirmedAt: new Date().toISOString(), changed: true, activityId: 7 }, { ok: true, confirmedAt: '2026-01-05T12:00:00.000Z', changed: true })
+    const box = () => <FreshnessFooter resourceId="r1" confirmedAt="2026-01-05T12:00:00.000Z" />
+    const first = render(box())
+    fireEvent.click(screen.getByRole('button', { name: 'Yes' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Undo' }))
+    await screen.findByText(/Still right\?/)
+    first.unmount()
+    render(box())
+    expect(screen.getByTestId('freshness')).toHaveTextContent('Confirmed Jan 5')
+  })
+
   // Inside the server's cooldown nothing changed, so there's nothing of this
   // browser's to undo, and "Undo" would restore a stamp it never set.
   it('offers no Undo when the tap changed nothing (someone confirmed minutes ago)', async () => {

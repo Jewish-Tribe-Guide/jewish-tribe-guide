@@ -4,7 +4,8 @@
 import '@testing-library/jest-dom/vitest'
 import { installMockGeolocation } from './src/test/geolocationMock'
 import { installMockIntersectionObserver } from './src/test/intersectionObserverMock'
-import { beforeAll, vi } from 'vitest'
+import { afterEach, beforeAll, vi } from 'vitest'
+import { forgetConfirmed } from './src/lib/confirmedHere'
 
 // next/dynamic loads a piece's code on first render, so a test would find it
 // missing for a moment. Here it loads with the file instead; see eagerDynamic.
@@ -13,6 +14,11 @@ beforeAll(async () => {
   const { dynamicLoaded } = await import('./src/test/eagerDynamic')
   await dynamicLoaded()
 })
+
+// What this tab confirmed (confirmedHere) is kept for the life of the page,
+// which in a test file is every test in it: one test's Yes would show the
+// next one's listing as confirmed.
+afterEach(() => forgetConfirmed())
 
 // jsdom 30's own window.localStorage isn't reliably wired up through
 // vitest's jsdom environment on this toolchain (Node 26 also defines its own
