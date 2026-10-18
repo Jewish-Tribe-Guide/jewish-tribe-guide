@@ -1008,7 +1008,7 @@ describe('Landing — example questions', () => {
     const store = makeListing({ id: 'c', category: 'grocery', name: 'Challah Shop', m: ['Challah'] })
     renderLanding(undefined, { content: { categories: [grocery] } }, [store])
     expect(screen.queryByRole('button', { name: 'Kosher wine' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Chalav yisroel milk' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Shabbos-friendly hotel' })).not.toBeInTheDocument()
   })
 })
 

@@ -7,6 +7,7 @@ import { useFetchOrPreview } from '@/lib/previewSend'
 import { EditButton, shortDate } from './listingParts'
 import { PencilIcon } from '@/components/icons'
 import { GOOGLE } from '@/lib/sourceNames'
+import { confirmedAtHere, recordConfirmed } from '@/lib/confirmedHere'
 import type { ConfirmedBy, ConfirmedFrom } from '@/types'
 
 
@@ -73,7 +74,8 @@ export default function FreshnessFooter(props: Props) {
 function FreshnessStatus({ resourceId, confirmedAt: initialConfirmedAt, lead, subject, ask = true, section, onEdit, source, by }: Props) {
   const now = useNow()
   const fetchOrPreview = useFetchOrPreview()
-  const [confirmedAt, setConfirmedAt] = useState(initialConfirmedAt)
+  // A Yes given here earlier this visit, if the page's copy predates it.
+  const [confirmedAt, setConfirmedAt] = useState(() => confirmedAtHere(resourceId, section, initialConfirmedAt))
   // What confirmedAt was right before the most recent confirm — lets a
   // misclick be undone back to the prior state instead of just cleared.
   const [previousConfirmedAt, setPreviousConfirmedAt] = useState<string | undefined>(undefined)
@@ -101,6 +103,7 @@ function FreshnessStatus({ resourceId, confirmedAt: initialConfirmedAt, lead, su
       if (json.ok && json.confirmedAt) {
         setPreviousConfirmedAt(confirmedAt)
         setConfirmedAt(json.confirmedAt)
+        recordConfirmed(resourceId, section, json.confirmedAt)
         setMine({ confirmedAt: json.confirmedAt, activityId: json.activityId ?? null, undoable: json.changed !== false })
         setJustConfirmedNow(true)
       } else {
@@ -129,6 +132,7 @@ function FreshnessStatus({ resourceId, confirmedAt: initialConfirmedAt, lead, su
       const json = (await res.json()) as { ok: boolean; confirmedAt?: string | null }
       if (json.ok) {
         setConfirmedAt(json.confirmedAt ?? undefined)
+        recordConfirmed(resourceId, section, json.confirmedAt ?? undefined)
         setMine(null)
         setJustConfirmedNow(false)
       } else {

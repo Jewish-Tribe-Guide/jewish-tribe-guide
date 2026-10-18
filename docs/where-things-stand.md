@@ -110,6 +110,35 @@ for that exact change, in the same conversation. Show the dry run first.
 
 7. The "+" button covers part of the third tile in a row on the phone home.
 
+## Done Oct 18 (on `redesign/oct18-fixes`, not merged)
+
+- **Coming back to the app no longer slows the next tap** (the user: taps
+  took seconds after switching apps, scrolling didn't). Coming back used to
+  re-render the whole page on the server every time, and a tap made while
+  that was out waited for it. Now the tab asks `/api/content-version`
+  first and re-renders only when something changed.
+- **A confirmed box stays confirmed** when the listing is closed and
+  opened again in the same tab (the page's own copy catches up later).
+- **Phone home:** no Hebrew date over Right now ("Right now · Sunday");
+  examples under the search box lead with everyday things and things
+  people wouldn't think to ask (Challah, Shabbos-friendly hotel, Young
+  professionals, Ice cream, Kosher wine); chalav yisroel milk is gone. A
+  search that lands on its places without a sentence counts as a good
+  example now, which is what let the hotel and young-professionals ones in.
+- **Trust sheet:** "Read again every day." without the eruv's Friday
+  rhythm, which stays on the Eruv page.
+- **Northeast and Elkins Park have their map lines on the live site**
+  (the user's yes, Oct 18: "not seeing two of the eruvs on the map").
+  They had been set up on the dev database only; their map links, lines,
+  approval, Northeast's colour and Elkins Park's left-out directions were
+  copied to live (backup in that session's scratchpad). The map reads them
+  through `/api/eruv/maps`, which the CDN keeps for an hour, so they show
+  within the hour with no admin save.
+- **Lower Merion:** Sunday to Thursday, last Friday's post shows as "Up
+  last Shabbos" in grey instead of an amber "Not posted yet this week"
+  (Friday and Shabbos are unchanged). A read that gets no answer is tried
+  once more straight away (live failed one on Oct 17, twice).
+
 ## Done Oct 17
 
 - **The hospitals' Refuah watches are on the live site** (Oct 18, with
@@ -178,7 +207,8 @@ for that exact change, in the same conversation. Show the dry run first.
   eruvim's status on it and Before candles; on Shabbos, the card with the
   eruvim. Never weekday minyanim.
 - **Trust sheet ("How this guide stays right"):** the idea in three lines,
-  each source named only once its check ran that week.
+  each source named only once its check ran that week. No reading
+  schedules beyond "every day" (Oct 18).
 - **Search box** on the phone home is the category pages' blue-edged box.
 - **Try asking keeps the minyan questions** (Oct 17). On a phone, up to six
   in one row that swipes sideways, running to the screen's edge so the last

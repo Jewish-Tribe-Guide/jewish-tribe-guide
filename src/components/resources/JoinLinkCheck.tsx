@@ -8,6 +8,7 @@ import { useFetchOrPreview } from '@/lib/previewSend'
 import TurnstileWidget from '@/components/TurnstileWidget'
 import { useTurnstileActive } from './useListingSubmit'
 import FreshnessFooter from './FreshnessFooter'
+import { recordConfirmed } from '@/lib/confirmedHere'
 
 // ── A group's join link: does it still work? ─────────────────────────────────
 // All a WhatsApp group's listing really holds is what it's for and the link,
@@ -50,7 +51,8 @@ export default function JoinLinkCheck({ item, joined }: { item: DirectoryResourc
     setPhase('confirming')
     try {
       const res = await fetchOrPreview(`/api/resource/${item.id}/confirm`, { method: 'POST' }, { confirmedAt: new Date().toISOString() })
-      const body = (await res.json().catch(() => ({}))) as { ok?: boolean }
+      const body = (await res.json().catch(() => ({}))) as { ok?: boolean; confirmedAt?: string }
+      if (res.ok && body.ok && body.confirmedAt) recordConfirmed(item.id, undefined, body.confirmedAt)
       setPhase(res.ok && body.ok ? 'thanks-yes' : 'failed')
     } catch {
       setPhase('failed')

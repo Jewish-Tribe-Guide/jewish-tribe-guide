@@ -8,8 +8,10 @@
 // Rules, agreed with the user on the canvas (page "eruv"):
 //   - The eruv's own "up", dated or not, is up, with the time the guide
 //     checked. An eruv that dates each week's post (statusDated: Lower
-//     Merion) is taken at its date: last week's "up" is "Not posted yet
-//     this week".
+//     Merion) is taken at its date: on Friday and Shabbos, last week's
+//     "up" is "Not posted yet this week". Sunday to Thursday it is "Up last
+//     Shabbos", in grey (the user, Oct 18: amber all week read as the guide
+//     failing to read it). Anything older is "Not posted yet this week".
 //   - A page that says both up and down, neither, or can't be read is never
 //     shown as up.
 //   - Down always shows as down.
@@ -182,7 +184,11 @@ export function eruvView(eruv: Eruv, now: Date, tz: string, candlesToday: number
   const checked = readLine(eruv.statusCheckedAt)
   if (eruv.status === 'down') return { tone: 'red', label: shabbosSide ? 'Down this Shabbos' : 'Down', checked }
   if (eruv.status !== 'up') return { tone: 'amber', label: 'Couldn’t read their status', checked }
-  if (eruv.statusDated && (!eruv.statusPostedOn || eruv.statusPostedOn < weekStart(date, weekday))) return { tone: 'amber', label: 'Not posted yet this week', checked }
+  if (eruv.statusDated && (!eruv.statusPostedOn || eruv.statusPostedOn < weekStart(date, weekday))) {
+    const lastWeek = !!eruv.statusPostedOn && eruv.statusPostedOn >= weekStart(date, weekday + 7)
+    if (lastWeek && !shabbosSide) return { tone: 'grey', label: 'Up last Shabbos', checked }
+    return { tone: 'amber', label: 'Not posted yet this week', checked }
+  }
   return { tone: 'green', label: shabbosSide ? 'Up for this Shabbos' : 'Up', checked }
 }
 

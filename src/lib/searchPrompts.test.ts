@@ -36,7 +36,27 @@ describe('candidatePrompts — questions for the moment', () => {
   })
 
   it('offers only questions whose answer doesn’t depend on the time, before it’s known', () => {
-    expect(candidatePrompts(null)).toEqual(['Chalav yisroel milk', 'Kosher wine', 'Shul near me'])
+    expect(candidatePrompts(null)).toEqual(['Challah', 'Shabbos-friendly hotel', 'Young professionals', 'Ice cream', 'Kosher wine'])
+  })
+
+  // The user, Oct 18: everyday things, from across the guide, ahead of the
+  // more particular ones.
+  it('leads with everyday things from across the guide, after the next minyan', () => {
+    expect(candidatePrompts({ day: 'tue', minutes: at(13) }).slice(0, 6)).toEqual([
+      'Next Mincha',
+      'Food open now',
+      'Challah',
+      'Shabbos-friendly hotel',
+      'Young professionals',
+      'Ice cream',
+    ])
+    expect(candidatePrompts({ day: 'tue', minutes: at(13) })).not.toContain('Chalav yisroel milk')
+  })
+
+  it('asks about challah once on a Friday morning', () => {
+    const friday = candidatePrompts({ day: 'fri', minutes: at(10) })
+    expect(friday).toContain('Where can I get challah?')
+    expect(friday).not.toContain('Challah')
   })
 })
 
@@ -50,9 +70,17 @@ describe('answersWell', () => {
     expect(answersWell({ text: 'No more Maariv today. First tomorrow: 7:15 PM, Mekor.' }, 3)).toBe(false)
   })
 
-  it('drops a question with no answer, or nothing found', () => {
-    expect(answersWell(null, 4)).toBe(false)
+  it('drops a search that found nothing', () => {
+    expect(answersWell(null, 0)).toBe(false)
     expect(answersWell({ text: 'ShopRite has Wine.' }, 0)).toBe(false)
+  })
+
+  // "Shabbos-friendly hotel" lands on Hotels with its 2 Shabbat-friendly
+  // places, and writes no sentence to do it; those were dropped, so the
+  // examples the user asked for (Oct 18: things people wouldn’t know they
+  // could search) never showed.
+  it('keeps a search that lands on its places without a sentence', () => {
+    expect(answersWell(null, 2)).toBe(true)
   })
 })
 

@@ -15,6 +15,7 @@ import { useFetchOrPreview } from '@/lib/previewSend'
 import { community as communityConfig } from '@/community.config'
 import { useTurnstileActive } from './useListingSubmit'
 import type { ItemMarksApi } from './useItemMarks'
+import { recordConfirmed } from '@/lib/confirmedHere'
 
 // ── One question card in a category page's list ─────────────────────────────
 // See questionCards.ts for what's asked, of which place, and in what words.
@@ -175,8 +176,9 @@ export default function QuestionCard({ category, shown = [], all = [], place = (
     setPhase({ kind: 'sending', value: true })
     try {
       const res = await fetchOrPreview(`/api/resource/${q.item.id}/confirm`, { method: 'POST' }, { confirmedAt: new Date().toISOString() })
-      const body = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string }
+      const body = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string; confirmedAt?: string }
       if (res.ok && body.ok) {
+        if (body.confirmedAt) recordConfirmed(q.item.id, undefined, body.confirmedAt)
         markAsked(q.item.id)
         setPhase({ kind: 'thanks', text: 'Thanks! It’s marked as current.' })
       } else {

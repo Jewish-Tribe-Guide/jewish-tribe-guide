@@ -108,6 +108,14 @@ describe('eruvView', () => {
     const lm = eruv({ statusDated: true, statusPostedOn: '2026-10-02' })
     expect(eruvView(lm, friday3pm, TZ, CANDLES)).toMatchObject({ tone: 'amber', label: 'Not posted yet this week' })
     expect(eruvView({ ...lm, statusPostedOn: '2026-10-09' }, friday3pm, TZ, CANDLES)).toMatchObject({ tone: 'green', label: 'Up for this Shabbos' })
+    // Sunday to Thursday, last week's post is what there is, not a lapse
+    // (the user, Oct 18: Lower Merion "keeps not reading status" was this,
+    // amber all week).
+    const sunday = at('2026-10-18T14:00:00Z')
+    expect(eruvView({ ...lm, statusPostedOn: '2026-10-16' }, sunday, TZ, null)).toMatchObject({ tone: 'grey', label: 'Up last Shabbos' })
+    expect(eruvView({ ...lm, statusPostedOn: '2026-10-16' }, at('2026-10-22T14:00:00Z'), TZ, null)).toMatchObject({ tone: 'grey', label: 'Up last Shabbos' })
+    // Older than last week, it is a lapse whatever the day.
+    expect(eruvView({ ...lm, statusPostedOn: '2026-10-09' }, sunday, TZ, null)).toMatchObject({ tone: 'amber', label: 'Not posted yet this week' })
     // Center City's "last updated" date is not a weekly post: it isn't dated.
     expect(eruvView(eruv({ statusPostedOn: '2026-08-28' }), friday3pm, TZ, CANDLES).tone).toBe('green')
   })
