@@ -120,84 +120,80 @@ The general rule, since this cost three separate investigations: **when a test
 "flakes" only in CI and the failure lands exactly on a round number, suspect a
 budget, not the system under test.**
 
-### …and `/about` had a second problem underneath it (closed — `test.fail()` marker removed)
+### …and `/about` had a second problem underneath it (root cause found 2026-10-17)
 
-Raising the budget did not make the `/about` test pass on its own. It still
-failed after that fix — `Timeout 60000ms exceeded`, every poll `HIT/old` —
-while never reproducing on demand: warm server 15/15 and 12/12 clean, cold
-build with the dist dir deleted 5/5 clean, the full suite 5/5 clean across
-both. It was also wrongly called CI-only here at one point, on the strength of
-several clean local runs, then reproduced locally within the hour with an
-identical signature. That correlation was noise. Don't trust a "CI-only"
-diagnosis on this test without a large number of local runs to back it.
+Raising the budget did not make the `/about` test pass on its own. It kept
+failing — `Timeout 60000ms exceeded`, every poll `HIT/old`, the row provably
+holding the new body — and for months never reproduced on demand (warm server
+15/15 and 12/12 clean, cold builds 5/5 clean). A `revalidatePath` per
+community was added as belt-and-braces, a 7/7 clean streak was read as the fix
+holding, and it came back on 2026-10-18 (CI run 39083904874, PR #324, a PR
+that touched no caching code).
 
-What the instrumentation established, which is the part worth keeping even
-though the root cause stayed elusive:
+**The cause is a race inside Next, not the tags.** Next stamps a route's
+cached page entry with the time it is *written* (`incremental-cache`'s
+`set()` records `lastModified: Date.now()`), and treats an entry as stale only
+if a tag was invalidated after that stamp. So a background regeneration that
+*starts* before an admin's save — reading the old row — and *finishes* after
+the save's `revalidateTag`/`revalidatePath` is stored as newer than the
+invalidation, and served as a fresh HIT for its whole `cacheLife` (days).
+`use cache` entries don't have this bug: they are stamped with their
+generation's start time. Still the same in Next 16.4.2 and the 16.5 canary.
 
-- **Every failing poll is HIT/old.** A healthy save reads `STALE/old →
-  HIT/new`. The failure never even reaches STALE — the page's cached entry is
-  never marked stale in the first place. That rules out stale-while-revalidate
-  (this file's diagnosis for months) and rules out the write: the stored row
-  is asserted to hold the new body, through the uncached admin route, before
-  the poll ever starts.
-- The symptom is precise even though the mechanism isn't: **this path's cache
-  entry was not invalidated.**
+Why the suite hit it only sometimes: the site-settings test's restore PATCH
+leaves `/philly/about` stale (the page carries `site-settings:philly` through
+its layout and metadata), so the `/about` test's first GET started a
+regeneration right before its PATCH — and whether that regeneration finished
+before or after the PATCH's invalidation was a coin toss on Supabase latency.
+Running the `/about` test alone never set the race up, which is why every
+"run it 15 times" attempt came back clean.
 
-The fix: the pages PATCH route now calls `revalidatePath(`/\${slug}`)` alongside
-its existing `revalidateTag(TAGS.pages, 'max')`. Tag-based invalidation is
-supposed to cover this on its own — that's the whole point of `cacheTag` — so
-this is belt-and-braces for a symptom that was observed, not a change made
-because the theory demanded it. `revalidatePath` marks the path's own entry
-directly, which is exactly the thing that was failing to be marked.
+Reproduced deterministically by a probe that does exactly that on purpose
+(make `/about` stale, GET it once, save straight away): **6 of 8 saves never
+appeared** on the old route, 0 of 5 with no regeneration in flight, and 0 of 12
+once the save lands 300ms or more after the regeneration starts (the in-flight
+window locally is under ~0.6s). Ruled out on the way: the build-time prerender (its
+stored entry carries `pages`, `_N_T_/philly/about` and
+`_N_T_/[community]/about/page`, so invalidation does reach it), and the
+`revalidatePath` "fix" (it hits the same race; it never helped).
 
-Since adding it: 7/7 real-suite runs clean (5 warm, 2 with a fresh cold
-build), where the failure used to surface within a handful of CI runs. That is
-evidence the fix helps, **not proof the underlying cause is understood** — the
-bug never reproduced on demand even before the fix, so a clean streak here
-is weaker evidence than it would be for a deterministic bug. If `/about`
-starts failing again with the same HIT/old signature, `revalidatePath` does
-not reach that entry either, and the next suspect is the build-time prerender
-specifically, not the tag mechanism in general.
+**The fix** (`src/lib/revalidateAfterInFlightRenders.ts`): after the pages
+PATCH's own invalidation, an `after()` callback waits
+`IN_FLIGHT_RENDER_GRACE_MS` (5s) and invalidates the route once more, which
+catches any regeneration that was mid-flight at the save. Two silent traps it
+steps around, worth knowing before touching it:
 
-Left running (not quarantined) rather than quarantined outright: while the
-fix was unproven, a conditional `test.fail(!!process.env.CI, …)` kept it as
-the only instrument that could tell us whether the fix actually held, without
-turning every local run red the way an unconditional marker would have.
+- **Next drops a revalidation repeated within one request.** `after()`
+  callbacks only execute revalidations whose tag+profile was not already
+  pending (`diffRevalidationState`), so calling the same
+  `revalidatePath('/philly/about')` or `revalidateTag(TAGS.pages, 'max')`
+  again in `after()` schedules a second pass that does nothing. The second
+  pass therefore uses the dynamic pattern, `revalidatePath('/[community]/about',
+  'page')` — a different tag (`_N_T_/[community]/about/page`) that every
+  community's copy carries.
+- It narrows the race to renders longer than 5s; it cannot close it from
+  outside Next.
 
-It has since come back an unexpected PASS in CI on top of the 7/7 runs
-above — Playwright's own signal, same as the two tests in the "Coverage that
-used to be missing" pattern below, that the marker is stale and needs to come
-off, not that anything is newly broken. The marker is gone; this is a plain
-`test()` now. If `/about` regresses again with the same HIT/old signature,
-that's a new investigation to reopen (see the build-time-prerender suspect
-above), not a reason to have kept the marker pre-emptively.
+The per-community `revalidatePath` stays, for a different, real reason:
+immediate expiry, so the admin's own next load is the new copy rather than
+one stale view (measured: `MISS/new` on the first poll with it).
 
-**It has regressed (2026-10-18), so that investigation is open again.** CI
-run 39083904874 (PR #324, commit `034a888d`) failed `test:cache-roundtrip`'s
-`/about` test with the identical signature: `Timeout 60000ms exceeded`, all
-62 polls `HIT/old`, the row asserted to hold the new body first. That PR
-touched no caching, routing or `/about` code (an eruv staleness rule, the
-phone home's tiles, docs), and nothing else wrote to the test project's
-`about` row in that window: the only overlapping job was the same run's
-`test:admin-write`, which owns `privacy`. So `revalidatePath` does not
-reliably reach that entry either. Don't re-run it until it goes green and
-call that a fix; the next suspect is the build-time prerender, as above.
+Proved by `e2e-cache`'s **"an admin save lands even when /about is
+mid-regeneration"**, which sets the race up three times per run and asserts
+STALE before each save so it can't silently stop testing it: red 3/3 against
+the old route (round 1 every time, `HIT/old` to the end), green with the fix.
+`pagesRevalidation.test.ts` asserts the second pass is present and uses the
+pattern; `revalidateAfterInFlightRenders.test.ts` checks its timing.
 
-Guarded structurally too, so this can't silently regress if someone
-"simplifies" the route later: `src/app/api/admin/pages/pagesRevalidation.
-test.ts` asserts both the tag and the path invalidation are present in the
-source, and that the path is derived from `PAGE_SLUGS` rather than
-hand-listed (so a third page can't get one and not the other).
-
-Whether this was ever hitting production is still genuinely unknown. Vercel
-serves `/about` as `x-vercel-cache: PRERENDER`, a different mechanism from
-`next start`'s in-process cache used here, so a CI/next-start-only artifact
-and a real "admin edits don't reliably appear" bug would look identical from
-this test alone. `revalidatePath` is the standard, recommended way to
-invalidate a specific route regardless of which caching layer is under it, so
-the fix is reasonable defense either way — but if someone reports that an
-About/Privacy edit didn't show up promptly on the live site, treat it as
-possibly the same bug, not a coincidence.
+**Every other admin save has the same exposure.** `revalidatePublicContent`
+and the stores' own `revalidateTag` calls invalidate the same way, so a
+regeneration in flight at, say, a listing approval can store a page without
+that listing for days — most plausibly when an admin approves several things
+in quick succession while the site is being browsed. Only the pages route has
+the second pass so far. Whether Vercel's own ISR cache stamps entries the same
+way is unknown (`/about` is served there as `x-vercel-cache: PRERENDER`), so
+if an admin edit is ever reported as not showing up on the live site, treat
+this as the first suspect.
 
 **A test that uses an existing row must put that row into a known state first, and restore it after.** Two of the write suites create their own fixture (a category, a form) and delete it again, so nothing an admin does can reach them. The suites that edit a singleton — the `page` rows, `site_settings` — have no such luxury and must borrow the real record, which makes them the ones that break. `e2e-admin-write/pages-editor.spec.ts` broke three times this way: on a page being retitled, on its body gaining headings (which changed which HTML element the editor's caret landed in), and on a locator that matched a newly-added toolbar. Read what you need from the row, overwrite it with something known, then restore it in `finally`. Never assume what a real page contains.
 
