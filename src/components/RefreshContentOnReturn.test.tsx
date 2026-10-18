@@ -31,70 +31,138 @@ function letThrottleExpire() {
   vi.setSystemTime(Date.now() + MIN_REFRESH_INTERVAL_MS + 1)
 }
 
+/** What /api/content-version answers: the server's current fingerprint. */
+let serverVersion = 'v1'
+const fetchMock = vi.fn(async (_url: string) => Response.json({ ok: true, version: serverVersion }))
+
+/** Lets the ask and its answer land: the component awaits both. */
+async function settle() {
+  for (let i = 0; i < 10; i++) await Promise.resolve()
+}
+
+const ON_SCREEN = 'v1'
+const show = () => render(<RefreshContentOnReturn community="philly" version={ON_SCREEN} />)
+
 beforeEach(() => {
   vi.useFakeTimers()
   resetMockRouter()
   setHidden(false)
+  serverVersion = 'v2'
+  fetchMock.mockClear()
+  vi.stubGlobal('fetch', fetchMock)
 })
 
 afterEach(() => {
   cleanup()
   vi.useRealTimers()
+  vi.unstubAllGlobals()
 })
 
 describe('RefreshContentOnReturn', () => {
-  it('refreshes when the window regains focus', () => {
-    render(<RefreshContentOnReturn />)
+  it('asks whether the content changed when the window regains focus, and refreshes when it did', async () => {
+    show()
     letThrottleExpire()
 
     window.dispatchEvent(new Event('focus'))
+    await settle()
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/content-version?community=philly', { cache: 'no-store' })
+    expect(mockRouter.refresh).toHaveBeenCalledTimes(1)
+  })
+
+  it('leaves the page alone when nothing changed, so a tap never waits on a refresh', async () => {
+    serverVersion = ON_SCREEN
+    show()
+    letThrottleExpire()
+
+    window.dispatchEvent(new Event('focus'))
+    document.dispatchEvent(new Event('visibilitychange'))
+    await settle()
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(mockRouter.refresh).not.toHaveBeenCalled()
+  })
+
+  it('leaves the page alone when there is no answer', async () => {
+    show()
+    letThrottleExpire()
+    fetchMock.mockRejectedValueOnce(new TypeError('Failed to fetch'))
+    window.dispatchEvent(new Event('focus'))
+    await settle()
+
+    letThrottleExpire()
+    fetchMock.mockResolvedValueOnce(Response.json({ ok: false }, { status: 502 }))
+    window.dispatchEvent(new Event('focus'))
+    await settle()
+
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(mockRouter.refresh).not.toHaveBeenCalled()
+  })
+
+  it('compares with what a refresh brought down, not what the tab first loaded', async () => {
+    const { rerender } = show()
+    letThrottleExpire()
+    window.dispatchEvent(new Event('focus'))
+    await settle()
+    expect(mockRouter.refresh).toHaveBeenCalledTimes(1)
+
+    // The refresh re-rendered the layout with the new fingerprint.
+    rerender(<RefreshContentOnReturn community="philly" version="v2" />)
+    letThrottleExpire()
+    window.dispatchEvent(new Event('focus'))
+    await settle()
 
     expect(mockRouter.refresh).toHaveBeenCalledTimes(1)
   })
 
-  it('refreshes when the tab becomes visible again', () => {
-    render(<RefreshContentOnReturn />)
+  it('asks when the tab becomes visible again', async () => {
+    show()
     letThrottleExpire()
 
     setHidden(false)
     document.dispatchEvent(new Event('visibilitychange'))
+    await settle()
 
     expect(mockRouter.refresh).toHaveBeenCalledTimes(1)
   })
 
-  it('refreshes when the network comes back', () => {
-    render(<RefreshContentOnReturn />)
+  it('asks when the network comes back', async () => {
+    show()
     letThrottleExpire()
 
     window.dispatchEvent(new Event('online'))
+    await settle()
 
     expect(mockRouter.refresh).toHaveBeenCalledTimes(1)
   })
 
-  it('does not refresh when the tab is being hidden', () => {
-    render(<RefreshContentOnReturn />)
+  it('does not ask when the tab is being hidden', async () => {
+    show()
     letThrottleExpire()
 
     setHidden(true)
     document.dispatchEvent(new Event('visibilitychange'))
+    await settle()
 
     // Nobody is looking at a hidden tab, so a request here renders for no one.
+    expect(fetchMock).not.toHaveBeenCalled()
     expect(mockRouter.refresh).not.toHaveBeenCalled()
   })
 
-  it('does not refresh immediately after mount', () => {
-    render(<RefreshContentOnReturn />)
+  it('does not ask immediately after mount', async () => {
+    show()
 
     // The content arrived with this render. A focus event landing straight
     // away — which desktop browsers do fire — must not spend a request
-    // re-fetching what just came.
+    // re-checking what just came.
     window.dispatchEvent(new Event('focus'))
+    await settle()
 
-    expect(mockRouter.refresh).not.toHaveBeenCalled()
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 
-  it('collapses a burst of triggers into one refresh', () => {
-    render(<RefreshContentOnReturn />)
+  it('collapses a burst of triggers into one ask', async () => {
+    show()
     letThrottleExpire()
 
     // Alt-tabbing between two windows, or a mobile connection flapping.
@@ -102,25 +170,28 @@ describe('RefreshContentOnReturn', () => {
     window.dispatchEvent(new Event('online'))
     document.dispatchEvent(new Event('visibilitychange'))
     window.dispatchEvent(new Event('focus'))
+    await settle()
 
-    expect(mockRouter.refresh).toHaveBeenCalledTimes(1)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
 
-    // ...and refreshes again once the window has genuinely passed.
+    // ...and asks again once the window has genuinely passed.
     letThrottleExpire()
     window.dispatchEvent(new Event('focus'))
+    await settle()
 
-    expect(mockRouter.refresh).toHaveBeenCalledTimes(2)
+    expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 
-  it('stops listening once unmounted', () => {
-    const { unmount } = render(<RefreshContentOnReturn />)
+  it('stops listening once unmounted', async () => {
+    const { unmount } = show()
     letThrottleExpire()
 
     unmount()
     window.dispatchEvent(new Event('focus'))
     window.dispatchEvent(new Event('online'))
     document.dispatchEvent(new Event('visibilitychange'))
+    await settle()
 
-    expect(mockRouter.refresh).not.toHaveBeenCalled()
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 })
