@@ -110,9 +110,11 @@ for that exact change, in the same conversation. Show the dry run first.
   truth for anything: "Checked with Google, Aug 28" (its own line, and an
   approved Google change). Plain "Confirmed" only on dates nothing records
   the giver of: the Oct 17 bulk stamp and the Aug 20 batch.
-  **Retroactive:** dev done (9). Live, waiting for a yes: 24 listings whose
-  date is an approved edit (the menus sent Oct 17–18) → "Confirmed by
-  community"; live has no Keystone-K or Google-dated approvals to relabel.
+  **Retroactive, done:** dev (9) and live (24, the user's yes Oct 18: the
+  listings whose date is an approved edit, the menus sent Oct 17–18;
+  backup in that session's scratchpad). Live has no Keystone-K or
+  Google-dated approvals to relabel. Live shows the new words once PR #324
+  is merged and deployed.
 
 - **A food place's menu link can be suggested.** Edit listing → Main dishes
   has a "Menu link" box (food places only; a grocery's items have none). The
