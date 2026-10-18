@@ -106,6 +106,35 @@ for that exact change, in the same conversation. Show the dry run first.
    `install`, then `readNewsletters` once. Link each sender on the Watches
    tab as it appears.
 
+6a. **Mekor Habracha's kosher list** (mekorhabracha.org/center-city,
+   78 places, "Last Updated 2026-10-12"; the user, Oct 18: stay in sync,
+   and flag a hechsher we show that they don't). Compared with the live
+   guide Oct 18, read-only:
+   - **Every IKC place we list is on Mekor as IKC except two.** Zevi's
+     Bakery: not on Mekor, but its own site says IKC. **Magical Sweet
+     Shop: we say IKC, Mekor says Keystone-K, Keystone-K's list doesn't
+     have it, its site says only "Certified Kosher".** Nothing records
+     where our IKC came from (there since at least July), and its
+     certificate link points at one of our own preview pages. Needs a
+     person to find out (call 856-309-1100, or ask Mekor).
+   - **On Mekor, not in the guide:** Cafe 613 at Temple Hillel, Shevy's
+     Babka Paradise (Chabad at Penn; Spring Garden St), Z Candy Bar,
+     Mike's Chicken (KCL, Lakewood delivery), La Chic N Sweet (Rabbi
+     Amiram Gabbai, no address), Cinnaholic (Cherry-K; Mekor's address is
+     Tasty Twisters'), Kosher Experience x2 (Cherry-K). Kosher Corner,
+     Penn's kosher dining and the Brodsky Center are already in the live
+     queue from Keystone-K's watch.
+   - **Archived here, still on Mekor:** Shtetl, Rita's Roosevelt Mall,
+     Nothing Bundt Cakes Springfield (none on Keystone-K's list now, so
+     likely Mekor is behind), and PLNT Burger Jenkintown, which Mekor
+     lists as IKC while ours said Keystone-K: may belong back, as IKC.
+   - **Smaller:** Nothing Bundt Cakes Cherry Hill and Marlton are
+     "Cherry-K" on Mekor, "Keystone-K" here (Keystone-K's list has both).
+     Mekor calls Lipkin's "Best Cake Kosher Bakery" (same address, phone
+     and Keystone-K page).
+   A daily Mekor watch, shaped like Keystone-K's, is proposed as its own
+   piece of work; its first run would file the above in the queue.
+
 ## Small open decisions
 
 7. The "+" button covers part of the third tile in a row on the phone home.
