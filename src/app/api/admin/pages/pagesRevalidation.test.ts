@@ -34,7 +34,7 @@ describe('saving a page invalidates the public route', () => {
     // The pattern, not routes[slug](c.slug) a second time: Next drops a
     // revalidation repeated within one request, so repeating the concrete
     // path would schedule a second pass that silently does nothing.
-    expect(ROUTE).toMatch(/revalidateRouteAfterInFlightRenders\(\s*routes\[slug\]\('\[community\]'\)\s*\)/)
+    expect(ROUTE).toMatch(/revalidateRouteAfterInFlightRenders\(\s*routes\[slug\]\('\[community\]'\),\s*'page'\s*\)/)
   })
 
   it('derives the path from the slug rather than listing routes by hand', () => {

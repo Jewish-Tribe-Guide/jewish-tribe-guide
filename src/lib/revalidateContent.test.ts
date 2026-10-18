@@ -1,5 +1,8 @@
+import { readdirSync, readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { allCommunityTags, TAGS } from './cacheTags'
+import { IN_FLIGHT_RENDER_GRACE_MS } from './inFlightRenderGrace'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // The other half of the caching guarantee.
@@ -15,12 +18,19 @@ import { allCommunityTags, TAGS } from './cacheTags'
 // ─────────────────────────────────────────────────────────────────────────────
 
 const revalidateTag = vi.fn()
+const revalidatePath = vi.fn()
 const listCommunities = vi.fn()
+const afterTasks: (() => Promise<void>)[] = []
 
 vi.mock('next/cache', () => ({
   revalidateTag: (...args: unknown[]) => revalidateTag(...args),
+  revalidatePath: (...args: unknown[]) => revalidatePath(...args),
   cacheTag: () => {},
   cacheLife: () => {},
+}))
+
+vi.mock('next/server', () => ({
+  after: (task: () => Promise<void>) => void afterTasks.push(task),
 }))
 
 vi.mock('./communityStore', () => ({
@@ -33,7 +43,9 @@ const community = (slug: string) => ({ slug, name: slug, isDefault: false })
 
 beforeEach(() => {
   revalidateTag.mockClear()
+  revalidatePath.mockClear()
   listCommunities.mockReset()
+  afterTasks.length = 0
 })
 
 /** Just the tag names passed to revalidateTag, in call order. */
@@ -97,5 +109,63 @@ describe('revalidatePublicContent', () => {
     await revalidatePublicContent()
 
     expect(new Set(invalidated()).size).toBe(invalidated().length)
+  })
+
+  // The race behind e2e-cache's "two admin saves in quick succession" test: a
+  // regeneration already running at the save read the old rows, and Next
+  // stores it stamped with its finish time, so the first pass alone misses it.
+  it('invalidates every public screen again once in-flight renders have finished', async () => {
+    vi.useFakeTimers()
+    try {
+      listCommunities.mockResolvedValue([community('philly'), community('baltimore')])
+
+      await revalidatePublicContent()
+      expect(revalidatePath, 'the second pass waits for after() and the grace period').not.toHaveBeenCalled()
+      expect(afterTasks).toHaveLength(1)
+
+      const task = afterTasks[0]()
+      await vi.advanceTimersByTimeAsync(IN_FLIGHT_RENDER_GRACE_MS)
+      await task
+      // The pattern as a layout: one call reaches every screen of every
+      // community, through a tag (_N_T_/[community]/layout) the first pass did
+      // not use — Next drops a repeat within one request.
+      expect(revalidatePath).toHaveBeenCalledExactlyOnceWith('/[community]', 'layout')
+      expect(invalidated()).not.toContain('_N_T_/[community]/layout')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('schedules the second pass even when the community read fails', async () => {
+    listCommunities.mockRejectedValue(new Error('supabase is down'))
+
+    await revalidatePublicContent()
+
+    expect(afterTasks).toHaveLength(1)
+  })
+})
+
+// The second pass keeps the function alive for IN_FLIGHT_RENDER_GRACE_MS after
+// the response. Fine for an admin save or a cron run; not for a route any
+// visitor can call in a loop, which is why the public write routes (confirm,
+// item, item/gone) invalidate their one tag directly instead. A new public
+// caller has to be a decision, not an import someone reached for.
+describe('who may call revalidatePublicContent', () => {
+  const files = (dir: string): string[] =>
+    readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
+      e.isDirectory() ? files(join(dir, e.name)) : /\.tsx?$/.test(e.name) && !/\.test\.tsx?$/.test(e.name) ? [join(dir, e.name)] : [],
+    )
+  // By import, not by name: several files mention it in a comment ("does NOT
+  // call revalidatePublicContent()"), and an import is what a call needs.
+  const callers = files('src').filter((f) =>
+    /import\s*\{[^}]*\brevalidatePublicContent\b[^}]*\}\s*from\s*'@\/lib\/revalidateContent'/.test(readFileSync(f, 'utf-8')),
+  )
+
+  it('is only admin routes and cron jobs', () => {
+    expect(callers.length, 'the scan should find the admin routes that do call it').toBeGreaterThan(10)
+    const others = callers.filter(
+      (f) => !/^src\/app\/api\/(admin|cron)\//.test(f),
+    )
+    expect(others, 'a public route calling this holds a function open for every visitor request').toEqual([])
   })
 })

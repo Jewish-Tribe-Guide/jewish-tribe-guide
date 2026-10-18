@@ -71,7 +71,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ sl
     // This invalidates the route again once such a render has had time to
     // finish. Must be the route PATTERN, not routes[slug](c.slug) again: Next
     // drops a revalidation repeated within one request. See the helper.
-    revalidateRouteAfterInFlightRenders(routes[slug]('[community]'))
+    revalidateRouteAfterInFlightRenders(routes[slug]('[community]'), 'page')
     return Response.json({ ok: true, page })
   } catch (err) {
     console.error('[admin/pages] PATCH failed:', err)

@@ -22,13 +22,13 @@ describe('revalidateRouteAfterInFlightRenders', () => {
   afterEach(() => vi.useRealTimers())
 
   it('defers the invalidation to after the response, not inline', () => {
-    revalidateRouteAfterInFlightRenders('/[community]/about')
+    revalidateRouteAfterInFlightRenders('/[community]/about', 'page')
     expect(after).toHaveBeenCalledTimes(1)
     expect(revalidatePath).not.toHaveBeenCalled()
   })
 
   it('waits out the grace period, then invalidates every page of the pattern', async () => {
-    revalidateRouteAfterInFlightRenders('/[community]/about')
+    revalidateRouteAfterInFlightRenders('/[community]/about', 'page')
     const task = after.mock.calls[0][0]()
 
     await vi.advanceTimersByTimeAsync(IN_FLIGHT_RENDER_GRACE_MS - 1)
@@ -39,6 +39,14 @@ describe('revalidateRouteAfterInFlightRenders', () => {
     // 'page' with the dynamic pattern: a tag the caller's own concrete-path
     // revalidation did not use, so Next's per-request dedupe cannot drop it.
     expect(revalidatePath).toHaveBeenCalledExactlyOnceWith('/[community]/about', 'page')
+  })
+
+  it('passes a layout through as a layout, reaching every route beneath it', async () => {
+    revalidateRouteAfterInFlightRenders('/[community]', 'layout')
+    const task = after.mock.calls[0][0]()
+    await vi.advanceTimersByTimeAsync(IN_FLIGHT_RENDER_GRACE_MS)
+    await task
+    expect(revalidatePath).toHaveBeenCalledExactlyOnceWith('/[community]', 'layout')
   })
 
   it('leaves a window comfortably above the measured in-flight render time', () => {

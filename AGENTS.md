@@ -185,15 +185,66 @@ the old route (round 1 every time, `HIT/old` to the end), green with the fix.
 `pagesRevalidation.test.ts` asserts the second pass is present and uses the
 pattern; `revalidateAfterInFlightRenders.test.ts` checks its timing.
 
-**Every other admin save has the same exposure.** `revalidatePublicContent`
-and the stores' own `revalidateTag` calls invalidate the same way, so a
-regeneration in flight at, say, a listing approval can store a page without
-that listing for days — most plausibly when an admin approves several things
-in quick succession while the site is being browsed. Only the pages route has
-the second pass so far. Whether Vercel's own ISR cache stamps entries the same
-way is unknown (`/about` is served there as `x-vercel-cache: PRERENDER`), so
-if an admin edit is ever reported as not showing up on the live site, treat
-this as the first suspect.
+**Every other admin save had the same exposure, and has the same fix
+(2026-10-17).** `revalidatePublicContent` invalidated the same way, so a
+regeneration in flight at, say, a listing approval stored a page without that
+listing for days — most plausibly two approvals in quick succession while the
+site is being browsed. It now schedules the same second pass, as
+`revalidatePath('/[community]', 'layout')`: every public screen sits under that
+layout, any of them can show what its tags hold, and `_N_T_/[community]/layout`
+is a tag no first pass uses (it is on every page entry's `x-next-cache-tags`;
+checked in the build's `.meta` files). `revalidateRouteAfterInFlightRenders`
+takes the type now — `'page'` for the pages route's one route, `'layout'` for
+this. Why that target and not the alternatives:
+
+- `revalidatePath('/', 'layout')` would also reach `/`, `/offline`, `/inbox`
+  and the `/icons` route's cached renders, none of which show admin content
+  beyond the root layout's settings. Per-route `'page'` patterns would have to
+  list every screen under `[community]` and miss the next one added.
+- Any path revalidation is an immediate expiry, not stale-while-revalidate,
+  and it also discards — once — every `use cache` entry read inside the routes
+  it reaches (they are checked against the route's implicit tags). The first
+  pass already marked those stale, so the cost is one more refetch each, and
+  the first visitor to each page after it waits on a render.
+- `after()` keeps the function alive for the 5s grace. So the second pass is
+  in `revalidatePublicContent` only, whose callers are admin routes and cron
+  jobs — `revalidateContent.test.ts` fails if anything else imports it. The
+  public write routes (`/api/resource/[id]/confirm`, `item`, `item/gone`)
+  invalidate `resources:<community>` directly and keep the race: a visitor's
+  confirmation can, rarely, not show until the next admin save or the
+  `cacheLife`. `/api/votes` invalidates nothing.
+
+Proved by `e2e-cache`'s **"two admin saves in quick succession both reach a
+category page mid-regeneration"**: rename the fixture category, GET the page
+(asserted STALE — a regeneration is reading the first name), rename again,
+poll for the second name; three rounds. Red 3/3 against the old
+`revalidatePublicContent` (round 1 every time, `HIT/a` on all 22 polls, the
+stored row holding the second name), green 3/3 with it (9/9 rounds, converging
+`MISS/b` about 5.8s after the save). On failure it names which layer holds the
+old name — stored row, `use cache` data, or only the page entry. Two traps hit
+while writing it: `--repeat-each` spreads the copies over several workers, so
+check it with `--workers=1` or they rename the one fixture over each other;
+and read a fixture's original value from the uncached admin route, never the
+public API, which is stale-while-revalidate straight after a save and hands
+back the value the last restore replaced.
+
+The `/about` race test above no longer isolates the pages route's own pass:
+its setup save (site settings) now schedules one too, which reaches `/about`.
+It proves the outcome; `pagesRevalidation.test.ts` pins the pages route's
+wiring. Whether Vercel's own ISR cache stamps entries the same way is unknown
+(`/about` is served there as `x-vercel-cache: PRERENDER`), so if an admin edit
+is ever reported as not showing up on the live site, treat this as the first
+suspect.
+
+**A direct database insert is invisible to the cached reads, in tests too.**
+`e2e-admin-write/main-dishes.spec.ts` inserts its listing straight into the
+test project and then reads the Main dishes tab, which lists places through
+`listApprovedResources` (`cacheLife('hours')`). It passed only while no test
+had cached that list yet — on a warm server it failed four runs in five
+before any of the above, and the second pass (public pages re-rendering
+sooner) made a cold server fail too. It now calls `POST /api/admin/revalidate`
+after the insert and reloads until the card shows. Any test that writes rows
+directly and then reads them through the site needs the same.
 
 **A test that uses an existing row must put that row into a known state first, and restore it after.** Two of the write suites create their own fixture (a category, a form) and delete it again, so nothing an admin does can reach them. The suites that edit a singleton — the `page` rows, `site_settings` — have no such luxury and must borrow the real record, which makes them the ones that break. `e2e-admin-write/pages-editor.spec.ts` broke three times this way: on a page being retitled, on its body gaining headings (which changed which HTML element the editor's caret landed in), and on a locator that matched a newly-added toolbar. Read what you need from the row, overwrite it with something known, then restore it in `finally`. Never assume what a real page contains.
 

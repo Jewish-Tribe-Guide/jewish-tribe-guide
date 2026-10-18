@@ -226,6 +226,14 @@ test('an admin save to a static page reaches the cached /about route', async ({ 
 // three rounds make a pass on the broken code a ~1-in-60 event. With it, each
 // round lands once the second pass runs, IN_FLIGHT_RENDER_GRACE_MS after the
 // save.
+//
+// Since revalidatePublicContent got a second pass of its own (the test below
+// this one), the site-settings save that sets each round up schedules one too,
+// and it reaches /about as well. So this now proves the outcome — a save made
+// mid-regeneration lands — rather than isolating the pages route's own pass,
+// which pagesRevalidation.test.ts pins instead. Nothing else marks /about
+// stale without a second pass that the suite can repeat (a visitor
+// confirmation has a ten-minute cooldown; cacheLife takes days).
 test('an admin save lands even when /about is mid-regeneration', async ({ request }) => {
   test.setTimeout(150_000)
   const { accessToken } = JSON.parse(readFileSync('e2e-cache/.auth/token.json', 'utf-8')) as {
@@ -312,6 +320,144 @@ test('an admin save lands even when /about is mid-regeneration', async ({ reques
       headers: authHeaders,
       data: { body: originalBody },
     })
+  }
+})
+
+// The same race on every other admin save — the ones that go through
+// revalidatePublicContent — in the shape it takes in real use: two saves in
+// quick succession (two approvals, a rename and then a fix to it) while the
+// site is being browsed.
+//
+// Save A marks the category page stale; the visitor's GET between the saves
+// starts a regeneration, which reads A; save B lands while it is still
+// running. Without revalidatePublicContent's delayed second pass, that
+// regeneration is stored stamped with its finish time — after B's
+// invalidation — and the page shows A for days. Polling for B is the check.
+//
+// On a category page, through the fixture category nothing else touches (see
+// the focus test below for why a borrowed one raced other suites).
+test('two admin saves in quick succession both reach a category page mid-regeneration', async ({ request }) => {
+  test.setTimeout(150_000)
+  const { accessToken } = JSON.parse(readFileSync('e2e-cache/.auth/token.json', 'utf-8')) as {
+    accessToken: string
+  }
+  const authHeaders = { Authorization: `Bearer ${accessToken}` }
+
+  const community = new URL((await request.get('/')).url()).pathname.split('/').filter(Boolean)[0]
+  expect(community, 'the "/" redirect should land on a community').toBeTruthy()
+
+  const slug = 'cache-roundtrip-seed'
+  // The fixture's name, by the UNCACHED admin read and the cached public one.
+  // The original comes from the uncached read: straight after a save the
+  // public one is stale-while-revalidate, so a run that started right after
+  // another's restore would read the name that restore replaced — and put it
+  // back as "the original", compounding a suffix per run.
+  type Cat = { id: string; label: string; pluralLabel: string }
+  const fixture = async (path: string, headers?: Record<string, string>) => {
+    const res = await request.get(path, { headers })
+    expect(res.ok(), `GET ${path} should succeed`).toBe(true)
+    return ((await res.json()).categories as Cat[]).find((c) => c.id === slug)
+  }
+  const stored = () => fixture(`/api/admin/categories?community=${community}`, authHeaders)
+  const target = await stored()
+  expect(target, 'the cache-roundtrip fixture category should exist — see run-test-project-server.mjs').toBeTruthy()
+  const { label: originalLabel, pluralLabel: originalPlural } = target!
+
+  const pageUrl = `/${community}/${slug}`
+  const header = (res: { headers(): Record<string, string> }) => res.headers()['x-nextjs-cache'] ?? 'no-header'
+  const rename = async (name: string) => {
+    const res = await request.patch(`/api/admin/categories/${slug}?community=${community}`, {
+      headers: authHeaders,
+      data: { label: name, pluralLabel: name },
+    })
+    expect(res.ok(), `renaming the fixture category to "${name}" should succeed`).toBe(true)
+  }
+
+  try {
+    for (let round = 1; round <= 3; round++) {
+      // Sit out the previous saves' delayed second passes, so one cannot land
+      // in this round's setup and turn the STALE below into a MISS.
+      await new Promise((resolve) => setTimeout(resolve, IN_FLIGHT_RENDER_GRACE_MS + 1_000))
+
+      await expect
+        .poll(async () => header(await request.get(pageUrl)), {
+          timeout: 15_000,
+          message: `round ${round}: the category page should settle to a cached HIT before the race is set up`,
+        })
+        .toBe('HIT')
+
+      const stamp = Date.now() % 100000
+      const first = `${originalPlural} (race ${round}a ${stamp})`
+      const second = `${originalPlural} (race ${round}b ${stamp})`
+
+      await rename(first)
+      // The visitor between the two saves. STALE is the proof a regeneration
+      // is now running in the background — reading the first name.
+      const visitor = await request.get(pageUrl)
+      expect(
+        header(visitor),
+        `round ${round}: the category page should be STALE here, with a regeneration started behind it — ` +
+          'anything else means this round did not set up the race it exists to test',
+      ).toBe('STALE')
+      await rename(second)
+
+      const seen: string[] = []
+      await expect
+        .poll(
+          async () => {
+            const res = await request.get(pageUrl)
+            const body = await res.text()
+            const shows = body.includes(second) ? 'b' : body.includes(first) ? 'a' : 'old'
+            seen.push(`${header(res)}/${shows}`)
+            return shows
+          },
+          {
+            timeout: 20_000,
+            message:
+              `round ${round}: the second save landed while the page was regenerating from the first. ` +
+              'HIT/a to the end means that regeneration was stored as fresh over the second save — ' +
+              "revalidatePublicContent's delayed second pass (revalidateAfterInFlightRenders.ts) did not run or did not reach it",
+          },
+        )
+        .toBe('b')
+        .catch(async (err: Error) => {
+          // Which layer is holding the old name: the stored row (uncached
+          // admin read), the `use cache` data entry (the public API reads the
+          // same listCategories every page does), or only the page entry. The
+          // data is polled briefly: the first read after a save is
+          // stale-while-revalidate by design, which is not what this asks.
+          const row = (await stored())?.pluralLabel
+          let data: string | undefined
+          for (let i = 0; i < 10 && data !== row; i++) {
+            data = (await fixture(`/api/categories?community=${community}`))?.pluralLabel
+            if (data !== row) await new Promise((resolve) => setTimeout(resolve, 500))
+          }
+          throw new Error(
+            `${err.message}\n\nall ${seen.length} polls: ${seen.join(' ')}` +
+              `\nstored row: "${row}"\ncached data (/api/categories): "${data}"\nexpected: "${second}"`,
+          )
+        })
+    }
+  } finally {
+    await request
+      .patch(`/api/admin/categories/${slug}?community=${community}`, {
+        headers: authHeaders,
+        data: { label: originalLabel, pluralLabel: originalPlural },
+      })
+      .catch(() => {})
+    // Hand the next test a settled fixture: the restore's own second pass
+    // run, and the page and the public API serving the original name again.
+    // The focus test below reads the name from the public API and clicks it.
+    await new Promise((resolve) => setTimeout(resolve, IN_FLIGHT_RENDER_GRACE_MS + 1_000))
+    await expect
+      .poll(
+        async () => {
+          if ((await fixture(`/api/categories?community=${community}`))?.pluralLabel !== originalPlural) return false
+          return !(await (await request.get(pageUrl)).text()).includes('(race ')
+        },
+        { timeout: 20_000, message: 'the fixture should be back to its original name after the restore' },
+      )
+      .toBe(true)
   }
 })
 

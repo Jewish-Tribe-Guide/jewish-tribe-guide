@@ -32,10 +32,11 @@ import { IN_FLIGHT_RENDER_GRACE_MS } from './inFlightRenderGrace'
 //     Next de-duplicates revalidations per request: after() callbacks only
 //     execute revalidations whose tag+profile was not already pending
 //     (revalidation-utils' diffRevalidationState), so a repeat is dropped
-//     without a word. Hence the dynamic route PATTERN with 'page' here
-//     (`/[community]/about` → `_N_T_/[community]/about/page`), a different
-//     tag from the concrete `/philly/about` a caller passes to its own
-//     revalidatePath — and one call covers every community's copy.
+//     without a word. Hence a dynamic route PATTERN here
+//     (`/[community]/about` + 'page' → `_N_T_/[community]/about/page`,
+//     `/[community]` + 'layout' → `_N_T_/[community]/layout`): implicit tags
+//     no caller's own first pass uses — the stores' data tags, or a concrete
+//     `/philly/about` — and one call covers every community's copy.
 //   • It has to run after the response, without holding it: after().
 //
 // The delay itself is IN_FLIGHT_RENDER_GRACE_MS (its own module, so the
@@ -43,12 +44,25 @@ import { IN_FLIGHT_RENDER_GRACE_MS } from './inFlightRenderGrace'
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** Call from a Route Handler (or Server Action) right after its own
- *  invalidation. `routePattern` is the route's dynamic pattern, e.g.
- *  `/[community]/about` — see the dedupe note above for why not a concrete
- *  path. */
-export function revalidateRouteAfterInFlightRenders(routePattern: string): void {
+ *  invalidation. `routePattern` is the route's dynamic pattern — see the
+ *  dedupe note above for why not a concrete path:
+ *    • `('/[community]/about', 'page')` — that one route, every community's
+ *      copy (the pages PATCH route).
+ *    • `('/[community]', 'layout')` — every route under it, i.e. every public
+ *      screen (revalidatePublicContent, whose writes can touch any of them).
+ *
+ *  Either way the second pass is an immediate expiry, not stale-while-
+ *  revalidate (revalidatePath takes no profile), and it also discards, once,
+ *  every `use cache` entry read inside the routes it reaches (they carry the
+ *  route's implicit tags). The first pass already marked those stale, so the
+ *  cost is one more refetch each, and the first visitor to each page after it
+ *  waits on a render instead of being served the old copy.
+ *
+ *  after() keeps the function alive for the grace period, so this belongs on
+ *  admin write paths, not on routes any visitor can call in a loop. */
+export function revalidateRouteAfterInFlightRenders(routePattern: string, type: 'page' | 'layout'): void {
   after(async () => {
     await new Promise((resolve) => setTimeout(resolve, IN_FLIGHT_RENDER_GRACE_MS))
-    revalidatePath(routePattern, 'page')
+    revalidatePath(routePattern, type)
   })
 }
