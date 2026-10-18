@@ -77,6 +77,19 @@ describe('when to read again', () => {
     expect(isStale(eruv({ statusCheckedAt: '2026-10-09T18:40:00Z', statusErrorAt: '2026-10-09T18:55:00Z' }), now, TZ, CANDLES)).toBe(false)
     expect(isStale(eruv({ statusUrl: null, statusCheckedAt: null }), now, TZ, CANDLES)).toBe(false)
   })
+
+  it('a read that failed is tried again after 15 minutes, not the whole 3 hours', () => {
+    // Saturday night, outside the checking hours: a good read waits 3 hours.
+    const now = at('2026-10-17T23:45:00Z')
+    expect(isStale(eruv({ statusCheckedAt: '2026-10-17T23:20:00Z' }), now, TZ, null)).toBe(false)
+    // Lower Merion on the live site, Oct 17: never read, one timeout.
+    expect(isStale(eruv({ statusCheckedAt: null, statusErrorAt: '2026-10-17T23:26:00Z' }), now, TZ, null)).toBe(true)
+    expect(isStale(eruv({ statusCheckedAt: null, statusErrorAt: '2026-10-17T23:35:00Z' }), now, TZ, null)).toBe(false)
+    // A good read earlier, then a failure: retried as soon.
+    expect(isStale(eruv({ statusCheckedAt: '2026-10-17T21:00:00Z', statusErrorAt: '2026-10-17T23:26:00Z' }), now, TZ, null)).toBe(true)
+    // A failure older than the good read that followed it changes nothing.
+    expect(isStale(eruv({ statusCheckedAt: '2026-10-17T23:20:00Z', statusErrorAt: '2026-10-17T21:00:00Z' }), now, TZ, null)).toBe(false)
+  })
 })
 
 describe('eruvView', () => {
