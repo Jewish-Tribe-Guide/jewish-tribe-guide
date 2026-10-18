@@ -1,12 +1,16 @@
 // One run of a Refuah watch: read the hospital's record from Refuah and put
 // what differs from the guide in the moderation queue (refuahWatch.ts has
-// the rules). Writes no listing: an admin approves or rejects the
-// suggestion with Refuah's entries in front of them.
+// the rules). Never changes what a listing says: an admin approves or
+// rejects the suggestion with Refuah's entries in front of them. When
+// Refuah says just what the guide says, the one thing it writes is the
+// listing's date, "From Refuah, Oct 18" (dateFromRefuah below).
 //
 // Run daily by /api/cron/watches for every website watch on a Refuah
 // hospital page, and on demand from the admin Watches tab.
 
 import { createHash } from 'node:crypto'
+import { revalidateTag } from 'next/cache'
+import { TAGS } from '@/lib/cacheTags'
 import { getAdminClient } from '@/lib/supabase/admin'
 import { sendWatchDigest } from '@/lib/email'
 import { submitListingUpdate } from '@/lib/submissionStore'
@@ -49,6 +53,56 @@ export async function readRefuahHospital(id: string, fetcher: typeof fetch = fet
 
 type Row = { id: string; category: string; name: string; address: string | null; phone: string | null; anchor_id: string; distance: number | null; details: Record<string, unknown> | null }
 
+/**
+ * Refuah says what the guide says, so Refuah is vouching for it today: the
+ * listing's date becomes "From Refuah, <today>" (confirmedFrom, which
+ * FreshnessFooter names only while its `at` is the listing's confirmedAt).
+ * Without this, a hospital Refuah keeps agreeing with went stale and asked
+ * "Still right?" 90 days after the last person looked.
+ *
+ * Not when Refuah has nothing to compare (Penn Presbyterian and
+ * Pennsylvania Hospital, Oct 17): agreeing about nothing vouches for
+ * nothing. Never over a newer date, which only a person can have given.
+ * sectionConfirmed, a visitor's tap on one box, is theirs and stays.
+ *
+ * The write is conditional on the listing still being exactly what was
+ * compared, so an approval or a tap landing in between is never undone and
+ * a listing that's changed isn't vouched for unread; tomorrow's run looks
+ * again. (A whole-object write, because a PostgREST update can't merge two
+ * keys into a jsonb column; the condition is what makes that safe.)
+ */
+async function dateFromRefuah(
+  supabase: ReturnType<typeof getAdminClient>,
+  community: string,
+  row: Row,
+  refuah: Record<string, unknown[]>,
+): Promise<{ error?: string }> {
+  if (!Object.values(refuah).some((entries) => entries.length > 0)) return {}
+  const details = row.details ?? {}
+  const now = new Date().toISOString()
+  const before = typeof details.confirmedAt === 'string' ? Date.parse(details.confirmedAt) : NaN
+  if (before >= Date.parse(now)) return {}
+
+  const { data, error } = await supabase
+    .from('resource')
+    .update({ details: { ...details, confirmedAt: now, confirmedFrom: { from: REFUAH_NAME, at: now } } })
+    .eq('community_id', community)
+    .eq('id', row.id)
+    .eq('status', 'approved')
+    .eq('details', JSON.stringify(row.details))
+    .select('id')
+  if (error) return { error: `Refuah agrees with the guide, but the date couldn’t be saved: ${error.message}` }
+  if (!data?.length) return {}
+  try {
+    // As a visitor's confirmation does, so the next visitor sees the date.
+    revalidateTag(TAGS.resources(community), 'max')
+  } catch {
+    // The test project's daily run is plain Node, with no Next cache to
+    // invalidate; the previews pick the date up when theirs expires.
+  }
+  return {}
+}
+
 export async function runRefuahWatch(community: string, url: string, resourceId: string | null): Promise<WatchOutcome> {
   const hospitalId = refuahHospitalId(url)
   if (!hospitalId) return { ok: false, error: 'Not a Refuah hospital page' }
@@ -82,7 +136,10 @@ export async function runRefuahWatch(community: string, url: string, resourceId:
   const pageHash = createHash('sha256').update(refuahFingerprint(refuah)).digest('hex')
   const details = row.details ?? {}
   const diffs = compareRefuah(details, refuah, Object.fromEntries(contacts.map((f) => [f.key, f.label])))
-  if (diffs.length === 0) return { ok: true, filed: 0, pageHash }
+  if (diffs.length === 0) {
+    const dated = await dateFromRefuah(supabase, community, row, refuah)
+    return dated.error ? { ok: false, error: dated.error } : { ok: true, filed: 0, pageHash }
+  }
 
   const fields = Object.fromEntries(diffs.map((d) => [d.key, d.after]))
   // Everything this watch has filed for the listing, whatever became of it.

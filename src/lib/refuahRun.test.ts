@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const m = vi.hoisted(() => ({
   listing: null as Record<string, unknown> | null,
@@ -6,23 +6,42 @@ const m = vi.hoisted(() => ({
   submitListingUpdate: vi.fn(),
   sendWatchDigest: vi.fn(),
   getCategoryById: vi.fn(),
+  revalidateTag: vi.fn(),
+  // Each write: what it set, and the filters it was conditional on.
+  updates: [] as { table: string; set: Record<string, unknown>; where: [string, string, unknown][] }[],
+  // What the guarded write found to change: none when the row moved on.
+  updated: [{ id: 'x' }] as { id: string }[],
+  updateError: null as { message: string } | null,
 }))
 
 // The two reads the run makes: the listing (maybeSingle), and what the watch
-// filed for it before (awaited as a list).
+// filed for it before (awaited as a list). And the one write, the date.
 vi.mock('@/lib/supabase/admin', () => ({
   getAdminClient: () => ({
     from: (table: string) => {
+      let write: (typeof m.updates)[number] | null = null
       const q = {
         select: () => q,
-        eq: () => q,
+        update: (set: Record<string, unknown>) => {
+          write = { table, set, where: [] }
+          m.updates.push(write)
+          return q
+        },
+        eq: (k: string, v: unknown) => (write?.where.push(['eq', k, v]), q),
+        is: (k: string, v: unknown) => (write?.where.push(['is', k, v]), q),
         maybeSingle: async () => ({ data: m.listing, error: null }),
-        then: (ok: (v: unknown) => unknown) => Promise.resolve({ data: table === 'submission' ? m.earlier : [], error: null }).then(ok),
+        then: (ok: (v: unknown) => unknown) =>
+          Promise.resolve(
+            write
+              ? { data: m.updateError ? null : m.updated, error: m.updateError }
+              : { data: table === 'submission' ? m.earlier : [], error: null },
+          ).then(ok),
       }
       return q
     },
   }),
 }))
+vi.mock('next/cache', () => ({ revalidateTag: m.revalidateTag }))
 vi.mock('@/lib/submissionStore', () => ({ submitListingUpdate: m.submitListingUpdate }))
 vi.mock('@/lib/email', () => ({ sendWatchDigest: m.sendWatchDigest }))
 vi.mock('@/lib/categoryStore', () => ({ getCategoryById: m.getCategoryById }))
@@ -47,7 +66,11 @@ beforeEach(() => {
   m.submitListingUpdate.mockReset().mockResolvedValue({ id: 's1' })
   m.sendWatchDigest.mockReset().mockResolvedValue(undefined)
   m.getCategoryById.mockReset().mockResolvedValue({ detailFields: [{ key: 'liaisons', label: 'Liaisons', type: 'contacts' }] })
+  m.revalidateTag.mockReset()
   m.earlier = []
+  m.updates = []
+  m.updated = [{ id: HOSPITAL }]
+  m.updateError = null
   m.listing = {
     id: HOSPITAL,
     category: 'hospital',
@@ -104,6 +127,92 @@ describe('runRefuahWatch', () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ status: 'error', errorMessage: 'Could not find function' })))
     expect(await runRefuahWatch('philly', URL_, HOSPITAL)).toMatchObject({ ok: false, error: expect.stringContaining('Could not find function') })
     expect(m.submitListingUpdate).not.toHaveBeenCalled()
+  })
+
+  // Refuah saying the same thing day after day is Refuah vouching for it:
+  // the hospital's boxes say "From Refuah, Oct 18" instead of going stale
+  // and asking "Still right?" 90 days after the last person looked.
+  describe('dating the listing when Refuah agrees', () => {
+    const NOW = '2026-10-18T07:30:00.000Z'
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ['Date'] })
+      vi.setSystemTime(new Date(NOW))
+    })
+    afterEach(() => vi.useRealTimers())
+
+    it('dates it “From Refuah”, today, and touches nothing else', async () => {
+      refuahAnswers(record('+1 215-805-8668'))
+      const before = { ...m.listing!.details as Record<string, unknown>, confirmedAt: '2026-10-07T01:46:49.573Z', sectionConfirmed: { liaisons: '2026-10-12T10:00:00.000Z' } }
+      m.listing!.details = before
+      expect(await runRefuahWatch('philly', URL_, HOSPITAL)).toMatchObject({ ok: true, filed: 0 })
+      expect(m.updates).toHaveLength(1)
+      const [{ table, set, where }] = m.updates
+      expect(table).toBe('resource')
+      // A visitor's tap on one box is theirs, and stays.
+      expect(set).toEqual({ details: { ...before, confirmedAt: NOW, confirmedFrom: { from: 'Refuah', at: NOW } } })
+      // Only if the listing is still exactly what was compared: an approval
+      // or a tap landing in between leaves it alone, never undone.
+      expect(where).toEqual(expect.arrayContaining([['eq', 'id', HOSPITAL], ['eq', 'community_id', 'philly'], ['eq', 'status', 'approved'], ['eq', 'details', JSON.stringify(before)]]))
+      expect(m.revalidateTag).toHaveBeenCalledWith('resources:philly', 'max')
+      expect(m.submitListingUpdate).not.toHaveBeenCalled()
+    })
+
+    it('never dates over a newer confirmation by a person', async () => {
+      refuahAnswers(record('+1 215-805-8668'))
+      m.listing!.details = { ...(m.listing!.details as Record<string, unknown>), confirmedAt: '2026-10-18T09:00:00.000Z' }
+      expect(await runRefuahWatch('philly', URL_, HOSPITAL)).toMatchObject({ ok: true, filed: 0 })
+      m.listing!.details = { ...(m.listing!.details as Record<string, unknown>), confirmedAt: NOW }
+      expect(await runRefuahWatch('philly', URL_, HOSPITAL)).toMatchObject({ ok: true, filed: 0 })
+      expect(m.updates).toHaveLength(0)
+    })
+
+    it('doesn’t date it when it filed a difference, or one it filed before', async () => {
+      refuahAnswers(record('+1 215-805-9000'))
+      expect(await runRefuahWatch('philly', URL_, HOSPITAL)).toMatchObject({ ok: true, filed: 1 })
+      m.earlier = [{ payload: { details: { liaisons: [{ name: 'Bikur Cholim of Philadelphia', who: 'Mrs. Schwartz', phones: ['+1 215-805-9000'] }] } } }]
+      expect(await runRefuahWatch('philly', URL_, HOSPITAL)).toMatchObject({ ok: true, filed: 0 })
+      expect(m.updates).toHaveLength(0)
+    })
+
+    it('doesn’t date it when Refuah has nothing for it, or nothing the guide has a box for', async () => {
+      refuahAnswers({ name: 'Penn Presbyterian Medical Center', liaisons: [], services: [] })
+      expect(await runRefuahWatch('philly', URL_, HOSPITAL)).toMatchObject({ ok: true, filed: 0 })
+      vi.restoreAllMocks()
+      refuahAnswers(record('+1 215-805-8668'))
+      m.getCategoryById.mockResolvedValue({ detailFields: [] })
+      expect(await runRefuahWatch('philly', URL_, HOSPITAL)).toMatchObject({ ok: true, filed: 0 })
+      expect(m.updates).toHaveLength(0)
+    })
+
+    it('doesn’t date it when the read failed', async () => {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('', { status: 503 }))
+      expect(await runRefuahWatch('philly', URL_, HOSPITAL)).toMatchObject({ ok: false })
+      expect(m.updates).toHaveLength(0)
+    })
+
+    it('a listing that changed under it is left for tomorrow’s run, not an error', async () => {
+      refuahAnswers(record('+1 215-805-8668'))
+      m.updated = []
+      expect(await runRefuahWatch('philly', URL_, HOSPITAL)).toMatchObject({ ok: true, filed: 0 })
+      expect(m.revalidateTag).not.toHaveBeenCalled()
+    })
+
+    it('a date it couldn’t save is a failed run, so the Watches tab says so', async () => {
+      refuahAnswers(record('+1 215-805-8668'))
+      m.updateError = { message: 'boom' }
+      expect(await runRefuahWatch('philly', URL_, HOSPITAL)).toMatchObject({ ok: false, error: expect.stringContaining('boom') })
+    })
+
+    // The test project's daily run (scripts/run-test-watches.mts) is plain
+    // Node, where Next's cache isn't there to invalidate.
+    it('outside Next, the date is still saved', async () => {
+      refuahAnswers(record('+1 215-805-8668'))
+      m.revalidateTag.mockImplementation(() => {
+        throw new Error('Invariant: static generation store missing')
+      })
+      expect(await runRefuahWatch('philly', URL_, HOSPITAL)).toMatchObject({ ok: true, filed: 0 })
+      expect(m.updates).toHaveLength(1)
+    })
   })
 
   it('needs the hospital it’s for', async () => {

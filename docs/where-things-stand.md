@@ -4,7 +4,7 @@ The running list of what's outstanding, kept in the repo so it survives a
 change of Claude account (artifacts and Claude's own notes stay with the old
 account). Update it in the same commit as the work that changes it.
 
-Last updated: Oct 17, 2026 (evening).
+Last updated: Oct 17, 2026 (night).
 
 ## The branch
 
@@ -57,6 +57,9 @@ for that exact change, in the same conversation. Show the dry run first.
    listing, on `refuah.com/hospitals/<id>` (the live listings' Refuah links
    already point there). Added on the dev/test database Oct 17. Two of the
    seven (Penn Presbyterian, Pennsylvania Hospital) have nothing on Refuah.
+   Once they run on live, each day Refuah agrees keeps that hospital's date
+   at "From Refuah, <today>" (below), so the Oct 17 hand-label stops
+   mattering.
 
 ## For the user or the community
 
@@ -117,7 +120,20 @@ for that exact change, in the same conversation. Show the dry run first.
 - **Refuah watch.** Refuah's pages build in the browser, so the watch reads
   the public data service the page calls (`hospitals:getWithReferences`).
   If Refuah renames that, the watch shows as not working and the admin is
-  emailed; nothing wrong is filed.
+  emailed; nothing wrong is filed. **When Refuah agrees, the watch keeps the
+  date current** (Oct 17): no differences means the listing's
+  `confirmedAt` becomes now and `confirmedFrom` `{ from: 'Refuah' }`, so its
+  boxes say "From Refuah, Oct 18" instead of asking "Still right?" 90 days
+  on. Not when it filed a difference (or one filed before), when the read
+  failed, or when Refuah has no contacts for it (Penn Presbyterian,
+  Pennsylvania Hospital); never over a newer date; a visitor's per-box tap
+  (`sectionConfirmed`) stays. The write is conditional on `details` being
+  exactly what was compared, so an approval or tap in between is never
+  undone (it waits for the next run). No migration. No activity-log entry
+  (a daily automated "confirmed" would bury real ones). On the test
+  database the five with contacts were dated by a by-hand run Oct 17; the
+  preview's cache isn't invalidated by the daily script (plain Node), so it
+  shows the new date when its cache refreshes.
 - **The preview's watches run daily** (the user, Oct 17: watches yes,
   Google's check no, since it costs Places calls).
   `.github/workflows/test-watches.yml` runs `scripts/run-test-watches.mts`
