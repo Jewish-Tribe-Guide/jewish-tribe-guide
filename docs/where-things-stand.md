@@ -36,8 +36,7 @@ Still different, each needing the user:
   is newer; keep).
 - **Listing edits made on the preview, dev only:** main dishes and menus at
   six food places (Charlie was a sinner, Sweet Box, Bar Bombón, HipCityVeg,
-  Say She Ate), the hospitals' Refuah contacts (the boxes stay hidden on
-  live until these are there), minyanim at Mikveh Israel and Mekor
+  Say She Ate), minyanim at Mikveh Israel and Mekor
   Habracha, grocery items at GIANT, Costco, ShopRite and Trader Joe's,
   levels at Lipkin's, Sweet Box and Montefiore, Ohel Leah's keilim note,
   Hampton Inn's photo.
@@ -52,9 +51,9 @@ for that exact change, in the same conversation. Show the dry run first.
 1. **Philly Synagogues:** add the "Minyan" yes/no field, and rename the
    category "Shuls & minyanim".
 2. **The hospitals' Refuah watches on the live site** (after the merge, and
-   after the hospital fields from Oct 6 are set up on the live Hospital
-   category; until then the watch has no fields to compare and files
-   nothing). Seven website watches, one per hospital, each tied to its
+   the hospital fields and the contacts are now both on live: the contacts,
+   eruv and sukkah of the five Refuah lists went across Oct 17 with the
+   user's yes, live's own Refuah links kept). Seven website watches, one per hospital, each tied to its
    listing, on `refuah.com/hospitals/<id>` (the live listings' Refuah links
    already point there). Added on the dev/test database Oct 17. Two of the
    seven (Penn Presbyterian, Pennsylvania Hospital) have nothing on Refuah.
