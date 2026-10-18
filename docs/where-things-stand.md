@@ -50,13 +50,6 @@ for that exact change, in the same conversation. Show the dry run first.
 
 1. **Philly Synagogues:** add the "Minyan" yes/no field, and rename the
    category "Shuls & minyanim".
-1a. **Two eruvim have no map line on the live site** (the user, Oct 18:
-   "not seeing two of the eruvs on the map"). Northeast and Elkins Park
-   have their Google My Maps links, lines, approval and colour only on the
-   dev database. Dry run shown Oct 18: copy `line_url`, `line`,
-   `line_read_at`, `line_approved_at`/`_by`, Northeast's `line_color` and
-   Elkins Park's `line_leave_out` from dev to live (backup first). Then
-   any admin save, so the live cache shows them.
 ## For the user or the community
 
 2. **Every live place has a date** (checked Oct 17, 11 PM: 155 of 155).
@@ -134,6 +127,13 @@ for that exact change, in the same conversation. Show the dry run first.
   example now, which is what let the hotel and young-professionals ones in.
 - **Trust sheet:** "Read again every day." without the eruv's Friday
   rhythm, which stays on the Eruv page.
+- **Northeast and Elkins Park have their map lines on the live site**
+  (the user's yes, Oct 18: "not seeing two of the eruvs on the map").
+  They had been set up on the dev database only; their map links, lines,
+  approval, Northeast's colour and Elkins Park's left-out directions were
+  copied to live (backup in that session's scratchpad). The map reads them
+  through `/api/eruv/maps`, which the CDN keeps for an hour, so they show
+  within the hour with no admin save.
 - **Lower Merion:** Sunday to Thursday, last Friday's post shows as "Up
   last Shabbos" in grey instead of an amber "Not posted yet this week"
   (Friday and Shabbos are unchanged). A read that gets no answer is tried
