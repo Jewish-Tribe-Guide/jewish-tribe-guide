@@ -8,6 +8,7 @@ import type { ContactEntry } from '@/lib/contacts'
 import type { EnrichedSubmission, ResourceRow } from '@/types'
 import { SubmissionCard } from './SubmissionCard'
 import { makeCategory } from '@/test/providerFixtures'
+import { editSubmission } from '@/lib/editSubmission'
 import { SYNC_INTERNAL_FIELDS, SHOWN_WHEN_CONFIGURED, SHOWN_WHEN_PROPOSED, MENU_LINK_PROPOSED } from '@/lib/syncFields'
 
 afterEach(() => cleanup())
@@ -350,6 +351,39 @@ describe('a food place’s menu link', () => {
   it('an edit without a link doesn’t read as taking it off', () => {
     renderMenuEdit({ dishes: ['Falafel'], menuUrl: 'https://old.example/menu' }, { dishes: ['Falafel', 'Shawarma'] })
     expect(screen.queryByText('Menu link')).not.toBeInTheDocument()
+  })
+})
+
+// Oct 18: a suggestion the site builds for someone (editSubmission — a
+// question card's answer, the "+ Add" box, a shul's newsletter) carries the
+// listing's fields and not its confirmed date, so the card showed
+// "confirmedAt 2026-10-16T18:48:02.339Z → —" as though approving would wipe
+// the date. It doesn't: approval dates the listing now (withConfirmedNow).
+describe('an edit the site built for someone', () => {
+  it('shows the change, and no row for the listing\u2019s confirmed date', () => {
+    const category = makeCategory({
+      id: 'restaurant',
+      detailFields: [{ key: 'kosherType', label: 'Kosher type', type: 'text' } as CategoryField],
+    })
+    const confirmedAt = '2026-10-16T18:48:02.339Z'
+    const item = { id: 'r1', category: 'restaurant', name: 'Place', address: '1 Main St', kosherType: 'Meat', confirmedAt }
+    const submission = {
+      id: 's1',
+      operation: 'update',
+      target_type: 'listing',
+      target_id: 'r1',
+      payload: editSubmission(category, item as never, { kosherType: 'Dairy' }),
+      note: null,
+      status: 'pending',
+      submitted_by: null,
+      created_at: new Date().toISOString(),
+      reviewed_at: null,
+      current: { id: 'r1', category: 'restaurant', name: 'Place', address: '1 Main St', details: { kosherType: 'Meat', confirmedAt } } as unknown as ResourceRow,
+    } as unknown as EnrichedSubmission
+    const { container } = render(<SubmissionCard submission={submission} categoriesById={new Map([['restaurant', category]])} />)
+    expect(container.textContent).toContain('Dairy')
+    expect(container.textContent).not.toContain('confirmedAt')
+    expect(container.textContent).not.toContain(confirmedAt)
   })
 })
 

@@ -92,6 +92,12 @@ for that exact change, in the same conversation. Show the dry run first.
 
 ## Done Oct 17
 
+- **The queue no longer shows "confirmedAt … → —"** (Oct 18). An edit the
+  site builds for someone (a question card's answer, the "+ Add" box, a
+  shul's newsletter) doesn't carry the listing's confirmed date, so the
+  queue showed it as taken off. Approving never did that: it dates the
+  listing now. The date is now one of the app's own keys, hidden from the
+  diff and never taken from a submission.
 - **The hospitals' Refuah watches are on the live site** (Oct 18, with
   the user's yes): seven website watches on `refuah.com/hospitals/<id>`,
   each tied to its live listing, copied from the test project's. The dry

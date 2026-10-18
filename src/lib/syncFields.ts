@@ -47,6 +47,12 @@ export const SYNC_INTERNAL_FIELDS = [
   // When each of a mikvah's sections was last confirmed (confirm_section,
   // migration 071): a visitor's tap, never a submitter's or a moderator's.
   'sectionConfirmed',
+  // When the listing was last confirmed: a visitor's "Still right?" tap
+  // (/api/resource/[id]/confirm) or an approval, which dates it now
+  // (submissionStore's withConfirmedNow). Never a submitter's to set, and
+  // not in an edit the site builds for someone (editSubmission), where the
+  // queue showed it as "confirmedAt 2026-10-16T… → —".
+  'confirmedAt',
   // Which outside source dated the listing (Keystone-K's list, Refuah), set
   // on approval from the submission's server-set source. Never a
   // submitter's: an edit can't say it came from the agency.
