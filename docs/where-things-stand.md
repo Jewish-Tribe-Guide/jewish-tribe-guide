@@ -77,7 +77,7 @@ for that exact change, in the same conversation. Show the dry run first.
    digest. The test project's daily watch run is on `main` now too.
 5. **Run migration 083 (`confirmed_by_visitor`) in the SQL editor, test
    project then live.** It makes a visitor's Yes on a whole listing say
-   "Confirmed by a community member". Safe in either order with the
+   "Confirmed by community". Safe in either order with the
    deploy: until it runs, that Yes says plain "Confirmed" as before.
    **Check 077 and 082 on the live database, now that the code is live.**
    Tables and columns through 081 are there. 077 (eruv suggestions, a
@@ -101,14 +101,18 @@ for that exact change, in the same conversation. Show the dry run first.
 
 ## Done Oct 17
 
-- **The date line says when a community member gave it** (the user, Oct
-  17). A visitor's Yes: "Confirmed by a community member, Oct 17" (a box's
-  own date is always one; the whole listing's needs migration 083). A
-  visitor's approved edit, typed or read by AI from what they sent:
-  "Updated by a community member, Oct 17" (`details.confirmedBy`). An
-  admin's own stamp or direct add, and Google's changes: "Confirmed".
-  Keystone-K's list and Refuah keep "From …". Dates given before this
-  still say "Confirmed": past taps can't be told from admin stamps.
+- **Every date line says who gave it, with a verb** (the user, Oct 18).
+  A person (a visitor's Yes, any approved edit, an admin's own):
+  "Confirmed by community, Oct 17" (`details.confirmedBy`; a box's own
+  date is always a visitor's; a Yes on the whole listing needs migration
+  083). An authority: "Confirmed by Keystone-K, Oct 12", "Confirmed by
+  Refuah" (`details.confirmedFrom`). Google, which isn't the source of
+  truth for anything: "Checked with Google, Aug 28" (its own line, and an
+  approved Google change). Plain "Confirmed" only on dates nothing records
+  the giver of: the Oct 17 bulk stamp and the Aug 20 batch.
+  **Retroactive:** dev done (9). Live, waiting for a yes: 24 listings whose
+  date is an approved edit (the menus sent Oct 17–18) → "Confirmed by
+  community"; live has no Keystone-K or Google-dated approvals to relabel.
 
 - **A food place's menu link can be suggested.** Edit listing → Main dishes
   has a "Menu link" box (food places only; a grocery's items have none). The

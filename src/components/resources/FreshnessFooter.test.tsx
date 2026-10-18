@@ -67,56 +67,69 @@ describe('FreshnessFooter', () => {
     expect(screen.getByTestId('freshness')).toHaveTextContent('Website from Google, Sep 23. Times confirmed Sep 20.')
   })
 
-  // Oct 17: every dated line says where the fact came from. An outside
-  // source that dated it is named in place of "Confirmed"; a person's later
-  // confirmation (a different date) is theirs.
-  it('names the outside source that gave the date, and only for that date', () => {
+  // Oct 18 (the user): every dated line says who gave it, with a verb. An
+  // authority "Confirmed by Keystone-K"; Google, which isn't the source of
+  // truth for anything, "Checked with Google"; a person "Confirmed by
+  // community". A later date (an admin's stamp) is plain "Confirmed".
+  it('says the authority that gave the date, and only for that date', () => {
     vi.useFakeTimers({ now: new Date('2026-10-17T12:00:00.000Z') })
-    const source = { from: 'Keystone-K’s list', at: '2026-10-12T12:00:00.000Z' }
-    render(<FreshnessFooter resourceId="r1" confirmedAt="2026-10-12T12:00:00.000Z" source={source} />)
-    expect(screen.getByTestId('freshness')).toHaveTextContent('From Keystone-K’s list, Oct 12.')
+    const at = '2026-10-12T12:00:00.000Z'
+    const source = { from: 'Keystone-K', at }
+    const line = () => screen.getByTestId('freshness').textContent
+    render(<FreshnessFooter resourceId="r1" confirmedAt={at} source={source} />)
+    expect(line()).toBe('Confirmed by Keystone-K, Oct 12.')
     cleanup()
     render(<FreshnessFooter resourceId="r1" confirmedAt="2026-10-14T12:00:00.000Z" source={source} />)
-    expect(screen.getByTestId('freshness')).toHaveTextContent('Confirmed Oct 14.')
+    expect(line()).toBe('Confirmed Oct 14.')
     cleanup()
-    render(<FreshnessFooter resourceId="r1" confirmedAt="2026-10-12T12:00:00.000Z" subject="Kosher details" ask={false} source={source} />)
-    expect(screen.getByTestId('freshness')).toHaveTextContent('Kosher details from Keystone-K’s list, Oct 12.')
+    render(<FreshnessFooter resourceId="r1" confirmedAt={at} subject="Kosher details" ask={false} source={source} />)
+    expect(line()).toBe('Kosher details confirmed by Keystone-K, Oct 12.')
     cleanup()
-    render(<FreshnessFooter resourceId="r1" confirmedAt="2026-10-12T12:00:00.000Z" source={source} onEdit={() => {}} />)
-    expect(screen.getByTestId('freshness')).toHaveTextContent('From Keystone-K’s list, Oct 12')
+    render(<FreshnessFooter resourceId="r1" confirmedAt={at} source={source} onEdit={() => {}} />)
+    expect(line()).toContain('Confirmed by Keystone-K, Oct 12')
+    cleanup()
+    render(<FreshnessFooter resourceId="r1" confirmedAt={at} subject="Times" source={source} />)
+    expect(line()).toBe('Times confirmed by Keystone-K, Oct 12.')
   })
 
-  // Oct 17 (the user): a visitor's Yes says "Confirmed by a community
-  // member", their approved edit "Updated by a community member", and an
-  // admin's stamp (no confirmedBy, or one from an older date) "Confirmed".
-  it('says a community member confirmed or updated it, only for the date they gave', () => {
+  it('Google checked it, never confirmed it', () => {
+    vi.useFakeTimers({ now: new Date('2026-10-17T12:00:00.000Z') })
+    const at = '2026-10-12T12:00:00.000Z'
+    render(<FreshnessFooter resourceId="r1" confirmedAt={at} source={{ from: 'Google', at }} />)
+    expect(screen.getByTestId('freshness').textContent).toBe('Checked with Google, Oct 12.')
+    cleanup()
+    render(<FreshnessFooter resourceId="r1" confirmedAt={at} subject="Times" source={{ from: 'Google', at }} />)
+    expect(screen.getByTestId('freshness').textContent).toBe('Times checked with Google, Oct 12.')
+  })
+
+  it('a person’s date, a Yes or an approved edit: “Confirmed by community”, only for the date they gave', () => {
     vi.useFakeTimers({ now: new Date('2026-10-17T12:00:00.000Z') })
     const at = '2026-10-12T12:00:00.000Z'
     const visitor = { by: 'visitor' as const, at }
     const edit = { by: 'edit' as const, at }
     const line = () => screen.getByTestId('freshness').textContent
     render(<FreshnessFooter resourceId="r1" confirmedAt={at} by={visitor} />)
-    expect(line()).toBe('Confirmed by a community member, Oct 12.')
+    expect(line()).toBe('Confirmed by community, Oct 12.')
     cleanup()
     render(<FreshnessFooter resourceId="r1" confirmedAt={at} by={edit} />)
-    expect(line()).toBe('Updated by a community member, Oct 12.')
+    expect(line()).toBe('Confirmed by community, Oct 12.')
     cleanup()
     render(<FreshnessFooter resourceId="r1" confirmedAt={at} by={visitor} onEdit={() => {}} />)
-    expect(line()).toContain('Confirmed by a community member, Oct 12')
+    expect(line()).toContain('Confirmed by community, Oct 12')
     cleanup()
     render(<FreshnessFooter resourceId="r1" confirmedAt={at} by={edit} subject="Times" />)
-    expect(line()).toBe('Times updated by a community member, Oct 12.')
+    expect(line()).toBe('Times confirmed by community, Oct 12.')
     cleanup()
     render(<FreshnessFooter resourceId="r1" confirmedAt={at} by={visitor} subject="Kosher details" ask={false} />)
-    expect(line()).toBe('Kosher details last checked by a community member, Oct 12.')
+    expect(line()).toBe('Kosher details confirmed by community, Oct 12.')
     cleanup()
     // A later date isn't theirs: an admin's stamp.
     render(<FreshnessFooter resourceId="r1" confirmedAt="2026-10-14T12:00:00.000Z" by={visitor} />)
     expect(line()).toBe('Confirmed Oct 14.')
     cleanup()
-    // An outside source that gave the same date is named instead.
+    // An authority that gave the same date is said instead.
     render(<FreshnessFooter resourceId="r1" confirmedAt={at} by={edit} source={{ from: 'Refuah', at }} />)
-    expect(line()).toBe('From Refuah, Oct 12.')
+    expect(line()).toBe('Confirmed by Refuah, Oct 12.')
   })
 
   it('once someone confirms it, the source is no longer said: the date is theirs', async () => {
@@ -124,7 +137,7 @@ describe('FreshnessFooter', () => {
     mockFetch({ ok: true, confirmedAt: '2026-10-17T12:00:00.000Z', changed: true, activityId: 1 })
     const at = '2026-03-01T12:00:00.000Z'
     render(<FreshnessFooter resourceId="r1" confirmedAt={at} source={{ from: 'Refuah', at }} />)
-    expect(screen.getByTestId('freshness')).toHaveTextContent('From Refuah, Mar 1. Still right? Yes')
+    expect(screen.getByTestId('freshness')).toHaveTextContent('Confirmed by Refuah, Mar 1. Still right? Yes')
     fireEvent.click(screen.getByRole('button', { name: 'Yes' }))
     await waitFor(() => expect(screen.getByTestId('freshness')).toHaveTextContent('Confirmed. Thanks!'))
     expect(screen.getByTestId('freshness')).not.toHaveTextContent('Refuah')

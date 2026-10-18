@@ -492,7 +492,7 @@ export default function ListingView({ item, category, color, place = null, upvot
   const otherHours = main === 'groups' ? [] : hoursFields.filter((f) => !f.audienceKey && hasAny(item[f.key]))
   // When Google last updated the box, at its foot (Oct 6): one date for
   // the box, not a list of which of its lines are Google's.
-  const googleLead = googleKeepsBox(item, { hours: otherHours.length > 0 }) ? `Last updated from Google, ${shortDate(item.googleSyncedAt!, clock)}` : null
+  const googleLead = googleKeepsBox(item, { hours: otherHours.length > 0 }) ? `Checked with Google, ${shortDate(item.googleSyncedAt!, clock)}` : null
   // The website, by name, with the address and phone (Oct 6): its round
   // button above says only "Website".
   const website = buttons.find((a): a is Extract<ActionSpec, { kind: 'link' }> => a.kind === 'link' && isWebsite(a.field))
@@ -648,14 +648,14 @@ export default function ListingView({ item, category, color, place = null, upvot
   // are.
   const fromGoogle = aboutFields.some((f) => f.key === 'googleDescription') && !!item.placeId && !!item.googleFields?.includes('description')
   // Its foot says when it was last right (the user, Oct 15): Google's
-  // date when the sync keeps it, as the contact box says Google's ("Last
-  // updated from Google, Aug 28."); otherwise its own "Confirmed Sep 29",
+  // date when the sync keeps it, as the contact box says Google's ("Checked
+  // with Google, Aug 28."); otherwise its own "Confirmed Sep 29",
   // asked about once that's old, under its first description's key
   // (migration 078). Edit beside either.
   const editAbout = editRows('About', ['about'])
   const aboutKey = aboutFields[0]?.key
   const aboutFoot = fromGoogle ? (
-    <span data-testid="about-google">{item.googleSyncedAt ? `Last updated from Google, ${shortDate(item.googleSyncedAt, clock)}.` : 'From Google.'}</span>
+    <span data-testid="about-google">{item.googleSyncedAt ? `Checked with Google, ${shortDate(item.googleSyncedAt, clock)}.` : 'Checked with Google.'}</span>
   ) : aboutKey ? (
     <FreshnessFooter resourceId={item.id} source={item.confirmedFrom} by={confirmedByFor(item, aboutKey)} confirmedAt={sectionConfirmedAt(item, aboutKey)} section={aboutKey} onEdit={editAbout} />
   ) : undefined

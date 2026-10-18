@@ -398,7 +398,7 @@ export async function approveSubmission(id: string, community?: string, reviewed
   let newItems: { fieldKey: string; item: string }[] = []
   let changes: ChangePart[] | undefined
   if (submission.target_type === 'listing') {
-    ;({ id: affectedResourceId, newItems, changes } = await applyListing(submission, reviewedBy))
+    ;({ id: affectedResourceId, newItems, changes } = await applyListing(submission))
   } else if (submission.target_type === 'category') {
     await applyCategory(submission)
   } else if (submission.target_type === 'eruv' && submission.operation === 'update') {
@@ -797,11 +797,11 @@ function withResolvedGoogleFields(
  * listing and says nothing about its details being current.
  */
 function withConfirmedNow(details: Record<string, unknown>, now: string, named?: string, community?: boolean): Record<string, unknown> {
-  // An outside source by name (submissionSource's `named`) dates it "From
-  // Keystone-K's list, Oct 12"; a visitor's own edit, "Updated by a
-  // community member, Oct 12" (isCommunityEdit); anything else, "Confirmed
-  // Oct 12". Always set or cleared here, so an older source or person never
-  // outlives the date they gave.
+  // An outside source by name (submissionSource's `named`) dates it
+  // "Confirmed by Keystone-K, Oct 12" ("Checked with Google"); a person's
+  // edit, "Confirmed by community, Oct 12" (isCommunityEdit). Always set or
+  // cleared here, so an older source or person never outlives the date
+  // they gave.
   const next: Record<string, unknown> = { ...details, confirmedAt: now }
   delete next.confirmedFrom
   delete next.confirmedBy
@@ -886,11 +886,11 @@ function menuOf(payload: unknown): { url: string | null } | null {
 
 type AppliedListing = { id: string | null; newItems: { fieldKey: string; item: string }[]; changes?: ChangePart[] }
 
-async function applyListing(submission: SubmissionRow, reviewedBy?: string): Promise<AppliedListing> {
+async function applyListing(submission: SubmissionRow): Promise<AppliedListing> {
   const supabase = getAdminClient()
   const now = new Date().toISOString()
   const named = submissionSource(submission).named
-  const community = isCommunityEdit(submission, reviewedBy)
+  const community = isCommunityEdit(submission)
 
   if (submission.operation === 'create') {
     const payload = submission.payload as unknown as ResourceSubmission
