@@ -7,6 +7,7 @@ import { withCommunity } from '@/lib/useCommunityData'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { MENU_WATCH_CREATOR, watchHealth, type Watch } from '@/lib/watches'
 import { refuahHospitalId } from '@/lib/refuahWatch'
+import { isMekorList } from '@/lib/mekorWatch'
 import { isIgnoredSender, isNewsletterWatch } from '@/lib/newsletter'
 
 // ── The "Watches" tab (freshness map, Oct 5) ────────────────────────────────
@@ -67,6 +68,16 @@ function WhatItDoes({ watch }: { watch: Watch }) {
     return (
       <p className="text-xs text-muted">
         Compared with the guide every morning. Differences go to the moderation queue, quoting the list.
+        {lastRead}
+      </p>
+    )
+  }
+  // Mekor Habracha's kosher list, read place by place (mekorWatch.ts).
+  if (isMekorList(watch.url)) {
+    return (
+      <p className="text-xs text-muted" data-testid="mekor-watch">
+        Compared with the guide every morning. A place it lists that the guide lacks, and any hechsher the guide shows that it doesn&rsquo;t (IKC
+        above all), go to the moderation queue, quoting the list. Nothing is taken off without you.
         {lastRead}
       </p>
     )

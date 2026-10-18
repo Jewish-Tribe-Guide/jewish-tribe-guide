@@ -1,5 +1,7 @@
 import { KEYSTONE_LIST_URL } from './keystoneWatch'
 import { runKeystoneWatch } from './keystoneRun'
+import { isMekorList } from './mekorWatch'
+import { runMekorWatch } from './mekorRun'
 import { readWebsite } from './websiteWatch'
 import { refuahHospitalId } from './refuahWatch'
 import { runRefuahWatch } from './refuahRun'
@@ -32,6 +34,12 @@ export async function runWatch(
     }
     if (watch.kind === 'keystone_list') {
       const run = await runKeystoneWatch(watch.communityId, watch.url)
+      return run.ok ? { ok: true, filed: run.filed } : { ok: false, error: run.error }
+    }
+    // Mekor Habracha's kosher list, read place by place like Keystone-K's
+    // (mekorWatch.ts). A website watch: no migration gave it a kind.
+    if (isMekorList(watch.url)) {
+      const run = await runMekorWatch(watch.communityId, watch.url)
       return run.ok ? { ok: true, filed: run.filed } : { ok: false, error: run.error }
     }
     // A hospital's page on Refuah builds itself in the browser, so it's read

@@ -105,6 +105,31 @@ for that exact change, in the same conversation. Show the dry run first.
    script.google.com, add the same secret as a script property, run
    `install`, then `readNewsletters` once. Link each sender on the Watches
    tab as it appears.
+6b. **Mekor Habracha watch** (built Oct 18 on
+   `claude/unruffled-aryabhata-926203`, no migration; the comparison in 6a,
+   made daily). A website watch on mekorhabracha.org/center-city is read
+   by code, never the AI (`src/lib/mekorWatch.ts`, `mekorRun.ts`). It
+   matches each Mekor place to a guide listing by its certificate link
+   (Keystone-K's shared pages don't count), else by name and street number
+   or phone, and files nothing when unsure. It never changes a listing: each
+   difference goes to the queue as "Mekor Habracha list (automated)",
+   quoting Mekor's entry: a place the guide lacks (Google is asked first,
+   and a closed one is skipped; an archived one says so), a hechsher the
+   guide shows that Mekor doesn't, or Mekor's other than Keystone-K, and
+   an IKC place Mekor doesn't list (removing IKC, for a person to decide).
+   Keystone-K is never added or taken off from here; Keystone-K's watch
+   owns it. It never re-files what it filed before, approved or rejected,
+   and skips places already in the queue from anyone. It files nothing if
+   it reads fewer than 40 places.
+   **Production dry run, Oct 18 (read-only): 18 suggestions**, as 6a,
+   plus Primo Water Ice. Mekor's is in Cherry Hill, the guide's in Haddon
+   Township, a different branch, so it's filed as new.
+   On the test project the watch row exists and filed 15, and a second
+   run filed nothing. Until this merges, the test project's daily run
+   treats it as a plain website check.
+   **For the user, once merged:** say yes, and an admin adds
+   `https://www.mekorhabracha.org/center-city` on the live Watches tab,
+   which runs it at once and files the 18.
 
 ## Small open decisions
 
