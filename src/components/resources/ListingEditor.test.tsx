@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { makeListing } from '@/test/providerFixtures'
-import { FOOD, HOSPITAL, MIKVAH, SHUL } from '@/test/editorFixtures'
+import { FOOD, GROCERY, HOSPITAL, MIKVAH, SHUL } from '@/test/editorFixtures'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { mockRouter } from '@/test/nextNavigationMock'
 import { PreviewSendProvider } from '@/lib/previewSend'
@@ -272,6 +272,32 @@ describe('ListingEditor — dishes and items', () => {
     await u.click(done())
     expect(row('items')).toHaveTextContent('Changed')
     expect(row('items')).toHaveTextContent('3 · Cupcakes, Babka, Brownies')
+  })
+
+  // Oct 17: a food place's menu link is suggested on its Main dishes screen,
+  // and sent with the edit for the queue.
+  it('a food place’s Main dishes screen has its menu link; a new one marks the row and is sent', async () => {
+    const u = user()
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ ok: true }) })
+    vi.stubGlobal('fetch', fetchMock)
+    renderEditor()
+    await u.click(row('items'))
+    const link = screen.getByLabelText('Menu link')
+    expect(link).toHaveValue('')
+    await u.type(link, 'https://shopsweetbox.com/menu')
+    await u.click(done())
+    expect(row('items')).toHaveTextContent('Changed')
+    await u.click(sendButton())
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).payload.details.menuUrl).toBe('https://shopsweetbox.com/menu')
+  })
+
+  it('a grocery’s items have no menu link', async () => {
+    const u = user()
+    renderEditor({ item: makeListing({ id: 'g', category: 'grocery', name: 'Acme', m: ['Challah'] }), category: GROCERY })
+    await u.click(row('items'))
+    expect(screen.getByTestId('items-editor')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Menu link')).not.toBeInTheDocument()
   })
 })
 

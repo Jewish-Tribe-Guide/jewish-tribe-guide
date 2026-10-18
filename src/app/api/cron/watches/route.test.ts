@@ -18,6 +18,9 @@ const mockAlert = vi.hoisted(() => vi.fn())
 vi.mock('@/lib/email', () => ({ sendWatchHealthAlert: mockAlert }))
 const mockEruvLines = vi.hoisted(() => vi.fn(async () => []))
 vi.mock('@/lib/eruvLineRun', () => ({ runEruvLines: mockEruvLines }))
+const mockSyncMenus = vi.hoisted(() => vi.fn(async () => [] as unknown[]))
+const mockMenu = vi.hoisted(() => vi.fn())
+vi.mock('@/lib/menuWatchRun', () => ({ syncMenuWatches: mockSyncMenus, runMenuWatch: mockMenu, newMenuReadBudget: () => ({ aiReads: 3 }) }))
 
 const { GET } = await import('./route')
 
@@ -60,6 +63,34 @@ afterEach(() => {
 })
 
 describe('/api/cron/watches', () => {
+  // Oct 17: each food place's menu link has a watch, made by the run itself.
+  it('gives the menu links their watches first, then runs them on one shared AI budget', async () => {
+    const order: string[] = []
+    mockSyncMenus.mockImplementationOnce(async () => (order.push('sync'), [{ community: 'philly', added: 1, removed: 0 }]))
+    mockList.mockImplementation(async () => (order.push('list'), {
+      available: true,
+      watches: [
+        watch({ id: 'm1', url: 'https://judah.example/menu', resourceId: 'r1', createdBy: 'menu links', pageHash: 'old' }),
+        watch({ id: 'm2', url: 'https://sweetbox.example/menu', resourceId: 'r2', createdBy: 'menu links' }),
+      ],
+    }))
+    mockMenu.mockResolvedValue({ ok: true, filed: 0, pageHash: 'h' })
+    const body = await (await GET(request())).json()
+    expect(order).toEqual(['sync', 'list'])
+    expect(body.menus).toEqual([{ community: 'philly', added: 1, removed: 0 }])
+    expect(mockMenu).toHaveBeenCalledTimes(2)
+    expect(mockMenu.mock.calls[0][0]).toMatchObject({ url: 'https://judah.example/menu', resourceId: 'r1', pageHash: 'old' })
+    expect(mockMenu.mock.calls[0][1]).toBe(mockMenu.mock.calls[1][1])
+    expect(mockWebsite).not.toHaveBeenCalled()
+  })
+
+  it('a failure making the menu watches never stops the rest', async () => {
+    mockSyncMenus.mockRejectedValueOnce(new Error('db down'))
+    mockList.mockResolvedValue({ available: true, watches: [watch({ id: 'site', url: 'https://bzbi.org/worship/' })] })
+    const body = await (await GET(request())).json()
+    expect(body.results.map((r: { id: string }) => r.id)).toEqual(['site'])
+  })
+
   it('runs every active watch with its own reader, and saves each run', async () => {
     mockList.mockResolvedValue({
       available: true,

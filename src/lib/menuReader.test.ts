@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { fetchPublic, findMenu, htmlToText, isOrderingApp, isPrivateAddress, menuLinks, menuMessages, readMenu, tidyMenuReading, type MenuSource } from './menuReader'
+import { fetchPublic, findMenu, htmlToText, isOrderingApp, isPrivateAddress, menuLinks, menuMessages, readMenu, readMenuPage, tidyMenuReading, type MenuSource } from './menuReader'
 
 const publicDns = async () => ['93.184.216.34']
 const page = (body: string, type = 'text/html; charset=utf-8', status = 200, headers: Record<string, string> = {}) =>
@@ -70,6 +70,20 @@ describe('reading a page', () => {
     expect(await findMenu('https://grill.example', { fetchImpl: onePage, resolve: publicDns })).toMatchObject({ url: 'https://grill.example/' })
     // A page with nearly no text (drawn by a script) isn't a menu.
     expect(await findMenu('https://grill.example', { fetchImpl: vi.fn().mockResolvedValue(page('<div id="root"></div>')), resolve: publicDns })).toBeNull()
+  })
+
+  // Oct 17: a place's own menu link is read as it is, never searched from.
+  it('a menu link: the page itself, or its PDF; never an ordering app, nor a page with nearly no text', async () => {
+    const menuText = `<h2>Mains</h2>${'<p>Chicken Shawarma Plate with rice and salad</p>'.repeat(8)}`
+    const one = vi.fn().mockResolvedValueOnce(page(menuText))
+    expect(await readMenuPage('https://grill.example/menu', { fetchImpl: one, resolve: publicDns })).toMatchObject({ url: 'https://grill.example/menu', pdf: null })
+    expect(one).toHaveBeenCalledTimes(1)
+    const pdf = await readMenuPage('https://grill.example/menu.pdf', { fetchImpl: vi.fn().mockResolvedValue(page('%PDF-1.4', 'application/pdf')), resolve: publicDns })
+    expect(pdf).toMatchObject({ text: null, pdf: expect.any(String) })
+    const app = vi.fn()
+    expect(await readMenuPage('https://www.doordash.com/store/grill', { fetchImpl: app, resolve: publicDns })).toBeNull()
+    expect(app).not.toHaveBeenCalled()
+    expect(await readMenuPage('https://grill.example/menu', { fetchImpl: vi.fn().mockResolvedValue(page('<div id="root"></div>')), resolve: publicDns })).toBeNull()
   })
 })
 

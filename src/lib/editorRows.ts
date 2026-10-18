@@ -7,6 +7,8 @@ import { sameFieldValue } from './listingDiff'
 import { boxesOf, mainCardOf, shabbosAfter, shabbosFieldsOf } from './listingParts'
 import { isCertificateLink, isWebsite, itemsField, kindField, siteName } from './listingView'
 import { minyanimForBox, type MinyanBox } from './minyanimBox'
+import { itemWording } from './itemMarks'
+import { MENU_LINK_KEY } from './menuLink'
 
 // ── The whole-listing editor's rows (agreed Oct 11, canvas page "editor") ───
 // "Suggest an edit" is the listing's own boxes, in the listing's order, one
@@ -298,6 +300,8 @@ export function rowChanged(row: EditorRow, item: DirectoryResource, values: Edit
     // rows go back with them.
     return boxText(minyanimForBox(was, row.box!)) !== boxText(minyanimForBox(now, row.box!))
   }
+  // A food place's menu link is typed on its Main dishes screen.
+  if (row.kind === 'items' && itemWording(row.fields[0]).noun === 'dish' && MENU_LINK_KEY in d && !sameFieldValue('url', item[MENU_LINK_KEY], d[MENU_LINK_KEY])) return true
   return row.fields.some((f) => {
     if (!fieldIsVisible(f, d) && !fieldIsVisible(f, item)) return false
     const after = fieldIsVisible(f, d) ? d[f.key] : undefined

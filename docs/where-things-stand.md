@@ -82,12 +82,27 @@ for that exact change, in the same conversation. Show the dry run first.
    can't be seen through the API: without them a public eruv suggestion
    fails to send and Yes under a contact box says "Didn't save". 067's
    columns (Today) are missing too, harmless while Today is held back.
+6. **Menu watches start on the live site with the next merge** (built Oct
+   17, no migration). The first daily run after it gives every live food
+   place with a menu link a watch of its own (about 15, created by "menu
+   links" on the Watches tab) and only records each menu as it is. From
+   then on a menu is read every morning for free; the AI (`OPENAI_API_KEY`)
+   reads it only when its words change, at most 3 a run, and dishes the
+   listing doesn't have wait on the Main dishes tab. Pausing one stops it;
+   removing one brings it back the next morning. The test project's daily
+   run makes the watches but never calls the AI.
 
 ## Small open decisions
 
-6. The "+" button covers part of the third tile in a row on the phone home.
+7. The "+" button covers part of the third tile in a row on the phone home.
 
 ## Done Oct 17
+
+- **A food place's menu link can be suggested.** Edit listing → Main dishes
+  has a "Menu link" box (food places only; a grocery's items have none). The
+  queue and the admin email show it as "Menu link", and approving it sets
+  "Full menu". The Main dishes tab's Read starts from it, and falls back to
+  the website.
 
 - **Shorter search hint, live:** `site_settings.search_placeholder` is "Ask:
   challah, pizza open now" on both databases (the user's yes, Oct 17; was

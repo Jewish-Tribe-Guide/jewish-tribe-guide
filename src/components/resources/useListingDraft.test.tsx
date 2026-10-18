@@ -39,4 +39,19 @@ describe('useListingDraft.buildSubmission', () => {
     expect(details.items).toEqual(['Challah'])
     expect(details.items_sometimes).toEqual(['Steak'])
   })
+
+  // Oct 17: a food place's menu link isn't a category field, so the draft
+  // carries it beside the dishes: the stored one is sent back as it was,
+  // and an edit to it is sent. A grocery's items have no menu.
+  it('carries a food place’s menu link, and sends an edit to it', () => {
+    const food = makeCategory({ detailFields: [{ key: 'dishes', label: 'Main dishes', type: 'tags', showCountInHeader: true, countLabel: 'main dish' }] })
+    const { result } = renderHook(() => useListingDraft(food, makeListing({ dishes: ['Falafel'], menuUrl: 'https://judah.example/menu' })))
+    expect(result.current.buildSubmission().details.menuUrl).toBe('https://judah.example/menu')
+    act(() => result.current.setDetail('menuUrl', 'https://judah.example/new'))
+    expect(result.current.buildSubmission().details.menuUrl).toBe('https://judah.example/new')
+
+    const grocery = makeCategory({ detailFields: [{ key: 'items', label: 'Kosher items', type: 'tags', showCountInHeader: true, countLabel: 'kosher item' }] })
+    const other = renderHook(() => useListingDraft(grocery, makeListing({ items: ['Challah'], menuUrl: 'https://acme.example/menu' })))
+    expect(other.result.current.buildSubmission().details).not.toHaveProperty('menuUrl')
+  })
 })

@@ -1,3 +1,5 @@
+import { MENU_LINK_KEY, readMenuLink } from './menuLink'
+
 // Detail keys that belong to the app, not to a person.
 //
 // Google-sync provenance and geocoding bookkeeping: written by the sync job
@@ -34,10 +36,13 @@ export const SYNC_INTERNAL_FIELDS = [
   // removal is its own submission). Set by mark_item, cleared by
   // rejecting that removal or a later "Still here".
   'itemGone',
-  // When an admin approved each dish from the place's own menu, and the
-  // menu it was read from (the admin's "Main dishes" tab, migration 065).
-  // An admin's, never a submitter's: an edit can't date a dish "on its menu".
+  // When an admin approved each dish from the place's own menu (the admin's
+  // "Main dishes" tab, migration 065). An admin's, never a submitter's: an
+  // edit can't date a dish "on its menu".
   'itemMenu',
+  // The menu's link. Kept across an edit that doesn't carry it, like the
+  // rest; but a person's to suggest too (menuLink.ts), so submitterDetails
+  // lets a submitter's own link through and the diff shows it.
   'menuUrl',
   // When each of a mikvah's sections was last confirmed (confirm_section,
   // migration 071): a visitor's tap, never a submitter's or a moderator's.
@@ -61,6 +66,11 @@ export const DIFF_ONLY_HIDDEN_FIELDS = ['geo', 'placeId', 'googleFields', 'googl
  *  category never configured it — see SKIP_WHEN_UNCONFIGURED. */
 export const SHOWN_WHEN_CONFIGURED = 'googleDescription'
 
+/** The other one a submission may carry: a food place's menu link, typed in
+ *  Edit listing's Main dishes (menuLink.ts). Shown in the moderation diff
+ *  whenever a submission carries it. */
+export const MENU_LINK_PROPOSED = MENU_LINK_KEY
+
 /** The one internal a submission may still carry: picking an address reads
  *  the place's status off Google (AddressInput → ListingForm), so a new
  *  listing isn't published with no status at all. Shown in the moderation
@@ -81,14 +91,16 @@ const GOOGLE_BUSINESS_STATUSES: ReadonlySet<unknown> = new Set(['OPERATIONAL', '
  * `googleSyncedAt` or `verifiedPlaceId` on a listing, and the admin approving
  * it would see nothing about it in the queue.
  *
- * Two kinds are a person's to send, and are kept:
+ * Three kinds are a person's to send, and are kept:
  * - `googleDescription` where the category configures it as a field (it is
  *   then a real, editable Description — see SHOWN_WHEN_CONFIGURED);
  * - `businessStatus` read off a place picked just now: a real Google status,
  *   in a category the sync covers, with a placeId that is new — every create,
  *   or an edit that changed the place. An edit that kept its place drops it,
  *   and approval keeps the listing's stored status, which the sync may have
- *   updated since the form loaded.
+ *   updated since the form loaded;
+ * - `menuUrl` where the category's items are dishes (`keepsMenuLink`): a web
+ *   address, tidied, or '' to take the link off. Anything else is dropped.
  */
 export function submitterDetails(
   details: Record<string, unknown>,
@@ -97,6 +109,8 @@ export function submitterDetails(
     fieldKeys: readonly string[]
     syncEligible: boolean
     storedPlaceId?: unknown
+    /** The category keeps a menu link (menuLink.ts's keepsMenuLink). */
+    keepsMenuLink?: boolean
   },
 ): Record<string, unknown> {
   const placeId = details.placeId
@@ -109,5 +123,7 @@ export function submitterDetails(
     if (key === SHOWN_WHEN_PROPOSED && keepStatus) continue
     delete next[key]
   }
+  const menu = ctx.keepsMenuLink ? readMenuLink(details[MENU_LINK_PROPOSED]) : undefined
+  if (menu !== undefined) next[MENU_LINK_PROPOSED] = menu
   return next
 }

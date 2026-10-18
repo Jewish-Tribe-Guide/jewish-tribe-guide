@@ -3,6 +3,7 @@ import { DAY_KEYS, dayLabel, fmt12, formatHoursSummary, isStructuredHours, type 
 import type { DirectoryResource, ResourceSubmission } from '@/types'
 import { readSchedules, schedulesKey } from './schedules'
 import { contactsChange, sameContacts } from './contacts'
+import { MENU_LINK_KEY, MENU_LINK_LABEL } from './menuLink'
 
 type Proposed = Pick<ResourceSubmission, 'name' | 'address' | 'phone' | 'details'>
 
@@ -241,6 +242,16 @@ export function listingChanges(existing: DirectoryResource | null | undefined, p
             : 'Photo removed'
           : `${describe(field, before)} → ${describe(field, after)}`
     changes.push({ key: field.key, label: field.label, before, after, summary })
+  }
+  // A food place's menu link (menuLink.ts): not one of the category's
+  // fields, so not in the loop above. Only when the edit carries one: an
+  // edit without it keeps the listing's on approval.
+  if (proposed.details && MENU_LINK_KEY in proposed.details) {
+    const before = existing[MENU_LINK_KEY]
+    const after = proposed.details[MENU_LINK_KEY]
+    if (normalize(before) !== normalize(after)) {
+      changes.push({ key: MENU_LINK_KEY, label: MENU_LINK_LABEL, before, after, summary: `${normalize(before) || '—'} → ${normalize(after) || '—'}` })
+    }
   }
   return changes
 }

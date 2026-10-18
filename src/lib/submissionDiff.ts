@@ -30,7 +30,9 @@ import {
   DIFF_ONLY_HIDDEN_FIELDS,
   SHOWN_WHEN_CONFIGURED,
   SHOWN_WHEN_PROPOSED,
+  MENU_LINK_PROPOSED,
 } from '@/lib/syncFields'
+import { MENU_LINK_LABEL } from '@/lib/menuLink'
 
 // A select/tags field stores raw option *values*, which don't always match
 // what the admin typed as the option's label (e.g. renamed since). Resolve
@@ -95,8 +97,9 @@ export function fmt(value: unknown, field?: CategoryField): string {
 // businessStatus is excluded too: it is the one internal a submission can
 // still set (from the Google place picked in the form), and a listing
 // arriving as "Permanently closed" is exactly what a moderator must see.
+// So is a food place's menu link (menuLink.ts), which anyone may suggest.
 export const HIDDEN_FROM_DIFF: ReadonlySet<string> = new Set<string>([
-  ...SYNC_INTERNAL_FIELDS.filter((k) => k !== SHOWN_WHEN_CONFIGURED && k !== SHOWN_WHEN_PROPOSED),
+  ...SYNC_INTERNAL_FIELDS.filter((k) => k !== SHOWN_WHEN_CONFIGURED && k !== SHOWN_WHEN_PROPOSED && k !== MENU_LINK_PROPOSED),
   ...DIFF_ONLY_HIDDEN_FIELDS,
 ])
 const SKIP = HIDDEN_FROM_DIFF
@@ -159,6 +162,10 @@ export function flatListing(src: ResourceRow | ResourceSubmission | undefined, f
       out.push({ key: k, label: BUSINESS_STATUS_LABEL, value: formatBusinessStatus(v) })
       continue
     }
+    if (k === MENU_LINK_PROPOSED) {
+      out.push({ key: k, label: MENU_LINK_LABEL, value: fmt(v) })
+      continue
+    }
     // Schedules beside a field the category no longer has: still read out.
     const schedules = k.endsWith('_schedules') ? readSchedules(v) : []
     out.push({ key: k, label: k, value: schedules.length ? formatSchedulesSummary(schedules) : fmt(v) })
@@ -190,12 +197,13 @@ export function diffListing(
   const after = flatListing(proposed, fields)
   const beforeByKey = new Map(before.map((r) => [r.key, r]))
   const afterByKey = new Map(after.map((r) => [r.key, r]))
-  // Except businessStatus: an edit that doesn't carry one leaves the stored
-  // status alone on approval (submissionStore's withPreservedInternals), so
-  // "Open → —" would report a change that never happens.
+  // Except businessStatus and the menu link: an edit that doesn't carry one
+  // leaves the stored one alone on approval (submissionStore's
+  // withPreservedInternals), so "Open → —" would report a change that never
+  // happens.
   const orderedKeys = [
     ...after.map((r) => r.key),
-    ...before.map((r) => r.key).filter((k) => !afterByKey.has(k) && k !== SHOWN_WHEN_PROPOSED),
+    ...before.map((r) => r.key).filter((k) => !afterByKey.has(k) && k !== SHOWN_WHEN_PROPOSED && k !== MENU_LINK_PROPOSED),
   ]
 
   return orderedKeys.map((key) => {

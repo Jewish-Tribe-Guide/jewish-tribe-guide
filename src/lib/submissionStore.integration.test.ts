@@ -193,13 +193,14 @@ describe('submissionStore (integration)', () => {
 
   // Oct 6: dishes read off a Food place's menu in the "+ Add" box are dated
   // "on its menu", with the link for "Full menu", as the Main dishes tab's
-  // approval does; dishes added any other way are "seen", and the link
-  // stays as it was.
-  it('approving dishes read off a menu dates them on its menu and keeps the link; others are seen', async () => {
+  // approval does; dishes added any other way are "seen". Since Oct 17 the
+  // link is a person's to suggest too: a typed one replaces it, '' takes it
+  // off, and an edit that doesn't mention it leaves it as it was.
+  it('approving dishes read off a menu dates them on its menu and keeps the link; others are seen; a typed link replaces it', async () => {
     const category = await makeTestCategory()
     await getAdminClient()
       .from('category')
-      .update({ fields: [{ key: 'dishes', label: 'Main dishes', type: 'tags', countLabel: 'main dish' }] })
+      .update({ fields: [{ key: 'dishes', label: 'Main dishes', type: 'tags', showCountInHeader: true, countLabel: 'main dish' }] })
       .eq('community_id', 'philly')
       .eq('id', category.id)
     const name = `Integration Listing ${randomUUID()}`
@@ -226,7 +227,21 @@ describe('submissionStore (integration)', () => {
     expect(afterTyped!.details.itemSeen.dishes.Kichari).toBeTruthy()
     expect(afterTyped!.details.itemMenu.dishes.Kichari).toBeUndefined()
     expect(afterTyped!.details.itemMenu.dishes.Dosas).toBe(afterMenu!.details.itemMenu.dishes.Dosas)
-    expect(afterTyped!.details.menuUrl).toBe('https://saysheate.co/menu/')
+    expect(afterTyped!.details.menuUrl).toBe('https://elsewhere.example/')
+
+    const silent = { ...listingPayload(category.id, name), details: { dishes: ['Salads', 'Dosas', 'Kichari'] } }
+    const silentSub = await submitListingUpdate('philly', created!.id, silent, null, null)
+    pendingSubmissionIds.push(silentSub.id)
+    await approveSubmission(silentSub.id)
+    const { data: afterSilent } = await getAdminClient().from('resource').select('details').eq('id', created!.id).single()
+    expect(afterSilent!.details.menuUrl).toBe('https://elsewhere.example/')
+
+    const cleared = { ...listingPayload(category.id, name), details: { dishes: ['Salads', 'Dosas', 'Kichari'], menuUrl: '' } }
+    const clearedSub = await submitListingUpdate('philly', created!.id, cleared, null, null)
+    pendingSubmissionIds.push(clearedSub.id)
+    await approveSubmission(clearedSub.id)
+    const { data: afterCleared } = await getAdminClient().from('resource').select('details').eq('id', created!.id).single()
+    expect(afterCleared!.details.menuUrl).toBeUndefined()
   })
 
   // Oct 17: a change an outside source made dates the listing "From
