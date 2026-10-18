@@ -61,13 +61,16 @@ for that exact change, in the same conversation. Show the dry run first.
 
 ## For the user or the community
 
-3. **Confirm the 23 live places with no date.** They say "Not confirmed by
-   anyone yet": 5 cemeteries, all 8 Networking groups, 2 WhatsApp groups, 3
-   mikvahs (Ohel Leah, Mei Shalva, Moishe Zvi), 4 restaurants (The Kosher
-   Grill, Chalavita, The Brazilian BBQ, Zevi's Bakery) and CKids. Once all
-   are dated, the home's trust line says "155 places · every listing dated"
-   by itself, and the sheet says "where and when it was last checked"
-   instead of "if and when".
+3. **Seven live places still have no date, on purpose.** On Oct 17 (the
+   user's yes) every other approved live listing with no confirmation was
+   stamped confirmed (80 of them, `confirmedAt` 2026-10-18T00:00Z, backup in
+   that session's scratchpad), so they show "Confirmed Oct 17" and are asked
+   "Still right?" after 90 days. Held back because something is known to be
+   wrong: Shtetl, The Brazilian BBQ and Rita's at Roosevelt Mall (off
+   Keystone-K's list), New York Bagel Bakery and Rita's at 1709 Grant Ave
+   and 2124 South St (Google: closed temporarily), Sababa Falafel (bad place
+   id). Fix or remove each; until all are dated the trust line keeps "if
+   and when".
 
 ## Getting the branch live
 
