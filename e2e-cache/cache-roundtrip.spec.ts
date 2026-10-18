@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { expect, test } from '@playwright/test'
 import { previewSettings } from '../e2e/helpers'
+import { IN_FLIGHT_RENDER_GRACE_MS } from '../src/lib/inFlightRenderGrace'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // The other half of caching.spec.ts.
@@ -101,31 +102,15 @@ test('an admin save reaches the cached public page', async ({ request }) => {
 // invalidated by the admin route calling revalidateTag directly instead of
 // going through revalidatePublicContent — a different enough code path from
 // site-settings above that a bug in one wouldn't show up in the other.
-// This test is RUNNING again, and it is the experiment for a fix.
 //
-// What the instrumentation below established, so nobody re-derives it:
-//   • The stored row holds the new body (asserted before the poll), so the
-//     write and the sanitizer are innocent.
-//   • Every failing poll is HIT/old — 62 in CI, 61 locally. A healthy run
-//     reads STALE/old → HIT/new. The failure never reaches STALE at all, so
-//     the page's cached entry was never marked. That rules out
-//     stale-while-revalidate, which this file blamed for months.
-//   • Not reproducible on demand. Warm server 15/15 and 12/12 clean, cold
-//     build with the dist dir deleted 5/5 clean, the suite itself 5/5 clean
-//     across warm and cold. It was also wrongly called CI-only after several
-//     clean local runs, then reproduced locally within the hour.
-//
-// The mechanism was never confirmed, but the symptom was precise — this
-// path's cache entry was never marked stale — so the PATCH route now calls
-// revalidatePath(`/${slug}`) alongside revalidateTag. That closed it: this
-// test (conditionally test.fail()'d on CI while the fix was unproven) has
-// come back an unexpected PASS in CI, which is Playwright's own signal that
-// the marker is stale and needs to come off, not that anything is newly
-// broken — see AGENTS.md's "…and /about had a second problem underneath it"
-// section for the full history. If /about ever regresses with the same
-// HIT/old signature, revalidatePath isn't reaching that entry either and the
-// next suspect is the build-time prerender, not the tag — but that's a new
-// investigation to reopen, not a reason to keep this marker pre-emptively.
+// This test's old intermittent failure — every poll HIT/old while the row held
+// the new body — was a race, found 2026-10-17: the site-settings test's
+// restore leaves /about stale, so this test's first GET started a
+// regeneration just before its PATCH, and Next stored that regeneration (built
+// from the old row) as newer than the save's invalidation. The test below this
+// one sets that race up on purpose; the fix is the PATCH route's delayed
+// second invalidation (revalidateAfterInFlightRenders.ts). See AGENTS.md's
+// "…and /about had a second problem underneath it".
 test('an admin save to a static page reaches the cached /about route', async ({ request }) => {
   const { accessToken } = JSON.parse(readFileSync('e2e-cache/.auth/token.json', 'utf-8')) as {
     accessToken: string
@@ -159,28 +144,13 @@ test('an admin save to a static page reaches the cached /about route', async ({ 
     expect(patchRes.ok(), 'PATCH /api/admin/pages/about should succeed').toBe(true)
     expect((await patchRes.json()).ok).toBe(true)
 
-    // 60s, not 20s, and the reason is measured rather than guessed — a
-    // timeout raised on a hunch is how a real caching bug gets buried.
+    // 60s, and it does not weaken this test. A healthy save converges in
+    // 1-2s; one that lands mid-regeneration (this test's usual case — see the
+    // note above it) converges once the route's delayed second invalidation
+    // runs, IN_FLIGHT_RENDER_GRACE_MS (5s) after the save. A genuine
+    // invalidation bug is unbounded, not slow: the entry would live for
+    // cacheLife('days'), so it fails at 60s as surely as at 20s.
     //
-    // This test failed intermittently in CI (roughly one run in thirty). The
-    // invalidation itself was instrumented by reading x-nextjs-cache on every
-    // poll, and it is not the problem: the transition is STALE → HIT on every
-    // observed run, in 15/15 repeated saves against a warm server (median
-    // 453ms), 3/3 single saves against a freshly booted one (~950ms), and 5/5
-    // full cold runs of this suite (1.2–1.6s). Cold start is under a second,
-    // so the earlier theory that this needed warm-up time was simply wrong.
-    //
-    // What is left is stale-while-revalidate: revalidateTag(…, 'max') serves
-    // the stale entry while regenerating behind it, so a single failed
-    // regeneration — a transient Supabase timeout while four CI jobs share one
-    // test project — leaves the old body being served rather than retrying at
-    // once. That matches the shape of the failure exactly: every success lands
-    // in well under two seconds and the rare failure never lands at all.
-    //
-    // Which is also why 60s does not weaken this test. A genuine invalidation
-    // bug is unbounded, not slow: the entry would live for cacheLife('days'),
-    // so it fails at 60s as surely as at 20s. The extra headroom only covers a
-    // regeneration that had to be retried.
     // Read the row back through the UNCACHED admin route first. This splits
     // the failure in two, and the split is the whole point: if the row does
     // not hold the new body, the write or the sanitizer is at fault and the
@@ -230,6 +200,113 @@ test('an admin save to a static page reaches the cached /about route', async ({ 
         const tail = seen.slice(-12).join(' ')
         throw new Error(`${err.message}\n\nlast ${Math.min(seen.length, 12)} of ${seen.length} polls: ${tail}`)
       })
+  } finally {
+    await request.patch('/api/admin/pages/about', {
+      headers: authHeaders,
+      data: { body: originalBody },
+    })
+  }
+})
+
+// The race behind the /about test's old HIT/old failure, set up on purpose
+// instead of waiting for CI to stumble into it.
+//
+// Next stamps a route's cached page with the time it was WRITTEN. A
+// regeneration that starts before the admin's save — reading the old row —
+// and finishes after the save's invalidation is therefore stored as newer
+// than the invalidation, and served as a fresh HIT for days. The test above
+// only met this by accident: the site-settings test's restore leaves /about
+// stale, so its first GET started a regeneration right before its PATCH.
+//
+// Each round here does that deliberately: settle /about, mark it stale through
+// a community tag it carries, GET it once (STALE — a regeneration is now in
+// flight), and save straight away. Against the route without its second,
+// delayed invalidation (revalidateAfterInFlightRenders.ts) a round loses the
+// save about three times in four — 6 of 8 in the probe that pinned this — so
+// three rounds make a pass on the broken code a ~1-in-60 event. With it, each
+// round lands once the second pass runs, IN_FLIGHT_RENDER_GRACE_MS after the
+// save.
+test('an admin save lands even when /about is mid-regeneration', async ({ request }) => {
+  test.setTimeout(150_000)
+  const { accessToken } = JSON.parse(readFileSync('e2e-cache/.auth/token.json', 'utf-8')) as {
+    accessToken: string
+  }
+  const authHeaders = { Authorization: `Bearer ${accessToken}` }
+
+  const community = new URL((await request.get('/')).url()).pathname.split('/').filter(Boolean)[0]
+  expect(community, 'the "/" redirect should land on a community').toBeTruthy()
+
+  const pagesRes = await request.get('/api/admin/pages', { headers: authHeaders })
+  expect(pagesRes.ok()).toBe(true)
+  const originalBody: string = (await pagesRes.json()).pages.find((p: { slug: string }) => p.slug === 'about').body
+  const settingsRes = await request.get('/api/admin/site-settings', { headers: authHeaders })
+  expect(settingsRes.ok()).toBe(true)
+  // Re-saved unchanged: the point is the invalidation the save performs, not
+  // the value, so there is nothing to restore.
+  const siteName: string = (await settingsRes.json()).settings.name
+
+  const aboutUrl = `/${community}/about`
+  const header = (res: { headers(): Record<string, string> }) => res.headers()['x-nextjs-cache'] ?? 'no-header'
+
+  try {
+    for (let round = 1; round <= 3; round++) {
+      // Sit out the previous save's delayed second invalidation, so it cannot
+      // land in the middle of this round's setup and turn the STALE below
+      // into a MISS. Every save in this suite schedules one.
+      await new Promise((resolve) => setTimeout(resolve, IN_FLIGHT_RENDER_GRACE_MS + 1_000))
+
+      // Settle: a fresh entry that the next step can mark stale.
+      await expect
+        .poll(async () => header(await request.get(aboutUrl)), {
+          timeout: 15_000,
+          message: `round ${round}: /about should settle to a cached HIT before the race is set up`,
+        })
+        .toBe('HIT')
+
+      const settingsPatch = await request.patch('/api/admin/site-settings', {
+        headers: authHeaders,
+        data: { name: siteName },
+      })
+      expect(settingsPatch.ok(), 'PATCH /api/admin/site-settings should succeed').toBe(true)
+
+      // The visitor whose request starts the regeneration. STALE is the proof
+      // that one is now running in the background, reading the current row.
+      const visitor = await request.get(aboutUrl)
+      expect(
+        header(visitor),
+        `round ${round}: /about should be STALE here, with a regeneration started behind it — ` +
+          'anything else means this round did not set up the race it exists to test',
+      ).toBe('STALE')
+
+      const marker = `Mid-regeneration check ${Date.now()} round ${round}`
+      const patchRes = await request.patch('/api/admin/pages/about', {
+        headers: authHeaders,
+        data: { body: marker },
+      })
+      expect(patchRes.ok(), 'PATCH /api/admin/pages/about should succeed').toBe(true)
+
+      const seen: string[] = []
+      await expect
+        .poll(
+          async () => {
+            const res = await request.get(aboutUrl)
+            const hit = (await res.text()).includes(marker)
+            seen.push(`${header(res)}${hit ? '/new' : '/old'}`)
+            return hit
+          },
+          {
+            timeout: 20_000,
+            message:
+              `round ${round}: the save landed while /about was regenerating from the old row. ` +
+              'HIT/old to the end means that regeneration was stored as fresh over the save — the ' +
+              'delayed second invalidation (revalidateAfterInFlightRenders.ts) did not run or did not reach it',
+          },
+        )
+        .toBe(true)
+        .catch((err: Error) => {
+          throw new Error(`${err.message}\n\nlast ${Math.min(seen.length, 12)} of ${seen.length} polls: ${seen.slice(-12).join(' ')}`)
+        })
+    }
   } finally {
     await request.patch('/api/admin/pages/about', {
       headers: authHeaders,
