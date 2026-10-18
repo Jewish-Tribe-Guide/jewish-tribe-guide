@@ -103,7 +103,7 @@ describe('WatchesManager', () => {
     const created = watch({ id: 'new', url: 'https://lowermerionsynagogue.org/', label: 'Weekly times' })
     await renderTab([], { post: { watch: created } })
     const user = userEvent.setup()
-    await user.type(screen.getByLabelText('Web address'), 'lowermerionsynagogue.org')
+    await user.type(screen.getByLabelText(/^Web address/), 'lowermerionsynagogue.org')
     await user.type(screen.getByLabelText(/The listing it keeps current/), 'Lower Merion Synagogue')
     await user.type(screen.getByLabelText(/Name/), 'Weekly times')
     await user.click(screen.getByRole('button', { name: 'Watch this page' }))
@@ -116,5 +116,42 @@ describe('WatchesManager', () => {
     await renderTab([], { available: false })
     expect(screen.getByText(/needs database migration 070/)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Watch this page' })).not.toBeInTheDocument()
+  })
+
+  // Shul newsletters (newsletter.ts): a sender the inbox hasn't seen comes
+  // in unlinked, to be tied to its shul here.
+  it('asks which shul a new newsletter sender is, and links it', async () => {
+    const sender = watch({ id: 'n', url: 'mailto:info@lms.org', label: 'Lower Merion Synagogue', createdBy: 'shul newsletters', active: false, lastRunAt: null, lastOkAt: null })
+    await renderTab([sender], { post: { watch: { ...sender, resourceId: 'shul-1', active: true } } })
+    const row = screen.getByTestId('watch-row')
+    expect(within(row).getByText('Newsletter from info@lms.org')).toBeInTheDocument()
+    expect(within(row).getByText(/Not linked to a shul yet/)).toBeInTheDocument()
+    // Nothing to check or pause until it's linked.
+    expect(within(row).queryByRole('button', { name: 'Check now' })).toBeNull()
+    const user = userEvent.setup()
+    const link = within(row).getByRole('button', { name: 'Link' })
+    expect(link).toBeDisabled()
+    await user.type(within(row).getByLabelText('The shul it’s from'), 'Lower Merion Synagogue')
+    await user.click(link)
+    const [, init] = vi.mocked(fetchJson).mock.calls.find(([, i]) => i?.method === 'POST')!
+    expect(JSON.parse(String(init!.body))).toEqual({ action: 'link', id: 'n', resourceId: 'shul-1' })
+    expect(await within(row).findByTestId('newsletter-watch')).toHaveTextContent(/No newsletter read yet/)
+    expect(within(row).getByText(/Keeps current: Lower Merion Synagogue/)).toBeInTheDocument()
+  })
+
+  it('says when a linked newsletter last came, and that a quiet month is flagged', async () => {
+    await renderTab([watch({ url: 'mailto:info@lms.org', resourceId: 'shul-1', createdBy: 'shul newsletters', lastFiled: 1, pageChangedAt: ago(3) })])
+    const line = screen.getByTestId('newsletter-watch')
+    expect(line).toHaveTextContent(/emailed if none comes for a month/)
+    expect(line).toHaveTextContent(/Last newsletter .*\. Last read: 1 suggestion\./)
+  })
+
+  it('skips a sender that isn’t a shul', async () => {
+    const sender = watch({ id: 'n', url: 'mailto:no-reply@accounts.google.com', createdBy: 'shul newsletters', active: false })
+    await renderTab([sender], { post: { watch: { ...sender, createdBy: 'shul newsletters: not a shul' } } })
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Not a shul' }))
+    const [, init] = vi.mocked(fetchJson).mock.calls.find(([, i]) => i?.method === 'POST')!
+    expect(JSON.parse(String(init!.body))).toEqual({ action: 'ignore', id: 'n' })
+    expect(await screen.findByText(/Not a shul: its emails are skipped/)).toBeInTheDocument()
   })
 })

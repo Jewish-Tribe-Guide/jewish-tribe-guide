@@ -60,6 +60,7 @@ const TO_COLUMN: Record<string, string> = {
   active: 'active',
   label: 'label',
   resourceId: 'resource_id',
+  createdBy: 'created_by',
 }
 
 function toColumns(patch: Partial<Watch>): Record<string, unknown> {
@@ -99,10 +100,20 @@ export async function getWatch(community: string, id: string): Promise<Watch | n
   return data ? fromRow(data as Row) : null
 }
 
-/** Adds a page. Null when the community already watches that address. */
+/** The watch on one address, if the community has it: a newsletter's
+ *  sender (`mailto:`), looked up as each email comes in. */
+export async function getWatchByUrl(community: string, url: string): Promise<Watch | null> {
+  const { data, error } = await getAdminClient().from('watch').select(COLUMNS).eq('community_id', community).eq('url', url).maybeSingle()
+  if (error) throw new Error(`Failed to load the watch: ${error.message}`)
+  return data ? fromRow(data as Row) : null
+}
+
+/** Adds a page. Null when the community already watches that address.
+ *  `active: false` adds it paused: a newsletter sender no one has tied to
+ *  a shul yet. */
 export async function addWatch(
   community: string,
-  watch: { kind: WatchKind; url: string; resourceId: string | null; label: string | null; createdBy: string | null },
+  watch: { kind: WatchKind; url: string; resourceId: string | null; label: string | null; createdBy: string | null; active?: boolean },
 ): Promise<Watch | null> {
   const { data, error } = await getAdminClient()
     .from('watch')
@@ -113,6 +124,7 @@ export async function addWatch(
       resource_id: watch.resourceId,
       label: watch.label,
       created_by: watch.createdBy,
+      ...(watch.active === false ? { active: false } : {}),
     })
     .select(COLUMNS)
     .single()

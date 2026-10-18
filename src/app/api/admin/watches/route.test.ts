@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { makeCategory, makeListing } from '@/test/providerFixtures'
 import type { Watch } from '@/lib/watches'
+import { NEWSLETTER_IGNORED_CREATOR, NEWSLETTER_WATCH_CREATOR } from '@/lib/newsletter'
 
 const m = vi.hoisted(() => ({
   getAdminUserForCommunity: vi.fn(),
@@ -116,5 +117,41 @@ describe('/api/admin/watches', () => {
     expect(m.runAndRecord).toHaveBeenCalledWith(added)
     await POST(req('POST', { action: 'remove', id: WATCH }))
     expect(m.removeWatch).toHaveBeenCalledWith('philly', WATCH)
+  })
+
+  // Shul newsletters (newsletter.ts): a sender is watched by its address.
+  describe('newsletters', () => {
+    const sender = { ...added, url: 'mailto:info@mekor.org', resourceId: null, active: false, createdBy: NEWSLETTER_WATCH_CREATOR } as Watch
+
+    it('adds a newsletter by its address, only with the shul it’s from, and doesn’t try to fetch it', async () => {
+      expect((await POST(req('POST', { action: 'add', url: 'Info@Mekor.org' }))).status).toBe(400)
+      expect(m.addWatch).not.toHaveBeenCalled()
+      const res = await POST(req('POST', { action: 'add', url: 'Info@Mekor.org', resourceId: SHUL }))
+      expect(res.status).toBe(200)
+      expect(m.addWatch).toHaveBeenCalledWith('philly', { kind: 'website', url: 'mailto:info@mekor.org', resourceId: SHUL, label: 'info@mekor.org', createdBy: NEWSLETTER_WATCH_CREATOR })
+      expect(m.runAndRecord).not.toHaveBeenCalled()
+    })
+
+    it('links a sender to its shul and turns it on', async () => {
+      m.getWatch.mockResolvedValue(sender)
+      expect((await POST(req('POST', { action: 'link', id: WATCH, resourceId: '5a1f0c2e-7b3d-4e8a-9c6f-1d2e3f4a5b6c' }))).status).toBe(400)
+      expect(m.updateWatch).not.toHaveBeenCalled()
+      const res = await POST(req('POST', { action: 'link', id: WATCH, resourceId: SHUL }))
+      expect((await res.json()).watch).toMatchObject({ resourceId: SHUL, active: true })
+      expect(m.updateWatch).toHaveBeenCalledWith('philly', WATCH, { resourceId: SHUL, active: true })
+    })
+
+    it('skips a sender that isn’t a shul', async () => {
+      m.getWatch.mockResolvedValue(sender)
+      await POST(req('POST', { action: 'ignore', id: WATCH }))
+      expect(m.updateWatch).toHaveBeenCalledWith('philly', WATCH, { createdBy: NEWSLETTER_IGNORED_CREATOR, resourceId: null, active: false })
+    })
+
+    it('links and skips only newsletters, never a page', async () => {
+      m.getWatch.mockResolvedValue(added)
+      expect((await POST(req('POST', { action: 'link', id: WATCH, resourceId: SHUL }))).status).toBe(400)
+      expect((await POST(req('POST', { action: 'ignore', id: WATCH }))).status).toBe(400)
+      expect(m.updateWatch).not.toHaveBeenCalled()
+    })
   })
 })

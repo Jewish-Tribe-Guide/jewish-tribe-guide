@@ -85,10 +85,30 @@ for that exact change, in the same conversation. Show the dry run first.
    listing doesn't have wait on the Main dishes tab. Pausing one stops it;
    removing one brings it back the next morning. The test project's daily
    run makes the watches but never calls the AI.
+6. **Shul newsletters** (built Oct 18 on `redesign/shul-newsletters`, not
+   merged; no migration). The guide's Gmail (phillyjewishguide@gmail.com)
+   is subscribed to shul newsletters. A Google Apps Script in that account
+   (`scripts/newsletter-apps-script.js`) sends each new email, hourly, to
+   `/api/inbound/newsletter`. The AI reads it for the shul's times, from the
+   words or else its PDF or picture, and for anything it says about other
+   places in the guide. It reads from the day the email was sent, so an old
+   one's "this Shabbos" is never filed as next week's. Each change goes to
+   the queue as "Shul newsletter (automated)", from "<shul>'s newsletter",
+   and approving it dates the listing "Confirmed by <shul>". Each sender is
+   a row on the Watches tab ("Newsletter from …"). A new sender comes in
+   unlinked: tie it to its shul there, or mark it "Not a shul". Its emails
+   are sent again every hour for two weeks until it is. The daily watch run
+   flags a newsletter that hasn't come in a month.
+   **For the user, once it's merged and live:** add `NEWSLETTER_SECRET` in
+   Vercel (Production), the value in `.env.local`. Then, signed in to the
+   guide's Gmail, follow the steps at the top of the script: paste it into
+   script.google.com, add the same secret as a script property, run
+   `install`, then `readNewsletters` once. Link each sender on the Watches
+   tab as it appears.
 
 ## Small open decisions
 
-6. The "+" button covers part of the third tile in a row on the phone home.
+7. The "+" button covers part of the third tile in a row on the phone home.
 
 ## Done Oct 17
 
