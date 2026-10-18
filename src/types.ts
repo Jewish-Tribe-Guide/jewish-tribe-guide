@@ -137,6 +137,11 @@ export type ResourceRow = {
 /** An outside source's name and the date it gave a listing. */
 export type ConfirmedFrom = { from: string; at: string }
 
+/** That a person dated a listing, and the date: a visitor's "Yes"
+ *  ('visitor'), or an edit an admin approved ('edit'). Both say "Confirmed
+ *  by community". An admin's bulk stamp carries none: plain "Confirmed". */
+export type ConfirmedBy = { by: 'visitor' | 'edit'; at: string }
+
 export type DirectoryResource = {
   id: string
   category: string
@@ -180,10 +185,16 @@ export type DirectoryResource = {
   /** ISO timestamp of the last time a user confirmed the community-curated info is still accurate. */
   confirmedAt?: string
   /** Where `confirmedAt` came from, when an admin approved a change an
-   *  outside source made ("Keystone-K’s list", "Refuah"): `at` is the
+   *  outside source made ("Keystone-K", "Refuah", "Google"): `at` is the
    *  confirmedAt it dated, so once a person confirms again (a new date) the
    *  line says "Confirmed" again. Set only by approval (submissionStore). */
   confirmedFrom?: ConfirmedFrom
+  /** Who `confirmedAt` came from, when a person gave it: "Confirmed by
+   *  community" (a visitor's tap, confirm_resource, migration 083, or an
+   *  approved edit).
+   *  `at` is the confirmedAt it dated, as with confirmedFrom, so a later
+   *  admin stamp says "Confirmed" again. */
+  confirmedBy?: ConfirmedBy
   /** 'OPERATIONAL'' | 'CLOSED_TEMPORARILY' | 'CLOSED_PERMANENTLY' from Google. */
   businessStatus?: 'OPERATIONAL' | 'CLOSED_TEMPORARILY' | 'CLOSED_PERMANENTLY'
   /** An admin's correction, which wins over `businessStatus` everywhere the

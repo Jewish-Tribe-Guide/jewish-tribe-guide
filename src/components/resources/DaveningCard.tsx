@@ -8,7 +8,7 @@ import { geoKey, geoOrCommunityDefault, resolveAnchorTime, type AnchorTimes } fr
 import { dateText, readSchedules, regularMinyanim, scheduleDayText, sendsWeekly, thisWeeksPost, type DayPosting, type SpecialSchedule } from '@/lib/schedules'
 import { clockMinutes, noteText, SHABBOS_PART_LABELS, shabbosList, timeText, weekdayTable, type ShabbosLine } from '@/lib/weekTable'
 import { DAY_KEYS, type DayKey } from '@/lib/hours'
-import { isMinyanOnly, sectionConfirmedAt } from '@/lib/listingView'
+import { confirmedByFor, isMinyanOnly, sectionConfirmedAt } from '@/lib/listingView'
 import { resolveCapabilities, type CategoryConfig } from '@/lib/categories'
 import { ui } from '@/lib/uiConfig'
 import { ChevronRightIcon, PlusIcon } from '@/components/icons'
@@ -80,7 +80,7 @@ export default function DaveningCard({
   // Older rows keep their times as one line of text.
   if (typeof minyanim === 'string') {
     return (
-      <Card title="Davening times" testId="listing-davening" footer={<FreshnessFooter resourceId={item.id} source={item.confirmedFrom} confirmedAt={item.confirmedAt} subject="Times" />}>
+      <Card title="Davening times" testId="listing-davening" footer={<FreshnessFooter resourceId={item.id} source={item.confirmedFrom} by={item.confirmedBy} confirmedAt={item.confirmedAt} subject="Times" />}>
         <DaveningTimes legacyText={minyanim} />
       </Card>
     )
@@ -151,13 +151,14 @@ export default function DaveningCard({
       <FreshnessFooter
         resourceId={item.id}
         source={item.confirmedFrom}
+        by={confirmedByFor(item, section)}
         confirmedAt={sectionConfirmedAt(item, section)}
         section={section}
         onEdit={() => onEditBox(section, section === 'weekday' ? 'Usual weekday times' : 'Usual Shabbos times')}
       />
     ) : (
       <div className="flex flex-wrap items-baseline gap-x-1.5">
-        <FreshnessFooter resourceId={item.id} source={item.confirmedFrom} confirmedAt={sectionConfirmedAt(item, section)} subject={subject} section={section} />
+        <FreshnessFooter resourceId={item.id} source={item.confirmedFrom} by={confirmedByFor(item, section)} confirmedAt={sectionConfirmedAt(item, section)} subject={subject} section={section} />
         {canAdd && updatingIn !== key && updated?.in !== key && (
           <button type="button" onClick={() => open(key)} className="cursor-pointer text-[13.5px] font-bold text-primary hover:underline">
             Update their times

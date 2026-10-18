@@ -51,6 +51,9 @@ export const SYNC_INTERNAL_FIELDS = [
   // on approval from the submission's server-set source. Never a
   // submitter's: an edit can't say it came from the agency.
   'confirmedFrom',
+  // Which kind of person dated it (a visitor's tap, confirm_resource; a
+  // visitor's approved edit, on approval). Never a submitter's to say.
+  'confirmedBy',
 ] as const
 
 /** Additionally hidden from the moderation diff, though a submitter MAY change

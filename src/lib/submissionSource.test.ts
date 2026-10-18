@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { markTimes, submissionSource, timesIn } from './submissionSource'
+import { isCommunityEdit, markTimes, submissionSource, timesIn } from './submissionSource'
 import { KEYSTONE_WATCH_NAME } from './keystoneWatch'
 import { GOOGLE_SUBMITTER_NAME } from './activity'
 
@@ -39,17 +39,17 @@ describe('submissionSource', () => {
     expect(submissionSource(sub('Keystone-K’s list says: "Mama’s"', KEYSTONE_WATCH_NAME))).toEqual({
       readBy: 'automatic',
       from: 'Keystone-K’s list',
-      named: 'Keystone-K’s list',
+      named: 'Keystone-K',
       original: 'Keystone-K’s list says: "Mama’s"',
     })
     expect(submissionSource(sub('Closed on Google', GOOGLE_SUBMITTER_NAME))).toMatchObject({ readBy: 'automatic', from: 'Google' })
   })
 
-  // Oct 17: approved, a named source dates the listing ("From Keystone-K’s
-  // list, Oct 12"). Google says its own date on its own line, so it isn't
-  // named; nor is anything a person sent, however it was read.
-  it('names an outside source for the listing’s date: Keystone-K’s list or one a filer stated, not Google or a person', () => {
-    expect(submissionSource(sub('Closed on Google', GOOGLE_SUBMITTER_NAME)).named).toBeUndefined()
+  // Approved, a named source dates the listing: "Confirmed by Keystone-K,
+  // Oct 12", "Checked with Google, Oct 12" (Oct 18). Nothing a person sent
+  // is named, however it was read.
+  it('names an outside source for the listing’s date: Keystone-K, Google or one a filer stated, not a person', () => {
+    expect(submissionSource(sub('Closed on Google', GOOGLE_SUBMITTER_NAME)).named).toBe('Google')
     expect(submissionSource(sub('They close early Fridays now', 'Dana')).named).toBeUndefined()
     expect(submissionSource(sub('x', undefined, { source: { readBy: 'ai', from: 'Refuah', named: 'Refuah' } })).named).toBe('Refuah')
     expect(submissionSource(sub('x', undefined, { source: { readBy: 'ai', from: 'a message' } })).named).toBeUndefined()
@@ -65,6 +65,26 @@ describe('submissionSource', () => {
     expect(submissionSource(sub('x', undefined, { source: stated }))).toEqual({ readBy: 'ai', from: 'their newsletter', original: 'Mincha 6:20pm' })
     expect(submissionSource(sub('x', undefined, { source: { readBy: 'robot', from: 'y' } }))).toMatchObject({ readBy: 'person' })
     expect(submissionSource(sub('x', undefined, { source: 'ai' }))).toMatchObject({ readBy: 'person' })
+  })
+})
+
+// Approving a person's edit dates the listing "Confirmed by community"
+// (Oct 17), an admin's own too (Oct 18); an outside source's doesn't.
+describe('isCommunityEdit', () => {
+  const sub = (submitted_by: { name?: string; email?: string } | null, payload: Record<string, unknown> = {}, note: string | null = null) => ({ note, submitted_by, payload })
+
+  it('a person’s own change, typed or read by AI from what they sent, an admin’s included', () => {
+    expect(isCommunityEdit(sub(null))).toBe(true)
+    expect(isCommunityEdit(sub({ name: 'Dana', email: 'dana@example.org' }))).toBe(true)
+    expect(isCommunityEdit(sub(null, {}, 'Times\n\nRead from what they pasted:\nShacharis 7'))).toBe(true)
+    expect(isCommunityEdit(sub({ name: 'admin@example.org', email: 'admin@example.org' }))).toBe(true)
+    expect(isCommunityEdit(sub(null, { source: { readBy: 'ai', from: 'their photo' } }))).toBe(true)
+  })
+
+  it('not an outside source’s, named or not', () => {
+    expect(isCommunityEdit(sub({ name: KEYSTONE_WATCH_NAME }))).toBe(false)
+    expect(isCommunityEdit(sub({ name: GOOGLE_SUBMITTER_NAME }))).toBe(false)
+    expect(isCommunityEdit(sub(null, { source: { readBy: 'automatic', from: 'Refuah', named: 'Refuah' } }))).toBe(false)
   })
 })
 

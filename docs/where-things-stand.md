@@ -4,7 +4,7 @@ The running list of what's outstanding, kept in the repo so it survives a
 change of Claude account (artifacts and Claude's own notes stay with the old
 account). Update it in the same commit as the work that changes it.
 
-Last updated: Oct 17, 2026 (evening).
+Last updated: Oct 18, 2026.
 
 ## The branch
 
@@ -50,41 +50,35 @@ for that exact change, in the same conversation. Show the dry run first.
 
 1. **Philly Synagogues:** add the "Minyan" yes/no field, and rename the
    category "Shuls & minyanim".
-2. **The hospitals' Refuah watches on the live site** (after the merge, and
-   the hospital fields and the contacts are now both on live: the contacts,
-   eruv and sukkah of the five Refuah lists went across Oct 17 with the
-   user's yes, live's own Refuah links kept). Seven website watches, one per hospital, each tied to its
-   listing, on `refuah.com/hospitals/<id>` (the live listings' Refuah links
-   already point there). Added on the dev/test database Oct 17. Two of the
-   seven (Penn Presbyterian, Pennsylvania Hospital) have nothing on Refuah.
-
 ## For the user or the community
 
-3. **Seven live places still have no date, on purpose.** On Oct 17 (the
-   user's yes) every other approved live listing with no confirmation was
-   stamped confirmed (80 of them, `confirmedAt` 2026-10-18T00:00Z, backup in
-   that session's scratchpad), so they show "Confirmed Oct 17" and are asked
-   "Still right?" after 90 days. Held back because something is known to be
-   wrong: Shtetl, The Brazilian BBQ and Rita's at Roosevelt Mall (off
-   Keystone-K's list), New York Bagel Bakery and Rita's at 1709 Grant Ave
-   and 2124 South St (Google: closed temporarily), Sababa Falafel (bad place
-   id). Fix or remove each; until all are dated the trust line keeps "if
-   and when".
+2. **Every live place has a date** (checked Oct 17, 11 PM: 155 of 155).
+   80 were stamped confirmed on Oct 17 with the user's yes (`confirmedAt`
+   2026-10-18T00:00Z, backup in that session's scratchpad); the last
+   undated one, The Brazillian BBQ (spelled so on live, off Keystone-K's
+   list), was confirmed by someone that evening. The trust line now says
+   "every listing dated" once the live cache refreshes (any admin save).
+   Shtetl, Rita's, New York Bagel Bakery and Sababa Falafel are dated by
+   Google's sync but still have the problems that held them back (off
+   Keystone-K's list, closed temporarily, bad place id): fix or remove each.
 
 ## Getting the branch live
 
-4. **Merged Oct 17.** The live Keystone-K watch's first run (07:00 UTC
+3. **Merged Oct 17.** The live Keystone-K watch's first run (07:00 UTC
    daily) will file about 34 suggestions at once and email the admins one
    digest. The test project's daily watch run is on `main` now too.
-5. **Check 077 and 082 on the live database, now that the code is live.**
+4. **Migration 083 (`confirmed_by_visitor`) is run on both databases**
+   (the user, Oct 18): a visitor's Yes on a whole listing says "Confirmed
+   by community".
+   **Check 077 and 082 on the live database, now that the code is live.**
    Tables and columns through 081 are there. 077 (eruv suggestions, a
    database rule) and 082 (confirming a contact box, a database function)
    can't be seen through the API: without them a public eruv suggestion
    fails to send and Yes under a contact box says "Didn't save". 067's
    columns (Today) are missing too, harmless while Today is held back.
-6. **Menu watches start on the live site with the next merge** (built Oct
-   17, no migration). The first daily run after it gives every live food
-   place with a menu link a watch of its own (about 15, created by "menu
+5. **Menu watches start on the live site Oct 18** (merged with #324, no
+   migration). The first daily run, 07:00 UTC Oct 18, gives every live food
+   place with a menu link a watch of its own (17 on Oct 18, created by "menu
    links" on the Watches tab) and only records each menu as it is. From
    then on a menu is read every morning for free; the AI (`OPENAI_API_KEY`)
    reads it only when its words change, at most 3 a run, and dishes the
@@ -94,9 +88,29 @@ for that exact change, in the same conversation. Show the dry run first.
 
 ## Small open decisions
 
-7. The "+" button covers part of the third tile in a row on the phone home.
+6. The "+" button covers part of the third tile in a row on the phone home.
 
 ## Done Oct 17
+
+- **The hospitals' Refuah watches are on the live site** (Oct 18, with
+  the user's yes): seven website watches on `refuah.com/hospitals/<id>`,
+  each tied to its live listing, copied from the test project's. The dry
+  run found all seven matching Refuah, so the first run files nothing.
+  Penn Presbyterian and Pennsylvania Hospital have nothing on Refuah yet.
+- **Every date line says who gave it, with a verb** (the user, Oct 18).
+  A person (a visitor's Yes, any approved edit, an admin's own):
+  "Confirmed by community, Oct 17" (`details.confirmedBy`; a box's own
+  date is always a visitor's; a Yes on the whole listing needs migration
+  083). An authority: "Confirmed by Keystone-K, Oct 12", "Confirmed by
+  Refuah" (`details.confirmedFrom`). Google, which isn't the source of
+  truth for anything: "Checked with Google, Aug 28" (its own line, and an
+  approved Google change). Plain "Confirmed" only on dates nothing records
+  the giver of: the Oct 17 bulk stamp and the Aug 20 batch.
+  **Retroactive, done:** dev (9) and live (24, the user's yes Oct 18: the
+  listings whose date is an approved edit, the menus sent Oct 17–18;
+  backup in that session's scratchpad). Live has no Keystone-K or
+  Google-dated approvals to relabel. Live shows the new words once PR #324
+  is merged and deployed.
 
 - **A food place's menu link can be suggested.** Edit listing → Main dishes
   has a "Menu link" box (food places only; a grocery's items have none). The

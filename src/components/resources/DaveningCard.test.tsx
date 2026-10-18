@@ -323,7 +323,7 @@ describe('a date per box (Oct 6)', () => {
   it('each box says when its own times were confirmed, the listing’s date where that’s later', () => {
     show({ confirmedAt: '2026-08-20T12:00:00Z', sectionConfirmed: { shabbos: '2026-09-29T12:00:00Z' } })
     expect(screen.getByTestId('davening-weekday')).toHaveTextContent('Weekday times confirmed Aug 20.')
-    expect(screen.getByTestId('davening-shabbos')).toHaveTextContent('Shabbos times confirmed Sep 29.')
+    expect(screen.getByTestId('davening-shabbos')).toHaveTextContent('Shabbos times confirmed by community, Sep 29.')
   })
 
   it('“Yes” confirms that box’s times alone', async () => {

@@ -150,7 +150,7 @@ describe('ListingView — the main thing', () => {
     fireEvent.click(today)
     expect(today).toHaveAttribute('aria-expanded', 'true')
     expect(box).toHaveTextContent('11 AM – 3 PM')
-    expect(within(box).getByTestId('listing-google')).toHaveTextContent('Last updated from Google, Sep 30.')
+    expect(within(box).getByTestId('listing-google')).toHaveTextContent('Checked with Google, Sep 30.')
   })
 
   it('the website by name with the address and phone (Oct 6), its round button above as before', () => {
@@ -287,7 +287,7 @@ describe('ListingView — about', () => {
   it('says when Google last updated it, when the sync keeps it, with Edit on the same line', () => {
     view({ item: { ...judah, placeId: 'p1', googleFields: ['description'], googleSyncedAt: '2026-08-28T06:59:09Z' } })
     const about = screen.getByTestId('listing-about')
-    expect(within(about).getByTestId('about-google')).toHaveTextContent('Last updated from Google, Aug 28.')
+    expect(within(about).getByTestId('about-google')).toHaveTextContent('Checked with Google, Aug 28.')
     expect(within(about).getByTestId('about-google').parentElement!.parentElement).toContainElement(within(about).getByRole('button', { name: 'Edit' }))
     // Google's to keep: nobody is asked whether it's right.
     expect(about).not.toHaveTextContent(/Confirmed|Right\?/)
@@ -299,7 +299,7 @@ describe('ListingView — about', () => {
     try {
       view({ item: { ...judah, confirmedAt: '2026-03-01T15:00:00Z', sectionConfirmed: { googleDescription: '2026-09-29T15:00:00Z' } } })
       const foot = within(screen.getByTestId('listing-about')).getByTestId('freshness')
-      expect(foot).toHaveTextContent(/^Confirmed Sep 29Edit$/)
+      expect(foot).toHaveTextContent(/^Confirmed by community, Sep 29Edit$/)
       cleanup()
       view({ item: { ...judah, confirmedAt: '2026-03-01T15:00:00Z' } })
       expect(within(screen.getByTestId('listing-about')).getByTestId('freshness')).toHaveTextContent(/^Confirmed Mar 1 · Still right\?YesEdit$/)
@@ -373,7 +373,7 @@ describe('ListingView — how sure', () => {
   it('Food: no question and no date on its kosher details, the certificate is the proof (Oct 6); Google’s part at the contact box’s foot', () => {
     view({ item: { ...judah, placeId: 'p1', googleSyncedAt: '2026-09-30T06:59:09Z', googleFields: ['phone', 'website'], confirmedAt: '2026-06-01T16:30:00Z' } })
     expect(screen.queryByText(/last checked/)).not.toBeInTheDocument()
-    expect(within(screen.getByTestId('listing-details')).getByTestId('listing-google')).toHaveTextContent('Last updated from Google, Sep 30.')
+    expect(within(screen.getByTestId('listing-details')).getByTestId('listing-google')).toHaveTextContent('Checked with Google, Sep 30.')
     // Asked only under About (its own date, Oct 15), never about the
     // kosher details.
     expect(screen.getAllByText(/Still right|Right\?/).every((el) => screen.getByTestId('listing-about').contains(el))).toBe(true)
@@ -455,7 +455,7 @@ describe('ListingView — how sure', () => {
     const [women, men, keilim] = [...screen.getByTestId('listing-groups').querySelectorAll('section')]
     // Old (over 90 days): asked, Yes or Edit. Recent: just the date and Edit.
     expect(within(women).getByTestId('freshness')).toHaveTextContent(/^Confirmed Sep 2 · Still right\?YesEdit$/)
-    expect(within(men).getByTestId('freshness')).toHaveTextContent(/^Confirmed Oct 1Edit$/)
+    expect(within(men).getByTestId('freshness')).toHaveTextContent(/^Confirmed by community, Oct 1Edit$/)
     // A section with notes and no hours still has its Edit: hours can be added.
     expect(within(keilim).getByRole('button', { name: 'Edit' })).toBeInTheDocument()
 
@@ -511,7 +511,7 @@ describe('ListingView — how sure', () => {
     try {
       view({ item, category: makeCategory({ detailFields: [website] }) })
       contact = screen.getByTestId('listing-details')
-      expect(within(contact).getByTestId('freshness')).toHaveTextContent(/^Confirmed Aug 5 · Still right\?YesEdit$/)
+      expect(within(contact).getByTestId('freshness')).toHaveTextContent(/^Confirmed by community, Aug 5 · Still right\?YesEdit$/)
       // One Edit, in the dated line, not a second one beside it.
       expect(within(contact).getAllByRole('button', { name: 'Edit' })).toHaveLength(1)
     } finally {
@@ -527,7 +527,7 @@ describe('ListingView — how sure', () => {
     cleanup()
     view({ item: { ...item, placeId: 'p1', googleSyncedAt: '2026-09-30T06:59:09Z', googleFields: ['phone'] }, category: makeCategory({ detailFields: [website] }) })
     expect(within(screen.getByTestId('listing-details')).queryByTestId('freshness')).not.toBeInTheDocument()
-    expect(within(screen.getByTestId('listing-details')).getByTestId('listing-google')).toHaveTextContent('Last updated from Google, Sep 30.')
+    expect(within(screen.getByTestId('listing-details')).getByTestId('listing-google')).toHaveTextContent('Checked with Google, Sep 30.')
   })
 })
 
@@ -577,7 +577,7 @@ describe('ListingView — details from Google', () => {
       item: makeListing({ m: ['Challah'], hours: { fri: { open: '09:00', close: '21:00' } }, placeId: 'p1', googleSyncedAt: '2026-09-30T06:59:09Z', googleFields: ['hours'] }),
       category: grocery,
     })
-    expect(within(screen.getByTestId('listing-details')).getByTestId('listing-google')).toHaveTextContent('Last updated from Google, Sep 30.')
+    expect(within(screen.getByTestId('listing-details')).getByTestId('listing-google')).toHaveTextContent('Checked with Google, Sep 30.')
   })
 })
 
