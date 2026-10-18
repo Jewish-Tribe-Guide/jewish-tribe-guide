@@ -2,7 +2,9 @@
 //
 // Runs every active watch once (watches.ts): Keystone-K's list files its
 // differences as suggestions, as does a hospital's page on Refuah
-// (refuahWatch.ts); any other website is checked for a change. Then the
+// (refuahWatch.ts); a food place's menu is read by the AI when it changed
+// (menuWatch.ts: first, every place with a menu link is given its watch);
+// any other website is checked for a change. Then the
 // eruvim's maps, for a part an admin left out that's gone (eruvLineRun.ts). Meant to
 // run daily (vercel.json). Each run is recorded on the watch, and the admins
 // are emailed once when a watch breaks and once when it recovers.
@@ -18,6 +20,7 @@ import { listAllWatches } from '@/lib/watchStore'
 import { BUILT_IN_WATCHES, runAndRecord, runWatch } from '@/lib/watchRunner'
 import { sendWatchHealthAlert, type WatchHealthAlert } from '@/lib/email'
 import { runEruvLines } from '@/lib/eruvLineRun'
+import { newMenuReadBudget, syncMenuWatches } from '@/lib/menuWatchRun'
 
 export const maxDuration = 60
 
@@ -29,6 +32,11 @@ async function eruvLines() {
 }
 
 async function runAll(): Promise<NextResponse> {
+  // Before listing them, so a place given a menu link yesterday is read today.
+  const menus = await syncMenuWatches().catch((err) => {
+    console.error('[cron/watches] menu watches failed:', err)
+    return []
+  })
   const { watches, available } = await listAllWatches()
 
   if (!available) {
@@ -39,8 +47,9 @@ async function runAll(): Promise<NextResponse> {
 
   const alerts = new Map<string, WatchHealthAlert[]>()
   const results = []
+  const budget = newMenuReadBudget()
   for (const watch of watches.filter((w) => w.active)) {
-    const { outcome, alert } = await runAndRecord(watch)
+    const { outcome, alert } = await runAndRecord(watch, undefined, budget)
     results.push({ id: watch.id, url: watch.url, ...outcome })
     if (alert) {
       const list = alerts.get(watch.communityId) ?? []
@@ -55,7 +64,7 @@ async function runAll(): Promise<NextResponse> {
       sendWatchHealthAlert(community, list).catch((err) => console.error('[cron/watches] alert failed:', err)),
     ),
   )
-  return NextResponse.json({ ok: true, recorded: true, results, eruvLines: await eruvLines() })
+  return NextResponse.json({ ok: true, recorded: true, menus, results, eruvLines: await eruvLines() })
 }
 
 export async function GET(req: NextRequest) {

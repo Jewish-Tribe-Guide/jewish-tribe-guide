@@ -253,6 +253,21 @@ export async function findMenu(
   return homeText.length >= 200 ? { url: home.url, text: homeText, pdf: null } : null
 }
 
+/** A menu at a known address: a place's menu link (menuLink.ts), read as
+ *  it is, a PDF or a page with real text on it. Null when it can't be read,
+ *  or it's an ordering app's (never fetched, see ORDERING_APPS). */
+export async function readMenuPage(
+  url: string,
+  opts: { fetchImpl?: typeof fetch; resolve?: Lookup } = {},
+): Promise<MenuSource | null> {
+  if (isOrderingApp(url)) return null
+  const page = await fetchPublic(url, opts)
+  if (!page) return null
+  if (page.type === 'pdf') return { url: page.url, text: null, pdf: page.body }
+  const text = htmlToText(page.body)
+  return text.length >= 200 ? { url: page.url, text, pdf: null } : null
+}
+
 // ── Asking the AI ────────────────────────────────────────────────────────────
 
 /** The guide's own names for dishes, which the AI uses where one fits, so

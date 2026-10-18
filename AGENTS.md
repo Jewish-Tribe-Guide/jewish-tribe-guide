@@ -172,6 +172,17 @@ off, not that anything is newly broken. The marker is gone; this is a plain
 that's a new investigation to reopen (see the build-time-prerender suspect
 above), not a reason to have kept the marker pre-emptively.
 
+**It has regressed (2026-10-18), so that investigation is open again.** CI
+run 39083904874 (PR #324, commit `034a888d`) failed `test:cache-roundtrip`'s
+`/about` test with the identical signature: `Timeout 60000ms exceeded`, all
+62 polls `HIT/old`, the row asserted to hold the new body first. That PR
+touched no caching, routing or `/about` code (an eruv staleness rule, the
+phone home's tiles, docs), and nothing else wrote to the test project's
+`about` row in that window: the only overlapping job was the same run's
+`test:admin-write`, which owns `privacy`. So `revalidatePath` does not
+reliably reach that entry either. Don't re-run it until it goes green and
+call that a fix; the next suspect is the build-time prerender, as above.
+
 Guarded structurally too, so this can't silently regress if someone
 "simplifies" the route later: `src/app/api/admin/pages/pagesRevalidation.
 test.ts` asserts both the tag and the path invalidation are present in the

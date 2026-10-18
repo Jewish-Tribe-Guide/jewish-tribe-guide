@@ -4,6 +4,7 @@ import type { DirectoryResource } from '@/types'
 import type { CategoryConfig } from '@/lib/categories'
 import { PencilIcon, TrashIcon } from '@/components/icons'
 import { mainThing } from '@/lib/listingView'
+import { EDIT_LISTING_LABEL } from './editListingLabel'
 
 // ── The one visible way to edit an open listing ──────────────────────────
 // A full-width pill that sits BELOW the listing rather than inside it, in
@@ -92,7 +93,7 @@ export default function ListingEditBar({
         data-quiet={quiet || undefined}
       >
         <PencilIcon className="h-4 w-4 shrink-0" />
-        Edit listing
+        {EDIT_LISTING_LABEL}
       </button>
       {onRequestRemoval && (
         <button

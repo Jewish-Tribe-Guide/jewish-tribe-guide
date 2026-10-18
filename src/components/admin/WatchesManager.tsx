@@ -5,7 +5,7 @@ import { useLoadOnMount } from '@/lib/useLoadOnMount'
 import { fetchJson } from '@/lib/fetchJson'
 import { withCommunity } from '@/lib/useCommunityData'
 import { useCommunitySlug } from '@/lib/communityContext'
-import { watchHealth, type Watch } from '@/lib/watches'
+import { MENU_WATCH_CREATOR, watchHealth, type Watch } from '@/lib/watches'
 import { refuahHospitalId } from '@/lib/refuahWatch'
 
 // ── The "Watches" tab (freshness map, Oct 5) ────────────────────────────────
@@ -63,6 +63,16 @@ function WhatItDoes({ watch }: { watch: Watch }) {
       <p className="text-xs text-muted">
         Compared with the hospital every morning. A new contact, or a changed phone, email or website, goes to the moderation queue as from Refuah.
         {lastRead}
+      </p>
+    )
+  }
+  // A food place's menu, given its watch by the daily run (menuWatch.ts).
+  if (watch.createdBy === MENU_WATCH_CREATOR) {
+    return (
+      <p className="text-xs text-muted" data-testid="menu-watch">
+        Its menu link, checked every morning. When the menu changes, the AI reads it, and dishes the listing doesn’t have wait on the Main dishes tab. Added for every place with a menu link: pause it to stop it.{' '}
+        {watch.pageChangedAt ? `Last changed ${day(watch.pageChangedAt)}.` : 'No change since it was added.'}
+        {watch.lastFiled ? ` Last read: new dishes for the Main dishes tab.` : ''}
       </p>
     )
   }

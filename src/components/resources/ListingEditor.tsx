@@ -27,6 +27,8 @@ import RemovalRequest from './RemovalRequest'
 import { DetailFieldInput } from './DetailFieldInput'
 import ContactsEditor from './ContactsEditor'
 import ItemsEditor, { itemLists } from './ItemsEditor'
+import { MENU_LINK_FIELD } from '@/lib/menuLink'
+import { itemWording } from '@/lib/itemMarks'
 import MinyanBoxEditor from './MinyanBoxEditor'
 import { useListingDraft, type ListingDraft } from './useListingDraft'
 import { useListingSubmit, useTurnstileActive, type SendVia } from './useListingSubmit'
@@ -529,16 +531,20 @@ export default function ListingEditor({
       const f = r.fields[0]
       const now = itemLists(details, f.key)
       return (
-        <ItemsEditor
-          field={f}
-          original={itemLists(item as Record<string, unknown>, f.key)}
-          always={now.always}
-          sometimes={now.sometimes}
-          onChange={(next) => {
-            setDetail(f.key, next.always)
-            setDetail(`${f.key}_sometimes`, next.sometimes)
-          }}
-        />
+        <>
+          <ItemsEditor
+            field={f}
+            original={itemLists(item as Record<string, unknown>, f.key)}
+            always={now.always}
+            sometimes={now.sometimes}
+            onChange={(next) => {
+              setDetail(f.key, next.always)
+              setDetail(`${f.key}_sometimes`, next.sometimes)
+            }}
+          />
+          {/* Where the menu is, for "Full menu" (the user, Oct 17): with the dishes, under them. */}
+          {itemWording(f).noun === 'dish' && fieldInput(MENU_LINK_FIELD)}
+        </>
       )
     }
     if (r.kind === 'minyans') {

@@ -8,7 +8,7 @@ import type { ContactEntry } from '@/lib/contacts'
 import type { EnrichedSubmission, ResourceRow } from '@/types'
 import { SubmissionCard } from './SubmissionCard'
 import { makeCategory } from '@/test/providerFixtures'
-import { SYNC_INTERNAL_FIELDS, SHOWN_WHEN_CONFIGURED, SHOWN_WHEN_PROPOSED } from '@/lib/syncFields'
+import { SYNC_INTERNAL_FIELDS, SHOWN_WHEN_CONFIGURED, SHOWN_WHEN_PROPOSED, MENU_LINK_PROPOSED } from '@/lib/syncFields'
 
 afterEach(() => cleanup())
 
@@ -298,7 +298,7 @@ describe('the note a suggestion came with', () => {
 // bookkeeping key added there must never need a second edit here to stay
 // hidden, because the second edit is the one that gets forgotten.
 describe('the diff hides sync bookkeeping, all of it', () => {
-  for (const key of SYNC_INTERNAL_FIELDS.filter((k) => k !== SHOWN_WHEN_CONFIGURED && k !== SHOWN_WHEN_PROPOSED)) {
+  for (const key of SYNC_INTERNAL_FIELDS.filter((k) => k !== SHOWN_WHEN_CONFIGURED && k !== SHOWN_WHEN_PROPOSED && k !== MENU_LINK_PROPOSED)) {
     it(`never shows ${key}`, () => {
       renderDiff({ key, type: 'text' }, 'INTERNAL_BEFORE', 'INTERNAL_AFTER')
       expect(screen.queryByText('INTERNAL_BEFORE')).not.toBeInTheDocument()
@@ -311,6 +311,45 @@ describe('the diff hides sync bookkeeping, all of it', () => {
   it('still shows googleDescription, which some categories offer as real content', () => {
     renderDiff({ key: SHOWN_WHEN_CONFIGURED, type: 'text' }, 'Old blurb', 'New blurb')
     expect(screen.getByText('New blurb')).toBeInTheDocument()
+  })
+})
+
+// Oct 17: anyone can suggest a food place's menu link in Edit listing
+// (menuLink.ts). It isn't one of the category's fields, so it reaches the
+// card as a key left over, and is shown under its own name; an edit that
+// doesn't carry one keeps the stored link, so it isn't shown as taken off.
+describe('a food place’s menu link', () => {
+  function renderMenuEdit(before: Record<string, unknown>, after: Record<string, unknown>) {
+    const category = makeCategory({
+      id: 'restaurant',
+      detailFields: [{ key: 'dishes', label: 'Main dishes', type: 'tags', showCountInHeader: true, countLabel: 'dish' } as CategoryField],
+    })
+    const submission = {
+      id: 's1',
+      operation: 'update',
+      target_type: 'listing',
+      target_id: 'r1',
+      payload: { category: 'restaurant', name: 'Place', details: after },
+      note: null,
+      status: 'pending',
+      submitted_by: null,
+      created_at: new Date().toISOString(),
+      reviewed_at: null,
+      current: { id: 'r1', category: 'restaurant', name: 'Place', details: before } as unknown as ResourceRow,
+    } as unknown as EnrichedSubmission
+    return render(<SubmissionCard submission={submission} categoriesById={new Map([['restaurant', category]])} />)
+  }
+
+  it('shows a suggested link as a change, under "Menu link"', () => {
+    const { container } = renderMenuEdit({ dishes: ['Falafel'], menuUrl: 'https://old.example/menu' }, { dishes: ['Falafel'], menuUrl: 'https://new.example/menu' })
+    expect(screen.getByText('Menu link')).toBeInTheDocument()
+    expect(container.textContent).toContain('https://old.example/menu')
+    expect(container.textContent).toContain('https://new.example/menu')
+  })
+
+  it('an edit without a link doesn’t read as taking it off', () => {
+    renderMenuEdit({ dishes: ['Falafel'], menuUrl: 'https://old.example/menu' }, { dishes: ['Falafel', 'Shawarma'] })
+    expect(screen.queryByText('Menu link')).not.toBeInTheDocument()
   })
 })
 

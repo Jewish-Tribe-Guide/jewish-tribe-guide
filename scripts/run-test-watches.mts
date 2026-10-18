@@ -15,7 +15,9 @@
 // place on Keystone-K's list is filed saying Google wasn't asked. Nor email:
 // the test project's admins aren't emailed a digest or an alert (the
 // "digest failed: Missing required environment variable: RESEND_API_KEY"
-// line in the log is that, as expected).
+// line in the log is that, as expected). Nor the AI: a menu watch
+// (menuWatch.ts) sets its fingerprint, and a changed menu waits for the live
+// site's run, so the test project's runs cost nothing.
 
 import { existsSync } from 'node:fs'
 
@@ -36,11 +38,15 @@ if (process.env.PROD_SUPABASE_URL && url === process.env.PROD_SUPABASE_URL) {
 // The app's own client (src/lib/supabase/admin.ts) reads these.
 process.env.NEXT_PUBLIC_SUPABASE_URL = url
 process.env.SUPABASE_SERVICE_ROLE_KEY = key
-for (const k of ['GOOGLE_MAPS_SERVER_KEY', 'GOOGLE_GEOCODING_API_KEY', 'RESEND_API_KEY']) delete process.env[k]
+for (const k of ['GOOGLE_MAPS_SERVER_KEY', 'GOOGLE_GEOCODING_API_KEY', 'RESEND_API_KEY', 'OPENAI_API_KEY']) delete process.env[k]
 
 // Imported after the environment is set: the stores read it when first used.
 const { listAllWatches } = await import('../src/lib/watchStore')
 const { runAndRecord } = await import('../src/lib/watchRunner')
+const { syncMenuWatches } = await import('../src/lib/menuWatchRun')
+
+// Every food place with a menu link gets its watch first, as on the live site.
+for (const m of await syncMenuWatches()) console.log(`Menu watches (${m.community}): ${m.added} added, ${m.removed} removed`)
 
 const { watches, available } = await listAllWatches()
 if (!available) {

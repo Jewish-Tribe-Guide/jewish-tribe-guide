@@ -3,6 +3,7 @@
 import { useRef, useState } from 'react'
 import { companionKeys, fieldIsVisible, isCategorySyncEligible, type CategoryConfig } from '@/lib/categories'
 import { formatPhone } from '@/lib/validation'
+import { MENU_LINK_KEY, keepsMenuLink } from '@/lib/menuLink'
 import type { DirectoryResource, ResourceSubmission } from '@/types'
 import type { PlaceSelectResult } from '@/components/intake/AddressInput'
 
@@ -56,6 +57,8 @@ export function useListingDraft(category: CategoryConfig, existingListing?: Dire
       // minyanim field's special schedules (companionKeys).
       if (existing) for (const k of companionKeys(field)) if (k in existing) init[k] = existing[k]
     }
+    // A food place's menu link, typed on the Main dishes screen (menuLink.ts).
+    if (keepsMenuLink(config) && existing && typeof existing[MENU_LINK_KEY] === 'string') init[MENU_LINK_KEY] = existing[MENU_LINK_KEY]
     return init
   })
 
@@ -128,6 +131,8 @@ export function useListingDraft(category: CategoryConfig, existingListing?: Dire
         for (const k of companionKeys(field)) if (field.type !== 'tags' && k in details) visible[k] = details[k]
       }
     }
+    // Sent once it's loaded or typed; an edit without it keeps the stored one.
+    if (keepsMenuLink(config) && MENU_LINK_KEY in details) visible[MENU_LINK_KEY] = details[MENU_LINK_KEY]
     return visible
   }
 

@@ -1,4 +1,5 @@
 import { SYNC_INTERNAL_FIELDS } from './syncFields'
+import { MENU_LINK_KEY, keepsMenuLink, readMenuLink } from './menuLink'
 import { getAdminClient } from './supabase/admin'
 import { listCategories, createCategory, getCategoryById } from './categoryStore'
 import { isCategorySyncEligible, type CategoryConfig } from './categories'
@@ -825,8 +826,11 @@ async function withItemDates(
   // Best-effort like the rest of the approval's extras: a category that can't
   // be read just means no item dates this time, never a failed approval.
   let fields: ReadonlyArray<{ key: string; type: string }> = []
+  let menuLinks = false
   try {
-    fields = (await getCategoryById(community, categoryId))?.detailFields ?? []
+    const category = await getCategoryById(community, categoryId)
+    fields = category?.detailFields ?? []
+    menuLinks = keepsMenuLink(category)
   } catch (err) {
     console.error('[submissions] could not read category for item dates:', err)
   }
@@ -835,11 +839,14 @@ async function withItemDates(
   delete next.itemSeen
   delete next.itemGone
   delete next.itemMenu
-  // The menu a dish list was read from is the admin's Main dishes tab's to
-  // set, never an edit's: the queue doesn't show it, so a link sent with an
-  // edit would be approved unseen.
-  delete next.menuUrl
-  if (existing?.menuUrl !== undefined) next.menuUrl = existing.menuUrl
+  // The menu's link: the one the edit suggests, shown in the queue as
+  // "Menu link" (menuLink.ts), where the category keeps one; '' takes it
+  // off. An edit that doesn't carry one keeps the listing's. Below, a menu
+  // the dishes were just read from wins over both.
+  const sentMenu = menuLinks ? readMenuLink(details[MENU_LINK_KEY]) : undefined
+  delete next[MENU_LINK_KEY]
+  if (sentMenu) next[MENU_LINK_KEY] = sentMenu
+  else if (sentMenu === undefined && existing?.[MENU_LINK_KEY] !== undefined) next[MENU_LINK_KEY] = existing[MENU_LINK_KEY]
   // A mikvah section's own "Still right?" date (confirm_section, Oct 6) is
   // the visitors', like an item's: never an edit's, which the queue doesn't
   // show.

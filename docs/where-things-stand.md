@@ -8,15 +8,40 @@ Last updated: Oct 17, 2026 (evening).
 
 ## The branch
 
-All of the redesign is on `redesign/map-google-sizes`, pushed. It is about
-580 commits ahead of `main`, which is what the live site runs (main was last
-merged Sep 14). Nothing below reaches the live site until this branch is
-merged.
+The redesign was merged into `main` on Oct 17 at 7:24 PM (#322, at
+7d5fead6) and is live. Later work is on `redesign/map-google-sizes` until
+the next merge.
 
 The user checks work on each commit's Vercel preview, on their phone. The
-preview reads the **dev/test database**, not the live one, so its numbers
-differ (150 places there, 155 live). A tab opened before a deploy keeps the
-old code until it's closed and reopened.
+preview reads the **dev/test database**, not the live one. A tab opened
+before a deploy keeps the old code until it's closed and reopened.
+
+**Preview and live differed by their databases, not code** (compared table
+by table, Oct 17). The redesign's setup was built on the dev database and
+never copied to the live one. **Copied Oct 17 with the user's yes** (group
+A, 25 rows, backup kept): hospital and hotel boxes and "Within a walk",
+Food's Main dishes, form sections and question card, WhatsApp off the map,
+descriptions in headers (WhatsApp, Networking, Cemetery), shuls not grouped
+by denomination, Grocery's "Kosher Type", phone tabs Home · Map · You and
+You in the desktop menu, the desktop home order, five category card images
+(copied into live storage). The live site shows it after any admin save
+(Admin → Site → Save) or within a day.
+
+Still different, each needing the user:
+
+- **Group B, which side is right:** Cemetery (dev renamed it "Cemetery" and
+  dropped its Cemetery/Funeral Home type; live has funeral homes), the
+  Mikvah pin colour (live blue #1544ab, dev magenta #a11956), the hero and
+  desktop wording (they differ; recommend keeping live's), the logo (live's
+  is newer; keep).
+- **Listing edits made on the preview, dev only:** main dishes and menus at
+  six food places (Charlie was a sinner, Sweet Box, Bar Bombón, HipCityVeg,
+  Say She Ate), minyanim at Mikveh Israel and Mekor
+  Habracha, grocery items at GIANT, Costco, ShopRite and Trader Joe's,
+  levels at Lipkin's, Sweet Box and Montefiore, Ohel Leah's keilim note,
+  Hampton Inn's photo.
+- **Dev is behind live:** 12 listings are only on live (Zevi's Bakery,
+  cemeteries, schools). Dev writes need no yes.
 
 ## Waiting for a yes to change the live site
 
@@ -26,44 +51,58 @@ for that exact change, in the same conversation. Show the dry run first.
 1. **Philly Synagogues:** add the "Minyan" yes/no field, and rename the
    category "Shuls & minyanim".
 2. **The hospitals' Refuah watches on the live site** (after the merge, and
-   after the hospital fields from Oct 6 are set up on the live Hospital
-   category; until then the watch has no fields to compare and files
-   nothing). Seven website watches, one per hospital, each tied to its
+   the hospital fields and the contacts are now both on live: the contacts,
+   eruv and sukkah of the five Refuah lists went across Oct 17 with the
+   user's yes, live's own Refuah links kept). Seven website watches, one per hospital, each tied to its
    listing, on `refuah.com/hospitals/<id>` (the live listings' Refuah links
    already point there). Added on the dev/test database Oct 17. Two of the
    seven (Penn Presbyterian, Pennsylvania Hospital) have nothing on Refuah.
 
 ## For the user or the community
 
-3. **Confirm the 23 live places with no date.** They say "Not confirmed by
-   anyone yet": 5 cemeteries, all 8 Networking groups, 2 WhatsApp groups, 3
-   mikvahs (Ohel Leah, Mei Shalva, Moishe Zvi), 4 restaurants (The Kosher
-   Grill, Chalavita, The Brazilian BBQ, Zevi's Bakery) and CKids. Once all
-   are dated, the home's trust line says "155 places · every listing dated"
-   by itself, and the sheet says "where and when it was last checked"
-   instead of "if and when".
+3. **Seven live places still have no date, on purpose.** On Oct 17 (the
+   user's yes) every other approved live listing with no confirmation was
+   stamped confirmed (80 of them, `confirmedAt` 2026-10-18T00:00Z, backup in
+   that session's scratchpad), so they show "Confirmed Oct 17" and are asked
+   "Still right?" after 90 days. Held back because something is known to be
+   wrong: Shtetl, The Brazilian BBQ and Rita's at Roosevelt Mall (off
+   Keystone-K's list), New York Bagel Bakery and Rita's at 1709 Grant Ave
+   and 2124 South St (Google: closed temporarily), Sababa Falafel (bad place
+   id). Fix or remove each; until all are dated the trust line keeps "if
+   and when".
 
 ## Getting the branch live
 
-4. **Merge `redesign/map-google-sizes` into `main`.** Until then the Keystone
-   K check, the eruv status reads, the Refuah watch and the "From …" dates
-   don't run on the live site, so the trust sheet can name only Google there.
-   The live Keystone-K watch row exists (since Oct 5) but has never run:
-   `main` has neither its code nor its daily schedule. Its first live run
-   will file about 34 suggestions at once (dev's first run, Oct 17: levels
-   the guide lacks, one moved Keystone page, 4 places off the list, 10 on
-   it but not in the guide) and email the admins one digest.
-5. **Check the live database has every migration first.** Tables and columns
-   through 081 are there (checked Oct 17). Not yet checked: 077 (eruv
-   suggestions, a database rule) and 082 (confirming a contact box, a
-   database function). Then deploy, verify, and only then any content that
-   needs the new code.
+4. **Merged Oct 17.** The live Keystone-K watch's first run (07:00 UTC
+   daily) will file about 34 suggestions at once and email the admins one
+   digest. The test project's daily watch run is on `main` now too.
+5. **Check 077 and 082 on the live database, now that the code is live.**
+   Tables and columns through 081 are there. 077 (eruv suggestions, a
+   database rule) and 082 (confirming a contact box, a database function)
+   can't be seen through the API: without them a public eruv suggestion
+   fails to send and Yes under a contact box says "Didn't save". 067's
+   columns (Today) are missing too, harmless while Today is held back.
+6. **Menu watches start on the live site with the next merge** (built Oct
+   17, no migration). The first daily run after it gives every live food
+   place with a menu link a watch of its own (about 15, created by "menu
+   links" on the Watches tab) and only records each menu as it is. From
+   then on a menu is read every morning for free; the AI (`OPENAI_API_KEY`)
+   reads it only when its words change, at most 3 a run, and dishes the
+   listing doesn't have wait on the Main dishes tab. Pausing one stops it;
+   removing one brings it back the next morning. The test project's daily
+   run makes the watches but never calls the AI.
 
 ## Small open decisions
 
-6. The "+" button covers part of the third tile in a row on the phone home.
+7. The "+" button covers part of the third tile in a row on the phone home.
 
 ## Done Oct 17
+
+- **A food place's menu link can be suggested.** Edit listing → Main dishes
+  has a "Menu link" box (food places only; a grocery's items have none). The
+  queue and the admin email show it as "Menu link", and approving it sets
+  "Full menu". The Main dishes tab's Read starts from it, and falls back to
+  the website.
 
 - **Shorter search hint, live:** `site_settings.search_placeholder` is "Ask:
   challah, pizza open now" on both databases (the user's yes, Oct 17; was

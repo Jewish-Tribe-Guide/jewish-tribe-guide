@@ -165,7 +165,9 @@ describe('Landing', () => {
   // The user, Oct 17: no group headings (under them, a group of one or two
   // left a tile alone in a row), and this is where a phone browses, so
   // every category is a tile, none in an "Also:" line.
-  it('mobile: browsing is one grid of tiles in the admin\'s order, every category, no headings', () => {
+  // Most places first (the user, Oct 17), the rest in the admin's order, and
+  // no count under a tile.
+  it('mobile: browsing is one grid of tiles, most places first, every category, no headings, no counts', () => {
     const ids = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n']
     const cats = ids.map((id) => makeCategory({ id, pluralLabel: `Cat ${id}`, cardImageUrl: `https://images.unsplash.com/photo-${id}` }))
     const section = (n: number, cardIds: string[]) => ({
@@ -184,13 +186,13 @@ describe('Landing', () => {
           homeSections: [section(1, ['n', 'a', 'b', 'c', 'd']), section(2, ['e', 'f', 'g', 'h', 'i']), section(3, ['j', 'k', 'l', 'm'])],
         },
       },
-      [makeListing({ id: 'p1', category: 'n' }), makeListing({ id: 'p2', category: 'n' })],
+      [makeListing({ id: 'p1', category: 'n' }), makeListing({ id: 'p2', category: 'n' }), makeListing({ id: 'p3', category: 'm' })],
     )
 
     const tiles = within(screen.getByTestId('category-tiles'))
-    // Each tile: its icon, its name, and how many places when it counts any.
-    const order = ['n', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm']
-    expect(tiles.getAllByRole('listitem').map((li) => li.textContent)).toEqual(order.map((id) => expect.stringMatching(new RegExp(`Cat ${id}${id === 'n' ? '2' : ''}$`))))
+    // Each tile: its icon and its name, nothing after it.
+    const order = ['n', 'm', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l']
+    expect(tiles.getAllByRole('listitem').map((li) => li.textContent)).toEqual(order.map((id) => expect.stringMatching(new RegExp(`Cat ${id}$`))))
     expect(tiles.getAllByRole('list')).toHaveLength(1)
     expect(tiles.queryAllByRole('heading')).toHaveLength(0)
     expect(screen.queryByText('Also:')).not.toBeInTheDocument()

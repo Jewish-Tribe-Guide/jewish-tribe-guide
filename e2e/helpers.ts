@@ -235,6 +235,16 @@ export async function categoryWithMapPoints(
   throw new Error('No listing category has any map-plottable (geocoded) listings — cannot test the map')
 }
 
+/** How many live listings each listing category has, by the API. */
+export async function listingCounts(request: APIRequestContext, community: string): Promise<Record<string, number>> {
+  const counts: Record<string, number> = {}
+  for (const category of (await categories(request, community)).filter((c) => c.kind === 'listing')) {
+    const body = await apiGet(request, `/api/resources?category=${category.id}&community=${community}`)
+    counts[category.id] = body.ok ? (body.resources as unknown[]).length : 0
+  }
+  return counts
+}
+
 /** The listing-kind category with the MOST listings — for tests that need a
  *  page long enough to actually scroll. `categoryWithListings` returns the
  *  first one with any at all, which is routinely a 4-entry category whose

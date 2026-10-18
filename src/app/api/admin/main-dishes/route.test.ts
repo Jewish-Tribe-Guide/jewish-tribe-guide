@@ -12,6 +12,7 @@ const m = vi.hoisted(() => ({
   saveMenuReading: vi.fn(),
   decideMenuReading: vi.fn(),
   findMenu: vi.fn(),
+  readMenuPage: vi.fn(),
   readMenu: vi.fn(),
   rpc: vi.fn(),
   revalidatePublicContent: vi.fn(),
@@ -29,7 +30,7 @@ vi.mock('@/lib/menuReadingStore', () => ({
   saveMenuReading: m.saveMenuReading,
   decideMenuReading: m.decideMenuReading,
 }))
-vi.mock('@/lib/menuReader', async (orig) => ({ ...(await orig<typeof import('@/lib/menuReader')>()), findMenu: m.findMenu, readMenu: m.readMenu }))
+vi.mock('@/lib/menuReader', async (orig) => ({ ...(await orig<typeof import('@/lib/menuReader')>()), findMenu: m.findMenu, readMenuPage: m.readMenuPage, readMenu: m.readMenu }))
 vi.mock('@/lib/supabase/admin', () => ({ getAdminClient: () => ({ rpc: m.rpc }) }))
 vi.mock('@/lib/revalidateContent', () => ({ revalidatePublicContent: m.revalidatePublicContent }))
 
@@ -93,6 +94,29 @@ describe('/api/admin/main-dishes', () => {
     // Proposed is not shown: nothing touches the listing.
     expect(m.rpc).not.toHaveBeenCalled()
     expect(m.revalidatePublicContent).not.toHaveBeenCalled()
+  })
+
+  // Oct 17: a menu link someone gave the place (menuLink.ts) is read first;
+  // its website is the fallback when the link can't be read.
+  it('reads its menu link first, and its website when the link can’t be read', async () => {
+    m.getResourceById.mockResolvedValue({ ...judah, menuUrl: 'https://judah.example/menu.pdf' })
+    m.readMenuPage.mockResolvedValue({ url: 'https://judah.example/menu.pdf', text: null, pdf: 'JVBER' })
+    m.readMenu.mockResolvedValue({ sourceUrl: 'https://judah.example/menu.pdf', dishes: [{ name: 'Shawarma', quote: 'Shawarma', checked: false }], note: null, model: 'gpt' })
+    await POST(req('POST', { action: 'read', resourceId: ID }))
+    expect(m.readMenuPage).toHaveBeenCalledWith('https://judah.example/menu.pdf')
+    expect(m.findMenu).not.toHaveBeenCalled()
+    expect(m.readMenu).toHaveBeenCalledWith(expect.objectContaining({ url: 'https://judah.example/menu.pdf' }), 'Judah', expect.anything())
+
+    m.readMenuPage.mockResolvedValue(null)
+    m.findMenu.mockResolvedValue({ url: 'https://judah.example/food', text: 'menu', pdf: null })
+    await POST(req('POST', { action: 'read', resourceId: ID }))
+    expect(m.findMenu).toHaveBeenCalledWith('https://judah.example')
+  })
+
+  it('lists each place’s menu link, for the tab to say what it reads', async () => {
+    m.listApprovedResources.mockResolvedValue([{ ...judah, menuUrl: 'https://judah.example/menu' }])
+    const body = await (await GET(req('GET'))).json()
+    expect(body.places[0].menuUrl).toBe('https://judah.example/menu')
   })
 
   it('a website with no readable menu is kept as couldn’t be read; no key, no reading', async () => {

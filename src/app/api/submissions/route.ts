@@ -2,6 +2,7 @@ import { validateSubmission, getResourceById } from '@/lib/resourceStore'
 import { getCategoryById } from '@/lib/categoryStore'
 import { resolveCapabilities, isCategorySyncEligible } from '@/lib/categories'
 import { submitterDetails } from '@/lib/syncFields'
+import { keepsMenuLink } from '@/lib/menuLink'
 import {
   submitListingCreate,
   submitListingUpdate,
@@ -177,6 +178,7 @@ export async function POST(request: Request) {
         fieldKeys: category?.detailFields.map((f) => f.key) ?? [],
         syncEligible: category ? isCategorySyncEligible(category) : false,
         storedPlaceId: existingResource?.placeId,
+        keepsMenuLink: keepsMenuLink(category),
       })
     }
     // Nobody types the "https://" scheme by hand for a website field — add it

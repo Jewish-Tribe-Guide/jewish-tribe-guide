@@ -25,7 +25,7 @@ type Reading = {
   decidedAt: string | null
   decidedBy: string | null
 }
-type Place = { id: string; name: string; categoryLabel: string; facts: string[]; website: string | null; dishes: string[]; reading: Reading | null }
+type Place = { id: string; name: string; categoryLabel: string; facts: string[]; website: string | null; menuUrl: string | null; dishes: string[]; reading: Reading | null }
 type Loaded = { places: Place[]; available: boolean; readerOn: boolean }
 
 const BATCH = 5
@@ -48,6 +48,8 @@ const hostOf = (url: string) => {
 function elsewhere(place: Place): boolean {
   const source = place.reading?.sourceUrl
   if (!source || !place.website || /\.pdf($|\?)/i.test(source)) return false
+  // Its menu link is wherever someone said the menu is.
+  if (place.menuUrl && hostOf(source) === hostOf(place.menuUrl)) return false
   const a = hostOf(source)
   const b = hostOf(place.website)
   return !!a && !!b && a !== b && !a.endsWith(`.${b}`) && !b.endsWith(`.${a}`)
@@ -119,7 +121,16 @@ function PlaceCard({
           Its website ({shortUrl(place.website!)}) sent the reader to another site. Check the listing’s website.
         </p>
       )}
-      {!place.website && !r && <p className="mt-1 text-xs text-muted">No website to read.</p>}
+      {/* Its menu link, which the reader reads first (menuLink.ts). */}
+      {place.menuUrl && !r && (
+        <p className="mt-1 text-xs text-slate-600" data-testid="dish-menu-link">
+          Reads its menu link{' '}
+          <a href={place.menuUrl} target="_blank" rel="noopener noreferrer" className="font-semibold text-primary hover:underline">
+            {shortUrl(place.menuUrl)} ↗
+          </a>
+        </p>
+      )}
+      {!place.website && !place.menuUrl && !r && <p className="mt-1 text-xs text-muted">No website or menu link to read.</p>}
       {r?.status === 'failed' && <p className="mt-1 text-xs text-amber-800">{r.note ?? 'Couldn’t read a menu.'}</p>}
 
       {r && r.status !== 'failed' && proposed.length > 0 && (
@@ -193,7 +204,7 @@ function PlaceCard({
             </button>
           </>
         )}
-        {place.website && readerOn && (
+        {(place.website || place.menuUrl) && readerOn && (
           <button type="button" disabled={busy} onClick={onRead} className="font-semibold text-primary hover:underline disabled:opacity-50">
             {busy ? 'Reading…' : r ? 'Read again' : 'Read its menu'}
           </button>
@@ -279,8 +290,8 @@ export default function MainDishes({ token }: { token: string }) {
 
   const of = (status: Reading['status']) => data.places.filter((p) => p.reading?.status === status)
   const toCheck = of('proposed')
-  const unread = data.places.filter((p) => !p.reading && p.website)
-  const failed = [...of('failed'), ...data.places.filter((p) => !p.reading && !p.website)]
+  const unread = data.places.filter((p) => !p.reading && (p.website || p.menuUrl))
+  const failed = [...of('failed'), ...data.places.filter((p) => !p.reading && !p.website && !p.menuUrl)]
   const done = [...of('approved'), ...of('skipped')]
   const rows = (list: Place[]) => (
     <ul className="divide-y divide-slate-100">
@@ -348,10 +359,10 @@ export default function MainDishes({ token }: { token: string }) {
                 </button>
               )}
             </div>
-            <p className="px-4 pb-2 text-xs text-muted">Each takes a few seconds: the AI reads the place&rsquo;s own website.</p>
+            <p className="px-4 pb-2 text-xs text-muted">Each takes a few seconds: the AI reads the place&rsquo;s menu link, or its own website.</p>
             {unread.length > 0 ? rows(unread) : <p className="px-4 pb-3 text-sm text-slate-600">All read.</p>}
           </section>
-          <CollapsibleSection title="Couldn’t be read" description="No website, or no menu on it the reader could read." count={failed.length} contentClassName="">
+          <CollapsibleSection title="Couldn’t be read" description="No website or menu link, or no menu the reader could read." count={failed.length} contentClassName="">
             {rows(failed)}
           </CollapsibleSection>
           <CollapsibleSection title="Approved and skipped" description="Read again any time; approving again only adds and re-dates." count={done.length} contentClassName="">

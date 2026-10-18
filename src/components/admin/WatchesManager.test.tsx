@@ -88,6 +88,17 @@ describe('WatchesManager', () => {
     expect(screen.queryByText(/worth a look/)).toBeNull()
   })
 
+  // Oct 17: a food place's menu watch, made by the daily run, says what it
+  // does and how to stop it (taking it off only brings it back tomorrow).
+  it('says a menu watch is the run’s own, that the AI reads only a change, and to pause it to stop it', async () => {
+    await renderTab([watch({ url: 'https://judah.example/menu', resourceId: 'shul-1', createdBy: 'menu links', lastFiled: 1, pageChangedAt: ago(1) })])
+    const line = screen.getByTestId('menu-watch')
+    expect(line).toHaveTextContent(/When the menu changes, the AI reads it/)
+    expect(line).toHaveTextContent(/pause it to stop it/)
+    expect(line).toHaveTextContent(/Last changed .*\. Last read: new dishes for the Main dishes tab\./)
+    expect(screen.queryByText(/worth a look/)).toBeNull()
+  })
+
   it('adds a page, tied to a listing picked by name', async () => {
     const created = watch({ id: 'new', url: 'https://lowermerionsynagogue.org/', label: 'Weekly times' })
     await renderTab([], { post: { watch: created } })

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import { categories, defaultCommunity, dismissLocationPrompt } from './helpers'
+import { categories, defaultCommunity, dismissLocationPrompt, listingCounts } from './helpers'
 
 // The phone home (the user, Oct 17), on a real build, at a fixed moment for
 // each kind of day: who keeps the guide right at the top (and the sheet it
@@ -136,6 +136,14 @@ test.describe('on a phone', () => {
     // Three to a row.
     const tops = await tiles.getByRole('listitem').evaluateAll((lis) => lis.slice(0, 3).map((li) => Math.round(li.getBoundingClientRect().top)))
     if (tops.length === 3) expect(new Set(tops).size).toBe(1)
+    // Most places first, as the computer's grid (the user, Oct 17), by the
+    // API's own counts, since a tile shows no number (the user, Oct 17).
+    // The first tile is the biggest category: its name, and no number.
+    await expect(tiles.getByRole('listitem').first()).not.toContainText(/\d/)
+    const counts = await listingCounts(request, community)
+    const shown = hrefs.map((h) => h!.split('/').at(-1)!).filter((id) => id in counts).map((id) => counts[id])
+    expect(shown.length).toBeGreaterThan(1)
+    expect(shown).toEqual([...shown].sort((a, b) => b - a))
   })
 
   // One search box on a phone (Oct 17): the home's had stayed the old pill

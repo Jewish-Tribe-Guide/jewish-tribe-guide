@@ -6,19 +6,23 @@ import { getAdminClient } from '@/lib/supabase/admin'
 import { revalidatePublicContent } from '@/lib/revalidateContent'
 import { itemsField, listingFacts } from '@/lib/listingView'
 import { addedItemName, cleanItemName, itemMarks, itemWording } from '@/lib/itemMarks'
-import { findMenu, readMenu, MAX_DISHES } from '@/lib/menuReader'
+import { findMenu, readMenu, readMenuPage, MAX_DISHES } from '@/lib/menuReader'
+import { MENU_LINK_KEY, readMenuLink } from '@/lib/menuLink'
 import { decideMenuReading, getMenuReading, listMenuReadings, saveMenuReading } from '@/lib/menuReadingStore'
 import { UUID } from '@/lib/itemMarkRoutes'
 import type { CategoryConfig } from '@/lib/categories'
 import type { DirectoryResource } from '@/types'
 
 // GET  /api/admin/main-dishes — the "Main dishes" tab (agreed Oct 1): every
-//      food place whose category keeps a list of dishes, with its website,
+//      food place whose category keeps a list of dishes, with its website
+//      and menu link,
 //      the dishes it lists now, and what the menu reader proposed for it
 //      (menu_reading, migration 065). Admin only.
 // POST /api/admin/main-dishes   body: { action: 'read', resourceId }
-//      Reads that place's own menu now (menuReader.ts) and keeps what the AI
-//      proposed, for an admin to check. Replaces an earlier reading.
+//      Reads that place's own menu now (menuReader.ts): its menu link when
+//      it has one that can be read (menuLink.ts), else what its website
+//      links to as its menu. Keeps what the AI proposed, for an admin to
+//      check. Replaces an earlier reading.
 // POST /api/admin/main-dishes   body: { action: 'approve', resourceId, dishes: string[] }
 //      Puts the dishes the admin kept (and any they added) on the listing,
 //      each dated "on its menu" today, with the menu's address for "Full
@@ -34,6 +38,11 @@ function dishKinds(categories: CategoryConfig[]) {
     const field = itemsField(c)
     return field && itemWording(field).noun === 'dish' ? [{ category: c, field }] : []
   })
+}
+
+/** A place's menu link, when it has one (menuLink.ts). */
+function menuLinkOf(item: DirectoryResource): string | null {
+  return readMenuLink(item[MENU_LINK_KEY]) || null
 }
 
 /** A place's own website: its category's first web-address field in the
@@ -66,6 +75,7 @@ export async function GET(request: Request) {
           categoryLabel: category.label,
           facts: listingFacts(l, category),
           website: websiteOf(l, category),
+          menuUrl: menuLinkOf(l),
           dishes: itemMarks(l, field).map((m) => m.name),
           reading: byId.get(l.id) ?? null,
         })),
@@ -99,13 +109,15 @@ export async function POST(request: Request) {
       const apiKey = process.env.OPENAI_API_KEY
       if (!apiKey) return Response.json({ ok: false, errors: ['The AI reader isn’t set up here (no OPENAI_API_KEY).'] }, { status: 503 })
       const website = websiteOf(listing, kind.category)
-      const source = website ? await findMenu(website) : null
+      const menuUrl = menuLinkOf(listing)
+      // Its menu link when that can be read, else what its website links to.
+      const source = (menuUrl ? await readMenuPage(menuUrl) : null) ?? (website ? await findMenu(website) : null)
       if (!source) {
         const reading = await saveMenuReading(community.slug, resourceId, {
           status: 'failed',
-          sourceUrl: website,
+          sourceUrl: menuUrl ?? website,
           dishes: [],
-          note: website ? 'Couldn’t read a menu on its website.' : 'No website to read.',
+          note: menuUrl ? `Couldn’t read its menu link${website ? ' or a menu on its website' : ''}.` : website ? 'Couldn’t read a menu on its website.' : 'No website or menu link to read.',
           model: null,
         })
         return Response.json({ ok: true, reading })

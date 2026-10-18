@@ -217,3 +217,21 @@ describe('a shul’s special schedules (step 4)', () => {
     expect(hasListingChanged({ ...existing, minyanim_schedules: [sukkos] } as DirectoryResource, proposed as never, [minyanimField])).toBe(false)
   })
 })
+
+// Oct 17: a food place's menu link isn't one of its category's fields, but
+// a suggestion that only changes it is still a change, shown under its name.
+describe('the menu link', () => {
+  const existing = listing({ category: 'restaurant', menuUrl: 'https://judah.example/menu' } as Partial<DirectoryResource>)
+  const base = { name: existing.name, address: existing.address!, phone: existing.phone! }
+
+  it('a new link alone is a change, labelled Menu link', () => {
+    const proposed = { ...base, details: { menuUrl: 'https://judah.example/new' } }
+    expect(hasListingChanged(existing, proposed, [])).toBe(true)
+    expect(listingChanges(existing, proposed, [])).toEqual([expect.objectContaining({ key: 'menuUrl', label: 'Menu link', before: 'https://judah.example/menu', after: 'https://judah.example/new' })])
+  })
+
+  it('the same link, or none sent, isn’t', () => {
+    expect(hasListingChanged(existing, { ...base, details: { menuUrl: 'https://judah.example/menu' } }, [])).toBe(false)
+    expect(hasListingChanged(existing, { ...base, details: {} }, [])).toBe(false)
+  })
+})

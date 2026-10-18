@@ -34,6 +34,12 @@ export type Watch = {
   pageChangedAt: string | null
 }
 
+/** The `created_by` of the watches the daily run makes for each food
+ *  place's menu (menuWatch.ts), so it only ever adds and removes its own,
+ *  and the Watches tab says what they do. An admin's own watch on a menu
+ *  page is an ordinary website watch. */
+export const MENU_WATCH_CREATOR = 'menu links'
+
 /** What one run of a watch came to. */
 export type WatchOutcome =
   | { ok: true; filed: number; pageHash?: string }

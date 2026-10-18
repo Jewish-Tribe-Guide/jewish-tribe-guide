@@ -141,6 +141,16 @@ describe('empty rows and changed rows', () => {
     const now: EditorValues = { name: was.name, address: was.address!, phone: was.phone!, details: { minyanim: [minyanim[0], { ...minyanim[1], time: '7:00am' }] } }
     expect(shul.filter((r) => rowChanged(r, was, now)).map((r) => r.id)).toEqual(['minyans:weekday'])
   })
+
+  // Oct 17: a food place's menu link sits on its Main dishes screen.
+  it('a food place: a new menu link marks its Main dishes row; a grocery has none to change', () => {
+    const withMenu = { ...item, menuUrl: 'https://sweetbox.example/menu' } as unknown as DirectoryResource
+    const moved = { ...same(), details: { ...same().details, menuUrl: 'https://sweetbox.example/new-menu' } }
+    expect(rows.filter((r) => rowChanged(r, withMenu, moved)).map((r) => r.id)).toEqual(['items'])
+    expect(rows.filter((r) => rowChanged(r, withMenu, { ...same(), details: { ...same().details, menuUrl: 'https://sweetbox.example/menu' } }))).toEqual([])
+    const grocery = editorRows(GROCERY, {})
+    expect(grocery.filter((r) => r.kind === 'items' && rowChanged(r, withMenu, moved))).toEqual([])
+  })
 })
 
 // A Record on purpose: a new field type is a compile error here until it's

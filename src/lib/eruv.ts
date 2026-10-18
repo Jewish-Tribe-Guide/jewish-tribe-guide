@@ -121,10 +121,18 @@ export function staleAfterMs(now: Date, tz: string, candlesToday: number | null)
   return inCheckingHours(now, tz, candlesToday) ? 15 * MINUTE : 180 * MINUTE
 }
 
+/** A read that failed is tried again after this long at most, not a whole
+ *  window: one timeout (Lower Merion's from the live site, Oct 17, a page
+ *  that answers in half a second) left "Couldn’t read their status" up for
+ *  three hours. */
+const RETRY_FAILED_MS = 15 * MINUTE
+
 export function isStale(eruv: Pick<Eruv, 'statusUrl' | 'statusCheckedAt' | 'statusErrorAt'>, now: Date, tz: string, candlesToday: number | null): boolean {
   if (!eruv.statusUrl) return false
-  const last = Math.max(eruv.statusCheckedAt ? Date.parse(eruv.statusCheckedAt) : 0, eruv.statusErrorAt ? Date.parse(eruv.statusErrorAt) : 0)
-  return now.getTime() - last >= staleAfterMs(now, tz, candlesToday)
+  const good = eruv.statusCheckedAt ? Date.parse(eruv.statusCheckedAt) : 0
+  const failed = eruv.statusErrorAt ? Date.parse(eruv.statusErrorAt) : 0
+  const wait = staleAfterMs(now, tz, candlesToday)
+  return now.getTime() - Math.max(good, failed) >= (failed > good ? Math.min(wait, RETRY_FAILED_MS) : wait)
 }
 
 // ── What a visitor sees ─────────────────────────────────────────────────────

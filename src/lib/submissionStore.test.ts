@@ -1691,6 +1691,36 @@ describe('approveSubmission: activity log and grocery item dates', () => {
     expect(details.menuUrl).toBe('https://example.com/menu')
   })
 
+  // Oct 17: a food place's menu link is a person's to suggest in Edit
+  // listing. A grocery's (above) still can't take one from a submission.
+  describe('a food place\'s menu link', () => {
+    const food = { id: 'restaurant', label: 'Food', hasAddress: true, detailFields: [{ key: 'dishes', label: 'Main dishes', type: 'tags', showCountInHeader: true, countLabel: 'main dish' }] }
+    async function approveWith(sent: Record<string, unknown>) {
+      const sub = baseSubmission({
+        operation: 'update',
+        target_id: 'res-1',
+        payload: listingPayload({ category: 'restaurant', details: { dishes: ['Falafel'], ...sent } }) as unknown as Record<string, unknown>,
+      })
+      const resource = mockFlow(sub, { id: 'res-1', details: { dishes: ['Falafel'], menuUrl: 'https://judah.example/menu' } })
+      mockGetCategoryById.mockResolvedValue(food)
+      await approveSubmission('sub-1')
+      return lastCallArg(resource.update).details
+    }
+
+    it('a sent link replaces the one it had, tidied', async () => {
+      expect((await approveWith({ menuUrl: 'judah.example/new-menu' })).menuUrl).toBe('https://judah.example/new-menu')
+    })
+
+    it('"" takes it off', async () => {
+      expect(await approveWith({ menuUrl: '' })).not.toHaveProperty('menuUrl')
+    })
+
+    it('an edit that doesn\'t mention it, or sends something that isn\'t a web page, leaves it', async () => {
+      expect((await approveWith({})).menuUrl).toBe('https://judah.example/menu')
+      expect((await approveWith({ menuUrl: 'javascript:alert(1)' })).menuUrl).toBe('https://judah.example/menu')
+    })
+  })
+
   // Oct 6: a mikvah section's own "Still right?" date (confirm_section) is
   // the visitors', never an edit's: the queue doesn't show it.
   it('keeps each section\'s confirmation date, and never takes one from a submission', async () => {

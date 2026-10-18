@@ -11,7 +11,7 @@ import { ui } from '@/lib/uiConfig'
 // "+ Add" on every screen but the Map (decided Oct 5, reversing the earlier
 // "no general Add": the box needs no category, so nobody is asked to pick
 // one first). Opens "Saw something? Tell us". A category page has its own
-// "+", with "Add a place" inside; a listing has Suggest an edit.
+// "+", with "Add a place" inside; a listing has Edit listing.
 
 // Loaded on the first tap: nobody browsing pays for the box.
 const TellUsSheet = dynamic(() => import('@/components/TellUsSheet'), { loading: () => null })

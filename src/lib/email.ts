@@ -11,7 +11,8 @@ import {
   BUSINESS_STATUS_LABEL,
   formatBusinessStatus,
 } from './submissionDiff'
-import { SHOWN_WHEN_PROPOSED } from './syncFields'
+import { MENU_LINK_PROPOSED, SHOWN_WHEN_PROPOSED } from './syncFields'
+import { MENU_LINK_LABEL } from './menuLink'
 import { getCommunityNotifyRecipients, getReviewActionRecipients } from './communityStore'
 import { adminBase } from './adminNav'
 import { formatHoursSummary } from './hours'
@@ -448,6 +449,7 @@ export async function sendSubmissionNotification(submission: SubmissionRow): Pro
         // admin-configured label and option text.
         const field = category?.detailFields.find((f) => f.key === k)
         if (!field && k === SHOWN_WHEN_PROPOSED) return row(BUSINESS_STATUS_LABEL, formatBusinessStatus(v))
+        if (!field && k === MENU_LINK_PROPOSED) return row(MENU_LINK_LABEL, formatDetailValue(v, undefined))
         return row(field?.label ?? k, formatDetailValue(v, field))
       })
       .join('')
