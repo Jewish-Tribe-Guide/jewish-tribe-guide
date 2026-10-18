@@ -43,11 +43,17 @@ function describe(f: WatchFinding): WatchDigestItem {
  *  new places are asked; the guide's own listings are already checked every
  *  night by the Google sync. */
 async function googleSays(f: Extract<WatchFinding, { kind: 'new' }>): Promise<{ closed: boolean; line: string }> {
+  return askGoogleIfOpen(f.entry.name, f.entry.address)
+}
+
+/** Whether Google says a place a list names is still open, as a line for
+ *  its card. Shared with Mekor Habracha's watch (mekorRun.ts). */
+export async function askGoogleIfOpen(name: string, address: string): Promise<{ closed: boolean; line: string }> {
   // Run with no Google key (the test project's daily run, which leaves
   // Google's paid calls out): said so, never "couldn't find it", so the
   // admin checks it's open before approving.
   if (!canAskGoogle()) return { closed: false, line: 'Google wasn\u2019t asked whether it\u2019s still open.' }
-  const g = await findPlaceStatus(f.entry.name, f.entry.address)
+  const g = await findPlaceStatus(name, address)
   if (!g) return { closed: false, line: 'Google: couldn\u2019t find it.' }
   const as = g.name ? ` (as "${g.name}")` : ''
   if (g.businessStatus === 'CLOSED_PERMANENTLY') return { closed: true, line: `Google: permanently closed${as}.` }

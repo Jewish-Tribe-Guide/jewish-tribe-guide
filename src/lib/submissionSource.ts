@@ -1,5 +1,6 @@
 import { GOOGLE_SUBMITTER_NAME } from './activity'
 import { KEYSTONE_WATCH_NAME } from './keystoneWatch'
+import { MEKOR_NAME, MEKOR_WATCH_NAME } from './mekorWatch'
 import { GOOGLE, KEYSTONE_NAME } from './sourceNames'
 
 // Where a suggestion came from, for the moderation queue (agreed Oct 5,
@@ -71,6 +72,7 @@ export function submissionSource(s: SourceInput): SubmissionSource {
   const by = s.submitted_by?.name
 
   if (by === KEYSTONE_WATCH_NAME) return { readBy: 'automatic', from: 'Keystone-K’s list', named: KEYSTONE_NAME, ...(note ? { original: note } : {}) }
+  if (by === MEKOR_WATCH_NAME) return { readBy: 'automatic', from: 'Mekor Habracha’s list', named: MEKOR_NAME, ...(note ? { original: note } : {}) }
   if (by === GOOGLE_SUBMITTER_NAME) return { readBy: 'automatic', from: GOOGLE, named: GOOGLE, ...(note ? { original: note } : {}) }
 
   if (note && (note.includes(PASTED) || note.includes(PHOTO))) {
