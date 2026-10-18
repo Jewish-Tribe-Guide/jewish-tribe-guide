@@ -103,7 +103,7 @@ export default function RightNow(props: Props) {
     )
   }
 
-  const day = rightNowDay(now, timezone, zmanim)
+  const day = rightNowDay(now, timezone)
   return (
     <section data-testid="right-now" data-moment={moment.kind} aria-labelledby="right-now-title">
       <h2 id="right-now-title" className="mb-2 text-[12.5px] font-extrabold uppercase tracking-[0.06em] text-slate-500">

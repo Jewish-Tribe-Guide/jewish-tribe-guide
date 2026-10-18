@@ -9,20 +9,35 @@ import { fetchDatesInfo } from './dateZmanim'
 // that. No cron needed; each page is read at most once per window however
 // many people look.
 
-const TIMEOUT_MS = 8000
+// Two tries of 5 seconds, the second only when the first got no answer at
+// all: Lower Merion's page answers in half a second, but a read from the
+// live site now and then got nothing (Oct 17, twice), and one quick retry
+// costs a visitor no more than the single 8-second wait it replaces.
+const TIMEOUT_MS = 5000
+const TRIES = 2
 const USER_AGENT = 'Mozilla/5.0 (compatible; PhillyJewishGuide/1.0; eruv status)'
 
 /** One page's status, or why it couldn't be read. */
 export async function readEruvPage(url: string, now: Date, fetchImpl: typeof fetch = fetch): Promise<StatusWrite> {
   const at = now.toISOString()
   try {
-    const res = await fetchImpl(url, { headers: { 'User-Agent': USER_AGENT }, signal: AbortSignal.timeout(TIMEOUT_MS), cache: 'no-store' })
+    const res = await fetchWithRetry(url, fetchImpl)
     if (!res.ok) return { ok: false, error: `The page answered ${res.status}`, at }
     const reading = readStatus(pageText(await res.text()))
     if (reading.status === 'unknown') return { ok: false, error: reading.words ? `Unclear: “${reading.words}”` : 'No status sentence on the page', at }
     return { ok: true, status: reading.status, words: reading.words, postedOn: reading.postedOn, at }
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err), at }
+  }
+}
+
+async function fetchWithRetry(url: string, fetchImpl: typeof fetch): Promise<Response> {
+  for (let tried = 1; ; tried++) {
+    try {
+      return await fetchImpl(url, { headers: { 'User-Agent': USER_AGENT }, signal: AbortSignal.timeout(TIMEOUT_MS), cache: 'no-store' })
+    } catch (err) {
+      if (tried >= TRIES) throw err
+    }
   }
 }
 

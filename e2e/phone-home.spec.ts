@@ -85,7 +85,7 @@ test.describe('on a phone', () => {
     // has places with hours. If it ever doesn't, this says so.
     await expect(now, 'something in the guide is open at Tuesday lunchtime').toBeVisible()
     await expect(now).toHaveAttribute('data-moment', 'weekday')
-    await expect(now.getByRole('heading')).toContainText('Right now · Tuesday · 2 Cheshvan')
+    await expect(now.getByRole('heading')).toHaveText(/^Right now · Tuesday$/i)
     for (const href of await now.getByRole('link').evaluateAll((as) => as.map((a) => a.getAttribute('href')))) {
       expect(href).toMatch(new RegExp(`^/${community}/[^/?]+\\?openNow=1$`))
     }

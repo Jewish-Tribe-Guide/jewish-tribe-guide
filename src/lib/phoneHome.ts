@@ -1,4 +1,4 @@
-import type { DirectoryResource, ZmanimData } from '@/types'
+import type { DirectoryResource } from '@/types'
 import { selectValues, type CategoryConfig } from '@/lib/categories'
 import { getOpenStatus, hasAnyHours } from '@/lib/hours'
 import { eruvView, type Eruv, type EruvTone } from '@/lib/eruv'
@@ -95,15 +95,16 @@ export function sourcesRead(
 /** The sheet's first line, the idea with its examples (the user, Oct 17:
  *  people want the philosophy, not each source): "Hours from Google,
  *  hechshers from Keystone-K's list, eruv status from each eruv’s own site.
- *  Read again every day, and every 15 minutes on Friday for the eruv." Null
- *  when nothing was read, and the sheet leaves the line out. */
+ *  Read again every day." The eruv's Friday rhythm is left to the Eruv page
+ *  (the user, Oct 18: too much detail for an overview). Null when nothing
+ *  was read, and the sheet leaves the line out. */
 export function sourcesSentence(read: SourcesRead): string | null {
   const parts = [read.google && 'hours from Google', ...read.lists.map((l) => `hechshers from ${l}`), read.eruv && 'eruv status from each eruv’s own site'].filter(
     (p): p is string => !!p,
   )
   if (parts.length === 0) return null
   const list = parts.length === 1 ? parts[0] : `${parts.slice(0, -1).join(', ')} and ${parts.at(-1)}`
-  return `${list.charAt(0).toUpperCase()}${list.slice(1)}. Read again every day${read.eruv ? ', and every 15 minutes on Friday for the eruv' : ''}.`
+  return `${list.charAt(0).toUpperCase()}${list.slice(1)}. Read again every day.`
 }
 
 // ── Right now, on a weekday ─────────────────────────────────────────────────
@@ -179,17 +180,13 @@ function openParts(category: CategoryConfig, open: readonly DirectoryResource[])
 
 // ── The label over Right now ────────────────────────────────────────────────
 
-/** "Tuesday · 2 Cheshvan"; Saturday is "Shabbos". The Hebrew date only when
- *  the zmanim are today's (a cached copy from yesterday would be a day
- *  off). Null before there's a clock. */
-export function rightNowDay(now: number | null, timezone: string, zmanim: ZmanimData | null): string | null {
+/** "Tuesday"; Saturday is "Shabbos". No Hebrew date (the user, Oct 18: the
+ *  phone home read as too Jewish for everyone it serves). Null before
+ *  there's a clock. */
+export function rightNowDay(now: number | null, timezone: string): string | null {
   if (now === null) return null
-  const at = new Date(now)
-  const weekday = at.toLocaleDateString('en-US', { weekday: 'long', timeZone: timezone })
-  const short = at.toLocaleDateString('en-US', { weekday: 'short', timeZone: timezone })
-  const today = zmanim && ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][zmanim.dayOfWeek] === short
-  const hebrew = today ? zmanim.hebrewDate.replace(/\s+\d{4}$/, '') : ''
-  return [weekday === 'Saturday' ? 'Shabbos' : weekday, hebrew].filter(Boolean).join(' · ')
+  const weekday = new Date(now).toLocaleDateString('en-US', { weekday: 'long', timeZone: timezone })
+  return weekday === 'Saturday' ? 'Shabbos' : weekday
 }
 
 // ── The eruvim, on the Friday card ──────────────────────────────────────────
@@ -217,7 +214,7 @@ export function eruvSummary(eruvim: readonly Eruv[], now: Date, timezone: string
   add('green', count((v) => v.tone === 'green'), 'up')
   add('amber', count((v) => v.tone === 'amber' && notPosted(v)), 'not posted yet')
   add('amber', count((v) => v.tone === 'amber' && !notPosted(v)), 'couldn’t be read')
-  add('grey', count((v) => v.tone === 'grey'), 'by phone')
+  add('grey', count((v) => v.label === 'No status online'), 'by phone')
   const down = downNames.length === 0 ? null : `${joinNames(downNames)} ${downNames.length === 1 ? 'is' : 'are'} down`
   return { down, parts }
 }
