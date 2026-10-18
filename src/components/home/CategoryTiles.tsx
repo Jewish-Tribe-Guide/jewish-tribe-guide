@@ -19,13 +19,15 @@ export function mostListedFirst(cards: readonly CardDef[], counts: Record<string
 
 // ── The phone home's categories, as tiles (the user, Oct 17) ────────────────
 // The list read as dull: every row alike, three screens of it. Tiles, each
-// in its own colour: the site's line glyph on its tint, its name, how many
-// places. Not the old photo tiles (stock photos, one download each). Most
-// places first, as the computer's grid (the user, Oct 17), with no group
-// headings: tried under them, a group of one or two left tiles alone in a
-// row (the user, on a phone: back to without).
-// Every category is a tile, since this is where a phone browses: no "Also:"
-// line of the ones that didn't fit.
+// in its own colour: the site's line glyph on its tint and its name. Not
+// the old photo tiles (stock photos, one download each). Most places first,
+// as the computer's grid (the user, Oct 17), and no count under a tile
+// (the user, Oct 17): the order already says which are biggest, "Cemetery
+// 1" made the guide look thin, and the category page says how many. No
+// group headings: tried under them, a group of one or two left tiles alone
+// in a row (the user, on a phone: back to without). Every category is a
+// tile, since this is where a phone browses: no "Also:" line of the ones
+// that didn't fit.
 
 export default function CategoryTiles({ communitySlug, listings }: { communitySlug: string; listings: readonly DirectoryResource[] | null }) {
   const { categories, sections, counts } = useBrowseCards(communitySlug, listings)
@@ -33,7 +35,7 @@ export default function CategoryTiles({ communitySlug, listings }: { communitySl
     return (
       <div aria-hidden="true" className="grid grid-cols-3 gap-2">
         {Array.from({ length: 9 }, (_, i) => (
-          <div key={i} className="h-[104px] animate-pulse rounded-2xl bg-slate-100" />
+          <div key={i} className="h-[88px] animate-pulse rounded-2xl bg-slate-100" />
         ))}
       </div>
     )
@@ -42,23 +44,18 @@ export default function CategoryTiles({ communitySlug, listings }: { communitySl
   return (
     <div data-testid="category-tiles">
       <ul className="grid grid-cols-3 gap-2">
-        {cards.map((card) => {
-          // Only where the card counts something (not a form).
-          const n = card.count && card.id ? counts?.[card.id] : undefined
-          return (
-            <li key={card.id ?? card.title} className="min-w-0">
-              <Link
-                href={card.href}
-                prefetch={false}
-                className="flex h-full min-h-[104px] flex-col items-center gap-1.5 rounded-2xl border border-slate-200 bg-white px-1.5 pt-3 pb-2.5 text-center hover:bg-slate-50"
-              >
-                <CategoryIcon icon={card.icon ?? ''} categoryId={card.id} color={getCategoryColor((categories ?? []) as CategoryConfig[], card.id ?? '')} className="h-10 w-10 text-lg" sizePx={40} />
-                <span className="line-clamp-2 text-[13.5px] font-bold leading-tight text-ink">{card.title}</span>
-                {n !== undefined && <span className="text-[12px] tabular-nums text-slate-500">{n}</span>}
-              </Link>
-            </li>
-          )
-        })}
+        {cards.map((card) => (
+          <li key={card.id ?? card.title} className="min-w-0">
+            <Link
+              href={card.href}
+              prefetch={false}
+              className="flex h-full min-h-[88px] flex-col items-center gap-1.5 rounded-2xl border border-slate-200 bg-white px-1.5 pt-3 pb-2.5 text-center hover:bg-slate-50"
+            >
+              <CategoryIcon icon={card.icon ?? ''} categoryId={card.id} color={getCategoryColor((categories ?? []) as CategoryConfig[], card.id ?? '')} className="h-10 w-10 text-lg" sizePx={40} />
+              <span className="line-clamp-2 text-[13.5px] font-bold leading-tight text-ink">{card.title}</span>
+            </Link>
+          </li>
+        ))}
       </ul>
       <BrowseFoot communitySlug={communitySlug} />
     </div>
