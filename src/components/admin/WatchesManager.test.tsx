@@ -105,6 +105,33 @@ describe('WatchesManager', () => {
     expect(screen.queryByText(/worth a look/)).toBeNull()
   })
 
+  it('says a shul’s own page is read by the AI only when it changes, and never dates the listing', async () => {
+    await renderTab([watch({ url: 'https://lms.org/davening', resourceId: 'shul-1', createdBy: 'listing pages', lastFiled: 1, pageChangedAt: ago(1) })])
+    const group = screen.getByRole('region', { name: 'Shul and mikvah pages' })
+    const line = within(group).getByTestId('listing-page-watch')
+    expect(line).toHaveTextContent(/When the page changes, the AI reads it/)
+    expect(line).toHaveTextContent(/not even the listing’s date/)
+    expect(line).toHaveTextContent(/Last changed .*\. Last read: 1 suggestion\./)
+    expect(screen.queryByText(/worth a look/)).toBeNull()
+  })
+
+  it('adds a listing’s own page, which needs the listing', async () => {
+    const created = watch({ id: 'new', url: 'https://lms.org/davening', label: 'LMS times', resourceId: 'shul-1', createdBy: 'listing pages' })
+    await renderTab([], { post: { watch: created } })
+    const user = userEvent.setup()
+    await user.type(screen.getByLabelText(/^Web address/), 'lms.org/davening')
+    await user.click(screen.getByLabelText(/own page of davening times or hours/))
+    await user.click(screen.getByRole('button', { name: 'Watch this page' }))
+    expect(await screen.findByText('Pick the shul or mikvah this page is for.')).toBeInTheDocument()
+    expect(vi.mocked(fetchJson).mock.calls.some(([, i]) => i?.method === 'POST')).toBe(false)
+
+    await user.type(screen.getByLabelText(/The listing it keeps current/), 'Lower Merion Synagogue')
+    await user.click(screen.getByRole('button', { name: 'Watch this page' }))
+    const [, init] = vi.mocked(fetchJson).mock.calls.find(([, i]) => i?.method === 'POST')!
+    expect(JSON.parse(String(init!.body))).toEqual({ action: 'add', url: 'lms.org/davening', resourceId: 'shul-1', label: '', forListing: true })
+    expect(await screen.findByText('LMS times')).toBeInTheDocument()
+  })
+
   it('adds a page, tied to a listing picked by name', async () => {
     const created = watch({ id: 'new', url: 'https://lowermerionsynagogue.org/', label: 'Weekly times' })
     await renderTab([], { post: { watch: created } })

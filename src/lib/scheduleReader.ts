@@ -84,10 +84,21 @@ Answer in JSON only: {"times": [{"tefillah": "...", "on": ["..."], "time": "..."
 
 const SUNSET = "(?:sunset|sundown|sh(?:e|')?kiah?)"
 
+/** A rule as written, without a hedge in front: "around 15 minutes before
+ *  sunset", "~30 min before sundown" (Mekor Habracha's page, Oct 19). Shuls
+ *  round; a time within two minutes is the rule anyway (scheduleUpdate.ts). */
+function unhedged(time: string): string {
+  return time
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/^(?:~|approx(?:\.|imately)?|around|about|ca\.?|circa)\s*/, '')
+}
+
 /** "10 min before sunset", "15 minutes after shkia", "at sunset", "sunset":
  *  minutes from sunset (negative before), or null for anything else. */
 export function readSunsetTime(time: string): number | null {
-  const t = time.toLowerCase().replace(/\s+/g, ' ').trim()
+  const t = unhedged(time)
   const offset = t.match(new RegExp(`^(\\d{1,3}) ?(?:min(?:ute)?s?\\.?|m) (before|prior to|after|past) (?:the )?${SUNSET}$`))
   if (offset) return Number(offset[1]) * (offset[2] === 'before' || offset[2] === 'prior to' ? -1 : 1)
   return new RegExp(`^(?:at )?${SUNSET}$`).test(t) ? 0 : null
@@ -182,7 +193,7 @@ export async function readSchedule(
 // What changes is worked out by plain code (scheduleUpdate.ts).
 
 const ZMAN_WORDS: [ZmanAnchor, string][] = [
-  ['candle_lighting', '(?:candle ?lighting|licht ?bentsh(?:en|ing)|lighting)'],
+  ['candle_lighting', '(?:candle[ -]?lighting|licht ?bentsh(?:en|ing)|lighting)'],
   ['havdalah', 'havdal(?:ah|a)'],
 ]
 
@@ -192,7 +203,7 @@ const ZMAN_WORDS: [ZmanAnchor, string][] = [
 export function readZmanTime(time: string): { anchor: ZmanAnchor; offsetMinutes: number } | null {
   const sunset = readSunsetTime(time)
   if (sunset !== null) return { anchor: 'sunset', offsetMinutes: sunset }
-  const t = time.toLowerCase().replace(/\s+/g, ' ').trim()
+  const t = unhedged(time)
   for (const [anchor, words] of ZMAN_WORDS) {
     const offset = t.match(new RegExp(`^(\\d{1,3}) ?(?:min(?:ute)?s?\\.?|m) (before|prior to|after|past) (?:the )?${words}$`))
     if (offset) return { anchor, offsetMinutes: Number(offset[1]) * (offset[2] === 'before' || offset[2] === 'prior to' ? -1 : 1) }
@@ -208,6 +219,10 @@ const EVENING: Tefillah[] = ['kabbalas_shabbos', 'mincha', 'maariv', 'mincha_maa
  *  the morning: no shul davens Mincha at 5:59 AM), or a rule from a zman
  *  for the tefillos that move with one. Anything else as written. */
 export function asRegularTime(tefillah: Tefillah, time: string): { time: string; anchor?: ZmanAnchor; offsetMinutes?: number } {
+  // "10am", "10 a.m.": the hour, as the guide writes it ("10:00am"), or
+  // it's a different time from the shul's own 10:00am (Kol Tzedek, Oct 19).
+  const hour = time.trim().match(/^(\d{1,2})\s*([ap])\.?\s*m\.?$/i)
+  if (hour && Number(hour[1]) >= 1 && Number(hour[1]) <= 12) return { time: `${Number(hour[1])}:00${hour[2].toLowerCase()}m` }
   const bare = time.trim().match(/^(\d{1,2}):(\d{2})$/)
   if (bare) {
     const h = Number(bare[1])
@@ -310,13 +325,21 @@ export function tidyRegularReading(raw: unknown, source: ScheduleSource, { today
     const notes = str(x.notes, 120)
     const unsure = str(x.unsure, 200)
     const occasion = date ? str(x.occasion, 40) : null
+    // The same time given twice (a page's summary and its detail) is one
+    // time on all the days either gives, not a second minyan.
+    const at = asRegularTime(tefillah, time)
+    const twin = times.find((o) => o.tefillah === tefillah && o.date === date && o.time === at.time && o.anchor === at.anchor && o.offsetMinutes === at.offsetMinutes)
+    if (twin) {
+      twin.days = [...new Set([...twin.days, ...(date ? [] : weekdays)])]
+      continue
+    }
     times.push({
       id: newId(),
       tefillah,
       days: date ? [] : weekdays,
       ...(date ? { date } : {}),
       ...(occasion ? { occasion } : {}),
-      ...asRegularTime(tefillah, time),
+      ...at,
       ...(notes ? { notes } : {}),
       quote,
       checked: text !== null,

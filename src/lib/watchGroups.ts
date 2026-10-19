@@ -12,14 +12,16 @@ import { MENU_WATCH_CREATOR, watchHealth, type Watch } from './watches'
 import { isIgnoredSender, isNewsletterWatch } from './newsletter'
 import { refuahHospitalId } from './refuahWatch'
 import { isMekorList } from './mekorWatch'
+import { isListingPageWatch } from './listingPageWatch'
 
-export type WatchGroupKey = 'kosher' | 'newsletters' | 'hospitals' | 'menus' | 'pages'
+export type WatchGroupKey = 'kosher' | 'newsletters' | 'hospitals' | 'menus' | 'listingPages' | 'pages'
 
 const GROUPS: { key: WatchGroupKey; label: string }[] = [
   { key: 'kosher', label: 'Kosher lists' },
   { key: 'newsletters', label: 'Shul newsletters' },
   { key: 'hospitals', label: 'Hospitals on Refuah' },
   { key: 'menus', label: 'Menus' },
+  { key: 'listingPages', label: 'Shul and mikvah pages' },
   { key: 'pages', label: 'Other pages' },
 ]
 
@@ -28,6 +30,7 @@ export function watchGroupOf(w: Watch): WatchGroupKey {
   if (w.kind === 'keystone_list' || isMekorList(w.url)) return 'kosher'
   if (refuahHospitalId(w.url)) return 'hospitals'
   if (w.createdBy === MENU_WATCH_CREATOR) return 'menus'
+  if (isListingPageWatch(w)) return 'listingPages'
   return 'pages'
 }
 

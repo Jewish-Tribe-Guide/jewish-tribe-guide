@@ -6,6 +6,8 @@ import { readWebsite } from './websiteWatch'
 import { refuahHospitalId } from './refuahWatch'
 import { runRefuahWatch } from './refuahRun'
 import { runMenuWatch, type MenuReadBudget } from './menuWatchRun'
+import { isListingPageWatch } from './listingPageWatch'
+import { runListingPageWatch } from './listingPageRun'
 import { updateWatch } from './watchStore'
 import { afterRun, MENU_WATCH_CREATOR, type Watch, type WatchOutcome } from './watches'
 import { isNewsletterWatch, quietError } from './newsletter'
@@ -49,6 +51,11 @@ export async function runWatch(
     // A food place's menu, read by the AI only when it changed (menuWatch.ts).
     if (watch.createdBy === MENU_WATCH_CREATOR) {
       return await runMenuWatch({ communityId: watch.communityId, url: watch.url, resourceId: watch.resourceId ?? null, pageHash: watch.pageHash ?? null }, budget)
+    }
+    // A shul's or mikvah's own page, read by the AI for its times or hours
+    // only when it changed (listingPageWatch.ts). Shares the run's AI reads.
+    if (isListingPageWatch({ createdBy: watch.createdBy ?? null })) {
+      return await runListingPageWatch({ communityId: watch.communityId, url: watch.url, resourceId: watch.resourceId ?? null, pageHash: watch.pageHash ?? null }, budget)
     }
     return await readWebsite(watch.url)
   } catch (err) {

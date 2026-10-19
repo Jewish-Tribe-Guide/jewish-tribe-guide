@@ -8,6 +8,7 @@ import { useCommunitySlug } from '@/lib/communityContext'
 import { MENU_WATCH_CREATOR, watchHealth, type Watch } from '@/lib/watches'
 import { refuahHospitalId } from '@/lib/refuahWatch'
 import { isMekorList } from '@/lib/mekorWatch'
+import { isListingPageWatch } from '@/lib/listingPageWatch'
 import { groupWatches, watchGroupOf, type WatchGroup, type WatchGroupKey, type WatchRank, type WatchRow } from '@/lib/watchGroups'
 import { isIgnoredSender, isNewsletterWatch } from '@/lib/newsletter'
 
@@ -109,6 +110,18 @@ function WhatItDoes({ watch }: { watch: Watch }) {
       </p>
     )
   }
+  // A shul's or mikvah's own page, read by the AI when it changes
+  // (listingPageWatch.ts).
+  if (isListingPageWatch(watch)) {
+    return (
+      <p className="text-xs text-muted" data-testid="listing-page-watch">
+        Checked every morning. When the page changes, the AI reads it, and davening times or hours that differ from the listing go to the
+        moderation queue with the page beside them. A page that agrees changes nothing, not even the listing&rsquo;s date.{' '}
+        {watch.pageChangedAt ? `Last changed ${day(watch.pageChangedAt)}.` : 'No change since it was added.'}
+        {watch.pageChangedAt && lastRead}
+      </p>
+    )
+  }
   return (
     <p className="text-xs text-muted">
       Checked every morning for a change.{' '}
@@ -204,6 +217,7 @@ export default function WatchesManager({ token }: { token: string }) {
   const [url, setUrl] = useState('')
   const [listingName, setListingName] = useState('')
   const [label, setLabel] = useState('')
+  const [forListing, setForListing] = useState(false)
   // Read once per render pass for every row alike; the tab is reloaded to refresh.
   const [now] = useState(() => Date.now())
   // Long groups the admin has opened, and the rows they've acted on.
@@ -262,9 +276,13 @@ export default function WatchesManager({ token }: { token: string }) {
       setSaveError('Pick the listing from the list, or leave it empty.')
       return
     }
+    if (forListing && !listing) {
+      setSaveError('Pick the shul or mikvah this page is for.')
+      return
+    }
     setBusy('add')
     try {
-      const res = await post({ action: 'add', url, resourceId: listing?.id ?? null, label })
+      const res = await post({ action: 'add', url, resourceId: listing?.id ?? null, label, ...(forListing ? { forListing: true } : {}) })
       if (res.watch) {
         const added = res.watch
         setData((d) => d && { ...d, watches: [...d.watches, added] })
@@ -274,6 +292,7 @@ export default function WatchesManager({ token }: { token: string }) {
       setUrl('')
       setListingName('')
       setLabel('')
+      setForListing(false)
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : 'Could not add that page.')
     } finally {
@@ -410,6 +429,12 @@ export default function WatchesManager({ token }: { token: string }) {
                 </option>
               ))}
             </datalist>
+          </label>
+          <label className="flex items-start gap-2 text-sm">
+            <input type="checkbox" checked={forListing} onChange={(e) => setForListing(e.target.checked)} className="mt-1" />
+            <span className="text-slate-700">
+              It&rsquo;s the listing&rsquo;s own page of davening times or hours: when it changes, read it and send what differs to the queue
+            </span>
           </label>
           <label className="block text-sm">
             <span className="text-slate-700">Name (optional)</span>

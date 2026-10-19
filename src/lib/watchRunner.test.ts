@@ -9,6 +9,8 @@ vi.mock('./refuahRun', () => ({ runRefuahWatch: vi.fn() }))
 const mekor = vi.hoisted(() => ({ run: vi.fn() }))
 vi.mock('./mekorRun', () => ({ runMekorWatch: mekor.run }))
 vi.mock('./menuWatchRun', () => ({ runMenuWatch: vi.fn() }))
+const page = vi.hoisted(() => ({ run: vi.fn() }))
+vi.mock('./listingPageRun', () => ({ runListingPageWatch: page.run }))
 vi.mock('./websiteWatch', () => ({ readWebsite: m.readWebsite }))
 vi.mock('./watchStore', () => ({ updateWatch: vi.fn() }))
 
@@ -45,5 +47,26 @@ describe('runWatch: Mekor Habracha’s list', () => {
   it('says why when it couldn’t be read', async () => {
     mekor.run.mockResolvedValue({ ok: false, error: 'Mekor Habracha’s list answered 503' })
     expect(await runWatch(mekorList)).toEqual({ ok: false, error: 'Mekor Habracha’s list answered 503' })
+  })
+})
+
+// A shul's or mikvah's own page (listingPageWatch.ts): read for the
+// listing's times or hours, sharing the run's AI reads with the menus.
+describe('runWatch: a listing’s own page', () => {
+  const shulPage = { communityId: 'philly', kind: 'website' as const, url: 'https://lms.org/davening', resourceId: 's1', createdBy: 'listing pages', pageHash: 'h' }
+
+  it('is read for the listing, with the run’s AI budget', async () => {
+    page.run.mockResolvedValue({ ok: true, filed: 1, pageHash: 'h2' })
+    const budget = { aiReads: 3 }
+    expect(await runWatch(shulPage, budget)).toEqual({ ok: true, filed: 1, pageHash: 'h2' })
+    expect(page.run).toHaveBeenCalledWith({ communityId: 'philly', url: shulPage.url, resourceId: 's1', pageHash: 'h' }, budget)
+    expect(m.readWebsite).not.toHaveBeenCalled()
+  })
+
+  it('an admin’s plain watch on the same page is only checked for a change', async () => {
+    m.readWebsite.mockResolvedValue({ ok: true, filed: 0, pageHash: 'h' })
+    await runWatch({ ...shulPage, createdBy: 'admin@example.org' })
+    expect(page.run).not.toHaveBeenCalled()
+    expect(m.readWebsite).toHaveBeenCalledWith(shulPage.url)
   })
 })

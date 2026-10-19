@@ -3,8 +3,9 @@
 // Runs every active watch once (watches.ts): Keystone-K's list files its
 // differences as suggestions, as does a hospital's page on Refuah
 // (refuahWatch.ts); a food place's menu is read by the AI when it changed
-// (menuWatch.ts: first, every place with a menu link is given its watch);
-// any other website is checked for a change. Then the
+// (menuWatch.ts: first, every place with a menu link is given its watch),
+// and so is a shul's or mikvah's own page of times or hours, for what
+// differs from its listing (listingPageWatch.ts); any other website is checked for a change. Then the
 // eruvim's maps, for a part an admin left out that's gone (eruvLineRun.ts). Meant to
 // run daily (vercel.json). Each run is recorded on the watch, and the admins
 // are emailed once when a watch breaks and once when it recovers.
