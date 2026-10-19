@@ -79,6 +79,15 @@ describe('confirmFromSource', () => {
     expect(m.revalidateTag).toHaveBeenCalledTimes(1)
     expect(m.revalidateTag).toHaveBeenCalledWith('resources:philly', 'max')
   })
+  it('still counts its dates when there is no site cache to refresh (the daily test-project job runs outside Next)', async () => {
+    m.rows = [{ id: 'a', details: null }]
+    m.revalidateTag.mockImplementationOnce(() => {
+      throw new Error('Invariant: static generation store missing in revalidateTag resources:philly')
+    })
+    const quiet = vi.spyOn(console, 'error').mockImplementation(() => {})
+    expect(await confirmFromSource('philly', ['a'], 'Keystone-K', NOW)).toBe(1)
+    quiet.mockRestore()
+  })
   it('does nothing for no listings', async () => {
     expect(await confirmFromSource('philly', [], 'Keystone-K', NOW)).toBe(0)
     expect(m.revalidateTag).not.toHaveBeenCalled()

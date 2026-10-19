@@ -95,7 +95,7 @@ export function sourcesRead(
 /** The sheet's first line, the idea with its examples (the user, Oct 17:
  *  people want the philosophy, not each source): "Hours from Google,
  *  hechshers from Keystone-K's list, eruv status from each eruv’s own site.
- *  Read again every day." The eruv's Friday rhythm is left to the Eruv page
+ *  Read again every day, hours every week." The eruv's Friday rhythm is left to the Eruv page
  *  (the user, Oct 18: too much detail for an overview). Null when nothing
  *  was read, and the sheet leaves the line out. */
 export function sourcesSentence(read: SourcesRead): string | null {
@@ -104,7 +104,11 @@ export function sourcesSentence(read: SourcesRead): string | null {
   )
   if (parts.length === 0) return null
   const list = parts.length === 1 ? parts[0] : `${parts.slice(0, -1).join(', ')} and ${parts.at(-1)}`
-  return `${list.charAt(0).toUpperCase()}${list.slice(1)}. Read again every day.`
+  // Google's hours are read once a week (sync-hours: every night only asks
+  // whether a place is open), so "every day" alone overstated them (the
+  // user, Oct 19).
+  const when = !read.google ? 'every day' : parts.length === 1 ? 'every week' : 'every day, hours every week'
+  return `${list.charAt(0).toUpperCase()}${list.slice(1)}. Read again ${when}.`
 }
 
 // ── Right now, on a weekday ─────────────────────────────────────────────────

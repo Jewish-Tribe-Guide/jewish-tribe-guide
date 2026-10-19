@@ -206,6 +206,13 @@ for that exact change, in the same conversation. Show the dry run first.
   phone and website are re-read once a week, a seventh of the places each
   night (Sep 29, for the Google bill). Most places were read on Oct 17,
   so "Checked with Google, Oct 17" moves on, place by place, by Oct 24.
+  The trust sheet said every source was read again every day; it says
+  "Read again every day, hours every week." now (the user's yes, Oct 19),
+  and "every week" alone when Google is the only source listed.
+- **The daily test-project job keeps going once a watch dates a
+  listing.** That job runs the watches outside Next, where refreshing the
+  site's cache throws; the dates are written first, and the refresh is
+  now skipped there with a note in the log.
 
 ## Done Oct 18 (on `redesign/oct18-fixes`, not merged)
 

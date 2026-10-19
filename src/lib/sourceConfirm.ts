@@ -54,6 +54,15 @@ export async function confirmFromSource(community: string, ids: readonly string[
     else dated += (done ?? []).length
   }
   // The same cached listings every page reads (as a visitor's Yes does).
-  if (dated > 0) revalidateTag(TAGS.resources(community), 'max')
+  // Outside Next (the daily test-project job, scripts/run-test-watches.mts)
+  // there is no cache to refresh and revalidateTag throws; the dates are
+  // written by then, so the run goes on.
+  if (dated > 0) {
+    try {
+      revalidateTag(TAGS.resources(community), 'max')
+    } catch (e) {
+      console.error(`[source-confirm] dated ${dated} by ${named}, but couldn’t refresh the cached listings:`, (e as Error).message)
+    }
+  }
   return dated
 }
