@@ -7,6 +7,7 @@ import type { Watch } from './watches'
 // the watch remembers of it. The readers are stood in for; applying the
 // times to the shul's own is the real thing (scheduleUpdate.ts).
 const m = vi.hoisted(() => ({
+  eruvSenders: vi.fn(),
   getWatchByUrl: vi.fn(),
   addWatch: vi.fn(),
   listWatches: vi.fn(),
@@ -26,6 +27,7 @@ vi.mock('@/lib/shulWeekReading', () => ({ readShulWeek: m.readShulWeek }))
 vi.mock('@/lib/messageReader', async (orig) => ({ ...(await orig<typeof import('./messageReader')>()), readMessage: m.readMessage }))
 vi.mock('@/lib/submissionStore', () => ({ submitListingUpdate: m.submitListingUpdate }))
 vi.mock('@/lib/email', () => ({ sendWatchDigest: m.sendWatchDigest }))
+vi.mock('@/lib/eruvEmailRun', () => ({ eruvSenders: m.eruvSenders }))
 vi.mock('@/lib/supabase/admin', () => ({
   getAdminClient: () => ({ storage: { from: () => ({ upload: m.upload, getPublicUrl: (p: string) => ({ data: { publicUrl: `https://kept/${p}` } }) }) } }),
 }))
@@ -122,8 +124,16 @@ describe('receiveNewsletter: who it’s from', () => {
 
   it('names the senders whose emails the script should send', async () => {
     m.listWatches.mockResolvedValue({ watches: [watch, { ...watch, id: 'w2', url: 'mailto:new@shul.org', resourceId: null, active: false }], available: true })
+    m.eruvSenders.mockResolvedValue([])
     expect(await newsletterSenders('philly')).toEqual(['info@mekorhabracha.org'])
     expect(m.listWatches).toHaveBeenCalledWith('philly')
+  })
+
+  it('names the eruvim whose status comes by email too, each sender once', async () => {
+    m.listWatches.mockResolvedValue({ watches: [watch], available: true })
+    m.eruvSenders.mockResolvedValue(['jcor-ne-philadelphia@groups.io', 'info@mekorhabracha.org'])
+    expect(await newsletterSenders('philly')).toEqual(['info@mekorhabracha.org', 'jcor-ne-philadelphia@groups.io'])
+    expect(m.eruvSenders).toHaveBeenCalledWith('philly')
   })
 
   it('leaves an email from an unlinked sender to wait, a paused one and an ignored one alone', async () => {
@@ -141,6 +151,14 @@ describe('receiveNewsletter: who it’s from', () => {
     m.getWatchByUrl.mockResolvedValue({ ...watch, pageHash: emailHash('gmail-123') })
     expect(await receiveNewsletter('philly', email, opts)).toEqual({ status: 'already' })
     expect(m.readShulWeek).not.toHaveBeenCalled()
+  })
+
+  // A mailing list sends each email from whoever posted it: the list's own
+  // address is the one a watch can have.
+  it('a list’s email is the list’s, whoever posted it', async () => {
+    m.getWatchByUrl.mockImplementation(async (_c: string, url: string) => (url === 'mailto:mekor@groups.io' ? { ...watch, url, pageHash: emailHash('gmail-123') } : null))
+    expect(await receiveNewsletter('philly', { ...email, from: 'Rabbi Cohen <rabbi=gmail.com@groups.io>', list: 'mekor@groups.io' }, opts)).toEqual({ status: 'already' })
+    expect(m.getWatchByUrl).toHaveBeenCalledWith('philly', 'mailto:rabbi=gmail.com@groups.io')
   })
 
   it('has nothing to do with an email without a sender’s address', async () => {

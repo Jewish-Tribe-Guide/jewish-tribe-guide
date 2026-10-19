@@ -33,6 +33,7 @@ vi.mock('./supabase/admin', () => ({
           return builder
         },
         eq: self,
+        is: self,
         not: self,
         order: self,
         then: (resolve: (v: unknown) => void) => resolve(result),
@@ -42,7 +43,7 @@ vi.mock('./supabase/admin', () => ({
   }),
 }))
 
-import { eruvMapsVersion, listEruvMapSources, listEruvimForAdmin, updateEruv } from './eruvStore'
+import { eruvMapsVersion, listEmailedEruvim, listEruvMapSources, listEruvim, listEruvimForAdmin, saveEmailRead, updateEruv } from './eruvStore'
 
 afterEach(() => {
   table.missing.clear()
@@ -84,6 +85,51 @@ describe('the eruv table before migration 081', () => {
   it('fails a colour it can’t keep, rather than dropping it without a word', async () => {
     table.missing.add('line_color')
     await expect(updateEruv('philly', 'northeast', { lineColor: '#1d4ed8' }, stored)).rejects.toThrow(/line_color/)
+  })
+})
+
+// Oct 19: an eruv's status by email (migration 084). The code goes out
+// before the migration is run: the Eruv page must still load, and no eruv
+// is read from email until it is.
+describe('the eruv table before migration 084', () => {
+  it('the public list still loads, every eruv read from its page', async () => {
+    table.missing = new Set(['status_email', 'status_email_kept'])
+    table.rows = [{ ...NE, status_url: 'https://www.centercityeruv.com/' }]
+    const { eruvim, available } = await listEruvim('philly')
+    expect(available).toBe(true)
+    expect(eruvim[0]).toMatchObject({ id: 'northeast', statusEmailed: false })
+    expect(table.selects.at(-1)).not.toMatch(/status_email/)
+  })
+
+  it('no eruv’s emails are read, and the admin tab still loads', async () => {
+    table.missing = new Set(['status_email', 'status_email_kept'])
+    table.rows = [NE]
+    expect(await listEmailedEruvim('philly')).toEqual([])
+    expect((await listEruvimForAdmin('philly')).eruvim[0]).toMatchObject({ statusEmail: null, statusEmailKept: null })
+  })
+
+  it('an address it can’t keep fails the save, rather than being dropped', async () => {
+    table.missing = new Set(['status_email', 'status_email_kept'])
+    await expect(updateEruv('philly', 'northeast', { statusEmail: 'eruv@example.org' }, stored)).rejects.toThrow(/status_email/)
+  })
+})
+
+describe('the eruv table after 084', () => {
+  it('the public list says which eruvim are emailed, never the address', async () => {
+    table.rows = [{ ...NE, status_email: 'jcor-ne-philadelphia@groups.io' }]
+    const { eruvim } = await listEruvim('philly')
+    expect(eruvim[0].statusEmailed).toBe(true)
+    expect(JSON.stringify(eruvim)).not.toContain('groups.io')
+    expect(await listEmailedEruvim('philly')).toMatchObject([{ id: 'northeast', statusEmail: 'jcor-ne-philadelphia@groups.io' }])
+  })
+
+  it('an email’s read saves its status as a page read does, and what’s kept', async () => {
+    await saveEmailRead('philly', 'northeast', { ok: true, status: 'down', words: 'The eruv is down', postedOn: '2026-10-09', at: '2026-10-09T17:30:00Z' }, null)
+    expect(table.updates.at(-1)).toMatchObject({ status: 'down', status_posted_on: '2026-10-09', status_checked_at: '2026-10-09T17:30:00Z', status_error: null, status_email_kept: null })
+    const kept = { messageId: 'g1', subject: 'Eruv dinner', sentAt: '2026-10-09T17:30:00Z', text: 'Thank our volunteers.', words: null }
+    await saveEmailRead('philly', 'northeast', null, kept)
+    expect(table.updates.at(-1)).toMatchObject({ status_email_kept: kept })
+    expect(table.updates.at(-1)).not.toHaveProperty('status')
   })
 })
 

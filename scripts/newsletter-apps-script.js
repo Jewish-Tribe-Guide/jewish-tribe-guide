@@ -22,6 +22,14 @@
 // nothing else in the inbox leaves it. A new newsletter: add its address on
 // the Watches tab, with its shul, and the next run picks it up (from the
 // last two weeks). Each email is sent once.
+//
+// Eruv status emails come the same way (src/lib/eruvEmail.ts): an eruv's
+// "Status emails from" on the admin Eruvim tab puts its sender on the same
+// list, and the site reads each email for up or down.
+//
+// A mailing list (Northeast's groups.io list) sends each email from whoever
+// posted it, so a list's emails are found by the list's own address too:
+// Gmail's list: search, and the List-Post header each one carries.
 // ─────────────────────────────────────────────────────────────────────────────
 
 /* eslint-disable @typescript-eslint/no-unused-vars -- Apps Script calls install and readNewsletters by name */
@@ -73,7 +81,7 @@ function readNewsletters() {
       var m = messages[j]
       if (sent[m.getId()]) continue
       // A reply in the thread from someone else stays here.
-      if (!wanted[addressOf(m.getFrom())]) continue
+      if (!wanted[addressOf(m.getFrom())] && !wanted[listOf(m)]) continue
       if (Date.now() - started > RUN_BUDGET_MS) break outer
       var res = UrlFetchApp.fetch(SITE + '/api/inbound/newsletter', {
         method: 'post',
@@ -136,9 +144,11 @@ function watchedSenders(secret) {
 function threadsFrom(senders) {
   var byId = {}
   for (var i = 0; i < senders.length; i += SENDERS_PER_SEARCH) {
-    var query = 'in:inbox newer_than:14d from:(' + senders.slice(i, i + SENDERS_PER_SEARCH).join(' OR ') + ')'
-    GmailApp.search(query, 0, 50).forEach(function (t) {
-      byId[t.getId()] = t
+    var some = senders.slice(i, i + SENDERS_PER_SEARCH).join(' OR ')
+    ;['from:(' + some + ')', 'list:(' + some + ')'].forEach(function (who) {
+      GmailApp.search('in:inbox newer_than:14d ' + who, 0, 50).forEach(function (t) {
+        byId[t.getId()] = t
+      })
     })
   }
   return Object.keys(byId)
@@ -154,6 +164,20 @@ function threadsFrom(senders) {
 function addressOf(from) {
   var bracketed = from.match(/<([^<>\s]+)>/)
   return (bracketed ? bracketed[1] : from).trim().toLowerCase()
+}
+
+/** The mailing list a message came through, lower case, from its
+ *  List-Post header ("<mailto:JCOR-NE-Philadelphia@groups.io>"); '' for
+ *  an email sent straight from its sender. */
+function listOf(m) {
+  var post = ''
+  try {
+    post = m.getHeader('List-Post') || ''
+  } catch (e) {
+    // An older Gmail service without headers: matched by From alone.
+  }
+  var found = post.match(/mailto:([^>\s?]+)/i)
+  return found ? found[1].toLowerCase() : ''
 }
 
 /** Today, as a day number: short, for the remembered list. */
@@ -175,6 +199,7 @@ function emailOf(m) {
     community: COMMUNITY,
     messageId: m.getId(),
     from: m.getFrom(),
+    list: listOf(m),
     subject: m.getSubject(),
     date: m.getDate().toISOString(),
     text: m.getPlainBody(),

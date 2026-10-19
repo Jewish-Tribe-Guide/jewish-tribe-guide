@@ -1,9 +1,13 @@
 import { timingSafeEqual } from 'node:crypto'
 import { listCommunities } from '@/lib/communityStore'
 import { newsletterSenders, receiveNewsletter, type NewsletterEmail } from '@/lib/newsletterRun'
+import { receiveEruvEmail } from '@/lib/eruvEmailRun'
+import { senderEmail } from '@/lib/eruvEmail'
 
 // POST /api/inbound/newsletter   Authorization: Bearer <NEWSLETTER_SECRET>
-//   { community, messageId, from, subject, date?, text, attachment?: { mime, b64 } }
+//   { community, messageId, from, list?, subject, date?, text, attachment?: { mime, b64 } }
+// `list` is the mailing list it came through (its List-Post address), when
+// it did: a list's emails are from whoever posted them.
 // A shul's newsletter, sent by the Google Apps Script in the guide's own
 // Gmail (scripts/newsletter-apps-script.js), one email a request
 // (newsletter.ts has the rules; newsletterRun.ts reads and files it).
@@ -12,10 +16,15 @@ import { newsletterSenders, receiveNewsletter, type NewsletterEmail } from '@/li
 // and any error leave the email to be sent again; everything else is done
 // with.
 //
+// An eruv's status email comes in the same way (eruvEmail.ts): from the
+// sender an admin gave the eruv, it's read for up or down by code alone, so
+// it needs no OPENAI_API_KEY, and goes live at once.
+//
 // GET /api/inbound/newsletter?community=philly   (the same secret)
 //   → { senders: ['office@shul.org', …] }
 // Whose emails to send: the script asks first and searches the inbox for
-// just those (watchedSenders), so nothing else leaves it.
+// just those (watchedSenders, and the eruvim's senders), so nothing else
+// leaves it.
 //
 // Auth: NEWSLETTER_SECRET, its own secret rather than CRON_SECRET, since it
 // lives in a script in a Gmail account. Without one the route is closed,
@@ -68,8 +77,6 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const refusal = refused(request)
   if (refusal) return refusal
-  const apiKey = process.env.OPENAI_API_KEY
-  if (!apiKey) return Response.json({ ok: false, error: 'Reading isn’t available here (OPENAI_API_KEY).' }, { status: 503 })
 
   const body = (await request.json().catch(() => null)) as Record<string, unknown> | null
   if (!body) return Response.json({ ok: false, error: 'Invalid request.' }, { status: 400 })
@@ -88,12 +95,23 @@ export async function POST(request: Request) {
   const email: NewsletterEmail = {
     messageId,
     from,
+    list: senderEmail(str(body.list, 300)),
     subject: str(body.subject, 500),
     date,
     text: str(body.text, MAX_TEXT),
     attachment,
   }
 
+  try {
+    const eruv = await receiveEruvEmail(community.slug, email, { timezone: community.timezone })
+    if (eruv) return Response.json({ ok: true, ...eruv })
+  } catch (err) {
+    console.error('[inbound/newsletter] eruv email failed:', err)
+    return Response.json({ ok: false, error: err instanceof Error ? err.message : 'Couldn’t read it.' }, { status: 502 })
+  }
+
+  const apiKey = process.env.OPENAI_API_KEY
+  if (!apiKey) return Response.json({ ok: false, error: 'Reading isn’t available here (OPENAI_API_KEY).' }, { status: 503 })
   try {
     const result = await receiveNewsletter(community.slug, email, {
       apiKey,

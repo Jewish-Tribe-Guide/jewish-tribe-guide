@@ -139,6 +139,48 @@ describe('eruvView', () => {
   })
 })
 
+// Northeast and Elkins Park post no page: their status is emailed (the user,
+// Oct 19), and nothing reads it again, so an email stands only through the
+// Shabbos it was sent for.
+describe('eruvView, a status that comes by email', () => {
+  const ne = (over: Partial<Eruv> = {}) =>
+    eruv({ id: 'northeast', name: 'Northeast Eruv', statusUrl: null, statusEmailed: true, statusWords: 'The eruv is up', statusPostedOn: '2026-10-09', statusCheckedAt: '2026-10-09T17:30:00Z', ...over })
+  const friday3pm = at('2026-10-09T19:00:00Z')
+
+  it('this week’s email is the status, and says it came by email', () => {
+    expect(eruvView(ne(), friday3pm, TZ, CANDLES)).toEqual({ tone: 'green', label: 'Up for this Shabbos', checked: 'From the eruv’s email, 1:30 PM' })
+    expect(eruvView(ne({ status: 'down' }), friday3pm, TZ, CANDLES)).toMatchObject({ tone: 'red', label: 'Down this Shabbos' })
+    // Sent on Sunday, it's for the coming Shabbos.
+    expect(eruvView(ne({ statusPostedOn: '2026-10-04', statusCheckedAt: '2026-10-04T14:00:00Z' }), friday3pm, TZ, CANDLES)).toMatchObject({ tone: 'green', label: 'Up for this Shabbos', checked: 'From the eruv’s email, Sun 10:00 AM' })
+  })
+
+  it('after its Shabbos, never a stale up, or a stale down', () => {
+    const sunday = at('2026-10-11T14:00:00Z')
+    expect(eruvView(ne(), sunday, TZ, null)).toMatchObject({ tone: 'grey', label: 'Up last Shabbos' })
+    expect(eruvView(ne({ status: 'down' }), sunday, TZ, null)).toMatchObject({ tone: 'grey', label: 'Down last Shabbos' })
+    // The next Friday, no email yet this week.
+    expect(eruvView(ne(), at('2026-10-16T19:00:00Z'), TZ, CANDLES)).toMatchObject({ tone: 'amber', label: 'Not posted yet this week' })
+    expect(eruvView(ne({ status: 'down' }), at('2026-10-16T19:00:00Z'), TZ, CANDLES)).toMatchObject({ tone: 'amber', label: 'Not posted yet this week' })
+    // Two weeks on, whatever the day.
+    expect(eruvView(ne(), at('2026-10-20T14:00:00Z'), TZ, null)).toMatchObject({ tone: 'amber', label: 'Not posted yet this week' })
+  })
+
+  it('dated by when it was sent where the community is, when no date was kept', () => {
+    // Saturday 9:30 PM in Philadelphia is Sunday in UTC: still last week's.
+    const late = ne({ statusPostedOn: null, statusCheckedAt: '2026-10-11T01:30:00Z' })
+    expect(eruvView(late, at('2026-10-12T14:00:00Z'), TZ, null)).toMatchObject({ tone: 'grey', label: 'Up last Shabbos' })
+  })
+
+  it('before its first email, not posted; an email it couldn’t read, never up', () => {
+    expect(eruvView(ne({ status: null, statusCheckedAt: null, statusPostedOn: null }), friday3pm, TZ, CANDLES)).toEqual({ tone: 'amber', label: 'Not posted yet this week', checked: null })
+    expect(eruvView(ne({ statusErrorAt: '2026-10-09T18:00:00Z', statusError: 'Unclear' }), friday3pm, TZ, CANDLES)).toEqual({ tone: 'amber', label: 'Couldn’t read their status', checked: 'From the eruv’s email, 2:00 PM' })
+  })
+
+  it('an eruv with a page is read from its page', () => {
+    expect(eruvView(eruv({ statusEmailed: true }), friday3pm, TZ, CANDLES).checked).toMatch(/^From centercityeruv\.com/)
+  })
+})
+
 describe('weekStart and dialable', () => {
   it('the Sunday before', () => {
     expect(weekStart('2026-10-09', 5)).toBe('2026-10-04')

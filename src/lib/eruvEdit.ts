@@ -1,4 +1,5 @@
 import type { EruvEdit } from './eruvStore'
+import { senderEmail } from './eruvEmail'
 
 // What an admin may set on an eruv, checked: text trimmed and kept short,
 // addresses that are web addresses, an order that's a number. Anything
@@ -49,6 +50,15 @@ export function readEruvEdit(raw: unknown): { ok: true; edit: EruvEdit } | { ok:
     if (v === undefined) return { ok: false, error: `That isn’t a web address: ${String(r[k])}` }
     edit[k] = v
   }
+  if ('statusEmail' in r) {
+    const raw = typeof r.statusEmail === 'string' ? r.statusEmail.trim() : ''
+    const v = raw ? senderEmail(raw) : null
+    if (raw && !v) return { ok: false, error: `That isn’t an email address: ${raw}` }
+    edit.statusEmail = v
+  }
+  // One source for its status: a page is read again all day; an email
+  // stands for its week. Both would take turns overwriting each other.
+  if (edit.statusUrl && edit.statusEmail) return { ok: false, error: 'An eruv’s status comes from its status page or its emails, not both. Empty one of them.' }
   if ('statusDated' in r) edit.statusDated = r.statusDated === true
   if ('active' in r) edit.active = r.active !== false
   if ('lineHidePoints' in r) edit.lineHidePoints = r.lineHidePoints === true

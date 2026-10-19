@@ -1,6 +1,7 @@
 import { getAdminUserForCommunity } from '@/lib/adminAuth'
 import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
-import { addEruv, listEruvimForAdmin, removeEruv, saveLineMissing, saveLineRead, saveStatusRead, updateEruv, type AdminEruv } from '@/lib/eruvStore'
+import { addEruv, listEruvimForAdmin, removeEruv, saveLineMissing, saveLineRead, saveStatusRead, saveEmailRead, updateEruv, type AdminEruv } from '@/lib/eruvStore'
+import { keptEmailSays } from '@/lib/eruvEmail'
 import { readEruvPage } from '@/lib/eruvReader'
 import { readEruvMap } from '@/lib/eruvLines'
 import { readEruvEdit, eruvIdFor } from '@/lib/eruvEdit'
@@ -11,6 +12,9 @@ import { readEruvEdit, eruvIdFor } from '@/lib/eruvEdit'
 // POST /api/admin/eruvim  body: { action: 'save', id, edit } | { action: 'add', name }
 //      | { action: 'remove' | 'check', id }
 //      'check' reads its status page and its map now.
+//      | { action: 'email-says', id, says: 'up' | 'down' | 'neither' }
+//      an admin reading the email from it the guide couldn't (eruvEmail.ts):
+//      its status from that email, live at once, or the email put away.
 
 export const maxDuration = 60
 
@@ -63,6 +67,13 @@ export async function POST(request: Request) {
     if (action === 'remove') {
       await removeEruv(community.slug, id)
       return Response.json({ ok: true })
+    }
+    if (action === 'email-says') {
+      const says = body?.says
+      if (says !== 'up' && says !== 'down' && says !== 'neither') return bad('Say up, down or neither.')
+      if (!eruv.statusEmailKept) return bad('There’s no email from it waiting.')
+      await saveEmailRead(community.slug, id, keptEmailSays(eruv.statusEmailKept, says, community.timezone), null)
+      return Response.json({ ok: true, eruv: await one(community.slug, id) })
     }
     if (action === 'check') {
       const now = new Date()
