@@ -129,9 +129,14 @@ for that exact change, in the same conversation. Show the dry run first.
    On the test project the watch row exists and filed 15, and a second
    run filed nothing. Until this merges, the test project's daily run
    treats it as a plain website check.
-   **For the user, once merged:** say yes, and an admin adds
-   `https://www.mekorhabracha.org/center-city` on the live Watches tab,
-   which runs it at once and files the 18.
+   **Live on Oct 19** (the user's yes): the watch is on production's
+   Watches tab as "Mekor Habracha kosher list". A dry run against
+   production that day read 78 places and found 18 differences, one of
+   them closed on Google (Z Candy Bar), so 17 to file. It was added
+   straight to the database, so it didn't run at once: it files at the
+   next daily run (07:00 UTC), or at once with Check now on the Watches
+   tab. Its agreement dates listings only once `redesign/oct18-fixes` is
+   deployed.
 
 6a. **Mekor Habracha's kosher list** (mekorhabracha.org/center-city,
    78 places, "Last Updated 2026-10-12"; the user, Oct 18: stay in sync,
