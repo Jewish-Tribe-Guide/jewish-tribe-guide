@@ -80,6 +80,42 @@ describe('what a shul has on a date', () => {
     expect(resolveDay(regular, [extra], sun)).toMatchObject({ skip: false, posting: { kind: 'schedule' } })
   })
 
+  // Oct 19: Mekor's week, Sunday to Thursday, approved as "Shabbat
+  // Schedule". The Minyanim list called Monday's Maariv "Shabbat Schedule
+  // times", and left off the WhatsApp group every usual weekday one has.
+  it('a week the shul sent out: “this week’s” unless just a Shabbos, its minyanim under the usual ones’ sign-up', () => {
+    const group = { link: 'https://chat.whatsapp.com/Mekor' }
+    const usual: Minyan[] = [
+      { ...m('u1', 'mincha_maariv', ['sun', 'mon', 'tue', 'wed', 'thu'], '15 min before Sunset'), season: 'summer', signUp: group },
+      { ...m('u2', 'shacharis', ['mon', 'thu'], '6:45am'), signUp: group },
+      m('u3', 'shacharis', ['sat'], '9:15am'),
+    ]
+    const week: SpecialSchedule = {
+      id: 'w',
+      kind: 'week',
+      name: 'Shabbat Schedule',
+      from: '2026-10-04',
+      to: '2026-10-08',
+      mode: 'replace',
+      minyanim: [
+        { id: 'w1', tefillah: 'mincha_maariv', on: ['2026-10-04', '2026-10-05'], time: '5:55pm' },
+        { id: 'w2', tefillah: 'shacharis', on: ['2026-10-05'], time: '6:45am' },
+        { id: 'w3', tefillah: 'maariv', on: ['2026-10-05'], time: '9:00pm' },
+      ],
+    }
+    const day = resolveDay(usual, [week], mon)
+    expect(day.posting).toEqual({ kind: 'schedule', name: 'Shabbat Schedule', thisWeek: true })
+    expect(day.rows.map((r) => [r.id, r.signUp?.link ?? null])).toEqual([
+      ['w1', group.link],
+      ['w2', group.link],
+      ['w3', null],
+    ])
+    // Just a Shabbos keeps its name; a festival's schedule takes no sign-up.
+    const shabbos: SpecialSchedule = { ...week, name: 'Shabbos Bereishis', from: '2026-10-02', to: '2026-10-03', minyanim: [{ id: 's1', tefillah: 'shacharis', on: ['2026-10-03'], time: '9:00am' }] }
+    expect(resolveDay(usual, [shabbos], sat).posting).toEqual({ kind: 'schedule', name: 'Shabbos Bereishis' })
+    expect(resolveDay(usual, [{ ...sukkos, minyanim: [{ id: 'f', tefillah: 'shacharis', on: ['2026-10-05'], time: '6:45am' }], to: '2026-10-05' }], mon).rows[0].signUp).toBeUndefined()
+  })
+
   it('the calendar not knowing a day doesn’t make it “not posted”', () => {
     expect(resolveDay(regular, [], factsFor('2026-10-01', undefined, undefined)).posting).toEqual({ kind: 'regular' })
   })

@@ -319,6 +319,43 @@ describe('this week’s schedule (Oct 6)', () => {
     expect(screen.getByTestId('davening-folded')).toHaveTextContent('Usual Shabbos times')
   })
 
+  // Oct 19: opened by tapping anywhere on it, it closed only by its arrow.
+  it('the usual times, opened, fold again from anywhere on their top, as they opened', () => {
+    show([...before, weekPost('Shabbos Bereishis', '2026-10-09', '2026-10-10')])
+    fireEvent.click(screen.getByTestId('davening-folded'))
+    fireEvent.click(within(screen.getByTestId('davening-shabbos')).getByTestId('davening-fold-reason'))
+    expect(screen.queryByTestId('davening-shabbos')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByTestId('davening-folded'))
+    fireEvent.click(within(screen.getByTestId('davening-shabbos')).getByText('Usual Shabbos times'))
+    expect(screen.queryByTestId('davening-shabbos')).not.toBeInTheDocument()
+  })
+
+  // Oct 19: every usual weekday minyan at Mekor is in its WhatsApp group;
+  // the week's box gave the same minyanim without it.
+  it('the week’s minyanim keep the usual ones’ sign-up group', () => {
+    const group = { link: 'https://chat.whatsapp.com/Mekor' }
+    const signUpUsual = [
+      ...usual.filter((u) => u.days.includes('sat') || u.days.includes('fri')),
+      { id: 'c', tefillah: 'shacharis', days: ['mon', 'thu'], time: '6:45am', signUp: group },
+      { id: 'd', tefillah: 'mincha_maariv', days: ['sun', 'mon', 'tue', 'wed', 'thu'], time: '15 min before Sunset', anchor: 'sunset', offsetMinutes: -15, season: 'summer', signUp: group },
+    ]
+    const weekdays = {
+      ...weekPost('Shabbat Schedule', '2026-10-04', '2026-10-08'),
+      minyanim: [
+        { id: 'w1', tefillah: 'shacharis', on: ['2026-10-05', '2026-10-08'], time: '6:45am' },
+        { id: 'w2', tefillah: 'mincha_maariv', on: ['2026-10-04', '2026-10-05', '2026-10-06', '2026-10-07', '2026-10-08'], time: '5:55pm' },
+      ],
+    }
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-10-06T16:00:00-04:00')) // Tue Oct 6
+    const shul = makeListing({ id: 'k', name: 'Mekor Habracha', category: 'synagogue', minyanim: signUpUsual, minyanim_schedules: [weekdays] })
+    renderWithProviders(<DaveningCard item={shul} minyanim={signUpUsual} schedules={[weekdays]} category={shuls} />, { content: { categories: [shuls] } })
+    const box = screen.getByTestId('davening-this-week')
+    expect(within(box).getByTestId('sign-up-box')).toHaveTextContent(/^All this week’s times: check the group first/)
+    expect(within(box).getByRole('link', { name: 'Say you’re coming' })).toHaveAttribute('href', group.link)
+    expect(within(box).queryByTestId('sign-up-time')).not.toBeInTheDocument()
+  })
+
   // Oct 19: Mekor's newsletter week ran Sunday to Friday night, headed
   // "Shabbat Schedule". It was titled for the Shabbos it didn't cover, and
   // folded away (greyed) Shabbos morning's usual time, which still held.
