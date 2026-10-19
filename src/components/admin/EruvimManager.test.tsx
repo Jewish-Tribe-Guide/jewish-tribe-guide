@@ -111,33 +111,32 @@ describe('EruvimManager', () => {
     expect(posts).toEqual([expect.objectContaining({ action: 'save', id: 'northeast', edit: expect.objectContaining({ lineColor: '#1d4ed8' }) })])
   })
 
-  // Oct 19: Northeast posts no status page; its status comes by email.
-  it('the address its status emails come from is saved with the rest', async () => {
-    const user = userEvent.setup()
-    serve([NE])
-    renderWithProviders(<EruvimManager token="t" />)
-    const card = await screen.findByTestId('admin-eruv')
-    await user.type(within(card).getByLabelText(/Status emails from/), 'JCOR-NE-Philadelphia@groups.io')
-    await user.click(within(card).getByRole('button', { name: 'Save' }))
-    expect(posts).toEqual([expect.objectContaining({ action: 'save', id: 'northeast', edit: expect.objectContaining({ statusEmail: 'JCOR-NE-Philadelphia@groups.io' }) })])
+  // Oct 19: an eruv's status source moved to the Watches tab. Here it only
+  // says where its status is read from, and links there to change it.
+  it('says where its status is read from, and sends the admin to the Watches tab to change it', async () => {
+    serve([{ ...NE, statusEmail: 'jcor-ne-philadelphia@groups.io' }])
+    renderWithProviders(<EruvimManager token="t" />, { community: { slug: 'philly' } })
+    const line = await screen.findByTestId('eruv-status-source')
+    expect(line).toHaveTextContent('Status read from emails from jcor-ne-philadelphia@groups.io.')
+    expect(within(line).getByRole('link', { name: 'Change it on the Watches tab' })).toHaveAttribute('href', '/philly/admin/watches')
+    // No status fields of its own any more.
+    expect(screen.queryByLabelText(/Status emails from/)).not.toBeInTheDocument()
+    expect(screen.queryByLabelText(/Status page/)).not.toBeInTheDocument()
   })
 
-  it('an email it couldn’t read is shown, and the admin says what it says', async () => {
-    const user = userEvent.setup()
-    const kept = { messageId: 'g1', subject: 'Eruv update', sentAt: '2026-10-09T17:30:00Z', text: 'The eruv is up. The eruv is down on Castor.', words: 'The eruv is up' }
+  it('an eruv with no status source says so, and where to add one', async () => {
+    serve([NE])
+    renderWithProviders(<EruvimManager token="t" />, { community: { slug: 'philly' } })
+    const line = await screen.findByTestId('eruv-status-source')
+    expect(line).toHaveTextContent('No status source.')
+    expect(within(line).getByRole('link', { name: 'Add one on the Watches tab' })).toBeInTheDocument()
+  })
+
+  it('an email it couldn’t read is pointed to, not read, here', async () => {
+    const kept = { messageId: 'g1', subject: 'Eruv update', sentAt: '2026-10-09T17:30:00Z', text: 'The eruv is up.', words: 'The eruv is up' }
     serve([{ ...NE, statusEmail: 'jcor-ne-philadelphia@groups.io', statusEmailKept: kept }])
-    renderWithProviders(<EruvimManager token="t" />)
-    const box = await screen.findByTestId('eruv-kept-email')
-    expect(box).toHaveTextContent('Their email says both up and down: “Eruv update”, Oct 9')
-    expect(box).toHaveTextContent('The eruv is down on Castor.')
-    await user.click(within(box).getByRole('button', { name: 'It says down' }))
-    expect(posts).toEqual([{ action: 'email-says', id: 'northeast', says: 'down' }])
-  })
-
-  it('no email waiting, no box', async () => {
-    serve([NE])
-    renderWithProviders(<EruvimManager token="t" />)
-    await screen.findByTestId('admin-eruv')
+    renderWithProviders(<EruvimManager token="t" />, { community: { slug: 'philly' } })
+    expect(await screen.findByTestId('eruv-status-source')).toHaveTextContent('An email from it waits for you there.')
     expect(screen.queryByTestId('eruv-kept-email')).not.toBeInTheDocument()
   })
 

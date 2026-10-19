@@ -9,11 +9,17 @@ import { UUID } from '@/lib/itemMarkRoutes'
 import { refuahHospitalId } from '@/lib/refuahWatch'
 import { LISTING_PAGE_WATCH_CREATOR, listingPageLabel, pageReadsFor } from '@/lib/listingPageWatch'
 import { isIgnoredSender, isNewsletterWatch, NEWSLETTER_IGNORED_CREATOR, NEWSLETTER_WATCH_CREATOR, newsletterUrl, senderAddress } from '@/lib/newsletter'
+import { isWatchPurpose, purposeInfo, sourceProblem } from '@/lib/watchPurposes'
 
 // GET  /api/admin/watches — the "Watches" tab: every page this community's
 //      guide reads on its own (watch, migration 070), and the listings a
-//      page can be tied to. Admin only.
-// POST /api/admin/watches  body: { action: 'add', url, resourceId?, label?, forListing? }
+//      page can be tied to, each with what its own page is read for
+//      (`reads`: 'times', 'hours' or null). Admin only.
+// POST /api/admin/watches  body: { action: 'add', purpose?, url, resourceId?, label?, forListing? }
+//      `purpose` (watchPurposes.ts) is what the admin said it keeps
+//      current: 'times' and 'hours' are a listing's own page (as
+//      `forListing`), 'weekly' a newsletter's address, 'hospital' a Refuah
+//      page. An eruv's status is set on the eruv (/api/admin/eruvim).
 //      Watches a new page and checks it once straight away, so the admin
 //      sees at once whether the guide can read it. `forListing`: the page
 //      is the listing's own (a shul's times, a mikvah's hours), read by the
@@ -40,13 +46,16 @@ export async function GET(request: Request) {
       listApprovedResources(community.slug),
       listCategories(community.slug),
     ])
-    const labelOf = new Map(categories.map((c) => [c.id, c.label]))
+    const categoryOf = new Map(categories.map((c) => [c.id, c]))
     return Response.json({
       ok: true,
       available,
       watches,
       listings: listings
-        .map((l) => ({ id: l.id, name: l.name, categoryLabel: labelOf.get(l.category) ?? l.category }))
+        .map((l) => {
+          const category = categoryOf.get(l.category)
+          return { id: l.id, name: l.name, categoryLabel: category?.label ?? l.category, reads: (category && pageReadsFor(category)?.kind) ?? null }
+        })
         .sort((a, b) => a.name.localeCompare(b.name)),
     })
   } catch (err) {
@@ -66,6 +75,14 @@ export async function POST(request: Request) {
   try {
     const listingIn = async (resourceId: unknown) =>
       typeof resourceId === 'string' && UUID.test(resourceId) && (await listApprovedResources(community.slug)).some((l) => l.id === resourceId)
+
+    // What the admin said it's for: the source has to suit it.
+    const purpose = action === 'add' && isWatchPurpose(body?.purpose) ? body.purpose : null
+    if (body?.purpose !== undefined && action === 'add') {
+      if (!purpose || purpose === 'eruv' || !purposeInfo(purpose).addable) return Response.json({ ok: false, errors: ['That can’t be added here.'] }, { status: 400 })
+      const problem = sourceProblem(purpose, typeof body?.url === 'string' ? body.url : '')
+      if (problem) return Response.json({ ok: false, errors: [problem] }, { status: 400 })
+    }
 
     if (action === 'add' && typeof body?.url === 'string' && senderAddress(body.url) && !/^https?:/i.test(body.url.trim())) {
       if (!(await listingIn(body.resourceId))) return Response.json({ ok: false, errors: ['Pick the shul this newsletter is from.'] }, { status: 400 })
@@ -95,14 +112,19 @@ export async function POST(request: Request) {
           return Response.json({ ok: false, errors: ['That listing isn’t in this guide.'] }, { status: 400 })
         }
       }
+      if (purpose === 'hospital' && !refuahHospitalId(url)) {
+        return Response.json({ ok: false, errors: ['Use the hospital’s own page on Refuah (refuah.com/hospitals/…).'] }, { status: 400 })
+      }
       let label = typeof body?.label === 'string' && body.label.trim() ? body.label.trim().slice(0, 120) : null
       let createdBy = admin.email
-      if (body?.forListing === true) {
+      if (body?.forListing === true || purpose === 'times' || purpose === 'hours') {
         const listing = resourceId ? (await listApprovedResources(community.slug)).find((l) => l.id === resourceId) : undefined
         if (!listing) return Response.json({ ok: false, errors: ['Pick the shul or mikvah this page is for.'] }, { status: 400 })
         const category = (await listCategories(community.slug)).find((c) => c.id === listing.category)
         const reads = category && pageReadsFor(category)
         if (!reads) return Response.json({ ok: false, errors: ['That listing has no davening times or hours for its page to keep current.'] }, { status: 400 })
+        if (purpose === 'times' && reads.kind !== 'times') return Response.json({ ok: false, errors: [`${listing.name} has no davening times to keep current.`] }, { status: 400 })
+        if (purpose === 'hours' && reads.kind !== 'hours') return Response.json({ ok: false, errors: [`${listing.name} has no hours to keep current.`] }, { status: 400 })
         label ??= listingPageLabel(listing.name, reads)
         createdBy = LISTING_PAGE_WATCH_CREATOR
       }

@@ -69,8 +69,9 @@ for that exact change, in the same conversation. Show the dry run first.
      (mikvahwestphilly.com): nothing differs.
    - Can't be read (blocked to servers): Lower Merion Synagogue, Sons of
      Israel (406), Chabad of the Main Line (403). Not worth a watch.
-   Adding the nine readable ones is Admin → Watches → add the page, pick
-   the listing, tick "It's the listing's own page…". Needs the user's yes.
+   Adding the nine readable ones is Admin → Watches → Add a watch →
+   "Shul’s usual times" (or "Hours" for a mikvah), pick the place, give
+   the page. Needs the user's yes.
 1b. **Eruv status by email (6c):** migration 084 is run on both databases
    (the user, Oct 19). Northeast's address on live is still to set: a yes,
    once the branch is deployed. Elkins Park's sender is still unknown.
@@ -135,8 +136,8 @@ for that exact change, in the same conversation. Show the dry run first.
 6c. **Eruv status by email** (the user, Oct 19; built on
    `claude/zen-golick-e5ddec`, migration 084 run on dev and live). Northeast
    (a groups.io list) and Elkins Park announce up and down only by email.
-   Each eruv now has "Status emails from" on the admin Eruvim tab: the
-   address its emails come from. The Gmail script that sends shul
+   Each eruv's status source (its page, or the address its emails come
+   from) is set on the admin Watches tab since Oct 19 (it was on Eruvim). The Gmail script that sends shul
    newsletters sends these too, since the site lists them with the
    newsletters' senders. No script change is needed.
    Each email is read by the status page's own sentence reader, never the
@@ -153,7 +154,8 @@ for that exact change, in the same conversation. Show the dry run first.
    Not handled yet.
    An email that says both up and down marks the status "Couldn't read
    their status", as such a page does. One that says neither (other news)
-   changes nothing. Either way the email is kept on the Eruvim tab, where
+   changes nothing. Either way the email is kept on the eruv's row on the
+   Watches tab, where
    an admin can say "It says up", "It says down" or "Not about the
    status". Up or down goes live at once.
    An eruv has a status page or a status email, not both: a page is read
@@ -171,8 +173,8 @@ for that exact change, in the same conversation. Show the dry run first.
    a real email.
    **Open: Elkins Park.** No sender yet: how YIEP announces its status
    isn't known (ask 267-415-6760, yiep.org, whether there's an email
-   list). Once the user sends its sender address, it's one field on the
-   Eruvim tab, no code: dev first, then live with a yes. Until then it
+   list). Once the user sends its sender address, it's Add a watch → Eruv
+   status on the Watches tab, no code: dev first, then live with a yes. Until then it
    shows "No status online".
 
 6b. **Mekor Habracha watch** (built Oct 18 on
@@ -238,6 +240,33 @@ for that exact change, in the same conversation. Show the dry run first.
 ## Small open decisions
 
 7. The "+" button covers part of the third tile in a row on the phone home.
+
+## Done Oct 19: the Watches tab redrawn (on `redesign/oct18-fixes`, not merged)
+
+- **Add a watch asks what it's for first** (the user, Oct 19: "add url or
+  email and then another to state what we're adding for"; built as drawn
+  in the mockup they approved). Three questions: what it keeps current
+  (Eruv status, Shul’s usual times, Shul’s weekly times, Hours, Kosher
+  list, Hospital contacts, Anything else), which place (only places that
+  have what it reads: shuls with davening times, places with hours), and
+  where it's read (a page or an email address, checked against the
+  choice: weekly times only by email). Then it says in a sentence what
+  will happen. `src/lib/watchPurposes.ts` holds the list; the server
+  checks the same rules.
+- **The list is grouped in the same words**, each row led by the place,
+  with where it's read from, what it last found, and a pill (Working, Not
+  working, To link, Paused…). Tapping a row opens what it does and its
+  buttons. A summary line says how many watches and how many need you.
+- **Eruv status moved here from the Eruvim tab**, first group: its page or
+  email, an email it couldn't read (with It says up / down), Check now,
+  Stop reading, and "Add its source" for one with none. The Eruvim tab now
+  only says where the status is read from and links here.
+- **Deviations from the drawing:** "Mikvah hours" is "Hours" (any place
+  with hours, no category-specific code). Menus aren't offered in Add,
+  since they're added on their own for each menu link. No Name field.
+- Not checked in a browser: the local admin sign-in was refused to this
+  session, so it was checked by its tests only (35 fail against the old
+  code).
 
 ## Done Oct 19: faster PR checks (on `redesign/oct18-fixes`, not merged)
 

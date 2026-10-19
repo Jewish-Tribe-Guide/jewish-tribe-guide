@@ -61,7 +61,17 @@ describe('/api/admin/watches', () => {
   it('lists the watches and the listings a page can keep current', async () => {
     const body = await (await GET(req('GET'))).json()
     expect(body).toMatchObject({ ok: true, available: true, watches: [] })
-    expect(body.listings).toEqual([{ id: SHUL, name: 'Lower Merion Synagogue', categoryLabel: 'Synagogue' }])
+    expect(body.listings).toEqual([{ id: SHUL, name: 'Lower Merion Synagogue', categoryLabel: 'Synagogue', reads: null }])
+  })
+
+  // Oct 19: "Add a watch" offers a place by what its own page can keep
+  // current, so each listing says.
+  it('says what each listing’s own page can keep current', async () => {
+    m.listCategories.mockResolvedValue([
+      makeCategory({ id: 'synagogue', label: 'Synagogue', detailFields: [{ key: 'minyanim', label: 'Davening Times', type: 'minyanim' }] }),
+    ])
+    const body = await (await GET(req('GET'))).json()
+    expect(body.listings[0].reads).toBe('times')
   })
 
   it('adds a page typed without https, tied to a listing, and checks it at once', async () => {
@@ -135,6 +145,49 @@ describe('/api/admin/watches', () => {
       createdBy: 'listing pages',
     })
     expect(m.runAndRecord).toHaveBeenCalledWith(added)
+  })
+
+  // Oct 19: the admin says what a watch is for, and the source has to suit
+  // it: weekly times come by email, a page's times from its listing's own
+  // page, and an eruv's status is set on the eruv.
+  describe('by what it keeps current', () => {
+    beforeEach(() => {
+      m.listCategories.mockResolvedValue([
+        makeCategory({ id: 'synagogue', label: 'Synagogue', detailFields: [{ key: 'minyanim', label: 'Davening Times', type: 'minyanim' }] }),
+      ])
+    })
+
+    it('refuses a source that doesn’t suit it, and what isn’t added here', async () => {
+      const weeklyPage = await POST(req('POST', { action: 'add', purpose: 'weekly', url: 'lms.org', resourceId: SHUL }))
+      expect(weeklyPage.status).toBe(400)
+      expect((await weeklyPage.json()).errors[0]).toContain('come by email')
+      const timesEmail = await POST(req('POST', { action: 'add', purpose: 'times', url: 'office@lms.org', resourceId: SHUL }))
+      expect(timesEmail.status).toBe(400)
+      expect((await timesEmail.json()).errors[0]).toContain('web address of the page')
+      expect((await POST(req('POST', { action: 'add', purpose: 'eruv', url: 'eruv.org' }))).status).toBe(400)
+      expect((await POST(req('POST', { action: 'add', purpose: 'menu', url: 'menu.org', resourceId: SHUL }))).status).toBe(400)
+      expect((await POST(req('POST', { action: 'add', purpose: 'whatever', url: 'x.org' }))).status).toBe(400)
+      expect((await POST(req('POST', { action: 'add', purpose: 'hospital', url: 'https://refuah.com/?q=x', resourceId: SHUL }))).status).toBe(400)
+      expect(m.addWatch).not.toHaveBeenCalled()
+    })
+
+    it('reads a shul’s page for its times, and won’t take a shul’s page for hours', async () => {
+      const hours = await POST(req('POST', { action: 'add', purpose: 'hours', url: 'lms.org/davening', resourceId: SHUL }))
+      expect(hours.status).toBe(400)
+      expect((await hours.json()).errors[0]).toBe('Lower Merion Synagogue has no hours to keep current.')
+      expect((await POST(req('POST', { action: 'add', purpose: 'times', url: 'lms.org/davening', resourceId: SHUL }))).status).toBe(200)
+      expect(m.addWatch.mock.calls[0][1]).toMatchObject({ resourceId: SHUL, createdBy: 'listing pages', label: 'Lower Merion Synagogue · davening times on their website' })
+    })
+
+    it('takes weekly times by the address the newsletter comes from', async () => {
+      expect((await POST(req('POST', { action: 'add', purpose: 'weekly', url: 'Info@Mekor.org', resourceId: SHUL }))).status).toBe(200)
+      expect(m.addWatch.mock.calls[0][1]).toMatchObject({ url: 'mailto:info@mekor.org', createdBy: NEWSLETTER_WATCH_CREATOR })
+    })
+
+    it('keeps any other page as a plain watch', async () => {
+      expect((await POST(req('POST', { action: 'add', purpose: 'other', url: 'bzbi.org/worship' }))).status).toBe(200)
+      expect(m.addWatch.mock.calls[0][1]).toMatchObject({ url: 'https://bzbi.org/worship', resourceId: null, createdBy: 'me@x.co' })
+    })
   })
 
   it('checks, pauses and removes only this community’s watches', async () => {
