@@ -171,7 +171,26 @@ for that exact change, in the same conversation. Show the dry run first.
 
 7. The "+" button covers part of the third tile in a row on the phone home.
 
-## Done Oct 19 (on `redesign/oct18-fixes`, not merged)
+## Done Oct 19, after #331 (on `redesign/oct18-fixes`, not merged)
+
+- **The usual times close the way they open** (the user, Oct 19: tapping
+  anywhere opened them, only the arrow closed them). Opened, their whole
+  top, title and "Not this week" line, folds them again.
+- **This week's times keep the WhatsApp group.** A newsletter gives the
+  times, not the group; each of the week's minyanim now takes the group of
+  the usual minyan it stands in for (the same tefillah on that weekday,
+  either season), in the week's box and on the Minyanim list.
+- **The Minyanim list says "This week's times"** for a week that goes by
+  its dates. It said "Shabbat Schedule times" on Mekor's weekday minyanim:
+  that week was approved before weeks were named by their dates.
+- **Why dates hadn't moved yet:** the dating went live with #331's deploy
+  (Oct 19, 17:10 UTC), after that day's 07:00 run. Refuah agrees with five
+  hospitals today, so they read "Confirmed by Refuah, Oct 20" after the
+  next run; Penn Presbyterian and Pennsylvania Hospital have nothing on
+  Refuah and keep theirs. The 20 places dated "Keystone-K's list" (older
+  approvals) become "Keystone-K" as the watch dates them.
+
+## Done Oct 19 (#331, merged)
 
 - **A shul's week of newsletter times** (the user, Oct 19):
   - The usual box this week replaces folds **back** after it's opened

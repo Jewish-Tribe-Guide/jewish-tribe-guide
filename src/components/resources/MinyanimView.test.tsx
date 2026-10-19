@@ -237,6 +237,26 @@ describe('a minyan that only runs when enough sign up', () => {
     expect(within(maariv).queryByTestId('sign-up-mark')).not.toBeInTheDocument()
   })
 
+  // Oct 19: Mekor's week, approved as "Shabbat Schedule", listed its Tuesday
+  // Maariv as "Shabbat Schedule times", without its WhatsApp group.
+  it('a week the shul sent out: “This week’s times”, and the usual minyan’s group', () => {
+    const group = { link: 'https://chat.whatsapp.com/Mekor' }
+    const shul = makeListing({
+      id: 'mekor',
+      name: 'Mekor Habracha',
+      category: 'synagogue',
+      minyanim: [{ id: 'u1', tefillah: 'mincha_maariv', days: ['sun', 'mon', 'tue', 'wed', 'thu'], time: '6:30pm', signUp: group }],
+      minyanim_schedules: [
+        { id: 'w', kind: 'week', name: 'Shabbat Schedule', from: '2026-10-04', to: '2026-10-08', mode: 'replace', minyanim: [{ id: 'w1', tefillah: 'mincha_maariv', on: ['2026-10-06'], time: '5:55pm' }] },
+      ],
+      milesFromCenter: 1.3,
+    })
+    renderWithProviders(<MinyanimView items={[shul]} categoryId="synagogue" />, { content: { categories: [shuls] } })
+    const row = within(screen.getByTestId('minyanim-rows')).getAllByRole('listitem')[0]
+    expect(within(row).getByTestId('minyan-whose')).toHaveTextContent('This week’s times')
+    expect(within(row).getByTestId('sign-up-mark')).toHaveTextContent('Check group first')
+  })
+
   // …and a minyan opens its place on that minyan: its id, the day shown and
   // the time the row worked out (TappedMinyan).
   it('opens its place on that minyan', () => {
