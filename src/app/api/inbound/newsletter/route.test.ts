@@ -42,7 +42,7 @@ describe('POST /api/inbound/newsletter', () => {
     expect(await res.json()).toEqual({ ok: true, status: 'read', filed: 1 })
     expect(m.receiveNewsletter).toHaveBeenCalledWith(
       'philly',
-      { messageId: 'g1', from: email.from, subject: 'Shabbos', date: '2026-10-16T14:00:00.000Z', text: 'Mincha 6pm', attachment: { mime: 'application/pdf', b64: 'JVBERg==' } },
+      { messageId: 'g1', from: email.from, list: null, subject: 'Shabbos', date: '2026-10-16T14:00:00.000Z', text: 'Mincha 6pm', attachment: { mime: 'application/pdf', b64: 'JVBERg==' } },
       { apiKey: 'k', communityName: 'Philadelphia' },
     )
   })
@@ -56,6 +56,13 @@ describe('POST /api/inbound/newsletter', () => {
     expect(await res.json()).toEqual({ ok: true, status: 'eruv', eruv: 'northeast', read: 'up' })
     expect(m.receiveEruvEmail).toHaveBeenCalledWith('philly', expect.objectContaining({ messageId: 'g1', from: email.from }), { timezone: 'America/New_York' })
     expect(m.receiveNewsletter).not.toHaveBeenCalled()
+  })
+
+  it('passes on the list it came through, as the list’s own address', async () => {
+    await POST(req({ ...email, list: 'JCOR-NE-Philadelphia+owner@groups.io' }))
+    expect(m.receiveEruvEmail.mock.calls[0][1]).toMatchObject({ list: 'jcor-ne-philadelphia@groups.io' })
+    await POST(req({ ...email, list: 'not an address' }))
+    expect(m.receiveEruvEmail.mock.calls[1][1]).toMatchObject({ list: null })
   })
 
   it('a shul’s newsletter still needs the AI key', async () => {

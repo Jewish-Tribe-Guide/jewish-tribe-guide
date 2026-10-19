@@ -82,8 +82,14 @@ export function keptEmailSays(kept: KeptEmail, says: 'up' | 'down' | 'neither', 
 }
 
 /** An email address as the guide keeps a sender: trimmed, lower case. Null
- *  for anything that isn't one. */
+ *  for anything that isn't one. A groups.io list's other addresses (its
+ *  owner's, its sign-up: "JCOR-NE-Philadelphia+owner@groups.io", the one
+ *  its web page shows) are the list's own: its emails come through that. */
 export function senderEmail(raw: string): string | null {
-  const t = raw.trim().replace(/^mailto:/i, '').toLowerCase()
+  const t = raw
+    .trim()
+    .replace(/^mailto:/i, '')
+    .toLowerCase()
+    .replace(/^([^+@\s]+)\+(owner|subscribe|unsubscribe|help|digest|fullfeatured|nomail)@groups\.io$/, '$1@groups.io')
   return /^[^\s@<>"]+@[^\s@<>"]+\.[a-z]{2,}$/.test(t) ? t : null
 }

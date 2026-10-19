@@ -36,6 +36,9 @@ export type NewsletterEmail = {
   /** Gmail's id for the message: the same email sent twice is read once. */
   messageId: string
   from: string
+  /** The mailing list it came through (its List-Post address, lower case),
+   *  if any: a list sends each email from whoever posted it. */
+  list?: string | null
   subject: string
   /** When it was sent, ISO. */
   date: string | null
@@ -109,8 +112,9 @@ export async function receiveNewsletter(
 ): Promise<NewsletterResult> {
   const address = senderAddress(email.from)
   if (!address) return { status: 'not_newsletter' }
-  const url = newsletterUrl(address)
-  const watch = await getWatchByUrl(community, url)
+  // A list's email is from whoever posted it: the list's address is the
+  // one a watch can have.
+  const watch = (await getWatchByUrl(community, newsletterUrl(address))) ?? (email.list ? await getWatchByUrl(community, newsletterUrl(email.list)) : null)
   if (!watch) return { status: 'unknown' }
   if (isIgnoredSender(watch)) return { status: 'ignored' }
   if (!isNewsletterWatch(watch)) return { status: 'not_newsletter' }

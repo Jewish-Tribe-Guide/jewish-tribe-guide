@@ -2,9 +2,12 @@ import { timingSafeEqual } from 'node:crypto'
 import { listCommunities } from '@/lib/communityStore'
 import { newsletterSenders, receiveNewsletter, type NewsletterEmail } from '@/lib/newsletterRun'
 import { receiveEruvEmail } from '@/lib/eruvEmailRun'
+import { senderEmail } from '@/lib/eruvEmail'
 
 // POST /api/inbound/newsletter   Authorization: Bearer <NEWSLETTER_SECRET>
-//   { community, messageId, from, subject, date?, text, attachment?: { mime, b64 } }
+//   { community, messageId, from, list?, subject, date?, text, attachment?: { mime, b64 } }
+// `list` is the mailing list it came through (its List-Post address), when
+// it did: a list's emails are from whoever posted them.
 // A shul's newsletter, sent by the Google Apps Script in the guide's own
 // Gmail (scripts/newsletter-apps-script.js), one email a request
 // (newsletter.ts has the rules; newsletterRun.ts reads and files it).
@@ -92,6 +95,7 @@ export async function POST(request: Request) {
   const email: NewsletterEmail = {
     messageId,
     from,
+    list: senderEmail(str(body.list, 300)),
     subject: str(body.subject, 500),
     date,
     text: str(body.text, MAX_TEXT),

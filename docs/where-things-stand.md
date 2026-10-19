@@ -50,9 +50,9 @@ for that exact change, in the same conversation. Show the dry run first.
 
 1. **Philly Synagogues:** add the "Minyan" yes/no field, and rename the
    category "Shuls & minyanim".
-1b. **Migration 084 (`eruv_status_email`)**, for eruv status by email
-   (6c): two new columns on `eruv`, nothing else. Run on dev first, then
-   live with a yes. Then each sender address set on live is its own yes.
+1b. **Eruv status by email (6c):** migration 084 is run on both databases
+   (the user, Oct 19). Northeast's address on live is still to set: a yes,
+   once the branch is deployed.
 ## For the user or the community
 
 2. **Every live place has a date** (checked Oct 17, 11 PM: 155 of 155).
@@ -111,7 +111,7 @@ for that exact change, in the same conversation. Show the dry run first.
    script.google.com (the secret property and the hourly trigger stay),
    then run `readNewsletters` once.
 6c. **Eruv status by email** (the user, Oct 19; built on
-   `claude/zen-golick-e5ddec`, migration 084 not run anywhere). Northeast
+   `claude/zen-golick-e5ddec`, migration 084 run on dev and live). Northeast
    (a groups.io list) and Elkins Park announce up and down only by email.
    Each eruv now has "Status emails from" on the admin Eruvim tab: the
    address its emails come from. The Gmail script that sends shul
@@ -136,12 +136,18 @@ for that exact change, in the same conversation. Show the dry run first.
    status". Up or down goes live at once.
    An eruv has a status page or a status email, not both: a page is read
    again all day, while an email stands for its week.
-   **For the user:** subscribe phillyjewishguide@gmail.com to the
-   Northeast list (groups.io/g/JCOR-NE-Philadelphia) and to Elkins Park's
-   emails, then send the From address each one's emails arrive with.
-   groups.io sometimes rewrites From to the person who posted, so check a
-   real email. Then: 084 on dev, try it there, 084 on live and the two
-   addresses (each a yes).
+   A mailing list sends each email from whoever posted it, so a list is
+   matched by its own address: the Gmail script searches `list:` too and
+   sends each email's List-Post address, and the site matches an eruv (or
+   a shul newsletter) by it. groups.io's owner and sign-up addresses
+   (`…+owner@groups.io`, what its page shows) are kept as the list's.
+   **Northeast:** `jcor-ne-philadelphia@groups.io`, set on dev Oct 19.
+   **For the user:** subscribe phillyjewishguide@gmail.com to the list;
+   after this branch is deployed, paste the new Gmail script over the old
+   one (the secret and trigger stay); then set Northeast's address on live
+   (a yes). The script talks to the live site, so the preview can't receive
+   a real email. **Elkins Park:** how it announces its status isn't known
+   yet; ask YIEP (267-415-6760, yiep.org) whether there's an email list.
 
 6b. **Mekor Habracha watch** (built Oct 18 on
    `claude/unruffled-aryabhata-926203`, no migration; the comparison in 6a,

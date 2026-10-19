@@ -60,6 +60,11 @@ describe('senderEmail', () => {
   it('an address, lower case; anything else is null', () => {
     expect(senderEmail(' JCOR-NE-Philadelphia@groups.io ')).toBe('jcor-ne-philadelphia@groups.io')
     expect(senderEmail('mailto:eruv@yiep.org')).toBe('eruv@yiep.org')
+    // The address groups.io's page shows is its owner's: the list's own is
+    // the one its emails come through (the user, Oct 19).
+    expect(senderEmail('JCOR-NE-Philadelphia+owner@groups.io')).toBe('jcor-ne-philadelphia@groups.io')
+    expect(senderEmail('JCOR-NE-Philadelphia+subscribe@groups.io')).toBe('jcor-ne-philadelphia@groups.io')
+    expect(senderEmail('rabbi+eruv@gmail.com')).toBe('rabbi+eruv@gmail.com')
     expect(senderEmail('https://groups.io/g/JCOR-NE-Philadelphia')).toBeNull()
     expect(senderEmail('eruv at yiep')).toBeNull()
   })

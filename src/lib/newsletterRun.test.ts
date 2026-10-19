@@ -153,6 +153,14 @@ describe('receiveNewsletter: who it’s from', () => {
     expect(m.readShulWeek).not.toHaveBeenCalled()
   })
 
+  // A mailing list sends each email from whoever posted it: the list's own
+  // address is the one a watch can have.
+  it('a list’s email is the list’s, whoever posted it', async () => {
+    m.getWatchByUrl.mockImplementation(async (_c: string, url: string) => (url === 'mailto:mekor@groups.io' ? { ...watch, url, pageHash: emailHash('gmail-123') } : null))
+    expect(await receiveNewsletter('philly', { ...email, from: 'Rabbi Cohen <rabbi=gmail.com@groups.io>', list: 'mekor@groups.io' }, opts)).toEqual({ status: 'already' })
+    expect(m.getWatchByUrl).toHaveBeenCalledWith('philly', 'mailto:rabbi=gmail.com@groups.io')
+  })
+
   it('has nothing to do with an email without a sender’s address', async () => {
     expect(await receiveNewsletter('philly', { ...email, from: 'Mekor Habracha' }, opts)).toEqual({ status: 'not_newsletter' })
     expect(m.getWatchByUrl).not.toHaveBeenCalled()

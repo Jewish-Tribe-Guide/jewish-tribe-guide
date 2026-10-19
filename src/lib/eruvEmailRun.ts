@@ -17,15 +17,16 @@ export async function eruvSenders(community: string): Promise<string[]> {
 }
 
 /**
- * Receives one email, if it's from an eruv's sender; null when it isn't,
+ * Receives one email, if it's from an eruv's sender, or came through its
+ * mailing list (whoever posted it); null when it isn't,
  * for the newsletter reader to take. An email no newer than what the eruv
  * already shows (the same one sent again, or an older one the script found
  * late) changes nothing.
  */
 export async function receiveEruvEmail(community: string, email: NewsletterEmail, { timezone, now = new Date().toISOString() }: { timezone: string; now?: string }): Promise<EruvEmailResult | null> {
-  const address = senderAddress(email.from)
-  if (!address) return null
-  const eruv = (await listEmailedEruvim(community)).find((e) => e.statusEmail === address)
+  const addresses = [senderAddress(email.from), email.list].filter(Boolean)
+  if (!addresses.length) return null
+  const eruv = (await listEmailedEruvim(community)).find((e) => addresses.includes(e.statusEmail))
   if (!eruv) return null
   const done = (read: EruvEmailResult['read']): EruvEmailResult => ({ status: 'eruv', eruv: eruv.id, read })
 

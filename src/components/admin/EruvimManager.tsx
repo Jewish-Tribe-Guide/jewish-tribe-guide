@@ -182,7 +182,7 @@ function EruvCard({
         <Field label="Status page" help="The page it says “The Eruv is up” on. Empty: no status online.">
           <input className={input} value={draft.statusUrl ?? ''} onChange={(e) => set('statusUrl', e.target.value)} />
         </Field>
-        <Field label="Status emails from" help="For an eruv with no status page: the address its “The eruv is up” emails come from. Each one shows at once, for that week’s Shabbos.">
+        <Field label="Status emails from" help="For an eruv with no status page: the address its “The eruv is up” emails come from, or a mailing list’s own address (…@groups.io). Each one shows at once, for that week’s Shabbos.">
           <input className={input} type="email" value={draft.statusEmail ?? ''} onChange={(e) => set('statusEmail', e.target.value)} placeholder="alerts@example.groups.io" />
         </Field>
         <label className="flex items-start gap-2 text-sm text-slate-700 sm:col-span-2">

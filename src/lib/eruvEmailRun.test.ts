@@ -40,6 +40,14 @@ describe('receiveEruvEmail', () => {
     expect(m.saveEmailRead).toHaveBeenCalledWith('philly', 'northeast', { ok: true, status: 'up', words: 'The Eruv is UP.', postedOn: '2026-10-09', at: '2026-10-09T17:30:00.000Z' }, null)
   })
 
+  // groups.io sends each email from whoever posted it (the user, Oct 19):
+  // the list it came through is the eruv's.
+  it('takes an email that came through its list, whoever posted it', async () => {
+    const posted = email({ from: 'Moshe Levi via groups.io <mlevi=gmail.com@groups.io>', list: 'jcor-ne-philadelphia@groups.io' })
+    expect(await receiveEruvEmail('philly', posted, { timezone: TZ })).toEqual({ status: 'eruv', eruv: 'northeast', read: 'up' })
+    expect(await receiveEruvEmail('philly', { ...posted, list: null }, { timezone: TZ })).toBeNull()
+  })
+
   it('is not for it when the sender is no eruv’s: the newsletter reader takes it', async () => {
     expect(await receiveEruvEmail('philly', email({ from: 'Mekor <info@mekor.org>' }), { timezone: TZ })).toBeNull()
     expect(m.saveEmailRead).not.toHaveBeenCalled()
