@@ -52,7 +52,7 @@ for that exact change, in the same conversation. Show the dry run first.
    category "Shuls & minyanim".
 1b. **Eruv status by email (6c):** migration 084 is run on both databases
    (the user, Oct 19). Northeast's address on live is still to set: a yes,
-   once the branch is deployed.
+   once the branch is deployed. Elkins Park's sender is still unknown.
 ## For the user or the community
 
 2. **Every live place has a date** (checked Oct 17, 11 PM: 155 of 155).
@@ -146,8 +146,12 @@ for that exact change, in the same conversation. Show the dry run first.
    after this branch is deployed, paste the new Gmail script over the old
    one (the secret and trigger stay); then set Northeast's address on live
    (a yes). The script talks to the live site, so the preview can't receive
-   a real email. **Elkins Park:** how it announces its status isn't known
-   yet; ask YIEP (267-415-6760, yiep.org) whether there's an email list.
+   a real email.
+   **Open: Elkins Park.** No sender yet: how YIEP announces its status
+   isn't known (ask 267-415-6760, yiep.org, whether there's an email
+   list). Once the user sends its sender address, it's one field on the
+   Eruvim tab, no code: dev first, then live with a yes. Until then it
+   shows "No status online".
 
 6b. **Mekor Habracha watch** (built Oct 18 on
    `claude/unruffled-aryabhata-926203`, no migration; the comparison in 6a,
