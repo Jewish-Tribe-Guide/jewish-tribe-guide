@@ -2253,8 +2253,11 @@ describe('ResourceMapView — eruv lines', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Back to listing' }))
     await waitFor(() => expect(screen.queryByTestId('eruv-editing')).not.toBeInTheDocument())
-    expect(screen.getByTestId('map-eruv-detail')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Back to results' })).toBeInTheDocument()
+    // Found, not got: the eruv's header comes back a render after the
+    // editor goes, and on a loaded CI runner that render can land after
+    // the check (it failed there once, Oct 19, and never locally).
+    expect(await screen.findByTestId('map-eruv-detail')).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Back to results' })).toBeInTheDocument()
   })
 
   it('turning the lines off closes an open eruv', async () => {
