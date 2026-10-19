@@ -5,7 +5,7 @@ import type { DirectoryResource } from '@/types'
 import { isMinyanim, signUpAction, TEFILLAH_LABELS, TEFILLAH_ORDER, type Minyan } from '@/lib/davening'
 import { useMinyanSchedule } from '@/lib/useMinyanSchedule'
 import { geoKey, geoOrCommunityDefault, resolveAnchorTime, type AnchorTimes } from '@/lib/useZmanAnchors'
-import { dateText, readSchedules, regularMinyanim, scheduleDayText, sendsWeekly, thisWeeksPost, weekKeepsHeading, weekPostRows, type DayPosting, type SpecialSchedule } from '@/lib/schedules'
+import { dateText, readSchedules, regularMinyanim, scheduleDayText, sendsWeekly, thisWeeksPost, usualSignUp, weekByDates, weekPostRows, type DayPosting, type SpecialSchedule } from '@/lib/schedules'
 import { clockMinutes, noteText, SHABBOS_PART_LABELS, shabbosList, timeText, weekdayTable, type ShabbosLine } from '@/lib/weekTable'
 import type { DayKey } from '@/lib/hours'
 import { confirmedByFor, isMinyanOnly, sectionConfirmedAt } from '@/lib/listingView'
@@ -105,7 +105,13 @@ export default function DaveningCard({
   const todayDate = schedule?.today.date ?? null
   const post = todayDate ? thisWeeksPost(schedules, todayDate) : undefined
   const waiting = !post && !!todayDate && sendsWeekly(schedules, todayDate)
-  const postRows = post ? weekPostRows(post) : []
+  // Each with the sign-up of the usual minyan it stands in for (usualSignUp).
+  const postRows = post
+    ? weekPostRows(post).map((m) => {
+        const signUp = usualSignUp(rows, m, m.days as DayKey[])
+        return signUp ? { ...m, signUp } : m
+      })
+    : []
   const postDays = new Set(postRows.flatMap((m) => m.days))
 
   // The usual times a schedule replaces fold to one line under it.
@@ -192,30 +198,31 @@ export default function DaveningCard({
     )
   }
 
-  /** A box opened though its times are replaced: it still says so, and its
-   *  arrow folds it again (the user, Oct 19: once opened, it stayed open). */
+  /** A box opened though its times are replaced: its top, the title and the
+   *  line saying why, folds it again, as the same top folded opened it (the
+   *  user, Oct 19: once opened, it stayed open; then only its arrow closed
+   *  it, though anywhere on it had opened it). Null when nothing replaces it. */
   const foldBack = (key: 'week' | 'shabbos', title: string) => {
     const reason = foldReason(key)
-    if (!reason) return { action: undefined, note: null }
-    return {
-      action: (
-        <button
-          type="button"
-          onClick={() => setUnfolded((u) => ({ ...u, [key]: false }))}
-          aria-expanded={true}
-          aria-label={`Fold ${title}`}
-          className="-my-2 -mr-2 flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center self-center rounded-full text-slate-400 hover:bg-slate-50"
-          data-testid="davening-fold"
-        >
-          <ChevronRightIcon className="h-5 w-5 -rotate-90" />
-        </button>
-      ),
-      note: (
-        <p className="mb-1.5 text-[13.5px] text-muted" data-testid="davening-fold-reason">
-          {reason}
-        </p>
-      ),
-    }
+    if (!reason) return null
+    return (
+      <button
+        type="button"
+        onClick={() => setUnfolded((u) => ({ ...u, [key]: false }))}
+        aria-expanded={true}
+        aria-label={`Fold ${title}`}
+        className="mb-1.5 flex w-full cursor-pointer items-center justify-between gap-3 pt-2.5 text-left"
+        data-testid="davening-fold"
+      >
+        <span>
+          <span className="block text-base font-extrabold text-slate-900">{title}</span>
+          <span className="mt-0.5 block text-[13.5px] text-muted" data-testid="davening-fold-reason">
+            {reason}
+          </span>
+        </span>
+        <ChevronRightIcon className="h-5 w-5 shrink-0 -rotate-90 text-slate-400" />
+      </button>
+    )
   }
   const weekFold = foldBack('week', 'Usual weekday times')
   const shabbosFold = foldBack('shabbos', 'Usual Shabbos times')
@@ -224,8 +231,8 @@ export default function DaveningCard({
     ? folded(
         'week',
         'Usual weekday times',
-        <Card key="week" title="Usual weekday times" testId="davening-weekday" footer={foot('week', 'weekday', 'Weekday times')} action={weekFold.action} muted={!!weekFold.note}>
-          {weekFold.note}
+        <Card key="week" title={weekFold ? undefined : 'Usual weekday times'} testId="davening-weekday" footer={foot('week', 'weekday', 'Weekday times')} muted={!!weekFold}>
+          {weekFold}
           <WeekTable table={week} today={today} marks={!week.everySignUp} />
           <Notes
             lines={[
@@ -259,8 +266,8 @@ export default function DaveningCard({
     ? folded(
         'shabbos',
         'Usual Shabbos times',
-        <Card key="shabbos" title="Usual Shabbos times" testId="davening-shabbos" footer={foot('shabbos-usual', 'shabbos', 'Shabbos times')} action={shabbosFold.action} muted={!!shabbosFold.note}>
-          {shabbosFold.note}
+        <Card key="shabbos" title={shabbosFold ? undefined : 'Usual Shabbos times'} testId="davening-shabbos" footer={foot('shabbos-usual', 'shabbos', 'Shabbos times')} muted={!!shabbosFold}>
+          {shabbosFold}
           <ShabbosLines lines={shab.lines} anchors={anchors} today={today} marks={!shab.lines.every((l) => l.row.signUp)} />
           <Notes lines={[shab.otherSeason]} />
           {!allSignUp &&
@@ -327,8 +334,13 @@ export default function DaveningCard({
             {postTitle(post)}
           </p>
           <p className="mt-1.5 rounded-lg bg-slate-100 px-2.5 py-1.5 text-[13px] leading-snug text-slate-700">In place of their usual times for these dates only.</p>
-          {postShabbos && <ShabbosLines lines={postShabbos.lines} anchors={anchors} today={today} />}
-          {postTable && <WeekTable table={postTable} today={today} />}
+          {postShabbos && <ShabbosLines lines={postShabbos.lines} anchors={anchors} today={today} marks={!postRows.every((m) => m.signUp)} />}
+          {postTable && <WeekTable table={postTable} today={today} marks={!postRows.every((m) => m.signUp)} />}
+          {!allSignUp &&
+            signUpBoxes(
+              postRows.filter((m) => m.signUp),
+              { section: postRows.every((m) => m.signUp) ? 'All this week’s times' : undefined, tapped: tappedRow },
+            )}
           {updateIn('this-week')}
         </Card>
       )}
@@ -405,7 +417,7 @@ function postTitle(post: SpecialSchedule): string {
   const to = dateText(post.to)
   const sameMonth = from.split(' ')[0] === to.split(' ')[0]
   const dates = post.from === post.to ? from : `${from}–${sameMonth ? to.split(' ')[1] : to}`
-  return /^times for /i.test(post.name) || !weekKeepsHeading(post) ? dates : `${post.name}, ${dates}`
+  return weekByDates(post) ? dates : `${post.name}, ${dates}`
 }
 
 const capital = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
