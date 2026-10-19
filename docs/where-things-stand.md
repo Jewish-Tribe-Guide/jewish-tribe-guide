@@ -268,7 +268,7 @@ for that exact change, in the same conversation. Show the dry run first.
   session, so it was checked by its tests only (35 fail against the old
   code).
 
-## Done Oct 19: faster PR checks (on `redesign/oct18-fixes`, not merged)
+## Done Oct 19: faster PR checks (#335, merged)
 
 - **A PR goes green in about half the time** (the user, Oct 19: "PRs are
   taking a really long time"). It took ~20 minutes: everything waited for
@@ -276,7 +276,9 @@ for that exact change, in the same conversation. Show the dry run first.
   ran alone for ~10 minutes, one test at a time. Now every job starts at
   once and the end-to-end suite runs on four runners side by side, each
   still one test at a time. `src/test/ciWorkflow.test.ts` keeps it that
-  way. Expected ~10 minutes; measure it on this PR's own run.
+  way. Measured on #335's own run: every shard done 9 minutes after the
+  start (lint/unit 4.3 min, the slowest shard 4.8 min after it). A shard
+  re-run (2/4 there) adds its own ~3 minutes.
 
 ## Done Oct 19 (#333, merged)
 
