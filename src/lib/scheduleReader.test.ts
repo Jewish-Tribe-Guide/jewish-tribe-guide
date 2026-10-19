@@ -100,6 +100,10 @@ describe('what the AI read, kept to what holds up', () => {
     expect(readSunsetTime('Sundown')).toBe(0)
     expect(readSunsetTime('6:30pm')).toBeNull()
     expect(readSunsetTime('after sunset')).toBeNull()
+    // A hedge in front is the rule all the same (Mekor Habracha's page).
+    expect(readSunsetTime('around 15 minutes before sunset')).toBe(-15)
+    expect(readSunsetTime('~20 min before sundown')).toBe(-20)
+    expect(readSunsetTime('approx. 10 minutes after shkiah')).toBe(10)
   })
 
   it('from a photo, nothing to check the words against: kept, and marked so', () => {
@@ -219,6 +223,24 @@ describe('reading a shul’s regular times', () => {
     ])
   })
 
+  it('reads the same time given twice as one, on every day either gives', () => {
+    const page = { text: 'Shabbat morning 10am\nShacharis: Shabbos 10 am, Sunday 10am' }
+    const r = tidyRegularReading(
+      {
+        kind: 'schedule',
+        times: [
+          { tefillah: 'shacharis', days: ['sat'], time: '10am', quote: 'Shabbat morning 10am' },
+          { tefillah: 'shacharis', days: ['sat', 'sun'], time: '10 am', quote: 'Shacharis: Shabbos 10 am, Sunday 10am' },
+        ],
+      },
+      page,
+      DAYS,
+      id,
+    )
+    expect(r.times).toHaveLength(1)
+    expect(r.times[0]).toMatchObject({ time: '10:00am', days: ['sat', 'sun'] })
+  })
+
   it('a "week" with no dates it can place is read as a schedule', () => {
     const r = tidyRegularReading({ kind: 'week', times: [{ tefillah: 'shacharis', days: ['sat'], time: '9:00am', quote: 'Shacharis 9:00' }] }, { text: POST }, DAYS, id)
     expect(r.kind).toBe('schedule')
@@ -229,9 +251,14 @@ describe('reading a shul’s regular times', () => {
     expect(readZmanTime('At Havdalah')).toEqual({ anchor: 'havdalah', offsetMinutes: 0 })
     expect(readZmanTime('15 minutes before shkia')).toEqual({ anchor: 'sunset', offsetMinutes: -15 })
     expect(readZmanTime('after kiddush')).toBeNull()
+    expect(readZmanTime('about 18 min before candle lighting')).toEqual({ anchor: 'candle_lighting', offsetMinutes: -18 })
     // Only tefillos that move with a zman.
     expect(asRegularTime('shacharis', 'at candle lighting')).toEqual({ time: 'at candle lighting' })
     expect(asRegularTime('maariv', '12:30')).toEqual({ time: '12:30' })
+    // The hour alone, as the guide writes it (Kol Tzedek's "10 am").
+    expect(asRegularTime('shacharis', '10 am')).toEqual({ time: '10:00am' })
+    expect(asRegularTime('maariv', '9 P.M.')).toEqual({ time: '9:00pm' })
+    expect(asRegularTime('mincha_maariv', 'around candle-lighting')).toMatchObject({ anchor: 'candle_lighting', offsetMinutes: 0 })
   })
 
   it('asks the model and tidies its answer', async () => {
