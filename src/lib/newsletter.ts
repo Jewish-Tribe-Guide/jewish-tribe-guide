@@ -2,13 +2,14 @@
 // Shul newsletters (the user, Oct 18): the guide's own inbox is subscribed
 // to the shuls' weekly emails, and each one is read for what it changes.
 //
-// A small Google Apps Script in that Gmail account sends every new email to
-// /api/inbound/newsletter (scripts/newsletter-apps-script.js). There, the
-// sender is looked up among the watches: each newsletter sender is a watch
-// on `mailto:<address>`, tied to its shul's listing, so the AI is never left
-// to guess which shul an email is from. A sender the guide hasn't seen
-// before is added paused and unlinked, for an admin to tie to its shul on
-// the Watches tab; its emails wait in the inbox until then.
+// Each newsletter sender is a watch on `mailto:<address>`, added on the
+// Watches tab with the shul it's from, so the AI is never left to guess
+// which shul an email is from. A small Google Apps Script in that Gmail
+// account (scripts/newsletter-apps-script.js) asks the site for those
+// senders (watchedSenders) and sends only their new emails to
+// /api/inbound/newsletter: the rest of the inbox never leaves it (the user,
+// Oct 18: "every email seems excessive"). A sender the guide doesn't have
+// is left alone there too, never added for an admin to sort out.
 //
 // Times go through the shul card's own week reader (shulWeekReading.ts);
 // anything else the email says about a place in the guide, through the
@@ -65,6 +66,14 @@ export function newsletterUrl(address: string): string {
 
 export function isNewsletterWatch(w: Pick<Watch, 'createdBy' | 'url'>): boolean {
   return w.createdBy === NEWSLETTER_WATCH_CREATOR && w.url.startsWith('mailto:')
+}
+
+/** The addresses the Gmail script sends emails from: the newsletters tied
+ *  to a shul and running. A paused one waits; it's sent again once it's
+ *  turned back on, if its emails are still in the two weeks searched. */
+export function watchedSenders(watches: Pick<Watch, 'createdBy' | 'url' | 'resourceId' | 'active'>[]): string[] {
+  const addresses = watches.filter((w) => isNewsletterWatch(w) && w.resourceId && w.active).map((w) => w.url.slice('mailto:'.length).toLowerCase())
+  return [...new Set(addresses)]
 }
 
 export function isIgnoredSender(w: Pick<Watch, 'createdBy' | 'url'>): boolean {

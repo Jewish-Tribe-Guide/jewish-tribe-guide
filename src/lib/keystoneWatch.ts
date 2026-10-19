@@ -325,6 +325,13 @@ export function compareKeystone(entries: KeystoneEntry[], listings: WatchedListi
   return findings
 }
 
+/** The listings the list has just as the guide does: on it, with nothing to
+ *  suggest. Their dates move forward (sourceConfirm.ts). */
+export function keystoneAgrees(entries: KeystoneEntry[], listings: WatchedListing[], findings: WatchFinding[]): string[] {
+  const differ = new Set(findings.flatMap((f) => ('listing' in f ? [f.listing.id] : [])))
+  return listings.filter((l) => !differ.has(l.id) && entryFor(l, entries)).map((l) => l.id)
+}
+
 // ── What the admin reads ─────────────────────────────────────────────────────
 
 /** The card's note: what the list says, word for word, and where. */

@@ -10,8 +10,35 @@ import {
   senderAddress,
   senderName,
   timesWereRead,
+  watchedSenders,
 } from './newsletter'
 import type { UpdateRow } from './scheduleUpdate'
+
+// The Gmail script sends only these senders' emails (the user, Oct 18:
+// "every email seems excessive"): a newsletter tied to its shul and running.
+describe('the senders the Gmail script asks for', () => {
+  const w = (url: string, extra: Partial<{ createdBy: string; resourceId: string | null; active: boolean }> = {}) => ({
+    url,
+    createdBy: NEWSLETTER_WATCH_CREATOR,
+    resourceId: 'shul-1',
+    active: true,
+    ...extra,
+  })
+
+  it('are the linked, running newsletters, each once, and nothing else', () => {
+    expect(
+      watchedSenders([
+        w('mailto:info@mekor.org'),
+        w('mailto:Office@YI.org'),
+        w('mailto:new@shul.org', { resourceId: null, active: false }),
+        w('mailto:paused@shul.org', { active: false }),
+        w('mailto:no-reply@accounts.google.com', { createdBy: NEWSLETTER_IGNORED_CREATOR, resourceId: null, active: false }),
+        w('https://shul.org/times', { createdBy: 'admin' }),
+        w('mailto:info@mekor.org'),
+      ]),
+    ).toEqual(['info@mekor.org', 'office@yi.org'])
+  })
+})
 
 describe('a sender', () => {
   it('is the address in the From header, lower case', () => {

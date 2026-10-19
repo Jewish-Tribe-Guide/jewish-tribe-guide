@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Minyan } from './davening'
 import type { CalendarDay } from './jewishDays'
-import { cleanSchedule, factsFor, readSchedules, resolveDay, sendsWeekly, thisWeeksPost, withSchedules, dateKey, type SpecialSchedule } from './schedules'
+import { cleanSchedule, factsFor, readSchedules, resolveDay, sendsWeekly, thisWeeksPost, weekPostDays, weekPostRows, withSchedules, withWeekRows, dateKey, type SpecialSchedule } from './schedules'
 import { listMinyanim, nextUpcomingDavening } from './upcomingDavening'
 import { geoKey, geoOrCommunityDefault } from './useZmanAnchors'
 
@@ -173,5 +173,55 @@ describe('a shul’s weekly schedule', () => {
     expect(thisWeeksPost([bereishis], '2026-10-10')?.name).toBe('Bereishis')
     expect(thisWeeksPost([bereishis], '2026-10-11')).toBeUndefined() // the Sunday after
     expect(thisWeeksPost([bereishis], '2026-10-03')).toBeUndefined() // the Shabbos before
+  })
+})
+
+// Oct 19: a week the shul sent out, edited from its own box: its times as
+// rows on weekdays, and back on its own dates.
+describe('editing this week’s schedule', () => {
+  const week: SpecialSchedule = {
+    id: 'w1',
+    name: 'Shabbos Bereishis',
+    from: '2026-10-09',
+    to: '2026-10-10',
+    mode: 'replace',
+    kind: 'week',
+    minyanim: [
+      { id: 'fn', tefillah: 'mincha_maariv', on: ['2026-10-09'], time: '6:10pm' },
+      { id: 'sm', tefillah: 'shacharis', on: ['sat'], time: '9:00am' },
+    ],
+  }
+  const yomTov: SpecialSchedule = { id: 'y', name: 'Sukkos', from: '2026-09-26', to: '2026-10-04', mode: 'replace', minyanim: [] }
+
+  it('offers the days it covers, Sunday first', () => {
+    expect(weekPostDays(week)).toEqual(['fri', 'sat'])
+    expect(weekPostDays({ from: '2026-10-10', to: '2026-10-12' })).toEqual(['sun', 'mon', 'sat'])
+  })
+
+  it('reads its times as weekday rows', () => {
+    expect(weekPostRows(week)).toEqual([
+      { id: 'fn', tefillah: 'mincha_maariv', days: ['fri'], time: '6:10pm' },
+      { id: 'sm', tefillah: 'shacharis', days: ['sat'], time: '9:00am' },
+    ])
+  })
+
+  it('sends nothing different when nothing changed', () => {
+    expect(withWeekRows([yomTov, week], 'w1', weekPostRows(week))).toEqual([yomTov, week])
+  })
+
+  it('puts a changed or new time on the week’s own dates, drops one taken out, and leaves other schedules alone', () => {
+    const rows: Minyan[] = [
+      { id: 'sm', tefillah: 'shacharis', days: ['sat'], time: '8:45am' },
+      { id: 'new', tefillah: 'mincha', days: ['fri', 'sat'], time: '1:30pm', signUp: { name: 'x' } },
+    ]
+    const [y, w] = withWeekRows([yomTov, week], 'w1', rows)
+    expect(y).toBe(yomTov)
+    expect(w).toEqual({
+      ...week,
+      minyanim: [
+        { id: 'sm', tefillah: 'shacharis', on: ['2026-10-10'], time: '8:45am' },
+        { id: 'new', tefillah: 'mincha', on: ['2026-10-09', '2026-10-10'], time: '1:30pm' },
+      ],
+    })
   })
 })

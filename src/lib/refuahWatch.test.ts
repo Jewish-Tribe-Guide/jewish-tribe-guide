@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { compareRefuah, refuahEntry, refuahFields, refuahHospitalId, refuahKey, refuahNote, type RefuahHospital } from './refuahWatch'
+import { compareRefuah, refuahEntry, refuahFields, refuahHasEntries, refuahHospitalId, refuahKey, refuahNote, type RefuahHospital } from './refuahWatch'
 
 // HUP's record as Refuah's data service gave it on Oct 17, 2026, trimmed to
 // what the watch reads.
@@ -122,5 +122,15 @@ describe('refuahKey', () => {
     const a = refuahKey('l1', { pantry: HUP_LISTING.pantry })
     expect(refuahKey('l1', { pantry: structuredClone(HUP_LISTING.pantry) })).toBe(a)
     expect(refuahKey('l1', { pantry: [{ ...HUP_LISTING.pantry[0], phones: ['+1 215-000-0000'] }] })).not.toBe(a)
+  })
+})
+
+// Oct 19: a hospital Refuah agrees with is dated by it, but one Refuah has
+// nothing for agrees only by having nothing.
+describe('refuahHasEntries', () => {
+  it('needs a liaison or a service', () => {
+    expect(refuahHasEntries({ name: 'Penn Presbyterian', liaisons: [], services: [] })).toBe(false)
+    expect(refuahHasEntries({ name: 'Penn Presbyterian' })).toBe(false)
+    expect(refuahHasEntries({ name: 'CHOP', liaisons: [{ name: 'Rivka' } as never] })).toBe(true)
   })
 })

@@ -1,6 +1,6 @@
 import { DAY_KEYS, type DayKey } from './hours'
 import { formatAnchorRule, parseTimeToMinutes, TEFILLAH_ORDER, type Minyan, type MinyanDayKey, type Tefillah, type ZmanAnchor } from './davening'
-import { dateText, type ScheduleDay, type SpecialSchedule } from './schedules'
+import { dateText, weekKeepsHeading, type ScheduleDay, type SpecialSchedule } from './schedules'
 import type { Season } from './season'
 
 // ── Updating a shul's times from what it sent (agreed Oct 1) ────────────────
@@ -486,7 +486,8 @@ export function applyUpdate(
 
   // …and the week itself, dated, in place of the regular times those days.
   if (update.kind === 'week' && update.from && update.to && changesAnything(update)) {
-    const name = update.title?.trim() || `Times for ${dateText(update.from)}${update.to !== update.from ? ` – ${dateText(update.to)}` : ''}`
+    const heading = weekKeepsHeading({ from: update.from, to: update.to }) ? update.title?.trim() : null
+    const name = heading || `Times for ${dateText(update.from)}${update.to !== update.from ? ` – ${dateText(update.to)}` : ''}`
     const minyanimOn = update.rows
       .filter((r) => r.status !== 'gone' || r.keep)
       .map((r) => ({ id: newId(), tefillah: r.tefillah, on: [r.day], ...pickTime(r), ...(r.notes ? { notes: r.notes } : {}) }))

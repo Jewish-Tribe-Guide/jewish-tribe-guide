@@ -230,7 +230,7 @@ describe('how this guide stays right: the sources it read this week', () => {
     const read = sourcesRead(facts, [{ label: 'Keystone-K’s list', okAt: ago(0.4) }], [ago(0.01), null], now)
     expect(read).toEqual({ google: true, lists: ['Keystone-K’s list'], eruv: true })
     expect(sourcesSentence(read)).toBe(
-      'Hours from Google, hechshers from Keystone-K’s list and eruv status from each eruv’s own site. Read again every day.',
+      'Hours from Google, hechshers from Keystone-K’s list and eruv status from each eruv’s own site. Read again every day, hours every week.',
     )
   })
 
@@ -239,7 +239,12 @@ describe('how this guide stays right: the sources it read this week', () => {
   it('a check that’s set up but hasn’t run, or stopped over a week ago, claims nothing', () => {
     const read = sourcesRead(facts, [{ label: 'Keystone-K’s list', okAt: null }, { label: 'Old list', okAt: ago(9) }], [null, ago(8)], now)
     expect(read).toEqual({ google: true, lists: [], eruv: false })
-    expect(sourcesSentence(read)).toBe('Hours from Google. Read again every day.')
+    expect(sourcesSentence(read)).toBe('Hours from Google. Read again every week.')
+  })
+
+  // Oct 19: Google's hours are read weekly, the lists and eruv sites daily.
+  it('without Google, every day', () => {
+    expect(sourcesSentence({ google: false, lists: ['Keystone-K’s list'], eruv: false })).toBe('Hechshers from Keystone-K’s list. Read again every day.')
   })
 
   it('nothing read at all: no sentence, and Google only when it checked this week', () => {

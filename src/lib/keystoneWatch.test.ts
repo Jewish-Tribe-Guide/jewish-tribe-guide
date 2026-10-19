@@ -6,6 +6,7 @@ import {
   compareKeystone,
   findingKey,
   findingNote,
+  keystoneAgrees,
   levelsIn,
   parseKeystoneList,
   submissionKey,
@@ -210,6 +211,20 @@ describe('compareKeystone', () => {
   it('finds a grocery the guide has under its plain chain name', () => {
     const giant = listing({ category: 'grocery', name: 'GIANT', address: '50 E Wynnewood Rd, Wynnewood, PA 19096, USA' })
     expect(compareKeystone(others(['giant-wynnewood']), [giant])).toEqual([])
+  })
+})
+
+// Oct 19: the watch ran every day and agreed, and nothing dated a listing
+// but an approved suggestion, so the dates sat at Oct 18.
+describe('keystoneAgrees', () => {
+  const others = (slugs: string[]) => entries.filter((e) => slugs.includes(e.slug))
+  it('is the listings on the list with nothing to suggest', () => {
+    const grill = listing({ name: 'Cherry Grill', details: { kosherCert: ['Keystone-K'], k: 'https://keystone-k.org/kosher/cherry-grill/', t: ['Meat'] } })
+    const bagel = listing({ name: 'New York Bagel Bakery', details: { kosherCert: 'Keystone-K', k: 'https://keystone-k.org/kosher/new-york-bagel/' } })
+    const elsewhere = listing({ name: 'Not On The List', details: { kosherCert: ['OU'] } })
+    const list = others(['cherry-grill', 'new-york-bagel'])
+    const all = [grill, bagel, elsewhere]
+    expect(keystoneAgrees(list, all, compareKeystone(list, all))).toEqual([grill.id])
   })
 })
 

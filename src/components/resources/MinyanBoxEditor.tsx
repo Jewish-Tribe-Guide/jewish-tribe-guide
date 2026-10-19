@@ -38,6 +38,12 @@ const DAY_LABELS: Record<Minyan['days'][number], string> = {
   yom_tov: 'Yom Tov',
   holiday: 'Holiday',
 }
+/** A row of a week the shul sent out ('this_week') reads as Shabbos's or
+ *  the week's, by its days. minyanText.ts's isShabbosRow, copied: the
+ *  editor doesn't import from there (see the top of that file). */
+const kindOf = (m: Minyan, box: MinyanBox): 'weekday' | 'shabbos' =>
+  box !== 'this_week' ? box : m.days.length > 0 && m.days.every((d) => d === 'sat' || (d === 'fri' && m.tefillah !== 'shacharis')) ? 'shabbos' : 'weekday'
+
 /** In the Shabbos box, Friday is Friday night. */
 const dayLabel = (d: Minyan['days'][number], box: MinyanBox) => (box === 'shabbos' && d === 'fri' ? 'Friday night' : DAY_LABELS[d])
 
@@ -51,6 +57,7 @@ export default function MinyanBoxEditor({
   boxTitle,
   place,
   writing,
+  dayChoices,
   onChange,
   onStep,
   send,
@@ -69,6 +76,9 @@ export default function MinyanBoxEditor({
   /** How the listing writes a minyan, from the listing (minyanText.ts says
    *  why it's handed over rather than imported). */
   writing: MinyanWriting
+  /** The days a minyan can be put on, when not the box's own: a week the
+   *  shul sent out, its own days. */
+  dayChoices?: Minyan['days']
   onChange: (rows: Minyan[]) => void
   /** A minyan opened: its title and the way back to the list, for the
    *  sheet's header; null on the list. */
@@ -97,12 +107,15 @@ export default function MinyanBoxEditor({
   }
 
   if (open !== null) {
-    const start: Minyan = editing ?? { id: crypto.randomUUID(), tefillah: 'shacharis', days: [...BOX_DAYS[box].newRow], time: '' }
+    const choices = dayChoices ?? BOX_DAYS[box].choices
+    const newRow = BOX_DAYS[box].newRow.filter((d) => choices.includes(d))
+    const start: Minyan = editing ?? { id: crypto.randomUUID(), tefillah: 'shacharis', days: newRow.length || box === 'weekday' ? newRow : choices.slice(-1), time: '' }
     return (
       <OneMinyan
         key={open}
         start={start}
         box={box}
+        choices={choices}
         under={`${boxTitle} · ${place}`}
         onDone={(m) => save(editing ? rows.map((r) => (r.id === m.id ? m : r)) : [...rows, m])}
         onRemove={editing ? () => save(rows.filter((r) => r.id !== editing.id)) : undefined}
@@ -120,7 +133,8 @@ export default function MinyanBoxEditor({
             {g.rows.map((m) => {
               // The week's rows are under their tefillah already: the time
               // and the days. Shabbos's say which tefillah.
-              const sub = [box === 'weekday' ? formatDays(m.days) : m.days.length > 1 ? m.days.map((d) => dayLabel(d, box)).join(' and ') : null, m.season ? SEASON_LABELS[m.season] : null, m.signUp ? 'Sign-up' : null, noteText(m.notes)].filter(Boolean).join(' · ')
+              const kind = kindOf(m, box)
+              const sub = [kind === 'weekday' ? formatDays(m.days) : m.days.length > 1 ? m.days.map((d) => dayLabel(d, kind)).join(' and ') : null, m.season ? SEASON_LABELS[m.season] : null, m.signUp ? 'Sign-up' : null, noteText(m.notes)].filter(Boolean).join(' · ')
               const changed = isChanged(m)
               return (
                 <li key={m.id}>
@@ -131,12 +145,12 @@ export default function MinyanBoxEditor({
                   >
                     <span className="min-w-0 flex-1">
                       <span className="block text-[15.5px] text-slate-900">
-                        {box === 'shabbos' && (
+                        {kind === 'shabbos' && (
                           <>
                             <b>{TEFILLAH_LABELS[m.tefillah]}</b>{' '}
                           </>
                         )}
-                        <span className={box === 'weekday' ? 'font-bold' : 'text-slate-700'}>{timeText(m)}</span>
+                        <span className={kind === 'weekday' ? 'font-bold' : 'text-slate-700'}>{timeText(m)}</span>
                       </span>
                       {sub && <span className="mt-0.5 block text-[13.5px] text-muted">{sub}</span>}
                     </span>
@@ -164,7 +178,7 @@ export default function MinyanBoxEditor({
 }
 
 /** One minyan: Add a minyan's screen, with Remove, and More for the rest. */
-function OneMinyan({ start, box, under, onDone, onRemove }: { start: Minyan; box: MinyanBox; under: string; onDone: (m: Minyan) => void; onRemove?: () => void }) {
+function OneMinyan({ start, box, choices, under, onDone, onRemove }: { start: Minyan; box: MinyanBox; choices: Minyan['days']; under: string; onDone: (m: Minyan) => void; onRemove?: () => void }) {
   const [row, setRow] = useState<Minyan>(start)
   const [more, setMore] = useState(!!(start.season || start.notBefore || start.notAfter || start.signUp))
   const modes = useTimeModes()
@@ -172,7 +186,6 @@ function OneMinyan({ start, box, under, onDone, onRemove }: { start: Minyan; box
   const relative = !!row.anchor
   const readable = relative || Number.isFinite(parseTimeToMinutes(row.time))
   const view = modes.view(row)
-  const choices = BOX_DAYS[box].choices
   const canBeRelative = RELATIVE_ELIGIBLE.includes(row.tefillah)
 
   return (

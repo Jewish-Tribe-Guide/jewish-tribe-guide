@@ -4,7 +4,7 @@ The running list of what's outstanding, kept in the repo so it survives a
 change of Claude account (artifacts and Claude's own notes stay with the old
 account). Update it in the same commit as the work that changes it.
 
-Last updated: Oct 18, 2026.
+Last updated: Oct 19, 2026.
 
 ## The branch
 
@@ -88,23 +88,25 @@ for that exact change, in the same conversation. Show the dry run first.
 6. **Shul newsletters** (built Oct 18 on `redesign/shul-newsletters`, not
    merged; no migration). The guide's Gmail (phillyjewishguide@gmail.com)
    is subscribed to shul newsletters. A Google Apps Script in that account
-   (`scripts/newsletter-apps-script.js`) sends each new email, hourly, to
-   `/api/inbound/newsletter`. The AI reads it for the shul's times, from the
+   (`scripts/newsletter-apps-script.js`) runs hourly: it asks the site for
+   the newsletter senders on the Watches tab and sends only their new
+   emails to `/api/inbound/newsletter` (since Oct 18, the user: "every email
+   seems excessive"; it used to send the whole inbox and add each stranger
+   as an unlinked row). The AI reads each for the shul's times, from the
    words or else its PDF or picture, and for anything it says about other
    places in the guide. It reads from the day the email was sent, so an old
    one's "this Shabbos" is never filed as next week's. Each change goes to
    the queue as "Shul newsletter (automated)", from "<shul>'s newsletter",
    and approving it dates the listing "Confirmed by <shul>". Each sender is
-   a row on the Watches tab ("Newsletter from …"). A new sender comes in
-   unlinked: tie it to its shul there, or mark it "Not a shul". Its emails
-   are sent again every hour for two weeks until it is. The daily watch run
-   flags a newsletter that hasn't come in a month.
-   **For the user, once it's merged and live:** add `NEWSLETTER_SECRET` in
-   Vercel (Production), the value in `.env.local`. Then, signed in to the
-   guide's Gmail, follow the steps at the top of the script: paste it into
-   script.google.com, add the same secret as a script property, run
-   `install`, then `readNewsletters` once. Link each sender on the Watches
-   tab as it appears.
+   a row on the Watches tab ("Newsletter from …"), added there by address
+   with its shul; a new subscription is picked up on the next run, from the
+   last two weeks. A paused one isn't sent. The daily watch run flags a
+   newsletter that hasn't come in a month.
+   **For the user:** `NEWSLETTER_SECRET` is in Vercel; redeploy Production
+   so it applies (the 503 on Oct 18 was the old deployment). Once the
+   senders-only change is live, paste the new script over the old one in
+   script.google.com (the secret property and the hourly trigger stay),
+   then run `readNewsletters` once.
 6b. **Mekor Habracha watch** (built Oct 18 on
    `claude/unruffled-aryabhata-926203`, no migration; the comparison in 6a,
    made daily). A website watch on mekorhabracha.org/center-city is read
@@ -127,13 +129,95 @@ for that exact change, in the same conversation. Show the dry run first.
    On the test project the watch row exists and filed 15, and a second
    run filed nothing. Until this merges, the test project's daily run
    treats it as a plain website check.
-   **For the user, once merged:** say yes, and an admin adds
-   `https://www.mekorhabracha.org/center-city` on the live Watches tab,
-   which runs it at once and files the 18.
+   **Live on Oct 19** (the user's yes): the watch is on production's
+   Watches tab as "Mekor Habracha kosher list". A dry run against
+   production that day read 78 places and found 18 differences, one of
+   them closed on Google (Z Candy Bar), so 17 to file. It was added
+   straight to the database, so it didn't run at once: it files at the
+   next daily run (07:00 UTC), or at once with Check now on the Watches
+   tab. Its agreement dates listings only once `redesign/oct18-fixes` is
+   deployed.
+
+6a. **Mekor Habracha's kosher list** (mekorhabracha.org/center-city,
+   78 places, "Last Updated 2026-10-12"; the user, Oct 18: stay in sync,
+   and flag a hechsher we show that they don't). Compared with the live
+   guide Oct 18, read-only:
+   - **Every IKC place we list is on Mekor as IKC except two.** Zevi's
+     Bakery: not on Mekor, but its own site says IKC. **Magical Sweet
+     Shop: we say IKC, Mekor says Keystone-K, Keystone-K's list doesn't
+     have it, its site says only "Certified Kosher".** Nothing records
+     where our IKC came from (there since at least July), and its
+     certificate link points at one of our own preview pages. Needs a
+     person to find out (call 856-309-1100, or ask Mekor).
+   - **On Mekor, not in the guide:** Cafe 613 at Temple Hillel, Shevy's
+     Babka Paradise (Chabad at Penn; Spring Garden St), Z Candy Bar,
+     Mike's Chicken (KCL, Lakewood delivery), La Chic N Sweet (Rabbi
+     Amiram Gabbai, no address), Cinnaholic (Cherry-K; Mekor's address is
+     Tasty Twisters'), Kosher Experience x2 (Cherry-K). Kosher Corner,
+     Penn's kosher dining and the Brodsky Center are already in the live
+     queue from Keystone-K's watch.
+   - **Archived here, still on Mekor:** Shtetl, Rita's Roosevelt Mall,
+     Nothing Bundt Cakes Springfield (none on Keystone-K's list now, so
+     likely Mekor is behind), and PLNT Burger Jenkintown, which Mekor
+     lists as IKC while ours said Keystone-K: may belong back, as IKC.
+   - **Smaller:** Nothing Bundt Cakes Cherry Hill and Marlton are
+     "Cherry-K" on Mekor, "Keystone-K" here (Keystone-K's list has both).
+     Mekor calls Lipkin's "Best Cake Kosher Bakery" (same address, phone
+     and Keystone-K page).
+   A daily Mekor watch, shaped like Keystone-K's, is proposed as its own
+   piece of work; its first run would file the above in the queue.
 
 ## Small open decisions
 
 7. The "+" button covers part of the third tile in a row on the phone home.
+
+## Done Oct 19 (on `redesign/oct18-fixes`, not merged)
+
+- **A shul's week of newsletter times** (the user, Oct 19):
+  - The usual box this week replaces folds **back** after it's opened
+    (an up chevron beside its title).
+  - Opened, it's a grey, dashed box with its times faded: still readable,
+    plainly not this week's. The line saying why, and its Confirmed footer,
+    stay at full strength.
+  - "This week's schedule" ends in the usual "Confirmed by …, date" line
+    with ✎ Edit, instead of "Posted Mon … Update their times".
+  - That Edit opens this week's times in the same editor as the usual
+    boxes, offering only the days the week covers. A changed row applies to
+    that week's matching dates; the usual times aren't touched, and the
+    queue shows the change like any other schedule edit.
+- **Mekor's newsletter week** (the user, Oct 19: "it read the email as all
+  for shabbos schedule"). The reading was right: one week, Sun Oct 18 to
+  Friday night, weekday times and all. Two things around it were wrong:
+  - It was named for the email's first heading, "Shabbat Schedule". A
+    week's heading now names it only when the week is just a Shabbos;
+    anything longer goes by its dates ("Oct 18–23"), when it's read and
+    when it's shown, so the live post reads right with no data change.
+  - Its Friday night folded the usual Shabbos times away, greyed, though
+    Shabbos morning's still held. They fold now only for a week with
+    Shabbos's own times.
+  - One week per email, not a Shabbos post and a weekday post: decided.
+- **A watch that agrees dates the listing** (the user, Oct 19: "I'm not
+  seeing updated confirmations"). Both daily jobs were running; nothing
+  dated a listing but an approved suggestion, so agreement, the usual
+  case, left the date at the last approval. Now Keystone-K's list,
+  Mekor's list (once its live watch has the user's yes, 6b) and a
+  hospital's Refuah page date each listing they agree
+  with ("Confirmed by Keystone-K, Oct 20"), daily (`sourceConfirm.ts`).
+  Not a hospital Refuah has nothing for, and not a listing with a
+  suggestion outstanding or rejected. Live from the first daily run after
+  this is deployed (07:00 UTC); no migration.
+- **Google's date is when its hours were last read** (decided, not
+  changed): every night asks only whether a place is still open; hours,
+  phone and website are re-read once a week, a seventh of the places each
+  night (Sep 29, for the Google bill). Most places were read on Oct 17,
+  so "Checked with Google, Oct 17" moves on, place by place, by Oct 24.
+  The trust sheet said every source was read again every day; it says
+  "Read again every day, hours every week." now (the user's yes, Oct 19),
+  and "every week" alone when Google is the only source listed.
+- **The daily test-project job keeps going once a watch dates a
+  listing.** That job runs the watches outside Next, where refreshing the
+  site's cache throws; the dates are written first, and the refresh is
+  now skipped there with a note in the log.
 
 ## Done Oct 18 (on `redesign/oct18-fixes`, not merged)
 
@@ -163,6 +247,16 @@ for that exact change, in the same conversation. Show the dry run first.
   last Shabbos" in grey instead of an amber "Not posted yet this week"
   (Friday and Shabbos are unchanged). A read that gets no answer is tried
   once more straight away (live failed one on Oct 17, twice).
+- **The Watches tab is grouped** (the user, Oct 18: "it's getting big and
+  there are groupings to be had"): Kosher lists (Keystone-K, Mekor), Shul
+  newsletters, Hospitals on Refuah, Menus, Other pages, always in that
+  order (`src/lib/watchGroups.ts`). Each heading gives the count and what
+  needs doing ("1 to link", "2 not working", "1 paused"). A group of more
+  than four starts closed but still shows anything not working or waiting
+  to be linked, and a row just linked or paused stays where it was. The
+  per-watch buttons are unchanged. Still open: each menu row repeats the
+  same paragraph, and on a phone a row's words squeeze into a narrow
+  column beside its buttons (both were there before the grouping).
 
 ## Done Oct 17
 

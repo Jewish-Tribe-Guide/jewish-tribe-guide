@@ -6,6 +6,7 @@ const m = vi.hoisted(() => ({
   submitListingUpdate: vi.fn(),
   sendWatchDigest: vi.fn(),
   getCategoryById: vi.fn(),
+  confirmFromSource: vi.fn(),
 }))
 
 // The two reads the run makes: the listing (maybeSingle), and what the watch
@@ -26,6 +27,7 @@ vi.mock('@/lib/supabase/admin', () => ({
 vi.mock('@/lib/submissionStore', () => ({ submitListingUpdate: m.submitListingUpdate }))
 vi.mock('@/lib/email', () => ({ sendWatchDigest: m.sendWatchDigest }))
 vi.mock('@/lib/categoryStore', () => ({ getCategoryById: m.getCategoryById }))
+vi.mock('@/lib/sourceConfirm', () => ({ confirmFromSource: m.confirmFromSource }))
 
 const { runRefuahWatch } = await import('./refuahRun')
 const { REFUAH_WATCH_NAME } = await import('./refuahWatch')
@@ -46,6 +48,7 @@ beforeEach(() => {
   vi.restoreAllMocks()
   m.submitListingUpdate.mockReset().mockResolvedValue({ id: 's1' })
   m.sendWatchDigest.mockReset().mockResolvedValue(undefined)
+  m.confirmFromSource.mockReset().mockResolvedValue(1)
   m.getCategoryById.mockReset().mockResolvedValue({ detailFields: [{ key: 'liaisons', label: 'Liaisons', type: 'contacts' }] })
   m.earlier = []
   m.listing = {
@@ -67,6 +70,9 @@ describe('runRefuahWatch', () => {
     expect(out).toMatchObject({ ok: true, filed: 0 })
     expect(JSON.parse(String(fetchSpy.mock.calls[0][1]?.body))).toMatchObject({ path: 'hospitals:getWithReferences', args: { id: 'jx77h9d00qztqgbbe8e0rfj1r589mgf5' } })
     expect(m.submitListingUpdate).not.toHaveBeenCalled()
+    // …and dates the hospital by Refuah (Oct 19: agreement used to leave
+    // the date where the last approval put it).
+    expect(m.confirmFromSource).toHaveBeenCalledWith('philly', [HOSPITAL], 'Refuah')
   })
 
   it('files a difference as a suggestion from Refuah, named, so approval dates it “From Refuah”', async () => {
@@ -95,6 +101,8 @@ describe('runRefuahWatch', () => {
     refuahAnswers({ name: 'Penn Presbyterian Medical Center', liaisons: [], services: [] })
     expect(await runRefuahWatch('philly', URL_, HOSPITAL)).toMatchObject({ ok: true, filed: 0 })
     expect(m.submitListingUpdate).not.toHaveBeenCalled()
+    // Agreeing only by having nothing doesn't date it.
+    expect(m.confirmFromSource).not.toHaveBeenCalled()
   })
 
   it('a record in a shape it doesn’t know, or an error, is a failed run, never a card', async () => {

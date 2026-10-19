@@ -139,6 +139,39 @@ describe('a whole new winter schedule', () => {
   })
 })
 
+// Mekor's newsletter for Parshat Noach (Oct 18): headed "Shabbat
+// Schedule", it gave the coming week's weekday times through Friday night.
+// The week was named for its heading, and read as a Shabbos.
+describe('a week longer than a Shabbos', () => {
+  const week: RegularReading = {
+    kind: 'week',
+    complete: false,
+    season: null,
+    title: 'Shabbat Schedule',
+    startsOn: null,
+    from: '2026-10-18',
+    to: '2026-10-23',
+    times: [
+      t({ tefillah: 'shacharis', date: '2026-10-19', time: '6:45am' }),
+      t({ tefillah: 'kabbalas_shabbos', date: '2026-10-23', time: '5:55pm' }),
+    ],
+  }
+  it('goes by its dates, not its heading', () => {
+    const u = compareTimes(MEKOR, week, { season: 'winter', newId })
+    const { schedules, changes } = applyUpdate(MEKOR, [], u, { newId })
+    expect(schedules[0]).toMatchObject({ name: 'Times for Oct 18 – Oct 23', kind: 'week' })
+    expect(changes.filter((c) => c.includes(' · '))).toEqual([
+      'Times for Oct 18 – Oct 23: new, shacharis · Mon Oct 19 · 6:45am',
+      'Times for Oct 18 – Oct 23: new, kabbalas shabbos · Fri Oct 23 · 5:55pm',
+    ])
+  })
+  it('a Shabbos keeps its heading', () => {
+    const shabbos = { ...week, title: 'Shabbos Noach', from: '2026-10-23', to: '2026-10-24', times: [t({ tefillah: 'shacharis', date: '2026-10-24', time: '9:00am' })] }
+    const { schedules } = applyUpdate(MEKOR, [], compareTimes(MEKOR, shabbos, { season: 'winter', newId }), { newId })
+    expect(schedules[0].name).toBe('Shabbos Noach')
+  })
+})
+
 describe('one Shabbos’s times', () => {
   const u = compareTimes(MEKOR, BEREISHIS, { season: 'summer', zmanim: ZMANIM, newId })
   it('matches clock times to the rules that day, and says what’s different', () => {

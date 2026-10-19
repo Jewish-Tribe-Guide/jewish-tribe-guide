@@ -280,6 +280,72 @@ export function sendsWeekly(schedules: readonly SpecialSchedule[], today: string
   return schedules.filter((s) => s.kind === 'week' && s.to >= since).length >= 2
 }
 
+/** The dates a schedule covers, in order. */
+function datesOf(s: Pick<SpecialSchedule, 'from' | 'to'>): string[] {
+  const out: string[] = []
+  for (let t = Date.parse(`${s.from}T12:00:00Z`); t <= Date.parse(`${s.to}T12:00:00Z`); t += DAY_MS) out.push(new Date(t).toISOString().slice(0, 10))
+  return out
+}
+
+const weekdayOfDate = (date: string): DayKey => DAY_KEYS[new Date(`${date}T12:00:00Z`).getUTCDay()]
+
+/** The weekdays a week post covers, Sunday first: the days its minyanim
+ *  can be put on when it's edited. */
+export function weekPostDays(post: Pick<SpecialSchedule, 'from' | 'to'>): DayKey[] {
+  const days = new Set(datesOf(post).map(weekdayOfDate))
+  return DAY_KEYS.filter((d) => days.has(d))
+}
+
+/** Whether a week's heading can name it: only when the week is just a
+ *  Shabbos (its dates all Friday or Shabbos). A newsletter's first heading
+ *  ("Shabbat Schedule") over a whole week's weekday times named the week
+ *  for the part it wasn't (Mekor, Oct 18), so a longer week goes by its
+ *  dates. */
+export function weekKeepsHeading(post: Pick<SpecialSchedule, 'from' | 'to'>): boolean {
+  return weekPostDays(post).every((d) => d === 'fri' || d === 'sat')
+}
+
+/** A week post's minyanim as rows on weekdays, the way its box shows them
+ *  and its Edit lists them. */
+export function weekPostRows(post: SpecialSchedule): Minyan[] {
+  return post.minyanim.flatMap((m) => {
+    const days = m.on.flatMap((d) => (isDate(d) ? [weekdayOfDate(d)] : (DAY_KEYS as readonly string[]).includes(d) ? [d as DayKey] : []))
+    if (days.length === 0) return []
+    const { on: _on, ...rest } = m
+    void _on
+    return [{ ...rest, days: [...new Set(days)] }]
+  })
+}
+
+// Field by field, whatever order they were set in.
+const plainRow = (m: object) => JSON.stringify(Object.fromEntries(Object.entries(m).filter(([, v]) => v !== undefined && v !== '').sort(([a], [b]) => a.localeCompare(b))))
+
+/**
+ * The shul's schedules with one week post's minyanim replaced by `rows`, as
+ * edited (Oct 19: "This week's schedule" had no Edit). Each row goes back
+ * on the post's own dates for its weekdays; a row nobody changed stays
+ * exactly as stored, so opening the editor and sending nothing changes
+ * nothing.
+ */
+export function withWeekRows(schedules: readonly SpecialSchedule[], postId: string, rows: readonly Minyan[]): SpecialSchedule[] {
+  return schedules.map((post) => {
+    if (post.id !== postId) return post
+    const dates = datesOf(post)
+    const stored = new Map(post.minyanim.map((m) => [m.id, m]))
+    const minyanim = rows.flatMap((row): ScheduleMinyan[] => {
+      const was = stored.get(row.id)
+      if (was && weekPostRows({ ...post, minyanim: [was] }).some((r) => plainRow(r) === plainRow(row))) return [was]
+      const on = dates.filter((d) => row.days.includes(weekdayOfDate(d)))
+      if (on.length === 0) return []
+      const { days: _days, signUp: _signUp, ...rest } = row
+      void _days
+      void _signUp
+      return [{ ...rest, on }]
+    })
+    return { ...post, minyanim }
+  })
+}
+
 /** The week post for the week `today` is in (Sunday to Shabbos) that hasn't
  *  ended yet, if one was sent. */
 export function thisWeeksPost(schedules: readonly SpecialSchedule[], today: string): SpecialSchedule | undefined {
