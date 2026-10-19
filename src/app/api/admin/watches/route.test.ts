@@ -105,6 +105,38 @@ describe('/api/admin/watches', () => {
     expect(m.addWatch.mock.calls[0][1]).toMatchObject({ kind: 'website', resourceId: SHUL })
   })
 
+  // Oct 19: a shul's or mikvah's own page, read by the AI for its times or
+  // hours when it changes (listingPageWatch.ts). Tied to the listing it
+  // keeps current, as a Refuah page is to its hospital.
+  it('adds a listing’s own page only tied to a listing with times or hours, as the run’s kind of watch', async () => {
+    m.listCategories.mockResolvedValue([
+      makeCategory({ id: 'synagogue', label: 'Synagogue', detailFields: [{ key: 'minyanim', label: 'Davening Times', type: 'minyanim' }] }),
+      makeCategory({ id: 'school', label: 'School', detailFields: [] }),
+    ])
+    const SCHOOL = '1c2d3e4f-5a6b-4c7d-8e9f-0a1b2c3d4e5f'
+    m.listApprovedResources.mockResolvedValue([
+      makeListing({ id: SHUL, category: 'synagogue', name: 'Lower Merion Synagogue' }),
+      makeListing({ id: SCHOOL, category: 'school', name: 'A School' }),
+    ])
+    const loose = await POST(req('POST', { action: 'add', url: 'lms.org/davening', forListing: true }))
+    expect(loose.status).toBe(400)
+    expect((await loose.json()).errors[0]).toContain('Pick the shul or mikvah')
+    const school = await POST(req('POST', { action: 'add', url: 'school.org', resourceId: SCHOOL, forListing: true }))
+    expect(school.status).toBe(400)
+    expect((await school.json()).errors[0]).toContain('no davening times or hours')
+    expect(m.addWatch).not.toHaveBeenCalled()
+
+    expect((await POST(req('POST', { action: 'add', url: 'lms.org/davening', resourceId: SHUL, forListing: true }))).status).toBe(200)
+    expect(m.addWatch).toHaveBeenCalledWith('philly', {
+      kind: 'website',
+      url: 'https://lms.org/davening',
+      resourceId: SHUL,
+      label: 'Lower Merion Synagogue · davening times on their website',
+      createdBy: 'listing pages',
+    })
+    expect(m.runAndRecord).toHaveBeenCalledWith(added)
+  })
+
   it('checks, pauses and removes only this community’s watches', async () => {
     m.getWatch.mockResolvedValue(null)
     expect((await POST(req('POST', { action: 'remove', id: WATCH }))).status).toBe(404)

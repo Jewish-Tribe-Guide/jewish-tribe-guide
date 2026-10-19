@@ -34,6 +34,7 @@ const menu = watch({ id: 'menu', url: 'https://judah.example/menu', resourceId: 
 const newsletter = watch({ id: 'news', url: 'mailto:info@lms.org', resourceId: 's1', createdBy: 'shul newsletters' })
 const notAShul = watch({ id: 'ignored', url: 'mailto:no-reply@accounts.google.com', createdBy: 'shul newsletters: not a shul', active: false })
 const page = watch({ id: 'page', url: 'https://bzbi.org/worship' })
+const shulPage = watch({ id: 'shulPage', url: 'https://lms.org/davening', resourceId: 's1', createdBy: 'listing pages' })
 
 describe('watchGroupOf', () => {
   it('sorts each kind of watch into its own group', () => {
@@ -44,6 +45,13 @@ describe('watchGroupOf', () => {
     expect(watchGroupOf(newsletter)).toBe('newsletters')
     expect(watchGroupOf(notAShul)).toBe('newsletters')
     expect(watchGroupOf(page)).toBe('pages')
+    expect(watchGroupOf(shulPage)).toBe('listingPages')
+  })
+
+  // Only a page added as the listing's own is read for its times or hours:
+  // an admin's plain watch tied to a shul is still just checked for a change.
+  it('keeps a plain watch tied to a shul with the other pages', () => {
+    expect(watchGroupOf(watch({ url: 'https://lms.org/davening', resourceId: 's1' }))).toBe('pages')
   })
 
   // An admin's own watch on a menu page is an ordinary page watch: only
@@ -55,8 +63,9 @@ describe('watchGroupOf', () => {
 
 describe('groupWatches', () => {
   it('lists the groups in a fixed order, leaving out empty ones', () => {
-    const groups = groupWatches([page, menu, refuah, newsletter, keystone], NOW)
-    expect(groups.map((g) => g.key)).toEqual(['kosher', 'newsletters', 'hospitals', 'menus', 'pages'])
+    const groups = groupWatches([page, shulPage, menu, refuah, newsletter, keystone], NOW)
+    expect(groups.map((g) => g.key)).toEqual(['kosher', 'newsletters', 'hospitals', 'menus', 'listingPages', 'pages'])
+    expect(groups.find((g) => g.key === 'listingPages')?.label).toBe('Shul and mikvah pages')
     expect(groupWatches([menu], NOW).map((g) => g.key)).toEqual(['menus'])
     expect(groupWatches([], NOW)).toEqual([])
   })
