@@ -296,6 +296,15 @@ export function weekPostDays(post: Pick<SpecialSchedule, 'from' | 'to'>): DayKey
   return DAY_KEYS.filter((d) => days.has(d))
 }
 
+/** Whether a week's heading can name it: only when the week is just a
+ *  Shabbos (its dates all Friday or Shabbos). A newsletter's first heading
+ *  ("Shabbat Schedule") over a whole week's weekday times named the week
+ *  for the part it wasn't (Mekor, Oct 18), so a longer week goes by its
+ *  dates. */
+export function weekKeepsHeading(post: Pick<SpecialSchedule, 'from' | 'to'>): boolean {
+  return weekPostDays(post).every((d) => d === 'fri' || d === 'sat')
+}
+
 /** A week post's minyanim as rows on weekdays, the way its box shows them
  *  and its Edit lists them. */
 export function weekPostRows(post: SpecialSchedule): Minyan[] {

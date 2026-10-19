@@ -1,7 +1,8 @@
 // One run of the Mekor Habracha watch: read Mekor's kosher list and put
 // every difference from the guide in the moderation queue (see
-// mekorWatch.ts). Writes no listing: an admin approves or rejects each
-// suggestion with Mekor's own words in front of them.
+// mekorWatch.ts). Changes no listing: an admin approves or rejects each
+// suggestion with Mekor's own words in front of them. A listing the list
+// agrees with only has its date moved forward (sourceConfirm.ts).
 //
 // Run daily by /api/cron/watches for a website watch on Mekor's list, and on
 // demand from the admin Watches tab. `dry` says what it would file and
@@ -12,9 +13,12 @@ import { sendWatchDigest, type WatchDigestItem } from '@/lib/email'
 import { submitListingCreate, submitListingUpdate } from '@/lib/submissionStore'
 import { WATCH_FETCH_HEADERS } from '@/lib/websiteWatch'
 import { askGoogleIfOpen } from '@/lib/keystoneRun'
+import { confirmFromSource } from '@/lib/sourceConfirm'
 import {
+  MEKOR_NAME,
   MEKOR_WATCH_NAME,
   compareMekor,
+  mekorAgrees,
   findingKey,
   findingNote,
   parseMekorList,
@@ -51,6 +55,8 @@ export type MekorRun =
       findings: number
       filed: number
       closedOnGoogle: string[]
+      /** Listings the list agreed with, dated today. */
+      confirmed?: number
       /** A dry run's suggestions, unfiled. */
       wouldFile?: (WatchDigestItem & { kind: MekorFinding['kind']; note: string })[]
     }
@@ -188,6 +194,7 @@ export async function runMekorWatch(community: string, url: string, { dry = fals
   }
 
   await sendWatchDigest(community, 'Mekor Habracha’s list', items).catch((err) => console.error('[watch-mekor] digest failed:', err))
+  const confirmed = await confirmFromSource(community, mekorAgrees(entries, (rows ?? []) as GuideListing[], findings), MEKOR_NAME)
 
-  return { ok: true, entries: entries.length, findings: findings.length, filed: items.length, closedOnGoogle: closed }
+  return { ok: true, entries: entries.length, findings: findings.length, filed: items.length, closedOnGoogle: closed, confirmed }
 }

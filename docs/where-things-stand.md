@@ -180,6 +180,32 @@ for that exact change, in the same conversation. Show the dry run first.
     boxes, offering only the days the week covers. A changed row applies to
     that week's matching dates; the usual times aren't touched, and the
     queue shows the change like any other schedule edit.
+- **Mekor's newsletter week** (the user, Oct 19: "it read the email as all
+  for shabbos schedule"). The reading was right: one week, Sun Oct 18 to
+  Friday night, weekday times and all. Two things around it were wrong:
+  - It was named for the email's first heading, "Shabbat Schedule". A
+    week's heading now names it only when the week is just a Shabbos;
+    anything longer goes by its dates ("Oct 18–23"), when it's read and
+    when it's shown, so the live post reads right with no data change.
+  - Its Friday night folded the usual Shabbos times away, greyed, though
+    Shabbos morning's still held. They fold now only for a week with
+    Shabbos's own times.
+  - One week per email, not a Shabbos post and a weekday post: decided.
+- **A watch that agrees dates the listing** (the user, Oct 19: "I'm not
+  seeing updated confirmations"). Both daily jobs were running; nothing
+  dated a listing but an approved suggestion, so agreement, the usual
+  case, left the date at the last approval. Now Keystone-K's list,
+  Mekor's list (once its live watch has the user's yes, 6b) and a
+  hospital's Refuah page date each listing they agree
+  with ("Confirmed by Keystone-K, Oct 20"), daily (`sourceConfirm.ts`).
+  Not a hospital Refuah has nothing for, and not a listing with a
+  suggestion outstanding or rejected. Live from the first daily run after
+  this is deployed (07:00 UTC); no migration.
+- **Google's date is when its hours were last read** (decided, not
+  changed): every night asks only whether a place is still open; hours,
+  phone and website are re-read once a week, a seventh of the places each
+  night (Sep 29, for the Google bill). Most places were read on Oct 17,
+  so "Checked with Google, Oct 17" moves on, place by place, by Oct 24.
 
 ## Done Oct 18 (on `redesign/oct18-fixes`, not merged)
 

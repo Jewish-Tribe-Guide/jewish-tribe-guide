@@ -319,6 +319,26 @@ describe('this week’s schedule (Oct 6)', () => {
     expect(screen.getByTestId('davening-folded')).toHaveTextContent('Usual Shabbos times')
   })
 
+  // Oct 19: Mekor's newsletter week ran Sunday to Friday night, headed
+  // "Shabbat Schedule". It was titled for the Shabbos it didn't cover, and
+  // folded away (greyed) Shabbos morning's usual time, which still held.
+  it('a week of weekdays to Friday night: named by its dates, and Shabbos’s usual times left open', () => {
+    const weekdays = {
+      ...weekPost('Shabbat Schedule', '2026-10-04', '2026-10-09'),
+      minyanim: [
+        { id: 'w1', tefillah: 'shacharis', on: ['2026-10-05'], time: '6:50am' },
+        { id: 'w2', tefillah: 'kabbalas_shabbos', on: ['2026-10-09'], time: '5:55pm' },
+      ],
+    }
+    show([...before, weekdays])
+    expect(screen.getByTestId('davening-this-week-dates')).toHaveTextContent(/^Oct 4–9$/)
+    const shabbos = screen.getByTestId('davening-shabbos')
+    expect(shabbos).toHaveTextContent('Shacharis 9:15 AM')
+    expect(shabbos).not.toHaveAttribute('data-muted')
+    // The weekday times it does replace still fold.
+    expect(screen.queryByTestId('davening-weekday')).not.toBeInTheDocument()
+  })
+
   it('a shul that has never sent one out just shows its usual times', () => {
     show([])
     expect(screen.queryByTestId('davening-this-week-waiting')).not.toBeInTheDocument()

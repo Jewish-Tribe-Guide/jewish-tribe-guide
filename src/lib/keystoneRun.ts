@@ -1,7 +1,8 @@
 // One run of the Keystone-K watch: read Keystone-K's list of the places it
 // certifies and put every difference from the guide in the moderation queue
-// (see keystoneWatch.ts). Writes no listing: an admin approves or rejects
-// each suggestion with the list's own words in front of them.
+// (see keystoneWatch.ts). Changes no listing: an admin approves or rejects
+// each suggestion with the list's own words in front of them. A listing the
+// list agrees with only has its date moved forward (sourceConfirm.ts).
 //
 // Run daily for every keystone_list watch by /api/cron/watches, and on
 // demand from the admin Watches tab. `dry` says what it would file and
@@ -11,11 +12,14 @@ import { getAdminClient } from '@/lib/supabase/admin'
 import { sendWatchDigest, type WatchDigestItem } from '@/lib/email'
 import { submitListingCreate, submitListingDelete, submitListingUpdate } from '@/lib/submissionStore'
 import { canAskGoogle, findPlaceStatus } from '@/lib/googlePlaces'
+import { confirmFromSource } from '@/lib/sourceConfirm'
+import { KEYSTONE_NAME } from '@/lib/sourceNames'
 import { WATCH_FETCH_HEADERS } from '@/lib/websiteWatch'
 import {
   KEYSTONE_WATCH_NAME,
   compareKeystone,
   findingKey,
+  keystoneAgrees,
   findingNote,
   parseKeystoneList,
   submissionKey,
@@ -69,6 +73,8 @@ export type KeystoneRun =
       findings: number
       filed: number
       closedOnGoogle: string[]
+      /** Listings the list agreed with, dated today. */
+      confirmed?: number
       /** A dry run's suggestions, unfiled. */
       wouldFile?: (WatchDigestItem & { kind: WatchFinding['kind']; note: string })[]
     }
@@ -185,6 +191,7 @@ export async function runKeystoneWatch(community: string, url: string, { dry = f
   await sendWatchDigest(community, "Keystone-K's list", items).catch((err) =>
     console.error('[watch-keystone] digest failed:', err),
   )
+  const confirmed = await confirmFromSource(community, keystoneAgrees(entries, (rows ?? []) as WatchedListing[], findings), KEYSTONE_NAME)
 
-  return { ok: true, entries: entries.length, findings: findings.length, filed: items.length, closedOnGoogle: closed }
+  return { ok: true, entries: entries.length, findings: findings.length, filed: items.length, closedOnGoogle: closed, confirmed }
 }

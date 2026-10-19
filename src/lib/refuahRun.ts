@@ -1,7 +1,8 @@
 // One run of a Refuah watch: read the hospital's record from Refuah and put
 // what differs from the guide in the moderation queue (refuahWatch.ts has
-// the rules). Writes no listing: an admin approves or rejects the
-// suggestion with Refuah's entries in front of them.
+// the rules). Changes no listing: an admin approves or rejects the
+// suggestion with Refuah's entries in front of them. A hospital Refuah
+// agrees with only has its date moved forward (sourceConfirm.ts).
 //
 // Run daily by /api/cron/watches for every website watch on a Refuah
 // hospital page, and on demand from the admin Watches tab.
@@ -11,6 +12,7 @@ import { getAdminClient } from '@/lib/supabase/admin'
 import { sendWatchDigest } from '@/lib/email'
 import { submitListingUpdate } from '@/lib/submissionStore'
 import { getCategoryById } from '@/lib/categoryStore'
+import { confirmFromSource } from '@/lib/sourceConfirm'
 import { WATCH_FETCH_HEADERS } from '@/lib/websiteWatch'
 import type { WatchOutcome } from '@/lib/watches'
 import {
@@ -22,6 +24,7 @@ import {
   refuahFingerprint,
   refuahHospitalId,
   refuahKey,
+  refuahHasEntries,
   refuahNote,
   type RefuahHospital,
 } from '@/lib/refuahWatch'
@@ -82,7 +85,11 @@ export async function runRefuahWatch(community: string, url: string, resourceId:
   const pageHash = createHash('sha256').update(refuahFingerprint(refuah)).digest('hex')
   const details = row.details ?? {}
   const diffs = compareRefuah(details, refuah, Object.fromEntries(contacts.map((f) => [f.key, f.label])))
-  if (diffs.length === 0) return { ok: true, filed: 0, pageHash }
+  if (diffs.length === 0) {
+    // Refuah agrees: the hospital's date moves forward (sourceConfirm.ts).
+    if (refuahHasEntries(record)) await confirmFromSource(community, [row.id], REFUAH_NAME)
+    return { ok: true, filed: 0, pageHash }
+  }
 
   const fields = Object.fromEntries(diffs.map((d) => [d.key, d.after]))
   // Everything this watch has filed for the listing, whatever became of it.

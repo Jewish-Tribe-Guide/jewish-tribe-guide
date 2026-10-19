@@ -387,6 +387,14 @@ export function compareMekor(entries: MekorEntry[], listings: GuideListing[], pe
   return findings
 }
 
+/** The live listings Mekor's list has just as the guide does: matched, with
+ *  nothing to suggest. Their dates move forward (sourceConfirm.ts). */
+export function mekorAgrees(entries: MekorEntry[], listings: GuideListing[], findings: MekorFinding[]): string[] {
+  const differ = new Set(findings.flatMap((f) => ('listing' in f ? [f.listing.id] : [])))
+  const { matched } = matchEntries(entries, listings)
+  return [...new Set([...matched.values()].filter((l) => l.status === 'approved' && !differ.has(l.id)).map((l) => l.id))]
+}
+
 // ── What the admin reads ─────────────────────────────────────────────────────
 
 function said(e: MekorEntry, updated: string | null): string[] {

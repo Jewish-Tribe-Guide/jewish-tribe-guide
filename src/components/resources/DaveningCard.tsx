@@ -5,7 +5,7 @@ import type { DirectoryResource } from '@/types'
 import { isMinyanim, signUpAction, TEFILLAH_LABELS, TEFILLAH_ORDER, type Minyan } from '@/lib/davening'
 import { useMinyanSchedule } from '@/lib/useMinyanSchedule'
 import { geoKey, geoOrCommunityDefault, resolveAnchorTime, type AnchorTimes } from '@/lib/useZmanAnchors'
-import { dateText, readSchedules, regularMinyanim, scheduleDayText, sendsWeekly, thisWeeksPost, weekPostRows, type DayPosting, type SpecialSchedule } from '@/lib/schedules'
+import { dateText, readSchedules, regularMinyanim, scheduleDayText, sendsWeekly, thisWeeksPost, weekKeepsHeading, weekPostRows, type DayPosting, type SpecialSchedule } from '@/lib/schedules'
 import { clockMinutes, noteText, SHABBOS_PART_LABELS, shabbosList, timeText, weekdayTable, type ShabbosLine } from '@/lib/weekTable'
 import type { DayKey } from '@/lib/hours'
 import { confirmedByFor, isMinyanOnly, sectionConfirmedAt } from '@/lib/listingView'
@@ -112,7 +112,10 @@ export default function DaveningCard({
   const foldReason = (key: 'week' | 'shabbos') =>
     specialSchedule?.mode === 'replace'
       ? `Not now: the ${specialSchedule.name} times above replace them`
-      : post && (key === 'shabbos' ? postDays.has('fri') || postDays.has('sat') : ['sun', 'mon', 'tue', 'wed', 'thu'].some((d) => postDays.has(d as DayKey)))
+      : // Shabbos's usual times fold only for a week with Shabbos's own: a
+        // newsletter ending Friday night (Mekor, Oct 18) left Shabbos
+        // morning's usual time folded away, greyed as not this week's.
+        post && (key === 'shabbos' ? postDays.has('sat') : ['sun', 'mon', 'tue', 'wed', 'thu'].some((d) => postDays.has(d as DayKey)))
         ? 'Not this week: this week’s schedule replaces them'
         : null
 
@@ -395,13 +398,14 @@ export default function DaveningCard({
 /** A week post's times as regular rows, each on its date's weekday, for the
  *  same table and Shabbos lines as the usual times. */
 /** "Shabbos Bereishis, Oct 9–10"; just the dates for a name the guide made
- *  up ("Times for Oct 9 – Oct 10"). */
+ *  up ("Times for Oct 9 – Oct 10"), or for a heading over more than a
+ *  Shabbos (weekKeepsHeading), as weeks read before that rule were named. */
 function postTitle(post: SpecialSchedule): string {
   const from = dateText(post.from)
   const to = dateText(post.to)
   const sameMonth = from.split(' ')[0] === to.split(' ')[0]
   const dates = post.from === post.to ? from : `${from}–${sameMonth ? to.split(' ')[1] : to}`
-  return /^times for /i.test(post.name) ? dates : `${post.name}, ${dates}`
+  return /^times for /i.test(post.name) || !weekKeepsHeading(post) ? dates : `${post.name}, ${dates}`
 }
 
 const capital = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)

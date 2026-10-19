@@ -7,6 +7,7 @@ import {
   findingKey,
   findingNote,
   isMekorList,
+  mekorAgrees,
   parseMekorList,
   submissionKey,
   type GuideListing,
@@ -251,6 +252,22 @@ describe('matching', () => {
     const giant = entry({ slug: 'giant', name: 'GIANT - Wynnewood Rd', kinds: ['Bakery'], certs: ['Keystone-K'], address: '50 E Wynnewood Rd' })
     const ours = listing({ category: 'grocery', name: 'GIANT', address: '50 E Wynnewood Rd, Wynnewood' })
     expect(compareMekor([giant], [ours], [])).toEqual([])
+  })
+})
+
+// Oct 19: agreement left no date; now it moves the listing's forward.
+describe('mekorAgrees', () => {
+  it('is the live listings matched with nothing to suggest', () => {
+    const cert = 'https://example.blob/mekor/joy-cafe.pdf'
+    const joy = entry({ slug: 'joy-cafe', name: 'Joy Cafe', certificate: cert, address: '630 N 2nd St' })
+    const ours = listing({ name: 'Joy Café & Bakery', address: '630 N 2nd St, Philadelphia', details: { kosherCert: 'IKC', k: cert } })
+    expect(mekorAgrees([joy], [ours], compareMekor([joy], [ours], []))).toEqual([ours.id])
+    // A different hechsher is a suggestion, not agreement.
+    const otherCert = listing({ ...ours, details: { kosherCert: 'OU', k: cert } })
+    expect(mekorAgrees([joy], [otherCert], compareMekor([joy], [otherCert], []))).toEqual([])
+    // An archived listing isn't dated.
+    const archived = listing({ ...ours, status: 'archived' })
+    expect(mekorAgrees([joy], [archived], compareMekor([joy], [archived], []))).toEqual([])
   })
 })
 
