@@ -115,7 +115,7 @@ describe('Right now', () => {
     show('2026-10-13T12:30:00-04:00', week)
     const section = screen.getByTestId('right-now')
     expect(section).toHaveAttribute('data-moment', 'weekday')
-    expect(screen.getByRole('heading', { name: /Right now/ })).toHaveTextContent('Right now · Tuesday · 2 Cheshvan')
+    expect(screen.getByRole('heading', { name: /Right now/ })).toHaveTextContent(/^Right now · Tuesday$/)
     const rows = within(section).getAllByRole('link')
     expect(rows.map((r) => [r.textContent, r.getAttribute('href')])).toEqual([
       ['Food2 open now1 meat · 1 parve', '/test-community/restaurant?openNow=1'],
@@ -154,7 +154,7 @@ describe('Right now', () => {
     expect(screen.getByTestId('today-candles')).toHaveTextContent('Havdalah 6:59 PM')
     expect(screen.queryByTestId('today-before-candles')).not.toBeInTheDocument()
     expect(screen.getByTestId('right-now')).not.toHaveTextContent('open now')
-    expect(screen.getByRole('heading', { name: /Right now/ })).toHaveTextContent('Right now · Shabbos · 6 Cheshvan')
+    expect(screen.getByRole('heading', { name: /Right now/ })).toHaveTextContent(/^Right now · Shabbos$/)
   })
 
   // The tiles under it shouldn't jump down when the clock arrives.

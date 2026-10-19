@@ -7,6 +7,7 @@ import { runAndRecord } from '@/lib/watchRunner'
 import { kindForUrl, normalizeWatchUrl } from '@/lib/watches'
 import { UUID } from '@/lib/itemMarkRoutes'
 import { refuahHospitalId } from '@/lib/refuahWatch'
+import { isIgnoredSender, isNewsletterWatch, NEWSLETTER_IGNORED_CREATOR, NEWSLETTER_WATCH_CREATOR, newsletterUrl, senderAddress } from '@/lib/newsletter'
 
 // GET  /api/admin/watches — the "Watches" tab: every page this community's
 //      guide reads on its own (watch, migration 070), and the listings a
@@ -14,7 +15,14 @@ import { refuahHospitalId } from '@/lib/refuahWatch'
 // POST /api/admin/watches  body: { action: 'add', url, resourceId?, label? }
 //      Watches a new page and checks it once straight away, so the admin
 //      sees at once whether the guide can read it.
+//      A shul's newsletter address ("office@shul.org") in place of a page,
+//      with the shul it's from, watches that sender's emails (newsletter.ts).
 // POST /api/admin/watches  body: { action: 'check' | 'pause' | 'resume' | 'remove', id }
+// POST /api/admin/watches  body: { action: 'link', id, resourceId }
+//      Ties a newsletter sender to its shul and turns it on: its emails
+//      waiting in the guide's inbox are read within the hour.
+// POST /api/admin/watches  body: { action: 'ignore', id }
+//      A sender that isn't a shul: its emails are skipped. Remove undoes it.
 
 export const maxDuration = 60
 
@@ -53,6 +61,18 @@ export async function POST(request: Request) {
   const action = body?.action
 
   try {
+    const listingIn = async (resourceId: unknown) =>
+      typeof resourceId === 'string' && UUID.test(resourceId) && (await listApprovedResources(community.slug)).some((l) => l.id === resourceId)
+
+    if (action === 'add' && typeof body?.url === 'string' && senderAddress(body.url) && !/^https?:/i.test(body.url.trim())) {
+      if (!(await listingIn(body.resourceId))) return Response.json({ ok: false, errors: ['Pick the shul this newsletter is from.'] }, { status: 400 })
+      const address = senderAddress(body.url)!
+      const label = typeof body?.label === 'string' && body.label.trim() ? body.label.trim().slice(0, 120) : address
+      const added = await addWatch(community.slug, { kind: 'website', url: newsletterUrl(address), resourceId: body.resourceId as string, label, createdBy: NEWSLETTER_WATCH_CREATOR })
+      if (!added) return Response.json({ ok: false, errors: ['The guide already has that newsletter.'] }, { status: 409 })
+      return Response.json({ ok: true, watch: added })
+    }
+
     if (action === 'add') {
       const url = normalizeWatchUrl(typeof body?.url === 'string' ? body.url : '')
       if (!url) return Response.json({ ok: false, errors: ['That isn’t a web address.'] }, { status: 400 })
@@ -80,12 +100,27 @@ export async function POST(request: Request) {
     }
 
     const id = typeof body?.id === 'string' ? body.id : ''
-    if (!UUID.test(id) || !['check', 'pause', 'resume', 'remove'].includes(String(action))) {
+    if (!UUID.test(id) || !['check', 'pause', 'resume', 'remove', 'link', 'ignore'].includes(String(action))) {
       return Response.json({ ok: false, errors: ['Invalid request.'] }, { status: 400 })
     }
     const existing = await getWatch(community.slug, id)
     if (!existing) return Response.json({ ok: false, errors: ['No such watch.'] }, { status: 404 })
 
+    if (action === 'link') {
+      if (!isNewsletterWatch(existing)) return Response.json({ ok: false, errors: ['Only a newsletter is linked to a shul here.'] }, { status: 400 })
+      if (!(await listingIn(body?.resourceId))) return Response.json({ ok: false, errors: ['Pick the shul this newsletter is from.'] }, { status: 400 })
+      const patch = { resourceId: body!.resourceId as string, active: true }
+      await updateWatch(community.slug, id, patch)
+      return Response.json({ ok: true, watch: { ...existing, ...patch } })
+    }
+    if (action === 'ignore') {
+      if (!isNewsletterWatch(existing) && !isIgnoredSender(existing)) {
+        return Response.json({ ok: false, errors: ['Only a newsletter sender is skipped here.'] }, { status: 400 })
+      }
+      const patch = { createdBy: NEWSLETTER_IGNORED_CREATOR, resourceId: null, active: false }
+      await updateWatch(community.slug, id, patch)
+      return Response.json({ ok: true, watch: { ...existing, ...patch } })
+    }
     if (action === 'remove') {
       await removeWatch(community.slug, id)
       return Response.json({ ok: true })

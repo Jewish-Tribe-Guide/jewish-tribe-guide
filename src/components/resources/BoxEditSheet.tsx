@@ -6,6 +6,7 @@ import type { CategoryConfig, CategoryField } from '@/lib/categories'
 import { isMinyanim, type Minyan } from '@/lib/davening'
 import { listingChanges } from '@/lib/listingDiff'
 import { mergeMinyanimBox, minyanimForBox, type MinyanBox } from '@/lib/minyanimBox'
+import { readSchedules, schedulesKey, weekPostDays, weekPostRows, withWeekRows } from '@/lib/schedules'
 import type { MinyanWriting } from '@/lib/minyanText'
 import { useIsMobile } from '@/lib/useIsMobile'
 import Honeypot from '@/components/Honeypot'
@@ -39,6 +40,9 @@ export type BoxEdit = {
    *  and how the listing writes them. */
   minyanimBox?: MinyanBox
   writing?: MinyanWriting
+  /** With minyanimBox 'this_week': the id of the week the shul sent out
+   *  (schedules.ts). Its times are edited, not the usual ones. */
+  week?: string
   /** Values already answered in the box ("Is it Shabbat friendly?" Yes). */
   preset?: Record<string, unknown>
   /** The whole-listing editor's rows for this box (editorRows ids), when
@@ -127,7 +131,12 @@ export function BoxEditor({
   const allRows: Minyan[] = minyanimField && isMinyanim(item[minyanimField.key]) ? (item[minyanimField.key] as Minyan[]) : []
   // A row stored without an id gets one here, as the old editor gave it
   // (MinyanimInput's initMinyanim): the list opens a minyan by its id.
-  const [boxRows] = useState(() => (edit.minyanimBox ? minyanimForBox(allRows, edit.minyanimBox).map((m) => (m.id ? m : { ...m, id: crypto.randomUUID() })) : []))
+  // A week the shul sent out: its own rows, sent back into its schedule.
+  const sk = minyanimField ? schedulesKey(minyanimField.key) : ''
+  const weekPost = edit.week && minyanimField ? readSchedules(item[sk]).find((s) => s.id === edit.week) : undefined
+  const [boxRows] = useState(() =>
+    weekPost ? weekPostRows(weekPost) : edit.minyanimBox ? minyanimForBox(allRows, edit.minyanimBox).map((m) => (m.id ? m : { ...m, id: crypto.randomUUID() })) : [],
+  )
 
   const changes = listingChanges(
     item,
@@ -191,8 +200,9 @@ export function BoxEditor({
             boxTitle={edit.title}
             place={item.name}
             writing={edit.writing!}
+            dayChoices={weekPost ? weekPostDays(weekPost) : undefined}
             onStep={onStep}
-            onChange={(rows) => setDetail(f.key, mergeMinyanimBox(allRows, edit.minyanimBox!, rows))}
+            onChange={(rows) => (weekPost ? setDetail(sk, withWeekRows(readSchedules(item[sk]), weekPost.id, rows)) : setDetail(f.key, mergeMinyanimBox(allRows, edit.minyanimBox!, rows)))}
             send={(n) => (
               <>
                 {errors}

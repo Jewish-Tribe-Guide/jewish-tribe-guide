@@ -131,7 +131,7 @@ export type ScheduledMinyan = Minyan & {
 
 /** Whose times a shul has for a date: a schedule's, or its regular ones
  *  where a festival has none posted ("Sukkos"), or plainly its regular ones. */
-export type DayPosting = { kind: 'schedule'; name: string } | { kind: 'not-posted'; festival: string } | { kind: 'regular' }
+export type DayPosting = { kind: 'schedule'; name: string; thisWeek?: true } | { kind: 'not-posted'; festival: string } | { kind: 'regular' }
 
 export type DayResolution = { rows: ScheduledMinyan[]; skip: boolean; posting: DayPosting }
 
@@ -147,10 +147,16 @@ export function resolveDay(regular: readonly Minyan[], schedules: readonly Speci
   // A shul that already tags regular rows "Yom Tov" has posted for it.
   const taggedYomTov = d.yomTov === true && regular.some((m) => m.days.includes('yom_tov'))
   if (covering) {
+    const week = covering.kind === 'week'
     const rows = covering.minyanim
       .filter((m) => heldOn(m, d))
-      .map(({ on: _on, ...m }): ScheduledMinyan => ({ ...m, days: [dateKey(d.date)], schedule: covering.name }))
-    if (rows.length > 0) return { rows, skip: covering.mode === 'replace', posting: { kind: 'schedule', name: covering.name } }
+      .map(({ on: _on, ...m }): ScheduledMinyan => {
+        void _on
+        const signUp = week ? usualSignUp(regular, m, [d.weekday]) : undefined
+        return { ...m, ...(signUp ? { signUp } : {}), days: [dateKey(d.date)], schedule: covering.name }
+      })
+    if (rows.length > 0)
+      return { rows, skip: covering.mode === 'replace', posting: { kind: 'schedule', name: covering.name, ...(week && weekByDates(covering) ? { thisWeek: true as const } : {}) } }
     // Nothing for this day in a schedule that replaces the regular times:
     // the regular ones, but not presented as the festival's.
     if (covering.mode === 'replace') return { rows: [], skip: false, posting: { kind: 'not-posted', festival: festival ?? covering.name } }
@@ -278,6 +284,91 @@ const DAY_MS = 86_400_000
 export function sendsWeekly(schedules: readonly SpecialSchedule[], today: string): boolean {
   const since = new Date(Date.parse(`${today}T12:00:00Z`) - 56 * DAY_MS).toISOString().slice(0, 10)
   return schedules.filter((s) => s.kind === 'week' && s.to >= since).length >= 2
+}
+
+/** The dates a schedule covers, in order. */
+function datesOf(s: Pick<SpecialSchedule, 'from' | 'to'>): string[] {
+  const out: string[] = []
+  for (let t = Date.parse(`${s.from}T12:00:00Z`); t <= Date.parse(`${s.to}T12:00:00Z`); t += DAY_MS) out.push(new Date(t).toISOString().slice(0, 10))
+  return out
+}
+
+const weekdayOfDate = (date: string): DayKey => DAY_KEYS[new Date(`${date}T12:00:00Z`).getUTCDay()]
+
+/** The weekdays a week post covers, Sunday first: the days its minyanim
+ *  can be put on when it's edited. */
+export function weekPostDays(post: Pick<SpecialSchedule, 'from' | 'to'>): DayKey[] {
+  const days = new Set(datesOf(post).map(weekdayOfDate))
+  return DAY_KEYS.filter((d) => days.has(d))
+}
+
+/** Whether a week's heading can name it: only when the week is just a
+ *  Shabbos (its dates all Friday or Shabbos). A newsletter's first heading
+ *  ("Shabbat Schedule") over a whole week's weekday times named the week
+ *  for the part it wasn't (Mekor, Oct 18), so a longer week goes by its
+ *  dates. */
+export function weekKeepsHeading(post: Pick<SpecialSchedule, 'from' | 'to'>): boolean {
+  return weekPostDays(post).every((d) => d === 'fri' || d === 'sat')
+}
+
+/** Whether a week goes by its dates rather than its name: one the guide
+ *  named by them ("Times for Oct 18 – Oct 23"), or one longer than a
+ *  Shabbos (weekKeepsHeading). Mekor's week was approved as "Shabbat
+ *  Schedule" before weeks were named by their dates, and the Minyanim list
+ *  called its Monday Maariv "Shabbat Schedule times" (the user, Oct 19). */
+export function weekByDates(post: Pick<SpecialSchedule, 'name' | 'from' | 'to'>): boolean {
+  return /^times for /i.test(post.name) || !weekKeepsHeading(post)
+}
+
+/** The sign-up a week's minyan runs under: its own, else that of the usual
+ *  minyan it stands in for, the same tefillah on one of its weekdays, in
+ *  either season. A newsletter gives the times, not the WhatsApp group, so
+ *  Mekor's week showed its weekday minyanim without the group every usual
+ *  one has (the user, Oct 19). */
+export function usualSignUp(regular: readonly Minyan[], m: { tefillah: Minyan['tefillah']; signUp?: Minyan['signUp'] }, weekdays: readonly DayKey[]): Minyan['signUp'] {
+  if (m.signUp) return m.signUp
+  return regular.find((r) => r.signUp && r.tefillah === m.tefillah && weekdays.some((d) => r.days.includes(d)))?.signUp
+}
+
+/** A week post's minyanim as rows on weekdays, the way its box shows them
+ *  and its Edit lists them. */
+export function weekPostRows(post: SpecialSchedule): Minyan[] {
+  return post.minyanim.flatMap((m) => {
+    const days = m.on.flatMap((d) => (isDate(d) ? [weekdayOfDate(d)] : (DAY_KEYS as readonly string[]).includes(d) ? [d as DayKey] : []))
+    if (days.length === 0) return []
+    const { on: _on, ...rest } = m
+    void _on
+    return [{ ...rest, days: [...new Set(days)] }]
+  })
+}
+
+// Field by field, whatever order they were set in.
+const plainRow = (m: object) => JSON.stringify(Object.fromEntries(Object.entries(m).filter(([, v]) => v !== undefined && v !== '').sort(([a], [b]) => a.localeCompare(b))))
+
+/**
+ * The shul's schedules with one week post's minyanim replaced by `rows`, as
+ * edited (Oct 19: "This week's schedule" had no Edit). Each row goes back
+ * on the post's own dates for its weekdays; a row nobody changed stays
+ * exactly as stored, so opening the editor and sending nothing changes
+ * nothing.
+ */
+export function withWeekRows(schedules: readonly SpecialSchedule[], postId: string, rows: readonly Minyan[]): SpecialSchedule[] {
+  return schedules.map((post) => {
+    if (post.id !== postId) return post
+    const dates = datesOf(post)
+    const stored = new Map(post.minyanim.map((m) => [m.id, m]))
+    const minyanim = rows.flatMap((row): ScheduleMinyan[] => {
+      const was = stored.get(row.id)
+      if (was && weekPostRows({ ...post, minyanim: [was] }).some((r) => plainRow(r) === plainRow(row))) return [was]
+      const on = dates.filter((d) => row.days.includes(weekdayOfDate(d)))
+      if (on.length === 0) return []
+      const { days: _days, signUp: _signUp, ...rest } = row
+      void _days
+      void _signUp
+      return [{ ...rest, on }]
+    })
+    return { ...post, minyanim }
+  })
 }
 
 /** The week post for the week `today` is in (Sunday to Shabbos) that hasn't

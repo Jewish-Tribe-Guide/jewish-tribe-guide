@@ -1,5 +1,7 @@
 import { GOOGLE_SUBMITTER_NAME } from './activity'
 import { KEYSTONE_WATCH_NAME } from './keystoneWatch'
+import { MEKOR_NAME, MEKOR_WATCH_NAME } from './mekorWatch'
+import { GOOGLE, KEYSTONE_NAME } from './sourceNames'
 
 // Where a suggestion came from, for the moderation queue (agreed Oct 5,
 // canvas QList/QOpen): every card says it, an AI-read one is labelled "Read
@@ -25,10 +27,10 @@ export type SubmissionSource = {
   /** Anything said with it: the person's own note, or the reader's summary. */
   note?: string
   /** An outside source by name, when that's what the change came from
-   *  ("Keystone-K’s list", "Refuah"): approved, the listing's date says
-   *  "From Refuah, Oct 20" instead of "Confirmed Oct 20". Not Google, whose
-   *  own line already says what it keeps and when, and never a person's
-   *  message, however it was read. */
+   *  (Keystone-K, Refuah, Google): approved, the listing's date says
+   *  "Confirmed by Refuah, Oct 20" ("Checked with Google" for Google)
+   *  instead of "Confirmed Oct 20". Never a person's message, however it
+   *  was read. */
   named?: string
   /** Dishes read off the place's menu: its link, or null for photos of it.
    *  Approval dates them "on its menu" and keeps the link for "Full menu". */
@@ -69,8 +71,9 @@ export function submissionSource(s: SourceInput): SubmissionSource {
   const note = s.note?.trim() || undefined
   const by = s.submitted_by?.name
 
-  if (by === KEYSTONE_WATCH_NAME) return { readBy: 'automatic', from: 'Keystone-K’s list', named: 'Keystone-K’s list', ...(note ? { original: note } : {}) }
-  if (by === GOOGLE_SUBMITTER_NAME) return { readBy: 'automatic', from: 'Google', ...(note ? { original: note } : {}) }
+  if (by === KEYSTONE_WATCH_NAME) return { readBy: 'automatic', from: 'Keystone-K’s list', named: KEYSTONE_NAME, ...(note ? { original: note } : {}) }
+  if (by === MEKOR_WATCH_NAME) return { readBy: 'automatic', from: 'Mekor Habracha’s list', named: MEKOR_NAME, ...(note ? { original: note } : {}) }
+  if (by === GOOGLE_SUBMITTER_NAME) return { readBy: 'automatic', from: GOOGLE, named: GOOGLE, ...(note ? { original: note } : {}) }
 
   if (note && (note.includes(PASTED) || note.includes(PHOTO))) {
     const pastedAt = note.indexOf(PASTED)
@@ -90,6 +93,15 @@ export function submissionSource(s: SourceInput): SubmissionSource {
   }
 
   return { readBy: 'person', from: 'a visitor', ...(note ? { note } : {}) }
+}
+
+/** Whether approving this makes the listing "Confirmed by community": a
+ *  person's change, however it was read (their words, or what they pasted
+ *  or photographed, read by AI), an admin's own included (the user, Oct
+ *  18). Not an outside source's (Keystone-K, Refuah, Google). */
+export function isCommunityEdit(s: SourceInput): boolean {
+  const source = submissionSource(s)
+  return !source.named && source.readBy !== 'automatic'
 }
 
 // ── Times in the original ──────────────────────────────────────────────────

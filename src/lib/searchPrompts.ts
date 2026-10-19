@@ -30,25 +30,32 @@ export function candidatePrompts(at: { day: DayKey; minutes: number } | null): s
   if (day === 'fri' || day === 'sat') out.push('Is the eruv up?')
   // Something to eat, while there is.
   if (minutes >= 7 * 60 && minutes < 22 * 60) out.push('Food open now')
-  out.push(TIMELESS[0], TIMELESS[1], 'Mikvah open today', TIMELESS[2])
+  // Friday morning already asks where to get it.
+  out.push(...TIMELESS.filter((q) => !(q === 'Challah' && out.includes('Where can I get challah?'))))
   // More for a phone's row, which swipes and holds six (SearchPrompts); a
   // computer shows three, so it rarely gets this far.
+  out.push('Shul near me', 'Mikvah open today')
   if (minutes >= 11 * 60 && minutes < 22 * 60) out.push('Pizza open now')
   out.push('Kosher bakery')
   return out
 }
 
-// Short, so three fit on a computer's one line (the user, Oct 16: "Where
-// can I get chalav yisroel milk?" was the one that wrapped). The search reads
-// "chalav yisroel milk" as the one item either way (itemFilter).
-const TIMELESS = ['Chalav yisroel milk', 'Kosher wine', 'Shul near me'] as const
+// Everyday things first, and from across the guide, not only shul and
+// kashrus (the user, Oct 18: chalav yisroel milk, and the Hebrew date beside
+// it, made the phone home read "a little too Jewish"): a grocery item, a
+// place to stay most wouldn't think to search for, the young professionals'
+// groups, a treat. Short, so three fit on a computer's one line (the user,
+// Oct 16: "Where can I get chalav yisroel milk?" was the one that wrapped).
+const TIMELESS = ['Challah', 'Shabbos-friendly hotel', 'Young professionals', 'Ice cream', 'Kosher wine'] as const
 
-/** Whether an answer is one worth showing off: a real one, and a yes.
- *  "Nothing open right now" and "No more Maariv today" are true, but a first
- *  try that says no teaches that search says no. */
+/** Whether an answer is one worth showing off: places found, and no
+ *  sentence saying no. "Nothing open right now" and "No more Maariv today"
+ *  are true, but a first try that says no teaches that search says no. A
+ *  search that lands on its places without a sentence ("Shabbos-friendly
+ *  hotel": Hotels, 2 Shabbat friendly) is a yes. */
 export function answersWell(answer: { text: string } | null, hitCount: number): boolean {
-  if (!answer || hitCount === 0) return false
-  return !/^(Nothing|No )/.test(answer.text)
+  if (hitCount === 0) return false
+  return !answer || !/^(Nothing|No )/.test(answer.text)
 }
 
 /** The first `count` questions that answer well. */

@@ -185,6 +185,19 @@ the old route (round 1 every time, `HIT/old` to the end), green with the fix.
 `pagesRevalidation.test.ts` asserts the second pass is present and uses the
 pattern; `revalidateAfterInFlightRenders.test.ts` checks its timing.
 
+Twice more on Oct 19, again all `HIT/old`: run 39291586172 on `main` (the
+push merging #331) and run 39295495574 on PR #332. Neither touched caching
+or `/about` (#332: the shul box's fold and week sign-ups). That is two of
+that day's three completed CI runs, so it is no longer rare. It is not a
+required check, so a PR still merges past it. Both ran on code without the
+fix above (`main` did not have `revalidateAfterInFlightRenders.ts` yet).
+
+Guarded structurally too, so this can't silently regress if someone
+"simplifies" the route later: `src/app/api/admin/pages/pagesRevalidation.
+test.ts` asserts both the tag and the path invalidation are present in the
+source, and that the path is derived from `PAGE_SLUGS` rather than
+hand-listed (so a third page can't get one and not the other).
+
 **Every other admin save had the same exposure, and has the same fix
 (2026-10-17).** `revalidatePublicContent` invalidated the same way, so a
 regeneration in flight at, say, a listing approval stored a page without that

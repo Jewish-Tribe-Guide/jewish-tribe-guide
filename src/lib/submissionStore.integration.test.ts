@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ResourceSubmission } from '@/types'
+import { GOOGLE_SUBMITTER_NAME } from './activity'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // The integration tier: exercises the real submit → moderate → live-table
@@ -268,6 +269,31 @@ describe('submissionStore (integration)', () => {
     await approveSubmission(personSub.id)
     const { data: afterPerson } = await getAdminClient().from('resource').select('details').eq('id', created!.id).single()
     expect(afterPerson!.details.confirmedFrom).toBeUndefined()
+    // A person's change: "Confirmed by community" (Oct 17).
+    expect(afterPerson!.details.confirmedBy).toEqual({ by: 'edit', at: afterPerson!.details.confirmedAt })
+
+    // The source's own approval carried none: "Confirmed by Refuah".
+    expect(afterRefuah!.details.confirmedBy).toBeUndefined()
+
+    // An admin's own change (the console's direct add) is a person's too
+    // (Oct 18).
+    const admin = 'integration-admin@example.org'
+    const byAdmin = { ...listingPayload(category.id, name), phone: '555-0103' }
+    const adminSub = await submitListingUpdate('philly', created!.id, byAdmin, null, { name: admin, email: admin })
+    pendingSubmissionIds.push(adminSub.id)
+    await approveSubmission(adminSub.id, undefined, admin)
+    const { data: afterAdmin } = await getAdminClient().from('resource').select('details').eq('id', created!.id).single()
+    expect(afterAdmin!.details.confirmedBy).toEqual({ by: 'edit', at: afterAdmin!.details.confirmedAt })
+    expect(afterAdmin!.details.confirmedFrom).toBeUndefined()
+
+    // Google's change (a closure it reports): "Checked with Google".
+    const fromGoogle = { ...listingPayload(category.id, name), phone: '555-0104' }
+    const googleSub = await submitListingUpdate('philly', created!.id, fromGoogle, null, { name: GOOGLE_SUBMITTER_NAME })
+    pendingSubmissionIds.push(googleSub.id)
+    await approveSubmission(googleSub.id)
+    const { data: afterGoogle } = await getAdminClient().from('resource').select('details').eq('id', created!.id).single()
+    expect(afterGoogle!.details.confirmedFrom).toEqual({ from: 'Google', at: afterGoogle!.details.confirmedAt })
+    expect(afterGoogle!.details.confirmedBy).toBeUndefined()
   })
 
   it('archiving a listing (approved removal) does not stamp it confirmed', async () => {

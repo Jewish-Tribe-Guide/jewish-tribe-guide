@@ -22,6 +22,23 @@ describe('readEruvPage', () => {
     expect(await readEruvPage('u', NOW, page('gone', 503))).toMatchObject({ ok: false, error: 'The page answered 503' })
     const failing = vi.fn(async () => { throw new Error('timed out') }) as unknown as typeof fetch
     expect(await readEruvPage('u', NOW, failing)).toMatchObject({ ok: false, error: 'timed out' })
+    expect(failing).toHaveBeenCalledTimes(2)
+  })
+  // Lower Merion's page answers in half a second, but a read from the live
+  // site now and then got no answer at all (Oct 17, twice), and the eruv
+  // showed "Couldn’t read their status" until the next try.
+  it('a read that gets no answer is tried once more straight away', async () => {
+    let calls = 0
+    const blip = vi.fn(async () => {
+      if (calls++ === 0) throw new Error('The operation was aborted due to timeout')
+      return new Response('<h2>The Eruv is Up!</h2>')
+    }) as unknown as typeof fetch
+    expect(await readEruvPage('u', NOW, blip)).toMatchObject({ ok: true, status: 'up' })
+  })
+  it('a page that answered is not asked again', async () => {
+    const gone = page('gone', 503)
+    await readEruvPage('u', NOW, gone)
+    expect(gone).toHaveBeenCalledTimes(1)
   })
 })
 

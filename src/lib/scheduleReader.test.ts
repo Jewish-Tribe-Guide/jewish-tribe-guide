@@ -140,6 +140,30 @@ describe('reading a shul’s regular times', () => {
     expect(system.content).toContain('Today is 2026-10-08')
   })
 
+  it('reads a message sent days ago from the day it was sent, and keeps none of its past times', () => {
+    // Sent Fri Oct 9, read Sun Oct 11: its "this Shabbos" was yesterday.
+    const late = { today: '2026-10-11', sentOn: '2026-10-09', days: DAYS.days.slice(1) }
+    const [system] = regularMessages({ text: POST }, late, 'Mekor Habracha') as { content: string }[]
+    expect(system.content).toContain('the message was sent on 2026-10-09 (Fri Oct 9)')
+    expect(system.content).toContain('2026-10-10 (Sat Oct 10): Parashat Bereshit')
+    const r = tidyRegularReading(
+      {
+        kind: 'week',
+        from: '2026-10-09',
+        to: '2026-10-10',
+        times: [
+          { tefillah: 'mincha_maariv', date: '2026-10-09', time: '6:12', quote: 'Mincha/Maariv 6:12' },
+          { tefillah: 'shacharis', date: '2026-10-10', time: '9:00', quote: 'Shacharis 9:00' },
+        ],
+      },
+      { text: POST },
+      late,
+      id,
+    )
+    expect(r.times).toEqual([])
+    expect(r.kind).toBe('schedule')
+  })
+
   it('reads a Shabbos post as that weekend, with bare times as the tefillah means them', () => {
     const r = tidyRegularReading(
       {

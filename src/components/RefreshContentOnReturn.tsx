@@ -46,6 +46,17 @@ import { useRouter } from 'next/navigation'
 // half-filled form or a scroll position survives. Server-side revalidation is
 // already correct and quick — an admin save reaches the server's own cache in
 // 2-4 seconds, measured — so this only has to make the client ask again.
+//
+// But it asks first, and refreshes only when the answer changed (the user,
+// Oct 18). A refresh used to go out on every return, and a tap made while it
+// was out — coming back to the guide and opening a category, the commonest
+// thing to do — waited for it: React holds every running transition until
+// all of them finish, so the navigation sat behind a whole server render,
+// seconds on a phone whose network was just waking. Measured in
+// e2e/return-to-app.spec.ts: 6.4s for a tap behind a refresh held 6s. The
+// question is a plain fetch of /api/content-version, a fingerprint of the
+// community's content (contentVersion.ts), which no tap ever waits on; the
+// content changes a few times a week, so the refresh is now rare.
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** Minimum gap between refreshes.
@@ -59,8 +70,14 @@ import { useRouter } from 'next/navigation'
  *  admin saves — rarely — so there is nothing to gain from being twitchier. */
 export const MIN_REFRESH_INTERVAL_MS = 10_000
 
-export default function RefreshContentOnReturn() {
+export default function RefreshContentOnReturn({ community, version }: { community: string; version: string }) {
   const router = useRouter()
+  // The fingerprint of what's on screen, kept current as a refresh brings a
+  // new one down with the layout.
+  const shown = useRef(version)
+  useEffect(() => {
+    shown.current = version
+  }, [version])
   // Seeded in the effect below rather than here. `useRef(Date.now())` reads
   // the clock during render, and Cache Components rejects that outright in a
   // prerendered client component ("Next.js encountered the unstable value
@@ -76,11 +93,18 @@ export default function RefreshContentOnReturn() {
     // request re-fetching what just arrived.
     lastRefreshedAt.current = Date.now()
 
-    function refreshIfDue() {
+    async function refreshIfDue() {
       const now = Date.now()
       if (now - lastRefreshedAt.current < MIN_REFRESH_INTERVAL_MS) return
       lastRefreshedAt.current = now
-      router.refresh()
+      try {
+        const res = await fetch(`/api/content-version?community=${encodeURIComponent(community)}`, { cache: 'no-store' })
+        const body = (await res.json()) as { ok?: boolean; version?: string }
+        // No answer (offline, a failed read) is no reason to re-render.
+        if (res.ok && body.ok && body.version && body.version !== shown.current) router.refresh()
+      } catch {
+        // Offline: `online` asks again when it's back.
+      }
     }
 
     function onVisibilityChange() {
@@ -98,7 +122,7 @@ export default function RefreshContentOnReturn() {
       window.removeEventListener('focus', refreshIfDue)
       window.removeEventListener('online', refreshIfDue)
     }
-  }, [router])
+  }, [router, community])
 
   return null
 }

@@ -9,7 +9,7 @@ import { isMinyanim } from './davening'
 import { parseWalkLists } from './walkList'
 import { boxesOf, mainCardOf } from './listingParts'
 import { readContacts } from './contacts'
-import type { DirectoryResource } from '@/types'
+import type { ConfirmedBy, DirectoryResource } from '@/types'
 
 // ── An opened listing ────────────────────────────────────────────────────────
 // Every listing opens to the same seven parts, in the same order, whatever
@@ -415,6 +415,15 @@ export function sectionConfirmedAt(item: DirectoryResource, key: string): string
   if (!own) return all
   if (!all) return own
   return Date.parse(own) >= Date.parse(all) ? own : all
+}
+
+/** Who gave the date a box shows (sectionConfirmedAt): a section's own date
+ *  is only ever a visitor's tap (confirm_section), the listing's date is
+ *  whoever gave it (`confirmedBy`). Without a key, the listing's own. */
+export function confirmedByFor(item: DirectoryResource, key?: string): ConfirmedBy | undefined {
+  const own = key ? (item.sectionConfirmed as Record<string, string> | undefined)?.[key] : undefined
+  if (own && own === sectionConfirmedAt(item, key!)) return { by: 'visitor', at: own }
+  return item.confirmedBy
 }
 
 /** The key a box is confirmed under (migration 073): its first list of

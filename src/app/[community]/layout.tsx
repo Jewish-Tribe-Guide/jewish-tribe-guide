@@ -6,6 +6,7 @@ import { SITE_SETTINGS_DEFAULTS } from '@/lib/siteSettings'
 import { CommunityProvider } from '@/lib/communityContext'
 import { ContentProvider } from '@/lib/contentContext'
 import { loadCommunityContent } from '@/lib/loadCommunityContent'
+import { contentVersion } from '@/lib/contentVersion'
 import SiteChrome from '@/components/SiteChrome'
 import RefreshContentOnReturn from '@/components/RefreshContentOnReturn'
 import { currentYear } from '@/lib/currentYear'
@@ -87,14 +88,15 @@ export default async function CommunityLayout(props: LayoutProps<'/[community]'>
   // already-open tab held whatever it loaded with until a full reload — an
   // admin's rename or newly published form never reached it. See that
   // component for the whole story.
-  const content = await loadCommunityContent(community.slug)
+  const [content, version] = await Promise.all([loadCommunityContent(community.slug), contentVersion(community.slug)])
 
   return (
     <CommunityProvider community={community} communities={communities}>
       <ContentProvider content={content}>
-        {/* Renders nothing; re-asks the server for the content above when the
-            tab is next looked at, or the network comes back. */}
-        <RefreshContentOnReturn />
+        {/* Renders nothing; asks whether the content above changed when the
+            tab is next looked at, or the network comes back, and re-asks
+            the server for it if so. */}
+        <RefreshContentOnReturn community={community.slug} version={version} />
         {/* The brand color is per-community now, so it's set here rather than on
             <html> in the root layout — switching community restyles the site
             without a reload. globals.css still holds the build-time fallback. */}

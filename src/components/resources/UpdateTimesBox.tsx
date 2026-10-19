@@ -12,6 +12,7 @@ import { RelativeTimeFields, TimeModeToggle, useTimeModes, ZMAN_ANCHOR_ORDER } f
 import TurnstileWidget from '@/components/TurnstileWidget'
 import { PencilIcon } from '@/components/icons'
 import { useTurnstileActive } from './useListingSubmit'
+import { recordConfirmed } from '@/lib/confirmedHere'
 
 // "Update their times" on a shul's card (agreed Oct 1). The user's words:
 // a shul that redoes its times doesn't want to "go one by one and compare
@@ -148,8 +149,9 @@ export default function UpdateTimesBox({
     setError(null)
     try {
       const res = await fetchOrPreview(`/api/resource/${item.id}/confirm`, { method: 'POST' }, { confirmedAt: new Date().toISOString() })
-      const json = (await res.json().catch(() => ({}))) as { ok?: boolean }
+      const json = (await res.json().catch(() => ({}))) as { ok?: boolean; confirmedAt?: string }
       if (!res.ok || !json.ok) throw new Error('failed')
+      if (json.confirmedAt) recordConfirmed(item.id, undefined, json.confirmedAt)
       onSent('confirmed')
     } catch {
       setError('That didn’t go through. Please try again.')

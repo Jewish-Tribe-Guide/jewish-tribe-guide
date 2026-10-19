@@ -8,6 +8,7 @@ import { useFetchOrPreview } from '@/lib/previewSend'
 import TurnstileWidget from '@/components/TurnstileWidget'
 import { useTurnstileActive } from './useListingSubmit'
 import FreshnessFooter from './FreshnessFooter'
+import { recordConfirmed } from '@/lib/confirmedHere'
 
 // ── A group's join link: does it still work? ─────────────────────────────────
 // All a WhatsApp group's listing really holds is what it's for and the link,
@@ -50,7 +51,8 @@ export default function JoinLinkCheck({ item, joined }: { item: DirectoryResourc
     setPhase('confirming')
     try {
       const res = await fetchOrPreview(`/api/resource/${item.id}/confirm`, { method: 'POST' }, { confirmedAt: new Date().toISOString() })
-      const body = (await res.json().catch(() => ({}))) as { ok?: boolean }
+      const body = (await res.json().catch(() => ({}))) as { ok?: boolean; confirmedAt?: string }
+      if (res.ok && body.ok && body.confirmedAt) recordConfirmed(item.id, undefined, body.confirmedAt)
       setPhase(res.ok && body.ok ? 'thanks-yes' : 'failed')
     } catch {
       setPhase('failed')
@@ -81,7 +83,7 @@ export default function JoinLinkCheck({ item, joined }: { item: DirectoryResourc
 
   const button = 'h-9 cursor-pointer rounded-full border border-slate-300 bg-white px-3.5 text-[14px] font-semibold text-slate-900 hover:bg-slate-50 disabled:cursor-default disabled:opacity-60'
 
-  if (phase === 'idle') return <FreshnessFooter resourceId={item.id} source={item.confirmedFrom} confirmedAt={item.confirmedAt} subject="Join link" />
+  if (phase === 'idle') return <FreshnessFooter resourceId={item.id} source={item.confirmedFrom} by={item.confirmedBy} confirmedAt={item.confirmedAt} subject="Join link" />
   if (phase === 'thanks-yes') return <p className="text-[14px] text-emerald-700" role="status">Thanks! It’s marked as working.</p>
   if (phase === 'thanks-no') return <p className="text-[14px] text-emerald-700" role="status">Thanks for saying. An admin will check the link.</p>
 

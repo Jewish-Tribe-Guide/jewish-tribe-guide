@@ -50,6 +50,13 @@ export type RefuahPerson = { name?: string; info?: string; phone1?: string; phon
 export type RefuahService = RefuahPerson & { type?: string }
 export type RefuahHospital = { _id?: string; name?: string; liaisons?: RefuahPerson[]; services?: RefuahService[] }
 
+/** Whether Refuah has anything for the hospital to agree with: a record
+ *  with no liaisons or services (Penn Presbyterian, Oct 17) matches the
+ *  guide only by having nothing, so it doesn't date the listing. */
+export function refuahHasEntries(record: RefuahHospital): boolean {
+  return (record.liaisons?.length ?? 0) + (record.services?.length ?? 0) > 0
+}
+
 /** Which of the guide's hospital fields each kind of Refuah entry goes in
  *  (the fields set up Oct 6 on Refuah's sections). A kind not here goes in
  *  "miscellaneous" ("Also"). */

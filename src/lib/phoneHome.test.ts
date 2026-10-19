@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest'
-import type { ZmanimData } from '@/types'
 import type { CategoryField } from './categories'
 import { makeCategory, makeListing } from '@/test/providerFixtures'
 import type { Eruv } from './eruv'
@@ -145,18 +144,18 @@ describe('right now, on a weekday: what’s open', () => {
 })
 
 describe('the label over Right now', () => {
-  const zmanim = (hebrewDate: string, dayOfWeek: number) => ({ hebrewDate, dayOfWeek }) as ZmanimData
-
-  it('the weekday and the Hebrew date without its year', () => {
-    expect(rightNowDay(Date.parse('2026-10-13T16:30:00Z'), NY, zmanim('2 Cheshvan 5787', 2))).toBe('Tuesday · 2 Cheshvan')
+  // No Hebrew date (the user, Oct 18: the phone home read as too Jewish for
+  // everyone it serves).
+  it('just the weekday', () => {
+    expect(rightNowDay(Date.parse('2026-10-13T16:30:00Z'), NY)).toBe('Tuesday')
   })
 
-  it('Saturday is Shabbos; yesterday’s zmanim give no Hebrew date', () => {
-    expect(rightNowDay(Date.parse('2026-10-17T15:00:00Z'), NY, zmanim('5 Cheshvan 5787', 5))).toBe('Shabbos')
+  it('Saturday is Shabbos', () => {
+    expect(rightNowDay(Date.parse('2026-10-17T15:00:00Z'), NY)).toBe('Shabbos')
   })
 
   it('nothing before there’s a clock', () => {
-    expect(rightNowDay(null, NY, null)).toBeNull()
+    expect(rightNowDay(null, NY)).toBeNull()
   })
 })
 
@@ -231,7 +230,7 @@ describe('how this guide stays right: the sources it read this week', () => {
     const read = sourcesRead(facts, [{ label: 'Keystone-K’s list', okAt: ago(0.4) }], [ago(0.01), null], now)
     expect(read).toEqual({ google: true, lists: ['Keystone-K’s list'], eruv: true })
     expect(sourcesSentence(read)).toBe(
-      'Hours from Google, hechshers from Keystone-K’s list and eruv status from each eruv’s own site. Read again every day, and every 15 minutes on Friday for the eruv.',
+      'Hours from Google, hechshers from Keystone-K’s list and eruv status from each eruv’s own site. Read again every day, hours every week.',
     )
   })
 
@@ -240,7 +239,12 @@ describe('how this guide stays right: the sources it read this week', () => {
   it('a check that’s set up but hasn’t run, or stopped over a week ago, claims nothing', () => {
     const read = sourcesRead(facts, [{ label: 'Keystone-K’s list', okAt: null }, { label: 'Old list', okAt: ago(9) }], [null, ago(8)], now)
     expect(read).toEqual({ google: true, lists: [], eruv: false })
-    expect(sourcesSentence(read)).toBe('Hours from Google. Read again every day.')
+    expect(sourcesSentence(read)).toBe('Hours from Google. Read again every week.')
+  })
+
+  // Oct 19: Google's hours are read weekly, the lists and eruv sites daily.
+  it('without Google, every day', () => {
+    expect(sourcesSentence({ google: false, lists: ['Keystone-K’s list'], eruv: false })).toBe('Hechshers from Keystone-K’s list. Read again every day.')
   })
 
   it('nothing read at all: no sentence, and Google only when it checked this week', () => {

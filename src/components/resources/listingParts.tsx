@@ -15,6 +15,7 @@ export function Card({
   testId,
   action,
   onEdit,
+  muted,
 }: {
   title?: string
   children: ReactNode
@@ -26,9 +27,20 @@ export function Card({
    *  every box). A box whose footer is a FreshnessFooter gives it the Edit
    *  instead, beside its date. */
   onEdit?: () => void
+  /** Times that don't apply right now, opened anyway (a shul's usual times
+   *  under this week's schedule): a grey, dashed box (plain grey matched the
+   *  listing sheet behind it and read as no box at all), faded but readable, its first
+   *  child (the line saying why) and its footer at full strength (the user,
+   *  Oct 19). */
+  muted?: boolean
 }) {
+  const [why, ...rest] = Array.isArray(children) ? children : [children]
   return (
-    <section className={`rounded-2xl border border-slate-200 bg-white px-4 pb-3 ${title ? 'pt-3.5' : 'pt-1'}`} data-testid={testId}>
+    <section
+      className={`rounded-2xl border px-4 pb-3 ${muted ? 'border-dashed border-slate-300 bg-slate-200/50' : 'border-slate-200 bg-white'} ${title ? 'pt-3.5' : 'pt-1'}`}
+      data-testid={testId}
+      data-muted={muted || undefined}
+    >
       {title &&
         (action ? (
           <div className="mb-1 flex items-baseline justify-between gap-3">
@@ -38,9 +50,16 @@ export function Card({
         ) : (
           <h2 className="mb-1 text-base font-extrabold text-slate-900">{title}</h2>
         ))}
-      {children}
+      {muted ? (
+        <>
+          {why}
+          <div className="opacity-50">{rest}</div>
+        </>
+      ) : (
+        children
+      )}
       {(footer || onEdit) && (
-        <div className="mt-2.5 flex items-center gap-2 border-t border-slate-100 pt-2 text-[13px] leading-snug text-muted">
+        <div className={`mt-2.5 flex items-center gap-2 border-t pt-2 text-[13px] leading-snug text-muted ${muted ? 'border-slate-300' : 'border-slate-100'}`}>
           <div className="min-w-0 flex-1">{footer}</div>
           {onEdit && <EditButton onClick={onEdit} />}
         </div>

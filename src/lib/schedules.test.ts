@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Minyan } from './davening'
 import type { CalendarDay } from './jewishDays'
-import { cleanSchedule, factsFor, readSchedules, resolveDay, sendsWeekly, thisWeeksPost, withSchedules, dateKey, type SpecialSchedule } from './schedules'
+import { cleanSchedule, factsFor, readSchedules, resolveDay, sendsWeekly, thisWeeksPost, weekPostDays, weekPostRows, withSchedules, withWeekRows, dateKey, type SpecialSchedule } from './schedules'
 import { listMinyanim, nextUpcomingDavening } from './upcomingDavening'
 import { geoKey, geoOrCommunityDefault } from './useZmanAnchors'
 
@@ -78,6 +78,42 @@ describe('what a shul has on a date', () => {
   it('a schedule that adds to the regular times keeps them', () => {
     const extra: SpecialSchedule = { ...sukkos, mode: 'add', minyanim: [{ id: 'h', tefillah: 'other', on: ['2026-10-04'], time: '7:30pm', notes: 'Hakafos' }] }
     expect(resolveDay(regular, [extra], sun)).toMatchObject({ skip: false, posting: { kind: 'schedule' } })
+  })
+
+  // Oct 19: Mekor's week, Sunday to Thursday, approved as "Shabbat
+  // Schedule". The Minyanim list called Monday's Maariv "Shabbat Schedule
+  // times", and left off the WhatsApp group every usual weekday one has.
+  it('a week the shul sent out: “this week’s” unless just a Shabbos, its minyanim under the usual ones’ sign-up', () => {
+    const group = { link: 'https://chat.whatsapp.com/Mekor' }
+    const usual: Minyan[] = [
+      { ...m('u1', 'mincha_maariv', ['sun', 'mon', 'tue', 'wed', 'thu'], '15 min before Sunset'), season: 'summer', signUp: group },
+      { ...m('u2', 'shacharis', ['mon', 'thu'], '6:45am'), signUp: group },
+      m('u3', 'shacharis', ['sat'], '9:15am'),
+    ]
+    const week: SpecialSchedule = {
+      id: 'w',
+      kind: 'week',
+      name: 'Shabbat Schedule',
+      from: '2026-10-04',
+      to: '2026-10-08',
+      mode: 'replace',
+      minyanim: [
+        { id: 'w1', tefillah: 'mincha_maariv', on: ['2026-10-04', '2026-10-05'], time: '5:55pm' },
+        { id: 'w2', tefillah: 'shacharis', on: ['2026-10-05'], time: '6:45am' },
+        { id: 'w3', tefillah: 'maariv', on: ['2026-10-05'], time: '9:00pm' },
+      ],
+    }
+    const day = resolveDay(usual, [week], mon)
+    expect(day.posting).toEqual({ kind: 'schedule', name: 'Shabbat Schedule', thisWeek: true })
+    expect(day.rows.map((r) => [r.id, r.signUp?.link ?? null])).toEqual([
+      ['w1', group.link],
+      ['w2', group.link],
+      ['w3', null],
+    ])
+    // Just a Shabbos keeps its name; a festival's schedule takes no sign-up.
+    const shabbos: SpecialSchedule = { ...week, name: 'Shabbos Bereishis', from: '2026-10-02', to: '2026-10-03', minyanim: [{ id: 's1', tefillah: 'shacharis', on: ['2026-10-03'], time: '9:00am' }] }
+    expect(resolveDay(usual, [shabbos], sat).posting).toEqual({ kind: 'schedule', name: 'Shabbos Bereishis' })
+    expect(resolveDay(usual, [{ ...sukkos, minyanim: [{ id: 'f', tefillah: 'shacharis', on: ['2026-10-05'], time: '6:45am' }], to: '2026-10-05' }], mon).rows[0].signUp).toBeUndefined()
   })
 
   it('the calendar not knowing a day doesn’t make it “not posted”', () => {
@@ -173,5 +209,55 @@ describe('a shul’s weekly schedule', () => {
     expect(thisWeeksPost([bereishis], '2026-10-10')?.name).toBe('Bereishis')
     expect(thisWeeksPost([bereishis], '2026-10-11')).toBeUndefined() // the Sunday after
     expect(thisWeeksPost([bereishis], '2026-10-03')).toBeUndefined() // the Shabbos before
+  })
+})
+
+// Oct 19: a week the shul sent out, edited from its own box: its times as
+// rows on weekdays, and back on its own dates.
+describe('editing this week’s schedule', () => {
+  const week: SpecialSchedule = {
+    id: 'w1',
+    name: 'Shabbos Bereishis',
+    from: '2026-10-09',
+    to: '2026-10-10',
+    mode: 'replace',
+    kind: 'week',
+    minyanim: [
+      { id: 'fn', tefillah: 'mincha_maariv', on: ['2026-10-09'], time: '6:10pm' },
+      { id: 'sm', tefillah: 'shacharis', on: ['sat'], time: '9:00am' },
+    ],
+  }
+  const yomTov: SpecialSchedule = { id: 'y', name: 'Sukkos', from: '2026-09-26', to: '2026-10-04', mode: 'replace', minyanim: [] }
+
+  it('offers the days it covers, Sunday first', () => {
+    expect(weekPostDays(week)).toEqual(['fri', 'sat'])
+    expect(weekPostDays({ from: '2026-10-10', to: '2026-10-12' })).toEqual(['sun', 'mon', 'sat'])
+  })
+
+  it('reads its times as weekday rows', () => {
+    expect(weekPostRows(week)).toEqual([
+      { id: 'fn', tefillah: 'mincha_maariv', days: ['fri'], time: '6:10pm' },
+      { id: 'sm', tefillah: 'shacharis', days: ['sat'], time: '9:00am' },
+    ])
+  })
+
+  it('sends nothing different when nothing changed', () => {
+    expect(withWeekRows([yomTov, week], 'w1', weekPostRows(week))).toEqual([yomTov, week])
+  })
+
+  it('puts a changed or new time on the week’s own dates, drops one taken out, and leaves other schedules alone', () => {
+    const rows: Minyan[] = [
+      { id: 'sm', tefillah: 'shacharis', days: ['sat'], time: '8:45am' },
+      { id: 'new', tefillah: 'mincha', days: ['fri', 'sat'], time: '1:30pm', signUp: { name: 'x' } },
+    ]
+    const [y, w] = withWeekRows([yomTov, week], 'w1', rows)
+    expect(y).toBe(yomTov)
+    expect(w).toEqual({
+      ...week,
+      minyanim: [
+        { id: 'sm', tefillah: 'shacharis', on: ['2026-10-10'], time: '8:45am' },
+        { id: 'new', tefillah: 'mincha', on: ['2026-10-09', '2026-10-10'], time: '1:30pm' },
+      ],
+    })
   })
 })

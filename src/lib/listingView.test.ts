@@ -5,6 +5,7 @@ import {
   audienceGroups,
   audienceStatus,
   compactWeek,
+  confirmedByFor,
   confirmPlace,
   firstSentence,
   googleKeepsBox,
@@ -418,5 +419,26 @@ describe('firstSentence', () => {
   })
   it('a decimal or a time isn’t the end of a sentence', () => {
     expect(firstSentence('Open 8:30 PM. Call first.').first).toBe('Open 8:30 PM.')
+  })
+})
+
+// Oct 17: who gave the date a box shows. A box's own date is only ever a
+// visitor's tap; the listing's is whoever its confirmedBy says.
+describe('confirmedByFor', () => {
+  const visitorTap = '2026-10-15T12:00:00.000Z'
+  const approved = '2026-10-12T12:00:00.000Z'
+
+  it('a box whose own date is the one shown: a visitor', () => {
+    const item = makeListing({ confirmedAt: approved, sectionConfirmed: { contact: visitorTap } })
+    expect(confirmedByFor(item, 'contact')).toEqual({ by: 'visitor', at: visitorTap })
+  })
+
+  it('a box showing the listing’s later date, or a listing’s own line: the listing’s confirmedBy', () => {
+    const by = { by: 'edit' as const, at: '2026-10-16T12:00:00.000Z' }
+    const item = makeListing({ confirmedAt: by.at, confirmedBy: by, sectionConfirmed: { contact: visitorTap } })
+    expect(confirmedByFor(item, 'contact')).toEqual(by)
+    expect(confirmedByFor(item, 'weekday')).toEqual(by)
+    expect(confirmedByFor(item)).toEqual(by)
+    expect(confirmedByFor(makeListing({ confirmedAt: approved }), 'contact')).toBeUndefined()
   })
 })

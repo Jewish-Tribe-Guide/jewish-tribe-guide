@@ -5,10 +5,10 @@ import type { DirectoryResource } from '@/types'
 import { isMinyanim, signUpAction, TEFILLAH_LABELS, TEFILLAH_ORDER, type Minyan } from '@/lib/davening'
 import { useMinyanSchedule } from '@/lib/useMinyanSchedule'
 import { geoKey, geoOrCommunityDefault, resolveAnchorTime, type AnchorTimes } from '@/lib/useZmanAnchors'
-import { dateText, readSchedules, regularMinyanim, scheduleDayText, sendsWeekly, thisWeeksPost, type DayPosting, type SpecialSchedule } from '@/lib/schedules'
+import { dateText, readSchedules, regularMinyanim, scheduleDayText, sendsWeekly, thisWeeksPost, usualSignUp, weekByDates, weekPostRows, type DayPosting, type SpecialSchedule } from '@/lib/schedules'
 import { clockMinutes, noteText, SHABBOS_PART_LABELS, shabbosList, timeText, weekdayTable, type ShabbosLine } from '@/lib/weekTable'
-import { DAY_KEYS, type DayKey } from '@/lib/hours'
-import { isMinyanOnly, sectionConfirmedAt } from '@/lib/listingView'
+import type { DayKey } from '@/lib/hours'
+import { confirmedByFor, isMinyanOnly, sectionConfirmedAt } from '@/lib/listingView'
 import { resolveCapabilities, type CategoryConfig } from '@/lib/categories'
 import { ui } from '@/lib/uiConfig'
 import { ChevronRightIcon, PlusIcon } from '@/components/icons'
@@ -50,7 +50,7 @@ export default function DaveningCard({
   category?: CategoryConfig
   /** Edit under a usual box (Oct 10): that box's times alone, in a plain
    *  editor (BoxEditSheet). Without it, "Update their times" as before. */
-  onEditBox?: (box: MinyanBox, title: string) => void
+  onEditBox?: (box: MinyanBox, title: string, week?: string) => void
 }) {
   const [adding, setAdding] = useState(false)
   const [sent, setSent] = useState(false)
@@ -80,7 +80,7 @@ export default function DaveningCard({
   // Older rows keep their times as one line of text.
   if (typeof minyanim === 'string') {
     return (
-      <Card title="Davening times" testId="listing-davening" footer={<FreshnessFooter resourceId={item.id} source={item.confirmedFrom} confirmedAt={item.confirmedAt} subject="Times" />}>
+      <Card title="Davening times" testId="listing-davening" footer={<FreshnessFooter resourceId={item.id} source={item.confirmedFrom} by={item.confirmedBy} confirmedAt={item.confirmedAt} subject="Times" />}>
         <DaveningTimes legacyText={minyanim} />
       </Card>
     )
@@ -105,14 +105,23 @@ export default function DaveningCard({
   const todayDate = schedule?.today.date ?? null
   const post = todayDate ? thisWeeksPost(schedules, todayDate) : undefined
   const waiting = !post && !!todayDate && sendsWeekly(schedules, todayDate)
-  const postRows = post ? weekRows(post) : []
+  // Each with the sign-up of the usual minyan it stands in for (usualSignUp).
+  const postRows = post
+    ? weekPostRows(post).map((m) => {
+        const signUp = usualSignUp(rows, m, m.days as DayKey[])
+        return signUp ? { ...m, signUp } : m
+      })
+    : []
   const postDays = new Set(postRows.flatMap((m) => m.days))
 
   // The usual times a schedule replaces fold to one line under it.
   const foldReason = (key: 'week' | 'shabbos') =>
     specialSchedule?.mode === 'replace'
       ? `Not now: the ${specialSchedule.name} times above replace them`
-      : post && (key === 'shabbos' ? postDays.has('fri') || postDays.has('sat') : ['sun', 'mon', 'tue', 'wed', 'thu'].some((d) => postDays.has(d as DayKey)))
+      : // Shabbos's usual times fold only for a week with Shabbos's own: a
+        // newsletter ending Friday night (Mekor, Oct 18) left Shabbos
+        // morning's usual time folded away, greyed as not this week's.
+        post && (key === 'shabbos' ? postDays.has('sat') : ['sun', 'mon', 'tue', 'wed', 'thu'].some((d) => postDays.has(d as DayKey)))
         ? 'Not this week: this week’s schedule replaces them'
         : null
 
@@ -151,13 +160,14 @@ export default function DaveningCard({
       <FreshnessFooter
         resourceId={item.id}
         source={item.confirmedFrom}
+        by={confirmedByFor(item, section)}
         confirmedAt={sectionConfirmedAt(item, section)}
         section={section}
         onEdit={() => onEditBox(section, section === 'weekday' ? 'Usual weekday times' : 'Usual Shabbos times')}
       />
     ) : (
       <div className="flex flex-wrap items-baseline gap-x-1.5">
-        <FreshnessFooter resourceId={item.id} source={item.confirmedFrom} confirmedAt={sectionConfirmedAt(item, section)} subject={subject} section={section} />
+        <FreshnessFooter resourceId={item.id} source={item.confirmedFrom} by={confirmedByFor(item, section)} confirmedAt={sectionConfirmedAt(item, section)} subject={subject} section={section} />
         {canAdd && updatingIn !== key && updated?.in !== key && (
           <button type="button" onClick={() => open(key)} className="cursor-pointer text-[13.5px] font-bold text-primary hover:underline">
             Update their times
@@ -188,11 +198,41 @@ export default function DaveningCard({
     )
   }
 
+  /** A box opened though its times are replaced: its top, the title and the
+   *  line saying why, folds it again, as the same top folded opened it (the
+   *  user, Oct 19: once opened, it stayed open; then only its arrow closed
+   *  it, though anywhere on it had opened it). Null when nothing replaces it. */
+  const foldBack = (key: 'week' | 'shabbos', title: string) => {
+    const reason = foldReason(key)
+    if (!reason) return null
+    return (
+      <button
+        type="button"
+        onClick={() => setUnfolded((u) => ({ ...u, [key]: false }))}
+        aria-expanded={true}
+        aria-label={`Fold ${title}`}
+        className="mb-1.5 flex w-full cursor-pointer items-center justify-between gap-3 pt-2.5 text-left"
+        data-testid="davening-fold"
+      >
+        <span>
+          <span className="block text-base font-extrabold text-slate-900">{title}</span>
+          <span className="mt-0.5 block text-[13.5px] text-muted" data-testid="davening-fold-reason">
+            {reason}
+          </span>
+        </span>
+        <ChevronRightIcon className="h-5 w-5 shrink-0 -rotate-90 text-slate-400" />
+      </button>
+    )
+  }
+  const weekFold = foldBack('week', 'Usual weekday times')
+  const shabbosFold = foldBack('shabbos', 'Usual Shabbos times')
+
   const weekBox = week
     ? folded(
         'week',
         'Usual weekday times',
-        <Card key="week" title="Usual weekday times" testId="davening-weekday" footer={foot('week', 'weekday', 'Weekday times')}>
+        <Card key="week" title={weekFold ? undefined : 'Usual weekday times'} testId="davening-weekday" footer={foot('week', 'weekday', 'Weekday times')} muted={!!weekFold}>
+          {weekFold}
           <WeekTable table={week} today={today} marks={!week.everySignUp} />
           <Notes
             lines={[
@@ -226,7 +266,8 @@ export default function DaveningCard({
     ? folded(
         'shabbos',
         'Usual Shabbos times',
-        <Card key="shabbos" title="Usual Shabbos times" testId="davening-shabbos" footer={foot('shabbos-usual', 'shabbos', 'Shabbos times')}>
+        <Card key="shabbos" title={shabbosFold ? undefined : 'Usual Shabbos times'} testId="davening-shabbos" footer={foot('shabbos-usual', 'shabbos', 'Shabbos times')} muted={!!shabbosFold}>
+          {shabbosFold}
           <ShabbosLines lines={shab.lines} anchors={anchors} today={today} marks={!shab.lines.every((l) => l.row.signUp)} />
           <Notes lines={[shab.otherSeason]} />
           {!allSignUp &&
@@ -252,6 +293,31 @@ export default function DaveningCard({
 
   const postTable = post ? weekdayTable(postRows, null) : null
   const postShabbos = post ? shabbosList(postRows, null) : null
+  // The week's own line, the same as every box's (the user, Oct 19): who
+  // confirmed it and when, Edit at its end, opening its own times. The
+  // approval that put it up dated the listing, so that date, unless the
+  // week was posted later than any confirmation (an older row).
+  const postConfirmedAt = post && (!item.confirmedAt || (post.postedAt && post.postedAt > item.confirmedAt) ? post.postedAt : item.confirmedAt)
+  const postFoot =
+    post &&
+    (onEditBox ? (
+      <FreshnessFooter
+        resourceId={item.id}
+        source={item.confirmedFrom}
+        by={item.confirmedBy}
+        confirmedAt={postConfirmedAt}
+        onEdit={() => onEditBox('this_week', 'This week’s schedule', post.id)}
+      />
+    ) : (
+      <div className="flex flex-wrap items-baseline gap-x-1.5">
+        <FreshnessFooter resourceId={item.id} source={item.confirmedFrom} by={item.confirmedBy} confirmedAt={postConfirmedAt} subject="Times" ask={false} />
+        {canAdd && updatingIn !== 'this-week' && updated?.in !== 'this-week' && (
+          <button type="button" onClick={() => open('this-week')} className="cursor-pointer text-[13.5px] font-bold text-primary hover:underline">
+            Update their times
+          </button>
+        )}
+      </div>
+    ))
 
   return (
     <div className="space-y-5" data-testid="listing-davening">
@@ -262,23 +328,19 @@ export default function DaveningCard({
         <Card
           title="This week’s schedule"
           testId="davening-this-week"
-          footer={
-            <div className="flex flex-wrap items-baseline gap-x-1.5">
-              {post.postedAt && <span>Posted {dateText(post.postedAt.slice(0, 10), { weekday: true })}.</span>}
-              {canAdd && updatingIn !== 'this-week' && updated?.in !== 'this-week' && (
-                <button type="button" onClick={() => open('this-week')} className="cursor-pointer text-[13.5px] font-bold text-primary hover:underline">
-                  Update their times
-                </button>
-              )}
-            </div>
-          }
+          footer={postFoot}
         >
           <p className="text-[14.5px] font-semibold text-slate-700" data-testid="davening-this-week-dates">
             {postTitle(post)}
           </p>
           <p className="mt-1.5 rounded-lg bg-slate-100 px-2.5 py-1.5 text-[13px] leading-snug text-slate-700">In place of their usual times for these dates only.</p>
-          {postShabbos && <ShabbosLines lines={postShabbos.lines} anchors={anchors} today={today} />}
-          {postTable && <WeekTable table={postTable} today={today} />}
+          {postShabbos && <ShabbosLines lines={postShabbos.lines} anchors={anchors} today={today} marks={!postRows.every((m) => m.signUp)} />}
+          {postTable && <WeekTable table={postTable} today={today} marks={!postRows.every((m) => m.signUp)} />}
+          {!allSignUp &&
+            signUpBoxes(
+              postRows.filter((m) => m.signUp),
+              { section: postRows.every((m) => m.signUp) ? 'All this week’s times' : undefined, tapped: tappedRow },
+            )}
           {updateIn('this-week')}
         </Card>
       )}
@@ -347,24 +409,15 @@ export default function DaveningCard({
 
 /** A week post's times as regular rows, each on its date's weekday, for the
  *  same table and Shabbos lines as the usual times. */
-function weekRows(post: SpecialSchedule): Minyan[] {
-  return post.minyanim.flatMap((m) => {
-    const days = m.on.flatMap((d) => (/^\d{4}-\d{2}-\d{2}$/.test(d) ? [DAY_KEYS[new Date(`${d}T12:00:00Z`).getUTCDay()]] : (DAY_KEYS as readonly string[]).includes(d) ? [d as DayKey] : []))
-    if (days.length === 0) return []
-    const { on: _on, ...rest } = m
-    void _on
-    return [{ ...rest, days: [...new Set(days)] }]
-  })
-}
-
 /** "Shabbos Bereishis, Oct 9–10"; just the dates for a name the guide made
- *  up ("Times for Oct 9 – Oct 10"). */
+ *  up ("Times for Oct 9 – Oct 10"), or for a heading over more than a
+ *  Shabbos (weekKeepsHeading), as weeks read before that rule were named. */
 function postTitle(post: SpecialSchedule): string {
   const from = dateText(post.from)
   const to = dateText(post.to)
   const sameMonth = from.split(' ')[0] === to.split(' ')[0]
   const dates = post.from === post.to ? from : `${from}–${sameMonth ? to.split(' ')[1] : to}`
-  return /^times for /i.test(post.name) ? dates : `${post.name}, ${dates}`
+  return weekByDates(post) ? dates : `${post.name}, ${dates}`
 }
 
 const capital = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)

@@ -63,7 +63,7 @@ describe('the trust line', () => {
     show({ places: 155, googleChecked: 135, checkedThisWeek: 129, dated: 132 })
     await user.click(screen.getByTestId('trust-band'))
     expect(await rows()).toEqual([
-      'Where there’s a source, we check itHours from Google, hechshers from Keystone-K’s list and eruv status from each eruv’s own site. Read again every day, and every 15 minutes on Friday for the eruv.',
+      'Where there’s a source, we check itHours from Google, hechshers from Keystone-K’s list and eruv status from each eruv’s own site. Read again every day, hours every week.',
       'People in Philadelphia fill in the restMinyan times, kosher items, mikvah hours. A person reviews every change before it shows.',
       // 23 places say "Not confirmed by anyone yet": the "if".
       'Every listing says if and when it was checkedSomething wrong? Open the place and tap Edit listing.',
@@ -89,7 +89,7 @@ describe('the trust line', () => {
     const user = userEvent.setup()
     show({ places: 155, googleChecked: 135, checkedThisWeek: 129, dated: 132 })
     await user.click(screen.getByTestId('trust-band'))
-    expect((await rows())[0]).toBe('Where there’s a source, we check itHours from Google. Read again every day.')
+    expect((await rows())[0]).toBe('Where there’s a source, we check itHours from Google. Read again every week.')
   })
 
   // A community that doesn't sync with Google and reads nothing else.
