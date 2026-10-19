@@ -13,7 +13,8 @@ import type { ResourceRow } from '@/types'
 // Server-only.
 
 /** How many AI reads this run has left: one object shared by a cron run's
- *  watches. A run without one ("Check now", one watch) isn't limited. */
+ *  watches, the menus' and the shul and mikvah pages' (listingPageRun.ts)
+ *  alike. A run without one ("Check now", one watch) isn't limited. */
 export type MenuReadBudget = { aiReads: number }
 
 export function newMenuReadBudget(): MenuReadBudget {

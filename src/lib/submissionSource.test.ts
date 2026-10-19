@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { LISTING_PAGE_WATCH_NAME } from './listingPageWatch'
 import { isCommunityEdit, markTimes, submissionSource, timesIn } from './submissionSource'
 import { KEYSTONE_WATCH_NAME } from './keystoneWatch'
 import { MEKOR_WATCH_NAME } from './mekorWatch'
@@ -123,5 +124,14 @@ describe('markTimes', () => {
 
   it('doesn’t take a date or a phone number for a time', () => {
     expect(timesIn('Oct 2, 215-555-0100, 7598 Haverford').size).toBe(0)
+  })
+})
+
+// A listing's own page, read by the AI (listingPageWatch.ts): its filer
+// states the source; a suggestion that somehow didn't still says so.
+describe('submissionSource: their website', () => {
+  it('is read by AI, from their website, never an outside source read by code', () => {
+    const s = submissionSource({ note: 'From their website, changed Oct 20: https://lms.org', submitted_by: { name: LISTING_PAGE_WATCH_NAME }, payload: {} })
+    expect(s).toEqual({ readBy: 'ai', from: 'their website', note: 'From their website, changed Oct 20: https://lms.org' })
   })
 })

@@ -50,6 +50,27 @@ for that exact change, in the same conversation. Show the dry run first.
 
 1. **Philly Synagogues:** add the "Minyan" yes/no field, and rename the
    category "Shuls & minyanim".
+1a. **Watches on shuls' and mikvahs' own pages** (built Oct 19, see Done).
+   None is on the live site. Dry run against live (reads only, Oct 19,
+   `scripts/listing-pages-dry-run.mts`), what each would file the first
+   time its page changes:
+   - Mekor Habracha, mekorhabracha.org/davening: nothing differs.
+   - B'nai Abraham Chabad, phillyshul.com/minyans: nothing differs.
+   - Society Hill Synagogue, societyhillsynagogue.org/minyan: nothing.
+   - Kol Tzedek, kol-tzedek.org/shabbat.html: "New: kabbalas shabbos ·
+     Fri · 6:30pm" (the page: Friday services at 6:30pm, twice a month;
+     the listing has no Friday time).
+   - Temple Beth Zion-Beth Israel, bzbi.org/worship: "New: shacharis ·
+     Shabbos · 9:30 AM" (the listing has no times); waits while its
+     current queue suggestion is there.
+   - Mikvah Mei Shalva (philamikvah.org/appointments), LMC Mikvah
+     (lmcmikvah.org/appointments-and-membership), Ohel Leah
+     (mikvahohelleah.org/make-an-appointment), Moishe Zvi
+     (mikvahwestphilly.com): nothing differs.
+   - Can't be read (blocked to servers): Lower Merion Synagogue, Sons of
+     Israel (406), Chabad of the Main Line (403). Not worth a watch.
+   Adding the nine readable ones is Admin → Watches → add the page, pick
+   the listing, tick "It's the listing's own page…". Needs the user's yes.
 ## For the user or the community
 
 2. **Every live place has a date** (checked Oct 17, 11 PM: 155 of 155).
@@ -171,7 +192,27 @@ for that exact change, in the same conversation. Show the dry run first.
 
 7. The "+" button covers part of the third tile in a row on the phone home.
 
-## Done Oct 19, after #331 (on `redesign/oct18-fixes`, not merged)
+## Done Oct 19 (on `claude/youthful-davinci-9f768f`, not merged)
+
+- **A watch on a listing's own page** (from the parent session's brief,
+  Oct 19): a shul's page of davening times, or a mikvah's page of hours,
+  tied to its listing on the Watches tab (a tick box when adding; group
+  "Shul and mikvah pages"). Read every morning; only when the page's words
+  change does the AI read it (sharing the menu watches' 3 reads a run),
+  and what differs goes to the queue as "Their website (automated)", noted
+  "From their website, changed <date>", with the page beside it. Agreeing
+  never dates the listing; the same suggestion is never filed twice; a
+  listing with anything in the queue waits. Shuls use the schedule reader
+  (usual times only, never one week's); mikvahs the any-field reader, hours
+  only. What the live dry run taught it: a page's menus are dropped before
+  reading; a time comes off only where the page gives that tefillah that
+  day (Society Hill's Monday-minyan page); a time the listing already has
+  that day isn't new, whatever its season or the name the AI gives it
+  (Mekor's page gives both seasons); and the schedule reader now takes
+  "around 15 minutes before sunset", "candle-lighting", "10 am", and a time
+  given twice as one, which helps the paste box too.
+
+## Done Oct 19, after #331 (merged in #332)
 
 - **The usual times close the way they open** (the user, Oct 19: tapping
   anywhere opened them, only the arrow closed them). Opened, their whole

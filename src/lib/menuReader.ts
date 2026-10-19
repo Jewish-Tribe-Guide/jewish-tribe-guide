@@ -109,10 +109,12 @@ async function publicUrl(raw: string, resolve: Lookup): Promise<URL | null> {
 export type Fetched = { url: string; type: 'html' | 'pdf'; body: string }
 
 /** A public page or PDF, following a few redirects, each one checked. Null
- *  when it can't be read. The body is text for a page, base64 for a PDF. */
+ *  when it can't be read. The body is text for a page, base64 for a PDF.
+ *  `headers` in place of the menu reader's own: a watch asks as a browser
+ *  does (WATCH_FETCH_HEADERS), which some shul sites need. */
 export async function fetchPublic(
   raw: string,
-  { fetchImpl = fetch, resolve = dnsLookup }: { fetchImpl?: typeof fetch; resolve?: Lookup } = {},
+  { fetchImpl = fetch, resolve = dnsLookup, headers }: { fetchImpl?: typeof fetch; resolve?: Lookup; headers?: Record<string, string> } = {},
 ): Promise<Fetched | null> {
   let next = raw
   for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
@@ -123,7 +125,7 @@ export async function fetchPublic(
       res = await fetchImpl(url, {
         redirect: 'manual',
         signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; community-guide menu reader)', Accept: 'text/html,application/pdf;q=0.9,*/*;q=0.5' },
+        headers: headers ?? { 'User-Agent': 'Mozilla/5.0 (compatible; community-guide menu reader)', Accept: 'text/html,application/pdf;q=0.9,*/*;q=0.5' },
       })
     } catch {
       return null
