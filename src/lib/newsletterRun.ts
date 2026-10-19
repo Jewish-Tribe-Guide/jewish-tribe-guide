@@ -19,6 +19,7 @@ import type { ScheduleSource } from '@/lib/scheduleReader'
 import type { SubmissionSource } from '@/lib/submissionSource'
 import { getWatchByUrl, listWatches, updateWatch } from '@/lib/watchStore'
 import { afterRun, type Watch } from '@/lib/watches'
+import { eruvSenders } from '@/lib/eruvEmailRun'
 import type { ResourceSubmission } from '@/types'
 import {
   isIgnoredSender,
@@ -84,10 +85,11 @@ async function keepAttachment(a: NonNullable<NewsletterEmail['attachment']>): Pr
   return storage.getPublicUrl(path).data.publicUrl
 }
 
-/** The senders the Gmail script sends emails from (watchedSenders). */
+/** The senders the Gmail script sends emails from: the shul newsletters
+ *  (watchedSenders) and the eruvim whose status comes by email. */
 export async function newsletterSenders(community: string): Promise<string[]> {
-  const { watches } = await listWatches(community)
-  return watchedSenders(watches)
+  const [{ watches }, eruvim] = await Promise.all([listWatches(community), eruvSenders(community)])
+  return [...new Set([...watchedSenders(watches), ...eruvim])]
 }
 
 /**

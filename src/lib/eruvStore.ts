@@ -3,6 +3,7 @@ import { getAdminClient } from './supabase/admin'
 import type { Eruv, EruvStatus } from './eruv'
 import type { EruvLineFile } from './eruvLine'
 import { readingsToReset } from './eruvEdit'
+import type { KeptEmail } from './eruvEmail'
 
 // The eruv table (migration 074): each eruv, its status as last read, and
 // where its map is. Uncached: the status changes through the day, and
@@ -10,20 +11,27 @@ import { readingsToReset } from './eruvEdit'
 // isn't an error: the page falls back to the old list. The maps themselves
 // are /api/eruv/maps (eruvMaps.ts), read from each eruv's own file
 // (migration 076), its lines in an admin's colour if one is set (081).
+// An eruv with no status page can have its status emailed instead (084:
+// eruvEmail.ts).
 
 const PUBLIC_COLUMNS =
   'id, name, covers, website, hotline, alerts_url, status_url, status_dated, status, status_words, status_posted_on, status_checked_at, status_error_at, status_error'
 const ADMIN_COLUMNS = `${PUBLIC_COLUMNS}, line_url, sort_order, active, line, line_read_at, line_error, line_leave_out`
 const SOURCE_COLUMNS = 'community_id, id, name, line_url, line, line_leave_out'
-// Columns later migrations add (076, 081). Until one is run, what it adds
-// isn't there (no markers hidden, nothing remembered as missing, the eruv's
-// own colours) and everything else works.
-const LATER_COLUMNS = ['line_hide_points', 'line_missing', 'line_color']
+// Columns later migrations add (076, 081, 084). Until one is run, what it
+// adds isn't there (no markers hidden, nothing remembered as missing, the
+// eruv's own colours, no status by email) and everything else works.
+const EMAIL_COLUMNS = ['status_email', 'status_email_kept']
+const LATER_COLUMNS = ['line_hide_points', 'line_missing', 'line_color', ...EMAIL_COLUMNS]
 const laterNamed = (message: string | undefined) => LATER_COLUMNS.filter((c) => !!message && message.includes(c))
 
 /** A select of `columns` plus the later ones, less any not there yet. */
-async function selectWithLater<T>(run: (columns: string) => PromiseLike<{ data: unknown; error: { message: string } | null }>, columns: string): Promise<{ data: T[] | null; error: { message: string } | null }> {
-  let later = LATER_COLUMNS
+async function selectWithLater<T>(
+  run: (columns: string) => PromiseLike<{ data: unknown; error: { message: string } | null }>,
+  columns: string,
+  laterWanted: string[] = LATER_COLUMNS,
+): Promise<{ data: T[] | null; error: { message: string } | null }> {
+  let later = laterWanted
   let res = await run([columns, ...later].join(', '))
   // Postgres names one missing column at a time.
   while (res.error) {
@@ -50,6 +58,7 @@ type Row = {
   status_checked_at: string | null
   status_error_at: string | null
   status_error: string | null
+  status_email?: string | null
 }
 type AdminRow = Row & {
   line_url: string | null
@@ -62,6 +71,7 @@ type AdminRow = Row & {
   line_hide_points?: boolean | null
   line_missing?: string[] | null
   line_color?: string | null
+  status_email_kept?: KeptEmail | null
 }
 
 /** Everything an admin sets and sees about one eruv. `rawLine` is the last
@@ -79,6 +89,10 @@ export type AdminEruv = Eruv & {
   lineMissing: string[]
   /** '#rrggbb' to draw its lines in; null, its own colours. */
   lineColor: string | null
+  /** The address its status emails come from (eruvEmail.ts). */
+  statusEmail: string | null
+  /** The last email from it the guide couldn't read, for an admin. */
+  statusEmailKept: KeptEmail | null
 }
 
 /** Where an eruv's map is, and what an admin chose to show of it. */
@@ -132,6 +146,8 @@ function fromRow(r: Row): Eruv {
     statusCheckedAt: r.status_checked_at,
     statusErrorAt: r.status_error_at,
     statusError: r.status_error,
+    // Whether, never the address: that's an admin's.
+    statusEmailed: !!r.status_email,
   }
 }
 
@@ -148,6 +164,8 @@ function fromAdminRow(r: AdminRow): AdminEruv {
     lineHidePoints: !!r.line_hide_points,
     lineMissing: r.line_missing ?? [],
     lineColor: r.line_color ?? null,
+    statusEmail: r.status_email ?? null,
+    statusEmailKept: r.status_email_kept ?? null,
   }
 }
 
@@ -158,7 +176,11 @@ export function eruvTableMissing(message: string | undefined): boolean {
 /** A community's active eruvim, in their order. `available` is false
  *  without migration 074. */
 export async function listEruvim(community: string): Promise<{ eruvim: Eruv[]; available: boolean }> {
-  const { data, error } = await getAdminClient().from('eruv').select(PUBLIC_COLUMNS).eq('community_id', community).eq('active', true).order('sort_order').order('name')
+  const { data, error } = await selectWithLater<Row>(
+    (cols) => getAdminClient().from('eruv').select(cols).eq('community_id', community).eq('active', true).order('sort_order').order('name'),
+    PUBLIC_COLUMNS,
+    ['status_email'],
+  )
   if (error) {
     if (eruvTableMissing(error.message)) return { eruvim: [], available: false }
     throw new Error(`Failed to load eruvim: ${error.message}`)
@@ -210,13 +232,42 @@ export type StatusWrite =
   | { ok: true; status: EruvStatus; words: string | null; postedOn: string | null; at: string }
   | { ok: false; error: string; at: string }
 
+function statusPatch(read: StatusWrite): Record<string, unknown> {
+  return read.ok
+    ? { status: read.status, status_words: read.words, status_posted_on: read.postedOn, status_checked_at: read.at, status_error: null, updated_at: read.at }
+    : { status_error_at: read.at, status_error: read.error.slice(0, 300), updated_at: read.at }
+}
+
 /** Records one read of an eruv's page: what it said, or why it couldn't
  *  be read. A failed read keeps the last status, so the page can say
  *  when it was last read properly. */
 export async function saveStatusRead(community: string, id: string, read: StatusWrite): Promise<void> {
-  const patch = read.ok
-    ? { status: read.status, status_words: read.words, status_posted_on: read.postedOn, status_checked_at: read.at, status_error: null, updated_at: read.at }
-    : { status_error_at: read.at, status_error: read.error.slice(0, 300), updated_at: read.at }
+  const patch = statusPatch(read)
+  const { error } = await getAdminClient().from('eruv').update(patch).eq('community_id', community).eq('id', id)
+  if (error) throw new Error(`Failed to save the eruv status: ${error.message}`)
+}
+
+/** The active eruvim whose status comes by email, by the address it comes
+ *  from: for the Gmail script, and to find the eruv an email is from. An
+ *  eruv with a status page is read from its page, never its emails. Empty
+ *  without migration 084. */
+export async function listEmailedEruvim(community: string): Promise<AdminEruv[]> {
+  const { data, error } = await selectWithLater<AdminRow>(
+    (cols) => getAdminClient().from('eruv').select(cols).eq('community_id', community).eq('active', true).is('status_url', null).not('status_email', 'is', null),
+    ADMIN_COLUMNS,
+  )
+  if (error) {
+    if (eruvTableMissing(error.message) || laterNamed(error.message).includes('status_email')) return []
+    throw new Error(`Failed to load the eruvim: ${error.message}`)
+  }
+  return ((data ?? []) as AdminRow[]).map(fromAdminRow).filter((e) => e.statusEmail)
+}
+
+/** Records one email from an eruv: its status, or why it couldn't be read
+ *  (`read`, as a page read), and the email kept for an admin when it
+ *  couldn't (`kept`; null clears the one kept before). */
+export async function saveEmailRead(community: string, id: string, read: StatusWrite | null, kept: KeptEmail | null): Promise<void> {
+  const patch = { ...(read ? statusPatch(read) : { updated_at: new Date().toISOString() }), status_email_kept: kept }
   const { error } = await getAdminClient().from('eruv').update(patch).eq('community_id', community).eq('id', id)
   if (error) throw new Error(`Failed to save the eruv status: ${error.message}`)
 }
@@ -241,7 +292,10 @@ export async function saveLineMissing(community: string, id: string, missing: st
 
 /** The fields an admin edits, by their names in AdminEruv. */
 export type EruvEdit = Partial<
-  Pick<AdminEruv, 'name' | 'covers' | 'website' | 'hotline' | 'alertsUrl' | 'statusUrl' | 'statusDated' | 'lineUrl' | 'sortOrder' | 'active' | 'lineLeaveOut' | 'lineHidePoints' | 'lineColor'>
+  Pick<
+    AdminEruv,
+    'name' | 'covers' | 'website' | 'hotline' | 'alertsUrl' | 'statusUrl' | 'statusDated' | 'statusEmail' | 'lineUrl' | 'sortOrder' | 'active' | 'lineLeaveOut' | 'lineHidePoints' | 'lineColor'
+  >
 >
 const EDIT_COLUMN: Record<keyof EruvEdit, string> = {
   name: 'name',
@@ -251,6 +305,7 @@ const EDIT_COLUMN: Record<keyof EruvEdit, string> = {
   alertsUrl: 'alerts_url',
   statusUrl: 'status_url',
   statusDated: 'status_dated',
+  statusEmail: 'status_email',
   lineUrl: 'line_url',
   sortOrder: 'sort_order',
   active: 'active',

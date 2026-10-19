@@ -2,7 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 // The door the guide's Gmail script knocks on: its own secret, a real
 // community, and what became of the email in the answer.
-const m = vi.hoisted(() => ({ receiveNewsletter: vi.fn(), newsletterSenders: vi.fn(), listCommunities: vi.fn() }))
+const m = vi.hoisted(() => ({ receiveNewsletter: vi.fn(), newsletterSenders: vi.fn(), listCommunities: vi.fn(), receiveEruvEmail: vi.fn() }))
+vi.mock('@/lib/eruvEmailRun', () => ({ receiveEruvEmail: m.receiveEruvEmail }))
 vi.mock('@/lib/newsletterRun', () => ({ receiveNewsletter: m.receiveNewsletter, newsletterSenders: m.newsletterSenders }))
 vi.mock('@/lib/communityStore', () => ({ listCommunities: m.listCommunities }))
 
@@ -16,7 +17,8 @@ beforeEach(() => {
   vi.resetAllMocks()
   vi.stubEnv('NEWSLETTER_SECRET', SECRET)
   vi.stubEnv('OPENAI_API_KEY', 'k')
-  m.listCommunities.mockResolvedValue([{ slug: 'philly', name: 'Philadelphia' }])
+  m.listCommunities.mockResolvedValue([{ slug: 'philly', name: 'Philadelphia', timezone: 'America/New_York' }])
+  m.receiveEruvEmail.mockResolvedValue(null)
   m.receiveNewsletter.mockResolvedValue({ status: 'read', filed: 1 })
   m.newsletterSenders.mockResolvedValue(['info@mekor.org'])
 })
@@ -43,6 +45,24 @@ describe('POST /api/inbound/newsletter', () => {
       { messageId: 'g1', from: email.from, subject: 'Shabbos', date: '2026-10-16T14:00:00.000Z', text: 'Mincha 6pm', attachment: { mime: 'application/pdf', b64: 'JVBERg==' } },
       { apiKey: 'k', communityName: 'Philadelphia' },
     )
+  })
+
+  // An eruv's status email (the user, Oct 19): read by code, live at once,
+  // so it needs no AI key, and never reaches the newsletter reader.
+  it('an eruv’s status email is read first, without the AI', async () => {
+    vi.stubEnv('OPENAI_API_KEY', '')
+    m.receiveEruvEmail.mockResolvedValue({ status: 'eruv', eruv: 'northeast', read: 'up' })
+    const res = await POST(req(email))
+    expect(await res.json()).toEqual({ ok: true, status: 'eruv', eruv: 'northeast', read: 'up' })
+    expect(m.receiveEruvEmail).toHaveBeenCalledWith('philly', expect.objectContaining({ messageId: 'g1', from: email.from }), { timezone: 'America/New_York' })
+    expect(m.receiveNewsletter).not.toHaveBeenCalled()
+  })
+
+  it('a shul’s newsletter still needs the AI key', async () => {
+    vi.stubEnv('OPENAI_API_KEY', '')
+    expect((await POST(req(email))).status).toBe(503)
+    expect(m.receiveEruvEmail).toHaveBeenCalled()
+    expect(m.receiveNewsletter).not.toHaveBeenCalled()
   })
 
   it('refuses an unknown community or an email missing its id or sender', async () => {

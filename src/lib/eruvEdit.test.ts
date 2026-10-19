@@ -27,6 +27,14 @@ describe('readEruvEdit', () => {
     expect(readEruvEdit({ lineColor: 'red;background:url(x)' })).toMatchObject({ ok: false })
     expect(readEruvEdit({ lineColor: 7 })).toMatchObject({ ok: false })
   })
+  // Oct 19: an eruv with no status page, its status emailed instead.
+  it('the address its status emails come from, tidied; never with a status page too', () => {
+    expect(readEruvEdit({ statusEmail: ' JCOR-NE-Philadelphia@groups.io ' })).toEqual({ ok: true, edit: { statusEmail: 'jcor-ne-philadelphia@groups.io' } })
+    expect(readEruvEdit({ statusEmail: '' })).toEqual({ ok: true, edit: { statusEmail: null } })
+    expect(readEruvEdit({ statusEmail: 'https://groups.io/g/JCOR-NE-Philadelphia' })).toMatchObject({ ok: false, error: expect.stringMatching(/email address/) })
+    expect(readEruvEdit({ statusUrl: 'https://www.centercityeruv.com/', statusEmail: 'eruv@example.org' })).toMatchObject({ ok: false, error: expect.stringMatching(/not both/) })
+    expect(readEruvEdit({ statusUrl: '', statusEmail: 'eruv@example.org' })).toEqual({ ok: true, edit: { statusUrl: null, statusEmail: 'eruv@example.org' } })
+  })
   it('an emptied address is cleared', () => {
     expect(readEruvEdit({ alertsUrl: '' })).toEqual({ ok: true, edit: { alertsUrl: null } })
   })

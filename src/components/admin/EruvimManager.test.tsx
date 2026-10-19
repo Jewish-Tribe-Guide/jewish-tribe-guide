@@ -26,6 +26,7 @@ const NE: AdminEruv = {
     marks: [{ name: 'Congregation Ahavas Torah', at: [40.068, -75.065], color: '#0288d1' }],
   },
   lineReadAt: '2026-10-12T11:00:00Z', lineError: null, lineLeaveOut: [], lineHidePoints: false, lineMissing: [], lineColor: null,
+  statusEmail: null, statusEmailKept: null,
 }
 
 const posts: unknown[] = []
@@ -108,6 +109,36 @@ describe('EruvimManager', () => {
     expect(shading(card)).toBe('0')
     await user.click(within(card).getByRole('button', { name: 'Save' }))
     expect(posts).toEqual([expect.objectContaining({ action: 'save', id: 'northeast', edit: expect.objectContaining({ lineColor: '#1d4ed8' }) })])
+  })
+
+  // Oct 19: Northeast posts no status page; its status comes by email.
+  it('the address its status emails come from is saved with the rest', async () => {
+    const user = userEvent.setup()
+    serve([NE])
+    renderWithProviders(<EruvimManager token="t" />)
+    const card = await screen.findByTestId('admin-eruv')
+    await user.type(within(card).getByLabelText(/Status emails from/), 'JCOR-NE-Philadelphia@groups.io')
+    await user.click(within(card).getByRole('button', { name: 'Save' }))
+    expect(posts).toEqual([expect.objectContaining({ action: 'save', id: 'northeast', edit: expect.objectContaining({ statusEmail: 'JCOR-NE-Philadelphia@groups.io' }) })])
+  })
+
+  it('an email it couldn’t read is shown, and the admin says what it says', async () => {
+    const user = userEvent.setup()
+    const kept = { messageId: 'g1', subject: 'Eruv update', sentAt: '2026-10-09T17:30:00Z', text: 'The eruv is up. The eruv is down on Castor.', words: 'The eruv is up' }
+    serve([{ ...NE, statusEmail: 'jcor-ne-philadelphia@groups.io', statusEmailKept: kept }])
+    renderWithProviders(<EruvimManager token="t" />)
+    const box = await screen.findByTestId('eruv-kept-email')
+    expect(box).toHaveTextContent('Their email says both up and down: “Eruv update”, Oct 9')
+    expect(box).toHaveTextContent('The eruv is down on Castor.')
+    await user.click(within(box).getByRole('button', { name: 'It says down' }))
+    expect(posts).toEqual([{ action: 'email-says', id: 'northeast', says: 'down' }])
+  })
+
+  it('no email waiting, no box', async () => {
+    serve([NE])
+    renderWithProviders(<EruvimManager token="t" />)
+    await screen.findByTestId('admin-eruv')
+    expect(screen.queryByTestId('eruv-kept-email')).not.toBeInTheDocument()
   })
 
   it('“Use its own” puts its own colour back', async () => {

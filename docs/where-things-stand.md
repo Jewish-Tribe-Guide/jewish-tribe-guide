@@ -50,6 +50,9 @@ for that exact change, in the same conversation. Show the dry run first.
 
 1. **Philly Synagogues:** add the "Minyan" yes/no field, and rename the
    category "Shuls & minyanim".
+1b. **Migration 084 (`eruv_status_email`)**, for eruv status by email
+   (6c): two new columns on `eruv`, nothing else. Run on dev first, then
+   live with a yes. Then each sender address set on live is its own yes.
 ## For the user or the community
 
 2. **Every live place has a date** (checked Oct 17, 11 PM: 155 of 155).
@@ -107,6 +110,39 @@ for that exact change, in the same conversation. Show the dry run first.
    senders-only change is live, paste the new script over the old one in
    script.google.com (the secret property and the hourly trigger stay),
    then run `readNewsletters` once.
+6c. **Eruv status by email** (the user, Oct 19; built on
+   `claude/zen-golick-e5ddec`, migration 084 not run anywhere). Northeast
+   (a groups.io list) and Elkins Park announce up and down only by email.
+   Each eruv now has "Status emails from" on the admin Eruvim tab: the
+   address its emails come from. The Gmail script that sends shul
+   newsletters sends these too, since the site lists them with the
+   newsletters' senders. No script change is needed.
+   Each email is read by the status page's own sentence reader, never the
+   AI (`src/lib/eruvEmail.ts`), and goes live at once with no approval, as
+   a page read does. It reads the subject and the body, leaving out a
+   quoted reply and the list's footer. It is dated by when it was sent.
+   **How long it counts (decided here; tell the user):** through the
+   Shabbos of the week it was sent, Sunday to Shabbos. After that, Sunday
+   to Thursday say "Up last Shabbos" (or "Down last Shabbos") in grey, and
+   Friday and Shabbos say "Not posted yet this week" in amber, as Lower
+   Merion's dated post does. A down expires the same way, since nothing
+   reads it again. Until the first email: "Not posted yet this week". A
+   Shabbos followed by Yom Tov on Sunday shows "last Shabbos" on Yom Tov.
+   Not handled yet.
+   An email that says both up and down marks the status "Couldn't read
+   their status", as such a page does. One that says neither (other news)
+   changes nothing. Either way the email is kept on the Eruvim tab, where
+   an admin can say "It says up", "It says down" or "Not about the
+   status". Up or down goes live at once.
+   An eruv has a status page or a status email, not both: a page is read
+   again all day, while an email stands for its week.
+   **For the user:** subscribe phillyjewishguide@gmail.com to the
+   Northeast list (groups.io/g/JCOR-NE-Philadelphia) and to Elkins Park's
+   emails, then send the From address each one's emails arrive with.
+   groups.io sometimes rewrites From to the person who posted, so check a
+   real email. Then: 084 on dev, try it there, 084 on live and the two
+   addresses (each a yes).
+
 6b. **Mekor Habracha watch** (built Oct 18 on
    `claude/unruffled-aryabhata-926203`, no migration; the comparison in 6a,
    made daily). A website watch on mekorhabracha.org/center-city is read

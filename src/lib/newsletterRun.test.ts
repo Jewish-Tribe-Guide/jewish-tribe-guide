@@ -7,6 +7,7 @@ import type { Watch } from './watches'
 // the watch remembers of it. The readers are stood in for; applying the
 // times to the shul's own is the real thing (scheduleUpdate.ts).
 const m = vi.hoisted(() => ({
+  eruvSenders: vi.fn(),
   getWatchByUrl: vi.fn(),
   addWatch: vi.fn(),
   listWatches: vi.fn(),
@@ -26,6 +27,7 @@ vi.mock('@/lib/shulWeekReading', () => ({ readShulWeek: m.readShulWeek }))
 vi.mock('@/lib/messageReader', async (orig) => ({ ...(await orig<typeof import('./messageReader')>()), readMessage: m.readMessage }))
 vi.mock('@/lib/submissionStore', () => ({ submitListingUpdate: m.submitListingUpdate }))
 vi.mock('@/lib/email', () => ({ sendWatchDigest: m.sendWatchDigest }))
+vi.mock('@/lib/eruvEmailRun', () => ({ eruvSenders: m.eruvSenders }))
 vi.mock('@/lib/supabase/admin', () => ({
   getAdminClient: () => ({ storage: { from: () => ({ upload: m.upload, getPublicUrl: (p: string) => ({ data: { publicUrl: `https://kept/${p}` } }) }) } }),
 }))
@@ -122,8 +124,16 @@ describe('receiveNewsletter: who it’s from', () => {
 
   it('names the senders whose emails the script should send', async () => {
     m.listWatches.mockResolvedValue({ watches: [watch, { ...watch, id: 'w2', url: 'mailto:new@shul.org', resourceId: null, active: false }], available: true })
+    m.eruvSenders.mockResolvedValue([])
     expect(await newsletterSenders('philly')).toEqual(['info@mekorhabracha.org'])
     expect(m.listWatches).toHaveBeenCalledWith('philly')
+  })
+
+  it('names the eruvim whose status comes by email too, each sender once', async () => {
+    m.listWatches.mockResolvedValue({ watches: [watch], available: true })
+    m.eruvSenders.mockResolvedValue(['jcor-ne-philadelphia@groups.io', 'info@mekorhabracha.org'])
+    expect(await newsletterSenders('philly')).toEqual(['info@mekorhabracha.org', 'jcor-ne-philadelphia@groups.io'])
+    expect(m.eruvSenders).toHaveBeenCalledWith('philly')
   })
 
   it('leaves an email from an unlinked sender to wait, a paused one and an ignored one alone', async () => {

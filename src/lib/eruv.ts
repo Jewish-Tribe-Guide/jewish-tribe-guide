@@ -15,6 +15,13 @@
 //   - A page that says both up and down, neither, or can't be read is never
 //     shown as up.
 //   - Down always shows as down.
+//   - An eruv that announces its status by email (Northeast, Elkins Park:
+//     the user, Oct 19) has no page to read again, so its last email stands
+//     only through the Shabbos it was sent for: an email from that week's
+//     Sunday to Shabbos. After it, Sunday to Thursday say "Up last Shabbos"
+//     (or "Down last Shabbos") in grey, and Friday and Shabbos "Not posted
+//     yet this week", the way Lower Merion's dated post does. Never a stale
+//     "up", and, since nothing reads it again, never a stale "down" either.
 
 export type EruvStatus = 'up' | 'down' | 'unknown'
 
@@ -30,6 +37,9 @@ export type Eruv = {
   alertsUrl: string | null
   /** The page it posts its status on; null when it has none (a hotline). */
   statusUrl: string | null
+  /** Its status comes by email instead (an admin gave its sending address,
+   *  which isn't public): eruvEmail.ts. */
+  statusEmailed?: boolean
   /** Posts a dated status each week, so an old date means not posted yet. */
   statusDated: boolean
   status: EruvStatus | null
@@ -178,6 +188,7 @@ export function eruvView(eruv: Eruv, now: Date, tz: string, candlesToday: number
   const site = eruv.statusUrl ? siteOf(eruv.statusUrl) : null
   const readLine = (iso: string) => (site ? `From ${site}, ${timeOf(iso, now, tz)} · ${every}` : checkedLine(iso))
 
+  if (!eruv.statusUrl && eruv.statusEmailed) return emailedView(eruv, now, tz)
   if (!eruv.statusUrl) return { tone: 'grey', label: 'No status online', checked: null }
   const failedSince = eruv.statusErrorAt && (!eruv.statusCheckedAt || Date.parse(eruv.statusErrorAt) > Date.parse(eruv.statusCheckedAt))
   if (!eruv.statusCheckedAt || failedSince) return { tone: 'amber', label: 'Couldn’t read their status', checked: eruv.statusErrorAt ? checkedLine(eruv.statusErrorAt) : null }
@@ -190,6 +201,26 @@ export function eruvView(eruv: Eruv, now: Date, tz: string, candlesToday: number
     return { tone: 'amber', label: 'Not posted yet this week', checked }
   }
   return { tone: 'green', label: shabbosSide ? 'Up for this Shabbos' : 'Up', checked }
+}
+
+/** An eruv whose status comes by email: its last email, for the week it
+ *  was sent in only (the rules at the top). */
+function emailedView(eruv: Eruv, now: Date, tz: string): EruvView {
+  const { date, weekday } = localParts(now, tz)
+  const shabbosSide = weekday === 5 || weekday === 6
+  const fromLine = (iso: string) => `From the eruv’s email, ${timeOf(iso, now, tz)}`
+  const failedSince = eruv.statusErrorAt && (!eruv.statusCheckedAt || Date.parse(eruv.statusErrorAt) > Date.parse(eruv.statusCheckedAt))
+  if (failedSince) return { tone: 'amber', label: 'Couldn’t read their status', checked: fromLine(eruv.statusErrorAt!) }
+  const notPosted: EruvView = { tone: 'amber', label: 'Not posted yet this week', checked: eruv.statusCheckedAt ? fromLine(eruv.statusCheckedAt) : null }
+  if (!eruv.statusCheckedAt || (eruv.status !== 'up' && eruv.status !== 'down')) return notPosted
+  const checked = fromLine(eruv.statusCheckedAt)
+  const sentOn = eruv.statusPostedOn ?? localParts(new Date(eruv.statusCheckedAt), tz).date
+  if (sentOn >= weekStart(date, weekday)) {
+    return eruv.status === 'down' ? { tone: 'red', label: shabbosSide ? 'Down this Shabbos' : 'Down', checked } : { tone: 'green', label: shabbosSide ? 'Up for this Shabbos' : 'Up', checked }
+  }
+  const lastWeek = sentOn >= weekStart(date, weekday + 7)
+  if (lastWeek && !shabbosSide) return { tone: 'grey', label: eruv.status === 'down' ? 'Down last Shabbos' : 'Up last Shabbos', checked }
+  return notPosted
 }
 
 /** A phone number as dialled: "(215) 333-ERUV" → "2153333788". */

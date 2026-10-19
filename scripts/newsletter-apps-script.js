@@ -22,6 +22,10 @@
 // nothing else in the inbox leaves it. A new newsletter: add its address on
 // the Watches tab, with its shul, and the next run picks it up (from the
 // last two weeks). Each email is sent once.
+//
+// Eruv status emails come the same way (src/lib/eruvEmail.ts): an eruv's
+// "Status emails from" on the admin Eruvim tab puts its sender on the same
+// list, and the site reads each email for up or down.
 // ─────────────────────────────────────────────────────────────────────────────
 
 /* eslint-disable @typescript-eslint/no-unused-vars -- Apps Script calls install and readNewsletters by name */
