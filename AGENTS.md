@@ -183,6 +183,12 @@ phone home's tiles, docs), and nothing else wrote to the test project's
 reliably reach that entry either. Don't re-run it until it goes green and
 call that a fix; the next suspect is the build-time prerender, as above.
 
+Twice more on Oct 19, again all `HIT/old`: run 39291586172 on `main` (the
+push merging #331) and run 39295495574 on PR #332. Neither touched caching
+or `/about` (#332: the shul box's fold and week sign-ups). That is two of
+that day's three completed CI runs, so it is no longer rare. It is not a
+required check, so a PR still merges past it.
+
 Guarded structurally too, so this can't silently regress if someone
 "simplifies" the route later: `src/app/api/admin/pages/pagesRevalidation.
 test.ts` asserts both the tag and the path invalidation are present in the

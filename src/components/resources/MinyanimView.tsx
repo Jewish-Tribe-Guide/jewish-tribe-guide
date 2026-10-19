@@ -369,8 +369,10 @@ export default function MinyanimView({
   )
 }
 
-/** ", its Sukkos times", or ", regular times · Sukkos not posted". */
+/** ", its Sukkos times", or ", regular times · Sukkos not posted". A week
+ *  the shul sent out that goes by its dates is "This week's times". */
 function whose(p: DayPosting, inSentence = false): string {
+  if (p.kind === 'schedule' && p.thisWeek) return inSentence ? ', its times for this week' : 'This week’s times'
   if (p.kind === 'schedule') return inSentence ? `, its ${p.name.replace(/\s+\d{4}$/, '')} times` : `${p.name.replace(/\s+\d{4}$/, '')} times`
   if (p.kind === 'not-posted') return inSentence ? `, regular times (${p.festival} not posted)` : `Regular times · ${p.festival} not posted`
   return ''
