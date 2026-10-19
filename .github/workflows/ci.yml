@@ -29,6 +29,15 @@ name: CI
 # `continue-on-error`, so a failure is visible in the Actions tab without
 # blocking anything.
 #
+# Nothing waits on `unit` any more (Oct 19). The suites against the test
+# project used to start only once lint, typecheck and the unit tests had
+# passed, which put ~4.5 minutes in front of everything else; e2e then waited
+# on cache-roundtrip and admin-write and ran for ~10 minutes alone, so a PR
+# took ~20 minutes to go green. They all start at once now: a failing unit
+# test no longer saves the other jobs' runner time, but this repo is public,
+# so runner minutes are free, and a PR's author waits on the slowest path,
+# not the total. e2e is sharded for the same reason (see its job).
+#
 # Every job below sets timeout-minutes, well above its normal run time (a
 # few minutes) but far under GitHub's 360-minute default — nothing should
 # silently eat a runner-hour (or make cancelling it someone's job to
@@ -81,7 +90,6 @@ jobs:
   integration:
     name: Integration tests (real Supabase reads/writes)
     runs-on: ubuntu-latest
-    needs: unit
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
@@ -99,7 +107,6 @@ jobs:
     name: Cache round-trip (admin save reaches the cached page)
     runs-on: ubuntu-latest
     container: mcr.microsoft.com/playwright:v1.63.0-noble
-    needs: unit
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
@@ -135,7 +142,6 @@ jobs:
     name: Form submission (wizard reaches the database)
     runs-on: ubuntu-latest
     container: mcr.microsoft.com/playwright:v1.63.0-noble
-    needs: unit
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
@@ -178,7 +184,6 @@ jobs:
     # here, CACHE_TEST_ADMIN_EMAIL for cache-roundtrip — see
     # cacheE2eAdmin.mjs's own comment), so the two genuinely run in parallel
     # now and this job no longer needs to wait for cache-roundtrip first.
-    needs: unit
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
@@ -203,10 +208,10 @@ jobs:
           retention-days: 14
 
   e2e:
-    name: End-to-end tests (test project)
+    name: End-to-end tests (test project, ${{ matrix.shard }}/4)
     runs-on: ubuntu-latest
     container: mcr.microsoft.com/playwright:v1.63.0-noble
-    # Needs cache-roundtrip and admin-write too, not just unit: both share
+    # Needs cache-roundtrip and admin-write first: both share
     # this same TEST_SUPABASE_* project now that e2e points at it and both
     # create/rename/delete categories and home-section rows — content e2e's
     # own helpers (defaultCommunity, categoryWithListings) read via "pick
@@ -231,8 +236,21 @@ jobs:
     # anything) it returns. Excluding it lets e2e start as soon as
     # cache-roundtrip/admin-write finish rather than also waiting on however
     # long form-roundtrip's own run takes.
-    needs: [unit, cache-roundtrip, admin-write]
+    #
+    # Split four ways, each shard on its own runner (Oct 19). The suite runs
+    # one test at a time per runner (playwright.config.ts's `workers` — a
+    # 4-vCPU runner shared with the server and Chromium flaked with more),
+    # so on one runner it took ~10 minutes, half of every PR's wait. Four
+    # runners keep one worker each, so the per-runner contention that comment
+    # describes is unchanged. Each shard builds the app itself (~1 min) and
+    # runs the `warmup` project first; Playwright puts a dependency project in
+    # every shard whose tests need it. Public repo: the extra runners are free.
+    needs: [cache-roundtrip, admin-write]
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -244,7 +262,7 @@ jobs:
       # device emulation are both Chromium) — no `playwright install` step
       # needed, see container image above. It ships every engine, but we
       # only invoke Chromium via test:e2e.
-      - run: npm run test:e2e
+      - run: npm run test:e2e -- --shard=${{ matrix.shard }}/4
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.TEST_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.TEST_SUPABASE_ANON_KEY }}
@@ -266,7 +284,7 @@ jobs:
       - uses: actions/upload-artifact@v7
         if: failure()
         with:
-          name: playwright-report
+          name: playwright-report-${{ matrix.shard }}
           path: playwright-report/
           retention-days: 14
 

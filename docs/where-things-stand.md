@@ -239,7 +239,17 @@ for that exact change, in the same conversation. Show the dry run first.
 
 7. The "+" button covers part of the third tile in a row on the phone home.
 
-## Done Oct 19 (on `claude/youthful-davinci-9f768f`, not merged)
+## Done Oct 19: faster PR checks (on `redesign/oct18-fixes`, not merged)
+
+- **A PR goes green in about half the time** (the user, Oct 19: "PRs are
+  taking a really long time"). It took ~20 minutes: everything waited for
+  lint, typecheck and the unit tests (~4.5 min), then the end-to-end suite
+  ran alone for ~10 minutes, one test at a time. Now every job starts at
+  once and the end-to-end suite runs on four runners side by side, each
+  still one test at a time. `src/test/ciWorkflow.test.ts` keeps it that
+  way. Expected ~10 minutes; measure it on this PR's own run.
+
+## Done Oct 19 (#333, merged)
 
 - **A watch on a listing's own page** (from the parent session's brief,
   Oct 19): a shul's page of davening times, or a mikvah's page of hours,
