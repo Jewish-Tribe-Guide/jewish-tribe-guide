@@ -68,7 +68,28 @@ test('a menu reading is checked, edited and approved onto its listing, dated by 
   await page.goto('/philly/admin/dishes')
   const toCheck = page.locator('section', { has: page.getByRole('heading', { name: /^To check/ }) })
   const card = toCheck.getByTestId('dish-place').filter({ hasText: name })
-  await expect(card).toBeVisible({ timeout: 20_000 })
+
+  // The listing went straight into the database, so the cached list of
+  // listings the tab reads (listApprovedResources, cacheLife hours) knows
+  // nothing about it. This used to pass only while no test had cached that
+  // list yet: on a warm server it failed four runs in five, and once admin
+  // saves gained a delayed second invalidation (revalidateAfterInFlightRenders)
+  // public pages re-rendered sooner and cached it on a cold one too. A real
+  // listing arrives through a save that invalidates, so invalidate as a
+  // direct write must (AGENTS.md) — the admin's own token, from the session
+  // the page just loaded — then reload: the first read after it is
+  // stale-while-revalidate, the next one fresh.
+  const revalidated = await page.evaluate(async () => {
+    const key = Object.keys(localStorage).find((k) => /^sb-.+-auth-token$/.test(k))
+    const token = key ? (JSON.parse(localStorage.getItem(key)!) as { access_token?: string }).access_token : undefined
+    const res = await fetch('/api/admin/revalidate', { method: 'POST', headers: { Authorization: `Bearer ${token}` } })
+    return res.status
+  })
+  expect(revalidated, 'POST /api/admin/revalidate with the signed-in admin’s token').toBe(200)
+  await expect(async () => {
+    await page.reload()
+    await expect(card).toBeVisible({ timeout: 3_000 })
+  }).toPass({ timeout: 20_000 })
   await expect(card).toContainText('Shawarma from “Chicken Shawarma Plate”')
   await expect(card.getByRole('link', { name: 'menu.example.invalid/menu ↗' })).toHaveAttribute('href', sourceUrl)
 

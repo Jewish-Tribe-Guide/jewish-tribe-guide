@@ -2,20 +2,19 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { PAGE_SLUGS } from '@/lib/pagesStore'
 
-// Saving a page has to invalidate BOTH the shared `pages` tag and the page's
-// own path.
+// Saving a page has to invalidate the shared `pages` tag, the page's own path
+// for every community, and — after a delay — the route once more.
 //
-// The tag alone is demonstrably not always enough. e2e-cache's /about test
-// fails intermittently with x-nextjs-cache HIT on every poll — the page's own
-// cached entry never even reaching STALE — while the stored row provably holds
-// the new body. The mechanism is still unknown and does not reproduce on
-// demand (warm server 15/15 and 12/12 clean, cold build 5/5 clean, CI fails
-// repeatedly), but the symptom is exactly "this path's entry was not marked",
-// and revalidatePath marks it.
+// The last one is the fix for e2e-cache's /about failure (every poll HIT/old
+// while the row held the new body). Next stamps a page entry with the time it
+// is written, so a regeneration already running when the save invalidated the
+// page — reading the old row — was stored as newer than the invalidation and
+// served as fresh for days. See revalidateAfterInFlightRenders.ts.
 //
-// Asserted from the source because both calls are one line each, invisible in
-// any local run that happens to pass, and the failure they guard against
-// looks like flakiness rather than a missing call.
+// Asserted from the source because each is one line, invisible in any local
+// run that happens not to hit the race, and the failure they guard against
+// looks like flakiness rather than a missing call. e2e-cache's
+// "mid-regeneration" test proves the behaviour end to end.
 const ROUTE = readFileSync('src/app/api/admin/pages/[slug]/route.ts', 'utf-8')
 
 describe('saving a page invalidates the public route', () => {
@@ -23,15 +22,19 @@ describe('saving a page invalidates the public route', () => {
     expect(ROUTE).toMatch(/revalidateTag\(\s*TAGS\.pages/)
   })
 
-  it("also invalidates the page's own path, for every community", () => {
-    expect(
-      /revalidatePath\(\s*routes\[slug\]\(c\.slug\)\s*\)/.test(ROUTE),
-      'the tag alone has been observed not to mark the page entry — see this file’s note',
-    ).toBe(true)
-    // /about and /privacy live under /[community] now — one shared `page`
-    // row, but a URL per community — so this has to loop over every
-    // community rather than revalidating a single hand-typed path.
+  it("also expires the page's own path, for every community", () => {
+    expect(ROUTE).toMatch(/revalidatePath\(\s*routes\[slug\]\(c\.slug\)\s*\)/)
+    // /about and /privacy live under /[community] — one shared `page` row,
+    // but a URL per community — so this loops over every community rather
+    // than revalidating a single hand-typed path.
     expect(ROUTE).toMatch(/for \(const c of communities\)/)
+  })
+
+  it('invalidates the route again once in-flight renders have finished, by its pattern', () => {
+    // The pattern, not routes[slug](c.slug) a second time: Next drops a
+    // revalidation repeated within one request, so repeating the concrete
+    // path would schedule a second pass that silently does nothing.
+    expect(ROUTE).toMatch(/revalidateRouteAfterInFlightRenders\(\s*routes\[slug\]\('\[community\]'\),\s*'page'\s*\)/)
   })
 
   it('derives the path from the slug rather than listing routes by hand', () => {
@@ -41,6 +44,7 @@ describe('saving a page invalidates the public route', () => {
     for (const slug of PAGE_SLUGS) {
       expect(ROUTE).not.toContain(`revalidatePath('/${slug}')`)
       expect(ROUTE).not.toContain(`revalidatePath(\`/${slug}\`)`)
+      expect(ROUTE).not.toContain(`'/[community]/${slug}'`)
     }
     expect(PAGE_SLUGS.length).toBeGreaterThan(1)
   })
