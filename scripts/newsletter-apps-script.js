@@ -1,8 +1,9 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // The guide's shul newsletters (src/lib/newsletter.ts): a Google Apps Script
 // that runs inside the guide's own Gmail (phillyjewishguide@gmail.com) and
-// sends each new email to the site, which reads it for changed times and
-// files them for an admin to approve. Nothing on the site changes from here.
+// sends each new email from a shul's newsletter to the site, which reads it
+// for changed times and files them for an admin to approve. Nothing on the
+// site changes from here.
 //
 // Not part of the app: it's pasted into script.google.com. To set it up,
 // signed in to the guide's Gmail:
@@ -16,9 +17,11 @@
 //   4. Run `readNewsletters` once by hand to see it work: View → Executions
 //      shows what each email came to.
 //
-// Each email is sent once. A sender the site hasn't been told about comes
-// back "unlinked": it shows on the admin Watches tab, to be tied to its shul,
-// and its emails are sent again every hour (for two weeks) until it is.
+// Only the newsletters on the admin Watches tab are sent: each run asks the
+// site for their addresses first and searches the inbox for just those, so
+// nothing else in the inbox leaves it. A new newsletter: add its address on
+// the Watches tab, with its shul, and the next run picks it up (from the
+// last two weeks). Each email is sent once.
 // ─────────────────────────────────────────────────────────────────────────────
 
 /* eslint-disable @typescript-eslint/no-unused-vars -- Apps Script calls install and readNewsletters by name */
@@ -36,6 +39,8 @@ var MAX_ATTACHMENT_BYTES = 3 * 1024 * 1024
  *  about 350 emails, many more than two weeks of shul newsletters. */
 var REMEMBER_DAYS = 15
 var MAX_REMEMBERED_CHARS = 8500
+/** Senders per Gmail search: a search's words are capped. */
+var SENDERS_PER_SEARCH = 20
 
 function install() {
   ScriptApp.getProjectTriggers().forEach(function (t) {
@@ -51,13 +56,24 @@ function readNewsletters() {
   var sent = JSON.parse(props.getProperty('SENT') || '{}')
   var started = Date.now()
 
-  // Oldest first, so a backlog is read in the order it was sent.
-  var threads = GmailApp.search('in:inbox newer_than:14d', 0, 50).reverse()
+  var senders = watchedSenders(secret)
+  if (!senders.length) {
+    console.log('No newsletters on the Watches tab yet: nothing to send.')
+    return
+  }
+  var wanted = {}
+  senders.forEach(function (s) {
+    wanted[s] = true
+  })
+
+  var threads = threadsFrom(senders)
   outer: for (var i = 0; i < threads.length; i++) {
     var messages = threads[i].getMessages()
     for (var j = 0; j < messages.length; j++) {
       var m = messages[j]
       if (sent[m.getId()]) continue
+      // A reply in the thread from someone else stays here.
+      if (!wanted[addressOf(m.getFrom())]) continue
       if (Date.now() - started > RUN_BUDGET_MS) break outer
       var res = UrlFetchApp.fetch(SITE + '/api/inbound/newsletter', {
         method: 'post',
@@ -76,8 +92,9 @@ function readNewsletters() {
       console.log(code + ' ' + (body.status || body.error || '') + ' · ' + m.getFrom() + ' · ' + m.getSubject())
       // The secret or the site's setup is wrong: every email would fail.
       if (code === 401 || code === 503) throw new Error('The site refused: ' + (body.error || code))
-      // Unlinked: sent again next hour. A failure: the same.
-      if (code === 200 && body.status !== 'unlinked') sent[m.getId()] = today()
+      // A sender the site no longer has: sent again next hour, in case it's
+      // added back. A failure: the same.
+      if (code === 200 && body.status !== 'unlinked' && body.status !== 'unknown') sent[m.getId()] = today()
     }
   }
 
@@ -93,6 +110,50 @@ function readNewsletters() {
   var kept = {}
   for (var n = 0; n < ids.length && JSON.stringify(kept).length < MAX_REMEMBERED_CHARS; n++) kept[ids[n]] = sent[ids[n]]
   props.setProperty('SENT', JSON.stringify(kept))
+}
+
+/** The newsletters on the Watches tab: the addresses, lower case, whose
+ *  emails are sent. */
+function watchedSenders(secret) {
+  var res = UrlFetchApp.fetch(SITE + '/api/inbound/newsletter?community=' + COMMUNITY, {
+    method: 'get',
+    headers: { Authorization: 'Bearer ' + secret },
+    muteHttpExceptions: true,
+  })
+  var code = res.getResponseCode()
+  var body = {}
+  try {
+    body = JSON.parse(res.getContentText())
+  } catch (e) {
+    // Not JSON: a platform error page. The status code says enough.
+  }
+  if (code !== 200 || !Array.isArray(body.senders)) throw new Error('The site refused: ' + (body.error || code))
+  return body.senders
+}
+
+/** Their threads from the last two weeks, oldest first, so a backlog is
+ *  read in the order it was sent. */
+function threadsFrom(senders) {
+  var byId = {}
+  for (var i = 0; i < senders.length; i += SENDERS_PER_SEARCH) {
+    var query = 'in:inbox newer_than:14d from:(' + senders.slice(i, i + SENDERS_PER_SEARCH).join(' OR ') + ')'
+    GmailApp.search(query, 0, 50).forEach(function (t) {
+      byId[t.getId()] = t
+    })
+  }
+  return Object.keys(byId)
+    .map(function (id) {
+      return byId[id]
+    })
+    .sort(function (a, b) {
+      return a.getLastMessageDate() - b.getLastMessageDate()
+    })
+}
+
+/** The address in a From header, lower case. */
+function addressOf(from) {
+  var bracketed = from.match(/<([^<>\s]+)>/)
+  return (bracketed ? bracketed[1] : from).trim().toLowerCase()
 }
 
 /** Today, as a day number: short, for the remembered list. */

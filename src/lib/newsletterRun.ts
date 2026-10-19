@@ -17,19 +17,18 @@ import { readSchedules, regularMinyanim, schedulesKey } from '@/lib/schedules'
 import { applyUpdate, changesAnything, type TimesUpdate } from '@/lib/scheduleUpdate'
 import type { ScheduleSource } from '@/lib/scheduleReader'
 import type { SubmissionSource } from '@/lib/submissionSource'
-import { addWatch, getWatchByUrl, updateWatch } from '@/lib/watchStore'
+import { getWatchByUrl, listWatches, updateWatch } from '@/lib/watchStore'
 import { afterRun, type Watch } from '@/lib/watches'
 import type { ResourceSubmission } from '@/types'
 import {
   isIgnoredSender,
   isNewsletterWatch,
-  NEWSLETTER_WATCH_CREATOR,
   NEWSLETTER_WATCH_NAME,
   newsletterText,
   newsletterUrl,
   senderAddress,
-  senderName,
   timesWereRead,
+  watchedSenders,
 } from '@/lib/newsletter'
 
 export type NewsletterEmail = {
@@ -44,10 +43,11 @@ export type NewsletterEmail = {
   attachment: { mime: string; b64: string } | null
 }
 
-/** What became of it, for the script: `unlinked` and `failed` stay in the
- *  inbox to be sent again; anything else is done with. */
+/** What became of it, for the script: `unknown`, `unlinked` and a failure
+ *  are sent again next time; anything else is done with. */
 export type NewsletterResult =
   | { status: 'not_newsletter' }
+  | { status: 'unknown' }
   | { status: 'unlinked'; watchId: string | null }
   | { status: 'paused' }
   | { status: 'ignored' }
@@ -84,10 +84,16 @@ async function keepAttachment(a: NonNullable<NewsletterEmail['attachment']>): Pr
   return storage.getPublicUrl(path).data.publicUrl
 }
 
+/** The senders the Gmail script sends emails from (watchedSenders). */
+export async function newsletterSenders(community: string): Promise<string[]> {
+  const { watches } = await listWatches(community)
+  return watchedSenders(watches)
+}
+
 /**
- * Receives one email. A sender the guide hasn't seen is added as a paused,
- * unlinked watch for an admin to tie to its shul; until then its emails
- * wait. A linked one is read, and the watch records it: the last email's
+ * Receives one email. The script sends only watched senders' emails, so
+ * one from a sender the guide doesn't have (removed since the script asked)
+ * is left alone: no watch is added for it. A linked one is read, and the watch records it: the last email's
  * time (pageChangedAt), what it filed, and the email itself (pageHash), so
  * the same one sent again files nothing.
  *
@@ -102,18 +108,8 @@ export async function receiveNewsletter(
   const address = senderAddress(email.from)
   if (!address) return { status: 'not_newsletter' }
   const url = newsletterUrl(address)
-  let watch = await getWatchByUrl(community, url)
-  if (!watch) {
-    watch = await addWatch(community, {
-      kind: 'website',
-      url,
-      resourceId: null,
-      label: senderName(email.from) ?? address,
-      createdBy: NEWSLETTER_WATCH_CREATOR,
-      active: false,
-    })
-    return { status: 'unlinked', watchId: watch?.id ?? null }
-  }
+  const watch = await getWatchByUrl(community, url)
+  if (!watch) return { status: 'unknown' }
   if (isIgnoredSender(watch)) return { status: 'ignored' }
   if (!isNewsletterWatch(watch)) return { status: 'not_newsletter' }
   if (!watch.resourceId) return { status: 'unlinked', watchId: watch.id }

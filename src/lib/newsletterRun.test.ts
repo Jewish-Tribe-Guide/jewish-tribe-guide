@@ -9,6 +9,7 @@ import type { Watch } from './watches'
 const m = vi.hoisted(() => ({
   getWatchByUrl: vi.fn(),
   addWatch: vi.fn(),
+  listWatches: vi.fn(),
   updateWatch: vi.fn(),
   listApprovedResources: vi.fn(),
   listCategories: vi.fn(),
@@ -18,7 +19,7 @@ const m = vi.hoisted(() => ({
   sendWatchDigest: vi.fn(),
   upload: vi.fn(),
 }))
-vi.mock('@/lib/watchStore', () => ({ getWatchByUrl: m.getWatchByUrl, addWatch: m.addWatch, updateWatch: m.updateWatch }))
+vi.mock('@/lib/watchStore', () => ({ getWatchByUrl: m.getWatchByUrl, addWatch: m.addWatch, updateWatch: m.updateWatch, listWatches: m.listWatches }))
 vi.mock('@/lib/resourceStore', () => ({ listApprovedResources: m.listApprovedResources }))
 vi.mock('@/lib/categoryStore', () => ({ listCategories: m.listCategories }))
 vi.mock('@/lib/shulWeekReading', () => ({ readShulWeek: m.readShulWeek }))
@@ -29,7 +30,7 @@ vi.mock('@/lib/supabase/admin', () => ({
   getAdminClient: () => ({ storage: { from: () => ({ upload: m.upload, getPublicUrl: (p: string) => ({ data: { publicUrl: `https://kept/${p}` } }) }) } }),
 }))
 
-const { receiveNewsletter, emailHash } = await import('./newsletterRun')
+const { receiveNewsletter, emailHash, newsletterSenders } = await import('./newsletterRun')
 
 const SHUL = '0b6c4c1e-2f55-4a8e-9d57-3b7f0d6f4a21'
 const STORE = '5a1f0c2e-7b3d-4e8a-9c6f-1d2e3f4a5b6c'
@@ -108,20 +109,21 @@ beforeEach(() => {
 })
 
 describe('receiveNewsletter: who it’s from', () => {
-  it('adds a sender it hasn’t seen, paused and unlinked, and reads nothing', async () => {
+  // Only the Watches tab's senders are sent (newsletterSenders), so a
+  // stranger's email is a slip, not a new newsletter: it adds no row.
+  it('leaves a sender no one added alone: adds no watch and reads nothing', async () => {
     m.getWatchByUrl.mockResolvedValue(null)
-    expect(await receiveNewsletter('philly', email, opts)).toEqual({ status: 'unlinked', watchId: 'new' })
+    expect(await receiveNewsletter('philly', email, opts)).toEqual({ status: 'unknown' })
     expect(m.getWatchByUrl).toHaveBeenCalledWith('philly', 'mailto:info@mekorhabracha.org')
-    expect(m.addWatch).toHaveBeenCalledWith('philly', {
-      kind: 'website',
-      url: 'mailto:info@mekorhabracha.org',
-      resourceId: null,
-      label: 'Mekor Habracha',
-      createdBy: NEWSLETTER_WATCH_CREATOR,
-      active: false,
-    })
+    expect(m.addWatch).not.toHaveBeenCalled()
     expect(m.readShulWeek).not.toHaveBeenCalled()
     expect(m.readMessage).not.toHaveBeenCalled()
+  })
+
+  it('names the senders whose emails the script should send', async () => {
+    m.listWatches.mockResolvedValue({ watches: [watch, { ...watch, id: 'w2', url: 'mailto:new@shul.org', resourceId: null, active: false }], available: true })
+    expect(await newsletterSenders('philly')).toEqual(['info@mekorhabracha.org'])
+    expect(m.listWatches).toHaveBeenCalledWith('philly')
   })
 
   it('leaves an email from an unlinked sender to wait, a paused one and an ignored one alone', async () => {

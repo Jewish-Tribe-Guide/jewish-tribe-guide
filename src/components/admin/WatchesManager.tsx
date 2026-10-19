@@ -16,8 +16,9 @@ import { isIgnoredSender, isNewsletterWatch } from '@/lib/newsletter'
 // working, and a way to add one. Keystone-K's list files its differences as
 // suggestions; any other page is checked for a change. A watch that breaks
 // emails the admins once, and shows here in red until it works again.
-// A shul's newsletter is watched by its sender's address (newsletter.ts):
-// a sender the guide hasn't seen comes in unlinked, to be tied to its shul.
+// A shul's newsletter is watched by its sender's address (newsletter.ts),
+// added here with its shul. A sender left without one (from before the
+// Gmail script sent only these, Oct 18) can still be tied to its shul.
 
 type Listing = { id: string; name: string; categoryLabel: string }
 type Loaded = { available: boolean; watches: Watch[]; listings: Listing[] }
