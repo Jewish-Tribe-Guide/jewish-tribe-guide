@@ -5,29 +5,42 @@ import { useLoadOnMount } from '@/lib/useLoadOnMount'
 import { fetchJson } from '@/lib/fetchJson'
 import { withCommunity } from '@/lib/useCommunityData'
 import { useCommunitySlug } from '@/lib/communityContext'
-import { MENU_WATCH_CREATOR, watchHealth, type Watch } from '@/lib/watches'
+import { MENU_WATCH_CREATOR, kindForUrl, normalizeWatchUrl, watchHealth, type Watch } from '@/lib/watches'
 import { refuahHospitalId } from '@/lib/refuahWatch'
 import { isMekorList } from '@/lib/mekorWatch'
 import { isListingPageWatch } from '@/lib/listingPageWatch'
 import { groupWatches, watchGroupOf, type WatchGroup, type WatchGroupKey, type WatchRank, type WatchRow } from '@/lib/watchGroups'
 import { isIgnoredSender, isNewsletterWatch } from '@/lib/newsletter'
+import { WATCH_PURPOSES, purposeInfo, sourceKind, sourceProblem, type ListingReads, type WatchPurpose } from '@/lib/watchPurposes'
+import { eruvView } from '@/lib/eruv'
+import type { AdminEruv } from '@/lib/eruvStore'
+import EruvKeptEmail from './EruvKeptEmail'
 
 // ── The "Watches" tab (freshness map, Oct 5) ────────────────────────────────
-// The pages the guide reads on its own every morning, whether each is still
-// working, and a way to add one. Keystone-K's list files its differences as
-// suggestions; any other page is checked for a change. A watch that breaks
-// emails the admins once, and shows here in red until it works again.
-// A shul's newsletter is watched by its sender's address (newsletter.ts),
-// added here with its shul. A sender left without one (from before the
-// Gmail script sent only these, Oct 18) can still be tied to its shul.
+// Everything the guide reads on its own to stay current: pages every
+// morning, emails as they arrive, eruv statuses on Friday afternoon. Since
+// Oct 19 it's laid out by what each keeps current (watchPurposes.ts): "Add a
+// watch" asks that first, then the place, then where it's read, and the
+// list below is grouped in the same words. A row leads with the place, then
+// where it's read from and what it last found; tapping it opens what it
+// does and its buttons. What needs the admin (not working, a sender to link,
+// an email to read, an eruv with no source) shows without opening anything.
+//
+// Eruv status moved here from the Eruvim tab (the user, Oct 19): an eruv's
+// source is its status page or status email, kept on the eruv
+// (/api/admin/eruvim), listed here first.
 
-type Listing = { id: string; name: string; categoryLabel: string }
+type Listing = { id: string; name: string; categoryLabel: string; reads: ListingReads }
 type Loaded = { available: boolean; watches: Watch[]; listings: Listing[] }
+type Eruvim = { available: boolean; timezone: string; eruvim: AdminEruv[] }
 type Action = 'check' | 'pause' | 'resume' | 'remove' | 'link' | 'ignore'
 
 /** A group longer than this starts closed, showing only what needs a look. */
 const OPEN_UP_TO = 4
 const collapsible = (g: WatchGroup) => g.rows.length > OPEN_UP_TO
+
+const BUTTON = 'rounded border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50'
+const INPUT = 'mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm'
 
 function day(iso: string): string {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
@@ -37,134 +50,238 @@ function shortUrl(url: string): string {
   return url.replace(/^mailto:/i, '').replace(/^https?:\/\/(www\.)?/i, '').replace(/\/$/, '')
 }
 
-function HealthLine({ watch, now }: { watch: Watch; now: number }) {
-  const h = watchHealth(watch, now)
-  if (h.state === 'paused') return <p className="text-sm text-slate-500">Paused</p>
-  if (h.state === 'waiting') return <p className="text-sm text-slate-500">Not checked yet: the first check is tomorrow morning, or press Check now.</p>
-  if (h.state === 'stale') {
-    return (
-      <p className="text-sm font-medium text-red-700">
-        Not checked since {day(h.lastRunAt)}. The daily run may have stopped.
-      </p>
-    )
-  }
-  if (h.state === 'failing') {
-    return (
-      <p className="text-sm font-medium text-red-700">
-        Not working since {day(h.since)}: {h.error}
-      </p>
-    )
-  }
-  return <p className="text-sm text-green-700">Working · read {day(h.since)}</p>
+function filedText(n: number): string {
+  return n === 0 ? 'nothing new' : `${n} suggestion${n === 1 ? '' : 's'} in the queue`
 }
 
-function WhatItDoes({ watch }: { watch: Watch }) {
-  const lastRead = watch.lastFiled !== null && ` Last read: ${watch.lastFiled === 0 ? 'nothing new' : `${watch.lastFiled} suggestion${watch.lastFiled === 1 ? '' : 's'}`}.`
-  if (isIgnoredSender(watch)) return <p className="text-xs text-muted">Not a shul: its emails are skipped. Remove this to read them again.</p>
-  // A shul's newsletter, read as it comes in (newsletter.ts).
-  if (isNewsletterWatch(watch)) {
-    return (
-      <p className="text-xs text-muted" data-testid="newsletter-watch">
-        Its newsletters, read as they come in. Changed times, and anything else it says about a place in the guide, go to the moderation queue with the
-        email beside them. You&rsquo;re emailed if none comes for a month.{' '}
-        {watch.pageChangedAt ? `Last newsletter ${day(watch.pageChangedAt)}.` : 'No newsletter read yet.'}
-        {watch.pageChangedAt && lastRead}
-      </p>
-    )
-  }
-  if (watch.kind === 'keystone_list') {
-    return (
-      <p className="text-xs text-muted">
-        Compared with the guide every morning. Differences go to the moderation queue, quoting the list.
-        {lastRead}
-      </p>
-    )
-  }
-  // Mekor Habracha's kosher list, read place by place (mekorWatch.ts).
-  if (isMekorList(watch.url)) {
-    return (
-      <p className="text-xs text-muted" data-testid="mekor-watch">
-        Compared with the guide every morning. A place it lists that the guide lacks, and any hechsher the guide shows that it doesn&rsquo;t (IKC
-        above all), go to the moderation queue, quoting the list. Nothing is taken off without you.
-        {lastRead}
-      </p>
-    )
-  }
-  // A hospital's page on Refuah is read from its data and compared with the
-  // hospital's listing (refuahWatch.ts), like Keystone-K's list.
-  if (refuahHospitalId(watch.url)) {
-    return (
-      <p className="text-xs text-muted">
-        Compared with the hospital every morning. A new contact, or a changed phone, email or website, goes to the moderation queue as from Refuah.
-        {lastRead}
-      </p>
-    )
-  }
-  // A food place's menu, given its watch by the daily run (menuWatch.ts).
-  if (watch.createdBy === MENU_WATCH_CREATOR) {
-    return (
-      <p className="text-xs text-muted" data-testid="menu-watch">
-        Its menu link, checked every morning. When the menu changes, the AI reads it, and dishes the listing doesn’t have wait on the Main dishes tab. Added for every place with a menu link: pause it to stop it.{' '}
-        {watch.pageChangedAt ? `Last changed ${day(watch.pageChangedAt)}.` : 'No change since it was added.'}
-        {watch.lastFiled ? ` Last read: new dishes for the Main dishes tab.` : ''}
-      </p>
-    )
-  }
-  // A shul's or mikvah's own page, read by the AI when it changes
-  // (listingPageWatch.ts).
-  if (isListingPageWatch(watch)) {
-    return (
-      <p className="text-xs text-muted" data-testid="listing-page-watch">
-        Checked every morning. When the page changes, the AI reads it, and davening times or hours that differ from the listing go to the
-        moderation queue with the page beside them. A page that agrees changes nothing, not even the listing&rsquo;s date.{' '}
-        {watch.pageChangedAt ? `Last changed ${day(watch.pageChangedAt)}.` : 'No change since it was added.'}
-        {watch.pageChangedAt && lastRead}
-      </p>
-    )
-  }
+type Pill = { tone: 'ok' | 'bad' | 'todo' | 'off'; text: string }
+const PILL: Record<Pill['tone'], string> = {
+  ok: 'bg-green-50 text-green-800',
+  bad: 'bg-red-50 text-red-700',
+  todo: 'bg-amber-50 text-amber-800',
+  off: 'bg-slate-100 text-slate-600',
+}
+
+function PillTag({ pill }: { pill: Pill }) {
+  return <span className={`shrink-0 whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-semibold ${PILL[pill.tone]}`}>{pill.text}</span>
+}
+
+function Glyph({ mail }: { mail: boolean }) {
+  return mail ? (
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true" className="shrink-0">
+      <rect x="1.8" y="3.3" width="12.4" height="9.4" rx="1.4" />
+      <path d="M2.3 4l5.7 4.6L13.7 4" />
+    </svg>
+  ) : (
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true" className="shrink-0">
+      <circle cx="8" cy="8" r="6.2" />
+      <path d="M1.8 8h12.4M8 1.8c1.8 1.9 2.6 4 2.6 6.2S9.8 12.3 8 14.2M8 1.8C6.2 3.7 5.4 5.8 5.4 8s.8 4.3 2.6 6.2" />
+    </svg>
+  )
+}
+
+/** Where a watch is read from: its page (a link) or the address its emails
+ *  come from. */
+function Source({ url }: { url: string | null }) {
+  if (!url) return <p className="text-xs text-slate-500">No source yet</p>
+  const mail = url.startsWith('mailto:') || !/^https?:/i.test(url)
   return (
-    <p className="text-xs text-muted">
-      Checked every morning for a change.{' '}
-      {watch.pageChangedAt ? (
-        <strong className="text-amber-800">Changed {day(watch.pageChangedAt)}: worth a look.</strong>
+    <p className="flex min-w-0 items-center gap-1.5 text-xs text-slate-600">
+      <Glyph mail={mail} />
+      {mail ? (
+        <span className="truncate">{shortUrl(url)}</span>
       ) : (
-        'No change since it was added.'
+        <a href={url} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="truncate text-primary underline">
+          {shortUrl(url)}
+        </a>
       )}
     </p>
   )
 }
 
+/** A watch's state, in a word or two. */
+function pillOf(w: Watch, now: number): Pill {
+  if (isIgnoredSender(w)) return { tone: 'off', text: 'Skipped' }
+  if (isNewsletterWatch(w) && !w.resourceId) return { tone: 'todo', text: 'To link' }
+  const h = watchHealth(w, now)
+  if (h.state === 'paused') return { tone: 'off', text: 'Paused' }
+  if (h.state === 'waiting') return { tone: 'off', text: isNewsletterWatch(w) ? 'No email yet' : 'Not checked yet' }
+  if (h.state === 'working') return { tone: 'ok', text: 'Working' }
+  return { tone: 'bad', text: 'Not working' }
+}
+
+/** What it last found, in one line. A broken or stale watch says why. */
+function LastLine({ watch: w, now }: { watch: Watch; now: number }) {
+  const h = watchHealth(w, now)
+  if (isIgnoredSender(w)) return <p className="text-sm text-slate-500">Not a shul: its emails are skipped. Remove this to read them again.</p>
+  if (h.state === 'stale') return <p className="text-sm font-medium text-red-700">Not checked since {day(h.lastRunAt)}. The daily run may have stopped.</p>
+  if (h.state === 'failing') return <p className="text-sm font-medium text-red-700">Not working since {day(h.since)}: {h.error}</p>
+  const filed = w.lastFiled !== null ? `: ${filedText(w.lastFiled)}` : ''
+  // A newsletter is read when one comes, not checked on a morning.
+  if (isNewsletterWatch(w)) return <p className="text-sm text-slate-700">{w.pageChangedAt ? `Newsletter ${day(w.pageChangedAt)}${filed}` : 'No newsletter read yet.'}</p>
+  if (h.state === 'waiting') return <p className="text-sm text-slate-500">Not checked yet: the first check is tomorrow morning, or press Check now.</p>
+  if (w.createdBy === MENU_WATCH_CREATOR) {
+    return <p className="text-sm text-slate-700">{w.pageChangedAt ? `Changed ${day(w.pageChangedAt)}${w.lastFiled ? ': new dishes on the Main dishes tab' : ''}` : 'No change since it was added.'}</p>
+  }
+  if (isListingPageWatch(w)) return <p className="text-sm text-slate-700">{w.pageChangedAt ? `Changed ${day(w.pageChangedAt)}${filed}` : 'No change since it was added.'}</p>
+  if (w.kind === 'keystone_list' || isMekorList(w.url) || refuahHospitalId(w.url)) {
+    return <p className="text-sm text-slate-700">Read {day(w.lastOkAt ?? w.lastRunAt!)}{filed}</p>
+  }
+  return w.pageChangedAt ? (
+    <p className="text-sm font-semibold text-amber-800">Changed {day(w.pageChangedAt)}: worth a look.</p>
+  ) : (
+    <p className="text-sm text-slate-700">No change since it was added.</p>
+  )
+}
+
+/** What a watch does, for the opened row. */
+function WhatItDoes({ watch }: { watch: Watch }) {
+  if (isIgnoredSender(watch)) return null
+  if (isNewsletterWatch(watch)) {
+    return (
+      <p className="text-xs text-muted" data-testid="newsletter-watch">
+        Its newsletters, read as they come in. Changed times, and anything else it says about a place in the guide, go to the moderation queue with the
+        email beside them. You&rsquo;re emailed if none comes for a month.
+      </p>
+    )
+  }
+  if (watch.kind === 'keystone_list') {
+    return <p className="text-xs text-muted">Compared with the guide every morning. Differences go to the moderation queue, quoting the list.</p>
+  }
+  if (isMekorList(watch.url)) {
+    return (
+      <p className="text-xs text-muted" data-testid="mekor-watch">
+        Compared with the guide every morning. A place it lists that the guide lacks, and any hechsher the guide shows that it doesn&rsquo;t (IKC
+        above all), go to the moderation queue, quoting the list. Nothing is taken off without you.
+      </p>
+    )
+  }
+  if (refuahHospitalId(watch.url)) {
+    return (
+      <p className="text-xs text-muted">
+        Compared with the hospital every morning. A new contact, or a changed phone, email or website, goes to the moderation queue as from Refuah.
+      </p>
+    )
+  }
+  if (watch.createdBy === MENU_WATCH_CREATOR) {
+    return (
+      <p className="text-xs text-muted" data-testid="menu-watch">
+        Its menu link, checked every morning. When the menu changes, the AI reads it, and dishes the listing doesn’t have wait on the Main dishes tab. Added for every place with a menu link: pause it to stop it.
+      </p>
+    )
+  }
+  if (isListingPageWatch(watch)) {
+    return (
+      <p className="text-xs text-muted" data-testid="listing-page-watch">
+        Checked every morning. When the page changes, the AI reads it, and davening times or hours that differ from the listing go to the
+        moderation queue with the page beside them. A page that agrees changes nothing, not even the listing&rsquo;s date.
+      </p>
+    )
+  }
+  return <p className="text-xs text-muted">Checked every morning for a change. You look at the page and decide.</p>
+}
+
+/** One row: the place, where it's read from, what it last found, and its
+ *  state. Tapping it opens what it does and its buttons. `alwaysShown` is
+ *  what needs the admin, shown without opening anything. */
+function Row({
+  name,
+  source,
+  pill,
+  last,
+  alwaysShown,
+  children,
+  testId,
+}: {
+  name: string
+  source: React.ReactNode
+  pill: Pill
+  last: React.ReactNode
+  alwaysShown?: React.ReactNode
+  children?: React.ReactNode
+  testId: string
+}) {
+  const [open, setOpen] = useState(false)
+  return (
+    <li className="px-4 py-3" data-testid={testId}>
+      {children ? (
+        <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} className="block w-full cursor-pointer text-left">
+          <RowHead name={name} source={source} pill={pill} last={last} open={open} />
+        </button>
+      ) : (
+        <RowHead name={name} source={source} pill={pill} last={last} />
+      )}
+      {alwaysShown}
+      {open && children && <div className="mt-2 space-y-2">{children}</div>}
+    </li>
+  )
+}
+
+function RowHead({ name, source, pill, last, open }: { name: string; source: React.ReactNode; pill: Pill; last: React.ReactNode; open?: boolean }) {
+  return (
+    <span className="flex items-start gap-3">
+      <span className="min-w-0 flex-1 space-y-0.5">
+        <span className="block font-semibold text-slate-900" data-testid="watch-name">{name}</span>
+        {source}
+        {last}
+      </span>
+      <span className="flex shrink-0 flex-col items-end gap-1">
+        <PillTag pill={pill} />
+        {open !== undefined && (
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true" className={`text-slate-400 ${open ? 'rotate-180' : ''}`}>
+            <path d="M4 6l4 4 4-4" />
+          </svg>
+        )}
+      </span>
+    </span>
+  )
+}
+
 /** One group: a heading that says how many and what needs doing, and its
  *  rows. A long group starts closed, but a row that needs a look (or one
- *  the admin just acted on) shows anyway, so nothing broken hides. */
-function WatchGroupSection({ group, open, onToggle, children }: { group: WatchGroup; open: boolean; onToggle: () => void; children: (row: WatchRow) => React.ReactNode }) {
-  const { toLink, notWorking, paused } = group.counts
-  const shown = open ? group.rows : group.rows.filter((r) => r.needsLook || r.keepShown)
-  const notes = [
-    toLink > 0 && <span key="link" className="text-amber-800">{toLink} to link</span>,
-    notWorking > 0 && <span key="broken" className="text-red-700">{notWorking} not working</span>,
-    paused > 0 && <span key="paused" className="text-slate-500">{paused} paused</span>,
-  ].filter(Boolean)
+ *  acted on this visit) shows anyway. */
+function GroupSection({
+  label,
+  total,
+  needs,
+  note,
+  collapsibleGroup,
+  open,
+  onToggle,
+  children,
+}: {
+  label: string
+  total: number
+  needs: string | null
+  note?: string
+  collapsibleGroup: boolean
+  open: boolean
+  onToggle: () => void
+  children: React.ReactNode
+}) {
   const heading = (
     <>
-      <span className="font-semibold text-slate-900">{group.label}</span>{' '}
-      <span className="text-slate-500">{group.rows.length}</span>{' '}
-      {notes.length > 0 && <span className="font-medium">{notes.flatMap((n, i) => (i ? [', ', n] : [n]))}</span>}
+      <span className="font-semibold text-slate-900">{label}</span> <span className="text-slate-500">{total}</span>{' '}
+      {needs ? (
+        <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-800">{needs}</span>
+      ) : total > 0 ? (
+        <span className="rounded-full bg-green-50 px-2 py-0.5 text-xs font-semibold text-green-800">All working</span>
+      ) : null}
     </>
   )
   return (
-    <section className="rounded-lg border border-slate-200 bg-white" data-testid="watch-group" aria-label={group.label}>
+    <section className="rounded-lg border border-slate-200 bg-white" data-testid="watch-group" aria-label={label}>
       <h3 className="text-sm">
-        {collapsible(group) ? (
-          <button type="button" aria-expanded={open} onClick={onToggle} className="flex w-full flex-wrap items-baseline gap-x-2 gap-y-1 px-4 py-3 text-left">
-            {heading}{' '}
-            <span className="ml-auto text-xs font-medium text-primary">{open ? 'Hide' : `Show all ${group.rows.length}`}</span>
+        {collapsibleGroup ? (
+          <button type="button" aria-expanded={open} onClick={onToggle} className="flex w-full flex-wrap items-baseline gap-x-2 gap-y-1 px-4 py-3 text-left hover:bg-slate-50">
+            {heading} <span className="ml-auto text-xs font-medium text-primary">{open ? 'Hide' : `Show all ${total}`}</span>
           </button>
         ) : (
           <span className="flex flex-wrap items-baseline gap-x-2 gap-y-1 px-4 py-3">{heading}</span>
         )}
       </h3>
-      {shown.length > 0 && <ul className="divide-y divide-slate-100 border-t border-slate-100">{shown.map(children)}</ul>}
+      {note && <p className="px-4 pb-3 text-xs text-muted">{note}</p>}
+      {children}
     </section>
   )
 }
@@ -175,7 +292,7 @@ function NewsletterLink({ listings, busy, onLink, onIgnore }: { listings: Listin
   const [name, setName] = useState('')
   const listing = listings.find((l) => l.name === name.trim())
   return (
-    <div className="space-y-2" data-testid="newsletter-unlinked">
+    <div className="mt-2 space-y-2" data-testid="newsletter-unlinked">
       <p className="text-sm font-medium text-amber-800">Not linked to a shul yet. Its emails wait in the guide&rsquo;s inbox until it is.</p>
       <div className="flex flex-wrap gap-2">
         <input
@@ -187,20 +304,10 @@ function NewsletterLink({ listings, busy, onLink, onIgnore }: { listings: Listin
           placeholder="The shul it’s from"
           className="min-w-0 flex-1 rounded-md border border-slate-300 px-3 py-1.5 text-sm"
         />
-        <button
-          type="button"
-          disabled={busy || !listing}
-          onClick={() => listing && onLink(listing.id)}
-          className="rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
-        >
+        <button type="button" disabled={busy || !listing} onClick={() => listing && onLink(listing.id)} className="rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50">
           Link
         </button>
-        <button
-          type="button"
-          disabled={busy}
-          onClick={onIgnore}
-          className="rounded border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-        >
+        <button type="button" disabled={busy} onClick={onIgnore} className={BUTTON}>
           Not a shul
         </button>
       </div>
@@ -208,16 +315,211 @@ function NewsletterLink({ listings, busy, onLink, onIgnore }: { listings: Listin
   )
 }
 
+/** An eruv's state as a watch: no source, can't be read, an email to
+ *  read, or working. */
+function eruvPill(e: AdminEruv): Pill {
+  if (!e.statusUrl && !e.statusEmail) return { tone: 'todo', text: 'No source' }
+  if (e.statusEmailKept) return { tone: 'todo', text: 'Email to read' }
+  if (e.statusUrl && e.statusErrorAt && (!e.statusCheckedAt || Date.parse(e.statusErrorAt) > Date.parse(e.statusCheckedAt))) return { tone: 'bad', text: 'Not working' }
+  return { tone: 'ok', text: 'Working' }
+}
+
+/** What "Add a watch" says will happen, once it knows enough to say. */
+function planFor(purpose: WatchPurpose, source: string, place: string | null): { main: string; small: string } {
+  const s = shortUrl(source.trim())
+  const p = place ?? 'the listing'
+  const email = sourceKind(source) === 'email'
+  switch (purpose) {
+    case 'eruv':
+      return email
+        ? { main: `Each email from ${s} is read for “up” or “down” and shown on ${p} at once, through that week’s Shabbos.`, small: 'The guide’s Gmail must get its emails. One it can’t make out waits for you on its row.' }
+        : { main: `The guide reads ${s} every 15 minutes on Friday afternoon, and shows ${p}’s status at once.`, small: 'It never sets a status itself: a page it can’t make out shows no status.' }
+    case 'times':
+      return { main: `Every morning the guide reads ${s}. Usual times that differ from ${p}’s go to the moderation queue, with the page beside them.`, small: 'A page that agrees changes nothing. One week’s times are left to the newsletter.' }
+    case 'weekly':
+      return { main: `Each newsletter from ${s} is read as it arrives, for that week’s times and anything else it says about ${p}. What differs goes to the moderation queue with the email beside it.`, small: 'The guide’s Gmail must be on the shul’s list. You’re emailed if none comes for a month.' }
+    case 'hours':
+      return { main: `Every morning the guide reads ${s}. Hours that differ from ${p}’s go to the moderation queue, with the page beside them.`, small: 'A page that agrees changes nothing.' }
+    case 'kosher': {
+      const url = normalizeWatchUrl(source)
+      return url && (kindForUrl(url) === 'keystone_list' || isMekorList(url))
+        ? { main: 'Every morning the list is compared with the guide, place by place. Differences go to the moderation queue, quoting the list.', small: 'Nothing is taken off the site without you.' }
+        : { main: `Every morning the guide checks ${s}, and marks its row when it changes.`, small: 'The guide reads a list place by place only once it has learned that list, as it has Keystone-K’s and Mekor Habracha’s. Until then it tells you the page changed.' }
+    }
+    case 'hospital':
+      return { main: `Every morning Refuah’s contacts for ${p} are compared with the listing. A new or changed phone, email or website goes to the moderation queue.`, small: 'When Refuah agrees, the listing is dated as confirmed by Refuah.' }
+    default:
+      return { main: `Every morning the guide checks ${s}, and marks its row when the page changes.`, small: 'It reads nothing into it: you look and decide.' }
+  }
+}
+
+const SOURCE_HELP: Record<WatchPurpose, string> = {
+  eruv: 'The eruv’s status page, or the address its “The eruv is up” emails come from (a mailing list’s own address, …@groups.io, for a list).',
+  times: 'The shul’s own page of davening times.',
+  weekly: 'The address the shul’s newsletter comes from.',
+  hours: 'The place’s own page of hours: a mikvah’s, or any place with hours.',
+  kosher: 'A hechsher’s list of the places it supervises.',
+  menu: '',
+  hospital: 'The hospital’s own page on Refuah (refuah.com/hospitals/…).',
+  other: 'Any page you want to hear about when it changes.',
+}
+
+/** "Add a watch": what it keeps current, then the place, then where it's
+ *  read from, then what will happen. */
+function AddWatch({
+  listings,
+  eruvim,
+  start,
+  busy,
+  onAdd,
+  onCancel,
+}: {
+  listings: Listing[]
+  eruvim: AdminEruv[] | null
+  start: { purpose: WatchPurpose; eruvId?: string } | null
+  busy: boolean
+  onAdd: (a: { purpose: WatchPurpose; source: string; listing: Listing | null; eruv: AdminEruv | null; statusDated: boolean }) => Promise<boolean>
+  onCancel: () => void
+}) {
+  const [purpose, setPurpose] = useState<WatchPurpose | null>(start?.purpose ?? null)
+  const [placeName, setPlaceName] = useState('')
+  const [eruvId, setEruvId] = useState(start?.eruvId ?? '')
+  const [source, setSource] = useState('')
+  const [statusDated, setStatusDated] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const info = purpose ? purposeInfo(purpose) : null
+  const choices = info?.placeReads ? listings.filter((l) => l.reads === info.placeReads) : listings
+  const listing = info?.place === 'listing' ? (choices.find((l) => l.name === placeName.trim()) ?? null) : null
+  const eruv = info?.place === 'eruv' ? (eruvim?.find((e) => e.id === eruvId) ?? null) : null
+  const placeLabel = info?.place === 'eruv' ? eruv?.name ?? null : listing?.name ?? null
+  const kind = sourceKind(source)
+  const problem = purpose && source.trim() ? sourceProblem(purpose, source) : null
+  const ready = !!purpose && !!source.trim() && !problem && (info?.place === null || (info?.place === 'listing' ? !!listing : !!eruv))
+  const plan = purpose && source.trim() && !problem ? planFor(purpose, source, placeLabel) : null
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!purpose) return
+    if (info?.place === 'listing' && !listing) return setError(`Pick the ${purpose === 'times' || purpose === 'weekly' ? 'shul' : 'place'} from the list.`)
+    if (info?.place === 'eruv' && !eruv) return setError('Pick the eruv.')
+    if (problem) return setError(problem)
+    setError(null)
+    await onAdd({ purpose, source, listing, eruv, statusDated })
+  }
+
+  return (
+    <form onSubmit={submit} className="space-y-5 rounded-lg border border-slate-200 bg-white p-4" aria-labelledby="add-watch-title" data-testid="add-watch">
+      <div className="flex items-baseline justify-between gap-3">
+        <h2 id="add-watch-title" className="text-base font-semibold text-slate-900">
+          Add a watch
+        </h2>
+        <button type="button" onClick={onCancel} className={BUTTON}>
+          Cancel
+        </button>
+      </div>
+
+      <fieldset className="space-y-2">
+        <legend className="text-sm font-semibold text-slate-800">What should it keep current?</legend>
+        <div className="flex flex-wrap gap-2">
+          {WATCH_PURPOSES.filter((p) => p.addable).map((p) => (
+            <button
+              key={p.key}
+              type="button"
+              aria-pressed={purpose === p.key}
+              onClick={() => {
+                setPurpose(p.key)
+                setPlaceName('')
+                setError(null)
+              }}
+              className={`rounded-full border px-3 py-1.5 text-sm ${purpose === p.key ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-300 bg-white text-slate-800 hover:bg-slate-50'}`}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+      </fieldset>
+
+      {purpose && info && (
+        <>
+          {info.place === 'listing' && (
+            <label className="block text-sm">
+              <span className="font-semibold text-slate-800">Which place?</span>
+              <input type="text" list="watch-add-places" value={placeName} onChange={(e) => setPlaceName(e.target.value)} placeholder="Start typing a name" className={INPUT} />
+              <datalist id="watch-add-places">
+                {choices.map((l) => (
+                  <option key={l.id} value={l.name}>
+                    {l.categoryLabel}
+                  </option>
+                ))}
+              </datalist>
+            </label>
+          )}
+          {info.place === 'eruv' && (
+            <label className="block text-sm">
+              <span className="font-semibold text-slate-800">Which eruv?</span>
+              <select value={eruvId} onChange={(e) => setEruvId(e.target.value)} className={INPUT}>
+                <option value="">Pick one</option>
+                {(eruvim ?? []).map((e) => (
+                  <option key={e.id} value={e.id}>
+                    {e.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          <label className="block text-sm">
+            <span className="font-semibold text-slate-800">Where does the guide read it?</span>
+            <input
+              type="text"
+              inputMode={info.source === 'email' ? 'email' : 'url'}
+              value={source}
+              onChange={(e) => setSource(e.target.value)}
+              placeholder={info.source === 'email' ? 'office@shul.org' : info.source === 'either' ? 'A web address, or an email address' : 'A web address'}
+              className={INPUT}
+            />
+            <span className="mt-1 block text-xs text-muted">{SOURCE_HELP[purpose]}</span>
+            {problem ? (
+              <span className="mt-1 block text-xs font-medium text-red-700">{problem}</span>
+            ) : kind ? (
+              <span className="mt-1 block text-xs font-medium text-green-800">{kind === 'email' ? 'An email address: read as each email arrives.' : 'A web page.'}</span>
+            ) : null}
+          </label>
+          {purpose === 'eruv' && kind === 'page' && (
+            <label className="flex items-start gap-2 text-sm text-slate-700">
+              <input type="checkbox" className="mt-0.5" checked={statusDated} onChange={(e) => setStatusDated(e.target.checked)} />
+              <span>
+                It dates each week’s post
+                <span className="block text-xs text-muted">Then last week’s “up” shows as “Not posted yet this week”. Leave off for an eruv whose date is only when it last changed.</span>
+              </span>
+            </label>
+          )}
+          {plan && (
+            <div className="space-y-1 rounded-md bg-amber-50/60 px-3 py-2.5 text-sm text-slate-800" data-testid="add-watch-plan">
+              <p>{plan.main}</p>
+              <p className="text-xs text-muted">{plan.small}</p>
+            </div>
+          )}
+          {error && <p className="text-sm text-red-700">{error}</p>}
+          <div className="flex flex-wrap items-center gap-3">
+            <button type="submit" disabled={busy || !ready} className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
+              {busy ? 'Checking…' : 'Start watching'}
+            </button>
+            <span className="text-xs text-muted">A page is checked once straight away, so you&rsquo;ll see at once whether the guide can read it.</span>
+          </div>
+        </>
+      )}
+    </form>
+  )
+}
+
 export default function WatchesManager({ token }: { token: string }) {
   const community = useCommunitySlug()
   const [data, setData] = useState<Loaded | null>(null)
+  const [eruvData, setEruvData] = useState<Eruvim | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
-  const [url, setUrl] = useState('')
-  const [listingName, setListingName] = useState('')
-  const [label, setLabel] = useState('')
-  const [forListing, setForListing] = useState(false)
+  const [adding, setAdding] = useState<{ purpose: WatchPurpose; eruvId?: string } | 'open' | null>(null)
   // Read once per render pass for every row alike; the tab is reloaded to refresh.
   const [now] = useState(() => Date.now())
   // Long groups the admin has opened, and the rows they've acted on.
@@ -229,11 +531,20 @@ export default function WatchesManager({ token }: { token: string }) {
       if (!next.delete(key)) next.add(key)
       return next
     })
+  const auth = { Authorization: `Bearer ${token}` }
 
   const load = useCallback(async () => {
     setError(null)
     try {
-      setData(await fetchJson<Loaded>(withCommunity('/api/admin/watches', community), { headers: { Authorization: `Bearer ${token}` } }, 'Failed to load the watches.'))
+      const headers = { Authorization: `Bearer ${token}` }
+      const [watches, eruvim] = await Promise.all([
+        fetchJson<Loaded>(withCommunity('/api/admin/watches', community), { headers }, 'Failed to load the watches.'),
+        // The eruvim are a part of the tab, not the whole: without them, the
+        // rest still shows.
+        fetchJson<Eruvim>(withCommunity('/api/admin/eruvim', community), { headers }, 'Failed to load the eruvim.').catch(() => null),
+      ])
+      setData(watches)
+      setEruvData(eruvim)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.')
     }
@@ -241,19 +552,15 @@ export default function WatchesManager({ token }: { token: string }) {
 
   useLoadOnMount(load)
 
-  const post = (body: unknown) =>
-    fetchJson<{ watch?: Watch }>(
-      withCommunity('/api/admin/watches', community),
-      { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body) },
-      'Could not do that.',
-    )
+  const post = <T,>(path: string, body: unknown) =>
+    fetchJson<T>(withCommunity(path, community), { method: 'POST', headers: { ...auth, 'Content-Type': 'application/json' }, body: JSON.stringify(body) }, 'Could not do that.')
 
   async function actOn(watch: Watch, action: Action, resourceId?: string) {
     if (action === 'remove' && !window.confirm(`Stop watching ${shortUrl(watch.url)}?`)) return
     setSaveError(null)
     setBusy(watch.id)
     try {
-      const res = await post({ action, id: watch.id, ...(resourceId ? { resourceId } : {}) })
+      const res = await post<{ watch?: Watch }>('/api/admin/watches', { action, id: watch.id, ...(resourceId ? { resourceId } : {}) })
       setData((d) =>
         d && {
           ...d,
@@ -267,34 +574,48 @@ export default function WatchesManager({ token }: { token: string }) {
     }
   }
 
-  async function add(e: React.FormEvent) {
-    e.preventDefault()
-    if (!data) return
+  /** An eruvim action; the eruv comes back as it now is. */
+  async function eruvPost(id: string, body: Record<string, unknown>): Promise<boolean> {
     setSaveError(null)
-    const listing = listingName.trim() ? data.listings.find((l) => l.name === listingName.trim()) : null
-    if (listingName.trim() && !listing) {
-      setSaveError('Pick the listing from the list, or leave it empty.')
-      return
+    setBusy(`eruv:${id}`)
+    try {
+      const res = await post<{ eruv?: AdminEruv }>('/api/admin/eruvim', { id, ...body })
+      if (res.eruv) setEruvData((d) => d && { ...d, eruvim: d.eruvim.map((e) => (e.id === id ? res.eruv! : e)) })
+      return true
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Could not save.')
+      return false
+    } finally {
+      setBusy(null)
     }
-    if (forListing && !listing) {
-      setSaveError('Pick the shul or mikvah this page is for.')
-      return
+  }
+
+  async function add(a: { purpose: WatchPurpose; source: string; listing: Listing | null; eruv: AdminEruv | null; statusDated: boolean }): Promise<boolean> {
+    if (a.purpose === 'eruv' && a.eruv) {
+      const email = sourceKind(a.source) === 'email'
+      // One source for its status (eruvEdit.ts): the other is emptied.
+      const edit = email ? { statusEmail: a.source.trim(), statusUrl: '' } : { statusUrl: a.source.trim(), statusEmail: '', statusDated: a.statusDated }
+      if (!(await eruvPost(a.eruv.id, { action: 'save', edit }))) return false
+      if (!email) await eruvPost(a.eruv.id, { action: 'check' })
+      setAdding(null)
+      return true
     }
+    setSaveError(null)
     setBusy('add')
     try {
-      const res = await post({ action: 'add', url, resourceId: listing?.id ?? null, label, ...(forListing ? { forListing: true } : {}) })
+      const res = await post<{ watch?: Watch }>('/api/admin/watches', { action: 'add', purpose: a.purpose, url: a.source.trim(), resourceId: a.listing?.id ?? null })
       if (res.watch) {
         const added = res.watch
         setData((d) => d && { ...d, watches: [...d.watches, added] })
         // Show it, even when its group is a long, closed one.
-        setOpened((o) => new Set(o).add(watchGroupOf(added)))
+        setOpened((o) => new Set(o).add(watchGroupOf(added, readsOf)))
+        setKept((k) => new Map(k).set(added.id, 2))
       }
-      setUrl('')
-      setListingName('')
-      setLabel('')
-      setForListing(false)
+      setAdding(null)
+      return true
     } catch (err) {
-      setSaveError(err instanceof Error ? err.message : 'Could not add that page.')
+      setSaveError(err instanceof Error ? err.message : 'Could not add that.')
+      return false
     } finally {
       setBusy(null)
     }
@@ -305,11 +626,18 @@ export default function WatchesManager({ token }: { token: string }) {
 
   const listings = data.listings
   const listingOf = new Map(listings.map((l) => [l.id, l]))
+  const readsOf = (id: string) => listingOf.get(id)?.reads ?? null
   // Acting on a row keeps it where it was (watchGroups.ts).
   const act = (row: WatchRow, action: Action, resourceId?: string) => {
     setKept((k) => (k.has(row.watch.id) ? k : new Map(k).set(row.watch.id, row.rank)))
     void actOn(row.watch, action, resourceId)
   }
+
+  const groups = data.available ? groupWatches(data.watches, now, kept, readsOf) : []
+  const eruvim = eruvData?.available ? eruvData.eruvim : []
+  const eruvNeeds = eruvim.filter((e) => eruvPill(e).tone !== 'ok').length
+  const counted = data.watches.filter((w) => !isIgnoredSender(w)).length + eruvim.length
+  const needs = groups.reduce((n, g) => n + g.counts.notWorking + g.counts.toLink, 0) + eruvNeeds
 
   function renderRow(row: WatchRow) {
     const w = row.watch
@@ -317,148 +645,189 @@ export default function WatchesManager({ token }: { token: string }) {
     const unlinked = isNewsletterWatch(w) && !w.resourceId
     const ignored = isIgnoredSender(w)
     return (
-      <li key={w.id} className="p-4" data-testid="watch-row">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0 flex-1 space-y-1">
-            <p className="font-semibold text-slate-900">{w.label || shortUrl(w.url)}</p>
-            {w.url.startsWith('mailto:') ? (
-              <p className="truncate text-xs text-slate-600">Newsletter from {shortUrl(w.url)}</p>
-            ) : (
-              <a href={w.url} target="_blank" rel="noopener noreferrer" className="block truncate text-xs text-primary underline">
-                {shortUrl(w.url)}
-              </a>
-            )}
-            {listing && <p className="text-xs text-slate-600">Keeps current: {listing.name} ({listing.categoryLabel})</p>}
-            {unlinked ? (
-              <NewsletterLink listings={listings} busy={busy !== null} onLink={(id) => act(row, 'link', id)} onIgnore={() => act(row, 'ignore')} />
-            ) : (
-              <>
-                {!ignored && <HealthLine watch={w} now={now} />}
-                <WhatItDoes watch={w} />
-              </>
-            )}
-          </div>
-          <div className="flex shrink-0 gap-2">
-            {!unlinked && !ignored && (
-              <>
-                <button
-                  type="button"
-                  disabled={busy !== null || !w.active}
-                  onClick={() => act(row, 'check')}
-                  className="rounded border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-                >
-                  {busy === w.id ? 'Checking…' : 'Check now'}
-                </button>
-                <button
-                  type="button"
-                  disabled={busy !== null}
-                  onClick={() => act(row, w.active ? 'pause' : 'resume')}
-                  className="rounded border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-                >
-                  {w.active ? 'Pause' : 'Resume'}
-                </button>
-              </>
-            )}
-            <button
-              type="button"
-              disabled={busy !== null}
-              onClick={() => act(row, 'remove')}
-              className="rounded border border-red-200 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"
-            >
-              Remove
-            </button>
-          </div>
+      <Row
+        key={w.id}
+        testId="watch-row"
+        name={listing?.name ?? w.label ?? shortUrl(w.url)}
+        source={<Source url={w.url} />}
+        pill={pillOf(w, now)}
+        last={unlinked ? null : <LastLine watch={w} now={now} />}
+        alwaysShown={unlinked && <NewsletterLink listings={listings} busy={busy !== null} onLink={(id) => act(row, 'link', id)} onIgnore={() => act(row, 'ignore')} />}
+      >
+        <WhatItDoes watch={w} />
+        {listing && w.label && w.label !== listing.name && <p className="text-xs text-slate-600">Named: {w.label}</p>}
+        <div className="flex flex-wrap gap-2">
+          {!unlinked && !ignored && (
+            <>
+              <button type="button" disabled={busy !== null || !w.active} onClick={() => act(row, 'check')} className={BUTTON}>
+                {busy === w.id ? 'Checking…' : 'Check now'}
+              </button>
+              <button type="button" disabled={busy !== null} onClick={() => act(row, w.active ? 'pause' : 'resume')} className={BUTTON}>
+                {w.active ? 'Pause' : 'Resume'}
+              </button>
+            </>
+          )}
+          <button type="button" disabled={busy !== null} onClick={() => act(row, 'remove')} className="rounded border border-red-200 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50 disabled:opacity-50">
+            Remove
+          </button>
         </div>
-      </li>
+      </Row>
     )
   }
+
+  function renderEruv(e: AdminEruv) {
+    const view = eruvView(e, new Date(now), eruvData!.timezone, null)
+    const source = e.statusUrl || (e.statusEmail ? `mailto:${e.statusEmail}` : null)
+    const noSource = !source
+    const failing = eruvPill(e).tone === 'bad'
+    return (
+      <Row
+        key={e.id}
+        testId="eruv-watch-row"
+        name={e.name}
+        source={<Source url={source} />}
+        pill={eruvPill(e)}
+        last={
+          noSource ? (
+            <p className="text-sm text-slate-500">Shows no status until it has a source.</p>
+          ) : failing && e.statusError ? (
+            <p className="text-sm font-medium text-red-700">Last read failed: {e.statusError}</p>
+          ) : (
+            <p className="text-sm text-slate-700">
+              {view.label}
+              {view.checked ? ` · ${view.checked}` : ''}
+              {!e.active ? ' · hidden on the site' : ''}
+            </p>
+          )
+        }
+        alwaysShown={
+          noSource ? (
+            <button type="button" onClick={() => setAdding({ purpose: 'eruv', eruvId: e.id })} className="mt-2 rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-white">
+              Add its source
+            </button>
+          ) : (
+            <EruvKeptEmail eruv={e} timezone={eruvData!.timezone} busy={busy !== null} onSays={(says) => void eruvPost(e.id, { action: 'email-says', says })} />
+          )
+        }
+      >
+        {!noSource && (
+          <>
+            <p className="text-xs text-muted">
+              {e.statusUrl
+                ? 'Its status page, read every 15 minutes on Friday afternoon until candle lighting. What it says shows on the site at once.'
+                : 'Its emails, read as each arrives. Up or down shows on the site at once, through that week’s Shabbos.'}
+            </p>
+            {e.statusWords && <p className="text-xs text-muted">Read from: “{e.statusWords}”</p>}
+            {e.statusUrl && (
+              <label className="flex items-start gap-2 text-sm text-slate-700">
+                <input type="checkbox" className="mt-0.5" checked={e.statusDated} disabled={busy !== null} onChange={(ev) => void eruvPost(e.id, { action: 'save', edit: { statusDated: ev.target.checked } })} />
+                <span>
+                  It dates each week’s post
+                  <span className="block text-xs text-muted">Then last week’s “up” shows as “Not posted yet this week”.</span>
+                </span>
+              </label>
+            )}
+            <div className="flex flex-wrap gap-2">
+              {e.statusUrl && (
+                <button type="button" disabled={busy !== null} onClick={() => void eruvPost(e.id, { action: 'check' })} className={BUTTON}>
+                  {busy === `eruv:${e.id}` ? 'Checking…' : 'Check now'}
+                </button>
+              )}
+              <button
+                type="button"
+                disabled={busy !== null}
+                onClick={() => {
+                  if (window.confirm(`Stop reading ${e.name}’s status? It shows no status until it has a source again.`)) void eruvPost(e.id, { action: 'save', edit: { statusUrl: '', statusEmail: '' } })
+                }}
+                className="rounded border border-red-200 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"
+              >
+                Stop reading
+              </button>
+            </div>
+          </>
+        )}
+      </Row>
+    )
+  }
+
+  const MENU_NOTE = 'Added on their own for each place with a menu link.'
 
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted">
-        Pages the guide reads on its own every morning to stay current. <strong>Nothing changes on the site from here:</strong>{' '}
-        what a page says goes to the moderation queue for you to approve. If a watch stops working, you&rsquo;re emailed once,
-        and again when it works.
+        What the guide reads on its own to stay current: pages every morning, emails as they arrive. <strong>What it finds goes to the moderation queue for you to approve</strong>, except an eruv&rsquo;s status, which shows at once. If a watch stops working, you&rsquo;re emailed once, and again when it works.
       </p>
       {!data.available && (
         <p className="bg-amber-50 border border-amber-200 rounded-md p-3 text-sm text-amber-800">
           Keeping a list here needs database migration 070. Until it&rsquo;s run, Keystone-K&rsquo;s list is still read every morning.
         </p>
       )}
-      {saveError && <p className="bg-red-50 border border-red-200 rounded-md p-3 text-sm text-red-700">{saveError}</p>}
-
-      {data.available && data.watches.length === 0 && (
-        <p className="rounded-lg border border-slate-200 bg-white p-4 text-sm text-muted">No pages watched yet.</p>
-      )}
-      {data.available &&
-        groupWatches(data.watches, now, kept).map((g) => (
-          <WatchGroupSection key={g.key} group={g} open={!collapsible(g) || opened.has(g.key)} onToggle={() => toggle(g.key)}>
-            {renderRow}
-          </WatchGroupSection>
-        ))}
 
       {data.available && (
-        <form onSubmit={add} className="space-y-3 rounded-lg border border-slate-200 bg-white p-4">
-          <p className="font-semibold text-slate-900">Watch a page</p>
-          <label className="block text-sm">
-            <span className="text-slate-700">Web address, or a shul newsletter&rsquo;s email address</span>
-            <input
-              type="text"
-              inputMode="url"
-              required
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              placeholder="e.g. lowermerionsynagogue.org"
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-            />
-          </label>
-          <label className="block text-sm">
-            <span className="text-slate-700">The listing it keeps current (optional)</span>
-            <input
-              type="text"
-              list="watch-listings"
-              value={listingName}
-              onChange={(e) => setListingName(e.target.value)}
-              placeholder="Start typing a name"
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-            />
-            <datalist id="watch-listings">
-              {data.listings.map((l) => (
-                <option key={l.id} value={l.name}>
-                  {l.categoryLabel}
-                </option>
-              ))}
-            </datalist>
-          </label>
-          <label className="flex items-start gap-2 text-sm">
-            <input type="checkbox" checked={forListing} onChange={(e) => setForListing(e.target.checked)} className="mt-1" />
-            <span className="text-slate-700">
-              It&rsquo;s the listing&rsquo;s own page of davening times or hours: when it changes, read it and send what differs to the queue
-            </span>
-          </label>
-          <label className="block text-sm">
-            <span className="text-slate-700">Name (optional)</span>
-            <input
-              type="text"
-              value={label}
-              onChange={(e) => setLabel(e.target.value)}
-              placeholder="e.g. Lower Merion's weekly times"
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-            />
-          </label>
-          <button
-            type="submit"
-            disabled={busy !== null || !url.trim()}
-            className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
-          >
-            {busy === 'add' ? 'Checking the page…' : 'Watch this page'}
-          </button>
-          <p className="text-xs text-muted">
-            A page is checked once straight away, so you&rsquo;ll see at once whether the guide can read it. A newsletter needs the shul it&rsquo;s from;
-            one the guide&rsquo;s inbox gets from a new sender shows up above on its own, to be linked.
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-slate-800" data-testid="watch-summary">
+            <strong>{counted} watches</strong> · {needs === 0 ? 'all working' : <span className="font-semibold text-amber-800">{needs} need{needs === 1 ? 's' : ''} you</span>}
           </p>
-        </form>
+          {!adding && (
+            <button type="button" onClick={() => setAdding('open')} className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-white">
+              Add a watch
+            </button>
+          )}
+        </div>
       )}
+      {saveError && <p className="bg-red-50 border border-red-200 rounded-md p-3 text-sm text-red-700">{saveError}</p>}
+
+      {data.available && adding && (
+        <AddWatch
+          key={adding === 'open' ? 'open' : `${adding.purpose}:${adding.eruvId ?? ''}`}
+          listings={listings}
+          eruvim={eruvim}
+          start={adding === 'open' ? null : adding}
+          busy={busy !== null}
+          onAdd={add}
+          onCancel={() => setAdding(null)}
+        />
+      )}
+
+      {eruvim.length > 0 && (
+        <GroupSection label="Eruv status" total={eruvim.length} needs={eruvNeeds ? `${eruvNeeds} need${eruvNeeds === 1 ? 's' : ''} you` : null} collapsibleGroup={false} open onToggle={() => {}}>
+          <ul className="divide-y divide-slate-100 border-t border-slate-100">
+            {[...eruvim].sort((a, b) => Number(eruvPill(a).tone === 'ok') - Number(eruvPill(b).tone === 'ok') || a.sortOrder - b.sortOrder).map(renderEruv)}
+          </ul>
+        </GroupSection>
+      )}
+
+      {groups.map((g) => {
+        const open = !collapsible(g) || opened.has(g.key)
+        const shown = open ? g.rows : g.rows.filter((r) => r.needsLook || r.keepShown)
+        const { toLink, notWorking, paused } = g.counts
+        const parts = [toLink && `${toLink} to link`, notWorking && `${notWorking} not working`, paused && `${paused} paused`].filter(Boolean)
+        return (
+          <GroupSection
+            key={g.key}
+            label={g.label}
+            total={g.rows.length}
+            needs={parts.length ? parts.join(' · ') : null}
+            note={g.key === 'menu' ? MENU_NOTE : undefined}
+            collapsibleGroup={collapsible(g)}
+            open={open}
+            onToggle={() => toggle(g.key)}
+          >
+            {shown.length > 0 && <ul className="divide-y divide-slate-100 border-t border-slate-100">{shown.map(renderRow)}</ul>}
+          </GroupSection>
+        )
+      })}
+      {data.available && data.watches.length === 0 && eruvim.length === 0 && (
+        <p className="rounded-lg border border-slate-200 bg-white p-4 text-sm text-muted">Nothing watched yet. Add a watch to start.</p>
+      )}
+
+      <datalist id="watch-listings">
+        {listings.map((l) => (
+          <option key={l.id} value={l.name}>
+            {l.categoryLabel}
+          </option>
+        ))}
+      </datalist>
     </div>
   )
 }

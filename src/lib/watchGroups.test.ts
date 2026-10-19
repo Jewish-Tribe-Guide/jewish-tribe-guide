@@ -37,36 +37,48 @@ const page = watch({ id: 'page', url: 'https://bzbi.org/worship' })
 const shulPage = watch({ id: 'shulPage', url: 'https://lms.org/davening', resourceId: 's1', createdBy: 'listing pages' })
 
 describe('watchGroupOf', () => {
-  it('sorts each kind of watch into its own group', () => {
+  it('sorts each watch into what it keeps current', () => {
     expect(watchGroupOf(keystone)).toBe('kosher')
     expect(watchGroupOf(mekor)).toBe('kosher')
-    expect(watchGroupOf(refuah)).toBe('hospitals')
-    expect(watchGroupOf(menu)).toBe('menus')
-    expect(watchGroupOf(newsletter)).toBe('newsletters')
-    expect(watchGroupOf(notAShul)).toBe('newsletters')
-    expect(watchGroupOf(page)).toBe('pages')
-    expect(watchGroupOf(shulPage)).toBe('listingPages')
+    expect(watchGroupOf(refuah)).toBe('hospital')
+    expect(watchGroupOf(menu)).toBe('menu')
+    expect(watchGroupOf(newsletter)).toBe('weekly')
+    expect(watchGroupOf(notAShul)).toBe('weekly')
+    expect(watchGroupOf(page)).toBe('other')
+    expect(watchGroupOf(shulPage)).toBe('times')
+  })
+
+  // A listing's own page goes under what it keeps current, by what its
+  // listing has: a mikvah's hours page with Hours, a shul's with its times.
+  it('puts a listing’s own page with times or hours by what its listing has', () => {
+    const mikvahPage = watch({ id: 'mikvah', url: 'https://mikvah.example/hours', resourceId: 'm1', createdBy: 'listing pages' })
+    const readsOf = (id: string) => (id === 'm1' ? 'hours' : id === 's1' ? 'times' : null)
+    expect(watchGroupOf(mikvahPage, readsOf)).toBe('hours')
+    expect(watchGroupOf(shulPage, readsOf)).toBe('times')
+    // Its listing gone: the label it was given still says.
+    const labelled = watch({ ...mikvahPage, resourceId: 'gone', label: 'Mikvah · hours on their website' })
+    expect(watchGroupOf(labelled, readsOf)).toBe('hours')
   })
 
   // Only a page added as the listing's own is read for its times or hours:
   // an admin's plain watch tied to a shul is still just checked for a change.
   it('keeps a plain watch tied to a shul with the other pages', () => {
-    expect(watchGroupOf(watch({ url: 'https://lms.org/davening', resourceId: 's1' }))).toBe('pages')
+    expect(watchGroupOf(watch({ url: 'https://lms.org/davening', resourceId: 's1' }))).toBe('other')
   })
 
   // An admin's own watch on a menu page is an ordinary page watch: only
   // the daily run's own menu watches are "Menus" (MENU_WATCH_CREATOR).
   it('keeps an admin’s own watch on a menu page with the other pages', () => {
-    expect(watchGroupOf(watch({ url: 'https://judah.example/menu' }))).toBe('pages')
+    expect(watchGroupOf(watch({ url: 'https://judah.example/menu' }))).toBe('other')
   })
 })
 
 describe('groupWatches', () => {
   it('lists the groups in a fixed order, leaving out empty ones', () => {
     const groups = groupWatches([page, shulPage, menu, refuah, newsletter, keystone], NOW)
-    expect(groups.map((g) => g.key)).toEqual(['kosher', 'newsletters', 'hospitals', 'menus', 'listingPages', 'pages'])
-    expect(groups.find((g) => g.key === 'listingPages')?.label).toBe('Shul and mikvah pages')
-    expect(groupWatches([menu], NOW).map((g) => g.key)).toEqual(['menus'])
+    expect(groups.map((g) => g.key)).toEqual(['times', 'weekly', 'kosher', 'menu', 'hospital', 'other'])
+    expect(groups.find((g) => g.key === 'times')?.label).toBe('Shul’s usual times')
+    expect(groupWatches([menu], NOW).map((g) => g.key)).toEqual(['menu'])
     expect(groupWatches([], NOW)).toEqual([])
   })
 
@@ -93,7 +105,7 @@ describe('groupWatches', () => {
     const failing = watch({ id: 'f', url: 'mailto:a@b.org', resourceId: 's2', createdBy: 'shul newsletters', failingSince: ago(1), lastError: 'No newsletter for a month' })
     const paused = watch({ id: 'p', url: 'mailto:c@d.org', resourceId: 's3', createdBy: 'shul newsletters', active: false })
     const [news] = groupWatches([newsletter, unlinked, failing, paused, notAShul], NOW)
-    expect(news.label).toBe('Shul newsletters')
+    expect(news.label).toBe('Shul’s weekly times')
     expect(news.rows).toHaveLength(5)
     expect(news.counts).toEqual({ toLink: 1, notWorking: 1, paused: 1 })
     // A sender marked not a shul is switched off, but isn't "paused".

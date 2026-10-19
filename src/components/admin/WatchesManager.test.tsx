@@ -6,6 +6,7 @@ import { mockRouter } from '@/test/nextNavigationMock'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { fetchJson } from '@/lib/fetchJson'
 import type { Watch } from '@/lib/watches'
+import type { AdminEruv } from '@/lib/eruvStore'
 import WatchesManager from './WatchesManager'
 
 vi.mock('next/navigation', () => ({
@@ -17,7 +18,8 @@ vi.mock('@/lib/fetchJson', () => ({ fetchJson: vi.fn(), parseOkJson: vi.fn() }))
 
 const NOW = Date.now()
 const ago = (days: number) => new Date(NOW - days * 86_400_000).toISOString()
-const SHUL = { id: 'shul-1', name: 'Lower Merion Synagogue', categoryLabel: 'Synagogue' }
+const SHUL = { id: 'shul-1', name: 'Lower Merion Synagogue', categoryLabel: 'Synagogue', reads: 'times' }
+const MIKVAH = { id: 'mikvah-1', name: 'Mikvah Ohel Rivkah', categoryLabel: 'Mikvah', reads: 'hours' }
 
 function watch(over: Partial<Watch>): Watch {
   return {
@@ -41,29 +43,60 @@ function watch(over: Partial<Watch>): Watch {
   }
 }
 
-async function renderTab(watches: Watch[], { available = true, post = {} as Record<string, unknown> } = {}) {
-  vi.mocked(fetchJson).mockImplementation(async (_url, init) =>
-    init?.method === 'POST' ? { ok: true, ...post } : { ok: true, available, watches, listings: [SHUL] },
-  )
-  renderWithProviders(<WatchesManager token="tok" />, { community: { slug: 'philly' } })
-  await screen.findByText(/Pages the guide reads on its own/)
+const NE: AdminEruv = {
+  id: 'northeast', name: 'Northeast Eruv', covers: null, website: null, hotline: null, alertsUrl: null, statusUrl: null, statusDated: false,
+  status: null, statusWords: null, statusPostedOn: null, statusCheckedAt: null, statusErrorAt: null, statusError: null,
+  lineUrl: null, sortOrder: 1, active: true, rawLine: null, lineReadAt: null, lineError: null, lineLeaveOut: [], lineHidePoints: false, lineMissing: [], lineColor: null,
+  statusEmail: null, statusEmailKept: null,
 }
 
+type Post = { url: string; body: Record<string, unknown> }
+const posts: Post[] = []
+
+async function renderTab(
+  watches: Watch[],
+  { available = true, post = {} as Record<string, unknown>, eruvim = [] as AdminEruv[] } = {},
+) {
+  vi.mocked(fetchJson).mockImplementation(async (url, init) => {
+    if (init?.method === 'POST') {
+      const body = JSON.parse(String(init.body))
+      posts.push({ url: String(url), body })
+      if (String(url).includes('/api/admin/eruvim')) {
+        const eruv = eruvim.find((e) => e.id === body.id)!
+        return { ok: true, eruv: { ...eruv, ...(body.edit ?? {}) } }
+      }
+      return { ok: true, ...post }
+    }
+    if (String(url).includes('/api/admin/eruvim')) return { ok: true, available: true, timezone: 'America/New_York', eruvim }
+    return { ok: true, available, watches, listings: [SHUL, MIKVAH] }
+  })
+  renderWithProviders(<WatchesManager token="tok" />, { community: { slug: 'philly' } })
+  await screen.findByText(/What the guide reads on its own/)
+}
+
+const names = (el: HTMLElement) => within(el).getAllByTestId('watch-name').map((n) => n.textContent)
+const open = (row: HTMLElement) => userEvent.setup().click(within(row).getAllByRole('button')[0])
+
 afterEach(() => {
+  posts.length = 0
   cleanup()
   vi.mocked(fetchJson).mockReset()
+  vi.unstubAllGlobals()
 })
 
 describe('WatchesManager', () => {
   it('says plainly which watch is broken, since when and why', async () => {
     await renderTab([
-      watch({ id: 'k', kind: 'keystone_list', label: 'Keystone-K’s list', lastFiled: 3 }),
+      watch({ id: 'k', kind: 'keystone_list', url: 'https://www.keystone-k.org/establishments', label: 'Keystone-K’s list', lastFiled: 3 }),
       watch({ id: 'b', label: 'BZBI worship page', failingSince: ago(2), lastError: 'The page answered 403', lastOkAt: ago(3) }),
     ])
-    const [keystone, bzbi] = screen.getAllByTestId('watch-row')
-    expect(within(keystone).getByText(/^Working/)).toBeInTheDocument()
-    expect(within(keystone).getByText(/Last read: 3 suggestions/)).toBeInTheDocument()
-    expect(within(bzbi).getByText(/Not working since .*: The page answered 403/)).toBeInTheDocument()
+    const keystone = screen.getByRole('region', { name: 'Kosher list' })
+    expect(within(keystone).getByText('Working')).toBeInTheDocument()
+    expect(within(keystone).getByText(/Read .*: 3 suggestions in the queue/)).toBeInTheDocument()
+    const other = screen.getByRole('region', { name: 'Anything else' })
+    expect(within(other).getByText('Not working')).toBeInTheDocument()
+    expect(within(other).getByText(/Not working since .*: The page answered 403/)).toBeInTheDocument()
+    expect(screen.getByTestId('watch-summary')).toHaveTextContent('2 watches · 1 needs you')
   })
 
   // The cron itself can stop, and then nothing fails: the last result just
@@ -73,9 +106,10 @@ describe('WatchesManager', () => {
     expect(screen.getByText(/The daily run may have stopped/)).toBeInTheDocument()
   })
 
-  it('shows the listing a page keeps current, and when its page changed', async () => {
-    await renderTab([watch({ resourceId: 'shul-1', pageChangedAt: ago(1) })])
-    expect(screen.getByText('Keeps current: Lower Merion Synagogue (Synagogue)')).toBeInTheDocument()
+  it('names a row by the place it keeps current, and says when a plain page changed', async () => {
+    await renderTab([watch({ resourceId: 'shul-1', url: 'https://lms.org/', pageChangedAt: ago(1) })])
+    expect(names(screen.getByRole('region', { name: 'Anything else' }))).toEqual(['Lower Merion Synagogue'])
+    expect(screen.getByRole('link', { name: 'lms.org' })).toHaveAttribute('href', 'https://lms.org/')
     expect(screen.getByText(/Changed .*: worth a look/)).toBeInTheDocument()
   })
 
@@ -83,108 +117,207 @@ describe('WatchesManager', () => {
   // says what it files, not "checked for a change".
   it('says a Refuah hospital page is compared with its hospital, and what it filed', async () => {
     await renderTab([watch({ url: 'https://refuah.com/hospitals/jx77h9d00qztqgbbe8e0rfj1r589mgf5', resourceId: 'shul-1', lastFiled: 1, pageChangedAt: ago(1) })])
-    expect(screen.getByText(/Compared with the hospital every morning/)).toBeInTheDocument()
-    expect(screen.getByText(/Last read: 1 suggestion\./)).toBeInTheDocument()
+    const row = within(screen.getByRole('region', { name: 'Hospital contacts' })).getByTestId('watch-row')
+    expect(within(row).getByText(/Read .*: 1 suggestion in the queue/)).toBeInTheDocument()
     expect(screen.queryByText(/worth a look/)).toBeNull()
+    await open(row)
+    expect(within(row).getByText(/Compared with the hospital every morning/)).toBeInTheDocument()
   })
 
-  it('says Mekor Habracha’s list is compared with the guide, IKC above all, and what it filed', async () => {
+  it('says Mekor Habracha’s list is compared with the guide, IKC above all', async () => {
     await renderTab([watch({ url: 'https://www.mekorhabracha.org/center-city', label: 'Mekor Habracha’s list', lastFiled: 18, pageHash: null })])
-    expect(screen.getByTestId('mekor-watch')).toHaveTextContent(/Compared with the guide every morning.*IKC above all.*Last read: 18 suggestions\./)
-    expect(screen.queryByText(/Checked every morning for a change/)).toBeNull()
+    const row = screen.getByTestId('watch-row')
+    expect(row).toHaveTextContent(/18 suggestions in the queue/)
+    await open(row)
+    expect(screen.getByTestId('mekor-watch')).toHaveTextContent(/Compared with the guide every morning.*IKC above all/)
   })
 
   // Oct 17: a food place's menu watch, made by the daily run, says what it
   // does and how to stop it (taking it off only brings it back tomorrow).
   it('says a menu watch is the run’s own, that the AI reads only a change, and to pause it to stop it', async () => {
     await renderTab([watch({ url: 'https://judah.example/menu', resourceId: 'shul-1', createdBy: 'menu links', lastFiled: 1, pageChangedAt: ago(1) })])
+    const group = screen.getByRole('region', { name: 'Menu' })
+    expect(group).toHaveTextContent('Added on their own for each place with a menu link.')
+    expect(group).toHaveTextContent(/Changed .*: new dishes on the Main dishes tab/)
+    await open(within(group).getByTestId('watch-row'))
     const line = screen.getByTestId('menu-watch')
     expect(line).toHaveTextContent(/When the menu changes, the AI reads it/)
     expect(line).toHaveTextContent(/pause it to stop it/)
-    expect(line).toHaveTextContent(/Last changed .*\. Last read: new dishes for the Main dishes tab\./)
     expect(screen.queryByText(/worth a look/)).toBeNull()
   })
 
-  it('says a shul’s own page is read by the AI only when it changes, and never dates the listing', async () => {
-    await renderTab([watch({ url: 'https://lms.org/davening', resourceId: 'shul-1', createdBy: 'listing pages', lastFiled: 1, pageChangedAt: ago(1) })])
-    const group = screen.getByRole('region', { name: 'Shul and mikvah pages' })
-    const line = within(group).getByTestId('listing-page-watch')
-    expect(line).toHaveTextContent(/When the page changes, the AI reads it/)
-    expect(line).toHaveTextContent(/not even the listing’s date/)
-    expect(line).toHaveTextContent(/Last changed .*\. Last read: 1 suggestion\./)
-    expect(screen.queryByText(/worth a look/)).toBeNull()
+  // Oct 19: a listing's own page is listed under what it keeps current, by
+  // what its listing has.
+  it('lists a shul’s own page under its times, and a mikvah’s under hours', async () => {
+    await renderTab([
+      watch({ id: 's', url: 'https://lms.org/davening', resourceId: 'shul-1', createdBy: 'listing pages', lastFiled: 1, pageChangedAt: ago(1) }),
+      watch({ id: 'm', url: 'https://ohelrivkah.org/hours', resourceId: 'mikvah-1', createdBy: 'listing pages' }),
+    ])
+    const times = screen.getByRole('region', { name: 'Shul’s usual times' })
+    expect(names(times)).toEqual(['Lower Merion Synagogue'])
+    expect(times).toHaveTextContent(/Changed .*: 1 suggestion in the queue/)
+    expect(names(screen.getByRole('region', { name: 'Hours' }))).toEqual(['Mikvah Ohel Rivkah'])
+    await open(within(times).getByTestId('watch-row'))
+    expect(screen.getByTestId('listing-page-watch')).toHaveTextContent(/not even the listing’s date/)
   })
 
-  it('adds a listing’s own page, which needs the listing', async () => {
-    const created = watch({ id: 'new', url: 'https://lms.org/davening', label: 'LMS times', resourceId: 'shul-1', createdBy: 'listing pages' })
-    await renderTab([], { post: { watch: created } })
-    const user = userEvent.setup()
-    await user.type(screen.getByLabelText(/^Web address/), 'lms.org/davening')
-    await user.click(screen.getByLabelText(/own page of davening times or hours/))
-    await user.click(screen.getByRole('button', { name: 'Watch this page' }))
-    expect(await screen.findByText('Pick the shul or mikvah this page is for.')).toBeInTheDocument()
-    expect(vi.mocked(fetchJson).mock.calls.some(([, i]) => i?.method === 'POST')).toBe(false)
+  describe('Add a watch', () => {
+    it('asks what it keeps current first, then the place and where it’s read, and says what will happen', async () => {
+      const created = watch({ id: 'new', url: 'https://lms.org/davening', resourceId: 'shul-1', createdBy: 'listing pages' })
+      await renderTab([], { post: { watch: created } })
+      const user = userEvent.setup()
+      await user.click(screen.getByRole('button', { name: 'Add a watch' }))
+      const form = screen.getByTestId('add-watch')
+      // Nothing else to fill in until it knows what for. Menus are added on
+      // their own, so aren't offered.
+      expect(within(form).queryByLabelText(/Where does the guide read it/)).toBeNull()
+      expect(within(form).queryByRole('button', { name: 'Menu' })).toBeNull()
 
-    await user.type(screen.getByLabelText(/The listing it keeps current/), 'Lower Merion Synagogue')
-    await user.click(screen.getByRole('button', { name: 'Watch this page' }))
-    const [, init] = vi.mocked(fetchJson).mock.calls.find(([, i]) => i?.method === 'POST')!
-    expect(JSON.parse(String(init!.body))).toEqual({ action: 'add', url: 'lms.org/davening', resourceId: 'shul-1', label: '', forListing: true })
-    expect(await screen.findByText('LMS times')).toBeInTheDocument()
+      await user.click(within(form).getByRole('button', { name: 'Shul’s usual times' }))
+      expect(within(form).getByRole('button', { name: 'Shul’s usual times' })).toHaveAttribute('aria-pressed', 'true')
+      // Only places whose page has davening times are offered.
+      expect([...form.querySelectorAll('#watch-add-places option')].map((o) => o.getAttribute('value'))).toEqual(['Lower Merion Synagogue'])
+      await user.type(within(form).getByLabelText(/Which place/), 'Lower Merion Synagogue')
+      await user.type(within(form).getByLabelText(/Where does the guide read it/), 'lms.org/davening')
+      expect(within(form).getByTestId('add-watch-plan')).toHaveTextContent('Every morning the guide reads lms.org/davening. Usual times that differ from Lower Merion Synagogue’s go to the moderation queue')
+      await user.click(within(form).getByRole('button', { name: 'Start watching' }))
+      expect(posts).toEqual([{ url: expect.stringContaining('/api/admin/watches'), body: { action: 'add', purpose: 'times', url: 'lms.org/davening', resourceId: 'shul-1' } }])
+      expect(names(await screen.findByRole('region', { name: 'Shul’s usual times' }))).toEqual(['Lower Merion Synagogue'])
+      expect(screen.queryByTestId('add-watch')).toBeNull()
+    })
+
+    it('won’t take a web page for weekly times, which come by email', async () => {
+      await renderTab([])
+      const user = userEvent.setup()
+      await user.click(screen.getByRole('button', { name: 'Add a watch' }))
+      await user.click(screen.getByRole('button', { name: 'Shul’s weekly times' }))
+      await user.type(screen.getByLabelText(/Which place/), 'Lower Merion Synagogue')
+      await user.type(screen.getByLabelText(/Where does the guide read it/), 'lms.org/newsletter')
+      expect(screen.getByText(/Weekly times come by email/)).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Start watching' })).toBeDisabled()
+    })
+
+    it('needs no place for a kosher list', async () => {
+      await renderTab([], { post: { watch: watch({ id: 'k', kind: 'keystone_list', url: 'https://www.keystone-k.org/establishments' }) } })
+      const user = userEvent.setup()
+      await user.click(screen.getByRole('button', { name: 'Add a watch' }))
+      await user.click(screen.getByRole('button', { name: 'Kosher list' }))
+      expect(screen.queryByLabelText(/Which place/)).toBeNull()
+      await user.type(screen.getByLabelText(/Where does the guide read it/), 'keystone-k.org/establishments')
+      expect(screen.getByTestId('add-watch-plan')).toHaveTextContent(/compared with the guide, place by place/)
+      await user.click(screen.getByRole('button', { name: 'Start watching' }))
+      expect(posts[0].body).toEqual({ action: 'add', purpose: 'kosher', url: 'keystone-k.org/establishments', resourceId: null })
+    })
+
+    // Oct 19: an eruv's status source is set here now, on the eruv itself.
+    it('sets an eruv’s status emails on the eruv, the other source emptied', async () => {
+      await renderTab([], { eruvim: [NE] })
+      const user = userEvent.setup()
+      await user.click(screen.getByRole('button', { name: 'Add a watch' }))
+      await user.click(within(screen.getByTestId('add-watch')).getByRole('button', { name: 'Eruv status' }))
+      await user.selectOptions(screen.getByLabelText(/Which eruv/), 'northeast')
+      await user.type(screen.getByLabelText(/Where does the guide read it/), 'JCOR-NE-Philadelphia@groups.io')
+      await user.click(screen.getByRole('button', { name: 'Start watching' }))
+      expect(posts.map((p) => p.body)).toEqual([{ id: 'northeast', action: 'save', edit: { statusEmail: 'JCOR-NE-Philadelphia@groups.io', statusUrl: '' } }])
+      const row = await screen.findByTestId('eruv-watch-row')
+      expect(row).toHaveTextContent('JCOR-NE-Philadelphia@groups.io')
+      expect(within(row).getByText('Working')).toBeInTheDocument()
+    })
+
+    it('sets an eruv’s status page and reads it at once', async () => {
+      await renderTab([], { eruvim: [NE] })
+      const user = userEvent.setup()
+      await user.click(screen.getByRole('button', { name: 'Add a watch' }))
+      await user.click(within(screen.getByTestId('add-watch')).getByRole('button', { name: 'Eruv status' }))
+      await user.selectOptions(screen.getByLabelText(/Which eruv/), 'northeast')
+      await user.type(screen.getByLabelText(/Where does the guide read it/), 'https://ne-eruv.org/status')
+      await user.click(screen.getByRole('checkbox', { name: /dates each week’s post/ }))
+      await user.click(screen.getByRole('button', { name: 'Start watching' }))
+      expect(posts.map((p) => p.body)).toEqual([
+        { id: 'northeast', action: 'save', edit: { statusUrl: 'https://ne-eruv.org/status', statusEmail: '', statusDated: true } },
+        { id: 'northeast', action: 'check' },
+      ])
+    })
   })
 
-  it('adds a page, tied to a listing picked by name', async () => {
-    const created = watch({ id: 'new', url: 'https://lowermerionsynagogue.org/', label: 'Weekly times' })
-    await renderTab([], { post: { watch: created } })
-    const user = userEvent.setup()
-    await user.type(screen.getByLabelText(/^Web address/), 'lowermerionsynagogue.org')
-    await user.type(screen.getByLabelText(/The listing it keeps current/), 'Lower Merion Synagogue')
-    await user.type(screen.getByLabelText(/Name/), 'Weekly times')
-    await user.click(screen.getByRole('button', { name: 'Watch this page' }))
-    const [, init] = vi.mocked(fetchJson).mock.calls.find(([, i]) => i?.method === 'POST')!
-    expect(JSON.parse(String(init!.body))).toEqual({ action: 'add', url: 'lowermerionsynagogue.org', resourceId: 'shul-1', label: 'Weekly times' })
-    expect(await screen.findByText('Weekly times')).toBeInTheDocument()
+  describe('Eruv status', () => {
+    it('an eruv with no source says so, and “Add its source” starts the form on it', async () => {
+      await renderTab([], { eruvim: [NE] })
+      const row = screen.getByTestId('eruv-watch-row')
+      expect(within(row).getByText('No source')).toBeInTheDocument()
+      expect(screen.getByTestId('watch-summary')).toHaveTextContent('1 watches · 1 needs you')
+      await userEvent.setup().click(within(row).getByRole('button', { name: 'Add its source' }))
+      const form = screen.getByTestId('add-watch')
+      expect(within(form).getByRole('button', { name: 'Eruv status' })).toHaveAttribute('aria-pressed', 'true')
+      expect(within(form).getByLabelText(/Which eruv/)).toHaveValue('northeast')
+    })
+
+    it('an email it couldn’t read is shown on its row, and the admin says what it says', async () => {
+      const kept = { messageId: 'g1', subject: 'Eruv update', sentAt: '2026-10-09T17:30:00Z', text: 'The eruv is up. The eruv is down on Castor.', words: 'The eruv is up' }
+      await renderTab([], { eruvim: [{ ...NE, statusEmail: 'jcor-ne-philadelphia@groups.io', statusEmailKept: kept }] })
+      const row = screen.getByTestId('eruv-watch-row')
+      expect(within(row).getByText('Email to read')).toBeInTheDocument()
+      const box = within(row).getByTestId('eruv-kept-email')
+      expect(box).toHaveTextContent('Their email says both up and down: “Eruv update”, Oct 9')
+      await userEvent.setup().click(within(box).getByRole('button', { name: 'It says down' }))
+      expect(posts.map((p) => p.body)).toEqual([{ id: 'northeast', action: 'email-says', says: 'down' }])
+    })
+
+    it('a page it can’t read says why', async () => {
+      await renderTab([], { eruvim: [{ ...NE, statusUrl: 'https://ne-eruv.org/status', statusErrorAt: ago(0.1), statusError: 'The page answered 500' }] })
+      const row = screen.getByTestId('eruv-watch-row')
+      expect(within(row).getByText('Not working')).toBeInTheDocument()
+      expect(row).toHaveTextContent('Last read failed: The page answered 500')
+    })
+
+    it('“Stop reading” empties both sources, once the admin says so', async () => {
+      vi.stubGlobal('confirm', vi.fn(() => true))
+      await renderTab([], { eruvim: [{ ...NE, statusUrl: 'https://ne-eruv.org/status', statusCheckedAt: ago(0.1) }] })
+      const row = screen.getByTestId('eruv-watch-row')
+      await open(row)
+      await userEvent.setup().click(within(row).getByRole('button', { name: 'Stop reading' }))
+      expect(posts.map((p) => p.body)).toEqual([{ id: 'northeast', action: 'save', edit: { statusUrl: '', statusEmail: '' } }])
+      expect(await within(row).findByText('No source')).toBeInTheDocument()
+    })
   })
 
   it('says the migration is needed, and that Keystone-K is still read, before 070', async () => {
     await renderTab([], { available: false })
     expect(screen.getByText(/needs database migration 070/)).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Watch this page' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Add a watch' })).not.toBeInTheDocument()
   })
 
   // Shul newsletters (newsletter.ts): a sender the inbox hasn't seen comes
   // in unlinked, to be tied to its shul here.
   it('asks which shul a new newsletter sender is, and links it', async () => {
-    const sender = watch({ id: 'n', url: 'mailto:info@lms.org', label: 'Lower Merion Synagogue', createdBy: 'shul newsletters', active: false, lastRunAt: null, lastOkAt: null })
+    const sender = watch({ id: 'n', url: 'mailto:info@lms.org', label: 'info@lms.org', createdBy: 'shul newsletters', active: false, lastRunAt: null, lastOkAt: null })
     await renderTab([sender], { post: { watch: { ...sender, resourceId: 'shul-1', active: true } } })
     const row = screen.getByTestId('watch-row')
-    expect(within(row).getByText('Newsletter from info@lms.org')).toBeInTheDocument()
+    expect(within(row).getByText('To link')).toBeInTheDocument()
     expect(within(row).getByText(/Not linked to a shul yet/)).toBeInTheDocument()
-    // Nothing to check or pause until it's linked.
-    expect(within(row).queryByRole('button', { name: 'Check now' })).toBeNull()
     const user = userEvent.setup()
     const link = within(row).getByRole('button', { name: 'Link' })
     expect(link).toBeDisabled()
     await user.type(within(row).getByLabelText('The shul it’s from'), 'Lower Merion Synagogue')
     await user.click(link)
-    const [, init] = vi.mocked(fetchJson).mock.calls.find(([, i]) => i?.method === 'POST')!
-    expect(JSON.parse(String(init!.body))).toEqual({ action: 'link', id: 'n', resourceId: 'shul-1' })
-    expect(await within(row).findByTestId('newsletter-watch')).toHaveTextContent(/No newsletter read yet/)
-    expect(within(row).getByText(/Keeps current: Lower Merion Synagogue/)).toBeInTheDocument()
+    expect(posts.map((p) => p.body)).toEqual([{ action: 'link', id: 'n', resourceId: 'shul-1' }])
+    expect(await within(row).findByText('No newsletter read yet.')).toBeInTheDocument()
+    expect(within(row).getByTestId('watch-name')).toHaveTextContent('Lower Merion Synagogue')
   })
 
   it('says when a linked newsletter last came, and that a quiet month is flagged', async () => {
     await renderTab([watch({ url: 'mailto:info@lms.org', resourceId: 'shul-1', createdBy: 'shul newsletters', lastFiled: 1, pageChangedAt: ago(3) })])
-    const line = screen.getByTestId('newsletter-watch')
-    expect(line).toHaveTextContent(/emailed if none comes for a month/)
-    expect(line).toHaveTextContent(/Last newsletter .*\. Last read: 1 suggestion\./)
+    const row = within(screen.getByRole('region', { name: 'Shul’s weekly times' })).getByTestId('watch-row')
+    expect(row).toHaveTextContent(/Newsletter .*: 1 suggestion in the queue/)
+    await open(row)
+    expect(screen.getByTestId('newsletter-watch')).toHaveTextContent(/emailed if none comes for a month/)
   })
 
   it('skips a sender that isn’t a shul', async () => {
     const sender = watch({ id: 'n', url: 'mailto:no-reply@accounts.google.com', createdBy: 'shul newsletters', active: false })
     await renderTab([sender], { post: { watch: { ...sender, createdBy: 'shul newsletters: not a shul' } } })
     await userEvent.setup().click(screen.getByRole('button', { name: 'Not a shul' }))
-    const [, init] = vi.mocked(fetchJson).mock.calls.find(([, i]) => i?.method === 'POST')!
-    expect(JSON.parse(String(init!.body))).toEqual({ action: 'ignore', id: 'n' })
+    expect(posts.map((p) => p.body)).toEqual([{ action: 'ignore', id: 'n' }])
     expect(await screen.findByText(/Not a shul: its emails are skipped/)).toBeInTheDocument()
   })
 
@@ -193,40 +326,34 @@ describe('WatchesManager', () => {
   // needs a look shows anyway, named in its group's heading.
   it('groups the watches, and a closed group still shows what’s broken', async () => {
     const menus = ['Bar Bombon', 'Goldie', 'Mama’s', 'Rita’s', 'Zevi’s'].map((name, i) =>
-      watch({ id: `m${i}`, label: `${name} menu`, url: `https://m${i}.example/menu`, resourceId: 'shul-1', createdBy: 'menu links' }),
+      watch({ id: `m${i}`, label: `${name} menu`, url: `https://m${i}.example/menu`, createdBy: 'menu links' }),
     )
     menus[3] = { ...menus[3], failingSince: ago(1), lastError: 'The page answered 404' }
-    await renderTab([watch({ id: 'k', kind: 'keystone_list', label: 'Keystone-K’s list' }), ...menus])
+    await renderTab([watch({ id: 'k', kind: 'keystone_list', url: 'https://www.keystone-k.org/establishments', label: 'Keystone-K’s list' }), ...menus])
     const [kosher, menuGroup] = screen.getAllByTestId('watch-group')
-    expect(kosher).toHaveAccessibleName('Kosher lists')
+    expect(kosher).toHaveAccessibleName('Kosher list')
     expect(within(kosher).getAllByTestId('watch-row')).toHaveLength(1)
-    expect(menuGroup).toHaveAccessibleName('Menus')
-    const toggle = within(menuGroup).getByRole('button', { name: /Menus.*5.*1 not working.*Show all 5/ })
+    expect(menuGroup).toHaveAccessibleName('Menu')
+    const toggle = within(menuGroup).getByRole('button', { name: /Menu.*5.*1 not working.*Show all 5/ })
     expect(toggle).toHaveAttribute('aria-expanded', 'false')
-    expect(within(menuGroup).getAllByTestId('watch-row').map((r) => r.querySelector('p')!.textContent)).toEqual(['Rita’s menu'])
+    expect(names(menuGroup)).toEqual(['Rita’s menu'])
     await userEvent.setup().click(toggle)
     expect(toggle).toHaveAttribute('aria-expanded', 'true')
     // Broken first, then by name.
-    expect(within(menuGroup).getAllByTestId('watch-row').map((r) => r.querySelector('p')!.textContent)).toEqual([
-      'Rita’s menu',
-      'Bar Bombon menu',
-      'Goldie menu',
-      'Mama’s menu',
-      'Zevi’s menu',
-    ])
+    expect(names(menuGroup)).toEqual(['Rita’s menu', 'Bar Bombon menu', 'Goldie menu', 'Mama’s menu', 'Zevi’s menu'])
   })
 
   it('keeps a newsletter sender in view after it’s linked, even in a closed group', async () => {
     const linked = ['a', 'b', 'c', 'd', 'e'].map((x) => watch({ id: x, url: `mailto:${x}@shul.org`, resourceId: 'shul-1', createdBy: 'shul newsletters' }))
     const sender = watch({ id: 'n', url: 'mailto:info@lms.org', label: 'New sender', createdBy: 'shul newsletters', active: false, lastRunAt: null, lastOkAt: null })
     await renderTab([...linked, sender], { post: { watch: { ...sender, resourceId: 'shul-1', active: true } } })
-    const group = screen.getByRole('region', { name: 'Shul newsletters' })
+    const group = screen.getByRole('region', { name: 'Shul’s weekly times' })
     expect(within(group).getByRole('button', { name: /6.*1 to link.*Show all 6/ })).toBeInTheDocument()
     const row = within(group).getByTestId('watch-row')
     const user = userEvent.setup()
     await user.type(within(row).getByLabelText('The shul it’s from'), 'Lower Merion Synagogue')
     await user.click(within(row).getByRole('button', { name: 'Link' }))
-    expect(await within(row).findByTestId('newsletter-watch')).toBeInTheDocument()
+    expect(await within(row).findByText('No newsletter read yet.')).toBeInTheDocument()
     expect(within(group).getAllByTestId('watch-row')).toEqual([row])
     expect(within(group).queryByText(/to link/)).toBeNull()
   })

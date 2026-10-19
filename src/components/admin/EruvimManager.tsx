@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useMemo, useState } from 'react'
+import Link from 'next/link'
 import { useLoadOnMount } from '@/lib/useLoadOnMount'
 import { fetchJson } from '@/lib/fetchJson'
 import { withCommunity } from '@/lib/useCommunityData'
@@ -8,6 +9,7 @@ import { useCommunitySlug } from '@/lib/communityContext'
 import { eruvView, shortDay } from '@/lib/eruv'
 import { DEFAULT_LINE_COLOR, lineColorOf, partNames, shownMap, withLineColor, type EruvLineFile } from '@/lib/eruvLine'
 import type { AdminEruv } from '@/lib/eruvStore'
+import { adminBase } from '@/lib/adminNav'
 
 // ── The "Eruvim" tab (Oct 7) ────────────────────────────────────────────────
 // Each eruv the guide shows: what the public sees of it (its status, as
@@ -17,8 +19,10 @@ import type { AdminEruv } from '@/lib/eruvStore'
 // hour (Oct 12); what's chosen here is only what to leave out of it: parts
 // by name, and its markers; and, for a line that's hard to see, the colour
 // it's drawn in (Oct 15). An eruv with no status page can have its status
-// emailed instead (Oct 19): the address its emails come from, and any
-// email the guide couldn't make out, for an admin to read.
+// emailed instead (Oct 19). Where its status is read from (its page or its
+// emails), and an email the guide couldn't make out, moved to the Watches
+// tab on Oct 19, with every other source the guide reads; this tab says
+// where, and links there.
 
 type Loaded = { available: boolean; timezone: string; eruvim: AdminEruv[] }
 
@@ -62,16 +66,15 @@ function LinePreview({ file: theirs, leaveOut, hideMarks, lineColor }: { file: E
 
 const input = 'w-full rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary'
 
-type Draft = Pick<AdminEruv, 'name' | 'covers' | 'website' | 'hotline' | 'alertsUrl' | 'statusUrl' | 'statusDated' | 'statusEmail' | 'lineUrl' | 'sortOrder' | 'active' | 'lineLeaveOut' | 'lineHidePoints' | 'lineColor'>
+// Not its status source: that's set on the Watches tab, and a save here
+// mustn't put back what was there when this tab loaded.
+type Draft = Pick<AdminEruv, 'name' | 'covers' | 'website' | 'hotline' | 'alertsUrl' | 'lineUrl' | 'sortOrder' | 'active' | 'lineLeaveOut' | 'lineHidePoints' | 'lineColor'>
 const draftOf = (e: AdminEruv): Draft => ({
   name: e.name,
   covers: e.covers,
   website: e.website,
   hotline: e.hotline,
   alertsUrl: e.alertsUrl,
-  statusUrl: e.statusUrl,
-  statusDated: e.statusDated,
-  statusEmail: e.statusEmail,
   lineUrl: e.lineUrl,
   sortOrder: e.sortOrder,
   active: e.active,
@@ -90,48 +93,20 @@ function Field({ label, help, children }: { label: string; help?: string; childr
   )
 }
 
-/** The last email from an eruv the guide couldn't make out, and the admin
- *  saying what it says: its status goes live at once, as a read one does. */
-function KeptEmailBox({ eruv, timezone, busy, onSays }: { eruv: AdminEruv; timezone: string; busy: boolean; onSays: (says: 'up' | 'down' | 'neither') => void }) {
-  const kept = eruv.statusEmailKept
-  if (!kept) return null
-  const button = 'cursor-pointer rounded-md border border-slate-300 bg-white px-3 py-1 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50'
-  return (
-    <div className="mt-3 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-900" data-testid="eruv-kept-email">
-      <p className="font-semibold">
-        {kept.words ? 'Their email says both up and down' : 'Their email doesn’t say up or down'}: “{kept.subject}”, {shortDay(kept.sentAt, timezone)}
-      </p>
-      <p className="mt-1 max-h-40 overflow-y-auto whitespace-pre-line text-xs text-slate-700">{kept.text}</p>
-      <div className="mt-2 flex flex-wrap items-center gap-2">
-        <button type="button" disabled={busy} onClick={() => onSays('up')} className={button}>
-          It says up
-        </button>
-        <button type="button" disabled={busy} onClick={() => onSays('down')} className={button}>
-          It says down
-        </button>
-        <button type="button" disabled={busy} onClick={() => onSays('neither')} className={button}>
-          Not about the status
-        </button>
-      </div>
-      <p className="mt-1 text-xs text-muted">Up or down shows on the site at once, for the week the email was sent.</p>
-    </div>
-  )
-}
-
 function EruvCard({
   eruv,
   timezone,
   busy,
   onAct,
   onSave,
-  onSays,
+  watchesHref,
 }: {
   eruv: AdminEruv
   timezone: string
   busy: boolean
   onAct: (action: 'check' | 'remove') => void
   onSave: (d: Draft) => void
-  onSays: (says: 'up' | 'down' | 'neither') => void
+  watchesHref: string
 }) {
   const [draft, setDraft] = useState<Draft>(() => draftOf(eruv))
   const [confirmRemove, setConfirmRemove] = useState(false)
@@ -156,7 +131,13 @@ function EruvCard({
       {view.checked && <p className="text-xs text-muted">{view.checked}</p>}
       {eruv.statusWords && <p className="text-xs text-muted">Read from: “{eruv.statusWords}”{eruv.statusPostedOn ? `, dated ${shortDay(eruv.statusPostedOn, timezone)}` : ''}</p>}
       {eruv.statusError && <p className="text-xs text-red-700">Last read failed: {eruv.statusError}</p>}
-      <KeptEmailBox eruv={eruv} timezone={timezone} busy={busy} onSays={onSays} />
+      <p className="mt-1 text-sm text-slate-700" data-testid="eruv-status-source">
+        {eruv.statusUrl ? `Status read from ${eruv.statusUrl.replace(/^https?:\/\/(www\.)?/i, '').replace(/\/$/, '')}.` : eruv.statusEmail ? `Status read from emails from ${eruv.statusEmail}.` : 'No status source.'}{' '}
+        <Link href={watchesHref} className="font-semibold text-primary hover:underline">
+          {eruv.statusUrl || eruv.statusEmail ? 'Change it on the Watches tab' : 'Add one on the Watches tab'}
+        </Link>
+        {eruv.statusEmailKept && <span className="block text-amber-800">An email from it waits for you there.</span>}
+      </p>
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         <Field label="Name">
@@ -179,19 +160,6 @@ function EruvCard({
         <Field label="Email alerts" help="Where people sign up for the eruv’s own alerts.">
           <input className={input} value={draft.alertsUrl ?? ''} onChange={(e) => set('alertsUrl', e.target.value)} />
         </Field>
-        <Field label="Status page" help="The page it says “The Eruv is up” on. Empty: no status online.">
-          <input className={input} value={draft.statusUrl ?? ''} onChange={(e) => set('statusUrl', e.target.value)} />
-        </Field>
-        <Field label="Status emails from" help="For an eruv with no status page: the address its “The eruv is up” emails come from, or a mailing list’s own address (…@groups.io). Each one shows at once, for that week’s Shabbos.">
-          <input className={input} type="email" value={draft.statusEmail ?? ''} onChange={(e) => set('statusEmail', e.target.value)} placeholder="alerts@example.groups.io" />
-        </Field>
-        <label className="flex items-start gap-2 text-sm text-slate-700 sm:col-span-2">
-          <input type="checkbox" className="mt-0.5" checked={draft.statusDated} onChange={(e) => set('statusDated', e.target.checked)} />
-          <span>
-            It dates each week’s post
-            <span className="block text-xs text-muted">Then last week’s “up” shows as “Not posted yet this week”. Leave off for an eruv whose date is only when it last changed.</span>
-          </span>
-        </label>
         <div className="sm:col-span-2">
           <Field label="Its map" help="A Google My Maps link, or a GeoJSON file. Shown as the eruv draws it, read about every hour.">
             <input className={input} value={draft.lineUrl ?? ''} onChange={(e) => set('lineUrl', e.target.value)} />
@@ -337,7 +305,7 @@ export default function EruvimManager({ token }: { token: string }) {
     <div className="space-y-4">
       <div>
         <h1 className="text-xl font-bold text-slate-900">Eruvim</h1>
-        <p className="text-sm text-muted">The guide reads each eruv’s status page every 15 minutes on Friday afternoon, or its status email as it comes, and its map about every hour. It never sets a status itself, or draws a line of its own.</p>
+        <p className="text-sm text-muted">The guide reads each eruv’s status from the page or emails set on the Watches tab, and its map about every hour. It never sets a status itself, or draws a line of its own.</p>
       </div>
       {saveError && <p className="text-sm text-red-700">{saveError}</p>}
       {data.eruvim.map((e) => (
@@ -348,7 +316,7 @@ export default function EruvimManager({ token }: { token: string }) {
           busy={busy === e.id}
           onAct={(action) => post(e.id, { action, id: e.id })}
           onSave={(edit) => post(e.id, { action: 'save', id: e.id, edit })}
-          onSays={(says) => post(e.id, { action: 'email-says', id: e.id, says })}
+          watchesHref={`${adminBase(community)}/watches`}
         />
       ))}
       <form

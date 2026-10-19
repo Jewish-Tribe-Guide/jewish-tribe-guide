@@ -1,9 +1,14 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // The Watches tab's groups (Oct 18). One long list stopped being scannable
 // once every food place's menu and every shul's newsletter got a watch, so
-// the tab groups them by what reads them, in a fixed order, and within a
-// group puts what needs the admin first so a broken watch can't hide in a
-// closed group of seventeen menus.
+// the tab groups them, in a fixed order, and within a group puts what needs
+// the admin first so a broken watch can't hide in a closed group of
+// seventeen menus.
+//
+// Since Oct 19 a group is what the watch keeps current (watchPurposes.ts),
+// the same words "Add a watch" offers, rather than what reads it. A
+// listing's own page goes with times or hours by what its listing has.
+// Eruv status is listed from the eruvim, not here.
 //
 // Pure: WatchesManager renders it.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -13,25 +18,26 @@ import { isIgnoredSender, isNewsletterWatch } from './newsletter'
 import { refuahHospitalId } from './refuahWatch'
 import { isMekorList } from './mekorWatch'
 import { isListingPageWatch } from './listingPageWatch'
+import { WATCH_PURPOSES, type ListingReads, type WatchPurpose } from './watchPurposes'
 
-export type WatchGroupKey = 'kosher' | 'newsletters' | 'hospitals' | 'menus' | 'listingPages' | 'pages'
+export type WatchGroupKey = Exclude<WatchPurpose, 'eruv'>
 
-const GROUPS: { key: WatchGroupKey; label: string }[] = [
-  { key: 'kosher', label: 'Kosher lists' },
-  { key: 'newsletters', label: 'Shul newsletters' },
-  { key: 'hospitals', label: 'Hospitals on Refuah' },
-  { key: 'menus', label: 'Menus' },
-  { key: 'listingPages', label: 'Shul and mikvah pages' },
-  { key: 'pages', label: 'Other pages' },
-]
+const GROUPS: { key: WatchGroupKey; label: string }[] = WATCH_PURPOSES.filter((p) => p.key !== 'eruv').map((p) => ({ key: p.key as WatchGroupKey, label: p.label }))
 
-export function watchGroupOf(w: Watch): WatchGroupKey {
-  if (isNewsletterWatch(w) || isIgnoredSender(w)) return 'newsletters'
+/** What a listing's page is read for, by its id. */
+export type ReadsOf = (resourceId: string) => ListingReads
+
+export function watchGroupOf(w: Watch, readsOf: ReadsOf = () => null): WatchGroupKey {
+  if (isNewsletterWatch(w) || isIgnoredSender(w)) return 'weekly'
   if (w.kind === 'keystone_list' || isMekorList(w.url)) return 'kosher'
-  if (refuahHospitalId(w.url)) return 'hospitals'
-  if (w.createdBy === MENU_WATCH_CREATOR) return 'menus'
-  if (isListingPageWatch(w)) return 'listingPages'
-  return 'pages'
+  if (refuahHospitalId(w.url)) return 'hospital'
+  if (w.createdBy === MENU_WATCH_CREATOR) return 'menu'
+  if (isListingPageWatch(w)) {
+    // Its listing gone or unknown: its label still says (listingPageLabel).
+    const reads = w.resourceId ? readsOf(w.resourceId) : null
+    return reads === 'hours' || (!reads && / hours on their website$/.test(w.label ?? '')) ? 'hours' : 'times'
+  }
+  return 'other'
 }
 
 /** Sort order within a group: 0 needs a look (not working, or a newsletter
@@ -63,11 +69,11 @@ function displayName(w: Watch): string {
  * admin has acted on had when they acted, so linking or pausing one doesn't
  * move it.
  */
-export function groupWatches(watches: Watch[], now: number, kept: ReadonlyMap<string, WatchRank> = new Map()): WatchGroup[] {
+export function groupWatches(watches: Watch[], now: number, kept: ReadonlyMap<string, WatchRank> = new Map(), readsOf: ReadsOf = () => null): WatchGroup[] {
   const byKey = new Map<WatchGroupKey, WatchRow[]>()
   const counts = new Map<WatchGroupKey, WatchGroup['counts']>()
   for (const watch of watches) {
-    const key = watchGroupOf(watch)
+    const key = watchGroupOf(watch, readsOf)
     const c = counts.get(key) ?? { toLink: 0, notWorking: 0, paused: 0 }
     counts.set(key, c)
     let rank: WatchRank
