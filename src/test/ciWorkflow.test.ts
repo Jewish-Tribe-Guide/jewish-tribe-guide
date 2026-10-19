@@ -98,3 +98,31 @@ describe('the Playwright container tag tracks the installed version', () => {
     }
   })
 })
+
+// A PR's wait is its slowest path, which was ~20 minutes: everything queued
+// behind lint/typecheck/unit (~4.5 min), then e2e ran for ~10 minutes on one
+// worker (the user, Oct 19: "PRs are taking a really long time"). Guarded so
+// a later edit putting `needs: unit` back, or folding e2e onto one runner
+// again, fails here rather than as a slow PR nobody connects to the change.
+describe('a PR’s checks start at once and e2e is split', () => {
+  function job(name: string): string {
+    const body = WORKFLOW.slice(WORKFLOW.indexOf('\njobs:'))
+    const block = body.split(/\n {2}(?=[a-z][\w-]*:\n)/).find((b) => b.startsWith(`${name}:`))
+    expect(block, `no job "${name}" in ci.yml`).toBeDefined()
+    return block!
+  }
+  const needs = (name: string) => job(name).match(/\n {4}needs:\s*(.+)/)?.[1] ?? ''
+
+  for (const name of ['integration', 'cache-roundtrip', 'form-roundtrip', 'admin-write', 'e2e']) {
+    it(`${name} doesn’t wait for the unit tests`, () => {
+      expect(needs(name)).not.toMatch(/\bunit\b/)
+    })
+  }
+
+  it('e2e runs as shards, each running its own share', () => {
+    const e2e = job('e2e')
+    const shards = e2e.match(/shard:\s*\[([^\]]+)\]/)?.[1].split(',').map((s) => s.trim()) ?? []
+    expect(shards.length).toBeGreaterThan(1)
+    expect(e2e).toMatch(new RegExp(`--shard=\\$\\{\\{ matrix\\.shard \\}\\}/${shards.length}\\b`))
+  })
+})
