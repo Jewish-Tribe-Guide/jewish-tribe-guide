@@ -58,6 +58,55 @@ describe('BoxEditor', () => {
 
 // A shul's usual box (Oct 10, canvas page "Minyan edit"): its minyanim as a
 // list, one opened at a time, every change sent together.
+// Oct 19: "This week's schedule" had no way to edit it. Edit under it opens
+// the week's own times, on its own days, and sends them back into that
+// week, leaving the usual times alone.
+describe('BoxEditor, this week’s schedule', () => {
+  const minyanim: CategoryField = { key: 'minyanim', label: 'Davening', type: 'minyanim', renderAs: 'row' }
+  const shuls = makeCategory({ id: 'synagogue', detailFields: [minyanim] })
+  const usual = [{ id: 'sh', tefillah: 'shacharis', days: ['sat'], time: '9:15am' }]
+  const week = {
+    id: 'w1',
+    name: 'Shabbos Bereishis',
+    from: '2026-10-09',
+    to: '2026-10-10',
+    mode: 'replace',
+    kind: 'week',
+    postedAt: '2026-10-07T15:00:00.000Z',
+    minyanim: [
+      { id: 'fn', tefillah: 'mincha_maariv', on: ['2026-10-09'], time: '6:10pm' },
+      { id: 'sm', tefillah: 'shacharis', on: ['2026-10-10'], time: '9:00am', notes: 'Kiddush after davening' },
+    ],
+  }
+  const shul = makeListing({ id: '5d0a7c1e-2f55-4a8e-9d57-3b7f0d6f4a21', name: 'Mekor Habracha', category: 'synagogue', minyanim: usual, minyanim_schedules: [week] })
+  const edit = { title: 'This week’s schedule', fields: [minyanim], minyanimBox: 'this_week' as const, writing: minyanWriting, week: 'w1' }
+
+  it('lists the week’s times in Shabbos order, offers only its own days, and sends the change into that week', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ ok: true }), { status: 200 }))
+    renderWithProviders(<BoxEditSheet item={shul} category={shuls} edit={edit} onClose={vi.fn()} />)
+    const list = screen.getByTestId('minyan-box-list')
+    expect(within(list).getAllByRole('button', { name: /^(Mincha|Shacharis)/ }).map((b) => b.textContent)).toEqual([
+      'Mincha & Maariv 6:10 PM',
+      'Shacharis 9 AMKiddush after davening',
+    ])
+    expect(within(list).queryByText(/9:15/)).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /^Shacharis/ }))
+    const sheet = screen.getByRole('dialog', { name: 'Shacharis' })
+    expect(within(within(sheet).getByRole('group', { name: 'Days' })).getAllByRole('button').map((b) => b.textContent)).toEqual(['Fri', 'Shabbos'])
+    fireEvent.change(within(sheet).getByLabelText('Time'), { target: { value: '8:45am' } })
+    fireEvent.click(within(sheet).getByRole('button', { name: 'Done' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Send 1 change' }))
+    await screen.findByTestId('box-edit-sent')
+
+    const details = JSON.parse(String(fetchMock.mock.calls[0][1]!.body)).payload.details
+    expect(details.minyanim).toEqual(usual)
+    const [sent] = details.minyanim_schedules
+    expect(sent).toMatchObject({ id: 'w1', from: '2026-10-09', to: '2026-10-10', kind: 'week' })
+    expect(sent.minyanim).toEqual([week.minyanim[0], { id: 'sm', tefillah: 'shacharis', on: ['2026-10-10'], time: '8:45am', notes: 'Kiddush after davening' }])
+  })
+})
+
 describe('BoxEditor, a shul’s usual Shabbos times', () => {
   const minyanim: CategoryField = { key: 'minyanim', label: 'Davening', type: 'minyanim', renderAs: 'row' }
   const shuls = makeCategory({ id: 'synagogue', detailFields: [minyanim] })

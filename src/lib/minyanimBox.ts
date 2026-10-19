@@ -13,12 +13,17 @@ import type { Minyan } from './davening'
 // it is stored, unsplit, so opening the box and sending nothing changes
 // nothing.
 
-export type MinyanBox = 'weekday' | 'shabbos'
+/** 'this_week': a week the shul sent out ("This week's schedule"), its
+ *  rows on the post's own days, Shabbos's and the week's together; edited
+ *  through schedules.ts's withWeekRows, never merged into the usual times. */
+export type MinyanBox = 'weekday' | 'shabbos' | 'this_week'
 
 /** The days a row in the box can be put on, and a new row's first day. */
 export const BOX_DAYS: Record<MinyanBox, { choices: Minyan['days']; newRow: Minyan['days'] }> = {
   shabbos: { choices: ['fri', 'sat'], newRow: ['sat'] },
   weekday: { choices: ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'rosh_chodesh', 'holiday'], newRow: [] },
+  // Narrowed to the days the post covers (MinyanBoxEditor's dayChoices).
+  this_week: { choices: ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'], newRow: ['sat'] },
 }
 
 /** The days of a row the box shows. Rosh Chodesh is the week's. Yom Tov

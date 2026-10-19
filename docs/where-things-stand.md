@@ -4,7 +4,7 @@ The running list of what's outstanding, kept in the repo so it survives a
 change of Claude account (artifacts and Claude's own notes stay with the old
 account). Update it in the same commit as the work that changes it.
 
-Last updated: Oct 18, 2026.
+Last updated: Oct 19, 2026.
 
 ## The branch
 
@@ -165,6 +165,21 @@ for that exact change, in the same conversation. Show the dry run first.
 ## Small open decisions
 
 7. The "+" button covers part of the third tile in a row on the phone home.
+
+## Done Oct 19 (on `redesign/oct18-fixes`, not merged)
+
+- **A shul's week of newsletter times** (the user, Oct 19):
+  - The usual box this week replaces folds **back** after it's opened
+    (an up chevron beside its title).
+  - Opened, it's a grey, dashed box with its times faded: still readable,
+    plainly not this week's. The line saying why, and its Confirmed footer,
+    stay at full strength.
+  - "This week's schedule" ends in the usual "Confirmed by …, date" line
+    with ✎ Edit, instead of "Posted Mon … Update their times".
+  - That Edit opens this week's times in the same editor as the usual
+    boxes, offering only the days the week covers. A changed row applies to
+    that week's matching dates; the usual times aren't touched, and the
+    queue shows the change like any other schedule edit.
 
 ## Done Oct 18 (on `redesign/oct18-fixes`, not merged)
 

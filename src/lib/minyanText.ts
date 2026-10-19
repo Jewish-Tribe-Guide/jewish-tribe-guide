@@ -91,6 +91,12 @@ export function shabbosPartOf(m: Minyan): ShabbosPart {
   return partOf(m, m.days.includes('fri') && m.tefillah !== 'shacharis' ? 'fri' : 'sat')
 }
 
+/** Whether a row is Shabbos's: Friday night or Saturday, nothing else. The
+ *  box editor has its own copy (see the top of this file). */
+export function isShabbosRow(m: Minyan): boolean {
+  return m.days.length > 0 && m.days.every((d) => d === 'sat' || (d === 'fri' && m.tefillah !== 'shacharis'))
+}
+
 // ── The box's minyanim as a list, one minyan at a time (Oct 10) ─────────────
 // Edit under a box opens its minyanim as the box reads ("Mincha & Maariv at
 // candle lighting"), one row each; a tap opens that one minyan. Shabbos's
@@ -104,6 +110,12 @@ const firstDay = (m: Minyan) => Math.min(...m.days.map((d) => DAY_ORDER.indexOf(
 const atMinutes = (m: Minyan) => clockMinutes(m.time) ?? 24 * 60
 
 export function boxGroups(rows: readonly Minyan[], box: MinyanBox): BoxGroup[] {
+  // A week the shul sent out: its Shabbos in the order of Shabbos, then its
+  // weekdays by tefillah, as its box shows them.
+  if (box === 'this_week') {
+    const shabbos = rows.filter(isShabbosRow)
+    return [...boxGroups(shabbos, 'shabbos'), ...boxGroups(rows.filter((m) => !shabbos.includes(m)), 'weekday')]
+  }
   if (box === 'shabbos') {
     return PART_ORDER.map((part) => ({
       label: SHABBOS_PART_LABELS[part],
