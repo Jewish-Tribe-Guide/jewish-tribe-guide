@@ -296,6 +296,40 @@ describe('HeroHeading — the search dropdown', () => {
     await user.type(phone.querySelector('input')!, 'food')
     expect(within(phone).getByText('Food')).toBeInTheDocument()
   })
+
+  // The user, Oct 20: on a phone, once results showed, only the box's ✕ put
+  // the home back. A tap away closes them as on a computer, the words kept;
+  // a tap in the box, or typing, brings them back.
+  it('on a phone, a tap away closes the results and keeps the words; the box brings them back', async () => {
+    const user = userEvent.setup()
+    const changes: boolean[] = []
+    const { container } = render(
+      <>
+        <Wrapper onSearchDismissedChange={(d) => changes.push(d)} />
+        <a href="#tile">Food tile</a>
+      </>,
+    )
+    const phone = container.querySelector<HTMLElement>('section.desktop\\:hidden')!
+    const input = phone.querySelector('input')!
+    await user.type(input, 'food')
+    // A tap on its own results, or in the box, leaves them open.
+    await user.click(within(phone).getByText('Food'))
+    await user.click(input)
+    expect(within(phone).getByText('Food')).toBeInTheDocument()
+
+    await user.click(screen.getByText('Food tile'))
+    expect(within(phone).queryByText('Food')).not.toBeInTheDocument()
+    expect(input).toHaveValue('food')
+    expect(changes).toEqual([true])
+
+    await user.click(input)
+    expect(within(phone).getByText('Food')).toBeInTheDocument()
+    expect(changes).toEqual([true, false])
+
+    await user.click(document.body)
+    await user.type(input, 's')
+    expect(within(phone).getByText('Food')).toBeInTheDocument()
+  })
 })
 
 // The "community-maintained" banner (CommunityStrip) used to render here, in

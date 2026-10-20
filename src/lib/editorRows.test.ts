@@ -12,12 +12,25 @@ const values = (details: Record<string, unknown>, core: Partial<EditorValues> = 
 describe('the whole-listing editor’s rows', () => {
   it('Food: the listing’s order, the kosher facts together, the dishes as the main thing', () => {
     const rows = editorRows(FOOD, {})
-    expect(titles(rows)).toEqual(['Name', 'Store Type', 'Kosher', 'Main dishes', 'Address, phone and website', 'Hours', 'About'])
+    expect(titles(rows)).toEqual(['Name', 'Store type and delivery', 'Kosher', 'Main dishes', 'Address, phone and website', 'Hours', 'About'])
     expect(keys(rows, 'name')).toEqual(['photo', 's'])
     // The certificate's link right under the hechsher, not with the website.
     expect(keys(rows, 'facts')).toEqual(['t', 'kosherCert', 'k', 'kosherPartial', 'kosherNote'])
     expect(keys(rows, 'contact')).toEqual(['website'])
-    expect(keys(rows, 'about')).toEqual(['googleDescription', 'delivery_details'])
+    expect(keys(rows, 'about')).toEqual(['googleDescription'])
+  })
+
+  // The user, Oct 20: adding a place with scheduled deliveries, there was
+  // no telling where its WhatsApp group went. Picking "Scheduled
+  // Deliveries" showed it in the contact row, two rows away.
+  it('what a choice brings up is in the same row as the choice, named for both', () => {
+    const rows = editorRows(FOOD, { foodType: 'Scheduled Deliveries' })
+    expect(keys(rows, 'kind')).toEqual(['foodType', 'delivery_whatsapp_group', 'delivery_details'])
+    expect(rows.find((r) => r.id === 'kind')!.title).toBe('Store type and delivery')
+    expect(keys(rows, 'contact')).toEqual(['website'])
+    // With nothing it brings up, the row keeps the field's own name.
+    const plain = { ...FOOD, detailFields: FOOD.detailFields.filter((f) => !f.showIf || f.showIf.field !== 'foodType') }
+    expect(editorRows(plain, {}).find((r) => r.id === 'kind')!.title).toBe('Store Type')
   })
 
   it('a certificate link stays with the website where there’s no hechsher to put it under', () => {
@@ -150,6 +163,19 @@ describe('empty rows and changed rows', () => {
     expect(rows.filter((r) => rowChanged(r, withMenu, { ...same(), details: { ...same().details, menuUrl: 'https://sweetbox.example/menu' } }))).toEqual([])
     const grocery = editorRows(GROCERY, {})
     expect(grocery.filter((r) => r.kind === 'items' && rowChanged(r, withMenu, moved))).toEqual([])
+  })
+
+  // The user, Oct 20: adding a food place, a menu link alone left Main
+  // dishes under "Not on the listing yet", as if nothing had been entered.
+  it('a menu link fills the Main dishes row, and says so, with no dishes yet', () => {
+    const withLink = values({ menuUrl: 'https://sweetbox.example/menu' })
+    expect(rowIsEmpty(row('items'), withLink)).toBe(false)
+    expect(rowSummary(row('items'), withLink, timeText)).toBe('Menu link')
+    expect(rowSummary(row('items'), values({ dishes: ['Pizza'], menuUrl: 'https://sweetbox.example/menu' }), timeText)).toBe('1 · Pizza · Menu link')
+    expect(rowIsEmpty(row('items'), values({ menuUrl: '' }))).toBe(true)
+    // A grocery's items have no menu link.
+    const groceryItems = editorRows(GROCERY, {}).find((r) => r.id === 'items')!
+    expect(rowIsEmpty(groceryItems, withLink)).toBe(true)
   })
 })
 

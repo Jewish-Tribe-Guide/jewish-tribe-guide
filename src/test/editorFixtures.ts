@@ -17,11 +17,17 @@ export const FOOD: CategoryConfig = makeCategory({
     { key: 'kosherCert', type: 'select', label: 'Kosher Certification', renderAs: 'badge', filterable: true, caveat: { flagField: 'kosherPartial', noteField: 'kosherNote' }, options: [{ label: 'IKC', value: 'IKC' }, { label: 'OU', value: 'OU' }] },
     { key: 'kosherPartial', type: 'boolean', label: 'Everything here is kosher', renderAs: 'hidden', invertDisplay: true },
     { key: 'kosherNote', type: 'textarea', label: 'What isn’t kosher?', renderAs: 'hidden', showIf: { field: 'kosherPartial', equals: true } },
-    { key: 'foodType', type: 'select', label: 'Store Type', renderAs: 'badge', filterable: true, options: [{ label: 'Restaurant', value: 'Restaurant' }, { label: 'Bakery', value: 'Bakery' }] },
+    { key: 'foodType', type: 'select', label: 'Store Type', renderAs: 'badge', filterable: true, formSection: 'storeType', options: [{ label: 'Restaurant', value: 'Restaurant' }, { label: 'Bakery', value: 'Bakery' }, { label: 'Scheduled Deliveries', value: 'Scheduled Deliveries' }] },
     { key: 'k', type: 'url', label: 'Kosher Certification URL', linkLabel: 'Certification', renderAs: 'row' },
-    { key: 'delivery_details', type: 'textarea', label: 'Delivery Details', renderAs: 'row' },
+    // Shown once "Scheduled Deliveries" is picked, as on the real Food.
+    { key: 'delivery_whatsapp_group', type: 'url', label: 'Delivery WhatsApp Group', linkLabel: 'Join WhatsApp Group', renderAs: 'row', formSection: 'storeType', showIf: { field: 'foodType', equals: 'Scheduled Deliveries' } },
+    { key: 'delivery_details', type: 'textarea', label: 'Delivery Details', renderAs: 'row', formSection: 'storeType', showIf: { field: 'foodType', equals: 'Scheduled Deliveries' } },
     { key: 'dishes', type: 'tags', label: 'Main dishes', renderAs: 'badge', showCountInHeader: true, countLabel: 'dish' },
     { key: 'secret', type: 'text', label: 'Internal', renderAs: 'hidden' },
+  ],
+  formSections: [
+    { key: 'kosher', label: 'Kosher details' },
+    { key: 'storeType', label: 'Store type and delivery' },
   ],
 })
 

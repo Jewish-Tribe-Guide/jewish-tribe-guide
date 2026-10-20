@@ -32,7 +32,7 @@ export default function SearchBox({
    *  devices rather than split into separate mobile/desktop copies (it's
    *  describing the same search either way). */
   placeholder: string
-  /** Desktop hero only — reopens HeroSearchDropdown when a visitor refocuses
+  /** The home's boxes — reopens the results when a visitor refocuses
    *  an already-typed-into box (e.g. after "See all" dismissed it), without
    *  requiring them to edit the text first. */
   onFocus?: () => void

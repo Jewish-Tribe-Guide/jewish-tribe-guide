@@ -12,6 +12,9 @@ import type { EruvLineFile } from './eruvLine'
 export type EruvStatuses = { available: false } | { available: true; timezone: string; candles: number | null; eruvim: Eruv[]; mapsVersion: string | null }
 
 const cache = new Map<string, Promise<EruvStatuses>>()
+// What arrived, to read at once rather than a render later: a sheet opened
+// after the page fetched them shows them without a loading bar.
+const arrived = new Map<string, EruvStatuses>()
 
 export function fetchEruvStatuses(communitySlug: string): Promise<EruvStatuses> {
   let p = cache.get(communitySlug)
@@ -22,7 +25,11 @@ export function fetchEruvStatuses(communitySlug: string): Promise<EruvStatuses> 
       .catch((): EruvStatuses => ({ available: false }))
     cache.set(communitySlug, p)
     // A failure isn't kept: the next page asks again.
-    p.then((s) => !s.available && cache.delete(communitySlug))
+    // Kept to read at once either way; a page that asks again replaces it.
+    p.then((s) => {
+      arrived.set(communitySlug, s)
+      if (!s.available) cache.delete(communitySlug)
+    })
   }
   return p
 }
@@ -30,6 +37,7 @@ export function fetchEruvStatuses(communitySlug: string): Promise<EruvStatuses> 
 /** For tests. */
 export function clearEruvStatuses(): void {
   cache.clear()
+  arrived.clear()
   mapsCache.clear()
 }
 
@@ -43,7 +51,7 @@ export function useEruvStatuses(communitySlug: string, wanted = true): EruvStatu
       live = false
     }
   }, [communitySlug, wanted])
-  return data
+  return data ?? (wanted ? (arrived.get(communitySlug) ?? null) : null)
 }
 
 /** How many eruvim the community has, for the Eruv card's count; null

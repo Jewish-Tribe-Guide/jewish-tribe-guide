@@ -81,6 +81,7 @@ const BARE_FETCH_ALLOWED: Record<string, string> = {
   'src/components/resources/EruvInfo.tsx': 'reads the eruv status',
   'src/components/resources/TagsInput.tsx': 'reads a tag group',
   'src/components/resources/WalkList.tsx': 'reads a category’s listings',
+  'src/components/resources/useMenuRead.ts': 'reads a menu link; ListingEditor turns it off in the preview',
   'src/components/ManageSubscriptionForm.tsx': 'its own page, not in the preview',
   'src/components/home/SubscribeSection.tsx': 'the home page, not in the preview',
   'src/components/home/TrustBand.tsx': 'reads which sources ran this week, on the home page, not in the preview',
