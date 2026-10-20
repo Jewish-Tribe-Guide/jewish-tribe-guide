@@ -22,11 +22,14 @@ export const TEFILLAH_CHOICES: readonly { label: string; tefillos: readonly Tefi
 ]
 
 /** How far, one at a time: from the visitor's location, else the
- *  community's centre, as every row measures it. */
+ *  community's centre, as every row measures it. Choices, not a slider: a
+ *  thumb can't set one easily, and nobody wants 2.3 miles. Walking first,
+ *  then 5 for a short drive (Oct 20). */
 export const WITHIN_CHOICES: readonly { label: string; miles: number }[] = [
   { label: 'Within ½ mi', miles: 0.5 },
   { label: 'Within 1 mi', miles: 1 },
   { label: 'Within 3 mi', miles: 3 },
+  { label: 'Within 5 mi', miles: 5 },
 ]
 
 /** The tefillos the chosen chips take in; null when none is chosen. */
