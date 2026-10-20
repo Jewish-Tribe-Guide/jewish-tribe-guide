@@ -42,8 +42,9 @@ describe('watchGroupOf', () => {
     expect(watchGroupOf(mekor)).toBe('kosher')
     expect(watchGroupOf(refuah)).toBe('hospital')
     expect(watchGroupOf(menu)).toBe('menu')
-    expect(watchGroupOf(newsletter)).toBe('weekly')
-    expect(watchGroupOf(notAShul)).toBe('weekly')
+    // A shul's times, from its website or its newsletter, are one (Oct 20).
+    expect(watchGroupOf(newsletter)).toBe('times')
+    expect(watchGroupOf(notAShul)).toBe('times')
     expect(watchGroupOf(page)).toBe('other')
     expect(watchGroupOf(shulPage)).toBe('times')
   })
@@ -76,8 +77,9 @@ describe('watchGroupOf', () => {
 describe('groupWatches', () => {
   it('lists the groups in a fixed order, leaving out empty ones', () => {
     const groups = groupWatches([page, shulPage, menu, refuah, newsletter, keystone], NOW)
-    expect(groups.map((g) => g.key)).toEqual(['times', 'weekly', 'kosher', 'menu', 'hospital', 'other'])
-    expect(groups.find((g) => g.key === 'times')?.label).toBe('Shul’s usual times')
+    expect(groups.map((g) => g.key)).toEqual(['times', 'kosher', 'menu', 'hospital', 'other'])
+    expect(groups.find((g) => g.key === 'times')?.label).toBe('Shul’s times')
+    expect(groups[0].rows.map((r) => r.watch.id).sort()).toEqual([newsletter.id, shulPage.id].sort())
     expect(groupWatches([menu], NOW).map((g) => g.key)).toEqual(['menu'])
     expect(groupWatches([], NOW)).toEqual([])
   })
@@ -105,7 +107,7 @@ describe('groupWatches', () => {
     const failing = watch({ id: 'f', url: 'mailto:a@b.org', resourceId: 's2', createdBy: 'shul newsletters', failingSince: ago(1), lastError: 'No newsletter for a month' })
     const paused = watch({ id: 'p', url: 'mailto:c@d.org', resourceId: 's3', createdBy: 'shul newsletters', active: false })
     const [news] = groupWatches([newsletter, unlinked, failing, paused, notAShul], NOW)
-    expect(news.label).toBe('Shul’s weekly times')
+    expect(news.label).toBe('Shul’s times')
     expect(news.rows).toHaveLength(5)
     expect(news.counts).toEqual({ toLink: 1, notWorking: 1, paused: 1 })
     // A sender marked not a shul is switched off, but isn't "paused".

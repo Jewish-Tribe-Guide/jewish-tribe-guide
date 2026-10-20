@@ -6,8 +6,9 @@ import { fetchPublic, htmlToText, type MenuSource } from '@/lib/menuReader'
 import { menuHash } from '@/lib/menuWatch'
 import { WATCH_FETCH_HEADERS } from '@/lib/websiteWatch'
 import { readShulWeek } from '@/lib/shulWeekReading'
-import { applyUpdate, changesAnything, sameTime, type TimesUpdate } from '@/lib/scheduleUpdate'
-import { readSchedules, regularMinyanim, schedulesKey } from '@/lib/schedules'
+import { CALENDAR_DAYS, CALENDAR_HEADING, calendarFeeds, calendarLines, embeddedEntries, icsEntries, isIcs, type CalendarEntry } from '@/lib/calendarFeed'
+import { applyUpdate, changesAnything, datesBetween, datesHeldOverWebsite, sameTime, weekdayOf, type TimesUpdate } from '@/lib/scheduleUpdate'
+import { readSchedules, regularMinyanim, schedulesKey, type SpecialSchedule } from '@/lib/schedules'
 import { buildCatalog, readMessage } from '@/lib/messageReader'
 import { fieldsEdit, readFieldChanges } from '@/lib/fieldChanges'
 import { editSubmission } from '@/lib/editSubmission'
@@ -38,16 +39,38 @@ import {
  *  Without its menus (<nav>): a shul site's runs to thousands of words,
  *  crowding out the times in what the AI is given, and a new menu item
  *  isn't a change to the page. */
-export async function readListingPage(url: string, opts: { fetchImpl?: typeof fetch } = {}): Promise<MenuSource | null> {
+export async function readListingPage(url: string, opts: { fetchImpl?: typeof fetch; now?: number } = {}): Promise<MenuSource | null> {
   const page = await fetchPublic(url, { fetchImpl: opts.fetchImpl, headers: WATCH_FETCH_HEADERS })
   if (!page) return null
   if (page.type === 'pdf') return { url: page.url, text: null, pdf: page.body }
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: communityConfig.timezone }).format(new Date(opts.now ?? Date.now()))
+  const last = new Date(Date.parse(`${today}T12:00:00Z`) + (CALENDAR_DAYS - 1) * 86_400_000).toISOString().slice(0, 10)
+  // The watch's address may be the calendar feed itself.
+  if (isIcs(page.body)) return withCalendar(page.url, '', icsEntries(page.body, communityConfig.timezone, today, last), today)
+  // A calendar on the page: its feed (the first that reads) or the event
+  // list in its scripts (calendarFeed.ts), ahead of the page's own words.
+  let entries = embeddedEntries(page.body, communityConfig.timezone)
+  for (const feed of calendarFeeds(page.body, page.url).slice(0, 2)) {
+    const got = await fetchPublic(feed, { fetchImpl: opts.fetchImpl, headers: WATCH_FETCH_HEADERS })
+    if (got?.type === 'html' && isIcs(got.body)) {
+      entries = icsEntries(got.body, communityConfig.timezone, today, last)
+      break
+    }
+  }
   const text = htmlToText(page.body.replace(/<nav\b[\s\S]*?<\/nav\s*>/gi, ' '))
-  return text.length >= 200 ? { url: page.url, text, pdf: null } : null
+  return withCalendar(page.url, text, entries, today)
+}
+
+/** The page as the reader takes it: its calendar's coming entries, when it
+ *  has any, then its words. A page with neither isn't readable. */
+function withCalendar(url: string, text: string, entries: CalendarEntry[], today: string): MenuSource | null {
+  const lines = calendarLines(entries, today)
+  if (lines.length) return { url, text: [CALENDAR_HEADING, ...lines, '', text].join('\n').trim(), pdf: null }
+  return text.length >= 200 ? { url, text, pdf: null } : null
 }
 
 /** What the page would change on the listing: the edit and its lines, or
- *  nothing (it agrees, it's one week's times, the AI found none). */
+ *  nothing (it agrees, the newsletter has those days, the AI found none). */
 export type PageProposal = { submission: ResourceSubmission; lines: string[]; keys: string[] } | null
 
 /** A shul's time comes off only where the page gives that tefillah on that
@@ -75,10 +98,56 @@ function sameMinyanName(a: Tefillah, b: Tefillah): boolean {
  *  reader compares one, so Mekor Habracha's winter Maariv, on the listing
  *  as winter's, came back as new all week (Oct 19); and the AI names a
  *  minyan its own way. The paste box asks a person; here no one is. */
-export function dropListed(update: TimesUpdate, current: readonly Minyan[]): TimesUpdate {
-  const listed = (r: TimesUpdate['rows'][number]) =>
-    current.some((m) => m.days.includes(r.day as Minyan['days'][number]) && sameMinyanName(m.tefillah, r.tefillah) && sameTime(m, r))
+export function dropListed(update: TimesUpdate, current: readonly Minyan[], schedules: readonly SpecialSchedule[] = []): TimesUpdate {
+  const listed = (r: TimesUpdate['rows'][number]) => {
+    // A dated time (a calendar's Shabbos service) is listed when it's the
+    // usual time that weekday, or already on a schedule for that date.
+    const dated = /^\d{4}-\d{2}-\d{2}$/.test(r.day)
+    const day = dated ? weekdayOf(r.day) : r.day
+    return (
+      current.some((m) => m.days.includes(day as Minyan['days'][number]) && sameMinyanName(m.tefillah, r.tefillah) && sameTime(m, r)) ||
+      (dated && schedules.some((s) => s.minyanim.some((m) => m.on.includes(r.day) && sameMinyanName(m.tefillah, r.tefillah) && sameTime(m, r))))
+    )
+  }
   return { ...update, rows: update.rows.filter((r) => r.status !== 'new' || !listed(r)) }
+}
+
+/** A calendar lists a weekly minyan once a date, and the reader passes each
+ *  on as a one-off: Rodeph Shalom's Thursday morning minyan came out as
+ *  "that day only" twice (Oct 20). The same tefillah at the same time on
+ *  the same weekday, two weeks or more, is a usual time: a change to the
+ *  shul's one such minyan that day, or a new one beside them. Run after
+ *  dropListed, so a date at the usual time is already gone. */
+export function weeklyFromCalendar(update: TimesUpdate, current: readonly Minyan[]): TimesUpdate {
+  if (update.kind !== 'schedule') return update
+  const dated = update.rows.filter((r) => r.status === 'new' && /^\d{4}-\d{2}-\d{2}$/.test(r.day) && !r.occasion)
+  const groups: (typeof dated)[] = []
+  for (const r of dated) {
+    const g = groups.find(([x]) => weekdayOf(x.day) === weekdayOf(r.day) && x.tefillah === r.tefillah && sameTime(x, r))
+    if (g) g.push(r)
+    else groups.push([r])
+  }
+  const folded = new Set<string>()
+  const weekly = groups.flatMap((g) => {
+    if (new Set(g.map((r) => r.day)).size < 2) return []
+    for (const r of g) folded.add(r.id)
+    const day = weekdayOf(g[0].day)
+    const usual = current.filter((m) => m.days.includes(day) && sameMinyanName(m.tefillah, g[0].tefillah))
+    const row = { ...g[0], day }
+    return [usual.length === 1 ? { ...row, status: 'changed' as const, was: usual[0].time, rowId: usual[0].id } : row]
+  })
+  return weekly.length ? { ...update, rows: [...update.rows.filter((r) => !folded.has(r.id)), ...weekly] } : update
+}
+
+/** What the website gives for days the shul's newsletter (or a person)
+ *  has already given a week for, taken out: the newsletter wins (the user,
+ *  Oct 20). A website is usually the one behind. A week of the website's
+ *  that touches such a day is left out whole, since it would replace that
+ *  day's times. Null when nothing is left. */
+export function yieldToNewsletter(update: TimesUpdate, schedules: readonly SpecialSchedule[]): TimesUpdate | null {
+  const held = datesHeldOverWebsite(schedules)
+  if (update.kind === 'week') return update.from && update.to && datesBetween(update.from, update.to).some((d) => held.has(d)) ? null : update
+  return { ...update, rows: update.rows.filter((r) => !held.has(r.day)) }
 }
 
 /** Has the AI read the page for the listing, and compares what it read
@@ -92,13 +161,17 @@ export async function proposeFromPage(
 ): Promise<PageProposal> {
   const text = source.text?.slice(0, MAX_PAGE_TEXT) ?? null
   if (reads.kind === 'times') {
-    // The shul's usual times (scheduleUpdate.ts): a page of one week's
-    // times is the newsletter's job, not a change to the usual ones.
+    // The shul's times (scheduleUpdate.ts): its usual ones, and since Oct 20
+    // the dated ones too, a week's or a calendar's (calendarFeed.ts), filed
+    // as that week's times. What the newsletter has given for the same
+    // days wins.
     const read = await readShulWeek(listing, reads.key, text !== null ? { text } : { pdf: source.pdf! }, apiKey)
-    const update = dropListed(keepUncovered(read.update), regularMinyanim(listing[reads.key]))
-    if (update.kind !== 'schedule' || !changesAnything(update)) return null
     const sk = schedulesKey(reads.key)
-    const applied = applyUpdate(regularMinyanim(listing[reads.key]), readSchedules(listing[sk]), update)
+    const regular = regularMinyanim(listing[reads.key])
+    const schedules = readSchedules(listing[sk])
+    const update = yieldToNewsletter(weeklyFromCalendar(dropListed(keepUncovered(read.update), regular, schedules), regular), schedules)
+    if (!update || !changesAnything(update)) return null
+    const applied = applyUpdate(regular, schedules, update, { postedBy: 'website' })
     if (applied.changes.length === 0) return null
     return { submission: editSubmission(category, listing, { [reads.key]: applied.minyanim, [sk]: applied.schedules }), lines: applied.changes, keys: [reads.key, sk] }
   }
@@ -166,7 +239,7 @@ export async function runListingPageWatch(
   const reads = category && pageReadsFor(category)
   if (!category || !reads) return { ok: false, error: 'The listing this page belongs to has no davening times or hours to keep current' }
 
-  const source = await readListingPage(watch.url, { fetchImpl: opts.fetchImpl })
+  const source = await readListingPage(watch.url, { fetchImpl: opts.fetchImpl, now: opts.now })
   if (!source) return { ok: false, error: 'Couldn’t read the page (blocked, moved, or built in the browser)' }
   const pageHash = menuHash(source)
   // The first read sets the baseline; an unchanged page is left alone, and

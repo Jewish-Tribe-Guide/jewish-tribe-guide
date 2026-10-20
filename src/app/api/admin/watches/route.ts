@@ -17,9 +17,9 @@ import { isWatchPurpose, purposeInfo, sourceProblem } from '@/lib/watchPurposes'
 //      (`reads`: 'times', 'hours' or null). Admin only.
 // POST /api/admin/watches  body: { action: 'add', purpose?, url, resourceId?, label?, forListing? }
 //      `purpose` (watchPurposes.ts) is what the admin said it keeps
-//      current: 'times' and 'hours' are a listing's own page (as
-//      `forListing`), 'weekly' a newsletter's address, 'hospital' a Refuah
-//      page. An eruv's status is set on the eruv (/api/admin/eruvim).
+//      current: 'hours' is a listing's own page (as `forListing`),
+//      'times' a shul's own page or calendar, or its newsletter's address,
+//      'hospital' a Refuah page. An eruv's status is set on the eruv (/api/admin/eruvim).
 //      Watches a new page and checks it once straight away, so the admin
 //      sees at once whether the guide can read it. `forListing`: the page
 //      is the listing's own (a shul's times, a mikvah's hours), read by the

@@ -144,7 +144,8 @@ export async function fetchPublic(
     if (bytes.byteLength > MAX_BYTES) return null
     const isPdf = type.includes('application/pdf') || (bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46)
     if (isPdf) return { url: url.toString(), type: 'pdf', body: Buffer.from(bytes).toString('base64') }
-    if (type && !type.includes('html') && !type.includes('text/plain')) return null
+    // A calendar feed (text/calendar) is text too: a shul's page links its own (calendarFeed.ts).
+    if (type && !type.includes('html') && !type.includes('text/plain') && !type.includes('text/calendar')) return null
     return { url: url.toString(), type: 'html', body: new TextDecoder().decode(bytes) }
   }
   return null

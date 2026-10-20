@@ -508,6 +508,10 @@ const SCHEDULE_FIELD_VISIBILITY: Record<keyof SpecialSchedule | keyof ScheduleMi
   // the schedule's name and dates already say which week it is (Oct 6).
   kind: 'deliberately-hidden',
   postedAt: 'deliberately-hidden',
+  // Set by the app on a week read off the shul's website (Oct 20), never
+  // typed: the suggestion itself is filed as "Their website (automated)",
+  // so the moderator already sees where it came from.
+  postedBy: 'deliberately-hidden',
   // As for regular minyanim: `time` carries the rule's text.
   anchor: 'deliberately-hidden',
   offsetMinutes: 'deliberately-hidden',

@@ -41,6 +41,10 @@ export type SpecialSchedule = {
   kind?: 'week'
   /** When a week's times were added, ISO. */
   postedAt?: string
+  /** 'website': read off the shul's own website or calendar (listingPageRun.ts).
+   *  A week from anywhere else (its newsletter, a person) wins over it for
+   *  the same days (the user, Oct 20). */
+  postedBy?: 'website'
 }
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/
@@ -79,6 +83,7 @@ export function readSchedules(raw: unknown): SpecialSchedule[] {
         minyanim,
         ...(x.kind === 'week' ? { kind: 'week' as const } : {}),
         ...(typeof x.postedAt === 'string' && !Number.isNaN(Date.parse(x.postedAt)) ? { postedAt: x.postedAt } : {}),
+        ...(x.postedBy === 'website' ? { postedBy: 'website' as const } : {}),
       },
     ]
   })

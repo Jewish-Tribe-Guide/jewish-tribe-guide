@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Minyan } from './davening'
 import type { SpecialSchedule } from './schedules'
-import { applyUpdate, changesAnything, compareTimes, mergeSchedule, sameTime, seasonFromNotes, seasonOf, type ReadRegularTime, type RegularReading } from './scheduleUpdate'
+import { applyUpdate, changesAnything, compareTimes, datesHeldOverWebsite, mergeSchedule, sameTime, seasonFromNotes, seasonOf, type ReadRegularTime, type RegularReading } from './scheduleUpdate'
 
 // Mekor Habracha's times as the guide has them (test copy, Oct 1): the
 // seasons are in the notes, not the season field.
@@ -210,6 +210,45 @@ describe('one Shabbos’s times', () => {
     const r = compareTimes(MEKOR, same, { season: 'summer', zmanim: ZMANIM, newId })
     expect(changesAnything(r)).toBe(false)
     expect(applyUpdate(MEKOR, [], r, { newId }).schedules).toEqual([])
+  })
+})
+
+// The user, Oct 20: the shul's website (or calendar) is read too, and
+// "the newsletter wins when they disagree".
+describe('a week from the website, and the newsletter’s for the same days', () => {
+  const u = compareTimes(MEKOR, BEREISHIS, { season: 'summer', zmanim: ZMANIM, newId })
+  const now = Date.parse('2026-10-07T15:00:00Z')
+  const fromWebsite = applyUpdate(MEKOR, [], u, { newId, now, postedBy: 'website' }).schedules
+
+  it('a week read off the website is marked so', () => {
+    expect(fromWebsite).toEqual([expect.objectContaining({ kind: 'week', postedBy: 'website' })])
+  })
+
+  it('the newsletter’s week takes the website’s days off, and keeps the website’s other days', () => {
+    const later: SpecialSchedule = {
+      id: 'w',
+      name: 'Times for Oct 10 – Oct 11',
+      from: '2026-10-10',
+      to: '2026-10-11',
+      mode: 'replace',
+      kind: 'week',
+      postedBy: 'website',
+      minyanim: [
+        { id: 'y', tefillah: 'mincha', on: ['2026-10-10'], time: '5:00pm' },
+        { id: 'z', tefillah: 'shacharis', on: ['2026-10-11'], time: '8:00am' },
+      ],
+    }
+    const { schedules } = applyUpdate(MEKOR, [...fromWebsite, later], u, { newId, now })
+    expect(schedules.map((s) => [s.name, s.postedBy ?? 'newsletter', s.from, s.minyanim.map((m) => m.on.join(','))])).toEqual([
+      ['Times for Oct 10 – Oct 11', 'website', '2026-10-11', ['2026-10-11']],
+      ['Shabbos Bereishis', 'newsletter', '2026-10-09', ['2026-10-09', '2026-10-10', '2026-10-10']],
+    ])
+  })
+
+  it('a week from the website takes nothing off the newsletter’s', () => {
+    const fromNewsletter = applyUpdate(MEKOR, [], u, { newId, now }).schedules
+    expect(datesHeldOverWebsite(fromNewsletter)).toEqual(new Set(['2026-10-09', '2026-10-10']))
+    expect(datesHeldOverWebsite(fromWebsite)).toEqual(new Set())
   })
 })
 
