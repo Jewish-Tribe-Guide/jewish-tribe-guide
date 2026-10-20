@@ -121,6 +121,21 @@ test.describe('on a phone', () => {
     await expect(page.getByTestId('right-now')).not.toContainText('open now')
   })
 
+  // The user, Oct 20: "Candle Lighting & Zmanim" came out "Candle Lighting
+  // &…", the one word that says what else is there cut off. A tile shows its
+  // whole name. Checked on every tile, and on one given that name, since
+  // the test project's own names may all be short.
+  test('every tile shows its whole name, a long one too', async ({ page }) => {
+    // An iPhone's width, not the Pixel 7's wider 412px, where it fit.
+    await page.setViewportSize({ width: 375, height: 812 })
+    await openHome(page, 'tuesday')
+    const names = page.getByTestId('category-tiles').getByTestId('tile-name')
+    await expect(names.first()).toBeVisible()
+    await names.first().evaluate((el) => (el.textContent = 'Candle Lighting & Zmanim'))
+    const cut = await names.evaluateAll((els) => els.filter((el) => el.scrollHeight > el.clientHeight + 1).map((el) => el.textContent))
+    expect(cut, 'tiles whose name is cut off').toEqual([])
+  })
+
   test('the categories as one grid of tiles, each a link to its page, none left out, no headings', async ({ page, request }) => {
     const community = await openHome(page, 'tuesday')
     const tiles = page.getByTestId('category-tiles')

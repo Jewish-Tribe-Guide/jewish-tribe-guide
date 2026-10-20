@@ -52,7 +52,10 @@ export default function CategoryTiles({ communitySlug, listings }: { communitySl
               className="flex h-full min-h-[88px] flex-col items-center gap-1.5 rounded-2xl border border-slate-200 bg-white px-1.5 pt-3 pb-2.5 text-center hover:bg-slate-50"
             >
               <CategoryIcon icon={card.icon ?? ''} categoryId={card.id} color={getCategoryColor((categories ?? []) as CategoryConfig[], card.id ?? '')} className="h-10 w-10 text-lg" sizePx={40} />
-              <span className="line-clamp-2 text-[13.5px] font-bold leading-tight text-ink">{card.title}</span>
+              {/* Three lines, not two: "Candle Lighting & Zmanim" lost its
+                  last word at an iPhone's width (Oct 20). A row with a
+                  three-line name is a little taller, all its tiles alike. */}
+              <span data-testid="tile-name" className="line-clamp-3 text-[13.5px] font-bold leading-tight text-ink">{card.title}</span>
             </Link>
           </li>
         ))}
