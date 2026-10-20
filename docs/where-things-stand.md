@@ -81,12 +81,11 @@ for that exact change, in the same conversation. Show the dry run first.
 1b. **Eruv status by email (6c):** migration 084 is run on both databases
    (the user, Oct 19). Northeast's address on live is still to set: a yes,
    once the branch is deployed. Elkins Park's sender is still unknown.
-1c. **Rename "Prayer & Shabbat Times" to "Candle Lighting & Zmanim"**
-   (decided Oct 20). Done on dev. On live (`zmanim`, philly): label and
-   plural "Prayer & Shabbat Times" → "Candle Lighting & Zmanim",
-   description "" → "Candle lighting, Havdalah and daily zmanim". Needs a
-   yes, after the tile change (three lines for a name) is deployed, then
-   an admin save or `POST /api/admin/revalidate`.
+1c. **"Candle Lighting & Zmanim"** (decided Oct 20): the user renamed it
+   on live Oct 20 (label and plural). Its description there is still
+   empty; dev has "Candle lighting, Havdalah and daily zmanim", which
+   category search reads ("havdalah" finds it). Until the three-line tiles are
+   live, the phone home cuts the name to "Candle Lighting &…".
 
 ## For the user or the community
 
@@ -265,8 +264,8 @@ The user's list of seven, all agreed.
    no loading bar.
 3. **"Within 5 mi"** added to How far, for a short drive. Choices kept,
    not a miles box.
-4. **"Candle Lighting & Zmanim"** for Prayer & Shabbat Times, on dev only
-   (live: 1c above). Home tiles show up to three lines of a name, so it
+4. **"Candle Lighting & Zmanim"** for Prayer & Shabbat Times (dev; the
+   user renamed it on live, see 1c). Home tiles show up to three lines of a name, so it
    isn't cut to "Candle Lighting &…".
 5. **Phone home search: a tap away closes the results** (and Escape). The
    words stay; tapping the box or typing opens them again.
