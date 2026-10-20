@@ -8,7 +8,7 @@ import { EDIT_LISTING_LABEL } from '@/components/resources/editListingLabel'
 import { ChevronRightIcon, PeopleIcon } from '@/components/icons'
 import { routes } from '@/lib/routes'
 import { everyListingDated, sourcesRead, sourcesSentence, trustLine, type TrustFacts } from '@/lib/phoneHome'
-import { useEruvStatuses } from '@/lib/useEruvStatuses'
+import { fetchEruvStatuses, useEruvStatuses } from '@/lib/useEruvStatuses'
 
 // ── Who keeps the guide right (the user, Oct 17) ────────────────────────────
 // The top of the phone home, where the headline and mission were: a promise
@@ -32,6 +32,21 @@ type Props = {
 
 export default function TrustBand({ facts, region, communitySlug }: Props) {
   const [open, setOpen] = useState(false)
+  // What the sheet names, asked for once the home has loaded rather than on
+  // the tap, so the sheet opens whole instead of with a loading bar each
+  // time (the user, Oct 20). Both are small and cached by the CDN.
+  useEffect(() => {
+    const read = () => {
+      fetchListsRead(communitySlug)
+      fetchEruvStatuses(communitySlug)
+    }
+    if (typeof requestIdleCallback === 'function') {
+      const id = requestIdleCallback(read, { timeout: 3000 })
+      return () => cancelIdleCallback(id)
+    }
+    const id = setTimeout(read, 1000)
+    return () => clearTimeout(id)
+  }, [communitySlug])
   return (
     <>
       <button
@@ -58,6 +73,8 @@ export default function TrustBand({ facts, region, communitySlug }: Props) {
 
 type ListRead = { label: string | null; okAt: string | null }
 let listsRead: Promise<ListRead[]> | null = null
+// What arrived, and when: read at once by a sheet opened after it did.
+let listsArrived: { lists: ListRead[]; at: number } | null = null
 
 /** The outside lists the guide reads (/api/sources), once per page load;
  *  nothing when it can't be had, so the sheet just doesn't name them. */
@@ -66,12 +83,16 @@ function fetchListsRead(communitySlug: string): Promise<ListRead[]> {
     .then((r) => r.json())
     .then((b) => (b?.ok && Array.isArray(b.lists) ? (b.lists as ListRead[]) : []))
     .catch(() => [])
+  listsRead.then((lists) => {
+    listsArrived = { lists, at: Date.now() }
+  })
   return listsRead
 }
 
 /** For tests. */
 export function clearListsRead(): void {
   listsRead = null
+  listsArrived = null
 }
 
 // The site's own bottom sheet, as Filters and Edit are (it was a sheet of
@@ -90,7 +111,8 @@ function TrustSheet({ open, facts, region, communitySlug, onClose }: { open: boo
       live = false
     }
   }, [open, communitySlug])
-  const read = lists && eruv ? sourcesRead(facts, lists.lists, eruv.available ? eruv.eruvim.map((e) => e.statusCheckedAt) : [], lists.at) : null
+  const have = lists ?? (open ? listsArrived : null)
+  const read = have && eruv ? sourcesRead(facts, have.lists, eruv.available ? eruv.eruvim.map((e) => e.statusCheckedAt) : [], have.at) : null
   const sentence = read ? sourcesSentence(read) : null
   return (
     <MobileSheet isOpen={open} onClose={onClose} title="How this guide stays right">

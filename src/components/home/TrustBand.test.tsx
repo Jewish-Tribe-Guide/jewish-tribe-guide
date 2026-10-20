@@ -52,8 +52,25 @@ describe('the trust line', () => {
   it('says who keeps it, how many places, and that Google checks the hours', () => {
     show({ places: 155, googleChecked: 135, checkedThisWeek: 129, dated: 132 })
     expect(screen.getByTestId('trust-band')).toHaveTextContent('Kept up by the community155 places · hours checked with Google every night')
-    // Nothing fetched until it's opened.
+    // Nothing fetched while the home itself is loading.
     expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  // The user, Oct 20: the sheet showed a loading bar every time, since what
+  // it says was only asked for on the tap. It's asked for once the home has
+  // loaded, so the sheet opens whole.
+  it('opened once the home has loaded, the sheet is whole at once: no loading bar', async () => {
+    lists = [{ label: 'Keystone-K’s list', okAt: hoursAgo(6) }]
+    eruvChecked = [hoursAgo(1)]
+    const user = userEvent.setup()
+    show({ places: 155, googleChecked: 135, checkedThisWeek: 129, dated: 132 })
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2), { timeout: 4000 })
+    await new Promise((r) => setTimeout(r, 0))
+    await user.click(screen.getByTestId('trust-band'))
+    const sheet = screen.getByTestId('trust-sheet')
+    expect(sheet.querySelector('.animate-pulse')).toBeNull()
+    expect(sheet).toHaveTextContent('Hours from Google, hechshers from Keystone-K’s list and eruv status from each eruv’s own site.')
+    expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 
   it('opens the idea in three lines: the sources it read this week, people for the rest, every listing dated', async () => {
