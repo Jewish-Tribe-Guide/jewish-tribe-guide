@@ -209,6 +209,29 @@ describe('POST /api/message/read — the reading', () => {
         const body = await (await POST(req({ text: 'https://www.doordash.com/store/say-she-ate-123', listingId: SAY, mode: 'menu' }))).json()
         expect(body.proposals[0]).toMatchObject({ kind: 'menu', listing: { id: SAY }, why: 'ordering_app' })
       })
+
+      // The user, Oct 20: a menu link typed while adding a food place by
+      // hand wasn't read at all. A place not listed yet goes by its name.
+      it('reads a place’s menu before it’s listed, by the name being added', async () => {
+        m.findMenu.mockResolvedValue({ url: 'https://saysheate.co/menu/', text: 'Masala Dosa', pdf: null })
+        m.readMenu.mockResolvedValue({ sourceUrl: 'https://saysheate.co/menu/', dishes, note: null, model: 'm' })
+        const body = await (await POST(req({ text: 'saysheate.co/menu/', placeName: 'Say She Ate Too', mode: 'menu' }))).json()
+        expect(m.readMessage).not.toHaveBeenCalled()
+        expect(m.findMenu).toHaveBeenCalledWith('https://saysheate.co/menu/')
+        expect(m.readMenu.mock.calls[0][1]).toBe('Say She Ate Too')
+        expect(body.proposals).toEqual([
+          expect.objectContaining({ kind: 'items', listingId: null, listing: null, items: [{ name: 'Dosas', availability: 'always', doubt: null }, { name: 'Salads', availability: 'always', doubt: null }], menu: { url: 'https://saysheate.co/menu/', dishes } }),
+        ])
+      })
+
+      it('says why it can’t read a new place’s menu, and reads only a link for one', async () => {
+        const app = await (await POST(req({ text: 'https://www.doordash.com/store/say-she-ate-123', placeName: 'Say She Ate Too', mode: 'menu' }))).json()
+        expect(app.proposals[0]).toMatchObject({ kind: 'menu', listing: null, why: 'ordering_app' })
+        const words = await (await POST(req({ text: 'just some words', placeName: 'Say She Ate Too', mode: 'menu' }))).json()
+        expect(words.proposals[0]).toMatchObject({ kind: 'menu', listing: null, why: 'no_source' })
+        expect(m.readMenu).not.toHaveBeenCalled()
+        expect(m.readMessage).not.toHaveBeenCalled()
+      })
     })
   })
 

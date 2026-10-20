@@ -288,8 +288,96 @@ describe('ListingEditor — dishes and items', () => {
     await u.click(done())
     expect(row('items')).toHaveTextContent('Changed')
     await u.click(sendButton())
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
-    expect(JSON.parse(fetchMock.mock.calls[0][1].body).payload.details.menuUrl).toBe('https://shopsweetbox.com/menu')
+    const sends = () => fetchMock.mock.calls.filter(([url]) => !String(url).includes('/api/message/read'))
+    await waitFor(() => expect(sends()).toHaveLength(1))
+    expect(JSON.parse(sends()[0][1].body).payload.details.menuUrl).toBe('https://shopsweetbox.com/menu')
+  })
+
+  // The user, Oct 20: adding a food place by hand, a menu link was kept as
+  // a link and nothing more, and Main dishes still read as not entered.
+  describe('a new menu link is read for its dishes', () => {
+    const reader = (answer: unknown) => {
+      const fetchMock = vi.fn<(url: string, init?: RequestInit) => Promise<{ ok: boolean; json: () => Promise<unknown> }>>(async (url) => ({ ok: true, json: async () => (String(url).includes('/api/message/read') ? answer : { ok: true }) }))
+      vi.stubGlobal('fetch', fetchMock)
+      return { fetchMock, reads: () => fetchMock.mock.calls.filter(([url]) => String(url).includes('/api/message/read')) }
+    }
+    const read = { ok: true, proposals: [{ kind: 'items', items: [{ name: 'Falafel' }, { name: 'Shawarma' }] }] }
+
+    it('adding a place: leaving the box reads the menu; its dishes go in the list to check, and are sent', async () => {
+      const u = user()
+      const { fetchMock, reads } = reader(read)
+      renderEditor({ item: undefined, category: { ...FOOD, hasAddress: false } })
+      await u.click(row('name'))
+      await u.type(screen.getByLabelText('Name'), 'Hummus Place')
+      await u.click(done())
+      await u.click(screen.getByTestId('editor-add-items'))
+      await u.type(screen.getByLabelText('Menu link'), 'hummusplace.example/menu')
+      await u.click(screen.getByTestId('items-editor'))
+      await waitFor(() => expect(screen.getByTestId('menu-read')).toHaveTextContent('Added 2 dishes from the menu. Take out any that aren’t right.'))
+      expect(reads()).toHaveLength(1)
+      const body = reads()[0][1]!.body as FormData
+      expect(Object.fromEntries(body)).toMatchObject({ text: 'https://hummusplace.example/menu', mode: 'menu', placeName: 'Hummus Place' })
+      expect(within(screen.getByTestId('items-editor')).getByText('Falafel')).toBeInTheDocument()
+      // Read once a link: leaving the box again sends nothing more.
+      await u.click(screen.getByLabelText('Menu link'))
+      await u.click(screen.getByTestId('items-editor'))
+      expect(reads()).toHaveLength(1)
+      await u.click(done())
+      expect(row('items')).toHaveTextContent('2 · Falafel, Shawarma · Menu link')
+      await u.click(screen.getByRole('button', { name: 'Send' }))
+      await waitFor(() => expect(fetchMock.mock.calls.length).toBe(2))
+      const sent = JSON.parse(fetchMock.mock.calls[1][1]!.body as string).payload
+      expect(sent.details).toMatchObject({ dishes: ['Falafel', 'Shawarma'], menuUrl: 'https://hummusplace.example/menu' })
+    })
+
+    it('says why when it can’t, and keeps the link', async () => {
+      const u = user()
+      reader({ ok: true, proposals: [{ kind: 'menu', why: 'ordering_app' }] })
+      renderEditor({ item: undefined })
+      await u.click(screen.getByTestId('editor-add-items'))
+      await u.type(screen.getByLabelText('Menu link'), 'https://www.doordash.com/store/hummus-1')
+      await u.click(screen.getByTestId('items-editor'))
+      await waitFor(() => expect(screen.getByTestId('menu-read')).toHaveTextContent('Delivery apps don’t let us read their menus.'))
+      await u.click(done())
+      expect(row('items')).toHaveTextContent('Menu link')
+    })
+
+    it('an edit: a dish already listed isn’t added twice; the link already there isn’t read', async () => {
+      const u = user()
+      const { reads } = reader({ ok: true, proposals: [{ kind: 'items', items: [{ name: 'cupcakes' }, { name: 'Babka' }] }] })
+      renderEditor({ item: { ...bakery, menuUrl: 'https://shopsweetbox.com/menu' } as typeof bakery })
+      await u.click(row('items'))
+      await u.click(screen.getByLabelText('Menu link'))
+      await u.click(screen.getByTestId('items-editor'))
+      expect(reads()).toHaveLength(0)
+      await u.clear(screen.getByLabelText('Menu link'))
+      await u.type(screen.getByLabelText('Menu link'), 'https://shopsweetbox.com/new-menu')
+      await u.click(screen.getByTestId('items-editor'))
+      await waitFor(() => expect(screen.getByTestId('menu-read')).toHaveTextContent('Added 1 dish from the menu.'))
+      await u.click(done())
+      expect(row('items')).toHaveTextContent('4 · Cupcakes, Cookies, Brownies, Babka · Menu link')
+    })
+
+    it('nothing is read from the admin console: its add has no bot check to pass, and its preview sends nothing', async () => {
+      const u = user()
+      const { reads } = reader(read)
+      const tryIt = async () => {
+        await u.click(screen.getByTestId('editor-add-items'))
+        await u.type(screen.getByLabelText('Menu link'), 'https://hummusplace.example/menu')
+        await u.click(screen.getByTestId('items-editor'))
+        expect(reads()).toHaveLength(0)
+        expect(screen.queryByTestId('menu-read')).not.toBeInTheDocument()
+      }
+      renderEditor({ item: undefined, adminSubmit: { token: 'admin-token' } })
+      await tryIt()
+      cleanup()
+      renderWithProviders(
+        <PreviewSendProvider listing={vi.fn()}>
+          <ListingEditor category={FOOD} onClose={() => {}} />
+        </PreviewSendProvider>,
+      )
+      await tryIt()
+    })
   })
 
   it('a grocery’s items have no menu link', async () => {

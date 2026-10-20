@@ -81,6 +81,12 @@ for that exact change, in the same conversation. Show the dry run first.
 1b. **Eruv status by email (6c):** migration 084 is run on both databases
    (the user, Oct 19). Northeast's address on live is still to set: a yes,
    once the branch is deployed. Elkins Park's sender is still unknown.
+1c. **Rename "Prayer & Shabbat Times" to "Candle Lighting & Zmanim"**
+   (decided Oct 20). Done on dev. On live (`zmanim`, philly): label and
+   plural "Prayer & Shabbat Times" → "Candle Lighting & Zmanim",
+   description "" → "Candle lighting, Havdalah and daily zmanim". Needs a
+   yes, after the tile change (three lines for a name) is deployed, then
+   an admin save or `POST /api/admin/revalidate`.
 
 ## For the user or the community
 
@@ -247,6 +253,42 @@ for that exact change, in the same conversation. Show the dry run first.
 
 7. The "+" button covers part of the third tile in a row on the phone home.
 
+## Done Oct 20: seven small fixes (on `redesign/oct18-fixes`, not merged)
+
+The user's list of seven, all agreed.
+
+1. **No gap under "N listings"** on categories with no map (Networking,
+   Cemetery, WhatsApp): the toolbar's margin is gone when the heading sits
+   in it.
+2. **The trust sheet opens whole.** Which lists were read is fetched while
+   the home is idle, so "Where there's a source, we check it…" shows with
+   no loading bar.
+3. **"Within 5 mi"** added to How far, for a short drive. Choices kept,
+   not a miles box.
+4. **"Candle Lighting & Zmanim"** for Prayer & Shabbat Times, on dev only
+   (live: 1c above). Home tiles show up to three lines of a name, so it
+   isn't cut to "Candle Lighting &…".
+5. **Phone home search: a tap away closes the results** (and Escape). The
+   words stay; tapping the box or typing opens them again.
+6. **Adding a food place by hand:**
+   - What a choice brings up is in that choice's row. Picking "Scheduled
+     Deliveries" showed the Delivery WhatsApp Group in the contact row; it
+     now shows right under Store Type, in a row named "Store type and
+     delivery" (the admin's section name).
+   - A menu link alone counts as entered: Main dishes says "Menu link"
+     and leaves "Not on the listing yet".
+   - A new menu link is read for its dishes when you leave the box (the
+     "+ Add" box's own menu reader, `mode=menu` with the place's name).
+     The dishes go into the list to check, and on to an admin with the
+     rest. Not in the admin console or its preview. Works in edits too,
+     for a link that's new.
+   - Not checked for real: Cloudflare's bot check fails in the in-app
+     browser (error 600010), so no read went out locally; covered by tests
+     (3 fail against the old editor, 2 against the old route).
+7. **Paste a photo on a phone:** a Paste button beside Upload reads a
+   photo copied from Google Images (or an image link). Needs an iPhone to
+   check Safari's own Paste bubble.
+
 ## Done Oct 20: one "Shul’s times", websites' calendars read (on `redesign/oct18-fixes`, not merged)
 
 - **One choice for a shul's times, from its website or its email** (the
@@ -311,7 +353,9 @@ for that exact change, in the same conversation. Show the dry run first.
   only says where the status is read from and links here.
 - **Deviations from the drawing:** "Mikvah hours" is "Hours" (any place
   with hours, no category-specific code). Menus aren't offered in Add,
-  since they're added on their own for each menu link. No Name field.
+  since they're added on their own for each menu link (and, since Oct 20,
+  a new link typed in an add or edit is read for its dishes there and
+  then). No Name field.
 - Not checked in a browser: the local admin sign-in was refused to this
   session, so it was checked by its tests only (35 fail against the old
   code).
