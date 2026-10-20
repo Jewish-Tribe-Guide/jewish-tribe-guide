@@ -240,13 +240,38 @@ describe('WatchesManager', () => {
   })
 
   it('says what a list run compared: how many listed, how many match, what it filed', async () => {
+    const differences = [
+      'Shtetl: No longer on the list',
+      'Bagel Bar: Hechsher: Keystone-K → Keystone-K (dairy)',
+      'Sababa Falafel: On the list, not in the guide',
+      'Kosher Korner: On the list, not in the guide (filed before)',
+    ]
     await renderTab([
       watch({
         kind: 'keystone_list', url: 'https://www.keystone-k.org/establishments', label: 'Keystone-K’s list', lastFiled: 4,
-        lastCheck: { at: ago(0), what: 'list', from: 'page', result: 'differs', read: [], differences: [], queue: 'filed', list: { listed: 78, matching: 74, differences: 4, filed: 4 } },
+        lastCheck: { at: ago(0), what: 'list', from: 'page', result: 'differs', read: [], differences, queue: 'filed', list: { listed: 78, matching: 74, differences: 4, filed: 3 } },
       }),
     ])
-    expect(screen.getByTestId('watch-row')).toHaveTextContent(/Read .*: 78 on the list, 74 match the guide, 4 suggestions in the queue/)
+    const row = screen.getByTestId('watch-row')
+    expect(row).toHaveTextContent(/Read .*: 78 on the list, 74 match the guide, 4 differ: 3 new suggestions in the queue, 1 filed before/)
+    // Opened, it names them: no Check now needed to see which.
+    await open(row)
+    const result = within(row).getByTestId('watch-check')
+    expect(result).toHaveTextContent('Where the list differs from the guide')
+    for (const line of differences) expect(result).toHaveTextContent(line)
+  })
+
+  it('opens a list that differs on nothing to no empty box', async () => {
+    await renderTab([
+      watch({
+        kind: 'keystone_list', url: 'https://www.keystone-k.org/establishments', label: 'Keystone-K’s list', lastFiled: 0,
+        lastCheck: { at: ago(0), what: 'list', from: null, result: 'agrees', read: [], differences: [], queue: null, list: { listed: 78, matching: 78, differences: 0, filed: 0 } },
+      }),
+    ])
+    const row = screen.getByTestId('watch-row')
+    expect(row).toHaveTextContent(/Read .*: 78 on the list, 78 match the guide, nothing differs/)
+    await open(row)
+    expect(within(row).queryByTestId('watch-check')).toBeNull()
   })
 
   describe('Add a watch', () => {

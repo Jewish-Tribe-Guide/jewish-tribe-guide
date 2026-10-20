@@ -273,7 +273,12 @@ for that exact change, in the same conversation. Show the dry run first.
   row's line says it in one: "Read Oct 20: agrees with the listing".
 - **Lists say what they compared:** "Read Oct 20: 78 on the list, 74
   match the guide, 4 suggestions in the queue" (Keystone-K, Mekor
-  Habracha); Refuah says how many contacts it read.
+  Habracha); Refuah says how many contacts it read. Opened, a list names
+  each place it differs on and why one wasn't filed ("Rita's: IKC in the
+  guide, not on Mekor's list (filed before)", "(closed on Google, not
+  filed)"), kept from every daily run, so no Check now is needed to see
+  them (the user, Oct 20). Until migration 085 is run, nothing is kept and
+  the row falls back to "Read Oct 20: nothing new".
 - **A page the AI has never read says so:** "Opens · not read yet", not
   a green "Working". One where it found nothing says "Reads nothing".
 - **A mikvah's hours go to the right field** (the user, Oct 20, on Lower

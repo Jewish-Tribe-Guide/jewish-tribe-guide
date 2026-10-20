@@ -13,6 +13,7 @@ import { sendWatchDigest, type WatchDigestItem } from '@/lib/email'
 import { submitListingCreate, submitListingDelete, submitListingUpdate } from '@/lib/submissionStore'
 import { canAskGoogle, findPlaceStatus } from '@/lib/googlePlaces'
 import { confirmFromSource } from '@/lib/sourceConfirm'
+import { listDifference } from '@/lib/watches'
 import { KEYSTONE_NAME } from '@/lib/sourceNames'
 import { WATCH_FETCH_HEADERS } from '@/lib/websiteWatch'
 import {
@@ -75,6 +76,8 @@ export type KeystoneRun =
       /** Listings the list names that agree with it. */
       matching: number
       closedOnGoogle: string[]
+      /** Every place it differs on, a line each (listDifference). */
+      differences: string[]
       /** Listings the list agreed with, dated today. */
       confirmed?: number
       /** A dry run's suggestions, unfiled. */
@@ -123,6 +126,7 @@ export async function runKeystoneWatch(community: string, url: string, { dry = f
 
   const notes = new Map<WatchFinding, string>()
   const closed: string[] = []
+  const closedNow = new Set<WatchFinding>()
   const fresh: WatchFinding[] = []
   for (const f of unfiled) {
     let note = findingNote(f)
@@ -130,6 +134,7 @@ export async function runKeystoneWatch(community: string, url: string, { dry = f
       const g = await googleSays(f)
       if (g.closed) {
         closed.push(f.entry.name)
+        closedNow.add(f)
         continue
       }
       note += `\n${g.line}`
@@ -137,6 +142,11 @@ export async function runKeystoneWatch(community: string, url: string, { dry = f
     notes.set(f, note)
     fresh.push(f)
   }
+
+  const differences = findings.map((f) => {
+    const d = describe(f)
+    return listDifference(d.name, d.what, filed.has(findingKey(f)) ? 'before' : closedNow.has(f) ? 'closed' : 'now')
+  })
 
   if (dry) {
     return {
@@ -146,6 +156,7 @@ export async function runKeystoneWatch(community: string, url: string, { dry = f
       filed: 0,
       matching: agree.length,
       closedOnGoogle: closed,
+      differences,
       wouldFile: fresh.map((f) => ({ kind: f.kind, ...describe(f), note: notes.get(f)! })),
     }
   }
@@ -197,5 +208,5 @@ export async function runKeystoneWatch(community: string, url: string, { dry = f
   )
   const confirmed = await confirmFromSource(community, agree, KEYSTONE_NAME)
 
-  return { ok: true, entries: entries.length, findings: findings.length, filed: items.length, matching: agree.length, closedOnGoogle: closed, confirmed }
+  return { ok: true, entries: entries.length, findings: findings.length, filed: items.length, matching: agree.length, closedOnGoogle: closed, differences, confirmed }
 }

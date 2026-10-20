@@ -83,16 +83,25 @@ export type CheckFound = Omit<WatchCheck, 'at'>
  *  page is an ordinary website watch. */
 export const MENU_WATCH_CREATOR = 'menu links'
 
+/** One place a list differs from the guide on, as a line for the Watches
+ *  tab, saying why it wasn't filed this time when it wasn't. */
+export function listDifference(name: string, what: string, filing: 'now' | 'before' | 'closed'): string {
+  const why = filing === 'before' ? ' (filed before)' : filing === 'closed' ? ' (closed on Google, not filed)' : ''
+  return `${name}: ${what}${why}`
+}
+
 /** What a run of a list read by code compared (Keystone-K's, Mekor's):
  *  how many places it lists, how many match the guide, how many differ,
- *  and how many of those it filed this time. The rest were filed before. */
-export function listCheck(run: { entries: number; matching: number; findings: number; filed: number }): CheckFound {
+ *  and how many of those it filed this time. The rest were filed before.
+ *  Which places differ is kept too, so an admin can see them without
+ *  pressing Check now (the user, Oct 20). */
+export function listCheck(run: { entries: number; matching: number; findings: number; filed: number; differences?: string[] }): CheckFound {
   return {
     what: 'list',
     from: null,
     result: run.findings ? 'differs' : 'agrees',
     read: [],
-    differences: [],
+    differences: run.differences ?? [],
     queue: run.findings ? (run.filed ? 'filed' : 'before') : null,
     list: { listed: run.entries, matching: run.matching, differences: run.findings, filed: run.filed },
   }

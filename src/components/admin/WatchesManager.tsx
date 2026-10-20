@@ -176,7 +176,21 @@ const FROM: Record<NonNullable<WatchCheck['from']>, string> = {
 /** What the last full read found, for the opened row: what it read and
  *  from where, then whether that agrees with the listing. */
 function CheckResult({ check: c }: { check: WatchCheck }) {
-  if (c.list) return null
+  // A list's counts are on the row; opened, it names the places that
+  // differ (kept since Oct 20; older checks kept only the counts).
+  if (c.list) {
+    if (!c.differences.length) return null
+    return (
+      <div className="space-y-1.5 rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-800" data-testid="watch-check">
+        <p className="text-xs font-semibold text-slate-600">Where the list differs from the guide, {day(c.at)}</p>
+        <ul className="space-y-0.5">
+          {c.differences.map((line) => (
+            <li key={line}>{line}</li>
+          ))}
+        </ul>
+      </div>
+    )
+  }
   return (
     <div className="space-y-1.5 rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-800" data-testid="watch-check">
       {c.result === 'unreadable' ? (

@@ -139,6 +139,10 @@ describe('runMekorWatch', () => {
     setDb([magical, zevis, shtetl], [], filed)
     const body = await run()
     expect(body.ok && body.filed).toBe(0)
+    // Still named, so the Watches tab can say which places differ.
+    const lines = body.ok ? body.differences : []
+    expect(lines.length).toBe(filed.length)
+    for (const l of lines) expect(l).toMatch(/\(filed before\)$/)
     expect(mockUpdate).not.toHaveBeenCalled()
     expect(mockCreate).not.toHaveBeenCalled()
   })
@@ -152,6 +156,9 @@ describe('runMekorWatch', () => {
     expect(mockCreate.mock.calls.map(([, p]) => p.name)).not.toContain('Z Candy Bar')
     expect(body.ok && body.closedOnGoogle).toContain('Z Candy Bar')
     expect(mockCreate.mock.calls[0][2]).toContain('Google: open.')
+    const lines = body.ok ? body.differences : []
+    expect(lines).toContain('Z Candy Bar: On Mekor’s list, not in the guide (closed on Google, not filed)')
+    expect(lines).toContain(`${mockCreate.mock.calls[0][1].name}: On Mekor’s list, not in the guide`)
   })
 
   it('files nothing on a dry run', async () => {

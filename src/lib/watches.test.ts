@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { afterRun, listCheck, kindForUrl, normalizeWatchUrl, STALE_AFTER_MS, watchHealth, type CheckFound, type Watch } from './watches'
+import { afterRun, listCheck, listDifference, kindForUrl, normalizeWatchUrl, STALE_AFTER_MS, watchHealth, type CheckFound, type Watch } from './watches'
 
 const NOW = '2026-10-06T07:00:00.000Z'
 const DAY = 86_400_000
@@ -113,6 +113,20 @@ describe('listCheck', () => {
     })
     expect(listCheck({ entries: 78, matching: 74, findings: 4, filed: 0 }).queue).toBe('before')
     expect(listCheck({ entries: 54, matching: 54, findings: 0, filed: 0 })).toMatchObject({ result: 'agrees', queue: null })
+  })
+
+  it('keeps which places differ, saying why one wasn’t filed this time', () => {
+    const differences = [
+      listDifference('Shtetl', 'No longer on the list', 'now'),
+      listDifference('Bagel Bar', 'On the list, not in the guide', 'before'),
+      listDifference('Sababa Falafel', 'On the list, not in the guide', 'closed'),
+    ]
+    expect(differences).toEqual([
+      'Shtetl: No longer on the list',
+      'Bagel Bar: On the list, not in the guide (filed before)',
+      'Sababa Falafel: On the list, not in the guide (closed on Google, not filed)',
+    ])
+    expect(listCheck({ entries: 78, matching: 75, findings: 3, filed: 1, differences }).differences).toEqual(differences)
   })
 })
 
