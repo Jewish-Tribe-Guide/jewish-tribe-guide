@@ -62,6 +62,7 @@ const watch: Watch = {
   lastFiled: null,
   pageHash: null,
   pageChangedAt: null,
+  lastCheck: null,
 }
 const email = {
   messageId: 'gmail-123',

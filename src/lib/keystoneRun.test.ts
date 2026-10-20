@@ -103,6 +103,17 @@ describe('runKeystoneWatch', () => {
     expect(mockDigest.mock.calls[0][2]).toHaveLength(body.ok ? body.filed : -1)
   })
 
+  // The user, Oct 20: the Watches tab says what a run compared, not only
+  // how many it filed, so a run that filed nothing still shows its work.
+  it('says how many of the guide’s places match the list', async () => {
+    setDb([bagel], [])
+    const differs = await run()
+    expect(differs).toMatchObject({ ok: true, matching: 0 })
+    setDb([{ ...bagel, details: { ...bagel.details, t: ['Dairy', 'Parve'] } }], [])
+    // A dry run: one that agrees would be dated, which this mock can't.
+    expect(await run(true)).toMatchObject({ ok: true, matching: 1 })
+  })
+
   it('files a removal for a place whose only hechsher was Keystone-K and is off the list', async () => {
     const shtetl = { ...bagel, id: 'shtetl-1', name: 'Shtetl', details: { kosherCert: 'Keystone-K' } }
     setDb([shtetl], [])

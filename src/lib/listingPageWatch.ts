@@ -3,7 +3,13 @@ import type { CategoryConfig } from './categories'
 import type { FieldRead } from './fieldChanges'
 import type { Proposal } from './messageReader'
 import type { SubmissionSource } from './submissionSource'
-import type { Watch } from './watches'
+import type { CheckFound, Watch } from './watches'
+import type { MenuSource } from './menuReader'
+import type { UpdateRow } from './scheduleUpdate'
+import { CALENDAR_HEADING } from './calendarFeed'
+import { formatDays, parseTimeToMinutes, TEFILLAH_LABELS, TEFILLAH_ORDER, type MinyanDayKey } from './davening'
+import { DAY_KEYS, fmt12 } from './hours'
+import { dateText } from './schedules'
 
 // ── Watching a listing's own web page (the user, Oct 19) ────────────────────
 // A shul's page of its usual minyan times, or a mikvah's page of its hours,
@@ -72,22 +78,102 @@ export function changedOn(now: number, timeZone = 'America/New_York'): string {
   return new Date(now).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone })
 }
 
-/** The suggestion's note: where it's from, when the page changed, and what
- *  it changes, a line each. */
-export function listingPageNote(url: string, on: string, lines: readonly string[]): string {
-  return [`From their website, changed ${on}: ${url}`, lines.join('\n')].join('\n\n')
+/** The suggestion's note: where it's from, when the page changed (or, from
+ *  "Check now" on a page that hadn't, when it was read), and what it
+ *  changes, a line each. */
+export function listingPageNote(url: string, on: string, lines: readonly string[], seen: 'changed' | 'read' = 'changed'): string {
+  return [`From their website, ${seen} ${on}: ${url}`, lines.join('\n')].join('\n\n')
+}
+
+// ── What a full read found (the user, Oct 20) ───────────────────────────────
+// "Check now" has the AI read the page whether or not it changed, and the
+// row keeps what it read and whether that agrees with the listing
+// (watches.ts, WatchCheck), so an admin can tell a watch that reads the
+// right things from one that only opens the page.
+
+/** How many lines of what it read a check keeps. */
+export const CHECK_READ_LINES = 8
+
+/** Where a page's words came from: a PDF, its calendar, or the page. */
+export function checkFrom(source: Pick<MenuSource, 'text' | 'pdf'>): CheckFound['from'] {
+  if (!source.text) return 'pdf'
+  return source.text.startsWith(CALENDAR_HEADING) ? 'calendar' : 'page'
+}
+
+/** The times the AI read off the page, a line per minyan: "Shacharis
+ *  Mon–Fri 7:00 AM", and a dated one "Mincha Sun Oct 25 6:05 PM". Only
+ *  what the page gives, never the listing's times it left alone. */
+/** A clock time as the site writes it ("6:45am" → "6:45 AM"); a time
+ *  that isn't a clock ("15 min before sunset") as the page wrote it. */
+function clockText(time: string): string {
+  if (!/^\d{1,2}:\d{2}\s*(am|pm)?$/i.test(time.trim())) return time
+  const m = parseTimeToMinutes(time)
+  return fmt12(`${Math.floor(m / 60)}:${m % 60}`)
+}
+
+export function timesReadLines(rows: readonly UpdateRow[]): string[] {
+  const weekly = new Map<string, { tefillah: UpdateRow['tefillah']; time: string; days: MinyanDayKey[] }>()
+  const dated: UpdateRow[] = []
+  for (const r of rows) {
+    if (r.status === 'gone' || r.status === 'kept') continue
+    if (!(DAY_KEYS as readonly string[]).includes(r.day)) {
+      dated.push(r)
+      continue
+    }
+    const time = clockText(r.time)
+    const key = `${r.tefillah} ${time}`
+    const g = weekly.get(key) ?? { tefillah: r.tefillah, time, days: [] }
+    if (!g.days.includes(r.day as MinyanDayKey)) g.days.push(r.day as MinyanDayKey)
+    weekly.set(key, g)
+  }
+  const order = (t: UpdateRow['tefillah'], time: string) => TEFILLAH_ORDER.indexOf(t) * 10_000 + (parseTimeToMinutes(time) || 0)
+  const lines = [...weekly.values()]
+    .sort((a, b) => order(a.tefillah, a.time) - order(b.tefillah, b.time))
+    .map((g) => `${TEFILLAH_LABELS[g.tefillah]} ${formatDays(g.days)} ${g.time}`)
+  const once = [...dated]
+    .sort((a, b) => a.day.localeCompare(b.day) || order(a.tefillah, a.time) - order(b.tefillah, b.time))
+    .map((r) => `${TEFILLAH_LABELS[r.tefillah]} ${dateText(r.day, { weekday: true })}${r.occasion ? ` (${r.occasion})` : ''} ${clockText(r.time)}`)
+  return [...lines, ...once]
+}
+
+/** The hours the AI read off the page, a line each: "Women’s Hours,
+ *  Sun–Thu: 7:00 PM–10:00 PM". */
+export function hoursReadLines(reads: readonly FieldRead[], category: Pick<CategoryConfig, 'detailFields'>): string[] {
+  return reads.flatMap((r) => {
+    const h = r.hours
+    if (!h) return []
+    const label = category.detailFields.find((f) => f.key === r.key)?.label ?? r.key
+    const days = h.days === 'all' ? 'every day' : formatDays(h.days)
+    const said = h.closed ? 'closed' : h.open && h.close ? `${fmt12(h.open)}–${fmt12(h.close)}` : h.open ? `opens ${fmt12(h.open)}` : `closes ${fmt12(h.close!)}`
+    return [`${label}, ${days}: ${said}${h.when === 'one_day' ? ' (one day only)' : ''}`]
+  })
+}
+
+/** What a read found, kept to its first few lines. */
+export function pageCheck(what: 'times' | 'hours' | 'dishes', from: CheckFound['from'], read: readonly string[], rest: Pick<CheckFound, 'differences' | 'queue' | 'note'>): CheckFound {
+  const result: CheckFound['result'] = rest.differences.length ? 'differs' : read.length ? 'agrees' : 'nothing'
+  return {
+    what,
+    from,
+    result,
+    read: read.slice(0, CHECK_READ_LINES),
+    ...(read.length > CHECK_READ_LINES ? { more: read.length - CHECK_READ_LINES } : {}),
+    differences: rest.differences,
+    queue: rest.differences.length ? rest.queue : null,
+    ...(rest.note ? { note: rest.note } : {}),
+  }
 }
 
 /** Where it came from, for the queue's opened card: their own page, read by
  *  the AI, with its words beside the change. The listing is the authority
  *  on itself, as with a shul's newsletter (newsletterRun.ts), so an
  *  admin's approval dates it by name; agreement alone never does. */
-export function listingPageSource(listingName: string, url: string, on: string, text: string | null): SubmissionSource {
+export function listingPageSource(listingName: string, url: string, on: string, text: string | null, seen: 'changed' | 'read' = 'changed'): SubmissionSource {
   return {
     readBy: 'ai',
     from: `${listingName}’s website`,
     named: listingName,
-    note: `From their website, changed ${on}: ${url}`,
+    note: `From their website, ${seen} ${on}: ${url}`,
     ...(text ? { original: text.slice(0, MAX_PAGE_TEXT) } : {}),
   }
 }

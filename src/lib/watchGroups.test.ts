@@ -23,6 +23,7 @@ function watch(over: Partial<Watch>): Watch {
     lastFiled: null,
     pageHash: 'h',
     pageChangedAt: null,
+    lastCheck: null,
     ...over,
   }
 }

@@ -32,7 +32,45 @@ export type Watch = {
   lastFiled: number | null
   pageHash: string | null
   pageChangedAt: string | null
+  /** What its last full read found (migration 085): null until one is
+   *  kept, and without the migration. */
+  lastCheck: WatchCheck | null
 }
+
+/** What a full read of a watch found, kept until the next one, so the
+ *  Watches tab can say what it read and whether that agrees with the
+ *  listing, not only that the page opened (the user, Oct 20). Made by
+ *  "Check now" and by a daily run that had the AI read a changed page, and
+ *  by every run of a list read by code (Keystone-K, Mekor, Refuah).
+ *
+ *   result   agrees      read something, and the listing already says it
+ *            differs     read something the listing doesn't say
+ *            nothing     the page opened, but the AI found nothing to read
+ *            unreadable  the page wouldn't open
+ *   queue    what became of the differences: filed now, filed before (and
+ *            not again), or waiting behind a suggestion already in the
+ *            queue for that listing
+ *   list     a list's counts: places on it, how many match the guide, how
+ *            many differ, how many of those were filed this time */
+export type WatchCheck = {
+  at: string
+  what: 'times' | 'hours' | 'dishes' | 'list' | 'contacts'
+  /** Where it read: the page, the page and its calendar, a PDF. */
+  from: 'page' | 'calendar' | 'pdf' | null
+  result: 'agrees' | 'differs' | 'nothing' | 'unreadable'
+  /** What it read, a short line each, the first few. */
+  read: string[]
+  /** How many more lines it read than `read` keeps. */
+  more?: number
+  differences: string[]
+  queue: 'filed' | 'before' | 'waiting' | null
+  /** Anything else worth a line: days left to the newsletter, say. */
+  note?: string
+  list?: { listed: number; matching: number; differences: number; filed: number }
+}
+
+/** A check as a runner makes it; the run dates it. */
+export type CheckFound = Omit<WatchCheck, 'at'>
 
 /** The `created_by` of the watches the daily run makes for each food
  *  place's menu (menuWatch.ts), so it only ever adds and removes its own,
@@ -40,10 +78,25 @@ export type Watch = {
  *  page is an ordinary website watch. */
 export const MENU_WATCH_CREATOR = 'menu links'
 
+/** What a run of a list read by code compared (Keystone-K's, Mekor's):
+ *  how many places it lists, how many match the guide, how many differ,
+ *  and how many of those it filed this time. The rest were filed before. */
+export function listCheck(run: { entries: number; matching: number; findings: number; filed: number }): CheckFound {
+  return {
+    what: 'list',
+    from: null,
+    result: run.findings ? 'differs' : 'agrees',
+    read: [],
+    differences: [],
+    queue: run.findings ? (run.filed ? 'filed' : 'before') : null,
+    list: { listed: run.entries, matching: run.matching, differences: run.findings, filed: run.filed },
+  }
+}
+
 /** What one run of a watch came to. */
 export type WatchOutcome =
-  | { ok: true; filed: number; pageHash?: string }
-  | { ok: false; error: string }
+  | { ok: true; filed: number; pageHash?: string; check?: CheckFound }
+  | { ok: false; error: string; check?: CheckFound }
 
 /** A page address as the guide keeps it: https, no fragment, no trailing
  *  spaces. Null for anything that isn't a web page. */
@@ -77,12 +130,14 @@ export function afterRun(
   outcome: WatchOutcome,
   now: string,
 ): {
-  update: Partial<Pick<Watch, 'lastRunAt' | 'lastOkAt' | 'lastError' | 'failingSince' | 'lastFiled' | 'pageHash' | 'pageChangedAt'>>
+  update: Partial<Pick<Watch, 'lastRunAt' | 'lastOkAt' | 'lastError' | 'failingSince' | 'lastFiled' | 'pageHash' | 'pageChangedAt' | 'lastCheck'>>
   alert: 'broke' | 'recovered' | null
 } {
+  // A run that only fingerprinted the page keeps the last check's result.
+  const check = outcome.check ? { lastCheck: { ...outcome.check, at: now } } : {}
   if (!outcome.ok) {
     return {
-      update: { lastRunAt: now, lastError: outcome.error, failingSince: watch.failingSince ?? now },
+      update: { lastRunAt: now, lastError: outcome.error, failingSince: watch.failingSince ?? now, ...check },
       alert: watch.failingSince ? null : 'broke',
     }
   }
@@ -92,6 +147,7 @@ export function afterRun(
     lastError: null,
     failingSince: null,
     lastFiled: outcome.filed,
+    ...check,
   }
   if (outcome.pageHash !== undefined) {
     update.pageHash = outcome.pageHash

@@ -72,6 +72,8 @@ export type KeystoneRun =
       entries: number
       findings: number
       filed: number
+      /** Listings the list names that agree with it. */
+      matching: number
       closedOnGoogle: string[]
       /** Listings the list agreed with, dated today. */
       confirmed?: number
@@ -106,6 +108,7 @@ export async function runKeystoneWatch(community: string, url: string, { dry = f
   if (error) return { ok: false, error: `Couldn\u2019t read the guide's listings: ${error.message}` }
 
   const findings = compareKeystone(entries, (rows ?? []) as WatchedListing[])
+  const agree = keystoneAgrees(entries, (rows ?? []) as WatchedListing[], findings)
 
   // Everything this watch has filed before, whatever became of it: a
   // suggestion an admin rejected isn't made again until the list changes.
@@ -141,6 +144,7 @@ export async function runKeystoneWatch(community: string, url: string, { dry = f
       entries: entries.length,
       findings: findings.length,
       filed: 0,
+      matching: agree.length,
       closedOnGoogle: closed,
       wouldFile: fresh.map((f) => ({ kind: f.kind, ...describe(f), note: notes.get(f)! })),
     }
@@ -191,7 +195,7 @@ export async function runKeystoneWatch(community: string, url: string, { dry = f
   await sendWatchDigest(community, "Keystone-K's list", items).catch((err) =>
     console.error('[watch-keystone] digest failed:', err),
   )
-  const confirmed = await confirmFromSource(community, keystoneAgrees(entries, (rows ?? []) as WatchedListing[], findings), KEYSTONE_NAME)
+  const confirmed = await confirmFromSource(community, agree, KEYSTONE_NAME)
 
-  return { ok: true, entries: entries.length, findings: findings.length, filed: items.length, closedOnGoogle: closed, confirmed }
+  return { ok: true, entries: entries.length, findings: findings.length, filed: items.length, matching: agree.length, closedOnGoogle: closed, confirmed }
 }

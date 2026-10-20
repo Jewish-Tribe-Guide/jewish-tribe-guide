@@ -16,18 +16,22 @@ import { submitListingUpdate } from '@/lib/submissionStore'
 import { sendWatchDigest } from '@/lib/email'
 import type { MenuReadBudget } from '@/lib/menuWatchRun'
 import type { CategoryConfig } from '@/lib/categories'
-import type { Watch, WatchOutcome } from '@/lib/watches'
+import type { Watch, WatchCheck, WatchOutcome } from '@/lib/watches'
 import type { Minyan, Tefillah } from '@/lib/davening'
 import type { DirectoryResource, ResourceSubmission } from '@/types'
 import {
   changedOn,
+  checkFrom,
   filedBefore,
+  hoursReadLines,
   hoursReads,
   LISTING_PAGE_WATCH_NAME,
   listingPageNote,
   listingPageSource,
   MAX_PAGE_TEXT,
+  pageCheck,
   pageReadsFor,
+  timesReadLines,
   type PageReads,
 } from '@/lib/listingPageWatch'
 
@@ -150,15 +154,25 @@ export function yieldToNewsletter(update: TimesUpdate, schedules: readonly Speci
   return { ...update, rows: update.rows.filter((r) => !held.has(r.day)) }
 }
 
+/** What the AI read off the page, a short line each (listingPageWatch.ts),
+ *  and what it would change on the listing. `note` says when the
+ *  newsletter's days were left to the newsletter. */
+export type PageReading = { read: string[]; proposal: PageProposal; note?: string }
+
+const NEWSLETTER_HELD = 'Some days differ, but the newsletter has given those days, and it wins.'
+
+/** A result's lines that change the listing. */
+const changing = (u: TimesUpdate | null) => (u ? u.rows.filter((r) => r.status === 'changed' || r.status === 'new' || (r.status === 'gone' && !r.keep)).length : 0)
+
 /** Has the AI read the page for the listing, and compares what it read
  *  with the listing as it is now. */
-export async function proposeFromPage(
+export async function readPageFor(
   listing: DirectoryResource,
   category: CategoryConfig,
   reads: PageReads,
   source: MenuSource,
   { apiKey, communityName, fetchImpl }: { apiKey: string; communityName: string; fetchImpl?: typeof fetch },
-): Promise<PageProposal> {
+): Promise<PageReading> {
   const text = source.text?.slice(0, MAX_PAGE_TEXT) ?? null
   if (reads.kind === 'times') {
     // The shul's times (scheduleUpdate.ts): its usual ones, and since Oct 20
@@ -169,11 +183,18 @@ export async function proposeFromPage(
     const sk = schedulesKey(reads.key)
     const regular = regularMinyanim(listing[reads.key])
     const schedules = readSchedules(listing[sk])
-    const update = yieldToNewsletter(weeklyFromCalendar(dropListed(keepUncovered(read.update), regular, schedules), regular), schedules)
-    if (!update || !changesAnything(update)) return null
+    const own = weeklyFromCalendar(dropListed(keepUncovered(read.update), regular, schedules), regular)
+    const update = yieldToNewsletter(own, schedules)
+    const lines = timesReadLines(read.update.rows)
+    const note = changing(update) < changing(own) ? NEWSLETTER_HELD : undefined
+    if (!update || !changesAnything(update)) return { read: lines, proposal: null, note }
     const applied = applyUpdate(regular, schedules, update, { postedBy: 'website' })
-    if (applied.changes.length === 0) return null
-    return { submission: editSubmission(category, listing, { [reads.key]: applied.minyanim, [sk]: applied.schedules }), lines: applied.changes, keys: [reads.key, sk] }
+    if (applied.changes.length === 0) return { read: lines, proposal: null, note }
+    return {
+      read: lines,
+      proposal: { submission: editSubmission(category, listing, { [reads.key]: applied.minyanim, [sk]: applied.schedules }), lines: applied.changes, keys: [reads.key, sk] },
+      note,
+    }
   }
   // Weekly hours: the any-field reader (messageReader.ts), told only of this
   // listing, and only its hours kept.
@@ -186,10 +207,16 @@ export async function proposeFromPage(
     { apiKey, communityName, about: listing.id, fetchImpl },
   )
   const changes = hoursReads(reading.proposals, listing.id, reads.keys)
-  if (changes.length === 0) return null
+  const lines = hoursReadLines(changes, category)
+  if (changes.length === 0) return { read: lines, proposal: null }
   const { values } = readFieldChanges(category, listing, changes)
-  const { submission, lines } = fieldsEdit(category, listing, values)
-  return lines.length ? { submission, lines, keys: reads.keys } : null
+  const { submission, lines: edits } = fieldsEdit(category, listing, values)
+  return { read: lines, proposal: edits.length ? { submission, lines: edits, keys: reads.keys } : null }
+}
+
+/** What the page would change on the listing, or nothing. */
+export async function proposeFromPage(...args: Parameters<typeof readPageFor>): Promise<PageProposal> {
+  return (await readPageFor(...args)).proposal
 }
 
 async function communityName(slug: string): Promise<string> {
@@ -225,11 +252,17 @@ export async function earlierSuggestions(community: string, listingId: string): 
 
 /** One listing's page: read it, and when its words changed, have the AI
  *  read it and file what differs from the listing. A page that agrees
- *  leaves the listing's date alone (listingPageWatch.ts). */
+ *  leaves the listing's date alone (listingPageWatch.ts).
+ *
+ *  `full` is the admin's "Check now" (the user, Oct 20): the AI reads the
+ *  page whether or not it changed, files what differs just as a change
+ *  would (never the same suggestion twice), and the result says what it
+ *  read and whether that agrees with the listing. The daily run reads with
+ *  the AI only a page that changed: it costs. */
 export async function runListingPageWatch(
   watch: Pick<Watch, 'communityId' | 'url' | 'resourceId' | 'pageHash'>,
   budget?: MenuReadBudget,
-  opts: { fetchImpl?: typeof fetch; apiKey?: string | undefined; now?: number } = {},
+  opts: { fetchImpl?: typeof fetch; apiKey?: string | undefined; now?: number; full?: boolean } = {},
 ): Promise<WatchOutcome> {
   if (!watch.resourceId) return { ok: false, error: 'Tie this watch to the listing it keeps current' }
   const row = await getResourceRowById(watch.resourceId, watch.communityId)
@@ -240,42 +273,61 @@ export async function runListingPageWatch(
   if (!category || !reads) return { ok: false, error: 'The listing this page belongs to has no davening times or hours to keep current' }
 
   const source = await readListingPage(watch.url, { fetchImpl: opts.fetchImpl, now: opts.now })
-  if (!source) return { ok: false, error: 'Couldn’t read the page (blocked, moved, or built in the browser)' }
+  if (!source) {
+    return {
+      ok: false,
+      error: 'Couldn’t read the page (blocked, moved, or built in the browser)',
+      ...(opts.full ? { check: { what: reads.kind, from: null, result: 'unreadable', read: [], differences: [], queue: null } as const } : {}),
+    }
+  }
   const pageHash = menuHash(source)
+  const changed = !!watch.pageHash && watch.pageHash !== pageHash
   // The first read sets the baseline; an unchanged page is left alone, and
   // its listing's date with it.
-  if (!watch.pageHash || watch.pageHash === pageHash) return { ok: true, filed: 0, pageHash }
+  if (!opts.full && !changed) return { ok: true, filed: 0, pageHash }
 
   // Changed. A suggestion already waiting, no AI, or this run's reads spent:
-  // the old fingerprint stays, so the change is still news next time.
-  if (await hasPendingSuggestion(watch.communityId, listing.id)) return { ok: true, filed: 0 }
+  // the old fingerprint stays, so the change is still news next time. A
+  // check reads it all the same, to say what it found.
+  const pending = await hasPendingSuggestion(watch.communityId, listing.id)
+  if (pending && !opts.full) return { ok: true, filed: 0 }
   const apiKey = 'apiKey' in opts ? opts.apiKey : process.env.OPENAI_API_KEY
-  if (!apiKey) return { ok: true, filed: 0 }
-  if (budget) {
+  if (!apiKey) {
+    if (!opts.full) return { ok: true, filed: 0 }
+    return { ok: true, filed: 0, check: { what: reads.kind, from: checkFrom(source), result: 'nothing', read: [], differences: [], queue: null, note: 'The AI isn’t set up here, so the page wasn’t read.' } }
+  }
+  if (budget && !opts.full) {
     if (budget.aiReads <= 0) return { ok: true, filed: 0 }
     budget.aiReads--
   }
 
-  let proposal: PageProposal
+  let reading: PageReading
   try {
-    proposal = await proposeFromPage(listing, category, reads, source, { apiKey, communityName: await communityName(watch.communityId), fetchImpl: opts.fetchImpl })
+    reading = await readPageFor(listing, category, reads, source, { apiKey, communityName: await communityName(watch.communityId), fetchImpl: opts.fetchImpl })
   } catch (err) {
-    return { ok: false, error: `The page changed, and the AI couldn’t read it (${err instanceof Error ? err.message : String(err)})` }
+    return { ok: false, error: `${changed ? 'The page changed, and the AI' : 'The AI'} couldn’t read it (${err instanceof Error ? err.message : String(err)})` }
   }
-  if (!proposal) return { ok: true, filed: 0, pageHash }
-  if (filedBefore(await earlierSuggestions(watch.communityId, listing.id), proposal.submission.details, proposal.keys)) return { ok: true, filed: 0, pageHash }
+  const { proposal } = reading
+  const check = (queue: WatchCheck['queue']) =>
+    pageCheck(reads.kind, checkFrom(source), reading.read, { differences: proposal?.lines ?? [], queue, note: reading.note })
+  if (!proposal) return { ok: true, filed: 0, pageHash, check: check(null) }
+  // Only a check gets here with one waiting: it says so, files nothing, and
+  // a change stays news for the daily run.
+  if (pending) return { ok: true, filed: 0, ...(watch.pageHash ? {} : { pageHash }), check: check('waiting') }
+  if (filedBefore(await earlierSuggestions(watch.communityId, listing.id), proposal.submission.details, proposal.keys)) return { ok: true, filed: 0, pageHash, check: check('before') }
 
   const on = changedOn(opts.now ?? Date.now(), communityConfig.timezone)
-  const note = listingPageNote(watch.url, on, proposal.lines)
+  const seen = changed ? 'changed' : 'read'
+  const note = listingPageNote(watch.url, on, proposal.lines, seen)
   await submitListingUpdate(
     watch.communityId,
     listing.id,
-    { ...proposal.submission, source: listingPageSource(listing.name, watch.url, on, source.text) } as ResourceSubmission,
+    { ...proposal.submission, source: listingPageSource(listing.name, watch.url, on, source.text, seen) } as ResourceSubmission,
     note,
     { name: LISTING_PAGE_WATCH_NAME },
   )
   await sendWatchDigest(watch.communityId, `${listing.name}’s website`, [{ name: listing.name, what: proposal.lines.join('; ') }]).catch((err) =>
     console.error('[watch-listing-page] digest failed:', err),
   )
-  return { ok: true, filed: 1, pageHash }
+  return { ok: true, filed: 1, pageHash, check: check('filed') }
 }

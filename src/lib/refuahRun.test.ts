@@ -67,7 +67,7 @@ describe('runRefuahWatch', () => {
   it('asks Refuah’s data service for the page’s hospital, and files nothing when the guide agrees', async () => {
     const fetchSpy = refuahAnswers(record('+1 215-805-8668'))
     const out = await runRefuahWatch('philly', URL_, HOSPITAL)
-    expect(out).toMatchObject({ ok: true, filed: 0 })
+    expect(out).toMatchObject({ ok: true, filed: 0, check: { what: 'contacts', result: 'agrees', read: ['1 contact on Refuah'], differences: [], queue: null } })
     expect(JSON.parse(String(fetchSpy.mock.calls[0][1]?.body))).toMatchObject({ path: 'hospitals:getWithReferences', args: { id: 'jx77h9d00qztqgbbe8e0rfj1r589mgf5' } })
     expect(m.submitListingUpdate).not.toHaveBeenCalled()
     // …and dates the hospital by Refuah (Oct 19: agreement used to leave
@@ -78,7 +78,7 @@ describe('runRefuahWatch', () => {
   it('files a difference as a suggestion from Refuah, named, so approval dates it “From Refuah”', async () => {
     refuahAnswers(record('+1 215-805-9000'))
     const out = await runRefuahWatch('philly', URL_, HOSPITAL)
-    expect(out).toMatchObject({ ok: true, filed: 1 })
+    expect(out).toMatchObject({ ok: true, filed: 1, check: { result: 'differs', differences: [expect.stringContaining('+1 215-805-9000')], queue: 'filed' } })
     const [community, id, payload, note, by] = m.submitListingUpdate.mock.calls[0]
     expect([community, id, by]).toEqual(['philly', HOSPITAL, { name: REFUAH_WATCH_NAME }])
     expect(payload.details.liaisons).toEqual([{ name: 'Bikur Cholim of Philadelphia', who: 'Mrs. Schwartz', phones: ['+1 215-805-9000'] }])
@@ -91,7 +91,7 @@ describe('runRefuahWatch', () => {
   it('doesn’t file the same suggestion twice, whatever became of the first', async () => {
     refuahAnswers(record('+1 215-805-9000'))
     m.earlier = [{ payload: { details: { liaisons: [{ name: 'Bikur Cholim of Philadelphia', who: 'Mrs. Schwartz', phones: ['+1 215-805-9000'] }] } } }]
-    expect(await runRefuahWatch('philly', URL_, HOSPITAL)).toMatchObject({ ok: true, filed: 0 })
+    expect(await runRefuahWatch('philly', URL_, HOSPITAL)).toMatchObject({ ok: true, filed: 0, check: { result: 'differs', queue: 'before' } })
     expect(m.submitListingUpdate).not.toHaveBeenCalled()
   })
 
@@ -99,7 +99,7 @@ describe('runRefuahWatch', () => {
   // nothing under them. A good read, not a broken watch emailing every day.
   it('a hospital Refuah has nothing for is a good read with nothing to file', async () => {
     refuahAnswers({ name: 'Penn Presbyterian Medical Center', liaisons: [], services: [] })
-    expect(await runRefuahWatch('philly', URL_, HOSPITAL)).toMatchObject({ ok: true, filed: 0 })
+    expect(await runRefuahWatch('philly', URL_, HOSPITAL)).toMatchObject({ ok: true, filed: 0, check: { result: 'nothing', read: [] } })
     expect(m.submitListingUpdate).not.toHaveBeenCalled()
     // Agreeing only by having nothing doesn't date it.
     expect(m.confirmFromSource).not.toHaveBeenCalled()

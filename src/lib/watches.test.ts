@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { afterRun, kindForUrl, normalizeWatchUrl, STALE_AFTER_MS, watchHealth, type Watch } from './watches'
+import { afterRun, listCheck, kindForUrl, normalizeWatchUrl, STALE_AFTER_MS, watchHealth, type CheckFound, type Watch } from './watches'
 
 const NOW = '2026-10-06T07:00:00.000Z'
 const DAY = 86_400_000
@@ -22,6 +22,7 @@ function watch(over: Partial<Watch> = {}): Watch {
     lastFiled: null,
     pageHash: null,
     pageChangedAt: null,
+    lastCheck: null,
     ...over,
   }
 }
@@ -87,6 +88,31 @@ describe('afterRun', () => {
 
   it('keeps the last fingerprint when a read fails, so a failure is never a change', () => {
     expect(afterRun(watch({ pageHash: 'aaa' }), { ok: false, error: 'down' }, NOW).update.pageHash).toBeUndefined()
+  })
+
+  // The user, Oct 20: what a full read found stays on the row until the
+  // next one; a run that only fingerprinted the page leaves it be.
+  it('keeps what a full read found, dated, and leaves it be after a run that read nothing', () => {
+    const check: CheckFound = { what: 'times', from: 'page', result: 'agrees', read: ['Shacharis Mon–Fri 7:00 AM'], differences: [], queue: null }
+    expect(afterRun(watch(), { ok: true, filed: 0, pageHash: 'a', check }, NOW).update.lastCheck).toEqual({ ...check, at: NOW })
+    expect(afterRun(watch(), { ok: false, error: 'down', check: { ...check, result: 'unreadable', read: [] } }, NOW).update.lastCheck).toMatchObject({ result: 'unreadable', at: NOW })
+    expect('lastCheck' in afterRun(watch(), { ok: true, filed: 0, pageHash: 'a' }, NOW).update).toBe(false)
+  })
+})
+
+describe('listCheck', () => {
+  it('says how many the list has, how many match, how many differ and how many it filed', () => {
+    expect(listCheck({ entries: 78, matching: 74, findings: 4, filed: 1 })).toEqual({
+      what: 'list',
+      from: null,
+      result: 'differs',
+      read: [],
+      differences: [],
+      queue: 'filed',
+      list: { listed: 78, matching: 74, differences: 4, filed: 1 },
+    })
+    expect(listCheck({ entries: 78, matching: 74, findings: 4, filed: 0 }).queue).toBe('before')
+    expect(listCheck({ entries: 54, matching: 54, findings: 0, filed: 0 })).toMatchObject({ result: 'agrees', queue: null })
   })
 })
 

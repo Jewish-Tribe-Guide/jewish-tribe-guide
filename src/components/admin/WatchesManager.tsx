@@ -5,7 +5,7 @@ import { useLoadOnMount } from '@/lib/useLoadOnMount'
 import { fetchJson } from '@/lib/fetchJson'
 import { withCommunity } from '@/lib/useCommunityData'
 import { useCommunitySlug } from '@/lib/communityContext'
-import { MENU_WATCH_CREATOR, kindForUrl, normalizeWatchUrl, watchHealth, type Watch } from '@/lib/watches'
+import { MENU_WATCH_CREATOR, kindForUrl, normalizeWatchUrl, watchHealth, type Watch, type WatchCheck } from '@/lib/watches'
 import { refuahHospitalId } from '@/lib/refuahWatch'
 import { isMekorList } from '@/lib/mekorWatch'
 import { isListingPageWatch } from '@/lib/listingPageWatch'
@@ -99,15 +99,115 @@ function Source({ url }: { url: string | null }) {
   )
 }
 
-/** A watch's state, in a word or two. */
+/** A page the AI reads for the listing: a shul's or mikvah's own, or a
+ *  menu. */
+function readByAi(w: Watch): boolean {
+  return isListingPageWatch(w) || w.createdBy === MENU_WATCH_CREATOR
+}
+
+/** A watch's state, in a word or two. A page the AI has never read has
+ *  only been seen to open, which isn't the same as working (the user,
+ *  Oct 20). */
 function pillOf(w: Watch, now: number): Pill {
   if (isIgnoredSender(w)) return { tone: 'off', text: 'Skipped' }
   if (isNewsletterWatch(w) && !w.resourceId) return { tone: 'todo', text: 'To link' }
   const h = watchHealth(w, now)
   if (h.state === 'paused') return { tone: 'off', text: 'Paused' }
   if (h.state === 'waiting') return { tone: 'off', text: isNewsletterWatch(w) ? 'No email yet' : 'Not checked yet' }
-  if (h.state === 'working') return { tone: 'ok', text: 'Working' }
+  if (h.state === 'working') {
+    if (readByAi(w) && !w.lastCheck) return { tone: 'off', text: 'Opens · not read yet' }
+    if (readByAi(w) && w.lastCheck?.result === 'nothing') return { tone: 'todo', text: 'Reads nothing' }
+    return { tone: 'ok', text: 'Working' }
+  }
   return { tone: 'bad', text: 'Not working' }
+}
+
+const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`
+
+/** What a check found nothing of, by what it reads. */
+const NOTHING: Record<WatchCheck['what'], string> = {
+  times: 'Found no times on this page',
+  hours: 'Found no hours on this page',
+  dishes: 'Found no dishes on this menu',
+  contacts: 'Refuah has no contacts for this hospital yet',
+  list: 'Found no places on the list',
+}
+
+/** What became of the differences, in a few words. */
+function queueText(c: WatchCheck): string {
+  if (c.what === 'dishes') return c.queue === 'before' ? 'already on the Main dishes tab, or skipped there' : 'waiting on the Main dishes tab'
+  if (c.queue === 'filed') return 'in the queue'
+  if (c.queue === 'before') return 'filed before, not again'
+  if (c.queue === 'waiting') return 'not filed: the listing already has a suggestion in the queue'
+  return ''
+}
+
+/** A list's counts: "78 on the list, 74 match the guide, 4 suggestions in
+ *  the queue". */
+function listText(c: WatchCheck): string {
+  const l = c.list!
+  const head = `${l.listed} on the list, ${l.matching} match${l.matching === 1 ? 'es' : ''} the guide`
+  if (!l.differences) return `${head}, nothing differs`
+  if (l.filed === l.differences) return `${head}, ${plural(l.differences, 'suggestion')} in the queue`
+  if (!l.filed) return `${head}, ${l.differences} differ${l.differences === 1 ? 's' : ''}, all filed before`
+  return `${head}, ${l.differences} differ: ${plural(l.filed, 'new suggestion')} in the queue, ${l.differences - l.filed} filed before`
+}
+
+/** What the last full read found, in one line. */
+function checkLine(c: WatchCheck): string {
+  if (c.result === 'unreadable') return `${day(c.at)}: the page wouldn’t open`
+  if (c.list) return `Read ${day(c.at)}: ${listText(c)}`
+  if (c.result === 'agrees') return `Read ${day(c.at)}: agrees with the listing`
+  if (c.result === 'nothing') {
+    const n = NOTHING[c.what]
+    return `Read ${day(c.at)}: ${c.what === 'contacts' ? n : n[0].toLowerCase() + n.slice(1)}`
+  }
+  return `Read ${day(c.at)}: ${plural(c.differences.length, 'difference')}, ${queueText(c)}`
+}
+
+const FROM: Record<NonNullable<WatchCheck['from']>, string> = {
+  page: 'the page',
+  calendar: 'the page and its calendar',
+  pdf: 'the PDF',
+}
+
+/** What the last full read found, for the opened row: what it read and
+ *  from where, then whether that agrees with the listing. */
+function CheckResult({ check: c }: { check: WatchCheck }) {
+  if (c.list) return null
+  return (
+    <div className="space-y-1.5 rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-800" data-testid="watch-check">
+      {c.result === 'unreadable' ? (
+        <p className="font-medium text-red-700">The page wouldn’t open.</p>
+      ) : c.read.length ? (
+        <>
+          <p className="text-xs font-semibold text-slate-600">
+            What it read{c.from ? ` from ${FROM[c.from]}` : ''}, {day(c.at)}
+          </p>
+          <ul className="space-y-0.5">
+            {c.read.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+            {c.more ? <li className="text-xs text-muted">and {c.more} more</li> : null}
+          </ul>
+        </>
+      ) : (
+        <p className="font-medium text-amber-800">{NOTHING[c.what]}.</p>
+      )}
+      {c.result === 'agrees' && <p className="font-medium text-green-800">Agrees with the listing.</p>}
+      {c.result === 'differs' && (
+        <>
+          <p className="font-medium text-amber-800">Differs from the listing, {queueText(c)}:</p>
+          <ul className="space-y-0.5">
+            {c.differences.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+        </>
+      )}
+      {c.note && <p className="text-xs text-muted">{c.note}</p>}
+    </div>
+  )
 }
 
 /** What it last found, in one line. A broken or stale watch says why. */
@@ -120,10 +220,29 @@ function LastLine({ watch: w, now }: { watch: Watch; now: number }) {
   // A newsletter is read when one comes, not checked on a morning.
   if (isNewsletterWatch(w)) return <p className="text-sm text-slate-700">{w.pageChangedAt ? `Newsletter ${day(w.pageChangedAt)}${filed}` : 'No newsletter read yet.'}</p>
   if (h.state === 'waiting') return <p className="text-sm text-slate-500">Not checked yet: the first check is tomorrow morning, or press Check now.</p>
-  if (w.createdBy === MENU_WATCH_CREATOR) {
-    return <p className="text-sm text-slate-700">{w.pageChangedAt ? `Changed ${day(w.pageChangedAt)}${w.lastFiled ? ': new dishes on the Main dishes tab' : ''}` : 'No change since it was added.'}</p>
+  // What its last full read found, once it has had one.
+  if (w.lastCheck && (readByAi(w) || w.lastCheck.list || refuahHospitalId(w.url))) {
+    const tone = w.lastCheck.result === 'agrees' ? 'text-slate-700' : w.lastCheck.result === 'unreadable' ? 'text-red-700' : 'text-amber-800'
+    return <p className={`text-sm ${tone}`}>{checkLine(w.lastCheck)}</p>
   }
-  if (isListingPageWatch(w)) return <p className="text-sm text-slate-700">{w.pageChangedAt ? `Changed ${day(w.pageChangedAt)}${filed}` : 'No change since it was added.'}</p>
+  // Seen to open, never read by the AI: Check now reads it.
+  const notRead = <span className="block text-xs text-muted">Not read by the AI yet. Check now reads it and shows what it finds.</span>
+  if (w.createdBy === MENU_WATCH_CREATOR) {
+    return (
+      <p className="text-sm text-slate-700">
+        {w.pageChangedAt ? `Changed ${day(w.pageChangedAt)}${w.lastFiled ? ': new dishes on the Main dishes tab' : ''}` : 'No change since it was added.'}
+        {notRead}
+      </p>
+    )
+  }
+  if (isListingPageWatch(w)) {
+    return (
+      <p className="text-sm text-slate-700">
+        {w.pageChangedAt ? `Changed ${day(w.pageChangedAt)}${filed}` : 'No change since it was added.'}
+        {notRead}
+      </p>
+    )
+  }
   if (w.kind === 'keystone_list' || isMekorList(w.url) || refuahHospitalId(w.url)) {
     return <p className="text-sm text-slate-700">Read {day(w.lastOkAt ?? w.lastRunAt!)}{filed}</p>
   }
@@ -166,7 +285,7 @@ function WhatItDoes({ watch }: { watch: Watch }) {
   if (watch.createdBy === MENU_WATCH_CREATOR) {
     return (
       <p className="text-xs text-muted" data-testid="menu-watch">
-        Its menu link, checked every morning. When the menu changes, the AI reads it, and dishes the listing doesn’t have wait on the Main dishes tab. Added for every place with a menu link: pause it to stop it.
+        Its menu link, checked every morning. When the menu changes, the AI reads it, and dishes the listing doesn’t have wait on the Main dishes tab. Check now reads it straight away. Added for every place with a menu link: pause it to stop it.
       </p>
     )
   }
@@ -174,7 +293,7 @@ function WhatItDoes({ watch }: { watch: Watch }) {
     return (
       <p className="text-xs text-muted" data-testid="listing-page-watch">
         Checked every morning. When the page changes, the AI reads it, and davening times or hours that differ from the listing go to the
-        moderation queue with the page beside them. A page that agrees changes nothing, not even the listing&rsquo;s date.
+        moderation queue with the page beside them. Check now reads it straight away. A page that agrees changes nothing, not even the listing&rsquo;s date.
       </p>
     )
   }
@@ -655,12 +774,13 @@ export default function WatchesManager({ token }: { token: string }) {
         alwaysShown={unlinked && <NewsletterLink listings={listings} busy={busy !== null} onLink={(id) => act(row, 'link', id)} onIgnore={() => act(row, 'ignore')} />}
       >
         <WhatItDoes watch={w} />
+        {w.lastCheck && <CheckResult check={w.lastCheck} />}
         {listing && w.label && w.label !== listing.name && <p className="text-xs text-slate-600">Named: {w.label}</p>}
         <div className="flex flex-wrap gap-2">
           {!unlinked && !ignored && (
             <>
               <button type="button" disabled={busy !== null || !w.active} onClick={() => act(row, 'check')} className={BUTTON}>
-                {busy === w.id ? 'Checking…' : 'Check now'}
+                {busy === w.id ? (readByAi(w) ? 'Reading…' : 'Checking…') : 'Check now'}
               </button>
               <button type="button" disabled={busy !== null} onClick={() => act(row, w.active ? 'pause' : 'resume')} className={BUTTON}>
                 {w.active ? 'Pause' : 'Resume'}

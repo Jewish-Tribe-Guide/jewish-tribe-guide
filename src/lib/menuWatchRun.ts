@@ -3,10 +3,11 @@ import { listCategoriesUncached } from '@/lib/categoryStore'
 import { getResourceRowById, normalizeRow } from '@/lib/resourceStore'
 import { keepsMenuLink } from '@/lib/menuLink'
 import { readMenu, readMenuPage } from '@/lib/menuReader'
-import { saveMenuReading } from '@/lib/menuReadingStore'
+import { getMenuReading, saveMenuReading } from '@/lib/menuReadingStore'
 import { addWatch, listWatches, removeWatch } from '@/lib/watchStore'
 import { changedMenuNote, listedDishes, menuHash, MENU_AI_READS_PER_RUN, MENU_WATCH_CREATOR, menuWatchChanges, newDishes, wantedMenuWatches } from '@/lib/menuWatch'
-import type { Watch, WatchOutcome } from '@/lib/watches'
+import { checkFrom, pageCheck } from '@/lib/listingPageWatch'
+import type { Watch, WatchCheck, WatchOutcome } from '@/lib/watches'
 import type { ResourceRow } from '@/types'
 
 // The menu watches' database and network half (menuWatch.ts has the rules).
@@ -57,11 +58,15 @@ export async function syncMenuWatches(): Promise<{ community: string; added: num
 }
 
 /** One food place's menu: read it, and when its words changed, have the AI
- *  read it and keep any dishes the listing doesn't have for an admin. */
+ *  read it and keep any dishes the listing doesn't have for an admin.
+ *  `full` is the admin's "Check now" (the user, Oct 20): the AI reads it
+ *  changed or not, and the result says which dishes it read and which the
+ *  listing lacks. A reading the Main dishes tab already has for those
+ *  dishes, waiting or skipped, isn't made again. */
 export async function runMenuWatch(
   watch: Pick<Watch, 'communityId' | 'url' | 'resourceId' | 'pageHash'>,
   budget?: MenuReadBudget,
-  opts: { fetchImpl?: typeof fetch; apiKey?: string | undefined } = {},
+  opts: { fetchImpl?: typeof fetch; apiKey?: string | undefined; full?: boolean } = {},
 ): Promise<WatchOutcome> {
   if (!watch.resourceId) return { ok: false, error: 'This menu watch isn’t tied to a listing' }
   const row = await getResourceRowById(watch.resourceId, watch.communityId)
@@ -71,16 +76,26 @@ export async function runMenuWatch(
   if (!category || !keepsMenuLink(category)) return { ok: false, error: 'The place this menu belongs to has no list of dishes' }
 
   const source = await readMenuPage(watch.url, { fetchImpl: opts.fetchImpl })
-  if (!source) return { ok: false, error: 'Couldn’t read the menu (blocked, moved, or built in the browser)' }
+  if (!source) {
+    return {
+      ok: false,
+      error: 'Couldn’t read the menu (blocked, moved, or built in the browser)',
+      ...(opts.full ? { check: { what: 'dishes', from: null, result: 'unreadable', read: [], differences: [], queue: null } as const } : {}),
+    }
+  }
   const pageHash = menuHash(source)
+  const changed = !!watch.pageHash && watch.pageHash !== pageHash
   // The first read sets the baseline; an unchanged menu is left alone.
-  if (!watch.pageHash || watch.pageHash === pageHash) return { ok: true, filed: 0, pageHash }
+  if (!opts.full && !changed) return { ok: true, filed: 0, pageHash }
 
   // Changed. Without the AI, or with this run's reads spent, the old
   // fingerprint stays, so the change is still news next time.
   const apiKey = 'apiKey' in opts ? opts.apiKey : process.env.OPENAI_API_KEY
-  if (!apiKey) return { ok: true, filed: 0 }
-  if (budget) {
+  if (!apiKey) {
+    if (!opts.full) return { ok: true, filed: 0 }
+    return { ok: true, filed: 0, check: { what: 'dishes', from: checkFrom(source), result: 'nothing', read: [], differences: [], queue: null, note: 'The AI isn’t set up here, so the menu wasn’t read.' } }
+  }
+  if (budget && !opts.full) {
     if (budget.aiReads <= 0) return { ok: true, filed: 0 }
     budget.aiReads--
   }
@@ -88,10 +103,22 @@ export async function runMenuWatch(
   try {
     read = await readMenu(source, listing.name, { apiKey, fetchImpl: opts.fetchImpl })
   } catch (err) {
-    return { ok: false, error: `The menu changed, and the AI couldn’t read it (${err instanceof Error ? err.message : String(err)})` }
+    return { ok: false, error: `${changed ? 'The menu changed, and the AI' : 'The AI'} couldn’t read it (${err instanceof Error ? err.message : String(err)})` }
   }
   const found = newDishes(read.dishes, listedDishes(listing, category))
-  if (found.length === 0) return { ok: true, filed: 0, pageHash }
+  const check = (queue: WatchCheck['queue']) =>
+    pageCheck('dishes', checkFrom(source), read.dishes.length ? [read.dishes.map((d) => d.name).join(', ')] : [], {
+      differences: found.length ? [`Not on the listing: ${found.map((d) => d.name).join(', ')}`] : [],
+      queue,
+    })
+  if (found.length === 0) return { ok: true, filed: 0, pageHash, check: check(null) }
+  if (opts.full) {
+    const kept = await getMenuReading(watch.communityId, listing.id)
+    const had = new Set((kept?.dishes ?? []).map((d) => d.name.trim().toLowerCase()))
+    if (kept && (kept.status === 'proposed' || kept.status === 'skipped') && found.every((d) => had.has(d.name.trim().toLowerCase()))) {
+      return { ok: true, filed: 0, pageHash, check: check('before') }
+    }
+  }
   await saveMenuReading(watch.communityId, listing.id, {
     status: 'proposed',
     sourceUrl: read.sourceUrl ?? watch.url,
@@ -99,5 +126,5 @@ export async function runMenuWatch(
     note: changedMenuNote(found),
     model: read.model,
   })
-  return { ok: true, filed: 1, pageHash }
+  return { ok: true, filed: 1, pageHash, check: check('filed') }
 }

@@ -14,7 +14,9 @@ const m = vi.hoisted(() => ({
   updateWatch: vi.fn(),
   removeWatch: vi.fn(),
   runAndRecord: vi.fn(),
+  enforceRateLimit: vi.fn(),
 }))
+vi.mock('@/lib/rateLimit', () => ({ enforceRateLimit: m.enforceRateLimit }))
 vi.mock('@/lib/adminAuth', () => ({ getAdminUserForCommunity: m.getAdminUserForCommunity }))
 vi.mock('@/lib/communityStore', () => ({
   communitySlugFromRequest: (r: Request) => new URL(r.url).searchParams.get('community'),
@@ -48,6 +50,7 @@ beforeEach(() => {
   m.listWatches.mockResolvedValue({ watches: [], available: true })
   m.addWatch.mockResolvedValue(added)
   m.runAndRecord.mockImplementation(async (w: Watch) => ({ watch: { ...w, lastRunAt: 'now' } }))
+  m.enforceRateLimit.mockResolvedValue(null)
 })
 
 describe('/api/admin/watches', () => {
@@ -84,7 +87,7 @@ describe('/api/admin/watches', () => {
       label: 'Weekly times',
       createdBy: 'me@x.co',
     })
-    expect(m.runAndRecord).toHaveBeenCalledWith(added)
+    expect(m.runAndRecord).toHaveBeenCalledWith(added, undefined, undefined, { full: true })
     expect((await res.json()).watch.lastRunAt).toBe('now')
   })
 
@@ -144,7 +147,7 @@ describe('/api/admin/watches', () => {
       label: 'Lower Merion Synagogue · davening times on their website',
       createdBy: 'listing pages',
     })
-    expect(m.runAndRecord).toHaveBeenCalledWith(added)
+    expect(m.runAndRecord).toHaveBeenCalledWith(added, undefined, undefined, { full: true })
   })
 
   // Oct 19: the admin says what a watch is for, and the source has to suit
@@ -198,9 +201,31 @@ describe('/api/admin/watches', () => {
     await POST(req('POST', { action: 'pause', id: WATCH }))
     expect(m.updateWatch).toHaveBeenCalledWith('philly', WATCH, { active: false })
     await POST(req('POST', { action: 'check', id: WATCH }))
-    expect(m.runAndRecord).toHaveBeenCalledWith(added)
+    expect(m.runAndRecord).toHaveBeenCalledWith(added, undefined, undefined, { full: true })
     await POST(req('POST', { action: 'remove', id: WATCH }))
     expect(m.removeWatch).toHaveBeenCalledWith('philly', WATCH)
+  })
+
+  // The user, Oct 20: "Check now" is the full check, the AI reading the page
+  // changed or not, and the row shows what it read. Each can cost an AI
+  // read, so there's a ceiling on how often.
+  it('checks in full, hands back what it read, and is rate-limited', async () => {
+    const lastCheck = { at: 'now', what: 'times', from: 'page', result: 'agrees', read: ['Shacharis Mon–Fri 7:00 AM'], differences: [], queue: null }
+    m.getWatch.mockResolvedValue(added)
+    m.runAndRecord.mockImplementation(async (w: Watch) => ({ watch: { ...w, lastCheck } }))
+    const res = await POST(req('POST', { action: 'check', id: WATCH }))
+    expect((await res.json()).watch.lastCheck).toEqual(lastCheck)
+    expect(m.runAndRecord).toHaveBeenCalledWith(added, undefined, undefined, { full: true })
+    expect(m.enforceRateLimit).toHaveBeenCalledWith(expect.any(Request), 'admin-watch-check', expect.objectContaining({ limit: expect.any(Number) }))
+
+    m.runAndRecord.mockClear()
+    m.enforceRateLimit.mockResolvedValue(Response.json({ ok: false }, { status: 429 }))
+    expect((await POST(req('POST', { action: 'check', id: WATCH }))).status).toBe(429)
+    expect((await POST(req('POST', { action: 'add', url: 'x.org' }))).status).toBe(429)
+    expect(m.runAndRecord).not.toHaveBeenCalled()
+    expect(m.addWatch).not.toHaveBeenCalled()
+    // Pausing costs nothing, and isn't held back.
+    expect((await POST(req('POST', { action: 'pause', id: WATCH }))).status).toBe(200)
   })
 
   // Shul newsletters (newsletter.ts): a sender is watched by its address.

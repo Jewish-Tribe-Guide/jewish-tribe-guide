@@ -87,6 +87,12 @@ for that exact change, in the same conversation. Show the dry run first.
    category search reads ("havdalah" finds it). Until the three-line tiles are
    live, the phone home cuts the name to "Candle Lighting &…".
 
+1d. **Migration 085 (`watch.last_check`)** keeps what a watch's last check
+   read (Check now, below). Run on neither database: this environment has
+   no SQL access, so it needs pasting into the SQL editor, dev first (no
+   yes needed there), then live with a yes. Until then everything works,
+   and a check's result shows only until the Watches tab is reloaded.
+
 ## For the user or the community
 
 2. **Every live place has a date** (checked Oct 17, 11 PM: 155 of 155).
@@ -251,6 +257,37 @@ for that exact change, in the same conversation. Show the dry run first.
 ## Small open decisions
 
 7. The "+" button covers part of the third tile in a row on the phone home.
+
+## Done Oct 20: "Check now" is the full check (on `redesign/oct18-fixes`, not merged)
+
+- **A shul's, mikvah's or menu page is read by the AI on Check now**,
+  changed or not. The daily run is unchanged: the AI only when the page
+  changed. Check now sets the fingerprint, and files what differs as the
+  daily run would, never the same suggestion twice. A listing that already
+  has a suggestion waiting is shown what differs, and nothing is filed.
+  Adding a watch checks it the same way. Rate-limited: 20 in 10 minutes.
+- **The opened row shows what it read and from where** (the page, or the
+  page and its calendar), as short lines ("Shacharis Mon–Fri 7:00 AM"),
+  then "Agrees with the listing." or each difference, "in the queue".
+  Or "Found no times on this page" / "The page wouldn't open". The
+  row's line says it in one: "Read Oct 20: agrees with the listing".
+- **Lists say what they compared:** "Read Oct 20: 78 on the list, 74
+  match the guide, 4 suggestions in the queue" (Keystone-K, Mekor
+  Habracha); Refuah says how many contacts it read.
+- **A page the AI has never read says so:** "Opens · not read yet", not
+  a green "Working". One where it found nothing says "Reads nothing".
+- Kept on the watch until the next check (migration 085, see 1d). The
+  daily run's AI reads keep theirs too; a morning that only saw the page
+  unchanged leaves the last one.
+- Checked by tests (41 fail against the old code) and in the local admin
+  console on dev, on Mekor Habracha's davening page (a watch added there
+  on dev Oct 20). Its first read filed one difference to dev's queue
+  ("New: mincha maariv · Fri · 7:00 PM"; the page gives Friday
+  7:00 PM and dev's listing has no Friday time). Check now again read the
+  same page and filed nothing, the suggestion still waiting. The AI read
+  Friday as one "Mincha & Maariv" the first time and as Kabbalas Shabbos,
+  Mincha and Maariv the second: the same page can come back worded a
+  little differently.
 
 ## Done Oct 20: seven small fixes (on `redesign/oct18-fixes`, not merged)
 

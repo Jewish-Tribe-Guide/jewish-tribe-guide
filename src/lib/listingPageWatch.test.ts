@@ -2,9 +2,16 @@ import { describe, expect, it } from 'vitest'
 import { makeCategory } from '@/test/providerFixtures'
 import type { Proposal } from './messageReader'
 import { isCommunityEdit } from './submissionSource'
+import type { UpdateRow } from './scheduleUpdate'
+import { CALENDAR_HEADING } from './calendarFeed'
 import {
   changedOn,
+  CHECK_READ_LINES,
+  checkFrom,
   filedBefore,
+  hoursReadLines,
+  pageCheck,
+  timesReadLines,
   hoursReads,
   isListingPageWatch,
   LISTING_PAGE_WATCH_CREATOR,
@@ -121,5 +128,64 @@ describe('filedBefore', () => {
   it('compares only the fields the page keeps', () => {
     expect(suggestionKey({ hours: { sun: null }, e: 'a' }, ['hours'])).toBe(suggestionKey({ hours: { sun: null }, e: 'b' }, ['hours']))
     expect(suggestionKey({ hours: { sun: null } }, ['hours'])).not.toBe(suggestionKey({ hours: { sun: { open: '19:00', close: '22:00' } } }, ['hours']))
+  })
+})
+
+// The user, Oct 20: "Check now" says what the AI read, a short line each.
+describe('what a full read found', () => {
+  const row = (day: string, tefillah: UpdateRow['tefillah'], time: string, status: UpdateRow['status'] = 'same'): UpdateRow => ({ id: `${day}${tefillah}${time}`, day, tefillah, time, status })
+
+  it('gives the times the page gives, a line per minyan, days run together', () => {
+    const rows = [
+      ...['mon', 'tue', 'wed', 'thu', 'fri'].map((d) => row(d, 'shacharis', '7:00 AM')),
+      row('sun', 'shacharis', '8:00 AM', 'changed'),
+      row('sun', 'mincha', '6:15 PM', 'new'),
+      // The listing's own time the page doesn't give isn't something it read.
+      row('sat', 'maariv', '8:00 PM', 'gone'),
+      row('fri', 'mincha', '6:00 PM', 'kept'),
+      row('2026-10-25', 'mincha', '6:05 PM', 'new'),
+    ]
+    expect(timesReadLines(rows)).toEqual(['Shacharis Mon–Fri 7:00 AM', 'Shacharis Sun 8:00 AM', 'Mincha Sun 6:15 PM', 'Mincha Sun Oct 25 6:05 PM'])
+  })
+
+  // Seen on Mekor Habracha's page: "6:45am" beside "12:20 PM".
+  it('writes every clock time the same way, and runs together days the page wrote differently', () => {
+    const rows = [row('mon', 'shacharis', '6:45am'), row('thu', 'shacharis', '6:45 AM'), row('sat', 'mincha', '12:20 pm'), row('sun', 'maariv', '15 min before Sunset')]
+    expect(timesReadLines(rows)).toEqual(['Shacharis Mon, Thu 6:45 AM', 'Mincha Sat 12:20 PM', 'Maariv Sun 15 min before Sunset'])
+  })
+
+  it('gives the hours the page gives', () => {
+    const category = { detailFields: [{ key: 'women_s_hours', label: 'Women’s Hours', type: 'hours' as const }] }
+    expect(
+      hoursReadLines(
+        [
+          { key: 'women_s_hours', hours: { days: ['sun', 'mon', 'tue', 'wed', 'thu'], open: '19:00', close: '22:00', closed: false, when: 'every_week' } },
+          { key: 'women_s_hours', hours: { days: ['fri'], open: null, close: null, closed: true, when: 'every_week' } },
+          { key: 'women_s_hours', hours: { days: 'all', open: null, close: '21:00', closed: false, when: 'one_day' } },
+        ],
+        category,
+      ),
+    ).toEqual(['Women’s Hours, Sun–Thu: 7:00 PM–10:00 PM', 'Women’s Hours, Fri: closed', 'Women’s Hours, every day: closes 9:00 PM (one day only)'])
+  })
+
+  it('says where it read: the page, its calendar, or a PDF', () => {
+    expect(checkFrom({ text: 'Shacharis 7am', pdf: null })).toBe('page')
+    expect(checkFrom({ text: `${CALENDAR_HEADING}\n2026-10-25, Sun, 6:05 PM: Mincha`, pdf: null })).toBe('calendar')
+    expect(checkFrom({ text: null, pdf: 'b64' })).toBe('pdf')
+  })
+
+  it('agrees when it read something and nothing differs, finds nothing when it read nothing, and keeps the first few lines', () => {
+    const lines = Array.from({ length: CHECK_READ_LINES + 3 }, (_, i) => `line ${i}`)
+    expect(pageCheck('times', 'page', lines, { differences: [], queue: 'filed' })).toEqual({
+      what: 'times',
+      from: 'page',
+      result: 'agrees',
+      read: lines.slice(0, CHECK_READ_LINES),
+      more: 3,
+      differences: [],
+      queue: null,
+    })
+    expect(pageCheck('times', 'page', [], { differences: [], queue: null }).result).toBe('nothing')
+    expect(pageCheck('hours', 'page', ['x'], { differences: ['y'], queue: 'waiting' })).toMatchObject({ result: 'differs', queue: 'waiting' })
   })
 })

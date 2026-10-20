@@ -30,6 +30,7 @@ const watch = (over: Partial<Watch> = {}): Watch => ({
   lastFiled: 2,
   pageHash: null,
   pageChangedAt: null,
+  lastCheck: null,
   ...over,
 })
 const call = async () => {

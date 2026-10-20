@@ -38,8 +38,12 @@ describe('runWatch: Mekor Habracha’s list', () => {
   const mekorList = { communityId: 'philly', kind: 'website' as const, url: 'https://www.mekorhabracha.org/center-city' }
 
   it('is read place by place, not watched for a change', async () => {
-    mekor.run.mockResolvedValue({ ok: true, entries: 78, findings: 18, filed: 18, closedOnGoogle: [] })
-    expect(await runWatch(mekorList)).toEqual({ ok: true, filed: 18 })
+    mekor.run.mockResolvedValue({ ok: true, entries: 78, matching: 60, findings: 18, filed: 18, closedOnGoogle: [] })
+    expect(await runWatch(mekorList)).toEqual({
+      ok: true,
+      filed: 18,
+      check: { what: 'list', from: null, result: 'differs', read: [], differences: [], queue: 'filed', list: { listed: 78, matching: 60, differences: 18, filed: 18 } },
+    })
     expect(mekor.run).toHaveBeenCalledWith('philly', mekorList.url)
     expect(m.readWebsite).not.toHaveBeenCalled()
   })
@@ -59,8 +63,15 @@ describe('runWatch: a listing’s own page', () => {
     page.run.mockResolvedValue({ ok: true, filed: 1, pageHash: 'h2' })
     const budget = { aiReads: 3 }
     expect(await runWatch(shulPage, budget)).toEqual({ ok: true, filed: 1, pageHash: 'h2' })
-    expect(page.run).toHaveBeenCalledWith({ communityId: 'philly', url: shulPage.url, resourceId: 's1', pageHash: 'h' }, budget)
+    expect(page.run).toHaveBeenCalledWith({ communityId: 'philly', url: shulPage.url, resourceId: 's1', pageHash: 'h' }, budget, { full: false })
     expect(m.readWebsite).not.toHaveBeenCalled()
+  })
+
+  // The user, Oct 20: "Check now" has the AI read it, changed or not.
+  it('is read in full when an admin checks it', async () => {
+    page.run.mockResolvedValue({ ok: true, filed: 0, pageHash: 'h' })
+    await runWatch(shulPage, undefined, undefined, { full: true })
+    expect(page.run).toHaveBeenCalledWith(expect.objectContaining({ resourceId: 's1' }), undefined, { full: true })
   })
 
   it('an admin’s plain watch on the same page is only checked for a change', async () => {

@@ -54,6 +54,8 @@ export type MekorRun =
       entries: number
       findings: number
       filed: number
+      /** Listings the list names that agree with it. */
+      matching: number
       closedOnGoogle: string[]
       /** Listings the list agreed with, dated today. */
       confirmed?: number
@@ -107,6 +109,7 @@ export async function runMekorWatch(community: string, url: string, { dry = fals
     }))
 
   const findings = compareMekor(entries, (rows ?? []) as GuideListing[], pending)
+  const agree = mekorAgrees(entries, (rows ?? []) as GuideListing[], findings)
 
   // Everything this watch has filed before, whatever became of it: a
   // suggestion an admin rejected isn't made again until the list changes.
@@ -145,6 +148,7 @@ export async function runMekorWatch(community: string, url: string, { dry = fals
       entries: entries.length,
       findings: findings.length,
       filed: 0,
+      matching: agree.length,
       closedOnGoogle: closed,
       wouldFile: fresh.map((f) => ({ kind: f.kind, ...describe(f), note: notes.get(f)! })),
     }
@@ -194,7 +198,7 @@ export async function runMekorWatch(community: string, url: string, { dry = fals
   }
 
   await sendWatchDigest(community, 'Mekor Habracha’s list', items).catch((err) => console.error('[watch-mekor] digest failed:', err))
-  const confirmed = await confirmFromSource(community, mekorAgrees(entries, (rows ?? []) as GuideListing[], findings), MEKOR_NAME)
+  const confirmed = await confirmFromSource(community, agree, MEKOR_NAME)
 
-  return { ok: true, entries: entries.length, findings: findings.length, filed: items.length, closedOnGoogle: closed, confirmed }
+  return { ok: true, entries: entries.length, findings: findings.length, filed: items.length, matching: agree.length, closedOnGoogle: closed, confirmed }
 }

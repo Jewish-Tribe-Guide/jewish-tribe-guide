@@ -10,6 +10,7 @@ import { refuahHospitalId } from '@/lib/refuahWatch'
 import { LISTING_PAGE_WATCH_CREATOR, listingPageLabel, pageReadsFor } from '@/lib/listingPageWatch'
 import { isIgnoredSender, isNewsletterWatch, NEWSLETTER_IGNORED_CREATOR, NEWSLETTER_WATCH_CREATOR, newsletterUrl, senderAddress } from '@/lib/newsletter'
 import { isWatchPurpose, purposeInfo, sourceProblem } from '@/lib/watchPurposes'
+import { enforceRateLimit } from '@/lib/rateLimit'
 
 // GET  /api/admin/watches — the "Watches" tab: every page this community's
 //      guide reads on its own (watch, migration 070), and the listings a
@@ -27,6 +28,11 @@ import { isWatchPurpose, purposeInfo, sourceProblem } from '@/lib/watchPurposes'
 //      A shul's newsletter address ("office@shul.org") in place of a page,
 //      with the shul it's from, watches that sender's emails (newsletter.ts).
 // POST /api/admin/watches  body: { action: 'check' | 'pause' | 'resume' | 'remove', id }
+//      'check' is the full check (the user, Oct 20): a shul's, mikvah's or
+//      menu page is read by the AI whether or not it changed, what differs
+//      is filed as the daily run would, and the watch keeps what it read
+//      (`lastCheck`). Adding a watch checks it the same way. Both are
+//      rate-limited: each can cost an AI read.
 // POST /api/admin/watches  body: { action: 'link', id, resourceId }
 //      Ties a newsletter sender to its shul and turns it on: its emails
 //      waiting in the guide's inbox are read within the hour.
@@ -34,6 +40,9 @@ import { isWatchPurpose, purposeInfo, sourceProblem } from '@/lib/watchPurposes'
 //      A sender that isn't a shul: its emails are skipped. Remove undoes it.
 
 export const maxDuration = 60
+
+/** Checks an admin can run in ten minutes. */
+const CHECK_LIMIT = { limit: 20, windowSec: 600 }
 
 export async function GET(request: Request) {
   const community = await resolveCommunity(communitySlugFromRequest(request))
@@ -71,6 +80,11 @@ export async function POST(request: Request) {
 
   const body = (await request.json().catch(() => null)) as Record<string, unknown> | null
   const action = body?.action
+  // A check can have the AI read a page: a ceiling on how often.
+  if (action === 'check' || action === 'add') {
+    const limited = await enforceRateLimit(request, 'admin-watch-check', CHECK_LIMIT)
+    if (limited) return limited
+  }
 
   try {
     const listingIn = async (resourceId: unknown) =>
@@ -130,7 +144,7 @@ export async function POST(request: Request) {
       }
       const added = await addWatch(community.slug, { kind: kindForUrl(url), url, resourceId, label, createdBy })
       if (!added) return Response.json({ ok: false, errors: ['The guide already watches that page.'] }, { status: 409 })
-      const { watch } = await runAndRecord(added)
+      const { watch } = await runAndRecord(added, undefined, undefined, { full: true })
       return Response.json({ ok: true, watch })
     }
 
@@ -164,7 +178,7 @@ export async function POST(request: Request) {
       await updateWatch(community.slug, id, { active: action === 'resume' })
       return Response.json({ ok: true, watch: { ...existing, active: action === 'resume' } })
     }
-    const { watch } = await runAndRecord(existing)
+    const { watch } = await runAndRecord(existing, undefined, undefined, { full: true })
     return Response.json({ ok: true, watch })
   } catch (err) {
     console.error('[admin/watches] POST failed:', err)

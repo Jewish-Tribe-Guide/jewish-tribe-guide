@@ -5,6 +5,7 @@ import { menuHash, MENU_WATCH_CREATOR } from './menuWatch'
 const m = vi.hoisted(() => ({
   listCategoriesUncached: vi.fn(),
   getResourceRowById: vi.fn(),
+  getMenuReading: vi.fn(),
   readMenuPage: vi.fn(),
   readMenu: vi.fn(),
   saveMenuReading: vi.fn(),
@@ -20,7 +21,7 @@ vi.mock('@/lib/resourceStore', () => ({
   normalizeRow: (r: { details?: Record<string, unknown> }) => ({ ...r, ...(r.details ?? {}) }),
 }))
 vi.mock('@/lib/menuReader', async (orig) => ({ ...(await orig<typeof import('./menuReader')>()), readMenuPage: m.readMenuPage, readMenu: m.readMenu }))
-vi.mock('@/lib/menuReadingStore', () => ({ saveMenuReading: m.saveMenuReading }))
+vi.mock('@/lib/menuReadingStore', () => ({ saveMenuReading: m.saveMenuReading, getMenuReading: m.getMenuReading }))
 vi.mock('@/lib/watchStore', () => ({ addWatch: m.addWatch, listWatches: m.listWatches, removeWatch: m.removeWatch }))
 vi.mock('@/lib/supabase/admin', () => ({
   getAdminClient: () => ({
@@ -69,14 +70,24 @@ describe('runMenuWatch', () => {
 
   it('a changed menu is read by the AI, and dishes the listing doesn’t have wait on the Main dishes tab', async () => {
     const out = await runMenuWatch({ ...watch, pageHash: 'old' }, undefined, { apiKey: 'k' })
-    expect(out).toEqual({ ok: true, filed: 1, pageHash: menuHash(page) })
+    expect(out).toEqual({
+      ok: true,
+      filed: 1,
+      pageHash: menuHash(page),
+      check: { what: 'dishes', from: 'page', result: 'differs', read: ['Falafel, Shawarma'], differences: ['Not on the listing: Shawarma'], queue: 'filed' },
+    })
     expect(m.readMenu).toHaveBeenCalledWith(page, 'Judah', expect.objectContaining({ apiKey: 'k' }))
     expect(m.saveMenuReading).toHaveBeenCalledWith('philly', 'r1', expect.objectContaining({ status: 'proposed', dishes: twoDishes.dishes, note: 'Its menu changed. One dish isn’t on the listing yet: Shawarma.' }))
   })
 
   it('a changed menu with nothing new proposes nothing, and moves on', async () => {
     m.readMenu.mockResolvedValue({ ...twoDishes, dishes: [twoDishes.dishes[0]] })
-    expect(await runMenuWatch({ ...watch, pageHash: 'old' }, undefined, { apiKey: 'k' })).toEqual({ ok: true, filed: 0, pageHash: menuHash(page) })
+    expect(await runMenuWatch({ ...watch, pageHash: 'old' }, undefined, { apiKey: 'k' })).toEqual({
+      ok: true,
+      filed: 0,
+      pageHash: menuHash(page),
+      check: { what: 'dishes', from: 'page', result: 'agrees', read: ['Falafel'], differences: [], queue: null },
+    })
     expect(m.saveMenuReading).not.toHaveBeenCalled()
   })
 
@@ -98,6 +109,31 @@ describe('runMenuWatch', () => {
     m.readMenu.mockRejectedValueOnce(new Error('429'))
     const failed = await runMenuWatch({ ...watch, pageHash: 'old' }, undefined, { apiKey: 'k' })
     expect(failed).toMatchObject({ ok: false, error: expect.stringContaining('429') })
+  })
+})
+
+// The user, Oct 20: "Check now" is the full check, the AI reading the menu
+// changed or not, and saying which dishes it read.
+describe('runMenuWatch: "Check now"', () => {
+  const full = { apiKey: 'k', full: true }
+
+  it('reads an unchanged menu with the AI and says which dishes the listing lacks', async () => {
+    const out = await runMenuWatch({ ...watch, pageHash: menuHash(page) }, undefined, full)
+    expect(out).toMatchObject({ ok: true, filed: 1, pageHash: menuHash(page), check: { result: 'differs', read: ['Falafel, Shawarma'], queue: 'filed' } })
+    expect(m.saveMenuReading).toHaveBeenCalledTimes(1)
+  })
+
+  it('doesn’t make the same reading again: one waiting or skipped on the Main dishes tab stands', async () => {
+    for (const status of ['proposed', 'skipped']) {
+      m.getMenuReading.mockResolvedValue({ status, dishes: [{ name: 'shawarma' }] })
+      expect(await runMenuWatch({ ...watch, pageHash: menuHash(page) }, undefined, full)).toMatchObject({ filed: 0, check: { result: 'differs', queue: 'before' } })
+    }
+    expect(m.saveMenuReading).not.toHaveBeenCalled()
+  })
+
+  it('says when the menu wouldn’t open', async () => {
+    m.readMenuPage.mockResolvedValue(null)
+    expect(await runMenuWatch(watch, undefined, full)).toMatchObject({ ok: false, check: { what: 'dishes', result: 'unreadable' } })
   })
 })
 

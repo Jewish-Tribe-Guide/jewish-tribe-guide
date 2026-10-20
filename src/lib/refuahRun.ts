@@ -14,7 +14,7 @@ import { submitListingUpdate } from '@/lib/submissionStore'
 import { getCategoryById } from '@/lib/categoryStore'
 import { confirmFromSource } from '@/lib/sourceConfirm'
 import { WATCH_FETCH_HEADERS } from '@/lib/websiteWatch'
-import type { WatchOutcome } from '@/lib/watches'
+import type { CheckFound, WatchCheck, WatchOutcome } from '@/lib/watches'
 import {
   REFUAH_DATA_URL,
   REFUAH_NAME,
@@ -85,10 +85,20 @@ export async function runRefuahWatch(community: string, url: string, resourceId:
   const pageHash = createHash('sha256').update(refuahFingerprint(refuah)).digest('hex')
   const details = row.details ?? {}
   const diffs = compareRefuah(details, refuah, Object.fromEntries(contacts.map((f) => [f.key, f.label])))
+  // What it compared, for the Watches tab (watches.ts, WatchCheck).
+  const listed = Object.values(refuah).reduce((n, entries) => n + entries.length, 0)
+  const check = (queue: WatchCheck['queue']): CheckFound => ({
+    what: 'contacts',
+    from: null,
+    result: diffs.length ? 'differs' : refuahHasEntries(record) ? 'agrees' : 'nothing',
+    read: listed ? [`${listed} contact${listed === 1 ? '' : 's'} on Refuah`] : [],
+    differences: diffs.flatMap((d) => d.lines),
+    queue: diffs.length ? queue : null,
+  })
   if (diffs.length === 0) {
     // Refuah agrees: the hospital's date moves forward (sourceConfirm.ts).
     if (refuahHasEntries(record)) await confirmFromSource(community, [row.id], REFUAH_NAME)
-    return { ok: true, filed: 0, pageHash }
+    return { ok: true, filed: 0, pageHash, check: check(null) }
   }
 
   const fields = Object.fromEntries(diffs.map((d) => [d.key, d.after]))
@@ -105,7 +115,7 @@ export async function runRefuahWatch(community: string, url: string, resourceId:
     const d = ((s.payload as { details?: Record<string, unknown> } | null)?.details ?? {}) as Record<string, unknown>
     return refuahKey(row.id, Object.fromEntries(Object.keys(fields).map((k) => [k, d[k]]))) === key
   })
-  if (filedBefore) return { ok: true, filed: 0, pageHash }
+  if (filedBefore) return { ok: true, filed: 0, pageHash, check: check('before') }
 
   const note = refuahNote(row.name, url, diffs)
   await submitListingUpdate(
@@ -127,5 +137,5 @@ export async function runRefuahWatch(community: string, url: string, resourceId:
   await sendWatchDigest(community, REFUAH_NAME, [{ name: row.name, what: diffs.flatMap((d) => d.lines).join('; ') }]).catch((err) =>
     console.error('[watch-refuah] digest failed:', err),
   )
-  return { ok: true, filed: 1, pageHash }
+  return { ok: true, filed: 1, pageHash, check: check('filed') }
 }

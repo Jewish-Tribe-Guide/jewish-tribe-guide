@@ -88,6 +88,8 @@ describe('runMekorWatch', () => {
     expect(note).toContain('last updated 2026-10-12')
     expect(by).toEqual({ name: 'Mekor Habracha list (automated)' })
     expect(byId.zevis[3]).toMatch(/doesn't have this place/)
+    // Both differ from the list: none of the guide's places matches it.
+    expect(body).toMatchObject({ entries: expect.any(Number), matching: 0 })
     expect(mockCreate).toHaveBeenCalled() // the places the guide lacks
     expect(mockDigest).toHaveBeenCalledTimes(1)
     expect(mockDigest.mock.calls[0][2]).toHaveLength(body.ok ? body.filed : -1)

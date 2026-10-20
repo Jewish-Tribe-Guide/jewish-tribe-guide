@@ -39,6 +39,7 @@ function watch(over: Partial<Watch>): Watch {
     lastFiled: null,
     pageHash: 'h',
     pageChangedAt: null,
+    lastCheck: null,
     ...over,
   }
 }
@@ -159,6 +160,75 @@ describe('WatchesManager', () => {
     expect(names(screen.getByRole('region', { name: 'Hours' }))).toEqual(['Mikvah Ohel Rivkah'])
     await open(within(times).getByTestId('watch-row'))
     expect(screen.getByTestId('listing-page-watch')).toHaveTextContent(/not even the listing’s date/)
+  })
+
+  // Oct 20: a page the AI has never read doesn't pass for working, and
+  // Check now shows what it read and whether it agrees with the listing.
+  it('says a shul’s page the AI has never read is not read yet, not working', async () => {
+    await renderTab([watch({ url: 'https://lms.org/davening', resourceId: 'shul-1', createdBy: 'listing pages' })])
+    const row = screen.getByTestId('watch-row')
+    expect(within(row).getByText('Opens · not read yet')).toBeInTheDocument()
+    expect(within(row).queryByText('Working')).toBeNull()
+    expect(row).toHaveTextContent(/Not read by the AI yet/)
+  })
+
+  it('Check now shows what the AI read, from where, and that it agrees with the listing', async () => {
+    const checked = watch({
+      id: 's', url: 'https://lms.org/davening', resourceId: 'shul-1', createdBy: 'listing pages',
+      lastCheck: { at: ago(0), what: 'times', from: 'calendar', result: 'agrees', read: ['Shacharis Mon–Fri 7:00 AM', 'Mincha Sun–Thu 6:05 PM'], differences: [], queue: null },
+    })
+    await renderTab([watch({ id: 's', url: 'https://lms.org/davening', resourceId: 'shul-1', createdBy: 'listing pages' })], { post: { watch: checked } })
+    const row = screen.getByTestId('watch-row')
+    await open(row)
+    await userEvent.setup().click(within(row).getByRole('button', { name: 'Check now' }))
+    expect(posts.map((p) => p.body)).toEqual([{ action: 'check', id: 's' }])
+    const result = await within(row).findByTestId('watch-check')
+    expect(result).toHaveTextContent(/What it read from the page and its calendar/)
+    expect(result).toHaveTextContent('Shacharis Mon–Fri 7:00 AM')
+    expect(result).toHaveTextContent('Agrees with the listing.')
+    expect(within(row).getByText('Working')).toBeInTheDocument()
+    expect(row).toHaveTextContent(/Read .*: agrees with the listing/)
+  })
+
+  it('lists each difference a check found, and says it is in the queue', async () => {
+    await renderTab([
+      watch({
+        url: 'https://lms.org/davening', resourceId: 'shul-1', createdBy: 'listing pages',
+        lastCheck: { at: ago(0), what: 'times', from: 'page', result: 'differs', read: ['Shacharis Mon–Fri 6:45 AM'], differences: ['Shacharis Mon–Fri: 7:00 AM → 6:45 AM'], queue: 'filed' },
+      }),
+    ])
+    const row = screen.getByTestId('watch-row')
+    expect(row).toHaveTextContent(/Read .*: 1 difference, in the queue/)
+    await open(row)
+    const result = within(row).getByTestId('watch-check')
+    expect(result).toHaveTextContent('Differs from the listing, in the queue:')
+    expect(result).toHaveTextContent('Shacharis Mon–Fri: 7:00 AM → 6:45 AM')
+  })
+
+  it('says when a check found no times, and when the page would not open', async () => {
+    await renderTab([
+      watch({ id: 'a', url: 'https://lms.org/davening', resourceId: 'shul-1', createdBy: 'listing pages', lastCheck: { at: ago(0), what: 'times', from: 'page', result: 'nothing', read: [], differences: [], queue: null } }),
+      watch({ id: 'b', url: 'https://lms.org/other', resourceId: 'shul-1', createdBy: 'listing pages', lastError: 'The page answered 500', failingSince: ago(0), lastCheck: { at: ago(0), what: 'times', from: null, result: 'unreadable', read: [], differences: [], queue: null } }),
+    ])
+    const rows = screen.getAllByTestId('watch-row')
+    const nothing = rows.find((r) => r.textContent?.includes('Reads nothing'))!
+    const broken = rows.find((r) => r.textContent?.includes('Not working'))!
+    expect(within(nothing).getByText('Reads nothing')).toBeInTheDocument()
+    expect(nothing).toHaveTextContent(/Read .*: found no times on this page/)
+    await open(nothing)
+    expect(within(nothing).getByTestId('watch-check')).toHaveTextContent('Found no times on this page.')
+    await open(broken)
+    expect(within(broken).getByTestId('watch-check')).toHaveTextContent('The page wouldn’t open.')
+  })
+
+  it('says what a list run compared: how many listed, how many match, what it filed', async () => {
+    await renderTab([
+      watch({
+        kind: 'keystone_list', url: 'https://www.keystone-k.org/establishments', label: 'Keystone-K’s list', lastFiled: 4,
+        lastCheck: { at: ago(0), what: 'list', from: 'page', result: 'differs', read: [], differences: [], queue: 'filed', list: { listed: 78, matching: 74, differences: 4, filed: 4 } },
+      }),
+    ])
+    expect(screen.getByTestId('watch-row')).toHaveTextContent(/Read .*: 78 on the list, 74 match the guide, 4 suggestions in the queue/)
   })
 
   describe('Add a watch', () => {
