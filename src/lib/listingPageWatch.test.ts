@@ -3,6 +3,7 @@ import { makeCategory } from '@/test/providerFixtures'
 import type { Proposal } from './messageReader'
 import { isCommunityEdit } from './submissionSource'
 import type { UpdateRow } from './scheduleUpdate'
+import type { DayKey } from './hours'
 import { CALENDAR_HEADING } from './calendarFeed'
 import {
   changedOn,
@@ -157,6 +158,14 @@ describe('what a full read found', () => {
   it('writes every clock time the same way, and runs together days the page wrote differently', () => {
     const rows = [row('mon', 'shacharis', '6:45am'), row('thu', 'shacharis', '6:45 AM'), row('sat', 'mincha', '12:20 pm'), row('sun', 'maariv', '15 min before Sunset')]
     expect(timesReadLines(rows)).toEqual(['Shacharis Mon, Thu 6:45 AM', 'Mincha Sat 12:20 PM', 'Maariv Sun 15 min before Sunset'])
+  })
+
+  // LMC's men's mikvah, Oct 20: "Sun, Mon, Tue, Wed, Thu, Sat".
+  it('runs the days together in their runs', () => {
+    const category = { detailFields: [{ key: 'men_s_hours', label: 'Men’s Hours', type: 'hours' as const }] }
+    const read = { key: 'men_s_hours', hours: { days: ['sun', 'mon', 'tue', 'wed', 'thu', 'sat'] as DayKey[], open: '04:30', close: '10:00', closed: false, when: 'every_week' as const } }
+    expect(hoursReadLines([read], category)).toEqual(['Men’s Hours, Sun–Thu, Sat: 4:30 AM–10:00 AM'])
+    expect(timesReadLines(['sun', 'mon', 'tue', 'thu', 'fri'].map((d) => row(d, 'shacharis', '7:00 AM')))).toEqual(['Shacharis Sun–Tue, Thu, Fri 7:00 AM'])
   })
 
   it('gives the hours the page gives', () => {

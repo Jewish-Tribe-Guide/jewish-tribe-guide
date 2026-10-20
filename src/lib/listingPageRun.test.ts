@@ -489,7 +489,8 @@ describe('runListingPageWatch: a mikvah with women’s, men’s and plain hours'
     await runListingPageWatch({ ...changed, resourceId: 'lmc' }, undefined, { apiKey: 'k', full: true })
     const [source, catalog] = m.readMessage.mock.calls[0]
     expect(source.text).toMatch(/Women’s Hours: Sun Closed · Mon–Thu 8:30 PM–10:30 PM · Fri–Sat Closed\nMen’s Hours: Sun 4:30 AM–10:00 AM/)
-    expect(source.text).toMatch(/propose only what the page says/)
+    expect(source.text).toMatch(/Give every weekly hours the page states, the ones that match the guide too/)
+    expect(source.text).toMatch(/Leave out a day whose time is set by candle lighting/)
     expect(catalog.categories[0].fields.map((f: { key: string }) => f.key)).not.toContain('hours')
   })
 

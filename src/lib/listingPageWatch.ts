@@ -76,7 +76,15 @@ export function hoursNowIntro(name: string, category: Pick<CategoryConfig, 'deta
     const label = category.detailFields.find((f) => f.key === k)?.label ?? k
     return `${label}: ${listing[k] ? formatHoursSummary(listing[k]) : 'none listed'}`
   })
-  return `What the guide lists for ${name} now, only so you can tell which hours the page gives (propose only what the page says):\n${lines.join('\n')}`
+  // "Every one, the same ones too": told what's listed, the AI otherwise
+  // gives only what differs, and a page that agrees reads as giving
+  // nothing. A time set by candle lighting can't be weekly hours: offered,
+  // LMC's men's Friday crowded out the rest of the week (Oct 20).
+  return [
+    `What the guide lists for ${name} now, only so you can tell which hours the page gives:`,
+    ...lines,
+    'Give every weekly hours the page states, the ones that match the guide too, and only what the page says. Leave out a day whose time is set by candle lighting, sunset or appointment: weekly hours can’t hold it.',
+  ].join('\n')
 }
 
 export function listingPageLabel(name: string, reads: PageReads): string {
@@ -128,6 +136,20 @@ function clockText(time: string): string {
   return fmt12(`${Math.floor(m / 60)}:${m % 60}`)
 }
 
+/** Days in their runs: "Sun–Thu, Sat", where formatDays, which the rest
+ *  of the site shows minyanim with, says "Sun, Mon, Tue, Wed, Thu, Sat". */
+function dayRuns(days: readonly MinyanDayKey[]): string {
+  const sorted = DAY_KEYS.filter((d) => days.includes(d))
+  if (sorted.length !== days.length || sorted.length === DAY_KEYS.length) return formatDays([...days])
+  const runs: (typeof sorted)[] = []
+  for (const d of sorted) {
+    const last = runs[runs.length - 1]
+    if (last && DAY_KEYS.indexOf(d) === DAY_KEYS.indexOf(last[last.length - 1]) + 1) last.push(d)
+    else runs.push([d])
+  }
+  return runs.map((r) => formatDays(r)).join(', ')
+}
+
 /** The times the AI read off the page, a line per minyan: "Shacharis
  *  Mon–Fri 7:00 AM", and a dated one "Mincha Sun Oct 25 6:05 PM". Only
  *  what the page gives, never the listing's times it left alone. */
@@ -150,7 +172,7 @@ export function timesReadLines(rows: readonly UpdateRow[]): string[] {
   const order = (t: UpdateRow['tefillah'], time: string) => TEFILLAH_ORDER.indexOf(t) * 10_000 + (parseTimeToMinutes(time) || 0)
   const lines = [...weekly.values()]
     .sort((a, b) => order(a.tefillah, a.time) - order(b.tefillah, b.time))
-    .map((g) => `${TEFILLAH_LABELS[g.tefillah]} ${formatDays(g.days)} ${g.time}`)
+    .map((g) => `${TEFILLAH_LABELS[g.tefillah]} ${dayRuns(g.days)} ${g.time}`)
   const once = [...dated]
     .sort((a, b) => a.day.localeCompare(b.day) || order(a.tefillah, a.time) - order(b.tefillah, b.time))
     .map((r) => `${TEFILLAH_LABELS[r.tefillah]} ${dateText(r.day, { weekday: true })}${r.occasion ? ` (${r.occasion})` : ''} ${clockText(r.time)}`)
@@ -164,7 +186,7 @@ export function hoursReadLines(reads: readonly FieldRead[], category: Pick<Categ
     const h = r.hours
     if (!h) return []
     const label = category.detailFields.find((f) => f.key === r.key)?.label ?? r.key
-    const days = h.days === 'all' ? 'every day' : formatDays(h.days)
+    const days = h.days === 'all' ? 'every day' : dayRuns(h.days)
     const said = h.closed ? 'closed' : h.open && h.close ? `${fmt12(h.open)}–${fmt12(h.close)}` : h.open ? `opens ${fmt12(h.open)}` : `closes ${fmt12(h.close!)}`
     return [`${label}, ${days}: ${said}${h.when === 'one_day' ? ' (one day only)' : ''}`]
   })

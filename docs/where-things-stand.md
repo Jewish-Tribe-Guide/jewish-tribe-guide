@@ -293,7 +293,14 @@ for that exact change, in the same conversation. Show the dry run first.
   both databases; its page says 7:30–9:30 PM every weeknight** (and "call
   before 9:00 PM", where the listing's note says 10:00 PM). Check now on
   dev's watch (lmcmikvah.org) files it to dev's queue; live needs a yes.
-  The page says nothing of men's or keilim hours, so those aren't read.
+  Men's and keilim hours are on their own pages (lmcmikvah.org/mens-mikvah,
+  /keilim-mikvah), each needing its own watch; neither is watched yet.
+  Read there (Oct 20), both agree with the listing: men's 6 of 6 once the
+  AI was told to give every hours the page states, matching or not (told
+  only what's listed, it gave only what differed, and twice of four gave
+  just Friday, "until 1 hour before candle lighting", which weekly hours
+  can't hold and it now leaves out); keilim 3 of 3. Ohel Leah's kelim
+  page ("closes shortly before sundown") is left out the same way.
 - Kept on the watch until the next check (migration 085, see 1d). The
   daily run's AI reads keep theirs too; a morning that only saw the page
   unchanged leaves the last one.
