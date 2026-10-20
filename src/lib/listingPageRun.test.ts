@@ -196,25 +196,33 @@ describe('runListingPageWatch: a shul’s page of times', () => {
   })
 
   // Rodeph Shalom's calendar, Oct 20: its Thursday morning minyan listed on
-  // each Thursday, and its Shabbos times, which the listing has.
-  it('a calendar’s weekly minyan is a usual time, not a one-off each week; its dates at the usual time stay out', async () => {
+  // each Thursday. Leyv Ha-Ir's: Kabbalat Shabbat on a Friday a month. A
+  // usual time is one the shul states; a calendar's dates stay dates (the
+  // user, Oct 20), and an admin can make one a usual time if it is.
+  it('a minyan a calendar shows every week goes to the queue date by date, never as a usual time', async () => {
     const thu = (day: string) => ({ ...dated(day, '8:10am'), tefillah: 'shacharis' as const })
     m.readShulWeek.mockResolvedValue({ update: calendar([thu('2026-10-22'), dated('2026-10-25', '6:15pm'), thu('2026-10-29'), dated('2026-11-01', '6:15pm')]), model: 'cheap' })
     expect(await runListingPageWatch(changed, undefined, { apiKey: 'k', now: NOW })).toMatchObject({ ok: true, filed: 1 })
     const [, , payload, note] = m.submitListingUpdate.mock.calls[0]
-    expect(note).toBe(`From their website, changed Oct 20: ${URL_}\n\nNew: shacharis · Thu · 8:10am`)
-    expect(payload.details.minyanim).toEqual(
-      expect.arrayContaining([expect.objectContaining({ tefillah: 'shacharis', days: ['thu'], time: '8:10am' }), expect.objectContaining({ tefillah: 'mincha', days: ['sun'], time: '6:15pm' })]),
+    expect(note).not.toMatch(/New: shacharis · Thu/)
+    expect(payload.details.minyanim).toEqual([expect.objectContaining({ tefillah: 'mincha', days: ['sun'], time: '6:15pm' })])
+    const on = (payload.details.minyanim_schedules as { minyanim: { tefillah: string; on: string[]; time: string }[] }[]).flatMap((s) => s.minyanim)
+    expect(on).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ tefillah: 'shacharis', on: ['2026-10-22'], time: '8:10am' }),
+        expect.objectContaining({ tefillah: 'shacharis', on: ['2026-10-29'], time: '8:10am' }),
+      ]),
     )
-    expect(payload.details.minyanim_schedules ?? []).toEqual([])
   })
 
-  it('a calendar’s new time for the shul’s one minyan that weekday, every week, is a change to it', async () => {
+  it('a calendar’s new time for the shul’s minyan, every week, goes to those dates; the usual time is left alone', async () => {
     m.readShulWeek.mockResolvedValue({ update: calendar([dated('2026-10-25', '6:05pm'), dated('2026-11-01', '6:05pm'), dated('2026-11-08', '6:05pm')]), model: 'cheap' })
     expect(await runListingPageWatch(changed, undefined, { apiKey: 'k', now: NOW })).toMatchObject({ ok: true, filed: 1 })
     const [, , payload, note] = m.submitListingUpdate.mock.calls[0]
-    expect(note).toContain('Changed: mincha · Sun · 6:05pm, was 6:15pm')
-    expect(payload.details.minyanim).toEqual([expect.objectContaining({ tefillah: 'mincha', days: ['sun'], time: '6:05pm' })])
+    expect(note).not.toContain('Changed: mincha · Sun')
+    expect(payload.details.minyanim).toEqual([expect.objectContaining({ tefillah: 'mincha', days: ['sun'], time: '6:15pm' })])
+    const on = (payload.details.minyanim_schedules as { minyanim: { on: string[]; time: string }[] }[]).flatMap((s) => s.minyanim.flatMap((x) => x.on))
+    expect(on.sort()).toEqual(['2026-10-25', '2026-11-01', '2026-11-08'])
   })
 
   it('a calendar’s service on a day the newsletter has given is left out, and so is one already on a schedule', async () => {

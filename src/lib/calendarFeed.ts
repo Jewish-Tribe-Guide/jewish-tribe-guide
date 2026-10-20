@@ -233,5 +233,9 @@ function minutes(time: string | null): number {
   return m ? ((Number(m[1]) % 12) + (m[3] === 'P' ? 12 : 0)) * 60 + Number(m[2]) : -1
 }
 
-/** What heads the calendar's lines in the text the reader is given. */
-export const CALENDAR_HEADING = 'Their calendar, the coming weeks, one entry per line (date, weekday, time: what it is):'
+/** What heads the calendar's lines in the text the reader is given. It
+ *  tells the reader each is that date's only: a service on every Friday
+ *  of the calendar isn't the shul saying it's every Friday (the user,
+ *  Oct 20). */
+export const CALENDAR_HEADING =
+  'Their calendar, the coming weeks, one entry per line (date, weekday, time: what it is). Each entry is for its date only, however often it repeats: give it that date, never a weekday:'

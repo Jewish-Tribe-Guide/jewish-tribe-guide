@@ -117,33 +117,6 @@ export function dropListed(update: TimesUpdate, current: readonly Minyan[], sche
   return { ...update, rows: update.rows.filter((r) => r.status !== 'new' || !listed(r)) }
 }
 
-/** A calendar lists a weekly minyan once a date, and the reader passes each
- *  on as a one-off: Rodeph Shalom's Thursday morning minyan came out as
- *  "that day only" twice (Oct 20). The same tefillah at the same time on
- *  the same weekday, two weeks or more, is a usual time: a change to the
- *  shul's one such minyan that day, or a new one beside them. Run after
- *  dropListed, so a date at the usual time is already gone. */
-export function weeklyFromCalendar(update: TimesUpdate, current: readonly Minyan[]): TimesUpdate {
-  if (update.kind !== 'schedule') return update
-  const dated = update.rows.filter((r) => r.status === 'new' && /^\d{4}-\d{2}-\d{2}$/.test(r.day) && !r.occasion)
-  const groups: (typeof dated)[] = []
-  for (const r of dated) {
-    const g = groups.find(([x]) => weekdayOf(x.day) === weekdayOf(r.day) && x.tefillah === r.tefillah && sameTime(x, r))
-    if (g) g.push(r)
-    else groups.push([r])
-  }
-  const folded = new Set<string>()
-  const weekly = groups.flatMap((g) => {
-    if (new Set(g.map((r) => r.day)).size < 2) return []
-    for (const r of g) folded.add(r.id)
-    const day = weekdayOf(g[0].day)
-    const usual = current.filter((m) => m.days.includes(day) && sameMinyanName(m.tefillah, g[0].tefillah))
-    const row = { ...g[0], day }
-    return [usual.length === 1 ? { ...row, status: 'changed' as const, was: usual[0].time, rowId: usual[0].id } : row]
-  })
-  return weekly.length ? { ...update, rows: [...update.rows.filter((r) => !folded.has(r.id)), ...weekly] } : update
-}
-
 /** What the website gives for days the shul's newsletter (or a person)
  *  has already given a week for, taken out: the newsletter wins (the user,
  *  Oct 20). A website is usually the one behind. A week of the website's
@@ -179,12 +152,14 @@ export async function readPageFor(
     // The shul's times (scheduleUpdate.ts): its usual ones, and since Oct 20
     // the dated ones too, a week's or a calendar's (calendarFeed.ts), filed
     // as that week's times. What the newsletter has given for the same
-    // days wins.
+    // days wins. A calendar's dates stay dates, however regular: a usual
+    // time is one the shul states, never one the guide works out from its
+    // calendar (the user, Oct 20, on Leyv Ha-Ir's monthly services).
     const read = await readShulWeek(listing, reads.key, text !== null ? { text } : { pdf: source.pdf! }, apiKey)
     const sk = schedulesKey(reads.key)
     const regular = regularMinyanim(listing[reads.key])
     const schedules = readSchedules(listing[sk])
-    const own = weeklyFromCalendar(dropListed(keepUncovered(read.update), regular, schedules), regular)
+    const own = dropListed(keepUncovered(read.update), regular, schedules)
     const update = yieldToNewsletter(own, schedules)
     const lines = timesReadLines(read.update.rows)
     const note = changing(update) < changing(own) ? NEWSLETTER_HELD : undefined

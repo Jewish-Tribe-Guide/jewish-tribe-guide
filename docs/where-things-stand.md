@@ -75,9 +75,10 @@ for that exact change, in the same conversation. Show the dry run first.
    Two more with calendars (dry run Oct 20, would file if the page changed
    today): Leyv Ha-Ir's calendar page, "New, that day only: kabbalas
    shabbos · Fri Oct 30 · 7:30 PM"; Rodeph Shalom's rodephshalom.org/calendar,
-   "New: shacharis · Thu · 8:10 AM" (its online morning minyan, every
-   Thursday on the calendar; its Friday and Shabbos times match). Neither
-   has a watch on dev or live.
+   "New, that day only: shacharis · Thu Oct 22 · 8:10 AM" and Oct 29 (its
+   online morning minyan, on the calendar each Thursday; its Friday and
+   Shabbos times match). Leyv Ha-Ir has a watch on dev; Rodeph Shalom has
+   none on dev or live.
 1b. **Eruv status by email (6c):** migration 084 is run on both databases
    (the user, Oct 19). Northeast's address on live is still to set: a yes,
    once the branch is deployed. Elkins Park's sender is still unknown.
@@ -373,10 +374,21 @@ The user's list of seven, all agreed.
   scripts. The next three weeks become a line each, read with the page. A
   watch can also be given the feed's own address. Tried on Leyv Ha-Ir
   (events in its scripts) and Rodeph Shalom (an iCal feed).
-- **A minyan a calendar shows every week is a usual time**, not a one-off
-  per date: the same tefillah at the same time on the same weekday, two
-  weeks or more. It's a change to the shul's one minyan of that tefillah
-  that day, or a new one beside its others.
+- **A calendar's dates stay dates** (the user, Oct 20: "not to guess on
+  anything a shul does"). A usual time is one the shul states, on a
+  schedule page (Mekor Habracha, Chabad); a calendar's services go to the
+  queue as those dates' times, however regular, and an admin can make one
+  a usual time. This replaced, the same day, a rule that made a time a
+  calendar showed on two same weekdays a usual one: it would have made
+  a twice-a-month service "every Friday", and Leyv Ha-Ir's monthly
+  Kabbalat Shabbat (Oct 30, Nov 20, Dec 11) missed that only by a day.
+  The reader is told so too ("Each entry is for its date only, however
+  often it repeats"). Dry runs, 3 each: Leyv Ha-Ir, Oct 30 that day only;
+  Rodeph Shalom, Thu Oct 22 and Oct 29 each that day only (it was "New:
+  shacharis · Thu"); Mekor Habracha's davening page still reads usual
+  times. The month a calendar shows doesn't matter: Leyv's page carries
+  every event to June 2027, and the watch takes the next three weeks of
+  them each morning.
 - **The newsletter wins when they disagree** ("the newsletter wins when
   they disagree"). What the website reads is marked as the website's. The
   website leaves out any day the newsletter (or a person, through Update

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { calendarFeeds, calendarLines, embeddedEntries, icsEntries, isIcs } from './calendarFeed'
+import { CALENDAR_HEADING, calendarFeeds, calendarLines, embeddedEntries, icsEntries, isIcs } from './calendarFeed'
 
 const TZ = 'America/New_York'
 
@@ -114,5 +114,14 @@ describe('calendarLines: what the reader is given', () => {
       '2026-10-30 (Fri) 6:00 PM: Shabbat Evening Service',
       '2026-10-31 (Sat) 10:45 AM: Shabbat Morning Services',
     ])
+  })
+})
+
+// Leyv Ha-Ir's Kabbalat Shabbat is on a Friday a month; the AI is told a
+// calendar's entries are each that date's, so it never makes one a usual
+// time (the user, Oct 20: a usual time is one the shul states).
+describe('CALENDAR_HEADING', () => {
+  it('tells the reader each entry is for its date only, never a weekday', () => {
+    expect(CALENDAR_HEADING).toMatch(/for its date only, however often it repeats: give it that date, never a weekday/)
   })
 })
