@@ -323,4 +323,59 @@ describe('ImageUploadField', () => {
     expect(document.querySelectorAll('input[type="file"]')).toHaveLength(1)
     expect(document.querySelector('input[type="file"][capture]')).not.toBeInTheDocument()
   })
+
+  // The user, Oct 20: on a phone, a photo copied from Google Images couldn't
+  // be pasted — Safari offers Paste only in a text field, so "click the
+  // preview, then ⌘V" never works there. A Paste button reads the clipboard
+  // itself (Safari asks with its own small "Paste" bubble).
+  describe('the Paste button', () => {
+    // After userEvent.setup(), which puts its own empty clipboard in place.
+    function stubClipboard(items: { type: string; data: Blob }[] | Error) {
+      vi.stubGlobal('navigator', {
+        ...navigator,
+        clipboard: {
+          read: vi.fn(async () => {
+            if (items instanceof Error) throw items
+            return items.map((i) => ({ types: [i.type], getType: async () => i.data }))
+          }),
+        },
+      })
+    }
+
+    it('crops a copied photo, as if it had been picked', async () => {
+      const user = userEvent.setup()
+      stubClipboard([{ type: 'image/png', data: new Blob(['png bytes'], { type: 'image/png' }) }])
+      render(<ControlledField />)
+      await user.click(await screen.findByRole('button', { name: 'Paste image' }))
+      expect(await screen.findByText(/^Source: file:/)).toBeInTheDocument()
+    })
+
+    it('takes a copied link to a photo as its URL', async () => {
+      const user = userEvent.setup()
+      stubClipboard([{ type: 'text/plain', data: new Blob(['https://example.com/copied.jpg'], { type: 'text/plain' }) }])
+      render(<ControlledField />)
+      await user.click(await screen.findByRole('button', { name: 'Paste image' }))
+      await waitFor(() => expect(document.querySelector('img')).toHaveAttribute('src', 'https://example.com/copied.jpg'))
+    })
+
+    it('says so when there is no photo to paste, or the browser says no', async () => {
+      const user = userEvent.setup()
+      stubClipboard([{ type: 'text/plain', data: new Blob(['just some words'], { type: 'text/plain' }) }])
+      render(<ControlledField />)
+      await user.click(await screen.findByRole('button', { name: 'Paste image' }))
+      expect(await screen.findByText('Nothing to paste. Copy a photo first, then tap Paste.')).toBeInTheDocument()
+
+      cleanup()
+      stubClipboard(new Error('NotAllowedError'))
+      render(<ControlledField />)
+      await user.click(await screen.findByRole('button', { name: 'Paste image' }))
+      expect(await screen.findByText('Couldn’t read what you copied. Tap Upload to choose the photo instead.')).toBeInTheDocument()
+    })
+
+    it('isn’t offered where the browser can’t read a copied picture', () => {
+      vi.stubGlobal('navigator', { ...navigator, clipboard: undefined })
+      render(<ControlledField />)
+      expect(screen.queryByRole('button', { name: 'Paste image' })).not.toBeInTheDocument()
+    })
+  })
 })

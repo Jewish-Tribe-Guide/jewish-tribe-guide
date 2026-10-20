@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useRef, useState, useSyncExternalStore } from 'react'
 import ImageCropModal from './ImageCropModal'
 import { useFetchOrPreview } from '@/lib/previewSend'
 
@@ -65,6 +65,10 @@ type Props = {
    *  — see DetailFieldInput's own call site. */
   collapseUrlInput?: boolean
 }
+
+// Nothing to subscribe to: whether the clipboard can be read doesn't change.
+const noSubscribe = () => () => {}
+const canReadClipboardNow = () => typeof navigator.clipboard?.read === 'function'
 
 /** A picture picker that isn't just a file input: paste a URL, drag a file
  *  onto the preview, click through to the OS file browser, or — on a phone —
@@ -136,6 +140,41 @@ export default function ImageUploadField({
     else localOriginalSourceRef.current = source
   }
   const fileInputRef = useRef<HTMLInputElement>(null)
+  // Whether this browser can read a copied picture (the Paste button):
+  // false on the server and in hydration, as SwipeRow reads hover.
+  const canReadClipboard = useSyncExternalStore(noSubscribe, canReadClipboardNow, () => false)
+
+  // The user, Oct 20: a photo copied on a phone (Google Images' "Copy")
+  // couldn't be pasted: Safari offers Paste only in a text field, so the
+  // preview's own paste (handlePaste) is for a keyboard. This reads the
+  // clipboard on a tap; Safari asks with its own small "Paste" bubble.
+  async function pasteFromClipboard() {
+    setError(null)
+    try {
+      const items = await navigator.clipboard.read()
+      for (const item of items) {
+        const type = item.types.find((t) => t.startsWith('image/'))
+        if (type) {
+          const blob = await item.getType(type)
+          pickNewFile(new File([blob], `pasted.${type.split('/')[1] || 'png'}`, { type }))
+          return
+        }
+      }
+      // Some copies are only the picture's link.
+      for (const item of items) {
+        if (!item.types.includes('text/plain')) continue
+        const text = (await (await item.getType('text/plain')).text()).trim()
+        if (/^https?:\/\/\S+$/i.test(text)) {
+          setOriginalSource(text)
+          onChange(text)
+          return
+        }
+      }
+      setError('Nothing to paste. Copy a photo first, then tap Paste.')
+    } catch {
+      setError('Couldn’t read what you copied. Tap Upload to choose the photo instead.')
+    }
+  }
 
   function pickNewFile(file: File) {
     setOriginalSource(file)
@@ -303,6 +342,18 @@ export default function ImageUploadField({
                 a new one. Only rendered at all when the caller asked to
                 collapse this (collapseUrlInput) — admin's own uploaders
                 keep the input permanently visible with no button here. */}
+            {canReadClipboard && (
+              <button
+                type="button"
+                onClick={pasteFromClipboard}
+                disabled={uploading}
+                aria-label="Paste image"
+                className="text-sm font-medium border border-slate-300 text-slate-600 rounded-md px-3 py-1.5 hover:bg-slate-50 transition-colors cursor-pointer disabled:opacity-60"
+              >
+                <span aria-hidden="true" className="sm:hidden">Paste</span>
+                <span aria-hidden="true" className="hidden sm:inline">Paste image</span>
+              </button>
+            )}
             {collapseUrlInput && (
               <button
                 type="button"
