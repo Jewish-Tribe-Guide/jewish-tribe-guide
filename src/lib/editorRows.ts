@@ -8,7 +8,7 @@ import { boxesOf, mainCardOf, shabbosAfter, shabbosFieldsOf } from './listingPar
 import { isCertificateLink, isWebsite, itemsField, kindField, siteName } from './listingView'
 import { minyanimForBox, type MinyanBox } from './minyanimBox'
 import { itemWording } from './itemMarks'
-import { MENU_LINK_KEY } from './menuLink'
+import { MENU_LINK_KEY, MENU_LINK_LABEL } from './menuLink'
 
 // ── The whole-listing editor's rows (agreed Oct 11, canvas page "editor") ───
 // "Suggest an edit" is the listing's own boxes, in the listing's order, one
@@ -71,6 +71,10 @@ export function opensInPlace(row: EditorRow): boolean {
   return !row.fields.some((f) => IS_A_LIST[f.type])
 }
 
+/** The inputs a kind of place can bring up beside it (a link, a note), not
+ *  a list or a week of hours, which are rows of their own. */
+const BROUGHT_UP: Partial<Record<FieldType, true>> = { url: true, text: true, textarea: true, tel: true, number: true, select: true, boolean: true }
+
 export function editorRows(category: CategoryConfig, details: Record<string, unknown>): EditorRow[] {
   const fields = category.detailFields
   const placed = new Set<string>()
@@ -92,8 +96,31 @@ export function editorRows(category: CategoryConfig, details: Record<string, unk
   rows.push({ id: 'name', title: 'Name', kind: 'name', fields: take([...photo, ...tagline]) })
 
   // 2 · What kind of place, then the facts that decide it.
+  const named = mainCardOf(category)
+  const namedKeys = new Set(named?.fields.map((f) => f.key) ?? [])
+  const shabbos = shabbosFieldsOf(category) ?? []
+  const shabbosKeys = new Set(shabbos.map((f) => f.key))
+  const boxKeys = new Set(boxesOf(category).flatMap((b) => b.fields.map((f) => f.key)))
   const kind = kindField(category)
-  if (kind && !placed.has(kind.key)) rows.push({ id: 'kind', title: kind.label, kind: 'fields', fields: take([kind]) })
+  if (kind && !placed.has(kind.key)) {
+    // What the choice brings up goes with it (the user, Oct 20): picking
+    // "Scheduled Deliveries" brought up a WhatsApp group in the contact
+    // row, two rows away, where nobody thought to look. Short inputs only,
+    // and none the admin put in a box of their own. The row is then named
+    // for both, by the admin's section ("Store type and delivery").
+    const brought = fields.filter(
+      (f) =>
+        f.showIf?.field === kind.key &&
+        !placed.has(f.key) &&
+        !f.audienceKey &&
+        BROUGHT_UP[f.type] &&
+        !namedKeys.has(f.key) &&
+        !shabbosKeys.has(f.key) &&
+        !boxKeys.has(f.key),
+    )
+    const section = brought.length > 0 ? category.formSections?.find((s) => s.key === kind.formSection)?.label?.trim() : undefined
+    rows.push({ id: 'kind', title: section || kind.label, kind: 'fields', fields: take([kind, ...brought]) })
+  }
   const items = itemsField(category)
   const factFields = fields.filter(
     (f) =>
@@ -102,11 +129,6 @@ export function editorRows(category: CategoryConfig, details: Record<string, unk
       !f.audienceKey &&
       (isBadge(f) || caveatParts.has(f.key) || audienceFlags.has(f.key)),
   )
-  const named = mainCardOf(category)
-  const namedKeys = new Set(named?.fields.map((f) => f.key) ?? [])
-  const shabbos = shabbosFieldsOf(category) ?? []
-  const shabbosKeys = new Set(shabbos.map((f) => f.key))
-  const boxKeys = new Set(boxesOf(category).flatMap((b) => b.fields.map((f) => f.key)))
   const facts = factFields.filter((f) => !namedKeys.has(f.key) && !shabbosKeys.has(f.key) && !boxKeys.has(f.key))
   // The certificate's link goes under the hechsher, not with the website
   // (the user, Oct 11), unless the admin put it in a box of its own.
@@ -240,7 +262,8 @@ export function rowSummary(row: EditorRow, values: EditorValues, timeText: (m: M
   if (row.kind === 'items') {
     const f = row.fields[0]
     const all = [...selectValues(d[f.key]), ...selectValues(d[`${f.key}_sometimes`])]
-    return all.length === 0 ? '' : `${all.length} · ${all.slice(0, 5).join(', ')}${all.length > 5 ? '…' : ''}`
+    const items = all.length === 0 ? '' : `${all.length} · ${all.slice(0, 5).join(', ')}${all.length > 5 ? '…' : ''}`
+    return [items, hasMenuLink(row, d) && MENU_LINK_LABEL].filter(Boolean).join(' · ')
   }
   const parts: string[] = []
   if (row.kind === 'contact') {
@@ -272,13 +295,19 @@ export function rowSummary(row: EditorRow, values: EditorValues, timeText: (m: M
   return parts.join(' · ')
 }
 
+/** A food place's menu link, typed on its Main dishes screen (menuLink.ts):
+ *  it fills that row, dishes or none (the user, Oct 20). */
+function hasMenuLink(row: EditorRow, d: Record<string, unknown>): boolean {
+  return itemWording(row.fields[0]).noun === 'dish' && typeof d[MENU_LINK_KEY] === 'string' && (d[MENU_LINK_KEY] as string).trim() !== ''
+}
+
 /** Nothing in the row yet: it goes under "Not on the listing yet". The
  *  name row never does. */
 export function rowIsEmpty(row: EditorRow, values: EditorValues): boolean {
   if (row.kind === 'name') return false
   const d = values.details
   if (row.kind === 'minyans') return minyanimForBox(isMinyanim(d[row.fields[0].key]) ? (d[row.fields[0].key] as Minyan[]) : [], row.box!).length === 0
-  if (row.kind === 'items') return blank(row.fields[0], d[row.fields[0].key]) && selectValues(d[`${row.fields[0].key}_sometimes`]).length === 0
+  if (row.kind === 'items') return blank(row.fields[0], d[row.fields[0].key]) && selectValues(d[`${row.fields[0].key}_sometimes`]).length === 0 && !hasMenuLink(row, d)
   if (row.kind === 'contact' && (values.address.trim() || values.phone.trim())) return false
   return row.fields.every((f) => (f.invertDisplay ? true : blank(f, d[f.key])))
 }
