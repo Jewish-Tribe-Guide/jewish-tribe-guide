@@ -276,6 +276,24 @@ for that exact change, in the same conversation. Show the dry run first.
   Habracha); Refuah says how many contacts it read.
 - **A page the AI has never read says so:** "Opens · not read yet", not
   a green "Working". One where it found nothing says "Reads nothing".
+- **A mikvah's hours go to the right field** (the user, Oct 20, on Lower
+  Merion Community Mikvah's homepage: "open from 7:30PM – 9:30PM every
+  weeknight"). The AI put that under the plain "Hours" or gave it no days,
+  and the check said it agreed with women's hours of 8:30–10:30. Now a
+  page is read for a category's named hours (women's, men's, keilim), not
+  the plain "Hours" beside them, and the AI is told what each holds now,
+  only to tell them apart. 5 of 5 reads of that page now give Women's
+  Hours 7:30–9:30 PM and the difference; pages with no weekly hours
+  (Mei Shalva, Ohel Leah) still read nothing, and the AI didn't echo the
+  listing's hours from a page that has none.
+- **A read it can't compare is never "agrees":** hours with no days, a
+  time that doesn't fit, one day only. The row says "Needs a look" and
+  "couldn't compare it with the listing", with what it read.
+- **Lower Merion Community Mikvah's women's hours are 8:30–10:30 PM on
+  both databases; its page says 7:30–9:30 PM every weeknight** (and "call
+  before 9:00 PM", where the listing's note says 10:00 PM). Check now on
+  dev's watch (lmcmikvah.org) files it to dev's queue; live needs a yes.
+  The page says nothing of men's or keilim hours, so those aren't read.
 - Kept on the watch until the next check (migration 085, see 1d). The
   daily run's AI reads keep theirs too; a morning that only saw the page
   unchanged leaves the last one.

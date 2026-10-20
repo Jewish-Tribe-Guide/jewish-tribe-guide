@@ -221,6 +221,24 @@ describe('WatchesManager', () => {
     expect(within(broken).getByTestId('watch-check')).toHaveTextContent('The page wouldn’t open.')
   })
 
+  it('says when it read something it couldn’t compare, never that it agrees', async () => {
+    const unread = ['Women’s Hours: opens 7:30 PM, closes 9:30 PM, but which days isn’t said']
+    await renderTab([
+      watch({
+        url: 'http://lmcmikvah.org/', resourceId: 'mikvah-1', createdBy: 'listing pages',
+        lastCheck: { at: ago(0), what: 'hours', from: 'page', result: 'unsure', read: ['Women’s Hours, every day: 7:30 PM–9:30 PM'], differences: [], unread, queue: null },
+      }),
+    ])
+    const row = screen.getByTestId('watch-row')
+    expect(within(row).getByText('Needs a look')).toBeInTheDocument()
+    expect(row).toHaveTextContent(/Read .*: couldn’t compare it with the listing/)
+    await open(row)
+    const result = within(row).getByTestId('watch-check')
+    expect(result).toHaveTextContent('Couldn’t compare with the listing, so nothing was filed for:')
+    expect(result).toHaveTextContent(unread[0])
+    expect(result).not.toHaveTextContent('Agrees')
+  })
+
   it('says what a list run compared: how many listed, how many match, what it filed', async () => {
     await renderTab([
       watch({

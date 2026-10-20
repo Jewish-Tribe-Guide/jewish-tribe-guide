@@ -9,6 +9,7 @@ import {
   CHECK_READ_LINES,
   checkFrom,
   filedBefore,
+  hoursNowIntro,
   hoursReadLines,
   pageCheck,
   timesReadLines,
@@ -41,9 +42,13 @@ describe('isListingPageWatch', () => {
 })
 
 describe('pageReadsFor', () => {
-  it('reads a shul’s page for its davening times, and a mikvah’s for every hours field', () => {
+  it('reads a shul’s page for its davening times, and a mikvah’s for its named hours, not the plain “Hours”', () => {
     expect(pageReadsFor(shul)).toEqual({ kind: 'times', key: 'minyanim' })
-    expect(pageReadsFor(mikvah)).toEqual({ kind: 'hours', keys: ['hours', 'women_s_hours'] })
+    expect(pageReadsFor(mikvah)).toEqual({ kind: 'hours', keys: ['women_s_hours'] })
+  })
+
+  it('reads the plain “Hours” where it is the only hours there are', () => {
+    expect(pageReadsFor(makeCategory({ detailFields: [{ key: 'hours', label: 'Hours', type: 'hours' }] }))).toEqual({ kind: 'hours', keys: ['hours'] })
   })
 
   it('has nothing to read for a listing with neither', () => {
@@ -187,5 +192,19 @@ describe('what a full read found', () => {
     })
     expect(pageCheck('times', 'page', [], { differences: [], queue: null }).result).toBe('nothing')
     expect(pageCheck('hours', 'page', ['x'], { differences: ['y'], queue: 'waiting' })).toMatchObject({ result: 'differs', queue: 'waiting' })
+  })
+
+  it('isn’t agreement when something it read couldn’t be compared', () => {
+    const unread = ['Women’s Hours: opens 7:30 PM, closes 9:30 PM, but which days isn’t said']
+    expect(pageCheck('hours', 'page', ['Women’s Hours, every day: 7:30 PM–9:30 PM'], { differences: [], queue: null, unread })).toMatchObject({ result: 'unsure', unread })
+    expect(pageCheck('hours', 'page', ['x'], { differences: ['y'], queue: 'filed', unread })).toMatchObject({ result: 'differs', unread })
+  })
+
+  it('tells the AI what each of several hours fields holds now, and nothing for one', () => {
+    const two = makeCategory({ detailFields: [{ key: 'women_s_hours', label: 'Women’s Hours', type: 'hours' }, { key: 'keilim_hours', label: 'Keilim Hours', type: 'hours' }] })
+    const intro = hoursNowIntro('LMC', two, ['women_s_hours', 'keilim_hours'], { women_s_hours: { mon: { open: '20:30', close: '22:30' } } })
+    expect(intro).toContain('Women’s Hours: Sun Closed · Mon 8:30 PM–10:30 PM · Tue–Sat Closed')
+    expect(intro).toContain('Keilim Hours: none listed')
+    expect(hoursNowIntro('LMC', two, ['women_s_hours'], {})).toBeNull()
   })
 })

@@ -8,7 +8,7 @@ import type { MenuSource } from './menuReader'
 import type { UpdateRow } from './scheduleUpdate'
 import { CALENDAR_HEADING } from './calendarFeed'
 import { formatDays, parseTimeToMinutes, TEFILLAH_LABELS, TEFILLAH_ORDER, type MinyanDayKey } from './davening'
-import { DAY_KEYS, fmt12 } from './hours'
+import { DAY_KEYS, fmt12, formatHoursSummary } from './hours'
 import { dateText } from './schedules'
 
 // ── Watching a listing's own web page (the user, Oct 19) ────────────────────
@@ -52,11 +52,31 @@ export function isListingPageWatch(w: Pick<Watch, 'createdBy'>): boolean {
  *  Null when its category has neither, and the page has nothing to give. */
 export type PageReads = { kind: 'times'; key: string } | { kind: 'hours'; keys: string[] }
 
+/** Every category's plain "Hours" field, the one Google keeps. */
+const PLAIN_HOURS_KEY = 'hours'
+
 export function pageReadsFor(category: Pick<CategoryConfig, 'detailFields'>): PageReads | null {
   const minyanim = category.detailFields.find((f) => f.type === 'minyanim')
   if (minyanim) return { kind: 'times', key: minyanim.key }
   const hours = category.detailFields.filter((f) => f.type === 'hours').map((f) => f.key)
-  return hours.length ? { kind: 'hours', keys: hours } : null
+  // A mikvah's page gives women's, men's or keilim hours, never the plain
+  // "Hours" beside them: offered that, the AI put Lower Merion's women's
+  // hours there and missed that they had changed (the user, Oct 20).
+  const named = hours.filter((k) => k !== PLAIN_HOURS_KEY)
+  return hours.length ? { kind: 'hours', keys: named.length ? named : hours } : null
+}
+
+/** For the AI reading a page for hours: what each field holds now, so it
+ *  can tell which of a mikvah's hours the page gives. Without it, "open
+ *  7:30–9:30 PM every weeknight" went nowhere, or to the wrong field
+ *  (Oct 20). It proposes only what the page says. Null with one field. */
+export function hoursNowIntro(name: string, category: Pick<CategoryConfig, 'detailFields'>, keys: readonly string[], listing: Record<string, unknown>): string | null {
+  if (keys.length < 2) return null
+  const lines = keys.map((k) => {
+    const label = category.detailFields.find((f) => f.key === k)?.label ?? k
+    return `${label}: ${listing[k] ? formatHoursSummary(listing[k]) : 'none listed'}`
+  })
+  return `What the guide lists for ${name} now, only so you can tell which hours the page gives (propose only what the page says):\n${lines.join('\n')}`
 }
 
 export function listingPageLabel(name: string, reads: PageReads): string {
@@ -100,9 +120,6 @@ export function checkFrom(source: Pick<MenuSource, 'text' | 'pdf'>): CheckFound[
   return source.text.startsWith(CALENDAR_HEADING) ? 'calendar' : 'page'
 }
 
-/** The times the AI read off the page, a line per minyan: "Shacharis
- *  Mon–Fri 7:00 AM", and a dated one "Mincha Sun Oct 25 6:05 PM". Only
- *  what the page gives, never the listing's times it left alone. */
 /** A clock time as the site writes it ("6:45am" → "6:45 AM"); a time
  *  that isn't a clock ("15 min before sunset") as the page wrote it. */
 function clockText(time: string): string {
@@ -110,6 +127,10 @@ function clockText(time: string): string {
   const m = parseTimeToMinutes(time)
   return fmt12(`${Math.floor(m / 60)}:${m % 60}`)
 }
+
+/** The times the AI read off the page, a line per minyan: "Shacharis
+ *  Mon–Fri 7:00 AM", and a dated one "Mincha Sun Oct 25 6:05 PM". Only
+ *  what the page gives, never the listing's times it left alone. */
 
 export function timesReadLines(rows: readonly UpdateRow[]): string[] {
   const weekly = new Map<string, { tefillah: UpdateRow['tefillah']; time: string; days: MinyanDayKey[] }>()
@@ -150,8 +171,17 @@ export function hoursReadLines(reads: readonly FieldRead[], category: Pick<Categ
 }
 
 /** What a read found, kept to its first few lines. */
-export function pageCheck(what: 'times' | 'hours' | 'dishes', from: CheckFound['from'], read: readonly string[], rest: Pick<CheckFound, 'differences' | 'queue' | 'note'>): CheckFound {
-  const result: CheckFound['result'] = rest.differences.length ? 'differs' : read.length ? 'agrees' : 'nothing'
+export function pageCheck(
+  what: 'times' | 'hours' | 'dishes',
+  from: CheckFound['from'],
+  read: readonly string[],
+  rest: Pick<CheckFound, 'differences' | 'queue' | 'note' | 'unread'>,
+): CheckFound {
+  // Something read that couldn't be set beside the listing isn't agreement:
+  // Lower Merion's women's hours, read with no days, showed as "agrees"
+  // when they had changed (Oct 20).
+  const unread = rest.unread ?? []
+  const result: CheckFound['result'] = rest.differences.length ? 'differs' : unread.length ? 'unsure' : read.length ? 'agrees' : 'nothing'
   return {
     what,
     from,
@@ -159,6 +189,7 @@ export function pageCheck(what: 'times' | 'hours' | 'dishes', from: CheckFound['
     read: read.slice(0, CHECK_READ_LINES),
     ...(read.length > CHECK_READ_LINES ? { more: read.length - CHECK_READ_LINES } : {}),
     differences: rest.differences,
+    ...(unread.length ? { unread } : {}),
     queue: rest.differences.length ? rest.queue : null,
     ...(rest.note ? { note: rest.note } : {}),
   }

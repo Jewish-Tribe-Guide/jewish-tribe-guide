@@ -442,6 +442,74 @@ describe('runListingPageWatch: a mikvah’s page of hours', () => {
   })
 })
 
+// The user, Oct 20, on Lower Merion Community Mikvah's page ("open from
+// 7:30PM – 9:30PM every weeknight"): the AI put that under the plain
+// "Hours", or gave it no days, and the check said it agreed with women's
+// hours of 8:30–10:30.
+describe('runListingPageWatch: a mikvah with women’s, men’s and plain hours', () => {
+  const lmcCategory = makeCategory({
+    id: 'mikvah',
+    detailFields: [
+      { key: 'hours', label: 'Hours', type: 'hours' },
+      { key: 'women_s_hours', label: 'Women’s Hours', type: 'hours' },
+      { key: 'men_s_hours', label: 'Men’s Hours', type: 'hours' },
+    ],
+  })
+  const evening = { open: '20:30', close: '22:30' }
+  const lmc = {
+    id: 'lmc',
+    category: 'mikvah',
+    name: 'Lower Merion Community Mikvah',
+    status: 'approved',
+    details: { women_s_hours: { mon: evening, tue: evening, wed: evening, thu: evening }, men_s_hours: { sun: { open: '04:30', close: '10:00' } } },
+  }
+  const reads = (key: string, days: string[] | 'all') => ({
+    proposals: [
+      {
+        kind: 'fields',
+        listingId: 'lmc',
+        asWritten: 'Lower Merion Community Mikvah',
+        ask: null,
+        changes: [{ key, hours: { days, open: '19:30', close: '21:30', closed: false, when: 'every_week' } }],
+        note: null,
+        quote: 'The mikvah will be open from 7:30PM – 9:30PM every weeknight.',
+        checked: false,
+      },
+    ],
+    model: 'cheap',
+  })
+
+  beforeEach(() => {
+    m.getResourceRowById.mockResolvedValue(lmc)
+    m.listCategoriesUncached.mockResolvedValue([lmcCategory])
+  })
+
+  it('tells the AI what each hours field holds now, and offers it only the named ones', async () => {
+    m.readMessage.mockResolvedValue(reads('women_s_hours', ['mon', 'tue', 'wed', 'thu']))
+    await runListingPageWatch({ ...changed, resourceId: 'lmc' }, undefined, { apiKey: 'k', full: true })
+    const [source, catalog] = m.readMessage.mock.calls[0]
+    expect(source.text).toMatch(/Women’s Hours: Sun Closed · Mon–Thu 8:30 PM–10:30 PM · Fri–Sat Closed\nMen’s Hours: Sun 4:30 AM–10:00 AM/)
+    expect(source.text).toMatch(/propose only what the page says/)
+    expect(catalog.categories[0].fields.map((f: { key: string }) => f.key)).not.toContain('hours')
+  })
+
+  it('files the women’s hours the page changed', async () => {
+    m.readMessage.mockResolvedValue(reads('women_s_hours', ['mon', 'tue', 'wed', 'thu']))
+    const out = await runListingPageWatch({ ...changed, resourceId: 'lmc' }, undefined, { apiKey: 'k', full: true })
+    expect(out).toMatchObject({ ok: true, filed: 1, check: { result: 'differs', read: ['Women’s Hours, Mon–Thu: 7:30 PM–9:30 PM'], queue: 'filed' } })
+    expect(m.submitListingUpdate.mock.calls[0][3]).toContain('Women’s Hours, Monday: 8:30 PM–10:30 PM → 7:30 PM–9:30 PM')
+  })
+
+  it('never says it agrees when what it read couldn’t be compared', async () => {
+    // "Every day" on hours the listing has none of leaves no days to set.
+    m.readMessage.mockResolvedValue(reads('men_s_hours', 'all'))
+    m.getResourceRowById.mockResolvedValue({ ...lmc, details: { ...lmc.details, men_s_hours: null } })
+    const out = await runListingPageWatch({ ...changed, resourceId: 'lmc' }, undefined, { apiKey: 'k', full: true })
+    expect(out).toMatchObject({ ok: true, filed: 0, check: { result: 'unsure', unread: ['Men’s Hours: opens 7:30 PM, closes 9:30 PM, but which days isn’t said'] } })
+    expect(m.submitListingUpdate).not.toHaveBeenCalled()
+  })
+})
+
 // The user, Oct 20: a shul with its services on a calendar, not a page of
 // times (Leyv Ha-Ir, Rodeph Shalom). calendarFeed.test.ts reads the formats.
 describe('readListingPage: a page with a calendar', () => {

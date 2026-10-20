@@ -23,6 +23,7 @@ import {
   changedOn,
   checkFrom,
   filedBefore,
+  hoursNowIntro,
   hoursReadLines,
   hoursReads,
   LISTING_PAGE_WATCH_NAME,
@@ -157,7 +158,7 @@ export function yieldToNewsletter(update: TimesUpdate, schedules: readonly Speci
 /** What the AI read off the page, a short line each (listingPageWatch.ts),
  *  and what it would change on the listing. `note` says when the
  *  newsletter's days were left to the newsletter. */
-export type PageReading = { read: string[]; proposal: PageProposal; note?: string }
+export type PageReading = { read: string[]; proposal: PageProposal; note?: string; unread?: string[] }
 
 const NEWSLETTER_HELD = 'Some days differ, but the newsletter has given those days, and it wins.'
 
@@ -198,20 +199,23 @@ export async function readPageFor(
   }
   // Weekly hours: the any-field reader (messageReader.ts), told only of this
   // listing, and only its hours kept.
+  const intro = hoursNowIntro(listing.name, category, reads.keys, listing)
+  // Only the hours fields it reads are offered (pageReadsFor).
+  const offered = { ...category, detailFields: category.detailFields.filter((f) => f.type !== 'hours' || reads.keys.includes(f.key)) }
   const reading = await readMessage(
     {
-      text: text !== null ? `${listing.name}’s own web page (${source.url ?? ''}), as it reads today:\n\n${text}` : '',
+      text: text !== null ? `${intro ? `${intro}\n\n` : ''}${listing.name}’s own web page (${source.url ?? ''}), as it reads today:\n\n${text}` : intro ?? '',
       images: source.pdf ? [{ mime: 'application/pdf', b64: source.pdf }] : [],
     },
-    buildCatalog([listing], [category]),
+    buildCatalog([listing], [offered]),
     { apiKey, communityName, about: listing.id, fetchImpl },
   )
   const changes = hoursReads(reading.proposals, listing.id, reads.keys)
   const lines = hoursReadLines(changes, category)
   if (changes.length === 0) return { read: lines, proposal: null }
-  const { values } = readFieldChanges(category, listing, changes)
+  const { values, unread } = readFieldChanges(category, listing, changes)
   const { submission, lines: edits } = fieldsEdit(category, listing, values)
-  return { read: lines, proposal: edits.length ? { submission, lines: edits, keys: reads.keys } : null }
+  return { read: lines, proposal: edits.length ? { submission, lines: edits, keys: reads.keys } : null, ...(unread.length ? { unread } : {}) }
 }
 
 /** What the page would change on the listing, or nothing. */
@@ -309,7 +313,7 @@ export async function runListingPageWatch(
   }
   const { proposal } = reading
   const check = (queue: WatchCheck['queue']) =>
-    pageCheck(reads.kind, checkFrom(source), reading.read, { differences: proposal?.lines ?? [], queue, note: reading.note })
+    pageCheck(reads.kind, checkFrom(source), reading.read, { differences: proposal?.lines ?? [], queue, note: reading.note, unread: reading.unread })
   if (!proposal) return { ok: true, filed: 0, pageHash, check: check(null) }
   // Only a check gets here with one waiting: it says so, files nothing, and
   // a change stays news for the daily run.

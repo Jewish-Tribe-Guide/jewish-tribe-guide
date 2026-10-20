@@ -117,6 +117,7 @@ function pillOf(w: Watch, now: number): Pill {
   if (h.state === 'working') {
     if (readByAi(w) && !w.lastCheck) return { tone: 'off', text: 'Opens · not read yet' }
     if (readByAi(w) && w.lastCheck?.result === 'nothing') return { tone: 'todo', text: 'Reads nothing' }
+    if (readByAi(w) && w.lastCheck?.result === 'unsure') return { tone: 'todo', text: 'Needs a look' }
     return { tone: 'ok', text: 'Working' }
   }
   return { tone: 'bad', text: 'Not working' }
@@ -158,6 +159,7 @@ function checkLine(c: WatchCheck): string {
   if (c.result === 'unreadable') return `${day(c.at)}: the page wouldn’t open`
   if (c.list) return `Read ${day(c.at)}: ${listText(c)}`
   if (c.result === 'agrees') return `Read ${day(c.at)}: agrees with the listing`
+  if (c.result === 'unsure') return `Read ${day(c.at)}: couldn’t compare it with the listing`
   if (c.result === 'nothing') {
     const n = NOTHING[c.what]
     return `Read ${day(c.at)}: ${c.what === 'contacts' ? n : n[0].toLowerCase() + n.slice(1)}`
@@ -195,6 +197,16 @@ function CheckResult({ check: c }: { check: WatchCheck }) {
         <p className="font-medium text-amber-800">{NOTHING[c.what]}.</p>
       )}
       {c.result === 'agrees' && <p className="font-medium text-green-800">Agrees with the listing.</p>}
+      {c.unread?.length ? (
+        <>
+          <p className="font-medium text-amber-800">Couldn’t compare with the listing, so nothing was filed for:</p>
+          <ul className="space-y-0.5">
+            {c.unread.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+        </>
+      ) : null}
       {c.result === 'differs' && (
         <>
           <p className="font-medium text-amber-800">Differs from the listing, {queueText(c)}:</p>

@@ -57,12 +57,17 @@ export type WatchCheck = {
   what: 'times' | 'hours' | 'dishes' | 'list' | 'contacts'
   /** Where it read: the page, the page and its calendar, a PDF. */
   from: 'page' | 'calendar' | 'pdf' | null
-  result: 'agrees' | 'differs' | 'nothing' | 'unreadable'
+  /** `unsure`: it read something it couldn't set beside the listing
+   *  (`unread`), so it can't say the two agree. */
+  result: 'agrees' | 'differs' | 'unsure' | 'nothing' | 'unreadable'
   /** What it read, a short line each, the first few. */
   read: string[]
   /** How many more lines it read than `read` keeps. */
   more?: number
   differences: string[]
+  /** What it read but couldn't compare: "Hours: opens 7:30 PM, closes
+   *  9:30 PM, but which days isn’t said". */
+  unread?: string[]
   queue: 'filed' | 'before' | 'waiting' | null
   /** Anything else worth a line: days left to the newsletter, say. */
   note?: string
