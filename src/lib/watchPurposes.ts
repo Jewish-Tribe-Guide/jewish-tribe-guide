@@ -10,12 +10,16 @@
 // with the rest all the same. Menus aren't added here: the daily run gives
 // every place with a menu link its own (menuWatch.ts).
 //
+// A shul's times are one choice, read from its website or its newsletter
+// (the user, Oct 20: "one Shul's times choice, website or email"). Before,
+// usual times (a page) and weekly times (an email) were two.
+//
 // Pure: WatchesManager and /api/admin/watches share it.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { senderAddress } from './newsletter'
 
-export type WatchPurpose = 'eruv' | 'times' | 'weekly' | 'hours' | 'kosher' | 'menu' | 'hospital' | 'other'
+export type WatchPurpose = 'eruv' | 'times' | 'hours' | 'kosher' | 'menu' | 'hospital' | 'other'
 
 /** What a listing's page can be read for (listingPageWatch.ts pageReadsFor). */
 export type ListingReads = 'times' | 'hours' | null
@@ -30,13 +34,12 @@ export type PurposeInfo = {
   /** Only listings whose page reads this. */
   placeReads?: Exclude<ListingReads, null>
   /** Where it's read from. */
-  source: 'page' | 'email' | 'either'
+  source: 'page' | 'either'
 }
 
 export const WATCH_PURPOSES: readonly PurposeInfo[] = [
   { key: 'eruv', label: 'Eruv status', addable: true, place: 'eruv', source: 'either' },
-  { key: 'times', label: 'Shul’s usual times', addable: true, place: 'listing', placeReads: 'times', source: 'page' },
-  { key: 'weekly', label: 'Shul’s weekly times', addable: true, place: 'listing', placeReads: 'times', source: 'email' },
+  { key: 'times', label: 'Shul’s times', addable: true, place: 'listing', placeReads: 'times', source: 'either' },
   { key: 'hours', label: 'Hours', addable: true, place: 'listing', placeReads: 'hours', source: 'page' },
   { key: 'kosher', label: 'Kosher list', addable: true, place: null, source: 'page' },
   { key: 'menu', label: 'Menu', addable: false, place: 'listing', source: 'page' },
@@ -65,9 +68,6 @@ export function sourceKind(raw: string): 'email' | 'page' | null {
 export function sourceProblem(purpose: WatchPurpose, raw: string): string | null {
   const kind = sourceKind(raw)
   if (!kind) return 'Give a web address, or an email address.'
-  const { source } = purposeInfo(purpose)
-  if (source === 'email' && kind !== 'email') return 'Weekly times come by email: give the address the shul’s newsletter comes from.'
-  if (source === 'page' && kind !== 'email') return null
-  if (source === 'page') return 'Give the web address of the page. Only weekly times and an eruv’s status are read from email.'
+  if (purposeInfo(purpose).source === 'page' && kind === 'email') return 'Give the web address of the page. Only a shul’s times and an eruv’s status are read from email.'
   return null
 }

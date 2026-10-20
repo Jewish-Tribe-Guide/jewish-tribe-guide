@@ -143,7 +143,7 @@ export function seasonFromNotes<T extends Pick<Minyan, 'season' | 'notes'>>(m: T
 
 type Timed = Pick<Minyan, 'time' | 'anchor' | 'offsetMinutes' | 'notBefore' | 'notAfter'>
 
-const weekdayOf = (date: string): DayKey => DAY_KEYS[new Date(`${date}T12:00:00Z`).getUTCDay()]
+export const weekdayOf = (date: string): DayKey => DAY_KEYS[new Date(`${date}T12:00:00Z`).getUTCDay()]
 
 function addDays(date: string, n: number): string {
   const d = new Date(`${date}T12:00:00Z`)
@@ -400,6 +400,26 @@ export function mergeSchedule(
   return existing.map((s, j) => (j === i ? merged : s))
 }
 
+/** The dates a week from the shul's newsletter (or a person) holds: what
+ *  the website gives for those days gives way (the user, Oct 20). */
+export function datesHeldOverWebsite(schedules: readonly SpecialSchedule[]): Set<string> {
+  return new Set(schedules.filter((s) => s.kind === 'week' && s.postedBy !== 'website').flatMap((s) => datesBetween(s.from, s.to)))
+}
+
+/** The schedules with what the website gave on these dates taken off, and
+ *  a website schedule left with nothing dropped. */
+function withoutWebsiteDays(schedules: readonly SpecialSchedule[], dates: ReadonlySet<string>): SpecialSchedule[] {
+  return schedules.flatMap((s) => {
+    if (s.postedBy !== 'website' || !datesBetween(s.from, s.to).some((d) => dates.has(d))) return [s]
+    const minyanim = s.minyanim.flatMap((m) => {
+      const on = m.on.filter((d) => !dates.has(d))
+      return on.length ? [{ ...m, on }] : []
+    })
+    const left = datesBetween(s.from, s.to).filter((d) => !dates.has(d))
+    return minyanim.length && left.length ? [{ ...s, from: left[0], to: left.at(-1)!, minyanim }] : []
+  })
+}
+
 /** "Mincha · Fri · 6:12 PM", for the admin's note. */
 function rowText(r: UpdateRow): string {
   const day = (DAY_KEYS as readonly string[]).includes(r.day) ? (r.day === 'sat' ? 'Shabbos' : r.day[0].toUpperCase() + r.day.slice(1)) : dateText(r.day, { weekday: true })
@@ -417,7 +437,7 @@ export function applyUpdate(
   current: readonly Minyan[],
   schedules: readonly SpecialSchedule[],
   update: Omit<TimesUpdate, 'otherSeason'>,
-  { newId = () => crypto.randomUUID(), now = Date.now() }: { newId?: () => string; now?: number } = {},
+  { newId = () => crypto.randomUUID(), now = Date.now(), postedBy }: { newId?: () => string; now?: number; postedBy?: 'website' } = {},
 ): { minyanim: Minyan[]; schedules: SpecialSchedule[]; changes: string[] } {
   const changes: string[] = []
   // The shul's times, one per day, each remembering which minyan it was.
@@ -491,6 +511,9 @@ export function applyUpdate(
     const minyanimOn = update.rows
       .filter((r) => r.status !== 'gone' || r.keep)
       .map((r) => ({ id: newId(), tefillah: r.tefillah, on: [r.day], ...pickTime(r), ...(r.notes ? { notes: r.notes } : {}) }))
+    // A week from the newsletter or a person wins over one read off the
+    // website for the same days (the user, Oct 20): the website's come off.
+    if (!postedBy) nextSchedules = withoutWebsiteDays(nextSchedules, new Set(datesBetween(update.from, update.to)))
     nextSchedules = mergeSchedule(nextSchedules, {
       id: newId(),
       name: name.slice(0, 60),
@@ -501,6 +524,7 @@ export function applyUpdate(
       // A week the shul sent out, and when: “This week's schedule” (Oct 6).
       kind: 'week',
       postedAt: new Date(now).toISOString(),
+      ...(postedBy ? { postedBy } : {}),
     })
     for (const r of update.rows) {
       if (r.status === 'changed') changes.push(`${name}: ${rowText(r)}, usually ${r.was}`)
@@ -521,6 +545,7 @@ export function applyUpdate(
       to: date,
       mode: 'add',
       minyanim: rs.map((r) => ({ id: newId(), tefillah: r.tefillah, on: [date], ...pickTime(r), ...(r.notes ? { notes: r.notes } : {}) })),
+      ...(postedBy ? { postedBy } : {}),
     })
     for (const r of rs) changes.push(`New, that day only: ${rowText(r)}`)
   }

@@ -148,8 +148,9 @@ describe('/api/admin/watches', () => {
   })
 
   // Oct 19: the admin says what a watch is for, and the source has to suit
-  // it: weekly times come by email, a page's times from its listing's own
-  // page, and an eruv's status is set on the eruv.
+  // it: a shul's times from its page or its newsletter's address (one
+  // choice since Oct 20), hours from a listing's own page, and an eruv's
+  // status is set on the eruv.
   describe('by what it keeps current', () => {
     beforeEach(() => {
       m.listCategories.mockResolvedValue([
@@ -158,12 +159,10 @@ describe('/api/admin/watches', () => {
     })
 
     it('refuses a source that doesn’t suit it, and what isn’t added here', async () => {
-      const weeklyPage = await POST(req('POST', { action: 'add', purpose: 'weekly', url: 'lms.org', resourceId: SHUL }))
-      expect(weeklyPage.status).toBe(400)
-      expect((await weeklyPage.json()).errors[0]).toContain('come by email')
-      const timesEmail = await POST(req('POST', { action: 'add', purpose: 'times', url: 'office@lms.org', resourceId: SHUL }))
-      expect(timesEmail.status).toBe(400)
-      expect((await timesEmail.json()).errors[0]).toContain('web address of the page')
+      const hoursEmail = await POST(req('POST', { action: 'add', purpose: 'hours', url: 'office@lms.org', resourceId: SHUL }))
+      expect(hoursEmail.status).toBe(400)
+      expect((await hoursEmail.json()).errors[0]).toContain('web address of the page')
+      expect((await POST(req('POST', { action: 'add', purpose: 'weekly', url: 'office@lms.org', resourceId: SHUL }))).status).toBe(400)
       expect((await POST(req('POST', { action: 'add', purpose: 'eruv', url: 'eruv.org' }))).status).toBe(400)
       expect((await POST(req('POST', { action: 'add', purpose: 'menu', url: 'menu.org', resourceId: SHUL }))).status).toBe(400)
       expect((await POST(req('POST', { action: 'add', purpose: 'whatever', url: 'x.org' }))).status).toBe(400)
@@ -179,8 +178,8 @@ describe('/api/admin/watches', () => {
       expect(m.addWatch.mock.calls[0][1]).toMatchObject({ resourceId: SHUL, createdBy: 'listing pages', label: 'Lower Merion Synagogue · davening times on their website' })
     })
 
-    it('takes weekly times by the address the newsletter comes from', async () => {
-      expect((await POST(req('POST', { action: 'add', purpose: 'weekly', url: 'Info@Mekor.org', resourceId: SHUL }))).status).toBe(200)
+    it('takes a shul’s times by the address its newsletter comes from too', async () => {
+      expect((await POST(req('POST', { action: 'add', purpose: 'times', url: 'Info@Mekor.org', resourceId: SHUL }))).status).toBe(200)
       expect(m.addWatch.mock.calls[0][1]).toMatchObject({ url: 'mailto:info@mekor.org', createdBy: NEWSLETTER_WATCH_CREATOR })
     })
 

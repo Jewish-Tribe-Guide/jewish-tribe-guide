@@ -139,9 +139,74 @@ describe('runListingPageWatch: a shul’s page of times', () => {
     expect(m.writes).toEqual([])
   })
 
-  it('a page of one week’s times isn’t a change to the usual ones', async () => {
-    m.readShulWeek.mockResolvedValue({ update: { ...moved, kind: 'week', from: '2026-10-23', to: '2026-10-24' }, model: 'cheap' })
-    expect(await runListingPageWatch(changed, undefined, { apiKey: 'k' })).toEqual({ ok: true, filed: 0, pageHash: await hashOfPage() })
+  // The user, Oct 20: "the website reader should also take dated services
+  // and calendars, and the newsletter wins when they disagree".
+  const week: TimesUpdate = {
+    ...moved,
+    kind: 'week',
+    from: '2026-10-25',
+    to: '2026-10-25',
+    rows: [{ id: 'r', day: '2026-10-25', tefillah: 'mincha', time: '6:05pm', status: 'changed', was: '6:15pm', rowId: 'm1', quote: 'Sunday Mincha 6:05pm' }],
+  }
+  const newsletterWeek = { id: 'w1', name: 'Times for Oct 25', from: '2026-10-25', to: '2026-10-25', mode: 'replace', kind: 'week', minyanim: [{ id: 'x', tefillah: 'mincha', on: ['2026-10-25'], time: '6:10pm' }] }
+
+  it('a page of one week’s times goes to the queue as that week’s times, marked as from the website', async () => {
+    m.readShulWeek.mockResolvedValue({ update: week, model: 'cheap' })
+    expect(await runListingPageWatch(changed, undefined, { apiKey: 'k', now: NOW })).toMatchObject({ ok: true, filed: 1 })
+    const payload = m.submitListingUpdate.mock.calls[0][2]
+    expect(payload.details.minyanim).toEqual([expect.objectContaining({ days: ['sun'], time: '6:15pm' })])
+    expect(payload.details.minyanim_schedules).toEqual([
+      expect.objectContaining({ kind: 'week', postedBy: 'website', from: '2026-10-25', minyanim: [expect.objectContaining({ on: ['2026-10-25'], time: '6:05pm' })] }),
+    ])
+  })
+
+  it('a week the newsletter already gave wins: the website’s week for those days is left out', async () => {
+    m.getResourceRowById.mockResolvedValue({ ...shul, details: { minyanim: [minyan], minyanim_schedules: [newsletterWeek] } })
+    m.readShulWeek.mockResolvedValue({ update: week, model: 'cheap' })
+    expect(await runListingPageWatch(changed, undefined, { apiKey: 'k', now: NOW })).toEqual({ ok: true, filed: 0, pageHash: await hashOfPage() })
+    expect(m.submitListingUpdate).not.toHaveBeenCalled()
+  })
+
+  // A calendar's entries come as dated one-offs (calendarFeed.ts).
+  const calendar = (rows: TimesUpdate['rows']): TimesUpdate => ({ ...moved, rows })
+  const dated = (day: string, time: string) => ({ id: day + time, day, tefillah: 'mincha' as const, time, status: 'new' as const, quote: `${day} ${time}: Mincha` })
+
+  it('a calendar’s service at a new time goes to the queue as that day’s; one at the usual time doesn’t', async () => {
+    m.readShulWeek.mockResolvedValue({ update: calendar([dated('2026-10-25', '6:15pm'), dated('2026-11-01', '5:00pm')]), model: 'cheap' })
+    expect(await runListingPageWatch(changed, undefined, { apiKey: 'k', now: NOW })).toMatchObject({ ok: true, filed: 1 })
+    const payload = m.submitListingUpdate.mock.calls[0][2]
+    expect(payload.details.minyanim_schedules).toEqual([
+      expect.objectContaining({ from: '2026-11-01', mode: 'add', postedBy: 'website', minyanim: [expect.objectContaining({ time: '5:00pm' })] }),
+    ])
+  })
+
+  // Rodeph Shalom's calendar, Oct 20: its Thursday morning minyan listed on
+  // each Thursday, and its Shabbos times, which the listing has.
+  it('a calendar’s weekly minyan is a usual time, not a one-off each week; its dates at the usual time stay out', async () => {
+    const thu = (day: string) => ({ ...dated(day, '8:10am'), tefillah: 'shacharis' as const })
+    m.readShulWeek.mockResolvedValue({ update: calendar([thu('2026-10-22'), dated('2026-10-25', '6:15pm'), thu('2026-10-29'), dated('2026-11-01', '6:15pm')]), model: 'cheap' })
+    expect(await runListingPageWatch(changed, undefined, { apiKey: 'k', now: NOW })).toMatchObject({ ok: true, filed: 1 })
+    const [, , payload, note] = m.submitListingUpdate.mock.calls[0]
+    expect(note).toBe(`From their website, changed Oct 20: ${URL_}\n\nNew: shacharis · Thu · 8:10am`)
+    expect(payload.details.minyanim).toEqual(
+      expect.arrayContaining([expect.objectContaining({ tefillah: 'shacharis', days: ['thu'], time: '8:10am' }), expect.objectContaining({ tefillah: 'mincha', days: ['sun'], time: '6:15pm' })]),
+    )
+    expect(payload.details.minyanim_schedules ?? []).toEqual([])
+  })
+
+  it('a calendar’s new time for the shul’s one minyan that weekday, every week, is a change to it', async () => {
+    m.readShulWeek.mockResolvedValue({ update: calendar([dated('2026-10-25', '6:05pm'), dated('2026-11-01', '6:05pm'), dated('2026-11-08', '6:05pm')]), model: 'cheap' })
+    expect(await runListingPageWatch(changed, undefined, { apiKey: 'k', now: NOW })).toMatchObject({ ok: true, filed: 1 })
+    const [, , payload, note] = m.submitListingUpdate.mock.calls[0]
+    expect(note).toContain('Changed: mincha · Sun · 6:05pm, was 6:15pm')
+    expect(payload.details.minyanim).toEqual([expect.objectContaining({ tefillah: 'mincha', days: ['sun'], time: '6:05pm' })])
+  })
+
+  it('a calendar’s service on a day the newsletter has given is left out, and so is one already on a schedule', async () => {
+    const filed = { id: 'w2', name: 'Sun, Nov 1', from: '2026-11-01', to: '2026-11-01', mode: 'add', postedBy: 'website', minyanim: [{ id: 'y', tefillah: 'mincha', on: ['2026-11-01'], time: '5:00pm' }] }
+    m.getResourceRowById.mockResolvedValue({ ...shul, details: { minyanim: [minyan], minyanim_schedules: [newsletterWeek, filed] } })
+    m.readShulWeek.mockResolvedValue({ update: calendar([dated('2026-10-25', '5:30pm'), dated('2026-11-01', '5:00pm')]), model: 'cheap' })
+    expect(await runListingPageWatch(changed, undefined, { apiKey: 'k', now: NOW })).toEqual({ ok: true, filed: 0, pageHash: await hashOfPage() })
     expect(m.submitListingUpdate).not.toHaveBeenCalled()
   })
 
@@ -280,5 +345,37 @@ describe('runListingPageWatch: a mikvah’s page of hours', () => {
     expect(m.submitListingUpdate).not.toHaveBeenCalled()
     expect(m.confirmFromSource).not.toHaveBeenCalled()
     expect(m.writes).toEqual([])
+  })
+})
+
+// The user, Oct 20: a shul with its services on a calendar, not a page of
+// times (Leyv Ha-Ir, Rodeph Shalom). calendarFeed.test.ts reads the formats.
+describe('readListingPage: a page with a calendar', () => {
+  const OCT_20 = Date.parse('2026-10-20T15:00:00Z')
+  const feed = 'BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nDTSTART;TZID=America/New_York:20261030T180000\r\nSUMMARY:Shabbat Evening Service\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n'
+
+  it('reads the feed the page links to, its coming entries ahead of the page’s words', async () => {
+    const { readListingPage } = await import('./listingPageRun')
+    const { CALENDAR_HEADING } = await import('./calendarFeed')
+    m.fetchPublic.mockImplementation(async (url: string) =>
+      url === URL_ ? { url, type: 'html', body: '<a href="/events/?ical=1">Export</a><p>Month view</p>' } : { url, type: 'html', body: feed },
+    )
+    const got = await readListingPage(URL_, { now: OCT_20 })
+    expect(m.fetchPublic).toHaveBeenCalledWith('https://lms.example/events/?ical=1', expect.anything())
+    expect(got?.text).toBe(`${CALENDAR_HEADING}\n2026-10-30 (Fri) 6:00 PM: Shabbat Evening Service\n\nExport Month view`)
+  })
+
+  it('reads a watch whose address is the feed itself, and an event list in the page’s scripts', async () => {
+    const { readListingPage } = await import('./listingPageRun')
+    m.fetchPublic.mockResolvedValue({ url: URL_, type: 'html', body: feed })
+    expect((await readListingPage(URL_, { now: OCT_20 }))?.text).toContain('2026-10-30 (Fri) 6:00 PM: Shabbat Evening Service')
+    m.fetchPublic.mockResolvedValue({ url: URL_, type: 'html', body: '<script>x = [{"title":"10:30 AM Shabbat Morning Service","start":"2026-11-07","allDay":true}]</script>' })
+    expect((await readListingPage(URL_, { now: OCT_20 }))?.text).toContain('2026-11-07 (Sat) 10:30 AM: Shabbat Morning Service')
+  })
+
+  it('a page with no calendar and next to no words isn’t readable', async () => {
+    const { readListingPage } = await import('./listingPageRun')
+    m.fetchPublic.mockResolvedValue({ url: URL_, type: 'html', body: '<header>Leyv Ha-Ir</header><footer>Philadelphia</footer>' })
+    expect(await readListingPage(URL_, { now: OCT_20 })).toBeNull()
   })
 })

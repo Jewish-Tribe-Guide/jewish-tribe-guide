@@ -335,9 +335,9 @@ function planFor(purpose: WatchPurpose, source: string, place: string | null): {
         ? { main: `Each email from ${s} is read for “up” or “down” and shown on ${p} at once, through that week’s Shabbos.`, small: 'The guide’s Gmail must get its emails. One it can’t make out waits for you on its row.' }
         : { main: `The guide reads ${s} every 15 minutes on Friday afternoon, and shows ${p}’s status at once.`, small: 'It never sets a status itself: a page it can’t make out shows no status.' }
     case 'times':
-      return { main: `Every morning the guide reads ${s}. Usual times that differ from ${p}’s go to the moderation queue, with the page beside them.`, small: 'A page that agrees changes nothing. One week’s times are left to the newsletter.' }
-    case 'weekly':
-      return { main: `Each newsletter from ${s} is read as it arrives, for that week’s times and anything else it says about ${p}. What differs goes to the moderation queue with the email beside it.`, small: 'The guide’s Gmail must be on the shul’s list. You’re emailed if none comes for a month.' }
+      return email
+        ? { main: `Each newsletter from ${s} is read as it arrives, for that week’s times and anything else it says about ${p}. What differs goes to the moderation queue with the email beside it.`, small: 'The guide’s Gmail must be on the shul’s list. You’re emailed if none comes for a month.' }
+        : { main: `Every morning the guide reads ${s}, and its calendar if it has one. Times that differ from ${p}’s, usual or dated, go to the moderation queue, with the page beside them.`, small: 'A page that agrees changes nothing. Where the newsletter has given that week’s times, the newsletter wins.' }
     case 'hours':
       return { main: `Every morning the guide reads ${s}. Hours that differ from ${p}’s go to the moderation queue, with the page beside them.`, small: 'A page that agrees changes nothing.' }
     case 'kosher': {
@@ -355,8 +355,7 @@ function planFor(purpose: WatchPurpose, source: string, place: string | null): {
 
 const SOURCE_HELP: Record<WatchPurpose, string> = {
   eruv: 'The eruv’s status page, or the address its “The eruv is up” emails come from (a mailing list’s own address, …@groups.io, for a list).',
-  times: 'The shul’s own page of davening times.',
-  weekly: 'The address the shul’s newsletter comes from.',
+  times: 'The shul’s own page of davening times or its calendar, or the address its newsletter comes from.',
   hours: 'The place’s own page of hours: a mikvah’s, or any place with hours.',
   kosher: 'A hechsher’s list of the places it supervises.',
   menu: '',
@@ -400,7 +399,7 @@ function AddWatch({
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     if (!purpose) return
-    if (info?.place === 'listing' && !listing) return setError(`Pick the ${purpose === 'times' || purpose === 'weekly' ? 'shul' : 'place'} from the list.`)
+    if (info?.place === 'listing' && !listing) return setError(`Pick the ${purpose === 'times' ? 'shul' : 'place'} from the list.`)
     if (info?.place === 'eruv' && !eruv) return setError('Pick the eruv.')
     if (problem) return setError(problem)
     setError(null)
@@ -471,10 +470,11 @@ function AddWatch({
             <span className="font-semibold text-slate-800">Where does the guide read it?</span>
             <input
               type="text"
-              inputMode={info.source === 'email' ? 'email' : 'url'}
+              // A web address or an email address: a keyboard with both / and @.
+              inputMode={info.source === 'either' ? 'text' : 'url'}
               value={source}
               onChange={(e) => setSource(e.target.value)}
-              placeholder={info.source === 'email' ? 'office@shul.org' : info.source === 'either' ? 'A web address, or an email address' : 'A web address'}
+              placeholder={info.source === 'either' ? 'A web address, or an email address' : 'A web address'}
               className={INPUT}
             />
             <span className="mt-1 block text-xs text-muted">{SOURCE_HELP[purpose]}</span>

@@ -4,7 +4,7 @@ The running list of what's outstanding, kept in the repo so it survives a
 change of Claude account (artifacts and Claude's own notes stay with the old
 account). Update it in the same commit as the work that changes it.
 
-Last updated: Oct 19, 2026.
+Last updated: Oct 20, 2026.
 
 ## The branch
 
@@ -70,8 +70,14 @@ for that exact change, in the same conversation. Show the dry run first.
    - Can't be read (blocked to servers): Lower Merion Synagogue, Sons of
      Israel (406), Chabad of the Main Line (403). Not worth a watch.
    Adding the nine readable ones is Admin → Watches → Add a watch →
-   "Shul’s usual times" (or "Hours" for a mikvah), pick the place, give
-   the page. Needs the user's yes.
+   "Shul’s times" (or "Hours" for a mikvah), pick the place, give the
+   page. Needs the user's yes.
+   Two more with calendars (dry run Oct 20, would file if the page changed
+   today): Leyv Ha-Ir's calendar page, "New, that day only: kabbalas
+   shabbos · Fri Oct 30 · 7:30 PM"; Rodeph Shalom's rodephshalom.org/calendar,
+   "New: shacharis · Thu · 8:10 AM" (its online morning minyan, every
+   Thursday on the calendar; its Friday and Shabbos times match). Neither
+   has a watch on dev or live.
 1b. **Eruv status by email (6c):** migration 084 is run on both databases
    (the user, Oct 19). Northeast's address on live is still to set: a yes,
    once the branch is deployed. Elkins Park's sender is still unknown.
@@ -241,13 +247,55 @@ for that exact change, in the same conversation. Show the dry run first.
 
 7. The "+" button covers part of the third tile in a row on the phone home.
 
-## Done Oct 19: the Watches tab redrawn (on `redesign/oct18-fixes`, not merged)
+## Done Oct 20: one "Shul’s times", websites' calendars read (on `redesign/oct18-fixes`, not merged)
+
+- **One choice for a shul's times, from its website or its email** (the
+  user, Oct 20: "one Shul's times choice, website or email"). "Shul’s
+  usual times" and "Shul’s weekly times" were two in Add a watch and two
+  groups in the list; now both are "Shul’s times". An email address goes
+  to the newsletter reader as before; a web address to the website reader.
+- **The website reader takes dated times now** ("the website reader should
+  also take dated services and calendars"). It used to drop anything but a
+  shul's usual times, leaving a week's times to the newsletter. Now a
+  week's times go to the queue as that week's schedule, and a dated
+  service as that day's.
+- **It reads a calendar on the page** (`src/lib/calendarFeed.ts`): an iCal
+  feed the page links to (`.ics`, `?ical=1`, `webcal:`, an embedded Google
+  Calendar), or the event list a calendar widget is handed in the page's
+  scripts. The next three weeks become a line each, read with the page. A
+  watch can also be given the feed's own address. Tried on Leyv Ha-Ir
+  (events in its scripts) and Rodeph Shalom (an iCal feed).
+- **A minyan a calendar shows every week is a usual time**, not a one-off
+  per date: the same tefillah at the same time on the same weekday, two
+  weeks or more. It's a change to the shul's one minyan of that tefillah
+  that day, or a new one beside its others.
+- **The newsletter wins when they disagree** ("the newsletter wins when
+  they disagree"). What the website reads is marked as the website's. The
+  website leaves out any day the newsletter (or a person, through Update
+  their times) has given a week for, and a newsletter's week takes the
+  website's times off its days.
+- **Gaps, plainly:** if a website suggestion and a newsletter suggestion
+  for one shul are both waiting in the queue, whichever is approved last
+  wins (the website watch never files while anything is waiting, so this
+  needs the newsletter to arrive after it). A calendar's lines move on
+  every day, so a calendar watch asks the AI most mornings, within the
+  run's three reads. A one-off on a day the shul has a usual time for
+  that tefillah is shown beside it, not in its place, as one-offs from
+  messages already are.
+- `scripts/listing-pages-dry-run.mts` takes an address with `=` in it now
+  (Leyv's has two).
+- Checked by tests (21 of the new ones fail against the old code; the
+  calendar reader's own tests caught a weekly repeat running a day past
+  its end) and the dry run above. Not checked in a browser, as before.
+
+## Done Oct 19: the Watches tab redrawn (#336, merged)
 
 - **Add a watch asks what it's for first** (the user, Oct 19: "add url or
   email and then another to state what we're adding for"; built as drawn
   in the mockup they approved). Three questions: what it keeps current
   (Eruv status, Shul’s usual times, Shul’s weekly times, Hours, Kosher
-  list, Hospital contacts, Anything else), which place (only places that
+  list, Hospital contacts, Anything else; the two shul ones are one since
+  Oct 20, above), which place (only places that
   have what it reads: shuls with davening times, places with hours), and
   where it's read (a page or an email address, checked against the
   choice: weekly times only by email). Then it says in a sentence what

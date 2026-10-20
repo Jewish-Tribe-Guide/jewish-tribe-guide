@@ -153,7 +153,7 @@ describe('WatchesManager', () => {
       watch({ id: 's', url: 'https://lms.org/davening', resourceId: 'shul-1', createdBy: 'listing pages', lastFiled: 1, pageChangedAt: ago(1) }),
       watch({ id: 'm', url: 'https://ohelrivkah.org/hours', resourceId: 'mikvah-1', createdBy: 'listing pages' }),
     ])
-    const times = screen.getByRole('region', { name: 'Shul’s usual times' })
+    const times = screen.getByRole('region', { name: 'Shul’s times' })
     expect(names(times)).toEqual(['Lower Merion Synagogue'])
     expect(times).toHaveTextContent(/Changed .*: 1 suggestion in the queue/)
     expect(names(screen.getByRole('region', { name: 'Hours' }))).toEqual(['Mikvah Ohel Rivkah'])
@@ -173,27 +173,43 @@ describe('WatchesManager', () => {
       expect(within(form).queryByLabelText(/Where does the guide read it/)).toBeNull()
       expect(within(form).queryByRole('button', { name: 'Menu' })).toBeNull()
 
-      await user.click(within(form).getByRole('button', { name: 'Shul’s usual times' }))
-      expect(within(form).getByRole('button', { name: 'Shul’s usual times' })).toHaveAttribute('aria-pressed', 'true')
+      await user.click(within(form).getByRole('button', { name: 'Shul’s times' }))
+      expect(within(form).getByRole('button', { name: 'Shul’s times' })).toHaveAttribute('aria-pressed', 'true')
       // Only places whose page has davening times are offered.
       expect([...form.querySelectorAll('#watch-add-places option')].map((o) => o.getAttribute('value'))).toEqual(['Lower Merion Synagogue'])
       await user.type(within(form).getByLabelText(/Which place/), 'Lower Merion Synagogue')
       await user.type(within(form).getByLabelText(/Where does the guide read it/), 'lms.org/davening')
-      expect(within(form).getByTestId('add-watch-plan')).toHaveTextContent('Every morning the guide reads lms.org/davening. Usual times that differ from Lower Merion Synagogue’s go to the moderation queue')
+      expect(within(form).getByTestId('add-watch-plan')).toHaveTextContent('Every morning the guide reads lms.org/davening, and its calendar if it has one. Times that differ from Lower Merion Synagogue’s, usual or dated, go to the moderation queue')
+      expect(within(form).getByTestId('add-watch-plan')).toHaveTextContent('the newsletter wins')
       await user.click(within(form).getByRole('button', { name: 'Start watching' }))
       expect(posts).toEqual([{ url: expect.stringContaining('/api/admin/watches'), body: { action: 'add', purpose: 'times', url: 'lms.org/davening', resourceId: 'shul-1' } }])
-      expect(names(await screen.findByRole('region', { name: 'Shul’s usual times' }))).toEqual(['Lower Merion Synagogue'])
+      expect(names(await screen.findByRole('region', { name: 'Shul’s times' }))).toEqual(['Lower Merion Synagogue'])
       expect(screen.queryByTestId('add-watch')).toBeNull()
     })
 
-    it('won’t take a web page for weekly times, which come by email', async () => {
+    // The user, Oct 20: "one Shul's times choice, website or email".
+    it('takes a shul’s times by its newsletter’s address too, and says the newsletter is read as it comes', async () => {
+      const created = watch({ id: 'nl', url: 'mailto:office@lms.org', resourceId: 'shul-1', createdBy: 'shul newsletters' })
+      await renderTab([], { post: { watch: created } })
+      const user = userEvent.setup()
+      await user.click(screen.getByRole('button', { name: 'Add a watch' }))
+      expect(screen.queryByRole('button', { name: /weekly times|usual times/ })).toBeNull()
+      await user.click(screen.getByRole('button', { name: 'Shul’s times' }))
+      await user.type(screen.getByLabelText(/Which place/), 'Lower Merion Synagogue')
+      await user.type(screen.getByLabelText(/Where does the guide read it/), 'office@lms.org')
+      expect(screen.getByTestId('add-watch-plan')).toHaveTextContent('Each newsletter from office@lms.org is read as it arrives')
+      await user.click(screen.getByRole('button', { name: 'Start watching' }))
+      expect(posts[0].body).toEqual({ action: 'add', purpose: 'times', url: 'office@lms.org', resourceId: 'shul-1' })
+    })
+
+    it('won’t take an email address for hours, which are read off a page', async () => {
       await renderTab([])
       const user = userEvent.setup()
       await user.click(screen.getByRole('button', { name: 'Add a watch' }))
-      await user.click(screen.getByRole('button', { name: 'Shul’s weekly times' }))
-      await user.type(screen.getByLabelText(/Which place/), 'Lower Merion Synagogue')
-      await user.type(screen.getByLabelText(/Where does the guide read it/), 'lms.org/newsletter')
-      expect(screen.getByText(/Weekly times come by email/)).toBeInTheDocument()
+      await user.click(screen.getByRole('button', { name: 'Hours' }))
+      await user.type(screen.getByLabelText(/Which place/), 'Mikvah Ohel Rivkah')
+      await user.type(screen.getByLabelText(/Where does the guide read it/), 'office@mikvah.org')
+      expect(screen.getByText(/Only a shul’s times and an eruv’s status are read from email/)).toBeInTheDocument()
       expect(screen.getByRole('button', { name: 'Start watching' })).toBeDisabled()
     })
 
@@ -307,7 +323,7 @@ describe('WatchesManager', () => {
 
   it('says when a linked newsletter last came, and that a quiet month is flagged', async () => {
     await renderTab([watch({ url: 'mailto:info@lms.org', resourceId: 'shul-1', createdBy: 'shul newsletters', lastFiled: 1, pageChangedAt: ago(3) })])
-    const row = within(screen.getByRole('region', { name: 'Shul’s weekly times' })).getByTestId('watch-row')
+    const row = within(screen.getByRole('region', { name: 'Shul’s times' })).getByTestId('watch-row')
     expect(row).toHaveTextContent(/Newsletter .*: 1 suggestion in the queue/)
     await open(row)
     expect(screen.getByTestId('newsletter-watch')).toHaveTextContent(/emailed if none comes for a month/)
@@ -347,7 +363,7 @@ describe('WatchesManager', () => {
     const linked = ['a', 'b', 'c', 'd', 'e'].map((x) => watch({ id: x, url: `mailto:${x}@shul.org`, resourceId: 'shul-1', createdBy: 'shul newsletters' }))
     const sender = watch({ id: 'n', url: 'mailto:info@lms.org', label: 'New sender', createdBy: 'shul newsletters', active: false, lastRunAt: null, lastOkAt: null })
     await renderTab([...linked, sender], { post: { watch: { ...sender, resourceId: 'shul-1', active: true } } })
-    const group = screen.getByRole('region', { name: 'Shul’s weekly times' })
+    const group = screen.getByRole('region', { name: 'Shul’s times' })
     expect(within(group).getByRole('button', { name: /6.*1 to link.*Show all 6/ })).toBeInTheDocument()
     const row = within(group).getByTestId('watch-row')
     const user = userEvent.setup()

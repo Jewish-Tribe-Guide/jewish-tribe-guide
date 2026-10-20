@@ -59,7 +59,7 @@ const PAGES: [string, string][] = [
   ['Mikvah Moishe Zvi', 'https://www.mikvahwestphilly.com/'],
 ]
 
-const pages: [string, string][] = process.argv.length > 2 ? process.argv.slice(2).map((a) => a.split('=') as [string, string]) : PAGES
+const pages: [string, string][] = process.argv.length > 2 ? process.argv.slice(2).map((a) => [a.slice(0, a.indexOf('=')), a.slice(a.indexOf('=') + 1)] as [string, string]) : PAGES
 
 const categories = await listCategoriesUncached(COMMUNITY)
 const { data: community } = await getAdminClient().from('community').select('name').eq('slug', COMMUNITY).maybeSingle()

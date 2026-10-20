@@ -28,7 +28,7 @@ const GROUPS: { key: WatchGroupKey; label: string }[] = WATCH_PURPOSES.filter((p
 export type ReadsOf = (resourceId: string) => ListingReads
 
 export function watchGroupOf(w: Watch, readsOf: ReadsOf = () => null): WatchGroupKey {
-  if (isNewsletterWatch(w) || isIgnoredSender(w)) return 'weekly'
+  if (isNewsletterWatch(w) || isIgnoredSender(w)) return 'times'
   if (w.kind === 'keystone_list' || isMekorList(w.url)) return 'kosher'
   if (refuahHospitalId(w.url)) return 'hospital'
   if (w.createdBy === MENU_WATCH_CREATOR) return 'menu'
