@@ -387,6 +387,67 @@ describe('this week’s schedule (Oct 6)', () => {
   })
 })
 
+// Oct 20: a calendar's dated service (Rodeph Shalom's Thursday minyan),
+// approved, showed only on the day and the day before, in a box of its own;
+// the user looked for it in This week's schedule. It's there all week now,
+// as well as the usual times.
+describe('this week’s one-day additions (Oct 20)', () => {
+  afterEach(() => vi.useRealTimers())
+  const usual = [
+    { id: 'm2', tefillah: 'shacharis', days: ['sat'], time: '10:45am' },
+    { id: 'm3', tefillah: 'kabbalas_shabbos', days: ['fri'], time: '6:00pm' },
+  ]
+  const day = (date: string, name: string, extra: object = {}) => ({
+    id: date, name, from: date, to: date, mode: 'add', postedBy: 'website',
+    minyanim: [{ id: `${date}m`, tefillah: 'shacharis', on: [date], time: '8:10 AM' }], ...extra,
+  })
+  const thursdays = [day('2026-10-08', 'Thu Oct 8'), day('2026-10-15', 'Thu Oct 15')]
+  const show = (at: string, schedules: unknown[]) => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date(at))
+    const shul = makeListing({ id: 'k', name: 'Congregation Rodeph Shalom', category: 'synagogue', minyanim: usual, minyanim_schedules: schedules })
+    renderWithProviders(<DaveningCard item={shul} minyanim={usual} schedules={schedules} category={shuls} />, { content: { categories: [shuls] } })
+  }
+
+  it('shows this week’s in This week’s schedule, as well as the usual times, days before; not next week’s', () => {
+    show('2026-10-06T10:00:00-04:00', thursdays) // Tue Oct 6
+    const box = screen.getByTestId('davening-this-week')
+    expect(box).toHaveTextContent('This week’s scheduleAs well as their usual times.Thu Oct 8Shacharis8:10 AM')
+    expect(box).not.toHaveTextContent('Oct 15')
+    expect(box).not.toHaveTextContent('In place of')
+    expect(screen.queryByTestId('davening-special-box')).not.toBeInTheDocument()
+    // Nothing of the usual times is folded away.
+    expect(screen.getByTestId('davening-shabbos')).toHaveTextContent('Shacharis 10:45 AM')
+    expect(screen.queryByTestId('davening-folded')).not.toBeInTheDocument()
+  })
+
+  it('the day before, it stays there rather than in a box of its own', () => {
+    show('2026-10-07T10:00:00-04:00', thursdays) // Wed Oct 7
+    expect(screen.getByTestId('davening-this-week')).toHaveTextContent('Thu Oct 8Shacharis8:10 AM')
+    expect(screen.queryByTestId('davening-special-box')).not.toBeInTheDocument()
+  })
+
+  it('leaves a Yom Tov schedule its own box, the same day', () => {
+    show('2026-10-01T10:00:00-04:00', [sukkos, day('2026-10-01', 'Thu Oct 1'), day('2026-10-02', 'Fri Oct 2')]) // Chol HaMoed
+    expect(screen.getByTestId('davening-special-box')).toHaveTextContent('Sukkos 5787')
+    expect(screen.getByTestId('davening-this-week')).toHaveTextContent('Thu Oct 1Shacharis8:10 AMFri Oct 2Shacharis8:10 AM')
+  })
+
+  it('keeps an occasion’s name beside its date', () => {
+    show('2026-10-06T10:00:00-04:00', [day('2026-10-08', 'Thanksgiving')])
+    expect(screen.getByTestId('davening-this-week')).toHaveTextContent('Thanksgiving, Thu Oct 8Shacharis8:10 AM')
+  })
+
+  it('under a week the shul sent out: also this week, after its own times', () => {
+    const week = { id: 'w', name: 'Shabbos Bereishis', from: '2026-10-09', to: '2026-10-10', mode: 'replace', kind: 'week', minyanim: [{ id: 'w1', tefillah: 'shacharis', on: ['2026-10-10'], time: '9:00am' }] }
+    show('2026-10-06T10:00:00-04:00', [week, ...thursdays])
+    const box = screen.getByTestId('davening-this-week')
+    expect(within(box).getByTestId('davening-this-week-dates')).toHaveTextContent('Shabbos Bereishis')
+    expect(within(box).getByTestId('davening-this-week-extras')).toHaveTextContent('Also this week, as well as their usual times:Thu Oct 8Shacharis8:10 AM')
+    expect(screen.getAllByTestId('davening-this-week')).toHaveLength(1)
+  })
+})
+
 // Oct 6 (migration 072): each box its own date, and “Update their times”
 // beside it, opening in that box. Someone who only davens there on Shabbos
 // can vouch for Shabbos without vouching for Shacharis.

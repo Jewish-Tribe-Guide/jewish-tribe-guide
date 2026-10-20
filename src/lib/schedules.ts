@@ -145,29 +145,48 @@ export type DayResolution = { rows: ScheduledMinyan[]; skip: boolean; posting: D
  * it), whether its regular rows step aside, and whose times they are.
  */
 export function resolveDay(regular: readonly Minyan[], schedules: readonly SpecialSchedule[], d: DateFacts): DayResolution {
+  const covers = schedules.filter((s) => s.from <= d.date && d.date <= s.to)
+  // A one-day addition (a calendar's dated service) is as well as whatever
+  // else the day has: it used to win as the latest-starting schedule, and a
+  // Thursday minyan on Chol HaMoed put the Sukkos times off that day.
+  const additions = covers.filter(isOneDayAddition)
   // The latest-starting schedule that covers the date: a "Shemini Atzeres"
   // one posted inside a "Sukkos" one wins on its days.
-  const covering = schedules.filter((s) => s.from <= d.date && d.date <= s.to).sort((a, b) => b.from.localeCompare(a.from))[0]
+  const covering = covers.filter((s) => !isOneDayAddition(s)).sort((a, b) => b.from.localeCompare(a.from))[0] ?? additions[0]
+  const added = covering && !isOneDayAddition(covering) ? additions.flatMap((s) => rowsOn(s, regular, d)) : []
   const festival = d.yomTov || d.cholHamoed ? (d.festival ?? d.name) : null
   // A shul that already tags regular rows "Yom Tov" has posted for it.
   const taggedYomTov = d.yomTov === true && regular.some((m) => m.days.includes('yom_tov'))
   if (covering) {
     const week = covering.kind === 'week'
-    const rows = covering.minyanim
-      .filter((m) => heldOn(m, d))
-      .map(({ on: _on, ...m }): ScheduledMinyan => {
-        void _on
-        const signUp = week ? usualSignUp(regular, m, [d.weekday]) : undefined
-        return { ...m, ...(signUp ? { signUp } : {}), days: [dateKey(d.date)], schedule: covering.name }
-      })
+    const rows = rowsOn(covering, regular, d)
     if (rows.length > 0)
-      return { rows, skip: covering.mode === 'replace', posting: { kind: 'schedule', name: covering.name, ...(week && weekByDates(covering) ? { thisWeek: true as const } : {}) } }
+      return { rows: [...rows, ...added], skip: covering.mode === 'replace', posting: { kind: 'schedule', name: covering.name, ...(week && weekByDates(covering) ? { thisWeek: true as const } : {}) } }
     // Nothing for this day in a schedule that replaces the regular times:
     // the regular ones, but not presented as the festival's.
-    if (covering.mode === 'replace') return { rows: [], skip: false, posting: { kind: 'not-posted', festival: festival ?? covering.name } }
+    if (covering.mode === 'replace') return { rows: added, skip: false, posting: { kind: 'not-posted', festival: festival ?? covering.name } }
+    if (added.length > 0) return { rows: added, skip: false, posting: { kind: 'schedule', name: additions[0].name } }
   }
   if (festival && !taggedYomTov) return { rows: [], skip: false, posting: { kind: 'not-posted', festival } }
   return { rows: [], skip: false, posting: { kind: 'regular' } }
+}
+
+/** One day's times as well as the usual ones: a calendar's dated service,
+ *  or a one-off a message gave. Not a week the shul sent out. */
+export function isOneDayAddition(s: SpecialSchedule): boolean {
+  return s.kind !== 'week' && s.mode === 'add' && s.from === s.to
+}
+
+/** A schedule's minyanim held on the date, keyed to it. */
+function rowsOn(s: SpecialSchedule, regular: readonly Minyan[], d: DateFacts): ScheduledMinyan[] {
+  const week = s.kind === 'week'
+  return s.minyanim
+    .filter((m) => heldOn(m, d))
+    .map(({ on: _on, ...m }): ScheduledMinyan => {
+      void _on
+      const signUp = week ? usualSignUp(regular, m, [d.weekday]) : undefined
+      return { ...m, ...(signUp ? { signUp } : {}), days: [dateKey(d.date)], schedule: s.name }
+    })
 }
 
 /**
@@ -376,10 +395,27 @@ export function withWeekRows(schedules: readonly SpecialSchedule[], postId: stri
   })
 }
 
+/** The Shabbos that ends the week `today` is in. */
+function saturdayOf(today: string): string {
+  const d = new Date(`${today}T12:00:00Z`)
+  return new Date(d.getTime() + (6 - d.getUTCDay()) * DAY_MS).toISOString().slice(0, 10)
+}
+
 /** The week post for the week `today` is in (Sunday to Shabbos) that hasn't
  *  ended yet, if one was sent. */
 export function thisWeeksPost(schedules: readonly SpecialSchedule[], today: string): SpecialSchedule | undefined {
-  const d = new Date(`${today}T12:00:00Z`)
-  const saturday = new Date(d.getTime() + (6 - d.getUTCDay()) * DAY_MS).toISOString().slice(0, 10)
+  const saturday = saturdayOf(today)
   return schedules.filter((s) => s.kind === 'week' && s.to >= today && s.from <= saturday).sort((a, b) => a.from.localeCompare(b.from))[0]
+}
+
+/** One-day times as well as the usual ones, from today to Shabbos: a
+ *  calendar's dated service (Rodeph Shalom's Thursday minyan), or a
+ *  one-off a message gave ("Thanksgiving"). Shown in "This week's
+ *  schedule" all week, not only the day before in a box of their own (the
+ *  user, Oct 20). In date order. */
+export function thisWeeksExtras(schedules: readonly SpecialSchedule[], today: string): SpecialSchedule[] {
+  const saturday = saturdayOf(today)
+  return schedules
+    .filter((s) => isOneDayAddition(s) && s.from >= today && s.from <= saturday)
+    .sort((a, b) => a.from.localeCompare(b.from))
 }

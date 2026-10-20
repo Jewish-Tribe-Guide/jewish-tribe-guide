@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Minyan } from './davening'
 import type { CalendarDay } from './jewishDays'
-import { cleanSchedule, factsFor, readSchedules, resolveDay, sendsWeekly, thisWeeksPost, weekPostDays, weekPostRows, withSchedules, withWeekRows, dateKey, type SpecialSchedule } from './schedules'
+import { cleanSchedule, factsFor, readSchedules, resolveDay, sendsWeekly, thisWeeksExtras, thisWeeksPost, weekPostDays, weekPostRows, withSchedules, withWeekRows, dateKey, type SpecialSchedule } from './schedules'
 import { listMinyanim, nextUpcomingDavening } from './upcomingDavening'
 import { geoKey, geoOrCommunityDefault } from './useZmanAnchors'
 
@@ -73,6 +73,25 @@ describe('what a shul has on a date', () => {
   it('a day a replacing schedule leaves out says not posted, rather than guessing', () => {
     const shabbosOnly: SpecialSchedule = { ...sukkos, minyanim: [{ id: 'x', tefillah: 'shacharis', on: ['yom_tov'], time: '9:00am' }] }
     expect(resolveDay(regular, [shabbosOnly], thu)).toEqual({ rows: [], skip: false, posting: { kind: 'not-posted', festival: 'Sukkos' } })
+  })
+
+  // Oct 20: a calendar's dated service is a one-day addition, and as the
+  // latest-starting schedule it won the day, putting off the Sukkos times
+  // (or a week the shul sent out) that day.
+  it('a one-day addition is as well as the schedule the day has, never in its place', () => {
+    const thursday: SpecialSchedule = { id: 't', name: 'Thu Oct 1', from: '2026-10-01', to: '2026-10-01', mode: 'add', postedBy: 'website', minyanim: [{ id: 'tm', tefillah: 'shacharis', on: ['2026-10-01'], time: '8:10am' }] }
+    expect(resolveDay(regular, [sukkos, thursday], thu)).toMatchObject({ skip: true, posting: { kind: 'schedule', name: 'Sukkos 5787' } })
+    expect(resolveDay(regular, [sukkos, thursday], thu).rows.map((r) => [r.time, r.schedule])).toEqual([
+      ['6:45am', 'Sukkos 5787'],
+      ['6:30pm', 'Sukkos 5787'],
+      ['8:10am', 'Thu Oct 1'],
+    ])
+    // A week the shul sent out, the same.
+    const week: SpecialSchedule = { id: 'w', name: 'Times for Oct 1', from: '2026-10-01', to: '2026-10-01', mode: 'replace', kind: 'week', minyanim: [{ id: 'wm', tefillah: 'mincha', on: ['2026-10-01'], time: '6:00pm' }] }
+    expect(resolveDay(regular, [thursday, week], thu).rows.map((r) => r.time)).toEqual(['6:00pm', '8:10am'])
+    // Alone, it's the day's schedule, as before.
+    expect(resolveDay(regular, [thursday], mon).rows).toEqual([])
+    expect(resolveDay(regular, [thursday], thu)).toMatchObject({ skip: false, posting: { kind: 'schedule', name: 'Thu Oct 1' } })
   })
 
   it('a schedule that adds to the regular times keeps them', () => {
@@ -209,6 +228,18 @@ describe('a shul’s weekly schedule', () => {
     expect(thisWeeksPost([bereishis], '2026-10-10')?.name).toBe('Bereishis')
     expect(thisWeeksPost([bereishis], '2026-10-11')).toBeUndefined() // the Sunday after
     expect(thisWeeksPost([bereishis], '2026-10-03')).toBeUndefined() // the Shabbos before
+  })
+  // Oct 20: Rodeph Shalom's calendar gave its Thursday minyan date by date,
+  // approved, and the listing showed nothing until the day before.
+  it('this week’s additions: one-day times as well as the usual ones, from today to Shabbos, in date order', () => {
+    const day = (date: string, extra: object = {}): SpecialSchedule => ({
+      id: date, name: date, from: date, to: date, mode: 'add', postedBy: 'website',
+      minyanim: [{ id: `${date}m`, tefillah: 'shacharis', on: [date], time: '8:10 AM' }], ...extra,
+    })
+    const all = [day('2026-10-29'), day('2026-10-22'), day('2026-10-19'), day('2026-10-24', { mode: 'replace' }), { ...day('2026-10-23'), to: '2026-10-24' }, { ...post('Bereishis', '2026-10-23', '2026-10-24'), mode: 'add' as const }]
+    expect(thisWeeksExtras(all, '2026-10-20').map((s) => s.id)).toEqual(['2026-10-22']) // Tue: not Monday's, not next week's
+    expect(thisWeeksExtras(all, '2026-10-22').map((s) => s.id)).toEqual(['2026-10-22']) // the day itself
+    expect(thisWeeksExtras(all, '2026-10-25').map((s) => s.id)).toEqual(['2026-10-29']) // the Sunday after
   })
 })
 

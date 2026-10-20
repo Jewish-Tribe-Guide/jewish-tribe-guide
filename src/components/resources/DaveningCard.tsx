@@ -5,7 +5,7 @@ import type { DirectoryResource } from '@/types'
 import { isMinyanim, signUpAction, TEFILLAH_LABELS, TEFILLAH_ORDER, type Minyan } from '@/lib/davening'
 import { useMinyanSchedule } from '@/lib/useMinyanSchedule'
 import { geoKey, geoOrCommunityDefault, resolveAnchorTime, type AnchorTimes } from '@/lib/useZmanAnchors'
-import { dateText, readSchedules, regularMinyanim, scheduleDayText, sendsWeekly, thisWeeksPost, usualSignUp, weekByDates, weekPostRows, type DayPosting, type SpecialSchedule } from '@/lib/schedules'
+import { dateText, readSchedules, regularMinyanim, scheduleDayText, sendsWeekly, thisWeeksExtras, thisWeeksPost, usualSignUp, weekByDates, weekPostRows, type DayPosting, type SpecialSchedule } from '@/lib/schedules'
 import { clockMinutes, noteText, SHABBOS_PART_LABELS, shabbosList, timeText, weekdayTable, type ShabbosLine } from '@/lib/weekTable'
 import type { DayKey } from '@/lib/hours'
 import { confirmedByFor, isMinyanOnly, sectionConfirmedAt } from '@/lib/listingView'
@@ -71,10 +71,14 @@ export default function DaveningCard({
   // regular ones on a festival day with none posted.
   const schedules = readSchedules(rawSchedules)
   const posting: DayPosting[] = schedule ? [schedule.today, schedule.tomorrow].map((d) => schedule.posting[item.id]?.[d.date] ?? { kind: 'regular' }) : []
-  const special = posting.find((p): p is Extract<DayPosting, { kind: 'schedule' }> => p.kind === 'schedule')
-  const specialFound = special ? schedules.find((s) => s.name === special.name) : undefined
-  // A week the shul sent out has its own box, "This week's schedule".
-  const specialSchedule = specialFound?.kind === 'week' ? undefined : specialFound
+  // This week's one-day additions are in "This week's schedule", all week.
+  const extras = schedule ? thisWeeksExtras(schedules, schedule.today.date) : []
+  // A week the shul sent out has its own box, "This week's schedule", and
+  // so do this week's additions; anything else today or tomorrow its own.
+  const specialSchedule = posting
+    .filter((p): p is Extract<DayPosting, { kind: 'schedule' }> => p.kind === 'schedule')
+    .map((p) => schedules.find((s) => s.name === p.name))
+    .find((s) => s && s.kind !== 'week' && !extras.includes(s))
   const notPosted = posting.find((p): p is Extract<DayPosting, { kind: 'not-posted' }> => p.kind === 'not-posted')
 
   // Older rows keep their times as one line of text.
@@ -341,7 +345,13 @@ export default function DaveningCard({
               postRows.filter((m) => m.signUp),
               { section: postRows.every((m) => m.signUp) ? 'All this week’s times' : undefined, tapped: tappedRow },
             )}
+          {extras.length > 0 && <WeekExtras extras={extras} also />}
           {updateIn('this-week')}
+        </Card>
+      )}
+      {!post && !waiting && extras.length > 0 && (
+        <Card title="This week’s schedule" testId="davening-this-week">
+          <WeekExtras extras={extras} />
         </Card>
       )}
       {waiting && (
@@ -357,6 +367,7 @@ export default function DaveningCard({
               Add this week’s schedule
             </button>
           )}
+          {extras.length > 0 && <WeekExtras extras={extras} also />}
           {updateIn('this-week')}
         </Card>
       )}
@@ -563,24 +574,50 @@ function SpecialTimes({ schedule }: { schedule: SpecialSchedule }) {
   return (
     <div className="mt-1" data-testid="davening-special-all">
       {[...groups].map(([label, rows]) => (
-        <div key={label} className="border-t border-slate-100 py-1.5 first:border-t-0">
-          <p className="text-[12px] font-extrabold uppercase tracking-wide text-muted">{label}</p>
-          {[...rows]
-            .sort((a, b) => TEFILLAH_ORDER.indexOf(a.tefillah) - TEFILLAH_ORDER.indexOf(b.tefillah) || (clockMinutes(a.time) ?? 1440) - (clockMinutes(b.time) ?? 1440))
-            .map((m) => {
-              const note = noteText(m.notes)
-              return (
-                <div key={m.id} className="grid grid-cols-[9.5rem_1fr] gap-2.5 py-0.5 text-[15px]">
-                  <span className="font-semibold text-slate-900">{TEFILLAH_LABELS[m.tefillah]}</span>
-                  <span className="text-slate-900">
-                    <b>{timeText(m)}</b>
-                    {note ? <span className="text-muted"> · {note}</span> : null}
-                  </span>
-                </div>
-              )
-            })}
-        </div>
+        <SpecialDay key={label} label={label} rows={rows} />
       ))}
+    </div>
+  )
+}
+
+/** One day's times in a schedule, under its name. */
+function SpecialDay({ label, rows }: { label: string; rows: SpecialSchedule['minyanim'] }) {
+  return (
+    <div className="border-t border-slate-100 py-1.5 first:border-t-0">
+      <p className="text-[12px] font-extrabold uppercase tracking-wide text-muted">{label}</p>
+      {[...rows]
+        .sort((a, b) => TEFILLAH_ORDER.indexOf(a.tefillah) - TEFILLAH_ORDER.indexOf(b.tefillah) || (clockMinutes(a.time) ?? 1440) - (clockMinutes(b.time) ?? 1440))
+        .map((m) => {
+          const note = noteText(m.notes)
+          return (
+            <div key={m.id} className="grid grid-cols-[9.5rem_1fr] gap-2.5 py-0.5 text-[15px]">
+              <span className="font-semibold text-slate-900">{TEFILLAH_LABELS[m.tefillah]}</span>
+              <span className="text-slate-900">
+                <b>{timeText(m)}</b>
+                {note ? <span className="text-muted"> · {note}</span> : null}
+              </span>
+            </div>
+          )
+        })}
+    </div>
+  )
+}
+
+/** This week's one-day additions (thisWeeksExtras), a day each, under the
+ *  week's own times when the shul sent a week out. A day named for an
+ *  occasion keeps its name beside the date. */
+function WeekExtras({ extras, also = false }: { extras: SpecialSchedule[]; also?: boolean }) {
+  return (
+    <div className={also ? 'mt-3 border-t border-slate-200 pt-2.5' : ''} data-testid="davening-this-week-extras">
+      <p className="rounded-lg bg-slate-100 px-2.5 py-1.5 text-[13px] leading-snug text-slate-700">
+        {also ? 'Also this week, as well as their usual times:' : 'As well as their usual times.'}
+      </p>
+      <div className="mt-1">
+        {extras.map((s) => {
+          const date = dateText(s.from, { weekday: true })
+          return <SpecialDay key={s.id} label={s.name === date ? date : `${s.name}, ${date}`} rows={s.minyanim} />
+        })}
+      </div>
     </div>
   )
 }

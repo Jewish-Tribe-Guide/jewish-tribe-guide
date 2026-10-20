@@ -389,6 +389,18 @@ The user's list of seven, all agreed.
   times. The month a calendar shows doesn't matter: Leyv's page carries
   every event to June 2027, and the watch takes the next three weeks of
   them each morning.
+- **This week's dated times are in "This week's schedule", all week**
+  (the user, Oct 20: Rodeph Shalom's Thursday minyan, approved on dev,
+  showed nowhere). A one-day addition (a calendar's service, a one-off a
+  message gave) used to show only that day and the day before, in a box
+  of its own. Now every one from today to Shabbos is listed there, "As
+  well as their usual times", under a week the shul sent out when there is
+  one ("Also this week"). Checked on dev's Rodeph Shalom listing: "Thu Oct
+  22 · Shacharis 8:10 AM". A Yom Tov schedule keeps its own box.
+- **A one-day addition no longer pushes a Yom Tov schedule or a sent week
+  off its day.** Each date took only the latest-starting schedule, so a
+  calendar's Thursday minyan on Chol HaMoed would have put that day back
+  on the usual times. It's added beside them now.
 - **The newsletter wins when they disagree** ("the newsletter wins when
   they disagree"). What the website reads is marked as the website's. The
   website leaves out any day the newsletter (or a person, through Update
