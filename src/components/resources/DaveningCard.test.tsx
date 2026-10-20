@@ -277,13 +277,15 @@ describe('this week’s schedule (Oct 6)', () => {
     expect(screen.getByTestId('davening-shabbos')).toHaveTextContent('Shacharis 9:15 AM')
   })
 
-  it('once it’s in: its name and dates, its times in Shabbos order, and the usual Shabbos times folded', () => {
+  it('once it’s in: its name and dates, its times day by day, and the usual Shabbos times folded', () => {
     show([...before, weekPost('Shabbos Bereishis', '2026-10-09', '2026-10-10', { postedAt: '2026-10-07T15:00:00.000Z' })])
     expect(screen.queryByTestId('davening-this-week-waiting')).not.toBeInTheDocument()
     const box = screen.getByTestId('davening-this-week')
     expect(within(box).getByTestId('davening-this-week-dates')).toHaveTextContent('Shabbos Bereishis, Oct 9–10')
-    expect(box).toHaveTextContent('In place of their usual times for these dates only.')
-    expect(within(box).getByTestId('davening-shabbos-lines')).toHaveTextContent('Friday nightMincha & Maariv 6:10 PMShabbos morningShacharis 9 AMKiddush after davening')
+    expect(within(box).getByTestId('davening-this-week-days')).toHaveTextContent('Fri Oct 9Mincha & Maariv6:10 PMSat Oct 10Shacharis9 AM · Kiddush after davening')
+    // It's this week's schedule, not something set against "usual times"
+    // (the user, Oct 20).
+    expect(box).not.toHaveTextContent(/usual/i)
     expect(screen.getByTestId('davening-folded')).toHaveTextContent('Usual Shabbos timesNot this week: this week’s schedule replaces them')
     // It only covers Shabbos: the weekday times stay as they are.
     expect(screen.getByTestId('davening-weekday')).toHaveTextContent('6:45 AM')
@@ -412,9 +414,9 @@ describe('this week’s one-day additions (Oct 20)', () => {
   it('shows this week’s in This week’s schedule, as well as the usual times, days before; not next week’s', () => {
     show('2026-10-06T10:00:00-04:00', thursdays) // Tue Oct 6
     const box = screen.getByTestId('davening-this-week')
-    expect(box).toHaveTextContent('This week’s scheduleAs well as their usual times.Thu Oct 8Shacharis8:10 AM')
+    expect(box).toHaveTextContent('This week’s scheduleOct 8Thu Oct 8Shacharis8:10 AM')
     expect(box).not.toHaveTextContent('Oct 15')
-    expect(box).not.toHaveTextContent('In place of')
+    expect(box).not.toHaveTextContent(/usual|in place of/i)
     expect(screen.queryByTestId('davening-special-box')).not.toBeInTheDocument()
     // Nothing of the usual times is folded away.
     expect(screen.getByTestId('davening-shabbos')).toHaveTextContent('Shacharis 10:45 AM')
@@ -430,7 +432,7 @@ describe('this week’s one-day additions (Oct 20)', () => {
   it('leaves a Yom Tov schedule its own box, the same day', () => {
     show('2026-10-01T10:00:00-04:00', [sukkos, day('2026-10-01', 'Thu Oct 1'), day('2026-10-02', 'Fri Oct 2')]) // Chol HaMoed
     expect(screen.getByTestId('davening-special-box')).toHaveTextContent('Sukkos 5787')
-    expect(screen.getByTestId('davening-this-week')).toHaveTextContent('Thu Oct 1Shacharis8:10 AMFri Oct 2Shacharis8:10 AM')
+    expect(screen.getByTestId('davening-this-week')).toHaveTextContent('Thu Oct 1TodayShacharis8:10 AMFri Oct 2Shacharis8:10 AM')
   })
 
   it('keeps an occasion’s name beside its date', () => {
@@ -438,13 +440,68 @@ describe('this week’s one-day additions (Oct 20)', () => {
     expect(screen.getByTestId('davening-this-week')).toHaveTextContent('Thanksgiving, Thu Oct 8Shacharis8:10 AM')
   })
 
-  it('under a week the shul sent out: also this week, after its own times', () => {
+  it('with a week the shul sent out: one list, in date order', () => {
     const week = { id: 'w', name: 'Shabbos Bereishis', from: '2026-10-09', to: '2026-10-10', mode: 'replace', kind: 'week', minyanim: [{ id: 'w1', tefillah: 'shacharis', on: ['2026-10-10'], time: '9:00am' }] }
     show('2026-10-06T10:00:00-04:00', [week, ...thursdays])
     const box = screen.getByTestId('davening-this-week')
-    expect(within(box).getByTestId('davening-this-week-dates')).toHaveTextContent('Shabbos Bereishis')
-    expect(within(box).getByTestId('davening-this-week-extras')).toHaveTextContent('Also this week, as well as their usual times:Thu Oct 8Shacharis8:10 AM')
+    expect(within(box).getByTestId('davening-this-week-dates')).toHaveTextContent(/^Oct 8–10$/)
+    expect(within(box).getByTestId('davening-this-week-days')).toHaveTextContent(/^Thu Oct 8Shacharis8:10 AMSat Oct 10Shacharis9 AM$/)
     expect(screen.getAllByTestId('davening-this-week')).toHaveLength(1)
+  })
+
+  it('a time the week already gives is there once', () => {
+    const week = { id: 'w', name: 'Times for Oct 4 – Oct 10', from: '2026-10-04', to: '2026-10-10', mode: 'replace', kind: 'week', postedBy: 'website', minyanim: [{ id: 'w1', tefillah: 'shacharis', on: ['2026-10-08'], time: '8:10am' }] }
+    show('2026-10-06T10:00:00-04:00', [week, ...thursdays])
+    expect(screen.getByTestId('davening-this-week-days')).toHaveTextContent(/^Thu Oct 8Shacharis8:10 AM$/)
+  })
+})
+
+// Oct 20: "There's only one schedule for a given week". A newsletter's week
+// and one read off the website were two boxes' worth; now one list, the
+// newsletter's times on any day both give.
+describe('one week, from the newsletter and the website (Oct 20)', () => {
+  afterEach(() => vi.useRealTimers())
+  const usual = [
+    { id: 'u1', tefillah: 'shacharis', days: ['sat'], time: '9:15am' },
+    { id: 'u2', tefillah: 'shacharis', days: ['mon', 'tue', 'wed', 'thu'], time: '6:45am' },
+  ]
+  const website = {
+    id: 'site', name: 'Times for Oct 6 – Oct 10', from: '2026-10-06', to: '2026-10-10', mode: 'replace', kind: 'week', postedBy: 'website',
+    minyanim: [
+      { id: 's1', tefillah: 'shacharis', on: ['2026-10-06', '2026-10-07'], time: '7:00am' },
+      { id: 's2', tefillah: 'shacharis', on: ['2026-10-10'], time: '9:30am' },
+    ],
+  }
+  const newsletter = {
+    id: 'news', name: 'Shabbos Bereishis', from: '2026-10-09', to: '2026-10-10', mode: 'replace', kind: 'week',
+    minyanim: [
+      { id: 'n1', tefillah: 'kabbalas_shabbos', on: ['2026-10-09'], time: '6:10pm' },
+      { id: 'n2', tefillah: 'shacharis', on: ['2026-10-10'], time: '9:00am' },
+    ],
+  }
+  const show = (schedules: unknown[], onEditBox?: () => void) => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-10-06T10:00:00-04:00')) // Tue Oct 6
+    const confirmed = { confirmedAt: '2026-10-05T18:00:00.000Z', confirmedFrom: { from: 'Mekor Habracha', at: '2026-10-05T18:00:00.000Z' } }
+    const shul = makeListing({ id: 'k', name: 'Mekor Habracha', category: 'synagogue', minyanim: usual, minyanim_schedules: schedules, ...confirmed })
+    renderWithProviders(<DaveningCard item={shul} minyanim={usual} schedules={schedules} category={shuls} onEditBox={onEditBox} />, { content: { categories: [shuls] } })
+  }
+
+  it('is one box, day by day, the newsletter’s times on the day both give', () => {
+    show([website, newsletter])
+    expect(screen.getAllByTestId('davening-this-week')).toHaveLength(1)
+    expect(screen.getByTestId('davening-this-week-dates')).toHaveTextContent(/^Oct 6–10$/)
+    expect(screen.getByTestId('davening-this-week-days')).toHaveTextContent(
+      /^Tue Oct 6TodayShacharis7 AMWed Oct 7Shacharis7 AMFri Oct 9Kabbalas Shabbos6:10 PMSat Oct 10Shacharis9 AM$/,
+    )
+    expect(screen.getByTestId('davening-this-week')).not.toHaveTextContent(/usual/i)
+  })
+
+  it('Edit opens the newsletter’s week', () => {
+    const onEditBox = vi.fn()
+    show([website, newsletter], onEditBox)
+    fireEvent.click(within(screen.getByTestId('davening-this-week')).getByTestId('box-edit-button'))
+    expect(onEditBox).toHaveBeenCalledWith('this_week', 'This week’s schedule', 'news')
   })
 })
 

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Minyan } from './davening'
 import type { CalendarDay } from './jewishDays'
-import { cleanSchedule, factsFor, readSchedules, resolveDay, sendsWeekly, thisWeeksExtras, thisWeeksPost, weekPostDays, weekPostRows, withSchedules, withWeekRows, dateKey, type SpecialSchedule } from './schedules'
+import { cleanSchedule, factsFor, readSchedules, resolveDay, sendsWeekly, thisWeeksDays, weekPostDays, weekPostRows, withSchedules, withWeekRows, dateKey, type SpecialSchedule } from './schedules'
 import { listMinyanim, nextUpcomingDavening } from './upcomingDavening'
 import { geoKey, geoOrCommunityDefault } from './useZmanAnchors'
 
@@ -222,24 +222,63 @@ describe('a shul’s weekly schedule', () => {
     expect(sendsWeekly([two[0], post('Sukkos 5787', '2026-09-26', '2026-10-04', null)], '2026-10-08')).toBe(false)
     expect(sendsWeekly(two, '2026-12-01')).toBe(false)
   })
-  it('this week’s post: the one for the week today is in, Sunday to Shabbos, not yet over', () => {
-    const bereishis = post('Bereishis', '2026-10-09', '2026-10-10')
-    expect(thisWeeksPost([bereishis], '2026-10-04')?.name).toBe('Bereishis') // the Sunday before
-    expect(thisWeeksPost([bereishis], '2026-10-10')?.name).toBe('Bereishis')
-    expect(thisWeeksPost([bereishis], '2026-10-11')).toBeUndefined() // the Sunday after
-    expect(thisWeeksPost([bereishis], '2026-10-03')).toBeUndefined() // the Shabbos before
+  it('this week’s schedule: the week today is in, Sunday to Shabbos, from today, not yet over', () => {
+    const bereishis = {
+      ...post('Bereishis', '2026-10-09', '2026-10-10'),
+      minyanim: [
+        { id: 'f', tefillah: 'mincha', on: ['2026-10-09'], time: '6:00pm' },
+        { id: 's', tefillah: 'shacharis', on: ['sat'], time: '9:00am' },
+      ],
+    } satisfies SpecialSchedule
+    const dates = (today: string) => thisWeeksDays([bereishis], today).days.map((d) => d.date)
+    expect(dates('2026-10-04')).toEqual(['2026-10-09', '2026-10-10']) // the Sunday before
+    expect(dates('2026-10-10')).toEqual(['2026-10-10'])
+    expect(dates('2026-10-11')).toEqual([]) // the Sunday after
+    expect(dates('2026-10-03')).toEqual([]) // the Shabbos before
+    expect(thisWeeksDays([bereishis], '2026-10-04').posts.map((p) => p.name)).toEqual(['Bereishis'])
   })
   // Oct 20: Rodeph Shalom's calendar gave its Thursday minyan date by date,
   // approved, and the listing showed nothing until the day before.
-  it('this week’s additions: one-day times as well as the usual ones, from today to Shabbos, in date order', () => {
+  it('this week’s additions: one-day times, from today to Shabbos, in date order', () => {
     const day = (date: string, extra: object = {}): SpecialSchedule => ({
       id: date, name: date, from: date, to: date, mode: 'add', postedBy: 'website',
       minyanim: [{ id: `${date}m`, tefillah: 'shacharis', on: [date], time: '8:10 AM' }], ...extra,
     })
-    const all = [day('2026-10-29'), day('2026-10-22'), day('2026-10-19'), day('2026-10-24', { mode: 'replace' }), { ...day('2026-10-23'), to: '2026-10-24' }, { ...post('Bereishis', '2026-10-23', '2026-10-24'), mode: 'add' as const }]
-    expect(thisWeeksExtras(all, '2026-10-20').map((s) => s.id)).toEqual(['2026-10-22']) // Tue: not Monday's, not next week's
-    expect(thisWeeksExtras(all, '2026-10-22').map((s) => s.id)).toEqual(['2026-10-22']) // the day itself
-    expect(thisWeeksExtras(all, '2026-10-25').map((s) => s.id)).toEqual(['2026-10-29']) // the Sunday after
+    const all = [day('2026-10-29'), day('2026-10-22'), day('2026-10-19'), day('2026-10-24', { mode: 'replace' }), { ...day('2026-10-23'), to: '2026-10-24' }]
+    const dates = (today: string) => thisWeeksDays(all, today).days.map((d) => d.date)
+    expect(dates('2026-10-20')).toEqual(['2026-10-22']) // Tue: not Monday's, not next week's
+    expect(dates('2026-10-22')).toEqual(['2026-10-22']) // the day itself
+    expect(dates('2026-10-25')).toEqual(['2026-10-29']) // the Sunday after
+    expect(thisWeeksDays(all, '2026-10-20').posts).toEqual([])
+  })
+  // Oct 20: "There's only one schedule for a given week", and the
+  // newsletter wins on a day the website also gives.
+  it('this week’s schedule is one list: the newsletter’s day over the website’s, additions beside, a repeated time once', () => {
+    const website: SpecialSchedule = {
+      ...post('Times for Oct 18 – Oct 24', '2026-10-18', '2026-10-24'),
+      postedBy: 'website',
+      minyanim: [
+        { id: 's1', tefillah: 'shacharis', on: ['2026-10-20', '2026-10-22'], time: '7:00am' },
+        { id: 's2', tefillah: 'kabbalas_shabbos', on: ['2026-10-23'], time: '6:30pm' },
+      ],
+    }
+    const newsletter: SpecialSchedule = { ...post('Shabbos Noach', '2026-10-23', '2026-10-24'), minyanim: [{ id: 'n1', tefillah: 'kabbalas_shabbos', on: ['2026-10-23'], time: '6:00pm' }] }
+    const thursday: SpecialSchedule = { id: 't', name: 'Thu Oct 22', from: '2026-10-22', to: '2026-10-22', mode: 'add', minyanim: [{ id: 't1', tefillah: 'shacharis', on: ['2026-10-22'], time: '7:00 AM' }, { id: 't2', tefillah: 'mincha', on: ['2026-10-22'], time: '1:30pm' }] }
+    const week = thisWeeksDays([newsletter, thursday, website], '2026-10-20')
+    expect(week.days.map((d) => [d.date, d.minyanim.map((m) => `${m.minyan.tefillah} ${m.minyan.time} ${m.from.id}`)])).toEqual([
+      ['2026-10-20', ['shacharis 7:00am Times for Oct 18 – Oct 24']],
+      ['2026-10-22', ['shacharis 7:00am Times for Oct 18 – Oct 24', 'mincha 1:30pm t']],
+      ['2026-10-23', ['kabbalas_shabbos 6:00pm Shabbos Noach']],
+    ])
+    expect(week.posts.map((p) => p.id)).toEqual(['Shabbos Noach', 'Times for Oct 18 – Oct 24'])
+    // The day's times, as the listing's next minyan reads them: the same.
+    expect(resolveDay([], [website, newsletter], factsFor('2026-10-23', [], '2026-10-30')).rows.map((r) => r.time)).toEqual(['6:00pm'])
+    // A website week read later in the week, starting after the
+    // newsletter's, still gives way to it.
+    const wholeNewsletter = { ...newsletter, from: '2026-10-18' }
+    const thursdayRead = { ...website, from: '2026-10-22' }
+    expect(thisWeeksDays([wholeNewsletter, thursdayRead], '2026-10-22').days.map((d) => d.minyanim.map((m) => m.from.name))).toEqual([['Shabbos Noach']])
+    expect(resolveDay([], [wholeNewsletter, thursdayRead], factsFor('2026-10-23', [], '2026-10-30')).rows.map((r) => r.time)).toEqual(['6:00pm'])
   })
 })
 

@@ -150,9 +150,7 @@ export function resolveDay(regular: readonly Minyan[], schedules: readonly Speci
   // else the day has: it used to win as the latest-starting schedule, and a
   // Thursday minyan on Chol HaMoed put the Sukkos times off that day.
   const additions = covers.filter(isOneDayAddition)
-  // The latest-starting schedule that covers the date: a "Shemini Atzeres"
-  // one posted inside a "Sukkos" one wins on its days.
-  const covering = covers.filter((s) => !isOneDayAddition(s)).sort((a, b) => b.from.localeCompare(a.from))[0] ?? additions[0]
+  const covering = firstCovering(covers.filter((s) => !isOneDayAddition(s))) ?? additions[0]
   const added = covering && !isOneDayAddition(covering) ? additions.flatMap((s) => rowsOn(s, regular, d)) : []
   const festival = d.yomTov || d.cholHamoed ? (d.festival ?? d.name) : null
   // A shul that already tags regular rows "Yom Tov" has posted for it.
@@ -169,6 +167,14 @@ export function resolveDay(regular: readonly Minyan[], schedules: readonly Speci
   }
   if (festival && !taggedYomTov) return { rows: [], skip: false, posting: { kind: 'not-posted', festival } }
   return { rows: [], skip: false, posting: { kind: 'regular' } }
+}
+
+/** Of the schedules covering a date, the one whose times it has: one
+ *  from the newsletter or a person over one read off the website (the
+ *  user, Oct 20: the newsletter wins), then the latest-starting, so a
+ *  "Shemini Atzeres" one posted inside a "Sukkos" one wins on its days. */
+function firstCovering(covers: readonly SpecialSchedule[]): SpecialSchedule | undefined {
+  return [...covers].sort((a, b) => Number(a.postedBy === 'website') - Number(b.postedBy === 'website') || b.from.localeCompare(a.from))[0]
 }
 
 /** One day's times as well as the usual ones: a calendar's dated service,
@@ -401,21 +407,49 @@ function saturdayOf(today: string): string {
   return new Date(d.getTime() + (6 - d.getUTCDay()) * DAY_MS).toISOString().slice(0, 10)
 }
 
-/** The week post for the week `today` is in (Sunday to Shabbos) that hasn't
- *  ended yet, if one was sent. */
-export function thisWeeksPost(schedules: readonly SpecialSchedule[], today: string): SpecialSchedule | undefined {
-  const saturday = saturdayOf(today)
-  return schedules.filter((s) => s.kind === 'week' && s.to >= today && s.from <= saturday).sort((a, b) => a.from.localeCompare(b.from))[0]
+/** A time's minutes from midnight, or `rule` for one set by a zman ("at
+ *  candle lighting"). */
+function clockOf(time: string, rule: number): number {
+  const m = parseTimeToMinutes(time)
+  return Number.isFinite(m) ? m : rule
 }
 
-/** One-day times as well as the usual ones, from today to Shabbos: a
- *  calendar's dated service (Rodeph Shalom's Thursday minyan), or a
- *  one-off a message gave ("Thanksgiving"). Shown in "This week's
- *  schedule" all week, not only the day before in a box of their own (the
- *  user, Oct 20). In date order. */
-export function thisWeeksExtras(schedules: readonly SpecialSchedule[], today: string): SpecialSchedule[] {
+/** Whether two times as written are the same time: "8:10 AM", "8:10am". */
+const sameClock = (a: string, b: string) => (Number.isFinite(parseTimeToMinutes(a)) ? parseTimeToMinutes(a) === parseTimeToMinutes(b) : a.trim().toLowerCase() === b.trim().toLowerCase())
+
+/** One day of "This week's schedule": its date, the occasion it's named
+ *  for ("Thanksgiving"), and its times, each with the post it's from. */
+export type WeekDayTimes = { date: string; occasion: string | null; minyanim: { minyan: ScheduleMinyan; from: SpecialSchedule }[] }
+
+/** "This week's schedule" (the user, Oct 20: "There's only one schedule
+ *  for a given week"), day by day from today to Shabbos: on each day the
+ *  week post that has it (the newsletter's over the website's, as
+ *  resolveDay picks), then that day's one-day additions, less any time
+ *  the week already gives. `posts` are the week posts it shows, the
+ *  newsletter's first. Days with nothing are left out. */
+export function thisWeeksDays(schedules: readonly SpecialSchedule[], today: string): { days: WeekDayTimes[]; posts: SpecialSchedule[] } {
   const saturday = saturdayOf(today)
-  return schedules
-    .filter((s) => isOneDayAddition(s) && s.from >= today && s.from <= saturday)
-    .sort((a, b) => a.from.localeCompare(b.from))
+  const weeks = schedules.filter((s) => s.kind === 'week' && s.to >= today && s.from <= saturday)
+  const days: WeekDayTimes[] = []
+  const used = new Set<SpecialSchedule>()
+  for (const date of datesOf({ from: today, to: saturday })) {
+    const weekday = weekdayOfDate(date)
+    const post = firstCovering(weeks.filter((s) => s.from <= date && date <= s.to))
+    const own = post ? post.minyanim.filter((m) => m.on.includes(date) || m.on.includes(weekday)).map((minyan) => ({ minyan, from: post })) : []
+    if (own.length) used.add(post!)
+    const extras = schedules.filter((s) => isOneDayAddition(s) && s.from === date)
+    const added = extras.flatMap((s) =>
+      s.minyanim
+        .filter((m) => !own.some((o) => o.minyan.tefillah === m.tefillah && sameClock(o.minyan.time, m.time)))
+        .map((minyan) => ({ minyan, from: s })),
+    )
+    const minyanim = [...own, ...added].sort(
+      (a, b) => clockOf(a.minyan.time, 1440) - clockOf(b.minyan.time, 1440) || TEFILLAH_ORDER.indexOf(a.minyan.tefillah) - TEFILLAH_ORDER.indexOf(b.minyan.tefillah),
+    )
+    if (!minyanim.length) continue
+    const named = extras.find((s) => s.name !== dateText(date, { weekday: true }))
+    days.push({ date, occasion: named?.name ?? null, minyanim })
+  }
+  const posts = weeks.filter((s) => used.has(s)).sort((a, b) => Number(a.postedBy === 'website') - Number(b.postedBy === 'website') || a.from.localeCompare(b.from))
+  return { days, posts }
 }

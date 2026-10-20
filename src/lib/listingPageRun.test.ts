@@ -182,7 +182,8 @@ describe('runListingPageWatch: a shul’s page of times', () => {
     expect(m.submitListingUpdate).not.toHaveBeenCalled()
   })
 
-  // A calendar's entries come as dated one-offs (calendarFeed.ts).
+  // A page's dated services come as one-offs; a calendar's are read a
+  // week at a time (below).
   const calendar = (rows: TimesUpdate['rows']): TimesUpdate => ({ ...moved, rows })
   const dated = (day: string, time: string) => ({ id: day + time, day, tefillah: 'mincha' as const, time, status: 'new' as const, quote: `${day} ${time}: Mincha` })
 
@@ -393,7 +394,7 @@ describe('runListingPageWatch: "Check now", the full check', () => {
   })
 
   it('says it read the calendar when the page has one', async () => {
-    const ics = ['BEGIN:VCALENDAR', 'BEGIN:VEVENT', 'DTSTART;TZID=America/New_York:20261025T181500', 'SUMMARY:Mincha', 'END:VEVENT', 'END:VCALENDAR'].join('\r\n')
+    const ics = ['BEGIN:VCALENDAR', 'BEGIN:VEVENT', 'DTSTART;TZID=America/New_York:20261023T181500', 'SUMMARY:Mincha', 'END:VEVENT', 'END:VCALENDAR'].join('\r\n')
     m.fetchPublic.mockResolvedValue({ url: URL_, type: 'html', body: ics })
     m.readShulWeek.mockResolvedValue({ update: agrees, model: 'cheap' })
     expect(await runListingPageWatch(watch, undefined, full)).toMatchObject({ check: { from: 'calendar' } })
@@ -523,7 +524,7 @@ describe('runListingPageWatch: a mikvah with women’s, men’s and plain hours'
 // times (Leyv Ha-Ir, Rodeph Shalom). calendarFeed.test.ts reads the formats.
 describe('readListingPage: a page with a calendar', () => {
   const OCT_20 = Date.parse('2026-10-20T15:00:00Z')
-  const feed = 'BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nDTSTART;TZID=America/New_York:20261030T180000\r\nSUMMARY:Shabbat Evening Service\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n'
+  const feed = 'BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nDTSTART;TZID=America/New_York:20261023T180000\r\nSUMMARY:Shabbat Evening Service\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n'
 
   it('reads the feed the page links to, its coming entries ahead of the page’s words', async () => {
     const { readListingPage } = await import('./listingPageRun')
@@ -533,20 +534,158 @@ describe('readListingPage: a page with a calendar', () => {
     )
     const got = await readListingPage(URL_, { now: OCT_20 })
     expect(m.fetchPublic).toHaveBeenCalledWith('https://lms.example/events/?ical=1', expect.anything())
-    expect(got?.text).toBe(`${CALENDAR_HEADING}\n2026-10-30 (Fri) 6:00 PM: Shabbat Evening Service\n\nExport Month view`)
+    expect(got?.text).toBe(`${CALENDAR_HEADING}\n2026-10-23 (Fri) 6:00 PM: Shabbat Evening Service\n\nExport Month view`)
   })
 
   it('reads a watch whose address is the feed itself, and an event list in the page’s scripts', async () => {
     const { readListingPage } = await import('./listingPageRun')
     m.fetchPublic.mockResolvedValue({ url: URL_, type: 'html', body: feed })
-    expect((await readListingPage(URL_, { now: OCT_20 }))?.text).toContain('2026-10-30 (Fri) 6:00 PM: Shabbat Evening Service')
-    m.fetchPublic.mockResolvedValue({ url: URL_, type: 'html', body: '<script>x = [{"title":"10:30 AM Shabbat Morning Service","start":"2026-11-07","allDay":true}]</script>' })
-    expect((await readListingPage(URL_, { now: OCT_20 }))?.text).toContain('2026-11-07 (Sat) 10:30 AM: Shabbat Morning Service')
+    expect((await readListingPage(URL_, { now: OCT_20 }))?.text).toContain('2026-10-23 (Fri) 6:00 PM: Shabbat Evening Service')
+    m.fetchPublic.mockResolvedValue({ url: URL_, type: 'html', body: '<script>x = [{"title":"10:30 AM Shabbat Morning Service","start":"2026-10-24","allDay":true}]</script>' })
+    expect((await readListingPage(URL_, { now: OCT_20 }))?.text).toContain('2026-10-24 (Sat) 10:30 AM: Shabbat Morning Service')
   })
 
   it('a page with no calendar and next to no words isn’t readable', async () => {
     const { readListingPage } = await import('./listingPageRun')
     m.fetchPublic.mockResolvedValue({ url: URL_, type: 'html', body: '<header>Leyv Ha-Ir</header><footer>Philadelphia</footer>' })
     expect(await readListingPage(URL_, { now: OCT_20 })).toBeNull()
+  })
+})
+
+// The user, Oct 20: a calendar is read "one week at a time so we just show
+// this week's"; "if anything is dated it should go in this week's schedule
+// even if it fully matches usual times"; "everything through the queue".
+describe('runListingPageWatch: a shul’s calendar, a week at a time', () => {
+  const THU = Date.parse('2026-10-22T14:00:00Z') // Thu Oct 22, 10 AM in Philadelphia
+  const usual = [
+    { id: 'k', tefillah: 'kabbalas_shabbos', days: ['fri'], time: '6:00pm' },
+    { id: 's', tefillah: 'shacharis', days: ['sat'], time: '10:45am' },
+    { id: 'mn', tefillah: 'mincha', days: ['sat'], time: '5:30pm' },
+  ]
+  const rodeph = { ...shul, id: 'rs', name: 'Congregation Rodeph Shalom', details: { minyanim: usual } }
+  const event = (date: string, hhmm: string, title: string) => ['BEGIN:VEVENT', `DTSTART;TZID=America/New_York:${date.replace(/-/g, '')}T${hhmm}00`, `SUMMARY:${title}`, 'END:VEVENT']
+  const ics = [
+    'BEGIN:VCALENDAR',
+    ...event('2026-10-20', '0810', 'Morning Minyan'), // this week, gone by
+    ...event('2026-10-22', '0810', 'Morning Minyan'),
+    ...event('2026-10-23', '1800', 'Kabbalat Shabbat'),
+    ...event('2026-10-24', '1045', 'Shabbat Morning Service'),
+    ...event('2026-10-30', '1800', 'Kabbalat Shabbat'),
+    ...event('2026-10-31', '1045', 'Shabbat Morning Service'),
+    ...event('2026-11-07', '1045', 'Two weeks on'),
+    'END:VCALENDAR',
+  ].join('\r\n')
+  type Row = TimesUpdate['rows'][number]
+  const row = (day: string, tefillah: Row['tefillah'], time: string, status: Row['status'], rowId?: string): Row => ({ id: `${day}${tefillah}`, day, tefillah, time, status, ...(rowId ? { rowId } : {}), quote: `${day} ${time}` })
+  const weekOf = (from: string, to: string, rows: Row[]): TimesUpdate => ({ kind: 'week', complete: true, season: null, title: null, startsOn: null, from, to, rows, otherSeason: 0 })
+  // The calendar's weeks as the reader would compare them: this week's
+  // Thursday minyan is new; Shabbos is as usual; nothing says Mincha.
+  const thisWeek = weekOf('2026-10-22', '2026-10-24', [
+    row('2026-10-22', 'shacharis', '8:10am', 'new'),
+    row('2026-10-23', 'kabbalas_shabbos', '6:00pm', 'same', 'k'),
+    row('2026-10-24', 'shacharis', '10:45am', 'same', 's'),
+    row('2026-10-24', 'mincha', '5:30pm', 'gone', 'mn'),
+  ])
+  const nextWeek = weekOf('2026-10-25', '2026-10-31', [
+    row('2026-10-30', 'kabbalas_shabbos', '6:00pm', 'same', 'k'),
+    row('2026-10-31', 'shacharis', '10:45am', 'same', 's'),
+    row('2026-10-31', 'mincha', '5:30pm', 'gone', 'mn'),
+  ])
+  const byWeek = (weeks: Record<string, TimesUpdate>) =>
+    m.readShulWeek.mockImplementation(async (_l: unknown, _k: unknown, _s: unknown, _a: unknown, opts: { week: { from: string } }) => ({ update: weeks[opts.week.from], model: 'cheap' }))
+  const run = (over: object = {}) => runListingPageWatch(changed, undefined, { apiKey: 'k', now: THU, ...over })
+  const schedulesFiled = () => m.submitListingUpdate.mock.calls[0][2].details.minyanim_schedules as { name: string; from: string; to: string; kind?: string; mode: string; postedBy?: string; minyanim: { tefillah: string; on: string[]; time: string }[] }[]
+
+  beforeEach(() => {
+    m.getResourceRowById.mockResolvedValue(rodeph)
+    m.fetchPublic.mockResolvedValue({ url: URL_, type: 'html', body: ics })
+    byWeek({ '2026-10-22': thisWeek, '2026-10-25': nextWeek })
+  })
+
+  it('reads this week and, from Thursday, next week, each on its own with only its days', async () => {
+    await run()
+    expect(m.readShulWeek).toHaveBeenCalledTimes(2)
+    const [[, , first, , a], [, , second, , b]] = m.readShulWeek.mock.calls
+    expect(a).toEqual({ week: expect.objectContaining({ from: '2026-10-22', to: '2026-10-24' }) })
+    expect(b).toEqual({ week: expect.objectContaining({ from: '2026-10-25', to: '2026-10-31' }) })
+    expect(first.text).toMatch(/2026-10-22 \(Thu\) 8:10 AM: Morning Minyan/)
+    expect(first.text).not.toMatch(/2026-10-20|2026-10-30/)
+    expect(second.text).toMatch(/2026-10-30 \(Fri\) 6:00 PM: Kabbalat Shabbat\n2026-10-31 \(Sat\) 10:45 AM: Shabbat Morning Service$/)
+  })
+
+  it('a week is this week’s schedule, its usual times and all, a usual minyan it doesn’t mention kept; filed though the next matches', async () => {
+    expect(await run()).toMatchObject({ ok: true, filed: 1 })
+    const [, , payload, note] = m.submitListingUpdate.mock.calls[0]
+    expect(payload.details.minyanim).toEqual(usual.map((u) => expect.objectContaining({ tefillah: u.tefillah, days: u.days, time: u.time })))
+    const [one, two] = schedulesFiled()
+    expect(one).toMatchObject({ name: 'Times for Oct 18 – Oct 24', from: '2026-10-22', to: '2026-10-24', kind: 'week', mode: 'replace', postedBy: 'website' })
+    expect(one.minyanim.map((x) => [x.on[0], x.tefillah, x.time])).toEqual([
+      ['2026-10-22', 'shacharis', '8:10am'],
+      ['2026-10-23', 'kabbalas_shabbos', '6:00pm'],
+      ['2026-10-24', 'shacharis', '10:45am'],
+      ['2026-10-24', 'mincha', '5:30pm'],
+    ])
+    expect(two).toMatchObject({ name: 'Times for Oct 25 – Oct 31', from: '2026-10-25', to: '2026-10-31', kind: 'week', postedBy: 'website' })
+    expect(note).toContain('Times for Oct 18 – Oct 24: new, shacharis · Thu Oct 22 · 8:10am')
+    expect(note).toContain('Times for Oct 25 – Oct 31: the same as their usual times, posted as this week’s schedule')
+    expect(note).not.toMatch(/not held/)
+  })
+
+  it('files nothing for a week already on the listing as it would be', async () => {
+    await run()
+    const posted = m.submitListingUpdate.mock.calls[0][2].details
+    vi.clearAllMocks()
+    m.getResourceRowById.mockResolvedValue({ ...rodeph, details: posted })
+    m.fetchPublic.mockResolvedValue({ url: URL_, type: 'html', body: ics })
+    byWeek({ '2026-10-22': thisWeek, '2026-10-25': nextWeek })
+    expect(await run({ full: true })).toMatchObject({ ok: true, filed: 0, check: { result: 'agrees' } })
+    expect(m.submitListingUpdate).not.toHaveBeenCalled()
+  })
+
+  it('a week of the calendar read again on a later day replaces that week’s days, rather than making a second week', async () => {
+    const earlier = { id: 'e', name: 'Times for Oct 18 – Oct 24', from: '2026-10-20', to: '2026-10-24', mode: 'replace', kind: 'week', postedBy: 'website', minyanim: [{ id: 'e1', tefillah: 'shacharis', on: ['2026-10-20'], time: '8:10am' }, { id: 'e2', tefillah: 'shacharis', on: ['2026-10-22'], time: '7:45am' }] }
+    m.getResourceRowById.mockResolvedValue({ ...rodeph, details: { minyanim: usual, minyanim_schedules: [earlier] } })
+    await run()
+    const weeks = schedulesFiled().filter((x) => x.name === 'Times for Oct 18 – Oct 24')
+    expect(weeks).toHaveLength(1)
+    expect(weeks[0]).toMatchObject({ from: '2026-10-20', to: '2026-10-24' })
+    expect(weeks[0].minyanim.filter((x) => x.on.includes('2026-10-22')).map((x) => x.time)).toEqual(['8:10am'])
+  })
+
+  // Leyv Ha-Ir's calendar: a Kabbalat Shabbat a month, and none of the
+  // shul's usual minyanim. Taken as the week, it would hide them all.
+  it('a calendar with none of the usual minyanim that week only adds what differs, each on its date, and says so', async () => {
+    byWeek({
+      '2026-10-22': weekOf('2026-10-22', '2026-10-24', [
+        row('2026-10-23', 'kabbalas_shabbos', '7:30pm', 'new'),
+        row('2026-10-23', 'kabbalas_shabbos', '6:00pm', 'gone', 'k'),
+        row('2026-10-24', 'shacharis', '10:45am', 'gone', 's'),
+        row('2026-10-24', 'mincha', '5:30pm', 'gone', 'mn'),
+      ]),
+      '2026-10-25': weekOf('2026-10-25', '2026-10-31', [row('2026-10-31', 'shacharis', '10:45am', 'gone', 's')]),
+    })
+    const out = await run({ full: true })
+    expect(out).toMatchObject({ ok: true, filed: 1, check: { note: 'Their calendar for Oct 22–24 has none of their usual minyanim, so only its other services go on, each on its own date, and their usual times stay.' } })
+    expect(schedulesFiled()).toEqual([expect.objectContaining({ from: '2026-10-23', to: '2026-10-23', mode: 'add', postedBy: 'website', minyanim: [expect.objectContaining({ tefillah: 'kabbalas_shabbos', time: '7:30pm' })] })])
+    expect(schedulesFiled()[0]).not.toHaveProperty('kind')
+  })
+
+  it('the newsletter keeps the days it gave; the website’s week keeps its others', async () => {
+    const newsletter = { id: 'n', name: 'Shabbos Noach', from: '2026-10-23', to: '2026-10-24', mode: 'replace', kind: 'week', minyanim: [{ id: 'n1', tefillah: 'kabbalas_shabbos', on: ['2026-10-23'], time: '5:55pm' }] }
+    m.getResourceRowById.mockResolvedValue({ ...rodeph, details: { minyanim: usual, minyanim_schedules: [newsletter] } })
+    const out = await run({ full: true })
+    expect(out).toMatchObject({ filed: 1 })
+    const site = schedulesFiled().find((x) => x.postedBy === 'website')!
+    expect(site).toMatchObject({ from: '2026-10-22', to: '2026-10-22', minyanim: [expect.objectContaining({ on: ['2026-10-22'], time: '8:10am' })] })
+    expect(schedulesFiled().find((x) => x.name === 'Shabbos Noach')).toMatchObject({ minyanim: [expect.objectContaining({ time: '5:55pm' })] })
+  })
+
+  it('its fingerprint stays the same all week, and changes when next week is added on Thursday', async () => {
+    const { readListingPage } = await import('./listingPageRun')
+    const at = async (iso: string) => menuHash((await readListingPage(URL_, { now: Date.parse(iso) }))!)
+    expect(await at('2026-10-20T14:00:00Z')).toBe(await at('2026-10-21T14:00:00Z')) // Tue, Wed
+    expect(await at('2026-10-21T14:00:00Z')).not.toBe(await at('2026-10-22T14:00:00Z')) // Thu
+    const tue = await readListingPage(URL_, { now: Date.parse('2026-10-20T14:00:00Z') })
+    expect(tue?.weeks).toEqual([{ sunday: '2026-10-18', from: '2026-10-20', to: '2026-10-24', lines: ['2026-10-20', '2026-10-22', '2026-10-23', '2026-10-24'].map((d) => expect.stringMatching(new RegExp(`^${d}`))) }])
   })
 })

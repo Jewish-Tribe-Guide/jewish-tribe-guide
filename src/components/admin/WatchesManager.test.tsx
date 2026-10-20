@@ -292,7 +292,7 @@ describe('WatchesManager', () => {
       expect([...form.querySelectorAll('#watch-add-places option')].map((o) => o.getAttribute('value'))).toEqual(['Lower Merion Synagogue'])
       await user.type(within(form).getByLabelText(/Which place/), 'Lower Merion Synagogue')
       await user.type(within(form).getByLabelText(/Where does the guide read it/), 'lms.org/davening')
-      expect(within(form).getByTestId('add-watch-plan')).toHaveTextContent('Every morning the guide reads lms.org/davening, and its calendar if it has one. Times that differ from Lower Merion Synagogue’s, usual or dated, go to the moderation queue')
+      expect(within(form).getByTestId('add-watch-plan')).toHaveTextContent('Every morning the guide reads lms.org/davening, and its calendar if it has one. Times that differ from Lower Merion Synagogue’s go to the moderation queue, with the page beside them; a calendar is read a week at a time, and its week goes as this week’s schedule.')
       expect(within(form).getByTestId('add-watch-plan')).toHaveTextContent('the newsletter wins')
       await user.click(within(form).getByRole('button', { name: 'Start watching' }))
       expect(posts).toEqual([{ url: expect.stringContaining('/api/admin/watches'), body: { action: 'add', purpose: 'times', url: 'lms.org/davening', resourceId: 'shul-1' } }])

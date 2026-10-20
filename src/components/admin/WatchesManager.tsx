@@ -482,7 +482,7 @@ function planFor(purpose: WatchPurpose, source: string, place: string | null): {
     case 'times':
       return email
         ? { main: `Each newsletter from ${s} is read as it arrives, for that week’s times and anything else it says about ${p}. What differs goes to the moderation queue with the email beside it.`, small: 'The guide’s Gmail must be on the shul’s list. You’re emailed if none comes for a month.' }
-        : { main: `Every morning the guide reads ${s}, and its calendar if it has one. Times that differ from ${p}’s, usual or dated, go to the moderation queue, with the page beside them.`, small: 'A page that agrees changes nothing. Where the newsletter has given that week’s times, the newsletter wins.' }
+        : { main: `Every morning the guide reads ${s}, and its calendar if it has one. Times that differ from ${p}’s go to the moderation queue, with the page beside them; a calendar is read a week at a time, and its week goes as this week’s schedule.`, small: 'A page that agrees changes nothing. Where the newsletter has given that week’s times, the newsletter wins.' }
     case 'hours':
       return { main: `Every morning the guide reads ${s}. Hours that differ from ${p}’s go to the moderation queue, with the page beside them.`, small: 'A page that agrees changes nothing.' }
     case 'kosher': {

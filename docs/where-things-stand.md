@@ -72,13 +72,18 @@ for that exact change, in the same conversation. Show the dry run first.
    Adding the nine readable ones is Admin → Watches → Add a watch →
    "Shul’s times" (or "Hours" for a mikvah), pick the place, give the
    page. Needs the user's yes.
-   Two more with calendars (dry run Oct 20, would file if the page changed
-   today): Leyv Ha-Ir's calendar page, "New, that day only: kabbalas
-   shabbos · Fri Oct 30 · 7:30 PM"; Rodeph Shalom's rodephshalom.org/calendar,
-   "New, that day only: shacharis · Thu Oct 22 · 8:10 AM" and Oct 29 (its
-   online morning minyan, on the calendar each Thursday; its Friday and
-   Shabbos times match). Leyv Ha-Ir has a watch on dev; Rodeph Shalom has
-   none on dev or live.
+   Two more with calendars (dry run Oct 20, read a week at a time, would
+   file if the page changed today): Rodeph Shalom's
+   rodephshalom.org/calendar, "Times for Oct 18 – Oct 24: new, shacharis ·
+   Thu Oct 22 · 8:10 AM" (its online morning minyan; its Friday and
+   Shabbos times match, and go on as this week's schedule too). Leyv
+   Ha-Ir's calendar page has nothing this week, so files nothing; dry run
+   as of Thu Oct 22, next week's "kabbalas shabbos · Fri Oct 30 · 7:30 PM"
+   goes on by itself (an events-only week, below). Leyv Ha-Ir has a watch
+   on dev; Rodeph Shalom has none on dev or live.
+   Two calendars the reader doesn't find yet: thelittleshul.org/calendar
+   and mikvehisrael.org/calendar-B4BK6 (their pages' words are read
+   instead).
 1b. **Eruv status by email (6c):** migration 084 is run on both databases
    (the user, Oct 19). Northeast's address on live is still to set: a yes,
    once the branch is deployed. Elkins Park's sender is still unknown.
@@ -355,6 +360,43 @@ The user's list of seven, all agreed.
 7. **Paste a photo on a phone:** a Paste button beside Upload reads a
    photo copied from Google Images (or an image link). Needs an iPhone to
    check Safari's own Paste bubble.
+
+## Done Oct 20, later: a calendar's week is this week's schedule (on `redesign/oct18-fixes`, not merged)
+
+Replaces "the next three weeks" and "As well as their usual times" in the
+section below (the user, Oct 20: "everything through the queue. ready to
+build").
+
+- **A calendar is read one week at a time**: this week from today to
+  Shabbos, and from Thursday next week too, each on its own, each to the
+  queue as that week's schedule ("Times for Oct 18 – Oct 24"). Every
+  time it gives goes on, the ones that match the usual times too, and it
+  goes to the queue even when the whole week matches: a week the shul's
+  calendar gives is this week's schedule, which usual times aren't. A
+  usual minyan the calendar doesn't mention that day stays. A week
+  already on the listing as it would be files nothing.
+- **One box, day by day** ("This week's schedule"), whether the week came
+  from the website or a newsletter, with no "usual times" wording: each
+  day from today to Shabbos with its times, a one-day service on its day,
+  and a time given twice shown once. Edit opens the newsletter’s week when
+  there is one. The newsletter still wins on any day both give: the box takes a
+  newsletter's (or a person's) week over the website's, and the website's
+  week leaves out those days before it's filed.
+- **An events-only calendar** (none of the shul's usual minyanim in its
+  week, as Leyv Ha-Ir's monthly Kabbalat Shabbat) only adds what differs,
+  each on its own date, and the watch says so: "Their calendar for Oct
+  25–31 has none of their usual minyanim, so only its other services go
+  on…".
+- **With a calendar, the page's own words aren't read for times** (still
+  for hours). The text the watch fingerprints starts from Sunday, so it
+  reads the same all week (it moved every day before) and changes on a
+  Sunday, on the Thursday next week is added, and when the calendar does.
+- **Gap, plainly:** from Thursday this week is read again. If an admin
+  rejected Sunday's suggestion, Thursday's (the days left) can come back
+  to the queue once.
+- Checked by tests (each new rule fails against the old code: 23 in all,
+  7 of them the box) and real-AI dry runs above. Not checked in a
+  browser.
 
 ## Done Oct 20: one "Shul’s times", websites' calendars read (on `redesign/oct18-fixes`, not merged)
 

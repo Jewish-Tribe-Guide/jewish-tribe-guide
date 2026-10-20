@@ -381,7 +381,10 @@ export function mergeSchedule(
   const i = existing.findIndex((s) => s.name.toLowerCase() === incoming.name.toLowerCase())
   if (i === -1) return [...existing, incoming]
   const old = existing[i]
-  const covered = new Set([...coveredBy(incoming)].flatMap((d) => [d, ...expand(d, incoming)]))
+  // A week stands for every date in it: a day it has nothing for has
+  // nothing, not what an earlier read of the same week had.
+  const whole = incoming.kind === 'week' ? datesBetween(incoming.from, incoming.to) : []
+  const covered = new Set([...coveredBy(incoming), ...whole].flatMap((d) => [d, ...expand(d, incoming)]))
   const kept = old.minyanim.flatMap((m) => {
     const on = m.on.flatMap((d) => {
       if (covered.has(d)) return []
@@ -437,7 +440,26 @@ export function applyUpdate(
   current: readonly Minyan[],
   schedules: readonly SpecialSchedule[],
   update: Omit<TimesUpdate, 'otherSeason'>,
-  { newId = () => crypto.randomUUID(), now = Date.now(), postedBy }: { newId?: () => string; now?: number; postedBy?: 'website' } = {},
+  {
+    newId = () => crypto.randomUUID(),
+    now = Date.now(),
+    postedBy,
+    name: weekName,
+    evenIfSame = false,
+  }: {
+    newId?: () => string
+    now?: number
+    postedBy?: 'website'
+    /** The week's name, in place of its dates from `from`: a calendar's
+     *  week is named for the whole week, so reading it again on a later
+     *  day merges with it (mergeSchedule). */
+    name?: string
+    /** Post the week even when every time is the usual one: a calendar's
+     *  week is this week's schedule all the same (the user, Oct 20:
+     *  "usual times doesn't read as reliable as something that says this
+     *  is confirmed this week's schedule"). */
+    evenIfSame?: boolean
+  } = {},
 ): { minyanim: Minyan[]; schedules: SpecialSchedule[]; changes: string[] } {
   const changes: string[] = []
   // The shul's times, one per day, each remembering which minyan it was.
@@ -505,9 +527,10 @@ export function applyUpdate(
   let nextSchedules = [...schedules]
 
   // …and the week itself, dated, in place of the regular times those days.
-  if (update.kind === 'week' && update.from && update.to && changesAnything(update)) {
+  const posting = update.rows.some((r) => r.status !== 'gone' || r.keep)
+  if (update.kind === 'week' && update.from && update.to && (changesAnything(update) || (evenIfSame && posting))) {
     const heading = weekKeepsHeading({ from: update.from, to: update.to }) ? update.title?.trim() : null
-    const name = heading || `Times for ${dateText(update.from)}${update.to !== update.from ? ` – ${dateText(update.to)}` : ''}`
+    const name = weekName || heading || `Times for ${dateText(update.from)}${update.to !== update.from ? ` – ${dateText(update.to)}` : ''}`
     const minyanimOn = update.rows
       .filter((r) => r.status !== 'gone' || r.keep)
       .map((r) => ({ id: newId(), tefillah: r.tefillah, on: [r.day], ...pickTime(r), ...(r.notes ? { notes: r.notes } : {}) }))
@@ -531,6 +554,7 @@ export function applyUpdate(
       if (r.status === 'new') changes.push(`${name}: new, ${rowText(r)}`)
       if (r.status === 'gone' && !r.keep) changes.push(`${name}: not held, ${rowText(r)}`)
     }
+    if (!changesAnything(update)) changes.push(`${name}: the same as their usual times, posted as this week’s schedule`)
   }
 
   // One-offs on their dates, as well as the regular times.

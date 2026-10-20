@@ -211,6 +211,35 @@ describe('one Shabbos’s times', () => {
     expect(changesAnything(r)).toBe(false)
     expect(applyUpdate(MEKOR, [], r, { newId }).schedules).toEqual([])
   })
+
+  // The user, Oct 20, on a calendar's week: "if anything is dated it
+  // should go in this week's schedule even if it fully matches usual times".
+  it('a week that matches everything is posted when asked, named as asked, and says it matches', () => {
+    const same: RegularReading = { ...BEREISHIS, complete: false, times: [BEREISHIS.times[0], t({ tefillah: 'shacharis', date: '2026-10-10', time: '9:15am' })] }
+    const r = compareTimes(MEKOR, same, { season: 'summer', zmanim: ZMANIM, newId })
+    const { schedules, changes, minyanim } = applyUpdate(MEKOR, [], r, { newId, postedBy: 'website', evenIfSame: true, name: 'Times for Oct 4 – Oct 10' })
+    expect(minyanim.map((m) => m.time).sort()).toEqual(MEKOR.map((m) => m.time).sort())
+    expect(schedules).toEqual([expect.objectContaining({ name: 'Times for Oct 4 – Oct 10', from: '2026-10-09', to: '2026-10-10', kind: 'week', mode: 'replace', postedBy: 'website' })])
+    // The usual times it gave, and the ones it didn't mention, kept.
+    expect(schedules[0].minyanim.map((m) => `${m.on[0]} ${m.tefillah} ${m.time}`)).toEqual([
+      '2026-10-09 mincha_maariv 6:12pm',
+      '2026-10-09 mincha_maariv 7:00pm',
+      '2026-10-10 shacharis 9:15am',
+      '2026-10-10 mincha 12:20pm',
+      '2026-10-10 mincha_maariv 30 min before Sunset',
+    ])
+    expect(changes[0]).toBe('Times for Oct 4 – Oct 10: the same as their usual times, posted as this week’s schedule')
+    // Nothing to post, nothing posted.
+    expect(applyUpdate(MEKOR, [], { ...r, rows: [] }, { newId, evenIfSame: true }).schedules).toEqual([])
+  })
+
+  it('a week sent again replaces every day of it, a day it now has nothing for too', () => {
+    const first = applyUpdate(MEKOR, [], u, { newId }).schedules
+    const fridayOnly = { ...u, rows: u.rows.filter((r) => r.day === '2026-10-09' && r.status === 'same') }
+    const [merged] = applyUpdate(MEKOR, first, fridayOnly, { newId, evenIfSame: true, name: 'Shabbos Bereishis' }).schedules
+    expect(merged.minyanim.map((m) => `${m.on[0]} ${m.time}`)).toEqual(['2026-10-09 6:12pm'])
+    expect([merged.from, merged.to]).toEqual(['2026-10-09', '2026-10-10'])
+  })
 })
 
 // The user, Oct 20: the shul's website (or calendar) is read too, and
