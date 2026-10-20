@@ -33,13 +33,15 @@ export type MenuDish = {
   name: string
   /** The menu's own words it was read from. */
   quote: string
-  /** Whether those words were found on the page we fetched. False only for
-   *  a PDF, which the AI read as a file. */
+  /** Whether those words were found on the page we fetched. False for a
+   *  PDF, which the AI read as a file, and for a picture. */
   checked: boolean
   /** Whether those words name the dish ("Classic Burger" for Burgers), not
    *  only a line near it ("Sandwich" for Falafel): the admin looks twice
    *  at one that doesn't. */
   named?: boolean
+  /** Read from a picture of the menu on its page (menuPictures). */
+  picture?: true
 }
 
 export type MenuReading = {
@@ -106,15 +108,19 @@ async function publicUrl(raw: string, resolve: Lookup): Promise<URL | null> {
   return url
 }
 
-export type Fetched = { url: string; type: 'html' | 'pdf'; body: string }
+export type Fetched = { url: string; type: 'html' | 'pdf'; body: string } | { url: string; type: 'picture'; body: string; mime: string }
+
+/** The pictures a model can read. */
+const PICTURE_TYPES = ['image/jpeg', 'image/png', 'image/webp']
 
 /** A public page or PDF, following a few redirects, each one checked. Null
  *  when it can't be read. The body is text for a page, base64 for a PDF.
  *  `headers` in place of the menu reader's own: a watch asks as a browser
- *  does (WATCH_FETCH_HEADERS), which some shul sites need. */
+ *  does (WATCH_FETCH_HEADERS), which some shul sites need. `pictures`: a
+ *  JPEG, PNG or WebP is read too, as base64 (a menu posted as a picture). */
 export async function fetchPublic(
   raw: string,
-  { fetchImpl = fetch, resolve = dnsLookup, headers }: { fetchImpl?: typeof fetch; resolve?: Lookup; headers?: Record<string, string> } = {},
+  { fetchImpl = fetch, resolve = dnsLookup, headers, pictures = false }: { fetchImpl?: typeof fetch; resolve?: Lookup; headers?: Record<string, string>; pictures?: boolean } = {},
 ): Promise<Fetched | null> {
   let next = raw
   for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
@@ -144,6 +150,8 @@ export async function fetchPublic(
     if (bytes.byteLength > MAX_BYTES) return null
     const isPdf = type.includes('application/pdf') || (bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46)
     if (isPdf) return { url: url.toString(), type: 'pdf', body: Buffer.from(bytes).toString('base64') }
+    const picture = PICTURE_TYPES.find((t) => type.includes(t))
+    if (picture) return pictures ? { url: url.toString(), type: 'picture', body: Buffer.from(bytes).toString('base64'), mime: picture } : null
     // A calendar feed (text/calendar) is text too: a shul's page links its own (calendarFeed.ts).
     if (type && !type.includes('html') && !type.includes('text/plain') && !type.includes('text/calendar')) return null
     return { url: url.toString(), type: 'html', body: new TextDecoder().decode(bytes) }
@@ -214,10 +222,94 @@ export function menuLinks(html: string, base: string): string[] {
   return [...found].sort((a, b) => b[1] - a[1]).map(([url]) => url)
 }
 
+// ── A menu posted as pictures (the user, Oct 20) ─────────────────────────────
+// Many small places post their menu as pictures: a scan, a flyer, a
+// brochure's pages (A La Karte, LUHV, Mordy's at the ballpark, Star of David
+// Grill). The page's words then name no dishes, and the reading failed, though
+// the menu was right there. Now a page's pictures that look like its menu
+// are kept with it, and read (as photos sent in the "+ Add" box are) when its
+// words name no dishes. Only then: a picture costs more to read than words,
+// and its dishes can't be checked against the page.
+
+/** At most this many pictures are read: a menu's pages, not a gallery. */
+export const MAX_MENU_PICTURES = 4
+
+/** A picture that's part of the page's look, not its menu. */
+const NOT_A_MENU_PICTURE = /logo|icon|favicon|sprite|avatar|badge|placeholder|spinner|loading|facebook|instagram|twitter|yelp|tripadvisor|google|apple|android|payment|visa|mastercard|kosher[-_ ]?(cert|symbol|logo)/i
+
+/** The pictures on a page that may be its menu, best first, at most
+ *  MAX_MENU_PICTURES: one whose address, alt text or link says "menu" (or
+ *  "brochure", "flyer"), then, on a page that is the menu (its menu link, a
+ *  page its website links to as its menu), the rest of its pictures. On any
+ *  other page (a home page), only those that say so: its food photos aren't
+ *  its menu. Never a logo, an icon, an SVG or a GIF. */
+export function menuPictures(html: string, base: string, { menuPage }: { menuPage: boolean }): string[] {
+  const found: { url: string; says: boolean }[] = []
+  const seen = new Set<string>()
+  const add = (raw: string | undefined, words: string) => {
+    if (!raw) return
+    const src = decode(raw.trim())
+    if (!src || src.startsWith('data:') || src.includes('{')) return
+    let url: URL
+    try {
+      url = new URL(src, base)
+    } catch {
+      return
+    }
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return
+    const path = decodeURIComponent(url.pathname + url.search).toLowerCase()
+    if (/\.(svg|gif|ico)(\?|$)/.test(path) || NOT_A_MENU_PICTURE.test(path) || NOT_A_MENU_PICTURE.test(words)) return
+    // A Squarespace original can be many megabytes: ask for a readable size.
+    if (url.hostname.endsWith('squarespace-cdn.com') && !url.search) url.search = '?format=1500w'
+    // One picture once, at whatever size; an image service's own address
+    // (Next's /_next/image?url=…) is the picture it serves.
+    const key = url.searchParams.get('url') ?? url.hostname + url.pathname
+    if (seen.has(key)) return
+    seen.add(key)
+    found.push({ url: url.toString(), says: /menu|brochure|flyer/i.test(`${path} ${words}`) })
+  }
+  for (const m of html.matchAll(/<img\b[^>]*>/gi)) {
+    const attr = (name: string) => new RegExp(`\\b${name}\\s*=\\s*(["'])(.*?)\\1`, 'i').exec(m[0])?.[2]
+    const srcset = attr('srcset') ?? attr('data-srcset')
+    // The largest of a srcset: its last entry, as sites write them.
+    const largest = srcset?.split(',').at(-1)?.trim().split(/\s+/)[0]
+    add(attr('data-image') ?? attr('data-src') ?? largest ?? attr('src'), `${attr('alt') ?? ''} ${attr('title') ?? ''}`)
+  }
+  // A link straight to a picture ("View our menu" → menu.jpg), as lightboxes link the full size.
+  for (const m of html.matchAll(/<a\b[^>]*\bhref\s*=\s*(["'])(.*?)\1[^>]*>([\s\S]*?)<\/a>/gi)) {
+    if (/\.(jpe?g|png|webp)(\?|$)/i.test(m[2])) add(m[2], htmlToText(m[3]))
+  }
+  const ordered = [...found.filter((f) => f.says), ...(menuPage ? found.filter((f) => !f.says) : [])]
+  return ordered.slice(0, MAX_MENU_PICTURES).map((f) => f.url)
+}
+
 /** A menu as read: a page's text, a PDF, or photos of it (a paper menu or
  *  a screenshot, sent in the "+ Add" box), with where it's from. A photo's
- *  `url` is null: there's no page to link to. */
-export type MenuSource = { url: string | null; text: string | null; pdf: string | null; images?: { mime: string; b64: string }[] }
+ *  `url` is null: there's no page to link to. `pictures`: the addresses of
+ *  the page's pictures that may be its menu (menuPictures), read when its
+ *  words name no dishes (readMenu). */
+export type MenuSource = { url: string | null; text: string | null; pdf: string | null; images?: { mime: string; b64: string }[]; pictures?: string[] }
+
+/** A page's words count as a menu's from this many characters: fewer is a
+ *  page drawn by a script, or a picture with a caption. */
+const MIN_TEXT = 200
+
+const isPictureAddress = (url: string) => {
+  try {
+    return /\.(jpe?g|png|webp)$/i.test(new URL(url).pathname)
+  } catch {
+    return false
+  }
+}
+
+/** A page as a menu: its words when there are enough, and its pictures
+ *  that may be the menu. Null when it has neither. */
+function pageAsMenu(page: { url: string; body: string }, menuPage: boolean): MenuSource | null {
+  const text = htmlToText(page.body)
+  const pictures = menuPictures(page.body, page.url, { menuPage })
+  if (text.length < MIN_TEXT && pictures.length === 0) return null
+  return { url: page.url, text: text.length >= MIN_TEXT ? text : null, pdf: null, ...(pictures.length ? { pictures } : {}) }
+}
 
 /** Delivery and ordering apps, whose menus the server never fetches: they
  *  block readers and their terms forbid it (agreed Oct 6). A person can
@@ -235,8 +327,9 @@ export function isOrderingApp(raw: string): boolean {
 
 /** Where a place's menu is: a page or PDF its own website links to as its
  *  menu, the best of the first few that can be read, or else the website
- *  itself (a one-page site often is the menu). Null when nothing can be
- *  read at all. */
+ *  itself (a one-page site often is the menu). A page counts with its
+ *  words or its menu's pictures (pageAsMenu); a link to a picture is that
+ *  picture. Null when nothing can be read at all. */
 export async function findMenu(
   website: string,
   opts: { fetchImpl?: typeof fetch; resolve?: Lookup } = {},
@@ -244,31 +337,32 @@ export async function findMenu(
   const home = await fetchPublic(website, opts)
   if (!home) return null
   if (home.type === 'pdf') return { url: home.url, text: null, pdf: home.body }
-  const homeText = htmlToText(home.body)
   for (const link of menuLinks(home.body, home.url).slice(0, 3)) {
+    if (isPictureAddress(link)) return { url: link, text: null, pdf: null, pictures: [link] }
     const page = await fetchPublic(link, opts)
     if (!page) continue
     if (page.type === 'pdf') return { url: page.url, text: null, pdf: page.body }
-    const text = htmlToText(page.body)
-    // A menu page drawn by a script after it loads has next to no text.
-    if (text.length >= 200) return { url: page.url, text, pdf: null }
+    // A menu page drawn by a script after it loads has next to no text, and no pictures.
+    const menu = pageAsMenu(page, true)
+    if (menu) return menu
   }
-  return homeText.length >= 200 ? { url: home.url, text: homeText, pdf: null } : null
+  return pageAsMenu(home, false)
 }
 
 /** A menu at a known address: a place's menu link (menuLink.ts), read as
- *  it is, a PDF or a page with real text on it. Null when it can't be read,
- *  or it's an ordering app's (never fetched, see ORDERING_APPS). */
+ *  it is, a PDF, a page with real text or its menu's pictures on it, or a
+ *  picture. Null when it can't be read, or it's an ordering app's (never
+ *  fetched, see ORDERING_APPS). */
 export async function readMenuPage(
   url: string,
   opts: { fetchImpl?: typeof fetch; resolve?: Lookup } = {},
 ): Promise<MenuSource | null> {
   if (isOrderingApp(url)) return null
+  if (isPictureAddress(url)) return { url, text: null, pdf: null, pictures: [url] }
   const page = await fetchPublic(url, opts)
   if (!page) return null
   if (page.type === 'pdf') return { url: page.url, text: null, pdf: page.body }
-  const text = htmlToText(page.body)
-  return text.length >= 200 ? { url: page.url, text, pdf: null } : null
+  return pageAsMenu(page, true)
 }
 
 // ── Asking the AI ────────────────────────────────────────────────────────────
@@ -353,11 +447,14 @@ export function tidyMenuReading(raw: unknown, source: MenuSource): MenuReading {
   return { sourceUrl: source.url, dishes, note: dishes.length ? null : (note ?? 'No main dishes found on the menu.') }
 }
 
-export async function readMenu(
-  source: MenuSource,
-  placeName: string,
-  { apiKey, model = DEFAULT_READER_MODEL, fetchImpl = fetch }: { apiKey: string; model?: string; fetchImpl?: typeof fetch },
-): Promise<MenuReading & { model: string }> {
+/** The page's menu pictures, fetched as the page was: those that can be
+ *  read, in order. */
+async function fetchPictures(urls: readonly string[], opts: { fetchImpl?: typeof fetch; resolve?: Lookup }): Promise<{ mime: string; b64: string }[]> {
+  const got = await Promise.all(urls.slice(0, MAX_MENU_PICTURES).map((u) => fetchPublic(u, { ...opts, pictures: true }).catch(() => null)))
+  return got.flatMap((g) => (g?.type === 'picture' ? [{ mime: g.mime, b64: g.body }] : []))
+}
+
+async function askModel(source: MenuSource, placeName: string, apiKey: string, model: string, fetchImpl: typeof fetch): Promise<MenuReading> {
   const res = await fetchImpl('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
@@ -372,5 +469,26 @@ export async function readMenu(
   } catch {
     raw = null
   }
-  return { ...tidyMenuReading(raw, source), model }
+  return tidyMenuReading(raw, source)
+}
+
+/** The AI's reading of a menu: its words, PDF or photos; and when those
+ *  name no dishes (or a page has no words to speak of), the page's menu
+ *  pictures (menuPictures), as photos are read. `fromPictures` says the
+ *  dishes came from those: they can't be checked against the page's words.
+ *  `fetchImpl` fetches the pictures too. */
+export async function readMenu(
+  source: MenuSource,
+  placeName: string,
+  { apiKey, model = DEFAULT_READER_MODEL, fetchImpl = fetch, resolve }: { apiKey: string; model?: string; fetchImpl?: typeof fetch; resolve?: Lookup },
+): Promise<MenuReading & { model: string; fromPictures?: boolean }> {
+  const hasWords = !!(source.text || source.pdf || source.images?.length)
+  const first = hasWords ? await askModel(source, placeName, apiKey, model, fetchImpl) : null
+  if (first?.dishes.length || !source.pictures?.length) return { ...(first ?? { sourceUrl: source.url, dishes: [], note: 'No menu found on that page.' }), model }
+  const images = await fetchPictures(source.pictures, { fetchImpl, resolve })
+  if (!images.length) return { ...(first ?? { sourceUrl: source.url, dishes: [], note: 'Its menu’s pictures couldn’t be opened.' }), model }
+  const read = await askModel({ url: source.url, text: null, pdf: null, images }, placeName, apiKey, model, fetchImpl)
+  // Nothing there either: what the words said is the better reason.
+  if (!read.dishes.length && first) return { ...first, model }
+  return { ...read, dishes: read.dishes.map((d) => ({ ...d, picture: true as const })), model, fromPictures: true }
 }

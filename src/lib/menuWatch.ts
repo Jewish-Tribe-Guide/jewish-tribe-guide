@@ -67,7 +67,8 @@ export function menuWatchChanges(
  *  changed its markup isn't a change. */
 export function menuHash(source: MenuSource): string {
   return createHash('sha256')
-    .update(source.text ? source.text.replace(/\s+/g, ' ').trim() : (source.pdf ?? ''))
+    // A menu that is only pictures: their addresses, which change when one is replaced.
+    .update(source.text ? source.text.replace(/\s+/g, ' ').trim() : (source.pdf ?? (source.pictures ?? []).join('\n')))
     .digest('hex')
 }
 

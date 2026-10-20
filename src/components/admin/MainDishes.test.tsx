@@ -52,13 +52,16 @@ afterEach(() => {
 
 describe('MainDishes', () => {
   it('shows what the AI read, the menu’s own words for each, and where it read them', async () => {
-    await renderTab([judah, unread, noSite])
+    // Oct 20: a dish read off a menu posted as pictures on its page.
+    const brisket = { name: 'Brisket', quote: 'Slow Roasted Brisket', checked: false, picture: true }
+    await renderTab([{ ...judah, reading: { ...read, dishes: [...read.dishes, brisket] } }, unread, noSite])
     expect(screen.getByTestId('dish-counts').textContent).toBe('0 of 3 approved · 1 to check · 1 not read yet · 1 couldn’t be read')
     const card = within(screen.getByRole('heading', { name: /To check \(1\)/ }).closest('section')!).getByTestId('dish-place')
     expect(card.textContent).toContain('Judah · Meat · Keystone-K')
     expect(within(card).getByRole('link', { name: 'judah.example/menu ↗' })).toHaveAttribute('href', 'https://judah.example/menu')
     expect(card.textContent).toContain('Shawarma from “chicken or beef SHAWARMA plate”')
-    expect(card.textContent).toContain('(from a PDF: open the menu to check)')
+    expect(card.textContent).toContain('Pizza from “Margherita” (from a PDF: open the menu to check)')
+    expect(card.textContent).toContain('Brisket from “Slow Roasted Brisket” (from a picture of the menu: open the menu to check)')
     expect(card.textContent).toContain('Falafel from “Sandwich” (these words don’t name it: check)')
     expect(within(card).queryByTestId('dish-elsewhere')).toBeNull()
     expect(screen.queryByTestId('dish-moved-sites')).toBeNull()

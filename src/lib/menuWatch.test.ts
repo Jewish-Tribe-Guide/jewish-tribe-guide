@@ -60,6 +60,13 @@ describe('menuHash', () => {
     expect(menuHash({ url: 'u', text: 'Falafel plate $13', pdf: null })).not.toBe(a)
     expect(menuHash({ url: 'u', text: null, pdf: 'JVBERi0x' })).not.toBe(menuHash({ url: 'u', text: null, pdf: 'JVBERi0y' }))
   })
+
+  // Oct 20: a menu page that is only pictures changes when a picture is replaced.
+  it('a menu of pictures only: its pictures’ addresses', () => {
+    const a = menuHash({ url: 'u', text: null, pdf: null, pictures: ['https://g.example/menu-2025.jpg'] })
+    expect(menuHash({ url: 'u', text: null, pdf: null, pictures: ['https://g.example/menu-2025.jpg'] })).toBe(a)
+    expect(menuHash({ url: 'u', text: null, pdf: null, pictures: ['https://g.example/menu-2026.jpg'] })).not.toBe(a)
+  })
 })
 
 describe('newDishes', () => {

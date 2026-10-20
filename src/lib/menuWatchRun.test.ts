@@ -123,6 +123,13 @@ describe('runMenuWatch: "Check now"', () => {
     expect(m.saveMenuReading).toHaveBeenCalledTimes(1)
   })
 
+  // Oct 20: a menu posted as pictures says it was read from them.
+  it('says when it read the menu’s pictures, not the page’s words', async () => {
+    m.readMenu.mockResolvedValue({ ...twoDishes, fromPictures: true })
+    const out = await runMenuWatch({ ...watch, pageHash: menuHash(page) }, undefined, full)
+    expect(out).toMatchObject({ ok: true, check: { from: 'pictures', read: ['Falafel, Shawarma'] } })
+  })
+
   it('doesn’t make the same reading again: one waiting or skipped on the Main dishes tab stands', async () => {
     for (const status of ['proposed', 'skipped']) {
       m.getMenuReading.mockResolvedValue({ status, dishes: [{ name: 'shawarma' }] })

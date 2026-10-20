@@ -186,6 +186,9 @@ describe('what a full read found', () => {
     expect(checkFrom({ text: 'Shacharis 7am', pdf: null })).toBe('page')
     expect(checkFrom({ text: `${CALENDAR_HEADING}\n2026-10-25, Sun, 6:05 PM: Mincha`, pdf: null })).toBe('calendar')
     expect(checkFrom({ text: null, pdf: 'b64' })).toBe('pdf')
+    // A menu read from its pictures (Oct 20): a page that is only pictures, or one whose words named no dishes.
+    expect(checkFrom({ text: null, pdf: null })).toBe('pictures')
+    expect(checkFrom({ text: 'About us', pdf: null }, { pictures: true })).toBe('pictures')
   })
 
   it('agrees when it read something and nothing differs, finds nothing when it read nothing, and keeps the first few lines', () => {

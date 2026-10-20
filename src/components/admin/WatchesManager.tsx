@@ -171,6 +171,7 @@ const FROM: Record<NonNullable<WatchCheck['from']>, string> = {
   page: 'the page',
   calendar: 'the page and its calendar',
   pdf: 'the PDF',
+  pictures: 'the pictures of its menu',
 }
 
 /** What the last full read found, for the opened row: what it read and

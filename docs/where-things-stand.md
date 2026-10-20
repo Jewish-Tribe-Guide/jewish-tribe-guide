@@ -361,6 +361,55 @@ The user's list of seven, all agreed.
    photo copied from Google Images (or an image link). Needs an iPhone to
    check Safari's own Paste bubble.
 
+## Done Oct 20: menus posted as pictures are read (on `redesign/oct18-fixes`, not merged)
+
+The user, Oct 20: Unit Su Vege's menu couldn't be read on the Main dishes
+tab, but a photo of it sent through the site worked. "If the reader could
+also read menus posted as pictures on the website itself that would be
+amazing … I want to see if that would have caught many."
+
+- **The menu reader reads a menu's pictures** (`menuPictures` and
+  `readMenu` in `src/lib/menuReader.ts`). A page's pictures that say
+  they're its menu (address, alt text or link: "menu", "brochure",
+  "flyer") are kept with it, and on a page that is the menu (its menu
+  link, or a page its website links to as its menu) its other pictures
+  too, four at most, never a logo, icon, SVG or GIF. They're read, as
+  photos sent in the "+ Add" box are, only when the page's words name no
+  dishes, or it has almost none. A menu link that is a picture works
+  too. Same everywhere the reader runs: Main dishes' "Read its menu", a
+  menu link sent in "+ Add" or typed in the editor, and the daily menu
+  watch (which says "read from the pictures of its menu").
+- Dishes read off a picture can't be checked against the page's words;
+  Main dishes says so beside each ("from a picture of the menu: open the
+  menu to check"), as it does for a PDF.
+- **What it would have caught** (dev, every place whose reading had
+  failed, 27, re-read with the real AI, nothing saved):
+  - 3 now read from their pictures: A La Karte (9 dishes from its
+    catering brochure), Star of David Kosher Grill (10, its menu page is
+    only pictures), The Kosher Grill at Citizens Bank Park (3).
+  - 2 now read from their words (their failure was the site not
+    answering that day): Ben & Jerry's, Espresso Cafe & Sushi Bar.
+  - 12 can't be opened at all, so pictures don't help: blocked, gone, or
+    drawn by a script (Judah, I Want Moore, 20th Street Pizza, House of
+    Kosher, Mike's Chicken, Stephen's Cafe, Insomnia Cookies ×2, Diane's,
+    LUHV Vegan Deli, Shlomo's, Center City Pretzel).
+  - 10 have no menu on the page read: Unit Su Vege (its menu is drawn
+    by a script from an ordering service, MenuFreeZone, so it isn't a
+    picture either), LUHV ×2 (its pictures are food photos), Savvati,
+    Deluxe Catering, Slices and Rolls, Magical Sweet Shop, Miss Rachel's,
+    Gelbstein's, and Shtetl, whose website now goes to a gambling site
+    (the Main dishes tab already flags it as moved).
+  So pictures fix a few; most failures need a person to give the menu,
+  which is what's next.
+- **Next (agreed Oct 20, not built):** on a failed row, "Give its menu
+  link" (saved as the listing's menu link, read from then on and watched)
+  and "Add photos of the menu" (read as the "+ Add" box reads photos);
+  and a row whose dishes came from somewhere else (a photo through the
+  site) says where, instead of the stale "Couldn't read".
+- Checked by tests (10 new, each failing against the old code; one
+  caught Next.js images all counting as one picture, which hid Mordy's
+  menu behind its header photo) and the re-read above.
+
 ## Done Oct 20, later: a calendar's week is this week's schedule (on `redesign/oct18-fixes`, not merged)
 
 Replaces "the next three weeks" and "As well as their usual times" in the

@@ -123,7 +123,8 @@ export function listingPageNote(url: string, on: string, lines: readonly string[
 export const CHECK_READ_LINES = 8
 
 /** Where a page's words came from: a PDF, its calendar, or the page. */
-export function checkFrom(source: Pick<MenuSource, 'text' | 'pdf'>): CheckFound['from'] {
+export function checkFrom(source: Pick<MenuSource, 'text' | 'pdf'>, opts: { pictures?: boolean } = {}): CheckFound['from'] {
+  if (opts.pictures || (!source.text && !source.pdf)) return 'pictures'
   if (!source.text) return 'pdf'
   return source.text.startsWith(CALENDAR_HEADING) ? 'calendar' : 'page'
 }

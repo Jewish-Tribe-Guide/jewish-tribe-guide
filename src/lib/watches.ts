@@ -55,8 +55,9 @@ export type Watch = {
 export type WatchCheck = {
   at: string
   what: 'times' | 'hours' | 'dishes' | 'list' | 'contacts'
-  /** Where it read: the page, the page and its calendar, a PDF. */
-  from: 'page' | 'calendar' | 'pdf' | null
+  /** Where it read: the page, the page and its calendar, a PDF, the
+   *  pictures of a menu on its page. */
+  from: 'page' | 'calendar' | 'pdf' | 'pictures' | null
   /** `unsure`: it read something it couldn't set beside the listing
    *  (`unread`), so it can't say the two agree. */
   result: 'agrees' | 'differs' | 'unsure' | 'nothing' | 'unreadable'

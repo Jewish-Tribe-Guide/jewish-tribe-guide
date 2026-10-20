@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { fetchPublic, findMenu, htmlToText, isOrderingApp, isPrivateAddress, menuLinks, menuMessages, readMenu, readMenuPage, tidyMenuReading, type MenuSource } from './menuReader'
+import { fetchPublic, findMenu, htmlToText, isOrderingApp, isPrivateAddress, MAX_MENU_PICTURES, menuLinks, menuMessages, menuPictures, readMenu, readMenuPage, tidyMenuReading, type MenuSource } from './menuReader'
 
 const publicDns = async () => ['93.184.216.34']
 const page = (body: string, type = 'text/html; charset=utf-8', status = 200, headers: Record<string, string> = {}) =>
@@ -187,5 +187,131 @@ describe('a menu from the "+ Add" box', () => {
       dishes: [{ name: 'Dosas', quote: 'Masala Dosa', checked: false, named: true }],
       note: null,
     })
+  })
+})
+
+// Oct 20 (the user): a menu posted as pictures on the place's own site.
+// Of 27 places whose reading had failed on dev, three had their menu as
+// pictures (A La Karte's brochure, Star of David Grill's menu page, Mordy's
+// ballpark menu); none of them could be read before.
+describe('a menu posted as pictures', () => {
+  const jpeg = (body = 'JPEGDATA') => new Response(body, { status: 200, headers: { 'content-type': 'image/jpeg' } })
+  const answer = (dishes: { name: string; quote: string }[], note?: string) =>
+    new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify({ dishes, note }) } }] }), { status: 200 })
+  const words = `<p>${'Welcome to our restaurant, family owned since 1990. '.repeat(6)}</p>`
+
+  it('on a home page, only pictures that say they’re the menu; on its menu page, its pictures; never a logo, an icon, an SVG or a GIF', () => {
+    const html = `
+      <img src="/img/logo.png" alt="Grill">
+      <img src="/img/food1.jpg" alt="Our shawarma">
+      <img src="/img/icon-menu.svg" alt="menu">
+      <img src="/img/spinner.gif">
+      <img data-src="/files/Catering_Menu_Brochure_1.jpg" src="data:image/gif;base64,R0lGOD">
+      <img src="/cdn/shop/files/Flyer_{width}x.png" alt="Shabbat menu">
+      <img src="/img/page2.jpg" alt="Shabbat menu, page 2">`
+    expect(menuPictures(html, 'https://grill.example/', { menuPage: false })).toEqual(['https://grill.example/files/Catering_Menu_Brochure_1.jpg', 'https://grill.example/img/page2.jpg'])
+    expect(menuPictures(html, 'https://grill.example/menu', { menuPage: true })).toEqual([
+      'https://grill.example/files/Catering_Menu_Brochure_1.jpg',
+      'https://grill.example/img/page2.jpg',
+      'https://grill.example/img/food1.jpg',
+    ])
+  })
+
+  it('the largest of a srcset; a Next.js image is its own picture, not one per site; a link straight to a picture; at most four', () => {
+    const next = (file: string, w: number) => `/_next/image?url=https%3A%2F%2Fcdn.example%2F${file}&amp;w=${w}&amp;q=75`
+    const html = `
+      <img alt="Ballpark" srcSet="${next('header.jpg', 640)} 640w, ${next('header.jpg', 3840)} 3840w">
+      <img alt="Citizens Bank Park menu." srcSet="${next('citizens-menu.jpg', 640)} 640w, ${next('citizens-menu.jpg', 3840)} 3840w">
+      <a href="/uploads/dinner.jpg">See our dinner menu</a>`
+    expect(menuPictures(html, 'https://mordys.example/park', { menuPage: false })).toEqual([
+      'https://mordys.example/_next/image?url=https%3A%2F%2Fcdn.example%2Fcitizens-menu.jpg&w=3840&q=75',
+      'https://mordys.example/uploads/dinner.jpg',
+    ])
+    const many = Array.from({ length: 9 }, (_, i) => `<img src="/menu-${i}.jpg">`).join('')
+    expect(menuPictures(many, 'https://grill.example/menu', { menuPage: true })).toHaveLength(MAX_MENU_PICTURES)
+  })
+
+  it('a picture is fetched only when asked for, as safely as a page', async () => {
+    expect(await fetchPublic('https://g.example/menu.jpg', { fetchImpl: vi.fn().mockResolvedValue(jpeg()), resolve: publicDns })).toBeNull()
+    expect(await fetchPublic('https://g.example/menu.jpg', { fetchImpl: vi.fn().mockResolvedValue(jpeg()), resolve: publicDns, pictures: true })).toEqual({
+      url: 'https://g.example/menu.jpg',
+      type: 'picture',
+      mime: 'image/jpeg',
+      body: Buffer.from('JPEGDATA').toString('base64'),
+    })
+    const metadata = vi.fn()
+    expect(await fetchPublic('https://g.example/menu.jpg', { fetchImpl: metadata, resolve: async () => ['169.254.169.254'], pictures: true })).toBeNull()
+    expect(metadata).not.toHaveBeenCalled()
+  })
+
+  it('a menu page that is only pictures is its menu; so is a menu link that is a picture', async () => {
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValueOnce(page(`<a href="/menu.html">Menu</a>${words}`))
+      .mockResolvedValueOnce(page('<img src="/images/menu1.jpg"><img src="/images/menu2.jpg">'))
+    expect(await findMenu('http://star.example/', { fetchImpl, resolve: publicDns })).toEqual({
+      url: 'http://star.example/menu.html',
+      text: null,
+      pdf: null,
+      pictures: ['http://star.example/images/menu1.jpg', 'http://star.example/images/menu2.jpg'],
+    })
+    const none = vi.fn()
+    expect(await readMenuPage('https://grill.example/uploads/Menu.JPG', { fetchImpl: none, resolve: publicDns })).toEqual({
+      url: 'https://grill.example/uploads/Menu.JPG',
+      text: null,
+      pdf: null,
+      pictures: ['https://grill.example/uploads/Menu.JPG'],
+    })
+    expect(none).not.toHaveBeenCalled()
+    expect(await readMenuPage('https://grill.example/menu', { fetchImpl: vi.fn().mockResolvedValue(page('<img src="/m.png">')), resolve: publicDns })).toMatchObject({ text: null, pictures: ['https://grill.example/m.png'] })
+  })
+
+  it('its words first; when they name no dishes, its pictures, read as photos, the dishes marked as from a picture', async () => {
+    const source: MenuSource = { url: 'https://karte.example/catering', text: 'Catering for every simcha. Ask about our brochure.', pdf: null, pictures: ['https://karte.example/brochure1.jpg', 'https://karte.example/brochure2.jpg'] }
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValueOnce(answer([], 'This page names no dishes.'))
+      .mockResolvedValueOnce(jpeg('ONE'))
+      .mockResolvedValueOnce(jpeg('TWO'))
+      .mockResolvedValueOnce(answer([{ name: 'Brisket', quote: 'Slow Roasted Brisket' }]))
+    const r = await readMenu(source, 'A La Karte', { apiKey: 'k', model: 'm', fetchImpl, resolve: publicDns })
+    expect(r).toEqual({
+      sourceUrl: 'https://karte.example/catering',
+      dishes: [{ name: 'Brisket', quote: 'Slow Roasted Brisket', checked: false, named: true, picture: true }],
+      note: null,
+      model: 'm',
+      fromPictures: true,
+    })
+    const second = JSON.parse(fetchImpl.mock.calls[3][1].body).messages[1].content
+    expect(second.map((c: { type: string }) => c.type)).toEqual(['text', 'image_url', 'image_url'])
+    expect(second[1].image_url.url).toBe(`data:image/jpeg;base64,${Buffer.from('ONE').toString('base64')}`)
+  })
+
+  it('words that name dishes are enough: the pictures aren’t fetched', async () => {
+    const source: MenuSource = { url: 'https://grill.example/menu', text: 'MAINS\nFalafel in pita', pdf: null, pictures: ['https://grill.example/menu.jpg'] }
+    const fetchImpl = vi.fn().mockResolvedValueOnce(answer([{ name: 'Falafel', quote: 'Falafel in pita' }]))
+    const r = await readMenu(source, 'Judah', { apiKey: 'k', fetchImpl, resolve: publicDns })
+    expect(r.dishes.map((d) => d.name)).toEqual(['Falafel'])
+    expect(r.fromPictures).toBeUndefined()
+    expect(fetchImpl).toHaveBeenCalledTimes(1)
+  })
+
+  it('a page with no words to speak of goes straight to its pictures; pictures that won’t open, or name nothing, leave the words’ reason', async () => {
+    const onlyPictures: MenuSource = { url: 'http://star.example/menu.html', text: null, pdf: null, pictures: ['http://star.example/m1.jpg'] }
+    const straight = vi.fn().mockResolvedValueOnce(jpeg()).mockResolvedValueOnce(answer([{ name: 'Shawarma', quote: 'Shawarma Plate' }]))
+    expect((await readMenu(onlyPictures, 'Star of David', { apiKey: 'k', fetchImpl: straight, resolve: publicDns })).dishes.map((d) => d.name)).toEqual(['Shawarma'])
+    expect(straight).toHaveBeenCalledTimes(2)
+
+    const broken = vi.fn().mockResolvedValueOnce(new Response('gone', { status: 404 }))
+    expect(await readMenu(onlyPictures, 'Star of David', { apiKey: 'k', model: 'm', fetchImpl: broken, resolve: publicDns })).toEqual({
+      sourceUrl: 'http://star.example/menu.html',
+      dishes: [],
+      note: 'Its menu’s pictures couldn’t be opened.',
+      model: 'm',
+    })
+
+    const withWords: MenuSource = { ...onlyPictures, text: 'About us: a family grill.' }
+    const nothing = vi.fn().mockResolvedValueOnce(answer([], 'An about page.')).mockResolvedValueOnce(jpeg()).mockResolvedValueOnce(answer([], 'A photo of the dining room.'))
+    expect((await readMenu(withWords, 'Star of David', { apiKey: 'k', fetchImpl: nothing, resolve: publicDns })).note).toBe('An about page.')
   })
 })

@@ -107,7 +107,7 @@ export async function runMenuWatch(
   }
   const found = newDishes(read.dishes, listedDishes(listing, category))
   const check = (queue: WatchCheck['queue']) =>
-    pageCheck('dishes', checkFrom(source), read.dishes.length ? [read.dishes.map((d) => d.name).join(', ')] : [], {
+    pageCheck('dishes', checkFrom(source, { pictures: read.fromPictures }), read.dishes.length ? [read.dishes.map((d) => d.name).join(', ')] : [], {
       differences: found.length ? [`Not on the listing: ${found.map((d) => d.name).join(', ')}`] : [],
       queue,
     })

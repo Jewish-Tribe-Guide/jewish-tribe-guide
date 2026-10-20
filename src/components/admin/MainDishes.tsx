@@ -14,7 +14,7 @@ import CollapsibleSection from './CollapsibleSection'
 // untick what's wrong, add what's missing, approve. Approved dishes say "on
 // its menu Oct 2" on the listing until a visitor says "Still served".
 
-type Dish = { name: string; quote: string; checked: boolean; named?: boolean }
+type Dish = { name: string; quote: string; checked: boolean; named?: boolean; picture?: true }
 type Reading = {
   status: 'proposed' | 'approved' | 'skipped' | 'failed'
   sourceUrl: string | null
@@ -166,7 +166,7 @@ function PlaceCard({
             {proposed.map((d) => (
               <li key={d.name}>
                 <span className="font-semibold text-slate-700">{d.name}</span> from “{d.quote}”
-                {!d.checked && <span className="text-amber-800"> (from a PDF: open the menu to check)</span>}
+                {!d.checked && <span className="text-amber-800"> ({d.picture ? 'from a picture of the menu' : 'from a PDF'}: open the menu to check)</span>}
                 {d.checked && d.named === false && <span className="text-amber-800"> (these words don’t name it: check)</span>}
               </li>
             ))}
