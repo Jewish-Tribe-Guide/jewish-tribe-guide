@@ -2,7 +2,7 @@
 
 import Image, { getImageProps } from 'next/image'
 import { preload } from 'react-dom'
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useEffectEvent, useRef, useState, type ReactNode } from 'react'
 import { ui } from '@/lib/uiConfig'
 import type { SiteSettings } from '@/lib/siteSettings'
 import { isOptimizableImage } from '@/lib/imageHosts'
@@ -46,6 +46,12 @@ type Props = {
    *  under the box while something is typed, over the page on desktop,
    *  in the page's flow on a phone. Built by Landing. */
   searchPanel?: ReactNode
+  /** Whether the visitor has closed the results (a tap or click away, or
+   *  Escape) with their words still in the box, for a caller that changes
+   *  the page around them (Landing's phone home dims its tiles while they
+   *  show). Kept here when not given. */
+  searchDismissed?: boolean
+  onSearchDismissedChange?: (dismissed: boolean) => void
   /** Questions to tap under the empty box, each known to go somewhere
    *  right now (see searchPrompts.ts). Tapped, the page goes there, as on
    *  Enter. */
@@ -132,6 +138,8 @@ export default function HeroHeading({
   onViewMap,
   onBrowseCategories,
   searchPanel = null,
+  searchDismissed,
+  onSearchDismissedChange,
   searchPrompts = [],
   onPickPrompt,
   today,
@@ -170,11 +178,21 @@ export default function HeroHeading({
   // until the visitor types again. Not just "has focus": clicking a result
   // blurs the input on the way to navigating, and closing the panel at that
   // exact moment would race the click.
-  const [dismissed, setDismissed] = useState(false)
+  // The phone's results close the same way (the user, Oct 20: once they
+  // showed, only the box's ✕ put the home back).
+  const [ownDismissed, setOwnDismissed] = useState(false)
+  const dismissed = searchDismissed ?? ownDismissed
+  const setDismissed = (next: boolean) => {
+    setOwnDismissed(next)
+    if (next !== dismissed) onSearchDismissedChange?.(next)
+  }
   const trimmedQuery = query.trim()
   const dropdownOpen = trimmedQuery.length > 0 && !dismissed && searchPanel != null
   const searchShellRef = useRef<HTMLDivElement>(null)
+  // The phone's box and its results, in the page's flow.
+  const phoneShellRef = useRef<HTMLDivElement>(null)
 
+  const dismiss = useEffectEvent(() => setDismissed(true))
   useEffect(() => {
     if (!dropdownOpen) return
     function onPointerDown(e: MouseEvent) {
@@ -184,10 +202,12 @@ export default function HeroHeading({
       // (/philly/ask/…) opened, the visitor tapped "Not now", and the answer
       // was gone.
       if (document.querySelector('[aria-modal="true"]')) return
-      if (searchShellRef.current && !searchShellRef.current.contains(e.target as Node)) setDismissed(true)
+      const target = e.target as Node
+      if ([searchShellRef, phoneShellRef].some((r) => r.current?.contains(target))) return
+      dismiss()
     }
     function onKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape') setDismissed(true)
+      if (e.key === 'Escape') dismiss()
     }
     document.addEventListener('mousedown', onPointerDown)
     document.addEventListener('keydown', onKeyDown)
@@ -205,7 +225,8 @@ export default function HeroHeading({
   const prompts = interactive && !trimmedQuery ? searchPrompts : []
   const pickPrompt = (p: string) => onPickPrompt?.(p)
   // On a phone, right under the box, in the page's flow.
-  const phonePanel = trimmedQuery && searchPanel ? <div className="mt-2 text-left">{searchPanel}</div> : null
+  const phonePanel = dropdownOpen ? <div className="mt-2 text-left">{searchPanel}</div> : null
+  const reopen = () => setDismissed(false)
 
   return (
     <>
@@ -218,8 +239,8 @@ export default function HeroHeading({
           <p className="min-h-5 text-[13.5px] font-semibold text-slate-500">{today.dayLine}</p>
           <h1 className="mt-0.5 text-[26px] font-extrabold leading-tight tracking-tight text-ink">{settings.heroTitle}</h1>
           {ui.search.landing && (
-            <div className="mt-3">
-              <SearchBox query={query} onQueryChange={onQueryChange} onSubmit={onSearchSubmit} interactive={interactive} placeholder={settings.searchPlaceholder} />
+            <div ref={phoneShellRef} className="mt-3">
+              <SearchBox query={query} onQueryChange={handleQueryChange} onSubmit={onSearchSubmit} interactive={interactive} placeholder={settings.searchPlaceholder} onFocus={reopen} />
               {phonePanel}
               <SearchPrompts prompts={prompts} onPick={pickPrompt} className="mt-2.5" oneLine />
             </div>
@@ -237,8 +258,8 @@ export default function HeroHeading({
         <h1 className="sr-only">{settings.heroTitle}</h1>
         {trust}
         {ui.search.landing && (
-          <div className={trust ? 'mt-3' : undefined}>
-            <SearchBox query={query} onQueryChange={onQueryChange} onSubmit={onSearchSubmit} interactive={interactive} placeholder={settings.searchPlaceholder} look="box" />
+          <div ref={phoneShellRef} className={trust ? 'mt-3' : undefined}>
+            <SearchBox query={query} onQueryChange={handleQueryChange} onSubmit={onSearchSubmit} interactive={interactive} placeholder={settings.searchPlaceholder} onFocus={reopen} look="box" />
             {phonePanel}
             <SearchPrompts prompts={prompts} onPick={pickPrompt} className="mt-2.5" oneLine />
           </div>
@@ -394,7 +415,7 @@ export default function HeroHeading({
                 onSubmit={onSearchSubmit}
                 interactive={interactive}
                 placeholder={settings.searchPlaceholder}
-                onFocus={() => setDismissed(false)}
+                onFocus={reopen}
                 className="pl-6 pr-2.5 py-3"
               />
               {/* Over the page, right under the box (canvas board 8b). */}

@@ -173,6 +173,10 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
   const allCards = resources ? [...entryCards, ...resources] : null
 
   const q = query.trim()
+  // The results closed with the words still in the box (a tap away, or
+  // Escape; HeroHeading): the phone's home comes back as it was.
+  const [searchDismissed, setSearchDismissed] = useState(false)
+  const searching = !!q && !searchDismissed
   const loading = !q && allCards === null
   const filtered = q && allCards ? allCards.filter((c) => cardMatches(c, q, categories ?? [])) : allCards
 
@@ -393,7 +397,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
   }
   const mobileResultsNode = (
     <>
-      {!q && (
+      {!searching && (
         <RightNow
           listings={listings}
           categories={orderedCategories}
@@ -406,7 +410,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
           onOpenListing={openListing}
         />
       )}
-      <div data-testid="home-browse-list" className={q ? 'opacity-40 transition-opacity' : 'transition-opacity'}>
+      <div data-testid="home-browse-list" className={searching ? 'opacity-40 transition-opacity' : 'transition-opacity'}>
         <CategoryTiles communitySlug={communitySlug} listings={listings} />
       </div>
     </>
@@ -492,7 +496,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
       openNow={openNow}
       cards={todayCards}
       onOpenListing={openListing}
-      searching={!!q}
+      searching={searching}
       pinned={<PinnedBlock communitySlug={communitySlug} from={coords ?? community.mapCenter} now={schedule?.now ?? null} />}
       hidden={settings.todayHidden}
       thisWeek={week}
@@ -563,6 +567,8 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
             browseCardRef.current?.scrollIntoView({ block: 'start' })
           }}
           searchPanel={linesNode || nothingNode || null}
+          searchDismissed={searchDismissed}
+          onSearchDismissedChange={setSearchDismissed}
           searchPrompts={prompts}
           onPickPrompt={pickPrompt}
           today={today ? { dayLine: dayLine(schedule?.now ?? null, timezone, zmanim.data) } : undefined}
