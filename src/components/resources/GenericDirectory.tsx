@@ -1745,6 +1745,9 @@ export default function GenericDirectory({ category, items, anchorLabel, address
         onShowMap={hasMapColumn && mapHidden ? () => setMapHidden(false) : undefined}
       />
   )
+  // The categories with no map keep the list's heading under the search,
+  // as the toolbar's last line.
+  const headingInToolbar = !hasMapColumn && !columnItem && !minyanimView && listHeading !== null
 
   return (
     <TellAboutContext.Provider value={canAdd || canEdit ? tellAbout : null}>
@@ -1851,7 +1854,11 @@ export default function GenericDirectory({ category, items, anchorLabel, address
         // Not sticky where the map sits beside the list: the map stays in
         // view instead, and the list's heading moves to the top of its
         // column (see hasMapColumn).
-        className={`mb-4 space-y-2 ${hasMapColumn ? '' : 'lg:sticky lg:top-14 lg:z-30 lg:transition-all lg:duration-300'} ${
+        // No margin under it when the list's heading is its last line (the
+        // categories with no map): the heading's own padding is the space
+        // above the list, as it is where the heading tops the list column.
+        // A margin as well left a gap there and nowhere else (Oct 20).
+        className={`${headingInToolbar ? '' : 'mb-4'} space-y-2 ${hasMapColumn ? '' : 'lg:sticky lg:top-14 lg:z-30 lg:transition-all lg:duration-300'} ${
           hasMapColumn
             ? ''
             : controlsStuck
@@ -1891,7 +1898,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
             </div>
           )}
         </div>
-        {!hasMapColumn && !columnItem && !minyanimView && listHeading}
+        {headingInToolbar && listHeading}
       </div>
 
       <div ref={splitRef} className={mapBeside ? 'group/split lg:grid lg:items-start' : undefined} style={mapBeside ? splitStyle : undefined}>
@@ -2032,6 +2039,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
             <Fragment key={item.id}>
             <div
               ref={setItemRowRef(item.id)}
+              data-testid="directory-row"
               // A row and its pin light up together (CategoryMap), on the
               // pointer moving onto it, not on scrolling past (pointerHover).
               {...(mapBeside ? pointerHover(() => highlight.set(item.id), () => highlight.set(null)) : {})}
