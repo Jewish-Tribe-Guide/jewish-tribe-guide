@@ -23,7 +23,14 @@ vi.mock('@/lib/resourceStore', () => ({
   normalizeRow: (r: { details?: Record<string, unknown> }) => ({ ...r, ...(r.details ?? {}) }),
 }))
 vi.mock('@/lib/menuReader', async (orig) => ({ ...(await orig<typeof import('./menuReader')>()), fetchPublic: m.fetchPublic }))
-vi.mock('@/lib/shulWeekReading', () => ({ readShulWeek: m.readShulWeek }))
+// Its `updates` (a page's usual times, then each dated week) are its one
+// `update` unless a test gives them.
+vi.mock('@/lib/shulWeekReading', () => ({
+  readShulWeek: async (...args: unknown[]) => {
+    const got = await m.readShulWeek(...args)
+    return { updates: [got.update], ...got }
+  },
+}))
 vi.mock('@/lib/messageReader', async (orig) => ({ ...(await orig<typeof import('./messageReader')>()), readMessage: m.readMessage }))
 vi.mock('@/lib/submissionStore', () => ({ submitListingUpdate: m.submitListingUpdate }))
 vi.mock('@/lib/email', () => ({ sendWatchDigest: m.sendWatchDigest }))
@@ -199,8 +206,9 @@ describe('runListingPageWatch: a shul’s page of times', () => {
     expect(m.submitListingUpdate).not.toHaveBeenCalled()
   })
 
-  // A page's dated services come as one-offs; a calendar's are read a
-  // week at a time (below).
+  // A schedule with dated rows as one update, each date a one-off: what a
+  // page's dated services were until Oct 21 (now their weeks, below), and
+  // still how applyUpdate takes one. A calendar's are read a week at a time.
   const calendar = (rows: TimesUpdate['rows']): TimesUpdate => ({ ...moved, rows })
   const dated = (day: string, time: string) => ({ id: day + time, day, tefillah: 'mincha' as const, time, status: 'new' as const, quote: `${day} ${time}: Mincha` })
 
@@ -248,6 +256,28 @@ describe('runListingPageWatch: a shul’s page of times', () => {
     m.getResourceRowById.mockResolvedValue({ ...shul, details: { minyanim: [minyan], minyanim_schedules: [newsletterWeek, filed] } })
     m.readShulWeek.mockResolvedValue({ update: calendar([dated('2026-10-25', '5:30pm'), dated('2026-11-01', '5:00pm')]), model: 'cheap' })
     expect(await runListingPageWatch(changed, undefined, { apiKey: 'k', now: NOW })).toMatchObject({ ok: true, filed: 0, pageHash: await hashOfPage(), check: { result: 'agrees' } })
+    expect(m.submitListingUpdate).not.toHaveBeenCalled()
+  })
+
+  // Mikveh Israel's home page, Oct 21: its usual times, and "Shabbat Lekh
+  // Lekha" Friday night at 6:00 PM. The user: "I don't want as well as the
+  // regular times. If we have specific dates then it should all go on this
+  // week" (datedAsWeeks).
+  it('a page’s dated times go on as that week’s schedule, not as one day’s extra', async () => {
+    const lekhLekha = { id: 'k', day: '2026-10-23', tefillah: 'kabbalas_shabbos' as const, time: '6:00pm', status: 'new' as const, occasion: 'Shabbat Lekh Lekha', quote: 'Friday Night Services 6:00PM' }
+    const asRead = calendar([...agrees.rows, lekhLekha])
+    const thisWeek: TimesUpdate = { ...moved, kind: 'week', title: 'Shabbat Lekh Lekha', from: '2026-10-23', to: '2026-10-24', rows: [lekhLekha] }
+    m.readShulWeek.mockResolvedValue({ update: asRead, updates: [agrees, thisWeek], model: 'cheap' })
+    expect(await runListingPageWatch(changed, undefined, { apiKey: 'k', now: NOW })).toMatchObject({ ok: true, filed: 1 })
+    const [, , payload, note] = m.submitListingUpdate.mock.calls[0]
+    expect(note).not.toMatch(/that day only/)
+    expect(payload.details.minyanim_schedules).toEqual([
+      expect.objectContaining({ kind: 'week', mode: 'replace', postedBy: 'website', name: 'Shabbat Lekh Lekha', from: '2026-10-23', to: '2026-10-24', minyanim: [expect.objectContaining({ tefillah: 'kabbalas_shabbos', on: ['2026-10-23'], time: '6:00pm' })] }),
+    ])
+    // Read again once that week is on the listing: nothing more to file.
+    m.submitListingUpdate.mockClear()
+    m.getResourceRowById.mockResolvedValue({ ...shul, details: { minyanim: [minyan], minyanim_schedules: payload.details.minyanim_schedules } })
+    expect(await runListingPageWatch(changed, undefined, { apiKey: 'k', now: NOW })).toMatchObject({ ok: true, filed: 0, check: { result: 'agrees' } })
     expect(m.submitListingUpdate).not.toHaveBeenCalled()
   })
 

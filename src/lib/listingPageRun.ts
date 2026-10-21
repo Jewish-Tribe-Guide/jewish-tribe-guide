@@ -191,20 +191,36 @@ export async function readPageFor(
     // is read as its calendar's weeks (readCalendarWeeks): a usual time is
     // one the shul states, never one the guide works out from its calendar
     // (the user, Oct 20, on Leyv Ha-Ir's monthly services).
+    // Its dated times go on as their week's schedule, apart from its usual
+    // times (datedAsWeeks).
     const read = await readShulWeek(listing, reads.key, text !== null ? { text } : { pdf: source.pdf! }, apiKey)
     const sk = schedulesKey(reads.key)
-    const regular = regularMinyanim(listing[reads.key])
-    const schedules = readSchedules(listing[sk])
-    const own = dropListed(keepUncovered(read.update), regular, schedules)
-    const update = yieldToNewsletter(own, schedules)
+    let minyanim = regularMinyanim(listing[reads.key])
+    let schedules = readSchedules(listing[sk])
     const lines = timesReadLines(read.update.rows)
-    const note = changing(update) < changing(own) ? NEWSLETTER_HELD : undefined
-    if (!update || !changesAnything(update)) return { read: lines, proposal: null, note }
-    const applied = applyUpdate(regular, schedules, update, { postedBy: 'website' })
-    if (applied.changes.length === 0) return { read: lines, proposal: null, note }
+    const changes: string[] = []
+    let held = false
+    for (const u of read.updates) {
+      const week = u.kind === 'week'
+      // A week's own times stay in it: one the listing has that weekday
+      // still belongs to that week's schedule.
+      const own = week ? keepUncovered(u) : dropListed(keepUncovered(u), minyanim, schedules)
+      const update = yieldToNewsletter(own, schedules)
+      if (changing(update) < changing(own)) held = true
+      if (!update || !changesAnything(update)) continue
+      const applied = applyUpdate(minyanim, schedules, update, { postedBy: 'website' })
+      if (applied.changes.length === 0) continue
+      // Already on the listing as it would be (read again the next day).
+      if (suggestionKey({ [reads.key]: applied.minyanim, [sk]: applied.schedules }, [reads.key, sk]) === suggestionKey({ [reads.key]: minyanim, [sk]: schedules }, [reads.key, sk])) continue
+      minyanim = applied.minyanim
+      schedules = applied.schedules
+      changes.push(...applied.changes)
+    }
+    const note = held ? NEWSLETTER_HELD : undefined
+    if (changes.length === 0) return { read: lines, proposal: null, note }
     return {
       read: lines,
-      proposal: { submission: editSubmission(category, listing, { [reads.key]: applied.minyanim, [sk]: applied.schedules }), lines: applied.changes, keys: [reads.key, sk] },
+      proposal: { submission: editSubmission(category, listing, { [reads.key]: minyanim, [sk]: schedules }), lines: changes, keys: [reads.key, sk] },
       note,
     }
   }

@@ -758,6 +758,19 @@ compare, and one it can't read, on desktop and phone.
        Open: the Shtiebel now has no page. Its home and calendar pages
        show no times the reader can see (production also reads its
        newsletter).
+     - **A page's dated times are this week's schedule, Oct 21.** Mikveh
+       Israel's home page gives "Shabbat Lekh Lekha", Friday 6:00 PM. It
+       was proposed as one day's extra, "as well as the regular times".
+       The user: "If we have specific dates then it should all go on this
+       week." Now a website page's dated times are proposed as that
+       week's schedule, from the first date to Shabbos, with the usual
+       times those days kept in it. They are apart from its usual times,
+       and a week already on the listing isn't filed again. The newsletter
+       and the paste box still read dated times as before.
+     - **Mikveh Israel's calendar is pictures, Oct 21.** Its Calendar
+       page's event list is empty. The month is two images ("Oct. High
+       Holiday calendar 2026.png", "Calendar September 2026.png"), which
+       the reader doesn't read. Not built.
 
 ## Done Oct 20: "Check now" is the full check (on `redesign/oct18-fixes`, not merged)
 
