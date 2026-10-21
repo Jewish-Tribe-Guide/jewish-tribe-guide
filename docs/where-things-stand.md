@@ -285,24 +285,39 @@ it. The same should hold for everything the site keeps current.
 **Drawn Oct 21:** https://claude.ai/artifact/RLGXHudw7AjUC3FKmyor14 (a
 page of its own; the design canvas couldn't be opened from this login).
 The main page, Mikvah hours with three sources, Hospitals, a finding to
-check, and one it can't read, on desktop and phone. **Waiting on the user
-before building:**
-- The tab's name (drawn as "Keeping current", replacing Main dishes and
-  Watches).
-- Approving a finding line by line, or all at once.
-- Where a finding opens (drawn in place on desktop, its own screen on the
-  phone).
-- Where a hospital on Refuah with nothing on it goes (drawn under "can't
-  be read", though there's nothing to do).
-- Jobs fixed in code, or switched on per category (the drawing's
-  suggestion, since a job named for Philly's categories won't fit every
-  community).
-- Where linking an email sender to a shul or eruv goes, with no Watches
-  tab.
-- Also raised: a visitor's suggestion and the reader's finding for the
-  same change would sit in two places (the queue and the job page); and
-  Keystone-K's and Mekor Habracha's lists disagreeing about a place isn't
-  drawn.
+compare, and one it can't read, on desktop and phone.
+
+**Settled with the user, Oct 21 (after the drawing)**
+- **The tab stays "Watches".** Main dishes folds into it as the Dishes job.
+- **A switch per job, and Off per place.** A job is switched on per
+  category, for what the reader can read in it (named hours fields, times,
+  a menu); "Mikvah hours" is Philly's name for one, so it fits any
+  community. With a job on, any place can be turned off. Every reason a
+  place isn't read (no menu, no hours online, not on Refuah, turned off)
+  is one Off section saying why, with "Turn back on", which reads it
+  straight away and puts it back where that read belongs.
+- **"Compare"** opens a finding: in place on desktop, its own screen on
+  the phone. **Approve line by line,** a tick per line, like dishes.
+- **"Nothing on Refuah yet"** is its own quiet section on Hospitals (a
+  match with no contacts: nothing to do).
+- **A newsletter is one of its shul's sources.** An email from a sender
+  nobody has linked shows at the top of Shul times ("Which shul is it?" /
+  "Ignore"). An eruv's status email stays set on the eruv.
+- **A finding a visitor also sent in** says "also sent in by a visitor, in
+  the queue"; approving either settles both.
+- **A source says which fields it's for,** so a hand-added one can be
+  instead of or as well as a found one; for its fields it wins. When two
+  sources disagree, the finding shows both.
+- **Every hand-added source says what the reader did,** worked out on its
+  own: "On its website, but the reader didn't find it there on its own" or
+  "Not on its website", rechecked each time it searches that website again.
+  "The reader gets smarter" means the user brings a miss back to a
+  session and the reader's code changes when it's a pattern (with a test
+  on that real page); it never learns on its own.
+- The user expects few findings a day once everything is connected; an
+  admin validates them.
+- Still to draw: Kosher certification when the two lists disagree (with
+  step 5).
 
 **The idea**
 - **Every listing is connected to its source automatically,** from what
