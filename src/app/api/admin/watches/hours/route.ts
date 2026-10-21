@@ -20,15 +20,20 @@ import type { DirectoryResource } from '@/types'
 //      watch's `lastCheck`), what they found that differs from the listing,
 //      waiting to compare (watchFindings.ts), and when the place's last
 //      one was decided. A place with no page says why: its website is
-//      searched again now (fetches only, no AI). Admin only.
+//      searched again now (fetches only, no AI), and the pages it finds
+//      added. Admin only.
 //      `?counts` (the Watches tab's row): the same, but no search, so the
 //      tab isn't kept waiting on a slow website; its reasons are null.
 //      `?job=times`: the Shul times page (Oct 21), every place with davening
 //      times, the same way. Every POST takes it too.
-// POST body: { action: 'give', resourceId, url }
-//      "Give its hours page": read from this page too, from now on, given
-//      by hand, so the morning's search never takes it away. A "No hours
-//      online" goes. Read straight away.
+// POST body: { action: 'check', resourceId }
+//      "Check now", on every row: its pages read straight away; with none,
+//      its website searched now and what it finds added and read.
+// POST body: { action: 'give', resourceId, url, replaces? }
+//      "Add a page": read from this page too, from now on, given by hand,
+//      so the morning's search never takes it away. A "No hours online"
+//      goes. Read straight away. `replaces`, "Use a different page": that
+//      page of its own is stopped.
 // POST body: { action: 'off', resourceId }
 //      "No hours online" / "Turn off this place": kept, so the search leaves
 //      it alone, and its pages stay, not read.
@@ -60,27 +65,40 @@ function placeWatches(watches: readonly Watch[], id: string) {
 const jobOf = (request: Request): PageJob => (new URL(request.url).searchParams.get('job') === 'times' ? 'times' : 'hours')
 const shown = (ws: readonly Watch[]) => ws.map((w) => ({ watch: w, source: sourceLine(w) }))
 
-/** Why a place has nothing read, in a line: its pages' trouble, or what
- *  searching its website finds now. Null when something was read. */
-async function reasonFor(place: DirectoryResource, pages: readonly Watch[], now: number, search: boolean, job: PageJob): Promise<string | null> {
+/** Why a place has nothing read, in a line: its pages' trouble. Null when
+ *  something was read, or when it has no page (searchFor says why). */
+function reasonFor(pages: readonly Watch[], now: number, job: PageJob): string | null {
   const words = jobWords(job)
   const live = pages.filter((w) => w.active)
-  if (live.length) {
-    const loading = live.filter((w) => !['failing', 'stale'].includes(watchHealth(w, now).state))
-    if (!loading.length) return `Its ${live.length === 1 ? 'page' : 'pages'} didn’t load${live[0].lastError ? `: ${live[0].lastError}` : ''}.`
-    if (loading.every((w) => w.lastCheck && (w.lastCheck.result === 'nothing' || w.lastCheck.result === 'unreadable'))) {
-      return `Read its ${loading.length === 1 ? 'page' : 'pages'}: ${words.none} on ${loading.length === 1 ? 'it' : 'them'}.`
-    }
-    return null
+  if (!live.length) return null
+  const loading = live.filter((w) => !['failing', 'stale'].includes(watchHealth(w, now).state))
+  if (!loading.length) return `Its ${live.length === 1 ? 'page' : 'pages'} didn’t load${live[0].lastError ? `: ${live[0].lastError}` : ''}.`
+  if (loading.every((w) => w.lastCheck && (w.lastCheck.result === 'nothing' || w.lastCheck.result === 'unreadable'))) {
+    return `Read its ${loading.length === 1 ? 'page' : 'pages'}: ${words.none} on ${loading.length === 1 ? 'it' : 'them'}.`
   }
-  if (pages.length || !search) return null
+  return null
+}
+
+/** A place with no page: its website searched now (fetches only, no AI),
+ *  and what it finds added, as the morning's run would add them (the user,
+ *  Oct 21: "all the ones in not read yet can't be checked"). So every row
+ *  on the page has a page to Check now, and the Watches tab, which
+ *  searches nothing, counts them as the page does. */
+async function searchFor(slug: string, place: DirectoryResource, watches: readonly Watch[], job: PageJob, deadline: number | null): Promise<{ added: Watch[]; reason: string | null }> {
+  const words = jobWords(job)
   const website = websiteOf(place)
-  if (!website) return 'No website on Google.'
-  const got = await Promise.race([searchHoursPages(website, undefined, job).catch(() => null), new Promise<null>((done) => setTimeout(() => done(null), SEARCH_DEADLINE_MS))])
-  if (!got) return 'Its website took too long to read.'
-  if ('error' in got) return `Its website wouldn’t open: ${got.error}.`
-  if (!got.found.length) return `Read its website: ${words.none} on it.`
-  return words.found
+  if (!website) return { added: [], reason: 'No website on Google.' }
+  const search = searchHoursPages(website, undefined, job).catch(() => null)
+  const got = deadline === null ? await search : await Promise.race([search, new Promise<null>((done) => setTimeout(() => done(null), deadline))])
+  if (!got) return { added: [], reason: 'Its website took too long to read.' }
+  if ('error' in got) return { added: [], reason: `Its website wouldn’t open: ${got.error}.` }
+  const added: Watch[] = []
+  for (const p of got.found) {
+    if (watches.some((w) => samePage(w.url, p.url))) continue
+    const w = await addWatch(slug, { kind: 'website', url: p.url, resourceId: place.id, label: foundPageLabel(place.name, p.link), createdBy: HOURS_FOUND_CREATOR })
+    if (w) added.push(w)
+  }
+  return { added, reason: added.length ? null : `Read its website: ${words.none} on it.` }
 }
 
 export async function GET(request: Request) {
@@ -100,9 +118,11 @@ export async function GET(request: Request) {
 
     const rows = await Promise.all(
       places.map(async (p) => {
-        const { pages, stopped, marker } = placeWatches(watches, p.id)
+        const { pages: had, stopped, marker } = placeWatches(watches, p.id)
         const category = categories.find((c) => c.id === p.category)!
-        const reason = marker ? null : await reasonFor(p, pages, now, search, job)
+        const searched = !marker && !had.length && search && available ? await searchFor(community.slug, p, watches, job, SEARCH_DEADLINE_MS) : null
+        const pages = [...had, ...(searched?.added ?? [])]
+        const reason = marker ? null : (searched?.reason ?? reasonFor(pages, now, job))
         return {
           id: p.id,
           name: p.name,
@@ -113,7 +133,6 @@ export async function GET(request: Request) {
           off: !!marker,
           offSince: marker?.createdAt ?? null,
           reason,
-          found: reason === jobWords(job).found,
           findings: findings.filter((f) => f.targetId === p.id),
           decided: decided.get(p.id) ?? null,
           fields: category.detailFields.filter((f) => (job === 'times' ? f.type === 'minyanim' : f.type === 'hours' && f.key !== 'hours')).map((f) => f.label),
@@ -136,7 +155,7 @@ export async function POST(request: Request) {
   const action = body?.action
   const resourceId = typeof body?.resourceId === 'string' ? body.resourceId : ''
   const id = typeof body?.id === 'string' ? body.id : ''
-  if (!['give', 'off', 'on', 'stop', 'again'].includes(String(action)) || !UUID.test(resourceId) || ((action === 'stop' || action === 'again') && !id)) {
+  if (!['give', 'off', 'on', 'stop', 'again', 'check'].includes(String(action)) || !UUID.test(resourceId) || ((action === 'stop' || action === 'again') && !id)) {
     return Response.json({ ok: false, errors: ['Invalid request.'] }, { status: 400 })
   }
   if (action !== 'off' && action !== 'stop') {
@@ -197,7 +216,10 @@ export async function POST(request: Request) {
       const added = await addWatch(slug, { kind: 'website', url, resourceId, label: listingPageLabel(place.name, reads), createdBy: LISTING_PAGE_WATCH_CREATOR })
       if (!added) return Response.json({ ok: false, errors: ['Could not save that page.'] }, { status: 409 })
       const [given] = await read([added])
-      return reply([...pages, given], stopped)
+      // "Use a different page": the old one stopped, so the search never adds it again.
+      const replaced = typeof body?.replaces === 'string' ? pages.find((w) => w.id === body.replaces) : undefined
+      if (replaced) await updateWatch(slug, replaced.id, { createdBy: PAGE_STOPPED_CREATOR, active: false })
+      return reply([...pages.filter((w) => w !== replaced), given], replaced ? [...stopped, { ...replaced, createdBy: PAGE_STOPPED_CREATOR, active: false }] : stopped)
     }
 
     if (action === 'off') {
@@ -210,24 +232,25 @@ export async function POST(request: Request) {
       )
     }
 
+    if (action === 'check') {
+      if (marker || (pages.length && !pages.some((w) => w.active))) return Response.json({ ok: false, errors: ['It’s turned off. Turn it back on to read it.'] }, { status: 400 })
+      if (!pages.length) {
+        const { added, reason } = await searchFor(slug, place, watches, job, null)
+        return reply(await read(added), stopped, { reason })
+      }
+      return reply(await read(pages.filter((w) => w.active)), stopped)
+    }
+
     // On again.
     if (marker) await removeWatch(slug, marker.id)
-    let on = pages
-    for (const w of on) if (!w.active) await updateWatch(slug, w.id, { active: true })
-    on = on.map((w) => ({ ...w, active: true }))
-    const website = websiteOf(place)
-    if (!on.length && website) {
+    for (const w of pages) if (!w.active) await updateWatch(slug, w.id, { active: true })
+    const on = pages.map((w) => ({ ...w, active: true }))
+    if (!on.length) {
       // Searched now, as the morning's run would.
-      const got = await searchHoursPages(website, undefined, job)
-      if ('error' in got) return reply([], stopped, { reason: `Its website wouldn’t open: ${got.error}.` })
-      for (const p of got.found) {
-        if (watches.some((w) => samePage(w.url, p.url))) continue
-        const added = await addWatch(slug, { kind: 'website', url: p.url, resourceId, label: foundPageLabel(place.name, p.link), createdBy: HOURS_FOUND_CREATOR })
-        if (added) on.push(added)
-      }
+      const { added, reason } = await searchFor(slug, place, watches, job, null)
+      return reply(await read(added), stopped, { reason })
     }
-    const done = await read(on)
-    return reply(done, stopped)
+    return reply(await read(on), stopped)
   } catch (err) {
     console.error('[admin/watches/hours] POST failed:', err)
     return Response.json({ ok: false, errors: ['Could not save that.'] }, { status: 502 })

@@ -32,27 +32,17 @@ export function jobWords(job: PageJob) {
         what: 'davening times',
         none: 'no davening times',
         noneOnline: 'No times online',
-        same: 'the same times as the listing',
         unsure: 'times it couldn’t set beside the listing',
-        give: 'Give another page with its times',
         pageLabel: 'Its davening times page',
         placeholder: 'its-website.org/davening',
-        found: 'Its pages with times are found, and read on a coming morning.',
-        toCheck: 'A page gives times the listing doesn’t, or different ones.',
-        cantRead: 'No page on its website gives its davening times, or its pages didn’t load. Give the page with its times, or say it has none online.',
       }
     : {
         what: 'hours',
         none: 'no weekly hours',
         noneOnline: 'No hours online',
-        same: 'the same hours as the listing',
         unsure: 'hours it couldn’t set beside the listing',
-        give: 'Give another hours page',
         pageLabel: 'Its hours page',
         placeholder: 'its-website.org/hours',
-        found: 'Its hours pages are found, and read on a coming morning.',
-        toCheck: 'A page gives hours the listing doesn’t, or different ones.',
-        cantRead: 'No page on its website gives its weekly hours, or its pages didn’t load. Give its hours page, or say it has no hours online.',
       }
 }
 

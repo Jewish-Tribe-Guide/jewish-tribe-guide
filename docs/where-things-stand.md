@@ -661,6 +661,40 @@ compare, and one it can't read, on desktop and phone.
      a schedule's change. A whole week's minyanim show as two blocks, so
      finding the one changed time is by eye.
 
+7. **One page for every job: Shul times and Mikvah hours BUILT Oct 21**
+   (on `redesign/oct18-fixes`, not merged). The user, after seeing six
+   pages that each looked different: "Each listing is there, showing the
+   source reading from, the results, how it compares to what we have... A
+   way to have it check again, a way to replace the source or add a
+   source." So a job page is one list (`JobPage.tsx`), no sections:
+   - **Every row, closed,** has the place, how its last read compares
+     ("Differs from the listing", "Couldn't read", "Didn't load", "Not
+     read yet", "Same as the listing", "Off"), where it read from and when
+     ("From mekorhabracha.org/davening · read Oct 21"), and **Check now**
+     (Turn back on for one that's off). A finding to Compare sits under it.
+   - **Order:** what needs you first, then A–Z, Off last. It's fixed for
+     the visit, so a row acted on stays where it is. The count at the top
+     is "5 need you · 16 shuls".
+   - **Opened:** each page, how it was found, what it read and how that
+     compares, with "Use a different page" (gives one and stops the old
+     one) and "Stop reading this page". Stopped pages have "Read it again".
+     Then "Add a page", "Turn off this place" (or "No times online" for
+     one with nothing to read), "Open its listing" and "Open its website".
+   - **Check now works on every row,** "Not read yet" included: it reads
+     all the place's pages. A place with no page has its website searched
+     now, and the pages found are added and read. Opening the page also
+     adds what its website search finds, as the morning's run would. So a
+     row is never stuck with nothing to check, and the Watches tab, which
+     searches nothing, now counts those as not read rather than "can't be
+     read" (it showed 13 can't be read for Shul times, against the
+     page's 4).
+   - **Next, once the user has seen it:** Dishes, Hospitals, Eruv and
+     Kosher onto the same page; the Watches tab's "Menu" list goes (it is
+     Dishes again); and the tab's row counts come from the same statuses.
+   - **Waiting on the user:** should a read that agrees with the listing
+     clear an older finding still waiting? Mekor Habracha's Oct 21 read
+     agrees, but its Oct 20 finding still waits to Compare.
+
 ## Done Oct 20: "Check now" is the full check (on `redesign/oct18-fixes`, not merged)
 
 - **A shul's, mikvah's or menu page is read by the AI on Check now**,
