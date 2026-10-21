@@ -63,7 +63,7 @@ for (const { slug, name: communityName } of (communities ?? []) as { slug: strin
         console.log(`   Its website can’t be read${trouble ? `: ${trouble}` : ''}.`)
         continue
       }
-      for (const page of hoursPages(home.url, home.body)) {
+      for (const { url: page } of hoursPages(home.url, home.body)) {
         console.log(`\n   ── ${page}`)
         const source = await readListingPage(page).catch(() => null)
         if (!source) {

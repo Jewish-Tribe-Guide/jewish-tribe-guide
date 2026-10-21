@@ -467,6 +467,42 @@ compare, and one it can't read, on desktop and phone.
    - **The pages the AI read hours from are exactly the ones with a clock
      time on them** ("7:30PM", "4:30 AM"), so the daily search for pages
      can be done without the AI.
+   - **Connected, BUILT Oct 21 (not merged).** Every morning, before the
+     reads, `/api/cron/watches` searches each mikvah's website
+     (`syncHoursWatches`, `hoursJobRun.ts`): its home page and up to four
+     of its links that may give hours (`hoursPages`), each kept if it has
+     a clock time on it (`looksLikeHours`). Fetches only, no AI; all
+     places at once, each given 20s. A page it finds is watched as
+     "listing pages (found)" and read the same morning by the usual
+     run. It never touches a page an admin gave, and removes only its own
+     pages it no longer finds; one that just didn't load, a website that
+     won't open, or a place turned off is left as it is.
+   - **The Mikvah hours page** (`/admin/watches/hours`, a row on the
+     Watches tab; its pages aren't listed below there any more): To
+     check, Can't be read, Not read yet, Checked, and a closed "Off". The
+     intro says what's read ("Women's Hours, Men's Hours and Keilim
+     Hours"). Opened, a place shows each page it's read from, where that
+     came from ("Found from its website's Men's Mikvah link", "Added by
+     hand") and what its last read found, with Check now; one added by
+     hand can be stopped. Can't be read says why ("Read its website: no
+     weekly hours on it.", "No website on Google.", "Its website wouldn't
+     open: …"), with "Fill it in yourself", "Give its hours page" and "No
+     hours online". Any place can be turned off; "Turn back on" reads its
+     pages straight away, or searches its website then and there.
+   - **Live data, read only (Oct 21):** each of the four already has its
+     home page watched, given by hand on Oct 19. The first live run adds
+     Lower Merion's Men's Mikvah and Keilim Mikvah pages, and nothing
+     else: its home page is the one given (as http://; a page is the same
+     page with http or https, www. or not, `samePage`), and the other
+     three are by appointment only, so they show under Can't be read
+     ("Read its page: no weekly hours on it.") until "No hours online" is
+     pressed for each. That is the deployed code writing watches, so it
+     happens only once this branch is merged.
+   - **Not done yet:** differences still go to the moderation queue
+     (Compare isn't built); no "Add photos"; no "Read it for" per page
+     (every page is read for all the named hours); "What the reader did"
+     isn't shown for a page added by hand; there's no monthly re-search
+     (it's every morning, cheap since it's fetches only).
 4. **Shuls:** the same dry run. Its count decides how far this goes for
    shuls, or whether newsletters are the real source.
 5. **Eruv and Kosher certification** move onto job pages, and the Watches

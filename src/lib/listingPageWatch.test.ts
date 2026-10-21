@@ -16,6 +16,7 @@ import {
   timesReadLines,
   hoursReads,
   isListingPageWatch,
+  LISTING_PAGE_FOUND_CREATOR,
   LISTING_PAGE_WATCH_CREATOR,
   LISTING_PAGE_WATCH_NAME,
   listingPageNote,
@@ -35,8 +36,10 @@ const mikvah = makeCategory({
 })
 
 describe('isListingPageWatch', () => {
-  it('is only a watch an admin added as the listing’s own page', () => {
+  it('is a listing’s own page: one an admin added, or one found from its website', () => {
     expect(isListingPageWatch({ createdBy: LISTING_PAGE_WATCH_CREATOR })).toBe(true)
+    expect(isListingPageWatch({ createdBy: LISTING_PAGE_FOUND_CREATOR })).toBe(true)
+    expect(isListingPageWatch({ createdBy: 'hours off' })).toBe(false)
     expect(isListingPageWatch({ createdBy: 'admin@example.org' })).toBe(false)
     expect(isListingPageWatch({ createdBy: 'menu links' })).toBe(false)
   })

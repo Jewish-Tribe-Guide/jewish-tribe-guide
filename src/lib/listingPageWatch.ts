@@ -43,8 +43,12 @@ export const LISTING_PAGE_WATCH_NAME = 'Their website (automated)'
 /** The longest page text the readers are given. */
 export const MAX_PAGE_TEXT = 8_000
 
+/** The `created_by` of a page found from the listing's website by the
+ *  morning's search (hoursJob.ts), not given by an admin. Read the same. */
+export const LISTING_PAGE_FOUND_CREATOR = 'listing pages (found)'
+
 export function isListingPageWatch(w: Pick<Watch, 'createdBy'>): boolean {
-  return w.createdBy === LISTING_PAGE_WATCH_CREATOR
+  return w.createdBy === LISTING_PAGE_WATCH_CREATOR || w.createdBy === LISTING_PAGE_FOUND_CREATOR
 }
 
 /** What a listing's page is read for: a shul's usual minyan times, or the

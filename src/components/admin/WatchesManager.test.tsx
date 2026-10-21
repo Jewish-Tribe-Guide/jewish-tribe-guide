@@ -56,7 +56,7 @@ const posts: Post[] = []
 
 async function renderTab(
   watches: Watch[],
-  { available = true, post = {} as Record<string, unknown>, eruvim = [] as AdminEruv[], dishes = null as unknown[] | null, hospitals = null as unknown[] | null } = {},
+  { available = true, post = {} as Record<string, unknown>, eruvim = [] as AdminEruv[], dishes = null as unknown[] | null, hospitals = null as unknown[] | null, hours = null as unknown[] | null } = {},
 ) {
   vi.mocked(fetchJson).mockImplementation(async (url, init) => {
     if (init?.method === 'POST') {
@@ -76,6 +76,11 @@ async function renderTab(
     if (String(url).includes('/api/admin/watches/hospitals')) {
       if (!hospitals) throw new Error('down')
       return { ok: true, hospitals }
+    }
+    // Counts only: the tab never waits on a website search.
+    if (String(url).includes('/api/admin/watches/hours?counts')) {
+      if (!hours) throw new Error('down')
+      return { ok: true, name: 'Mikvah hours', places: hours }
     }
     return { ok: true, available, watches, listings: [SHUL, MIKVAH] }
   })
@@ -147,6 +152,30 @@ describe('WatchesManager', () => {
     // Their watches aren't listed below, nor counted.
     expect(screen.queryByRole('region', { name: 'Hospital contacts' })).toBeNull()
     expect(screen.getByTestId('watch-summary')).toHaveTextContent('1 watches')
+  })
+
+  // Oct 21: a mikvah's hours pages are on the Mikvah hours page, found from
+  // its website on their own, and its "No hours online" with them.
+  it('has a Mikvah hours row, and its pages aren’t listed below', async () => {
+    const read = { at: ago(0.1), what: 'hours' as const, from: null, result: 'agrees' as const, read: [], differences: [], queue: null }
+    const home = watch({ id: 'h', url: 'https://lmcmikvah.org/', resourceId: 'mikvah-1', createdBy: 'listing pages (found)', lastCheck: read })
+    const given = watch({ id: 'g', url: 'https://lmcmikvah.org/keilim/', resourceId: 'mikvah-1', createdBy: 'listing pages', lastCheck: read })
+    const off = watch({ id: 'o', url: 'https://guide.invalid/hours-off/m2', resourceId: 'm2', createdBy: 'hours off', active: false })
+    const shul = watch({ id: 's', resourceId: 'shul-1', url: 'https://lms.org/', createdBy: 'listing pages' })
+    await renderTab([home, given, off, shul], {
+      hours: [
+        { id: 'mikvah-1', pages: [{ watch: home }, { watch: given }], off: false },
+        { id: 'm2', pages: [], off: true },
+        { id: 'm3', pages: [], off: false },
+      ],
+    })
+    const hours = screen.getAllByTestId('job-row').at(-1)!
+    expect(hours).toHaveAttribute('href', '/philly/admin/watches/hours')
+    expect(hours).toHaveTextContent('Mikvah hours3 places, from their websites')
+    expect(hours).toHaveTextContent('1checked0to check1can’t be read0didn’t load today')
+    expect(screen.getByTestId('watch-summary')).toHaveTextContent('1 watches')
+    expect(names(screen.getByRole('region', { name: 'Shul’s times' }))).toEqual(['Lower Merion Synagogue'])
+    expect(screen.queryByRole('region', { name: 'Hours' })).toBeNull()
   })
 
   it('a job whose counts didn’t load still opens', async () => {

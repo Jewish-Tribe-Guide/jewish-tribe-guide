@@ -16,7 +16,7 @@ describe('hoursLinks', () => {
       a('http://www.mikvahrsvp.com/lmcmikvah', 'Make an Appointment'),
       a('https://buy.stripe.com/8wM8', 'Donate'),
     ].join('')
-    expect(hoursLinks(html, 'https://lmcmikvah.org/')).toEqual([
+    expect(hoursLinks(html, 'https://lmcmikvah.org/').map((l) => l.url)).toEqual([
       'https://lmcmikvah.org/appointments-and-membership/',
       'https://lmcmikvah.org/mens-mikvah/',
       'https://lmcmikvah.org/keilim-mikvah/',
@@ -27,7 +27,7 @@ describe('hoursLinks', () => {
 
   it('a page called hours or schedule comes first', () => {
     const html = a('/contact', 'Contact') + a('/kelim-mikvah/', 'Kelim Mikvah') + a('/visit#hours', 'Hours')
-    expect(hoursLinks(html, 'https://mikvah.example.org/')[0]).toBe('https://mikvah.example.org/visit')
+    expect(hoursLinks(html, 'https://mikvah.example.org/')[0]).toEqual({ url: 'https://mikvah.example.org/visit', text: 'Hours' })
   })
 
   it('leaves out what is never hours: donations, the cart, the home page again, other sites, files', () => {
@@ -46,7 +46,7 @@ describe('hoursLinks', () => {
 
   it('a link given twice counts once, at its best', () => {
     const html = a('/make-an-appointment/', 'Make an Appointment') + a('/make-an-appointment/', 'Contact an attendant on duty')
-    expect(hoursLinks(html, 'https://mikvahohelleah.org/')).toEqual(['https://mikvahohelleah.org/make-an-appointment/'])
+    expect(hoursLinks(html, 'https://mikvahohelleah.org/')).toEqual([{ url: 'https://mikvahohelleah.org/make-an-appointment/', text: 'Make an Appointment' }])
   })
 })
 
@@ -54,7 +54,8 @@ describe('hoursPages', () => {
   it('reads the home page, then a few of its links', () => {
     const html = Array.from({ length: 8 }, (_, i) => a(`/hours-${i}`, 'Hours')).join('')
     const pages = hoursPages('https://m.example.org/', html)
-    expect(pages[0]).toBe('https://m.example.org/')
+    expect(pages[0]).toEqual({ url: 'https://m.example.org/', link: null })
+    expect(pages[1]).toEqual({ url: 'https://m.example.org/hours-0', link: 'Hours' })
     expect(pages).toHaveLength(1 + MAX_HOURS_PAGES)
   })
 })

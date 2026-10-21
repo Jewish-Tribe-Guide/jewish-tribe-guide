@@ -23,6 +23,8 @@ const mockMenu = vi.hoisted(() => vi.fn())
 vi.mock('@/lib/menuWatchRun', () => ({ syncMenuWatches: mockSyncMenus, runMenuWatch: mockMenu, newMenuReadBudget: () => ({ aiReads: 3 }) }))
 const mockSyncRefuah = vi.hoisted(() => vi.fn(async () => [] as unknown[]))
 vi.mock('@/lib/refuahMatchRun', () => ({ syncRefuahWatches: mockSyncRefuah }))
+const mockSyncHours = vi.hoisted(() => vi.fn(async () => [] as unknown[]))
+vi.mock('@/lib/hoursJobRun', () => ({ syncHoursWatches: mockSyncHours }))
 
 const { GET } = await import('./route')
 
@@ -95,6 +97,23 @@ describe('/api/cron/watches', () => {
     const body = await (await GET(request())).json()
     expect(order).toEqual(['refuah', 'list'])
     expect(body.hospitals).toEqual([{ community: 'philly', added: 1, removed: 0 }])
+  })
+
+  // Oct 21: each mikvah's pages of hours are found from its website.
+  it('finds the mikvahs’ hours pages before listing the watches, so a new page is read the same morning', async () => {
+    const order: string[] = []
+    mockSyncHours.mockImplementationOnce(async () => (order.push('hours'), [{ community: 'philly', added: 2, removed: 0 }]))
+    mockList.mockImplementation(async () => (order.push('list'), { available: true, watches: [] }))
+    const body = await (await GET(request())).json()
+    expect(order).toEqual(['hours', 'list'])
+    expect(body.hours).toEqual([{ community: 'philly', added: 2, removed: 0 }])
+  })
+
+  it('a failure finding hours pages never stops the rest', async () => {
+    mockSyncHours.mockRejectedValueOnce(new Error('db down'))
+    mockList.mockResolvedValue({ available: true, watches: [watch({ id: 'site', url: 'https://bzbi.org/worship/' })] })
+    const body = await (await GET(request())).json()
+    expect(body.results.map((r: { id: string }) => r.id)).toEqual(['site'])
   })
 
   it('Refuah being down never stops the rest', async () => {

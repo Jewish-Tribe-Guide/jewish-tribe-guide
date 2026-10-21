@@ -19,13 +19,17 @@ const SOMETIMES = /\b(faqs?|contact|contact us|visit|visiting|what to expect|inf
 // Never a page of hours, whatever its link says.
 const NOT_HOURS = /\b(donate|donation|donations|fundraiser|campaign|cart|checkout|pay|payment|login|account|membership-?form|blog|news|gallery|photos)\b/
 
+/** A link that may give hours: where it goes, and what it's called. */
+export type HoursLink = { url: string; text: string }
+
 /** Links on a page, on the same website, that may give its hours: best
- *  first, in page order within each. The home page itself isn't one. */
-export function hoursLinks(html: string, base: string): string[] {
+ *  first, in page order within each, each with the words it's linked by
+ *  (the first, or the best). The home page itself isn't one. */
+export function hoursLinks(html: string, base: string): HoursLink[] {
   const site = new URL(base)
   const own = siteOf(site.hostname)
   const home = new URL('/', site).toString()
-  const found = new Map<string, number>()
+  const found = new Map<string, { score: number; text: string }>()
   for (const m of html.matchAll(/<a\b[^>]*\bhref\s*=\s*(["'])(.*?)\1[^>]*>([\s\S]*?)<\/a>/gi)) {
     const href = decode(m[2].trim())
     if (!href || /^(#|mailto:|tel:|javascript:)/i.test(href)) continue
@@ -39,19 +43,26 @@ export function hoursLinks(html: string, base: string): string[] {
     url.search = ''
     if (!/^https?:$/.test(url.protocol) || siteOf(url.hostname) !== own) continue
     if (/\.(jpe?g|png|gif|webp|svg|zip|docx?)$/i.test(url.pathname)) continue
-    const words = `${htmlToText(m[3])} ${decodeURIComponent(url.pathname).replace(/[-_/]+/g, ' ')}`.toLowerCase()
+    const text = htmlToText(m[3]).replace(/\s+/g, ' ').trim()
+    const words = `${text} ${decodeURIComponent(url.pathname).replace(/[-_/]+/g, ' ')}`.toLowerCase()
     if (NOT_HOURS.test(words)) continue
     const score = HOURS.test(words) ? 4 : APPOINTMENTS.test(words) ? 3 : ONE_KIND.test(words) ? 3 : SOMETIMES.test(words) ? 1 : 0
     if (score === 0) continue
     const key = url.toString()
     if (key === home || key === site.toString()) continue
-    found.set(key, Math.max(found.get(key) ?? 0, score))
+    const had = found.get(key)
+    if (!had || score > had.score) found.set(key, { score, text: text || had?.text || '' })
+    else if (!had.text) had.text = text
   }
-  return [...found].sort((a, b) => b[1] - a[1]).map(([url]) => url)
+  return [...found].sort((a, b) => b[1].score - a[1].score).map(([url, { text }]) => ({ url, text }))
 }
+
+/** A page to read a place's hours from: its home page (link null), or one
+ *  of its links, by the words it's linked by. */
+export type HoursPage = { url: string; link: string | null }
 
 /** The pages to read a place's hours from: its home page, then up to
  *  MAX_HOURS_PAGES of its links (hoursLinks). */
-export function hoursPages(homeUrl: string, html: string): string[] {
-  return [homeUrl, ...hoursLinks(html, homeUrl).slice(0, MAX_HOURS_PAGES)]
+export function hoursPages(homeUrl: string, html: string): HoursPage[] {
+  return [{ url: homeUrl, link: null }, ...hoursLinks(html, homeUrl).slice(0, MAX_HOURS_PAGES).map((l) => ({ url: l.url, link: l.text || null }))]
 }

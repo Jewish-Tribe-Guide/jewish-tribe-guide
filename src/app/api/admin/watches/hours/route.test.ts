@@ -1,0 +1,167 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { makeListing } from '@/test/providerFixtures'
+import type { Watch, WatchCheck } from '@/lib/watches'
+
+const m = vi.hoisted(() => ({
+  getAdminUserForCommunity: vi.fn(),
+  hoursJobPlaces: vi.fn(),
+  searchHoursPages: vi.fn(),
+  listWatches: vi.fn(),
+  addWatch: vi.fn(),
+  updateWatch: vi.fn(),
+  removeWatch: vi.fn(),
+  runAndRecord: vi.fn(),
+  pending: [] as { target_id: string }[],
+}))
+vi.mock('@/lib/rateLimit', () => ({ enforceRateLimit: async () => null }))
+vi.mock('@/lib/adminAuth', () => ({ getAdminUserForCommunity: m.getAdminUserForCommunity }))
+vi.mock('@/lib/communityStore', () => ({ communitySlugFromRequest: () => 'philly', resolveCommunity: async () => ({ slug: 'philly' }) }))
+vi.mock('@/lib/hoursJobRun', async (real) => ({ ...(await real<typeof import('@/lib/hoursJobRun')>()), hoursJobPlaces: m.hoursJobPlaces, searchHoursPages: m.searchHoursPages }))
+vi.mock('@/lib/watchStore', () => ({ listWatches: m.listWatches, addWatch: m.addWatch, updateWatch: m.updateWatch, removeWatch: m.removeWatch }))
+vi.mock('@/lib/watchRunner', () => ({ runAndRecord: m.runAndRecord }))
+vi.mock('@/lib/supabase/admin', () => ({
+  getAdminClient: () => ({
+    from: () => {
+      const q = { select: () => q, eq: () => q, in: () => q, then: (ok: (v: unknown) => unknown) => Promise.resolve({ data: m.pending, error: null }).then(ok) }
+      return q
+    },
+  }),
+}))
+
+const { GET, POST } = await import('./route')
+const { HOURS_FOUND_CREATOR, HOURS_OFF_CREATOR, hoursOffUrl } = await import('@/lib/hoursJob')
+const { LISTING_PAGE_WATCH_CREATOR } = await import('@/lib/listingPageWatch')
+
+const LMC = '0b6c4c1e-2f55-4a8e-9d57-3b7f0d6f4a21'
+const MEI = '7d1f3c2a-9b8e-4c6d-a5f4-3e2d1c0b9a87'
+const NONE = '3c9e1a7b-5d2f-4e8a-b6c4-1f0e9d8c7b6a'
+const MIKVAH = {
+  id: 'mikvah',
+  label: 'Mikvah',
+  detailFields: [
+    { key: 'hours', label: 'Hours', type: 'hours' },
+    { key: 'women_s_hours', label: 'Women’s Hours', type: 'hours' },
+    { key: 'men_s_hours', label: 'Men’s Hours', type: 'hours' },
+  ],
+}
+const req = (method: string, body?: unknown) => new Request('http://x/api/admin/watches/hours', { method, body: body === undefined ? undefined : JSON.stringify(body) })
+const check = (result: WatchCheck['result']): WatchCheck => ({ at: new Date().toISOString(), what: 'hours', from: null, result, read: [], differences: [], queue: null })
+const w = (over: Partial<Watch>) =>
+  ({ id: 'w1', communityId: 'philly', kind: 'website', url: 'https://lmcmikvah.org/', resourceId: LMC, active: true, createdBy: HOURS_FOUND_CREATOR, label: 'Lower Merion Community Mikvah · its website', lastRunAt: new Date().toISOString(), lastCheck: check('agrees'), ...over }) as Watch
+
+beforeEach(() => {
+  vi.clearAllMocks()
+  m.pending = []
+  m.getAdminUserForCommunity.mockResolvedValue({ email: 'me@x.co' })
+  m.hoursJobPlaces.mockResolvedValue({
+    categories: [MIKVAH],
+    places: [
+      makeListing({ id: LMC, category: 'mikvah', name: 'Lower Merion Community Mikvah', website: 'http://lmcmikvah.org/' }),
+      makeListing({ id: MEI, category: 'mikvah', name: 'Mikvah Mei Shalva', website: 'https://philamikvah.org/' }),
+      makeListing({ id: NONE, category: 'mikvah', name: 'No Website Mikvah' }),
+    ],
+  })
+  m.searchHoursPages.mockResolvedValue({ found: [], unloaded: [] })
+  m.listWatches.mockResolvedValue({ watches: [], available: true })
+  m.addWatch.mockImplementation(async (_c: string, x: Partial<Watch>) => w({ id: 'new', lastRunAt: null, lastCheck: null, ...x }))
+  m.runAndRecord.mockImplementation(async (x: Watch) => ({ watch: { ...x, lastRunAt: 'now', lastCheck: check('agrees') } }))
+})
+
+describe('GET /api/admin/watches/hours', () => {
+  it('refuses anyone who isn’t this community’s admin', async () => {
+    m.getAdminUserForCommunity.mockResolvedValue(null)
+    expect((await GET(req('GET'))).status).toBe(401)
+    expect((await POST(req('POST', { action: 'off', resourceId: LMC }))).status).toBe(401)
+  })
+
+  it('lists each place with its pages, where each came from, and what waits in the queue', async () => {
+    m.listWatches.mockResolvedValue({
+      watches: [
+        w({ id: 'home' }),
+        w({ id: 'mens', url: 'https://lmcmikvah.org/mens-mikvah/', label: 'Lower Merion Community Mikvah · Men’s Mikvah' }),
+        w({ id: 'given', url: 'https://lmcmikvah.org/keilim-mikvah/', createdBy: LISTING_PAGE_WATCH_CREATOR }),
+      ],
+      available: true,
+    })
+    m.pending = [{ target_id: LMC }]
+    const body = await (await GET(req('GET'))).json()
+    expect(body.name).toBe('Mikvah hours')
+    const lmc = body.places.find((p: { id: string }) => p.id === LMC)
+    expect(lmc).toMatchObject({ pending: 1, off: false, reason: null, fields: ['Women’s Hours', 'Men’s Hours'] })
+    expect(lmc.pages.map((p: { source: string }) => p.source)).toEqual(['Found from its website', 'Found from its website’s Men’s Mikvah link', 'Added by hand'])
+  })
+
+  it('says why a place has nothing read: no website, its website, or no hours on it', async () => {
+    m.searchHoursPages.mockImplementation(async (url: string) => (url.includes('philamikvah') ? { found: [], unloaded: [] } : { error: 'it couldn’t be reached' }))
+    const body = await (await GET(req('GET'))).json()
+    const reason = (id: string) => body.places.find((p: { id: string }) => p.id === id).reason
+    expect(reason(MEI)).toBe('Read its website: no weekly hours on it.')
+    expect(reason(NONE)).toBe('No website on Google.')
+    expect(reason(LMC)).toBe('Its website wouldn’t open: it couldn’t be reached.')
+    // A place with pages isn't searched again here, even when they're paused.
+    m.listWatches.mockResolvedValue({ watches: [w({ lastCheck: check('nothing') }), w({ id: 'paused', resourceId: MEI, url: 'https://philamikvah.org/', active: false })], available: true })
+    m.searchHoursPages.mockClear()
+    const again = await (await GET(req('GET'))).json()
+    expect(again.places.find((p: { id: string }) => p.id === LMC).reason).toBe('Read its page: no weekly hours on it.')
+    expect(again.places.find((p: { id: string }) => p.id === MEI).reason).toBeNull()
+    expect(m.searchHoursPages).not.toHaveBeenCalled()
+  })
+
+  it('the Watches tab’s counts search nothing, so a slow website can’t hold the tab up', async () => {
+    const body = await (await GET(new Request('http://x/api/admin/watches/hours?counts&community=philly'))).json()
+    expect(body.places).toHaveLength(3)
+    expect(m.searchHoursPages).not.toHaveBeenCalled()
+    // Its reasons are the job page's to give.
+    expect(body.places.find((p: { id: string }) => p.id === NONE).reason).toBeNull()
+  })
+})
+
+describe('POST /api/admin/watches/hours', () => {
+  it('give: a page given by hand, read straight away, and its Off goes', async () => {
+    m.listWatches.mockResolvedValue({ watches: [w({ id: 'off', url: hoursOffUrl(MEI), resourceId: MEI, createdBy: HOURS_OFF_CREATOR, active: false })], available: true })
+    const body = await (await POST(req('POST', { action: 'give', resourceId: MEI, url: 'philamikvah.org/hours' }))).json()
+    expect(m.removeWatch).toHaveBeenCalledWith('philly', 'off')
+    expect(m.addWatch).toHaveBeenCalledWith('philly', { kind: 'website', url: 'https://philamikvah.org/hours', resourceId: MEI, label: 'Mikvah Mei Shalva · hours on their website', createdBy: LISTING_PAGE_WATCH_CREATOR })
+    expect(m.runAndRecord).toHaveBeenCalledWith(expect.objectContaining({ id: 'new' }), undefined, undefined, { full: true })
+    expect(body).toMatchObject({ ok: true, off: false, pages: [{ source: 'Added by hand' }] })
+  })
+
+  it('give: refuses a page read for another place, or not a web address', async () => {
+    m.listWatches.mockResolvedValue({ watches: [w({ url: 'https://lmcmikvah.org/' })], available: true })
+    const taken = await POST(req('POST', { action: 'give', resourceId: MEI, url: 'http://www.lmcmikvah.org' }))
+    expect(taken.status).toBe(409)
+    expect((await taken.json()).errors[0]).toBe('That page is read for Lower Merion Community Mikvah already.')
+    expect((await POST(req('POST', { action: 'give', resourceId: MEI, url: 'mailto:x@y.org' }))).status).toBe(400)
+  })
+
+  it('off: kept, so the search leaves it alone, and its pages stay, not read', async () => {
+    m.listWatches.mockResolvedValue({ watches: [w({ id: 'home' })], available: true })
+    const body = await (await POST(req('POST', { action: 'off', resourceId: LMC }))).json()
+    expect(m.updateWatch).toHaveBeenCalledWith('philly', 'home', { active: false })
+    expect(m.addWatch).toHaveBeenCalledWith('philly', expect.objectContaining({ url: hoursOffUrl(LMC), createdBy: HOURS_OFF_CREATOR, active: false }))
+    expect(body).toMatchObject({ off: true, pages: [{ watch: { id: 'home', active: false } }] })
+    expect(m.runAndRecord).not.toHaveBeenCalled()
+  })
+
+  it('on: its pages read again straight away; with none, its website searched now', async () => {
+    m.listWatches.mockResolvedValue({ watches: [w({ id: 'home', active: false }), w({ id: 'off', url: hoursOffUrl(LMC), createdBy: HOURS_OFF_CREATOR, active: false })], available: true })
+    await POST(req('POST', { action: 'on', resourceId: LMC }))
+    expect(m.removeWatch).toHaveBeenCalledWith('philly', 'off')
+    expect(m.updateWatch).toHaveBeenCalledWith('philly', 'home', { active: true })
+    expect(m.runAndRecord).toHaveBeenCalledWith(expect.objectContaining({ id: 'home', active: true }), undefined, undefined, { full: true })
+
+    vi.clearAllMocks()
+    m.listWatches.mockResolvedValue({ watches: [], available: true })
+    m.searchHoursPages.mockResolvedValue({ found: [{ url: 'https://lmcmikvah.org/mens-mikvah/', link: 'Men’s Mikvah' }], unloaded: [] })
+    m.addWatch.mockImplementation(async (_c: string, x: Partial<Watch>) => w({ id: 'found', ...x }))
+    m.runAndRecord.mockImplementation(async (x: Watch) => ({ watch: x }))
+    const body = await (await POST(req('POST', { action: 'on', resourceId: LMC }))).json()
+    expect(m.addWatch).toHaveBeenCalledWith('philly', { kind: 'website', url: 'https://lmcmikvah.org/mens-mikvah/', resourceId: LMC, label: 'Lower Merion Community Mikvah · Men’s Mikvah', createdBy: HOURS_FOUND_CREATOR })
+    expect(body.pages.map((p: { source: string }) => p.source)).toEqual(['Found from its website’s Men’s Mikvah link'])
+  })
+
+  it('refuses a place whose hours aren’t read, and an unknown action', async () => {
+    expect((await POST(req('POST', { action: 'off', resourceId: '9f8e7d6c-5b4a-4c3d-a2b1-0f9e8d7c6b5a' }))).status).toBe(400)
+    expect((await POST(req('POST', { action: 'remove', resourceId: LMC }))).status).toBe(400)
+  })
+})

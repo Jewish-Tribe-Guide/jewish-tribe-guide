@@ -4,7 +4,8 @@
 // differences as suggestions, as does a hospital's page on Refuah
 // (refuahWatch.ts); a food place's menu is read by the AI when it changed
 // (menuWatch.ts: first, every place with a menu link is given its watch,
-// and every hospital the Refuah page nearest it, refuahMatch.ts),
+// every hospital the Refuah page nearest it, refuahMatch.ts, and every
+// mikvah its pages of hours found from its website, hoursJob.ts),
 // and so is a shul's or mikvah's own page of times or hours, for what
 // differs from its listing (listingPageWatch.ts); any other website is checked for a change. Then the
 // eruvim's maps, for a part an admin left out that's gone (eruvLineRun.ts). Meant to
@@ -24,6 +25,7 @@ import { sendWatchHealthAlert, type WatchHealthAlert } from '@/lib/email'
 import { runEruvLines } from '@/lib/eruvLineRun'
 import { newMenuReadBudget, syncMenuWatches } from '@/lib/menuWatchRun'
 import { syncRefuahWatches } from '@/lib/refuahMatchRun'
+import { syncHoursWatches } from '@/lib/hoursJobRun'
 
 export const maxDuration = 60
 
@@ -40,10 +42,17 @@ async function runAll(): Promise<NextResponse> {
     console.error('[cron/watches] menu watches failed:', err)
     return []
   })
-  const hospitals = await syncRefuahWatches().catch((err) => {
-    console.error('[cron/watches] Refuah matches failed:', err)
-    return []
-  })
+  // At once: one asks Refuah, the other the mikvahs' websites.
+  const [hospitals, hours] = await Promise.all([
+    syncRefuahWatches().catch((err) => {
+      console.error('[cron/watches] Refuah matches failed:', err)
+      return []
+    }),
+    syncHoursWatches().catch((err) => {
+      console.error('[cron/watches] hours pages failed:', err)
+      return []
+    }),
+  ])
   const { watches, available } = await listAllWatches()
 
   if (!available) {
@@ -71,7 +80,7 @@ async function runAll(): Promise<NextResponse> {
       sendWatchHealthAlert(community, list).catch((err) => console.error('[cron/watches] alert failed:', err)),
     ),
   )
-  return NextResponse.json({ ok: true, recorded: true, menus, hospitals, results, eruvLines: await eruvLines() })
+  return NextResponse.json({ ok: true, recorded: true, menus, hospitals, hours, results, eruvLines: await eruvLines() })
 }
 
 export async function GET(req: NextRequest) {
