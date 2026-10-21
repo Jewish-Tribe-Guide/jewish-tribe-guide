@@ -276,6 +276,83 @@ for that exact change, in the same conversation. Show the dry run first.
 
 7. The "+" button covers part of the third tile in a row on the phone home.
 
+## Planned: keeping listings current (agreed Oct 21, not built; to be drawn first)
+
+The user, Oct 21: Main dishes needed no watch set up. A food place's
+Google website was enough: the reader found its menu and the tab listed
+it. The same should hold for everything the site keeps current. **Next
+step: draw it on the design canvas before building any of it.**
+
+**The idea**
+- **Every listing is connected to its source automatically,** from what
+  we already know. Food places, shuls and mikvahs start from the website
+  Google gave us, and the reader finds the right page on it. Hospitals are
+  matched to Refuah by map position. An eruv is found from its website.
+- **A manual source is the fallback,** for when it can't find one or
+  finds the wrong one, as "Give its menu link" is on Main dishes.
+- **One admin page, a row per job:** Dishes, Shul times, Mikvah hours,
+  Hospitals, Eruv status, Kosher certification. Each row has its counts
+  (checked, to check, can't be read, a source that didn't load today).
+  Each opens a Main dishes-style page with every place in that category:
+  where it's read from and why ("Found from its website's Menu link",
+  "Matched to Refuah's Pennsylvania Hospital, 800 Spruce St", "Added by
+  you"), when it was last read, what it says next to what the listing
+  says, and for one it can't read, why and the ways out.
+- **No Watches tab.** A source covering many places becomes a job of its
+  own: Keystone-K's list is "Kosher certification", with each food place
+  on it or not. A shul's newsletter is one of that shul's sources. A
+  broken source shows on its job's row, and the email alert stays.
+
+**Decided (the user, Oct 21)**
+- **Findings go to the job pages,** next to what the listing says, not the
+  moderation queue. The queue keeps what people send in. Today the shul,
+  mikvah and Refuah watches file to the queue.
+- **Refuah: build it now;** the user asks Refuah afterwards. Checked Oct
+  21: its data service can be searched from a server, with no browser
+  (`hospitals:list` by map position, nearest first, and `hospitals:search`
+  by name, both with addresses and map positions). It's the service its
+  own site uses, not a published one; its robots.txt allows everything;
+  its terms weren't read. Match by map position, not name: searching
+  "Pennsylvania Hospital" put HUP first. Penn Presbyterian and
+  Pennsylvania Hospital are on Refuah now but empty (no liaisons, no
+  services).
+- **The eruv works the same way:** its status found from its website, and
+  where it can't be, the user says on the Eruv page how to find it. Status
+  is already read by code from a page or an email (6c above), and goes
+  live with no approval; that stays. What moves is where its source is set
+  (now the Watches tab). It matters most on Friday afternoon, so it's read
+  more often then.
+
+**How sources work**
+- **A place has a list of sources, not one link.** A mikvah may have a
+  women's hours page, a men's and a keilim page, each saying what it's
+  read for, with its own last read and problems. Found ones and ones an
+  admin adds sit side by side. **And one source can serve several
+  places** (Refuah, Keystone-K's list, one page for two mikvahs).
+- **It remembers where it found things.** Next time it goes straight to
+  that page rather than searching the whole website. It searches again
+  only when that page breaks, stops having the thing, or once a month.
+- **It watches the page with the link, not only what it links to:** a
+  restaurant uploading "menu-fall-2026.pdf" under a new name each season
+  is noticed that way.
+- **A source an admin added is never replaced by the search.** One it
+  found itself can be, and the page says so ("Its menu moved: now read
+  from …"). No learning beyond remembering: the page can always say why
+  it reads where it reads.
+
+**Build order**
+1. **Finish menus:** the menu page the reader found becomes what the
+   daily check watches. Today only places with a menu link are watched
+   daily; the tab reads websites only when asked.
+2. **Hospitals:** matched to Refuah automatically, on their own page, so
+   the main page has two rows.
+3. **Mikvahs:** one dry run first (read each website once, save nothing,
+   count how many it reads right), then connected.
+4. **Shuls:** the same dry run. Its count decides how far this goes for
+   shuls, or whether newsletters are the real source.
+5. **Eruv and Kosher certification** move onto job pages, and the Watches
+   tab goes.
+
 ## Done Oct 20: "Check now" is the full check (on `redesign/oct18-fixes`, not merged)
 
 - **A shul's, mikvah's or menu page is read by the AI on Check now**,
