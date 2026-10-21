@@ -85,10 +85,12 @@ export function isPrivateAddress(ip: string): boolean {
   return true
 }
 
-type Lookup = (host: string) => Promise<string[]>
-const dnsLookup: Lookup = async (host) => (await lookup(host, { all: true })).map((a) => a.address)
+export type Lookup = (host: string) => Promise<string[]>
+export const dnsLookup: Lookup = async (host) => (await lookup(host, { all: true })).map((a) => a.address)
 
-async function publicUrl(raw: string, resolve: Lookup): Promise<URL | null> {
+/** A web address on the public internet, its host resolved and checked; null
+ *  for anything else (see isPrivateAddress). */
+export async function publicUrl(raw: string, resolve: Lookup): Promise<URL | null> {
   let url: URL
   try {
     url = new URL(raw)
@@ -356,6 +358,18 @@ export function isOrderingApp(raw: string): boolean {
   }
 }
 
+/** A page as a browser drew it (renderPage.ts): where it ended up, and its
+ *  HTML once its scripts had run. */
+export type Rendered = { url: string; body: string }
+
+/** How the reader reaches pages. `render`, when given, draws a page that
+ *  came back with almost no words and no menu pictures, as a browser does
+ *  (renderPage.ts); without it such a page is given up on. */
+type Reach = { fetchImpl?: typeof fetch; resolve?: Lookup; render?: ((url: string) => Promise<Rendered | null>) | null }
+
+/** At most this many pages are drawn in a browser for one website. */
+export const MAX_RENDERS = 3
+
 /** How many pages of a website are read for its menu, best first: the
  *  first can be the wrong one (Diane's "Thanksgiving menu coming soon",
  *  I Want Moore's list of its shop's sections). */
@@ -366,13 +380,20 @@ export const MAX_MENU_PAGES = 3
  *  (a one-page site often is the menu). A page counts with its words or
  *  its menu's pictures (pageAsMenu); a link to a picture is that picture.
  *  Empty when nothing can be read at all. */
-export async function findMenus(
-  website: string,
-  opts: { fetchImpl?: typeof fetch; resolve?: Lookup } = {},
-): Promise<MenuSource[]> {
-  const home = await fetchPublic(website, opts)
-  if (!home) return []
-  if (home.type !== 'html') return home.type === 'pdf' ? [{ url: home.url, text: null, pdf: home.body }] : []
+export async function findMenus(website: string, opts: Reach = {}): Promise<MenuSource[]> {
+  const fetched = await fetchPublic(website, opts)
+  if (!fetched) return []
+  if (fetched.type !== 'html') return fetched.type === 'pdf' ? [{ url: fetched.url, text: null, pdf: fetched.body }] : []
+  // A page with almost nothing on it may be drawn by a script: drawn in a
+  // browser when the caller can (MAX_RENDERS a website).
+  let renders = 0
+  const drawn = async (page: Rendered): Promise<Rendered | null> => {
+    if (!opts.render || renders >= MAX_RENDERS) return null
+    renders++
+    return opts.render(page.url)
+  }
+  // Its links too: a script-drawn home page has none until it's drawn.
+  const home: Rendered = (pageAsMenu(fetched, false) ? null : await drawn(fetched)) ?? fetched
   const found: MenuSource[] = []
   for (const link of menuLinks(home.body, home.url).slice(0, MAX_MENU_PAGES + 1)) {
     if (found.length >= MAX_MENU_PAGES) break
@@ -386,8 +407,13 @@ export async function findMenus(
       found.push({ url: page.url, text: null, pdf: page.body })
       continue
     }
-    // A menu page drawn by a script after it loads has next to no text, and no pictures.
-    const menu = pageAsMenu(page, true)
+    // A menu page drawn by a script after it loads has next to no text, and
+    // no pictures, until it's drawn.
+    let menu = pageAsMenu(page, true)
+    if (!menu) {
+      const again = await drawn(page)
+      menu = again && pageAsMenu(again, true)
+    }
     if (menu) found.push(menu)
   }
   const itself = pageAsMenu(home, false)
@@ -396,7 +422,7 @@ export async function findMenus(
 }
 
 /** The best place a website's menu may be (findMenus), or null. */
-export async function findMenu(website: string, opts: { fetchImpl?: typeof fetch; resolve?: Lookup } = {}): Promise<MenuSource | null> {
+export async function findMenu(website: string, opts: Reach = {}): Promise<MenuSource | null> {
   return (await findMenus(website, opts))[0] ?? null
 }
 
@@ -404,16 +430,16 @@ export async function findMenu(website: string, opts: { fetchImpl?: typeof fetch
  *  it is, a PDF, a page with real text or its menu's pictures on it, or a
  *  picture. Null when it can't be read, or it's an ordering app's (never
  *  fetched, see ORDERING_APPS). */
-export async function readMenuPage(
-  url: string,
-  opts: { fetchImpl?: typeof fetch; resolve?: Lookup } = {},
-): Promise<MenuSource | null> {
+export async function readMenuPage(url: string, opts: Reach = {}): Promise<MenuSource | null> {
   if (isOrderingApp(url)) return null
   if (isPictureAddress(url)) return { url, text: null, pdf: null, pictures: [url] }
   const page = await fetchPublic(url, opts)
   if (!page) return null
   if (page.type === 'pdf') return { url: page.url, text: null, pdf: page.body }
-  return pageAsMenu(page, true)
+  const menu = pageAsMenu(page, true)
+  if (menu || !opts.render) return menu
+  const drawn = await opts.render(page.url)
+  return drawn && pageAsMenu(drawn, true)
 }
 
 // ── Asking the AI ────────────────────────────────────────────────────────────

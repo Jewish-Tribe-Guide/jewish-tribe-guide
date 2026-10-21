@@ -47,6 +47,19 @@ const nextConfig: NextConfig = {
   // (Cache Components only behaves correctly there), just pointed at the
   // disposable test Supabase project instead of the real one.
   distDir: process.env.NEXT_DIST_DIR || '.next',
+  // The menu reader draws a page built by a script in a headless Chromium
+  // (src/lib/renderPage.ts). On Vercel that's @sparticuz/chromium, whose
+  // browser is a compressed file it unpacks at run time, found by a path
+  // the build's file tracing can't see; and playwright-core loads parts of
+  // itself by paths tracing can miss (it traced 87 of its files). So both
+  // are listed whole for the routes that read menus. (Both are already left
+  // unbundled: they're on Next's own serverExternalPackages list.)
+  outputFileTracingIncludes: Object.fromEntries(
+    ['/api/admin/main-dishes', '/api/admin/watches', '/api/cron/watches'].map((route) => [
+      route,
+      ['./node_modules/@sparticuz/chromium/**', './node_modules/playwright-core/**'],
+    ]),
+  ),
   images: {
     // Shared with the components that render these images, so the config and
     // the "can this be optimized?" check can't drift apart — see

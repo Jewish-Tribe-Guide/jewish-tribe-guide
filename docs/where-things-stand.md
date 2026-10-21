@@ -110,6 +110,10 @@ for that exact change, in the same conversation. Show the dry run first.
    Shtetl, Rita's, New York Bagel Bakery and Sababa Falafel are dated by
    Google's sync but still have the problems that held them back (off
    Keystone-K's list, closed temporarily, bad place id): fix or remove each.
+3. **Check the menu reader's browser on the preview** (Oct 20): Admin →
+   Main dishes → Insomnia Cookies → "Read again" should come back with
+   cookies, brownies and ice cream within about 20 seconds. It's the one
+   part that can only run on Vercel (see "a menu page built by a script").
 
 ## Getting the branch live
 
@@ -407,6 +411,55 @@ amazing … I want to see if that would have caught many."
   caught Next.js images all counting as one picture, which hid Mordy's
   menu behind its header photo) and the re-read above.
 
+## Done Oct 20, later: a menu page built by a script is drawn in a browser (on `redesign/oct18-fixes`, not merged)
+
+The user, Oct 20: "build the failed-row options first, then the browser
+fallback". Some places' own sites send an empty page and a program that
+draws the menu in the visitor's browser; the reader downloaded the page
+but never ran the program, so it saw nothing.
+
+- **Now, when a page comes back with almost no words and no menu
+  pictures, it's opened in a headless Chromium**, given four seconds to
+  draw, and read as drawn (`src/lib/renderPage.ts`). An empty home page is
+  drawn and the links it then has are followed; a menu page with nothing
+  on it is drawn too. At most three pages a website. A page with its
+  words already is never drawn.
+- **Where:** Main dishes' "Read its menu" and "Give its menu link", and
+  the menu watch. "Check now" always draws; the daily run draws one page a
+  run (it has a minute for every watch), and one left undrawn isn't
+  counted as a failure. Not the public "+ Add" box: a visitor's link stays
+  a plain fetch.
+- **Never a way round a block.** A site that refuses the reader is never
+  drawn (20th Street Pizza's "prove you're a person" refuses the plain
+  fetch, so it never gets that far); a drawn page that turns out to be
+  one is given up on; an ordering app's page is never opened, even when a
+  site sends the browser there. Every request a drawn page makes goes
+  through the reader's own check (no private addresses), and pictures,
+  video and fonts aren't loaded.
+- **What it catches** (locally, real sites, nothing saved): Mike's Chicken
+  (6 dishes), Insomnia ×2 (5 each), Center City Pretzel (Pretzels), about
+  15 seconds each. Not LUHV Vegan Deli or Unit Su Vege (drawn, still no
+  dishes). With the morning's changes, 18 of the 27 places on dev now
+  read; the rest need a person (menu link or photos) or have no menu.
+- **How it runs on Vercel:** `@sparticuz/chromium` 153 (a Chromium built
+  for serverless functions, matching Playwright 1.63's) with
+  `playwright-core` 1.63, both now production dependencies; locally,
+  Playwright's own Chromium. `next.config.ts` lists both packages' files
+  for the three routes that read menus (about 80MB; the limit is 250MB).
+  `MENU_RENDER=off` (an environment variable, then a redeploy) turns it
+  off.
+- **Not checked yet: that it starts on Vercel.** It can only run there.
+  **For the user:** on the branch's preview, Main dishes → Insomnia
+  Cookies → "Read again" should come back with cookies, brownies and ice
+  cream within about 20 seconds. If it says it couldn't read a menu,
+  the Vercel logs will say "[renderPage] couldn't draw".
+- Checked by tests: `renderPage.test.ts` (3: what a drawn page may
+  request, the challenge check, never opening a browser for an ordering
+  app or private address, or when off); 4 in `menuReader.test.ts` (3 fail
+  against the reader without it; at most three drawn); 2 in
+  `menuWatchRun.test.ts` (the run's budget, "Check now" always). Each of
+  ten one-line breaks fails its own test.
+
 ## Done Oct 20, later: a menu that couldn't be read gets three ways on (on `redesign/oct18-fixes`, not merged)
 
 Agreed with the user Oct 20 ("build the failed-row options first, then the
@@ -435,8 +488,8 @@ read" now has:
   last failed (or said no menu) now says "Its dishes came from a menu
   sent through the site, approved Oct 20", under "Approved and skipped",
   instead of a stale "Couldn't read".
-- Not built yet: the browser fallback (drawing a page that's built in the
-  browser, only when the page comes back nearly empty). Next.
+- The browser fallback came next: see "a menu page built by a script"
+  above.
 - Checked by tests: 5 new in `MainDishes.test.tsx` (4 fail against the
   old tab; the fifth guards the date rule, and fails when it's taken
   out), 7 new in the route's (6 fail against the old route; photos not

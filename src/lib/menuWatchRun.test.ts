@@ -170,3 +170,39 @@ describe('syncMenuWatches', () => {
     expect(m.addWatch).not.toHaveBeenCalled()
   })
 })
+
+// Oct 20: a menu drawn by a script is drawn in a browser (renderPage.ts):
+// always for "Check now", within the budget for the daily run, where one
+// left undrawn isn't a failure (the run has a minute for every watch).
+describe('a menu drawn by a script', () => {
+  const drawnPage = { url: URL_, body: `<p>${'Falafel plate. Shawarma laffa. '.repeat(10)}</p>` }
+  // readMenuPage, as the real one: a page with nothing on it is drawn when it can be.
+  const nearlyEmpty = async (_url: string, opts: { render?: ((u: string) => Promise<unknown>) | null }) => ((await opts.render?.(URL_)) ? page : null)
+  const renderer = () => ({ render: vi.fn(async () => drawnPage), close: vi.fn(async () => {}) })
+
+  it('the daily run draws within its budget, then leaves the rest for a run with room, without failing them', async () => {
+    m.readMenuPage.mockImplementation(nearlyEmpty)
+    const budget = newMenuReadBudget()
+    expect(budget.renders).toBe(1)
+    const first = renderer()
+    expect(await runMenuWatch(watch, budget, { apiKey: 'k', renderer: first })).toEqual({ ok: true, filed: 0, pageHash: menuHash(page) })
+    expect(first.render).toHaveBeenCalledTimes(1)
+    expect(first.close).toHaveBeenCalled()
+    expect(budget.renders).toBe(0)
+
+    const second = renderer()
+    expect(await runMenuWatch(watch, budget, { apiKey: 'k', renderer: second })).toEqual({ ok: true, filed: 0 })
+    expect(second.render).not.toHaveBeenCalled()
+  })
+
+  it('“Check now” always draws; one that still can’t be read is a failure, as before', async () => {
+    m.readMenuPage.mockImplementation(nearlyEmpty)
+    const drawn = renderer()
+    const out = await runMenuWatch(watch, { aiReads: 0, renders: 0 }, { apiKey: 'k', renderer: drawn, full: true })
+    expect(drawn.render).toHaveBeenCalledTimes(1)
+    expect(out.ok).toBe(true)
+
+    const nothing = { render: vi.fn(async () => null), close: vi.fn(async () => {}) }
+    expect((await runMenuWatch(watch, newMenuReadBudget(), { apiKey: 'k', renderer: nothing })).ok).toBe(false)
+  })
+})

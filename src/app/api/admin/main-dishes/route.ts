@@ -20,6 +20,7 @@ import {
   type StoredMenuReading,
 } from '@/lib/menuReadingStore'
 import { UUID } from '@/lib/itemMarkRoutes'
+import { pageRenderer } from '@/lib/renderPage'
 import type { CategoryConfig, CategoryField } from '@/lib/categories'
 import type { DirectoryResource } from '@/types'
 
@@ -161,9 +162,16 @@ export async function POST(request: Request) {
       const website = websiteOf(listing, kind.category)
       const menuUrl = menuLinkOf(listing)
       // Its menu link when that can be read, else the pages its website
-      // links to as its menu, best first, until one names dishes.
-      const linked = menuUrl ? await readMenuPage(menuUrl) : null
-      const sources = linked ? [linked] : website ? await findMenus(website) : []
+      // links to as its menu, best first, until one names dishes. A page
+      // drawn by a script is drawn in a browser (renderPage.ts).
+      const renderer = pageRenderer()
+      let sources
+      try {
+        const linked = menuUrl ? await readMenuPage(menuUrl, { render: renderer.render }) : null
+        sources = linked ? [linked] : website ? await findMenus(website, { render: renderer.render }) : []
+      } finally {
+        await renderer.close()
+      }
       if (!sources.length) {
         const reading = await saveMenuReading(community.slug, resourceId, {
           status: 'failed',
@@ -192,7 +200,8 @@ export async function POST(request: Request) {
       await revalidatePublicContent()
       const apiKey = process.env.OPENAI_API_KEY
       if (!apiKey) return Response.json({ ok: true, menuUrl: url, reading: null })
-      const source = await readMenuPage(url)
+      const renderer = pageRenderer()
+      const source = await readMenuPage(url, { render: renderer.render }).finally(() => renderer.close())
       const read = source ? (await readMenus([source], listing.name, { apiKey }))! : null
       const reading = await saveMenuReading(community.slug, resourceId, {
         status: read?.dishes.length ? 'proposed' : 'failed',
@@ -202,7 +211,7 @@ export async function POST(request: Request) {
           ? read.note
           : isOrderingApp(url)
             ? 'Saved as its menu link. The reader doesn’t open ordering apps: add photos of the menu.'
-            : 'Saved as its menu link, but it couldn’t be read (blocked, or drawn in the browser). Add photos of the menu.',
+            : 'Saved as its menu link, but it couldn’t be read (blocked, or nothing on it). Add photos of the menu.',
         model: read?.model ?? null,
       })
       return Response.json({ ok: true, menuUrl: url, reading })

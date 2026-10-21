@@ -46,8 +46,8 @@ vi.mock('@/lib/menuReader', async (orig) => ({
   readMenu: m.readMenu,
   // The routes read every page a menu may be on (findMenus, readMenus);
   // these tests give one, through the single-page mocks above.
-  findMenus: async (url: string) => {
-    const one = await m.findMenu(url)
+  findMenus: async (url: string, opts?: unknown) => {
+    const one = await m.findMenu(url, opts)
     return one ? [one] : []
   },
   readMenus: async (sources: MenuSource[], name: string, opts: unknown) => {
@@ -61,6 +61,10 @@ vi.mock('@/lib/menuReader', async (orig) => ({
   },
 }))
 vi.mock('@/lib/supabase/admin', () => ({ getAdminClient: () => ({ rpc: m.rpc }) }))
+// A page drawn in a browser (renderPage.ts): never a real one here.
+const render = vi.hoisted(() => vi.fn())
+const closeRenderer = vi.hoisted(() => vi.fn())
+vi.mock('@/lib/renderPage', () => ({ pageRenderer: () => ({ render, close: closeRenderer }) }))
 vi.mock('@/lib/revalidateContent', () => ({ revalidatePublicContent: m.revalidatePublicContent }))
 
 const { GET, POST } = await import('./route')
@@ -120,7 +124,7 @@ describe('/api/admin/main-dishes', () => {
     m.readMenu.mockResolvedValue({ sourceUrl: 'https://judah.example/menu', dishes: [{ name: 'Shawarma', quote: 'Shawarma plate', checked: true }], note: null, model: 'gpt' })
     const res = await POST(req('POST', { action: 'read', resourceId: ID }))
     expect(res.status).toBe(200)
-    expect(m.findMenu).toHaveBeenCalledWith('https://judah.example')
+    expect(m.findMenu).toHaveBeenCalledWith('https://judah.example', { render })
     expect(m.saveMenuReading).toHaveBeenCalledWith('philly', ID, expect.objectContaining({ status: 'proposed', dishes: [{ name: 'Shawarma', quote: 'Shawarma plate', checked: true }] }))
     // Proposed is not shown: nothing touches the listing.
     expect(m.rpc).not.toHaveBeenCalled()
@@ -134,14 +138,22 @@ describe('/api/admin/main-dishes', () => {
     m.readMenuPage.mockResolvedValue({ url: 'https://judah.example/menu.pdf', text: null, pdf: 'JVBER' })
     m.readMenu.mockResolvedValue({ sourceUrl: 'https://judah.example/menu.pdf', dishes: [{ name: 'Shawarma', quote: 'Shawarma', checked: false }], note: null, model: 'gpt' })
     await POST(req('POST', { action: 'read', resourceId: ID }))
-    expect(m.readMenuPage).toHaveBeenCalledWith('https://judah.example/menu.pdf')
+    expect(m.readMenuPage).toHaveBeenCalledWith('https://judah.example/menu.pdf', { render })
     expect(m.findMenu).not.toHaveBeenCalled()
     expect(m.readMenu).toHaveBeenCalledWith(expect.objectContaining({ url: 'https://judah.example/menu.pdf' }), 'Judah', expect.anything())
 
     m.readMenuPage.mockResolvedValue(null)
     m.findMenu.mockResolvedValue({ url: 'https://judah.example/food', text: 'menu', pdf: null })
     await POST(req('POST', { action: 'read', resourceId: ID }))
-    expect(m.findMenu).toHaveBeenCalledWith('https://judah.example')
+    expect(m.findMenu).toHaveBeenCalledWith('https://judah.example', { render })
+  })
+
+  // Oct 20: a page drawn by a script is drawn in a browser (renderPage.ts),
+  // which is always closed, even when reading fails.
+  it('the reader can draw a page in a browser, which is closed after, whatever happens', async () => {
+    m.findMenu.mockRejectedValue(new Error('boom'))
+    expect((await POST(req('POST', { action: 'read', resourceId: ID }))).status).toBe(502)
+    expect(closeRenderer).toHaveBeenCalledTimes(1)
   })
 
   it('lists each place’s menu link, for the tab to say what it reads', async () => {
@@ -199,7 +211,8 @@ describe('/api/admin/main-dishes', () => {
       const body = await (await POST(req('POST', { action: 'link', resourceId: ID, url: 'judah.example/menu' }))).json()
       expect(m.saveMenuLink).toHaveBeenCalledWith('philly', ID, 'https://judah.example/menu')
       expect(m.revalidatePublicContent).toHaveBeenCalled()
-      expect(m.readMenuPage).toHaveBeenCalledWith('https://judah.example/menu')
+      expect(m.readMenuPage).toHaveBeenCalledWith('https://judah.example/menu', { render })
+      expect(closeRenderer).toHaveBeenCalled()
       expect(m.findMenu).not.toHaveBeenCalled()
       expect(body).toMatchObject({ ok: true, menuUrl: 'https://judah.example/menu', reading: { status: 'proposed' } })
     })

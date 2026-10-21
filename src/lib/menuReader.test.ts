@@ -397,3 +397,46 @@ describe('a menu on another page, or by another name', () => {
     expect(fetchImpl).toHaveBeenCalledTimes(2)
   })
 })
+
+// Oct 20: a page drawn by a script (Insomnia, Center City Pretzel, Mike's
+// Chicken) has almost nothing on it until a browser runs it. When the
+// caller can draw one (renderPage.ts), it's drawn; never otherwise.
+describe('a page drawn by a script', () => {
+  const empty = '<div id="root"></div><script src="/app.js"></script>'
+  const menuWords = `<h2>Mains</h2>${'<p>Chicken Shawarma Plate with rice and salad</p>'.repeat(8)}`
+  const drawn = (url: string, body: string) => ({ url, body })
+
+  it('an empty home page is drawn, and the links it then has are followed; a menu page with nothing on it is drawn too', async () => {
+    const fetchImpl = vi.fn().mockResolvedValueOnce(page(empty)).mockResolvedValueOnce(page(empty))
+    const render = vi
+      .fn()
+      .mockResolvedValueOnce(drawn('https://cookies.example/', `<a href="/menu">Menu</a><p>Warm cookies, delivered late.</p>`))
+      .mockResolvedValueOnce(drawn('https://cookies.example/menu', menuWords))
+    const found = await findMenus('https://cookies.example', { fetchImpl, resolve: publicDns, render })
+    expect(render.mock.calls.map(([u]) => u)).toEqual(['https://cookies.example/', 'https://cookies.example/menu'])
+    expect(found).toEqual([expect.objectContaining({ url: 'https://cookies.example/menu', text: expect.stringContaining('Chicken Shawarma Plate') })])
+  })
+
+  it('nothing is drawn without a way to draw it, nor a page that has its words already', async () => {
+    expect(await findMenus('https://cookies.example', { fetchImpl: vi.fn().mockResolvedValue(page(empty)), resolve: publicDns })).toEqual([])
+    const render = vi.fn()
+    await findMenus('https://grill.example', { fetchImpl: vi.fn().mockResolvedValue(page(menuWords)), resolve: publicDns, render })
+    expect(render).not.toHaveBeenCalled()
+  })
+
+  it('at most three pages drawn for a website', async () => {
+    const links = `<a href="/menu">Menu</a><a href="/catering">Catering</a><a href="/our-food">Our Food</a><a href="/shop">Shop</a>`
+    const render = vi.fn(async (url: string) => drawn(url, url.endsWith('.example/') ? links : empty))
+    await findMenus('https://cookies.example', { fetchImpl: vi.fn().mockImplementation(async () => page(empty)), resolve: publicDns, render })
+    expect(render).toHaveBeenCalledTimes(3)
+  })
+
+  it('a menu link with nothing on it is drawn; a site that refuses the reader is never drawn', async () => {
+    const render = vi.fn().mockResolvedValue(drawn('https://mikes.example/menu', menuWords))
+    expect(await readMenuPage('https://mikes.example/menu', { fetchImpl: vi.fn().mockResolvedValue(page(empty)), resolve: publicDns, render })).toMatchObject({ url: 'https://mikes.example/menu', text: expect.stringContaining('Shawarma') })
+    const refused = vi.fn()
+    expect(await readMenuPage('https://pizza.example/', { fetchImpl: vi.fn().mockResolvedValue(new Response('no', { status: 403 })), resolve: publicDns, render: refused })).toBeNull()
+    expect(await findMenus('https://pizza.example/', { fetchImpl: vi.fn().mockResolvedValue(new Response('no', { status: 403 })), resolve: publicDns, render: refused })).toEqual([])
+    expect(refused).not.toHaveBeenCalled()
+  })
+})

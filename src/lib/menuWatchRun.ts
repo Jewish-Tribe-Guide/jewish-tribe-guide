@@ -7,6 +7,7 @@ import { getMenuReading, saveMenuReading } from '@/lib/menuReadingStore'
 import { addWatch, listWatches, removeWatch } from '@/lib/watchStore'
 import { changedMenuNote, listedDishes, menuHash, MENU_AI_READS_PER_RUN, MENU_WATCH_CREATOR, menuWatchChanges, newDishes, wantedMenuWatches } from '@/lib/menuWatch'
 import { checkFrom, pageCheck } from '@/lib/listingPageWatch'
+import { pageRenderer } from '@/lib/renderPage'
 import type { Watch, WatchCheck, WatchOutcome } from '@/lib/watches'
 import type { ResourceRow } from '@/types'
 
@@ -15,11 +16,16 @@ import type { ResourceRow } from '@/types'
 
 /** How many AI reads this run has left: one object shared by a cron run's
  *  watches, the menus' and the shul and mikvah pages' (listingPageRun.ts)
- *  alike. A run without one ("Check now", one watch) isn't limited. */
-export type MenuReadBudget = { aiReads: number }
+ *  alike. A run without one ("Check now", one watch) isn't limited.
+ *  `renders`: how many menu pages it may draw in a browser (renderPage.ts),
+ *  each several seconds of a run that has a minute for every watch. */
+export type MenuReadBudget = { aiReads: number; renders?: number }
+
+/** Menu pages a cron run may draw in a browser. */
+export const MENU_RENDERS_PER_RUN = 1
 
 export function newMenuReadBudget(): MenuReadBudget {
-  return { aiReads: MENU_AI_READS_PER_RUN }
+  return { aiReads: MENU_AI_READS_PER_RUN, renders: MENU_RENDERS_PER_RUN }
 }
 
 /** Gives every food place with a menu link its watch, and takes away the
@@ -66,7 +72,7 @@ export async function syncMenuWatches(): Promise<{ community: string; added: num
 export async function runMenuWatch(
   watch: Pick<Watch, 'communityId' | 'url' | 'resourceId' | 'pageHash'>,
   budget?: MenuReadBudget,
-  opts: { fetchImpl?: typeof fetch; apiKey?: string | undefined; full?: boolean } = {},
+  opts: { fetchImpl?: typeof fetch; apiKey?: string | undefined; full?: boolean; renderer?: ReturnType<typeof pageRenderer> | null } = {},
 ): Promise<WatchOutcome> {
   if (!watch.resourceId) return { ok: false, error: 'This menu watch isn’t tied to a listing' }
   const row = await getResourceRowById(watch.resourceId, watch.communityId)
@@ -75,7 +81,25 @@ export async function runMenuWatch(
   const category = (await listCategoriesUncached(watch.communityId)).find((c) => c.id === listing.category)
   if (!category || !keepsMenuLink(category)) return { ok: false, error: 'The place this menu belongs to has no list of dishes' }
 
-  const source = await readMenuPage(watch.url, { fetchImpl: opts.fetchImpl })
+  // A menu drawn by a script is drawn in a browser: always for "Check now",
+  // within the run's budget for the daily run. One left undrawn for want
+  // of budget isn't a failure: it's read on a run with room.
+  let undrawn = false
+  const renderer = opts.renderer === undefined ? pageRenderer() : opts.renderer
+  const render =
+    renderer?.render &&
+    (async (url: string) => {
+      if (budget && !opts.full) {
+        if ((budget.renders ?? 0) <= 0) {
+          undrawn = true
+          return null
+        }
+        budget.renders!--
+      }
+      return renderer.render!(url)
+    })
+  const source = await readMenuPage(watch.url, { fetchImpl: opts.fetchImpl, render }).finally(() => renderer?.close())
+  if (!source && undrawn) return { ok: true, filed: 0 }
   if (!source) {
     return {
       ok: false,
