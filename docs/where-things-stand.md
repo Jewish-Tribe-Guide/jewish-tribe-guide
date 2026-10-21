@@ -449,10 +449,18 @@ but never ran the program, so it saw nothing.
   first 2 pages (two small button pictures take the other 2 of the 4).
   LUHV Vegan Deli's menu is on its Square Online order page
   (`deli.luhvfood.com/s/order?location=…`), which shows the menu with no
-  clicks once the location is in the address. That is an ordering app on
-  the place's own domain, so whether to read it is the user's call (the
-  Oct 6 rule says ordering apps are never fetched; `square.site` is on
-  the list, a Square store on its own domain isn't).
+  clicks once the location is in the address. Decided Oct 21: the reader
+  stays off it. The site's own `robots.txt` asks every reader but
+  Google's to keep out of `/s/`, and Square's buyer terms forbid robots
+  and scrapers (the UK, Irish and Canadian ones say so; the US text
+  wasn't found). A screenshot the reader took would be no different; one
+  a person takes and adds ("Add photos of the menu") is fine. So a
+  Square store's order page (`/s/order`, on any domain) now counts as an
+  ordering app, which before it didn't: given as a menu link it would
+  have been opened and drawn.
+- **Done on dev, Oct 21:** Unit Su Vege given its menu link; 9 dishes
+  waiting in "To check" for the user to approve. LUHV Vegan Deli needs
+  a person's screenshots of its order page.
 - **How it runs on Vercel:** `@sparticuz/chromium` 153 (a Chromium built
   for serverless functions, matching Playwright 1.63's) with
   `playwright-core` 1.63, both now production dependencies; locally,

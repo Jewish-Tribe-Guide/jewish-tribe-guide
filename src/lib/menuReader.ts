@@ -349,10 +349,16 @@ function pageAsMenu(page: { url: string; body: string }, menuPage: boolean): Men
  *  still send a screenshot of one. */
 const ORDERING_APPS = ['doordash.com', 'ubereats.com', 'grubhub.com', 'seamless.com', 'postmates.com', 'caviar.com', 'toasttab.com', 'chownow.com', 'slicelife.com', 'menufy.com', 'clover.com', 'square.site', 'order.online']
 
+/** The same apps on a place's own domain, known by their pages' address:
+ *  a Square store's order page is /s/order wherever it's hosted (LUHV Vegan
+ *  Deli's, Oct 21). */
+const ORDERING_APP_PATH = /^\/s\/order(\/|$)/i
+
 export function isOrderingApp(raw: string): boolean {
   try {
-    const host = new URL(raw).hostname.toLowerCase().replace(/^www\./, '')
-    return ORDERING_APPS.some((h) => host === h || host.endsWith(`.${h}`))
+    const url = new URL(raw)
+    const host = url.hostname.toLowerCase().replace(/^www\./, '')
+    return ORDERING_APPS.some((h) => host === h || host.endsWith(`.${h}`)) || ORDERING_APP_PATH.test(url.pathname)
   } catch {
     return false
   }

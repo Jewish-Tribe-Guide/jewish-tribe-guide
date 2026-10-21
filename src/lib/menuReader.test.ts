@@ -175,6 +175,14 @@ describe('a menu from the "+ Add" box', () => {
     expect(isOrderingApp('not a link')).toBe(false)
   })
 
+  it('a Square store on a place’s own domain is an ordering app too, by its order page', () => {
+    expect(isOrderingApp('https://deli.luhvfood.com/s/order?location=4R67MWX3GRYC0')).toBe(true)
+    expect(isOrderingApp('https://deli.luhvfood.com/s/order')).toBe(true)
+    expect(isOrderingApp('https://deli.luhvfood.com/S/Order/')).toBe(true)
+    expect(isOrderingApp('https://www.luhvfood.com/our-food')).toBe(false)
+    expect(isOrderingApp('https://example.com/menus/order-ahead')).toBe(false)
+  })
+
   it('sends photos of a menu as images, saying there’s no page, and keeps the dishes unchecked', () => {
     const source: MenuSource = { url: null, text: null, pdf: null, images: [{ mime: 'image/jpeg', b64: 'AAA' }] }
     const user = menuMessages(source, 'Say She Ate')[1] as { content: unknown[] }
