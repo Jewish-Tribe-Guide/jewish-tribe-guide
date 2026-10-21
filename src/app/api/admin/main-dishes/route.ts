@@ -6,11 +6,21 @@ import { getAdminClient } from '@/lib/supabase/admin'
 import { revalidatePublicContent } from '@/lib/revalidateContent'
 import { itemsField, listingFacts } from '@/lib/listingView'
 import { addedItemName, cleanItemName, itemMarks, itemWording } from '@/lib/itemMarks'
-import { findMenus, readMenus, readMenuPage, MAX_DISHES } from '@/lib/menuReader'
+import { findMenus, isOrderingApp, readMenu, readMenus, readMenuPage, MAX_DISHES, type MenuDish } from '@/lib/menuReader'
 import { MENU_LINK_KEY, readMenuLink } from '@/lib/menuLink'
-import { decideMenuReading, getMenuReading, listMenuReadings, saveMenuReading } from '@/lib/menuReadingStore'
+import {
+  clearMenuReading,
+  decideMenuReading,
+  getMenuReading,
+  isNoMenu,
+  listMenuReadings,
+  markNoMenu,
+  saveMenuLink,
+  saveMenuReading,
+  type StoredMenuReading,
+} from '@/lib/menuReadingStore'
 import { UUID } from '@/lib/itemMarkRoutes'
-import type { CategoryConfig } from '@/lib/categories'
+import type { CategoryConfig, CategoryField } from '@/lib/categories'
 import type { DirectoryResource } from '@/types'
 
 // GET  /api/admin/main-dishes — the "Main dishes" tab (agreed Oct 1): every
@@ -29,8 +39,43 @@ import type { DirectoryResource } from '@/types'
 //      menu ↗". The address is the reading's own, never the request's.
 // POST /api/admin/main-dishes   body: { action: 'skip', resourceId }
 //      Not now: the reading stays, marked skipped.
+//
+// For a place whose menu couldn't be read (the user, Oct 20):
+// POST body: { action: 'link', resourceId, url }
+//      "Give its menu link": saved on the listing as its menu link (so the
+//      tab reads it first from now on, and the menu watch watches it), then
+//      read. Saved even when it can't be read (an ordering app's, say): it's
+//      still the listing's "Full menu".
+// POST multipart: action=photos, resourceId, file (up to 3)
+//      "Add photos of the menu": read as the "+ Add" box reads photos (or a
+//      PDF), kept as a reading to check like any other. The photos aren't
+//      kept, and don't become its menu link.
+// POST body: { action: 'no_menu' | 'undo_no_menu', resourceId }
+//      "No menu": the place has none to read (menuReadingStore's isNoMenu).
+//
+// A reading marked "no menu" is sent as status 'no_menu'. Each place also
+// has `menuAt`, the newest "on its menu" date among the dishes it lists:
+// dishes approved from a menu someone sent through the site, which the tab
+// says, rather than a stale "couldn't read".
 
 export const maxDuration = 60
+
+const MAX_PHOTOS = 3
+const MAX_PHOTO_BYTES = 5 * 1024 * 1024
+const PHOTO_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp', 'application/pdf'])
+
+type Action = 'read' | 'approve' | 'skip' | 'link' | 'photos' | 'no_menu' | 'undo_no_menu'
+const ACTIONS: readonly Action[] = ['read', 'approve', 'skip', 'link', 'photos', 'no_menu', 'undo_no_menu']
+
+/** A reading as the tab gets it: "no menu" said as its own status. */
+function forTab(r: StoredMenuReading) {
+  return isNoMenu(r) ? { ...r, status: 'no_menu' as const } : r
+}
+
+/** The newest "on its menu" date among the dishes a place lists. */
+function newestMenuDate(item: DirectoryResource, field: CategoryField): string | null {
+  return itemMarks(item, field).reduce<string | null>((newest, m) => (m.menuAt && (!newest || m.menuAt > newest) ? m.menuAt : newest), null)
+}
 
 /** The categories with a list of dishes, each with that list's field. */
 function dishKinds(categories: CategoryConfig[]) {
@@ -77,7 +122,8 @@ export async function GET(request: Request) {
           website: websiteOf(l, category),
           menuUrl: menuLinkOf(l),
           dishes: itemMarks(l, field).map((m) => m.name),
-          reading: byId.get(l.id) ?? null,
+          menuAt: newestMenuDate(l, field),
+          reading: byId.has(l.id) ? forTab(byId.get(l.id)!) : null,
         })),
     )
     places.sort((a, b) => a.name.localeCompare(b.name))
@@ -93,10 +139,14 @@ export async function POST(request: Request) {
   const admin = await getAdminUserForCommunity(request, community.slug)
   if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
 
-  const body = (await request.json().catch(() => null)) as Record<string, unknown> | null
+  // Photos come as a form; everything else as JSON.
+  const form = (request.headers.get('content-type') ?? '').includes('multipart/form-data') ? await request.formData().catch(() => null) : null
+  const body = form
+    ? (Object.fromEntries([...form.entries()].filter(([, v]) => typeof v === 'string')) as Record<string, unknown>)
+    : ((await request.json().catch(() => null)) as Record<string, unknown> | null)
   const resourceId = typeof body?.resourceId === 'string' ? body.resourceId : ''
-  const action = body?.action
-  if (!UUID.test(resourceId) || (action !== 'read' && action !== 'approve' && action !== 'skip')) {
+  const action = ACTIONS.find((a) => a === body?.action)
+  if (!UUID.test(resourceId) || !action || (action === 'photos') !== !!form) {
     return Response.json({ ok: false, errors: ['Invalid request.'] }, { status: 400 })
   }
 
@@ -135,7 +185,61 @@ export async function POST(request: Request) {
       return Response.json({ ok: true, reading })
     }
 
+    if (action === 'link') {
+      const url = readMenuLink(body?.url)
+      if (!url) return Response.json({ ok: false, errors: ['That isn’t a web address.'] }, { status: 400 })
+      if (!(await saveMenuLink(community.slug, resourceId, url))) return Response.json({ ok: false, errors: ['That listing isn’t live any more.'] }, { status: 404 })
+      await revalidatePublicContent()
+      const apiKey = process.env.OPENAI_API_KEY
+      if (!apiKey) return Response.json({ ok: true, menuUrl: url, reading: null })
+      const source = await readMenuPage(url)
+      const read = source ? (await readMenus([source], listing.name, { apiKey }))! : null
+      const reading = await saveMenuReading(community.slug, resourceId, {
+        status: read?.dishes.length ? 'proposed' : 'failed',
+        sourceUrl: read?.sourceUrl ?? url,
+        dishes: read?.dishes ?? [],
+        note: read
+          ? read.note
+          : isOrderingApp(url)
+            ? 'Saved as its menu link. The reader doesn’t open ordering apps: add photos of the menu.'
+            : 'Saved as its menu link, but it couldn’t be read (blocked, or drawn in the browser). Add photos of the menu.',
+        model: read?.model ?? null,
+      })
+      return Response.json({ ok: true, menuUrl: url, reading })
+    }
+
+    if (action === 'photos') {
+      const apiKey = process.env.OPENAI_API_KEY
+      if (!apiKey) return Response.json({ ok: false, errors: ['The AI reader isn’t set up here (no OPENAI_API_KEY).'] }, { status: 503 })
+      const files = form!.getAll('file').filter((f): f is File => f instanceof File && f.size > 0)
+      if (files.length === 0 || files.length > MAX_PHOTOS) return Response.json({ ok: false, errors: [`Add 1 to ${MAX_PHOTOS} photos of the menu.`] }, { status: 400 })
+      if (files.some((f) => !PHOTO_TYPES.has(f.type))) return Response.json({ ok: false, errors: ['Photos (PNG, JPG or WebP) or a PDF, please.'] }, { status: 400 })
+      if (files.some((f) => f.size > MAX_PHOTO_BYTES)) return Response.json({ ok: false, errors: ['Each photo needs to be under 5MB.'] }, { status: 400 })
+      const sent = await Promise.all(files.map(async (f) => ({ mime: f.type, b64: Buffer.from(await f.arrayBuffer()).toString('base64') })))
+      const pdf = sent.find((f) => f.mime === 'application/pdf')
+      const photos = sent.filter((f) => f.mime !== 'application/pdf')
+      const read = await readMenu({ url: null, text: null, pdf: pdf?.b64 ?? null, images: photos }, listing.name, { apiKey })
+      // Read off a photo: said beside each dish, as for a menu's pictures.
+      const dishes: MenuDish[] = pdf ? read.dishes : read.dishes.map((d) => ({ ...d, picture: true as const }))
+      const reading = await saveMenuReading(community.slug, resourceId, {
+        status: dishes.length ? 'proposed' : 'failed',
+        sourceUrl: null,
+        dishes,
+        note: dishes.length ? null : (read.note ?? 'No dishes in those photos.'),
+        model: read.model,
+      })
+      return Response.json({ ok: true, reading })
+    }
+
+    if (action === 'no_menu') {
+      return Response.json({ ok: true, reading: forTab(await markNoMenu(community.slug, resourceId, admin.email)) })
+    }
+
     const stored = await getMenuReading(community.slug, resourceId)
+    if (action === 'undo_no_menu') {
+      if (stored && isNoMenu(stored)) await clearMenuReading(community.slug, resourceId)
+      return Response.json({ ok: true, reading: null })
+    }
     if (!stored) return Response.json({ ok: false, errors: ['Read its menu first.'] }, { status: 409 })
 
     if (action === 'skip') {

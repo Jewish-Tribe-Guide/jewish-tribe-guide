@@ -118,3 +118,72 @@ test('a menu reading is checked, edited and approved onto its listing, dated by 
   await expect(dishes).toContainText('seen')
   await expect(dishes.getByRole('link', { name: 'Full menu' })).toHaveAttribute('href', sourceUrl)
 })
+
+// Oct 20: a place whose menu couldn't be read gets three ways on. "No menu"
+// takes it out of "Couldn't be read" and is kept; Undo puts it back; "Give
+// its menu link" saves the link on the listing even when the reader can't
+// open it (a .invalid address never resolves, so no AI is ever asked).
+test('a menu that couldn’t be read: no menu, undone, then its menu link given', async ({ page }) => {
+  const supabase = getAdminClient()
+  const { data: cats } = await supabase.from('category').select('id, fields').eq('community_id', 'philly')
+  const found = (cats as { id: string; fields: Field[] }[])
+    .flatMap((c) => (c.fields ?? []).filter((f) => f.type === 'tags' && f.showCountInHeader && /\bdish$/i.test(f.countLabel ?? '')).map((f) => ({ c, f })))
+    .at(0)
+  test.skip(!found, 'no category with a list of dishes on the test project')
+  const { c } = found!
+
+  expect((await supabase.from('resource').insert({ id, community_id: 'philly', category: c.id, name, status: 'approved', details: { website: 'https://menu.example.invalid' } })).error).toBeNull()
+  expect(
+    (
+      await supabase.from('menu_reading').insert({
+        community_id: 'philly',
+        resource_id: id,
+        status: 'failed',
+        source_url: 'https://menu.example.invalid',
+        note: 'Couldn’t read a menu on its website.',
+        dishes: [],
+      })
+    ).error,
+  ).toBeNull()
+
+  await page.goto('/philly/admin/dishes')
+  // Written straight to the database: invalidate as a direct write must (see above).
+  const revalidated = await page.evaluate(async () => {
+    const key = Object.keys(localStorage).find((k) => /^sb-.+-auth-token$/.test(k))
+    const token = key ? (JSON.parse(localStorage.getItem(key)!) as { access_token?: string }).access_token : undefined
+    return (await fetch('/api/admin/revalidate', { method: 'POST', headers: { Authorization: `Bearer ${token}` } })).status
+  })
+  expect(revalidated).toBe(200)
+  const card = page.getByTestId('dish-place').filter({ hasText: name })
+  await expect(async () => {
+    await page.reload()
+    await page.getByRole('button', { name: 'Show Couldn’t be read' }).click()
+    await expect(card).toBeVisible({ timeout: 3_000 })
+  }).toPass({ timeout: 20_000 })
+  await expect(card).toContainText('Couldn’t read a menu on its website.')
+
+  const reading = async () => (await supabase.from('menu_reading').select('status, note, decided_by').eq('resource_id', id).maybeSingle()).data
+  await card.getByRole('button', { name: 'No menu' }).click()
+  await expect(page.getByTestId('dish-counts')).toContainText('no menu')
+  await expect.poll(async () => (await reading())?.note).toBe('No menu')
+  expect((await reading())?.decided_by).toBeTruthy()
+
+  // Kept: after a reload it's under "No menu", and Undo takes it away.
+  await page.reload()
+  await page.getByRole('button', { name: 'Show No menu' }).click()
+  await expect(card).toContainText('No menu, said')
+  await card.getByRole('button', { name: 'Undo' }).click()
+  await expect.poll(reading).toBeNull()
+
+  // Back as not read yet (it has a website); fail it again for the link.
+  await supabase.from('menu_reading').insert({ community_id: 'philly', resource_id: id, status: 'failed', source_url: null, note: 'Couldn’t read a menu on its website.', dishes: [] })
+  await page.reload()
+  await page.getByRole('button', { name: 'Show Couldn’t be read' }).click()
+  await card.getByRole('button', { name: 'Give its menu link' }).click()
+  await card.getByLabel(`${name}’s menu link`).fill('menu.example.invalid/our-menu')
+  await card.getByRole('button', { name: /^Save/ }).click()
+  const details = async () => (await supabase.from('resource').select('details').eq('id', id).single()).data?.details as Record<string, unknown>
+  await expect.poll(async () => (await details()).menuUrl).toBe('https://menu.example.invalid/our-menu')
+  expect((await details()).website).toBe('https://menu.example.invalid')
+})
+

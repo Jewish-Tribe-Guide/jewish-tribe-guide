@@ -97,4 +97,69 @@ describe('MainDishes', () => {
     expect(screen.getByText('Reading menus needs database migration 065.')).toBeTruthy()
     expect(screen.queryByRole('button', { name: /Read/ })).toBeNull()
   })
+
+  // Oct 20: a place whose menu couldn't be read gets three ways on.
+  describe('a menu that couldn’t be read', () => {
+    const failed = { ...unread, reading: { ...read, status: 'failed', dishes: [], note: 'Couldn’t read a menu on its website.', model: null } }
+    const openStuck = () => userEvent.click(screen.getByRole('button', { name: 'Show Couldn’t be read' }))
+
+    it('give its menu link: sent, and the place reads it from then on', async () => {
+      await renderTab([failed], { post: { menuUrl: 'https://bb.example/menu', reading: { ...read, sourceUrl: 'https://bb.example/menu', readAt: '2026-10-20T15:00:00Z' } } })
+      await openStuck()
+      await userEvent.click(screen.getByRole('button', { name: 'Give its menu link' }))
+      await userEvent.type(screen.getByLabelText('Bar Bombón’s menu link'), 'bb.example/menu')
+      await userEvent.click(screen.getByRole('button', { name: 'Save and read' }))
+      expect(posted()).toEqual([{ action: 'link', resourceId: 'p2', url: 'bb.example/menu' }])
+      // Its dishes are now to check.
+      expect(await screen.findByRole('heading', { name: /To check \(1\)/ })).toBeTruthy()
+    })
+
+    it('add photos of the menu: sent as a form, and its reading says so', async () => {
+      const photoReading = { ...read, sourceUrl: null, readAt: '2026-10-20T15:00:00Z', dishes: [{ name: 'Burgers', quote: 'Beyond Burger', checked: false, picture: true }] }
+      await renderTab([failed], { post: { reading: photoReading } })
+      await openStuck()
+      const photo = new File(['JPEG'], 'menu.jpg', { type: 'image/jpeg' })
+      await userEvent.upload(screen.getByLabelText('Photos of Bar Bombón’s menu'), photo)
+      const [, init] = vi.mocked(fetchJson).mock.calls.find(([, i]) => i?.method === 'POST')!
+      const body = init!.body as FormData
+      expect([body.get('action'), body.get('resourceId'), (body.get('file') as File).name]).toEqual(['photos', 'p2', 'menu.jpg'])
+      const card = within((await screen.findByRole('heading', { name: /To check \(1\)/ })).closest('section')!).getByTestId('dish-place')
+      expect(card.textContent).toContain('Read from photos of the menu, added Oct 20')
+      expect(card.textContent).toContain('Burgers from “Beyond Burger” (from a picture of the menu: open the menu to check)')
+    })
+
+    it('no menu: out of “couldn’t be read”, counted on its own, and undone', async () => {
+      const marked = { ...read, status: 'no_menu', dishes: [], note: 'No menu', model: null, sourceUrl: null, decidedAt: '2026-10-20T15:00:00Z', decidedBy: 'me@x.co' }
+      await renderTab([failed], { post: { reading: marked } })
+      await openStuck()
+      await userEvent.click(screen.getByRole('button', { name: 'No menu' }))
+      expect(posted()).toEqual([{ action: 'no_menu', resourceId: 'p2' }])
+      expect(screen.getByTestId('dish-counts').textContent).toBe('0 of 1 approved · 0 to check · 0 not read yet · 0 couldn’t be read · 1 no menu')
+      await userEvent.click(screen.getByRole('button', { name: 'Show No menu' }))
+      const card = screen.getByTestId('dish-place')
+      expect(card.textContent).toContain('No menu, said Oct 20 by me@x.co')
+      // Not read again while it says so.
+      expect(within(card).queryByRole('button', { name: /Read/ })).toBeNull()
+      vi.mocked(fetchJson).mockImplementation(async () => ({ ok: true, reading: null }))
+      await userEvent.click(within(card).getByRole('button', { name: 'Undo' }))
+      expect(posted().at(-1)).toEqual({ action: 'undo_no_menu', resourceId: 'p2' })
+      expect(screen.getByTestId('dish-counts').textContent).toBe('0 of 1 approved · 0 to check · 1 not read yet · 0 couldn’t be read')
+    })
+
+    it('a place whose dishes came from a menu sent through the site says so, not “couldn’t read”', async () => {
+      const sent = { ...failed, dishes: ['Burgers'], menuAt: '2026-10-21T12:00:00Z' }
+      await renderTab([sent])
+      expect(screen.getByTestId('dish-counts').textContent).toBe('0 of 1 approved · 0 to check · 0 not read yet · 0 couldn’t be read')
+      await userEvent.click(screen.getByRole('button', { name: 'Show Approved and skipped' }))
+      const card = screen.getByTestId('dish-place')
+      expect(within(card).getByTestId('dish-sent-through-site').textContent).toBe('Its dishes came from a menu sent through the site, approved Oct 21.')
+      expect(card.textContent).not.toContain('Couldn’t read a menu')
+      expect(within(card).queryByRole('button', { name: 'No menu' })).toBeNull()
+    })
+
+    it('a menu date older than the failed reading is the tab’s own: still couldn’t be read', async () => {
+      await renderTab([{ ...failed, dishes: ['Burgers'], menuAt: '2026-09-01T12:00:00Z' }])
+      expect(screen.getByTestId('dish-counts').textContent).toContain('1 couldn’t be read')
+    })
+  })
 })

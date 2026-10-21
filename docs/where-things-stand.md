@@ -401,14 +401,48 @@ amazing … I want to see if that would have caught many."
     (the Main dishes tab already flags it as moved).
   So pictures fix a few; most failures need a person to give the menu,
   which is what's next.
-- **Next (agreed Oct 20, not built):** on a failed row, "Give its menu
-  link" (saved as the listing's menu link, read from then on and watched)
-  and "Add photos of the menu" (read as the "+ Add" box reads photos);
-  and a row whose dishes came from somewhere else (a photo through the
-  site) says where, instead of the stale "Couldn't read".
+- **Next (agreed Oct 20):** the failed row's options. Built later the
+  same day, see "a menu that couldn't be read" below.
 - Checked by tests (10 new, each failing against the old code; one
   caught Next.js images all counting as one picture, which hid Mordy's
   menu behind its header photo) and the re-read above.
+
+## Done Oct 20, later: a menu that couldn't be read gets three ways on (on `redesign/oct18-fixes`, not merged)
+
+Agreed with the user Oct 20 ("build the failed-row options first, then the
+browser fallback"). On the Main dishes tab, each row under "Couldn't be
+read" now has:
+
+- **Give its menu link.** Saved on the listing as its menu link straight
+  away (its "Full menu", and from then on what the tab reads first and the
+  menu watch watches), then read. Saved even when it can't be read: an
+  ordering app's link (Toast) is still a good "Full menu" for a visitor,
+  and the row then says to add photos instead.
+- **Add photos of the menu** (up to 3, or a PDF). Read as the "+ Add"
+  box reads photos, and kept as a reading to check like any other, each
+  dish "from a picture of the menu". The photos aren't kept and don't
+  become its menu link.
+- **No menu.** For a place with none to read (a butcher, a caterer who
+  cooks to order). It leaves "Couldn't be read" for its own folded "No
+  menu" group, counted on its own ("· 2 no menu"), isn't read again, and
+  says who said so and when; Undo takes it back. Kept as a skipped
+  reading with the note "No menu" (`isNoMenu`, `menuReadingStore.ts`), so
+  **no migration**: this environment can't run SQL, and it works on both
+  databases as soon as it's deployed. A later reading (a menu link,
+  photos, the menu watch finding dishes) replaces it.
+- **Dishes from a menu sent through the site say so.** A place whose
+  dishes were approved from a menu sent in the "+ Add" box after the tab
+  last failed (or said no menu) now says "Its dishes came from a menu
+  sent through the site, approved Oct 20", under "Approved and skipped",
+  instead of a stale "Couldn't read".
+- Not built yet: the browser fallback (drawing a page that's built in the
+  browser, only when the page comes back nearly empty). Next.
+- Checked by tests: 5 new in `MainDishes.test.tsx` (4 fail against the
+  old tab; the fifth guards the date rule, and fails when it's taken
+  out), 7 new in the route's (6 fail against the old route; photos not
+  marked as pictures, and Undo clearing any reading, each fail their own),
+  and `e2e-admin-write/main-dishes.spec.ts` drives No menu, a reload,
+  Undo, and a menu link saved on the listing, against the test project.
 
 ## Done Oct 20, later: menus on another page, or by another name (on `redesign/oct18-fixes`, not merged)
 
@@ -459,7 +493,9 @@ reader to maybe take a screenshot and then read it?"
   needs a headless browser in the function (`@sparticuz/chromium`, about
   50MB and several seconds a read) or a paid rendering service. Not worth
   it for 3 places while "Give its menu link" / "Add photos" cover them;
-  worth revisiting if script-drawn sites grow. **For the user.**
+  worth revisiting if script-drawn sites grow. The user, Oct 20: build it,
+  as a fallback only when a page comes back nearly empty, after the
+  failed-row options.
 - Checked by tests (5 new in `menuReader.test.ts`, all 5 failing against
   the old file; each of six one-line mutations (old headers, no other
   names, own subdomain not counted, one page only, first page only, no

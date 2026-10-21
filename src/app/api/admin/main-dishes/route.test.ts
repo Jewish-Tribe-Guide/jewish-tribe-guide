@@ -12,6 +12,9 @@ const m = vi.hoisted(() => ({
   getMenuReading: vi.fn(),
   saveMenuReading: vi.fn(),
   decideMenuReading: vi.fn(),
+  markNoMenu: vi.fn(),
+  clearMenuReading: vi.fn(),
+  saveMenuLink: vi.fn(),
   findMenu: vi.fn(),
   readMenuPage: vi.fn(),
   readMenu: vi.fn(),
@@ -30,6 +33,11 @@ vi.mock('@/lib/menuReadingStore', () => ({
   getMenuReading: m.getMenuReading,
   saveMenuReading: m.saveMenuReading,
   decideMenuReading: m.decideMenuReading,
+  markNoMenu: m.markNoMenu,
+  clearMenuReading: m.clearMenuReading,
+  saveMenuLink: m.saveMenuLink,
+  NO_MENU_NOTE: 'No menu',
+  isNoMenu: (r: { status: string; note: string | null; dishes: unknown[] }) => r.status === 'skipped' && r.note === 'No menu' && r.dishes.length === 0,
 }))
 vi.mock('@/lib/menuReader', async (orig) => ({
   ...(await orig<typeof import('@/lib/menuReader')>()),
@@ -84,6 +92,8 @@ beforeEach(() => {
   m.listMenuReadings.mockResolvedValue({ readings: [reading], available: true })
   m.getMenuReading.mockResolvedValue(reading)
   m.saveMenuReading.mockImplementation(async (_c, id, r) => ({ ...reading, ...r, resourceId: id }))
+  m.saveMenuLink.mockResolvedValue(true)
+  m.markNoMenu.mockImplementation(async (_c, id, by) => ({ ...reading, resourceId: id, status: 'skipped', dishes: [], note: 'No menu', sourceUrl: null, model: null, decidedBy: by }))
   m.rpc.mockResolvedValue({ data: [{ out_community: 'philly', out_labels: ['Falafel', 'Shawarma'] }], error: null })
   vi.stubEnv('OPENAI_API_KEY', 'test-key')
 })
@@ -171,5 +181,105 @@ describe('/api/admin/main-dishes', () => {
     await POST(req('POST', { action: 'skip', resourceId: ID }))
     expect(m.decideMenuReading).toHaveBeenCalledWith('philly', ID, 'skipped', 'me@x.co')
     expect(m.rpc).not.toHaveBeenCalled()
+  })
+
+  // Oct 20: three ways on for a place whose menu couldn't be read.
+  describe('a menu that couldn’t be read', () => {
+    const photosReq = (files: File[], fields: Record<string, string> = { action: 'photos', resourceId: ID }) => {
+      const form = new FormData()
+      for (const [k, v] of Object.entries(fields)) form.append(k, v)
+      for (const f of files) form.append('file', f)
+      return new Request('http://x/api/admin/main-dishes?community=philly', { method: 'POST', body: form })
+    }
+    const jpeg = (name = 'menu.jpg', bytes = 'JPEG') => new File([bytes], name, { type: 'image/jpeg' })
+
+    it('a menu link is saved on the listing, the site told, and read', async () => {
+      m.readMenuPage.mockResolvedValue({ url: 'https://judah.example/menu', text: 'menu', pdf: null })
+      m.readMenu.mockResolvedValue({ sourceUrl: 'https://judah.example/menu', dishes: [{ name: 'Shawarma', quote: 'Shawarma', checked: true }], note: null, model: 'gpt' })
+      const body = await (await POST(req('POST', { action: 'link', resourceId: ID, url: 'judah.example/menu' }))).json()
+      expect(m.saveMenuLink).toHaveBeenCalledWith('philly', ID, 'https://judah.example/menu')
+      expect(m.revalidatePublicContent).toHaveBeenCalled()
+      expect(m.readMenuPage).toHaveBeenCalledWith('https://judah.example/menu')
+      expect(m.findMenu).not.toHaveBeenCalled()
+      expect(body).toMatchObject({ ok: true, menuUrl: 'https://judah.example/menu', reading: { status: 'proposed' } })
+    })
+
+    it('a link that can’t be read is still saved, and says what to do instead; an ordering app’s says why', async () => {
+      m.readMenuPage.mockResolvedValue(null)
+      await POST(req('POST', { action: 'link', resourceId: ID, url: 'https://www.toasttab.com/judah' }))
+      expect(m.saveMenuLink).toHaveBeenCalledWith('philly', ID, 'https://www.toasttab.com/judah')
+      expect(m.saveMenuReading).toHaveBeenLastCalledWith('philly', ID, expect.objectContaining({ status: 'failed', sourceUrl: 'https://www.toasttab.com/judah', note: expect.stringMatching(/doesn’t open ordering apps: add photos/) }))
+      await POST(req('POST', { action: 'link', resourceId: ID, url: 'https://judah.example/menu' }))
+      expect(m.saveMenuReading).toHaveBeenLastCalledWith('philly', ID, expect.objectContaining({ status: 'failed', note: expect.stringMatching(/couldn’t be read .* Add photos/) }))
+      expect(m.readMenu).not.toHaveBeenCalled()
+    })
+
+    it('not a web address, or a listing no longer live: nothing saved', async () => {
+      expect((await POST(req('POST', { action: 'link', resourceId: ID, url: 'their menu' }))).status).toBe(400)
+      expect((await POST(req('POST', { action: 'link', resourceId: ID, url: 'javascript:alert(1)' }))).status).toBe(400)
+      expect(m.saveMenuLink).not.toHaveBeenCalled()
+      m.saveMenuLink.mockResolvedValue(false)
+      expect((await POST(req('POST', { action: 'link', resourceId: ID, url: 'https://judah.example/menu' }))).status).toBe(404)
+      expect(m.revalidatePublicContent).not.toHaveBeenCalled()
+    })
+
+    it('photos of the menu are read as photos, each dish marked as from a picture, and nothing about the listing changes', async () => {
+      m.readMenu.mockResolvedValue({ sourceUrl: null, dishes: [{ name: 'Burgers', quote: 'Beyond Burger', checked: false }], note: null, model: 'gpt' })
+      const body = await (await POST(photosReq([jpeg('a.jpg', 'ONE'), jpeg('b.jpg', 'TWO')]))).json()
+      expect(m.readMenu).toHaveBeenCalledWith(
+        { url: null, text: null, pdf: null, images: [{ mime: 'image/jpeg', b64: Buffer.from('ONE').toString('base64') }, { mime: 'image/jpeg', b64: Buffer.from('TWO').toString('base64') }] },
+        'Judah',
+        expect.anything(),
+      )
+      expect(m.saveMenuReading).toHaveBeenCalledWith('philly', ID, {
+        status: 'proposed',
+        sourceUrl: null,
+        dishes: [{ name: 'Burgers', quote: 'Beyond Burger', checked: false, picture: true }],
+        note: null,
+        model: 'gpt',
+      })
+      expect(body.ok).toBe(true)
+      expect(m.saveMenuLink).not.toHaveBeenCalled()
+      expect(m.rpc).not.toHaveBeenCalled()
+
+      m.readMenu.mockResolvedValue({ sourceUrl: null, dishes: [], note: null, model: 'gpt' })
+      await POST(photosReq([jpeg()]))
+      expect(m.saveMenuReading).toHaveBeenLastCalledWith('philly', ID, expect.objectContaining({ status: 'failed', note: 'No dishes in those photos.' }))
+    })
+
+    it('photos: one to three, pictures or a PDF, each under 5MB, and only as a form', async () => {
+      expect((await POST(photosReq([]))).status).toBe(400)
+      expect((await POST(photosReq([jpeg(), jpeg(), jpeg(), jpeg()]))).status).toBe(400)
+      expect((await POST(photosReq([new File(['x'], 'menu.svg', { type: 'image/svg+xml' })]))).status).toBe(400)
+      expect((await POST(photosReq([jpeg('big.jpg', 'x'.repeat(5 * 1024 * 1024 + 1))]))).status).toBe(400)
+      expect((await POST(req('POST', { action: 'photos', resourceId: ID }))).status).toBe(400)
+      expect(m.readMenu).not.toHaveBeenCalled()
+      m.getAdminUserForCommunity.mockResolvedValue(null)
+      expect((await POST(photosReq([jpeg()]))).status).toBe(401)
+    })
+
+    it('no menu: kept, sent back as its own status, listed as such; undone only when it says no menu', async () => {
+      const body = await (await POST(req('POST', { action: 'no_menu', resourceId: ID }))).json()
+      expect(m.markNoMenu).toHaveBeenCalledWith('philly', ID, 'me@x.co')
+      expect(body.reading).toMatchObject({ status: 'no_menu', decidedBy: 'me@x.co' })
+
+      m.listMenuReadings.mockResolvedValue({ readings: [{ ...reading, status: 'skipped', dishes: [], note: 'No menu' }], available: true })
+      expect((await (await GET(req('GET'))).json()).places[0].reading.status).toBe('no_menu')
+
+      m.getMenuReading.mockResolvedValue({ ...reading, status: 'skipped', dishes: [], note: 'No menu' })
+      await POST(req('POST', { action: 'undo_no_menu', resourceId: ID }))
+      expect(m.clearMenuReading).toHaveBeenCalledWith('philly', ID)
+      m.clearMenuReading.mockClear()
+      m.getMenuReading.mockResolvedValue(reading)
+      await POST(req('POST', { action: 'undo_no_menu', resourceId: ID }))
+      expect(m.clearMenuReading).not.toHaveBeenCalled()
+    })
+
+    it('each place says when its newest dish came off a menu', async () => {
+      m.listApprovedResources.mockResolvedValue([{ ...judah, dishes: ['Falafel', 'Burgers'], itemMenu: { dishes: { falafel: '2026-10-01T12:00:00Z', burgers: '2026-10-20T12:00:00Z' } } }])
+      expect((await (await GET(req('GET'))).json()).places[0].menuAt).toBe('2026-10-20T12:00:00Z')
+      m.listApprovedResources.mockResolvedValue([judah])
+      expect((await (await GET(req('GET'))).json()).places[0].menuAt).toBeNull()
+    })
   })
 })

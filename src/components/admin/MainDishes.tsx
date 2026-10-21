@@ -13,10 +13,15 @@ import CollapsibleSection from './CollapsibleSection'
 // it read it from. Nothing shows on the site until an admin approves it:
 // untick what's wrong, add what's missing, approve. Approved dishes say "on
 // its menu Oct 2" on the listing until a visitor says "Still served".
+//
+// A place whose menu couldn't be read gets three ways on (the user, Oct 20):
+// give its menu link, add photos of the menu, or say it has no menu. And a
+// place whose dishes came from a menu someone sent through the site says
+// so, instead of a stale "Couldn't read".
 
 type Dish = { name: string; quote: string; checked: boolean; named?: boolean; picture?: true }
 type Reading = {
-  status: 'proposed' | 'approved' | 'skipped' | 'failed'
+  status: 'proposed' | 'approved' | 'skipped' | 'failed' | 'no_menu'
   sourceUrl: string | null
   dishes: Dish[]
   note: string | null
@@ -25,7 +30,18 @@ type Reading = {
   decidedAt: string | null
   decidedBy: string | null
 }
-type Place = { id: string; name: string; categoryLabel: string; facts: string[]; website: string | null; menuUrl: string | null; dishes: string[]; reading: Reading | null }
+type Place = {
+  id: string
+  name: string
+  categoryLabel: string
+  facts: string[]
+  website: string | null
+  menuUrl: string | null
+  dishes: string[]
+  /** The newest "on its menu" date among the dishes it lists. */
+  menuAt?: string | null
+  reading: Reading | null
+}
 type Loaded = { places: Place[]; available: boolean; readerOn: boolean }
 
 const BATCH = 5
@@ -55,6 +71,18 @@ function elsewhere(place: Place): boolean {
   return !!a && !!b && a !== b && !a.endsWith(`.${b}`) && !b.endsWith(`.${a}`)
 }
 
+/** Its dishes came from a menu someone sent through the site ("+ Add"),
+ *  approved after the tab last failed to read one, or said it had none.
+ *  The tab's own approvals aren't this: their reading says approved. */
+function sentThroughSite(place: Place): boolean {
+  const r = place.reading
+  if (!place.menuAt || place.dishes.length === 0) return false
+  return !r || ((r.status === 'failed' || r.status === 'no_menu') && Date.parse(place.menuAt) > Date.parse(r.readAt))
+}
+
+/** A reading of photos an admin added: it has no address. */
+const fromPhotos = (r: Reading | null) => !!r && !r.sourceUrl && !!r.model
+
 function shortUrl(url: string): string {
   return url.replace(/^https?:\/\/(www\.)?/i, '').replace(/\/$/, '')
 }
@@ -66,6 +94,10 @@ function PlaceCard({
   onRead,
   onApprove,
   onSkip,
+  onLink,
+  onPhotos,
+  onNoMenu,
+  onUndoNoMenu,
 }: {
   place: Place
   busy: boolean
@@ -73,12 +105,21 @@ function PlaceCard({
   onRead: () => void
   onApprove: (dishes: string[]) => void
   onSkip: () => void
+  onLink: (url: string) => void
+  onPhotos: (files: File[]) => void
+  onNoMenu: () => void
+  onUndoNoMenu: () => void
 }) {
   const r = place.reading
   const proposed = r?.dishes ?? []
   const [off, setOff] = useState<Set<string>>(new Set())
   const [added, setAdded] = useState<string[]>([])
   const [typing, setTyping] = useState('')
+  const [giving, setGiving] = useState(false)
+  const [link, setLink] = useState('')
+  const elsewhereDishes = sentThroughSite(place)
+  // Couldn't be read: a failed reading, or nothing to read it from.
+  const stuck = !elsewhereDishes && (r?.status === 'failed' || (!r && !place.website && !place.menuUrl))
   const kept = [...proposed.map((d) => d.name).filter((n) => !off.has(n)), ...added]
   const toggle = (name: string) =>
     setOff((prev) => {
@@ -103,7 +144,13 @@ function PlaceCard({
         </p>
         {r && (
           <p className="text-xs text-muted">
-            {r.status === 'approved' ? `Approved ${formatDay(r.decidedAt ?? r.readAt)}${r.decidedBy ? ` by ${r.decidedBy}` : ''}` : r.status === 'skipped' ? 'Skipped' : `Read ${formatDay(r.readAt)}`}
+            {r.status === 'approved'
+              ? `Approved ${formatDay(r.decidedAt ?? r.readAt)}${r.decidedBy ? ` by ${r.decidedBy}` : ''}`
+              : r.status === 'skipped'
+                ? 'Skipped'
+                : r.status === 'no_menu'
+                  ? `No menu, said ${formatDay(r.decidedAt ?? r.readAt)}${r.decidedBy ? ` by ${r.decidedBy}` : ''}`
+                  : `Read ${formatDay(r.readAt)}`}
           </p>
         )}
       </div>
@@ -114,6 +161,12 @@ function PlaceCard({
           <a href={r.sourceUrl} target="_blank" rel="noopener noreferrer" className="font-semibold text-primary hover:underline">
             {shortUrl(r.sourceUrl)} ↗
           </a>
+        </p>
+      )}
+      {fromPhotos(r) && <p className="mt-1 text-xs text-slate-600">Read from photos of the menu, added {formatDay(r!.readAt)}</p>}
+      {elsewhereDishes && (
+        <p className="mt-1 text-xs text-slate-600" data-testid="dish-sent-through-site">
+          Its dishes came from a menu sent through the site, approved {formatDay(place.menuAt!)}.
         </p>
       )}
       {elsewhere(place) && (
@@ -130,8 +183,8 @@ function PlaceCard({
           </a>
         </p>
       )}
-      {!place.website && !place.menuUrl && !r && <p className="mt-1 text-xs text-muted">No website or menu link to read.</p>}
-      {r?.status === 'failed' && <p className="mt-1 text-xs text-amber-800">{r.note ?? 'Couldn’t read a menu.'}</p>}
+      {!place.website && !place.menuUrl && !r && !elsewhereDishes && <p className="mt-1 text-xs text-muted">No website or menu link to read.</p>}
+      {r?.status === 'failed' && !elsewhereDishes && <p className="mt-1 text-xs text-amber-800">{r.note ?? 'Couldn’t read a menu.'}</p>}
 
       {r && r.status !== 'failed' && proposed.length > 0 && (
         <>
@@ -204,9 +257,69 @@ function PlaceCard({
             </button>
           </>
         )}
-        {(place.website || place.menuUrl) && readerOn && (
+        {(place.website || place.menuUrl) && readerOn && r?.status !== 'no_menu' && (
           <button type="button" disabled={busy} onClick={onRead} className="font-semibold text-primary hover:underline disabled:opacity-50">
             {busy ? 'Reading…' : r ? 'Read again' : 'Read its menu'}
+          </button>
+        )}
+        {stuck && !giving && (
+          <>
+            <button type="button" disabled={busy} onClick={() => setGiving(true)} className="font-semibold text-primary hover:underline disabled:opacity-50">
+              Give its menu link
+            </button>
+            {readerOn && (
+              <label className={`font-semibold text-primary hover:underline ${busy ? 'pointer-events-none opacity-50' : 'cursor-pointer'}`}>
+                Add photos of the menu
+                <input
+                  type="file"
+                  multiple
+                  accept="image/png,image/jpeg,image/webp,application/pdf"
+                  aria-label={`Photos of ${place.name}’s menu`}
+                  className="sr-only"
+                  disabled={busy}
+                  onChange={(e) => {
+                    const files = [...(e.target.files ?? [])]
+                    e.target.value = ''
+                    if (files.length) onPhotos(files)
+                  }}
+                />
+              </label>
+            )}
+            <button type="button" disabled={busy} onClick={onNoMenu} className="font-medium text-muted hover:text-slate-800 disabled:opacity-50">
+              No menu
+            </button>
+          </>
+        )}
+        {stuck && giving && (
+          <form
+            className="flex flex-wrap items-center gap-2"
+            onSubmit={(e) => {
+              e.preventDefault()
+              if (!link.trim()) return
+              onLink(link.trim())
+              setGiving(false)
+            }}
+          >
+            <input
+              value={link}
+              onChange={(e) => setLink(e.target.value)}
+              placeholder="Their menu page or PDF"
+              aria-label={`${place.name}’s menu link`}
+              inputMode="url"
+              className="h-8 w-64 rounded-md border border-slate-300 px-2 text-xs"
+              autoFocus
+            />
+            <button type="submit" disabled={busy || !link.trim()} className="rounded-md bg-primary px-3 py-1.5 font-semibold text-white hover:bg-primary-dark disabled:opacity-50">
+              {readerOn ? 'Save and read' : 'Save'}
+            </button>
+            <button type="button" onClick={() => setGiving(false)} className="font-medium text-muted hover:text-slate-800">
+              Cancel
+            </button>
+          </form>
+        )}
+        {r?.status === 'no_menu' && (
+          <button type="button" disabled={busy} onClick={onUndoNoMenu} className="font-semibold text-primary hover:underline disabled:opacity-50">
+            Undo
           </button>
         )}
         {r?.model && <span className="text-muted">Read by {r.model}</span>}
@@ -243,7 +356,7 @@ export default function MainDishes({ token }: { token: string }) {
     })
   const patch = (id: string, p: Partial<Place>) => setData((d) => d && { ...d, places: d.places.map((x) => (x.id === id ? { ...x, ...p } : x)) })
   const post = (body: unknown) =>
-    fetchJson<{ reading?: Reading; dishes?: string[] }>(
+    fetchJson<{ reading?: Reading | null; dishes?: string[]; menuUrl?: string }>(
       withCommunity('/api/admin/main-dishes', community),
       { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body) },
       'Could not do that.',
@@ -257,6 +370,54 @@ export default function MainDishes({ token }: { token: string }) {
       if (reading) patch(id, { reading })
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : 'Could not read that menu.')
+    } finally {
+      mark(id, false)
+    }
+  }
+
+  /** "Give its menu link": saved on the listing, then read. */
+  async function giveLink(id: string, url: string) {
+    setSaveError(null)
+    mark(id, true)
+    try {
+      const res = await post({ action: 'link', resourceId: id, url })
+      patch(id, { menuUrl: res.menuUrl ?? url, ...(res.reading ? { reading: res.reading } : {}) })
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Could not save that link.')
+    } finally {
+      mark(id, false)
+    }
+  }
+
+  async function addPhotos(id: string, files: File[]) {
+    setSaveError(null)
+    mark(id, true)
+    try {
+      const body = new FormData()
+      body.append('action', 'photos')
+      body.append('resourceId', id)
+      for (const f of files) body.append('file', f)
+      const { reading } = await fetchJson<{ reading?: Reading }>(
+        withCommunity('/api/admin/main-dishes', community),
+        { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body },
+        'Could not read those photos.',
+      )
+      if (reading) patch(id, { reading })
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Could not read those photos.')
+    } finally {
+      mark(id, false)
+    }
+  }
+
+  async function noMenu(id: string, on: boolean) {
+    setSaveError(null)
+    mark(id, true)
+    try {
+      const { reading } = await post({ action: on ? 'no_menu' : 'undo_no_menu', resourceId: id })
+      patch(id, { reading: reading ?? null })
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Could not save.')
     } finally {
       mark(id, false)
     }
@@ -288,11 +449,12 @@ export default function MainDishes({ token }: { token: string }) {
   if (error) return <p className="bg-red-50 border border-red-200 rounded-md p-3 text-sm text-red-700">{error}</p>
   if (!data) return <p className="text-sm text-muted">Loading food places…</p>
 
-  const of = (status: Reading['status']) => data.places.filter((p) => p.reading?.status === status)
+  const of = (status: Reading['status']) => data.places.filter((p) => p.reading?.status === status && !sentThroughSite(p))
   const toCheck = of('proposed')
-  const unread = data.places.filter((p) => !p.reading && (p.website || p.menuUrl))
-  const failed = [...of('failed'), ...data.places.filter((p) => !p.reading && !p.website && !p.menuUrl)]
-  const done = [...of('approved'), ...of('skipped')]
+  const unread = data.places.filter((p) => !p.reading && (p.website || p.menuUrl) && !sentThroughSite(p))
+  const failed = [...of('failed'), ...data.places.filter((p) => !p.reading && !p.website && !p.menuUrl && !sentThroughSite(p))]
+  const noMenus = of('no_menu')
+  const done = [...of('approved'), ...of('skipped'), ...data.places.filter(sentThroughSite)]
   const rows = (list: Place[]) => (
     <ul className="divide-y divide-slate-100">
       {list.map((p) => (
@@ -304,6 +466,10 @@ export default function MainDishes({ token }: { token: string }) {
           onRead={() => void read(p.id)}
           onApprove={(dishes) => void decide(p, 'approve', dishes)}
           onSkip={() => void decide(p, 'skip')}
+          onLink={(url) => void giveLink(p.id, url)}
+          onPhotos={(files) => void addPhotos(p.id, files)}
+          onNoMenu={() => void noMenu(p.id, true)}
+          onUndoNoMenu={() => void noMenu(p.id, false)}
         />
       ))}
     </ul>
@@ -342,6 +508,7 @@ export default function MainDishes({ token }: { token: string }) {
       )}
       <p className="text-sm font-semibold text-slate-800" data-testid="dish-counts">
         {of('approved').length} of {data.places.length} approved · {toCheck.length} to check · {unread.length} not read yet · {failed.length} couldn&rsquo;t be read
+        {noMenus.length > 0 && <> · {noMenus.length} no menu</>}
       </p>
       {data.available && (
         <>
@@ -362,10 +529,25 @@ export default function MainDishes({ token }: { token: string }) {
             <p className="px-4 pb-2 text-xs text-muted">Each takes a few seconds: the AI reads the place&rsquo;s menu link, or its own website.</p>
             {unread.length > 0 ? rows(unread) : <p className="px-4 pb-3 text-sm text-slate-600">All read.</p>}
           </section>
-          <CollapsibleSection title="Couldn’t be read" description="No website or menu link, or no menu the reader could read." count={failed.length} contentClassName="">
+          <CollapsibleSection
+            title="Couldn’t be read"
+            description="No website or menu link, or no menu the reader could read. Give its menu link, add photos of the menu, or say it has none."
+            count={failed.length}
+            contentClassName=""
+          >
             {rows(failed)}
           </CollapsibleSection>
-          <CollapsibleSection title="Approved and skipped" description="Read again any time; approving again only adds and re-dates." count={done.length} contentClassName="">
+          {noMenus.length > 0 && (
+            <CollapsibleSection title="No menu" description="Said to have no menu to read. Not read again; Undo puts one back." count={noMenus.length} contentClassName="">
+              {rows(noMenus)}
+            </CollapsibleSection>
+          )}
+          <CollapsibleSection
+            title="Approved and skipped"
+            description="Read again any time; approving again only adds and re-dates. Places whose dishes came from a menu sent through the site are here too."
+            count={done.length}
+            contentClassName=""
+          >
             {rows(done)}
           </CollapsibleSection>
         </>
