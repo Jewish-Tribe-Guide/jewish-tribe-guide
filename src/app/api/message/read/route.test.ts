@@ -1,3 +1,4 @@
+import type { MenuSource } from '@/lib/menuReader'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { makeCategory, makeListing } from '@/test/providerFixtures'
 import type { MessageReading } from '@/lib/messageReader'
@@ -31,7 +32,26 @@ vi.mock('@/lib/communityStore', () => ({
 vi.mock('@/lib/resourceStore', () => ({ listApprovedResources: m.listApprovedResources }))
 vi.mock('@/lib/categoryStore', () => ({ listCategories: m.listCategories }))
 vi.mock('@/lib/shulWeekReading', () => ({ readShulWeek: m.readShulWeek }))
-vi.mock('@/lib/menuReader', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/lib/menuReader')>()), findMenu: m.findMenu, readMenu: m.readMenu }))
+vi.mock('@/lib/menuReader', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/menuReader')>()),
+  findMenu: m.findMenu,
+  readMenu: m.readMenu,
+  // The routes read every page a menu may be on (findMenus, readMenus);
+  // these tests give one, through the single-page mocks above.
+  findMenus: async (url: string) => {
+    const one = await m.findMenu(url)
+    return one ? [one] : []
+  },
+  readMenus: async (sources: MenuSource[], name: string, opts: unknown) => {
+    let first = null
+    for (const s of sources) {
+      const read = await m.readMenu(s, name, opts)
+      if (read.dishes.length) return read
+      first ??= read
+    }
+    return first
+  },
+}))
 vi.mock('@/lib/messageReader', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/lib/messageReader')>()), readMessage: m.readMessage }))
 
 const { POST } = await import('./route')

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { fetchPublic, findMenu, htmlToText, isOrderingApp, isPrivateAddress, MAX_MENU_PICTURES, menuLinks, menuMessages, menuPictures, readMenu, readMenuPage, tidyMenuReading, type MenuSource } from './menuReader'
+import { fetchPublic, findMenu, findMenus, htmlToText, isOrderingApp, isPrivateAddress, MAX_MENU_PAGES, MAX_MENU_PICTURES, menuLinks, menuMessages, menuPictures, readMenu, readMenuPage, readMenus, tidyMenuReading, type MenuSource } from './menuReader'
 
 const publicDns = async () => ['93.184.216.34']
 const page = (body: string, type = 'text/html; charset=utf-8', status = 200, headers: Record<string, string> = {}) =>
@@ -313,5 +313,87 @@ describe('a menu posted as pictures', () => {
     const withWords: MenuSource = { ...onlyPictures, text: 'About us: a family grill.' }
     const nothing = vi.fn().mockResolvedValueOnce(answer([], 'An about page.')).mockResolvedValueOnce(jpeg()).mockResolvedValueOnce(answer([], 'A photo of the dining room.'))
     expect((await readMenu(withWords, 'Star of David', { apiKey: 'k', fetchImpl: nothing, resolve: publicDns })).note).toBe('An about page.')
+  })
+})
+
+// Oct 20: of the places whose menu couldn't be read, four sites refused the
+// reader's old "compatible; … menu reader" name, several call their menu
+// something else ("Our Food", "Catering", a store), and some link a wrong
+// page first ("Thanksgiving menu coming soon").
+describe('a menu on another page, or by another name', () => {
+  const answer = (dishes: { name: string; quote: string }[], note?: string) =>
+    new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify({ dishes, note }) } }] }), { status: 200 })
+  const words = (what: string) => `<p>${`${what} `.repeat(40)}</p>`
+
+  it('asks as the website watch does, with the guide’s name in it', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(page('<p>hi</p>'))
+    await fetchPublic('https://judah.example', { fetchImpl, resolve: publicDns })
+    const headers = fetchImpl.mock.calls[0][1].headers as Record<string, string>
+    expect(headers['user-agent']).toContain('PhillyJewishGuide')
+    expect(JSON.stringify(headers)).not.toContain('compatible;')
+    expect(headers.accept).toContain('application/pdf')
+  })
+
+  it('a link that calls the menu something else counts, after the ones that say menu; its own store does too, never an ordering app', () => {
+    const html = `
+      <a href="/about">About us</a>
+      <a href="/our-food">Our Food</a>
+      <a href="/catering">Catering</a>
+      <a href="/sweet-shop">Sweet Shop</a>
+      <a href="https://store.bakery.example/">Online Ordering</a>
+      <a href="https://www.toasttab.com/bakery">Order online</a>
+      <a href="/cart">Shop</a>
+      <a href="/menu">Menu</a>`
+    expect(menuLinks(html, 'https://www.bakery.example/')).toEqual([
+      'https://www.bakery.example/menu',
+      'https://www.bakery.example/our-food',
+      'https://www.bakery.example/catering',
+      'https://www.bakery.example/sweet-shop',
+      'https://store.bakery.example/',
+    ])
+  })
+
+  it(`up to ${MAX_MENU_PAGES} pages, best first, the website itself last`, async () => {
+    const home = `<a href="/menu">Menu</a><a href="/catering">Catering</a><a href="/our-food">Our Food</a><a href="/shop">Shop</a>${words('Welcome to the bakery.')}`
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValueOnce(page(home))
+      .mockResolvedValueOnce(page(words('Holiday menu coming soon.')))
+      .mockResolvedValueOnce(page('<div id="root"></div>'))
+      .mockResolvedValueOnce(page(words('Rugelach and challah.')))
+      .mockResolvedValueOnce(page(words('Cakes.')))
+    const found = await findMenus('https://diane.example', { fetchImpl, resolve: publicDns })
+    expect(found.map((s) => s.url)).toEqual(['https://diane.example/menu', 'https://diane.example/our-food', 'https://diane.example/shop'])
+    const room = vi
+      .fn()
+      .mockResolvedValueOnce(page(`<a href="/menu">Menu</a>${words('Welcome to the bakery.')}`))
+      .mockResolvedValueOnce(page(words('Holiday menu coming soon.')))
+    expect((await findMenus('https://diane.example', { fetchImpl: room, resolve: publicDns })).map((s) => s.url)).toEqual(['https://diane.example/menu', 'https://diane.example/'])
+    expect(await findMenus('https://diane.example', { fetchImpl: vi.fn().mockResolvedValue(new Response('no', { status: 403 })), resolve: publicDns })).toEqual([])
+  })
+
+  it('reads the next page when one names no dishes; none do: the first one’s reason', async () => {
+    const sources: MenuSource[] = [
+      { url: 'https://diane.example/menu', text: 'Holiday menu coming soon.', pdf: null },
+      { url: 'https://diane.example/', text: 'Rugelach, challah, kugel.', pdf: null },
+    ]
+    const fetchImpl = vi.fn().mockResolvedValueOnce(answer([], 'Coming soon.')).mockResolvedValueOnce(answer([{ name: 'Rugelach', quote: 'Rugelach' }]))
+    const r = await readMenus(sources, 'Diane’s', { apiKey: 'k', fetchImpl, resolve: publicDns })
+    expect(r).toMatchObject({ sourceUrl: 'https://diane.example/', dishes: [{ name: 'Rugelach' }] })
+    const none = vi.fn().mockResolvedValueOnce(answer([], 'Coming soon.')).mockResolvedValueOnce(answer([], 'A home page.'))
+    expect(await readMenus(sources, 'Diane’s', { apiKey: 'k', fetchImpl: none, resolve: publicDns })).toMatchObject({ sourceUrl: 'https://diane.example/menu', dishes: [], note: 'Coming soon.' })
+    expect(await readMenus([], 'Diane’s', { apiKey: 'k', fetchImpl: vi.fn() })).toBeNull()
+  })
+
+  it('stops trying more pages once its time is up, so a request still answers', async () => {
+    const sources: MenuSource[] = [1, 2, 3].map((n) => ({ url: `https://slow.example/${n}`, text: 'About us.', pdf: null }))
+    let t = 0
+    const fetchImpl = vi.fn().mockImplementation(async () => {
+      t += 20_000
+      return answer([], 'No menu.')
+    })
+    const r = await readMenus(sources, 'Slow', { apiKey: 'k', fetchImpl, resolve: publicDns, budgetMs: 30_000, now: () => t })
+    expect(r).toMatchObject({ sourceUrl: 'https://slow.example/1', dishes: [] })
+    expect(fetchImpl).toHaveBeenCalledTimes(2)
   })
 })

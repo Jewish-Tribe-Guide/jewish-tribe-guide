@@ -1,3 +1,4 @@
+import type { MenuSource } from '@/lib/menuReader'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { makeCategory, makeListing } from '@/test/providerFixtures'
 
@@ -30,7 +31,27 @@ vi.mock('@/lib/menuReadingStore', () => ({
   saveMenuReading: m.saveMenuReading,
   decideMenuReading: m.decideMenuReading,
 }))
-vi.mock('@/lib/menuReader', async (orig) => ({ ...(await orig<typeof import('@/lib/menuReader')>()), findMenu: m.findMenu, readMenuPage: m.readMenuPage, readMenu: m.readMenu }))
+vi.mock('@/lib/menuReader', async (orig) => ({
+  ...(await orig<typeof import('@/lib/menuReader')>()),
+  findMenu: m.findMenu,
+  readMenuPage: m.readMenuPage,
+  readMenu: m.readMenu,
+  // The routes read every page a menu may be on (findMenus, readMenus);
+  // these tests give one, through the single-page mocks above.
+  findMenus: async (url: string) => {
+    const one = await m.findMenu(url)
+    return one ? [one] : []
+  },
+  readMenus: async (sources: MenuSource[], name: string, opts: unknown) => {
+    let first = null
+    for (const s of sources) {
+      const read = await m.readMenu(s, name, opts)
+      if (read.dishes.length) return read
+      first ??= read
+    }
+    return first
+  },
+}))
 vi.mock('@/lib/supabase/admin', () => ({ getAdminClient: () => ({ rpc: m.rpc }) }))
 vi.mock('@/lib/revalidateContent', () => ({ revalidatePublicContent: m.revalidatePublicContent }))
 

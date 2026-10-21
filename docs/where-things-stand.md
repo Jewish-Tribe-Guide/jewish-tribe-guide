@@ -410,6 +410,61 @@ amazing … I want to see if that would have caught many."
   caught Next.js images all counting as one picture, which hid Mordy's
   menu behind its header photo) and the re-read above.
 
+## Done Oct 20, later: menus on another page, or by another name (on `redesign/oct18-fixes`, not merged)
+
+The user, Oct 20, of the menus still not read: "Some just aren't being
+read right and some have their menu on toast … Is there an option for the
+reader to maybe take a screenshot and then read it?"
+
+- **The reader asks as the website watch does** (`MENU_FETCH_HEADERS`,
+  `src/lib/menuReader.ts`), with the guide's name in it. Four places'
+  sites refused its old "compatible; … menu reader" and nothing else:
+  Judah, House of Kosher, Diane's, I Want Moore.
+- **A menu by another name counts** (`menuLinks`): "Our Food",
+  "Catering", "Shop", "Bakery", "Online Ordering" and the like, after
+  the links that say "menu". So does a place's own store on its own name
+  (store.gelbsteinsbakery.com). An ordering app's link still never is.
+- **Up to three pages are read, best first** (`findMenus`, `readMenus`):
+  the first link can be the wrong page (Diane's "Thanksgiving menu coming
+  soon", I Want Moore's list of its shop's sections). The next one is read
+  when a page names no dishes, the website itself last; within 30 seconds,
+  so the request still answers. Main dishes' "Read its menu" and a website
+  sent in "+ Add" both do this. A place's own menu link is still read as
+  it is, alone. The daily menu watch is unchanged: it watches one page.
+- **What it catches** (dev, the 27 places whose reading had failed,
+  re-read with the real AI, nothing saved): 14 of 27 are read now, 9 more
+  than this morning's pictures change.
+  - Judah (10, from its pictures), Gelbstein's (5, its store), House of
+    Kosher (5, a PDF), LUHV ×2 (its "Our Food"), Diane's (8), I Want
+    Moore (9, its breakfast page), Deluxe Catering (9, its sealed-meals
+    page), Magical Sweet Shop (only "Soups", from its catering page: a
+    weak reading, worth a look before approving).
+  - 13 still aren't: no menu on the site (Miss Rachel's, Savvati's
+    pages name no dishes, Shlomo's is a meat and fish market, not a
+    restaurant), a menu only on an ordering app (Slices and Rolls and
+    Stephen's on Toast, Unit Su Vege's drawn from MenuFreeZone), a site
+    that asks a visitor to prove they're a person (20th Street Pizza),
+    a website gone (Shtetl, now a gambling site), and drawn by a script
+    after it loads (LUHV Vegan Deli, Center City Pretzel, Mike's
+    Chicken, Insomnia ×2).
+- **Not done, on purpose: getting into Toast and the like.** A screenshot
+  of an ordering app or a "prove you're a person" page would be getting
+  round a block the site put there, which the watches already don't do
+  (`websiteWatch.ts`), and ordering apps are never fetched (agreed Oct 6).
+  For those, a person gives the menu (the "Next" below).
+- **Tried, not built: drawing a page as a browser does.** Rendered
+  locally in Chromium (each place's own site only), the script-drawn ones
+  give 3 places, 4 listings: Insomnia ×2, Center City Pretzel, Mike's
+  Chicken. Not LUHV Vegan Deli, Unit Su Vege or the rest. On Vercel it
+  needs a headless browser in the function (`@sparticuz/chromium`, about
+  50MB and several seconds a read) or a paid rendering service. Not worth
+  it for 3 places while "Give its menu link" / "Add photos" cover them;
+  worth revisiting if script-drawn sites grow. **For the user.**
+- Checked by tests (5 new in `menuReader.test.ts`, all 5 failing against
+  the old file; each of six one-line mutations (old headers, no other
+  names, own subdomain not counted, one page only, first page only, no
+  time limit) fails its own test).
+
 ## Done Oct 20, later: a calendar's week is this week's schedule (on `redesign/oct18-fixes`, not merged)
 
 Replaces "the next three weeks" and "As well as their usual times" in the

@@ -13,7 +13,7 @@ vi.mock('@/lib/watchStore', () => ({ listAllWatches: mockList, updateWatch: mock
 const mockKeystone = vi.hoisted(() => vi.fn())
 vi.mock('@/lib/keystoneRun', () => ({ runKeystoneWatch: mockKeystone }))
 const mockWebsite = vi.hoisted(() => vi.fn())
-vi.mock('@/lib/websiteWatch', () => ({ readWebsite: mockWebsite }))
+vi.mock('@/lib/websiteWatch', async (real) => ({ ...(await real<typeof import('@/lib/websiteWatch')>()), readWebsite: mockWebsite }))
 const mockAlert = vi.hoisted(() => vi.fn())
 vi.mock('@/lib/email', () => ({ sendWatchHealthAlert: mockAlert }))
 const mockEruvLines = vi.hoisted(() => vi.fn(async () => []))

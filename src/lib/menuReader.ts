@@ -4,6 +4,7 @@ import { ITEM_NAMES, itemName, itemWords } from './itemNames'
 import { words } from './ask'
 import { addedItemName, cleanItemName } from './itemMarks'
 import { DEFAULT_READER_MODEL } from './readQuestion'
+import { WATCH_FETCH_HEADERS } from './websiteWatch'
 
 // ── Reading a food place's main dishes off its own menu (agreed Oct 1) ───────
 // On the admin's "Main dishes" tab, once per place, on demand: the server
@@ -108,6 +109,17 @@ async function publicUrl(raw: string, resolve: Lookup): Promise<URL | null> {
   return url
 }
 
+/** How the menu reader asks: as the website watch does (websiteWatch.ts),
+ *  the guide's name in it, taking a PDF or a picture too. It used to say
+ *  "compatible; … menu reader", and four food places' sites (Judah, House
+ *  of Kosher, Diane's, I Want Moore, Oct 20) refused that and nothing else.
+ *  A site that still refuses, or asks a visitor to prove they're a person,
+ *  isn't worked around. */
+export const MENU_FETCH_HEADERS: Record<string, string> = {
+  ...WATCH_FETCH_HEADERS,
+  accept: 'text/html,application/xhtml+xml,application/pdf;q=0.9,image/webp,image/*;q=0.8,*/*;q=0.5',
+}
+
 export type Fetched = { url: string; type: 'html' | 'pdf'; body: string } | { url: string; type: 'picture'; body: string; mime: string }
 
 /** The pictures a model can read. */
@@ -131,7 +143,7 @@ export async function fetchPublic(
       res = await fetchImpl(url, {
         redirect: 'manual',
         signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-        headers: headers ?? { 'User-Agent': 'Mozilla/5.0 (compatible; community-guide menu reader)', Accept: 'text/html,application/pdf;q=0.9,*/*;q=0.5' },
+        headers: headers ?? MENU_FETCH_HEADERS,
       })
     } catch {
       return null
@@ -190,13 +202,24 @@ export function htmlToText(html: string): string {
     .join('\n')
 }
 
+/** What a food place calls its menu when it doesn't say "menu" (Oct 20):
+ *  a bakery's "Sweet Shop", a caterer's "Catering", LUHV's "Our Food",
+ *  Gelbstein's "Online Ordering" on its own store. */
+const MENU_BY_ANOTHER_NAME = /\b(our food|food|products?|catering|meals|shop|store|bakery|baked goods|sweets|treats|order online|online ordering)\b/
+
+/** The registrable part of a host, near enough: its last two labels
+ *  ("store.gelbsteinsbakery.com" → "gelbsteinsbakery.com"). */
+const siteOf = (hostname: string) => hostname.toLowerCase().split('.').slice(-2).join('.')
+
 /** Links on a page that look like its menu: "Menu", "Our menu", "Dinner
- *  menu", a /menu address, a PDF named for one. Best first: a link that
- *  says it's the menu, then one whose address does. On the same site, or a
- *  PDF anywhere (menus are often kept on a file host). */
+ *  menu", a /menu address, a PDF named for one, then what a place calls its
+ *  menu by another name (MENU_BY_ANOTHER_NAME). Best first, in page order
+ *  within each. On the same site or one of its own (a store.… or deli.…
+ *  of the same name), or a PDF anywhere (menus are often kept on a file
+ *  host); never an ordering app's, which is never fetched. */
 export function menuLinks(html: string, base: string): string[] {
   const site = new URL(base)
-  const host = site.hostname.replace(/^www\./, '')
+  const own = siteOf(site.hostname)
   const found = new Map<string, number>()
   for (const m of html.matchAll(/<a\b[^>]*\bhref\s*=\s*(["'])(.*?)\1[^>]*>([\s\S]*?)<\/a>/gi)) {
     const href = decode(m[2].trim())
@@ -211,9 +234,17 @@ export function menuLinks(html: string, base: string): string[] {
     const text = htmlToText(m[3]).toLowerCase()
     const path = decodeURIComponent(url.pathname).toLowerCase()
     const pdf = path.endsWith('.pdf')
-    const sameSite = url.hostname.replace(/^www\./, '') === host
-    if (!sameSite && !pdf) continue
-    const score = /\bmenus?\b/.test(text) ? 3 : /menu/.test(path) ? 2 : pdf && /menu|food|dinner|lunch/.test(path + text) ? 1 : 0
+    const ownSite = siteOf(url.hostname) === own && !isOrderingApp(url.toString())
+    if (!ownSite && !pdf) continue
+    const score = /\bmenus?\b/.test(text)
+      ? 4
+      : /menu/.test(path)
+        ? 3
+        : pdf && /menu|food|dinner|lunch/.test(path + text)
+          ? 2
+          : !pdf && (MENU_BY_ANOTHER_NAME.test(text) || MENU_BY_ANOTHER_NAME.test(path.replace(/[-_/]+/g, ' ')))
+            ? 1
+            : 0
     if (score === 0 || /order|cart|checkout|login|account/.test(path)) continue
     const key = url.toString()
     if (key === site.toString()) continue
@@ -325,28 +356,48 @@ export function isOrderingApp(raw: string): boolean {
   }
 }
 
-/** Where a place's menu is: a page or PDF its own website links to as its
- *  menu, the best of the first few that can be read, or else the website
- *  itself (a one-page site often is the menu). A page counts with its
- *  words or its menu's pictures (pageAsMenu); a link to a picture is that
- *  picture. Null when nothing can be read at all. */
-export async function findMenu(
+/** How many pages of a website are read for its menu, best first: the
+ *  first can be the wrong one (Diane's "Thanksgiving menu coming soon",
+ *  I Want Moore's list of its shop's sections). */
+export const MAX_MENU_PAGES = 3
+
+/** Where a place's menu may be, best first, MAX_MENU_PAGES at most: pages
+ *  or PDFs its own website links to as its menu, then the website itself
+ *  (a one-page site often is the menu). A page counts with its words or
+ *  its menu's pictures (pageAsMenu); a link to a picture is that picture.
+ *  Empty when nothing can be read at all. */
+export async function findMenus(
   website: string,
   opts: { fetchImpl?: typeof fetch; resolve?: Lookup } = {},
-): Promise<MenuSource | null> {
+): Promise<MenuSource[]> {
   const home = await fetchPublic(website, opts)
-  if (!home) return null
-  if (home.type === 'pdf') return { url: home.url, text: null, pdf: home.body }
-  for (const link of menuLinks(home.body, home.url).slice(0, 3)) {
-    if (isPictureAddress(link)) return { url: link, text: null, pdf: null, pictures: [link] }
+  if (!home) return []
+  if (home.type !== 'html') return home.type === 'pdf' ? [{ url: home.url, text: null, pdf: home.body }] : []
+  const found: MenuSource[] = []
+  for (const link of menuLinks(home.body, home.url).slice(0, MAX_MENU_PAGES + 1)) {
+    if (found.length >= MAX_MENU_PAGES) break
+    if (isPictureAddress(link)) {
+      found.push({ url: link, text: null, pdf: null, pictures: [link] })
+      continue
+    }
     const page = await fetchPublic(link, opts)
-    if (!page) continue
-    if (page.type === 'pdf') return { url: page.url, text: null, pdf: page.body }
+    if (!page || page.type === 'picture') continue
+    if (page.type === 'pdf') {
+      found.push({ url: page.url, text: null, pdf: page.body })
+      continue
+    }
     // A menu page drawn by a script after it loads has next to no text, and no pictures.
     const menu = pageAsMenu(page, true)
-    if (menu) return menu
+    if (menu) found.push(menu)
   }
-  return pageAsMenu(home, false)
+  const itself = pageAsMenu(home, false)
+  if (itself && found.length < MAX_MENU_PAGES) found.push(itself)
+  return found
+}
+
+/** The best place a website's menu may be (findMenus), or null. */
+export async function findMenu(website: string, opts: { fetchImpl?: typeof fetch; resolve?: Lookup } = {}): Promise<MenuSource | null> {
+  return (await findMenus(website, opts))[0] ?? null
 }
 
 /** A menu at a known address: a place's menu link (menuLink.ts), read as
@@ -491,4 +542,24 @@ export async function readMenu(
   // Nothing there either: what the words said is the better reason.
   if (!read.dishes.length && first) return { ...first, model }
   return { ...read, dishes: read.dishes.map((d) => ({ ...d, picture: true as const })), model, fromPictures: true }
+}
+
+/** Reads the pages a menu may be on (findMenus), best first, until one
+ *  names dishes. When none does, the first page's reading, which says why.
+ *  Stops trying more once `budgetMs` has gone (a request has a minute). */
+export async function readMenus(
+  sources: readonly MenuSource[],
+  placeName: string,
+  opts: { apiKey: string; model?: string; fetchImpl?: typeof fetch; resolve?: Lookup; budgetMs?: number; now?: () => number },
+): Promise<(MenuReading & { model: string; fromPictures?: boolean }) | null> {
+  const now = opts.now ?? Date.now
+  const start = now()
+  let first: Awaited<ReturnType<typeof readMenu>> | null = null
+  for (const source of sources) {
+    if (first && now() - start > (opts.budgetMs ?? 30_000)) break
+    const read = await readMenu(source, placeName, opts)
+    if (read.dishes.length) return read
+    first ??= read
+  }
+  return first
 }

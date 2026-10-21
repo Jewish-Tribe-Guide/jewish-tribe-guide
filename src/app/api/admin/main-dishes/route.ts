@@ -6,7 +6,7 @@ import { getAdminClient } from '@/lib/supabase/admin'
 import { revalidatePublicContent } from '@/lib/revalidateContent'
 import { itemsField, listingFacts } from '@/lib/listingView'
 import { addedItemName, cleanItemName, itemMarks, itemWording } from '@/lib/itemMarks'
-import { findMenu, readMenu, readMenuPage, MAX_DISHES } from '@/lib/menuReader'
+import { findMenus, readMenus, readMenuPage, MAX_DISHES } from '@/lib/menuReader'
 import { MENU_LINK_KEY, readMenuLink } from '@/lib/menuLink'
 import { decideMenuReading, getMenuReading, listMenuReadings, saveMenuReading } from '@/lib/menuReadingStore'
 import { UUID } from '@/lib/itemMarkRoutes'
@@ -20,8 +20,8 @@ import type { DirectoryResource } from '@/types'
 //      (menu_reading, migration 065). Admin only.
 // POST /api/admin/main-dishes   body: { action: 'read', resourceId }
 //      Reads that place's own menu now (menuReader.ts): its menu link when
-//      it has one that can be read (menuLink.ts), else what its website
-//      links to as its menu. Keeps what the AI proposed, for an admin to
+//      it has one that can be read (menuLink.ts), else the pages its
+//      website links to as its menu, best first, until one names dishes. Keeps what the AI proposed, for an admin to
 //      check. Replaces an earlier reading.
 // POST /api/admin/main-dishes   body: { action: 'approve', resourceId, dishes: string[] }
 //      Puts the dishes the admin kept (and any they added) on the listing,
@@ -110,9 +110,11 @@ export async function POST(request: Request) {
       if (!apiKey) return Response.json({ ok: false, errors: ['The AI reader isn’t set up here (no OPENAI_API_KEY).'] }, { status: 503 })
       const website = websiteOf(listing, kind.category)
       const menuUrl = menuLinkOf(listing)
-      // Its menu link when that can be read, else what its website links to.
-      const source = (menuUrl ? await readMenuPage(menuUrl) : null) ?? (website ? await findMenu(website) : null)
-      if (!source) {
+      // Its menu link when that can be read, else the pages its website
+      // links to as its menu, best first, until one names dishes.
+      const linked = menuUrl ? await readMenuPage(menuUrl) : null
+      const sources = linked ? [linked] : website ? await findMenus(website) : []
+      if (!sources.length) {
         const reading = await saveMenuReading(community.slug, resourceId, {
           status: 'failed',
           sourceUrl: menuUrl ?? website,
@@ -122,7 +124,7 @@ export async function POST(request: Request) {
         })
         return Response.json({ ok: true, reading })
       }
-      const read = await readMenu(source, listing.name, { apiKey })
+      const read = (await readMenus(sources, listing.name, { apiKey }))!
       const reading = await saveMenuReading(community.slug, resourceId, {
         status: read.dishes.length ? 'proposed' : 'failed',
         sourceUrl: read.sourceUrl,
