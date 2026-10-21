@@ -121,6 +121,12 @@ describe('what the AI read, kept to what holds up', () => {
     expect(user.content.map((c) => c.type)).toEqual(['text', 'image_url'])
   })
 
+  it('sends a calendar posted as pictures as every one of them (Mikveh Israel’s month)', () => {
+    const images = [{ mime: 'image/png', b64: 'OCT' }, { mime: 'image/png', b64: 'NOV' }]
+    const [, user] = regularMessages({ images }, DAYS, 'Mikveh Israel') as { content: { type: string; image_url?: { url: string } }[] }[]
+    expect(user.content.map((c) => c.image_url?.url ?? c.type)).toEqual(['text', 'data:image/png;base64,OCT', 'data:image/png;base64,NOV'])
+  })
+
   it('asks the model and tidies its answer, never echoing its error', async () => {
     const ok = vi.fn().mockResolvedValue(new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify({ times: [{ tefillah: 'mincha', on: ['2026-09-26'], time: '6:35pm', quote: 'Mincha 6:35' }] }) } }] })))
     expect((await readSchedule({ text }, sukkos, 'K', { apiKey: 'k', fetchImpl: ok, newId: id })).times).toHaveLength(1)
@@ -366,6 +372,9 @@ describe('reading a shul’s regular times', () => {
     // The hour alone, as the guide writes it (Kol Tzedek's "10 am").
     expect(asRegularTime('shacharis', '10 am')).toEqual({ time: '10:00am' })
     expect(asRegularTime('maariv', '9 P.M.')).toEqual({ time: '9:00pm' })
+    // With its minutes and dots (Mikveh Israel's calendar picture, Oct 21).
+    expect(asRegularTime('shacharis', '9:00 A.M.')).toEqual({ time: '9:00am' })
+    expect(asRegularTime('mincha', '2:00 p.m.')).toEqual({ time: '2:00pm' })
     expect(asRegularTime('mincha_maariv', 'around candle-lighting')).toMatchObject({ anchor: 'candle_lighting', offsetMinutes: 0 })
   })
 

@@ -767,10 +767,40 @@ compare, and one it can't read, on desktop and phone.
        times those days kept in it. They are apart from its usual times,
        and a week already on the listing isn't filed again. The newsletter
        and the paste box still read dated times as before.
-     - **Mikveh Israel's calendar is pictures, Oct 21.** Its Calendar
-       page's event list is empty. The month is two images ("Oct. High
-       Holiday calendar 2026.png", "Calendar September 2026.png"), which
-       the reader doesn't read. Not built.
+     - **A calendar posted as pictures is read, Oct 21.** Mikveh Israel's
+       Calendar page has an empty event list. The month is two images,
+       "Oct. High Holiday calendar 2026.png" and "Calendar September
+       2026.png". Now a shul's page with no calendar and no davening time
+       in its words is read from its calendar pictures, the way a PDF is,
+       a week at a time. Each week becomes that week's schedule, like a
+       calendar feed's.
+       - Which pictures: ones whose file name or alt text says calendar,
+         schedule, davening, zmanim or luach, then ones the shape of a
+         printed page (upright, at least 1000 pixels tall). At most two.
+         Never a logo, a banner or a photo. Never a picture that names a
+         month the weeks aren't in, so September's is skipped in October.
+       - Not on a page that gives its times in words, and never on a
+         mikvah's hours page.
+       - The morning search keeps a page with such a picture, as it keeps
+         a PDF. Pages showing the same pictures are read once.
+       - The pictures are downloaded only when the AI reads them. The
+         page's fingerprint changes when a picture is replaced, on
+         Sunday, and on Thursday when next week is added. So the daily run
+         reads each week once. That is one AI read with images for each
+         week.
+       - Also fixed: "9:00 A.M." (with dots) was kept as text, so it never
+         matched the listing's 9:00am.
+
+       Dry read on dev, as of Thursday Oct 22, using the October picture:
+       Mon/Thu Shacharis 7:15 AM; Mincha 2:00 PM Monday to Thursday;
+       Friday 6:00 PM on Oct 23 and 5:45 PM on Oct 30; Shabbos 9:00 AM.
+       It would file the two Friday times, each in its week's schedule.
+       Read twice. On the second read the cheapest model missed Monday
+       Oct 26's Mincha. Nothing was taken off the listing, because a usual
+       minyan a week doesn't mention is kept.
+       The page is still stopped on dev. "Read it again" on the Shul times
+       page starts it again. Production has no found pages, so to use this
+       there, give the page by hand.
      - **Kol Tzedek's calendar is read, Oct 21.** Its home page embeds a
        Google Calendar, but the embed names the calendar in base64, so
        the feed address the reader built was a 404. And Google's feed is
@@ -781,8 +811,8 @@ compare, and one it can't read, on desktop and phone.
        watches the same home page (given by hand), so it reads the
        calendar once this is deployed; its newsletter is read too.
        Calendars the reader takes: iCal links, Google Calendar embeds,
-       event lists in a page's scripts. Not: a calendar posted as
-       pictures (Mikveh Israel) or drawn by a script from its own server.
+       event lists in a page's scripts, and (since later Oct 21) a month
+       posted as pictures. Not: one drawn by a script from its own server.
 
 ## Done Oct 20: "Check now" is the full check (on `redesign/oct18-fixes`, not merged)
 

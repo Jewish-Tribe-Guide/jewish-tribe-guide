@@ -6,6 +6,9 @@ import { fetchPublic, htmlToText, type MenuSource } from '@/lib/menuReader'
 import { menuHash } from '@/lib/menuWatch'
 import { WATCH_FETCH_HEADERS } from '@/lib/websiteWatch'
 import { readShulWeek } from '@/lib/shulWeekReading'
+import { calendarPictures } from '@/lib/calendarPictures'
+import { hasDaveningTimes } from '@/lib/hoursJob'
+import type { ScheduleSource } from '@/lib/scheduleReader'
 import { CALENDAR_HEADING, MAX_FEED_BYTES, calendarFeeds, calendarLines, calendarWeeks, embeddedEntries, icsEntries, isIcs, type CalendarEntry, type CalendarWeek } from '@/lib/calendarFeed'
 import { applyUpdate, changesAnything, datesBetween, datesHeldOverWebsite, sameTime, seasonOf, weekdayOf, type TimesUpdate } from '@/lib/scheduleUpdate'
 import { dateText, readSchedules, regularMinyanim, schedulesKey, type SpecialSchedule } from '@/lib/schedules'
@@ -45,13 +48,15 @@ import {
 
 /** A page as the readers take it: its text, a line per block, or a PDF,
  *  and when it has a calendar, its weeks (calendarWeeks), each read on its
- *  own for the shul's times. */
+ *  own for the shul's times. A calendar posted as pictures has its
+ *  pictures' addresses (`pictures`), fetched only when the AI reads them. */
 export type PageSource = MenuSource & { weeks?: CalendarWeek[] }
 
 /** A page as the readers take it. Without its menus (<nav>): a shul
  *  site's runs to thousands of words, crowding out the times in what the
- *  AI is given, and a new menu item isn't a change to the page. */
-export async function readListingPage(url: string, opts: { fetchImpl?: typeof fetch; now?: number } = {}): Promise<PageSource | null> {
+ *  AI is given, and a new menu item isn't a change to the page.
+ *  `pictures`: a shul's page, whose calendar may be posted as pictures. */
+export async function readListingPage(url: string, opts: { fetchImpl?: typeof fetch; now?: number; pictures?: boolean } = {}): Promise<PageSource | null> {
   const page = await fetchPublic(url, { fetchImpl: opts.fetchImpl, headers: WATCH_FETCH_HEADERS })
   if (!page) return null
   if (page.type === 'pdf') return { url: page.url, text: null, pdf: page.body }
@@ -72,7 +77,32 @@ export async function readListingPage(url: string, opts: { fetchImpl?: typeof fe
     }
   }
   const text = htmlToText(page.body.replace(/<nav\b[\s\S]*?<\/nav\s*>/gi, ' '))
+  // No calendar and no davening time in its words: the month may be
+  // posted as pictures (calendarPictures). A page that gives its times in
+  // words is read for them, whatever its pictures are called.
+  if (opts.pictures && !calendarLines(entries, first, last).length && !hasDaveningTimes(text)) {
+    const pictures = calendarPictures(page.body, page.url, weeks.flatMap((w) => [w.sunday, w.to]))
+    if (pictures.length) return withPictures(page.url, text, pictures, weeks)
+  }
   return withCalendar(page.url, text, entries, weeks)
+}
+
+/** What heads a page whose calendar is pictures. */
+export const PICTURES_HEADING = 'Their calendar, as pictures, read a week at a time:'
+
+/** A page whose calendar is pictures. Its text names the pictures and the
+ *  weeks they're read for, from each week's Sunday, so its fingerprint
+ *  (menuHash) changes when a picture is replaced, on a Sunday, and on the
+ *  Thursday next week is added, as a calendar's text does (withCalendar):
+ *  each week is read in its turn. */
+function withPictures(url: string, text: string, pictures: string[], weeks: Omit<CalendarWeek, 'lines'>[]): PageSource {
+  return {
+    url,
+    text: [PICTURES_HEADING, ...pictures, `Weeks from ${weeks.map((w) => w.sunday).join(', ')}`, '', text].join('\n').trim(),
+    pdf: null,
+    pictures,
+    weeks: weeks.map((w) => ({ ...w, lines: [] })),
+  }
 }
 
 /** The page as the readers take it: its calendar's entries for the weeks
@@ -183,7 +213,17 @@ export async function readPageFor(
   { apiKey, communityName, fetchImpl }: { apiKey: string; communityName: string; fetchImpl?: typeof fetch },
 ): Promise<PageReading> {
   const text = source.text?.slice(0, MAX_PAGE_TEXT) ?? null
-  if (reads.kind === 'times' && source.weeks) return readCalendarWeeks(listing, category, reads.key, source.weeks, apiKey)
+  if (reads.kind === 'times' && source.weeks && source.pictures?.length) {
+    // A calendar posted as pictures, read together, a week at a time.
+    const got = await Promise.all(source.pictures.map((u) => fetchPublic(u, { fetchImpl, headers: WATCH_FETCH_HEADERS, pictures: true }).catch(() => null)))
+    const images = got.flatMap((g) => (g?.type === 'picture' ? [{ mime: g.mime, b64: g.body }] : []))
+    if (!images.length) return { read: [], proposal: null, note: 'Their calendar’s pictures couldn’t be opened.' }
+    return readCalendarWeeks(listing, category, reads.key, source.weeks, apiKey, () => ({ images }))
+  }
+  if (reads.kind === 'times' && source.weeks) {
+    const words = (w: CalendarWeek) => (w.lines.length ? { text: [CALENDAR_HEADING, ...w.lines].join('\n') } : null)
+    return readCalendarWeeks(listing, category, reads.key, source.weeks, apiKey, words)
+  }
   if (reads.kind === 'times') {
     // The shul's times (scheduleUpdate.ts): its usual ones, and since Oct 20
     // the dated ones too, a week's, filed as that week's times. What the
@@ -258,7 +298,8 @@ export async function readPageFor(
  * then only what differs goes on, each on its date, as well as the usual
  * times, and the watch says so. A week already on the listing as it would
  * be (read again on the Thursday) files nothing; the newsletter keeps its
- * days (yieldToNewsletter).
+ * days (yieldToNewsletter). `sourceFor`: what's read for a week, its
+ * calendar's lines or the calendar's pictures, or nothing that week.
  */
 async function readCalendarWeeks(
   listing: DirectoryResource,
@@ -266,6 +307,7 @@ async function readCalendarWeeks(
   key: string,
   weeks: readonly CalendarWeek[],
   apiKey: string,
+  sourceFor: (w: CalendarWeek) => ScheduleSource | null,
 ): Promise<PageReading> {
   const sk = schedulesKey(key)
   let minyanim = regularMinyanim(listing[key])
@@ -274,8 +316,9 @@ async function readCalendarWeeks(
   const lines: string[] = []
   const notes: string[] = []
   for (const w of weeks) {
-    if (!w.lines.length) continue
-    const got = await readShulWeek(listing, key, { text: [CALENDAR_HEADING, ...w.lines].join('\n') }, apiKey, { week: w })
+    const source = sourceFor(w)
+    if (!source) continue
+    const got = await readShulWeek(listing, key, source, apiKey, { week: w })
     read.push(...timesReadLines(got.update.rows))
     const week = keepUncovered(got.update)
     const usualThere = week.rows.some((r) => r.status === 'kept' || r.status === 'gone')
@@ -356,7 +399,7 @@ export async function runListingPageWatch(
   const reads = category && pageReadsFor(category)
   if (!category || !reads) return { ok: false, error: 'The listing this page belongs to has no davening times or hours to keep current' }
 
-  const source = await readListingPage(watch.url, { fetchImpl: opts.fetchImpl, now: opts.now })
+  const source = await readListingPage(watch.url, { fetchImpl: opts.fetchImpl, now: opts.now, pictures: reads.kind === 'times' })
   if (!source) {
     return {
       ok: false,
@@ -382,7 +425,7 @@ export async function runListingPageWatch(
   const apiKey = 'apiKey' in opts ? opts.apiKey : process.env.OPENAI_API_KEY
   if (!apiKey) {
     if (!opts.full) return { ok: true, filed: 0 }
-    return { ok: true, filed: 0, check: { what: reads.kind, from: checkFrom(source), result: 'nothing', read: [], differences: [], queue: null, note: 'The AI isn’t set up here, so the page wasn’t read.' } }
+    return { ok: true, filed: 0, check: { what: reads.kind, from: checkFrom(source, { pictures: !!source.pictures?.length }), result: 'nothing', read: [], differences: [], queue: null, note: 'The AI isn’t set up here, so the page wasn’t read.' } }
   }
   if (budget && !opts.full) {
     if (budget.aiReads <= 0) return { ok: true, filed: 0 }
@@ -397,7 +440,7 @@ export async function runListingPageWatch(
   }
   const { proposal } = reading
   const check = (queue: WatchCheck['queue']) =>
-    pageCheck(reads.kind, checkFrom(source), reading.read, { differences: proposal?.lines ?? [], queue, note: reading.note, unread: reading.unread })
+    pageCheck(reads.kind, checkFrom(source, { pictures: !!source.pictures?.length }), reading.read, { differences: proposal?.lines ?? [], queue, note: reading.note, unread: reading.unread })
   if (!proposal) return { ok: true, filed: 0, pageHash, check: check(null) }
   // Only a check gets here with one waiting: it says so, files nothing, and
   // a change stays news for the daily run.

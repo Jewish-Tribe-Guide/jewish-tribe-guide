@@ -86,8 +86,13 @@ function daveningLines(lines: readonly string[]): string[] {
   return lines.filter((l, i) => CLOCK_TIME.test(l) && DAVENING.test(`${lines[i - 1] ?? ''} ${l} ${lines[i + 1] ?? ''}`))
 }
 
+/** Whether a page's words give a davening time. */
+export function hasDaveningTimes(text: string): boolean {
+  return daveningLines(text.split('\n')).length > 0
+}
+
 /** A page as the search reads it (listingPageRun.ts's PageSource). */
-type SearchSource = { text: string | null; pdf: string | null; weeks?: readonly { lines: readonly string[] }[] }
+type SearchSource = { text: string | null; pdf: string | null; weeks?: readonly { lines: readonly string[] }[]; pictures?: readonly string[] }
 
 /** Which of a shul's pages (home page first, then its links, best first)
  *  to read its times from (Oct 21's read-only check of every shul page):
@@ -97,14 +102,17 @@ type SearchSource = { text: string | null; pdf: string | null; weeks?: readonly 
  *  - of pages showing one calendar (a site-wide widget: Beth Zion-Beth
  *    Israel's five pages all showed the same week), only the one whose own
  *    words give the most davening times, so the week is read once. A PDF
- *    can't be told without reading it, so it's read. */
+ *    can't be told without reading it, so it's read, and so is a calendar
+ *    posted as pictures (Mikveh Israel's month, calendarPictures.ts), once
+ *    however many pages show it. */
 export function timesPagesToRead(sources: readonly (SearchSource | null)[]): boolean[] {
-  const calendarOf = (s: SearchSource) => (s.weeks?.some((w) => w.lines.length) ? JSON.stringify(s.weeks.map((w) => w.lines)) : null)
+  const calendarOf = (s: SearchSource) =>
+    s.pictures?.length ? JSON.stringify(s.pictures) : s.weeks?.some((w) => w.lines.length) ? JSON.stringify(s.weeks.map((w) => w.lines)) : null
   const own = (s: SearchSource) => {
     const shown = new Set(s.weeks?.flatMap((w) => w.lines))
     return daveningLines((s.text ?? '').split('\n').filter((l) => !shown.has(l))).length
   }
-  const keep = sources.map((s) => !!s && (s.pdf !== null || daveningLines((s.text ?? '').split('\n')).length > 0))
+  const keep = sources.map((s) => !!s && (s.pdf !== null || !!s.pictures?.length || hasDaveningTimes(s.text ?? '')))
   const best = new Map<string, number>()
   sources.forEach((s, i) => {
     const calendar = s && keep[i] ? calendarOf(s) : null

@@ -34,9 +34,23 @@ export type ScheduleReading = {
   missing: string | null
 }
 
-export type ScheduleSource = { text: string } | { image: string; mime: string } | { pdf: string }
+/** What's read: words, a photo, a PDF, or a calendar's pictures (a month
+ *  posted as pictures on a shul's page, listingPageRun.ts), read together. */
+export type ScheduleSource = { text: string } | { image: string; mime: string } | { pdf: string } | { images: { mime: string; b64: string }[] }
 
 const MAX_TEXT = 8_000
+
+/** The user's message: the intro, then what was sent. */
+function messageContent(intro: string, source: ScheduleSource): unknown {
+  if ('text' in source) return `${intro}\n\n${source.text.slice(0, MAX_TEXT)}`
+  const picture = (mime: string, b64: string) => ({ type: 'image_url', image_url: { url: `data:${mime};base64,${b64}` } })
+  if ('image' in source) return [{ type: 'text', text: intro }, picture(source.mime, source.image)]
+  if ('images' in source) return [{ type: 'text', text: intro }, ...source.images.map((i) => picture(i.mime, i.b64))]
+  return [
+    { type: 'text', text: intro },
+    { type: 'file', file: { filename: 'schedule.pdf', file_data: `data:application/pdf;base64,${source.pdf}` } },
+  ]
+}
 
 /** The festival's days, as the AI is told them: each date with its name, so
  *  "Shemini Atzeres" in a message is a date, and "Yom Tov" a known set. */
@@ -64,18 +78,7 @@ Rules:
 
 Answer in JSON only: {"times": [{"tefillah": "...", "on": ["..."], "time": "...", "notes": "...", "quote": "...", "unsure": "..."}], "missing": "..."}`
   const intro = `The shul: ${shulName}. Its schedule:`
-  const content =
-    'text' in source
-      ? `${intro}\n\n${source.text.slice(0, MAX_TEXT)}`
-      : 'image' in source
-        ? [
-            { type: 'text', text: intro },
-            { type: 'image_url', image_url: { url: `data:${source.mime};base64,${source.image}` } },
-          ]
-        : [
-            { type: 'text', text: intro },
-            { type: 'file', file: { filename: 'schedule.pdf', file_data: `data:application/pdf;base64,${source.pdf}` } },
-          ]
+  const content = messageContent(intro, source)
   return [
     { role: 'system', content: system },
     { role: 'user', content },
@@ -235,6 +238,10 @@ export function asRegularTime(tefillah: Tefillah, time: string): { time: string;
   // it's a different time from the shul's own 10:00am (Kol Tzedek, Oct 19).
   const hour = time.trim().match(/^(\d{1,2})\s*([ap])\.?\s*m\.?$/i)
   if (hour && Number(hour[1]) >= 1 && Number(hour[1]) <= 12) return { time: `${Number(hour[1])}:00${hour[2].toLowerCase()}m` }
+  // "9:00 A.M.", as Mikveh Israel's calendar picture writes it (Oct 21):
+  // else it's text, not a clock, and never the listing's 9:00am.
+  const dotted = time.trim().match(/^(\d{1,2}):(\d{2})\s*([ap])\.\s*m\.?$/i)
+  if (dotted) return { time: `${Number(dotted[1])}:${dotted[2]}${dotted[3].toLowerCase()}m` }
   const bare = time.trim().match(/^(\d{1,2}):(\d{2})$/)
   if (bare) {
     const h = Number(bare[1])
@@ -287,18 +294,7 @@ Then "times", one entry per prayer time:
 
 Answer in JSON only: {"kind": "...", "complete": true, "season": null, "title": "...", "startsOn": null, "from": null, "to": null, "times": [{"tefillah": "...", "days": ["..."], "date": "...", "occasion": "...", "time": "...", "notes": "...", "season": "...", "quote": "...", "unsure": "..."}]}`
   const intro = `The shul: ${shulName}. Its message:`
-  const content =
-    'text' in source
-      ? `${intro}\n\n${source.text.slice(0, MAX_TEXT)}`
-      : 'image' in source
-        ? [
-            { type: 'text', text: intro },
-            { type: 'image_url', image_url: { url: `data:${source.mime};base64,${source.image}` } },
-          ]
-        : [
-            { type: 'text', text: intro },
-            { type: 'file', file: { filename: 'schedule.pdf', file_data: `data:application/pdf;base64,${source.pdf}` } },
-          ]
+  const content = messageContent(intro, source)
   return [
     { role: 'system', content: system },
     { role: 'user', content },

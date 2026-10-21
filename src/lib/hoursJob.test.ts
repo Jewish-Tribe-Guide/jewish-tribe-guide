@@ -58,6 +58,15 @@ describe('timesPagesToRead', () => {
     // None says more than the calendar: the first, the home page.
     expect(timesPagesToRead([home, sermons])).toEqual([true, false])
   })
+
+  it('reads a calendar posted as pictures, as a PDF is, and once however many pages show it', () => {
+    // Mikveh Israel's calendar page: an empty event list and a footer's
+    // office hours in its words, the month in a picture.
+    const pictured = (words: string) => ({ ...page(words), pictures: ['https://cdn.example/Oct+calendar+2026.png'] })
+    const calendar = pictured('No results found\nOffice Hours\n9 AM - 5 PM')
+    expect(timesPagesToRead([calendar, page('Office Hours\n9 AM - 5 PM')])).toEqual([true, false])
+    expect(timesPagesToRead([calendar, pictured('Visit us\nOffice Hours\n9 AM - 5 PM')])).toEqual([true, false])
+  })
 })
 
 describe('hoursJobCategories', () => {

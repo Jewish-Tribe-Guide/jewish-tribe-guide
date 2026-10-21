@@ -38,7 +38,8 @@ export async function fetchHome(url: string): Promise<{ url: string; body: strin
 export async function searchHoursPages(website: string, reach: HoursReach = {}, job: PageJob = 'hours'): Promise<{ found: HoursPage[]; unloaded: string[] } | { error: string }> {
   const home = await (reach.fetchHome ?? fetchHome)(website)
   if ('error' in home) return home
-  const read = reach.readPage ?? ((u: string) => readListingPage(u))
+  // A shul's calendar may be posted as pictures (calendarPictures.ts).
+  const read = reach.readPage ?? ((u: string) => readListingPage(u, { pictures: job === 'times' }))
   const pages = (job === 'times' ? timesPages : hoursPages)(home.url, home.body)
   const sources = await Promise.all(pages.map((p) => read(p.url).catch(() => null)))
   const keep = job === 'times' ? timesPagesToRead(sources) : sources.map((s) => !!s && looksLikeHours(s))

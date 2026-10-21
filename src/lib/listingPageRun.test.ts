@@ -739,6 +739,86 @@ describe('runListingPageWatch: a shul’s calendar, a week at a time', () => {
   })
 })
 
+// Mikveh Israel, Oct 21: its calendar page's event list is empty, and the
+// month is in pictures (calendarPictures.test.ts has which).
+describe('a shul’s month posted as pictures', () => {
+  const THU = Date.parse('2026-10-22T14:00:00Z')
+  const OCT_PNG = 'https://images.squarespace-cdn.com/content/v1/mi/Oct.+High+Holiday+calendar+2026.png'
+  const pictureHtml = (png = OCT_PNG) =>
+    `<header><img src="/logo.png" alt="Congregation Mikveh Israel"></header><main><p>No results found</p><img data-image="${png}" data-image-dimensions="2550x3300" alt=""></main><footer>Office Hours Monday – Thursday 9 AM - 5 PM</footer>`
+  const usual = [
+    { id: 'sh', tefillah: 'shacharis', days: ['mon', 'thu'], time: '7:15am' },
+    { id: 'sat', tefillah: 'shacharis', days: ['sat'], time: '9:00am' },
+  ]
+  const mikvehIsrael = { ...shul, id: 'mi', name: 'Congregation Mikveh Israel', details: { minyanim: usual } }
+  type Row = TimesUpdate['rows'][number]
+  const row = (day: string, tefillah: Row['tefillah'], time: string, status: Row['status'], rowId?: string): Row => ({ id: `${day}${tefillah}`, day, tefillah, time, status, ...(rowId ? { rowId } : {}), quote: time })
+  const weekOf = (from: string, to: string, rows: Row[]): TimesUpdate => ({ kind: 'week', complete: true, season: null, title: null, startsOn: null, from, to, rows, otherSeason: 0 })
+  const serve = (pictures: 'open' | 'gone' = 'open', html = pictureHtml()) =>
+    m.fetchPublic.mockImplementation(async (url: string, o?: { pictures?: boolean }) =>
+      url === URL_ ? { url, type: 'html', body: html } : pictures === 'open' && o?.pictures ? { url, type: 'picture', mime: 'image/png', body: `b64 of ${url}` } : null,
+    )
+
+  beforeEach(() => {
+    m.getResourceRowById.mockResolvedValue(mikvehIsrael)
+    serve()
+    m.readShulWeek.mockImplementation(async (_l: unknown, _k: unknown, _s: unknown, _a: unknown, opts: { week: { from: string } }) => ({
+      update:
+        opts.week.from === '2026-10-22'
+          ? weekOf('2026-10-22', '2026-10-24', [row('2026-10-22', 'shacharis', '7:15am', 'same', 'sh'), row('2026-10-23', 'other', '6:00pm', 'new'), row('2026-10-24', 'shacharis', '9:00am', 'same', 'sat')])
+          : weekOf('2026-10-25', '2026-10-31', [row('2026-10-30', 'kabbalas_shabbos', '5:45pm', 'new'), row('2026-10-31', 'shacharis', '9:00am', 'same', 'sat')]),
+      model: 'cheap',
+    }))
+  })
+
+  it('a shul’s page with no calendar or times in its words is read for its calendar’s pictures', async () => {
+    const { readListingPage, PICTURES_HEADING } = await import('./listingPageRun')
+    const got = await readListingPage(URL_, { now: THU, pictures: true })
+    expect(got).toMatchObject({ pdf: null, pictures: [`${OCT_PNG}?format=1500w`], weeks: [{ from: '2026-10-22', lines: [] }, { from: '2026-10-25', lines: [] }] })
+    expect(got?.text?.startsWith(`${PICTURES_HEADING}\n${OCT_PNG}?format=1500w\nWeeks from 2026-10-18, 2026-10-25`)).toBe(true)
+    // Not fetched to be found: only when the AI reads them.
+    expect(m.fetchPublic).toHaveBeenCalledTimes(1)
+    // A mikvah's page isn't looked at for one, and nor is a page that gives
+    // its times in words.
+    expect(await readListingPage(URL_, { now: THU })).toBeNull()
+    serve('open', `${pictureHtml()}<p>Shacharit 7:15 AM Monday and Thursday. ${'Everyone is welcome to join us. '.repeat(6)}</p>`)
+    expect((await readListingPage(URL_, { now: THU, pictures: true }))?.pictures).toBeUndefined()
+  })
+
+  it('its fingerprint changes when a picture is replaced, and from week to week', async () => {
+    const { readListingPage } = await import('./listingPageRun')
+    const at = async (iso: string) => menuHash((await readListingPage(URL_, { now: Date.parse(iso), pictures: true }))!)
+    expect(await at('2026-10-20T14:00:00Z')).toBe(await at('2026-10-21T14:00:00Z')) // Tue, Wed
+    expect(await at('2026-10-21T14:00:00Z')).not.toBe(await at('2026-10-22T14:00:00Z')) // Thu: next week added
+    const before = await at('2026-10-22T14:00:00Z')
+    serve('open', pictureHtml('https://images.squarespace-cdn.com/content/v1/mi/Oct.+calendar+2026+v2.png'))
+    expect(await at('2026-10-22T14:00:00Z')).not.toBe(before)
+  })
+
+  it('reads the pictures a week at a time, and files each week as that week’s schedule', async () => {
+    const out = await runListingPageWatch(changed, undefined, { apiKey: 'k', now: THU, full: true })
+    expect(m.fetchPublic).toHaveBeenCalledWith(`${OCT_PNG}?format=1500w`, expect.objectContaining({ pictures: true }))
+    expect(m.readShulWeek).toHaveBeenCalledTimes(2)
+    for (const [, , source, , opts] of m.readShulWeek.mock.calls) {
+      expect(source).toEqual({ images: [{ mime: 'image/png', b64: `b64 of ${OCT_PNG}?format=1500w` }] })
+      expect(opts).toEqual({ week: expect.objectContaining({ lines: [] }) })
+    }
+    expect(out).toMatchObject({ ok: true, filed: 1, check: { from: 'pictures', result: 'differs' } })
+    const weeks = m.submitListingUpdate.mock.calls[0][2].details.minyanim_schedules as { name: string; minyanim: { on: string[]; time: string }[] }[]
+    expect(weeks.map((w) => [w.name, w.minyanim.map((x) => `${x.on[0]} ${x.time}`)])).toEqual([
+      ['Times for Oct 18 – Oct 24', ['2026-10-22 7:15am', '2026-10-23 6:00pm', '2026-10-24 9:00am']],
+      ['Times for Oct 25 – Oct 31', ['2026-10-30 5:45pm', '2026-10-31 9:00am']],
+    ])
+  })
+
+  it('pictures that won’t open are said to, and nothing is read', async () => {
+    serve('gone')
+    const out = await runListingPageWatch(changed, undefined, { apiKey: 'k', now: THU, full: true })
+    expect(out).toMatchObject({ ok: true, filed: 0, check: { from: 'pictures', note: 'Their calendar’s pictures couldn’t be opened.' } })
+    expect(m.readShulWeek).not.toHaveBeenCalled()
+  })
+})
+
 // A page that gives both seasons' times is compared season by season
 // (compareTimes), each row marked with its season. Neither filter may
 // cross seasons.

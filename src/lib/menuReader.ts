@@ -349,16 +349,19 @@ export const MAX_MENU_PICTURES = 4
 /** A picture that's part of the page's look, not its menu. */
 const NOT_A_MENU_PICTURE = /logo|icon|favicon|sprite|avatar|badge|placeholder|spinner|loading|facebook|instagram|twitter|yelp|tripadvisor|google|apple|android|payment|visa|mastercard|kosher[-_ ]?(cert|symbol|logo)/i
 
-/** The pictures on a page that may be its menu, best first, at most
- *  MAX_MENU_PICTURES: one whose address, alt text or link says "menu" (or
- *  "brochure", "flyer"), then, on a page that is the menu (its menu link, a
- *  page its website links to as its menu), the rest of its pictures. On any
- *  other page (a home page), only those that say so: its food photos aren't
- *  its menu. Never a logo, an icon, an SVG or a GIF. */
-export function menuPictures(html: string, base: string, { menuPage }: { menuPage: boolean }): string[] {
-  const found: { url: string; says: boolean }[] = []
+/** A picture on a page that may be part of what it says, not of its look:
+ *  its address, the words it's given (alt text, title, or a link's text),
+ *  and its size when the page says it. */
+export type PagePicture = { url: string; words: string; width: number | null; height: number | null }
+
+/** The pictures on a page, in its order, each once: the largest a srcset
+ *  offers, a link straight to a picture (as lightboxes link the full size).
+ *  Never a logo, an icon, an SVG or a GIF. Shared by a menu posted as
+ *  pictures (menuPictures) and a calendar posted as one (calendarPictures). */
+export function pagePictures(html: string, base: string): PagePicture[] {
+  const found: PagePicture[] = []
   const seen = new Set<string>()
-  const add = (raw: string | undefined, words: string) => {
+  const add = (raw: string | undefined, words: string, size: [number, number] | null = null) => {
     if (!raw) return
     const src = decode(raw.trim())
     if (!src || src.startsWith('data:') || src.includes('{')) return
@@ -378,19 +381,36 @@ export function menuPictures(html: string, base: string, { menuPage }: { menuPag
     const key = url.searchParams.get('url') ?? url.hostname + url.pathname
     if (seen.has(key)) return
     seen.add(key)
-    found.push({ url: url.toString(), says: /menu|brochure|flyer/i.test(`${path} ${words}`) })
+    found.push({ url: url.toString(), words, width: size?.[0] ?? null, height: size?.[1] ?? null })
   }
   for (const m of html.matchAll(/<img\b[^>]*>/gi)) {
     const attr = (name: string) => new RegExp(`\\b${name}\\s*=\\s*(["'])(.*?)\\1`, 'i').exec(m[0])?.[2]
     const srcset = attr('srcset') ?? attr('data-srcset')
     // The largest of a srcset: its last entry, as sites write them.
     const largest = srcset?.split(',').at(-1)?.trim().split(/\s+/)[0]
-    add(attr('data-image') ?? attr('data-src') ?? largest ?? attr('src'), `${attr('alt') ?? ''} ${attr('title') ?? ''}`)
+    // Its size as the picture is (Squarespace's data-image-dimensions), else as it's drawn.
+    const dims = /^(\d+)x(\d+)$/.exec(attr('data-image-dimensions') ?? '')
+    const [w, h] = dims ? [Number(dims[1]), Number(dims[2])] : [Number(attr('width')), Number(attr('height'))]
+    add(attr('data-image') ?? attr('data-src') ?? largest ?? attr('src'), `${attr('alt') ?? ''} ${attr('title') ?? ''}`, w > 0 && h > 0 ? [w, h] : null)
   }
-  // A link straight to a picture ("View our menu" → menu.jpg), as lightboxes link the full size.
   for (const m of html.matchAll(/<a\b[^>]*\bhref\s*=\s*(["'])(.*?)\1[^>]*>([\s\S]*?)<\/a>/gi)) {
     if (/\.(jpe?g|png|webp)(\?|$)/i.test(m[2])) add(m[2], htmlToText(m[3]))
   }
+  return found
+}
+
+/** The pictures on a page that may be its menu, best first, at most
+ *  MAX_MENU_PICTURES: one whose address, alt text or link says "menu" (or
+ *  "brochure", "flyer"), then, on a page that is the menu (its menu link, a
+ *  page its website links to as its menu), the rest of its pictures. On any
+ *  other page (a home page), only those that say so: its food photos aren't
+ *  its menu. Never a logo, an icon, an SVG or a GIF. */
+export function menuPictures(html: string, base: string, { menuPage }: { menuPage: boolean }): string[] {
+  const says = (p: PagePicture) => {
+    const url = new URL(p.url)
+    return /menu|brochure|flyer/i.test(`${decodeURIComponent(url.pathname + url.search)} ${p.words}`)
+  }
+  const found = pagePictures(html, base).map((p) => ({ url: p.url, says: says(p) }))
   const ordered = [...found.filter((f) => f.says), ...(menuPage ? found.filter((f) => !f.says) : [])]
   return ordered.slice(0, MAX_MENU_PICTURES).map((f) => f.url)
 }

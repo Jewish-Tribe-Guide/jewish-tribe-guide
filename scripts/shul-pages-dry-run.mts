@@ -75,7 +75,7 @@ async function dryRun(slug: string, communityName: string, category: Awaited<Ret
   t.givenFound = given.filter((g) => pages.some((p) => samePage(p.url, g))).length
   for (const { url: page, link } of pages) {
     say(`\n   ── ${page}${link ? ` (its “${link}” link)` : ''}`)
-    const source = await readListingPage(page).catch(() => null)
+    const source = await readListingPage(page, { pictures: true }).catch(() => null)
     if (!source) {
       say('      Can’t be read (blocked, moved, or nearly empty).')
       continue
