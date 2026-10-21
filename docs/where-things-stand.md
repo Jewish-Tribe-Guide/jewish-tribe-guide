@@ -4,7 +4,7 @@ The running list of what's outstanding, kept in the repo so it survives a
 change of Claude account (artifacts and Claude's own notes stay with the old
 account). Update it in the same commit as the work that changes it.
 
-Last updated: Oct 20, 2026.
+Last updated: Oct 21, 2026.
 
 ## The branch
 
@@ -251,6 +251,56 @@ for that exact change, in the same conversation. Show the dry run first.
 ## Small open decisions
 
 7. The "+" button covers part of the third tile in a row on the phone home.
+
+## Done Oct 21: npm audit's critical and high findings (on `deps/audit-next-sharp`, not merged)
+
+`npm audit` had 1 critical and 8 high (12 in all) before the Oct 20 menu
+work. Now 5 high, all one lint-only chain, explained below.
+
+- **next 16.3.5 → 16.3.8** (and `eslint-config-next` to match): the
+  smallest version clear of all seven Next advisories. 16.4.x was not
+  needed. Whether each one reached this app:
+  - **RCE in `next/og` ImageResponse** (critical, 16.2.0–16.3.5): not
+    reachable. Nothing imports `next/og` and there is no
+    `opengraph-image`/`icon`/`twitter-image` file convention, so Next never
+    builds an ImageResponse. `/icons/[size]` is a plain route handler using
+    sharp.
+  - **SSRF in Image Optimization** (high): `remotePatterns` is only our
+    Supabase storage and Unsplash (`src/lib/imageHosts.ts`), and on Vercel
+    `/_next/image` is served by Vercel's optimizer, not this app's server.
+    Low exposure; patched anyway.
+  - **SSG/ISR cache poisoning** (two, moderate): the self-hosted one doesn't
+    apply on Vercel; the cross-user one could. Patched. 16.3.8 namespaces
+    response cache keys by source route (its docs'
+    `incrementalCacheHandlerPath` page); no custom cache handler here, so
+    nothing to change.
+  - **Draft Mode leaking through `use cache`**: no `draftMode()` anywhere.
+  - **Metadata image routes via `dynamicParams`**: no metadata image routes.
+  - **Dev server MCP endpoint**: dev only.
+- **sharp 0.35.4 → 0.35.5** (librsvg CVE, SVG input only). Not reachable by
+  a visitor. Its one use, `/icons/[size]`, decodes the admin-uploaded logo
+  (the logo upload does take SVG); a visitor picks only an allowed size.
+  Visitor photo uploads (`/api/submissions/photo`) refuse SVG by declared
+  type, and Next's optimizer sniffs the bytes and refuses SVG regardless
+  (`dangerouslyAllowSVG` is off), so a renamed SVG never reaches sharp.
+- **vite 8.3.0 → 8.3.5, source-map-js 1.2.1 → 1.2.2** (high, dev and build
+  tooling only), plus dompurify 3.4.17 (low, inside posthog-js) and
+  tsx 4.23.15 / esbuild 0.28.2 (moderate, dev server). The tsx bump is
+  bigger than the smallest fix (4.19.3) on purpose. 4.19.3 pins esbuild
+  0.25, and vite wants `^0.27 || ^0.28`, so `npm ls` already flagged the
+  old tree as invalid. 4.23.15 clears that.
+- **Left: `braces` ≤3.0.3** (high, stack exhaustion on deeply nested brace
+  patterns), via `eslint-config-next → @next/eslint-plugin-next → fast-glob
+  → micromatch`. No patched `braces` exists (3.0.3 is the latest), so no
+  override fixes it. `npm audit fix --force` would downgrade
+  `eslint-config-next` to 14.2.35, which is wrong for Next 16. It runs
+  only inside `npm run lint`, on glob patterns from our own config, never
+  on a visitor's input, and none of it ships. Recheck when `braces`
+  publishes a fix.
+- Checked: unit 5061 passed, e2e 330 passed / 0 failed,
+  `test:cache-roundtrip` 6 passed (run because 16.3.8 rekeys the ISR
+  cache; both in-flight-regeneration race tests green), tsc and lint
+  clean, Sentry has no unresolved errors.
 
 ## Done Oct 20: seven small fixes (on `redesign/oct18-fixes`, not merged)
 
