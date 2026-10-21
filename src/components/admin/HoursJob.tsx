@@ -11,15 +11,16 @@ import { watchHealth, type Watch } from '@/lib/watches'
 import type { Finding } from '@/lib/watchFindings'
 import type { Decided } from '@/lib/watchFindingStore'
 import FindingCompare, { type Decision } from './FindingCompare'
-import { BUTTON, GivePage, JobPage, JobRow, SourceCard, day, jobOrder, needsYou, shortUrl, type JobStatus } from './JobPage'
+import { BUTTON, GivePage, JobPage, JobRow, SourceCard, day, jobTabs, needsYou, shortUrl, type JobStatus, type JobTab } from './JobPage'
 
 // ── The Watches tab's Mikvah hours and Shul times pages (the user, Oct 21) ──
 // Every place whose category has named weekly hours (a mikvah's women's,
 // men's and keilim hours), or davening times (`job="times"`), read every
 // morning from the pages on its own website that give them: found by the
 // morning's search (hoursJobRun.ts), or added here by hand. On the one
-// page every job has (JobPage.tsx): each place on a row, with how its last
-// read compares with the listing, the page it read, and Check now; opened,
+// page every job has (JobPage.tsx), in its tabs: each place on a row, with
+// how its last read compares with the listing, the page it read, and Check
+// now; opened,
 // what each page read, and ways to use a different page, stop one, or add
 // one.
 //
@@ -212,14 +213,20 @@ export default function HoursJob({ token, job = 'hours' }: { token: string; job?
   const [now] = useState(() => Date.now())
   // Findings updated or skipped this visit.
   const [settled, setSettled] = useState<Settled>(new Map())
+  // Each place's tab, as it was when the page loaded, and the one showing.
+  const [tabOf, setTabOf] = useState<ReadonlyMap<string, JobTab>>(new Map())
+  const [tab, setTab] = useState<JobTab>('to_check')
 
   const load = useCallback(async () => {
     setError(null)
     try {
       const got = await fetchJson<Loaded>(withCommunity(api, community), { headers: { Authorization: `Bearer ${token}` } }, 'Failed to load the places.')
-      // In this order for the whole visit: a row acted on stays where it is.
+      // In its tab for the whole visit: a row acted on stays where it is.
       const t = Date.now()
-      setData({ ...got, places: jobOrder(got.places, (p) => hoursStatus(p, hoursSection(asPlace(p, new Map()), t), t), (p) => p.name) })
+      const { rows, tabs, first } = jobTabs(got.places, (p) => hoursStatus(p, hoursSection(asPlace(p, new Map()), t), t), (p) => p.name)
+      setData({ ...got, places: rows })
+      setTabOf(tabs)
+      setTab(first)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.')
     }
@@ -271,6 +278,8 @@ export default function HoursJob({ token, job = 'hours' }: { token: string; job?
     setData((x) => x && { ...x, places: x.places.map((y) => (y.id === p.id ? { ...y, decided: { at: new Date().toISOString(), status: d } } : y)) })
   }
   // What's read, said once above when it's the same for every place.
+  const counts = { to_check: 0, cant_read: 0, not_read: 0, checked: 0, off: 0 }
+  for (const p of data.places) counts[tabOf.get(p.id) ?? 'to_check']++
   const fields = data.places[0]?.fields ?? []
   const sameFields = data.places.every((p) => p.fields.join('|') === fields.join('|'))
   return (
@@ -281,6 +290,7 @@ export default function HoursJob({ token, job = 'hours' }: { token: string; job?
       needYou={data.places.filter((p) => needsYou(statusOf(p))).length}
       total={data.places.length}
       noun={noun}
+      tabs={{ counts, active: tab, onChange: setTab }}
       notice={
         <>
           {!data.available && <p className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">Reading websites needs database migration 070.</p>}
@@ -288,7 +298,7 @@ export default function HoursJob({ token, job = 'hours' }: { token: string; job?
         </>
       }
     >
-      {data.places.map((p) => {
+      {data.places.filter((p) => (tabOf.get(p.id) ?? 'to_check') === tab).map((p) => {
         const status = statusOf(p)
         const findings = p.findings ?? []
         return (

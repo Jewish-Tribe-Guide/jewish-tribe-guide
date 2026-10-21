@@ -84,6 +84,7 @@ const rows = () => screen.getAllByTestId('job-row')
 const rowOf = (name: string) => rows().find((r) => within(r).queryAllByText(name).length) as HTMLElement
 const pill = (name: string) => within(rowOf(name)).getByTestId('job-status').textContent
 const open = (name: string) => userEvent.setup().click(within(rowOf(name)).getAllByRole('button')[0])
+const tab = (name: string) => userEvent.setup().click(screen.getByRole('tab', { name: new RegExp(`^${name} \\d+$`) }))
 const HOURS = '/api/admin/watches/hours?community=philly'
 
 afterEach(() => {
@@ -96,31 +97,47 @@ afterEach(() => {
 describe('HoursJob', () => {
   // The user, Oct 21: "Each listing is there, showing the source reading
   // from, the results, how it compares to what we have... A way to have it
-  // check again." One list, no sections; all of it on the closed row.
-  it('one list: every place with how it compares, where it read from, and Check now, without opening it', async () => {
+  // check again." All of it on the closed row.
+  it('every row says how it compares, where it read from, and has Check now, without opening it', async () => {
     const OFF = place({ id: 'ol', name: 'Aaron Mikvah', off: true })
     await renderPage([MOISHE, OFF, MEI, LMC])
-    expect(screen.queryAllByRole('region')).toHaveLength(0)
-    // What needs you first, then A–Z, Off last.
-    expect(rows().map((r) => within(r).getAllByRole('button')[0].querySelector('.font-semibold')?.textContent)).toEqual([LMC.name, MEI.name, MOISHE.name, OFF.name])
     expect(screen.getByTestId('job-counts').textContent).toBe('2 need you · 4 places')
     expect(pill(LMC.name)).toBe('Differs from the listing')
-    expect(pill(MEI.name)).toBe('Couldn’t read')
-    expect(pill(MOISHE.name)).toBe('Same as the listing')
-    expect(pill(OFF.name)).toBe('Off')
-    expect(within(rowOf(MOISHE.name)).getByText(/^From mikvahwestphilly\.com · read [A-Z][a-z]{2} \d+$/)).toBeInTheDocument()
     expect(within(rowOf(LMC.name)).getByText(/^From lmcmikvah\.org and 1 other page · read /)).toBeInTheDocument()
-    expect(within(rowOf(MEI.name)).getByText('Read its website: no weekly hours on it.')).toBeInTheDocument()
-    expect(within(rowOf(OFF.name)).getByText('No hours online: not read.')).toBeInTheDocument()
-    // Check now on every row, Turn back on on one that's off.
-    for (const n of [LMC.name, MEI.name, MOISHE.name]) expect(within(rowOf(n)).getByRole('button', { name: 'Check now' })).toBeInTheDocument()
-    expect(within(rowOf(OFF.name)).getByRole('button', { name: 'Turn back on' })).toBeInTheDocument()
+    expect(within(rowOf(LMC.name)).getByRole('button', { name: 'Check now' })).toBeInTheDocument()
     // What it found waits on its row, not in the moderation queue (step 6).
     expect(within(rowOf(LMC.name)).getByTestId('finding')).toHaveTextContent('Women’s Hours: its page says 7:30 PM – 9:30 PM. The listing says 8:30 PM – 10:30 PM. And 1 more.')
+    await tab('Can’t be read')
+    expect(pill(MEI.name)).toBe('Couldn’t read')
+    expect(within(rowOf(MEI.name)).getByText('Read its website: no weekly hours on it.')).toBeInTheDocument()
+    expect(within(rowOf(MEI.name)).getByRole('button', { name: 'Check now' })).toBeInTheDocument()
+    await tab('Checked')
+    expect(pill(MOISHE.name)).toBe('Same as the listing')
+    expect(within(rowOf(MOISHE.name)).getByText(/^From mikvahwestphilly\.com · read [A-Z][a-z]{2} \d+$/)).toBeInTheDocument()
+    await tab('Off')
+    expect(within(rowOf(OFF.name)).getByText('No hours online: not read.')).toBeInTheDocument()
+    expect(within(rowOf(OFF.name)).getByRole('button', { name: 'Turn back on' })).toBeInTheDocument()
     // What's read is said once, not on every row.
     expect(screen.getByText(/^Women’s Hours, Men’s Hours and Keilim Hours, read every morning/)).toBeInTheDocument()
     expect(screen.queryByText('Women’s Hours · Men’s Hours · Keilim Hours')).toBeNull()
     expect(screen.getByRole('link', { name: '‹ Watches' })).toHaveAttribute('href', '/philly/admin/watches')
+  })
+
+  // The user, Oct 21: "can the to check, can't be read, not read yet be
+  // tabs so the page isn't so messy".
+  it('in tabs, each with its count, opening on the first with anything in it; Off only when there are any', async () => {
+    const unread = place({ id: 'u', name: 'Unread Mikvah', pages: [{ watch: watch({ id: 'w-u', lastRunAt: null, lastCheck: null }), source: 'Found from its website' }] })
+    await renderPage([MOISHE, MEI, unread])
+    expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual(['To check 0', 'Can’t be read 1', 'Not read yet 1', 'Checked 1'])
+    // Nothing to check: it opens on Can't be read.
+    expect(screen.getByRole('tab', { selected: true })).toHaveTextContent('Can’t be read')
+    expect(rows().map((r) => within(r).getAllByRole('button')[0].querySelector('.font-semibold')?.textContent)).toEqual([MEI.name])
+    await tab('To check')
+    expect(screen.queryAllByTestId('job-row')).toHaveLength(0)
+    expect(screen.getByRole('tabpanel')).toHaveTextContent('None right now.')
+    await tab('Not read yet')
+    expect(rows()).toHaveLength(1)
+    expect(within(rows()[0]).getByText(/· not read yet$/)).toBeInTheDocument()
   })
 
   it('opened: each page it reads, where it came from, what it read, and how that compares', async () => {
@@ -149,13 +166,15 @@ describe('HoursJob', () => {
       now = filed
       return { pages: filed.pages, stopped: [] }
     })
+    await tab('Checked')
     await userEvent.setup().click(within(rowOf(MOISHE.name)).getByRole('button', { name: 'Check now' }))
     expect(posts.at(-1)).toEqual({ url: HOURS, body: { resourceId: 'mz', action: 'check' } })
     expect(await within(rowOf(MOISHE.name)).findByTestId('finding')).toBeInTheDocument()
     expect(pill(MOISHE.name)).toBe('Differs from the listing')
     expect(gets.at(-1)).toBe('/api/admin/watches/hours?counts&community=philly')
-    // Still second: it doesn't jump away under the admin's hand.
-    expect(rows()[1]).toBe(rowOf(MOISHE.name))
+    // Still in Checked: it doesn't jump away under the admin's hand.
+    expect(screen.getByRole('tab', { selected: true })).toHaveTextContent('Checked 1')
+    expect(rows()).toEqual([rowOf(MOISHE.name)])
   })
 
   // The user, Oct 21: "all the ones in not read yet can't be checked".
@@ -163,11 +182,13 @@ describe('HoursJob', () => {
     const unread = place({ id: 'u', name: 'Unread Mikvah', pages: [{ watch: watch({ id: 'w-u', lastRunAt: null, lastCheck: null }), source: 'Found from its website' }] })
     const read = { watch: watch({ id: 'w-u', lastCheck: check('agrees') }), source: 'Found from its website' }
     await renderPage([unread, MEI], (body) => (body.resourceId === 'u' ? { pages: [read], stopped: [] } : { pages: [], stopped: [], reason: 'Read its website: no weekly hours on it.' }))
+    await tab('Not read yet')
     expect(pill('Unread Mikvah')).toBe('Not read yet')
     expect(within(rowOf('Unread Mikvah')).getByText(/· not read yet$/)).toBeInTheDocument()
     await userEvent.setup().click(within(rowOf('Unread Mikvah')).getByRole('button', { name: 'Check now' }))
     expect(posts.at(-1)!.body).toEqual({ resourceId: 'u', action: 'check' })
     expect(pill('Unread Mikvah')).toBe('Same as the listing')
+    await tab('Can’t be read')
     await userEvent.setup().click(within(rowOf(MEI.name)).getByRole('button', { name: 'Check now' }))
     expect(posts.at(-1)!.body).toEqual({ resourceId: 'mei', action: 'check' })
   })

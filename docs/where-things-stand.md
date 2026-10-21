@@ -666,15 +666,18 @@ compare, and one it can't read, on desktop and phone.
    pages that each looked different: "Each listing is there, showing the
    source reading from, the results, how it compares to what we have... A
    way to have it check again, a way to replace the source or add a
-   source." So a job page is one list (`JobPage.tsx`), no sections:
+   source." So a job page is one list (`JobPage.tsx`), in tabs (the user:
+   "can the to check, can't be read, not read yet be tabs so the page
+   isn't so messy"): **To check · Can't be read · Not read yet · Checked**,
+   and **Off** when there are any, each with its count, A–Z within. It
+   opens on the first with anything in it. A row stays in its tab for the
+   visit, so one just checked doesn't vanish; its pill says what it is now.
    - **Every row, closed,** has the place, how its last read compares
      ("Differs from the listing", "Couldn't read", "Didn't load", "Not
      read yet", "Same as the listing", "Off"), where it read from and when
      ("From mekorhabracha.org/davening · read Oct 21"), and **Check now**
      (Turn back on for one that's off). A finding to Compare sits under it.
-   - **Order:** what needs you first, then A–Z, Off last. It's fixed for
-     the visit, so a row acted on stays where it is. The count at the top
-     is "5 need you · 16 shuls".
+   - **The count at the top** is "5 need you · 16 shuls".
    - **Opened:** each page, how it was found, what it read and how that
      compares, with "Use a different page" (gives one and stops the old
      one) and "Stop reading this page". Stopped pages have "Read it again".

@@ -12,10 +12,12 @@ import Link from 'next/link'
 // all without opening it. Opened, a row shows each source: what it read,
 // and ways to use a different one, stop it, or add another.
 //
-// No sections. The rows that need the admin (what was read differs, or
-// couldn't be read) come first, the rest A–Z, Off last; in that order for
-// the whole visit, so a row acted on doesn't jump away under the admin's
-// hand.
+// In tabs, so the page isn't one long list (the user, Oct 21: "can the to
+// check, can't be read, not read yet be tabs so the page isn't so messy"):
+// To check, Can't be read, Not read yet, Checked, and Off when there are
+// any, each A–Z. It opens on the first with anything in it. A row stays in
+// the tab it was in for the whole visit, so one acted on doesn't vanish
+// from under the admin's hand; its pill says what it is now.
 
 /** How a listing's last read compares with the listing. */
 export type JobStatus = 'differs' | 'unsure' | 'cant_read' | 'didnt_load' | 'not_read' | 'same' | 'off'
@@ -32,10 +34,22 @@ const STATUS: Record<JobStatus, { label: string; tone: string; needsYou: boolean
 
 export const needsYou = (s: JobStatus) => STATUS[s].needsYou
 
-/** Needs you first, then the rest A–Z, Off last. */
-export function jobOrder<T>(rows: readonly T[], status: (r: T) => JobStatus, name: (r: T) => string): T[] {
-  const rank = (r: T) => (needsYou(status(r)) ? 0 : status(r) === 'off' ? 2 : 1)
-  return [...rows].sort((a, b) => rank(a) - rank(b) || name(a).localeCompare(name(b)))
+/** The page's tabs, in order. */
+export type JobTab = 'to_check' | 'cant_read' | 'not_read' | 'checked' | 'off'
+const TABS: { key: JobTab; label: string; statuses: JobStatus[] }[] = [
+  { key: 'to_check', label: 'To check', statuses: ['differs', 'unsure'] },
+  { key: 'cant_read', label: 'Can’t be read', statuses: ['cant_read', 'didnt_load'] },
+  { key: 'not_read', label: 'Not read yet', statuses: ['not_read'] },
+  { key: 'checked', label: 'Checked', statuses: ['same'] },
+  { key: 'off', label: 'Off', statuses: ['off'] },
+]
+export const tabOf = (s: JobStatus): JobTab => TABS.find((t) => t.statuses.includes(s))!.key
+
+/** Each row's tab, from its status when the page loaded, A–Z within it. */
+export function jobTabs<T extends { id: string }>(rows: readonly T[], status: (r: T) => JobStatus, name: (r: T) => string): { rows: T[]; tabs: ReadonlyMap<string, JobTab>; first: JobTab } {
+  const tabs = new Map(rows.map((r) => [r.id, tabOf(status(r))]))
+  const first = TABS.find((t) => rows.some((r) => tabs.get(r.id) === t.key))?.key ?? 'to_check'
+  return { rows: [...rows].sort((a, b) => name(a).localeCompare(name(b))), tabs, first }
 }
 
 export const BUTTON = 'rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50'
@@ -59,6 +73,8 @@ export function StatusPill({ status }: { status: JobStatus }) {
   )
 }
 
+const hasRows = (children: ReactNode) => (Array.isArray(children) ? children.length > 0 : children != null && children !== false)
+
 export function JobPage({
   backHref,
   title,
@@ -67,6 +83,7 @@ export function JobPage({
   total,
   noun,
   notice,
+  tabs,
   children,
 }: {
   backHref: string
@@ -77,6 +94,8 @@ export function JobPage({
   /** "place", "shul". */
   noun: string
   notice?: ReactNode
+  /** How many rows each tab holds, and which is showing. */
+  tabs?: { counts: Readonly<Record<JobTab, number>>; active: JobTab; onChange: (t: JobTab) => void }
   children?: ReactNode
 }) {
   return (
@@ -92,7 +111,35 @@ export function JobPage({
         </p>
       </div>
       {notice}
-      {children && <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white shadow-sm">{children}</ul>}
+      {tabs && (
+        <div role="tablist" aria-label={title} className="-mx-1 flex gap-1 overflow-x-auto border-b border-slate-200 px-1">
+          {TABS.filter((t) => t.key !== 'off' || tabs.counts.off > 0).map((t) => {
+            const on = t.key === tabs.active
+            return (
+              <button
+                key={t.key}
+                type="button"
+                role="tab"
+                aria-selected={on}
+                onClick={() => tabs.onChange(t.key)}
+                className={`-mb-px shrink-0 whitespace-nowrap border-b-2 px-3 py-2 text-sm font-semibold ${on ? 'border-primary text-primary' : 'border-transparent text-slate-600 hover:text-slate-900'}`}
+              >
+                {t.label} <span className={on ? '' : 'text-slate-400'}>{tabs.counts[t.key]}</span>
+              </button>
+            )
+          })}
+        </div>
+      )}
+      {children !== undefined &&
+        (hasRows(children) ? (
+          <ul role={tabs ? 'tabpanel' : undefined} className="divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white shadow-sm">
+            {children}
+          </ul>
+        ) : (
+          <p role={tabs ? 'tabpanel' : undefined} className="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600 shadow-sm">
+            None right now.
+          </p>
+        ))}
     </div>
   )
 }
