@@ -84,6 +84,11 @@ export type CheckFound = Omit<WatchCheck, 'at'>
  *  page is an ordinary website watch. */
 export const MENU_WATCH_CREATOR = 'menu links'
 
+/** The `created_by` of the watches the daily run makes for each hospital
+ *  it matches to Refuah by map position (refuahMatch.ts). As with menus,
+ *  it only adds and removes its own. */
+export const REFUAH_MATCH_CREATOR = 'Refuah match'
+
 /** One place a list differs from the guide on, as a line for the Watches
  *  tab, saying why it wasn't filed this time when it wasn't. */
 export function listDifference(name: string, what: string, filing: 'now' | 'before' | 'closed'): string {

@@ -65,7 +65,7 @@ test('a menu reading is checked, edited and approved onto its listing, dated by 
     ).error,
   ).toBeNull()
 
-  await page.goto('/philly/admin/dishes')
+  await page.goto('/philly/admin/watches/dishes')
   const toCheck = page.locator('section', { has: page.getByRole('heading', { name: /^To check/ }) })
   const card = toCheck.getByTestId('dish-place').filter({ hasText: name })
 
@@ -146,7 +146,7 @@ test('a menu that couldn’t be read: no menu, undone, then its menu link given'
     ).error,
   ).toBeNull()
 
-  await page.goto('/philly/admin/dishes')
+  await page.goto('/philly/admin/watches/dishes')
   // Written straight to the database: invalidate as a direct write must (see above).
   const revalidated = await page.evaluate(async () => {
     const key = Object.keys(localStorage).find((k) => /^sb-.+-auth-token$/.test(k))

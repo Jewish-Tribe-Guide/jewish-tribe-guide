@@ -6,6 +6,7 @@ import { fetchJson } from '@/lib/fetchJson'
 import { withCommunity } from '@/lib/useCommunityData'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { readElsewhere } from '@/lib/menuLink'
+import { dishSections, sentThroughSite } from '@/lib/watchJobs'
 import CollapsibleSection from './CollapsibleSection'
 
 // ── The "Main dishes" tab: each food place's dishes, read off its menu ───────
@@ -61,15 +62,6 @@ function formatDay(iso: string): string {
 /** A menu read somewhere other than the place's own site (readElsewhere). */
 function elsewhere(place: Place): boolean {
   return readElsewhere(place.reading?.sourceUrl ?? null, place.website, place.menuUrl)
-}
-
-/** Its dishes came from a menu someone sent through the site ("+ Add"),
- *  approved after the tab last failed to read one, or said it had none.
- *  The tab's own approvals aren't this: their reading says approved. */
-function sentThroughSite(place: Place): boolean {
-  const r = place.reading
-  if (!place.menuAt || place.dishes.length === 0) return false
-  return !r || ((r.status === 'failed' || r.status === 'no_menu') && Date.parse(place.menuAt) > Date.parse(r.readAt))
 }
 
 /** A reading of photos an admin added: it has no address. */
@@ -457,12 +449,7 @@ export default function MainDishes({ token }: { token: string }) {
   if (error) return <p className="bg-red-50 border border-red-200 rounded-md p-3 text-sm text-red-700">{error}</p>
   if (!data) return <p className="text-sm text-muted">Loading food places…</p>
 
-  const of = (status: Reading['status']) => data.places.filter((p) => p.reading?.status === status && !sentThroughSite(p))
-  const toCheck = of('proposed')
-  const unread = data.places.filter((p) => !p.reading && (p.website || p.menuUrl) && !sentThroughSite(p))
-  const failed = [...of('failed'), ...data.places.filter((p) => !p.reading && !p.website && !p.menuUrl && !sentThroughSite(p))]
-  const noMenus = of('no_menu')
-  const done = [...of('approved'), ...of('skipped'), ...data.places.filter(sentThroughSite)]
+  const { approved, toCheck, unread, failed, noMenus, done } = dishSections(data.places)
   const rows = (list: Place[]) => (
     <ul className="divide-y divide-slate-100">
       {list.map((p) => (
@@ -515,7 +502,7 @@ export default function MainDishes({ token }: { token: string }) {
         </div>
       )}
       <p className="text-sm font-semibold text-slate-800" data-testid="dish-counts">
-        {of('approved').length} of {data.places.length} approved · {toCheck.length} to check · {unread.length} not read yet · {failed.length} couldn&rsquo;t be read
+        {approved.length} of {data.places.length} approved · {toCheck.length} to check · {unread.length} not read yet · {failed.length} couldn&rsquo;t be read
         {noMenus.length > 0 && <> · {noMenus.length} no menu</>}
       </p>
       {data.available && (

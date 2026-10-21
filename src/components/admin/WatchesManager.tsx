@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useState } from 'react'
+import Link from 'next/link'
 import { useLoadOnMount } from '@/lib/useLoadOnMount'
 import { fetchJson } from '@/lib/fetchJson'
 import { withCommunity } from '@/lib/useCommunityData'
@@ -14,6 +15,10 @@ import { isIgnoredSender, isNewsletterWatch } from '@/lib/newsletter'
 import { WATCH_PURPOSES, purposeInfo, sourceKind, sourceProblem, type ListingReads, type WatchPurpose } from '@/lib/watchPurposes'
 import { eruvView } from '@/lib/eruv'
 import type { AdminEruv } from '@/lib/eruvStore'
+import { isHospitalWatch } from '@/lib/refuahMatch'
+import { adminBase } from '@/lib/adminNav'
+import { dishCounts, hospitalCounts, type DishPlace, type JobCounts } from '@/lib/watchJobs'
+import type { Hospital } from './HospitalsJob'
 import EruvKeptEmail from './EruvKeptEmail'
 
 // ── The "Watches" tab (freshness map, Oct 5) ────────────────────────────────
@@ -29,11 +34,52 @@ import EruvKeptEmail from './EruvKeptEmail'
 // Eruv status moved here from the Eruvim tab (the user, Oct 19): an eruv's
 // source is its status page or status email, kept on the eruv
 // (/api/admin/eruvim), listed here first.
+//
+// Since Oct 21 the tab starts with a row per job (watchJobs.ts), each
+// opening a page with every place in it: Dishes (what was the Main dishes
+// tab) and Hospitals (matched to Refuah on their own, so their watches
+// aren't listed here any more). The rest are still listed below, until each
+// becomes a job of its own.
 
 type Listing = { id: string; name: string; categoryLabel: string; reads: ListingReads }
 type Loaded = { available: boolean; watches: Watch[]; listings: Listing[] }
 type Eruvim = { available: boolean; timezone: string; eruvim: AdminEruv[] }
 type Action = 'check' | 'pause' | 'resume' | 'remove' | 'link' | 'ignore'
+type Jobs = { dishes: DishPlace[] | null; hospitals: Hospital[] | null }
+
+/** One job's row: what it is and its four counts; the whole row opens its
+ *  page. Null counts: they couldn't be loaded. */
+function JobRow({ href, name, about, counts }: { href: string; name: string; about: string; counts: JobCounts | null }) {
+  const stat = (n: number, label: string, flag: boolean) => (
+    <span className="flex min-w-[4.5rem] flex-col">
+      <span className={`text-base font-semibold ${flag && n > 0 ? 'text-amber-800' : 'text-slate-900'}`}>{n}</span>
+      <span className="text-xs text-muted">{label}</span>
+    </span>
+  )
+  return (
+    <li>
+      <Link href={href} className="flex flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3 hover:bg-slate-50" data-testid="job-row">
+        <span className="min-w-[12rem] flex-1">
+          <span className="block font-semibold text-slate-900">{name}</span>
+          <span className="block text-sm text-slate-600">{about}</span>
+        </span>
+        {counts ? (
+          <span className="flex flex-wrap gap-x-4 gap-y-1">
+            {stat(counts.checked, 'checked', false)}
+            {stat(counts.toCheck, 'to check', true)}
+            {stat(counts.cantRead, 'can’t be read', true)}
+            {stat(counts.didntLoad, 'didn’t load today', true)}
+          </span>
+        ) : (
+          <span className="text-sm text-slate-500">Couldn&rsquo;t load its counts.</span>
+        )}
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true" className="shrink-0 text-slate-400">
+          <path d="M6 4l4 4-4 4" />
+        </svg>
+      </Link>
+    </li>
+  )
+}
 
 /** A group longer than this starts closed, showing only what needs a look. */
 const OPEN_UP_TO = 4
@@ -662,6 +708,7 @@ export default function WatchesManager({ token }: { token: string }) {
   const community = useCommunitySlug()
   const [data, setData] = useState<Loaded | null>(null)
   const [eruvData, setEruvData] = useState<Eruvim | null>(null)
+  const [jobs, setJobs] = useState<Jobs>({ dishes: null, hospitals: null })
   const [error, setError] = useState<string | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
@@ -683,14 +730,17 @@ export default function WatchesManager({ token }: { token: string }) {
     setError(null)
     try {
       const headers = { Authorization: `Bearer ${token}` }
-      const [watches, eruvim] = await Promise.all([
+      const [watches, eruvim, dishes, hospitals] = await Promise.all([
         fetchJson<Loaded>(withCommunity('/api/admin/watches', community), { headers }, 'Failed to load the watches.'),
-        // The eruvim are a part of the tab, not the whole: without them, the
-        // rest still shows.
+        // The eruvim and the jobs' counts are a part of the tab, not the
+        // whole: without them, the rest still shows.
         fetchJson<Eruvim>(withCommunity('/api/admin/eruvim', community), { headers }, 'Failed to load the eruvim.').catch(() => null),
+        fetchJson<{ places: DishPlace[] }>(withCommunity('/api/admin/main-dishes', community), { headers }, '').catch(() => null),
+        fetchJson<{ hospitals: Hospital[] }>(withCommunity('/api/admin/watches/hospitals', community), { headers }, '').catch(() => null),
       ])
       setData(watches)
       setEruvData(eruvim)
+      setJobs({ dishes: dishes?.places ?? null, hospitals: hospitals?.hospitals ?? null })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.')
     }
@@ -779,10 +829,15 @@ export default function WatchesManager({ token }: { token: string }) {
     void actOn(row.watch, action, resourceId)
   }
 
-  const groups = data.available ? groupWatches(data.watches, now, kept, readsOf) : []
+  // A hospital's Refuah page is on the Hospitals page.
+  const listed = data.watches.filter((w) => !isHospitalWatch(w))
+  const groups = data.available ? groupWatches(listed, now, kept, readsOf) : []
   const eruvim = eruvData?.available ? eruvData.eruvim : []
   const eruvNeeds = eruvim.filter((e) => eruvPill(e).tone !== 'ok').length
-  const counted = data.watches.filter((w) => !isIgnoredSender(w)).length + eruvim.length
+  const counted = listed.filter((w) => !isIgnoredSender(w)).length + eruvim.length
+  const base = adminBase(community)
+  const menuWatches = data.watches.filter((w) => w.createdBy === MENU_WATCH_CREATOR)
+  const hospitalsNothing = jobs.hospitals ? hospitalCounts(jobs.hospitals, now).nothing : 0
   const needs = groups.reduce((n, g) => n + g.counts.notWorking + g.counts.toLink, 0) + eruvNeeds
 
   function renderRow(row: WatchRow) {
@@ -904,6 +959,26 @@ export default function WatchesManager({ token }: { token: string }) {
       <p className="text-sm text-muted">
         What the guide reads on its own to stay current: pages every morning, emails as they arrive. <strong>What it finds goes to the moderation queue for you to approve</strong>, except an eruv&rsquo;s status, which shows at once. If a watch stops working, you&rsquo;re emailed once, and again when it works.
       </p>
+      <section className="rounded-lg border border-slate-200 bg-white" aria-label="Jobs">
+        <ul className="divide-y divide-slate-100">
+          <JobRow
+            href={`${base}/watches/dishes`}
+            name="Dishes"
+            about={jobs.dishes ? `${jobs.dishes.length} food places, from their menus` : 'Food places, from their menus'}
+            counts={jobs.dishes && dishCounts(jobs.dishes, menuWatches, now)}
+          />
+          <JobRow
+            href={`${base}/watches/hospitals`}
+            name="Hospitals"
+            about={
+              jobs.hospitals
+                ? `${jobs.hospitals.length} hospital${jobs.hospitals.length === 1 ? '' : 's'}, from Refuah${hospitalsNothing ? ` · ${hospitalsNothing} with nothing there yet` : ''}`
+                : 'Hospitals, from Refuah'
+            }
+            counts={jobs.hospitals && hospitalCounts(jobs.hospitals, now)}
+          />
+        </ul>
+      </section>
       {!data.available && (
         <p className="bg-amber-50 border border-amber-200 rounded-md p-3 text-sm text-amber-800">
           Keeping a list here needs database migration 070. Until it&rsquo;s run, Keystone-K&rsquo;s list is still read every morning.

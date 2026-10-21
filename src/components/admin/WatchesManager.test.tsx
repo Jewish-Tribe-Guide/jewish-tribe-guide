@@ -56,7 +56,7 @@ const posts: Post[] = []
 
 async function renderTab(
   watches: Watch[],
-  { available = true, post = {} as Record<string, unknown>, eruvim = [] as AdminEruv[] } = {},
+  { available = true, post = {} as Record<string, unknown>, eruvim = [] as AdminEruv[], dishes = null as unknown[] | null, hospitals = null as unknown[] | null } = {},
 ) {
   vi.mocked(fetchJson).mockImplementation(async (url, init) => {
     if (init?.method === 'POST') {
@@ -69,6 +69,14 @@ async function renderTab(
       return { ok: true, ...post }
     }
     if (String(url).includes('/api/admin/eruvim')) return { ok: true, available: true, timezone: 'America/New_York', eruvim }
+    if (String(url).includes('/api/admin/main-dishes')) {
+      if (!dishes) throw new Error('down')
+      return { ok: true, places: dishes }
+    }
+    if (String(url).includes('/api/admin/watches/hospitals')) {
+      if (!hospitals) throw new Error('down')
+      return { ok: true, hospitals }
+    }
     return { ok: true, available, watches, listings: [SHUL, MIKVAH] }
   })
   renderWithProviders(<WatchesManager token="tok" />, { community: { slug: 'philly' } })
@@ -114,15 +122,38 @@ describe('WatchesManager', () => {
     expect(screen.getByText(/Changed .*: worth a look/)).toBeInTheDocument()
   })
 
-  // Oct 17: a hospital's Refuah page is compared with the hospital, so it
-  // says what it files, not "checked for a change".
-  it('says a Refuah hospital page is compared with its hospital, and what it filed', async () => {
-    await renderTab([watch({ url: 'https://refuah.com/hospitals/jx77h9d00qztqgbbe8e0rfj1r589mgf5', resourceId: 'shul-1', lastFiled: 1, pageChangedAt: ago(1) })])
-    const row = within(screen.getByRole('region', { name: 'Hospital contacts' })).getByTestId('watch-row')
-    expect(within(row).getByText(/Read .*: 1 suggestion in the queue/)).toBeInTheDocument()
-    expect(screen.queryByText(/worth a look/)).toBeNull()
-    await open(row)
-    expect(within(row).getByText(/Compared with the hospital every morning/)).toBeInTheDocument()
+  // Oct 21: a row per job, each opening its page. Hospitals are matched to
+  // Refuah on their own and listed on their page, not here.
+  it('starts with a row per job, with its counts, each opening its page', async () => {
+    const refuah = watch({ id: 'r', url: 'https://refuah.com/hospitals/jx77h9d00qztqgbbe8e0rfj1r589mgf5', resourceId: 'h1', lastCheck: { at: ago(0.1), what: 'contacts', from: null, result: 'agrees', read: [], differences: [], queue: null } })
+    const empty = watch({ id: 'e', url: 'https://refuah.com/hospitals/jx75q42dv17pxq7zckc9sx31v589mzem', resourceId: 'h2', lastCheck: { at: ago(0.1), what: 'contacts', from: null, result: 'nothing', read: [], differences: [], queue: null } })
+    const brokenMenu = watch({ id: 'm', url: 'https://judah.example/menu', resourceId: 'f1', createdBy: 'menu links', failingSince: ago(1), lastError: 'The page answered 404' })
+    const place = (status: string | null) => ({ website: 'https://x.example', menuUrl: null, dishes: [], reading: status && { status, readAt: ago(1) } })
+    await renderTab([refuah, empty, brokenMenu], {
+      dishes: [place('approved'), place('approved'), place('proposed'), place('failed'), place(null)],
+      hospitals: [
+        { id: 'h1', watch: refuah, notOnRefuah: false },
+        { id: 'h2', watch: empty, notOnRefuah: false },
+        { id: 'h3', watch: null, notOnRefuah: false },
+      ],
+    })
+    const [dishes, hospitals] = screen.getAllByTestId('job-row')
+    expect(dishes).toHaveAttribute('href', '/philly/admin/watches/dishes')
+    expect(dishes).toHaveTextContent('5 food places, from their menus')
+    expect(dishes).toHaveTextContent('2checked1to check1can’t be read1didn’t load today')
+    expect(hospitals).toHaveAttribute('href', '/philly/admin/watches/hospitals')
+    expect(hospitals).toHaveTextContent('3 hospitals, from Refuah · 1 with nothing there yet')
+    expect(hospitals).toHaveTextContent('1checked0to check1can’t be read0didn’t load today')
+    // Their watches aren't listed below, nor counted.
+    expect(screen.queryByRole('region', { name: 'Hospital contacts' })).toBeNull()
+    expect(screen.getByTestId('watch-summary')).toHaveTextContent('1 watches')
+  })
+
+  it('a job whose counts didn’t load still opens', async () => {
+    await renderTab([])
+    const [dishes] = screen.getAllByTestId('job-row')
+    expect(dishes).toHaveTextContent('Couldn’t load its counts.')
+    expect(dishes).toHaveAttribute('href', '/philly/admin/watches/dishes')
   })
 
   it('says Mekor Habracha’s list is compared with the guide, IKC above all', async () => {

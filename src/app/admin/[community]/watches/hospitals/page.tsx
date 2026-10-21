@@ -2,14 +2,14 @@
 
 import { useAdminSession } from '@/components/admin/AdminAuthGate'
 import AdminNav from '@/components/admin/AdminNav'
-import MainDishes from '@/components/admin/MainDishes'
+import HospitalsJob from '@/components/admin/HospitalsJob'
 
-export default function AdminMainDishesPage() {
+export default function AdminHospitalsPage() {
   const session = useAdminSession()
   return (
     <div>
       <AdminNav />
-      <MainDishes token={session.access_token} />
+      <HospitalsJob token={session.access_token} />
     </div>
   )
 }

@@ -28,6 +28,7 @@ import {
   refuahNote,
   type RefuahHospital,
 } from '@/lib/refuahWatch'
+import type { RefuahListed } from '@/lib/refuahMatch'
 
 /** Asks Refuah's data service for one hospital, as its page does. */
 export async function readRefuahHospital(id: string, fetcher: typeof fetch = fetch): Promise<RefuahHospital | { error: string }> {
@@ -48,6 +49,45 @@ export async function readRefuahHospital(id: string, fetcher: typeof fetch = fet
   if (body?.status !== 'success') return { error: `Refuah couldn’t give this hospital (${body?.errorMessage ?? 'no answer'}); its pages may have changed` }
   if (!body.value) return { error: 'Refuah has no hospital at this address any more' }
   return body.value
+}
+
+/** Refuah's hospitals near each of these places, with their addresses and
+ *  map positions, nearest first from each. Refuah only answers "the 25
+ *  nearest to a point" (asked with no point, it gives 50 of its hospitals,
+ *  none of them Philadelphia's; Oct 21), so it's asked once per place, from
+ *  where that place is, and the answers merged. A place's own match is
+ *  always in its own answer. One that fails fails them all: a partial list
+ *  would call a hospital "not on Refuah" that is. */
+export async function readRefuahNear(places: readonly { lat: number; lng: number }[], fetcher: typeof fetch = fetch): Promise<RefuahListed[] | { error: string }> {
+  const points = [...new Map(places.map((p) => [`${p.lat},${p.lng}`, p])).values()]
+  const answers = await Promise.all(points.map((p) => readRefuahPage({ latitude: p.lat, longitude: p.lng }, fetcher)))
+  const failed = answers.find((a): a is { error: string } => 'error' in a)
+  if (failed) return failed
+  const merged = new Map<string, RefuahListed>()
+  for (const list of answers as RefuahListed[][]) for (const h of list) merged.set(h._id, h)
+  return [...merged.values()]
+}
+
+async function readRefuahPage(args: { latitude: number; longitude: number }, fetcher: typeof fetch): Promise<RefuahListed[] | { error: string }> {
+  let res: Response
+  try {
+    res = await fetcher(REFUAH_DATA_URL, {
+      method: 'POST',
+      headers: { ...WATCH_FETCH_HEADERS, accept: 'application/json', 'content-type': 'application/json' },
+      body: JSON.stringify({ path: 'hospitals:list', args, format: 'json' }),
+      cache: 'no-store',
+      signal: AbortSignal.timeout(20_000),
+    })
+  } catch (err) {
+    return { error: `Couldn’t reach Refuah (${err instanceof Error ? err.message : String(err)})` }
+  }
+  if (!res.ok) return { error: `Refuah answered ${res.status}` }
+  const body = (await res.json().catch(() => null)) as { status?: string; value?: unknown } | null
+  if (body?.status !== 'success' || !Array.isArray(body.value)) return { error: 'Refuah couldn’t list its hospitals; its pages may have changed' }
+  return body.value.filter(
+    (h): h is RefuahListed =>
+      !!h && typeof h._id === 'string' && typeof h.name === 'string' && Number.isFinite(h.latitude) && Number.isFinite(h.longitude),
+  )
 }
 
 type Row = { id: string; category: string; name: string; address: string | null; phone: string | null; anchor_id: string; distance: number | null; details: Record<string, unknown> | null }

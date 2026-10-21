@@ -8,7 +8,9 @@
 // An eruv's status isn't a `watch` row: its source is its status page or
 // status email on the eruv itself (eruvStore.ts). The tab adds and lists it
 // with the rest all the same. Menus aren't added here: the daily run gives
-// every place with a menu link its own (menuWatch.ts).
+// every place with a menu link its own (menuWatch.ts), nor hospitals: each is
+// matched to its Refuah page (refuahMatch.ts), or given one on the
+// Hospitals page.
 //
 // A shul's times are one choice, read from its website or its newsletter
 // (the user, Oct 20: "one Shul's times choice, website or email"). Before,
@@ -43,7 +45,8 @@ export const WATCH_PURPOSES: readonly PurposeInfo[] = [
   { key: 'hours', label: 'Hours', addable: true, place: 'listing', placeReads: 'hours', source: 'page' },
   { key: 'kosher', label: 'Kosher list', addable: true, place: null, source: 'page' },
   { key: 'menu', label: 'Menu', addable: false, place: 'listing', source: 'page' },
-  { key: 'hospital', label: 'Hospital contacts', addable: true, place: 'listing', source: 'page' },
+  // Matched to Refuah on their own; a page is given on the Hospitals page (Oct 21).
+  { key: 'hospital', label: 'Hospital contacts', addable: false, place: 'listing', source: 'page' },
   { key: 'other', label: 'Anything else', addable: true, place: null, source: 'page' },
 ]
 

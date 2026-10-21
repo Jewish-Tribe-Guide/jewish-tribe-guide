@@ -171,6 +171,8 @@ const nextConfig: NextConfig = {
     return [
       { source: '/inbox', destination: '/philly/inbox', permanent: true },
       { source: '/:community/pinned', destination: '/:community/you', permanent: true },
+      // Main dishes became the Watches tab's Dishes job (Oct 21).
+      { source: '/:community/admin/dishes', destination: '/:community/admin/watches/dishes', permanent: false },
     ];
   },
 };

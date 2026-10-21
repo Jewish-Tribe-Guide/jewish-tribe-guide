@@ -21,6 +21,8 @@ vi.mock('@/lib/eruvLineRun', () => ({ runEruvLines: mockEruvLines }))
 const mockSyncMenus = vi.hoisted(() => vi.fn(async () => [] as unknown[]))
 const mockMenu = vi.hoisted(() => vi.fn())
 vi.mock('@/lib/menuWatchRun', () => ({ syncMenuWatches: mockSyncMenus, runMenuWatch: mockMenu, newMenuReadBudget: () => ({ aiReads: 3 }) }))
+const mockSyncRefuah = vi.hoisted(() => vi.fn(async () => [] as unknown[]))
+vi.mock('@/lib/refuahMatchRun', () => ({ syncRefuahWatches: mockSyncRefuah }))
 
 const { GET } = await import('./route')
 
@@ -83,6 +85,23 @@ describe('/api/cron/watches', () => {
     expect(mockMenu.mock.calls[0][0]).toMatchObject({ url: 'https://judah.example/menu', resourceId: 'r1', pageHash: 'old' })
     expect(mockMenu.mock.calls[0][1]).toBe(mockMenu.mock.calls[1][1])
     expect(mockWebsite).not.toHaveBeenCalled()
+  })
+
+  // Oct 21: each hospital is matched to Refuah by the run itself.
+  it('matches the hospitals to Refuah before listing the watches, so a new match is read the same morning', async () => {
+    const order: string[] = []
+    mockSyncRefuah.mockImplementationOnce(async () => (order.push('refuah'), [{ community: 'philly', added: 1, removed: 0 }]))
+    mockList.mockImplementation(async () => (order.push('list'), { available: true, watches: [] }))
+    const body = await (await GET(request())).json()
+    expect(order).toEqual(['refuah', 'list'])
+    expect(body.hospitals).toEqual([{ community: 'philly', added: 1, removed: 0 }])
+  })
+
+  it('Refuah being down never stops the rest', async () => {
+    mockSyncRefuah.mockRejectedValueOnce(new Error('Refuah answered 502'))
+    mockList.mockResolvedValue({ available: true, watches: [watch({ id: 'site', url: 'https://bzbi.org/worship/' })] })
+    const body = await (await GET(request())).json()
+    expect(body.results.map((r: { id: string }) => r.id)).toEqual(['site'])
   })
 
   it('a failure making the menu watches never stops the rest', async () => {

@@ -39,7 +39,6 @@ export type AdminTab =
   | 'metrics'
   | 'searches'
   | 'questions'
-  | 'dishes'
   | 'watches'
   | 'eruvim'
   | 'team'
@@ -62,11 +61,10 @@ export function adminTabs(community: string, isSuperAdmin: boolean): { tab: Admi
     { tab: 'searches', href: `${base}/searches`, label: 'Missed searches' },
     // How the AI reader read what people asked, approvable as rules.
     { tab: 'questions', href: `${base}/questions`, label: 'Read questions' },
-    // Each food place's main dishes, read off its own menu by the AI, for
-    // an admin to approve (agreed Oct 1).
-    { tab: 'dishes', href: `${base}/dishes`, label: 'Main dishes' },
-    // The pages the guide reads on its own every morning (Keystone-K's
-    // list, shul times pages), and whether each is still working.
+    // What the guide keeps current on its own, a row per job (Oct 21):
+    // Dishes (each food place's main dishes, read off its own menu, which
+    // was a tab of its own), Hospitals (from Refuah), and the pages it
+    // reads every morning (Keystone-K's list, shul times pages).
     { tab: 'watches', href: `${base}/watches`, label: 'Watches' },
     // Each eruv: its status as read from its own page, and its line,
     // waiting here for an admin when it's new or changed (Oct 7).

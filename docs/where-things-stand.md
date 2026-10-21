@@ -413,8 +413,42 @@ compare, and one it can't read, on desktop and phone.
      page still opens but no longer has the menu. Both need somewhere to
      keep when a place was last searched. Watching the page that links to
      a PDF (a "menu-fall-2026.pdf" renamed each season) is also not done.
-2. **Hospitals:** matched to Refuah automatically, on their own page, so
-   the main page has two rows.
+2. **Hospitals:** BUILT Oct 21 on `redesign/oct18-fixes`. What it does
+   and doesn't do yet:
+   - **The Watches tab starts with two job rows,** Dishes and Hospitals,
+     each with checked / to check / can't be read / didn't load today.
+     The whole row opens its page. Main dishes is no longer a tab: it's
+     the Dishes page (`/admin/watches/dishes`; the old address
+     redirects). Hospital watches are off the tab's list, and "Hospital
+     on Refuah" is no longer something Add a watch offers.
+   - **Matched automatically, every morning, before the reads**
+     (`syncRefuahWatches`, `refuahMatch.ts`): each hospital listing on
+     the map gets the Refuah hospital nearest it, if within 0.2 mi. Two
+     listings nearest one record: the nearer gets it. Refuah's list is
+     asked per hospital position (`hospitals:list` with no position
+     returns 50 hospitals, none in Philly). It never touches a page an
+     admin gave, and removes only its own watches. Refuah down: nothing
+     removed.
+   - **The Hospitals page** (`/admin/watches/hospitals`): To check, Can't
+     be read (not found, or its page didn't load), Not read yet, Checked,
+     and quiet "Nothing on Refuah yet" and "Off" sections. Each row says
+     what it is matched to: "Matched to Refuah's Pennsylvania Hospital,
+     800 Spruce St · same spot on the map", or "Given by hand: …". Opened:
+     its Refuah page, Check now, "Choose a different Refuah hospital" (the
+     nearest four, or a pasted link), "Fill it in yourself", Turn off.
+     Can't be read offers the nearest four and "Not on Refuah"; Off has
+     "Turn back on", which reads it straight away.
+   - **"Not read yet"** includes a watch whose page opened but whose
+     result wasn't kept: every Refuah watch today except dev's CHOP,
+     since the live site runs `main`'s code. Each fills in on the first
+     run of this branch's code, or on Check now.
+   - **Live data, read only (Oct 21):** all seven Philly hospitals match
+     on their own to the same Refuah pages they were given by hand, so
+     the first live run adds and removes nothing.
+   - **Not done yet:** differences still go to the moderation queue
+     (Compare isn't built), and the per-category job switch isn't built.
+     "Off" here is the hospitals' own (a paused watch, or a "not on
+     Refuah" marker watch).
 3. **Mikvahs:** one dry run first (read each website once, save nothing,
    count how many it reads right), then connected.
 4. **Shuls:** the same dry run. Its count decides how far this goes for
