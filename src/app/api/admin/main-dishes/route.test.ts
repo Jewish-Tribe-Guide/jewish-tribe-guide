@@ -322,4 +322,41 @@ describe('/api/admin/main-dishes', () => {
       expect((await (await GET(req('GET'))).json()).places[0].menuAt).toBeNull()
     })
   })
+
+  // The user, Oct 21: a dish added by hand is looked for on every read
+  // after, and a reading says which listed dishes its menu doesn't name.
+  describe('the listing’s own dishes', () => {
+    const listingOf = { ...judah, dishes: ['Falafel'], dishes_sometimes: ['Kugel'] }
+    const read = { sourceUrl: 'https://judah.example/menu', dishes: [{ name: 'Falafel', quote: 'Falafel', checked: true, onListing: true }], note: null, model: 'gpt', missing: ['Kugel'] }
+    beforeEach(() => {
+      m.getResourceById.mockResolvedValue(listingOf)
+      m.readMenu.mockResolvedValue(read)
+    })
+
+    it('every read is given them, the sometimes ones too, and keeps the ones its menu doesn’t name', async () => {
+      m.findMenu.mockResolvedValue({ url: 'https://judah.example/menu', text: 'menu', pdf: null })
+      await POST(req('POST', { action: 'read', resourceId: ID }))
+      expect(m.readMenu).toHaveBeenLastCalledWith(expect.anything(), 'Judah', expect.objectContaining({ listed: ['Falafel', 'Kugel'] }))
+      expect(m.saveMenuReading).toHaveBeenLastCalledWith('philly', ID, expect.objectContaining({ dishes: read.dishes, missing: ['Kugel'] }))
+
+      m.readMenuPage.mockResolvedValue({ url: 'https://judah.example/menu', text: 'menu', pdf: null })
+      await POST(req('POST', { action: 'link', resourceId: ID, url: 'https://judah.example/menu' }))
+      expect(m.readMenu).toHaveBeenLastCalledWith(expect.anything(), 'Judah', expect.objectContaining({ listed: ['Falafel', 'Kugel'] }))
+      expect(m.saveMenuReading).toHaveBeenLastCalledWith('philly', ID, expect.objectContaining({ missing: ['Kugel'] }))
+
+      const form = new FormData()
+      form.append('action', 'photos')
+      form.append('resourceId', ID)
+      form.append('file', new File(['PDF'], 'menu.pdf', { type: 'application/pdf' }))
+      await POST(new Request('http://x/api/admin/main-dishes?community=philly', { method: 'POST', body: form }))
+      expect(m.readMenu).toHaveBeenLastCalledWith(expect.anything(), 'Judah', expect.objectContaining({ listed: ['Falafel', 'Kugel'] }))
+      expect(m.saveMenuReading).toHaveBeenLastCalledWith('philly', ID, expect.objectContaining({ missing: ['Kugel'] }))
+    })
+
+    it('approving dates the ones its menu still names, however many the listing has', async () => {
+      const many = Array.from({ length: 30 }, (_, i) => `Dish ${i + 1}`)
+      expect((await POST(req('POST', { action: 'approve', resourceId: ID, dishes: many }))).status).toBe(200)
+      expect(m.rpc).toHaveBeenCalledWith('approve_menu_dishes', expect.objectContaining({ p_items: many }))
+    })
+  })
 })

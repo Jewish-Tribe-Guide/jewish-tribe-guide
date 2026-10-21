@@ -6,7 +6,7 @@ import { getAdminClient } from '@/lib/supabase/admin'
 import { revalidatePublicContent } from '@/lib/revalidateContent'
 import { itemsField, listingFacts } from '@/lib/listingView'
 import { addedItemName, cleanItemName, itemMarks, itemWording } from '@/lib/itemMarks'
-import { findMenus, isOrderingApp, readMenu, readMenus, readMenuPage, troubleClause, unreadMenuNote, MAX_DISHES, type MenuDish, type Trouble } from '@/lib/menuReader'
+import { findMenus, isOrderingApp, readMenu, readMenus, readMenuPage, troubleClause, unreadMenuNote, type MenuDish, type Trouble } from '@/lib/menuReader'
 import { MENU_LINK_KEY, readMenuLink } from '@/lib/menuLink'
 import {
   clearMenuReading,
@@ -73,6 +73,16 @@ function forTab(r: StoredMenuReading) {
   return isNoMenu(r) ? { ...r, status: 'no_menu' as const } : r
 }
 
+/** The dishes a place lists now: each looked for again on a new read of
+ *  its menu (the user, Oct 21), the ones added by hand included. */
+function listedNames(item: DirectoryResource, field: CategoryField): string[] {
+  return itemMarks(item, field).map((m) => m.name)
+}
+
+/** At most this many dishes approved at once: a reading's ten, the
+ *  listing's own that its menu still names, and a few added. */
+const MAX_APPROVED = 60
+
 /** The newest "on its menu" date among the dishes a place lists. */
 function newestMenuDate(item: DirectoryResource, field: CategoryField): string | null {
   return itemMarks(item, field).reduce<string | null>((newest, m) => (m.menuAt && (!newest || m.menuAt > newest) ? m.menuAt : newest), null)
@@ -122,7 +132,7 @@ export async function GET(request: Request) {
           facts: listingFacts(l, category),
           website: websiteOf(l, category),
           menuUrl: menuLinkOf(l),
-          dishes: itemMarks(l, field).map((m) => m.name),
+          dishes: listedNames(l, field),
           menuAt: newestMenuDate(l, field),
           reading: byId.has(l.id) ? forTab(byId.get(l.id)!) : null,
         })),
@@ -184,11 +194,12 @@ export async function POST(request: Request) {
         })
         return Response.json({ ok: true, reading })
       }
-      const read = (await readMenus(sources, listing.name, { apiKey }))!
+      const read = (await readMenus(sources, listing.name, { apiKey, listed: listedNames(listing, kind.field) }))!
       const reading = await saveMenuReading(community.slug, resourceId, {
         status: read.dishes.length ? 'proposed' : 'failed',
         sourceUrl: read.sourceUrl,
         dishes: read.dishes,
+        missing: read.missing,
         note: read.note,
         model: read.model,
       })
@@ -205,11 +216,12 @@ export async function POST(request: Request) {
       const renderer = pageRenderer()
       const linkTrouble: { t?: Trouble } = {}
       const source = await readMenuPage(url, { render: renderer.render, trouble: (t) => void (linkTrouble.t ??= t) }).finally(() => renderer.close())
-      const read = source ? (await readMenus([source], listing.name, { apiKey }))! : null
+      const read = source ? (await readMenus([source], listing.name, { apiKey, listed: listedNames(listing, kind.field) }))! : null
       const reading = await saveMenuReading(community.slug, resourceId, {
         status: read?.dishes.length ? 'proposed' : 'failed',
         sourceUrl: read?.sourceUrl ?? url,
         dishes: read?.dishes ?? [],
+        missing: read?.missing,
         note: read
           ? read.note
           : isOrderingApp(url)
@@ -230,13 +242,14 @@ export async function POST(request: Request) {
       const sent = await Promise.all(files.map(async (f) => ({ mime: f.type, b64: Buffer.from(await f.arrayBuffer()).toString('base64') })))
       const pdf = sent.find((f) => f.mime === 'application/pdf')
       const photos = sent.filter((f) => f.mime !== 'application/pdf')
-      const read = await readMenu({ url: null, text: null, pdf: pdf?.b64 ?? null, images: photos }, listing.name, { apiKey })
+      const read = await readMenu({ url: null, text: null, pdf: pdf?.b64 ?? null, images: photos }, listing.name, { apiKey, listed: listedNames(listing, kind.field) })
       // Read off a photo: said beside each dish, as for a menu's pictures.
       const dishes: MenuDish[] = pdf ? read.dishes : read.dishes.map((d) => ({ ...d, picture: true as const }))
       const reading = await saveMenuReading(community.slug, resourceId, {
         status: dishes.length ? 'proposed' : 'failed',
         sourceUrl: null,
         dishes,
+        missing: read.missing,
         note: dishes.length ? null : (read.note ?? 'No dishes in those photos.'),
         model: read.model,
       })
@@ -264,7 +277,7 @@ export async function POST(request: Request) {
       const name = cleanItemName(d)
       return name ? [[addedItemName(name).toLowerCase(), addedItemName(name)] as const] : []
     })).values()]
-    if (names.length === 0 || names.length > MAX_DISHES + 5) return Response.json({ ok: false, errors: ['Pick at least one dish.'] }, { status: 400 })
+    if (names.length === 0 || names.length > MAX_APPROVED) return Response.json({ ok: false, errors: ['Pick at least one dish.'] }, { status: 400 })
     const { data, error } = await getAdminClient().rpc('approve_menu_dishes', {
       p_id: resourceId,
       p_field: kind.field.key,

@@ -119,6 +119,9 @@ for that exact change, in the same conversation. Show the dry run first.
    Diane's says why each fails (see "a menu that can't be read says why").
 4. **Go through the menus read, after that** (the user, Oct 21): for each
    place read, what the reader got right and which dishes it missed.
+   Dishes added by hand are now looked for on each read after (see
+   "dishes added by hand are checked"), so "Read again" after adding
+   them shows which the reader finds.
 
 ## Getting the branch live
 
@@ -415,6 +418,40 @@ amazing … I want to see if that would have caught many."
 - Checked by tests (10 new, each failing against the old code; one
   caught Next.js images all counting as one picture, which hid Mordy's
   menu behind its header photo) and the re-read above.
+
+## Done Oct 21, later: dishes added by hand are checked on every read (on `redesign/oct18-fixes`, not merged)
+
+The user, Oct 21: "if I add something manually from a menu … will future
+reads look for that and tell me if it's successfully finding/tracking it?"
+Before this, no: a read only proposed up to ten dishes of its own, and a
+hand-added one was dated once, at approval, and never looked for again.
+
+- **Each read is given the listing's dishes** (the "sometimes" ones and
+  hand-added ones too): the Main dishes tab's "Read again", "Give its menu
+  link", photos, and the menu watch. For each, the AI points to the menu's
+  words for it, checked on the page as every dish is, or leaves it out.
+- **Found:** it comes ticked, marked "(on the listing)", on top of the ten.
+  Approving dates it again ("on its menu" today). The listing's spelling is
+  kept, so it never turns into a second copy.
+- **Not found:** "Not on this menu any more? Hummus. It stays on the
+  listing until you take it off." Never taken off by itself. Said only of
+  a menu read whole (its words, or a PDF), and only when the read named
+  some dishes: a few photos may be only part of a menu, and a cookie
+  notice names none. The menu watch files a reading for a menu that
+  changed and lost a listed dish, even with nothing new on it.
+- **Not checked:** a listed dish a reading didn't look for says "Not
+  checked against this menu" (readings made before this, a reading of
+  photos, a dish added at approval). "Read again" checks them.
+- **Kept without a migration:** the missing ones are stored among the
+  reading's `dishes`, marked `missing` (`menuReadingStore.ts`). Approving
+  can now send up to 60 dishes (was 15), for a listing with many.
+- **Left out: an unchanged page counting as "still on its menu".** The
+  page's fingerprint is the menu watch's, not kept with the reading, so
+  there's no telling a page unchanged since an approval. A dish stays
+  dated from the last approval until a read finds it again.
+- Checked by tests: 5 in `menuReader.test.ts`, 3 in the new
+  `menuReadingStore.test.ts`, 3 in `menuWatchRun.test.ts`, 2 in the
+  route's, 2 in `MainDishes.test.tsx`; all 15 fail against the old code.
 
 ## Done Oct 21: a menu that can't be read says why (on `redesign/oct18-fixes`, not merged)
 

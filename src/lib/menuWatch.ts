@@ -86,7 +86,9 @@ export function newDishes(read: MenuDish[], listed: string[]): MenuDish[] {
 }
 
 /** The reading's note on the Main dishes tab. */
-export function changedMenuNote(found: MenuDish[]): string {
+export function changedMenuNote(found: MenuDish[], missing: readonly string[] = []): string {
   const names = found.map((d) => d.name)
-  return `Its menu changed. ${names.length === 1 ? 'One dish isn’t' : `${names.length} dishes aren’t`} on the listing yet: ${names.join(', ')}.`
+  const added = names.length ? ` ${names.length === 1 ? 'One dish isn’t' : `${names.length} dishes aren’t`} on the listing yet: ${names.join(', ')}.` : ''
+  const gone = missing.length ? ` ${missing.length === 1 ? 'One listed dish isn’t' : `${missing.length} listed dishes aren’t`} on it any more: ${missing.join(', ')}.` : ''
+  return `Its menu changed.${added}${gone}`
 }

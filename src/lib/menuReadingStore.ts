@@ -13,6 +13,8 @@ export type StoredMenuReading = {
   status: MenuReadingStatus
   sourceUrl: string | null
   dishes: MenuDish[]
+  /** Dishes on the listing this menu doesn't name (menuReader's `missing`). */
+  missing: string[]
   note: string | null
   model: string | null
   readAt: string
@@ -38,12 +40,29 @@ type Row = {
   decided_by: string | null
 }
 
+// The listing's dishes a menu doesn't name are kept among the reading's
+// dishes, each marked `missing` and with no words from the menu, so they
+// need no migration. Split apart again on the way out.
+type MissingEntry = { name: string; quote: ''; checked: false; missing: true }
+
+export function storedDishes(dishes: MenuDish[], missing: readonly string[] = []): (MenuDish | MissingEntry)[] {
+  return [...dishes, ...missing.map((name) => ({ name, quote: '' as const, checked: false as const, missing: true as const }))]
+}
+
+export function splitDishes(raw: unknown): { dishes: MenuDish[]; missing: string[] } {
+  const all = Array.isArray(raw) ? (raw as (MenuDish & { missing?: true })[]) : []
+  return {
+    dishes: all.filter((d) => !d.missing),
+    missing: all.filter((d) => d.missing && typeof d.name === 'string').map((d) => d.name),
+  }
+}
+
 function fromRow(r: Row): StoredMenuReading {
   return {
     resourceId: r.resource_id,
     status: r.status,
     sourceUrl: r.source_url,
-    dishes: Array.isArray(r.dishes) ? (r.dishes as MenuDish[]) : [],
+    ...splitDishes(r.dishes),
     note: r.note,
     model: r.model,
     readAt: r.read_at,
@@ -72,7 +91,7 @@ export async function getMenuReading(community: string, resourceId: string): Pro
 export async function saveMenuReading(
   community: string,
   resourceId: string,
-  reading: { status: 'proposed' | 'failed'; sourceUrl: string | null; dishes: MenuDish[]; note: string | null; model: string | null },
+  reading: { status: 'proposed' | 'failed'; sourceUrl: string | null; dishes: MenuDish[]; missing?: readonly string[]; note: string | null; model: string | null },
 ): Promise<StoredMenuReading> {
   const { data, error } = await getAdminClient()
     .from('menu_reading')
@@ -82,7 +101,7 @@ export async function saveMenuReading(
         resource_id: resourceId,
         status: reading.status,
         source_url: reading.sourceUrl,
-        dishes: reading.dishes,
+        dishes: storedDishes(reading.dishes, reading.missing),
         note: reading.note,
         model: reading.model,
         read_at: new Date().toISOString(),

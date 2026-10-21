@@ -82,6 +82,35 @@ describe('MainDishes', () => {
     expect(screen.getByRole('heading', { name: /To check \(0\)/ })).toBeTruthy()
   })
 
+  // The user, Oct 21: the listing's own dishes, hand-added ones too, are
+  // looked for on each read. Found ones come ticked, so approving dates
+  // them again; missing ones are flagged, never taken off.
+  it('marks the listing’s dishes the menu still names, the ones it doesn’t, and the ones not checked', async () => {
+    const reading = {
+      ...read,
+      dishes: [
+        { name: 'Shawarma', quote: 'chicken or beef SHAWARMA plate', checked: true, onListing: true },
+        { name: 'Laffa', quote: 'Laffa', checked: true },
+      ],
+      missing: ['Hummus'],
+    }
+    await renderTab([{ ...judah, dishes: ['Shawarma', 'Hummus', 'Kugel'], reading }])
+    const card = screen.getByTestId('dish-place')
+    expect(card.textContent).toContain('Shawarma from “chicken or beef SHAWARMA plate” (on the listing)')
+    expect(card.textContent).not.toContain('Laffa from “Laffa” (on the listing)')
+    expect(within(card).getByTestId('dish-missing').textContent).toBe('Not on this menu any more? Hummus. It stays on the listing until you take it off.')
+    expect(within(card).getByTestId('dish-unchecked').textContent).toBe('Not checked against this menu: Kugel.')
+    await userEvent.click(within(card).getByRole('button', { name: 'Approve 2 dishes' }))
+    expect(posted()).toEqual([{ action: 'approve', resourceId: 'p1', dishes: ['Shawarma', 'Laffa'] }])
+  })
+
+  it('a reading from before it looked marks every listed dish not checked; a failed one marks none', async () => {
+    await renderTab([{ ...judah, dishes: ['Kugel', 'Shawarma'] }, { ...judah, id: 'p9', name: 'Stuck', dishes: ['Kugel'], reading: { ...read, status: 'failed', dishes: [], missing: ['Kugel'] } }])
+    expect(screen.getByTestId('dish-unchecked').textContent).toBe('Not checked against this menu: Kugel.')
+    expect(screen.queryAllByTestId('dish-unchecked')).toHaveLength(1)
+    expect(screen.queryByTestId('dish-missing')).toBeNull()
+  })
+
   it('reads the next few not read yet, one at a time', async () => {
     await renderTab([unread, { ...unread, id: 'p4', name: 'Slices' }], { post: { reading: read } })
     await userEvent.click(screen.getByRole('button', { name: 'Read the next 2' }))

@@ -18,12 +18,19 @@ import CollapsibleSection from './CollapsibleSection'
 // give its menu link, add photos of the menu, or say it has no menu. And a
 // place whose dishes came from a menu someone sent through the site says
 // so, instead of a stale "Couldn't read".
+//
+// A new read looks for the dishes the listing has already, ones added by
+// hand too (the user, Oct 21). Those it finds come ticked, so approving
+// dates them again; those it doesn't are flagged, never taken off. Listed
+// dishes no reading has looked for say so.
 
-type Dish = { name: string; quote: string; checked: boolean; named?: boolean; picture?: true }
+type Dish = { name: string; quote: string; checked: boolean; named?: boolean; picture?: true; onListing?: true }
 type Reading = {
   status: 'proposed' | 'approved' | 'skipped' | 'failed' | 'no_menu'
   sourceUrl: string | null
   dishes: Dish[]
+  /** Dishes on the listing this menu doesn't name. */
+  missing?: string[]
   note: string | null
   model: string | null
   readAt: string
@@ -121,6 +128,11 @@ function PlaceCard({
   // Couldn't be read: a failed reading, or nothing to read it from.
   const stuck = !elsewhereDishes && (r?.status === 'failed' || (!r && !place.website && !place.menuUrl))
   const kept = [...proposed.map((d) => d.name).filter((n) => !off.has(n)), ...added]
+  // The listing's dishes this reading didn't look for, or couldn't say of
+  // (read before it looked, from pictures, or added by hand at approval).
+  const missing = r?.status === 'failed' || r?.status === 'no_menu' ? [] : (r?.missing ?? [])
+  const looked = new Set([...proposed.map((d) => d.name), ...missing].map((n) => n.toLowerCase()))
+  const unchecked = r && r.status !== 'failed' && r.status !== 'no_menu' && proposed.length > 0 ? place.dishes.filter((n) => !looked.has(n.toLowerCase())) : []
   const toggle = (name: string) =>
     setOff((prev) => {
       const next = new Set(prev)
@@ -219,12 +231,23 @@ function PlaceCard({
             {proposed.map((d) => (
               <li key={d.name}>
                 <span className="font-semibold text-slate-700">{d.name}</span> from “{d.quote}”
+                {d.onListing && <span className="text-muted"> (on the listing)</span>}
                 {!d.checked && <span className="text-amber-800"> ({d.picture ? 'from a picture of the menu' : 'from a PDF'}: open the menu to check)</span>}
                 {d.checked && d.named === false && <span className="text-amber-800"> (these words don’t name it: check)</span>}
               </li>
             ))}
           </ul>
         </>
+      )}
+      {missing.length > 0 && (
+        <p className="mt-1.5 text-xs font-semibold text-amber-800" data-testid="dish-missing">
+          Not on this menu any more? {missing.join(', ')}. {missing.length === 1 ? 'It stays' : 'They stay'} on the listing until you take {missing.length === 1 ? 'it' : 'them'} off.
+        </p>
+      )}
+      {unchecked.length > 0 && (
+        <p className="mt-1 text-xs text-muted" data-testid="dish-unchecked">
+          Not checked against this menu: {unchecked.join(', ')}.
+        </p>
       )}
 
       <div className="mt-2.5 flex flex-wrap items-center gap-3 text-xs">

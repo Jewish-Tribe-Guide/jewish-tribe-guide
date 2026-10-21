@@ -64,7 +64,8 @@ export async function syncMenuWatches(): Promise<{ community: string; added: num
 }
 
 /** One food place's menu: read it, and when its words changed, have the AI
- *  read it and keep any dishes the listing doesn't have for an admin.
+ *  read it and keep for an admin any dishes the listing doesn't have, and
+ *  any it has that the menu no longer names (the user, Oct 21).
  *  `full` is the admin's "Check now" (the user, Oct 20): the AI reads it
  *  changed or not, and the result says which dishes it read and which the
  *  listing lacks. A reading the Main dishes tab already has for those
@@ -126,23 +127,35 @@ export async function runMenuWatch(
     if (budget.aiReads <= 0) return { ok: true, filed: 0 }
     budget.aiReads--
   }
+  const listed = listedDishes(listing, category)
   let read
   try {
-    read = await readMenu(source, listing.name, { apiKey, fetchImpl: opts.fetchImpl })
+    read = await readMenu(source, listing.name, { apiKey, fetchImpl: opts.fetchImpl, listed })
   } catch (err) {
     return { ok: false, error: `${changed ? 'The menu changed, and the AI' : 'The AI'} couldn’t read it (${err instanceof Error ? err.message : String(err)})` }
   }
-  const found = newDishes(read.dishes, listedDishes(listing, category))
+  const found = newDishes(read.dishes, listed)
+  const missing = read.missing ?? []
   const check = (queue: WatchCheck['queue']) =>
     pageCheck('dishes', checkFrom(source, { pictures: read.fromPictures }), read.dishes.length ? [read.dishes.map((d) => d.name).join(', ')] : [], {
-      differences: found.length ? [`Not on the listing: ${found.map((d) => d.name).join(', ')}`] : [],
+      differences: [
+        ...(found.length ? [`Not on the listing: ${found.map((d) => d.name).join(', ')}`] : []),
+        ...(missing.length ? [`Not on the menu: ${missing.join(', ')}`] : []),
+      ],
       queue,
     })
-  if (found.length === 0) return { ok: true, filed: 0, pageHash, check: check(null) }
+  if (found.length === 0 && missing.length === 0) return { ok: true, filed: 0, pageHash, check: check(null) }
   if (opts.full) {
     const kept = await getMenuReading(watch.communityId, listing.id)
-    const had = new Set((kept?.dishes ?? []).map((d) => d.name.trim().toLowerCase()))
-    if (kept && (kept.status === 'proposed' || kept.status === 'skipped') && found.every((d) => had.has(d.name.trim().toLowerCase()))) {
+    const lower = (n: string) => n.trim().toLowerCase()
+    const had = new Set((kept?.dishes ?? []).map((d) => lower(d.name)))
+    const hadMissing = new Set((kept?.missing ?? []).map(lower))
+    if (
+      kept &&
+      (kept.status === 'proposed' || kept.status === 'skipped') &&
+      found.every((d) => had.has(lower(d.name))) &&
+      missing.every((n) => hadMissing.has(lower(n)))
+    ) {
       return { ok: true, filed: 0, pageHash, check: check('before') }
     }
   }
@@ -150,7 +163,8 @@ export async function runMenuWatch(
     status: 'proposed',
     sourceUrl: read.sourceUrl ?? watch.url,
     dishes: read.dishes,
-    note: changedMenuNote(found),
+    missing,
+    note: changedMenuNote(found, missing),
     model: read.model,
   })
   return { ok: true, filed: 1, pageHash, check: check('filed') }

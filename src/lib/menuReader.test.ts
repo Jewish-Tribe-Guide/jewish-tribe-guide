@@ -163,6 +163,77 @@ describe('what the AI said, kept to what holds up', () => {
   })
 })
 
+// The user, Oct 21: "if I add something manually from a menu … will
+// future reads look for that and tell me if it's successfully finding it?"
+// Each read is given the listing's dishes, hand-added ones too, and either
+// points to the menu's words for each or says it isn't there.
+describe('the listing’s own dishes, looked for on every read', () => {
+  const source: MenuSource = { url: 'https://grill.example/menu', text: 'MAINS\nChicken or beef SHAWARMA plate\nFalafel in pita\nClassic Burger\nFountain drinks', pdf: null }
+  const listed = ['Falafel', 'Hamburgers', 'Hummus plate']
+
+  it('tells the AI the dishes the listing has, and asks where the menu names each', () => {
+    const [system, user] = menuMessages(source, 'Judah', listed) as { content: unknown }[]
+    expect(system.content).toMatch(/put each one the menu names in "listed"/)
+    expect(system.content).toContain('"listed": [{"name": "...", "quote": "..."}]')
+    expect(JSON.stringify(user.content)).toContain('Its listing has these dishes already: Falafel, Hamburgers, Hummus plate.')
+    expect(JSON.stringify((menuMessages(source, 'Judah') as { content: unknown }[])[1].content)).not.toContain('already')
+  })
+
+  it('one the menu names is kept as the listing spells it, marked; one it doesn’t is missing', () => {
+    const r = tidyMenuReading(
+      {
+        dishes: [{ name: 'Shawarma', quote: 'Chicken or beef SHAWARMA plate' }, { name: 'Burger', quote: 'Classic Burger' }],
+        listed: [
+          { name: 'Falafel', quote: 'Falafel in pita' },
+          { name: 'Hamburgers', quote: 'Classic Burger' },
+          // Words that aren't on the page don't count as finding it.
+          { name: 'Hummus plate', quote: 'Hummus plate' },
+        ],
+      },
+      source,
+      listed,
+    )
+    expect(r.dishes).toEqual([
+      { name: 'Shawarma', quote: 'Chicken or beef SHAWARMA plate', checked: true, named: true },
+      { name: 'Hamburgers', quote: 'Classic Burger', checked: true, named: true, onListing: true },
+      { name: 'Falafel', quote: 'Falafel in pita', checked: true, named: true, onListing: true },
+    ])
+    expect(r.missing).toEqual(['Hummus plate'])
+  })
+
+  it('the listing’s own come on top of the ten', () => {
+    const ten = Array.from({ length: 12 }, (_, i) => ({ name: `Dish ${String.fromCharCode(65 + i)}`, quote: 'Fountain drinks' }))
+    const r = tidyMenuReading({ dishes: ten, listed: [{ name: 'Falafel', quote: 'Falafel in pita' }] }, source, ['Falafel'])
+    expect(r.dishes).toHaveLength(11)
+    expect(r.dishes.at(-1)).toMatchObject({ name: 'Falafel', onListing: true })
+    expect(r.missing).toEqual([])
+  })
+
+  it('never says a dish is missing from a menu it only saw part of, or didn’t read', () => {
+    const photos: MenuSource = { url: null, text: null, pdf: null, images: [{ mime: 'image/jpeg', b64: 'AAA' }] }
+    expect(tidyMenuReading({ dishes: [{ name: 'Dosas', quote: 'Masala Dosa' }] }, photos, listed).missing).toEqual([])
+    // A page that named no dishes isn't a menu without them.
+    expect(tidyMenuReading({ dishes: [], note: 'A cookie notice.' }, source, listed).missing).toEqual([])
+    // A PDF is a whole menu.
+    const pdf: MenuSource = { url: 'https://g.example/m.pdf', text: null, pdf: 'JVBERg==' }
+    expect(tidyMenuReading({ dishes: [{ name: 'Pizza', quote: 'Margherita Pizza' }] }, pdf, listed).missing).toEqual(listed)
+  })
+
+  it('a menu read from its pictures, after its words named nothing, says nothing is missing', async () => {
+    const answers = [{ dishes: [], note: 'Just a welcome page.' }, { dishes: [{ name: 'Falafel', quote: 'Falafel' }] }]
+    const fetchImpl = vi.fn<typeof fetch>(async (url) => {
+      if (String(url).includes('openai')) return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify(answers.shift()) } }] }), { status: 200 })
+      return new Response(new Uint8Array([1, 2, 3]), { status: 200, headers: { 'content-type': 'image/jpeg' } })
+    })
+    const r = await readMenu({ ...source, pictures: ['https://grill.example/menu.jpg'] }, 'Judah', { apiKey: 'k', model: 'm', fetchImpl, resolve: publicDns, listed })
+    expect(r.fromPictures).toBe(true)
+    expect(r.missing).toEqual([])
+    const sent = fetchImpl.mock.calls.filter(([u]) => String(u).includes('openai')).map(([, init]) => init!.body as string)
+    expect(sent).toHaveLength(2)
+    expect(sent.every((b) => b.includes('Its listing has these dishes already: Falafel, Hamburgers, Hummus plate.'))).toBe(true)
+  })
+})
+
 // Oct 6: a menu can come from the "+ Add" box, as photos or as a link. A
 // delivery app's is never fetched (agreed: its terms forbid it, and it
 // blocks readers), and a photo has no words to check the dishes against.

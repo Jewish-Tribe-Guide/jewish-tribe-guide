@@ -43,6 +43,8 @@ export type MenuDish = {
   named?: boolean
   /** Read from a picture of the menu on its page (menuPictures). */
   picture?: true
+  /** Already on the listing: the menu still names it (the user, Oct 21). */
+  onListing?: true
 }
 
 export type MenuReading = {
@@ -51,6 +53,11 @@ export type MenuReading = {
   dishes: MenuDish[]
   /** Why there are none, when there are none. */
   note: string | null
+  /** Dishes on the listing this menu doesn't name (the user, Oct 21: a
+   *  dish added by hand is checked on every read after). Only said of a
+   *  menu read whole, as its words or a PDF: a few pictures of one may be
+   *  only part of it. Never taken off the listing by the reader. */
+  missing?: string[]
 }
 
 // ── Fetching, safely ─────────────────────────────────────────────────────────
@@ -552,12 +559,15 @@ Rules:
 - Fewer is better than padding. If you were shown only part of a menu (a few photos, one section), pick the main dishes in that part; never fill the list with vegetables, rice, noodles or other sides because nothing else is there. Return fewer, or none, and say in "note" that it looks like only part of the menu.
 - For each dish, "quote" is a few words copied exactly from the menu where you read it (a heading or an item line), so a person can find it. Copy the words exactly as written, including their spelling and capitals.
 - If what you were given isn't a menu, or names no dishes, return no dishes and say why in "note".
+- When you're told the dishes the place's listing has already, check each against the menu: put each one the menu names in "listed", with its name as given and a "quote" copied exactly from the menu as above. Leave out any it doesn't name; never guess. A listed dish can be in "dishes" too, if it's one of the main dishes.
 
-Answer in JSON only: {"dishes": [{"name": "...", "quote": "..."}], "note": "..."}`
+Answer in JSON only: {"dishes": [{"name": "...", "quote": "..."}], "listed": [{"name": "...", "quote": "..."}], "note": "..."}`
 
-/** The messages sent: a page as its text, a PDF as the file itself. */
-export function menuMessages(source: MenuSource, placeName: string): unknown[] {
-  const intro = `The place: ${placeName}. Its menu, ${source.url ? `from ${source.url}` : 'in the photos'}:`
+/** The messages sent: a page as its text, a PDF as the file itself.
+ *  `listed`: the dishes on the listing now, for the AI to look for. */
+export function menuMessages(source: MenuSource, placeName: string, listed: readonly string[] = []): unknown[] {
+  const has = listed.length ? ` Its listing has these dishes already: ${listed.join(', ')}.` : ''
+  const intro = `The place: ${placeName}.${has} Its menu, ${source.url ? `from ${source.url}` : 'in the photos'}:`
   const content = source.images?.length
     ? [{ type: 'text', text: intro }, ...source.images.map((img) => ({ type: 'image_url', image_url: { url: `data:${img.mime};base64,${img.b64}` } }))]
     : source.pdf
@@ -591,31 +601,48 @@ function plain(text: string): string {
  * page's text, a dish whose quote isn't on the page is dropped: the AI
  * made it up or misread it, and either way the menu doesn't say it.
  */
-export function tidyMenuReading(raw: unknown, source: MenuSource): MenuReading {
+export function tidyMenuReading(raw: unknown, source: MenuSource, listed: readonly string[] = []): MenuReading {
   const body = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {}
-  const list = Array.isArray(body.dishes) ? body.dishes : []
   const page = source.text ? ` ${plain(source.text)} ` : null
-  const seen = new Set<string>()
-  const dishes: MenuDish[] = []
-  for (const d of list) {
-    if (dishes.length >= MAX_DISHES) break
-    if (!d || typeof d !== 'object') continue
+  const keyOf = (name: string) => itemName(name).toLowerCase()
+  const onListing = new Map(listed.map((n) => [keyOf(n), n]))
+  /** A dish the AI named, with words that hold up: on the page, when we have its words. */
+  const take = (d: unknown): MenuDish | null => {
+    if (!d || typeof d !== 'object') return null
     const name = cleanItemName((d as Record<string, unknown>).name)
     const quoteRaw = (d as Record<string, unknown>).quote
     const quote = typeof quoteRaw === 'string' ? quoteRaw.replace(/\s+/g, ' ').trim().slice(0, 160) : ''
-    if (!name || !quote) continue
+    if (!name || !quote) return null
     const said = plain(quote)
-    if (!said) continue
-    if (page && !page.includes(` ${said} `)) continue
-    const named = addedItemName(name)
-    const key = itemName(named).toLowerCase()
-    if (seen.has(key)) continue
-    seen.add(key)
+    if (!said) return null
+    if (page && !page.includes(` ${said} `)) return null
+    const named = onListing.get(keyOf(name)) ?? addedItemName(name)
     const nameWords = new Set(itemWords(named))
-    dishes.push({ name: named, quote, checked: !!page, named: words(quote).some((w) => nameWords.has(w)) })
+    return { name: named, quote, checked: !!page, named: words(quote).some((w) => nameWords.has(w)), ...(onListing.has(keyOf(named)) ? { onListing: true as const } : {}) }
+  }
+  const seen = new Set<string>()
+  const dishes: MenuDish[] = []
+  for (const d of Array.isArray(body.dishes) ? body.dishes : []) {
+    if (dishes.length >= MAX_DISHES) break
+    const dish = take(d)
+    if (!dish || seen.has(keyOf(dish.name))) continue
+    seen.add(keyOf(dish.name))
+    dishes.push(dish)
+  }
+  // The listing's own dishes the menu still names, past the ten: each is
+  // checked again on every read.
+  for (const d of Array.isArray(body.listed) ? body.listed : []) {
+    const dish = take(d)
+    if (!dish?.onListing || seen.has(keyOf(dish.name))) continue
+    seen.add(keyOf(dish.name))
+    dishes.push(dish)
   }
   const note = typeof body.note === 'string' && body.note.trim() ? body.note.trim().slice(0, 300) : null
-  return { sourceUrl: source.url, dishes, note: dishes.length ? null : (note ?? 'No main dishes found on the menu.') }
+  // Not named: said only of a menu read whole, and one that named dishes
+  // (a cookie notice names none, and isn't a menu without them).
+  const whole = !!(source.text || source.pdf) && !source.images?.length
+  const missing = whole && dishes.length ? listed.filter((n) => !seen.has(keyOf(n))) : []
+  return { sourceUrl: source.url, dishes, note: dishes.length ? null : (note ?? 'No main dishes found on the menu.'), ...(listed.length ? { missing } : {}) }
 }
 
 /** The page's menu pictures, fetched as the page was: those that can be
@@ -625,11 +652,11 @@ async function fetchPictures(urls: readonly string[], opts: { fetchImpl?: typeof
   return got.flatMap((g) => (g?.type === 'picture' ? [{ mime: g.mime, b64: g.body }] : []))
 }
 
-async function askModel(source: MenuSource, placeName: string, apiKey: string, model: string, fetchImpl: typeof fetch): Promise<MenuReading> {
+async function askModel(source: MenuSource, placeName: string, apiKey: string, model: string, fetchImpl: typeof fetch, listed: readonly string[]): Promise<MenuReading> {
   const res = await fetchImpl('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-    body: JSON.stringify({ model, messages: menuMessages(source, placeName), response_format: { type: 'json_object' } }),
+    body: JSON.stringify({ model, messages: menuMessages(source, placeName, listed), response_format: { type: 'json_object' } }),
     signal: AbortSignal.timeout(45_000),
   })
   const body = (await res.json().catch(() => ({}))) as { error?: { message?: string }; choices?: { message?: { content?: string } }[] }
@@ -640,25 +667,26 @@ async function askModel(source: MenuSource, placeName: string, apiKey: string, m
   } catch {
     raw = null
   }
-  return tidyMenuReading(raw, source)
+  return tidyMenuReading(raw, source, listed)
 }
 
 /** The AI's reading of a menu: its words, PDF or photos; and when those
  *  name no dishes (or a page has no words to speak of), the page's menu
  *  pictures (menuPictures), as photos are read. `fromPictures` says the
  *  dishes came from those: they can't be checked against the page's words.
- *  `fetchImpl` fetches the pictures too. */
+ *  `fetchImpl` fetches the pictures too. `listed`: the dishes on the
+ *  listing now, each looked for on the menu (MenuReading's `missing`). */
 export async function readMenu(
   source: MenuSource,
   placeName: string,
-  { apiKey, model = DEFAULT_READER_MODEL, fetchImpl = fetch, resolve }: { apiKey: string; model?: string; fetchImpl?: typeof fetch; resolve?: Lookup },
+  { apiKey, model = DEFAULT_READER_MODEL, fetchImpl = fetch, resolve, listed = [] }: { apiKey: string; model?: string; fetchImpl?: typeof fetch; resolve?: Lookup; listed?: readonly string[] },
 ): Promise<MenuReading & { model: string; fromPictures?: boolean }> {
   const hasWords = !!(source.text || source.pdf || source.images?.length)
-  const first = hasWords ? await askModel(source, placeName, apiKey, model, fetchImpl) : null
+  const first = hasWords ? await askModel(source, placeName, apiKey, model, fetchImpl, listed) : null
   if (first?.dishes.length || !source.pictures?.length) return { ...(first ?? { sourceUrl: source.url, dishes: [], note: 'No menu found on that page.' }), model }
   const images = await fetchPictures(source.pictures, { fetchImpl, resolve })
   if (!images.length) return { ...(first ?? { sourceUrl: source.url, dishes: [], note: 'Its menu’s pictures couldn’t be opened.' }), model }
-  const read = await askModel({ url: source.url, text: null, pdf: null, images }, placeName, apiKey, model, fetchImpl)
+  const read = await askModel({ url: source.url, text: null, pdf: null, images }, placeName, apiKey, model, fetchImpl, listed)
   // Nothing there either: what the words said is the better reason.
   if (!read.dishes.length && first) return { ...first, model }
   return { ...read, dishes: read.dishes.map((d) => ({ ...d, picture: true as const })), model, fromPictures: true }
@@ -670,7 +698,7 @@ export async function readMenu(
 export async function readMenus(
   sources: readonly MenuSource[],
   placeName: string,
-  opts: { apiKey: string; model?: string; fetchImpl?: typeof fetch; resolve?: Lookup; budgetMs?: number; now?: () => number },
+  opts: { apiKey: string; model?: string; fetchImpl?: typeof fetch; resolve?: Lookup; budgetMs?: number; now?: () => number; listed?: readonly string[] },
 ): Promise<(MenuReading & { model: string; fromPictures?: boolean }) | null> {
   const now = opts.now ?? Date.now
   const start = now()
