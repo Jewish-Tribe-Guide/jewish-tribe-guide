@@ -441,6 +441,18 @@ but never ran the program, so it saw nothing.
   15 seconds each. Not LUHV Vegan Deli or Unit Su Vege (drawn, still no
   dishes). With the morning's changes, 18 of the 27 places on dev now
   read; the rest need a person (menu link or photos) or have no menu.
+- **Corrected Oct 21, from the user's look:** Unit Su Vege's menu is
+  pictures on its own site, at `unitsuvege.com/order/showNormalMenu.html`
+  (8 pages); its "MENU" button is a script, not a link, so the reader
+  never finds the page. The earlier "drawn from MenuFreeZone" was wrong.
+  Given that link ("Give its menu link"), it reads 10 dishes from the
+  first 2 pages (two small button pictures take the other 2 of the 4).
+  LUHV Vegan Deli's menu is on its Square Online order page
+  (`deli.luhvfood.com/s/order?location=…`), which shows the menu with no
+  clicks once the location is in the address. That is an ordering app on
+  the place's own domain, so whether to read it is the user's call (the
+  Oct 6 rule says ordering apps are never fetched; `square.site` is on
+  the list, a Square store on its own domain isn't).
 - **How it runs on Vercel:** `@sparticuz/chromium` 153 (a Chromium built
   for serverless functions, matching Playwright 1.63's) with
   `playwright-core` 1.63, both now production dependencies; locally,
