@@ -254,7 +254,7 @@ export function refusal(status: number): Trouble {
 
 const ENTITIES: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', rsquo: '’', lsquo: '‘', rdquo: '”', ldquo: '“', ndash: '–', mdash: '—', eacute: 'é', hellip: '…' }
 
-function decode(text: string): string {
+export function decode(text: string): string {
   return text.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (whole, code: string) => {
     if (code[0] === '#') {
       const n = code[1].toLowerCase() === 'x' ? parseInt(code.slice(2), 16) : parseInt(code.slice(1), 10)
@@ -288,7 +288,7 @@ const MENU_BY_ANOTHER_NAME = /\b(our food|food|products?|catering|meals|shop|sto
 
 /** The registrable part of a host, near enough: its last two labels
  *  ("store.gelbsteinsbakery.com" → "gelbsteinsbakery.com"). */
-const siteOf = (hostname: string) => hostname.toLowerCase().split('.').slice(-2).join('.')
+export const siteOf = (hostname: string) => hostname.toLowerCase().split('.').slice(-2).join('.')
 
 /** Links on a page that look like its menu: "Menu", "Our menu", "Dinner
  *  menu", a /menu address, a PDF named for one, then what a place calls its

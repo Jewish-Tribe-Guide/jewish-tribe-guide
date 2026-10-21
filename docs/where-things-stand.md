@@ -451,6 +451,22 @@ compare, and one it can't read, on desktop and phone.
      Refuah" marker watch).
 3. **Mikvahs:** one dry run first (read each website once, save nothing,
    count how many it reads right), then connected.
+   - **Dry run, Oct 21, live data, nothing saved**
+     (`scripts/hours-pages-dry-run.mts`, finding pages with
+     `hoursPages.ts`): 4 of 4 mikvahs read right, from 14 pages, with no
+     page given by hand. Lower Merion: its home page (women's), Men's
+     Mikvah and Keilim Mikvah pages were all found from its home page's
+     links. Women's reads 7:30–9:30 PM, Sun–Thu, against the listing's
+     8:30–10:30 PM, the known change. Men's agrees (its Friday "until 1 hour
+     before candle lighting" rightly left out). Keilim agrees. Mei Shalva,
+     Moishe Zvi and Ohel Leah are by appointment only: nothing read from
+     any of their 10 pages, which is right; Ohel Leah's "the kelim mikvah
+     closes at sunset" isn't weekly hours, and wasn't read as any.
+   - **One judgement call:** "every weeknight" was read as Sunday to
+     Thursday; the listing has Sunday closed.
+   - **The pages the AI read hours from are exactly the ones with a clock
+     time on them** ("7:30PM", "4:30 AM"), so the daily search for pages
+     can be done without the AI.
 4. **Shuls:** the same dry run. Its count decides how far this goes for
    shuls, or whether newsletters are the real source.
 5. **Eruv and Kosher certification** move onto job pages, and the Watches
