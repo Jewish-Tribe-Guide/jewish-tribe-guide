@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { hoursLinks, hoursPages, MAX_HOURS_PAGES } from './hoursPages'
+import { hoursLinks, hoursPages, MAX_HOURS_PAGES, timesPages } from './hoursPages'
 
 const a = (href: string, text: string) => `<a href="${href}">${text}</a>`
 
@@ -57,5 +57,36 @@ describe('hoursPages', () => {
     expect(pages[0]).toEqual({ url: 'https://m.example.org/', link: null })
     expect(pages[1]).toEqual({ url: 'https://m.example.org/hours-0', link: 'Hours' })
     expect(pages).toHaveLength(1 + MAX_HOURS_PAGES)
+  })
+})
+
+describe('timesPages', () => {
+  // The pages given by hand on Oct 19, each linked from its shul's home page.
+  it('finds a shul’s pages of davening times, not its mikvah words', () => {
+    const html = [
+      a('/about', 'About Us'),
+      a('/donate', 'Donate'),
+      a('/shabbat.html', 'Shabbat'),
+      a('/davening', 'Davening'),
+      a('/minyans', 'Minyans'),
+      a('/hours', 'Office hours'),
+      a('/womens-league', 'Women’s League'),
+    ].join('')
+    expect(timesPages('https://shul.example.org/', html).map((p) => p.link)).toEqual([null, 'Davening', 'Minyans', 'Shabbat', 'About Us'])
+  })
+
+  // Both found by the Oct 21 dry run.
+  it('keeps a page’s query, and counts a page once with or without its closing slash', () => {
+    const html = [
+      a('/index.cfm?fuseaction=Page.ViewPage&pageId=500&utm_source=nav', 'Worship Services'),
+      a('/calendar', 'Calendar'),
+      a('/calendar/', 'Calendar'),
+      a('https://rodephshalom.org', 'Home'),
+    ].join('')
+    expect(timesPages('https://rodephshalom.org/', html)).toEqual([
+      { url: 'https://rodephshalom.org/', link: null },
+      { url: 'https://rodephshalom.org/index.cfm?fuseaction=Page.ViewPage&pageId=500', link: 'Worship Services' },
+      { url: 'https://rodephshalom.org/calendar', link: 'Calendar' },
+    ])
   })
 })

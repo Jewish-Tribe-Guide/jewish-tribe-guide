@@ -505,6 +505,43 @@ compare, and one it can't read, on desktop and phone.
      (it's every morning, cheap since it's fetches only).
 4. **Shuls:** the same dry run. Its count decides how far this goes for
    shuls, or whether newsletters are the real source.
+   - **Dry run, Oct 21, live data, nothing saved**
+     (`scripts/shul-pages-dry-run.mts`, finding pages with `timesPages`:
+     links called davening, minyanim, services, schedule, Shabbat,
+     calendar…). Run twice. Of 14 shuls:
+     - **6 read right, and would file only what's right:** B'nai Abraham
+       (its Minyans page, agrees), Rodeph Shalom (its calendar's
+       Thursday online minyan, as on Oct 20), Shivtei Yeshuron (agrees),
+       Mikveh Israel (Friday night 6:00 PM, new), Kol Tzedek (Friday
+       6:30 PM, new, as on Oct 19), BZBI (its week from its Shabbat
+       page's calendar; the listing has no times).
+     - **3 read their times right but would also file something wrong:**
+       Mekor Habracha (the OU's daily 1:00 PM Tehillim phone call on its
+       bulletin board, as a minyan every day, both runs; and "Fri 7:00 PM"
+       beside the listing's "at candle lighting, not after 7:00 PM"),
+       Society Hill (its once-a-month family service as every week, and
+       end times: "6:00–7:15 pm, was 5:30pm"), Kesher Israel (only end
+       times: "8:00 AM – 8:40 AM, was 8:00am", six times over).
+     - **2 have nothing to read:** Leyv Ha-Ir (its calendar is empty this
+       week, as on Oct 20), South Philadelphia Shtiebel (its calendar is
+       drawn by script; its holiday pages rightly read as nothing).
+     - **3 turn the reader away:** Lower Merion Synagogue, Sons of Israel
+       (406), Chabad of the Main Line (403).
+   - **Finding the page works:** 8 of the 9 pages given by hand on Oct 19
+     were found on their own (not Chabad of the Main Line's, whose site is
+     blocked). Two finder bugs the run turned up, fixed for mikvahs too: a
+     page's query was dropped (Leyv Ha-Ir's pages are all
+     `index.cfm?…pageId=`), and /calendar and /calendar/ were two pages.
+   - **The AI varies on labels between runs:** Rodeph Shalom's and BZBI's
+     Shabbat morning service was Shacharis one run and "other" the next.
+   - **What it means (my recommendation, for the user to decide):** not
+     the mikvahs' way, a daily search that adds pages on its own. A
+     shul's site has times that aren't its minyanim (classes, holidays,
+     phone calls, family services), and one wrong page files every
+     morning. The reader's three faults above are worth fixing first.
+     Found pages could then be offered on a Shul times page for an admin
+     to accept. For the three blocked shuls and the Orthodox shuls whose
+     times move each week, the newsletter is the real source.
 5. **Eruv and Kosher certification** move onto job pages, and the Watches
    tab goes.
 
