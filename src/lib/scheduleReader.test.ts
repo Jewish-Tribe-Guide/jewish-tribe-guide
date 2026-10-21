@@ -283,7 +283,70 @@ describe('reading a shul’s regular times', () => {
 
   it('asks for a time given for one season to say so (Mekor’s “7:00 PM · Summer”)', () => {
     const [system] = regularMessages({ text: POST }, DAYS, 'Mekor Habracha') as { content: string }[]
-    expect(system.content).toContain('A time for one season only (a "Summer" or "Winter" label beside it')
+    expect(system.content).toContain('"season": "summer" or "winter" for a time held in one season only')
+    expect(system.content).toContain('A minyan with a summer time and a winter time is two entries')
+  })
+
+  // Mekor's website, Oct 21: Friday night "7:00 PM" in summer, "around
+  // candle-lighting" in winter.
+  const FRIDAY = 'Friday: Mincha / Kabbalat Shabbat / Ma’ariv 7:00 PM (Summer); around candle-lighting (Winter)'
+  it('puts a time’s season in its note, where the guide reads it', () => {
+    const r = tidyRegularReading(
+      {
+        kind: 'schedule',
+        times: [
+          { tefillah: 'mincha_maariv', days: ['fri'], time: '7:00 PM', season: 'summer', quote: 'Ma’ariv 7:00 PM (Summer)' },
+          { tefillah: 'mincha_maariv', days: ['fri'], time: 'around candle-lighting', season: 'winter', notes: 'with Kabbalat Shabbat', quote: 'around candle-lighting (Winter)' },
+          { tefillah: 'shacharis', days: ['sat'], time: '9:15am', season: 'spring', quote: 'Kabbalat Shabbat' },
+        ],
+      },
+      { text: FRIDAY },
+      DAYS,
+      id,
+    )
+    expect(r.times.map((t) => [t.time, t.anchor ?? null, t.notes ?? null])).toEqual([
+      ['7:00 PM', null, 'Summer only'],
+      ['At Candle Lighting', 'candle_lighting', 'Winter only- with Kabbalat Shabbat'],
+      ['9:15am', null, null],
+    ])
+  })
+
+  it('reads one Friday night minyan as one, however the AI splits it (Mekor, Oct 21)', () => {
+    const at7 = (tefillah: string, season = 'summer') => ({ tefillah, days: ['fri'], time: '7:00 PM', season, quote: 'Ma’ariv 7:00 PM (Summer)' })
+    const r = tidyRegularReading(
+      {
+        kind: 'schedule',
+        times: [
+          at7('mincha'),
+          at7('kabbalas_shabbos'),
+          at7('maariv'),
+          at7('kabbalas_shabbos', 'winter'),
+        ],
+      },
+      { text: FRIDAY },
+      DAYS,
+      id,
+    )
+    expect(r.times.map((t) => `${t.days.join(',')} ${t.tefillah} ${t.notes ?? ''}`)).toEqual([
+      'fri mincha_maariv Summer only- with Kabbalas Shabbos',
+      'fri kabbalas_shabbos Winter only',
+    ])
+  })
+
+  it('keeps the same time in two seasons as two times', () => {
+    const r = tidyRegularReading(
+      {
+        kind: 'schedule',
+        times: [
+          { tefillah: 'mincha_maariv', days: ['fri'], time: '7:00 PM', season: 'summer', quote: 'Ma’ariv 7:00 PM (Summer)' },
+          { tefillah: 'mincha_maariv', days: ['fri'], time: '7:00 PM', season: 'winter', quote: 'Ma’ariv 7:00 PM (Summer)' },
+        ],
+      },
+      { text: FRIDAY },
+      DAYS,
+      id,
+    )
+    expect(r.times.map((t) => t.notes)).toEqual(['Summer only', 'Winter only'])
   })
 
   it('a "week" with no dates it can place is read as a schedule', () => {

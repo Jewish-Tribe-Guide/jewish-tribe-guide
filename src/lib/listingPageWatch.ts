@@ -5,7 +5,7 @@ import type { Proposal } from './messageReader'
 import type { SubmissionSource } from './submissionSource'
 import type { CheckFound, Watch } from './watches'
 import type { MenuSource } from './menuReader'
-import type { UpdateRow } from './scheduleUpdate'
+import { seasonOf, type UpdateRow } from './scheduleUpdate'
 import { CALENDAR_HEADING } from './calendarFeed'
 import { formatDays, parseTimeToMinutes, TEFILLAH_LABELS, TEFILLAH_ORDER, type MinyanDayKey } from './davening'
 import { DAY_KEYS, fmt12, formatHoursSummary } from './hours'
@@ -160,7 +160,7 @@ function dayRuns(days: readonly MinyanDayKey[]): string {
  *  what the page gives, never the listing's times it left alone. */
 
 export function timesReadLines(rows: readonly UpdateRow[]): string[] {
-  const weekly = new Map<string, { tefillah: UpdateRow['tefillah']; time: string; days: MinyanDayKey[] }>()
+  const weekly = new Map<string, { tefillah: UpdateRow['tefillah']; time: string; season: string; days: MinyanDayKey[] }>()
   const dated: UpdateRow[] = []
   for (const r of rows) {
     if (r.status === 'gone' || r.status === 'kept') continue
@@ -169,15 +169,18 @@ export function timesReadLines(rows: readonly UpdateRow[]): string[] {
       continue
     }
     const time = clockText(r.time)
-    const key = `${r.tefillah} ${time}`
-    const g = weekly.get(key) ?? { tefillah: r.tefillah, time, days: [] }
+    // "· Summer": a page that gives both seasons says which is which.
+    const s = r.season ?? seasonOf({ notes: r.notes })
+    const season = s ? ` · ${s === 'summer' ? 'Summer' : 'Winter'}` : ''
+    const key = `${r.tefillah} ${time}${season}`
+    const g = weekly.get(key) ?? { tefillah: r.tefillah, time, season, days: [] }
     if (!g.days.includes(r.day as MinyanDayKey)) g.days.push(r.day as MinyanDayKey)
     weekly.set(key, g)
   }
   const order = (t: UpdateRow['tefillah'], time: string) => TEFILLAH_ORDER.indexOf(t) * 10_000 + (parseTimeToMinutes(time) || 0)
   const lines = [...weekly.values()]
     .sort((a, b) => order(a.tefillah, a.time) - order(b.tefillah, b.time))
-    .map((g) => `${TEFILLAH_LABELS[g.tefillah]} ${dayRuns(g.days)} ${g.time}`)
+    .map((g) => `${TEFILLAH_LABELS[g.tefillah]} ${dayRuns(g.days)} ${g.time}${g.season}`)
   const once = [...dated]
     .sort((a, b) => a.day.localeCompare(b.day) || order(a.tefillah, a.time) - order(b.tefillah, b.time))
     .map((r) => `${TEFILLAH_LABELS[r.tefillah]} ${dateText(r.day, { weekday: true })}${r.occasion ? ` (${r.occasion})` : ''} ${clockText(r.time)}`)

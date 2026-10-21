@@ -707,3 +707,25 @@ describe('runListingPageWatch: a shul’s calendar, a week at a time', () => {
     expect(tue?.weeks).toEqual([{ sunday: '2026-10-18', from: '2026-10-20', to: '2026-10-24', lines: ['2026-10-20', '2026-10-22', '2026-10-23', '2026-10-24'].map((d) => expect.stringMatching(new RegExp(`^${d}`))) }])
   })
 })
+
+// A page that gives both seasons' times is compared season by season
+// (compareTimes), each row marked with its season. Neither filter may
+// cross seasons.
+describe('both seasons on one page', () => {
+  const row = (x: Partial<TimesUpdate['rows'][number]>): TimesUpdate['rows'][number] => ({ id: 'r', day: 'fri', tefillah: 'mincha_maariv', time: '7:00 PM', status: 'new', ...x })
+  const update = (rows: TimesUpdate['rows']): TimesUpdate => ({ kind: 'schedule', complete: true, season: null, title: null, startsOn: null, from: null, to: null, rows, otherSeason: 0 })
+
+  it('a page with only winter’s time takes no summer time off', async () => {
+    const { keepUncovered } = await import('./listingPageRun')
+    const u = keepUncovered(update([row({ status: 'gone', season: 'summer', rowId: 'a' }), row({ status: 'same', season: 'winter', rowId: 'b' })]))
+    expect(u.rows.map((r) => r.status)).toEqual(['kept', 'same'])
+  })
+
+  it('winter’s 7:00 PM on the listing isn’t summer’s', async () => {
+    const { dropListed } = await import('./listingPageRun')
+    const listing = [{ id: 'w', tefillah: 'mincha_maariv' as const, days: ['fri' as const], time: '7:00pm', season: 'winter' as const }]
+    expect(dropListed(update([row({ season: 'summer' })]), listing).rows).toHaveLength(1)
+    expect(dropListed(update([row({ season: 'winter' })]), listing).rows).toHaveLength(0)
+    expect(dropListed(update([row({})]), listing).rows).toHaveLength(0)
+  })
+})

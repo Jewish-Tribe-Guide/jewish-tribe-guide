@@ -716,11 +716,28 @@ compare, and one it can't read, on desktop and phone.
      - **"Not read yet" goes** (the user, Oct 21): a page is read as soon
        as it's found, so the tabs are To check · Can't be read · Checked
        (and Off).
-     - Found drawing it: the reader doesn't write seasons the website's
-       way. Mekor's website gives Friday night as 7:00 PM in summer and
-       around candle-lighting in winter. Its Oct 20 finding kept the
-       all-year row, and its Oct 21 read called the listing a match. That
-       needs fixing before the page can be trusted.
+     - Found drawing it, **fixed Oct 21:** the reader didn't write seasons
+       the website's way. Mekor's website gives Friday night as 7:00 PM in
+       summer and around candle-lighting in winter. Its Oct 20 finding kept
+       the all-year row, and its Oct 21 read called the listing a match.
+       Three causes:
+       - a page of usual times was compared in this season only;
+       - "at candle lighting (not after 7:00 PM)" counted as the same as
+         "at candle lighting";
+       - the AI split one Friday night minyan into two or three prayers.
+
+       Now a page that labels seasons is compared season by season, a
+       rule's limit counts, and evening prayers at one time are one
+       Mincha & Maariv. Read three times, Mekor's page gave the same
+       proposal each time, as drawn. Mekor's Oct 20 finding is still
+       waiting in the queue on dev.
+     - **Read-only check of all 27 shul pages on dev, Oct 21:** besides
+       Mekor, Kol Tzedek and Society Hill each propose one new Friday
+       evening time. Not fixed, for later:
+       - Beth Zion-Beth Israel has 5 pages (two are High Holy Day
+         pages), all reading the same calendar week.
+       - The Rosenbach, a museum, has 5 pages read for shul times.
+       - Rodeph Shalom's calendar page doesn't load.
 
 ## Done Oct 20: "Check now" is the full check (on `redesign/oct18-fixes`, not merged)
 

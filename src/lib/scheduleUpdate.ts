@@ -96,6 +96,9 @@ export type UpdateRow = {
   keep?: boolean
   /** For a changed time in a week's message: their usual time now. */
   everyWeek?: boolean
+  /** The season it's for, when the message gives both seasons' times
+   *  (compareTimes). None: all year, or the message's own season. */
+  season?: Season
 }
 
 export type TimesUpdate = {
@@ -176,7 +179,16 @@ export function minutesOn(t: Timed, zm: DayZmanim | undefined): number | null {
 /** Whether two times are the same minyan time: the same rule, the same
  *  clock time, or a clock time within two minutes of a rule on that date. */
 export function sameTime(a: Timed, b: Timed, zm?: DayZmanim): boolean {
-  if (a.anchor && b.anchor) return a.anchor === b.anchor && (a.offsetMinutes ?? 0) === (b.offsetMinutes ?? 0)
+  if (a.anchor && b.anchor) {
+    if (a.anchor !== b.anchor || (a.offsetMinutes ?? 0) !== (b.offsetMinutes ?? 0)) return false
+    if ((a.notBefore ?? null) === (b.notBefore ?? null) && (a.notAfter ?? null) === (b.notAfter ?? null)) return true
+    // "At candle lighting (not after 7:00 PM)" isn't the website's "around
+    // candle-lighting" (Mekor, Oct 21): a usual time said another way is a
+    // change. On a date, the same minute is the same time.
+    const x = minutesOn(a, zm)
+    const y = minutesOn(b, zm)
+    return x !== null && y !== null && Math.abs(x - y) <= SAME_WITHIN_MINUTES
+  }
   if (!a.anchor && !b.anchor) {
     const x = parseTimeToMinutes(a.time)
     const y = parseTimeToMinutes(b.time)
@@ -267,6 +279,26 @@ export function compareTimes(
   reading: RegularReading,
   { season, zmanim = {}, newId = () => crypto.randomUUID() }: { season: Season | null; zmanim?: Record<string, DayZmanim>; newId?: () => string },
 ): TimesUpdate {
+  // Usual times that say which are each season's ("7:00 PM · Summer"
+  // beside "around candle-lighting · Winter", Mekor's website, Oct 21) are
+  // the whole year's: compared season by season, each row marked with its
+  // season, and one the same in both left all year. The website wins, said
+  // its way (the user, Oct 21: "we really want to mimic the website").
+  if (reading.kind === 'schedule' && !reading.season && reading.times.some((t) => seasonOf({ notes: t.notes }))) {
+    const pass = (s: Season) =>
+      compareTimes(current, { ...reading, season: s, times: reading.times.filter((t) => (seasonOf({ notes: t.notes }) ?? s) === s) }, { season: s, zmanim, newId }).rows
+    const summer = pass('summer')
+    const winter = pass('winter')
+    const inWinter = new Set(winter.map(rowKey))
+    const allYear = new Set(summer.map(rowKey).filter((k) => inWinter.has(k)))
+    const rows = [
+      ...summer.map((r): UpdateRow => (allYear.has(rowKey(r)) ? r : { ...r, season: 'summer' })),
+      ...winter.filter((r) => !allYear.has(rowKey(r))).map((r): UpdateRow => ({ ...r, season: 'winter' })),
+    ]
+    const at = (r: UpdateRow) => [DAY_KEYS.indexOf(r.day as DayKey) === -1 ? 7 : DAY_KEYS.indexOf(r.day as DayKey), TEFILLAH_ORDER.indexOf(r.tefillah)]
+    rows.sort((a, b) => at(a)[0] - at(b)[0] || at(a)[1] - at(b)[1] || (a.day < b.day ? -1 : a.day > b.day ? 1 : 0))
+    return { kind: 'schedule', complete: reading.complete, season: null, title: reading.title, startsOn: reading.startsOn, from: null, to: null, rows, otherSeason: 0 }
+  }
   // A schedule is for a season: the other season's times are left alone.
   // A week's times are what's happening those days, whatever the season:
   // compared with all the shul's times, since the guide's season (from the
@@ -327,6 +359,10 @@ export function compareTimes(
     otherSeason: current.length - scoped.length,
   }
 }
+
+/** A row, whatever its id: the same in both seasons' passes is all year. */
+const rowKey = (r: UpdateRow) =>
+  JSON.stringify([r.day, r.tefillah, r.status, r.rowId ?? null, r.time, r.anchor ?? null, r.offsetMinutes ?? null, r.notBefore ?? null, r.notAfter ?? null, r.notes ?? null, r.was ?? null])
 
 /** Whether a result changes anything: otherwise it only confirms. */
 export function changesAnything(u: Pick<TimesUpdate, 'rows'>): boolean {
@@ -475,7 +511,7 @@ export function applyUpdate(
 
   /** The shul's time on a day comes off; one it keeps all year stays for
    *  the other season when the message is one season's. */
-  const takeOff = (r: UpdateRow): DaySlot | null => {
+  const takeOff = (r: UpdateRow, seasonal: Season | null): DaySlot | null => {
     const i = slots.findIndex((s) => s.from === r.rowId && s.day === r.day)
     if (i === -1) return null
     const s = slots[i]
@@ -504,15 +540,18 @@ export function applyUpdate(
         if (r.status === 'new') dated.push(r)
         continue
       }
-      const was = r.status === 'changed' ? takeOff(r) : null
+      // A row compared in one season (both seasons' times, compareTimes)
+      // is that season's.
+      const season = r.season ?? seasonal
+      const was = r.status === 'changed' ? takeOff(r, season) : null
       if (was) {
-        add(r, seasonal, was)
-        changes.push(`Changed: ${rowText(r)}, was ${r.was}${seasonal ? ` (${seasonal})` : ''}`)
+        add(r, season, was)
+        changes.push(`Changed: ${rowText(r)}, was ${r.was}${season ? ` (${season})` : ''}`)
       } else if (r.status === 'new') {
-        add(r, seasonal)
-        changes.push(`New: ${rowText(r)}${seasonal ? ` (${seasonal})` : ''}`)
-      } else if (r.status === 'gone' && !r.keep && takeOff(r)) {
-        changes.push(`Off: ${rowText(r)}${seasonal ? ` (for ${seasonal})` : ''}`)
+        add(r, season)
+        changes.push(`New: ${rowText(r)}${season ? ` (${season})` : ''}`)
+      } else if (r.status === 'gone' && !r.keep && takeOff(r, season)) {
+        changes.push(`Off: ${rowText(r)}${season ? ` (for ${season})` : ''}`)
       }
     }
   } else {

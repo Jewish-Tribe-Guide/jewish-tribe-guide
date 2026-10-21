@@ -95,36 +95,63 @@ describe('the same time', () => {
 describe('a website’s times for both seasons', () => {
   // Mekor's website, Oct 21: Friday "7:00 PM · Summer", "around
   // candle-lighting · Winter"; the listing, "At Candle Lighting (not after
-  // 7:00 PM)". Each season's time compared in its season, and said their
-  // way it's a change, not a match.
-  it('compares only the season it is', () => {
-    const capped: Minyan = { id: 'f', tefillah: 'mincha_maariv', days: ['fri'], time: 'At Candle Lighting (not after 7:00 PM)', anchor: 'candle_lighting', offsetMinutes: 0, notAfter: '19:00' }
-    const page: RegularReading = {
-      ...WINTER,
-      season: null,
-      complete: false,
-      times: [
-        t({ tefillah: 'mincha_maariv', days: ['fri'], time: '7:00 PM', notes: 'Summer only' }),
-        t({ tefillah: 'mincha_maariv', days: ['fri'], time: '8:15 PM', notes: 'Winter only' }),
-      ],
+  // 7:00 PM)" all year. The website wins, said its way (the user, Oct 21:
+  // "we really want to mimic the website"), so both seasons are compared,
+  // whatever the season is now.
+  const capped: Minyan = { id: 'f', tefillah: 'mincha_maariv', days: ['fri'], time: 'At Candle Lighting (not after 7:00 PM)', anchor: 'candle_lighting', offsetMinutes: 0, notAfter: '19:00' }
+  const page: RegularReading = {
+    ...WINTER,
+    season: null,
+    startsOn: null,
+    complete: true,
+    times: [
+      t({ tefillah: 'mincha_maariv', days: ['fri'], time: '7:00 PM', notes: 'Summer only' }),
+      t({ tefillah: 'mincha_maariv', days: ['fri'], time: 'At candle lighting', anchor: 'candle_lighting', offsetMinutes: 0, notes: 'Winter only' }),
+      t({ tefillah: 'shacharis', days: ['sat'], time: '9:15am' }),
+    ],
+  }
+  const seasoned = (rows: { season?: string }[] & Parameters<typeof brief>[0]) => brief(rows).map((b, i) => `${b}${rows[i].season ? ` · ${rows[i].season}` : ''}`)
+  const show = (ms: Minyan[]) => ms.map((m) => `${m.days.join(',')} ${m.tefillah} ${m.time}${m.season ? ` ${m.season}` : ''}${m.notes ? ` (${m.notes})` : ''}`).sort()
+  const listing: Minyan[] = [capped, { id: 's', tefillah: 'shacharis', days: ['sat'], time: '9:15am' }]
+
+  it('compares each season’s time in its season, in either season', () => {
+    for (const season of ['summer', 'winter'] as const) {
+      expect(seasoned(compareTimes(listing, page, { season, newId }).rows)).toEqual([
+        'fri mincha_maariv 7:00 PM changed was At Candle Lighting (not after 7:00 PM) · summer',
+        'fri mincha_maariv At candle lighting changed was At Candle Lighting (not after 7:00 PM) · winter',
+        'sat shacharis 9:15am same',
+      ])
     }
-    expect(brief(compareTimes([capped], page, { season: 'summer', newId }).rows)).toEqual(['fri mincha_maariv 7:00 PM changed was At Candle Lighting (not after 7:00 PM)'])
-    expect(brief(compareTimes([capped], page, { season: 'winter', newId }).rows)).toEqual(['fri mincha_maariv 8:15 PM changed was At Candle Lighting (not after 7:00 PM)'])
   })
 
-  it('a listing with both seasons’ times, as the page has them, agrees, and isn’t given the other season’s again', () => {
-    const page: RegularReading = {
-      ...WINTER,
-      season: null,
-      times: [
-        t({ tefillah: 'mincha_maariv', days: ['fri'], time: '7:00pm', notes: 'Summer only' }),
-        t({ tefillah: 'mincha_maariv', days: ['fri'], time: 'At Candle Lighting', anchor: 'candle_lighting', offsetMinutes: 0, notes: 'Winter only' }),
-      ],
-    }
+  it('applies it as the website has it: summer’s 7:00 PM, winter’s candle lighting', () => {
+    const { minyanim, changes } = applyUpdate(listing, [], compareTimes(listing, page, { season: 'summer', newId }), { newId })
+    expect(show(minyanim)).toEqual(['fri mincha_maariv 7:00 PM summer', 'fri mincha_maariv At candle lighting winter', 'sat shacharis 9:15am'])
+    expect(changes).toEqual([
+      'Changed: mincha maariv · Fri · 7:00 PM, was At Candle Lighting (not after 7:00 PM) (summer)',
+      'Changed: mincha maariv · Fri · At candle lighting, was At Candle Lighting (not after 7:00 PM) (winter)',
+    ])
+  })
+
+  it('a listing with both seasons’ times, as the page has them, agrees', () => {
     const fridays = MEKOR.filter((m) => m.days.includes('fri'))
-    const u = compareTimes(fridays, page, { season: 'summer', newId })
-    expect(brief(u.rows)).toEqual(['fri mincha_maariv 7:00pm same'])
+    const u = compareTimes(fridays, { ...page, times: page.times.slice(0, 2) }, { season: 'summer', newId })
+    expect(seasoned(u.rows)).toEqual(['fri mincha_maariv 7:00pm same · summer', 'fri mincha_maariv At Candle Lighting same · winter'])
     expect(changesAnything(u)).toBe(false)
+  })
+
+  it('a time for one season only takes nothing off the other', () => {
+    const winterOnly: RegularReading = { ...page, times: [page.times[1]] }
+    const u = compareTimes(MEKOR.filter((m) => m.days.includes('fri')), winterOnly, { season: 'winter', newId })
+    expect(seasoned(u.rows)).toEqual(['fri mincha_maariv 7:00pm gone · summer', 'fri mincha_maariv At Candle Lighting same · winter'])
+  })
+
+  it('a rule with a limit isn’t the same rule without it, except on a date it comes to the same minute', () => {
+    const plain = { time: 'At candle lighting', anchor: 'candle_lighting' as const, offsetMinutes: 0 }
+    expect(sameTime(capped, plain)).toBe(false)
+    // Oct 9: candle lighting 6:12 PM, before the 7:00 PM limit.
+    expect(sameTime(capped, plain, ZMANIM['2026-10-09'])).toBe(true)
+    expect(sameTime(capped, { ...plain, notAfter: '19:00' })).toBe(true)
   })
 })
 

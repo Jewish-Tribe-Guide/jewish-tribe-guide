@@ -171,6 +171,15 @@ describe('what a full read found', () => {
     expect(timesReadLines(['sun', 'mon', 'tue', 'thu', 'fri'].map((d) => row(d, 'shacharis', '7:00 AM')))).toEqual(['Shacharis Sun–Tue, Thu, Fri 7:00 AM'])
   })
 
+  it('says which season a time is for, when the page gives both (Mekor, Oct 21)', () => {
+    const rows = [
+      { ...row('fri', 'mincha_maariv', '7:00 PM'), season: 'summer' as const },
+      { ...row('fri', 'mincha_maariv', 'At Candle Lighting'), season: 'winter' as const },
+      { ...row('sun', 'maariv', '6:30 PM'), notes: 'Winter only' },
+    ]
+    expect(timesReadLines(rows)).toEqual(['Maariv Sun 6:30 PM · Winter', 'Mincha & Maariv Fri 7:00 PM · Summer', 'Mincha & Maariv Fri At Candle Lighting · Winter'])
+  })
+
   it('gives the hours the page gives', () => {
     const category = { detailFields: [{ key: 'women_s_hours', label: 'Women’s Hours', type: 'hours' as const }] }
     expect(

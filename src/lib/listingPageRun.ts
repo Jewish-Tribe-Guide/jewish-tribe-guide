@@ -7,7 +7,7 @@ import { menuHash } from '@/lib/menuWatch'
 import { WATCH_FETCH_HEADERS } from '@/lib/websiteWatch'
 import { readShulWeek } from '@/lib/shulWeekReading'
 import { CALENDAR_HEADING, calendarFeeds, calendarLines, calendarWeeks, embeddedEntries, icsEntries, isIcs, type CalendarEntry, type CalendarWeek } from '@/lib/calendarFeed'
-import { applyUpdate, changesAnything, datesBetween, datesHeldOverWebsite, sameTime, weekdayOf, type TimesUpdate } from '@/lib/scheduleUpdate'
+import { applyUpdate, changesAnything, datesBetween, datesHeldOverWebsite, sameTime, seasonOf, weekdayOf, type TimesUpdate } from '@/lib/scheduleUpdate'
 import { dateText, readSchedules, regularMinyanim, schedulesKey, type SpecialSchedule } from '@/lib/schedules'
 import { buildCatalog, readMessage } from '@/lib/messageReader'
 import { fieldsEdit, readFieldChanges } from '@/lib/fieldChanges'
@@ -105,8 +105,11 @@ export type PageProposal = { submission: ResourceSubmission; lines: string[]; ke
  *  off (Oct 19). The paste box asks a person, who can Keep it; here no
  *  one is asked. */
 export function keepUncovered(update: TimesUpdate): TimesUpdate {
-  const read = new Set(update.rows.filter((r) => r.status !== 'gone' && r.status !== 'kept').map((r) => `${r.day} ${r.tefillah}`))
-  return { ...update, rows: update.rows.map((r) => (r.status === 'gone' && !read.has(`${r.day} ${r.tefillah}`) ? { ...r, status: 'kept' } : r)) }
+  // In its season, when the page gives both seasons': a page with only
+  // winter's Mincha takes no summer Mincha off.
+  const read = update.rows.filter((r) => r.status !== 'gone' && r.status !== 'kept')
+  const covered = (g: TimesUpdate['rows'][number]) => read.some((r) => r.day === g.day && r.tefillah === g.tefillah && (!r.season || !g.season || r.season === g.season))
+  return { ...update, rows: update.rows.map((r) => (r.status === 'gone' && !covered(r) ? { ...r, status: 'kept' } : r)) }
 }
 
 const EVENING: readonly Tefillah[] = ['mincha', 'maariv', 'mincha_maariv', 'kabbalas_shabbos']
@@ -117,6 +120,10 @@ const EVENING: readonly Tefillah[] = ['mincha', 'maariv', 'mincha_maariv', 'kabb
 function sameMinyanName(a: Tefillah, b: Tefillah): boolean {
   return a === b || a === 'other' || b === 'other' || (EVENING.includes(a) && EVENING.includes(b))
 }
+
+/** A row for one season (both seasons' times) is listed only by a minyan
+ *  held then: winter's 7:00 PM isn't summer's. */
+const sameSeason = (m: Minyan, r: TimesUpdate['rows'][number]) => !r.season || !seasonOf(m) || seasonOf(m) === r.season
 
 /** A time the page gives that the listing already has, that day at that
  *  time, isn't new. A shul's page gives both seasons at once and the
@@ -130,7 +137,7 @@ export function dropListed(update: TimesUpdate, current: readonly Minyan[], sche
     const dated = /^\d{4}-\d{2}-\d{2}$/.test(r.day)
     const day = dated ? weekdayOf(r.day) : r.day
     return (
-      current.some((m) => m.days.includes(day as Minyan['days'][number]) && sameMinyanName(m.tefillah, r.tefillah) && sameTime(m, r)) ||
+      current.some((m) => m.days.includes(day as Minyan['days'][number]) && sameMinyanName(m.tefillah, r.tefillah) && sameTime(m, r) && sameSeason(m, r)) ||
       (dated && schedules.some((s) => s.minyanim.some((m) => m.on.includes(r.day) && sameMinyanName(m.tefillah, r.tefillah) && sameTime(m, r))))
     )
   }
