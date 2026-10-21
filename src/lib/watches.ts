@@ -75,6 +75,12 @@ export type WatchCheck = {
   list?: { listed: number; matching: number; differences: number; filed: number }
 }
 
+/** A check whose differences were filed, now or before, so they're a
+ *  finding (watchFindings.ts): settled once none of the place's findings
+ *  waits, since the admin updated the listing or skipped it. `waiting`
+ *  unknown, nothing is settled. */
+export const settles = (c: WatchCheck, waiting: number | undefined) => waiting === 0 && c.result === 'differs' && (c.queue === 'filed' || c.queue === 'before')
+
 /** A check as a runner makes it; the run dates it. */
 export type CheckFound = Omit<WatchCheck, 'at'>
 

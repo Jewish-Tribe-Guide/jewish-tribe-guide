@@ -9,7 +9,10 @@ import { useCommunitySlug } from '@/lib/communityContext'
 import { adminBase } from '@/lib/adminNav'
 import { hoursCounts, hoursSection, jobWords, type HoursSection, type PageJob } from '@/lib/hoursJob'
 import { watchHealth, type Watch } from '@/lib/watches'
+import type { Finding } from '@/lib/watchFindings'
+import type { Decided } from '@/lib/watchFindingStore'
 import CollapsibleSection from './CollapsibleSection'
+import FindingCompare, { type Decision } from './FindingCompare'
 
 // ── The Watches tab's Mikvah hours and Shul times pages (the user, Oct 21) ──
 // Every place whose category has named weekly hours (a mikvah's women's,
@@ -26,8 +29,9 @@ import CollapsibleSection from './CollapsibleSection'
 // stopped) or another given, and the place's website is a tap away to see
 // what the reader missed.
 //
-// What a page has that the listing doesn't still goes to the moderation
-// queue, as before: Compare on the job page is a later step.
+// What a page has that the listing doesn't waits here, on its place's row,
+// beside what the listing says (FindingCompare, step 6, Oct 21), not in the
+// moderation queue. "The queue keeps what people send in."
 
 type Page = { watch: Watch; source: string }
 export type HoursPlace = {
@@ -41,7 +45,10 @@ export type HoursPlace = {
   off: boolean
   offSince: string | null
   reason: string | null
-  pending: number
+  /** What its pages (or a shul's newsletter) found, waiting to compare. */
+  findings?: Finding[]
+  /** When its last finding was decided, and how. */
+  decided?: Decided | null
   fields: string[]
   /** Pages found on its website just now, not watched yet. */
   found?: boolean
@@ -59,7 +66,10 @@ function day(iso: string): string {
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`
 const listed = (xs: string[]) => (xs.length < 2 ? xs.join('') : `${xs.slice(0, -1).join(', ')} and ${xs.at(-1)}`)
-const asPlace = (p: HoursPlace) => ({ pages: p.pages.map((x) => x.watch), off: p.off, found: p.found })
+type Settled = ReadonlyMap<string, Decision>
+/** Its findings not decided yet, this visit included. */
+const waitingOf = (p: HoursPlace, settled: Settled) => (p.findings ?? []).filter((f) => !settled.has(f.id))
+const asPlace = (p: HoursPlace, settled: Settled) => ({ pages: p.pages.map((x) => x.watch), off: p.off, found: p.found, waiting: waitingOf(p, settled).length })
 
 /** A page's address without its scheme, for its link. */
 function shortUrl(url: string): string {
@@ -91,8 +101,14 @@ function placeLine(p: HoursPlace, section: HoursSection, words: Words): string |
   const when = at ? `Read ${day(at)}: ` : ''
   if (section === 'to_check') {
     const n = checks.reduce((sum, c) => sum + c.differences.length, 0)
-    const queued = p.pending > 0 || checks.some((c) => c.queue === 'filed' || c.queue === 'waiting')
-    return `${when}${n ? plural(n, 'difference') : 'something to check'} from the listing${queued ? ', in the moderation queue' : ''}.`
+    // Not filed: someone's suggestion for it waits in the queue already.
+    const visitor = !p.findings?.length && checks.some((c) => c.queue === 'waiting')
+    const what = n ? `${plural(n, 'difference')} from the listing` : p.findings?.length ? 'differs from the listing' : 'something to check from the listing'
+    return `${when}${what}${visitor ? '. Not shown here: someone’s suggestion for it waits in the moderation queue' : ''}.`
+  }
+  // Decided here, and its pages still say what they said.
+  if (p.decided && checks.some((c) => c.result === 'differs')) {
+    return p.decided.status === 'approved' ? `Updated on the listing ${day(p.decided.at)}.` : `Skipped ${day(p.decided.at)}: shown again if its page changes.`
   }
   return `${when}${words.same}.`
 }
@@ -179,7 +195,11 @@ function PlaceRow({
   queueHref,
   showFields,
   words,
+  token,
+  jobName,
+  settled,
   onAct,
+  onDecided,
 }: {
   place: HoursPlace
   section: HoursSection
@@ -188,8 +208,13 @@ function PlaceRow({
   words: Words
   busy: boolean
   queueHref: string
+  token: string
+  jobName: string
+  settled: Settled
   onAct: (body: Record<string, unknown>) => void
+  onDecided: (f: Finding, d: Decision) => void
 }) {
+  const community = useCommunitySlug()
   const [open, setOpen] = useState(false)
   const [giving, setGiving] = useState(false)
   const line = placeLine(p, section, words)
@@ -208,6 +233,15 @@ function PlaceRow({
           </svg>
         </span>
       </button>
+      {(p.findings?.length ?? 0) > 0 && (
+        <ul className="mt-2 space-y-2">
+          {p.findings!.map((f) => (
+            <li key={f.id}>
+              <FindingCompare finding={f} token={token} community={community} jobName={jobName} decided={settled.get(f.id)} onDecided={(d) => onDecided(f, d)} />
+            </li>
+          ))}
+        </ul>
+      )}
       {open && (
         <div className="mt-2 space-y-2">
           {p.website && (
@@ -241,15 +275,11 @@ function PlaceRow({
               ))}
             </ul>
           )}
-          {section === 'to_check' && (
-            <p className="text-sm text-slate-700">
-              {p.pending ? (
-                <Link href={queueHref} className="font-semibold text-primary hover:underline">
-                  Approve or reject it in the moderation queue
-                </Link>
-              ) : (
-                'Filed to the moderation queue before, and settled there.'
-              )}
+          {section === 'to_check' && !p.findings?.length && p.pages.some((x) => x.watch.lastCheck?.queue === 'waiting') && (
+            <p className="text-sm">
+              <Link href={queueHref} className="font-semibold text-primary hover:underline">
+                See it in the moderation queue
+              </Link>
             </p>
           )}
           {section === 'cant_read' && (
@@ -296,6 +326,8 @@ export default function HoursJob({ token, job = 'hours' }: { token: string; job?
   // A row acted on stays in the section it was in until the page reloads,
   // so it doesn't jump away under the admin's hand.
   const [kept, setKept] = useState<ReadonlyMap<string, HoursSection>>(new Map())
+  // Findings updated or skipped this visit.
+  const [settled, setSettled] = useState<Settled>(new Map())
 
   const load = useCallback(async () => {
     setError(null)
@@ -324,6 +356,14 @@ export default function HoursJob({ token, job = 'hours' }: { token: string; job?
         return { ...x, pages: res.pages ?? x.pages, stopped: res.stopped ?? x.stopped, off: res.off ?? x.off, reason: res.reason ?? (res.pages?.length ? null : x.reason) }
       }
       setData((d) => d && { ...d, places: d.places.map((x) => (x.id === p.id ? next(x) : x)) })
+      // A read that filed something: fetch it, to compare here. Without the
+      // website search (?counts), which only places with no page need.
+      const pages = res.watch ? [res.watch] : (res.pages ?? []).map((x) => x.watch)
+      if (pages.some((w) => w.lastCheck?.queue === 'filed')) {
+        const fresh = await fetchJson<Loaded>(withCommunity(`${api}${api.includes('?') ? '&' : '?'}counts`, community), { headers: { Authorization: `Bearer ${token}` } }, '')
+        const got = fresh.places.find((x) => x.id === p.id)
+        if (got) setData((d) => d && { ...d, places: d.places.map((x) => (x.id === p.id ? { ...x, findings: got.findings, decided: got.decided } : x)) })
+      }
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : 'Could not save.')
     } finally {
@@ -339,9 +379,16 @@ export default function HoursJob({ token, job = 'hours' }: { token: string; job?
   if (error) return <div className="space-y-3">{back}<p className="bg-red-50 border border-red-200 rounded-md p-3 text-sm text-red-700">{error}</p></div>
   if (!data) return <div className="space-y-3">{back}<p className="text-sm text-muted">Loading places…</p></div>
 
-  const sectionOf = (p: HoursPlace) => kept.get(p.id) ?? hoursSection(asPlace(p), now)
+  const placeOf = (p: HoursPlace) => asPlace(p, settled)
+  const sectionOf = (p: HoursPlace) => kept.get(p.id) ?? hoursSection(placeOf(p), now)
   const inSection = (s: HoursSection) => data.places.filter((p) => sectionOf(p) === s)
-  const counts = hoursCounts(data.places.map(asPlace), now)
+  const counts = hoursCounts(data.places.map(placeOf), now)
+  // Updated or skipped, it says so where it was, and stays there till reload.
+  const decide = (p: HoursPlace, f: Finding, d: Decision) => {
+    setKept((k) => (k.has(p.id) ? k : new Map(k).set(p.id, sectionOf(p))))
+    setSettled((m) => new Map(m).set(f.id, d))
+    setData((x) => x && { ...x, places: x.places.map((y) => (y.id === p.id ? { ...y, decided: { at: new Date().toISOString(), status: d } } : y)) })
+  }
   const off = inSection('off')
   const waiting = inSection('waiting')
   const cantRead = inSection('cant_read')
@@ -353,7 +400,21 @@ export default function HoursJob({ token, job = 'hours' }: { token: string; job?
     <ul className="divide-y divide-slate-100">
       {list.map((p) => (
         // Placed by where it was; its line and buttons say what it is now.
-        <PlaceRow key={p.id} place={p} section={hoursSection(asPlace(p), now)} now={now} busy={busy === p.id} queueHref={queueHref} showFields={!sameFields} words={words} onAct={(body) => void act(p, sectionOf(p), body)} />
+        <PlaceRow
+          key={p.id}
+          place={p}
+          section={hoursSection(placeOf(p), now)}
+          now={now}
+          busy={busy === p.id}
+          queueHref={queueHref}
+          showFields={!sameFields}
+          words={words}
+          token={token}
+          jobName={data.name}
+          settled={settled}
+          onAct={(body) => void act(p, sectionOf(p), body)}
+          onDecided={(f, d) => decide(p, f, d)}
+        />
       ))}
     </ul>
   )
@@ -375,7 +436,7 @@ export default function HoursJob({ token, job = 'hours' }: { token: string; job?
         <p className="text-sm text-muted">
           {plural(data.places.length, 'place')}.{' '}
           {sameFields && fields.length > 0 ? `${listed(fields)}, each read` : 'Each read'} every morning from the pages on its own website that give
-          them. What differs from the listing goes to the moderation queue for you to approve.
+          them. What differs from the listing waits on its row, beside what the listing says: Compare it, then update the listing or skip it.
         </p>
       </div>
       {!data.available && <p className="bg-amber-50 border border-amber-200 rounded-md p-3 text-sm text-amber-800">Reading websites needs database migration 070.</p>}

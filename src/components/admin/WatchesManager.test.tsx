@@ -18,7 +18,9 @@ vi.mock('@/lib/fetchJson', () => ({ fetchJson: vi.fn(), parseOkJson: vi.fn() }))
 
 const NOW = Date.now()
 const ago = (days: number) => new Date(NOW - days * 86_400_000).toISOString()
-const SHUL = { id: 'shul-1', name: 'Lower Merion Synagogue', categoryLabel: 'Synagogue', reads: 'times' }
+// Step 6: what's read for a shul waits on the Shul times page; a place no
+// job reads, in the moderation queue.
+const SHUL = { id: 'shul-1', name: 'Lower Merion Synagogue', categoryLabel: 'Synagogue', reads: 'times', job: 'Shul times' }
 const MIKVAH = { id: 'mikvah-1', name: 'Mikvah Ohel Rivkah', categoryLabel: 'Mikvah', reads: 'hours' }
 
 function watch(over: Partial<Watch>): Watch {
@@ -190,6 +192,24 @@ describe('WatchesManager', () => {
     expect(screen.getByTestId('watch-summary')).toHaveTextContent('1 watches')
     expect(names(screen.getByRole('region', { name: 'Shul’s times' }))).toEqual(['Lower Merion Synagogue'])
     expect(screen.queryByRole('region', { name: 'Hours' })).toBeNull()
+  })
+
+  // Step 6: a job row counts a place as its page does. A difference decided
+  // on the job page is checked; one with a finding waiting there is to check.
+  it('a job row counts what waits on its page as to check, and what was decided there as checked', async () => {
+    const differs = { at: ago(0.1), what: 'hours' as const, from: null, result: 'differs' as const, read: [], differences: ['Women’s Hours differ'], queue: 'before' as const }
+    const a = watch({ id: 'a', url: 'https://a.example/', resourceId: 'm1', createdBy: 'listing pages (found)', lastCheck: differs })
+    const b = watch({ id: 'b', url: 'https://b.example/', resourceId: 'm2', createdBy: 'listing pages (found)', lastCheck: { ...differs, queue: 'filed' as const } })
+    const r = watch({ id: 'r', url: 'https://refuah.com/hospitals/x', resourceId: 'h1', lastCheck: { ...differs, what: 'contacts' as const, queue: 'filed' as const } })
+    await renderTab([a, b, r], {
+      hours: [
+        { id: 'm1', pages: [{ watch: a }], off: false, findings: [] },
+        { id: 'm2', pages: [{ watch: b }], off: false, findings: [{ id: 's-m2' }] },
+      ],
+      hospitals: [{ id: 'h1', watch: r, notOnRefuah: false, findings: [] }],
+    })
+    expect(jobRow('hours')).toHaveTextContent('1checked1to check')
+    expect(jobRow('hospitals')).toHaveTextContent('1checked0to check')
   })
 
   // Oct 21: a shul's pages are on the Shul times page, and one an admin
@@ -368,7 +388,7 @@ describe('WatchesManager', () => {
       expect([...form.querySelectorAll('#watch-add-places option')].map((o) => o.getAttribute('value'))).toEqual(['Lower Merion Synagogue'])
       await user.type(within(form).getByLabelText(/Which place/), 'Lower Merion Synagogue')
       await user.type(within(form).getByLabelText(/Where does the guide read it/), 'lms.org/davening')
-      expect(within(form).getByTestId('add-watch-plan')).toHaveTextContent('Every morning the guide reads lms.org/davening, and its calendar if it has one. Times that differ from Lower Merion Synagogue’s go to the moderation queue, with the page beside them; a calendar is read a week at a time, and its week goes as this week’s schedule.')
+      expect(within(form).getByTestId('add-watch-plan')).toHaveTextContent('Every morning the guide reads lms.org/davening, and its calendar if it has one. Times that differ from Lower Merion Synagogue’s wait on the Shul times page, beside what the listing says; a calendar is read a week at a time, and its week goes as this week’s schedule.')
       expect(within(form).getByTestId('add-watch-plan')).toHaveTextContent('the newsletter wins')
       await user.click(within(form).getByRole('button', { name: 'Start watching' }))
       expect(posts).toEqual([{ url: expect.stringContaining('/api/admin/watches'), body: { action: 'add', purpose: 'times', url: 'lms.org/davening', resourceId: 'shul-1' } }])

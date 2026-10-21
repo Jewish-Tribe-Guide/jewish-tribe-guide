@@ -1,5 +1,5 @@
 import { LISTING_PAGE_FOUND_CREATOR, pageReadsFor } from './listingPageWatch'
-import { normalizeWatchUrl, watchHealth, type Watch } from './watches'
+import { normalizeWatchUrl, settles, watchHealth, type Watch } from './watches'
 import type { HoursPage } from './hoursPages'
 import type { JobCounts } from './watchJobs'
 import type { CategoryConfig } from './categories'
@@ -159,8 +159,11 @@ export function hoursWatchChanges(
 export type HoursSection = 'to_check' | 'waiting' | 'checked' | 'cant_read' | 'off'
 
 /** `found`: no page watched yet, but searching its website just now found
- *  some, which the morning's run will watch and read. */
-export type HoursPlace = { pages: Watch[]; off: boolean; found?: boolean }
+ *  some, which the morning's run will watch and read. `waiting`: how many
+ *  of its findings wait on the job page (watchFindings.ts); given, a page
+ *  that differs only because of one already decided (Update or Skip) is
+ *  settled, not to check. */
+export type HoursPlace = { pages: Watch[]; off: boolean; found?: boolean; waiting?: number }
 
 const loads = (w: Watch, now: number) => {
   const state = watchHealth(w, now).state
@@ -169,12 +172,15 @@ const loads = (w: Watch, now: number) => {
 
 export function hoursSection(p: HoursPlace, now: number): HoursSection {
   if (p.off) return 'off'
+  // A finding to compare, whatever its pages say this morning.
+  if (p.waiting) return 'to_check'
   const live = p.pages.filter((w) => w.active)
   if (!live.length) return p.pages.length ? 'off' : p.found ? 'waiting' : 'cant_read'
   const ok = live.filter((w) => loads(w, now))
   if (!ok.length) return 'cant_read'
   const results = ok.map((w) => (w.lastRunAt && w.lastCheck ? w.lastCheck.result : null))
-  if (results.some((r) => r === 'differs' || r === 'unsure')) return 'to_check'
+  const open = ok.some((w) => w.lastRunAt && w.lastCheck && (w.lastCheck.result === 'differs' || w.lastCheck.result === 'unsure') && !settles(w.lastCheck, p.waiting))
+  if (open) return 'to_check'
   if (results.some((r) => r === null)) return 'waiting'
   if (results.every((r) => r === 'nothing' || r === 'unreadable')) return 'cant_read'
   return 'checked'

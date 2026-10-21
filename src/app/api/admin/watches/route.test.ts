@@ -64,7 +64,7 @@ describe('/api/admin/watches', () => {
   it('lists the watches and the listings a page can keep current', async () => {
     const body = await (await GET(req('GET'))).json()
     expect(body).toMatchObject({ ok: true, available: true, watches: [] })
-    expect(body.listings).toEqual([{ id: SHUL, name: 'Lower Merion Synagogue', categoryLabel: 'Synagogue', reads: null }])
+    expect(body.listings).toEqual([{ id: SHUL, name: 'Lower Merion Synagogue', categoryLabel: 'Synagogue', reads: null, job: null }])
   })
 
   // Oct 19: "Add a watch" offers a place by what its own page can keep
@@ -75,6 +75,8 @@ describe('/api/admin/watches', () => {
     ])
     const body = await (await GET(req('GET'))).json()
     expect(body.listings[0].reads).toBe('times')
+    // Step 6: and where what's read for it waits, so "Add a watch" can say.
+    expect(body.listings[0].job).toBe('Shul times')
   })
 
   it('adds a page typed without https, tied to a listing, and checks it at once', async () => {

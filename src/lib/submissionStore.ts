@@ -14,6 +14,7 @@ import { withReviewEdits } from './reviewEdits'
 import { isCommunityEdit, submissionSource } from './submissionSource'
 import { listEruvimForAdmin, updateEruv } from './eruvStore'
 import type { EruvSuggestion } from './eruvSuggestion'
+import { jobCategories, keepOnly, onAJobPage, watchNameOf } from './watchFindings'
 import type {
   ResourceRow,
   ResourceSubmission,
@@ -108,10 +109,15 @@ export async function listSubmissionsByStatus(
     .order(status === 'pending' ? 'created_at' : 'reviewed_at', { ascending: false })
 
   if (error) throw new Error(`Failed to load submissions: ${error.message}`)
-  const submissions = data as SubmissionRow[]
+  const all = data as SubmissionRow[]
 
   // Resolve category labels for display.
   const categories = await listCategories(community)
+  // What a watch found waits on the job page that reads the place, next to
+  // what the listing says, not here: "The queue keeps what people send in"
+  // (watchFindings.ts). Decided ones stay in the history either way.
+  const jobs = status === 'pending' && all.some((s) => watchNameOf(s)) ? jobCategories(categories) : null
+  const submissions = jobs ? all.filter((s) => !onAJobPage(s, (s.payload as { category?: string }).category, jobs)) : all
   const labelById = new Map(categories.map((c) => [c.id, c.label]))
   const categoryLabel = (s: SubmissionRow, current: ResourceRow | null): string | undefined => {
     if (s.target_type === 'category') return (s.payload as CategorySubmissionPayload).label
@@ -360,7 +366,16 @@ export class ReviewEditError extends Error {}
 // `edited`, when given: the admin's copy of the listing, fixed in the opened
 // card before approving (reviewEdits.ts). It's what goes live, and it's
 // saved on the submission with a record of what the admin changed.
-export async function approveSubmission(id: string, community?: string, reviewedBy?: string, edited?: unknown): Promise<SubmissionRow> {
+// `only`, instead: the lines of a watch's finding the admin ticked on its job
+// page (watchFindings.ts); every other line stays as the listing says now,
+// recorded the same way.
+export async function approveSubmission(
+  id: string,
+  community?: string,
+  reviewedBy?: string,
+  edited?: unknown,
+  only?: readonly string[],
+): Promise<SubmissionRow> {
   const supabase = getAdminClient()
 
   const { data: sub, error: subErr } = await supabase
@@ -376,6 +391,16 @@ export async function approveSubmission(id: string, community?: string, reviewed
   }
 
   let savedPayload: Record<string, unknown> | null = null
+  if (only !== undefined) {
+    if (submission.target_type !== 'listing' || submission.operation !== 'update' || !submission.target_id) {
+      throw new ReviewEditError('Only an edit can be approved line by line.')
+    }
+    const { data: row, error: rowErr } = await supabase.from('resource').select('*').eq('community_id', submission.community_id).eq('id', submission.target_id).single()
+    if (rowErr || !row) throw new ReviewEditError('The listing this changes couldn’t be found.')
+    const sent = submission.payload as unknown as ResourceSubmission
+    const category = await getCategoryById(submission.community_id, sent.category)
+    edited = keepOnly(sent, row as ResourceRow, only, category?.detailFields ?? [])
+  }
   if (edited !== undefined) {
     if (submission.target_type !== 'listing' || submission.operation === 'delete') {
       throw new ReviewEditError('Only a new listing or an edit can be changed before approving.')

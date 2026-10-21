@@ -1,11 +1,11 @@
 import { getAdminUserForCommunity } from '@/lib/adminAuth'
 import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
-import { getAdminClient } from '@/lib/supabase/admin'
+import { jobFindings } from '@/lib/watchFindingStore'
 import { addWatch, listWatches, removeWatch, updateWatch } from '@/lib/watchStore'
 import { runAndRecord } from '@/lib/watchRunner'
 import { normalizeWatchUrl, watchHealth, type Watch } from '@/lib/watches'
 import { UUID } from '@/lib/itemMarkRoutes'
-import { LISTING_PAGE_WATCH_CREATOR, LISTING_PAGE_WATCH_NAME, isListingPageWatch, listingPageLabel, pageReadsFor } from '@/lib/listingPageWatch'
+import { LISTING_PAGE_WATCH_CREATOR, isListingPageWatch, listingPageLabel, pageReadsFor } from '@/lib/listingPageWatch'
 import { HOURS_FOUND_CREATOR, HOURS_OFF_CREATOR, PAGE_STOPPED_CREATOR, foundPageLabel, hoursJobName, hoursOffUrl, isHoursOff, isStoppedPage, jobWords, samePage, sourceLine, type PageJob } from '@/lib/hoursJob'
 import { SEARCH_DEADLINE_MS, hoursJobPlaces, searchHoursPages, websiteOf } from '@/lib/hoursJobRun'
 import { listingSlug } from '@/lib/listingSlug'
@@ -17,8 +17,9 @@ import type { DirectoryResource } from '@/types'
 //      user, Oct 21): every place with named weekly hours (a mikvah's), the
 //      pages it's read from and where each came from (found from its
 //      website, or added by hand), what each one's last read found (its
-//      watch's `lastCheck`), and how many of their suggestions wait in the
-//      moderation queue. A place with no page says why: its website is
+//      watch's `lastCheck`), what they found that differs from the listing,
+//      waiting to compare (watchFindings.ts), and when the place's last
+//      one was decided. A place with no page says why: its website is
 //      searched again now (fetches only, no AI). Admin only.
 //      `?counts` (the Watches tab's row): the same, but no search, so the
 //      tab isn't kept waiting on a slow website; its reasons are null.
@@ -93,22 +94,9 @@ export async function GET(request: Request) {
     const job = jobOf(request)
     const [{ watches, available }, { categories, places }] = await Promise.all([listWatches(community.slug), hoursJobPlaces(community.slug, job)])
 
-    // Their websites' suggestions waiting in the queue, by place.
-    const pending = new Map<string, number>()
-    if (places.length) {
-      const { data, error } = await getAdminClient()
-        .from('submission')
-        .select('target_id')
-        .eq('community_id', community.slug)
-        .eq('status', 'pending')
-        .eq('submitted_by->>name', LISTING_PAGE_WATCH_NAME)
-        .in(
-          'target_id',
-          places.map((p) => p.id),
-        )
-      if (error) throw new Error(error.message)
-      for (const s of (data ?? []) as { target_id: string }[]) pending.set(s.target_id, (pending.get(s.target_id) ?? 0) + 1)
-    }
+    // What their pages (and a shul's newsletter) found, waiting here to
+    // compare, and when each place's last one was decided (watchFindings.ts).
+    const { findings, decided } = await jobFindings(community.slug, job, categories)
 
     const rows = await Promise.all(
       places.map(async (p) => {
@@ -126,7 +114,8 @@ export async function GET(request: Request) {
           offSince: marker?.createdAt ?? null,
           reason,
           found: reason === jobWords(job).found,
-          pending: pending.get(p.id) ?? 0,
+          findings: findings.filter((f) => f.targetId === p.id),
+          decided: decided.get(p.id) ?? null,
           fields: category.detailFields.filter((f) => (job === 'times' ? f.type === 'minyanim' : f.type === 'hours' && f.key !== 'hours')).map((f) => f.label),
         }
       }),

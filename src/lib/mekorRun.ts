@@ -10,6 +10,7 @@
 
 import { getAdminClient } from '@/lib/supabase/admin'
 import { sendWatchDigest, type WatchDigestItem } from '@/lib/email'
+import { findingPage } from '@/lib/watchFindings'
 import { submitListingCreate, submitListingUpdate } from '@/lib/submissionStore'
 import { WATCH_FETCH_HEADERS } from '@/lib/websiteWatch'
 import { askGoogleIfOpen } from '@/lib/keystoneRun'
@@ -219,7 +220,7 @@ export async function runMekorWatch(community: string, url: string, { dry = fals
     items.push(describe(f))
   }
 
-  await sendWatchDigest(community, 'Mekor Habracha’s list', items).catch((err) => console.error('[watch-mekor] digest failed:', err))
+  await sendWatchDigest(community, 'Mekor Habracha’s list', items, findingPage(community, 'kosher')).catch((err) => console.error('[watch-mekor] digest failed:', err))
   const confirmed = await confirmFromSource(community, agree, MEKOR_NAME)
 
   return { ok: true, entries: entries.length, findings: findings.length, filed: items.length, matching: agree.length, closedOnGoogle: closed, differences, confirmed }

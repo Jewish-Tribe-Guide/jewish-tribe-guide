@@ -10,7 +10,10 @@ import { adminBase } from '@/lib/adminNav'
 import { milesText } from '@/lib/geo'
 import { hospitalCounts, hospitalSection, type HospitalSection } from '@/lib/watchJobs'
 import type { Watch } from '@/lib/watches'
+import type { Finding } from '@/lib/watchFindings'
+import type { Decided } from '@/lib/watchFindingStore'
 import CollapsibleSection from './CollapsibleSection'
+import FindingCompare, { type Decision } from './FindingCompare'
 
 // ── The Watches tab's Hospitals page (the user, Oct 21) ─────────────────────
 // Every hospital in the guide, each matched to its Refuah page by where it
@@ -19,8 +22,9 @@ import CollapsibleSection from './CollapsibleSection'
 // can be given its page by hand, or said not to be on Refuah; one matched
 // wrong can be given a different one; any can be turned off and back on.
 //
-// What Refuah has that the listing doesn't still goes to the moderation
-// queue, as before: Compare on the job page is a later step.
+// What Refuah has that the listing doesn't waits here, on its row, beside
+// what the listing says (FindingCompare, step 6, Oct 21), not in the
+// moderation queue.
 
 type Refuah = { id: string; name: string; street: string | null; url: string }
 export type Hospital = {
@@ -33,8 +37,14 @@ export type Hospital = {
   line: string
   refuah: Refuah | null
   nearby: (Refuah & { miles: number })[]
-  pending: number
+  /** What Refuah has that the listing doesn't, waiting to compare. */
+  findings?: Finding[]
+  /** When its last finding was decided, and how. */
+  decided?: Decided | null
 }
+type Settled = ReadonlyMap<string, Decision>
+/** As the sections count it: its findings not decided yet, this visit included. */
+const stateOf = (h: Hospital, settled: Settled) => ({ ...h, waiting: (h.findings ?? []).filter((f) => !settled.has(f.id)).length })
 type Loaded = { available: boolean; refuahError: string | null; hospitals: Hospital[] }
 
 const BUTTON = 'rounded border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50'
@@ -59,7 +69,12 @@ function readLine(h: Hospital, section: HospitalSection): string | null {
   if (c.result === 'nothing') return `${when}Refuah lists no contacts there yet.`
   if (c.result === 'differs') {
     const n = c.differences.length
-    return `${when}${n ? plural(n, 'difference') : 'differences'} from the listing${h.pending || c.queue === 'filed' || c.queue === 'waiting' ? ', in the moderation queue' : ''}.`
+    // Decided here, and Refuah still says what it said.
+    if (section === 'checked' && h.decided) {
+      return h.decided.status === 'approved' ? `Updated on the listing ${day(h.decided.at)}.` : `Skipped ${day(h.decided.at)}: shown again if Refuah changes.`
+    }
+    const visitor = !h.findings?.length && c.queue === 'waiting'
+    return `${when}${n ? plural(n, 'difference') : 'differences'} from the listing${visitor ? '. Not shown here: someone’s suggestion for it waits in the moderation queue' : ''}.`
   }
   return `${when}${c.read[0] ? `${c.read[0]}, ` : ''}all on the listing.`
 }
@@ -113,14 +128,21 @@ function HospitalRow({
   section,
   busy,
   queueHref,
+  token,
+  settled,
   onAct,
+  onDecided,
 }: {
   hospital: Hospital
   section: HospitalSection
   busy: boolean
   queueHref: string
+  token: string
+  settled: Settled
   onAct: (body: Record<string, unknown>) => void
+  onDecided: (f: Finding, d: Decision) => void
 }) {
+  const community = useCommunitySlug()
   const [open, setOpen] = useState(false)
   const [choosing, setChoosing] = useState(false)
   const read = readLine(h, section)
@@ -139,6 +161,15 @@ function HospitalRow({
           </svg>
         </span>
       </button>
+      {(h.findings?.length ?? 0) > 0 && (
+        <ul className="mt-2 space-y-2">
+          {h.findings!.map((f) => (
+            <li key={f.id}>
+              <FindingCompare finding={f} token={token} community={community} jobName="Hospitals" decided={settled.get(f.id)} onDecided={(d) => onDecided(f, d)} />
+            </li>
+          ))}
+        </ul>
+      )}
       {open && (
         <div className="mt-2 space-y-2">
           {h.watch && (
@@ -156,15 +187,11 @@ function HospitalRow({
               ))}
             </ul>
           )}
-          {section === 'to_check' && (
-            <p className="text-sm text-slate-700">
-              {h.pending ? (
-                <Link href={queueHref} className="font-semibold text-primary hover:underline">
-                  Approve or reject it in the moderation queue
-                </Link>
-              ) : (
-                'Filed to the moderation queue before, and settled there.'
-              )}
+          {section === 'to_check' && !h.findings?.length && c?.queue === 'waiting' && (
+            <p className="text-sm">
+              <Link href={queueHref} className="font-semibold text-primary hover:underline">
+                See it in the moderation queue
+              </Link>
             </p>
           )}
           {section === 'nothing' && (
@@ -218,6 +245,8 @@ export default function HospitalsJob({ token }: { token: string }) {
   // A row acted on stays in the section it was in until the page reloads,
   // so it doesn't jump away under the admin's hand.
   const [kept, setKept] = useState<ReadonlyMap<string, HospitalSection>>(new Map())
+  // Findings updated or skipped this visit.
+  const [settled, setSettled] = useState<Settled>(new Map())
 
   const load = useCallback(async () => {
     setError(null)
@@ -247,6 +276,12 @@ export default function HospitalsJob({ token }: { token: string }) {
         return
       }
       setData((d) => d && { ...d, hospitals: d.hospitals.map((x) => (x.id === h.id ? { ...x, watch: res.watch === undefined ? x.watch : res.watch, notOnRefuah: res.notOnRefuah ?? x.notOnRefuah } : x)) })
+      // A read that filed something: fetch it, to compare here.
+      if (res.watch?.lastCheck?.queue === 'filed') {
+        const fresh = await fetchJson<Loaded>(withCommunity('/api/admin/watches/hospitals', community), { headers: { Authorization: `Bearer ${token}` } }, '')
+        const got = fresh.hospitals.find((x) => x.id === h.id)
+        if (got) setData((d) => d && { ...d, hospitals: d.hospitals.map((x) => (x.id === h.id ? { ...x, findings: got.findings, decided: got.decided } : x)) })
+      }
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : 'Could not save.')
     } finally {
@@ -262,9 +297,16 @@ export default function HospitalsJob({ token }: { token: string }) {
   if (error) return <div className="space-y-3">{back}<p className="bg-red-50 border border-red-200 rounded-md p-3 text-sm text-red-700">{error}</p></div>
   if (!data) return <div className="space-y-3">{back}<p className="text-sm text-muted">Loading hospitals…</p></div>
 
-  const sectionOf = (h: Hospital) => kept.get(h.id) ?? hospitalSection(h, now)
+  const liveSection = (h: Hospital) => hospitalSection(stateOf(h, settled), now)
+  const sectionOf = (h: Hospital) => kept.get(h.id) ?? liveSection(h)
   const inSection = (s: HospitalSection) => data.hospitals.filter((h) => sectionOf(h) === s)
-  const counts = hospitalCounts(data.hospitals, now)
+  const counts = hospitalCounts(data.hospitals.map((h) => stateOf(h, settled)), now)
+  // Updated or skipped, it says so where it was, and stays there till reload.
+  const decide = (h: Hospital, f: Finding, d: Decision) => {
+    setKept((k) => (k.has(h.id) ? k : new Map(k).set(h.id, sectionOf(h))))
+    setSettled((m) => new Map(m).set(f.id, d))
+    setData((x) => x && { ...x, hospitals: x.hospitals.map((y) => (y.id === h.id ? { ...y, decided: { at: new Date().toISOString(), status: d } } : y)) })
+  }
   const off = inSection('off')
   const waiting = inSection('waiting')
   const queueHref = adminBase(community)
@@ -272,7 +314,17 @@ export default function HospitalsJob({ token }: { token: string }) {
     <ul className="divide-y divide-slate-100">
       {list.map((h) => (
         // Placed by where it was; its line and buttons say what it is now.
-        <HospitalRow key={h.id} hospital={h} section={hospitalSection(h, now)} busy={busy === h.id} queueHref={queueHref} onAct={(body) => void act(h, sectionOf(h), body)} />
+        <HospitalRow
+          key={h.id}
+          hospital={h}
+          section={liveSection(h)}
+          busy={busy === h.id}
+          queueHref={queueHref}
+          token={token}
+          settled={settled}
+          onAct={(body) => void act(h, sectionOf(h), body)}
+          onDecided={(f, d) => decide(h, f, d)}
+        />
       ))}
     </ul>
   )
@@ -293,7 +345,7 @@ export default function HospitalsJob({ token }: { token: string }) {
         <h2 className="text-lg font-semibold text-slate-900">Hospitals</h2>
         <p className="text-sm text-muted">
           {plural(data.hospitals.length, 'hospital')}. Each matched to Refuah by where it is on the map, and read every morning. What Refuah has that a
-          listing doesn&rsquo;t goes to the moderation queue for you to approve.
+          listing doesn&rsquo;t waits on its row, beside what the listing says: Compare it, then update the listing or skip it.
         </p>
       </div>
       {!data.available && <p className="bg-amber-50 border border-amber-200 rounded-md p-3 text-sm text-amber-800">Reading Refuah needs database migration 070.</p>}

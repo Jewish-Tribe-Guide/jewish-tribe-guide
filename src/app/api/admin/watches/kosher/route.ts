@@ -3,7 +3,10 @@ import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore
 import { getAdminClient } from '@/lib/supabase/admin'
 import { listWatches } from '@/lib/watchStore'
 import type { Watch } from '@/lib/watches'
-import { KEYSTONE_LIST_URL, KEYSTONE_WATCH_NAME, submissionKey as keystoneSubmissionKey } from '@/lib/keystoneWatch'
+import { KEYSTONE_LIST_URL, KEYSTONE_WATCH_NAME, baseName, submissionKey as keystoneSubmissionKey } from '@/lib/keystoneWatch'
+import { listCategories } from '@/lib/categoryStore'
+import { jobFindings } from '@/lib/watchFindingStore'
+import type { Finding } from '@/lib/watchFindings'
 import { MEKOR_LIST_URL, MEKOR_WATCH_NAME, isMekorList, submissionKey as mekorSubmissionKey, type GuideListing } from '@/lib/mekorWatch'
 import { readKeystoneList } from '@/lib/keystoneRun'
 import { CATEGORIES, readMekorList } from '@/lib/mekorRun'
@@ -16,10 +19,11 @@ import { routes } from '@/lib/routes'
 //     now, and every food place in the guide with what each list says about
 //     it next to what the listing says (kosherJob.ts). What each difference
 //     became comes from the suggestions those lists' daily reads filed: in
-//     the queue, decided there, or to be filed by tomorrow morning's read.
+//     here to compare, decided before, or to be filed by tomorrow morning's
+//     read; what's filed comes with each place, as `findings`
+//     (watchFindings.ts), and `others` holds any that no longer match one.
 //     A list with no watch is offered to start; a paused one isn't read.
-//     Reads only; the lists' own reads still file to the moderation queue.
-//     Admin only.
+//     Reads only. Admin only.
 
 export const maxDuration = 60
 
@@ -58,7 +62,7 @@ export async function GET(request: Request) {
       if (error) throw new Error(error.message)
       return (data ?? []) as Submission[]
     }
-    const [{ watches, available }, listingRows, keystoneFiled, mekorFiled] = await Promise.all([
+    const [{ watches, available }, listingRows, keystoneFiled, mekorFiled, { findings, decided }] = await Promise.all([
       listWatches(slug),
       supabase
         .from('resource')
@@ -68,6 +72,8 @@ export async function GET(request: Request) {
         .in('category', CATEGORIES),
       filedBy(KEYSTONE_WATCH_NAME),
       filedBy(MEKOR_WATCH_NAME),
+      // What they filed, waiting here to compare (watchFindings.ts).
+      listCategories(slug).then((categories) => jobFindings(slug, 'kosher', categories)),
     ])
     if (listingRows.error) throw new Error(listingRows.error.message)
 
@@ -103,13 +109,32 @@ export async function GET(request: Request) {
       }
     })
 
+    // Each finding beside its place: a listing's by its id, a new place's
+    // by its name. One that matches neither now (the list changed since)
+    // still waits, on its own.
+    const placed = new Set<string>()
+    const take = (match: (f: Finding) => boolean) =>
+      findings.filter((f) => {
+        if (placed.has(f.id) || !match(f)) return false
+        placed.add(f.id)
+        return true
+      })
+    const withFindings = places.map((p) => {
+      const own = take((f) => f.targetId === p.id)
+      return { ...p, href: routes.listing(slug, p.category, listingSlug(p)), findings: own, waiting: own.length, decided: decided.get(p.id) ?? null }
+    })
+    const newWithFindings = newPlaces.map((n) => ({ ...n, findings: take((f) => f.operation === 'create' && baseName(f.name) === baseName(n.name)) }))
+    const others = findings.filter((f) => !placed.has(f.id))
+    const counts = kosherCounts(withFindings, newPlaces, lists.filter((l) => l.error).length)
+
     return Response.json({
       ok: true,
       available,
       lists,
-      counts: kosherCounts(places, newPlaces, lists.filter((l) => l.error).length),
-      places: places.map((p) => ({ ...p, href: routes.listing(slug, p.category, listingSlug(p)) })),
-      newPlaces,
+      counts: { ...counts, toCheck: counts.toCheck + others.length },
+      places: withFindings,
+      newPlaces: newWithFindings,
+      others,
     })
   } catch (err) {
     console.error('[admin/watches/kosher] GET failed:', err)

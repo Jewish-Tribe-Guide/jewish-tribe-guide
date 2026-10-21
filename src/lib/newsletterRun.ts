@@ -6,6 +6,7 @@
 import { createHash } from 'node:crypto'
 import { getAdminClient } from '@/lib/supabase/admin'
 import { sendWatchDigest } from '@/lib/email'
+import { findingPage } from '@/lib/watchFindings'
 import { submitListingUpdate } from '@/lib/submissionStore'
 import { listCategories } from '@/lib/categoryStore'
 import { listApprovedResources } from '@/lib/resourceStore'
@@ -268,6 +269,9 @@ async function readAndFile(
       community,
       from,
       filings.map((f) => ({ name: f.name, what: f.lines.join('; ') })),
+      // A newsletter is one of its shul's sources: its findings wait on
+      // Shul times, with the website's.
+      findingPage(community, 'times'),
     ).catch((err) => console.error('[newsletter] digest failed:', err))
   }
   return filings.length

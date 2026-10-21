@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Resend } from 'resend'
 import type { ContactHospitalData, SubmissionRow } from '@/types'
-import { adminAppUrl, escapeHtml, sendAdminMagicLink, sendEmail, sendInboxMagicLink, sendNotification, sendReviewActionNotification, sendStatusChangeDigest, sendSubmissionNotification } from './email'
+import { adminAppUrl, escapeHtml, sendAdminMagicLink, sendEmail, sendInboxMagicLink, sendNotification, sendReviewActionNotification, sendStatusChangeDigest, sendSubmissionNotification, sendWatchDigest } from './email'
 
 const minimalContact: ContactHospitalData = {
   fullName: '',
@@ -762,6 +762,30 @@ describe('sendStatusChangeDigest — the body', () => {
     const { html } = h.last()
     expect(html).toContain('First Place')
     expect(html).toContain('Second Place')
+  })
+})
+
+// Step 6 (Oct 21): a watch's findings wait on its job's page, not the
+// queue, so its email has to send the admin there.
+describe('sendWatchDigest — where the suggestions wait', () => {
+  const h = harness()
+  beforeEach(() => {
+    mockGetCommunityNotifyRecipients.mockResolvedValue(['admin@example.com'])
+    vi.stubEnv('APP_URL', 'https://guide.example')
+  })
+
+  it('names and links the job page they wait on', async () => {
+    await sendWatchDigest('philly', 'Refuah', [{ name: 'HUP', what: 'Kosher food: a new contact' }], { path: '/philly/admin/watches/hospitals', name: 'Hospitals' })
+    const { html } = h.last()
+    expect(html).toContain('waiting on the Watches tab’s Hospitals page')
+    expect(html).toContain('href="https://guide.example/philly/admin/watches/hospitals"')
+    expect(html).toContain('Open Hospitals')
+    expect(html).not.toContain('moderation queue')
+  })
+
+  it('without a job page, says the moderation queue', async () => {
+    await sendWatchDigest('philly', 'Somewhere’s website', [{ name: 'Somewhere', what: 'Hours' }])
+    expect(h.last().html).toContain('waiting in the moderation queue')
   })
 })
 

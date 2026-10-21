@@ -11,6 +11,7 @@ import { LISTING_PAGE_WATCH_CREATOR, listingPageLabel, pageReadsFor } from '@/li
 import { isIgnoredSender, isNewsletterWatch, NEWSLETTER_IGNORED_CREATOR, NEWSLETTER_WATCH_CREATOR, newsletterUrl, senderAddress } from '@/lib/newsletter'
 import { isWatchPurpose, purposeInfo, sourceProblem } from '@/lib/watchPurposes'
 import { enforceRateLimit } from '@/lib/rateLimit'
+import { jobPageFor } from '@/lib/watchFindings'
 
 // GET  /api/admin/watches — the "Watches" tab: every page this community's
 //      guide reads on its own (watch, migration 070), and the listings a
@@ -63,7 +64,9 @@ export async function GET(request: Request) {
       listings: listings
         .map((l) => {
           const category = categoryOf.get(l.category)
-          return { id: l.id, name: l.name, categoryLabel: category?.label ?? l.category, reads: (category && pageReadsFor(category)?.kind) ?? null }
+          // Where what's read for it waits: its job page, or the queue.
+          const job = category ? (jobPageFor(community.slug, category)?.name ?? null) : null
+          return { id: l.id, name: l.name, categoryLabel: category?.label ?? l.category, reads: (category && pageReadsFor(category)?.kind) ?? null, job }
         })
         .sort((a, b) => a.name.localeCompare(b.name)),
     })

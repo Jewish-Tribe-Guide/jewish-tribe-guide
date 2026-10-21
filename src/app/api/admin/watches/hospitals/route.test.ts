@@ -12,6 +12,7 @@ const m = vi.hoisted(() => ({
   runAndRecord: vi.fn(),
   readRefuahNear: vi.fn(),
   pending: [] as { target_id: string }[],
+  jobFindings: vi.fn(),
 }))
 vi.mock('@/lib/rateLimit', () => ({ enforceRateLimit: async () => null }))
 vi.mock('@/lib/adminAuth', () => ({ getAdminUserForCommunity: m.getAdminUserForCommunity }))
@@ -20,6 +21,8 @@ vi.mock('@/lib/resourceStore', () => ({ listApprovedResources: m.listApprovedRes
 vi.mock('@/lib/watchStore', () => ({ listWatches: m.listWatches, addWatch: m.addWatch, updateWatch: m.updateWatch, removeWatch: m.removeWatch }))
 vi.mock('@/lib/watchRunner', () => ({ runAndRecord: m.runAndRecord }))
 vi.mock('@/lib/refuahRun', () => ({ readRefuahNear: m.readRefuahNear }))
+vi.mock('@/lib/watchFindingStore', () => ({ jobFindings: m.jobFindings }))
+vi.mock('@/lib/categoryStore', () => ({ listCategories: async () => [] }))
 vi.mock('@/lib/supabase/admin', () => ({
   getAdminClient: () => ({
     from: () => {
@@ -42,6 +45,7 @@ const w = (over: Partial<Watch>) => ({ id: 'w1', communityId: 'philly', kind: 'w
 beforeEach(() => {
   vi.clearAllMocks()
   m.pending = []
+  m.jobFindings.mockResolvedValue({ findings: [], decided: new Map() })
   m.getAdminUserForCommunity.mockResolvedValue({ email: 'me@x.co' })
   m.listApprovedResources.mockResolvedValue([
     makeListing({ id: PA_ID, category: 'hospital', name: 'Pennsylvania Hospital', geo: { lat: 39.9451, lng: -75.1556 } }),
@@ -61,13 +65,17 @@ describe('GET /api/admin/watches/hospitals', () => {
     expect((await POST(req('POST', { action: 'off', resourceId: PA_ID }))).status).toBe(401)
   })
 
-  it('lists each hospital with where its Refuah page came from, or why it has none, and what waits in the queue', async () => {
+  it('lists each hospital with where its Refuah page came from, or why it has none, what Refuah found waiting to compare, and when one was decided', async () => {
     m.listWatches.mockResolvedValue({ watches: [w({ url: refuahPageUrl(PA._id), resourceId: PA_ID })], available: true })
-    m.pending = [{ target_id: PA_ID }]
+    // What it found, waiting to compare; and another's, decided.
+    const finding = { id: 'f1', targetId: PA_ID, operation: 'update', lines: [] }
+    const decided = { at: '2026-10-21T09:00:00Z', status: 'rejected' }
+    m.jobFindings.mockResolvedValue({ findings: [finding, { ...finding, id: 'f2', targetId: 'elsewhere' }], decided: new Map([[FAR_ID, decided]]) })
     const body = await (await GET(req('GET'))).json()
     expect(body.hospitals.map((h: { name: string }) => h.name)).toEqual(['Pennsylvania Hospital', 'Shriners'])
     const [pa, far] = body.hospitals
-    expect(pa).toMatchObject({ source: 'match', line: 'Matched to Refuah’s Pennsylvania Hospital, 800 Spruce St · same spot on the map', pending: 1, refuah: { name: 'Pennsylvania Hospital', street: '800 Spruce St' } })
+    expect(pa).toMatchObject({ source: 'match', line: 'Matched to Refuah’s Pennsylvania Hospital, 800 Spruce St · same spot on the map', findings: [finding], decided: null, refuah: { name: 'Pennsylvania Hospital', street: '800 Spruce St' } })
+    expect(far.decided).toEqual(decided)
     expect(far).toMatchObject({ source: null, watch: null, line: expect.stringMatching(/^Not found on Refuah\. The nearest hospital on Refuah is 3\.\d mi away/) })
     // Nearest first, for "Give its Refuah page".
     expect(far.nearby.map((r: { id: string }) => r.id)).toEqual([PA._id, HUP._id])

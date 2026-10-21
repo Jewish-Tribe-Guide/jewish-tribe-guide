@@ -14,6 +14,7 @@ import { fieldsEdit, readFieldChanges } from '@/lib/fieldChanges'
 import { editSubmission } from '@/lib/editSubmission'
 import { submitListingUpdate } from '@/lib/submissionStore'
 import { sendWatchDigest } from '@/lib/email'
+import { jobPageFor } from '@/lib/watchFindings'
 import type { MenuReadBudget } from '@/lib/menuWatchRun'
 import type { CategoryConfig } from '@/lib/categories'
 import type { Watch, WatchCheck, WatchOutcome } from '@/lib/watches'
@@ -390,7 +391,7 @@ export async function runListingPageWatch(
     note,
     { name: LISTING_PAGE_WATCH_NAME },
   )
-  await sendWatchDigest(watch.communityId, `${listing.name}’s website`, [{ name: listing.name, what: proposal.lines.join('; ') }]).catch((err) =>
+  await sendWatchDigest(watch.communityId, `${listing.name}’s website`, [{ name: listing.name, what: proposal.lines.join('; ') }], jobPageFor(watch.communityId, category)).catch((err) =>
     console.error('[watch-listing-page] digest failed:', err),
   )
   return { ok: true, filed: 1, pageHash, check: check('filed') }

@@ -12,6 +12,7 @@ const m = vi.hoisted(() => ({
   removeWatch: vi.fn(),
   runAndRecord: vi.fn(),
   pending: [] as { target_id: string }[],
+  jobFindings: vi.fn(),
 }))
 vi.mock('@/lib/rateLimit', () => ({ enforceRateLimit: async () => null }))
 vi.mock('@/lib/adminAuth', () => ({ getAdminUserForCommunity: m.getAdminUserForCommunity }))
@@ -19,6 +20,7 @@ vi.mock('@/lib/communityStore', () => ({ communitySlugFromRequest: () => 'philly
 vi.mock('@/lib/hoursJobRun', async (real) => ({ ...(await real<typeof import('@/lib/hoursJobRun')>()), hoursJobPlaces: m.hoursJobPlaces, searchHoursPages: m.searchHoursPages }))
 vi.mock('@/lib/watchStore', () => ({ listWatches: m.listWatches, addWatch: m.addWatch, updateWatch: m.updateWatch, removeWatch: m.removeWatch }))
 vi.mock('@/lib/watchRunner', () => ({ runAndRecord: m.runAndRecord }))
+vi.mock('@/lib/watchFindingStore', () => ({ jobFindings: m.jobFindings }))
 vi.mock('@/lib/supabase/admin', () => ({
   getAdminClient: () => ({
     from: () => {
@@ -52,6 +54,7 @@ const w = (over: Partial<Watch>) =>
 beforeEach(() => {
   vi.clearAllMocks()
   m.pending = []
+  m.jobFindings.mockResolvedValue({ findings: [], decided: new Map() })
   m.getAdminUserForCommunity.mockResolvedValue({ email: 'me@x.co' })
   m.hoursJobPlaces.mockResolvedValue({
     categories: [MIKVAH],
@@ -74,7 +77,7 @@ describe('GET /api/admin/watches/hours', () => {
     expect((await POST(req('POST', { action: 'off', resourceId: LMC }))).status).toBe(401)
   })
 
-  it('lists each place with its pages, where each came from, and what waits in the queue', async () => {
+  it('lists each place with its pages, where each came from, what it found waiting to compare, and when one was decided', async () => {
     m.listWatches.mockResolvedValue({
       watches: [
         w({ id: 'home' }),
@@ -83,12 +86,17 @@ describe('GET /api/admin/watches/hours', () => {
       ],
       available: true,
     })
-    m.pending = [{ target_id: LMC }]
+    // What it found, waiting to compare; and another's, decided.
+    const finding = { id: 'f1', targetId: LMC, operation: 'update', lines: [] }
+    const decided = { at: '2026-10-21T09:00:00Z', status: 'rejected' }
+    m.jobFindings.mockResolvedValue({ findings: [finding, { ...finding, id: 'f2', targetId: 'elsewhere' }], decided: new Map([[MEI, decided]]) })
     const body = await (await GET(req('GET'))).json()
     expect(body.name).toBe('Mikvah hours')
     const lmc = body.places.find((p: { id: string }) => p.id === LMC)
-    expect(lmc).toMatchObject({ pending: 1, off: false, reason: null, fields: ['Women’s Hours', 'Men’s Hours'] })
+    expect(lmc).toMatchObject({ findings: [finding], decided: null, off: false, reason: null, fields: ['Women’s Hours', 'Men’s Hours'] })
     expect(lmc.pages.map((p: { source: string }) => p.source)).toEqual(['Found from its website', 'Found from its website’s Men’s Mikvah link', 'Added by hand'])
+    expect(body.places.find((p: { id: string }) => p.id === MEI).decided).toEqual(decided)
+    expect(m.jobFindings).toHaveBeenCalledWith('philly', 'hours', [MIKVAH])
   })
 
   it('says why a place has nothing read: no website, its website, or no hours on it', async () => {

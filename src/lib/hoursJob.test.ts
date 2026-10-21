@@ -118,6 +118,22 @@ describe('hoursSection', () => {
     expect(s([watch({ active: false })])).toBe('off')
   })
 
+  // Step 6: a finding waits on the job page, and Update or Skip settles it.
+  it('a waiting finding is to check; a page that differs only by one decided is checked', () => {
+    const filed = (queue: WatchCheck['queue']) => watch({ lastCheck: { ...check('differs'), queue } })
+    const at = (pages: Watch[], waiting: number) => hoursSection({ pages, off: false, waiting }, NOW)
+    expect(at([filed('filed')], 1)).toBe('to_check')
+    // A newsletter's finding, with its page agreeing.
+    expect(at([watch({ lastCheck: check('agrees') })], 1)).toBe('to_check')
+    expect(at([filed('filed')], 0)).toBe('checked')
+    expect(at([filed('before')], 0)).toBe('checked')
+    // Not filed, for a suggestion already waiting in the queue: still to check.
+    expect(at([filed('waiting')], 0)).toBe('to_check')
+    expect(at([watch({ lastCheck: check('unsure') })], 0)).toBe('to_check')
+    // Not known what waits: as before.
+    expect(s([filed('before')])).toBe('to_check')
+  })
+
   it('counts them for the Watches tab’s row', () => {
     const places = [
       { pages: [watch({ lastCheck: check('differs') }), watch({ failingSince: ago(1), lastError: 'HTTP 500' })], off: false },

@@ -1,4 +1,4 @@
-import { watchHealth, type Watch } from './watches'
+import { settles, watchHealth, type Watch } from './watches'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // The Watches tab's jobs (the user, Oct 21): a row per thing the guide keeps
@@ -72,10 +72,13 @@ export function dishCounts(places: readonly DishPlace[], menuWatches: readonly W
  *   off        turned off, or said not to be on Refuah */
 export type HospitalSection = 'to_check' | 'checked' | 'nothing' | 'waiting' | 'cant_read' | 'off'
 
-export type HospitalState = { watch: Watch | null; notOnRefuah: boolean }
+/** `waiting`: how many of Refuah's findings for it wait on the page; given,
+ *  a difference already decided there (Update or Skip) is settled. */
+export type HospitalState = { watch: Watch | null; notOnRefuah: boolean; waiting?: number }
 
 export function hospitalSection(h: HospitalState, now: number): HospitalSection {
   if (h.notOnRefuah || (h.watch && !h.watch.active)) return 'off'
+  if (h.waiting) return 'to_check'
   if (!h.watch) return 'cant_read'
   const state = watchHealth(h.watch, now).state
   if (state === 'failing' || state === 'stale') return 'cant_read'
@@ -83,7 +86,7 @@ export function hospitalSection(h: HospitalState, now: number): HospitalSection 
   // migration 085): not known to agree.
   if (state === 'waiting' || !h.watch.lastCheck) return 'waiting'
   const result = h.watch.lastCheck.result
-  if (result === 'differs') return 'to_check'
+  if (result === 'differs') return settles(h.watch.lastCheck, h.waiting) ? 'checked' : 'to_check'
   if (result === 'nothing') return 'nothing'
   return 'checked'
 }

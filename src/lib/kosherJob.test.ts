@@ -71,6 +71,13 @@ describe('kosherPlaces', () => {
     expect(kosherSection(places[0])).toBe('checked')
   })
 
+  // Step 6: a finding filed before still waits here after the list changes.
+  it('a place with a finding waiting is to check, even once the list agrees', () => {
+    const { places } = kosherPlaces({ listings: [cherry], keystone: [cherryEntry], mekor: null })
+    expect(kosherSection({ ...places[0], waiting: 1 })).toBe('to_check')
+    expect(kosherCounts([{ ...places[0], waiting: 1 }], [], 0).toCheck).toBe(1)
+  })
+
   it('a place on Keystone-K’s list whose listing doesn’t name Keystone-K is to check, in a line', () => {
     const l = listing({ id: 'judah', name: 'Judah Grille', details: { kosherCert: ['IKC'], t: ['Meat'] } })
     const e = keystone({ slug: 'judah-grille', name: 'Judah Grille' })

@@ -103,7 +103,7 @@ describe('PATCH /api/admin/submissions/:id — the decision', () => {
     const res = await patch({ status: 'approved' })
     expect(res.status).toBe(200)
     expect((await res.json()).submission.id).toBe('sub1')
-    expect(m.approveSubmission).toHaveBeenCalledWith('sub1', 'ues', 'admin@x.co', undefined)
+    expect(m.approveSubmission).toHaveBeenCalledWith('sub1', 'ues', 'admin@x.co', undefined, undefined)
     expect(m.rejectSubmission).not.toHaveBeenCalled()
     expect(m.revalidatePublicContent).toHaveBeenCalled()
   })
@@ -114,7 +114,7 @@ describe('PATCH /api/admin/submissions/:id — the decision', () => {
   it('approves with the admin’s fixes when the opened card sends them', async () => {
     const fixed = { name: 'Kosher Deli', address: '1 Main St', phone: '', details: { hours: 'x' } }
     expect((await patch({ status: 'approved', payload: fixed })).status).toBe(200)
-    expect(m.approveSubmission).toHaveBeenCalledWith('sub1', 'ues', 'admin@x.co', fixed)
+    expect(m.approveSubmission).toHaveBeenCalledWith('sub1', 'ues', 'admin@x.co', fixed, undefined)
   })
 
   it('400s fixes that can’t go live, saying why, with nothing sent and nothing refreshed', async () => {
@@ -124,6 +124,19 @@ describe('PATCH /api/admin/submissions/:id — the decision', () => {
     expect((await res.json()).errors).toEqual(['Address is required.'])
     expect(m.afterCallbacks).toHaveLength(0)
     expect(m.revalidatePublicContent).not.toHaveBeenCalled()
+  })
+
+  // A watch's finding on its job page: a tick per line, "Update 1 on the
+  // listing" when one is unticked. The store keeps the rest as they are.
+  it('approves only the ticked lines of a finding, and refuses none ticked or a rejection with them', async () => {
+    expect((await patch({ status: 'approved', only: ['women_s_hours'] })).status).toBe(200)
+    expect(m.approveSubmission).toHaveBeenCalledWith('sub1', 'ues', 'admin@x.co', undefined, ['women_s_hours'])
+    m.approveSubmission.mockClear()
+    for (const body of [{ status: 'approved', only: [] }, { status: 'approved', only: 'women_s_hours' }, { status: 'rejected', only: ['x'] }, { status: 'approved', only: ['x'], payload: { details: {} } }]) {
+      expect((await patch(body)).status).toBe(400)
+    }
+    expect(m.approveSubmission).not.toHaveBeenCalled()
+    expect(m.rejectSubmission).not.toHaveBeenCalled()
   })
 
   it('400s fixes sent with a rejection: they’d be thrown away', async () => {

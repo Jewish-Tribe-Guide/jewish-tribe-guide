@@ -179,7 +179,7 @@ describe('receiveNewsletter: what it changes', () => {
     expect(payload.source).toMatchObject({ readBy: 'ai', from: 'Mekor Habracha’s newsletter', named: 'Mekor Habracha', original: email.text, note: email.subject })
     expect(note).toContain('From Mekor Habracha’s newsletter: “This Shabbos at Mekor” (Oct 16).')
     expect(note).toContain('9:00am')
-    expect(m.sendWatchDigest).toHaveBeenCalledWith('philly', 'Mekor Habracha’s newsletter', [expect.objectContaining({ name: 'Mekor Habracha' })])
+    expect(m.sendWatchDigest).toHaveBeenCalledWith('philly', 'Mekor Habracha’s newsletter', [expect.objectContaining({ name: 'Mekor Habracha' })], { path: '/philly/admin/watches/times', name: 'Shul times' })
     expect(m.updateWatch).toHaveBeenCalledWith(
       'philly',
       'w1',

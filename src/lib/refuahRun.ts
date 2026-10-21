@@ -10,6 +10,7 @@
 import { createHash } from 'node:crypto'
 import { getAdminClient } from '@/lib/supabase/admin'
 import { sendWatchDigest } from '@/lib/email'
+import { findingPage } from '@/lib/watchFindings'
 import { submitListingUpdate } from '@/lib/submissionStore'
 import { getCategoryById } from '@/lib/categoryStore'
 import { confirmFromSource } from '@/lib/sourceConfirm'
@@ -174,7 +175,7 @@ export async function runRefuahWatch(community: string, url: string, resourceId:
     note,
     { name: REFUAH_WATCH_NAME },
   )
-  await sendWatchDigest(community, REFUAH_NAME, [{ name: row.name, what: diffs.flatMap((d) => d.lines).join('; ') }]).catch((err) =>
+  await sendWatchDigest(community, REFUAH_NAME, [{ name: row.name, what: diffs.flatMap((d) => d.lines).join('; ') }], findingPage(community, 'hospitals')).catch((err) =>
     console.error('[watch-refuah] digest failed:', err),
   )
   return { ok: true, filed: 1, pageHash, check: check('filed') }

@@ -24,6 +24,14 @@ describe('hospitalSection', () => {
     expect(hospitalSection({ watch: null, notOnRefuah: true }, NOW)).toBe('off')
   })
 
+  it('a waiting finding from Refuah is to check; a difference already decided is checked', () => {
+    const differs = watch({ lastCheck: { ...check('differs'), queue: 'before' } })
+    expect(hospitalSection({ watch: differs, notOnRefuah: false, waiting: 1 }, NOW)).toBe('to_check')
+    expect(hospitalSection({ watch: watch({ lastCheck: check('agrees') }), notOnRefuah: false, waiting: 1 }, NOW)).toBe('to_check')
+    expect(hospitalSection({ watch: differs, notOnRefuah: false, waiting: 0 }, NOW)).toBe('checked')
+    expect(hospitalSection({ watch: differs, notOnRefuah: false }, NOW)).toBe('to_check')
+  })
+
   it('counts "can’t be read" (no page) apart from "didn’t load today" (a page that failed)', () => {
     const counts = hospitalCounts(
       [

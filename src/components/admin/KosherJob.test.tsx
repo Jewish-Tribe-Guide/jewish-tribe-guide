@@ -7,6 +7,7 @@ import { renderWithProviders } from '@/test/renderWithProviders'
 import { fetchJson } from '@/lib/fetchJson'
 import type { Watch } from '@/lib/watches'
 import type { KosherPlace } from '@/lib/kosherJob'
+import type { Finding } from '@/lib/watchFindings'
 import KosherJob, { type KosherListState, type KosherLoaded } from './KosherJob'
 
 vi.mock('next/navigation', () => ({
@@ -38,7 +39,22 @@ const MEKOR: KosherListState = {
   updated: '2026-10-12',
 }
 
-const place = (over: Partial<KosherPlace>): KosherPlace & { href: string } => ({
+// What a list filed, waiting here to compare (step 6).
+const finding = (over: Partial<Finding> = {}): Finding => ({
+  id: 's-judah',
+  operation: 'update',
+  targetId: 'judah',
+  name: 'Judah Grille',
+  from: 'Keystone-K’s list',
+  says: 'Keystone-K says',
+  named: 'Keystone-K',
+  at: ago(0.1),
+  notes: [],
+  lines: [{ key: 'kosher_cert', label: 'Hechsher', before: 'IKC', after: 'IKC, Keystone-K', choosable: true }],
+  ...over,
+})
+
+const place = (over: Partial<KosherPlace> & { findings?: Finding[] }): KosherPlace & { href: string; findings?: Finding[] } => ({
   id: 'p',
   name: 'Somewhere',
   category: 'restaurant',
@@ -66,6 +82,7 @@ const JUDAH = place({
     { list: 'keystone', line: 'On Keystone-K’s list; the listing doesn’t name Keystone-K', filed: 'queued' },
     { list: 'mekor', line: 'The listing says IKC; Mekor Habracha’s list doesn’t have it', filed: 'decided' },
   ],
+  findings: [finding()],
 })
 const SABABA = place({
   id: 'sababa',
@@ -88,7 +105,7 @@ async function renderPage(over: Partial<KosherLoaded> = {}) {
     ...over,
   }
   vi.mocked(fetchJson).mockImplementation(async (url, init) => {
-    if (init?.method === 'POST') {
+    if (init?.method === 'POST' || init?.method === 'PATCH') {
       posts.push({ url: String(url), body: JSON.parse(String(init.body)) })
       return { ok: true }
     }
@@ -115,7 +132,9 @@ describe('KosherJob', () => {
     expect(toCheck).toHaveLength(1)
     expect(toCheck[0]).toHaveTextContent('Judah Grille')
     expect(toCheck[0]).toHaveTextContent('The listing says IKC · Meat')
-    expect(toCheck[0]).toHaveTextContent('On Keystone-K’s list; the listing doesn’t name Keystone-K · in the moderation queue')
+    // What waits is beside what the listing says, to Compare, not in the queue.
+    expect(within(toCheck[0]).getByTestId('finding')).toHaveTextContent('Hechsher: Keystone-K says IKC, Keystone-K. The listing says IKC.')
+    expect(screen.queryByText(/moderation queue/)).toBeNull()
     // What was decided before isn't asked again beside it.
     expect(toCheck[0]).not.toHaveTextContent('Mekor Habracha’s list doesn’t have it')
     // The rest start closed.
@@ -125,20 +144,38 @@ describe('KosherJob', () => {
     expect(screen.getByRole('link', { name: '‹ Watches' })).toHaveAttribute('href', '/philly/admin/watches')
   })
 
-  it('opened, a place says what each list says, in its words, and links to the queue and the listing', async () => {
+  it('opened, a place says what each list says, in its words, and links to the listing', async () => {
     await renderPage()
     const row = within(section('To check')).getByTestId('kosher-place')
     await userEvent.setup().click(within(row).getAllByRole('button')[0])
     expect(row).toHaveTextContent('Keystone-K says: “Meat”')
     expect(within(row).getByRole('link', { name: 'Keystone-K' })).toHaveAttribute('href', 'https://keystone-k.org/kosher/judah-grille/')
-    expect(within(row).getByRole('link', { name: 'Approve or reject it in the moderation queue' })).toHaveAttribute('href', '/philly/admin')
+    expect(within(row).queryByRole('link', { name: /moderation queue/ })).toBeNull()
     expect(within(row).getByRole('link', { name: 'Open its listing' })).toHaveAttribute('href', '/philly/restaurant/somewhere-p')
   })
 
-  it('a difference not filed yet says tomorrow morning’s read files it', async () => {
-    await renderPage({ places: [{ ...JUDAH, differences: [{ ...JUDAH.differences[0], filed: 'next' }] }] })
+  it('Compare and Update: dated as confirmed by Keystone-K, and it stays in To check saying so', async () => {
+    await renderPage()
+    const user = userEvent.setup()
     const row = within(section('To check')).getByTestId('kosher-place')
-    expect(row).toHaveTextContent('· filed with tomorrow morning’s read')
+    await user.click(within(row).getByRole('button', { name: 'Compare' }))
+    expect(within(row).getByText('Updating dates the listing as confirmed by Keystone-K today.')).toBeInTheDocument()
+    await user.click(within(row).getByRole('button', { name: 'Update 1 on the listing' }))
+    expect(posts.at(-1)).toEqual({ url: '/api/admin/submissions/s-judah?community=philly', body: { status: 'approved' } })
+    expect(within(section('To check')).getByTestId('finding-decided')).toHaveTextContent('Updated on the listing.')
+  })
+
+  it('a finding that no longer matches a place still waits, on its own', async () => {
+    await renderPage({ others: [finding({ id: 's-gone', targetId: null, operation: 'create', name: 'Moved Cafe', lines: [] })] })
+    const other = within(section('To check')).getByTestId('kosher-other')
+    expect(other).toHaveTextContent('Moved Cafe')
+    expect(within(other).getByTestId('finding')).toHaveTextContent('Suggested as a new listing, from Keystone-K’s list.')
+  })
+
+  it('a difference not filed yet says tomorrow morning’s read files it', async () => {
+    await renderPage({ places: [{ ...JUDAH, findings: [], differences: [{ ...JUDAH.differences[0], filed: 'next' }] }] })
+    const row = within(section('To check')).getByTestId('kosher-place')
+    expect(row).toHaveTextContent('· here after tomorrow morning’s read')
     await userEvent.setup().click(within(row).getAllByRole('button')[0])
     expect(within(row).queryByRole('link', { name: /moderation queue/ })).toBeNull()
   })
@@ -149,10 +186,10 @@ describe('KosherJob', () => {
     await user.click(screen.getByRole('button', { name: /Checked/ }))
     expect(screen.getByText('Cherry Grill').closest('li')).toHaveTextContent('Keystone-K agrees')
     await user.click(screen.getByRole('button', { name: /Decided before/ }))
-    expect(screen.getByText('Sababa').closest('li')).toHaveTextContent('Mekor Habracha says IKC; the listing says OU · decided in the queue before')
+    expect(screen.getByText('Sababa').closest('li')).toHaveTextContent('Mekor Habracha says IKC; the listing says OU · decided before')
   })
 
-  it('a place only a list has says which list, and whether it waits in the queue', async () => {
+  it('a place only a list has says which list, and is compared here', async () => {
     await renderPage({
       newPlaces: [
         {
@@ -164,6 +201,7 @@ describe('KosherJob', () => {
           ],
           archived: null,
           filed: 'queued',
+          findings: [finding({ id: 's-shug', targetId: null, operation: 'create', name: 'Shug Sisters', lines: [] })],
         },
         { name: 'Old Deli', address: '', on: [{ list: 'mekor', name: 'Old Deli', url: 'https://www.mekorhabracha.org/post/old-deli', says: '' }], archived: 'Old Deli', filed: 'next' },
       ],
@@ -171,9 +209,10 @@ describe('KosherJob', () => {
     const [shug, deli] = within(section('On a list, not in the guide')).getAllByTestId('kosher-new')
     expect(shug).toHaveTextContent('On Keystone-K’s list: “Dairy”')
     expect(shug).toHaveTextContent('On Mekor Habracha’s list: “Under Keystone-K”')
-    expect(within(shug).getByRole('link', { name: 'Approve or reject it in the moderation queue' })).toBeInTheDocument()
+    await userEvent.setup().click(within(shug).getByRole('button', { name: 'Compare' }))
+    expect(within(shug).getByRole('button', { name: 'Add it to the guide' })).toBeInTheDocument()
     expect(deli).toHaveTextContent('The guide has it archived, as “Old Deli”.')
-    expect(deli).toHaveTextContent('Filed with tomorrow morning’s read, unless Google says it has closed.')
+    expect(deli).toHaveTextContent('Here to compare after tomorrow morning’s read, unless Google says it has closed.')
   })
 
   // Moved from the Watches tab's rows (Oct 20): a list says what its
@@ -183,7 +222,7 @@ describe('KosherJob', () => {
     await renderPage({ lists: [{ ...KEYSTONE, watch: { ...KEYSTONE.watch!, lastCheck } }, MEKOR] })
     const [keystone, mekor] = screen.getAllByTestId('kosher-list')
     expect(keystone).toHaveTextContent('Keystone-K’s list78 places on it now.')
-    expect(keystone).toHaveTextContent(/Read .*: 78 on the list, 74 match the guide, 4 differ: 3 new suggestions in the queue, 1 filed before/)
+    expect(keystone).toHaveTextContent(/Read .*: 78 on the list, 74 match the guide, 4 differ: 3 new suggestions to check here, 1 filed before/)
     expect(mekor).toHaveTextContent('52 places on it now, updated Oct 12.')
   })
 

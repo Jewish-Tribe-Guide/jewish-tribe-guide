@@ -445,8 +445,8 @@ compare, and one it can't read, on desktop and phone.
    - **Live data, read only (Oct 21):** all seven Philly hospitals match
      on their own to the same Refuah pages they were given by hand, so
      the first live run adds and removes nothing.
-   - **Not done yet:** differences still go to the moderation queue
-     (Compare isn't built), and the per-category job switch isn't built.
+   - **Not done yet:** the per-category job switch isn't built.
+     (Differences wait on the page with Compare since step 6.)
      "Off" here is the hospitals' own (a paused watch, or a "not on
      Refuah" marker watch).
 3. **Mikvahs:** one dry run first (read each website once, save nothing,
@@ -502,8 +502,7 @@ compare, and one it can't read, on desktop and phone.
      ("Read its page: no weekly hours on it.") until "No hours online" is
      pressed for each. That is the deployed code writing watches, so it
      happens only once this branch is merged.
-   - **Not done yet:** differences still go to the moderation queue
-     (Compare isn't built); no "Add photos"; no "Read it for" per page
+   - **Not done yet:** no "Add photos"; no "Read it for" per page
      (every page is read for all the named hours); "What the reader did"
      isn't shown for a page added by hand; there's no monthly re-search
      (it's every morning, cheap since it's fetches only).
@@ -601,15 +600,14 @@ compare, and one it can't read, on desktop and phone.
      food places, from Keystone-K's and Mekor Habracha's lists"). Both
      lists are read when the page opens and compared with every approved
      food place (`kosherJob.ts`). Sections: To check (a list says
-     something the listing doesn't, each line "in the moderation queue",
-     "filed with tomorrow morning's read" or decided before), On a list,
+     something the listing doesn't, each to Compare on its row (step 6),
+     "here after tomorrow morning's read" or decided before), On a list,
      not in the guide, and closed: Checked, Decided before, On neither
      list. Each list shows its size and its morning read, with Check now
      and Pause. This answers "Kosher certification when the two lists
      disagree": a place shows each list's line beside the listing's.
-   - **The lists still file to the moderation queue** each morning; the
-     page reads and shows, it doesn't file. Findings onto the job pages
-     (step 6, below) would change that.
+   - **The lists' morning reads file what differs,** as before; since
+     step 6 it waits on this page, not in the moderation queue.
    - **"Add a watch" no longer offers an eruv or a kosher list**; they are
      given on their job pages.
    - Fixes found on the way: every site on WordPress.com (192.0.78.x) was
@@ -619,9 +617,49 @@ compare, and one it can't read, on desktop and phone.
      whose label's colon sits outside its bold read as ": Dairy – …"; an
      eruv website that didn't open now says "Its website, …, wouldn't
      open: …"; Mekor's "updated 2026-10-12" says "Oct 12".
-6. **Not asked for yet (my recommendation):** findings onto the job pages,
-   next to what the listing says, with Compare, as decided Oct 21, instead
-   of the moderation queue.
+6. **Findings on the job pages: BUILT Oct 21** (the user: "let's do step
+   6"; on `redesign/oct18-fixes`, not merged). What a watch finds waits on
+   the job page that reads the place (Mikvah hours, Shul times, Hospitals,
+   Kosher certification), on its row, beside what the listing says, not in
+   the moderation queue. "The queue keeps what people send in."
+   - **Storage is unchanged.** A watch still files a pending suggestion,
+     so the runs' never-twice rule is the same. The queue leaves out those
+     a job page shows (`watchFindings.ts`, `onAJobPage`). Refuah's and the
+     kosher lists' always are. A website's or a newsletter's are only
+     when its place is in a category a job reads, so a hand-added watch
+     elsewhere still files to the queue. Decided ones stay in the
+     queue's history.
+   - **Compare** opens a finding: in place on desktop, its own screen on
+     the phone with "‹ {job}" back. It shows a line per field: the
+     listing says / its page (newsletter, Refuah, Keystone-K, Mekor) says.
+     There is a tick per line; untick one and "Update 2 on the listing"
+     becomes "Update 1". Update is the queue's own approval, with
+     `only` (the ticked lines; the unticked stay as the listing says), so
+     it dates the listing ("confirmed by Refuah" and so on) and refreshes
+     the site. "Skip for now" is a rejection: it's not shown again until
+     its source says something new.
+   - **A line that would empty the listing starts unticked.** This is for
+     a field what was read leaves empty but the listing has. An approval
+     replaces the details whole, so a finding filed before the listing
+     gained, say, its main dishes would have emptied them (seen in dev,
+     Oct 21: Keystone-K findings from Oct 17). It also covers a list
+     taking a hechsher off; ticking it empties the listing's. The "confirmed
+     at" date isn't a line: every approval sets it.
+   - **Sections count what waits:** a place with a finding waiting is To
+     check. Once decided, it's Checked, and its row says "Updated on the
+     listing Oct 21." or "Skipped Oct 21: shown again if its page
+     changes." A row acted on stays where it was until reload. Check now
+     that files something fetches it, to compare there.
+   - **The Watches tab** says findings wait on each job's page. "Add a
+     watch" says which page a place's findings wait on (the listings carry
+     `job`), or the moderation queue when no job reads it. Digest emails
+     link to the job page (built before).
+   - **Not built:** "also sent in by a visitor, in the queue" (planned as
+     a follow-up). A place with a visitor's suggestion waiting is still not
+     filed, and its row says so with a link to the queue. Also not built:
+     Undo (not planned); a check on a real phone; and a per-minyan view of
+     a schedule's change. A whole week's minyanim show as two blocks, so
+     finding the one changed time is by eye.
 
 ## Done Oct 20: "Check now" is the full check (on `redesign/oct18-fixes`, not merged)
 

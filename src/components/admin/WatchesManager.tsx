@@ -42,7 +42,9 @@ import { hoursCounts, isHoursOff, isStoppedPage } from '@/lib/hoursJob'
 // Mekor Habracha's lists) are jobs too. The rest are still listed below,
 // until each becomes a job of its own.
 
-type Listing = { id: string; name: string; categoryLabel: string; reads: ListingReads }
+/** `job`: the job page where what's read for it waits ("Shul times"); none,
+ *  the moderation queue. */
+type Listing = { id: string; name: string; categoryLabel: string; reads: ListingReads; job?: string | null }
 type Loaded = { available: boolean; watches: Watch[]; listings: Listing[] }
 type Action = 'check' | 'pause' | 'resume' | 'remove' | 'link' | 'ignore'
 type PagesJob = { name: string; places: HoursPlace[] } | null
@@ -196,10 +198,12 @@ const NOTHING: Record<WatchCheck['what'], string> = {
   list: 'Found no places on the list',
 }
 
-/** What became of the differences, in a few words. */
-function queueText(c: WatchCheck): string {
+/** What became of the differences, in a few words. `where`: where a
+ *  filed one waits, for a job page that shows its own ("to check here");
+ *  otherwise the queue. */
+function queueText(c: WatchCheck, where = 'in the queue'): string {
   if (c.what === 'dishes') return c.queue === 'before' ? 'already on the Main dishes tab, or skipped there' : 'waiting on the Main dishes tab'
-  if (c.queue === 'filed') return 'in the queue'
+  if (c.queue === 'filed') return where
   if (c.queue === 'before') return 'filed before, not again'
   if (c.queue === 'waiting') return 'not filed: the listing already has a suggestion in the queue'
   return ''
@@ -207,26 +211,26 @@ function queueText(c: WatchCheck): string {
 
 /** A list's counts: "78 on the list, 74 match the guide, 4 suggestions in
  *  the queue". */
-function listText(c: WatchCheck): string {
+function listText(c: WatchCheck, where = 'in the queue'): string {
   const l = c.list!
   const head = `${l.listed} on the list, ${l.matching} match${l.matching === 1 ? 'es' : ''} the guide`
   if (!l.differences) return `${head}, nothing differs`
-  if (l.filed === l.differences) return `${head}, ${plural(l.differences, 'suggestion')} in the queue`
+  if (l.filed === l.differences) return `${head}, ${plural(l.differences, 'suggestion')} ${where}`
   if (!l.filed) return `${head}, ${l.differences} differ${l.differences === 1 ? 's' : ''}, all filed before`
-  return `${head}, ${l.differences} differ: ${plural(l.filed, 'new suggestion')} in the queue, ${l.differences - l.filed} filed before`
+  return `${head}, ${l.differences} differ: ${plural(l.filed, 'new suggestion')} ${where}, ${l.differences - l.filed} filed before`
 }
 
-/** What the last full read found, in one line. */
-export function checkLine(c: WatchCheck): string {
+/** What the last full read found, in one line. `where`: as queueText. */
+export function checkLine(c: WatchCheck, where?: string): string {
   if (c.result === 'unreadable') return `${day(c.at)}: the page wouldn’t open`
-  if (c.list) return `Read ${day(c.at)}: ${listText(c)}`
+  if (c.list) return `Read ${day(c.at)}: ${listText(c, where)}`
   if (c.result === 'agrees') return `Read ${day(c.at)}: agrees with the listing`
   if (c.result === 'unsure') return `Read ${day(c.at)}: couldn’t compare it with the listing`
   if (c.result === 'nothing') {
     const n = NOTHING[c.what]
     return `Read ${day(c.at)}: ${c.what === 'contacts' ? n : n[0].toLowerCase() + n.slice(1)}`
   }
-  return `Read ${day(c.at)}: ${plural(c.differences.length, 'difference')}, ${queueText(c)}`
+  return `Read ${day(c.at)}: ${plural(c.differences.length, 'difference')}, ${queueText(c, where)}`
 }
 
 const FROM: Record<NonNullable<WatchCheck['from']>, string> = {
@@ -348,26 +352,26 @@ function WhatItDoes({ watch }: { watch: Watch }) {
   if (isNewsletterWatch(watch)) {
     return (
       <p className="text-xs text-muted" data-testid="newsletter-watch">
-        Its newsletters, read as they come in. Changed times, and anything else it says about a place in the guide, go to the moderation queue with the
-        email beside them. You&rsquo;re emailed if none comes for a month.
+        Its newsletters, read as they come in. Changed times, and anything else it says about a place in the guide, wait on the Shul times page with
+        the email beside them. You&rsquo;re emailed if none comes for a month.
       </p>
     )
   }
   if (watch.kind === 'keystone_list') {
-    return <p className="text-xs text-muted">Compared with the guide every morning. Differences go to the moderation queue, quoting the list.</p>
+    return <p className="text-xs text-muted">Compared with the guide every morning. Differences wait on the Kosher certification page, quoting the list.</p>
   }
   if (isMekorList(watch.url)) {
     return (
       <p className="text-xs text-muted" data-testid="mekor-watch">
         Compared with the guide every morning. A place it lists that the guide lacks, and any hechsher the guide shows that it doesn&rsquo;t (IKC
-        above all), go to the moderation queue, quoting the list. Nothing is taken off without you.
+        above all), wait on the Kosher certification page, quoting the list. Nothing is taken off without you.
       </p>
     )
   }
   if (refuahHospitalId(watch.url)) {
     return (
       <p className="text-xs text-muted">
-        Compared with the hospital every morning. A new contact, or a changed phone, email or website, goes to the moderation queue as from Refuah.
+        Compared with the hospital every morning. A new contact, or a changed phone, email or website, waits on the Hospitals page as from Refuah.
       </p>
     )
   }
@@ -524,19 +528,21 @@ function NewsletterLink({ listings, busy, onLink, onIgnore }: { listings: Listin
 }
 
 /** What "Add a watch" says will happen, once it knows enough to say. */
-function planFor(purpose: AddPurpose, source: string, place: string | null): { main: string; small: string } {
+function planFor(purpose: AddPurpose, source: string, place: string | null, job: string | null): { main: string; small: string } {
   const s = shortUrl(source.trim())
   const p = place ?? 'the listing'
   const email = sourceKind(source) === 'email'
+  // Step 6: what a job reads waits on its page, beside the listing.
+  const goes = job ? `wait on the ${job} page, beside what the listing says` : 'go to the moderation queue, with the page beside them'
   switch (purpose) {
     case 'times':
       return email
-        ? { main: `Each newsletter from ${s} is read as it arrives, for that week’s times and anything else it says about ${p}. What differs goes to the moderation queue with the email beside it.`, small: 'The guide’s Gmail must be on the shul’s list. You’re emailed if none comes for a month.' }
-        : { main: `Every morning the guide reads ${s}, and its calendar if it has one. Times that differ from ${p}’s go to the moderation queue, with the page beside them; a calendar is read a week at a time, and its week goes as this week’s schedule.`, small: 'A page that agrees changes nothing. Where the newsletter has given that week’s times, the newsletter wins.' }
+        ? { main: `Each newsletter from ${s} is read as it arrives, for that week’s times and anything else it says about ${p}. What differs ${job ? `waits on the ${job} page, beside what the listing says` : 'goes to the moderation queue with the email beside it'}.`, small: 'The guide’s Gmail must be on the shul’s list. You’re emailed if none comes for a month.' }
+        : { main: `Every morning the guide reads ${s}, and its calendar if it has one. Times that differ from ${p}’s ${goes}; a calendar is read a week at a time, and its week goes as this week’s schedule.`, small: 'A page that agrees changes nothing. Where the newsletter has given that week’s times, the newsletter wins.' }
     case 'hours':
-      return { main: `Every morning the guide reads ${s}. Hours that differ from ${p}’s go to the moderation queue, with the page beside them.`, small: 'A page that agrees changes nothing.' }
+      return { main: `Every morning the guide reads ${s}. Hours that differ from ${p}’s ${goes}.`, small: 'A page that agrees changes nothing.' }
     case 'hospital':
-      return { main: `Every morning Refuah’s contacts for ${p} are compared with the listing. A new or changed phone, email or website goes to the moderation queue.`, small: 'When Refuah agrees, the listing is dated as confirmed by Refuah.' }
+      return { main: `Every morning Refuah’s contacts for ${p} are compared with the listing. A new or changed phone, email or website waits on the Hospitals page, beside what the listing says.`, small: 'When Refuah agrees, the listing is dated as confirmed by Refuah.' }
     default:
       return { main: `Every morning the guide checks ${s}, and marks its row when the page changes.`, small: 'It reads nothing into it: you look and decide.' }
   }
@@ -578,7 +584,7 @@ function AddWatch({
   const kind = sourceKind(source)
   const problem = purpose && source.trim() ? sourceProblem(purpose, source) : null
   const ready = !!purpose && !!source.trim() && !problem && (info?.place !== 'listing' || !!listing)
-  const plan = purpose && source.trim() && !problem ? planFor(purpose, source, listing?.name ?? null) : null
+  const plan = purpose && source.trim() && !problem ? planFor(purpose, source, listing?.name ?? null, purpose === 'hospital' ? null : (listing?.job ?? null)) : null
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
@@ -798,7 +804,9 @@ export default function WatchesManager({ token }: { token: string }) {
   const counted = listed.filter((w) => !isIgnoredSender(w)).length
   const base = adminBase(community)
   const menuWatches = data.watches.filter((w) => w.createdBy === MENU_WATCH_CREATOR)
-  const hospitalsNothing = jobs.hospitals ? hospitalCounts(jobs.hospitals, now).nothing : 0
+  // As the Hospitals page counts them: a finding waiting there is to check.
+  const hospitalStates = jobs.hospitals?.map((h) => ({ ...h, waiting: h.findings?.length }))
+  const hospitalsNothing = hospitalStates ? hospitalCounts(hospitalStates, now).nothing : 0
   const needs = groups.reduce((n, g) => n + g.counts.notWorking + g.counts.toLink, 0)
 
   function renderRow(row: WatchRow) {
@@ -843,7 +851,7 @@ export default function WatchesManager({ token }: { token: string }) {
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted">
-        What the guide reads on its own to stay current: pages every morning, emails as they arrive. <strong>What it finds goes to the moderation queue for you to approve</strong>, except an eruv&rsquo;s status, which shows at once. If a watch stops working, you&rsquo;re emailed once, and again when it works.
+        What the guide reads on its own to stay current: pages every morning, emails as they arrive. <strong>What it finds waits on each job&rsquo;s page, beside what the listing says, for you to update or skip</strong>; a page no job reads goes to the moderation queue, and an eruv&rsquo;s status shows at once. If a watch stops working, you&rsquo;re emailed once, and again when it works.
       </p>
       <section className="rounded-lg border border-slate-200 bg-white" aria-label="Jobs">
         <ul className="divide-y divide-slate-100">
@@ -861,14 +869,14 @@ export default function WatchesManager({ token }: { token: string }) {
                 ? `${jobs.hospitals.length} hospital${jobs.hospitals.length === 1 ? '' : 's'}, from Refuah${hospitalsNothing ? ` · ${hospitalsNothing} with nothing there yet` : ''}`
                 : 'Hospitals, from Refuah'
             }
-            counts={jobs.hospitals && hospitalCounts(jobs.hospitals, now)}
+            counts={hospitalStates ? hospitalCounts(hospitalStates, now) : null}
           />
           {jobs.hours && jobs.hours.places.length > 0 && (
             <JobRow
               href={`${base}/watches/hours`}
               name={jobs.hours.name}
               about={`${jobs.hours.places.length} place${jobs.hours.places.length === 1 ? '' : 's'}, from their websites`}
-              counts={hoursCounts(jobs.hours.places.map((p) => ({ pages: p.pages.map((x) => x.watch), off: p.off })), now)}
+              counts={hoursCounts(jobs.hours.places.map((p) => ({ pages: p.pages.map((x) => x.watch), off: p.off, waiting: p.findings?.length })), now)}
             />
           )}
           {jobs.times && jobs.times.places.length > 0 && (
@@ -876,7 +884,7 @@ export default function WatchesManager({ token }: { token: string }) {
               href={`${base}/watches/times`}
               name={jobs.times.name}
               about={`${jobs.times.places.length} shul${jobs.times.places.length === 1 ? '' : 's'}, from their websites`}
-              counts={hoursCounts(jobs.times.places.map((p) => ({ pages: p.pages.map((x) => x.watch), off: p.off })), now)}
+              counts={hoursCounts(jobs.times.places.map((p) => ({ pages: p.pages.map((x) => x.watch), off: p.off, waiting: p.findings?.length })), now)}
             />
           )}
           <JobRow

@@ -19,9 +19,9 @@ import type { JobCounts } from './watchJobs'
 // certification', with each food place on it or not" (the plan, Oct 21).
 //
 // It compares the same way the two lists' daily reads do (keystoneWatch.ts,
-// mekorWatch.ts), so the page shows exactly what those reads file. They
-// still file to the moderation queue: what each difference became is
-// worked out from the suggestions they filed before (FiledState).
+// mekorWatch.ts), so the page shows exactly what those reads file. What
+// they file waits here, to compare (watchFindings.ts, step 6); what each
+// difference became is worked out from what they filed before (FiledState).
 //
 // Pure: the route reads the lists and the database.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -31,10 +31,9 @@ export type KosherList = 'keystone' | 'mekor'
 export const KOSHER_LIST_NAMES: Record<KosherList, string> = { keystone: 'Keystone-K’s list', mekor: 'Mekor Habracha’s list' }
 const WHO: Record<KosherList, string> = { keystone: 'Keystone-K', mekor: 'Mekor Habracha' }
 
-/** What became of a difference: a suggestion waiting in the moderation
- *  queue; one filed before and decided there (not filed again until the
- *  list or the listing changes); or neither yet, so the next morning's read
- *  files it. */
+/** What became of a difference: a finding waiting to compare; one filed
+ *  before and decided (not filed again until the list or the listing
+ *  changes); or neither yet, so the next morning's read files it. */
 export type FiledState = 'queued' | 'decided' | 'next'
 
 /** A list that has the place: its name for it, its page, and what it says
@@ -57,15 +56,17 @@ export type KosherPlace = {
 export type NewOnList = { name: string; address: string; on: OnList[]; archived: string | null; filed: FiledState }
 
 /** Where a place is on the page.
- *   to_check    a list differs from it, and that's in the queue or will be
+ *   to_check    a list differs from it, and that waits here or will
  *   decided     a list differs, but that was decided before
  *   checked     on a list, and the list agrees
  *   not_listed  on neither list: its hechsher is one they don't cover, or
  *               it names none */
 export type KosherSection = 'to_check' | 'decided' | 'checked' | 'not_listed'
 
-export function kosherSection(p: Pick<KosherPlace, 'on' | 'differences'>): KosherSection {
-  if (p.differences.some((d) => d.filed !== 'decided')) return 'to_check'
+/** `waiting`: how many of the lists' findings for it wait on the page
+ *  (watchFindings.ts), whatever the lists say now. */
+export function kosherSection(p: Pick<KosherPlace, 'on' | 'differences'> & { waiting?: number }): KosherSection {
+  if (p.waiting || p.differences.some((d) => d.filed !== 'decided')) return 'to_check'
   if (p.differences.length) return 'decided'
   return p.on.length ? 'checked' : 'not_listed'
 }
@@ -193,7 +194,7 @@ export const listWho = (list: KosherList) => WHO[list]
 /** The page's counts, for its row on the Watches tab. To check counts the
  *  places a list differs from and the places only a list has, unless
  *  decided before; didn't load counts the lists. */
-export function kosherCounts(places: readonly KosherPlace[], newPlaces: readonly NewOnList[], listsUnread: number): JobCounts & { notListed: number } {
+export function kosherCounts(places: readonly (KosherPlace & { waiting?: number })[], newPlaces: readonly NewOnList[], listsUnread: number): JobCounts & { notListed: number } {
   const of = (s: KosherSection) => places.filter((p) => kosherSection(p) === s).length
   return {
     checked: of('checked'),

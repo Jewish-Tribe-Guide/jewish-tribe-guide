@@ -1,12 +1,13 @@
 import { getAdminUserForCommunity } from '@/lib/adminAuth'
 import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
 import { listApprovedResources } from '@/lib/resourceStore'
-import { getAdminClient } from '@/lib/supabase/admin'
+import { jobFindings } from '@/lib/watchFindingStore'
+import { listCategories } from '@/lib/categoryStore'
 import { addWatch, listWatches, removeWatch, updateWatch } from '@/lib/watchStore'
 import { runAndRecord } from '@/lib/watchRunner'
 import { normalizeWatchUrl, type Watch } from '@/lib/watches'
 import { UUID } from '@/lib/itemMarkRoutes'
-import { REFUAH_WATCH_NAME, refuahHospitalId } from '@/lib/refuahWatch'
+import { refuahHospitalId } from '@/lib/refuahWatch'
 import { readRefuahNear } from '@/lib/refuahRun'
 import {
   HOSPITAL_CATEGORY,
@@ -34,8 +35,9 @@ import type { DirectoryResource } from '@/types'
 // GET  /api/admin/watches/hospitals — the Watches tab's Hospitals page (the
 //      user, Oct 21): every hospital in the guide, with the Refuah page it's
 //      read from and where that came from (matched by map position, or given
-//      by hand), what the last read found (its watch's `lastCheck`), and how
-//      many of Refuah's suggestions for it wait in the moderation queue.
+//      by hand), what the last read found (its watch's `lastCheck`), what
+//      Refuah has that the listing doesn't, waiting to compare
+//      (watchFindings.ts), and when its last one was decided.
 //      `nearby`: Refuah's hospitals nearest it, for "Choose a different
 //      Refuah hospital". One request to Refuah per hospital (readRefuahNear).
 //      Admin only.
@@ -99,22 +101,9 @@ export async function GET(request: Request) {
     const matches = matchRefuah(hospitals, refuah)
     const names = new Map(hospitals.map((h) => [h.id, h.name]))
 
-    // Refuah's suggestions waiting in the queue, by hospital.
-    const pending = new Map<string, number>()
-    if (hospitals.length) {
-      const { data, error } = await getAdminClient()
-        .from('submission')
-        .select('target_id')
-        .eq('community_id', community.slug)
-        .eq('status', 'pending')
-        .eq('submitted_by->>name', REFUAH_WATCH_NAME)
-        .in(
-          'target_id',
-          hospitals.map((h) => h.id),
-        )
-      if (error) throw new Error(error.message)
-      for (const s of (data ?? []) as { target_id: string }[]) pending.set(s.target_id, (pending.get(s.target_id) ?? 0) + 1)
-    }
+    // What Refuah has that a listing doesn't, waiting here to compare, and
+    // when each hospital's last one was decided (watchFindings.ts).
+    const { findings, decided } = hospitals.length ? await jobFindings(community.slug, 'hospitals', await listCategories(community.slug)) : { findings: [], decided: new Map() }
 
     return Response.json({
       ok: true,
@@ -135,7 +124,8 @@ export async function GET(request: Request) {
             line: lineFor(h, watch, record, matches.get(h.id), names),
             refuah: record ? asRefuah(record) : null,
             nearby: nearestRefuah(h.geo, refuah).map((r) => ({ ...asRefuah(r), miles: r.miles })),
-            pending: pending.get(h.id) ?? 0,
+            findings: findings.filter((f) => f.targetId === h.id),
+            decided: decided.get(h.id) ?? null,
           }
         })
         .sort((a, b) => a.name.localeCompare(b.name)),

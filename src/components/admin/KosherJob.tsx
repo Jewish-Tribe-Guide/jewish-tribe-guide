@@ -10,16 +10,20 @@ import { adminBase } from '@/lib/adminNav'
 import { KOSHER_LIST_NAMES, kosherSection, listWho, type FiledState, type KosherList, type KosherPlace, type KosherSection, type NewOnList } from '@/lib/kosherJob'
 import type { JobCounts } from '@/lib/watchJobs'
 import type { Watch } from '@/lib/watches'
+import type { Finding } from '@/lib/watchFindings'
+import type { Decided } from '@/lib/watchFindingStore'
 import CollapsibleSection from './CollapsibleSection'
+import FindingCompare, { type Decision } from './FindingCompare'
 import { checkLine } from './WatchesManager'
 
 // ── The Watches tab's Kosher certification page (step 5, Oct 21) ────────────
 // Every food place in the guide, with what Keystone-K's and Mekor
 // Habracha's lists say about it next to what the listing says
 // (kosherJob.ts), and the places a list has that the guide doesn't. The
-// lists are read now, as each morning's read does. What differs still goes
-// to the moderation queue from that read, so each difference says where it
-// is: waiting there, decided there before, or filed tomorrow morning.
+// lists are read now, as each morning's read does. What differs waits here
+// from that read, on its place's row, to Compare and update or skip (step
+// 6, Oct 21): each difference says where it is, to compare, decided
+// before, or here after tomorrow morning's read.
 // The lists themselves are at the top: Check now, Pause, or start reading
 // one this guide doesn't read yet.
 
@@ -28,9 +32,14 @@ export type KosherLoaded = {
   available: boolean
   lists: KosherListState[]
   counts: JobCounts & { notListed: number }
-  places: (KosherPlace & { href: string })[]
-  newPlaces: NewOnList[]
+  places: Place[]
+  newPlaces: (NewOnList & { findings?: Finding[] })[]
+  /** What a list filed that matches no place now (the list changed since). */
+  others?: Finding[]
 }
+type Place = KosherPlace & { href: string; findings?: Finding[]; decided?: Decided | null }
+type Settled = ReadonlyMap<string, Decision>
+type Decide = { token: string; community: string; settled: Settled; onDecided: (f: Finding, d: Decision) => void }
 
 const BUTTON = 'rounded border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50'
 
@@ -41,9 +50,23 @@ function day(iso: string): string {
 }
 
 const FILED: Record<FiledState, string> = {
-  queued: 'in the moderation queue',
-  next: 'filed with tomorrow morning’s read',
-  decided: 'decided in the queue before',
+  queued: 'to compare',
+  next: 'here after tomorrow morning’s read',
+  decided: 'decided before',
+}
+
+/** Its findings, each to Compare, or saying what deciding did. */
+function Findings({ findings, decide: { token, community, settled, onDecided } }: { findings: readonly Finding[]; decide: Decide }) {
+  if (!findings.length) return null
+  return (
+    <ul className="mt-2 space-y-2">
+      {findings.map((f) => (
+        <li key={f.id}>
+          <FindingCompare finding={f} token={token} community={community} jobName="Kosher certification" decided={settled.get(f.id)} onDecided={(d) => onDecided(f, d)} />
+        </li>
+      ))}
+    </ul>
+  )
 }
 
 /** What the listing says about its kosher certification, in a line. */
@@ -76,7 +99,7 @@ function ListRow({ list: l, busy, onAct }: { list: KosherListState; busy: boolea
         <span className={`block text-sm ${l.error ? 'font-medium text-red-700' : 'text-slate-600'}`}>{listLine(l)}</span>
         {/* What its morning read compared and filed. */}
         {l.watch?.lastCheck ? (
-          <span className="block text-sm text-slate-600">{checkLine(l.watch.lastCheck)}</span>
+          <span className="block text-sm text-slate-600">{checkLine(l.watch.lastCheck, 'to check here')}</span>
         ) : l.watch?.lastOkAt ? (
           <span className="block text-sm text-slate-600">Read {day(l.watch.lastOkAt)}</span>
         ) : null}
@@ -103,9 +126,11 @@ function ListRow({ list: l, busy, onAct }: { list: KosherListState; busy: boolea
   )
 }
 
-function PlaceRow({ place: p, section, queueHref }: { place: KosherPlace & { href: string }; section: KosherSection; queueHref: string }) {
+function PlaceRow({ place: p, section, decide }: { place: Place; section: KosherSection; decide: Decide }) {
   const [open, setOpen] = useState(false)
-  const shown = section === 'to_check' ? p.differences.filter((d) => d.filed !== 'decided') : p.differences
+  const findings = p.findings ?? []
+  // One waiting to compare is said by its own box below.
+  const shown = (section === 'to_check' ? p.differences.filter((d) => d.filed !== 'decided') : p.differences).filter((d) => !(findings.length && d.filed === 'queued'))
   return (
     <li className="px-4 py-3" data-testid="kosher-place">
       <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} className="block w-full cursor-pointer text-left">
@@ -125,12 +150,13 @@ function PlaceRow({ place: p, section, queueHref }: { place: KosherPlace & { hre
           </svg>
         </span>
       </button>
+      <Findings findings={findings} decide={decide} />
       {open && (
         <div className="mt-2 space-y-2 text-sm">
           {p.on.length > 0 ? (
             <ul className="space-y-0.5 text-slate-700">
               {p.on.map((o) => (
-                <li key={o.list}>
+                <li key={`${o.list}:${o.url}`}>
                   <a href={o.url} target="_blank" rel="noopener noreferrer" className="text-primary underline">
                     {listWho(o.list)}
                   </a>{' '}
@@ -141,12 +167,11 @@ function PlaceRow({ place: p, section, queueHref }: { place: KosherPlace & { hre
           ) : (
             <p className="text-slate-700">On neither list.</p>
           )}
-          {shown.some((d) => d.filed === 'queued') && (
-            <Link href={queueHref} className="block font-semibold text-primary hover:underline">
-              Approve or reject it in the moderation queue
-            </Link>
+          {section === 'decided' && (
+            <p className="text-slate-700">
+              {p.decided ? `${p.decided.status === 'approved' ? 'Updated on the listing' : 'Skipped'} ${day(p.decided.at)}` : 'Decided before'}. Shown again if the list or the listing changes.
+            </p>
           )}
-          {section === 'decided' && <p className="text-slate-700">Not filed again until the list or the listing changes.</p>}
           <a href={p.href} target="_blank" rel="noopener noreferrer" className="block font-semibold text-primary hover:underline">
             Open its listing
           </a>
@@ -156,13 +181,13 @@ function PlaceRow({ place: p, section, queueHref }: { place: KosherPlace & { hre
   )
 }
 
-function NewRow({ place: n, queueHref }: { place: NewOnList; queueHref: string }) {
+function NewRow({ place: n, decide }: { place: NewOnList & { findings?: Finding[] }; decide: Decide }) {
   return (
     <li className="space-y-0.5 px-4 py-3 text-sm" data-testid="kosher-new">
       <p className="font-semibold text-slate-900">{n.name}</p>
       {n.address && <p className="text-slate-600">{n.address}</p>}
       {n.on.map((o) => (
-        <p key={o.list} className="text-slate-700">
+        <p key={`${o.list}:${o.url}`} className="text-slate-700">
           On{' '}
           <a href={o.url} target="_blank" rel="noopener noreferrer" className="text-primary underline">
             {KOSHER_LIST_NAMES[o.list]}
@@ -172,11 +197,9 @@ function NewRow({ place: n, queueHref }: { place: NewOnList; queueHref: string }
       ))}
       {n.archived && <p className="text-slate-700">The guide has it archived, as &ldquo;{n.archived}&rdquo;.</p>}
       {n.filed === 'queued' ? (
-        <Link href={queueHref} className="font-semibold text-primary hover:underline">
-          Approve or reject it in the moderation queue
-        </Link>
+        n.findings?.length ? <Findings findings={n.findings} decide={decide} /> : <p className="text-slate-600">Waiting to compare.</p>
       ) : (
-        <p className="text-slate-600">{n.filed === 'next' ? 'Filed with tomorrow morning’s read, unless Google says it has closed.' : 'Decided in the queue before.'}</p>
+        <p className="text-slate-600">{n.filed === 'next' ? 'Here to compare after tomorrow morning’s read, unless Google says it has closed.' : 'Decided before.'}</p>
       )}
     </li>
   )
@@ -188,6 +211,8 @@ export default function KosherJob({ token }: { token: string }) {
   const [error, setError] = useState<string | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [busy, setBusy] = useState<KosherList | null>(null)
+  // Findings updated or skipped this visit.
+  const [settled, setSettled] = useState<Settled>(new Map())
 
   const load = useCallback(async () => {
     setError(null)
@@ -225,14 +250,25 @@ export default function KosherJob({ token }: { token: string }) {
   if (error) return <div className="space-y-3">{back}<p className="bg-red-50 border border-red-200 rounded-md p-3 text-sm text-red-700">{error}</p></div>
   if (!data) return <div className="space-y-3">{back}<p className="text-sm text-muted">Reading the kosher lists…</p></div>
 
-  const queueHref = adminBase(community)
-  const inSection = (s: KosherSection) => data.places.filter((p) => kosherSection(p) === s)
+  const decide: Decide = {
+    token,
+    community,
+    settled,
+    onDecided: (f, d) => {
+      setSettled((m) => new Map(m).set(f.id, d))
+      setData((x) => x && { ...x, places: x.places.map((y) => (y.id === f.targetId ? { ...y, decided: { at: new Date().toISOString(), status: d } } : y)) })
+    },
+  }
+  // A place stays in To check while it has a finding here, decided this
+  // visit or not, so it doesn't jump away under the admin's hand.
+  const inSection = (s: KosherSection) => data.places.filter((p) => kosherSection({ ...p, waiting: p.findings?.length }) === s)
+  const others = data.others ?? []
   const fresh = data.newPlaces.filter((n) => n.filed !== 'decided')
   const freshDecided = data.newPlaces.filter((n) => n.filed === 'decided')
   const rows = (list: (KosherPlace & { href: string })[], s: KosherSection) => (
     <ul className="divide-y divide-slate-100">
       {list.map((p) => (
-        <PlaceRow key={p.id} place={p} section={s} queueHref={queueHref} />
+        <PlaceRow key={p.id} place={p} section={s} decide={decide} />
       ))}
     </ul>
   )
@@ -246,7 +282,8 @@ export default function KosherJob({ token }: { token: string }) {
         <h2 className="text-lg font-semibold text-slate-900">Kosher certification</h2>
         <p className="text-sm text-muted">
           {plural(data.places.length, 'food place')}, compared every morning with Keystone-K&rsquo;s and Mekor Habracha&rsquo;s lists. What a list says that a
-          listing doesn&rsquo;t goes to the moderation queue for you to approve. Nothing is taken off without you.
+          listing doesn&rsquo;t waits on its row, beside what the listing says: Compare it, then update the listing or skip it. Nothing is taken off
+          without you.
         </p>
       </div>
       {!data.available && <p className="bg-amber-50 border border-amber-200 rounded-md p-3 text-sm text-amber-800">Keeping a list here needs database migration 070.</p>}
@@ -266,7 +303,18 @@ export default function KosherJob({ token }: { token: string }) {
       <section className="bg-white border border-slate-200 rounded-lg shadow-sm" aria-label="To check">
         <h3 className="px-4 pt-3 text-sm font-semibold text-slate-800">To check ({toCheck.length})</h3>
         <p className="px-4 pb-2 text-xs text-muted">A list says something about its certification the listing doesn&rsquo;t.</p>
-        {toCheck.length > 0 ? rows(toCheck, 'to_check') : <p className="px-4 pb-3 text-sm text-slate-600">None right now.</p>}
+        {toCheck.length > 0 ? rows(toCheck, 'to_check') : others.length === 0 && <p className="px-4 pb-3 text-sm text-slate-600">None right now.</p>}
+        {others.length > 0 && (
+          <ul className="divide-y divide-slate-100 border-t border-slate-100" aria-label="No longer matching a place">
+            {others.map((f) => (
+              <li key={f.id} className="px-4 py-3" data-testid="kosher-other">
+                <p className="font-semibold text-slate-900">{f.name}</p>
+                <p className="text-sm text-slate-600">From {f.from}, which no longer matches it to a place here.</p>
+                <Findings findings={[f]} decide={decide} />
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
       {fresh.length > 0 && (
         <section className="bg-white border border-slate-200 rounded-lg shadow-sm" aria-label="On a list, not in the guide">
@@ -274,7 +322,7 @@ export default function KosherJob({ token }: { token: string }) {
           <p className="px-4 pb-2 text-xs text-muted">Each is suggested as a new listing, once Google says it&rsquo;s open.</p>
           <ul className="divide-y divide-slate-100">
             {fresh.map((n) => (
-              <NewRow key={n.name} place={n} queueHref={queueHref} />
+              <NewRow key={n.name} place={n} decide={decide} />
             ))}
           </ul>
         </section>
@@ -283,12 +331,12 @@ export default function KosherJob({ token }: { token: string }) {
         {rows(inSection('checked'), 'checked')}
       </CollapsibleSection>
       {(inSection('decided').length > 0 || freshDecided.length > 0) && (
-        <CollapsibleSection title="Decided before" description="A list differs, and that was approved or rejected in the queue. Not filed again until the list or the listing changes." count={inSection('decided').length + freshDecided.length} contentClassName="">
+        <CollapsibleSection title="Decided before" description="A list differs, and that was updated or skipped before. Shown again if the list or the listing changes." count={inSection('decided').length + freshDecided.length} contentClassName="">
           {rows(inSection('decided'), 'decided')}
           {freshDecided.length > 0 && (
             <ul className="divide-y divide-slate-100 border-t border-slate-100">
               {freshDecided.map((n) => (
-                <NewRow key={n.name} place={n} queueHref={queueHref} />
+                <NewRow key={n.name} place={n} decide={decide} />
               ))}
             </ul>
           )}

@@ -8,7 +8,10 @@ const m = vi.hoisted(() => ({
   readMekorList: vi.fn(),
   rows: {} as Record<string, unknown[]>,
   filters: [] as [string, string, unknown][],
+  jobFindings: vi.fn(),
 }))
+vi.mock('@/lib/watchFindingStore', () => ({ jobFindings: m.jobFindings }))
+vi.mock('@/lib/categoryStore', () => ({ listCategories: async () => [] }))
 vi.mock('@/lib/adminAuth', () => ({ getAdminUserForCommunity: m.getAdminUserForCommunity }))
 vi.mock('@/lib/communityStore', () => ({ communitySlugFromRequest: () => 'philly', resolveCommunity: async () => ({ slug: 'philly' }) }))
 vi.mock('@/lib/watchStore', () => ({ listWatches: m.listWatches }))
@@ -73,6 +76,7 @@ beforeEach(() => {
   m.listWatches.mockResolvedValue({ watches: [KEYSTONE, MEKOR], available: true })
   m.readKeystoneList.mockResolvedValue({ entries: [judahEntry] })
   m.readMekorList.mockResolvedValue({ error: 'Mekor Habracha’s list answered 503' })
+  m.jobFindings.mockResolvedValue({ findings: [], decided: new Map() })
 })
 
 describe('GET /api/admin/watches/kosher', () => {
@@ -115,6 +119,23 @@ describe('GET /api/admin/watches/kosher', () => {
     const body = await (await GET(req())).json()
     expect(body.places[0].differences.map((d: { filed: string }) => d.filed)).toEqual(['decided', 'decided'])
     expect(body.counts.toCheck).toBe(0)
+  })
+
+  // Step 6: what its reads filed waits beside the place, to compare.
+  it('each finding beside its place, a new place’s by name, and one matching neither on its own', async () => {
+    const f = (id: string, over: object) => ({ id, operation: 'update', targetId: null, name: '', lines: [], ...over })
+    const mine = f('f1', { targetId: judah.id })
+    const fresh = f('f2', { operation: 'create', name: 'Holy Bagel' })
+    const stray = f('f3', { operation: 'create', name: 'Long Gone Deli' })
+    m.jobFindings.mockResolvedValue({ findings: [mine, fresh, stray], decided: new Map() })
+    m.readKeystoneList.mockResolvedValue({ entries: [judahEntry, { ...judahEntry, slug: 'holy-bagel', url: 'https://keystone-k.org/kosher/holy-bagel/', name: 'Holy Bagel' }] })
+    const body = await (await GET(req())).json()
+    expect(body.places[0]).toMatchObject({ findings: [mine], waiting: 1 })
+    expect(body.newPlaces).toEqual([expect.objectContaining({ name: 'Holy Bagel', findings: [fresh] })])
+    expect(body.others).toEqual([stray])
+    // Judah, Holy Bagel and the stray one.
+    expect(body.counts.toCheck).toBe(3)
+    expect(m.jobFindings).toHaveBeenCalledWith('philly', 'kosher', [])
   })
 
   it('a paused list isn’t read, and a list with no watch is offered', async () => {
