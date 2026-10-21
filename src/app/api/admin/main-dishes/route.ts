@@ -6,7 +6,7 @@ import { getAdminClient } from '@/lib/supabase/admin'
 import { revalidatePublicContent } from '@/lib/revalidateContent'
 import { itemsField, listingFacts } from '@/lib/listingView'
 import { addedItemName, cleanItemName, itemMarks, itemWording } from '@/lib/itemMarks'
-import { findMenus, isOrderingApp, readMenu, readMenus, readMenuPage, MAX_DISHES, type MenuDish } from '@/lib/menuReader'
+import { findMenus, isOrderingApp, readMenu, readMenus, readMenuPage, troubleClause, unreadMenuNote, MAX_DISHES, type MenuDish, type Trouble } from '@/lib/menuReader'
 import { MENU_LINK_KEY, readMenuLink } from '@/lib/menuLink'
 import {
   clearMenuReading,
@@ -164,11 +164,13 @@ export async function POST(request: Request) {
       // Its menu link when that can be read, else the pages its website
       // links to as its menu, best first, until one names dishes. A page
       // drawn by a script is drawn in a browser (renderPage.ts).
+      // Why each couldn't be read, the first reason each, for the note.
       const renderer = pageRenderer()
+      const trouble: { link?: Trouble; site?: Trouble } = {}
       let sources
       try {
-        const linked = menuUrl ? await readMenuPage(menuUrl, { render: renderer.render }) : null
-        sources = linked ? [linked] : website ? await findMenus(website, { render: renderer.render }) : []
+        const linked = menuUrl ? await readMenuPage(menuUrl, { render: renderer.render, trouble: (t) => void (trouble.link ??= t) }) : null
+        sources = linked ? [linked] : website ? await findMenus(website, { render: renderer.render, trouble: (t) => void (trouble.site ??= t) }) : []
       } finally {
         await renderer.close()
       }
@@ -177,7 +179,7 @@ export async function POST(request: Request) {
           status: 'failed',
           sourceUrl: menuUrl ?? website,
           dishes: [],
-          note: menuUrl ? `Couldn’t read its menu link${website ? ' or a menu on its website' : ''}.` : website ? 'Couldn’t read a menu on its website.' : 'No website or menu link to read.',
+          note: unreadMenuNote(menuUrl, website, trouble),
           model: null,
         })
         return Response.json({ ok: true, reading })
@@ -201,7 +203,8 @@ export async function POST(request: Request) {
       const apiKey = process.env.OPENAI_API_KEY
       if (!apiKey) return Response.json({ ok: true, menuUrl: url, reading: null })
       const renderer = pageRenderer()
-      const source = await readMenuPage(url, { render: renderer.render }).finally(() => renderer.close())
+      const linkTrouble: { t?: Trouble } = {}
+      const source = await readMenuPage(url, { render: renderer.render, trouble: (t) => void (linkTrouble.t ??= t) }).finally(() => renderer.close())
       const read = source ? (await readMenus([source], listing.name, { apiKey }))! : null
       const reading = await saveMenuReading(community.slug, resourceId, {
         status: read?.dishes.length ? 'proposed' : 'failed',
@@ -211,7 +214,7 @@ export async function POST(request: Request) {
           ? read.note
           : isOrderingApp(url)
             ? 'Saved as its menu link. The reader doesn’t open ordering apps: add photos of the menu.'
-            : 'Saved as its menu link, but it couldn’t be read (blocked, or nothing on it). Add photos of the menu.',
+            : `Saved as its menu link, but it couldn’t be read${linkTrouble.t ? `: ${troubleClause(linkTrouble.t)}` : ''}. Add photos of the menu.`,
         model: read?.model ?? null,
       })
       return Response.json({ ok: true, menuUrl: url, reading })

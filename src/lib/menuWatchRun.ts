@@ -2,7 +2,7 @@ import { getAdminClient } from '@/lib/supabase/admin'
 import { listCategoriesUncached } from '@/lib/categoryStore'
 import { getResourceRowById, normalizeRow } from '@/lib/resourceStore'
 import { keepsMenuLink } from '@/lib/menuLink'
-import { readMenu, readMenuPage } from '@/lib/menuReader'
+import { readMenu, readMenuPage, troubleClause, type Render, type Trouble } from '@/lib/menuReader'
 import { getMenuReading, saveMenuReading } from '@/lib/menuReadingStore'
 import { addWatch, listWatches, removeWatch } from '@/lib/watchStore'
 import { changedMenuNote, listedDishes, menuHash, MENU_AI_READS_PER_RUN, MENU_WATCH_CREATOR, menuWatchChanges, newDishes, wantedMenuWatches } from '@/lib/menuWatch'
@@ -86,24 +86,27 @@ export async function runMenuWatch(
   // of budget isn't a failure: it's read on a run with room.
   let undrawn = false
   const renderer = opts.renderer === undefined ? pageRenderer() : opts.renderer
-  const render =
-    renderer?.render &&
-    (async (url: string) => {
-      if (budget && !opts.full) {
-        if ((budget.renders ?? 0) <= 0) {
-          undrawn = true
-          return null
+  const render: Render | null =
+    renderer?.render
+      ? async (url, trouble) => {
+          if (budget && !opts.full) {
+            if ((budget.renders ?? 0) <= 0) {
+              undrawn = true
+              return null
+            }
+            budget.renders!--
+          }
+          return renderer.render!(url, trouble)
         }
-        budget.renders!--
-      }
-      return renderer.render!(url)
-    })
-  const source = await readMenuPage(watch.url, { fetchImpl: opts.fetchImpl, render }).finally(() => renderer?.close())
+      : null
+  // Why it couldn't be read, the first reason, for the watch's error.
+  const trouble: { t?: Trouble } = {}
+  const source = await readMenuPage(watch.url, { fetchImpl: opts.fetchImpl, render, trouble: (t) => void (trouble.t ??= t) }).finally(() => renderer?.close())
   if (!source && undrawn) return { ok: true, filed: 0 }
   if (!source) {
     return {
       ok: false,
-      error: 'Couldn’t read the menu (blocked, moved, or built in the browser)',
+      error: trouble.t ? `Couldn’t read the menu: ${troubleClause(trouble.t)}` : 'Couldn’t read the menu (blocked, moved, or built in the browser)',
       ...(opts.full ? { check: { what: 'dishes', from: null, result: 'unreadable', read: [], differences: [], queue: null } as const } : {}),
     }
   }

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { fetchPublic, findMenu, findMenus, htmlToText, isOrderingApp, isPrivateAddress, MAX_MENU_PAGES, MAX_MENU_PICTURES, menuLinks, menuMessages, menuPictures, readMenu, readMenuPage, readMenus, tidyMenuReading, type MenuSource } from './menuReader'
+import { fetchPublic, findMenu, findMenus, htmlToText, isOrderingApp, isPrivateAddress, MAX_MENU_PAGES, MAX_MENU_PICTURES, menuLinks, menuMessages, menuPictures, readMenu, readMenuPage, readMenus, tidyMenuReading, troubleClause, unreadMenuNote, type MenuSource, type Trouble } from './menuReader'
 
 const publicDns = async () => ['93.184.216.34']
 const page = (body: string, type = 'text/html; charset=utf-8', status = 200, headers: Record<string, string> = {}) =>
@@ -446,5 +446,96 @@ describe('a page drawn by a script', () => {
     expect(await readMenuPage('https://pizza.example/', { fetchImpl: vi.fn().mockResolvedValue(new Response('no', { status: 403 })), resolve: publicDns, render: refused })).toBeNull()
     expect(await findMenus('https://pizza.example/', { fetchImpl: vi.fn().mockResolvedValue(new Response('no', { status: 403 })), resolve: publicDns, render: refused })).toEqual([])
     expect(refused).not.toHaveBeenCalled()
+  })
+})
+
+// Oct 21: Ben & Jerry's, Center City Pretzel, Insomnia and Diane's read on a
+// laptop and not on the site, and "Couldn't read a menu on its website"
+// couldn't say why. The reader now says what it was told, page by page.
+describe('why a page couldn’t be read', () => {
+  const told = () => {
+    const heard: Trouble[] = []
+    return { heard, trouble: (t: Trouble) => void heard.push(t) }
+  }
+  const empty = '<div id="root"></div><script src="/app.js"></script>'
+
+  it('turned away, missing, broken, silent, not public, or not a page', async () => {
+    const cases: [() => Promise<Response>, Trouble][] = [
+      [async () => new Response('no', { status: 403 }), { why: 'refused', status: 403 }],
+      [async () => new Response('no', { status: 429 }), { why: 'refused', status: 429 }],
+      [async () => new Response('no', { status: 404 }), { why: 'error', status: 404 }],
+      [async () => new Response('no', { status: 500 }), { why: 'error', status: 500 }],
+      [async () => { throw Object.assign(new Error('slow'), { name: 'TimeoutError' }) }, { why: 'unreachable', timedOut: true }],
+      [async () => { throw new TypeError('fetch failed') }, { why: 'unreachable', timedOut: false }],
+      [async () => page('x', 'application/zip'), { why: 'not_a_page' }],
+    ]
+    for (const [answer, want] of cases) {
+      const { heard, trouble } = told()
+      expect(await fetchPublic('https://site.example/', { fetchImpl: vi.fn(answer), resolve: publicDns, trouble })).toBeNull()
+      expect(heard).toEqual([want])
+    }
+    const { heard, trouble } = told()
+    expect(await fetchPublic('https://site.example/', { resolve: async () => ['10.0.0.1'], trouble })).toBeNull()
+    expect(heard).toEqual([{ why: 'not_public' }])
+  })
+
+  it('a page read is no trouble', async () => {
+    const { heard, trouble } = told()
+    expect(await fetchPublic('https://site.example/', { fetchImpl: vi.fn().mockResolvedValue(page('<p>hi</p>')), resolve: publicDns, trouble })).not.toBeNull()
+    expect(heard).toEqual([])
+  })
+
+  it('an empty page with no way to draw it; drawn, still empty; or why the browser couldn’t draw it', async () => {
+    const fetchImpl = () => vi.fn().mockImplementation(async () => page(empty))
+    let t = told()
+    expect(await findMenus('https://cookies.example', { fetchImpl: fetchImpl(), resolve: publicDns, trouble: t.trouble })).toEqual([])
+    expect(t.heard).toEqual([{ why: 'empty' }])
+
+    t = told()
+    await findMenus('https://cookies.example', { fetchImpl: fetchImpl(), resolve: publicDns, trouble: t.trouble, render: async (url) => ({ url, body: empty }) })
+    expect(t.heard).toEqual([{ why: 'drawn_empty' }])
+
+    t = told()
+    await findMenus('https://cookies.example', {
+      fetchImpl: fetchImpl(),
+      resolve: publicDns,
+      trouble: t.trouble,
+      render: async (_url, trouble) => {
+        trouble?.({ why: 'refused', status: 403 })
+        return null
+      },
+    })
+    expect(t.heard).toEqual([{ why: 'refused', status: 403 }])
+
+    t = told()
+    expect(await readMenuPage('https://mikes.example/menu', { fetchImpl: fetchImpl(), resolve: publicDns, trouble: t.trouble, render: async (url) => ({ url, body: empty }) })).toBeNull()
+    expect(t.heard).toEqual([{ why: 'drawn_empty' }])
+
+    t = told()
+    expect(await readMenuPage('https://mikes.example/menu', { fetchImpl: fetchImpl(), resolve: publicDns, trouble: t.trouble })).toBeNull()
+    expect(t.heard).toEqual([{ why: 'empty' }])
+
+    t = told()
+    expect(await readMenuPage('https://order.toasttab.com/x', { trouble: t.trouble })).toBeNull()
+    expect(t.heard).toEqual([{ why: 'ordering_app' }])
+  })
+
+  it('says each in words, and what was tried', () => {
+    expect(troubleClause({ why: 'refused', status: 403 })).toBe('it turned the reader away (403)')
+    expect(troubleClause({ why: 'error', status: 404 })).toBe('it says the page isn’t there (404)')
+    expect(troubleClause({ why: 'error', status: 500 })).toBe('it answered with an error (500)')
+    expect(troubleClause({ why: 'unreachable', timedOut: true })).toBe('it didn’t answer in time')
+    expect(troubleClause({ why: 'draw_failed', detail: 'net::ERR_ABORTED' })).toBe('it’s drawn by a script, and the browser couldn’t draw it (net::ERR_ABORTED)')
+    expect(unreadMenuNote(null, 'https://x.example', { site: { why: 'person_check' } })).toBe('Couldn’t read a menu on its website: it asked the reader to prove it’s a person, which it never does.')
+    expect(unreadMenuNote(null, 'https://x.example', {})).toBe('Couldn’t read a menu on its website.')
+    expect(unreadMenuNote('https://x.example/menu', null, { link: { why: 'empty' } })).toBe('Couldn’t read its menu link: it has almost no words on it and no menu pictures.')
+    expect(unreadMenuNote(null, null, {})).toBe('No website or menu link to read.')
+  })
+
+  it('a chain’s own ordering site (order.…) is an ordering app; a word that merely starts with “order” isn’t', () => {
+    expect(isOrderingApp('https://order.benjerry.com/menu/upenn?canRedirect=True')).toBe(true)
+    expect(isOrderingApp('https://ordering.example.com/')).toBe(true)
+    expect(isOrderingApp('https://orderly.example.com/')).toBe(false)
+    expect(isOrderingApp('https://www.benjerry.com/scoop-shops/menu')).toBe(false)
   })
 })

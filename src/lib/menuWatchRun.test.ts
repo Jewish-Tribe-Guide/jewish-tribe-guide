@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { makeCategory } from '@/test/providerFixtures'
 import { menuHash, MENU_WATCH_CREATOR } from './menuWatch'
+import type { Trouble } from './menuReader'
 
 const m = vi.hoisted(() => ({
   listCategoriesUncached: vi.fn(),
@@ -204,5 +205,21 @@ describe('a menu drawn by a script', () => {
 
     const nothing = { render: vi.fn(async () => null), close: vi.fn(async () => {}) }
     expect((await runMenuWatch(watch, newMenuReadBudget(), { apiKey: 'k', renderer: nothing })).ok).toBe(false)
+  })
+
+  // Oct 21: the watch says why, as the Main dishes tab does.
+  it('a menu that can’t be read says why: the reader’s own reason, or the browser’s', async () => {
+    m.readMenuPage.mockImplementation(async (_url: string, opts: { trouble?: (t: unknown) => void }) => {
+      opts.trouble?.({ why: 'refused', status: 403 })
+      return null
+    })
+    expect(await runMenuWatch(watch, newMenuReadBudget(), { apiKey: 'k', renderer: null })).toEqual({ ok: false, error: 'Couldn’t read the menu: it turned the reader away (403)' })
+
+    m.readMenuPage.mockImplementation(async (url: string, opts: { render?: ((u: string, t: (t: unknown) => void) => Promise<unknown>) | null; trouble?: (t: unknown) => void }) => {
+      await opts.render?.(url, opts.trouble!)
+      return null
+    })
+    const slow = { render: vi.fn(async (_u: string, trouble?: (t: Trouble) => void) => (trouble?.({ why: 'draw_timeout' }), null)), close: vi.fn(async () => {}) }
+    expect(await runMenuWatch(watch, newMenuReadBudget(), { apiKey: 'k', renderer: slow })).toEqual({ ok: false, error: 'Couldn’t read the menu: it’s drawn by a script, and took too long to draw' })
   })
 })

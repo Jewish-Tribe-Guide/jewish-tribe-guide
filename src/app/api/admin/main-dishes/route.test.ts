@@ -124,7 +124,7 @@ describe('/api/admin/main-dishes', () => {
     m.readMenu.mockResolvedValue({ sourceUrl: 'https://judah.example/menu', dishes: [{ name: 'Shawarma', quote: 'Shawarma plate', checked: true }], note: null, model: 'gpt' })
     const res = await POST(req('POST', { action: 'read', resourceId: ID }))
     expect(res.status).toBe(200)
-    expect(m.findMenu).toHaveBeenCalledWith('https://judah.example', { render })
+    expect(m.findMenu).toHaveBeenCalledWith('https://judah.example', { render, trouble: expect.any(Function) })
     expect(m.saveMenuReading).toHaveBeenCalledWith('philly', ID, expect.objectContaining({ status: 'proposed', dishes: [{ name: 'Shawarma', quote: 'Shawarma plate', checked: true }] }))
     // Proposed is not shown: nothing touches the listing.
     expect(m.rpc).not.toHaveBeenCalled()
@@ -138,14 +138,14 @@ describe('/api/admin/main-dishes', () => {
     m.readMenuPage.mockResolvedValue({ url: 'https://judah.example/menu.pdf', text: null, pdf: 'JVBER' })
     m.readMenu.mockResolvedValue({ sourceUrl: 'https://judah.example/menu.pdf', dishes: [{ name: 'Shawarma', quote: 'Shawarma', checked: false }], note: null, model: 'gpt' })
     await POST(req('POST', { action: 'read', resourceId: ID }))
-    expect(m.readMenuPage).toHaveBeenCalledWith('https://judah.example/menu.pdf', { render })
+    expect(m.readMenuPage).toHaveBeenCalledWith('https://judah.example/menu.pdf', { render, trouble: expect.any(Function) })
     expect(m.findMenu).not.toHaveBeenCalled()
     expect(m.readMenu).toHaveBeenCalledWith(expect.objectContaining({ url: 'https://judah.example/menu.pdf' }), 'Judah', expect.anything())
 
     m.readMenuPage.mockResolvedValue(null)
     m.findMenu.mockResolvedValue({ url: 'https://judah.example/food', text: 'menu', pdf: null })
     await POST(req('POST', { action: 'read', resourceId: ID }))
-    expect(m.findMenu).toHaveBeenCalledWith('https://judah.example', { render })
+    expect(m.findMenu).toHaveBeenCalledWith('https://judah.example', { render, trouble: expect.any(Function) })
   })
 
   // Oct 20: a page drawn by a script is drawn in a browser (renderPage.ts),
@@ -154,6 +154,33 @@ describe('/api/admin/main-dishes', () => {
     m.findMenu.mockRejectedValue(new Error('boom'))
     expect((await POST(req('POST', { action: 'read', resourceId: ID }))).status).toBe(502)
     expect(closeRenderer).toHaveBeenCalledTimes(1)
+  })
+
+  // Oct 21: four places read on a laptop and not on the site, and the note
+  // couldn't say why. It now says what the reader was told.
+  it('a website that can’t be read says why, and a menu link and website each say theirs', async () => {
+    m.findMenu.mockImplementation(async (_url: string, opts: { trouble?: (t: unknown) => void }) => {
+      opts.trouble?.({ why: 'refused', status: 403 })
+      opts.trouble?.({ why: 'drawn_empty' })
+      return null
+    })
+    await POST(req('POST', { action: 'read', resourceId: ID }))
+    expect(m.saveMenuReading).toHaveBeenLastCalledWith('philly', ID, expect.objectContaining({ status: 'failed', note: 'Couldn’t read a menu on its website: it turned the reader away (403).' }))
+
+    m.getResourceById.mockResolvedValue({ ...judah, menuUrl: 'https://judah.example/menu' })
+    m.readMenuPage.mockImplementation(async (_url: string, opts: { trouble?: (t: unknown) => void }) => {
+      opts.trouble?.({ why: 'draw_timeout' })
+      return null
+    })
+    await POST(req('POST', { action: 'read', resourceId: ID }))
+    expect(m.saveMenuReading).toHaveBeenLastCalledWith('philly', ID, expect.objectContaining({
+      note: 'Couldn’t read its menu link: it’s drawn by a script, and took too long to draw. Couldn’t read a menu on its website either: it turned the reader away (403).',
+    }))
+
+    await POST(req('POST', { action: 'link', resourceId: ID, url: 'https://judah.example/menu' }))
+    expect(m.saveMenuReading).toHaveBeenLastCalledWith('philly', ID, expect.objectContaining({
+      note: 'Saved as its menu link, but it couldn’t be read: it’s drawn by a script, and took too long to draw. Add photos of the menu.',
+    }))
   })
 
   it('lists each place’s menu link, for the tab to say what it reads', async () => {
@@ -211,7 +238,7 @@ describe('/api/admin/main-dishes', () => {
       const body = await (await POST(req('POST', { action: 'link', resourceId: ID, url: 'judah.example/menu' }))).json()
       expect(m.saveMenuLink).toHaveBeenCalledWith('philly', ID, 'https://judah.example/menu')
       expect(m.revalidatePublicContent).toHaveBeenCalled()
-      expect(m.readMenuPage).toHaveBeenCalledWith('https://judah.example/menu', { render })
+      expect(m.readMenuPage).toHaveBeenCalledWith('https://judah.example/menu', { render, trouble: expect.any(Function) })
       expect(closeRenderer).toHaveBeenCalled()
       expect(m.findMenu).not.toHaveBeenCalled()
       expect(body).toMatchObject({ ok: true, menuUrl: 'https://judah.example/menu', reading: { status: 'proposed' } })
@@ -223,7 +250,7 @@ describe('/api/admin/main-dishes', () => {
       expect(m.saveMenuLink).toHaveBeenCalledWith('philly', ID, 'https://www.toasttab.com/judah')
       expect(m.saveMenuReading).toHaveBeenLastCalledWith('philly', ID, expect.objectContaining({ status: 'failed', sourceUrl: 'https://www.toasttab.com/judah', note: expect.stringMatching(/doesn’t open ordering apps: add photos/) }))
       await POST(req('POST', { action: 'link', resourceId: ID, url: 'https://judah.example/menu' }))
-      expect(m.saveMenuReading).toHaveBeenLastCalledWith('philly', ID, expect.objectContaining({ status: 'failed', note: expect.stringMatching(/couldn’t be read .* Add photos/) }))
+      expect(m.saveMenuReading).toHaveBeenLastCalledWith('philly', ID, expect.objectContaining({ status: 'failed', note: expect.stringMatching(/couldn’t be read.* Add photos/) }))
       expect(m.readMenu).not.toHaveBeenCalled()
     })
 

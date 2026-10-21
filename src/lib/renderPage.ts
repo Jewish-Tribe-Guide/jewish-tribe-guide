@@ -1,4 +1,4 @@
-import { dnsLookup, htmlToText, isOrderingApp, MENU_FETCH_HEADERS, publicUrl, type Lookup, type Rendered } from './menuReader'
+import { dnsLookup, htmlToText, isOrderingApp, MENU_FETCH_HEADERS, publicUrl, refusal, type Lookup, type Render, type Trouble } from './menuReader'
 
 // ── Drawing a page as a browser does (the user, Oct 20) ─────────────────────
 // Some places' own sites send an empty page and a program that draws the
@@ -60,15 +60,29 @@ async function launch(): Promise<Browser> {
   return chromium.launch({ headless: true })
 }
 
+/** Why a page couldn't be drawn, from what the browser threw: a timeout,
+ *  or its first line, short (the admin reads it in a note). */
+export function drawTrouble(err: unknown): Trouble {
+  if (err instanceof Error && err.name === 'TimeoutError') return { why: 'draw_timeout' }
+  const line = (err instanceof Error ? err.message : String(err)).split('\n')[0].trim()
+  return { why: 'draw_failed', detail: line.length > 80 ? `${line.slice(0, 79)}…` : line || 'no reason given' }
+}
+
 /** A browser for drawing pages, opened on first use and kept for the rest
  *  of a request (findMenus may draw a home page and a menu page). Always
- *  `close()` it. `render` is null when it's turned off. */
-export function pageRenderer(opts: { resolve?: Lookup } = {}): { render: ((url: string) => Promise<Rendered | null>) | null; close: () => Promise<void> } {
+ *  `close()` it. `render` is null when it's turned off; it tells `trouble`
+ *  why a page couldn't be drawn. */
+export function pageRenderer(opts: { resolve?: Lookup } = {}): { render: Render | null; close: () => Promise<void> } {
   if (process.env.MENU_RENDER === 'off') return { render: null, close: async () => {} }
   const resolve = opts.resolve ?? dnsLookup
   let browser: Promise<Browser> | null = null
-  const render = async (url: string): Promise<Rendered | null> => {
-    if (isOrderingApp(url) || !(await publicUrl(url, resolve))) return null
+  const render: Render = async (url, trouble) => {
+    const fail = (t: Trouble) => {
+      trouble?.(t)
+      return null
+    }
+    if (isOrderingApp(url)) return fail({ why: 'ordering_app' })
+    if (!(await publicUrl(url, resolve))) return fail({ why: 'not_public' })
     let context: Awaited<ReturnType<Browser['newContext']>> | null = null
     try {
       browser ??= launch()
@@ -85,16 +99,19 @@ export function pageRenderer(opts: { resolve?: Lookup } = {}): { render: ((url: 
       await context.routeWebSocket(/.*/, (ws) => ws.close())
       const page = await context.newPage()
       const deadline = Date.now() + RENDER_TIMEOUT_MS
-      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: RENDER_TIMEOUT_MS })
+      const response = await page.goto(url, { waitUntil: 'domcontentloaded', timeout: RENDER_TIMEOUT_MS })
+      // A site can let the reader's plain fetch in and turn a browser away.
+      if (response && response.status() >= 400) return fail(refusal(response.status()))
       await page.waitForLoadState('networkidle', { timeout: Math.max(0, Math.min(SETTLE_MS, deadline - Date.now())) }).catch(() => {})
       const finalUrl = page.url()
-      if (isOrderingApp(finalUrl) || !(await publicUrl(finalUrl, resolve))) return null
+      if (isOrderingApp(finalUrl)) return fail({ why: 'ordering_app' })
+      if (!(await publicUrl(finalUrl, resolve))) return fail({ why: 'not_public' })
       const html = await page.content()
-      if (isChallenge(await page.title(), html)) return null
+      if (isChallenge(await page.title(), html)) return fail({ why: 'person_check' })
       return { url: finalUrl, body: html }
     } catch (err) {
       console.error('[renderPage] couldn’t draw', url, err instanceof Error ? err.message.split('\n')[0] : err)
-      return null
+      return fail(drawTrouble(err))
     } finally {
       await context?.close().catch(() => {})
     }

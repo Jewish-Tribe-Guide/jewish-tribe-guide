@@ -114,6 +114,11 @@ for that exact change, in the same conversation. Show the dry run first.
    Main dishes → Insomnia Cookies → "Read again" should come back with
    cookies, brownies and ice cream within about 20 seconds. It's the one
    part that can only run on Vercel (see "a menu page built by a script").
+   Oct 21: it ran there, but Insomnia came back as a cookie notice. Now
+   "Read again" on Ben & Jerry's, Center City Pretzel, Insomnia and
+   Diane's says why each fails (see "a menu that can't be read says why").
+4. **Go through the menus read, after that** (the user, Oct 21): for each
+   place read, what the reader got right and which dishes it missed.
 
 ## Getting the branch live
 
@@ -410,6 +415,51 @@ amazing … I want to see if that would have caught many."
 - Checked by tests (10 new, each failing against the old code; one
   caught Next.js images all counting as one picture, which hid Mordy's
   menu behind its header photo) and the re-read above.
+
+## Done Oct 21: a menu that can't be read says why (on `redesign/oct18-fixes`, not merged)
+
+The user, Oct 21: 11 places still couldn't be read on the preview. Three
+are ordering apps (Slices and Rolls and Stephen's on Toast, LUHV Deli on
+Square) and one has no website (The Brazilian BBQ). 20th Street Pizza's
+whole website is an ordering store, and it turns away anything that isn't
+a person's browser (403 to the reader and the browser): an ordering app,
+so a person's screenshots. Shlomo's is a market (No menu).
+
+That leaves four that read on a laptop and not on the site:
+- Ben & Jerry's (Ice Cream, Sundaes, Shakes, Sorbet)
+- Center City Pretzel (Pretzels)
+- Insomnia ×2 (Cookies, Brownies, Ice Cream, Cookie Sandwiches, Cookie Cakes)
+- Diane's (Cakes, Cupcakes, Tarts, Rugelach, Macaroons, Cookies, Kugel,
+  Challah, from her home page: no menu page, but it names them)
+
+None of their `robots.txt` keeps readers off those pages. The likely
+cause is that they turn away visits from cloud servers like Vercel's:
+benjerry.com answers a server's request for its `robots.txt` with 403;
+on the preview Insomnia's page was drawn but only its cookie notice came,
+as if its menu's own request was refused; Diane's needs no drawing at all.
+Not proved: the note said only "Couldn't read a menu on its website", and
+there's no access to Vercel's logs from here.
+
+- **Now the note says why:** the reader tells what it was told, page by
+  page (`Trouble` in `menuReader.ts`): turned away (403, 401, 429, 999),
+  not there (404), an error, no answer in time, not a public address, not
+  a page, an ordering app, asked to prove it's a person, drawn by a
+  script and too slow to draw, the browser's own error, drawn and still
+  empty, or almost no words and no menu pictures. The Main dishes tab
+  says it after "Couldn't read a menu on its website:" (and for a menu
+  link, and "Give its menu link"); the menu watch's error too. The browser
+  now also gives up on a page that answers it with an error (a site can
+  let a plain fetch in and turn a browser away).
+- **And a chain's ordering site is an ordering app:** an `order.`,
+  `orders.`, `ordering.` or `online-order.` subdomain. Ben & Jerry's sent
+  the browser to `order.benjerry.com` (its dishes came from its ordinary
+  menu page anyway).
+- **If it's cloud servers being turned away,** those places are like
+  Toast: a person's screenshots. Sending the reader through a home
+  connection to get past it would be getting round their block.
+- Checked by tests: 5 in `menuReader.test.ts`, 4 in `renderPage.test.ts`,
+  1 in `menuWatchRun.test.ts`, 1 in the route's; against the old code 12
+  fail (the 9 new ones that test a reason, and 3 updated expectations).
 
 ## Done Oct 20, later: a menu page built by a script is drawn in a browser (on `redesign/oct18-fixes`, not merged)
 

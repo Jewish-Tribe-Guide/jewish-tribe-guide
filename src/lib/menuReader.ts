@@ -124,6 +124,51 @@ export const MENU_FETCH_HEADERS: Record<string, string> = {
 
 export type Fetched = { url: string; type: 'html' | 'pdf'; body: string } | { url: string; type: 'picture'; body: string; mime: string }
 
+/** Why a page couldn't be read, so the Main dishes tab and the menu watch
+ *  say what happened, not just "couldn't read" (the user, Oct 21: four
+ *  places read on a laptop and not on the site, and the note couldn't say
+ *  why). Told to a `trouble` callback as the reader goes. */
+export type Trouble =
+  | { why: 'refused'; status: number }
+  | { why: 'error'; status: number }
+  | { why: 'unreachable'; timedOut: boolean }
+  | { why: 'not_public' }
+  | { why: 'not_a_page' }
+  | { why: 'ordering_app' }
+  | { why: 'person_check' }
+  | { why: 'draw_timeout' }
+  | { why: 'draw_failed'; detail: string }
+  | { why: 'drawn_empty' }
+  | { why: 'empty' }
+
+/** What a trouble did, said of "it" (the website, or the menu link). */
+export function troubleClause(t: Trouble): string {
+  switch (t.why) {
+    case 'refused':
+      return `it turned the reader away (${t.status})`
+    case 'error':
+      return t.status === 404 || t.status === 410 ? `it says the page isn’t there (${t.status})` : `it answered with an error (${t.status})`
+    case 'unreachable':
+      return t.timedOut ? 'it didn’t answer in time' : 'it couldn’t be reached'
+    case 'not_public':
+      return 'its address doesn’t lead to a public website'
+    case 'not_a_page':
+      return 'it sent something that isn’t a page, a PDF or a picture'
+    case 'ordering_app':
+      return 'it’s on an ordering app, which the reader stays off'
+    case 'person_check':
+      return 'it asked the reader to prove it’s a person, which it never does'
+    case 'draw_timeout':
+      return 'it’s drawn by a script, and took too long to draw'
+    case 'draw_failed':
+      return `it’s drawn by a script, and the browser couldn’t draw it (${t.detail})`
+    case 'drawn_empty':
+      return 'it’s drawn by a script, and once drawn it still showed no menu'
+    case 'empty':
+      return 'it has almost no words on it and no menu pictures'
+  }
+}
+
 /** The pictures a model can read. */
 const PICTURE_TYPES = ['image/jpeg', 'image/png', 'image/webp']
 
@@ -134,12 +179,22 @@ const PICTURE_TYPES = ['image/jpeg', 'image/png', 'image/webp']
  *  JPEG, PNG or WebP is read too, as base64 (a menu posted as a picture). */
 export async function fetchPublic(
   raw: string,
-  { fetchImpl = fetch, resolve = dnsLookup, headers, pictures = false }: { fetchImpl?: typeof fetch; resolve?: Lookup; headers?: Record<string, string>; pictures?: boolean } = {},
+  {
+    fetchImpl = fetch,
+    resolve = dnsLookup,
+    headers,
+    pictures = false,
+    trouble,
+  }: { fetchImpl?: typeof fetch; resolve?: Lookup; headers?: Record<string, string>; pictures?: boolean; trouble?: (t: Trouble) => void } = {},
 ): Promise<Fetched | null> {
+  const fail = (t: Trouble) => {
+    trouble?.(t)
+    return null
+  }
   let next = raw
   for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
     const url = await publicUrl(next, resolve)
-    if (!url) return null
+    if (!url) return fail({ why: 'not_public' })
     let res: Response
     try {
       res = await fetchImpl(url, {
@@ -147,30 +202,45 @@ export async function fetchPublic(
         signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
         headers: headers ?? MENU_FETCH_HEADERS,
       })
-    } catch {
-      return null
+    } catch (err) {
+      return fail({ why: 'unreachable', timedOut: err instanceof Error && err.name === 'TimeoutError' })
     }
     if (res.status >= 300 && res.status < 400) {
       const to = res.headers.get('location')
-      if (!to) return null
+      if (!to) return fail({ why: 'error', status: res.status })
       next = new URL(to, url).toString()
       continue
     }
-    if (!res.ok) return null
+    if (!res.ok) return fail(refusal(res.status))
     const type = (res.headers.get('content-type') ?? '').toLowerCase()
     const length = Number(res.headers.get('content-length') ?? 0)
-    if (length > MAX_BYTES) return null
+    if (length > MAX_BYTES) return fail({ why: 'not_a_page' })
     const bytes = new Uint8Array(await res.arrayBuffer())
-    if (bytes.byteLength > MAX_BYTES) return null
+    if (bytes.byteLength > MAX_BYTES) return fail({ why: 'not_a_page' })
     const isPdf = type.includes('application/pdf') || (bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46)
     if (isPdf) return { url: url.toString(), type: 'pdf', body: Buffer.from(bytes).toString('base64') }
     const picture = PICTURE_TYPES.find((t) => type.includes(t))
-    if (picture) return pictures ? { url: url.toString(), type: 'picture', body: Buffer.from(bytes).toString('base64'), mime: picture } : null
+    if (picture) return pictures ? { url: url.toString(), type: 'picture', body: Buffer.from(bytes).toString('base64'), mime: picture } : fail({ why: 'not_a_page' })
     // A calendar feed (text/calendar) is text too: a shul's page links its own (calendarFeed.ts).
-    if (type && !type.includes('html') && !type.includes('text/plain') && !type.includes('text/calendar')) return null
+    if (type && !type.includes('html') && !type.includes('text/plain') && !type.includes('text/calendar')) return fail({ why: 'not_a_page' })
     return { url: url.toString(), type: 'html', body: new TextDecoder().decode(bytes) }
   }
-  return null
+  return fail({ why: 'error', status: 310 })
+}
+
+/** The Main dishes tab's note for a place nothing could be read for: what
+ *  was tried, and why each failed when the reader knows. */
+export function unreadMenuNote(menuUrl: string | null, website: string | null, trouble: { link?: Trouble; site?: Trouble }): string {
+  const why = (t?: Trouble) => (t ? `: ${troubleClause(t)}` : '')
+  const site = (either: boolean) => `Couldn’t read a menu on its website${either ? ' either' : ''}${why(trouble.site)}.`
+  if (menuUrl) return `Couldn’t read its menu link${why(trouble.link)}.${website ? ` ${site(true)}` : ''}`
+  return website ? site(false) : 'No website or menu link to read.'
+}
+
+/** A page that answered with an error: turned away (401, 403, 429, or the
+ *  999 some sites give a reader), or broken some other way. */
+export function refusal(status: number): Trouble {
+  return [401, 403, 429, 999].includes(status) ? { why: 'refused', status } : { why: 'error', status }
 }
 
 // ── Reading a page ───────────────────────────────────────────────────────────
@@ -351,14 +421,16 @@ const ORDERING_APPS = ['doordash.com', 'ubereats.com', 'grubhub.com', 'seamless.
 
 /** The same apps on a place's own domain, known by their pages' address:
  *  a Square store's order page is /s/order wherever it's hosted (LUHV Vegan
- *  Deli's, Oct 21). */
+ *  Deli's, Oct 21), and a chain's ordering site is its order. subdomain
+ *  (Ben & Jerry's sends a browser to order.benjerry.com, Oct 21). */
 const ORDERING_APP_PATH = /^\/s\/order(\/|$)/i
+const ORDERING_APP_SUBDOMAIN = /^(order|orders|ordering|online-?order(ing)?)\./
 
 export function isOrderingApp(raw: string): boolean {
   try {
     const url = new URL(raw)
     const host = url.hostname.toLowerCase().replace(/^www\./, '')
-    return ORDERING_APPS.some((h) => host === h || host.endsWith(`.${h}`)) || ORDERING_APP_PATH.test(url.pathname)
+    return ORDERING_APPS.some((h) => host === h || host.endsWith(`.${h}`)) || ORDERING_APP_SUBDOMAIN.test(host) || ORDERING_APP_PATH.test(url.pathname)
   } catch {
     return false
   }
@@ -370,8 +442,10 @@ export type Rendered = { url: string; body: string }
 
 /** How the reader reaches pages. `render`, when given, draws a page that
  *  came back with almost no words and no menu pictures, as a browser does
- *  (renderPage.ts); without it such a page is given up on. */
-type Reach = { fetchImpl?: typeof fetch; resolve?: Lookup; render?: ((url: string) => Promise<Rendered | null>) | null }
+ *  (renderPage.ts), telling `trouble` why when it can't; without it such a
+ *  page is given up on. `trouble` hears why each page couldn't be read. */
+export type Render = (url: string, trouble?: (t: Trouble) => void) => Promise<Rendered | null>
+type Reach = { fetchImpl?: typeof fetch; resolve?: Lookup; render?: Render | null; trouble?: (t: Trouble) => void }
 
 /** At most this many pages are drawn in a browser for one website. */
 export const MAX_RENDERS = 3
@@ -394,12 +468,16 @@ export async function findMenus(website: string, opts: Reach = {}): Promise<Menu
   // browser when the caller can (MAX_RENDERS a website).
   let renders = 0
   const drawn = async (page: Rendered): Promise<Rendered | null> => {
-    if (!opts.render || renders >= MAX_RENDERS) return null
+    if (!opts.render || renders >= MAX_RENDERS) {
+      opts.trouble?.({ why: 'empty' })
+      return null
+    }
     renders++
-    return opts.render(page.url)
+    return opts.render(page.url, opts.trouble)
   }
   // Its links too: a script-drawn home page has none until it's drawn.
   const home: Rendered = (pageAsMenu(fetched, false) ? null : await drawn(fetched)) ?? fetched
+  if (home !== fetched && !pageAsMenu(home, false) && !menuLinks(home.body, home.url).length) opts.trouble?.({ why: 'drawn_empty' })
   const found: MenuSource[] = []
   for (const link of menuLinks(home.body, home.url).slice(0, MAX_MENU_PAGES + 1)) {
     if (found.length >= MAX_MENU_PAGES) break
@@ -419,6 +497,7 @@ export async function findMenus(website: string, opts: Reach = {}): Promise<Menu
     if (!menu) {
       const again = await drawn(page)
       menu = again && pageAsMenu(again, true)
+      if (again && !menu) opts.trouble?.({ why: 'drawn_empty' })
     }
     if (menu) found.push(menu)
   }
@@ -437,15 +516,24 @@ export async function findMenu(website: string, opts: Reach = {}): Promise<MenuS
  *  picture. Null when it can't be read, or it's an ordering app's (never
  *  fetched, see ORDERING_APPS). */
 export async function readMenuPage(url: string, opts: Reach = {}): Promise<MenuSource | null> {
-  if (isOrderingApp(url)) return null
+  if (isOrderingApp(url)) {
+    opts.trouble?.({ why: 'ordering_app' })
+    return null
+  }
   if (isPictureAddress(url)) return { url, text: null, pdf: null, pictures: [url] }
   const page = await fetchPublic(url, opts)
   if (!page) return null
   if (page.type === 'pdf') return { url: page.url, text: null, pdf: page.body }
   const menu = pageAsMenu(page, true)
-  if (menu || !opts.render) return menu
-  const drawn = await opts.render(page.url)
-  return drawn && pageAsMenu(drawn, true)
+  if (menu) return menu
+  if (!opts.render) {
+    opts.trouble?.({ why: 'empty' })
+    return null
+  }
+  const drawn = await opts.render(page.url, opts.trouble)
+  const read = drawn && pageAsMenu(drawn, true)
+  if (drawn && !read) opts.trouble?.({ why: 'drawn_empty' })
+  return read
 }
 
 // ── Asking the AI ────────────────────────────────────────────────────────────

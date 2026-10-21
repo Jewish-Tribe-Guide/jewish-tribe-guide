@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 const launch = vi.hoisted(() => vi.fn())
 vi.mock('playwright-core', () => ({ chromium: { launch } }))
 
-const { isChallenge, pageRenderer, requestAllowed } = await import('./renderPage')
+const { drawTrouble, isChallenge, pageRenderer, requestAllowed } = await import('./renderPage')
 
 const publicDns = async () => ['93.184.216.34']
 
@@ -40,5 +40,57 @@ describe('drawing a page as a browser does', () => {
     expect(launch).not.toHaveBeenCalled()
     vi.stubEnv('MENU_RENDER', 'off')
     expect(pageRenderer().render).toBeNull()
+  })
+
+  // Oct 21: why a page couldn't be drawn, for the admin's note.
+  describe('says why a page couldn’t be drawn', () => {
+    /** A browser whose one page answers as told. */
+    const browser = (answer: { status?: number; goto?: () => Promise<never>; url?: string; title?: string; html?: string }) => {
+      const page = {
+        goto: answer.goto ?? (async () => ({ status: () => answer.status ?? 200 })),
+        waitForLoadState: async () => {},
+        url: () => answer.url ?? 'https://cookies.example/',
+        content: async () => answer.html ?? '<p>Cookies</p>',
+        title: async () => answer.title ?? 'Cookies',
+      }
+      launch.mockResolvedValue({ newContext: async () => ({ route: async () => {}, routeWebSocket: async () => {}, newPage: async () => page, close: async () => {} }), close: async () => {} })
+    }
+    const draw = async () => {
+      const heard: unknown[] = []
+      const { render, close } = pageRenderer({ resolve: publicDns })
+      const got = await render!('https://cookies.example/', (t) => void heard.push(t))
+      await close()
+      return { got, heard }
+    }
+
+    it('turned away, sent to an ordering app, asked to prove it’s a person, or too slow', async () => {
+      browser({ status: 403 })
+      expect(await draw()).toEqual({ got: null, heard: [{ why: 'refused', status: 403 }] })
+      browser({ url: 'https://order.toasttab.com/online/cookies' })
+      expect(await draw()).toEqual({ got: null, heard: [{ why: 'ordering_app' }] })
+      browser({ title: 'Just a moment...' })
+      expect(await draw()).toEqual({ got: null, heard: [{ why: 'person_check' }] })
+      browser({ goto: async () => { throw Object.assign(new Error('page.goto: Timeout 15000ms exceeded.\nCall log: …'), { name: 'TimeoutError' }) } })
+      expect(await draw()).toEqual({ got: null, heard: [{ why: 'draw_timeout' }] })
+    })
+
+    it('a page drawn is no trouble', async () => {
+      browser({})
+      expect(await draw()).toEqual({ got: { url: 'https://cookies.example/', body: '<p>Cookies</p>' }, heard: [] })
+    })
+
+    it('the browser’s own error, its first line, short', () => {
+      expect(drawTrouble(new Error('browserType.launch: Executable doesn’t exist\nmore'))).toEqual({ why: 'draw_failed', detail: 'browserType.launch: Executable doesn’t exist' })
+      expect((drawTrouble(new Error('x'.repeat(200))) as { detail: string }).detail).toHaveLength(80)
+    })
+
+    it('an ordering app or a private address is told too, with no browser opened', async () => {
+      const heard: unknown[] = []
+      const { render } = pageRenderer({ resolve: async () => ['10.0.0.5'] })
+      await render!('https://www.doordash.com/store/cookies', (t) => void heard.push(t))
+      await render!('https://cookies.example/', (t) => void heard.push(t))
+      expect(heard).toEqual([{ why: 'ordering_app' }, { why: 'not_public' }])
+      expect(launch).not.toHaveBeenCalled()
+    })
   })
 })
