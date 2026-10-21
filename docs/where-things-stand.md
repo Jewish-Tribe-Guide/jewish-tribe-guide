@@ -280,8 +280,29 @@ for that exact change, in the same conversation. Show the dry run first.
 
 The user, Oct 21: Main dishes needed no watch set up. A food place's
 Google website was enough: the reader found its menu and the tab listed
-it. The same should hold for everything the site keeps current. **Next
-step: draw it on the design canvas before building any of it.**
+it. The same should hold for everything the site keeps current.
+
+**Drawn Oct 21:** https://claude.ai/artifact/RLGXHudw7AjUC3FKmyor14 (a
+page of its own; the design canvas couldn't be opened from this login).
+The main page, Mikvah hours with three sources, Hospitals, a finding to
+check, and one it can't read, on desktop and phone. **Waiting on the user
+before building:**
+- The tab's name (drawn as "Keeping current", replacing Main dishes and
+  Watches).
+- Approving a finding line by line, or all at once.
+- Where a finding opens (drawn in place on desktop, its own screen on the
+  phone).
+- Where a hospital on Refuah with nothing on it goes (drawn under "can't
+  be read", though there's nothing to do).
+- Jobs fixed in code, or switched on per category (the drawing's
+  suggestion, since a job named for Philly's categories won't fit every
+  community).
+- Where linking an email sender to a shul or eruv goes, with no Watches
+  tab.
+- Also raised: a visitor's suggestion and the reader's finding for the
+  same change would sit in two places (the queue and the job page); and
+  Keystone-K's and Mekor Habracha's lists disagreeing about a place isn't
+  drawn.
 
 **The idea**
 - **Every listing is connected to its source automatically,** from what
