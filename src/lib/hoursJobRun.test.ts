@@ -10,11 +10,13 @@ const m = vi.hoisted(() => ({
 vi.mock('@/lib/supabase/admin', () => ({
   getAdminClient: () => ({
     from: (table: string) => {
+      let only: string[] | null = null
       const q = {
         select: () => q,
         eq: () => q,
-        in: () => q,
-        then: (ok: (v: unknown) => unknown) => Promise.resolve({ data: table === 'community' ? [{ slug: 'philly' }] : m.rows, error: null }).then(ok),
+        in: (_col: string, vals: string[]) => ((only = vals), q),
+        then: (ok: (v: unknown) => unknown) =>
+          Promise.resolve({ data: table === 'community' ? [{ slug: 'philly' }] : m.rows.filter((r) => !only || only.includes(r.category as string)), error: null }).then(ok),
       }
       return q
     },
@@ -32,6 +34,7 @@ vi.mock('@/lib/categoryStore', () => ({
         { key: 'men_s_hours', label: 'Men’s Hours', type: 'hours' },
       ],
     },
+    { id: 'synagogue', label: 'Shuls', detailFields: [{ key: 'minyanim', label: 'Minyanim', type: 'minyanim' }] },
   ],
 }))
 
@@ -49,7 +52,7 @@ const reach = {
   fetchHome: vi.fn(async (url: string) => (url.includes('lmcmikvah') ? { url: 'https://lmcmikvah.org/', body: HOME } : { error: 'it couldn’t be reached' })),
   readPage: vi.fn(async (url: string) => (PAGES[url] ? { url, text: PAGES[url], pdf: null } : null)),
 }
-const row = (id: string, name: string, website: string | null) => ({ id, community_id: 'philly', category: 'mikvah', name, status: 'approved', details: website ? { website } : {} })
+const row = (id: string, name: string, website: string | null, category = 'mikvah') => ({ id, community_id: 'philly', category, name, status: 'approved', details: website ? { website } : {} })
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -98,6 +101,21 @@ describe('syncHoursWatches', () => {
     m.rows = [row('lmc', 'Lower Merion Community Mikvah', 'http://lmcmikvah.org/')]
     const never = { ...reach, fetchHome: () => new Promise<never>(() => {}) }
     expect(await syncHoursWatches(never, 10)).toEqual([{ community: 'philly', added: 0, removed: 0 }])
+  })
+
+  // Shuls (the user, Oct 21): their pages found by what a shul's website
+  // calls them, Lower Merion's mikvah's by what a mikvah's does.
+  it('watches each shul’s pages with times, found by the links a shul’s website has', async () => {
+    const shul = '<a href="/davening">Davening</a><a href="/mens-mikvah/">Men’s Mikvah</a>'
+    const shulReach = {
+      fetchHome: vi.fn(async (url: string) => (url.includes('kesher') ? { url: 'https://kesher.org/', body: shul } : reach.fetchHome(url))),
+      readPage: vi.fn(async (url: string) => (url === 'https://kesher.org/davening' ? { url, text: 'Shacharis 8:00 AM', pdf: null } : reach.readPage(url))),
+    }
+    m.rows = [row('lmc', 'Lower Merion Community Mikvah', 'http://lmcmikvah.org/'), row('kesher', 'Kesher Israel', 'https://kesher.org/', 'synagogue')]
+    expect(await syncHoursWatches(shulReach)).toEqual([{ community: 'philly', added: 3, removed: 0 }])
+    expect(m.addWatch).toHaveBeenCalledWith('philly', { kind: 'website', url: 'https://kesher.org/davening', resourceId: 'kesher', label: 'Kesher Israel · Davening', createdBy: HOURS_FOUND_CREATOR })
+    // A shul's website isn't searched for a mikvah's links.
+    expect(m.addWatch).not.toHaveBeenCalledWith('philly', expect.objectContaining({ resourceId: 'kesher', url: expect.stringContaining('mikvah') }))
   })
 
   it('takes away its own page it no longer finds', async () => {

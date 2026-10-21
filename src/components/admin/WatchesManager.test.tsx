@@ -56,7 +56,7 @@ const posts: Post[] = []
 
 async function renderTab(
   watches: Watch[],
-  { available = true, post = {} as Record<string, unknown>, eruvim = [] as AdminEruv[], dishes = null as unknown[] | null, hospitals = null as unknown[] | null, hours = null as unknown[] | null } = {},
+  { available = true, post = {} as Record<string, unknown>, eruvim = [] as AdminEruv[], dishes = null as unknown[] | null, hospitals = null as unknown[] | null, hours = null as unknown[] | null, times = null as unknown[] | null } = {},
 ) {
   vi.mocked(fetchJson).mockImplementation(async (url, init) => {
     if (init?.method === 'POST') {
@@ -78,6 +78,10 @@ async function renderTab(
       return { ok: true, hospitals }
     }
     // Counts only: the tab never waits on a website search.
+    if (String(url).includes('/api/admin/watches/hours?counts&job=times')) {
+      if (!times) throw new Error('down')
+      return { ok: true, name: 'Shul times', places: times }
+    }
     if (String(url).includes('/api/admin/watches/hours?counts')) {
       if (!hours) throw new Error('down')
       return { ok: true, name: 'Mikvah hours', places: hours }
@@ -176,6 +180,22 @@ describe('WatchesManager', () => {
     expect(screen.getByTestId('watch-summary')).toHaveTextContent('1 watches')
     expect(names(screen.getByRole('region', { name: 'Shul’s times' }))).toEqual(['Lower Merion Synagogue'])
     expect(screen.queryByRole('region', { name: 'Hours' })).toBeNull()
+  })
+
+  // Oct 21: a shul's pages are on the Shul times page, and one an admin
+  // stopped is listed nowhere but there.
+  it('has a Shul times row, and its pages aren’t listed below', async () => {
+    const read = { at: ago(0.1), what: 'times' as const, from: null, result: 'agrees' as const, read: [], differences: [], queue: null }
+    const shul = watch({ id: 's', resourceId: 'shul-1', url: 'https://lms.org/', createdBy: 'listing pages (found)', lastCheck: read })
+    const stopped = watch({ id: 'x', resourceId: 'shul-1', url: 'https://lms.org/events', createdBy: 'listing pages (stopped)', active: false })
+    const other = watch({ id: 'k', url: 'https://keystone-k.org/list' })
+    await renderTab([shul, stopped, other], { times: [{ id: 'shul-1', pages: [{ watch: shul }], off: false }] })
+    const times = screen.getAllByTestId('job-row').at(-1)!
+    expect(times).toHaveAttribute('href', '/philly/admin/watches/times')
+    expect(times).toHaveTextContent('Shul times1 shul, from their websites')
+    expect(times).toHaveTextContent('1checked0to check0can’t be read')
+    expect(screen.getByTestId('watch-summary')).toHaveTextContent('1 watches')
+    expect(screen.queryByRole('region', { name: 'Shul’s times' })).toBeNull()
   })
 
   it('a job whose counts didn’t load still opens', async () => {

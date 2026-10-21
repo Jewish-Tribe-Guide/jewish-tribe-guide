@@ -241,6 +241,51 @@ describe('reading a shul’s regular times', () => {
     expect(r.times[0]).toMatchObject({ time: '10:00am', days: ['sat', 'sun'] })
   })
 
+  // The Oct 21 shul pages dry run: what a website says that isn't a weekly
+  // minyan, read as one.
+  it('leaves out what isn’t the shul’s weekly davening: a monthly service, a call, a class', () => {
+    const page = {
+      text: [
+        'Once per month on Fridays at 5:45 pm and once per month on Saturdays at 11:15 am, we hold a Young Families Shabbat service.',
+        'Daily at 1:00 PM; to participate, dial (773) 377-9170.',
+        'Join Rabbi Gotlib Tuesdays at 7:00 PM for a study of Pathways to God.',
+        'Kabbalat Shabbat Fridays 6:00pm',
+      ].join('\n'),
+    }
+    const r = tidyRegularReading(
+      {
+        kind: 'schedule',
+        times: [
+          { tefillah: 'other', days: ['fri'], time: '5:45 pm', notes: 'Young Families Shabbat service', quote: 'Once per month on Fridays at 5:45 pm' },
+          { tefillah: 'other', days: ['sat'], time: '11:15 am', notes: 'Young Families Shabbat service', quote: 'once per month on Saturdays at 11:15 am' },
+          { tefillah: 'other', days: ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'], time: '1:00 PM', notes: 'Tehillim', quote: 'Daily at 1:00 PM' },
+          { tefillah: 'other', days: ['tue'], time: '7:00 PM', notes: 'Study with Rabbi Gotlib', quote: 'Tuesdays at 7:00 PM' },
+          { tefillah: 'kabbalas_shabbos', days: ['fri'], time: '6:00pm', quote: 'Kabbalat Shabbat Fridays 6:00pm' },
+        ],
+      },
+      page,
+      DAYS,
+      id,
+    )
+    expect(r.times.map((t) => `${t.tefillah} ${t.time}`)).toEqual(['kabbalas_shabbos 6:00pm'])
+    // And the AI is told so.
+    const [system] = regularMessages(page, DAYS, 'Mekor Habracha') as { content: string }[]
+    expect(system.content).toMatch(/not held every week[^\n]*leave it out/)
+  })
+
+  it('a time given as a range is its start (Kesher’s “8:00 AM – 8:40 AM”)', () => {
+    expect(asRegularTime('shacharis', '8:00 AM – 8:40 AM')).toEqual({ time: '8:00 AM' })
+    expect(asRegularTime('kabbalas_shabbos', '6:00-7:15 pm')).toEqual({ time: '6:00pm' })
+    expect(asRegularTime('shacharis', '9:30 – 10:30am')).toEqual({ time: '9:30am' })
+    expect(asRegularTime('mincha', '11:30 to 1:00 pm')).toEqual({ time: '11:30am' })
+    expect(asRegularTime('mincha', '12:30 until 1:00pm')).toEqual({ time: '12:30pm' })
+  })
+
+  it('asks for a time given for one season to say so (Mekor’s “7:00 PM · Summer”)', () => {
+    const [system] = regularMessages({ text: POST }, DAYS, 'Mekor Habracha') as { content: string }[]
+    expect(system.content).toContain('A time for one season only (a "Summer" or "Winter" label beside it')
+  })
+
   it('a "week" with no dates it can place is read as a schedule', () => {
     const r = tidyRegularReading({ kind: 'week', times: [{ tefillah: 'shacharis', days: ['sat'], time: '9:00am', quote: 'Shacharis 9:00' }] }, { text: POST }, DAYS, id)
     expect(r.kind).toBe('schedule')

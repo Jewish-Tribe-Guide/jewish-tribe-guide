@@ -26,6 +26,7 @@ import {
   hoursNowIntro,
   hoursReadLines,
   hoursReads,
+  LISTING_PAGE_FOUND_CREATOR,
   LISTING_PAGE_WATCH_NAME,
   listingPageNote,
   listingPageSource,
@@ -319,7 +320,7 @@ export async function earlierSuggestions(community: string, listingId: string): 
  *  read and whether that agrees with the listing. The daily run reads with
  *  the AI only a page that changed: it costs. */
 export async function runListingPageWatch(
-  watch: Pick<Watch, 'communityId' | 'url' | 'resourceId' | 'pageHash'>,
+  watch: Pick<Watch, 'communityId' | 'url' | 'resourceId' | 'pageHash'> & Partial<Pick<Watch, 'createdBy'>>,
   budget?: MenuReadBudget,
   opts: { fetchImpl?: typeof fetch; apiKey?: string | undefined; now?: number; full?: boolean } = {},
 ): Promise<WatchOutcome> {
@@ -341,9 +342,13 @@ export async function runListingPageWatch(
   }
   const pageHash = menuHash(source)
   const changed = !!watch.pageHash && watch.pageHash !== pageHash
-  // The first read sets the baseline; an unchanged page is left alone, and
-  // its listing's date with it.
-  if (!opts.full && !changed) return { ok: true, filed: 0, pageHash }
+  // A page the hours or times job found (hoursJob.ts) is read on its first
+  // morning, as one an admin gives is read when it's given: else its job
+  // page could never say what it reads until the page changed (Oct 21).
+  const firstFound = !watch.pageHash && watch.createdBy === LISTING_PAGE_FOUND_CREATOR
+  // Else the first read sets the baseline; an unchanged page is left
+  // alone, and its listing's date with it.
+  if (!opts.full && !changed && !firstFound) return { ok: true, filed: 0, pageHash }
 
   // Changed. A suggestion already waiting, no AI, or this run's reads spent:
   // the old fingerprint stays, so the change is still news next time. A

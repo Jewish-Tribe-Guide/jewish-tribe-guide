@@ -29,7 +29,7 @@ vi.mock('@/lib/supabase/admin', () => ({
 }))
 
 const { GET, POST } = await import('./route')
-const { HOURS_FOUND_CREATOR, HOURS_OFF_CREATOR, hoursOffUrl } = await import('@/lib/hoursJob')
+const { HOURS_FOUND_CREATOR, HOURS_OFF_CREATOR, PAGE_STOPPED_CREATOR, hoursOffUrl } = await import('@/lib/hoursJob')
 const { LISTING_PAGE_WATCH_CREATOR } = await import('@/lib/listingPageWatch')
 
 const LMC = '0b6c4c1e-2f55-4a8e-9d57-3b7f0d6f4a21'
@@ -44,7 +44,7 @@ const MIKVAH = {
     { key: 'men_s_hours', label: 'Men’s Hours', type: 'hours' },
   ],
 }
-const req = (method: string, body?: unknown) => new Request('http://x/api/admin/watches/hours', { method, body: body === undefined ? undefined : JSON.stringify(body) })
+const req = (method: string, body?: unknown, query = '') => new Request(`http://x/api/admin/watches/hours${query}`, { method, body: body === undefined ? undefined : JSON.stringify(body) })
 const check = (result: WatchCheck['result']): WatchCheck => ({ at: new Date().toISOString(), what: 'hours', from: null, result, read: [], differences: [], queue: null })
 const w = (over: Partial<Watch>) =>
   ({ id: 'w1', communityId: 'philly', kind: 'website', url: 'https://lmcmikvah.org/', resourceId: LMC, active: true, createdBy: HOURS_FOUND_CREATOR, label: 'Lower Merion Community Mikvah · its website', lastRunAt: new Date().toISOString(), lastCheck: check('agrees'), ...over }) as Watch
@@ -98,6 +98,11 @@ describe('GET /api/admin/watches/hours', () => {
     expect(reason(MEI)).toBe('Read its website: no weekly hours on it.')
     expect(reason(NONE)).toBe('No website on Google.')
     expect(reason(LMC)).toBe('Its website wouldn’t open: it couldn’t be reached.')
+    expect(body.places.every((p: { found: boolean }) => !p.found)).toBe(true)
+    // Found just now: not read yet, not "can't be read".
+    m.searchHoursPages.mockResolvedValue({ found: [{ url: 'https://philamikvah.org/hours', link: 'Hours' }], unloaded: [] })
+    const found = (await (await GET(req('GET'))).json()).places.find((p: { id: string }) => p.id === MEI)
+    expect(found).toMatchObject({ found: true, reason: 'Its hours pages are found, and read on a coming morning.' })
     // A place with pages isn't searched again here, even when they're paused.
     m.listWatches.mockResolvedValue({ watches: [w({ lastCheck: check('nothing') }), w({ id: 'paused', resourceId: MEI, url: 'https://philamikvah.org/', active: false })], available: true })
     m.searchHoursPages.mockClear()
@@ -116,7 +121,67 @@ describe('GET /api/admin/watches/hours', () => {
   })
 })
 
+describe('the Shul times page (?job=times)', () => {
+  const KESHER = '5e2d8c4a-1b3f-4d6e-9a7c-2f1e0d9c8b7a'
+  beforeEach(() => {
+    m.hoursJobPlaces.mockImplementation(async (_c: string, job: string) =>
+      job === 'times'
+        ? { categories: [{ id: 'synagogue', label: 'Shuls', detailFields: [{ key: 'minyanim', label: 'Davening Times', type: 'minyanim' }] }], places: [makeListing({ id: KESHER, category: 'synagogue', name: 'Kesher Israel', website: 'https://kesher.org/' })] }
+        : { categories: [MIKVAH], places: [] },
+    )
+  })
+
+  it('lists the shuls, searched for their times, in its own words', async () => {
+    const body = await (await GET(req('GET', undefined, '?job=times'))).json()
+    expect(m.hoursJobPlaces).toHaveBeenCalledWith('philly', 'times')
+    expect(m.searchHoursPages).toHaveBeenCalledWith('https://kesher.org/', undefined, 'times')
+    expect(body.name).toBe('Shul times')
+    expect(body.places[0]).toMatchObject({ id: KESHER, fields: ['Davening Times'], reason: 'Read its website: no davening times on it.' })
+    // And its POSTs are for its places.
+    expect((await POST(req('POST', { action: 'off', resourceId: KESHER }))).status).toBe(400)
+    expect((await POST(req('POST', { action: 'off', resourceId: KESHER }, '?job=times'))).status).toBe(200)
+    expect(m.addWatch).toHaveBeenCalledWith('philly', expect.objectContaining({ label: 'Kesher Israel: davening times not read' }))
+  })
+})
+
 describe('POST /api/admin/watches/hours', () => {
+  // The user, Oct 21: an admin "can remove or replace them".
+  it('stop: any page, found or given, kept and never read, so the search never adds it again', async () => {
+    m.listWatches.mockResolvedValue({ watches: [w({ id: 'home' }), w({ id: 'mens', url: 'https://lmcmikvah.org/mens-mikvah/' })], available: true })
+    const body = await (await POST(req('POST', { action: 'stop', resourceId: LMC, id: 'mens' }))).json()
+    expect(m.updateWatch).toHaveBeenCalledWith('philly', 'mens', { createdBy: PAGE_STOPPED_CREATOR, active: false })
+    expect(m.removeWatch).not.toHaveBeenCalled()
+    expect(body.pages.map((p: { watch: Watch }) => p.watch.id)).toEqual(['home'])
+    expect(body.stopped).toMatchObject([{ watch: { id: 'mens', active: false }, source: 'Stopped' }])
+    expect(m.runAndRecord).not.toHaveBeenCalled()
+    // Shown as stopped on the page, not as one it reads.
+    const listed = await (await GET(req('GET'))).json()
+    m.listWatches.mockResolvedValue({ watches: [w({ id: 'home' }), w({ id: 'mens', url: 'https://lmcmikvah.org/mens-mikvah/', createdBy: PAGE_STOPPED_CREATOR, active: false })], available: true })
+    const after = (await (await GET(req('GET'))).json()).places.find((p: { id: string }) => p.id === LMC)
+    expect(listed.places.find((p: { id: string }) => p.id === LMC).stopped).toEqual([])
+    expect(after.pages.map((p: { watch: Watch }) => p.watch.id)).toEqual(['home'])
+    expect(after.stopped.map((p: { watch: Watch }) => p.watch.id)).toEqual(['mens'])
+    // Not another place's page.
+    expect((await POST(req('POST', { action: 'stop', resourceId: MEI, id: 'home' }))).status).toBe(400)
+  })
+
+  it('again: a stopped page read again, as given by hand, straight away; giving it again does the same', async () => {
+    const stopped = w({ id: 'mens', url: 'https://lmcmikvah.org/mens-mikvah/', createdBy: PAGE_STOPPED_CREATOR, active: false })
+    m.listWatches.mockResolvedValue({ watches: [stopped], available: true })
+    const body = await (await POST(req('POST', { action: 'again', resourceId: LMC, id: 'mens' }))).json()
+    expect(m.updateWatch).toHaveBeenCalledWith('philly', 'mens', { createdBy: LISTING_PAGE_WATCH_CREATOR, active: true })
+    expect(m.runAndRecord).toHaveBeenCalledWith(expect.objectContaining({ id: 'mens', active: true, createdBy: LISTING_PAGE_WATCH_CREATOR }), undefined, undefined, { full: true })
+    expect(body).toMatchObject({ pages: [{ watch: { id: 'mens' }, source: 'Added by hand' }], stopped: [] })
+
+    vi.clearAllMocks()
+    m.runAndRecord.mockImplementation(async (x: Watch) => ({ watch: x }))
+    const given = await POST(req('POST', { action: 'give', resourceId: LMC, url: 'lmcmikvah.org/mens-mikvah' }))
+    expect(given.status).toBe(200)
+    expect(m.addWatch).not.toHaveBeenCalled()
+    expect(m.updateWatch).toHaveBeenCalledWith('philly', 'mens', { createdBy: LISTING_PAGE_WATCH_CREATOR, active: true })
+  })
+
+
   it('give: a page given by hand, read straight away, and its Off goes', async () => {
     m.listWatches.mockResolvedValue({ watches: [w({ id: 'off', url: hoursOffUrl(MEI), resourceId: MEI, createdBy: HOURS_OFF_CREATOR, active: false })], available: true })
     const body = await (await POST(req('POST', { action: 'give', resourceId: MEI, url: 'philamikvah.org/hours' }))).json()
@@ -163,5 +228,6 @@ describe('POST /api/admin/watches/hours', () => {
   it('refuses a place whose hours aren’t read, and an unknown action', async () => {
     expect((await POST(req('POST', { action: 'off', resourceId: '9f8e7d6c-5b4a-4c3d-a2b1-0f9e8d7c6b5a' }))).status).toBe(400)
     expect((await POST(req('POST', { action: 'remove', resourceId: LMC }))).status).toBe(400)
+    expect((await POST(req('POST', { action: 'stop', resourceId: LMC }))).status).toBe(400)
   })
 })

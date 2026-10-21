@@ -5,8 +5,8 @@ import { addWatch, listWatches, removeWatch } from '@/lib/watchStore'
 import { fetchPublic, troubleClause, type Trouble } from '@/lib/menuReader'
 import { WATCH_FETCH_HEADERS } from '@/lib/websiteWatch'
 import { readListingPage, type PageSource } from '@/lib/listingPageRun'
-import { hoursPages, type HoursPage } from '@/lib/hoursPages'
-import { HOURS_FOUND_CREATOR, hoursJobCategories, hoursWatchChanges, looksLikeHours } from '@/lib/hoursJob'
+import { hoursPages, timesPages, type HoursPage } from '@/lib/hoursPages'
+import { HOURS_FOUND_CREATOR, PAGE_JOBS, hoursJobCategories, hoursWatchChanges, looksLikeHours, type PageJob } from '@/lib/hoursJob'
 import type { CategoryConfig } from '@/lib/categories'
 import type { DirectoryResource, ResourceRow } from '@/types'
 
@@ -28,14 +28,15 @@ async function fetchHome(url: string): Promise<{ url: string; body: string } | {
   return { error: trouble ? troubleClause(trouble) : 'it isn’t a web page' }
 }
 
-/** A place's pages that may give its weekly hours, from its website: its
- *  home page and the links on it (hoursPages), each kept if it has a clock
- *  time on it (looksLikeHours). One that doesn't load is `unloaded`. */
-export async function searchHoursPages(website: string, reach: HoursReach = {}): Promise<{ found: HoursPage[]; unloaded: string[] } | { error: string }> {
+/** A place's pages that may give its weekly hours, or a shul's its
+ *  davening times, from its website: its home page and the links on it
+ *  (hoursPages, timesPages), each kept if it has a clock time on it
+ *  (looksLikeHours). One that doesn't load is `unloaded`. */
+export async function searchHoursPages(website: string, reach: HoursReach = {}, job: PageJob = 'hours'): Promise<{ found: HoursPage[]; unloaded: string[] } | { error: string }> {
   const home = await (reach.fetchHome ?? fetchHome)(website)
   if ('error' in home) return home
   const read = reach.readPage ?? ((u: string) => readListingPage(u))
-  const pages = hoursPages(home.url, home.body)
+  const pages = (job === 'times' ? timesPages : hoursPages)(home.url, home.body)
   const sources = await Promise.all(pages.map((p) => read(p.url).catch(() => null)))
   return {
     found: pages.filter((_, i) => sources[i] && looksLikeHours(sources[i]!)),
@@ -51,8 +52,8 @@ const deadline = <T,>(work: Promise<T>, ms: number): Promise<T | null> =>
   Promise.race([work, new Promise<null>((done) => setTimeout(() => done(null), ms))])
 
 /** The places with the job in one community, and their categories. */
-export async function hoursJobPlaces(community: string): Promise<{ categories: CategoryConfig[]; places: DirectoryResource[] }> {
-  const categories = hoursJobCategories(await listCategoriesUncached(community))
+export async function hoursJobPlaces(community: string, job: PageJob = 'hours'): Promise<{ categories: CategoryConfig[]; places: DirectoryResource[] }> {
+  const categories = hoursJobCategories(await listCategoriesUncached(community), job)
   if (!categories.length) return { categories, places: [] }
   const { data, error } = await getAdminClient()
     .from('resource')
@@ -69,31 +70,33 @@ export async function hoursJobPlaces(community: string): Promise<{ categories: C
 
 export const websiteOf = (p: DirectoryResource): string | null => (typeof p.website === 'string' && p.website.trim() ? p.website.trim() : null)
 
-/** Watches every place's hours pages found from its website, and takes
- *  away the search's own pages it no longer finds (hoursWatchChanges).
- *  All places at once, each given SEARCH_DEADLINE_MS; one that takes
- *  longer, or whose website doesn't open, is left as it is. Returns what it
- *  did, for the run's log. */
+/** Watches every place's hours pages, and every shul's pages with its
+ *  times, found from its website, and takes away the search's own pages
+ *  it no longer finds (hoursWatchChanges). All places of both jobs at
+ *  once, each given SEARCH_DEADLINE_MS; one that takes longer, or whose
+ *  website doesn't open, is left as it is. Returns what it did, for the
+ *  run's log. */
 export async function syncHoursWatches(reach: HoursReach = {}, ms = SEARCH_DEADLINE_MS): Promise<{ community: string; added: number; removed: number }[]> {
   const { data, error } = await getAdminClient().from('community').select('slug')
   if (error) throw new Error(`Couldn’t list the communities: ${error.message}`)
   const out = []
   for (const { slug } of (data ?? []) as { slug: string }[]) {
-    const { places } = await hoursJobPlaces(slug)
+    const jobs = await Promise.all(PAGE_JOBS.map(async (job) => (await hoursJobPlaces(slug, job)).places.map((place) => ({ place, job }))))
+    const places = jobs.flat()
     if (!places.length) continue
     const { watches, available } = await listWatches(slug)
     if (!available) continue
     const searches = await Promise.all(
-      places.map(async (p) => {
+      places.map(async ({ place: p, job }) => {
         const website = websiteOf(p)
         if (!website) return null
-        const got = await deadline(searchHoursPages(website, reach).catch(() => null), ms)
+        const got = await deadline(searchHoursPages(website, reach, job).catch(() => null), ms)
         return got && !('error' in got) ? got : null
       }),
     )
     let added = 0
     let removed = 0
-    for (const [i, place] of places.entries()) {
+    for (const [i, { place }] of places.entries()) {
       const { add, remove } = hoursWatchChanges(place, searches[i], watches)
       for (const w of add) {
         if (await addWatch(slug, { kind: 'website', url: w.url, resourceId: place.id, label: w.label, createdBy: HOURS_FOUND_CREATOR })) added++

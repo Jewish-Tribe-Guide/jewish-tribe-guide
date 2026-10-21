@@ -92,6 +92,42 @@ describe('the same time', () => {
   })
 })
 
+describe('a website’s times for both seasons', () => {
+  // Mekor's website, Oct 21: Friday "7:00 PM · Summer", "around
+  // candle-lighting · Winter"; the listing, "At Candle Lighting (not after
+  // 7:00 PM)". Each season's time compared in its season, and said their
+  // way it's a change, not a match.
+  it('compares only the season it is', () => {
+    const capped: Minyan = { id: 'f', tefillah: 'mincha_maariv', days: ['fri'], time: 'At Candle Lighting (not after 7:00 PM)', anchor: 'candle_lighting', offsetMinutes: 0, notAfter: '19:00' }
+    const page: RegularReading = {
+      ...WINTER,
+      season: null,
+      complete: false,
+      times: [
+        t({ tefillah: 'mincha_maariv', days: ['fri'], time: '7:00 PM', notes: 'Summer only' }),
+        t({ tefillah: 'mincha_maariv', days: ['fri'], time: '8:15 PM', notes: 'Winter only' }),
+      ],
+    }
+    expect(brief(compareTimes([capped], page, { season: 'summer', newId }).rows)).toEqual(['fri mincha_maariv 7:00 PM changed was At Candle Lighting (not after 7:00 PM)'])
+    expect(brief(compareTimes([capped], page, { season: 'winter', newId }).rows)).toEqual(['fri mincha_maariv 8:15 PM changed was At Candle Lighting (not after 7:00 PM)'])
+  })
+
+  it('a listing with both seasons’ times, as the page has them, agrees, and isn’t given the other season’s again', () => {
+    const page: RegularReading = {
+      ...WINTER,
+      season: null,
+      times: [
+        t({ tefillah: 'mincha_maariv', days: ['fri'], time: '7:00pm', notes: 'Summer only' }),
+        t({ tefillah: 'mincha_maariv', days: ['fri'], time: 'At Candle Lighting', anchor: 'candle_lighting', offsetMinutes: 0, notes: 'Winter only' }),
+      ],
+    }
+    const fridays = MEKOR.filter((m) => m.days.includes('fri'))
+    const u = compareTimes(fridays, page, { season: 'summer', newId })
+    expect(brief(u.rows)).toEqual(['fri mincha_maariv 7:00pm same'])
+    expect(changesAnything(u)).toBe(false)
+  })
+})
+
 describe('a whole new winter schedule', () => {
   const u = compareTimes(MEKOR, WINTER, { season: 'summer', newId })
   it('marks each time, and leaves the summer one out', () => {

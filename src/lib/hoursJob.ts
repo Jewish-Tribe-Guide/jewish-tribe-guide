@@ -12,7 +12,49 @@ import type { CategoryConfig } from './categories'
 // gives sits beside them and is never taken away. The Watches tab's job
 // page shows every place, in sections.
 //
+// Shuls too (the user, Oct 21: "I don't mind adding shuls automatically,
+// but we should be able to see what they're reading"): every place whose
+// category has davening times, its pages found by the links a shul's
+// website calls them by (timesPages), on a Shul times page of its own.
+// An admin can stop any page, found or given, and it stays stopped: the
+// search never adds it again.
+//
 // Pure: no database, no network. hoursJobRun.ts searches and saves.
+
+/** Which job: a mikvah's named weekly hours, or a shul's davening times. */
+export type PageJob = 'hours' | 'times'
+export const PAGE_JOBS: readonly PageJob[] = ['hours', 'times']
+
+/** The words that differ between the two jobs' pages. */
+export function jobWords(job: PageJob) {
+  return job === 'times'
+    ? {
+        what: 'davening times',
+        none: 'no davening times',
+        noneOnline: 'No times online',
+        same: 'the same times as the listing',
+        unsure: 'times it couldn’t set beside the listing',
+        give: 'Give another page with its times',
+        pageLabel: 'Its davening times page',
+        placeholder: 'its-website.org/davening',
+        found: 'Its pages with times are found, and read on a coming morning.',
+        toCheck: 'A page gives times the listing doesn’t, or different ones.',
+        cantRead: 'No page on its website gives its davening times, or its pages didn’t load. Give the page with its times, or say it has none online.',
+      }
+    : {
+        what: 'hours',
+        none: 'no weekly hours',
+        noneOnline: 'No hours online',
+        same: 'the same hours as the listing',
+        unsure: 'hours it couldn’t set beside the listing',
+        give: 'Give another hours page',
+        pageLabel: 'Its hours page',
+        placeholder: 'its-website.org/hours',
+        found: 'Its hours pages are found, and read on a coming morning.',
+        toCheck: 'A page gives hours the listing doesn’t, or different ones.',
+        cantRead: 'No page on its website gives its weekly hours, or its pages didn’t load. Give its hours page, or say it has no hours online.',
+      }
+}
 
 /** The `created_by` of a page the morning's search found. Read by the
  *  daily run like any listing-page watch (isListingPageWatch); only the
@@ -27,6 +69,12 @@ export const hoursOffUrl = (resourceId: string) => `https://guide.invalid/hours-
 export const isHoursOff = (w: Pick<Watch, 'createdBy'>) => w.createdBy === HOURS_OFF_CREATOR
 export const isFoundHoursPage = (w: Pick<Watch, 'createdBy'>) => w.createdBy === HOURS_FOUND_CREATOR
 
+/** "Stop reading this page": kept, never read, so the morning's search,
+ *  which adds only pages not watched already, never finds it again. "Read
+ *  it again" makes it a page given by hand. */
+export const PAGE_STOPPED_CREATOR = 'listing pages (stopped)'
+export const isStoppedPage = (w: Pick<Watch, 'createdBy'>) => w.createdBy === PAGE_STOPPED_CREATOR
+
 /** A clock time: "7:30PM", "4:30 AM", "10 a.m.". In the Oct 21 dry run the
  *  pages the AI read hours from were exactly the ones with one, so the
  *  search needs no AI. */
@@ -38,18 +86,20 @@ export function looksLikeHours(source: { text: string | null; pdf: string | null
   return source.pdf !== null || CLOCK_TIME.test(source.text ?? '')
 }
 
-/** The categories with the job: weekly hours fields with names, not only
- *  the plain "Hours" Google keeps (pageReadsFor leaves that out when there
- *  are named ones). */
-export function hoursJobCategories<C extends Pick<CategoryConfig, 'id' | 'detailFields'>>(categories: readonly C[]): C[] {
+/** The categories with the job. Hours: weekly hours fields with names,
+ *  not only the plain "Hours" Google keeps (pageReadsFor leaves that out
+ *  when there are named ones). Times: davening times. */
+export function hoursJobCategories<C extends Pick<CategoryConfig, 'id' | 'detailFields'>>(categories: readonly C[], job: PageJob = 'hours'): C[] {
   return categories.filter((c) => {
     const reads = pageReadsFor(c)
-    return reads?.kind === 'hours' && !reads.keys.includes('hours')
+    return job === 'times' ? reads?.kind === 'times' : reads?.kind === 'hours' && !reads.keys.includes('hours')
   })
 }
 
-/** The job's name: "Mikvah hours", from the category's own name. */
-export function hoursJobName(categories: readonly Pick<CategoryConfig, 'label'>[]): string {
+/** The job's name: "Mikvah hours", from the category's own name; "Shul
+ *  times", as the guide calls them. */
+export function hoursJobName(categories: readonly Pick<CategoryConfig, 'label'>[], job: PageJob = 'hours'): string {
+  if (job === 'times') return 'Shul times'
   return categories.length === 1 ? `${categories[0].label} hours` : 'Hours'
 }
 
@@ -62,6 +112,7 @@ export function foundPageLabel(name: string, link: string | null): string {
 
 /** Where a source came from, in a line. */
 export function sourceLine(w: Pick<Watch, 'createdBy' | 'label'>): string {
+  if (isStoppedPage(w)) return 'Stopped'
   if (!isFoundHoursPage(w)) return 'Added by hand'
   const link = w.label?.slice(w.label.lastIndexOf(' · ') + 3)
   return !link || link === ITS_WEBSITE ? 'Found from its website' : `Found from its website’s ${link} link`
@@ -83,8 +134,8 @@ const same = samePage
 
 /** What the search changes for one place: found pages not watched yet are
  *  added; its own found pages the search no longer finds go. A page an
- *  admin gave is never touched, nor a place that's off, nor anything when
- *  its website didn't open. */
+ *  admin gave or stopped is never touched, nor a place that's off, nor
+ *  anything when its website didn't open. */
 export function hoursWatchChanges(
   place: { id: string; name: string },
   search: HoursSearch,
@@ -100,13 +151,16 @@ export function hoursWatchChanges(
 /** Where a place sits on the job's page:
  *   to_check   a page says something different from the listing, or
  *              something it couldn't compare
- *   waiting    a page not compared with the listing yet
+ *   waiting    a page not compared with the listing yet, or pages found
+ *              that the morning's run hasn't watched yet
  *   checked    its pages agree with the listing
  *   cant_read  no page to read, none loads, or none gives weekly hours
  *   off        "No hours online" or turned off */
 export type HoursSection = 'to_check' | 'waiting' | 'checked' | 'cant_read' | 'off'
 
-export type HoursPlace = { pages: Watch[]; off: boolean }
+/** `found`: no page watched yet, but searching its website just now found
+ *  some, which the morning's run will watch and read. */
+export type HoursPlace = { pages: Watch[]; off: boolean; found?: boolean }
 
 const loads = (w: Watch, now: number) => {
   const state = watchHealth(w, now).state
@@ -116,7 +170,7 @@ const loads = (w: Watch, now: number) => {
 export function hoursSection(p: HoursPlace, now: number): HoursSection {
   if (p.off) return 'off'
   const live = p.pages.filter((w) => w.active)
-  if (!live.length) return p.pages.length ? 'off' : 'cant_read'
+  if (!live.length) return p.pages.length ? 'off' : p.found ? 'waiting' : 'cant_read'
   const ok = live.filter((w) => loads(w, now))
   if (!ok.length) return 'cant_read'
   const results = ok.map((w) => (w.lastRunAt && w.lastCheck ? w.lastCheck.result : null))

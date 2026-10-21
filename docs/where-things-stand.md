@@ -473,8 +473,12 @@ compare, and one it can't read, on desktop and phone.
      of its links that may give hours (`hoursPages`), each kept if it has
      a clock time on it (`looksLikeHours`). Fetches only, no AI; all
      places at once, each given 20s. A page it finds is watched as
-     "listing pages (found)" and read the same morning by the usual
-     run. It never touches a page an admin gave, and removes only its own
+     "listing pages (found)" and read by the AI on its first morning
+     (a page found, not given by hand, used to only get its fingerprint
+     taken then, so it was never read until it changed; fixed Oct 21),
+     within the run's three AI reads shared with menus, so a few new
+     pages can take a few mornings; Check now reads one at once. It
+     never touches a page an admin gave, and removes only its own
      pages it no longer finds; one that just didn't load, a website that
      won't open, or a place turned off is left as it is.
    - **The Mikvah hours page** (`/admin/watches/hours`, a row on the
@@ -534,14 +538,47 @@ compare, and one it can't read, on desktop and phone.
      `index.cfm?…pageId=`), and /calendar and /calendar/ were two pages.
    - **The AI varies on labels between runs:** Rodeph Shalom's and BZBI's
      Shabbat morning service was Shacharis one run and "other" the next.
-   - **What it means (my recommendation, for the user to decide):** not
-     the mikvahs' way, a daily search that adds pages on its own. A
-     shul's site has times that aren't its minyanim (classes, holidays,
-     phone calls, family services), and one wrong page files every
-     morning. The reader's three faults above are worth fixing first.
-     Found pages could then be offered on a Shul times page for an admin
-     to accept. For the three blocked shuls and the Orthodox shuls whose
-     times move each week, the newsletter is the real source.
+   - **Decided (the user, Oct 21):** "I don't mind adding shuls
+     automatically, but we should be able to see what they're reading…
+     and then an admin can remove or replace them or just check the
+     website". So shuls are connected the mikvahs' way, and the reader's
+     faults were fixed first. And on Mekor's Friday ("at candle lighting,
+     not after 7:00 PM" against the website's "7:00 PM" in summer): "we're
+     just trying to show what they have. So if they say it one way we can
+     adjust and show it on our site that way." A website's different
+     wording for the same time is a change to suggest, not a match.
+   - **Reader fixes, BUILT Oct 21 (not merged)** (`scheduleReader.ts`):
+     a service not held every week ("once a month", "the last Shabbat of
+     the month"), a phone call, a class or a program is left out, by the
+     prompt and again after it; a time range ("6:00–7:15 pm") is its
+     start; a time labelled for one season ("Summer", "Winter") is read
+     as "Summer only"/"Winter only", and compared only in its season
+     (`compareTimes`), so a listing with both seasons' times isn't
+     offered the other season's.
+   - **Dry run again after the fixes (Oct 21, nothing saved):** the
+     Tehillim call, the monthly family service and Kesher Israel's end
+     times are gone. What would be filed: Rodeph Shalom's Thursday
+     8:10 AM and BZBI's week (as before), Mikveh Israel's and Kol
+     Tzedek's Friday nights (new), Society Hill's Friday 6:00 PM (was
+     5:30 PM) and Mekor's Friday 7:00 PM (was "At Candle Lighting (not
+     after 7:00 PM)"), both what the websites say.
+   - **Connected, BUILT Oct 21 (not merged):** the same morning search
+     as mikvahs, for shuls (`timesPages`), and the **Shul times page**
+     (`/admin/watches/times`, a row on the Watches tab: "N shuls, from
+     their websites"). The same sections as Mikvah hours. Opened, a shul
+     shows each page with what it read ("It read": Shacharis Mon–Fri
+     7:00 AM…), "Stop reading this page" on any page (a stopped page is
+     kept, turned off, and never found again; "Read it again" turns it
+     back on and reads it), "Open its website", and "Give another page
+     with its times" to replace one. Mikvah hours has the same controls.
+   - **Live data, read only:** the first live run adds the shuls' found
+     pages and reads them over the next mornings, filing what differs to
+     the queue. That is the deployed code writing, so it happens only
+     once this branch is merged.
+   - **The newsletter stays the source** for the three shuls whose
+     websites turn the reader away (Lower Merion Synagogue, Sons of
+     Israel 406, Chabad of the Main Line 403) and for the Orthodox shuls
+     whose times move each week.
 5. **Eruv and Kosher certification** move onto job pages, and the Watches
    tab goes.
 

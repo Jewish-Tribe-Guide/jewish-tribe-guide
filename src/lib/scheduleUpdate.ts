@@ -278,11 +278,18 @@ export function compareTimes(
     return !s || !target || s === target
   }
   const scoped = current.filter(inScope)
+  // And what was read for the other season ("7:00 PM · Summer" in a
+  // table beside "around candle-lighting · Winter", Mekor's website, Oct
+  // 21) isn't compared: the listing's own times for it were left out above,
+  // so it would come out as new. Said their way, not the listing's, it's a
+  // change to suggest (the user, Oct 21: "if they say it one way we can
+  // adjust and show it on our site that way").
+  const readInScope = (t: ReadRegularTime) => inScope({ notes: t.notes } as Minyan)
   const rows: UpdateRow[] = []
   const pair = (day: string, weekday: DayKey, read: ReadRegularTime[], zm?: DayZmanim) => {
     for (const tefillah of TEFILLAH_ORDER) {
       const c = scoped.filter((m) => m.tefillah === tefillah && m.days.includes(weekday)).map((row) => ({ row }))
-      const r = read.filter((t) => t.tefillah === tefillah)
+      const r = read.filter((t) => t.tefillah === tefillah && readInScope(t))
       if (c.length || r.length) rows.push(...pairDay(day, c, r, { complete: reading.complete, zm, newId }))
     }
   }

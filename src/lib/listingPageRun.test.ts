@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { makeCategory } from '@/test/providerFixtures'
 import { menuHash } from './menuWatch'
-import { LISTING_PAGE_WATCH_NAME } from './listingPageWatch'
+import { LISTING_PAGE_FOUND_CREATOR, LISTING_PAGE_WATCH_NAME } from './listingPageWatch'
 import type { TimesUpdate } from './scheduleUpdate'
 
 const m = vi.hoisted(() => ({
@@ -108,6 +108,21 @@ describe('runListingPageWatch: a shul’s page of times', () => {
   it('the first read only sets the fingerprint: no AI', async () => {
     expect(await runListingPageWatch(watch, undefined, { apiKey: 'k' })).toEqual({ ok: true, filed: 0, pageHash: await hashOfPage() })
     expect(m.readShulWeek).not.toHaveBeenCalled()
+  })
+
+  // Oct 21: a page the hours or times job found would otherwise never be
+  // read, so its job page could never say what it reads.
+  it('a page the job found is read on its first morning, as read, not changed, under the run’s budget', async () => {
+    const found = { ...watch, createdBy: LISTING_PAGE_FOUND_CREATOR }
+    const out = await runListingPageWatch(found, newMenuReadBudget(), { apiKey: 'k', now: NOW })
+    expect(out).toMatchObject({ ok: true, filed: 1, pageHash: await hashOfPage(), check: { result: 'differs', read: ['Mincha Sun 6:05 PM'] } })
+    expect(m.submitListingUpdate.mock.calls[0][3]).toBe(`From their website, read Oct 20: ${URL_}\n\nChanged: mincha · Sun · 6:05pm, was 6:15pm`)
+    // Its reads spent: left for a later morning, its fingerprint unset.
+    m.readShulWeek.mockClear()
+    expect(await runListingPageWatch(found, { ...newMenuReadBudget(), aiReads: 0 }, { apiKey: 'k' })).toEqual({ ok: true, filed: 0 })
+    expect(m.readShulWeek).not.toHaveBeenCalled()
+    // Once read, it's read again only when it changes.
+    expect(await runListingPageWatch({ ...found, pageHash: await hashOfPage() }, undefined, { apiKey: 'k' })).toEqual({ ok: true, filed: 0, pageHash: await hashOfPage() })
   })
 
   it('an unchanged page is left alone: no AI, nothing filed, the listing not dated', async () => {

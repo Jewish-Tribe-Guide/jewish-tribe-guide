@@ -219,6 +219,18 @@ const EVENING: Tefillah[] = ['kabbalas_shabbos', 'mincha', 'maariv', 'mincha_maa
  *  the morning: no shul davens Mincha at 5:59 AM), or a rule from a zman
  *  for the tefillos that move with one. Anything else as written. */
 export function asRegularTime(tefillah: Tefillah, time: string): { time: string; anchor?: ZmanAnchor; offsetMinutes?: number } {
+  // "8:00 AM – 8:40 AM", "6:00-7:15 pm": a minyan starts at its start;
+  // its end isn't a time anyone comes for (Kesher, Oct 21: six "changes"
+  // that were the same 8:00am with an end on it). The start takes the
+  // end's am/pm unless it's earlier in the clock's cycle: 11:30 to 1:00 pm.
+  const range = time.trim().match(/^(\d{1,2})(:\d{2})?\s*([ap]\.?m\.?)?\s*(?:–|—|-|to|until)\s*(\d{1,2})(?::\d{2})?\s*([ap])\.?m\.?$/i)
+  if (range) {
+    const [, h, min = ':00', own, endH, endAp] = range
+    if (own) return asRegularTime(tefillah, `${h}${min} ${own}`)
+    const flip = Number(h) !== 12 && Number(h) > Number(endH)
+    const ap = flip ? (endAp.toLowerCase() === 'p' ? 'a' : 'p') : endAp.toLowerCase()
+    return { time: `${Number(h)}${min}${ap}m` }
+  }
   // "10am", "10 a.m.": the hour, as the guide writes it ("10:00am"), or
   // it's a different time from the shul's own 10:00am (Kol Tzedek, Oct 19).
   const hour = time.trim().match(/^(\d{1,2})\s*([ap])\.?\s*m\.?$/i)
@@ -262,11 +274,12 @@ First, what the message is:
 
 Then "times", one entry per prayer time:
 - "tefillah" is one of: ${TEFILLOS}. A combined "Mincha/Maariv" is mincha_maariv. Candle lighting, Shabbos ends, havdalah, a kiddush, a class or a shiur are not prayers: leave them out, or put them in "notes" of the nearest prayer.
+- Only the shul's own davening, held every week as given. A service not held every week ("once a month", "the last Shabbat of the month", "first Friday"), a phone or online call run by someone else, a class, a program or an event: leave it out.
 - For "schedule": "days" lists the weekdays it's held, as sun, mon, tue, wed, thu, fri, sat ("Shabbos" is sat, "Sunday–Thursday" is sun to thu). A time for one date only ("Thanksgiving, Thu Nov 26") has "date" (YYYY-MM-DD, the next such date from today, even past the days listed) and "occasion" ("Thanksgiving") instead, never a weekday. Only when the message gives the date or names a day with a fixed date; otherwise leave that time out.
 - For "week": every time has "date", from the days above.
 - Dates are calendar days, midnight to midnight, not Jewish days that start at nightfall. Friday night's Mincha, Maariv or Kabbalas Shabbos is on the Friday.
 - "time" exactly as written, with am/pm when you can tell it ("9:00am", "5:59pm", "30 min before shkiah", "at candle lighting"). Never work a time out or move it.
-- "notes": anything the message says about that one minyan ("following Kiddush", "Winter only"), else leave it out.
+- "notes": anything the message says about that one minyan ("following Kiddush", "Winter only"), else leave it out. A time for one season only (a "Summer" or "Winter" label beside it, "during daylight saving time") has notes starting "Summer only" or "Winter only".
 - "quote": a few words copied exactly from the message where you read this time.
 - "unsure": when you can't tell what a time is for or which day it's on, say why in a few words. Otherwise leave it out.
 - Only times the message gives. Never add one it doesn't.
@@ -291,6 +304,8 @@ Answer in JSON only: {"kind": "...", "complete": true, "season": null, "title": 
   ]
 }
 
+const NOT_EVERY_WEEK = /\b(?:once (?:a|per|each|every) month|twice (?:a|per) month|monthly|every other (?:week|shabbat|shabbos|friday|saturday)|(?:first|second|third|fourth|last) (?:shabbat|shabbos|friday|saturday|sunday)s? of (?:the|each|every)(?: english| hebrew)? month)\b/i
+const NOT_DAVENING = /\b(?:dial|call|tehillim|class|classes|shiur|shiurim|study|lecture|program|event)\b/i
 const WEEKDAYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'] as const
 const isWeekday = (d: unknown): d is (typeof WEEKDAYS)[number] => (WEEKDAYS as readonly unknown[]).includes(d)
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
@@ -323,6 +338,11 @@ export function tidyRegularReading(raw: unknown, source: ScheduleSource, { today
     if (!tefillah || !time || !quote || (!date && weekdays.length === 0)) continue
     if (text !== null && !text.includes(` ${plain(quote)} `)) continue
     const notes = str(x.notes, 120)
+    // What a website says that isn't its weekly davening, read as if it
+    // were, whatever the AI was told (the Oct 21 dry run: a monthly young
+    // families service, the OU's daily Tehillim call, a Tuesday class).
+    if (!date && NOT_EVERY_WEEK.test(`${quote} ${notes ?? ''}`)) continue
+    if (tefillah === 'other' && NOT_DAVENING.test(`${quote} ${notes ?? ''}`)) continue
     const unsure = str(x.unsure, 200)
     const occasion = date ? str(x.occasion, 40) : null
     // The same time given twice (a page's summary and its detail) is one

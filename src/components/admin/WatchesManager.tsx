@@ -20,7 +20,7 @@ import { adminBase } from '@/lib/adminNav'
 import { dishCounts, hospitalCounts, type DishPlace, type JobCounts } from '@/lib/watchJobs'
 import type { Hospital } from './HospitalsJob'
 import type { HoursPlace } from './HoursJob'
-import { hoursCounts, isHoursOff } from '@/lib/hoursJob'
+import { hoursCounts, isHoursOff, isStoppedPage } from '@/lib/hoursJob'
 import EruvKeptEmail from './EruvKeptEmail'
 
 // ── The "Watches" tab (freshness map, Oct 5) ────────────────────────────────
@@ -40,15 +40,17 @@ import EruvKeptEmail from './EruvKeptEmail'
 // Since Oct 21 the tab starts with a row per job (watchJobs.ts), each
 // opening a page with every place in it: Dishes (what was the Main dishes
 // tab), Hospitals (matched to Refuah on their own, so their watches
-// aren't listed here any more) and Mikvah hours (read from the pages on
-// each one's own website, found on their own). The rest are still listed below, until each
+// aren't listed here any more), Mikvah hours (read from the pages on
+// each one's own website, found on their own) and Shul times (the same,
+// for davening times). The rest are still listed below, until each
 // becomes a job of its own.
 
 type Listing = { id: string; name: string; categoryLabel: string; reads: ListingReads }
 type Loaded = { available: boolean; watches: Watch[]; listings: Listing[] }
 type Eruvim = { available: boolean; timezone: string; eruvim: AdminEruv[] }
 type Action = 'check' | 'pause' | 'resume' | 'remove' | 'link' | 'ignore'
-type Jobs = { dishes: DishPlace[] | null; hospitals: Hospital[] | null; hours: { name: string; places: HoursPlace[] } | null }
+type PagesJob = { name: string; places: HoursPlace[] } | null
+type Jobs = { dishes: DishPlace[] | null; hospitals: Hospital[] | null; hours: PagesJob; times: PagesJob }
 
 /** One job's row: what it is and its four counts; the whole row opens its
  *  page. Null counts: they couldn't be loaded. */
@@ -711,7 +713,7 @@ export default function WatchesManager({ token }: { token: string }) {
   const community = useCommunitySlug()
   const [data, setData] = useState<Loaded | null>(null)
   const [eruvData, setEruvData] = useState<Eruvim | null>(null)
-  const [jobs, setJobs] = useState<Jobs>({ dishes: null, hospitals: null, hours: null })
+  const [jobs, setJobs] = useState<Jobs>({ dishes: null, hospitals: null, hours: null, times: null })
   const [error, setError] = useState<string | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
@@ -733,7 +735,7 @@ export default function WatchesManager({ token }: { token: string }) {
     setError(null)
     try {
       const headers = { Authorization: `Bearer ${token}` }
-      const [watches, eruvim, dishes, hospitals, hours] = await Promise.all([
+      const [watches, eruvim, dishes, hospitals, hours, times] = await Promise.all([
         fetchJson<Loaded>(withCommunity('/api/admin/watches', community), { headers }, 'Failed to load the watches.'),
         // The eruvim and the jobs' counts are a part of the tab, not the
         // whole: without them, the rest still shows.
@@ -741,10 +743,12 @@ export default function WatchesManager({ token }: { token: string }) {
         fetchJson<{ places: DishPlace[] }>(withCommunity('/api/admin/main-dishes', community), { headers }, '').catch(() => null),
         fetchJson<{ hospitals: Hospital[] }>(withCommunity('/api/admin/watches/hospitals', community), { headers }, '').catch(() => null),
         fetchJson<{ name: string; places: HoursPlace[] }>(withCommunity('/api/admin/watches/hours?counts', community), { headers }, '').catch(() => null),
+        fetchJson<{ name: string; places: HoursPlace[] }>(withCommunity('/api/admin/watches/hours?counts&job=times', community), { headers }, '').catch(() => null),
       ])
       setData(watches)
       setEruvData(eruvim)
-      setJobs({ dishes: dishes?.places ?? null, hospitals: hospitals?.hospitals ?? null, hours: hours?.places ? { name: hours.name, places: hours.places } : null })
+      const job = (j: { name: string; places: HoursPlace[] } | null): PagesJob => (j?.places ? { name: j.name, places: j.places } : null)
+      setJobs({ dishes: dishes?.places ?? null, hospitals: hospitals?.hospitals ?? null, hours: job(hours), times: job(times) })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.')
     }
@@ -833,10 +837,12 @@ export default function WatchesManager({ token }: { token: string }) {
     void actOn(row.watch, action, resourceId)
   }
 
-  // A hospital's Refuah page is on the Hospitals page, and a mikvah's hours
-  // pages on the hours page.
-  const hoursIds = new Set(jobs.hours?.places.map((p) => p.id))
-  const listed = data.watches.filter((w) => !isHospitalWatch(w) && !isHoursOff(w) && !(w.resourceId && hoursIds.has(w.resourceId) && isListingPageWatch(w)))
+  // A hospital's Refuah page is on the Hospitals page, a mikvah's hours
+  // pages on the hours page, and a shul's pages on the Shul times page.
+  const jobIds = new Set([...(jobs.hours?.places ?? []), ...(jobs.times?.places ?? [])].map((p) => p.id))
+  const listed = data.watches.filter(
+    (w) => !isHospitalWatch(w) && !isHoursOff(w) && !isStoppedPage(w) && !(w.resourceId && jobIds.has(w.resourceId) && isListingPageWatch(w)),
+  )
   const groups = data.available ? groupWatches(listed, now, kept, readsOf) : []
   const eruvim = eruvData?.available ? eruvData.eruvim : []
   const eruvNeeds = eruvim.filter((e) => eruvPill(e).tone !== 'ok').length
@@ -989,6 +995,14 @@ export default function WatchesManager({ token }: { token: string }) {
               name={jobs.hours.name}
               about={`${jobs.hours.places.length} place${jobs.hours.places.length === 1 ? '' : 's'}, from their websites`}
               counts={hoursCounts(jobs.hours.places.map((p) => ({ pages: p.pages.map((x) => x.watch), off: p.off })), now)}
+            />
+          )}
+          {jobs.times && jobs.times.places.length > 0 && (
+            <JobRow
+              href={`${base}/watches/times`}
+              name={jobs.times.name}
+              about={`${jobs.times.places.length} shul${jobs.times.places.length === 1 ? '' : 's'}, from their websites`}
+              counts={hoursCounts(jobs.times.places.map((p) => ({ pages: p.pages.map((x) => x.watch), off: p.off })), now)}
             />
           )}
         </ul>

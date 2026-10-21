@@ -63,7 +63,7 @@ describe('runWatch: a listing’s own page', () => {
     page.run.mockResolvedValue({ ok: true, filed: 1, pageHash: 'h2' })
     const budget = { aiReads: 3 }
     expect(await runWatch(shulPage, budget)).toEqual({ ok: true, filed: 1, pageHash: 'h2' })
-    expect(page.run).toHaveBeenCalledWith({ communityId: 'philly', url: shulPage.url, resourceId: 's1', pageHash: 'h' }, budget, { full: false })
+    expect(page.run).toHaveBeenCalledWith({ communityId: 'philly', url: shulPage.url, resourceId: 's1', pageHash: 'h', createdBy: 'listing pages' }, budget, { full: false })
     expect(m.readWebsite).not.toHaveBeenCalled()
   })
 

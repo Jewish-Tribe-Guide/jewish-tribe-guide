@@ -6,7 +6,7 @@ import { runAndRecord } from '@/lib/watchRunner'
 import { normalizeWatchUrl, watchHealth, type Watch } from '@/lib/watches'
 import { UUID } from '@/lib/itemMarkRoutes'
 import { LISTING_PAGE_WATCH_CREATOR, LISTING_PAGE_WATCH_NAME, isListingPageWatch, listingPageLabel, pageReadsFor } from '@/lib/listingPageWatch'
-import { HOURS_FOUND_CREATOR, HOURS_OFF_CREATOR, foundPageLabel, hoursJobName, hoursOffUrl, isHoursOff, samePage, sourceLine } from '@/lib/hoursJob'
+import { HOURS_FOUND_CREATOR, HOURS_OFF_CREATOR, PAGE_STOPPED_CREATOR, foundPageLabel, hoursJobName, hoursOffUrl, isHoursOff, isStoppedPage, jobWords, samePage, sourceLine, type PageJob } from '@/lib/hoursJob'
 import { SEARCH_DEADLINE_MS, hoursJobPlaces, searchHoursPages, websiteOf } from '@/lib/hoursJobRun'
 import { listingSlug } from '@/lib/listingSlug'
 import { routes } from '@/lib/routes'
@@ -22,6 +22,8 @@ import type { DirectoryResource } from '@/types'
 //      searched again now (fetches only, no AI). Admin only.
 //      `?counts` (the Watches tab's row): the same, but no search, so the
 //      tab isn't kept waiting on a slow website; its reasons are null.
+//      `?job=times`: the Shul times page (Oct 21), every place with davening
+//      times, the same way. Every POST takes it too.
 // POST body: { action: 'give', resourceId, url }
 //      "Give its hours page": read from this page too, from now on, given
 //      by hand, so the morning's search never takes it away. A "No hours
@@ -32,39 +34,52 @@ import type { DirectoryResource } from '@/types'
 // POST body: { action: 'on', resourceId }
 //      "Turn back on": its pages are read again straight away; with none,
 //      its website is searched now.
+// POST body: { action: 'stop', resourceId, id }
+//      "Stop reading this page", found or given: kept, never read, so the
+//      morning's search never adds it again (the user, Oct 21: an admin
+//      "can remove or replace them"; replacing is this and Give).
+// POST body: { action: 'again', resourceId, id }
+//      "Read it again": a stopped page, read from now on as one given by
+//      hand, and straight away.
 
 export const maxDuration = 60
 
 const CHECK_LIMIT = { limit: 20, windowSec: 600 }
 
-/** The watches the page reads for one place: its pages, and its Off. */
+/** The watches the page reads for one place: its pages, the ones an admin
+ *  stopped, and its Off. */
 function placeWatches(watches: readonly Watch[], id: string) {
   return {
     pages: watches.filter((w) => w.resourceId === id && isListingPageWatch(w)),
+    stopped: watches.filter((w) => w.resourceId === id && isStoppedPage(w)),
     marker: watches.find((w) => w.resourceId === id && isHoursOff(w)) ?? null,
   }
 }
 
+const jobOf = (request: Request): PageJob => (new URL(request.url).searchParams.get('job') === 'times' ? 'times' : 'hours')
+const shown = (ws: readonly Watch[]) => ws.map((w) => ({ watch: w, source: sourceLine(w) }))
+
 /** Why a place has nothing read, in a line: its pages' trouble, or what
  *  searching its website finds now. Null when something was read. */
-async function reasonFor(place: DirectoryResource, pages: readonly Watch[], now: number, search: boolean): Promise<string | null> {
+async function reasonFor(place: DirectoryResource, pages: readonly Watch[], now: number, search: boolean, job: PageJob): Promise<string | null> {
+  const words = jobWords(job)
   const live = pages.filter((w) => w.active)
   if (live.length) {
     const loading = live.filter((w) => !['failing', 'stale'].includes(watchHealth(w, now).state))
     if (!loading.length) return `Its ${live.length === 1 ? 'page' : 'pages'} didn’t load${live[0].lastError ? `: ${live[0].lastError}` : ''}.`
     if (loading.every((w) => w.lastCheck && (w.lastCheck.result === 'nothing' || w.lastCheck.result === 'unreadable'))) {
-      return `Read its ${loading.length === 1 ? 'page' : 'pages'}: no weekly hours on ${loading.length === 1 ? 'it' : 'them'}.`
+      return `Read its ${loading.length === 1 ? 'page' : 'pages'}: ${words.none} on ${loading.length === 1 ? 'it' : 'them'}.`
     }
     return null
   }
   if (pages.length || !search) return null
   const website = websiteOf(place)
   if (!website) return 'No website on Google.'
-  const got = await Promise.race([searchHoursPages(website).catch(() => null), new Promise<null>((done) => setTimeout(() => done(null), SEARCH_DEADLINE_MS))])
+  const got = await Promise.race([searchHoursPages(website, undefined, job).catch(() => null), new Promise<null>((done) => setTimeout(() => done(null), SEARCH_DEADLINE_MS))])
   if (!got) return 'Its website took too long to read.'
   if ('error' in got) return `Its website wouldn’t open: ${got.error}.`
-  if (!got.found.length) return 'Read its website: no weekly hours on it.'
-  return 'Its hours pages are found, and read tomorrow morning.'
+  if (!got.found.length) return `Read its website: ${words.none} on it.`
+  return words.found
 }
 
 export async function GET(request: Request) {
@@ -75,7 +90,8 @@ export async function GET(request: Request) {
   try {
     const now = Date.now()
     const search = !new URL(request.url).searchParams.has('counts')
-    const [{ watches, available }, { categories, places }] = await Promise.all([listWatches(community.slug), hoursJobPlaces(community.slug)])
+    const job = jobOf(request)
+    const [{ watches, available }, { categories, places }] = await Promise.all([listWatches(community.slug), hoursJobPlaces(community.slug, job)])
 
     // Their websites' suggestions waiting in the queue, by place.
     const pending = new Map<string, number>()
@@ -96,23 +112,26 @@ export async function GET(request: Request) {
 
     const rows = await Promise.all(
       places.map(async (p) => {
-        const { pages, marker } = placeWatches(watches, p.id)
+        const { pages, stopped, marker } = placeWatches(watches, p.id)
         const category = categories.find((c) => c.id === p.category)!
+        const reason = marker ? null : await reasonFor(p, pages, now, search, job)
         return {
           id: p.id,
           name: p.name,
           href: routes.listing(community.slug, p.category, listingSlug(p)),
           website: websiteOf(p),
-          pages: pages.map((w) => ({ watch: w, source: sourceLine(w) })),
+          pages: shown(pages),
+          stopped: shown(stopped),
           off: !!marker,
           offSince: marker?.createdAt ?? null,
-          reason: marker ? null : await reasonFor(p, pages, now, search),
+          reason,
+          found: reason === jobWords(job).found,
           pending: pending.get(p.id) ?? 0,
-          fields: category.detailFields.filter((f) => f.type === 'hours' && f.key !== 'hours').map((f) => f.label),
+          fields: category.detailFields.filter((f) => (job === 'times' ? f.type === 'minyanim' : f.type === 'hours' && f.key !== 'hours')).map((f) => f.label),
         }
       }),
     )
-    return Response.json({ ok: true, available, name: hoursJobName(categories), places: rows })
+    return Response.json({ ok: true, available, name: hoursJobName(categories, job), places: rows })
   } catch (err) {
     console.error('[admin/watches/hours] GET failed:', err)
     return Response.json({ ok: false, errors: ['Could not load the places.'] }, { status: 502 })
@@ -127,28 +146,59 @@ export async function POST(request: Request) {
   const body = (await request.json().catch(() => null)) as Record<string, unknown> | null
   const action = body?.action
   const resourceId = typeof body?.resourceId === 'string' ? body.resourceId : ''
-  if (!['give', 'off', 'on'].includes(String(action)) || !UUID.test(resourceId)) {
+  const id = typeof body?.id === 'string' ? body.id : ''
+  if (!['give', 'off', 'on', 'stop', 'again'].includes(String(action)) || !UUID.test(resourceId) || ((action === 'stop' || action === 'again') && !id)) {
     return Response.json({ ok: false, errors: ['Invalid request.'] }, { status: 400 })
   }
-  if (action !== 'off') {
+  if (action !== 'off' && action !== 'stop') {
     const limited = await enforceRateLimit(request, 'admin-watch-check', CHECK_LIMIT)
     if (limited) return limited
   }
 
   try {
     const slug = community.slug
-    const { categories, places } = await hoursJobPlaces(slug)
+    const job = jobOf(request)
+    const words = jobWords(job)
+    const { categories, places } = await hoursJobPlaces(slug, job)
     const place = places.find((p) => p.id === resourceId)
-    if (!place) return Response.json({ ok: false, errors: ['That place isn’t one whose hours are read.'] }, { status: 400 })
+    if (!place) return Response.json({ ok: false, errors: [`That place isn’t one whose ${words.what} are read.`] }, { status: 400 })
     const { watches, available } = await listWatches(slug)
     if (!available) return Response.json({ ok: false, errors: ['This needs database migration 070.'] }, { status: 400 })
-    const { pages, marker } = placeWatches(watches, resourceId)
+    const { pages, stopped, marker } = placeWatches(watches, resourceId)
     const read = async (ws: Watch[]) => Promise.all(ws.map(async (w) => (await runAndRecord(w, undefined, undefined, { full: true })).watch))
+    const reply = (ps: readonly Watch[], st: readonly Watch[], rest: Record<string, unknown> = {}) => Response.json({ ok: true, pages: shown(ps), stopped: shown(st), off: false, ...rest })
+    const again = async (w: Watch) => {
+      await updateWatch(slug, w.id, { createdBy: LISTING_PAGE_WATCH_CREATOR, active: true })
+      const [done] = await read([{ ...w, createdBy: LISTING_PAGE_WATCH_CREATOR, active: true }])
+      return reply([...pages, done], stopped.filter((x) => x.id !== w.id))
+    }
+
+    if (action === 'stop') {
+      const page = pages.find((w) => w.id === id)
+      if (!page) return Response.json({ ok: false, errors: ['That page isn’t read for it.'] }, { status: 400 })
+      await updateWatch(slug, page.id, { createdBy: PAGE_STOPPED_CREATOR, active: false })
+      return reply(
+        pages.filter((w) => w.id !== id),
+        [...stopped, { ...page, createdBy: PAGE_STOPPED_CREATOR, active: false }],
+        { off: !!marker },
+      )
+    }
+
+    if (action === 'again') {
+      const page = stopped.find((w) => w.id === id)
+      if (!page) return Response.json({ ok: false, errors: ['That page isn’t one you stopped.'] }, { status: 400 })
+      return await again(page)
+    }
 
     if (action === 'give') {
       const url = normalizeWatchUrl(typeof body?.url === 'string' ? body.url : '')
       if (!url) return Response.json({ ok: false, errors: ['That isn’t a web address.'] }, { status: 400 })
       const watched = watches.find((w) => samePage(w.url, url))
+      // Given again after it was stopped: read again.
+      if (watched && watched.resourceId === resourceId && isStoppedPage(watched)) {
+        if (marker) await removeWatch(slug, marker.id)
+        return await again(watched)
+      }
       if (watched) {
         const other = places.find((p) => p.id === watched.resourceId)
         return Response.json({ ok: false, errors: [other?.id === resourceId ? 'That page is read for it already.' : `That page is read for ${other?.name ?? 'another listing'} already.`] }, { status: 409 })
@@ -158,13 +208,17 @@ export async function POST(request: Request) {
       const added = await addWatch(slug, { kind: 'website', url, resourceId, label: listingPageLabel(place.name, reads), createdBy: LISTING_PAGE_WATCH_CREATOR })
       if (!added) return Response.json({ ok: false, errors: ['Could not save that page.'] }, { status: 409 })
       const [given] = await read([added])
-      return Response.json({ ok: true, pages: [...pages, given].map((w) => ({ watch: w, source: sourceLine(w) })), off: false })
+      return reply([...pages, given], stopped)
     }
 
     if (action === 'off') {
       for (const w of pages) if (w.active) await updateWatch(slug, w.id, { active: false })
-      if (!marker) await addWatch(slug, { kind: 'website', url: hoursOffUrl(resourceId), resourceId, label: `${place.name}: hours not read`, createdBy: HOURS_OFF_CREATOR, active: false })
-      return Response.json({ ok: true, pages: pages.map((w) => ({ watch: { ...w, active: false }, source: sourceLine(w) })), off: true })
+      if (!marker) await addWatch(slug, { kind: 'website', url: hoursOffUrl(resourceId), resourceId, label: `${place.name}: ${words.what} not read`, createdBy: HOURS_OFF_CREATOR, active: false })
+      return reply(
+        pages.map((w) => ({ ...w, active: false })),
+        stopped,
+        { off: true },
+      )
     }
 
     // On again.
@@ -175,8 +229,8 @@ export async function POST(request: Request) {
     const website = websiteOf(place)
     if (!on.length && website) {
       // Searched now, as the morning's run would.
-      const got = await searchHoursPages(website)
-      if ('error' in got) return Response.json({ ok: true, pages: [], off: false, reason: `Its website wouldn’t open: ${got.error}.` })
+      const got = await searchHoursPages(website, undefined, job)
+      if ('error' in got) return reply([], stopped, { reason: `Its website wouldn’t open: ${got.error}.` })
       for (const p of got.found) {
         if (watches.some((w) => samePage(w.url, p.url))) continue
         const added = await addWatch(slug, { kind: 'website', url: p.url, resourceId, label: foundPageLabel(place.name, p.link), createdBy: HOURS_FOUND_CREATOR })
@@ -184,7 +238,7 @@ export async function POST(request: Request) {
       }
     }
     const done = await read(on)
-    return Response.json({ ok: true, pages: done.map((w) => ({ watch: w, source: sourceLine(w) })), off: false })
+    return reply(done, stopped)
   } catch (err) {
     console.error('[admin/watches/hours] POST failed:', err)
     return Response.json({ ok: false, errors: ['Could not save that.'] }, { status: 502 })

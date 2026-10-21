@@ -10,6 +10,7 @@ import {
   hoursSection,
   hoursWatchChanges,
   looksLikeHours,
+  PAGE_STOPPED_CREATOR,
   sourceLine,
 } from './hoursJob'
 import { LISTING_PAGE_WATCH_CREATOR } from './listingPageWatch'
@@ -42,6 +43,9 @@ describe('hoursJobCategories', () => {
     const shul = { id: 'shul', label: 'Shul', detailFields: [field('minyanim', 'minyanim')] }
     expect(hoursJobCategories([mikvah, food, shul]).map((c) => c.id)).toEqual(['mikvah'])
     expect(hoursJobName([mikvah])).toBe('Mikvah hours')
+    // Shuls (Oct 21): a category with davening times.
+    expect(hoursJobCategories([mikvah, food, shul], 'times').map((c) => c.id)).toEqual(['shul'])
+    expect(hoursJobName([shul], 'times')).toBe('Shul times')
   })
 })
 
@@ -78,6 +82,14 @@ describe('hoursWatchChanges', () => {
     expect(got.remove).toEqual(['gone'])
   })
 
+  it('never adds again a page an admin stopped, nor takes it away', () => {
+    const stopped = watch({ id: 'stopped', url: 'https://lmcmikvah.org/mens-mikvah/', createdBy: PAGE_STOPPED_CREATOR, active: false })
+    const home = watch({ id: 'home', url: 'https://lmcmikvah.org/' })
+    expect(hoursWatchChanges(place, { found: found.slice(0, 1), unloaded: [] }, [home, stopped])).toEqual({ add: [], remove: [] })
+    expect(hoursWatchChanges(place, { found, unloaded: [] }, [home, stopped])).toEqual({ add: [], remove: [] })
+    expect(sourceLine(stopped)).toBe('Stopped')
+  })
+
   it('changes nothing when the website didn’t open, or the place is off', () => {
     const own = watch({ id: 'own', url: 'https://lmcmikvah.org/old/' })
     expect(hoursWatchChanges(place, null, [own])).toEqual({ add: [], remove: [] })
@@ -97,6 +109,8 @@ describe('hoursSection', () => {
     // Pages that give no weekly hours, or none to read.
     expect(s([watch({ lastCheck: check('nothing') })])).toBe('cant_read')
     expect(s([])).toBe('cant_read')
+    // Pages found on its website, not watched yet: the morning's run reads them.
+    expect(hoursSection({ pages: [], off: false, found: true }, NOW)).toBe('waiting')
     // A page that didn't load this morning doesn't hide what the others read.
     expect(s([watch({ failingSince: ago(1), lastError: 'HTTP 500' }), watch({ lastCheck: check('agrees') })])).toBe('checked')
     expect(s([watch({ failingSince: ago(1), lastError: 'HTTP 500' })])).toBe('cant_read')
