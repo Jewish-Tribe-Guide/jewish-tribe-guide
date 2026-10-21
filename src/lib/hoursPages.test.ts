@@ -89,6 +89,25 @@ describe('timesPages', () => {
       { url: 'https://rodephshalom.org/calendar', link: 'Calendar' },
     ])
   })
+  // Oct 21's read-only check of every shul page: pages read for times that
+  // were one holiday's, one year's or a sermon's.
+  it('never reads a page for one holiday or year, whatever folder it’s in', () => {
+    const shtiebel = [
+      a('/calendar', 'Calendar'),
+      a('/calendar/high-holidays-5785', 'High Holidays'),
+      a('/calendar/holidays-sukkot', 'Sukkot'),
+      a('/calendar/chanukah', 'Chanukah'),
+    ].join('')
+    expect(timesPages('https://www.southphiladelphiashtiebel.org/', shtiebel).map((p) => p.link)).toEqual([null, 'Calendar'])
+    const bzbi = [
+      a('/worship/', 'Worship'),
+      a('/worship/high-holy-days-sermons/', 'High Holy Days Sermons'),
+      a('/worship/shabbat/', 'Shabbat'),
+      a('/worship/hhd5786/', 'High Holy Days 2026/5787'),
+      a('/worship/passover-services/', 'Passover Services'),
+    ].join('')
+    expect(timesPages('https://bzbi.org/', bzbi).map((p) => p.link)).toEqual([null, 'Worship', 'Shabbat'])
+  })
 })
 
 describe('eruvPages', () => {

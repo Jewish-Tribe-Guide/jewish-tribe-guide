@@ -77,6 +77,31 @@ describe('searchHoursPages', () => {
     const slow = { ...reach, readPage: vi.fn(async (url: string) => (url.endsWith('mens-mikvah/') ? null : { url, text: PAGES[url], pdf: null })) }
     expect(await searchHoursPages('http://lmcmikvah.org/', slow)).toMatchObject({ unloaded: ['https://lmcmikvah.org/mens-mikvah/'] })
   })
+  // Beth Zion-Beth Israel as Oct 21's check of every shul page found it:
+  // five pages read, all showing its calendar's week, two of them its High
+  // Holy Days pages; and the Rosenbach, a museum, read for its opening hours.
+  it('a shul’s: its pages with davening times, its calendar read once, no holiday pages', async () => {
+    const week = ['2026-10-22 (Thu) 7:45 AM: Monday & Thursday Morning Minyan']
+    const bzbi: Record<string, string> = {
+      'https://bzbi.org/': 'Welcome',
+      'https://bzbi.org/worship/': 'Weekday Minyan, Monday–Friday 7:45 AM',
+      'https://bzbi.org/worship/high-holy-days-sermons/': 'Kol Nidre sermon',
+      'https://bzbi.org/worship/shabbat/': 'Shabbat morning',
+      'https://bzbi.org/worship/hhd5786/': 'Rosh Hashanah services 9:30AM',
+    }
+    const shulReach = {
+      fetchHome: async (url: string) =>
+        url.includes('bzbi')
+          ? { url: 'https://bzbi.org/', body: ['/worship/|Worship', '/worship/high-holy-days-sermons/|High Holy Days Sermons', '/worship/shabbat/|Shabbat', '/worship/hhd5786/|High Holy Days 2026/5787'].map((l) => `<a href="${l.split('|')[0]}">${l.split('|')[1]}</a>`).join('') }
+          : { url: 'https://www.rosenbach.org/', body: '<a href="/about">About Us</a><a href="/visit">Visit in Person</a>' },
+      readPage: async (url: string) =>
+        url.includes('bzbi')
+          ? { url, text: [...week, '', bzbi[url]].join('\n'), pdf: null, weeks: [{ sunday: '2026-10-18', from: '2026-10-21', to: '2026-10-24', lines: week }] }
+          : { url, text: 'Thursday: 10:30am — 6:00pm\nSunday: 10:30am — 4:30pm', pdf: null },
+    }
+    expect(await searchHoursPages('http://www.bzbi.org/', shulReach, 'times')).toEqual({ found: [{ url: 'https://bzbi.org/worship/', link: 'Worship' }], unloaded: [] })
+    expect(await searchHoursPages('http://rosenbach.org/', shulReach, 'times')).toEqual({ found: [], unloaded: [] })
+  })
 })
 
 describe('syncHoursWatches', () => {

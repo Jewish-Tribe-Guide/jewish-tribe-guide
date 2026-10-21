@@ -76,6 +76,48 @@ export function looksLikeHours(source: { text: string | null; pdf: string | null
   return source.pdf !== null || CLOCK_TIME.test(source.text ?? '')
 }
 
+/** What a davening time is called beside its clock time. */
+const DAVENING = /\b(shacharit|shacharis|shachris|shaharit|mincha|minchah|maariv|ma’ariv|ma'ariv|arvit|musaf|minyan|minyans|minyanim|daven|davening|services?|kabbalat|kabbalas|tefill?ah|tefillot|prayers?|selichot|slichos|neilah|kol nidre)\b/i
+
+/** The lines of a shul's page with a davening time: a clock time with a
+ *  davening word on its line or the one beside it ("Shacharit" over
+ *  "7:15 AM"). */
+function daveningLines(lines: readonly string[]): string[] {
+  return lines.filter((l, i) => CLOCK_TIME.test(l) && DAVENING.test(`${lines[i - 1] ?? ''} ${l} ${lines[i + 1] ?? ''}`))
+}
+
+/** A page as the search reads it (listingPageRun.ts's PageSource). */
+type SearchSource = { text: string | null; pdf: string | null; weeks?: readonly { lines: readonly string[] }[] }
+
+/** Which of a shul's pages (home page first, then its links, best first)
+ *  to read its times from (Oct 21's read-only check of every shul page):
+ *  - one with a davening time on it, not any clock time: a museum's
+ *    opening hours (the Rosenbach's), or a footer's office hours on every
+ *    page (Mikveh Israel's About and Visit), aren't davening times;
+ *  - of pages showing one calendar (a site-wide widget: Beth Zion-Beth
+ *    Israel's five pages all showed the same week), only the one whose own
+ *    words give the most davening times, so the week is read once. A PDF
+ *    can't be told without reading it, so it's read. */
+export function timesPagesToRead(sources: readonly (SearchSource | null)[]): boolean[] {
+  const calendarOf = (s: SearchSource) => (s.weeks?.some((w) => w.lines.length) ? JSON.stringify(s.weeks.map((w) => w.lines)) : null)
+  const own = (s: SearchSource) => {
+    const shown = new Set(s.weeks?.flatMap((w) => w.lines))
+    return daveningLines((s.text ?? '').split('\n').filter((l) => !shown.has(l))).length
+  }
+  const keep = sources.map((s) => !!s && (s.pdf !== null || daveningLines((s.text ?? '').split('\n')).length > 0))
+  const best = new Map<string, number>()
+  sources.forEach((s, i) => {
+    const calendar = s && keep[i] ? calendarOf(s) : null
+    if (calendar === null) return
+    const had = best.get(calendar)
+    if (had === undefined || own(s!) > own(sources[had]!)) best.set(calendar, i)
+  })
+  return keep.map((k, i) => {
+    const calendar = k ? calendarOf(sources[i]!) : null
+    return k && (calendar === null || best.get(calendar) === i)
+  })
+}
+
 /** The categories with the job. Hours: weekly hours fields with names,
  *  not only the plain "Hours" Google keeps (pageReadsFor leaves that out
  *  when there are named ones). Times: davening times. */

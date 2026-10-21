@@ -733,11 +733,31 @@ compare, and one it can't read, on desktop and phone.
        waiting in the queue on dev.
      - **Read-only check of all 27 shul pages on dev, Oct 21:** besides
        Mekor, Kol Tzedek and Society Hill each propose one new Friday
-       evening time. Not fixed, for later:
-       - Beth Zion-Beth Israel has 5 pages (two are High Holy Day
-         pages), all reading the same calendar week.
-       - The Rosenbach, a museum, has 5 pages read for shul times.
-       - Rodeph Shalom's calendar page doesn't load.
+       evening time. It also found pages that shouldn't be read, all
+       added by the website search. **Fixed Oct 21:**
+       - Beth Zion-Beth Israel had 5 pages, two of them High Holy Days
+         pages, all showing the same site calendar, so each would propose
+         the same week. Now pages that show one calendar are read as one:
+         the page whose own words give the most times (its Worship page).
+       - The Shtiebel's pages were its High Holidays 5785, Sukkot and
+         Chanukah pages. A page for one holiday, one Hebrew year or a
+         sermon is never read for shul times now, whatever folder it's
+         in.
+       - The Rosenbach (a museum, 5 pages) and Mikveh Israel's About and
+         Visit pages passed because any clock time counted: opening hours,
+         a footer's office hours. Now a shul's page needs a clock time
+         beside a davening word (Shacharit, Mincha, services, minyan…).
+       - Rodeph Shalom's calendar page loads; it was given by hand and
+         read its calendar this morning. Nothing to fix.
+
+       Of the 27 pages on dev, 16 are now stopped (3 had been stopped by
+       hand already) and 11 are still read. Production has no found
+       pages yet, so nothing there changes. The Rosenbach is archived on production; dev's copy is
+       stale and still approved. The morning search takes away found pages
+       it no longer finds, so it would have dropped them anyway.
+       Open: the Shtiebel now has no page. Its home and calendar pages
+       show no times the reader can see (production also reads its
+       newsletter).
 
 ## Done Oct 20: "Check now" is the full check (on `redesign/oct18-fixes`, not merged)
 

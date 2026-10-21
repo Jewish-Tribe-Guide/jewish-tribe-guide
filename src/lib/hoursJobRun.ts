@@ -6,7 +6,7 @@ import { fetchPublic, troubleClause, type Trouble } from '@/lib/menuReader'
 import { WATCH_FETCH_HEADERS } from '@/lib/websiteWatch'
 import { readListingPage, type PageSource } from '@/lib/listingPageRun'
 import { hoursPages, timesPages, type HoursPage } from '@/lib/hoursPages'
-import { HOURS_FOUND_CREATOR, PAGE_JOBS, hoursJobCategories, hoursWatchChanges, looksLikeHours, type PageJob } from '@/lib/hoursJob'
+import { HOURS_FOUND_CREATOR, PAGE_JOBS, hoursJobCategories, hoursWatchChanges, looksLikeHours, timesPagesToRead, type PageJob } from '@/lib/hoursJob'
 import type { CategoryConfig } from '@/lib/categories'
 import type { DirectoryResource, ResourceRow } from '@/types'
 
@@ -32,15 +32,18 @@ export async function fetchHome(url: string): Promise<{ url: string; body: strin
 /** A place's pages that may give its weekly hours, or a shul's its
  *  davening times, from its website: its home page and the links on it
  *  (hoursPages, timesPages), each kept if it has a clock time on it
- *  (looksLikeHours). One that doesn't load is `unloaded`. */
+ *  (looksLikeHours), a shul's if it has a davening time and isn't another
+ *  copy of a calendar (timesPagesToRead). One that doesn't load is
+ *  `unloaded`. */
 export async function searchHoursPages(website: string, reach: HoursReach = {}, job: PageJob = 'hours'): Promise<{ found: HoursPage[]; unloaded: string[] } | { error: string }> {
   const home = await (reach.fetchHome ?? fetchHome)(website)
   if ('error' in home) return home
   const read = reach.readPage ?? ((u: string) => readListingPage(u))
   const pages = (job === 'times' ? timesPages : hoursPages)(home.url, home.body)
   const sources = await Promise.all(pages.map((p) => read(p.url).catch(() => null)))
+  const keep = job === 'times' ? timesPagesToRead(sources) : sources.map((s) => !!s && looksLikeHours(s))
   return {
-    found: pages.filter((_, i) => sources[i] && looksLikeHours(sources[i]!)),
+    found: pages.filter((_, i) => keep[i]),
     unloaded: pages.filter((_, i) => !sources[i]).map((p) => p.url),
   }
 }

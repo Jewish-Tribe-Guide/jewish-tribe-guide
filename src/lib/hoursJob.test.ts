@@ -10,6 +10,7 @@ import {
   hoursSection,
   hoursWatchChanges,
   looksLikeHours,
+  timesPagesToRead,
   PAGE_STOPPED_CREATOR,
   sourceLine,
 } from './hoursJob'
@@ -32,6 +33,30 @@ describe('looksLikeHours', () => {
     expect(looksLikeHours({ text: 'The cost is $18 and 48 hours notice is required.', pdf: null })).toBe(false)
     expect(looksLikeHours({ text: 'On Shabbos, by appointment only, one hour after candle-lighting time.', pdf: null })).toBe(false)
     expect(looksLikeHours({ text: null, pdf: 'JVBERi0' })).toBe(true)
+  })
+})
+
+describe('timesPagesToRead', () => {
+  const page = (text: string, weeks?: string[][]) => ({ text, pdf: null, weeks: weeks?.map((lines) => ({ lines })) })
+
+  // Oct 21's read-only check of every shul page, as each page read.
+  it('reads a shul’s page with a davening time, not a museum’s hours or a footer’s office hours', () => {
+    const rosenbach = page('Hours\nThursday: 10:30am — 6:00pm\nSunday: 10:30am — 4:30pm\nGuided tours are offered every Thursday through Sunday at 10:30am.')
+    const officeFooter = page('About our congregation\nOffice Hours\n9 AM - 5 PM\n9 AM - 3 PM')
+    const mikvehIsrael = page('Shacharit\n7:15 AM (In synagogue)\nFriday Night Services 6:00PM\nOffice Hours\n9 AM - 5 PM')
+    expect(timesPagesToRead([rosenbach, officeFooter, mikvehIsrael, null, { text: null, pdf: 'JVBERi0' }])).toEqual([false, false, true, false, true])
+  })
+
+  it('reads a calendar every page shows once, from the page whose own words give the most times', () => {
+    const week = ['2026-10-22 (Thu) 7:45 AM: Monday & Thursday Morning Minyan', '2026-10-24 (Sat) 9:30 AM: Shabbat Services']
+    const text = (own: string) => [...week, '', own].join('\n')
+    const home = page(text('Welcome to BZBI'), [week])
+    const worship = page(text('Weekday Minyan\nMonday–Friday 7:45 AM\nShabbat Services 9:30 AM'), [week])
+    const sermons = page(text('Rosh Hashanah sermon'), [week])
+    const other = page(['2026-10-23 (Fri) 6:00 PM: Shabbat Evening Service'].join('\n'), [['2026-10-23 (Fri) 6:00 PM: Shabbat Evening Service']])
+    expect(timesPagesToRead([home, worship, sermons, other])).toEqual([false, true, false, true])
+    // None says more than the calendar: the first, the home page.
+    expect(timesPagesToRead([home, sermons])).toEqual([true, false])
   })
 })
 

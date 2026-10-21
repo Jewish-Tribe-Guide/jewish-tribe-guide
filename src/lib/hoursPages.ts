@@ -23,8 +23,14 @@ const HOURS_WORDS: Scoring = [
 ]
 
 // A shul's (step 4, Oct 21): what a page of davening times is called, then
-// where a week's times often are, then where they sometimes are.
+// where a week's times often are, then where they sometimes are. First, a
+// page for one holiday, one year or one event scores none, whatever else
+// it's called: its times aren't the usual week's (Oct 21's check of every
+// shul page: South Philadelphia Shtiebel's High Holidays 5785, Sukkot and
+// Chanukah pages, Beth Zion-Beth Israel's High Holy Days sermons under its
+// Worship pages).
 const TIMES_WORDS: Scoring = [
+  [/\b(high holy ?days?|high holidays?|rosh hashanah?|yom kippur|sukkot|sukkos|simchat torah|simchas torah|chanukah|hanukkah|hanukah|purim|pesach|passover|seders?|shavuot|shavuos|tisha b.?av|sermons?|57\d\d)\b/, 0],
   [/\b(davening|daven|minyan|minyans|minyanim|services|service times|schedule|times|zmanim|prayer|prayers|tefill?ah|tefillot|worship)\b/, 4],
   [/\b(shabbat|shabbos|calendar|weekly|this week|bulletin|newsletter)\b/, 2],
   [/\b(visit|visiting|about|contact|info|information)\b/, 1],
