@@ -697,6 +697,30 @@ compare, and one it can't read, on desktop and phone.
    - **Waiting on the user:** should a read that agrees with the listing
      clear an older finding still waiting? Mekor Habracha's Oct 21 read
      agrees, but its Oct 20 finding still waits to Compare.
+   - **Redrawn for Shul times, Oct 21, not built**
+     (https://claude.ai/artifact/B3vwpSiqwdK833s9VAVHBc, replaces board 6
+     of the keeping-current drawing for this page). The user: "website
+     wins", mimic it ("if the website says 10 minutes before shkiyah that's
+     what we want"), and show "what the reader proposes the new listing
+     should be and how it differs. Like the moderation queue."
+     - No Compare step: the row says the change in a line; opened, it is
+       the proposal in the listing's own boxes, changes marked, with Use
+       this · Edit · Keep the listing.
+     - A Reading on/off switch per shul, in place of Turn off / Turn back
+       on / No times online.
+     - **Usual times and this week's schedule are proposed separately**
+       (the user: "there's a whole difference between this week schedule
+       and usual times"). A page of usual times proposes only usual times;
+       a posted week proposes only that week, as This week's schedule
+       (Use this week · Edit · Skip this week).
+     - **"Not read yet" goes** (the user, Oct 21): a page is read as soon
+       as it's found, so the tabs are To check · Can't be read · Checked
+       (and Off).
+     - Found drawing it: the reader doesn't write seasons the website's
+       way. Mekor's website gives Friday night as 7:00 PM in summer and
+       around candle-lighting in winter. Its Oct 20 finding kept the
+       all-year row, and its Oct 21 read called the listing a match. That
+       needs fixing before the page can be trusted.
 
 ## Done Oct 20: "Check now" is the full check (on `redesign/oct18-fixes`, not merged)
 
