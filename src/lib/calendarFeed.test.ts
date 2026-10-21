@@ -22,6 +22,19 @@ describe('calendarFeeds: the iCal feeds a page links to', () => {
     expect(calendarFeeds(html, 'https://shul.example/')).toEqual(['https://calendar.google.com/calendar/ical/shul%40gmail.com/public/basic.ics'])
   })
 
+  // Kol Tzedek's home page, Oct 21: Google's embed code gave its calendar
+  // in base64, and the feed at that address is a 404.
+  it('reads a Google Calendar embed that names its calendar in base64', () => {
+    const html = `<iframe src="https://calendar.google.com/calendar/embed?height=600&amp;mode=AGENDA&amp;src=a29sdHplZGVrY29tbXVuaWNhdGlvbnNAZ21haWwuY29t&amp;color=%23F6BF26"></iframe>`
+    expect(calendarFeeds(html, 'https://www.kol-tzedek.org/')).toEqual(['https://calendar.google.com/calendar/ical/koltzedekcommunications%40gmail.com/public/basic.ics'])
+    // A calendar id that only looks like base64 is left as it is.
+    const plain = `<iframe src="https://calendar.google.com/calendar/embed?src=en.usa%23holiday%40group.v.calendar.google.com"></iframe><iframe src="https://calendar.google.com/calendar/embed?src=abcd"></iframe>`
+    expect(calendarFeeds(plain, 'https://shul.example/')).toEqual([
+      'https://calendar.google.com/calendar/ical/en.usa%23holiday%40group.v.calendar.google.com/public/basic.ics',
+      'https://calendar.google.com/calendar/ical/abcd/public/basic.ics',
+    ])
+  })
+
   it('finds nothing on a page with no calendar', () => {
     expect(calendarFeeds('<a href="/davening">Davening</a><a href="mailto:a@b.c">Mail</a>', 'https://shul.example/')).toEqual([])
   })

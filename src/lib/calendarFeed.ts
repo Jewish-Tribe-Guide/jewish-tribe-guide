@@ -31,6 +31,21 @@ const MAX_LINES = 120
 
 const ICS_LINK = /(?:\.ics(?:[?#]|$)|[?&]ical=1\b|^webcal:)/i
 
+/** A Google Calendar embed's calendar, as its feed is addressed. Google's
+ *  embed code may give it in base64 (Kol Tzedek's, Oct 21:
+ *  "a29sdHplZGVr…" for koltzedekcommunications@gmail.com), and the feed
+ *  at that address is a 404. */
+function googleCalendarId(src: string): string {
+  if (src.includes('@') || !/^[A-Za-z0-9+/_-]+={0,2}$/.test(src)) return src
+  const decoded = Buffer.from(src, 'base64').toString('utf8')
+  return /^[^\s@]+@[^\s@]+\.[a-z.]+$/i.test(decoded) ? decoded : src
+}
+
+/** How big a calendar feed may be. Google's public feed is every event
+ *  the calendar ever had: Kol Tzedek's was 4.8 MB on Oct 21, over what a
+ *  page may be (menuReader.ts). */
+export const MAX_FEED_BYTES = 20_000_000
+
 /** The iCal feeds a page links to or embeds, as addresses to fetch, the
  *  page's own first. A Google Calendar embed (`calendar/embed?src=…`) has
  *  a public feed at a known address. */
@@ -51,7 +66,7 @@ export function calendarFeeds(html: string, pageUrl: string): string[] {
     const google = /calendar\.google\.com\/calendar\/(?:u\/\d+\/)?embed\?([^"'\s]+)/i.exec(raw)
     if (google) {
       for (const src of new URLSearchParams(google[1].replace(/&amp;/g, '&')).getAll('src')) {
-        add(`https://calendar.google.com/calendar/ical/${encodeURIComponent(src)}/public/basic.ics`)
+        add(`https://calendar.google.com/calendar/ical/${encodeURIComponent(googleCalendarId(src))}/public/basic.ics`)
       }
     }
   }

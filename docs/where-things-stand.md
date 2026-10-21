@@ -771,6 +771,18 @@ compare, and one it can't read, on desktop and phone.
        page's event list is empty. The month is two images ("Oct. High
        Holiday calendar 2026.png", "Calendar September 2026.png"), which
        the reader doesn't read. Not built.
+     - **Kol Tzedek's calendar is read, Oct 21.** Its home page embeds a
+       Google Calendar, but the embed names the calendar in base64, so
+       the feed address the reader built was a 404. And Google's feed is
+       every event the calendar ever had (4.8 MB), over the 3 MB a page
+       may be. Now the name is decoded, and a calendar feed may be up to
+       20 MB. Dev's home page now reads "Sat Oct 24 10:00 AM In-Person
+       Shabbat Morning Services" and the rest of the week. Production
+       watches the same home page (given by hand), so it reads the
+       calendar once this is deployed; its newsletter is read too.
+       Calendars the reader takes: iCal links, Google Calendar embeds,
+       event lists in a page's scripts. Not: a calendar posted as
+       pictures (Mikveh Israel) or drawn by a script from its own server.
 
 ## Done Oct 20: "Check now" is the full check (on `redesign/oct18-fixes`, not merged)
 

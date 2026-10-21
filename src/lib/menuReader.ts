@@ -183,7 +183,8 @@ const PICTURE_TYPES = ['image/jpeg', 'image/png', 'image/webp']
  *  when it can't be read. The body is text for a page, base64 for a PDF.
  *  `headers` in place of the menu reader's own: a watch asks as a browser
  *  does (WATCH_FETCH_HEADERS), which some shul sites need. `pictures`: a
- *  JPEG, PNG or WebP is read too, as base64 (a menu posted as a picture). */
+ *  JPEG, PNG or WebP is read too, as base64 (a menu posted as a picture).
+ *  `maxBytes`: a calendar feed may be bigger than a page (MAX_FEED_BYTES). */
 export async function fetchPublic(
   raw: string,
   {
@@ -192,7 +193,8 @@ export async function fetchPublic(
     headers,
     pictures = false,
     trouble,
-  }: { fetchImpl?: typeof fetch; resolve?: Lookup; headers?: Record<string, string>; pictures?: boolean; trouble?: (t: Trouble) => void } = {},
+    maxBytes = MAX_BYTES,
+  }: { fetchImpl?: typeof fetch; resolve?: Lookup; headers?: Record<string, string>; pictures?: boolean; trouble?: (t: Trouble) => void; maxBytes?: number } = {},
 ): Promise<Fetched | null> {
   const fail = (t: Trouble) => {
     trouble?.(t)
@@ -221,9 +223,9 @@ export async function fetchPublic(
     if (!res.ok) return fail(refusal(res.status))
     const type = (res.headers.get('content-type') ?? '').toLowerCase()
     const length = Number(res.headers.get('content-length') ?? 0)
-    if (length > MAX_BYTES) return fail({ why: 'not_a_page' })
+    if (length > maxBytes) return fail({ why: 'not_a_page' })
     const bytes = new Uint8Array(await res.arrayBuffer())
-    if (bytes.byteLength > MAX_BYTES) return fail({ why: 'not_a_page' })
+    if (bytes.byteLength > maxBytes) return fail({ why: 'not_a_page' })
     const isPdf = type.includes('application/pdf') || (bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46)
     if (isPdf) return { url: url.toString(), type: 'pdf', body: Buffer.from(bytes).toString('base64') }
     const picture = PICTURE_TYPES.find((t) => type.includes(t))

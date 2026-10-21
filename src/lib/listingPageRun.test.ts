@@ -581,7 +581,8 @@ describe('readListingPage: a page with a calendar', () => {
       url === URL_ ? { url, type: 'html', body: '<a href="/events/?ical=1">Export</a><p>Month view</p>' } : { url, type: 'html', body: feed },
     )
     const got = await readListingPage(URL_, { now: OCT_20 })
-    expect(m.fetchPublic).toHaveBeenCalledWith('https://lms.example/events/?ical=1', expect.anything())
+    // A feed may be bigger than a page (Kol Tzedek's Google Calendar, 4.8 MB).
+    expect(m.fetchPublic).toHaveBeenCalledWith('https://lms.example/events/?ical=1', expect.objectContaining({ maxBytes: 20_000_000 }))
     expect(got?.text).toBe(`${CALENDAR_HEADING}\n2026-10-23 (Fri) 6:00 PM: Shabbat Evening Service\n\nExport Month view`)
   })
 

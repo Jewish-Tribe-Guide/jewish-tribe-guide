@@ -49,6 +49,14 @@ describe('only the public internet', () => {
     expect(await fetchPublic('https://g.example', { fetchImpl: vi.fn().mockResolvedValue(page('x', 'text/html', 200, { 'content-length': '9000000' })), resolve: publicDns })).toBeNull()
     expect(await fetchPublic('https://g.example', { fetchImpl: vi.fn().mockResolvedValue(page('x', 'image/png')), resolve: publicDns })).toBeNull()
   })
+
+  // Kol Tzedek's Google Calendar feed was 4.8 MB on Oct 21: every event it
+  // ever had. A calendar feed may be that big; a page may not.
+  it('a calendar feed may be bigger than a page, when the caller says so', async () => {
+    const big = () => vi.fn().mockResolvedValue(page('BEGIN:VCALENDAR' + ' '.repeat(4_800_000), 'text/calendar'))
+    expect(await fetchPublic('https://calendar.google.com/x.ics', { fetchImpl: big(), resolve: publicDns })).toBeNull()
+    expect(await fetchPublic('https://calendar.google.com/x.ics', { fetchImpl: big(), resolve: publicDns, maxBytes: 20_000_000 })).toMatchObject({ type: 'html' })
+  })
 })
 
 describe('reading a page', () => {

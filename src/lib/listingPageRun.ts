@@ -6,7 +6,7 @@ import { fetchPublic, htmlToText, type MenuSource } from '@/lib/menuReader'
 import { menuHash } from '@/lib/menuWatch'
 import { WATCH_FETCH_HEADERS } from '@/lib/websiteWatch'
 import { readShulWeek } from '@/lib/shulWeekReading'
-import { CALENDAR_HEADING, calendarFeeds, calendarLines, calendarWeeks, embeddedEntries, icsEntries, isIcs, type CalendarEntry, type CalendarWeek } from '@/lib/calendarFeed'
+import { CALENDAR_HEADING, MAX_FEED_BYTES, calendarFeeds, calendarLines, calendarWeeks, embeddedEntries, icsEntries, isIcs, type CalendarEntry, type CalendarWeek } from '@/lib/calendarFeed'
 import { applyUpdate, changesAnything, datesBetween, datesHeldOverWebsite, sameTime, seasonOf, weekdayOf, type TimesUpdate } from '@/lib/scheduleUpdate'
 import { dateText, readSchedules, regularMinyanim, schedulesKey, type SpecialSchedule } from '@/lib/schedules'
 import { buildCatalog, readMessage } from '@/lib/messageReader'
@@ -65,7 +65,7 @@ export async function readListingPage(url: string, opts: { fetchImpl?: typeof fe
   // list in its scripts (calendarFeed.ts), ahead of the page's own words.
   let entries = embeddedEntries(page.body, communityConfig.timezone)
   for (const feed of calendarFeeds(page.body, page.url).slice(0, 2)) {
-    const got = await fetchPublic(feed, { fetchImpl: opts.fetchImpl, headers: WATCH_FETCH_HEADERS })
+    const got = await fetchPublic(feed, { fetchImpl: opts.fetchImpl, headers: WATCH_FETCH_HEADERS, maxBytes: MAX_FEED_BYTES })
     if (got?.type === 'html' && isIcs(got.body)) {
       entries = icsEntries(got.body, communityConfig.timezone, first, last)
       break
