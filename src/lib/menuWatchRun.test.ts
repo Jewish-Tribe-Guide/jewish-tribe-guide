@@ -9,6 +9,9 @@ const m = vi.hoisted(() => ({
   getMenuReading: vi.fn(),
   readMenuPage: vi.fn(),
   readMenu: vi.fn(),
+  findMenus: vi.fn(),
+  readMenus: vi.fn(),
+  listMenuReadings: vi.fn(),
   saveMenuReading: vi.fn(),
   addWatch: vi.fn(),
   listWatches: vi.fn(),
@@ -21,8 +24,8 @@ vi.mock('@/lib/resourceStore', () => ({
   getResourceRowById: m.getResourceRowById,
   normalizeRow: (r: { details?: Record<string, unknown> }) => ({ ...r, ...(r.details ?? {}) }),
 }))
-vi.mock('@/lib/menuReader', async (orig) => ({ ...(await orig<typeof import('./menuReader')>()), readMenuPage: m.readMenuPage, readMenu: m.readMenu }))
-vi.mock('@/lib/menuReadingStore', () => ({ saveMenuReading: m.saveMenuReading, getMenuReading: m.getMenuReading }))
+vi.mock('@/lib/menuReader', async (orig) => ({ ...(await orig<typeof import('./menuReader')>()), readMenuPage: m.readMenuPage, readMenu: m.readMenu, findMenus: m.findMenus, readMenus: m.readMenus }))
+vi.mock('@/lib/menuReadingStore', () => ({ saveMenuReading: m.saveMenuReading, getMenuReading: m.getMenuReading, listMenuReadings: m.listMenuReadings }))
 vi.mock('@/lib/watchStore', () => ({ addWatch: m.addWatch, listWatches: m.listWatches, removeWatch: m.removeWatch }))
 vi.mock('@/lib/supabase/admin', () => ({
   getAdminClient: () => ({
@@ -44,6 +47,19 @@ const URL_ = 'https://judah.example/menu'
 const row = { id: 'r1', category: 'restaurant', name: 'Judah', status: 'approved', details: { dishes: ['Falafel'], menuUrl: URL_ } }
 const page = { url: URL_, text: 'Falafel plate. Shawarma laffa. '.repeat(10), pdf: null }
 const watch = { communityId: 'philly', url: URL_, resourceId: 'r1', pageHash: null as string | null }
+// A place watched on a page the reader found, on its own website.
+const site = makeCategory({
+  id: 'restaurant',
+  detailFields: [
+    { key: 'website', label: 'Website', type: 'url' },
+    { key: 'dishes', label: 'Main dishes', type: 'tags', showCountInHeader: true, countLabel: 'main dish' },
+  ],
+})
+const FOUND = 'https://shalom.example/menu'
+const MOVED = 'https://shalom.example/our-food'
+const foundRow = { id: 'r2', category: 'restaurant', name: 'Shalom', status: 'approved', details: { dishes: ['Falafel'], website: 'https://shalom.example' } }
+const foundReading = { resourceId: 'r2', status: 'proposed', sourceUrl: FOUND, dishes: [{ name: 'Falafel', quote: 'Falafel plate', checked: true }], note: null }
+const foundWatch = { communityId: 'philly', url: FOUND, resourceId: 'r2', pageHash: 'old' }
 const twoDishes = { sourceUrl: URL_, dishes: [{ name: 'Falafel', quote: 'Falafel plate', checked: true }, { name: 'Shawarma', quote: 'Shawarma laffa', checked: true }], note: null, model: 'gpt' }
 
 beforeEach(() => {
@@ -54,6 +70,9 @@ beforeEach(() => {
   m.readMenu.mockResolvedValue(twoDishes)
   m.listWatches.mockResolvedValue({ watches: [], available: true })
   m.addWatch.mockImplementation(async () => ({ id: 'new' }))
+  m.listMenuReadings.mockResolvedValue({ readings: [], available: true })
+  m.getMenuReading.mockResolvedValue(null)
+  m.findMenus.mockResolvedValue([])
   m.resources = [row]
 })
 
@@ -202,6 +221,26 @@ describe('syncMenuWatches', () => {
     expect(m.removeWatch).toHaveBeenCalledTimes(1)
   })
 
+  // Oct 21: a place with no menu link yet is watched on the page its
+  // reading found the menu on, and the watch follows the reading.
+  it('watches the page the reader found, for a place with no menu link', async () => {
+    m.listCategoriesUncached.mockResolvedValue([site])
+    m.resources = [foundRow]
+    m.listMenuReadings.mockResolvedValue({ readings: [foundReading], available: true })
+    expect(await syncMenuWatches()).toEqual([{ community: 'philly', added: 1, removed: 0 }])
+    expect(m.addWatch).toHaveBeenCalledWith('philly', { kind: 'website', url: FOUND, resourceId: 'r2', label: 'Menu · Shalom', createdBy: MENU_WATCH_CREATOR })
+  })
+
+  it('moves its watch when the reading is from another page now', async () => {
+    m.listCategoriesUncached.mockResolvedValue([site])
+    m.resources = [foundRow]
+    m.listMenuReadings.mockResolvedValue({ readings: [{ ...foundReading, sourceUrl: MOVED }], available: true })
+    m.listWatches.mockResolvedValue({ watches: [{ id: 'w1', url: FOUND, resourceId: 'r2', createdBy: MENU_WATCH_CREATOR }], available: true })
+    expect(await syncMenuWatches()).toEqual([{ community: 'philly', added: 1, removed: 1 }])
+    expect(m.addWatch).toHaveBeenCalledWith('philly', expect.objectContaining({ url: MOVED, resourceId: 'r2' }))
+    expect(m.removeWatch).toHaveBeenCalledWith('philly', 'w1')
+  })
+
   it('does nothing before the watch table exists', async () => {
     m.listWatches.mockResolvedValue({ watches: [], available: false })
     expect(await syncMenuWatches()).toEqual([])
@@ -258,5 +297,80 @@ describe('a menu drawn by a script', () => {
     })
     const slow = { render: vi.fn(async (_u: string, trouble?: (t: Trouble) => void) => (trouble?.({ why: 'draw_timeout' }), null)), close: vi.fn(async () => {}) }
     expect(await runMenuWatch(watch, newMenuReadBudget(), { apiKey: 'k', renderer: slow })).toEqual({ ok: false, error: 'Couldn’t read the menu: it’s drawn by a script, and took too long to draw' })
+  })
+})
+
+// Oct 21: a watched menu page that stops opening sends the run back to the
+// place's website to find where the menu is now. What it finds waits on the
+// Main dishes tab: approving it moves the menu link, so a person moves it.
+describe('runMenuWatch: a menu page that stops opening', () => {
+  const movedPage = { url: MOVED, text: 'Falafel plate. Shawarma laffa. '.repeat(10), pdf: null }
+  const run = (budget?: ReturnType<typeof newMenuReadBudget>) => runMenuWatch(foundWatch, budget, { apiKey: 'k', renderer: null })
+  const runWithoutAi = () => runMenuWatch(foundWatch, undefined, { apiKey: undefined, renderer: null })
+  beforeEach(() => {
+    m.listCategoriesUncached.mockResolvedValue([site])
+    m.getResourceRowById.mockResolvedValue(foundRow)
+    m.readMenuPage.mockResolvedValue(null)
+    m.getMenuReading.mockResolvedValue({ ...foundReading })
+  })
+
+  it('searches its website again, keeps what it finds on the new page for the admin, and says so', async () => {
+    m.findMenus.mockResolvedValue([{ url: FOUND, text: 'x', pdf: null }, movedPage])
+    m.readMenus.mockResolvedValue({ ...twoDishes, sourceUrl: MOVED })
+    expect(await run(newMenuReadBudget())).toEqual({
+      ok: false,
+      error: `Couldn’t read the menu (blocked, moved, or built in the browser). Its menu was found at ${MOVED}, waiting on the Main dishes tab.`,
+    })
+    expect(m.findMenus).toHaveBeenCalledWith('https://shalom.example', expect.anything())
+    // Not the page that just failed.
+    expect(m.readMenus).toHaveBeenCalledWith([movedPage], 'Shalom', expect.objectContaining({ apiKey: 'k', listed: ['Falafel'] }))
+    expect(m.saveMenuReading).toHaveBeenCalledWith('philly', 'r2', {
+      status: 'proposed',
+      sourceUrl: MOVED,
+      dishes: twoDishes.dishes,
+      missing: [],
+      note: `Its menu page stopped opening, and the menu is now at ${MOVED}. Approving makes that its menu link. One dish isn’t on the listing yet: Shawarma.`,
+      model: 'gpt',
+    })
+  })
+
+  it('a menu link’s page too: approving the new page is what moves the link', async () => {
+    m.getResourceRowById.mockResolvedValue({ ...foundRow, details: { ...foundRow.details, menuUrl: FOUND } })
+    m.getMenuReading.mockResolvedValue({ ...foundReading, status: 'approved' })
+    m.findMenus.mockResolvedValue([movedPage])
+    m.readMenus.mockResolvedValue({ ...twoDishes, sourceUrl: MOVED })
+    expect(await run()).toMatchObject({ ok: false, error: expect.stringContaining(`found at ${MOVED}`) })
+    expect(m.saveMenuReading).toHaveBeenCalledWith('philly', 'r2', expect.objectContaining({ status: 'proposed', sourceUrl: MOVED }))
+  })
+
+  it('no other page of its own site with dishes on it: still failing, and says it searched', async () => {
+    const searched = 'Couldn’t read the menu (blocked, moved, or built in the browser). Its website was searched again, and no other page on it has the menu.'
+    expect(await run()).toEqual({ ok: false, error: searched })
+    m.findMenus.mockResolvedValue([movedPage])
+    m.readMenus.mockResolvedValue({ ...twoDishes, sourceUrl: 'https://casino.example/menu' })
+    expect(await run()).toEqual({ ok: false, error: searched })
+    m.readMenus.mockResolvedValue({ ...twoDishes, sourceUrl: MOVED, dishes: [] })
+    expect(await run()).toEqual({ ok: false, error: searched })
+    expect(m.saveMenuReading).not.toHaveBeenCalled()
+  })
+
+  it('isn’t searched again once its reading is from another page, waiting or decided', async () => {
+    for (const status of ['proposed', 'skipped', 'approved']) {
+      m.getMenuReading.mockResolvedValue({ ...foundReading, status, sourceUrl: MOVED })
+      expect(await run()).toEqual({ ok: false, error: `Couldn’t read the menu (blocked, moved, or built in the browser). Its menu was last read from ${MOVED}: see the Main dishes tab.` })
+    }
+    expect(m.findMenus).not.toHaveBeenCalled()
+  })
+
+  it('the daily run searches within its budget, an AI read included; past it, or without the AI, fails as before', async () => {
+    m.findMenus.mockResolvedValue([movedPage])
+    m.readMenus.mockResolvedValue({ ...twoDishes, sourceUrl: MOVED })
+    const budget = newMenuReadBudget()
+    expect(budget.searches).toBe(1)
+    await run(budget)
+    expect(budget).toMatchObject({ searches: 0, aiReads: 2 })
+    expect(await run(budget)).toEqual({ ok: false, error: 'Couldn’t read the menu (blocked, moved, or built in the browser)' })
+    expect(await runWithoutAi()).toEqual({ ok: false, error: 'Couldn’t read the menu (blocked, moved, or built in the browser)' })
+    expect(m.findMenus).toHaveBeenCalledTimes(1)
   })
 })

@@ -138,12 +138,14 @@ describe('WatchesManager', () => {
   it('says a menu watch is the run’s own, that the AI reads only a change, and to pause it to stop it', async () => {
     await renderTab([watch({ url: 'https://judah.example/menu', resourceId: 'shul-1', createdBy: 'menu links', lastFiled: 1, pageChangedAt: ago(1) })])
     const group = screen.getByRole('region', { name: 'Menu' })
-    expect(group).toHaveTextContent('Added on their own for each place with a menu link.')
+    expect(group).toHaveTextContent('Added on their own for each place whose menu is known: its menu link, or the page the reader found it on.')
     expect(group).toHaveTextContent(/Changed .*: new dishes on the Main dishes tab/)
     await open(within(group).getByTestId('watch-row'))
     const line = screen.getByTestId('menu-watch')
     expect(line).toHaveTextContent(/When the menu changes, the AI reads it/)
     expect(line).toHaveTextContent(/pause it to stop it/)
+    // Oct 21: and that a page that stops opening sends it looking.
+    expect(line).toHaveTextContent(/If the page stops opening, its website is searched again/)
     expect(screen.queryByText(/worth a look/)).toBeNull()
   })
 

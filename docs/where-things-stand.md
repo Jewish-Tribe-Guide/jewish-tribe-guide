@@ -377,9 +377,42 @@ compare, and one it can't read, on desktop and phone.
   it reads where it reads.
 
 **Build order**
-1. **Finish menus:** the menu page the reader found becomes what the
-   daily check watches. Today only places with a menu link are watched
-   daily; the tab reads websites only when asked.
+1. **Finish menus:** BUILT Oct 21 on `redesign/oct18-fixes`. What it does
+   and doesn't do yet:
+   - **Already true before this, and easy to miss:** approving a reading
+     on Main dishes writes the page it was read from as the place's menu
+     link (`approve_menu_dishes`, migration 065). So most "menu links" are
+     the reader's own finds, and were watched daily already.
+   - **New: a place with no menu link yet** is watched on the page its
+     latest reading found the menu on. Conditions: dishes were read there
+     (not photos, a failure or "no menu"), and the page is on the place's
+     own website or is a PDF (`foundMenuPage`, `menuWatch.ts`). A reading
+     waiting or skipped counts. A menu link that's an ordering app gives
+     way to it.
+   - **New: a watched page that stops opening sends the run back to the
+     website** (`findMenus`, as Main dishes does). A menu found on another
+     page of the place's own site is saved as a reading waiting on Main
+     dishes: "Its menu page stopped opening, and the menu is now at …
+     Approving makes that its menu link." The watch keeps failing until
+     then, and its error says where the menu went, so the admin's email
+     says it too.
+   - **Never moved without a person.** That's stricter than the plan above
+     ("one it found itself can be replaced"): a found link and one an
+     admin typed look the same once approved, so the run never tells them
+     apart and only ever proposes. Once a reading is from another page
+     (waiting, skipped or approved), that place isn't searched again.
+   - **Budget:** one search per daily run (`MENU_SEARCHES_PER_RUN`). It
+     takes one of the run's three AI reads, so the run's AI time doesn't
+     grow. Check now always searches.
+   - **Tried on real sites, with writes refused:** PLNT Burger, watched on
+     a dead page, found `/menu` and would have saved six dishes with that
+     note, in 38s (nearly all of it the AI). Judah's menu times out at
+     45s on the AI on every read, the ordinary one too: not new, worth a
+     look. Dev's 11 failing menu watches all open fine now: stale.
+   - **Not done yet:** the monthly re-search, and searching again when a
+     page still opens but no longer has the menu. Both need somewhere to
+     keep when a place was last searched. Watching the page that links to
+     a PDF (a "menu-fall-2026.pdf" renamed each season) is also not done.
 2. **Hospitals:** matched to Refuah automatically, on their own page, so
    the main page has two rows.
 3. **Mikvahs:** one dry run first (read each website once, save nothing,

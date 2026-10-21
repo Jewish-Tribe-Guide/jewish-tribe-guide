@@ -312,7 +312,7 @@ function WhatItDoes({ watch }: { watch: Watch }) {
   if (watch.createdBy === MENU_WATCH_CREATOR) {
     return (
       <p className="text-xs text-muted" data-testid="menu-watch">
-        Its menu link, checked every morning. When the menu changes, the AI reads it, and dishes the listing doesn’t have wait on the Main dishes tab. Check now reads it straight away. Added for every place with a menu link: pause it to stop it.
+        Its menu, checked every morning: its menu link, or the page the reader found its menu on. When the menu changes, the AI reads it, and dishes the listing doesn’t have wait on the Main dishes tab. If the page stops opening, its website is searched again, and a menu found on another page waits there too. Check now reads it straight away. Added for every place whose menu is known: pause it to stop it.
       </p>
     )
   }
@@ -897,7 +897,7 @@ export default function WatchesManager({ token }: { token: string }) {
     )
   }
 
-  const MENU_NOTE = 'Added on their own for each place with a menu link.'
+  const MENU_NOTE = 'Added on their own for each place whose menu is known: its menu link, or the page the reader found it on.'
 
   return (
     <div className="space-y-4">

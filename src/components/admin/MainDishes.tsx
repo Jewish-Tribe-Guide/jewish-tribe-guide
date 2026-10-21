@@ -5,6 +5,7 @@ import { useLoadOnMount } from '@/lib/useLoadOnMount'
 import { fetchJson } from '@/lib/fetchJson'
 import { withCommunity } from '@/lib/useCommunityData'
 import { useCommunitySlug } from '@/lib/communityContext'
+import { readElsewhere } from '@/lib/menuLink'
 import CollapsibleSection from './CollapsibleSection'
 
 // ── The "Main dishes" tab: each food place's dishes, read off its menu ───────
@@ -57,25 +58,9 @@ function formatDay(iso: string): string {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
-const hostOf = (url: string) => {
-  try {
-    return new URL(url).hostname.replace(/^www\./, '')
-  } catch {
-    return ''
-  }
-}
-
-/** A menu read somewhere other than the place's own site, and not a PDF
- *  it links to: its website may have moved, lapsed or been taken over
- *  (one in Philly's guide now sends visitors to a gambling site). */
+/** A menu read somewhere other than the place's own site (readElsewhere). */
 function elsewhere(place: Place): boolean {
-  const source = place.reading?.sourceUrl
-  if (!source || !place.website || /\.pdf($|\?)/i.test(source)) return false
-  // Its menu link is wherever someone said the menu is.
-  if (place.menuUrl && hostOf(source) === hostOf(place.menuUrl)) return false
-  const a = hostOf(source)
-  const b = hostOf(place.website)
-  return !!a && !!b && a !== b && !a.endsWith(`.${b}`) && !b.endsWith(`.${a}`)
+  return readElsewhere(place.reading?.sourceUrl ?? null, place.website, place.menuUrl)
 }
 
 /** Its dishes came from a menu someone sent through the site ("+ Add"),

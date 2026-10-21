@@ -7,7 +7,7 @@ import { revalidatePublicContent } from '@/lib/revalidateContent'
 import { itemsField, listingFacts } from '@/lib/listingView'
 import { addedItemName, cleanItemName, itemMarks, itemWording } from '@/lib/itemMarks'
 import { findMenus, isOrderingApp, readMenu, readMenus, readMenuPage, troubleClause, unreadMenuNote, type MenuDish, type Trouble } from '@/lib/menuReader'
-import { MENU_LINK_KEY, readMenuLink } from '@/lib/menuLink'
+import { MENU_LINK_KEY, menuWebsite, readMenuLink } from '@/lib/menuLink'
 import {
   clearMenuReading,
   decideMenuReading,
@@ -101,14 +101,6 @@ function menuLinkOf(item: DirectoryResource): string | null {
   return readMenuLink(item[MENU_LINK_KEY]) || null
 }
 
-/** A place's own website: its category's first web-address field in the
- *  form's basics (Website), or one keyed "website". */
-function websiteOf(item: DirectoryResource, category: CategoryConfig): string | null {
-  const field = category.detailFields.find((f) => f.type === 'url' && f.coreSection) ?? category.detailFields.find((f) => f.key === 'website')
-  const url = field ? item[field.key] : null
-  return typeof url === 'string' && /^https?:\/\//i.test(url.trim()) ? url.trim() : null
-}
-
 export async function GET(request: Request) {
   const community = await resolveCommunity(communitySlugFromRequest(request))
   const admin = await getAdminUserForCommunity(request, community.slug)
@@ -130,7 +122,7 @@ export async function GET(request: Request) {
           name: l.name,
           categoryLabel: category.label,
           facts: listingFacts(l, category),
-          website: websiteOf(l, category),
+          website: menuWebsite(l, category),
           menuUrl: menuLinkOf(l),
           dishes: listedNames(l, field),
           menuAt: newestMenuDate(l, field),
@@ -169,7 +161,7 @@ export async function POST(request: Request) {
     if (action === 'read') {
       const apiKey = process.env.OPENAI_API_KEY
       if (!apiKey) return Response.json({ ok: false, errors: ['The AI reader isn’t set up here (no OPENAI_API_KEY).'] }, { status: 503 })
-      const website = websiteOf(listing, kind.category)
+      const website = menuWebsite(listing, kind.category)
       const menuUrl = menuLinkOf(listing)
       // Its menu link when that can be read, else the pages its website
       // links to as its menu, best first, until one names dishes. A page
