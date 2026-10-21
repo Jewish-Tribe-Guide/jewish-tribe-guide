@@ -25,6 +25,7 @@ import {
   parseMekorList,
   submissionKey,
   type GuideListing,
+  type MekorEntry,
   type MekorFinding,
   type PendingCreate,
 } from '@/lib/mekorWatch'
@@ -34,7 +35,8 @@ import {
  *  place in the guide. The list had 78 on Oct 18, 2026. */
 const MIN_ENTRIES = 40
 
-const CATEGORIES = ['restaurant', 'grocery']
+/** The food places a kosher list is compared with. */
+export const CATEGORIES = ['restaurant', 'grocery']
 
 /** Ten digits as the guide writes a phone. */
 function phone(digits: string): string {
@@ -66,18 +68,27 @@ export type MekorRun =
       wouldFile?: (WatchDigestItem & { kind: MekorFinding['kind']; note: string })[]
     }
 
-export async function runMekorWatch(community: string, url: string, { dry = false }: { dry?: boolean } = {}): Promise<MekorRun> {
+/** Mekor Habracha's list, read now: its entries and its "Last Updated"
+ *  date, or why it couldn't be. Shared with the Kosher certification page. */
+export async function readMekorList(url: string): Promise<{ updated: string | null; entries: MekorEntry[] } | { error: string }> {
   let res: Response
   try {
     res = await fetch(url, { headers: WATCH_FETCH_HEADERS, cache: 'no-store', signal: AbortSignal.timeout(20_000) })
   } catch (err) {
-    return { ok: false, error: `Couldn’t reach Mekor Habracha’s list (${err instanceof Error ? err.message : String(err)})` }
+    return { error: `Couldn’t reach Mekor Habracha’s list (${err instanceof Error ? err.message : String(err)})` }
   }
-  if (!res.ok) return { ok: false, error: `Mekor Habracha’s list answered ${res.status}` }
+  if (!res.ok) return { error: `Mekor Habracha’s list answered ${res.status}` }
   const { updated, entries } = parseMekorList(await res.text())
   if (entries.length < MIN_ENTRIES) {
-    return { ok: false, error: `Read only ${entries.length} places from Mekor Habracha’s list; its page may have changed. Nothing filed.` }
+    return { error: `Read only ${entries.length} places from Mekor Habracha’s list; its page may have changed. Nothing filed.` }
   }
+  return { updated, entries }
+}
+
+export async function runMekorWatch(community: string, url: string, { dry = false }: { dry?: boolean } = {}): Promise<MekorRun> {
+  const list = await readMekorList(url)
+  if ('error' in list) return { ok: false, error: list.error }
+  const { updated, entries } = list
 
   const supabase = getAdminClient()
   // Archived listings too: a place Mekor still lists that the guide took

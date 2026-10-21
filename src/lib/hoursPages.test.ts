@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { hoursLinks, hoursPages, MAX_HOURS_PAGES, timesPages } from './hoursPages'
+import { eruvPages, hoursLinks, hoursPages, MAX_HOURS_PAGES, timesPages } from './hoursPages'
 
 const a = (href: string, text: string) => `<a href="${href}">${text}</a>`
 
@@ -88,5 +88,20 @@ describe('timesPages', () => {
       { url: 'https://rodephshalom.org/index.cfm?fuseaction=Page.ViewPage&pageId=500', link: 'Worship Services' },
       { url: 'https://rodephshalom.org/calendar', link: 'Calendar' },
     ])
+  })
+})
+
+describe('eruvPages', () => {
+  // The shape of Lower Merion's eruv site (Oct 21): its status is behind an
+  // "Eruv Status" link, beside its map and its donations.
+  it('finds an eruv’s status page first, then the pages about it', () => {
+    const html = [
+      a('/wordpress/?page_id=2', 'Map'),
+      a('/wordpress/?page_id=40', 'Donate'),
+      a('/wordpress/?page_id=12', 'About the Eruv'),
+      a('/wordpress/?page_id=29', 'Eruv Status'),
+      a('/wordpress/?page_id=8', 'Contact'),
+    ].join('')
+    expect(eruvPages('https://www.lowermerioneruv.org/', html).map((p) => p.link)).toEqual([null, 'Eruv Status', 'About the Eruv'])
   })
 })

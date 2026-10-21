@@ -69,7 +69,7 @@ export type MenuReading = {
 export function isPrivateAddress(ip: string): boolean {
   const v = isIP(ip)
   if (v === 4) {
-    const [a, b] = ip.split('.').map(Number)
+    const [a, b, c] = ip.split('.').map(Number)
     return (
       a === 0 ||
       a === 10 ||
@@ -78,7 +78,7 @@ export function isPrivateAddress(ip: string): boolean {
       (a === 169 && b === 254) ||
       (a === 172 && b >= 16 && b <= 31) ||
       (a === 192 && b === 168) ||
-      (a === 192 && b === 0) ||
+      (a === 192 && b === 0 && (c === 0 || c === 2)) ||
       (a === 198 && (b === 18 || b === 19)) ||
       a >= 224
     )

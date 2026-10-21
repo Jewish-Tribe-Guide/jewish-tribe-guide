@@ -56,19 +56,31 @@ const posts: Post[] = []
 
 async function renderTab(
   watches: Watch[],
-  { available = true, post = {} as Record<string, unknown>, eruvim = [] as AdminEruv[], dishes = null as unknown[] | null, hospitals = null as unknown[] | null, hours = null as unknown[] | null, times = null as unknown[] | null } = {},
+  {
+    available = true,
+    post = {} as Record<string, unknown>,
+    eruvim = null as AdminEruv[] | null,
+    kosher = null as Record<string, unknown> | null,
+    dishes = null as unknown[] | null,
+    hospitals = null as unknown[] | null,
+    hours = null as unknown[] | null,
+    times = null as unknown[] | null,
+  } = {},
 ) {
   vi.mocked(fetchJson).mockImplementation(async (url, init) => {
     if (init?.method === 'POST') {
       const body = JSON.parse(String(init.body))
       posts.push({ url: String(url), body })
-      if (String(url).includes('/api/admin/eruvim')) {
-        const eruv = eruvim.find((e) => e.id === body.id)!
-        return { ok: true, eruv: { ...eruv, ...(body.edit ?? {}) } }
-      }
       return { ok: true, ...post }
     }
-    if (String(url).includes('/api/admin/eruvim')) return { ok: true, available: true, timezone: 'America/New_York', eruvim }
+    if (String(url).includes('/api/admin/eruvim')) {
+      if (!eruvim) throw new Error('down')
+      return { ok: true, available: true, timezone: 'America/New_York', eruvim }
+    }
+    if (String(url).includes('/api/admin/watches/kosher')) {
+      if (!kosher) throw new Error('down')
+      return { ok: true, ...kosher }
+    }
     if (String(url).includes('/api/admin/main-dishes')) {
       if (!dishes) throw new Error('down')
       return { ok: true, places: dishes }
@@ -92,6 +104,7 @@ async function renderTab(
   await screen.findByText(/What the guide reads on its own/)
 }
 
+const jobRow = (page: string) => screen.getAllByTestId('job-row').find((r) => r.getAttribute('href') === `/philly/admin/watches/${page}`)!
 const names = (el: HTMLElement) => within(el).getAllByTestId('watch-name').map((n) => n.textContent)
 const open = (row: HTMLElement) => userEvent.setup().click(within(row).getAllByRole('button')[0])
 
@@ -105,13 +118,11 @@ afterEach(() => {
 describe('WatchesManager', () => {
   it('says plainly which watch is broken, since when and why', async () => {
     await renderTab([
-      watch({ id: 'k', kind: 'keystone_list', url: 'https://www.keystone-k.org/establishments', label: 'Keystone-K’s list', lastFiled: 3 }),
+      watch({ id: 'a', label: 'A page', url: 'https://a.example/' }),
       watch({ id: 'b', label: 'BZBI worship page', failingSince: ago(2), lastError: 'The page answered 403', lastOkAt: ago(3) }),
     ])
-    const keystone = screen.getByRole('region', { name: 'Kosher list' })
-    expect(within(keystone).getByText('Working')).toBeInTheDocument()
-    expect(within(keystone).getByText(/Read .*: 3 suggestions in the queue/)).toBeInTheDocument()
     const other = screen.getByRole('region', { name: 'Anything else' })
+    expect(within(other).getByText('Working')).toBeInTheDocument()
     expect(within(other).getByText('Not working')).toBeInTheDocument()
     expect(within(other).getByText(/Not working since .*: The page answered 403/)).toBeInTheDocument()
     expect(screen.getByTestId('watch-summary')).toHaveTextContent('2 watches · 1 needs you')
@@ -173,8 +184,7 @@ describe('WatchesManager', () => {
         { id: 'm3', pages: [], off: false },
       ],
     })
-    const hours = screen.getAllByTestId('job-row').at(-1)!
-    expect(hours).toHaveAttribute('href', '/philly/admin/watches/hours')
+    const hours = jobRow('hours')
     expect(hours).toHaveTextContent('Mikvah hours3 places, from their websites')
     expect(hours).toHaveTextContent('1checked0to check1can’t be read0didn’t load today')
     expect(screen.getByTestId('watch-summary')).toHaveTextContent('1 watches')
@@ -190,8 +200,7 @@ describe('WatchesManager', () => {
     const stopped = watch({ id: 'x', resourceId: 'shul-1', url: 'https://lms.org/events', createdBy: 'listing pages (stopped)', active: false })
     const other = watch({ id: 'k', url: 'https://keystone-k.org/list' })
     await renderTab([shul, stopped, other], { times: [{ id: 'shul-1', pages: [{ watch: shul }], off: false }] })
-    const times = screen.getAllByTestId('job-row').at(-1)!
-    expect(times).toHaveAttribute('href', '/philly/admin/watches/times')
+    const times = jobRow('times')
     expect(times).toHaveTextContent('Shul times1 shul, from their websites')
     expect(times).toHaveTextContent('1checked0to check0can’t be read')
     expect(screen.getByTestId('watch-summary')).toHaveTextContent('1 watches')
@@ -205,12 +214,32 @@ describe('WatchesManager', () => {
     expect(dishes).toHaveAttribute('href', '/philly/admin/watches/dishes')
   })
 
-  it('says Mekor Habracha’s list is compared with the guide, IKC above all', async () => {
-    await renderTab([watch({ url: 'https://www.mekorhabracha.org/center-city', label: 'Mekor Habracha’s list', lastFiled: 18, pageHash: null })])
-    const row = screen.getByTestId('watch-row')
-    expect(row).toHaveTextContent(/18 suggestions in the queue/)
-    await open(row)
-    expect(screen.getByTestId('mekor-watch')).toHaveTextContent(/Compared with the guide every morning.*IKC above all/)
+  // Step 5, Oct 21: Eruv status and Kosher certification are jobs too.
+  it('has an Eruv status row, whose status goes live rather than waiting to be checked', async () => {
+    await renderTab([], {
+      eruvim: [
+        { ...NE, statusUrl: 'https://ne-eruv.org/status', statusCheckedAt: ago(0.1) },
+        { ...NE, id: 'cc', name: 'Center City Eruv' },
+      ],
+    })
+    const eruv = jobRow('eruv')
+    expect(eruv).toHaveTextContent('Eruv status2 eruvim. Goes live on its own; every 15 minutes on Friday afternoons')
+    expect(eruv).toHaveTextContent('1checked–goes live1can’t be read0didn’t load today')
+    expect(screen.queryByTestId('eruv-watch-row')).toBeNull()
+    expect(screen.queryByRole('region', { name: 'Eruv status' })).toBeNull()
+  })
+
+  it('has a Kosher certification row, and the lists aren’t listed below', async () => {
+    const keystone = watch({ id: 'k', kind: 'keystone_list', url: 'https://www.keystone-k.org/establishments', label: 'Keystone-K’s list', lastFiled: 3 })
+    const mekor = watch({ id: 'm', url: 'https://www.mekorhabracha.org/center-city', label: 'Mekor Habracha’s list', lastFiled: 18, pageHash: null })
+    await renderTab([keystone, mekor, watch({ id: 'o', url: 'https://other.example/' })], {
+      kosher: { lists: [], places: [{}, {}, {}], newPlaces: [], counts: { checked: 2, toCheck: 1, cantRead: 0, didntLoad: 1, notListed: 0 } },
+    })
+    const kosher = jobRow('kosher')
+    expect(kosher).toHaveTextContent('Kosher certification3 food places, from Keystone-K’s and Mekor Habracha’s lists')
+    expect(kosher).toHaveTextContent('2checked1to check0can’t be read1didn’t load today')
+    expect(screen.queryByRole('region', { name: 'Kosher list' })).toBeNull()
+    expect(screen.getByTestId('watch-summary')).toHaveTextContent('1 watches')
   })
 
   // Oct 17: a food place's menu watch, made by the daily run, says what it
@@ -321,41 +350,6 @@ describe('WatchesManager', () => {
     expect(result).not.toHaveTextContent('Agrees')
   })
 
-  it('says what a list run compared: how many listed, how many match, what it filed', async () => {
-    const differences = [
-      'Shtetl: No longer on the list',
-      'Bagel Bar: Hechsher: Keystone-K → Keystone-K (dairy)',
-      'Sababa Falafel: On the list, not in the guide',
-      'Kosher Korner: On the list, not in the guide (filed before)',
-    ]
-    await renderTab([
-      watch({
-        kind: 'keystone_list', url: 'https://www.keystone-k.org/establishments', label: 'Keystone-K’s list', lastFiled: 4,
-        lastCheck: { at: ago(0), what: 'list', from: 'page', result: 'differs', read: [], differences, queue: 'filed', list: { listed: 78, matching: 74, differences: 4, filed: 3 } },
-      }),
-    ])
-    const row = screen.getByTestId('watch-row')
-    expect(row).toHaveTextContent(/Read .*: 78 on the list, 74 match the guide, 4 differ: 3 new suggestions in the queue, 1 filed before/)
-    // Opened, it names them: no Check now needed to see which.
-    await open(row)
-    const result = within(row).getByTestId('watch-check')
-    expect(result).toHaveTextContent('Where the list differs from the guide')
-    for (const line of differences) expect(result).toHaveTextContent(line)
-  })
-
-  it('opens a list that differs on nothing to no empty box', async () => {
-    await renderTab([
-      watch({
-        kind: 'keystone_list', url: 'https://www.keystone-k.org/establishments', label: 'Keystone-K’s list', lastFiled: 0,
-        lastCheck: { at: ago(0), what: 'list', from: null, result: 'agrees', read: [], differences: [], queue: null, list: { listed: 78, matching: 78, differences: 0, filed: 0 } },
-      }),
-    ])
-    const row = screen.getByTestId('watch-row')
-    expect(row).toHaveTextContent(/Read .*: 78 on the list, 78 match the guide, nothing differs/)
-    await open(row)
-    expect(within(row).queryByTestId('watch-check')).toBeNull()
-  })
-
   describe('Add a watch', () => {
     it('asks what it keeps current first, then the place and where it’s read, and says what will happen', async () => {
       const created = watch({ id: 'new', url: 'https://lms.org/davening', resourceId: 'shul-1', createdBy: 'listing pages' })
@@ -408,87 +402,15 @@ describe('WatchesManager', () => {
       expect(screen.getByRole('button', { name: 'Start watching' })).toBeDisabled()
     })
 
-    it('needs no place for a kosher list', async () => {
-      await renderTab([], { post: { watch: watch({ id: 'k', kind: 'keystone_list', url: 'https://www.keystone-k.org/establishments' }) } })
-      const user = userEvent.setup()
-      await user.click(screen.getByRole('button', { name: 'Add a watch' }))
-      await user.click(screen.getByRole('button', { name: 'Kosher list' }))
-      expect(screen.queryByLabelText(/Which place/)).toBeNull()
-      await user.type(screen.getByLabelText(/Where does the guide read it/), 'keystone-k.org/establishments')
-      expect(screen.getByTestId('add-watch-plan')).toHaveTextContent(/compared with the guide, place by place/)
-      await user.click(screen.getByRole('button', { name: 'Start watching' }))
-      expect(posts[0].body).toEqual({ action: 'add', purpose: 'kosher', url: 'keystone-k.org/establishments', resourceId: null })
-    })
-
-    // Oct 19: an eruv's status source is set here now, on the eruv itself.
-    it('sets an eruv’s status emails on the eruv, the other source emptied', async () => {
+    // Step 5, Oct 21: each is set on its own job page.
+    it('doesn’t offer an eruv’s status or a kosher list, which have pages of their own', async () => {
       await renderTab([], { eruvim: [NE] })
       const user = userEvent.setup()
       await user.click(screen.getByRole('button', { name: 'Add a watch' }))
-      await user.click(within(screen.getByTestId('add-watch')).getByRole('button', { name: 'Eruv status' }))
-      await user.selectOptions(screen.getByLabelText(/Which eruv/), 'northeast')
-      await user.type(screen.getByLabelText(/Where does the guide read it/), 'JCOR-NE-Philadelphia@groups.io')
-      await user.click(screen.getByRole('button', { name: 'Start watching' }))
-      expect(posts.map((p) => p.body)).toEqual([{ id: 'northeast', action: 'save', edit: { statusEmail: 'JCOR-NE-Philadelphia@groups.io', statusUrl: '' } }])
-      const row = await screen.findByTestId('eruv-watch-row')
-      expect(row).toHaveTextContent('JCOR-NE-Philadelphia@groups.io')
-      expect(within(row).getByText('Working')).toBeInTheDocument()
-    })
-
-    it('sets an eruv’s status page and reads it at once', async () => {
-      await renderTab([], { eruvim: [NE] })
-      const user = userEvent.setup()
-      await user.click(screen.getByRole('button', { name: 'Add a watch' }))
-      await user.click(within(screen.getByTestId('add-watch')).getByRole('button', { name: 'Eruv status' }))
-      await user.selectOptions(screen.getByLabelText(/Which eruv/), 'northeast')
-      await user.type(screen.getByLabelText(/Where does the guide read it/), 'https://ne-eruv.org/status')
-      await user.click(screen.getByRole('checkbox', { name: /dates each week’s post/ }))
-      await user.click(screen.getByRole('button', { name: 'Start watching' }))
-      expect(posts.map((p) => p.body)).toEqual([
-        { id: 'northeast', action: 'save', edit: { statusUrl: 'https://ne-eruv.org/status', statusEmail: '', statusDated: true } },
-        { id: 'northeast', action: 'check' },
-      ])
-    })
-  })
-
-  describe('Eruv status', () => {
-    it('an eruv with no source says so, and “Add its source” starts the form on it', async () => {
-      await renderTab([], { eruvim: [NE] })
-      const row = screen.getByTestId('eruv-watch-row')
-      expect(within(row).getByText('No source')).toBeInTheDocument()
-      expect(screen.getByTestId('watch-summary')).toHaveTextContent('1 watches · 1 needs you')
-      await userEvent.setup().click(within(row).getByRole('button', { name: 'Add its source' }))
       const form = screen.getByTestId('add-watch')
-      expect(within(form).getByRole('button', { name: 'Eruv status' })).toHaveAttribute('aria-pressed', 'true')
-      expect(within(form).getByLabelText(/Which eruv/)).toHaveValue('northeast')
-    })
-
-    it('an email it couldn’t read is shown on its row, and the admin says what it says', async () => {
-      const kept = { messageId: 'g1', subject: 'Eruv update', sentAt: '2026-10-09T17:30:00Z', text: 'The eruv is up. The eruv is down on Castor.', words: 'The eruv is up' }
-      await renderTab([], { eruvim: [{ ...NE, statusEmail: 'jcor-ne-philadelphia@groups.io', statusEmailKept: kept }] })
-      const row = screen.getByTestId('eruv-watch-row')
-      expect(within(row).getByText('Email to read')).toBeInTheDocument()
-      const box = within(row).getByTestId('eruv-kept-email')
-      expect(box).toHaveTextContent('Their email says both up and down: “Eruv update”, Oct 9')
-      await userEvent.setup().click(within(box).getByRole('button', { name: 'It says down' }))
-      expect(posts.map((p) => p.body)).toEqual([{ id: 'northeast', action: 'email-says', says: 'down' }])
-    })
-
-    it('a page it can’t read says why', async () => {
-      await renderTab([], { eruvim: [{ ...NE, statusUrl: 'https://ne-eruv.org/status', statusErrorAt: ago(0.1), statusError: 'The page answered 500' }] })
-      const row = screen.getByTestId('eruv-watch-row')
-      expect(within(row).getByText('Not working')).toBeInTheDocument()
-      expect(row).toHaveTextContent('Last read failed: The page answered 500')
-    })
-
-    it('“Stop reading” empties both sources, once the admin says so', async () => {
-      vi.stubGlobal('confirm', vi.fn(() => true))
-      await renderTab([], { eruvim: [{ ...NE, statusUrl: 'https://ne-eruv.org/status', statusCheckedAt: ago(0.1) }] })
-      const row = screen.getByTestId('eruv-watch-row')
-      await open(row)
-      await userEvent.setup().click(within(row).getByRole('button', { name: 'Stop reading' }))
-      expect(posts.map((p) => p.body)).toEqual([{ id: 'northeast', action: 'save', edit: { statusUrl: '', statusEmail: '' } }])
-      expect(await within(row).findByText('No source')).toBeInTheDocument()
+      expect(within(form).getByRole('button', { name: 'Hours' })).toBeInTheDocument()
+      expect(within(form).queryByRole('button', { name: 'Eruv status' })).toBeNull()
+      expect(within(form).queryByRole('button', { name: 'Kosher list' })).toBeNull()
     })
   })
 
@@ -540,10 +462,10 @@ describe('WatchesManager', () => {
       watch({ id: `m${i}`, label: `${name} menu`, url: `https://m${i}.example/menu`, createdBy: 'menu links' }),
     )
     menus[3] = { ...menus[3], failingSince: ago(1), lastError: 'The page answered 404' }
-    await renderTab([watch({ id: 'k', kind: 'keystone_list', url: 'https://www.keystone-k.org/establishments', label: 'Keystone-K’s list' }), ...menus])
-    const [kosher, menuGroup] = screen.getAllByTestId('watch-group')
-    expect(kosher).toHaveAccessibleName('Kosher list')
-    expect(within(kosher).getAllByTestId('watch-row')).toHaveLength(1)
+    await renderTab([watch({ id: 's', url: 'https://lms.org/davening', resourceId: 'shul-1', createdBy: 'listing pages' }), ...menus])
+    const [times, menuGroup] = screen.getAllByTestId('watch-group')
+    expect(times).toHaveAccessibleName('Shul’s times')
+    expect(within(times).getAllByTestId('watch-row')).toHaveLength(1)
     expect(menuGroup).toHaveAccessibleName('Menu')
     const toggle = within(menuGroup).getByRole('button', { name: /Menu.*5.*1 not working.*Show all 5/ })
     expect(toggle).toHaveAttribute('aria-expanded', 'false')

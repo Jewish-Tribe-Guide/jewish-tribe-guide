@@ -316,8 +316,8 @@ compare, and one it can't read, on desktop and phone.
   on that real page); it never learns on its own.
 - The user expects few findings a day once everything is connected; an
   admin validates them.
-- Still to draw: Kosher certification when the two lists disagree (with
-  step 5).
+- Kosher certification when the two lists disagree: built with step 5
+  (each list's line beside the listing's), not drawn.
 
 **The idea**
 - **Every listing is connected to its source automatically,** from what
@@ -579,8 +579,49 @@ compare, and one it can't read, on desktop and phone.
      websites turn the reader away (Lower Merion Synagogue, Sons of
      Israel 406, Chabad of the Main Line 403) and for the Orthodox shuls
      whose times move each week.
-5. **Eruv and Kosher certification** move onto job pages, and the Watches
-   tab goes.
+5. **Eruv and Kosher certification** move onto job pages. **BUILT Oct 21
+   (not merged).** The Watches tab stays, under that name: it is the page
+   of job rows, and the one-off watches below them.
+   - **Eruv status page** (`/admin/watches/eruv`, a row on the Watches
+     tab: "N eruvim. Goes live on its own"). Sections: Can't be read (no
+     source, or an email it couldn't make out), Didn't load, Read. Each
+     eruv says what it reads from ("Read from its status page, …", "Read
+     from its emails, from …"), with Check now, "Use a different page"
+     and "Stop reading" (confirmed on the page). The row's "to check" is
+     "–": an eruv's status goes live with no approval.
+   - **"Find it on its website"** searches the eruv's website for pages
+     that say it's up or down (`eruvFind.ts`, the eruv words in
+     `hoursPages.ts`) and offers each, with what it says: "Read its status
+     from here". **Offered, never set on its own**, because a status shows
+     on the site at once. Saves nothing until the admin picks one.
+   - **Elkins Park stays "No source":** its website in the guide
+     (yiep.org/eruv-map) answers 404. Its website or status page is the
+     user's to give.
+   - **Kosher certification page** (`/admin/watches/kosher`, a row: "N
+     food places, from Keystone-K's and Mekor Habracha's lists"). Both
+     lists are read when the page opens and compared with every approved
+     food place (`kosherJob.ts`). Sections: To check (a list says
+     something the listing doesn't, each line "in the moderation queue",
+     "filed with tomorrow morning's read" or decided before), On a list,
+     not in the guide, and closed: Checked, Decided before, On neither
+     list. Each list shows its size and its morning read, with Check now
+     and Pause. This answers "Kosher certification when the two lists
+     disagree": a place shows each list's line beside the listing's.
+   - **The lists still file to the moderation queue** each morning; the
+     page reads and shows, it doesn't file. Findings onto the job pages
+     (step 6, below) would change that.
+   - **"Add a watch" no longer offers an eruv or a kosher list**; they are
+     given on their job pages.
+   - Fixes found on the way: every site on WordPress.com (192.0.78.x) was
+     refused as a private address, Elkins Park's eruv among them
+     (`menuReader.ts`; only 192.0.0.x and 192.0.2.x are set aside); a
+     Keystone-K entry
+     whose label's colon sits outside its bold read as ": Dairy – …"; an
+     eruv website that didn't open now says "Its website, …, wouldn't
+     open: …"; Mekor's "updated 2026-10-12" says "Oct 12".
+6. **Not asked for yet (my recommendation):** findings onto the job pages,
+   next to what the listing says, with Compare, as decided Oct 21, instead
+   of the moderation queue.
 
 ## Done Oct 20: "Check now" is the full check (on `redesign/oct18-fixes`, not merged)
 

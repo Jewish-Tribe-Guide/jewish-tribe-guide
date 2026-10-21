@@ -13,6 +13,14 @@ describe('only the public internet', () => {
     for (const ip of ['93.184.216.34', '8.8.8.8', '2606:4700::1111']) expect(isPrivateAddress(ip), ip).toBe(false)
   })
 
+  // Oct 21: all of 192.0.x.x was refused, and WordPress.com's sites are
+  // 192.0.78.x (Elkins Park's eruv, yiep.org). Only 192.0.0.0/24 and the
+  // documentation range 192.0.2.0/24 are set aside.
+  it('a site WordPress.com hosts is the public internet', () => {
+    for (const ip of ['192.0.78.24', '192.0.78.25', '192.0.1.1']) expect(isPrivateAddress(ip), ip).toBe(false)
+    for (const ip of ['192.0.0.8', '192.0.2.1']) expect(isPrivateAddress(ip), ip).toBe(true)
+  })
+
   it('a site whose name resolves to a private address isn’t fetched', async () => {
     const fetchImpl = vi.fn()
     expect(await fetchPublic('http://menu.example', { fetchImpl, resolve: async () => ['127.0.0.1'] })).toBeNull()

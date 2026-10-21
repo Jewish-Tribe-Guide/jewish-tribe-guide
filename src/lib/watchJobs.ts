@@ -3,8 +3,9 @@ import { watchHealth, type Watch } from './watches'
 // ─────────────────────────────────────────────────────────────────────────────
 // The Watches tab's jobs (the user, Oct 21): a row per thing the guide keeps
 // current on its own, each with four counts (checked, to check, can't be
-// read, didn't load today), opening a page with every place in it. Built so
-// far: Dishes (what was the Main dishes tab) and Hospitals.
+// read, didn't load today), opening a page with every place in it: Dishes
+// (what was the Main dishes tab), Hospitals, Eruv status here, and Mikvah
+// hours, Shul times (hoursJob.ts) and Kosher certification (kosherJob.ts).
 //
 // The counts are worked out here, from the same sections each job's page
 // shows, so a row and the page it opens can't disagree.
@@ -96,4 +97,39 @@ export function hospitalCounts(hospitals: readonly HospitalState[], now: number)
     didntLoad: hospitals.filter((h) => h.watch?.active && didntLoad(h.watch, now)).length,
     nothing: of('nothing'),
   }
+}
+
+// ── Eruv status ─────────────────────────────────────────────────────────────
+
+/** Where an eruv is on its page.
+ *   read        its page or its email was read, and the site shows what it said
+ *   didnt_load  its page didn't open on the last read, so the site shows no
+ *               current status
+ *   email       an email from it the reader couldn't make out, waiting for
+ *               an admin to say what it says
+ *   no_source   nowhere to read it from */
+export type EruvSection = 'read' | 'didnt_load' | 'email' | 'no_source'
+
+export type EruvState = {
+  statusUrl: string | null
+  statusEmail?: string | null
+  statusEmailKept?: unknown
+  statusErrorAt: string | null
+  statusCheckedAt: string | null
+}
+
+export function eruvSection(e: EruvState): EruvSection {
+  if (!e.statusUrl && !e.statusEmail) return 'no_source'
+  if (e.statusEmailKept) return 'email'
+  if (e.statusUrl && e.statusErrorAt && (!e.statusCheckedAt || Date.parse(e.statusErrorAt) > Date.parse(e.statusCheckedAt))) return 'didnt_load'
+  return 'read'
+}
+
+/** An eruv's counts never have anything to check: its status goes live
+ *  with no approval (the drawing's "goes live"). */
+export type EruvCounts = Omit<JobCounts, 'toCheck'> & { toCheck: null }
+
+export function eruvCounts(eruvim: readonly EruvState[]): EruvCounts {
+  const of = (s: EruvSection) => eruvim.filter((e) => eruvSection(e) === s).length
+  return { checked: of('read'), toCheck: null, cantRead: of('no_source') + of('email'), didntLoad: of('didnt_load') }
 }

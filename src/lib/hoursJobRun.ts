@@ -21,7 +21,8 @@ export type HoursReach = {
   readPage?: (url: string) => Promise<PageSource | null>
 }
 
-async function fetchHome(url: string): Promise<{ url: string; body: string } | { error: string }> {
+/** A website's home page, after its redirects, or why it didn't open. */
+export async function fetchHome(url: string): Promise<{ url: string; body: string } | { error: string }> {
   let trouble: Trouble | null = null
   const page = await fetchPublic(url, { headers: WATCH_FETCH_HEADERS, trouble: (t) => (trouble = t) })
   if (page?.type === 'html') return page

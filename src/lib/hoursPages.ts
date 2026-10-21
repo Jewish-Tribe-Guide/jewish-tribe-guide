@@ -29,6 +29,13 @@ const TIMES_WORDS: Scoring = [
   [/\b(shabbat|shabbos|calendar|weekly|this week|bulletin|newsletter)\b/, 2],
   [/\b(visit|visiting|about|contact|info|information)\b/, 1],
 ]
+// An eruv's (step 5, Oct 21): where an eruv posts whether it's up, then
+// the pages that are about the eruv at all.
+const ERUV_WORDS: Scoring = [
+  [/\b(status|is the eruv up|eruv up|updates?|this week|weekly)\b/, 4],
+  [/\b(eruv|eiruv|shabbat|shabbos)\b/, 2],
+  [/\b(about|info|information)\b/, 1],
+]
 // Never a page of hours, whatever its link says.
 const NOT_HOURS = /\b(donate|donation|donations|fundraiser|campaign|cart|checkout|pay|payment|login|account|membership-?form|blog|news|gallery|photos)\b/
 
@@ -91,4 +98,10 @@ export function hoursPages(homeUrl: string, html: string, scoring: Scoring = HOU
  *  to MAX_HOURS_PAGES links called davening, minyanim, services… */
 export function timesPages(homeUrl: string, html: string): HoursPage[] {
   return hoursPages(homeUrl, html, TIMES_WORDS)
+}
+
+/** An eruv's pages that may post its status, the same way: its home page,
+ *  then up to MAX_HOURS_PAGES links called status, updates, eruv… */
+export function eruvPages(homeUrl: string, html: string): HoursPage[] {
+  return hoursPages(homeUrl, html, ERUV_WORDS)
 }

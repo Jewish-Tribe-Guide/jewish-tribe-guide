@@ -268,7 +268,7 @@ function identifyingLinks(entries: MekorEntry[]): Set<string> {
  *  certificate isn't then offered a neighbour with the same phone. A place
  *  that fits two listings equally is matched to neither, and remembered so
  *  it isn't suggested as new either. */
-function matchEntries(entries: MekorEntry[], listings: GuideListing[]): { matched: Map<string, GuideListing>; unsure: Set<string> } {
+export function matchEntries(entries: MekorEntry[], listings: GuideListing[]): { matched: Map<string, GuideListing>; unsure: Set<string> } {
   const links = identifyingLinks(entries)
   const matched = new Map<string, GuideListing>()
   const unsure = new Set<string>()

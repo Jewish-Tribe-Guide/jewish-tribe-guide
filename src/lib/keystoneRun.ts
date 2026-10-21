@@ -24,6 +24,7 @@ import {
   findingNote,
   parseKeystoneList,
   submissionKey,
+  type KeystoneEntry,
   type WatchFinding,
   type WatchedListing,
 } from '@/lib/keystoneWatch'
@@ -84,7 +85,9 @@ export type KeystoneRun =
       wouldFile?: (WatchDigestItem & { kind: WatchFinding['kind']; note: string })[]
     }
 
-export async function runKeystoneWatch(community: string, url: string, { dry = false }: { dry?: boolean } = {}): Promise<KeystoneRun> {
+/** Keystone-K's list, read now: every entry on it, or why it couldn't be.
+ *  Shared with the Kosher certification page (/api/admin/watches/kosher). */
+export async function readKeystoneList(url: string): Promise<{ entries: KeystoneEntry[] } | { error: string }> {
   let res: Response
   try {
     res = await fetch(url, {
@@ -93,13 +96,20 @@ export async function runKeystoneWatch(community: string, url: string, { dry = f
       signal: AbortSignal.timeout(20_000),
     })
   } catch (err) {
-    return { ok: false, error: `Couldn\u2019t reach Keystone-K's list (${err instanceof Error ? err.message : String(err)})` }
+    return { error: `Couldn\u2019t reach Keystone-K's list (${err instanceof Error ? err.message : String(err)})` }
   }
-  if (!res.ok) return { ok: false, error: `Keystone-K's list answered ${res.status}` }
+  if (!res.ok) return { error: `Keystone-K's list answered ${res.status}` }
   const entries = parseKeystoneList(await res.text())
   if (entries.length < MIN_ENTRIES) {
-    return { ok: false, error: `Read only ${entries.length} places from Keystone-K's list; its page may have changed. Nothing filed.` }
+    return { error: `Read only ${entries.length} places from Keystone-K's list; its page may have changed. Nothing filed.` }
   }
+  return { entries }
+}
+
+export async function runKeystoneWatch(community: string, url: string, { dry = false }: { dry?: boolean } = {}): Promise<KeystoneRun> {
+  const list = await readKeystoneList(url)
+  if ('error' in list) return { ok: false, error: list.error }
+  const { entries } = list
 
   const supabase = getAdminClient()
   const { data: rows, error } = await supabase
