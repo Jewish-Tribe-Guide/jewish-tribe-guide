@@ -906,6 +906,16 @@ compare, and one it can't read, on desktop and phone.
      as "Summer only"/"Winter only", and compared only in its season
      (`compareTimes`), so a listing with both seasons' times isn't
      offered the other season's.
+   - **Reader fixes, BUILT Oct 22** (`scheduleReader.ts`): a rule in a
+     sentence is the rule the listing keeps: Sons of Israel's
+     "Approximately 15 minutes before shkiah." is 15 min before Sunset,
+     not a change (a full stop, "shkiya", "within 10 minutes after",
+     "following", and times up to 60 characters). "Within 10 minutes
+     of" candle lighting or havdalah is still kept as written: it
+     doesn't say before or after. A morning "Shabbat service" or
+     "Services" is that day's Shacharis (Kesher Israel's was left out as
+     a program), its start the time and its end in the notes; a range
+     with no am/pm ("9:00–11:30") is its start.
    - **Dry run again after the fixes (Oct 21, nothing saved):** the
      Tehillim call, the monthly family service and Kesher Israel's end
      times are gone. What would be filed: Rodeph Shalom's Thursday
