@@ -55,8 +55,9 @@ async function dishField() {
     .at(0)
 }
 
-/** The page reads places not read yet as it opens. The AI is never asked:
- *  each read comes back with nothing. */
+/** The page reads nothing as it opens (Oct 22: the morning's
+ *  /api/cron/read-menus does); should a read be sent, the AI is never
+ *  asked: it comes back with nothing. */
 async function noAiReads(page: Page) {
   await page.route('**/api/admin/main-dishes**', async (route) => {
     const req = route.request()

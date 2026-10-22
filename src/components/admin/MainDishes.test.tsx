@@ -7,7 +7,7 @@ import { renderWithProviders } from '@/test/renderWithProviders'
 import { makeCategory, makeListing } from '@/test/providerFixtures'
 import { fetchJson } from '@/lib/fetchJson'
 import { day } from './JobPage'
-import MainDishes, { READ_ON_LOAD, dishSay } from './MainDishes'
+import MainDishes, { dishSay } from './MainDishes'
 
 vi.mock('@vercel/analytics', () => ({ track: vi.fn() }))
 vi.mock('next/navigation', () => ({
@@ -228,11 +228,13 @@ describe('MainDishes', () => {
     expect(posted().at(-1)).toEqual({ action: 'link', resourceId: 'p1', url: 'charlie.example/food' })
   })
 
-  it(`reads the places not read yet as the page opens, at most ${READ_ON_LOAD}`, async () => {
-    const places = Array.from({ length: READ_ON_LOAD + 2 }, (_, i) => ({ ...unread, id: `u${i}`, name: `Place ${i}` }))
+  // The user, Oct 22: opening the page shows what was done; the morning's
+  // run reads the places never read (/api/cron/read-menus).
+  it('reads nothing as the page opens, places not read yet included', async () => {
+    const places = Array.from({ length: 7 }, (_, i) => ({ ...unread, id: `u${i}`, name: `Place ${i}` }))
     await renderPage(places, { readerOn: true, post: { reading: read } })
-    await vi.waitFor(() => expect(posted()).toHaveLength(READ_ON_LOAD))
-    expect(posted().every((b) => b.action === 'read')).toBe(true)
+    await new Promise((r) => setTimeout(r, 20))
+    expect(posted()).toEqual([])
   })
 
   it('reads nothing on its own when the reader isn’t set up, and says so', async () => {

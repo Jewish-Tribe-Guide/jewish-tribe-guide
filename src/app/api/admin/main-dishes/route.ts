@@ -3,10 +3,11 @@ import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore
 import { listCategories } from '@/lib/categoryStore'
 import { getResourceById, listApprovedResources } from '@/lib/resourceStore'
 import { revalidatePublicContent } from '@/lib/revalidateContent'
-import { itemsField, listingFacts } from '@/lib/listingView'
-import { addedItemName, cleanItemName, itemMarks, itemWording } from '@/lib/itemMarks'
-import { findMenus, isOrderingApp, readMenu, readMenus, readMenuPage, troubleClause, unreadMenuNote, type MenuDish, type Trouble } from '@/lib/menuReader'
-import { MENU_LINK_KEY, menuWebsite, readMenuLink } from '@/lib/menuLink'
+import { listingFacts } from '@/lib/listingView'
+import { addedItemName, cleanItemName, itemMarks } from '@/lib/itemMarks'
+import { isOrderingApp, readMenu, readMenus, readMenuPage, troubleClause, type MenuDish, type Trouble } from '@/lib/menuReader'
+import { menuWebsite, readMenuLink } from '@/lib/menuLink'
+import { dishKinds, listedNames, menuLinkOf, newestMenuDate, readPlaceMenu } from '@/lib/menuPlaceRead'
 import {
   clearMenuReading,
   decideMenuReading,
@@ -31,7 +32,7 @@ import { isListingPageWatch } from '@/lib/listingPageWatch'
 import { PAGE_STOPPED_CREATOR, homePageReads } from '@/lib/hoursJob'
 import { listedContact } from '@/lib/contactRead'
 import { MENU_WATCH_CREATOR, type Watch } from '@/lib/watches'
-import type { CategoryConfig, CategoryField } from '@/lib/categories'
+import type { CategoryField } from '@/lib/categories'
 import type { DirectoryResource } from '@/types'
 
 // GET  /api/admin/main-dishes — the "Main dishes" tab (agreed Oct 1): every
@@ -118,12 +119,6 @@ function forTab(r: StoredMenuReading) {
   return isNoMenu(r) ? { ...r, status: 'no_menu' as const } : r
 }
 
-/** The dishes a place lists now: each looked for again on a new read of
- *  its menu (the user, Oct 21), the ones added by hand included. */
-function listedNames(item: DirectoryResource, field: CategoryField): string[] {
-  return itemMarks(item, field).map((m) => m.name)
-}
-
 /** The listing's side of dishProposal: its dishes, the "not always" ones,
  *  and those a reader found on its menu before (a menu date). */
 function listedDishes(item: DirectoryResource, field: CategoryField) {
@@ -140,24 +135,6 @@ function cleanNames(raw: unknown): string[] {
     const name = cleanItemName(d)
     return name ? [[addedItemName(name).toLowerCase(), addedItemName(name)] as const] : []
   })).values()]
-}
-
-/** The newest "on its menu" date among the dishes a place lists. */
-function newestMenuDate(item: DirectoryResource, field: CategoryField): string | null {
-  return itemMarks(item, field).reduce<string | null>((newest, m) => (m.menuAt && (!newest || m.menuAt > newest) ? m.menuAt : newest), null)
-}
-
-/** The categories with a list of dishes, each with that list's field. */
-function dishKinds(categories: CategoryConfig[]) {
-  return categories.flatMap((c) => {
-    const field = itemsField(c)
-    return field && itemWording(field).noun === 'dish' ? [{ category: c, field }] : []
-  })
-}
-
-/** A place's menu link, when it has one (menuLink.ts). */
-function menuLinkOf(item: DirectoryResource): string | null {
-  return readMenuLink(item[MENU_LINK_KEY]) || null
 }
 
 export async function GET(request: Request) {
@@ -254,40 +231,8 @@ export async function POST(request: Request) {
       // another, as the hours job's Check now reads them.
       const pages: Watch[] = []
       for (const w of pagesOf((await listWatches(community.slug)).watches, resourceId).filter((x) => x.active)) pages.push((await runAndRecord(w, undefined, undefined, { full: true })).watch)
-      const website = menuWebsite(listing, kind.category)
-      const menuUrl = menuLinkOf(listing)
-      // Its menu link when that can be read, else the pages its website
-      // links to as its menu, best first, until one names dishes. A page
-      // drawn by a script is drawn in a browser (renderPage.ts).
-      // Why each couldn't be read, the first reason each, for the note.
-      const renderer = pageRenderer()
-      const trouble: { link?: Trouble; site?: Trouble } = {}
-      let sources
-      try {
-        const linked = menuUrl ? await readMenuPage(menuUrl, { render: renderer.render, trouble: (t) => void (trouble.link ??= t) }) : null
-        sources = linked ? [linked] : website ? await findMenus(website, { render: renderer.render, trouble: (t) => void (trouble.site ??= t) }) : []
-      } finally {
-        await renderer.close()
-      }
-      if (!sources.length) {
-        const reading = await saveMenuReading(community.slug, resourceId, {
-          status: 'failed',
-          sourceUrl: menuUrl ?? website,
-          dishes: [],
-          note: unreadMenuNote(menuUrl, website, trouble),
-          model: null,
-        })
-        return Response.json({ ok: true, reading, pages })
-      }
-      const read = (await readMenus(sources, listing.name, { apiKey, listed: listedNames(listing, kind.field) }))!
-      const reading = await saveMenuReading(community.slug, resourceId, {
-        status: read.dishes.length ? 'proposed' : 'failed',
-        sourceUrl: read.sourceUrl,
-        dishes: read.dishes,
-        missing: read.missing,
-        note: read.note,
-        model: read.model,
-      })
+      // Its menu (menuPlaceRead.ts).
+      const reading = await readPlaceMenu(community.slug, listing, kind, apiKey)
       return Response.json({ ok: true, reading, pages })
     }
 

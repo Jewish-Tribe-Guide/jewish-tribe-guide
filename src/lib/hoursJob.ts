@@ -66,6 +66,30 @@ export const isFoundHoursPage = (w: Pick<Watch, 'createdBy'>) => w.createdBy ===
 export const PAGE_STOPPED_CREATOR = 'listing pages (stopped)'
 export const isStoppedPage = (w: Pick<Watch, 'createdBy'>) => w.createdBy === PAGE_STOPPED_CREATOR
 
+/** What the last search of a place's website said when it found no page
+ *  (the user, Oct 22: the job's page shows what was done, not search
+ *  again): kept as a watch that's never read, `lastRunAt` when and
+ *  `lastError` why. One per place and job; gone once it has a page. */
+export const HOURS_SEARCHED_CREATOR = 'hours search'
+export const hoursSearchedUrl = (resourceId: string, job: PageJob) => `https://guide.invalid/hours-search/${job}/${resourceId}`
+export const isHoursSearched = (w: Pick<Watch, 'createdBy'>) => w.createdBy === HOURS_SEARCHED_CREATOR
+
+/** A place with no website, said as its search would say it. */
+export const NO_WEBSITE = 'No website on Google.'
+/** A place its search hasn't reached yet. */
+export const NOT_SEARCHED = 'Not searched yet.'
+
+/** Why a search of a place's website left it with no page: `got` is the
+ *  search (null when it ran out of time), `pages` how many it has after.
+ *  Null when it has one. */
+export function searchReason(website: string | null, got: { found: unknown[] } | { error: string } | null, pages: number, job: PageJob): string | null {
+  if (pages) return null
+  if (!website) return NO_WEBSITE
+  if (!got) return 'Its website took too long to read.'
+  if ('error' in got) return `Its website wouldn’t open: ${got.error}.`
+  return `Read its website: ${jobWords(job).none} on it.`
+}
+
 /** A clock time: "7:30PM", "4:30 AM", "10 a.m.". In the Oct 21 dry run the
  *  pages the AI read hours from were exactly the ones with one, so the
  *  search needs no AI. */

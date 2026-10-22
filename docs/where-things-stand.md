@@ -562,9 +562,20 @@ agreed:
      first run since this change (so once per list, on its next daily run
      or Check now). The tab asks for Hospitals with `?counts`, which skips
      Refuah. Every admin read also checks the sign-in and the community's
-     admins at once rather than one after the other. Still slow by design:
-     Main dishes reads up to 5 menus by AI on open, and the hours/times
-     pages search websites on open.
+     admins at once rather than one after the other.
+   - Opening a job page does no work (the user, Oct 22: "why is AI
+     reading menus and searching places' websites when we're just trying
+     to load what we already did"). Mikvah hours and Shul times searched
+     the website of every place with no page on each open, because the
+     morning's search threw away a "found nothing". It now keeps why, and
+     when, as a never-read watch per place and job (`hours search`,
+     `recordSearch` in `hoursJobRun.ts`, no migration); the page shows
+     that, or "Not searched yet" until the first morning run or Check
+     now reaches it. Main dishes read up to 5 never-read menus by AI on
+     open; a new daily cron, `/api/cron/read-menus` (07:30, `vercel.json`),
+     reads up to 5 a morning instead (`menuPlaceRead.ts`), and "Read now"
+     still reads one on demand. On dev nothing runs the crons, so dev
+     shows "Not searched yet" until Check now.
 
 Each page is compared with its drawing, side by side, before it's called
 done. All of it is on dev. Anything live (Refuah watches, hospital fields)

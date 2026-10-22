@@ -8,8 +8,8 @@ import { normalizeWatchUrl, watchHealth, type Watch } from '@/lib/watches'
 import { UUID } from '@/lib/itemMarkRoutes'
 import { hoursSections, offeredSections, sectionKeys } from '@/lib/hoursSections'
 import { LISTING_PAGE_WATCH_CREATOR, isListingPageWatch, listingPageLabel, pageReadsFor } from '@/lib/listingPageWatch'
-import { HOURS_FOUND_CREATOR, HOURS_OFF_CREATOR, PAGE_STOPPED_CREATOR, foundPageLabel, hoursJobName, hoursOffUrl, isHoursOff, isStoppedPage, jobWords, samePage, sourceLine, type PageJob } from '@/lib/hoursJob'
-import { SEARCH_DEADLINE_MS, hoursJobPlaces, searchHoursPages, websiteOf } from '@/lib/hoursJobRun'
+import { HOURS_FOUND_CREATOR, HOURS_OFF_CREATOR, NOT_SEARCHED, NO_WEBSITE, PAGE_STOPPED_CREATOR, foundPageLabel, hoursJobName, hoursOffUrl, hoursSearchedUrl, isHoursOff, isHoursSearched, isStoppedPage, jobWords, samePage, searchReason, sourceLine, type PageJob } from '@/lib/hoursJob'
+import { hoursJobPlaces, recordSearch, searchHoursPages, websiteOf } from '@/lib/hoursJobRun'
 import { listingSlug } from '@/lib/listingSlug'
 import { listedContact } from '@/lib/contactRead'
 import { routes } from '@/lib/routes'
@@ -24,11 +24,10 @@ import type { DirectoryResource } from '@/types'
 //      website, or added by hand), what each one's last read found (its
 //      watch's `lastCheck`), what they found that differs from the listing,
 //      waiting to compare (watchFindings.ts), and when the place's last
-//      one was decided. A place with no page says why: its website is
-//      searched again now (fetches only, no AI), and the pages it finds
-//      added. Admin only.
-//      `?counts` (the Watches tab's row): the same, but no search, so the
-//      tab isn't kept waiting on a slow website; its reasons are null.
+//      one was decided. A place with no page says why, as its last search
+//      found it (recordSearch: the morning's run, or Check now); nothing
+//      is searched or read here. Admin only.
+//      `?counts` (the Watches tab's row): the same.
 //      `?job=times`: the Shul times page (Oct 21), every place with davening
 //      times, the same way, and each one's times as the listing has them
 //      (`times`), for the boxes that are the same as its website. Every POST
@@ -71,6 +70,14 @@ function placeWatches(watches: readonly Watch[], id: string) {
   }
 }
 
+/** Why a place with no page has none, as its last search said (or that
+ *  none has reached it yet). */
+function searchedReason(watches: readonly Watch[], p: DirectoryResource, job: PageJob): string {
+  if (!websiteOf(p)) return NO_WEBSITE
+  const url = hoursSearchedUrl(p.id, job)
+  return watches.find((w) => isHoursSearched(w) && w.url === url)?.lastError ?? NOT_SEARCHED
+}
+
 /** A shul's times as its listing has them. */
 function listedTimes(p: DirectoryResource, category: CategoryConfig) {
   const field = category.detailFields.find((f) => f.type === 'minyanim')
@@ -91,7 +98,7 @@ const jobOf = (request: Request): PageJob => (new URL(request.url).searchParams.
 const shown = (ws: readonly Watch[]) => ws.map((w) => ({ watch: w, source: sourceLine(w) }))
 
 /** Why a place has nothing read, in a line: its pages' trouble. Null when
- *  something was read, or when it has no page (searchFor says why). */
+ *  something was read, or when it has no page (searchedReason says why). */
 function reasonFor(pages: readonly Watch[], now: number, job: PageJob): string | null {
   const words = jobWords(job)
   const live = pages.filter((w) => w.active)
@@ -105,25 +112,20 @@ function reasonFor(pages: readonly Watch[], now: number, job: PageJob): string |
 }
 
 /** A place with no page: its website searched now (fetches only, no AI),
- *  and what it finds added, as the morning's run would add them (the user,
- *  Oct 21: "all the ones in not read yet can't be checked"). So every row
- *  on the page has a page to Check now, and the Watches tab, which
- *  searches nothing, counts them as the page does. */
-async function searchFor(slug: string, place: DirectoryResource, watches: readonly Watch[], job: PageJob, deadline: number | null): Promise<{ added: Watch[]; reason: string | null }> {
-  const words = jobWords(job)
+ *  what it finds added, as the morning's run would add them, and why it
+ *  found none kept (recordSearch). Check now and Turn back on. */
+async function searchFor(slug: string, place: DirectoryResource, watches: readonly Watch[], job: PageJob): Promise<{ added: Watch[]; reason: string | null }> {
   const website = websiteOf(place)
-  if (!website) return { added: [], reason: 'No website on Google.' }
-  const search = searchHoursPages(website, undefined, job).catch(() => null)
-  const got = deadline === null ? await search : await Promise.race([search, new Promise<null>((done) => setTimeout(() => done(null), deadline))])
-  if (!got) return { added: [], reason: 'Its website took too long to read.' }
-  if ('error' in got) return { added: [], reason: `Its website wouldn’t open: ${got.error}.` }
+  const got = website ? await searchHoursPages(website, undefined, job).catch(() => null) : null
   const added: Watch[] = []
-  for (const p of got.found) {
+  for (const p of got && !('error' in got) ? got.found : []) {
     if (watches.some((w) => samePage(w.url, p.url))) continue
     const w = await addWatch(slug, { kind: 'website', url: p.url, resourceId: place.id, label: foundPageLabel(place.name, p.link), createdBy: HOURS_FOUND_CREATOR })
     if (w) added.push(w)
   }
-  return { added, reason: added.length ? null : `Read its website: ${words.none} on it.` }
+  const reason = searchReason(website, got, added.length, job)
+  await recordSearch(slug, place, job, reason, watches)
+  return { added, reason }
 }
 
 export async function GET(request: Request) {
@@ -133,7 +135,6 @@ export async function GET(request: Request) {
 
   try {
     const now = Date.now()
-    const search = !new URL(request.url).searchParams.has('counts')
     const job = jobOf(request)
     const itemId = new URL(request.url).searchParams.get('item')
     if (itemId !== null) {
@@ -150,32 +151,28 @@ export async function GET(request: Request) {
     // compare, and when each place's last one was decided (watchFindings.ts).
     const { findings, decided } = await jobFindings(community.slug, job, categories)
 
-    const rows = await Promise.all(
-      places.map(async (p) => {
-        const { pages: had, stopped, marker } = placeWatches(watches, p.id)
-        const category = categories.find((c) => c.id === p.category)!
-        const searched = !marker && !had.length && search && available ? await searchFor(community.slug, p, watches, job, SEARCH_DEADLINE_MS) : null
-        const pages = [...had, ...(searched?.added ?? [])]
-        const reason = marker ? null : (searched?.reason ?? reasonFor(pages, now, job))
-        return {
-          id: p.id,
-          name: p.name,
-          href: routes.listing(community.slug, p.category, listingSlug(p)),
-          website: websiteOf(p),
-          pages: shown(pages),
-          stopped: shown(stopped),
-          off: !!marker,
-          offSince: marker?.createdAt ?? null,
-          reason,
-          findings: findings.filter((f) => f.targetId === p.id),
-          decided: decided.get(p.id) ?? null,
-          fields: category.detailFields.filter((f) => (job === 'times' ? f.type === 'minyanim' : f.type === 'hours' && f.key !== 'hours')).map((f) => f.label),
-          ...(job === 'times' ? { times: listedTimes(p, category) } : { sections: listedSections(p, category) }),
-          // Its phone and email as listed, for the Phone or Contact box.
-          contact: listedContact(category, p as unknown as Record<string, unknown>),
-        }
-      }),
-    )
+    const rows = places.map((p) => {
+      const { pages, stopped, marker } = placeWatches(watches, p.id)
+      const category = categories.find((c) => c.id === p.category)!
+      const reason = marker ? null : pages.length ? reasonFor(pages, now, job) : searchedReason(watches, p, job)
+      return {
+        id: p.id,
+        name: p.name,
+        href: routes.listing(community.slug, p.category, listingSlug(p)),
+        website: websiteOf(p),
+        pages: shown(pages),
+        stopped: shown(stopped),
+        off: !!marker,
+        offSince: marker?.createdAt ?? null,
+        reason,
+        findings: findings.filter((f) => f.targetId === p.id),
+        decided: decided.get(p.id) ?? null,
+        fields: category.detailFields.filter((f) => (job === 'times' ? f.type === 'minyanim' : f.type === 'hours' && f.key !== 'hours')).map((f) => f.label),
+        ...(job === 'times' ? { times: listedTimes(p, category) } : { sections: listedSections(p, category) }),
+        // Its phone and email as listed, for the Phone or Contact box.
+        contact: listedContact(category, p as unknown as Record<string, unknown>),
+      }
+    })
     return Response.json({ ok: true, available, name: hoursJobName(categories, job), places: rows })
   } catch (err) {
     console.error('[admin/watches/hours] GET failed:', err)
@@ -280,7 +277,7 @@ export async function POST(request: Request) {
     if (action === 'check') {
       if (marker || (pages.length && !pages.some((w) => w.active))) return Response.json({ ok: false, errors: ['It’s turned off. Turn it back on to read it.'] }, { status: 400 })
       if (!pages.length) {
-        const { added, reason } = await searchFor(slug, place, watches, job, null)
+        const { added, reason } = await searchFor(slug, place, watches, job)
         return reply(await read(added), stopped, { reason })
       }
       return reply(await read(pages.filter((w) => w.active)), stopped)
@@ -292,7 +289,7 @@ export async function POST(request: Request) {
     const on = pages.map((w) => ({ ...w, active: true }))
     if (!on.length) {
       // Searched now, as the morning's run would.
-      const { added, reason } = await searchFor(slug, place, watches, job, null)
+      const { added, reason } = await searchFor(slug, place, watches, job)
       return reply(await read(added), stopped, { reason })
     }
     return reply(await read(on), stopped)

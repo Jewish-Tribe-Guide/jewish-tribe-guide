@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useState } from 'react'
 import type { DirectoryResource } from '@/types'
 import type { CategoryConfig } from '@/lib/categories'
 import { useLoadOnMount } from '@/lib/useLoadOnMount'
@@ -79,8 +79,6 @@ type Loaded = { places: Place[]; available: boolean; readerOn: boolean }
 type Decided = 'used' | 'kept'
 type Settled = ReadonlyMap<string, Decision>
 
-/** Places not read yet, read on their own when the page loads, at most. */
-export const READ_ON_LOAD = 5
 const TITLE = 'Main dishes'
 
 const STATUS: Record<DishJobStatus, 'differs' | 'not_read' | 'cant_read' | 'didnt_load' | 'same' | 'off'> = { differs: 'differs', not_read: 'not_read', cant_read: 'cant_read', didnt_load: 'didnt_load', same: 'same', off: 'off' }
@@ -495,19 +493,6 @@ export default function MainDishes({ token }: { token: string }) {
       setSaveError(err instanceof Error ? err.message : 'Could not open its dishes.')
     }
   }
-
-  // Places not read yet, read now, one after another.
-  const readOnLoad = useRef(false)
-  useEffect(() => {
-    if (!data || readOnLoad.current) return
-    readOnLoad.current = true
-    if (!data.readerOn) return
-    const unread = data.places.filter((p) => dishStatus(p) === 'not_read').slice(0, READ_ON_LOAD)
-    void (async () => {
-      for (const p of unread) await act(p, { action: 'read' })
-    })()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data])
 
   const backHref = `${adminBase(community)}/watches`
   if (error || !data) {

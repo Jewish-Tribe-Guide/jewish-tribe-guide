@@ -5,6 +5,7 @@ const m = vi.hoisted(() => ({
   listWatches: vi.fn(),
   addWatch: vi.fn(),
   removeWatch: vi.fn(),
+  updateWatch: vi.fn(),
 }))
 
 vi.mock('@/lib/supabase/admin', () => ({
@@ -22,7 +23,7 @@ vi.mock('@/lib/supabase/admin', () => ({
     },
   }),
 }))
-vi.mock('@/lib/watchStore', () => ({ listWatches: m.listWatches, addWatch: m.addWatch, removeWatch: m.removeWatch }))
+vi.mock('@/lib/watchStore', () => ({ listWatches: m.listWatches, addWatch: m.addWatch, removeWatch: m.removeWatch, updateWatch: m.updateWatch }))
 vi.mock('@/lib/categoryStore', () => ({
   listCategoriesUncached: async () => [
     {
@@ -48,7 +49,7 @@ vi.mock('@/lib/categoryStore', () => ({
 }))
 
 const { searchHoursPages, syncHoursWatches } = await import('./hoursJobRun')
-const { HOURS_FOUND_CREATOR } = await import('./hoursJob')
+const { HOURS_FOUND_CREATOR, HOURS_SEARCHED_CREATOR, hoursSearchedUrl } = await import('./hoursJob')
 
 // Lower Merion's home page and two of its links, as they were Oct 21.
 const HOME = '<a href="/appointments-and-membership/">Appointments and Membership</a><a href="/mens-mikvah/">Men’s Mikvah</a>'
@@ -138,6 +139,21 @@ describe('syncHoursWatches', () => {
     m.rows = [row('lmc', 'Lower Merion Community Mikvah', 'http://lmcmikvah.org/')]
     const never = { ...reach, fetchHome: () => new Promise<never>(() => {}) }
     expect(await syncHoursWatches(never, 10)).toEqual([{ community: 'philly', added: 0, removed: 0 }])
+  })
+
+  // The user, Oct 22: the job's page shows what the search found, rather
+  // than search again each time it's opened.
+  it('keeps why a place was left with no page, and takes it away once it has one', async () => {
+    const searched = { id: 's1', url: hoursSearchedUrl('lmc', 'hours'), resourceId: 'lmc', createdBy: HOURS_SEARCHED_CREATOR, active: false }
+    m.rows = [row('mei', 'Mikvah Mei Shalva', 'https://philamikvah.org/'), row('none', 'No Website Mikvah', null), row('lmc', 'Lower Merion Community Mikvah', 'http://lmcmikvah.org/')]
+    m.listWatches.mockResolvedValue({ watches: [searched], available: true })
+    m.addWatch.mockImplementation(async (_s: string, w: { url: string }) => ({ id: w.url }))
+    await syncHoursWatches(reach)
+    expect(m.addWatch).toHaveBeenCalledWith('philly', { kind: 'website', url: hoursSearchedUrl('mei', 'hours'), resourceId: 'mei', label: 'Mikvah Mei Shalva: hours searched', createdBy: HOURS_SEARCHED_CREATOR, active: false })
+    const why = Object.fromEntries(m.updateWatch.mock.calls.map(([, id, patch]) => [id, patch.lastError]))
+    expect(why).toEqual({ [hoursSearchedUrl('mei', 'hours')]: 'Its website wouldn’t open: it couldn’t be reached.', [hoursSearchedUrl('none', 'hours')]: 'No website on Google.' })
+    // Lower Merion's search found its pages: what it said before goes.
+    expect(m.removeWatch).toHaveBeenCalledWith('philly', 's1')
   })
 
   // Shuls (the user, Oct 21): their pages found by what a shul's website

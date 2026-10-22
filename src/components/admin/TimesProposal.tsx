@@ -76,6 +76,7 @@ export function cantRead(reason: string | null): { pill: string; short: string }
   if (/no davening times/.test(r)) return { pill: 'No times found', short: 'no times' }
   if (/no weekly hours/.test(r)) return { pill: 'No hours found', short: 'no hours' }
   if (/No website/.test(r)) return { pill: 'No website', short: '' }
+  if (/Not searched yet/.test(r)) return { pill: 'Not searched yet', short: 'not searched yet' }
   if (/took too long|didn’t answer in time/.test(r)) return { pill: 'Too slow to read', short: 'too slow' }
   if (/didn’t load/.test(r)) return { pill: 'Didn’t load', short: 'didn’t load' }
   if (/wouldn’t open/.test(r)) return { pill: 'Wouldn’t open', short: 'wouldn’t open' }

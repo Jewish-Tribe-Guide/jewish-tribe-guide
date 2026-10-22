@@ -153,6 +153,13 @@ describe('Mikvah hours', () => {
     expect(screen.getByRole('link', { name: '‹ Watches' })).toHaveAttribute('href', '/philly/admin/watches')
   })
 
+  // Oct 22: a place the morning's search hasn't reached yet (the page
+  // itself searches nothing).
+  it('a mikvah not searched yet says so', async () => {
+    await renderPage([{ ...NONE, reason: 'Not searched yet.' }])
+    expect(pill(NONE.name)).toBe('Not searched yet')
+  })
+
   it('a quiet day says so, and opens on the first tab with anything in it', async () => {
     await renderPage([SAME, NONE])
     expect(screen.getByTestId('job-counts')).toHaveTextContent('No mikvah’s website has an update.')

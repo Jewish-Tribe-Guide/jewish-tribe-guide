@@ -21,7 +21,7 @@ import { isEruvWebsiteWatch } from '@/lib/eruvWebsite'
 import type { Hospital } from './HospitalsJob'
 import type { HoursPlace } from './HoursJob'
 import type { KosherLoaded } from './KosherJob'
-import { hoursCounts, isHoursOff, isStoppedPage } from '@/lib/hoursJob'
+import { hoursCounts, isHoursOff, isHoursSearched, isStoppedPage } from '@/lib/hoursJob'
 
 // ── The "Watches" tab (freshness map, Oct 5) ────────────────────────────────
 // Everything the guide reads on its own to stay current: pages every
@@ -788,6 +788,7 @@ export default function WatchesManager({ token }: { token: string }) {
     (w) =>
       !isHospitalWatch(w) &&
       !isHoursOff(w) &&
+      !isHoursSearched(w) &&
       !isStoppedPage(w) &&
       watchGroupOf(w) !== 'kosher' &&
       !isEruvWebsiteWatch(w) &&

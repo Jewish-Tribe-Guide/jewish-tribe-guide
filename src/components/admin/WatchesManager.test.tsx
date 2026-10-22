@@ -285,6 +285,16 @@ describe('WatchesManager', () => {
     expect(screen.getByTestId('watch-summary')).toHaveTextContent('1 watches · all working')
   })
 
+  // Oct 22: why a place's search found no page is kept as a watch never
+  // read (hoursJob.ts), for its job page; the tab lists none.
+  it('lists no search’s record', async () => {
+    await renderTab([
+      watch({ id: 's', url: 'https://guide.invalid/hours-search/hours/m1', resourceId: 'm1', label: 'Mikvah: hours searched', createdBy: 'hours search', active: false, lastError: 'Read its website: no weekly hours on it.' }),
+      watch({ id: 'a', label: 'Hand-added', url: 'https://other.example/', createdBy: 'someone@example.org' }),
+    ])
+    expect(names(screen.getByRole('region', { name: 'Anything else' }))).toEqual(['Hand-added'])
+  })
+
   // Oct 19: a listing's own page is listed under what it keeps current, by
   // what its listing has.
   it('lists a shul’s own page under its times, and a mikvah’s under hours', async () => {
