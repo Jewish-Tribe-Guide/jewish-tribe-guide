@@ -173,6 +173,8 @@ const nextConfig: NextConfig = {
       { source: '/:community/pinned', destination: '/:community/you', permanent: true },
       // Main dishes became the Watches tab's Dishes job (Oct 21).
       { source: '/:community/admin/dishes', destination: '/:community/admin/watches/dishes', permanent: false },
+      // Eruvim became part of the Categories tab's Eruv row (Oct 22).
+      { source: '/:community/admin/eruvim', destination: '/:community/admin/categories', permanent: false },
     ];
   },
 };
