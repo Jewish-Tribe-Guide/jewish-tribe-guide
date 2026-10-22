@@ -203,6 +203,11 @@ export type Minyan = {
    *  hidden: it might well happen. Set per minyan, never per shul: a shul's
    *  other times stay regular. Absent means a regular minyan. */
   signUp?: MinyanSignUp
+  /** Where to join it from home: its Zoom, Google Meet or livestream link
+   *  (Rodeph Shalom's Thursday minyan is on Zoom: the user, Oct 22). A web
+   *  link; the listing shows it on the minyan's row (joinAction). Absent:
+   *  in person only, or not known. */
+  joinLink?: string
 }
 
 /** Where a sign-up minyan's people say they're coming: its WhatsApp
@@ -241,6 +246,30 @@ export function signUpText(s: MinyanSignUp): string {
   if (link) return `Sign-up: ${link}`
   const who = [s.name?.trim(), s.phone?.trim()].filter(Boolean).join(' ')
   return who ? `Sign-up: text ${who}` : 'Sign-up'
+}
+
+/** "Join on Zoom": a minyan's join link as the listing shows it, a web
+ *  link only (it can come from the public). Null for anything else.
+ *  `what` names the minyan, where the link isn't on its row: "Join
+ *  Thursday Shacharis on Zoom". */
+export function joinAction(link: string | undefined, what?: string): { href: string; label: string } | null {
+  const href = link?.trim()
+  if (!href || !/^https?:\/\/[^\s]+$/i.test(href)) return null
+  let host: string
+  try {
+    host = new URL(href).hostname.toLowerCase()
+  } catch {
+    return null
+  }
+  const on = (d: string) => host === d || host.endsWith(`.${d}`)
+  const [verb, service] = on('zoom.us') ? ['Join', 'Zoom'] : on('meet.google.com') ? ['Join', 'Google Meet'] : on('youtube.com') || on('youtu.be') ? ['Watch', 'YouTube'] : on('vimeo.com') ? ['Watch', 'Vimeo'] : ['Join', null]
+  return { href, label: [verb, what, service ? `on ${service}` : 'online'].filter(Boolean).join(' ') }
+}
+
+/** "Online: upenn.zoom.us/j/123": for summaries and the moderation queue,
+ *  where a link from the public is approved like any other content. */
+export function joinText(link: string): string {
+  return `Online: ${link.trim().replace(/^https?:\/\//i, '')}`
 }
 
 export const SEASON_LABELS: Record<Season, string> = {
@@ -461,6 +490,7 @@ export function formatMinyanimSummary(minyanim: Minyan[]): string {
         m.time,
         m.season && SEASON_LABELS[m.season],
         m.signUp && signUpText(m.signUp),
+        m.joinLink && joinText(m.joinLink),
         m.notes,
       ]
         .filter(Boolean)

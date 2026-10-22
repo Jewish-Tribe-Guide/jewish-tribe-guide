@@ -79,7 +79,7 @@ describe('BoxEditor, this week’s schedule', () => {
     ],
   }
   const shul = makeListing({ id: '5d0a7c1e-2f55-4a8e-9d57-3b7f0d6f4a21', name: 'Mekor Habracha', category: 'synagogue', minyanim: usual, minyanim_schedules: [week] })
-  const edit = { title: 'This week’s schedule', fields: [minyanim], minyanimBox: 'this_week' as const, writing: minyanWriting, week: 'w1' }
+  const edit = { title: 'This week’s schedule', fields: [minyanim], minyanimBox: 'this_week' as const, writing: minyanWriting, weeks: ['w1'] }
 
   it('lists the week’s times in Shabbos order, offers only its own days, and sends the change into that week', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ ok: true }), { status: 200 }))
@@ -121,6 +121,39 @@ describe('BoxEditor, this week’s schedule', () => {
     expect(details.minyanim_schedules).toEqual([week])
     expect(fetchMock).not.toHaveBeenCalled()
     expect(screen.queryByText(/Verifying/)).not.toBeInTheDocument()
+  })
+
+  // Oct 22: Kol Tzedek's and Mikveh Israel's websites gave this week and
+  // next, and the update had no Edit. Each week is a list under its dates,
+  // one opened at a time; one Save keeps both weeks' changes.
+  it('two weeks: a list each, under its dates, both weeks’ changes saved together', async () => {
+    const next = { ...week, id: 'w2', name: 'Times for Oct 11 – Oct 17', from: '2026-10-11', to: '2026-10-17', minyanim: [{ id: 'n1', tefillah: 'shacharis', on: ['2026-10-12', '2026-10-13'], time: '7:00am' }] }
+    const via = vi.fn().mockResolvedValue(new Response(JSON.stringify({ ok: true }), { status: 200 }))
+    const onSaved = vi.fn()
+    const bare = makeListing({ ...shul, minyanim_schedules: [] })
+    renderWithProviders(
+      <BoxEditSheet item={bare} category={shuls} edit={{ ...edit, weeks: ['w1', 'w2'], preset: { minyanim_schedules: [week, next] }, save: { label: 'Save to the listing', via, onSaved } }} onClose={vi.fn()} />,
+    )
+    const lists = screen.getAllByTestId('minyan-box-list')
+    expect(lists.map((l) => l.querySelector('p')!.textContent)).toEqual(['Oct 9–10', 'Oct 11–17'])
+
+    fireEvent.click(within(lists[1]).getByRole('button', { name: /^7 AM/ }))
+    const sheet = screen.getByRole('dialog', { name: 'Shacharis' })
+    // Only the open week shows.
+    expect(lists[0].closest('[hidden]')).not.toBeNull()
+    expect(within(within(sheet).getByRole('group', { name: 'Days' })).getAllByRole('button').map((b) => b.textContent)).toEqual(['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Shabbos'])
+    fireEvent.change(within(sheet).getByLabelText('Time'), { target: { value: '6:45am' } })
+    fireEvent.click(within(sheet).getByRole('button', { name: 'Done' }))
+
+    fireEvent.click(within(screen.getAllByTestId('minyan-box-list')[0]).getByRole('button', { name: /^Shacharis/ }))
+    fireEvent.change(within(screen.getByRole('dialog', { name: 'Shacharis' })).getByLabelText('Time'), { target: { value: '8:45am' } })
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Shacharis' })).getByRole('button', { name: 'Done' }))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save to the listing' }))
+    await vi.waitFor(() => expect(onSaved).toHaveBeenCalled())
+    const [w1, w2] = via.mock.calls[0][0].payload.details.minyanim_schedules
+    expect(w1.minyanim[1]).toMatchObject({ id: 'sm', time: '8:45am', on: ['2026-10-10'] })
+    expect(w2.minyanim).toEqual([{ id: 'n1', tefillah: 'shacharis', on: ['2026-10-12', '2026-10-13'], time: '6:45am' }])
   })
 })
 
@@ -280,6 +313,27 @@ describe('BoxEditor, a shul’s usual Shabbos times', () => {
     const send = fetchMock.mock.calls.find(([url]) => String(url).startsWith('/api/submissions'))!
     const rows = findMinyanim(JSON.parse(String(send[1]!.body))) as { id: string; signUp?: unknown }[]
     expect(rows.find((r) => r.id === 'sh')?.signUp).toEqual({ link: 'https://chat.whatsapp.com/Hash' })
+  })
+
+  // Oct 22: a minyan people can join from home, its link under More.
+  it('a minyan’s Zoom or livestream link, a web link only, sent with it', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => new Response(JSON.stringify({ ok: true, resources: [] }), { status: 200 }))
+    renderWithProviders(<BoxEditSheet item={shul} category={shuls} edit={edit} onClose={vi.fn()} />, { content: { categories: [shuls] } })
+    fireEvent.click(screen.getByRole('button', { name: /^Shacharis/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'More' }))
+    fireEvent.change(screen.getByLabelText('Zoom or livestream link'), { target: { value: 'upenn.zoom.us/j/97084263584' } })
+    expect(screen.getByRole('button', { name: 'Done' })).toBeDisabled()
+    fireEvent.change(screen.getByLabelText('Zoom or livestream link'), { target: { value: 'https://upenn.zoom.us/j/97084263584' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }))
+    const list = screen.getByTestId('minyan-box-list')
+    fireEvent.click(within(list).getByRole('button', { name: /^Shacharis 9:15 AM.*Online/ }))
+    expect(screen.getByLabelText('Zoom or livestream link'), 'opens with More open').toHaveValue('https://upenn.zoom.us/j/97084263584')
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }))
+    fireEvent.click(within(screen.getByTestId('minyan-box-list')).getByRole('button', { name: 'Send 1 change' }))
+    await screen.findByTestId('box-edit-sent')
+    const send = fetchMock.mock.calls.find(([url]) => String(url).startsWith('/api/submissions'))!
+    const rows = findMinyanim(JSON.parse(String(send[1]!.body))) as { id: string; joinLink?: string }[]
+    expect(rows.find((r) => r.id === 'sh')?.joinLink).toBe('https://upenn.zoom.us/j/97084263584')
   })
 
   it('Back from a minyan leaves it as it was', () => {

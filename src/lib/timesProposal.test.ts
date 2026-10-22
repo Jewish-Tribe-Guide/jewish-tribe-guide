@@ -47,6 +47,11 @@ describe('usualProposal', () => {
     const boxes = usualProposal([shacharis], [{ ...shacharis, signUp: { link: 'chat.whatsapp.com/x' } }])
     expect(boxes[0].rows[0]).toMatchObject({ status: 'changed', note: 'Sign-up: chat.whatsapp.com/x', was: { note: 'No note' } })
   })
+
+  it('shows a join link change, so it’s never approved blind (Oct 22)', () => {
+    const boxes = usualProposal([shacharis], [{ ...shacharis, joinLink: 'https://upenn.zoom.us/j/97084263584' }])
+    expect(boxes[0].rows[0]).toMatchObject({ status: 'changed', note: 'Online: upenn.zoom.us/j/97084263584', was: { note: 'No note' } })
+  })
 })
 
 describe('scheduleProposal', () => {
@@ -85,6 +90,11 @@ describe('scheduleProposal', () => {
         ],
       },
     ])
+  })
+
+  it('says a time’s join link, read off the calendar (Oct 22)', () => {
+    const linked = { ...week, minyanim: [{ id: 't', tefillah: 'shacharis' as const, on: ['2026-10-22'], time: '8:10am', joinLink: 'https://upenn.zoom.us/j/97084263584' }] }
+    expect(scheduleProposal([], [linked], []).weeks[0].days[0].rows[0]).toMatchObject({ what: 'Shacharis', note: 'Online: upenn.zoom.us/j/97084263584' })
   })
 
   it('leaves out a schedule the listing has already, and names one it takes off', () => {

@@ -130,6 +130,10 @@ const MINYAN_FIELD_VISIBILITY: Record<keyof Minyan, 'shown' | 'deliberately-hidd
   // Where people sign up for a minyan that needs it (Oct 16): a link or a
   // phone number from the public, shown so it isn't approved blind.
   signUp: 'shown',
+  // Where to join it from home (Oct 22): a Zoom or livestream link, from
+  // the public or read off the shul's calendar, shown so it isn't approved
+  // blind.
+  joinLink: 'shown',
   // Bookkeeping, not content — a moderator has no use for it.
   id: 'deliberately-hidden',
   // `time` is generated from these by formatAnchorRule and kept in sync by the
@@ -151,6 +155,7 @@ const MINYAN_CHANGES: Record<string, [Partial<Minyan>, Partial<Minyan>]> = {
   notes: [{ notes: 'Upstairs' }, { notes: 'Downstairs' }],
   season: [{ season: 'winter' }, { season: 'summer' }],
   signUp: [{ signUp: { link: 'https://chat.whatsapp.com/Aa11' } }, { signUp: { link: 'https://chat.whatsapp.com/Bb22' } }],
+  joinLink: [{ joinLink: 'https://upenn.zoom.us/j/111' }, { joinLink: 'https://upenn.zoom.us/j/222' }],
 }
 
 describe('moderation queue — every minyan property a moderator should see', () => {
@@ -502,6 +507,8 @@ const SCHEDULE_FIELD_VISIBILITY: Record<keyof SpecialSchedule | keyof ScheduleMi
   time: 'shown',
   notes: 'shown',
   season: 'shown',
+  // Read off the shul's calendar onto a dated time (Oct 22).
+  joinLink: 'shown',
   // Bookkeeping, not content.
   id: 'deliberately-hidden',
   // Set by the app when a week's times are applied, never typed by anyone:
@@ -538,6 +545,7 @@ const SCHEDULE_CHANGES: Record<string, [SpecialSchedule, SpecialSchedule]> = {
   on: [baseSchedule, { ...baseSchedule, minyanim: [{ ...row, on: ['yom_tov', '2026-10-02'] }] }],
   time: [baseSchedule, { ...baseSchedule, minyanim: [{ ...row, time: '9:30am' }] }],
   notes: [baseSchedule, { ...baseSchedule, minyanim: [{ ...row, notes: 'Yizkor about 10:45' }] }],
+  joinLink: [baseSchedule, { ...baseSchedule, minyanim: [{ ...row, joinLink: 'https://upenn.zoom.us/j/97084263584' }] }],
   season: [baseSchedule, { ...baseSchedule, minyanim: [{ ...row, season: 'winter' }] }],
 }
 

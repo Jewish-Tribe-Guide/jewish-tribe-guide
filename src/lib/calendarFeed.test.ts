@@ -1,5 +1,20 @@
 import { describe, expect, it } from 'vitest'
-import { CALENDAR_HEADING, calendarFeeds, calendarLines, calendarWeeks, embeddedEntries, icsEntries, isIcs } from './calendarFeed'
+import {
+  CALENDAR_HEADING,
+  MAX_EVENT_PAGES,
+  calendarFeeds,
+  calendarJoins,
+  calendarLines,
+  calendarWeeks,
+  embeddedEntries,
+  eventPagesToOpen,
+  icsEntries,
+  isIcs,
+  joinLinkIn,
+  withJoinLinks,
+  type CalendarEntry,
+} from './calendarFeed'
+import type { SpecialSchedule } from './schedules'
 
 const TZ = 'America/New_York'
 
@@ -70,6 +85,14 @@ describe('embeddedEntries: a calendar widget’s event list in the page’s scri
     ])
   })
 
+  it('keeps an event’s end that day', () => {
+    const html = `[{"title":"Shacharis","start":"2026-10-25T08:10:00","end":"2026-10-25T08:40:00"},{"title":"Retreat","start":"2026-10-25T18:00:00","end":"2026-10-27"}]`
+    expect(embeddedEntries(html, TZ)).toEqual([
+      { date: '2026-10-25', time: '8:10 AM', end: '8:40 AM', title: 'Shacharis' },
+      { date: '2026-10-25', time: '6:00 PM', title: 'Retreat' },
+    ])
+  })
+
   it('skips anything that isn’t an event', () => {
     expect(embeddedEntries(`{"title":"No start"} {"start":"2026-10-25"} {"title": broken, "start": "x"}`, TZ)).toEqual([])
   })
@@ -88,6 +111,21 @@ describe('icsEntries: an iCal feed’s entries in the coming days', () => {
     expect(icsEntries(feed, TZ, '2026-10-20', '2026-11-09')).toEqual([
       { date: '2026-10-30', time: '6:00 PM', title: 'Shabbat Evening Service' },
       { date: '2026-10-31', time: '10:45 AM', title: 'Shabbat Morning Services, Sanctuary' },
+    ])
+  })
+
+  // Oct 22: Rodeph Shalom's Thursday minyan is 8:10–8:40, and the reader,
+  // given only its start, never had its end.
+  it('keeps an event’s end that day, also over a weekly repeat; one ending another day has none', () => {
+    const feed = ics(
+      'BEGIN:VEVENT\r\nDTSTART;TZID=America/New_York:20261022T081000\r\nDTEND;TZID=America/New_York:20261022T084000\r\nSUMMARY:Online Community Morning Minyan\r\nEND:VEVENT\r\n' +
+        'BEGIN:VEVENT\r\nDTSTART;TZID=America/New_York:20260901T071500\r\nDTEND;TZID=America/New_York:20260901T080000\r\nRRULE:FREQ=WEEKLY;BYDAY=MO\r\nSUMMARY:Shacharis\r\nEND:VEVENT\r\n' +
+        'BEGIN:VEVENT\r\nDTSTART;TZID=America/New_York:20261024T200000\r\nDTEND;TZID=America/New_York:20261025T010000\r\nSUMMARY:Late Havdalah\r\nEND:VEVENT\r\n',
+    )
+    expect(icsEntries(feed, TZ, '2026-10-20', '2026-10-26')).toEqual([
+      { date: '2026-10-22', time: '8:10 AM', end: '8:40 AM', title: 'Online Community Morning Minyan' },
+      { date: '2026-10-26', time: '7:15 AM', end: '8:00 AM', title: 'Shacharis' },
+      { date: '2026-10-24', time: '8:00 PM', title: 'Late Havdalah' },
     ])
   })
 
@@ -138,6 +176,10 @@ describe('calendarLines: what the reader is given', () => {
       '2026-10-31 (Sat) 10:45 AM: Shabbat Morning Services',
     ])
   })
+
+  it('an entry’s end, beside its start', () => {
+    expect(calendarLines([{ date: '2026-10-22', time: '8:10 AM', end: '8:40 AM', title: 'Online Community Morning Minyan' }], '2026-10-22', '2026-10-24')).toEqual(['2026-10-22 (Thu) 8:10 AM–8:40 AM: Online Community Morning Minyan'])
+  })
 })
 
 // The user, Oct 20: "for websites where we have access to the big schedule
@@ -164,5 +206,97 @@ describe('calendarWeeks: the weeks a calendar is read for', () => {
 describe('CALENDAR_HEADING', () => {
   it('tells the reader each entry is for its date only, never a weekday', () => {
     expect(CALENDAR_HEADING).toMatch(/for its date only, however often it repeats: give it that date, never a weekday/)
+  })
+})
+
+// The user, Oct 22: Rodeph Shalom's watch "didn't pick up on … zoom link
+// for 8:10 minyan". Its feed gives the minyan's own page (URL and
+// LOCATION), the page says "Join Zoom here", and its DESCRIPTION is the
+// whole month page.
+describe('join links: a service’s Zoom or livestream, from its calendar', () => {
+  const PAGE = 'https://rodephshalom.org/event/community-morning-minyan-108-2-2-2/2026-10-22/'
+  const ZOOM = 'https://upenn.zoom.us/j/97084263584'
+  const vevent = (...props: string[]) =>
+    ['BEGIN:VCALENDAR', 'BEGIN:VEVENT', 'DTSTART;TZID=America/New_York:20261022T081000', 'DTEND;TZID=America/New_York:20261022T084000', 'SUMMARY:Online Community Morning Minyan', ...props, 'END:VEVENT', 'END:VCALENDAR'].join('\r\n')
+
+  it('keeps an event’s own page, from its URL or a LOCATION that is a web address', () => {
+    expect(icsEntries(vevent(`URL:${PAGE}`, `LOCATION:${PAGE}`), TZ, '2026-10-22', '2026-10-24')).toEqual([
+      { date: '2026-10-22', time: '8:10 AM', end: '8:40 AM', title: 'Online Community Morning Minyan', url: PAGE },
+    ])
+    expect(icsEntries(vevent(`LOCATION:${PAGE}`), TZ, '2026-10-22', '2026-10-24')[0].url).toBe(PAGE)
+    expect(icsEntries(vevent('LOCATION:Congregation Rodeph Shalom\\, 615 North Broad Street'), TZ, '2026-10-22', '2026-10-24')[0]).not.toHaveProperty('url')
+  })
+
+  it('takes a join link the feed gives itself: its LOCATION, its URL, a Google Meet', () => {
+    expect(icsEntries(vevent(`LOCATION:${ZOOM}`), TZ, '2026-10-22', '2026-10-24')[0]).toMatchObject({ join: ZOOM })
+    expect(icsEntries(vevent(`URL:${ZOOM}`), TZ, '2026-10-22', '2026-10-24')[0]).toMatchObject({ join: ZOOM })
+    expect(icsEntries(vevent(`URL:${ZOOM}`), TZ, '2026-10-22', '2026-10-24')[0]).not.toHaveProperty('url')
+    expect(icsEntries(vevent('X-GOOGLE-CONFERENCE:https://meet.google.com/abc-defg-hij'), TZ, '2026-10-22', '2026-10-24')[0]).toMatchObject({ join: 'https://meet.google.com/abc-defg-hij' })
+  })
+
+  it('a description’s link only when it’s short and has the one: never a month page of other events’ links', () => {
+    expect(icsEntries(vevent(`DESCRIPTION:Join us on Zoom: ${ZOOM}?pwd=abc. All welcome`), TZ, '2026-10-22', '2026-10-24')[0]).toMatchObject({ join: `${ZOOM}?pwd=abc` })
+    const month = `DESCRIPTION:Calendar\\n35 events found. ${'Torah study on Zoom https://zoom.us/j/111 '.repeat(60)}`
+    expect(icsEntries(vevent(month), TZ, '2026-10-22', '2026-10-24')[0]).not.toHaveProperty('join')
+    expect(icsEntries(vevent('DESCRIPTION:Minyan https://zoom.us/j/111 or Torah study https://zoom.us/j/222'), TZ, '2026-10-22', '2026-10-24')[0]).not.toHaveProperty('join')
+  })
+
+  it('an event page’s one meeting, outside its header and footer; never a channel or a link inside another', () => {
+    const page = `<header><a href="https://zoom.us/j/555">Board meeting</a></header>
+      <main><p>Every Thursday from 8:10-8:40 a.m. on Zoom</p><p>Join Zoom <a href="${ZOOM}">here</a>. Open to all.</p>
+      <a href="https://www.google.com/calendar/event?action=TEMPLATE&amp;details=Join+Zoom+%3Ca+href%3D%22https%3A%2F%2Fupenn.zoom.us%2Fj%2F97084263584%22">Google Calendar</a></main>
+      <footer><a href="https://www.youtube.com/c/RodephShalomPhiladelphia">Youtube</a></footer>`
+    expect(joinLinkIn(page)).toBe(ZOOM)
+    // A channel's link in the page itself isn't a service's.
+    expect(joinLinkIn('<p><a href="https://www.youtube.com/c/RodephShalomPhiladelphia">Youtube</a></p>')).toBeNull()
+    expect(joinLinkIn('<p><a href="https://www.youtube.com/@shul/live">Watch live</a></p>')).toBe('https://www.youtube.com/@shul/live')
+    // One meeting twice, once with its passcode, is one.
+    expect(joinLinkIn(`<a href="${ZOOM}">here</a> <a href="${ZOOM}?pwd=x">here</a>`)).toBe(ZOOM)
+    // Two meetings: which is the service's isn't known.
+    expect(joinLinkIn('<a href="https://zoom.us/j/111">Minyan</a> <a href="https://zoom.us/j/222">Class</a>')).toBeNull()
+    expect(joinLinkIn('<a href="javascript:alert(1)">zoom.us/j/1</a>')).toBeNull()
+  })
+
+  it('opens the pages of services from today on, each once, a few a read', () => {
+    const e = (date: string, title: string, url: string, more: Partial<CalendarEntry> = {}): CalendarEntry => ({ date, time: '8:10 AM', title, url, ...more })
+    const entries = [
+      e('2026-10-20', 'Morning Minyan', 'https://x/a'), // gone by
+      e('2026-10-23', 'Shabbat Evening Service', 'https://x/b'),
+      e('2026-10-22', 'Online Community Morning Minyan', 'https://x/c'),
+      e('2026-10-22', 'Sisterhood Potluck', 'https://x/d'),
+      e('2026-10-24', 'Shabbat Morning Service', 'https://x/b'),
+      e('2026-10-24', 'Havdalah', 'https://x/e', { join: ZOOM }),
+      e('2026-10-25', 'Mincha', 'https://x/f', { time: null }),
+    ]
+    expect(eventPagesToOpen(entries, '2026-10-22', '2026-10-31')).toEqual(['https://x/c', 'https://x/b'])
+    const many = Array.from({ length: 9 }, (_, i) => e('2026-10-26', 'Minyan', `https://x/${i}`))
+    expect(eventPagesToOpen(many, '2026-10-22', '2026-10-31')).toHaveLength(MAX_EVENT_PAGES)
+  })
+
+  it('onto the website’s week: the minyan on that date at that time, the admin told; nothing a person or the newsletter gave', () => {
+    const joins = calendarJoins([{ date: '2026-10-22', time: '8:10 AM', title: 'Online Community Morning Minyan', join: ZOOM }], '2026-10-22', '2026-10-24')
+    expect(joins).toEqual([{ date: '2026-10-22', time: '8:10 AM', link: ZOOM }])
+    const week = (over: Partial<SpecialSchedule> = {}): SpecialSchedule => ({
+      id: 'w',
+      name: 'Times for Oct 18 – Oct 24',
+      from: '2026-10-22',
+      to: '2026-10-24',
+      mode: 'replace',
+      kind: 'week',
+      postedBy: 'website',
+      minyanim: [
+        { id: 'a', tefillah: 'shacharis', on: ['2026-10-22'], time: '8:10am' },
+        { id: 'b', tefillah: 'shacharis', on: ['2026-10-22'], time: '7:00am' },
+        { id: 'c', tefillah: 'shacharis', on: ['2026-10-24'], time: '8:10am' },
+      ],
+      ...over,
+    })
+    const got = withJoinLinks([week()], joins)
+    expect(got.schedules[0].minyanim.map((m) => m.joinLink ?? null)).toEqual([ZOOM, null, null])
+    expect(got.changes).toEqual(['Times for Oct 18 – Oct 24: Shacharis, Thu Oct 22, 8:10am · Online: upenn.zoom.us/j/97084263584'])
+    // Already there: nothing to tell.
+    expect(withJoinLinks(got.schedules, joins).changes).toEqual([])
+    const newsletter = week({ postedBy: undefined })
+    expect(withJoinLinks([newsletter], joins)).toEqual({ schedules: [newsletter], changes: [] })
   })
 })

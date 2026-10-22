@@ -58,6 +58,7 @@ export default function MinyanBoxEditor({
   place,
   writing,
   dayChoices,
+  heading,
   onChange,
   onStep,
   send,
@@ -79,6 +80,9 @@ export default function MinyanBoxEditor({
   /** The days a minyan can be put on, when not the box's own: a week the
    *  shul sent out, its own days. */
   dayChoices?: Minyan['days']
+  /** Over the list in place of the shul's name: one of several weeks
+   *  edited together ("Oct 25–31"), the name said once above them. */
+  heading?: string
   onChange: (rows: Minyan[]) => void
   /** A minyan opened: its title and the way back to the list, for the
    *  sheet's header; null on the list. */
@@ -125,7 +129,7 @@ export default function MinyanBoxEditor({
 
   return (
     <div className="space-y-4" data-testid="minyan-box-list">
-      <p className="-mt-1 text-[14px] text-muted">{place}</p>
+      {heading ? <p className="text-[15.5px] font-extrabold text-slate-900">{heading}</p> : <p className="-mt-1 text-[14px] text-muted">{place}</p>}
       {boxGroups(rows, box).map((g) => (
         <div key={g.label}>
           <p className="text-[12.5px] font-extrabold uppercase tracking-[0.04em] text-muted">{g.label}</p>
@@ -134,7 +138,7 @@ export default function MinyanBoxEditor({
               // The week's rows are under their tefillah already: the time
               // and the days. Shabbos's say which tefillah.
               const kind = kindOf(m, box)
-              const sub = [kind === 'weekday' ? formatDays(m.days) : m.days.length > 1 ? m.days.map((d) => dayLabel(d, kind)).join(' and ') : null, m.season ? SEASON_LABELS[m.season] : null, m.signUp ? 'Sign-up' : null, noteText(m.notes)].filter(Boolean).join(' · ')
+              const sub = [kind === 'weekday' ? formatDays(m.days) : m.days.length > 1 ? m.days.map((d) => dayLabel(d, kind)).join(' and ') : null, m.season ? SEASON_LABELS[m.season] : null, m.signUp ? 'Sign-up' : null, m.joinLink ? 'Online' : null, noteText(m.notes)].filter(Boolean).join(' · ')
               const changed = isChanged(m)
               return (
                 <li key={m.id}>
@@ -180,7 +184,7 @@ export default function MinyanBoxEditor({
 /** One minyan: Add a minyan's screen, with Remove, and More for the rest. */
 function OneMinyan({ start, box, choices, under, onDone, onRemove }: { start: Minyan; box: MinyanBox; choices: Minyan['days']; under: string; onDone: (m: Minyan) => void; onRemove?: () => void }) {
   const [row, setRow] = useState<Minyan>(start)
-  const [more, setMore] = useState(!!(start.season || start.notBefore || start.notAfter || start.signUp))
+  const [more, setMore] = useState(!!(start.season || start.notBefore || start.notAfter || start.signUp || start.joinLink))
   const modes = useTimeModes()
   const set = (p: Partial<Minyan>) => setRow((r) => ({ ...r, ...p }))
   const relative = !!row.anchor
@@ -288,6 +292,20 @@ function OneMinyan({ start, box, choices, under, onDone, onRemove }: { start: Mi
             </div>
           )}
           <SignUpFields signUp={row.signUp} onChange={(signUp) => set({ signUp })} />
+          <label className="block space-y-1.5">
+            <span className="block text-[14px] font-bold text-slate-700">Zoom or livestream link</span>
+            <input
+              type="url"
+              inputMode="url"
+              value={row.joinLink ?? ''}
+              maxLength={300}
+              onChange={(e) => set({ joinLink: e.target.value.trim() || undefined })}
+              placeholder="https://zoom.us/j/…"
+              aria-label="Zoom or livestream link"
+              className={`${input} w-full`}
+            />
+            {!signUpLinkOk(row.joinLink) && <span className="block text-[13px] text-caution">Paste the whole link, starting https://</span>}
+          </label>
           {/* Folds it away again; what's set stays set. */}
           <button type="button" onClick={() => setMore(false)} className="inline-flex cursor-pointer items-center gap-1 text-[14.5px] font-bold text-primary">
             Less
@@ -307,7 +325,7 @@ function OneMinyan({ start, box, choices, under, onDone, onRemove }: { start: Mi
             Remove this minyan
           </button>
         )}
-        <button type="button" disabled={!readable || !row.time.trim() || row.days.length === 0 || !signUpLinkOk(row.signUp?.link)} onClick={() => onDone(row)} className={SUBMIT_PILL}>
+        <button type="button" disabled={!readable || !row.time.trim() || row.days.length === 0 || !signUpLinkOk(row.signUp?.link) || !signUpLinkOk(row.joinLink)} onClick={() => onDone(row)} className={SUBMIT_PILL}>
           Done
         </button>
       </div>

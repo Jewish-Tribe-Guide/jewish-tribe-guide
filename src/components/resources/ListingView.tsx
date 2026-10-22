@@ -424,7 +424,7 @@ export default function ListingView({ item, category, color, place = null, upvot
         minyanim={item[f.key]}
         schedules={item[schedulesKey(f.key)]}
         category={category}
-        onEditBox={editBox ? (box, title, week) => editBox({ title, fields: [f], minyanimBox: box, writing: minyanWriting, week }) : undefined}
+        onEditBox={editBox ? (box, title, week) => editBox({ title, fields: [f], minyanimBox: box, writing: minyanWriting, weeks: week ? [week] : undefined }) : undefined}
       />
     )
   } else if (main === 'items' && itemsF) {

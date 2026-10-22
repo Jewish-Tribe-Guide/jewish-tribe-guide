@@ -1,4 +1,4 @@
-import { TEFILLAH_LABELS, TEFILLAH_ORDER, formatDays, signUpText, type Minyan } from './davening'
+import { TEFILLAH_LABELS, TEFILLAH_ORDER, formatDays, joinText, signUpText, type Minyan } from './davening'
 import { minyanimForBox } from './minyanimBox'
 import { PART_ORDER, clockMinutes, noteText, shabbosPartOf, timeText } from './minyanText'
 import { dateText, scheduleDayText, type ScheduleMinyan, type SpecialSchedule } from './schedules'
@@ -49,7 +49,7 @@ const BOX_LABELS = { weekday: 'Usual weekday times', shabbos: 'Usual Shabbos tim
 const SEASON = { summer: 'Summer', winter: 'Winter' } as const
 
 /** A minyan's parts, its "Winter only" note read as its season. */
-function partsOf(raw: Minyan): Parts & { signUp: string | null } {
+function partsOf(raw: Minyan): Parts & { signUp: string | null; join: string | null } {
   const m = seasonFromNotes(raw)
   return {
     days: formatDays(m.days),
@@ -57,10 +57,11 @@ function partsOf(raw: Minyan): Parts & { signUp: string | null } {
     note: noteText(m.notes),
     season: m.season ? SEASON[m.season] : null,
     signUp: m.signUp ? signUpText(m.signUp) : null,
+    join: m.joinLink?.trim() ? joinText(m.joinLink) : null,
   }
 }
 
-const KEYS = ['days', 'when', 'note', 'season', 'signUp'] as const
+const KEYS = ['days', 'when', 'note', 'season', 'signUp', 'join'] as const
 const differing = (a: Minyan, b: Minyan) => {
   const pa = partsOf(a)
   const pb = partsOf(b)
@@ -110,7 +111,7 @@ function row(m: Minyan, status: ProposalStatus, box: ProposalBox['box'], was?: M
     status,
     what: `${TEFILLAH_LABELS[m.tefillah]}${p.days ? ` · ${p.days}` : ''}`,
     when: p.when,
-    note: [p.note, p.signUp].filter(Boolean).join(' · ') || null,
+    note: [p.note, p.signUp, p.join].filter(Boolean).join(' · ') || null,
     season: p.season,
     anchored: !!m.anchor,
     tefillah: TEFILLAH_LABELS[m.tefillah],
@@ -122,7 +123,7 @@ function row(m: Minyan, status: ProposalStatus, box: ProposalBox['box'], was?: M
     out.was = {}
     if (changed.includes('days')) out.was.days = o.days
     if (changed.includes('when')) out.was.when = o.when
-    if (changed.includes('note') || changed.includes('signUp')) out.was.note = [o.note, o.signUp].filter(Boolean).join(' · ') || 'No note'
+    if (changed.includes('note') || changed.includes('signUp') || changed.includes('join')) out.was.note = [o.note, o.signUp, o.join].filter(Boolean).join(' · ') || 'No note'
     if (changed.includes('season')) out.was.season = o.season ?? 'All year'
   }
   return out
@@ -309,7 +310,7 @@ export function scheduleProposal(current: readonly SpecialSchedule[], proposed: 
           rows: runTogether(
             [...ms]
               .sort((a, b) => TEFILLAH_ORDER.indexOf(a.tefillah) - TEFILLAH_ORDER.indexOf(b.tefillah) || (clockMinutes(a.time) ?? 24 * 60) - (clockMinutes(b.time) ?? 24 * 60))
-              .map((m) => ({ what: TEFILLAH_LABELS[m.tefillah], when: timeText(m), note: noteText(m.notes), usually: usually(m, on, usual) })),
+              .map((m) => ({ what: TEFILLAH_LABELS[m.tefillah], when: timeText(m), note: [noteText(m.notes), m.joinLink?.trim() && joinText(m.joinLink)].filter(Boolean).join(' · ') || null, usually: usually(m, on, usual) })),
           ),
         }))
       const dates = `${dateText(s.from)}${s.to !== s.from ? ` – ${dateText(s.to)}` : ''}`

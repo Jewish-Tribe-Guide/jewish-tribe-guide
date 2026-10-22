@@ -17,12 +17,26 @@
 // Pure: listingPageRun.ts fetches.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { joinText, parseTimeToMinutes, TEFILLAH_LABELS } from './davening'
+import { dateText, type SpecialSchedule } from './schedules'
+
 export type CalendarEntry = {
   /** YYYY-MM-DD, as the shul's calendar has it. */
   date: string
   /** "7:30 PM", or null for an all-day entry with no time in its title. */
   time: string | null
+  /** When it ends that day, "8:40 AM", when the calendar says. Rodeph
+   *  Shalom's Thursday minyan is 8:10–8:40, and the reader, given only the
+   *  start, never had its end (the user, Oct 22). */
+  end?: string | null
   title: string
+  /** The event's own page, when the calendar gives one (an iCal URL, or a
+   *  LOCATION that is a web address): Rodeph Shalom's minyan's says "Join
+   *  Zoom here" there, and nowhere in its feed (the user, Oct 22). */
+  url?: string
+  /** Where to join it from home, when the calendar or its page gives a
+   *  Zoom, Google Meet or livestream link (joinLinkIn). */
+  join?: string
 }
 
 /** At most this many lines: a busy shul's two weeks, well inside what the
@@ -123,17 +137,22 @@ export function embeddedEntries(html: string, timezone: string): CalendarEntry[]
     const start = o.start
     const dateOnly = /^(\d{4}-\d{2}-\d{2})$/.exec(start)
     const { time: titled, title } = timeFromTitle(unescapeHtml(o.title))
+    const page = typeof o.url === 'string' && /^https?:\/\//i.test(o.url) ? { url: o.url } : {}
     if (dateOnly) {
-      out.push({ date: dateOnly[1], time: titled, title })
+      out.push({ date: dateOnly[1], time: titled, title, ...page })
       continue
     }
-    const wall = /^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})(?::\d{2}(?:\.\d+)?)?$/.exec(start)
-    if (wall) {
-      out.push({ date: wall[1], time: clock(Number(wall[2]), Number(wall[3])), title })
-      continue
+    const at = (v: unknown): { date: string; time: string } | null => {
+      if (typeof v !== 'string') return null
+      const wall = /^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})(?::\d{2}(?:\.\d+)?)?$/.exec(v)
+      if (wall) return { date: wall[1], time: clock(Number(wall[2]), Number(wall[3])) }
+      const ms = Date.parse(v)
+      return Number.isFinite(ms) && !/^\d{4}-\d{2}-\d{2}$/.test(v) ? local(ms, timezone) : null
     }
-    const ms = Date.parse(start)
-    if (Number.isFinite(ms)) out.push({ ...local(ms, timezone), title })
+    const begins = at(start)
+    if (!begins) continue
+    const ends = at(o.end)
+    out.push({ ...begins, ...(ends && ends.date === begins.date && ends.time !== begins.time ? { end: ends.time } : {}), title, ...page })
   }
   return out
 }
@@ -159,6 +178,133 @@ function icsWhen(p: Prop, timezone: string): { date: string; time: string | null
   return { date, time: clock(Number(m[4]), Number(m[5])) }
 }
 
+/** An iCal event's own page and its join link. Its URL, or a LOCATION
+ *  that is a web address, is its page (Rodeph Shalom's both are); a join
+ *  link may be either, or a Google Meet's X-GOOGLE-CONFERENCE. Its
+ *  DESCRIPTION only when it's short and has one: Rodeph Shalom's plugin
+ *  puts the whole month page in every event's, any other event's Zoom
+ *  link included. */
+function eventLinks(event: Record<string, Prop>): Pick<CalendarEntry, 'url' | 'join'> {
+  const web = (p: Prop | undefined) => {
+    const v = p && icsText(p.value)
+    return v && /^https?:\/\/\S+$/i.test(v) ? v : null
+  }
+  const given = [web(event.URL), web(event.LOCATION)].filter((v): v is string => !!v)
+  const description = event.DESCRIPTION ? icsText(event.DESCRIPTION.value) : ''
+  const join =
+    [...given, web(event['X-GOOGLE-CONFERENCE'])].find((v) => v && isJoinLink(v)) ??
+    (description.length <= 2_000 ? onlyJoinLink(description.match(/https?:\/\/[^\s"'<>]+/gi) ?? []) : null)
+  const url = given.find((v) => !isJoinLink(v))
+  return { ...(url ? { url } : {}), ...(join ? { join } : {}) }
+}
+
+// ── Join links ──────────────────────────────────────────────────────────────
+
+/** A Zoom meeting, a Google Meet, or a live stream: a link to join from
+ *  home. A YouTube or Vimeo link only when it's a live one, as a site's
+ *  footer links its channel (Rodeph Shalom's event page does). The meeting
+ *  it is, so two links to one meeting (one with its passcode) are one. */
+function joinKey(link: string): string | null {
+  let u: URL
+  try {
+    u = new URL(link)
+  } catch {
+    return null
+  }
+  if (u.protocol !== 'https:' && u.protocol !== 'http:') return null
+  const host = u.hostname.toLowerCase()
+  const on = (d: string) => host === d || host.endsWith(`.${d}`)
+  const path = u.pathname.replace(/\/+$/, '')
+  if (on('zoom.us')) {
+    const id = /^\/(?:j|w|my|wc\/join)\/([^/]+)/i.exec(path)
+    return id ? `zoom:${id[1].toLowerCase()}` : null
+  }
+  if (host === 'meet.google.com') return /^\/[a-z]{3}-[a-z]{4}-[a-z]{3}$/i.test(path) ? `meet:${path.slice(1).toLowerCase()}` : null
+  if (on('youtube.com')) {
+    if (/^\/live\/[\w-]+$/.test(path)) return `youtube:${path}`
+    if (/^\/(?:@[\w.-]+|c\/[\w.-]+|channel\/[\w-]+|user\/[\w.-]+)\/(?:live|streams)$/i.test(path)) return `youtube:${path.toLowerCase()}`
+    if (path === '/embed/live_stream' && u.searchParams.get('channel')) return `youtube:live:${u.searchParams.get('channel')}`
+    return null
+  }
+  if (on('vimeo.com')) return /^\/event\/\d+/.test(path) ? `vimeo:${path}` : null
+  return null
+}
+
+export const isJoinLink = (link: string) => joinKey(link) !== null
+
+/** The one meeting these links are to, as the first of them; null for
+ *  none, or for two different ones (which is which isn't known). */
+function onlyJoinLink(links: readonly string[]): string | null {
+  const joins = links.map((l) => l.replace(/[).,;]+$/, '')).filter(isJoinLink)
+  return joins.length && new Set(joins.map(joinKey)).size === 1 ? joins[0] : null
+}
+
+/** An event's page's join link: the one meeting its links go to, outside
+ *  its menus, header and footer. Null when there's none, or more than one
+ *  (a page of several events). Its links only, never text: "Add to Google
+ *  Calendar" carries the Zoom link inside its own address. */
+export function joinLinkIn(html: string): string | null {
+  const body = html.replace(/<(nav|header|footer|script|style)\b[\s\S]*?<\/\1\s*>/gi, ' ')
+  return onlyJoinLink([...body.matchAll(/\bhref\s*=\s*["']([^"']+)["']/gi)].map((m) => m[1].replace(/&amp;/g, '&').trim()))
+}
+
+/** Words that make a calendar entry a service, whose page is worth
+ *  opening for its join link; a lecture's or a potluck's isn't. */
+const SERVICE_TITLE = /\b(minyan|minyanim|services?|shacharit|shacharis|mincha|minchah|ma'?ariv|maariv|arvit|davening|daven|tefill?ah|tefill?ot|prayers?|kabbal(?:at|as) shabbat|kabbal(?:at|as) shabbos|havdalah|musaf|mussaf)\b/i
+
+export const isServiceTitle = (title: string) => SERVICE_TITLE.test(title)
+
+/** How many event pages one read opens for their join links. */
+export const MAX_EVENT_PAGES = 4
+
+/** The event pages to open for their join links: services from `from`
+ *  (today) to `to`, in date order, each page once, at most
+ *  MAX_EVENT_PAGES. One already with its link isn't opened. */
+export function eventPagesToOpen(entries: readonly CalendarEntry[], from: string, to: string): string[] {
+  const pages: string[] = []
+  for (const e of [...entries].sort((a, b) => a.date.localeCompare(b.date) || minutes(a.time) - minutes(b.time))) {
+    if (pages.length >= MAX_EVENT_PAGES) break
+    if (e.date < from || e.date > to || !e.url || e.join || !e.time || !isServiceTitle(e.title) || pages.includes(e.url)) continue
+    pages.push(e.url)
+  }
+  return pages
+}
+
+/** A dated time's join link, from its calendar. */
+export type CalendarJoin = { date: string; time: string; link: string }
+
+/** The calendar's join links from `from` to `to`, a timed entry each. */
+export function calendarJoins(entries: readonly CalendarEntry[], from: string, to: string): CalendarJoin[] {
+  return entries.flatMap((e) => (e.join && e.time && e.date >= from && e.date <= to ? [{ date: e.date, time: e.time, link: e.join }] : []))
+}
+
+/**
+ * The calendar's join links onto the times the website's reading put on
+ * those dates: a minyan on a date the calendar has a join link for, at
+ * the same time, gets it, and the admin is told. By code, never the AI:
+ * the reader is given the calendar's lines alone. Only the website's
+ * schedules, and only a single date's minyan, so a time a person or the
+ * newsletter gave is never touched.
+ */
+export function withJoinLinks(schedules: readonly SpecialSchedule[], joins: readonly CalendarJoin[]): { schedules: SpecialSchedule[]; changes: string[] } {
+  const changes: string[] = []
+  const next = schedules.map((s) => {
+    if (s.postedBy !== 'website') return s
+    let touched = false
+    const minyanim = s.minyanim.map((m) => {
+      if (m.on.length !== 1) return m
+      const at = parseTimeToMinutes(m.time)
+      const join = joins.find((j) => j.date === m.on[0] && parseTimeToMinutes(j.time) === at)
+      if (!join || m.joinLink === join.link) return m
+      touched = true
+      changes.push(`${s.name}: ${TEFILLAH_LABELS[m.tefillah]}, ${dateText(join.date, { weekday: true })}, ${m.time} · ${joinText(join.link)}`)
+      return { ...m, joinLink: join.link }
+    })
+    return touched ? { ...s, minyanim } : s
+  })
+  return { schedules: next, changes }
+}
+
 function addDays(date: string, n: number): string {
   return new Date(Date.parse(`${date}T12:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10)
 }
@@ -167,7 +313,7 @@ const weekdayNumber = (date: string) => new Date(`${date}T12:00:00Z`).getUTCDay(
 
 /** One week of a calendar, as it's read: Sunday to Shabbos, from `from`
  *  (today, in this week), with that week's lines (calendarLines). */
-export type CalendarWeek = { sunday: string; from: string; to: string; lines: string[] }
+export type CalendarWeek = { sunday: string; from: string; to: string; lines: string[]; joins?: CalendarJoin[] }
 
 /** The weeks a calendar is read for (the user, Oct 20: "only read one week
  *  at a time so we just show this week's"): this week, from today to
@@ -196,7 +342,12 @@ export function icsEntries(ics: string, timezone: string, from: string, to: stri
     }
     if (line === 'END:VEVENT' && event) {
       const start = event.DTSTART && icsWhen(event.DTSTART, timezone)
+      // Its end, when on the same day.
+      const ends = start && start.time && event.DTEND ? icsWhen(event.DTEND, timezone) : null
+      const ending = ends && ends.date === start!.date && ends.time && ends.time !== start!.time ? { end: ends.time } : {}
       const title = event.SUMMARY ? icsText(event.SUMMARY.value) : ''
+      // Its page and its join link (eventLinks), the same on every date of a repeat.
+      const end = { ...ending, ...eventLinks(event) }
       if (start && title && event.STATUS?.value !== 'CANCELLED') {
         const rule = event.RRULE ? Object.fromEntries(event.RRULE.value.split(';').map((kv) => kv.split('=') as [string, string])) : null
         if (rule?.FREQ === 'WEEKLY') {
@@ -211,10 +362,10 @@ export function icsEntries(ics: string, timezone: string, from: string, to: stri
             const weeks = Math.floor((Date.parse(`${d}T12:00:00Z`) - Date.parse(`${start.date}T12:00:00Z`)) / (7 * 86_400_000))
             if (weeks % interval !== 0 || !byDay.includes(new Date(`${d}T12:00:00Z`).getUTCDay())) continue
             n++
-            if (d >= from && !exdates.includes(d)) out.push({ date: d, time: start.time, title })
+            if (d >= from && !exdates.includes(d)) out.push({ date: d, time: start.time, ...end, title })
           }
         } else if (start.date >= from && start.date <= to) {
-          out.push({ date: start.date, time: start.time, title })
+          out.push({ date: start.date, time: start.time, ...end, title })
         }
       }
       event = null
@@ -243,7 +394,8 @@ export function isIcs(text: string): boolean {
 }
 
 /** The calendar's days from `from` to `to`, a line each, for the reader:
- *  "2026-10-30 (Fri) 7:30 PM: Kabbalat Shabbat Service". In order, each
+ *  "2026-10-30 (Fri) 7:30 PM: Kabbalat Shabbat Service", or with its end,
+ *  "2026-10-22 (Thu) 8:10 AM–8:40 AM: Online Community Morning Minyan". In order, each
  *  entry once. Empty when there's nothing in that time. */
 export function calendarLines(entries: readonly CalendarEntry[], from: string, to: string): string[] {
   const seen = new Set<string>()
@@ -252,7 +404,7 @@ export function calendarLines(entries: readonly CalendarEntry[], from: string, t
     .sort((a, b) => a.date.localeCompare(b.date) || minutes(a.time) - minutes(b.time))
     .map((e) => {
       const weekday = new Date(`${e.date}T12:00:00Z`).toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' })
-      return `${e.date} (${weekday})${e.time ? ` ${e.time}` : ''}: ${e.title.replace(/\s+/g, ' ').slice(0, 120)}`
+      return `${e.date} (${weekday})${e.time ? ` ${e.time}${e.end ? `–${e.end}` : ''}` : ''}: ${e.title.replace(/\s+/g, ' ').slice(0, 120)}`
     })
     .filter((l) => (seen.has(l) ? false : (seen.add(l), true)))
     .slice(0, MAX_LINES)
