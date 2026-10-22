@@ -22,6 +22,16 @@ describe('calendarFeeds: the iCal feeds a page links to', () => {
     expect(calendarFeeds(html, 'https://shul.example/')).toEqual(['https://calendar.google.com/calendar/ical/shul%40gmail.com/public/basic.ics'])
   })
 
+  // The South Philadelphia Shtiebel's calendar page, Oct 22: its embed is
+  // drawn by a script, and its "Add our Calendar" button names the calendar.
+  it('reads a link to add a Google Calendar, its calendar named in base64', () => {
+    const html = `<a data-testid="linkElement" href="https://calendar.google.com/calendar/u/0?cid=OTQ0OGU3YXI5NjNlMnJ2a25yc2I1ODU1bGNAZ3JvdXAuY2FsZW5kYXIuZ29vZ2xlLmNvbQ" target="_blank">Add our Calendar</a>`
+    expect(calendarFeeds(html, 'https://www.southphiladelphiashtiebel.org/calendar')).toEqual(['https://calendar.google.com/calendar/ical/9448e7ar963e2rvknrsb5855lc%40group.calendar.google.com/public/basic.ics'])
+    expect(calendarFeeds(`<a href="https://calendar.google.com/calendar/r?cid=shul%40gmail.com">Add</a>`, 'https://shul.example/')).toEqual(['https://calendar.google.com/calendar/ical/shul%40gmail.com/public/basic.ics'])
+    // Its other pages name no calendar.
+    expect(calendarFeeds(`<a href="https://calendar.google.com/calendar/u/0/r/eventedit?text=Kiddush">Add</a>`, 'https://shul.example/')).toEqual([])
+  })
+
   // Kol Tzedek's home page, Oct 21: Google's embed code gave its calendar
   // in base64, and the feed at that address is a 404.
   it('reads a Google Calendar embed that names its calendar in base64', () => {

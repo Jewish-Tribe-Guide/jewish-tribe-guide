@@ -603,6 +603,10 @@ agreed:
      read (Rodeph Shalom, Leyv Ha-Ir: "Same" with nothing under it). The
      week's dated lines show in a "This week's schedule" box, "Same as" its
      page, until an update to it is kept.
+   - Shul times: the South Philadelphia Shtiebel's calendar is read from
+     its "Add our Calendar" link (`calendar/u/0?cid=…`); its embed is drawn
+     by a script. It still needs its page: Add a page,
+     southphiladelphiashtiebel.org/calendar.
 
 Each page is compared with its drawing, side by side, before it's called
 done. All of it is on dev. Anything live (Refuah watches, hospital fields)
