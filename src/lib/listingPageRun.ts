@@ -15,7 +15,8 @@ import { dateText, readSchedules, regularMinyanim, schedulesKey, type SpecialSch
 import { buildCatalog, readMessage } from '@/lib/messageReader'
 import { fieldsEdit, readFieldChanges } from '@/lib/fieldChanges'
 import { editSubmission } from '@/lib/editSubmission'
-import { submitListingUpdate } from '@/lib/submissionStore'
+import { replacePendingSuggestion, submitListingUpdate } from '@/lib/submissionStore'
+import { TIMES_PART_LABELS, partKey, partLines, partSize, readPartSource, splitParts, type PartReading, type PartSource } from '@/lib/timesParts'
 import { sendWatchDigest } from '@/lib/email'
 import { jobPageFor } from '@/lib/watchFindings'
 import type { MenuReadBudget } from '@/lib/menuWatchRun'
@@ -354,16 +355,22 @@ async function communityName(slug: string): Promise<string> {
 /** Whether the listing has a suggestion waiting in the queue, from anyone:
  *  one at a time, so approving one can't undo the other. */
 export async function hasPendingSuggestion(community: string, listingId: string): Promise<boolean> {
-  const { data, error } = await getAdminClient()
-    .from('submission')
-    .select('id')
-    .eq('community_id', community)
-    .eq('target_id', listingId)
-    .eq('status', 'pending')
-    .limit(1)
-  if (error) throw new Error(`Couldn’t read the queue: ${error.message}`)
-  return (data ?? []).length > 0
+  return (await pendingSuggestions(community, listingId)).length > 0
 }
+
+type Filed = { id: string; payload: unknown }
+
+/** The listing's suggestions waiting in the queue, from anyone. */
+async function pendingSuggestions(community: string, listingId: string): Promise<Filed[]> {
+  const { data, error } = await getAdminClient().from('submission').select('id, payload').eq('community_id', community).eq('target_id', listingId).eq('status', 'pending')
+  if (error) throw new Error(`Couldn’t read the queue: ${error.message}`)
+  return (data ?? []) as Filed[]
+}
+
+/** The part of a shul's times a suggestion is about (timesParts.ts), if
+ *  it's one of them. */
+const partOf = (s: { payload: unknown }): PartSource | null => readPartSource((s.payload as { source?: { part?: unknown } } | null)?.source?.part)
+const detailsOf = (s: { payload: unknown }) => (s.payload as { details?: Record<string, unknown> } | null)?.details ?? {}
 
 /** Everything this watch has filed for the listing, whatever became of it. */
 export async function earlierSuggestions(community: string, listingId: string): Promise<{ payload: unknown }[]> {
@@ -420,8 +427,12 @@ export async function runListingPageWatch(
   // Changed. A suggestion already waiting, no AI, or this run's reads spent:
   // the old fingerprint stays, so the change is still news next time. A
   // check reads it all the same, to say what it found.
-  const pending = await hasPendingSuggestion(watch.communityId, listing.id)
-  if (pending && !opts.full) return { ok: true, filed: 0 }
+  // A part of a shul's times waiting holds back only that part
+  // (timesParts.ts): its other parts can still be filed beside it.
+  const waitingNow = await pendingSuggestions(watch.communityId, listing.id)
+  const pending = waitingNow.length > 0
+  const blocked = waitingNow.some((s) => !partOf(s))
+  if (blocked && !opts.full) return { ok: true, filed: 0 }
   const apiKey = 'apiKey' in opts ? opts.apiKey : process.env.OPENAI_API_KEY
   if (!apiKey) {
     if (!opts.full) return { ok: true, filed: 0 }
@@ -442,6 +453,22 @@ export async function runListingPageWatch(
   const check = (queue: WatchCheck['queue']) =>
     pageCheck(reads.kind, checkFrom(source, { pictures: !!source.pictures?.length }), reading.read, { differences: proposal?.lines ?? [], queue, note: reading.note, unread: reading.unread })
   if (!proposal) return { ok: true, filed: 0, pageHash, check: check(null) }
+  // A shul's times: filed as the parts they change, each on its own.
+  const [timesKey, sk] = proposal.keys
+  const parts =
+    reads.kind === 'times' && proposal.keys.length === 2 && sk === schedulesKey(timesKey)
+      ? splitParts({ ...proposal.submission.details, [timesKey]: listing[timesKey] ?? null, [sk]: listing[sk] ?? null }, proposal.submission.details, timesKey)
+      : []
+  if (parts.length) {
+    if (blocked) return { ok: true, filed: 0, ...(watch.pageHash ? {} : { pageHash }), check: check('waiting') }
+    const { queue, filed } = await fileParts(watch, listing, proposal, parts, waitingNow, source.text, { now: opts.now, seen: changed ? 'changed' : 'read' })
+    if (filed.length) {
+      await sendWatchDigest(watch.communityId, `${listing.name}’s website`, filed.map((what) => ({ name: listing.name, what })), jobPageFor(watch.communityId, category)).catch((err) =>
+        console.error('[watch-listing-page] digest failed:', err),
+      )
+    }
+    return { ok: true, filed: filed.length, ...(queue === 'waiting' && watch.pageHash ? {} : { pageHash }), check: check(queue) }
+  }
   // Only a check gets here with one waiting: it says so, files nothing, and
   // a change stays news for the daily run.
   if (pending) return { ok: true, filed: 0, ...(watch.pageHash ? {} : { pageHash }), check: check('waiting') }
@@ -461,4 +488,61 @@ export async function runListingPageWatch(
     console.error('[watch-listing-page] digest failed:', err),
   )
   return { ok: true, filed: 1, pageHash, check: check('filed') }
+}
+
+/** A shul's times, filed a part at a time: the usual weekday times, the
+ *  usual Shabbos times and this week's schedule each a finding of its own
+ *  (the user, Oct 21: "Readings should very clearly fall into one of
+ *  those"). A part already waiting as read here is left waiting; one
+ *  filed before isn't filed again; one waiting from another page is
+ *  replaced only by a page that gives more of it (Sons of Israel's
+ *  Tefillot page, beside its home page's few lines). `filed`: what each
+ *  part filed, for the email. */
+async function fileParts(
+  watch: Pick<Watch, 'communityId' | 'url'>,
+  listing: DirectoryResource,
+  proposal: NonNullable<PageProposal>,
+  parts: readonly PartReading[],
+  waiting: readonly Filed[],
+  text: string | null,
+  at: { now?: number; seen: 'changed' | 'read' },
+): Promise<{ queue: 'filed' | 'waiting' | 'before'; filed: string[] }> {
+  const { submission } = proposal
+  const earlier = await earlierSuggestions(watch.communityId, listing.id)
+  const on = changedOn(at.now ?? Date.now(), communityConfig.timezone)
+  const listingDetails = { ...submission.details, ...Object.fromEntries(parts.flatMap((p) => [p.source.field, schedulesKey(p.source.field)]).map((k) => [k, listing[k] ?? null])) }
+  const outcomes: ('filed' | 'waiting' | 'before')[] = []
+  const filed: string[] = []
+  for (const p of parts) {
+    const key = partKey(p.source, p.details)
+    const same = waiting.filter((s) => partOf(s)?.part === p.part)
+    if (same.some((s) => partKey(partOf(s)!, detailsOf(s)) === key)) {
+      outcomes.push('waiting')
+      continue
+    }
+    // Filed before as this part, or (a box) inside a whole reading from
+    // before the parts.
+    if (earlier.some((s) => { const sp = partOf(s); return sp ? sp.part === p.part && partKey(sp, detailsOf(s)) === key : p.part !== 'week' && partKey(p.source, detailsOf(s)) === key })) {
+      outcomes.push('before')
+      continue
+    }
+    // The reader's own lines when they're all this part's.
+    const lines = parts.length === 1 ? proposal.lines : partLines(p.source, listingDetails, p.details)
+    const payload = { ...submission, details: p.details, source: { ...listingPageSource(listing.name, watch.url, on, text, at.seen), part: p.source } } as ResourceSubmission
+    const note = listingPageNote(watch.url, on, lines, at.seen)
+    const what = `${TIMES_PART_LABELS[p.part]}: ${lines.join('; ')}`
+    const there = same[0]
+    if (there) {
+      if (p.size <= partSize(partOf(there)!, detailsOf(there)) || !(await replacePendingSuggestion(watch.communityId, there.id, payload, note))) {
+        outcomes.push('waiting')
+        continue
+      }
+    } else {
+      await submitListingUpdate(watch.communityId, listing.id, payload, note, { name: LISTING_PAGE_WATCH_NAME })
+    }
+    outcomes.push('filed')
+    filed.push(what)
+  }
+  const queue = outcomes.includes('filed') ? 'filed' : outcomes.includes('waiting') ? 'waiting' : 'before'
+  return { queue, filed }
 }

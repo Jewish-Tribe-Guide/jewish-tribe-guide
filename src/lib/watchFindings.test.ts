@@ -89,6 +89,26 @@ describe('findingFrom', () => {
   })
 })
 
+describe('findingFrom: a shul’s times', () => {
+  const TIMES: CategoryField[] = [{ key: 'minyanim', label: 'Davening times', type: 'minyanim' }]
+  const was = [{ id: 'a', tefillah: 'shacharis', days: ['sun'], time: '8:00am' }]
+  const shul = { ...current, category: 'shuls', details: { minyanim: was } }
+  const read = (details: Record<string, unknown>) => sub({ payload: { category: 'shuls', name: shul.name, address: shul.address, phone: shul.phone, details } } as Partial<SubmissionRow>)
+
+  it('carries the listing’s times and what was read, whole, when the times are all it changes', () => {
+    const now = [{ id: 'a', tefillah: 'shacharis', days: ['sun'], time: '8:30am' }]
+    const week = [{ id: 'w', name: 'Times for Oct 19 – Oct 25', from: '2026-10-19', to: '2026-10-25', mode: 'replace', kind: 'week', minyanim: [] }]
+    const f = findingFrom(read({ minyanim: now, minyanim_schedules: week }), shul, TIMES)
+    expect(f.times).toEqual({ field: TIMES[0], current: was, proposed: now, currentSchedules: [], proposedSchedules: week })
+  })
+
+  it('none when it would change something else too, so it’s shown line by line', () => {
+    const f = findingFrom(read({ minyanim: was, rabbi: 'Rabbi Cohen' }), shul, [...TIMES, { key: 'rabbi', label: 'Rabbi', type: 'text' }])
+    expect(f.lines.map((l) => l.key)).toEqual(['rabbi'])
+    expect(f.times).toBeUndefined()
+  })
+})
+
 describe('keepOnly', () => {
   it('an unticked line goes back to what the listing says; a ticked one is as its source says', () => {
     const edited = keepOnly(sub().payload as never, current, ['women_s_hours'], FIELDS) as { details: Record<string, unknown>; name: string }

@@ -276,6 +276,82 @@ for that exact change, in the same conversation. Show the dry run first.
 
 7. The "+" button covers part of the third tile in a row on the phone home.
 
+## Building next: the job pages, as drawn (agreed Oct 21)
+
+The user, Oct 21: "great, let's do it". There is one drawing per page, all
+agreed:
+- Shul times: https://claude.ai/artifact/B3vwpSiqwdK833s9VAVHBc
+- Mikvah hours: https://claude.ai/artifact/7MUNppcA4S4yvXKupEKJPR
+- Main dishes: https://claude.ai/artifact/7EYjgU1WcHrXG2W6Qpigb7
+- Hospitals: https://claude.ai/artifact/Jf2Nvzj8dy1fWop5ZzVFmy
+- Kosher certification: https://claude.ai/artifact/2PPYvecC87w2KLNeHgYfTN
+- Eruv status: https://claude.ai/artifact/9Kv6MGeAEooZREzW28hiBu
+
+**Rules on every page:**
+- An opened place is its listing's own boxes. Boxes with an update come
+  first, open; boxes with nothing new sit closed below them; Reads is last.
+- A changed row has one highlight colour. A row going away is crossed out,
+  with a tag saying why ("Not on the menu", "Not on Refuah"). A changed
+  value has "was …" beside it. A new row is only highlighted. There are no
+  New or Changed tags.
+- Pills: a place's row says "N updates". A box's pill names the kind when
+  it holds one kind ("1 new", "2 changes", "3 not on the menu"), and says
+  "N updates" only when it mixes kinds.
+- The buttons are Use this / Edit / Keep the listing. Use this takes off
+  what the source no longer has; the old "flagged, never taken off"
+  comment in `MainDishes.tsx` is wrong. Each box ends with "From X · read
+  Oct 21". After Use this, the box shows a grey "Used Oct 21".
+- Edit is the listing's own per-box Edit sheet (`BoxEditSheet`), filled
+  with the source's version, with the button "Save to the listing".
+- Reads: the Reading switch, then one line per page, each naming the boxes
+  it updated ("Usual weekday times · Usual Shabbos times", "Menu link ·
+  Main dishes"; "Nothing from it" if none), with a date or a greyed reason
+  and a ×. Below them: Add a page · Read them now · Open its listing.
+  Can't be read opens straight to Reads.
+- A field Google keeps (`details.googleFields`) isn't read from the
+  website. The address is never checked.
+
+**Per page:**
+- **Kosher:**
+  - The two lists sit at the top, each with the page's only Reading
+    switches.
+  - Each list speaks only for its own hechsher.
+  - "What isn't kosher?" is compared only for being there or not.
+  - No hechsher left: "Archive the listing".
+  - "It's <near name> now" is offered only when the list has a near name.
+  - A New on a list place that is left out isn't shown again.
+- **Hospitals:**
+  - Entries are compared by name, phones, email and website, never their
+    wording.
+  - Eruv and Sukkah aren't checked here.
+- **Eruv:**
+  - Status and map go live as today, with no Use this.
+  - Details (hotline, email-alerts link) are read from the eruv's website
+    and wait for Use this. "Where it goes" is never compared.
+  - "Up" is green.
+
+**Decided before building:**
+- An item an admin added by hand is never crossed out because a read missed
+  it. The reader is asked to look for it next time.
+- Watches never read the guide's own pages; this is built first.
+- A read that agrees with the listing clears that watch's older finding.
+- The uncommitted filing-side work is committed as it was, then built on.
+- Mikvah hours given as notes ("by appointment, 48 hours ahead") waits for
+  the user.
+
+**Order:**
+1. The own-pages fix.
+2. Main dishes, which sets the shared box, Reads and Edit pieces.
+3. Shul times.
+4. Mikvah hours.
+5. Hospitals.
+6. Kosher.
+7. Eruv.
+
+Each page is compared with its drawing, side by side, before it's called
+done. All of it is on dev. Anything live (Refuah watches, hospital fields)
+waits for a yes.
+
 ## Planned: keeping listings current (agreed Oct 21, not built; to be drawn first)
 
 The user, Oct 21: Main dishes needed no watch set up. A food place's
@@ -694,9 +770,10 @@ compare, and one it can't read, on desktop and phone.
    - **Next, once the user has seen it:** Dishes, Hospitals, Eruv and
      Kosher onto the same page; the Watches tab's "Menu" list goes (it is
      Dishes again); and the tab's row counts come from the same statuses.
-   - **Waiting on the user:** should a read that agrees with the listing
-     clear an older finding still waiting? Mekor Habracha's Oct 21 read
-     agrees, but its Oct 20 finding still waits to Compare.
+   - **Decided Oct 21 (the user):** a read that agrees with the listing
+     clears that watch's older finding still waiting (Mekor Habracha's
+     Oct 20 finding, which its Oct 21 read agrees with). Not built; see
+     "Building next" above.
    - **Redrawn for Shul times, Oct 21, not built**
      (https://claude.ai/artifact/B3vwpSiqwdK833s9VAVHBc, replaces board 6
      of the keeping-current drawing for this page). The user: "website

@@ -204,6 +204,20 @@ describe('POST /api/admin/watches/hours', () => {
     expect(body.pages.map((p: { watch: Watch }) => p.watch.lastRunAt)).toEqual(['now', 'now'])
     expect(m.searchHoursPages).not.toHaveBeenCalled()
 
+    // One page after another, never at once: else each files what the
+    // next would have seen waiting (Sons of Israel's three findings).
+    vi.clearAllMocks()
+    const order: string[] = []
+    m.runAndRecord.mockImplementation(async (x: Watch) => {
+      order.push(`start ${x.id}`)
+      await new Promise((r) => setTimeout(r, 5))
+      order.push(`end ${x.id}`)
+      return { watch: x }
+    })
+    await POST(req('POST', { action: 'check', resourceId: LMC }))
+    expect(order).toEqual(['start home', 'end home', 'start mens', 'end mens'])
+    m.runAndRecord.mockImplementation(async (x: Watch) => ({ watch: { ...x, lastRunAt: 'now', lastCheck: check('agrees') } }))
+
     // Not read yet, no page: searched, added, read.
     vi.clearAllMocks()
     m.listWatches.mockResolvedValue({ watches: [], available: true })

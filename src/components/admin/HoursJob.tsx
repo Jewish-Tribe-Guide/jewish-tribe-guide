@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLoadOnMount } from '@/lib/useLoadOnMount'
 import { fetchJson } from '@/lib/fetchJson'
 import { withCommunity } from '@/lib/useCommunityData'
@@ -12,6 +12,7 @@ import type { Finding } from '@/lib/watchFindings'
 import type { Decided } from '@/lib/watchFindingStore'
 import FindingCompare, { type Decision } from './FindingCompare'
 import { BUTTON, GivePage, JobPage, JobRow, SourceCard, day, jobTabs, needsYou, shortUrl, type JobStatus, type JobTab } from './JobPage'
+import { ShulRow } from './TimesProposal'
 
 // ── The Watches tab's Mikvah hours and Shul times pages (the user, Oct 21) ──
 // Every place whose category has named weekly hours (a mikvah's women's,
@@ -26,7 +27,12 @@ import { BUTTON, GivePage, JobPage, JobRow, SourceCard, day, jobTabs, needsYou, 
 //
 // What a page has that the listing doesn't waits on its place's row,
 // beside what the listing says (FindingCompare, step 6, Oct 21), not in the
-// moderation queue. "The queue keeps what people send in."
+// moderation queue. "The queue keeps what people send in." On Shul times,
+// as the proposal it is (TimesProposal.tsx, redrawn Oct 21).
+//
+// A page not read yet is read as soon as the page loads (the user, Oct 21:
+// no "Not read yet"), a few at a time, so the rate limit is left for the
+// admin's own Check now.
 
 type Page = { watch: Watch; source: string }
 export type HoursPlace = {
@@ -59,6 +65,27 @@ const waitingOf = (p: HoursPlace, settled: Settled) => (p.findings ?? []).filter
 const asPlace = (p: HoursPlace, settled: Settled) => ({ pages: p.pages.map((x) => x.watch), off: p.off, waiting: waitingOf(p, settled).length })
 const loads = (w: Watch, now: number) => !['failing', 'stale'].includes(watchHealth(w, now).state)
 const isRead = (w: Watch) => !!(w.lastRunAt && w.lastCheck)
+/** Pages not read yet, read on their own when the page loads, at most. */
+export const READ_ON_LOAD = 5
+
+/** The sentence over Shul times: does anything need you? */
+export function shulSay(statuses: readonly JobStatus[]): { head: string; sub: string } {
+  const n = (s: JobStatus) => statuses.filter((x) => x === s).length
+  const total = statuses.length
+  const differs = n('differs')
+  const cant = n('cant_read') + n('didnt_load')
+  const head = [
+    differs === 1 ? '1 shul’s website says something different.' : differs ? `${differs} shuls’ websites say something different.` : total && n('same') === total ? (total === 1 ? 'Its one shul matches its website.' : `All ${total} shuls match their websites.`) : 'No shul’s website says anything different.',
+    n('unsure') ? `${n('unsure')} couldn’t be compared.` : '',
+    n('not_read') ? `${n('not_read')} not read yet.` : '',
+  ]
+  const sub = [
+    `${plural(total, 'shul')}, read every morning from their own websites.`,
+    cant ? `${cant} ${cant === 1 ? 'needs its' : 'need their'} page found.` : '',
+    n('off') ? `${n('off')} kept by hand.` : '',
+  ]
+  return { head: head.filter(Boolean).join(' '), sub: sub.filter(Boolean).join(' ') }
+}
 
 /** How its last read compares with the listing, for its row's pill. */
 export function hoursStatus(p: HoursPlace, section: HoursSection, now: number, settled: Settled = new Map()): JobStatus {
@@ -209,7 +236,8 @@ export default function HoursJob({ token, job = 'hours' }: { token: string; job?
   const [data, setData] = useState<Loaded | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
-  const [busy, setBusy] = useState<string | null>(null)
+  // The places being acted on, or read on their own.
+  const [busy, setBusy] = useState<ReadonlySet<string>>(new Set())
   const [now] = useState(() => Date.now())
   // Findings updated or skipped this visit.
   const [settled, setSettled] = useState<Settled>(new Map())
@@ -235,7 +263,7 @@ export default function HoursJob({ token, job = 'hours' }: { token: string; job?
 
   async function act(p: HoursPlace, body: Record<string, unknown>) {
     setSaveError(null)
-    setBusy(p.id)
+    setBusy((b) => new Set(b).add(p.id))
     try {
       const res = await fetchJson<Saved>(
         withCommunity(api, community),
@@ -260,9 +288,25 @@ export default function HoursJob({ token, job = 'hours' }: { token: string; job?
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : 'Could not save.')
     } finally {
-      setBusy(null)
+      setBusy((b) => {
+        const next = new Set(b)
+        next.delete(p.id)
+        return next
+      })
     }
   }
+
+  // Pages not read yet, read now, one place after another.
+  const readOnLoad = useRef(false)
+  useEffect(() => {
+    if (!data || readOnLoad.current) return
+    readOnLoad.current = true
+    const unread = data.places.filter((p) => hoursSection(asPlace(p, new Map()), now) === 'waiting' && p.pages.some((x) => x.watch.active)).slice(0, READ_ON_LOAD)
+    void (async () => {
+      for (const p of unread) await act(p, { action: 'check' })
+    })()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data])
 
   const backHref = `${adminBase(community)}/watches`
   const noun = job === 'times' ? 'shul' : 'place'
@@ -278,7 +322,7 @@ export default function HoursJob({ token, job = 'hours' }: { token: string; job?
     setData((x) => x && { ...x, places: x.places.map((y) => (y.id === p.id ? { ...y, decided: { at: new Date().toISOString(), status: d } } : y)) })
   }
   // What's read, said once above when it's the same for every place.
-  const counts = { to_check: 0, cant_read: 0, not_read: 0, checked: 0, off: 0 }
+  const counts = { to_check: 0, cant_read: 0, checked: 0, off: 0 }
   for (const p of data.places) counts[tabOf.get(p.id) ?? 'to_check']++
   const fields = data.places[0]?.fields ?? []
   const sameFields = data.places.every((p) => p.fields.join('|') === fields.join('|'))
@@ -290,6 +334,7 @@ export default function HoursJob({ token, job = 'hours' }: { token: string; job?
       needYou={data.places.filter((p) => needsYou(statusOf(p))).length}
       total={data.places.length}
       noun={noun}
+      say={job === 'times' ? shulSay(data.places.map(statusOf)) : undefined}
       tabs={{ counts, active: tab, onChange: setTab }}
       notice={
         <>
@@ -301,13 +346,31 @@ export default function HoursJob({ token, job = 'hours' }: { token: string; job?
       {data.places.filter((p) => (tabOf.get(p.id) ?? 'to_check') === tab).map((p) => {
         const status = statusOf(p)
         const findings = p.findings ?? []
+        if (job === 'times') {
+          return (
+            <ShulRow
+              key={p.id}
+              place={p}
+              status={status}
+              busy={busy.has(p.id)}
+              reading={busy.has(p.id) && status === 'not_read'}
+              token={token}
+              community={community}
+              jobName={data.name}
+              settled={settled}
+              words={words}
+              onAct={(body) => void act(p, body)}
+              onDecided={(f, d) => decide(p, f, d)}
+            />
+          )
+        }
         return (
           <JobRow
             key={p.id}
             name={p.name}
             status={status}
             lines={[...(sameFields || !p.fields.length ? [] : [p.fields.join(' · ')]), ...rowLines(p, status, now, words)]}
-            check={{ label: status === 'off' ? 'Turn back on' : 'Check now', busy: busy === p.id, onClick: () => void act(p, { action: status === 'off' ? 'on' : 'check' }) }}
+            check={{ label: status === 'off' ? 'Turn back on' : 'Check now', busy: busy.has(p.id), onClick: () => void act(p, { action: status === 'off' ? 'on' : 'check' }) }}
             below={
               findings.length > 0 && (
                 <ul className="space-y-2">
@@ -320,7 +383,7 @@ export default function HoursJob({ token, job = 'hours' }: { token: string; job?
               )
             }
           >
-            <Opened place={p} status={status} now={now} busy={busy === p.id} words={words} onAct={(body) => void act(p, body)} />
+            <Opened place={p} status={status} now={now} busy={busy.has(p.id)} words={words} onAct={(body) => void act(p, body)} />
           </JobRow>
         )
       })}

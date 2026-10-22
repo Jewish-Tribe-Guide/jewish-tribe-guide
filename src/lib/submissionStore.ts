@@ -11,7 +11,9 @@ import { recordActivity } from './activityStore'
 import { newListingFacts, visitorChanges, type ChangePart } from './changeParts'
 import { normalizeRow, validateSubmission } from './resourceStore'
 import { withReviewEdits } from './reviewEdits'
-import { isCommunityEdit, submissionSource } from './submissionSource'
+import { isCommunityEdit, statedSource, submissionSource } from './submissionSource'
+import { rebasePart } from './timesParts'
+import { schedulesKey } from './schedules'
 import { listEruvimForAdmin, updateEruv } from './eruvStore'
 import type { EruvSuggestion } from './eruvSuggestion'
 import { jobCategories, keepOnly, onAJobPage, watchNameOf } from './watchFindings'
@@ -222,6 +224,21 @@ export async function submitListingUpdate(
   })
 }
 
+/** A pending suggestion said again better: the same part of a shul's
+ *  times read more fully off another page (listingPageRun.ts). Only while
+ *  it's pending, so one an admin decided meanwhile stays as decided. */
+export async function replacePendingSuggestion(community: string, id: string, payload: ResourceSubmission, note: string | null): Promise<boolean> {
+  const { data, error } = await getAdminClient()
+    .from('submission')
+    .update({ payload: payload as unknown as Record<string, unknown>, note })
+    .eq('community_id', community)
+    .eq('id', id)
+    .eq('status', 'pending')
+    .select('id')
+  if (error) throw new Error(`Couldn’t update the suggestion: ${error.message}`)
+  return (data ?? []).length > 0
+}
+
 // Records a suggested fix to an eruv's listing (eruvSuggestion.ts).
 export async function submitEruvUpdate(
   community: string,
@@ -417,6 +434,30 @@ export async function approveSubmission(
       savedPayload = structuredClone(next) as unknown as Record<string, unknown>
       submission.payload = next as unknown as Record<string, unknown>
     }
+  }
+
+  // A shul's times read as one of the three parts (timesParts.ts): only
+  // that part goes on the listing, and everything else stays as the
+  // listing has it now. Approving the Shabbos times then never undoes
+  // weekday times, a week's schedule or a new phone number approved since
+  // they were read.
+  const part = submission.target_type === 'listing' && submission.operation === 'update' && submission.target_id ? statedSource(submission.payload)?.part : undefined
+  if (part) {
+    const { data: row, error: rowErr } = await supabase.from('resource').select('name, address, phone, details').eq('community_id', submission.community_id).eq('id', submission.target_id).single()
+    if (rowErr || !row) throw new ReviewEditError('The listing this changes couldn’t be found.')
+    const sent = submission.payload as unknown as ResourceSubmission
+    const now = row as Pick<ResourceRow, 'name' | 'address' | 'phone' | 'details'>
+    const current = now.details ?? {}
+    const times = new Set([part.field, schedulesKey(part.field)])
+    // The finding's own keys, each as the listing has it now (none, gone).
+    const listing = Object.fromEntries(Object.keys({ ...sent.details, ...Object.fromEntries([...times].map((k) => [k, null])) }).map((k) => [k, current[k] ?? null]))
+    submission.payload = {
+      ...sent,
+      name: now.name,
+      address: now.address ?? '',
+      phone: now.phone ?? '',
+      details: rebasePart(part, listing, sent.details ?? {}),
+    } as unknown as Record<string, unknown>
   }
 
   let affectedResourceId: string | null = null

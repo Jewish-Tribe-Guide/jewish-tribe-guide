@@ -14,10 +14,13 @@ import Link from 'next/link'
 //
 // In tabs, so the page isn't one long list (the user, Oct 21: "can the to
 // check, can't be read, not read yet be tabs so the page isn't so messy"):
-// To check, Can't be read, Not read yet, Checked, and Off when there are
-// any, each A–Z. It opens on the first with anything in it. A row stays in
-// the tab it was in for the whole visit, so one acted on doesn't vanish
-// from under the admin's hand; its pill says what it is now.
+// To check, Can't be read, Checked, and Off when there are any, each A–Z.
+// It opens on the first with anything in it. A row stays in the tab it was
+// in for the whole visit, so one acted on doesn't vanish from under the
+// admin's hand; its pill says what it is now.
+//
+// No "Not read yet" (the user, Oct 21): a page is read as soon as it's
+// found, so one not read yet is in To check, being read.
 
 /** How a listing's last read compares with the listing. */
 export type JobStatus = 'differs' | 'unsure' | 'cant_read' | 'didnt_load' | 'not_read' | 'same' | 'off'
@@ -35,11 +38,10 @@ const STATUS: Record<JobStatus, { label: string; tone: string; needsYou: boolean
 export const needsYou = (s: JobStatus) => STATUS[s].needsYou
 
 /** The page's tabs, in order. */
-export type JobTab = 'to_check' | 'cant_read' | 'not_read' | 'checked' | 'off'
+export type JobTab = 'to_check' | 'cant_read' | 'checked' | 'off'
 const TABS: { key: JobTab; label: string; statuses: JobStatus[] }[] = [
-  { key: 'to_check', label: 'To check', statuses: ['differs', 'unsure'] },
+  { key: 'to_check', label: 'To check', statuses: ['differs', 'unsure', 'not_read'] },
   { key: 'cant_read', label: 'Can’t be read', statuses: ['cant_read', 'didnt_load'] },
-  { key: 'not_read', label: 'Not read yet', statuses: ['not_read'] },
   { key: 'checked', label: 'Checked', statuses: ['same'] },
   { key: 'off', label: 'Off', statuses: ['off'] },
 ]
@@ -82,6 +84,7 @@ export function JobPage({
   needYou,
   total,
   noun,
+  say,
   notice,
   tabs,
   children,
@@ -93,6 +96,9 @@ export function JobPage({
   total: number
   /** "place", "shul". */
   noun: string
+  /** In place of the counts, a sentence saying whether anything needs
+   *  you, and a line under it (Shul times, Oct 21). */
+  say?: { head: string; sub: string }
   notice?: ReactNode
   /** How many rows each tab holds, and which is showing. */
   tabs?: { counts: Readonly<Record<JobTab, number>>; active: JobTab; onChange: (t: JobTab) => void }
@@ -105,10 +111,19 @@ export function JobPage({
       </Link>
       <div className="space-y-1">
         <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
-        <p className="max-w-[70ch] text-sm text-muted">{intro}</p>
-        <p className="text-sm font-semibold text-slate-800" data-testid="job-counts">
-          {needYou} need{needYou === 1 ? 's' : ''} you · {total} {total === 1 ? noun : `${noun}s`}
-        </p>
+        {say ? (
+          <p className="text-[15px] font-semibold text-slate-900" data-testid="job-counts">
+            {say.head}
+            <span className="block text-sm font-normal text-slate-600">{say.sub}</span>
+          </p>
+        ) : (
+          <>
+            <p className="max-w-[70ch] text-sm text-muted">{intro}</p>
+            <p className="text-sm font-semibold text-slate-800" data-testid="job-counts">
+              {needYou} need{needYou === 1 ? 's' : ''} you · {total} {total === 1 ? noun : `${noun}s`}
+            </p>
+          </>
+        )}
       </div>
       {notice}
       {tabs && (

@@ -11,6 +11,7 @@ const m = vi.hoisted(() => ({
   readShulWeek: vi.fn(),
   readMessage: vi.fn(),
   submitListingUpdate: vi.fn(),
+  replacePendingSuggestion: vi.fn(),
   sendWatchDigest: vi.fn(),
   confirmFromSource: vi.fn(),
   pending: [] as unknown[],
@@ -32,7 +33,7 @@ vi.mock('@/lib/shulWeekReading', () => ({
   },
 }))
 vi.mock('@/lib/messageReader', async (orig) => ({ ...(await orig<typeof import('./messageReader')>()), readMessage: m.readMessage }))
-vi.mock('@/lib/submissionStore', () => ({ submitListingUpdate: m.submitListingUpdate }))
+vi.mock('@/lib/submissionStore', () => ({ submitListingUpdate: m.submitListingUpdate, replacePendingSuggestion: m.replacePendingSuggestion }))
 vi.mock('@/lib/email', () => ({ sendWatchDigest: m.sendWatchDigest }))
 // Never called: a page the AI read never dates a listing. Mocked so a call
 // would be seen, not made.
@@ -365,9 +366,79 @@ describe('runListingPageWatch: a shul’s page of times', () => {
       },
       model: 'cheap',
     })
-    expect(await runListingPageWatch(changed, undefined, { apiKey: 'k', now: NOW })).toMatchObject({ ok: true, filed: 1 })
-    const [, , , note] = m.submitListingUpdate.mock.calls[0]
-    expect(note.split('\n\n')[1].split('\n')).toEqual(['Changed: mincha · Sun · 6:05pm, was 6:15pm', 'New: maariv · Mon · 9:00pm', 'New: shacharis · Shabbos · 10:00pm'])
+    // The weekdays and Shabbos, each its own finding (timesParts.ts).
+    expect(await runListingPageWatch(changed, undefined, { apiKey: 'k', now: NOW })).toMatchObject({ ok: true, filed: 2 })
+    const notes = m.submitListingUpdate.mock.calls.map(([, , payload, note]) => [payload.source.part.part, note.split('\n\n')[1].split('\n')])
+    expect(notes).toEqual([['weekday', ['Changed: Mincha · Sun, 6:05 PM, was 6:15 PM', 'New: Maariv · Mon, 9 PM']], ['shabbos', ['New: Shacharis · Sat, 10 PM']]])
+  })
+
+  // The user, Oct 21: "There are three possible shul times it's changing.
+  // Usual shabbos, usual weekday, this week. Readings should very clearly
+  // fall into one of those." Sons of Israel had three whole proposals
+  // waiting at once, one per page.
+  describe('a part at a time', () => {
+    const sat = (id: string, time: string) => ({ id, day: 'sat', tefillah: 'shacharis', time, status: 'new' as const, quote: time })
+    const shabbosRead = (...rows: ReturnType<typeof sat>[]) => m.readShulWeek.mockResolvedValue({ update: { ...moved, rows: [...moved.rows, ...rows] }, model: 'cheap' })
+    const shabbosPart = (rows: object[]) => ({
+      id: 'p1',
+      payload: { details: { minyanim: [minyan, ...rows] }, source: { readBy: 'ai', from: 'x', part: { part: 'shabbos', field: 'minyanim' } } },
+    })
+
+    it('files each part as its own finding, saying which, with only that part changed', async () => {
+      shabbosRead(sat('n', '9:00am'))
+      expect(await runListingPageWatch(changed, undefined, { apiKey: 'k', now: NOW })).toMatchObject({ filed: 2 })
+      const [weekday, shabbos] = m.submitListingUpdate.mock.calls.map(([, , payload]) => payload)
+      expect(weekday.source.part).toEqual({ part: 'weekday', field: 'minyanim' })
+      expect(weekday.details.minyanim).toEqual([expect.objectContaining({ tefillah: 'mincha', days: ['sun'], time: '6:05pm' })])
+      expect(shabbos.source.part).toEqual({ part: 'shabbos', field: 'minyanim' })
+      expect(shabbos.details.minyanim).toEqual([minyan, expect.objectContaining({ tefillah: 'shacharis', days: ['sat'], time: '9:00am' })])
+      expect(m.sendWatchDigest.mock.calls[0][2]).toEqual([
+        { name: 'Lower Merion Synagogue', what: 'Usual weekday times: Changed: Mincha · Sun, 6:05 PM, was 6:15 PM' },
+        { name: 'Lower Merion Synagogue', what: 'Usual Shabbos times: New: Shacharis · Sat, 9 AM' },
+      ])
+    })
+
+    it('a part waiting from another page holds back only that part, unless this page gives more of it', async () => {
+      m.pending = [shabbosPart([{ id: 'a', tefillah: 'shacharis', days: ['sat'], time: '9:00am' }, { id: 'b', tefillah: 'mincha', days: ['sat'], time: '5:00pm' }])]
+      shabbosRead(sat('n', '8:30am'))
+      expect(await runListingPageWatch(changed, undefined, { apiKey: 'k', now: NOW })).toMatchObject({ filed: 1 })
+      expect(m.submitListingUpdate.mock.calls.map(([, , p]) => p.source.part.part)).toEqual(['weekday'])
+      expect(m.replacePendingSuggestion).not.toHaveBeenCalled()
+    })
+
+    it('a page giving more of a part waiting replaces it, still pending', async () => {
+      m.pending = [shabbosPart([{ id: 'a', tefillah: 'shacharis', days: ['sat'], time: '9:00am' }])]
+      m.replacePendingSuggestion.mockResolvedValue(true)
+      shabbosRead(sat('n', '8:30am'), { ...sat('o', '5:00pm'), tefillah: 'mincha' })
+      expect(await runListingPageWatch(changed, undefined, { apiKey: 'k', now: NOW })).toMatchObject({ filed: 2 })
+      const [community, id, payload] = m.replacePendingSuggestion.mock.calls[0]
+      expect([community, id, payload.source.part.part, payload.details.minyanim.length]).toEqual(['philly', 'p1', 'shabbos', 3])
+      expect(m.submitListingUpdate.mock.calls.map(([, , p]) => p.source.part.part)).toEqual(['weekday'])
+    })
+
+    it('the same part waiting as read here is left as it is', async () => {
+      m.pending = [shabbosPart([{ id: 'z', tefillah: 'shacharis', days: ['sat'], time: '9:00am' }])]
+      shabbosRead(sat('n', '9:00am'))
+      await runListingPageWatch(changed, undefined, { apiKey: 'k', now: NOW })
+      expect(m.submitListingUpdate.mock.calls.map(([, , p]) => p.source.part.part)).toEqual(['weekday'])
+      expect(m.replacePendingSuggestion).not.toHaveBeenCalled()
+    })
+
+    it('a part filed before, as a part or inside a whole reading, isn’t filed again', async () => {
+      shabbosRead(sat('n', '9:00am'))
+      m.earlier = [{ payload: { details: { minyanim: [{ ...minyan, time: '6:05pm' }, { id: 'q', tefillah: 'shacharis', days: ['sat'], time: '9:00am' }] } } }]
+      expect(await runListingPageWatch(changed, undefined, { apiKey: 'k', now: NOW })).toMatchObject({ filed: 0 })
+      expect(m.submitListingUpdate).not.toHaveBeenCalled()
+    })
+
+    it('anything else waiting, a person’s edit, still holds back the lot', async () => {
+      m.pending = [{ id: 'x', payload: { details: {} } }]
+      shabbosRead(sat('n', '9:00am'))
+      expect(await runListingPageWatch(changed, undefined, { apiKey: 'k', now: NOW })).toEqual({ ok: true, filed: 0 })
+      expect(m.readShulWeek).not.toHaveBeenCalled()
+      expect((await runListingPageWatch(changed, undefined, { apiKey: 'k', now: NOW, full: true })).check?.queue).toBe('waiting')
+      expect(m.submitListingUpdate).not.toHaveBeenCalled()
+    })
   })
 
   it('reads the page without its menus', async () => {

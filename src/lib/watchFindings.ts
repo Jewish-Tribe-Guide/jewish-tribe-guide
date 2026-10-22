@@ -8,6 +8,8 @@ import { REFUAH_WATCH_NAME } from './refuahWatch'
 import { KEYSTONE_WATCH_NAME } from './keystoneWatch'
 import { MEKOR_WATCH_NAME } from './mekorWatch'
 import { submissionSource } from './submissionSource'
+import { regularMinyanim, readSchedules, schedulesKey, type SpecialSchedule } from './schedules'
+import type { Minyan } from './davening'
 
 // Step 6 of keeping listings current (decided by the user, Oct 21):
 // "Findings go to the job pages, next to what the listing says, not the
@@ -85,6 +87,34 @@ export type Finding = {
    *  Oct 20: https://…"), and the list's own note on a kosher finding. */
   notes: string[]
   lines: FindingLine[]
+  /** A shul's times, when they're all it would change: the listing's and
+   *  what was read, whole, for Shul times to show as a proposal
+   *  (timesProposal.ts) rather than line by line. */
+  times?: FindingTimes
+}
+
+export type FindingTimes = {
+  field: CategoryField
+  current: Minyan[]
+  proposed: Minyan[]
+  currentSchedules: SpecialSchedule[]
+  proposedSchedules: SpecialSchedule[]
+}
+
+/** A finding's times, when an update would change a shul's times and
+ *  nothing else. */
+function timesOf(s: SubmissionRow, current: ResourceRow | null, payload: ResourceSubmission | undefined, lines: readonly FindingLine[], fields: readonly CategoryField[]): FindingTimes | undefined {
+  if (s.operation !== 'update' || !current || !payload?.details || !lines.length) return undefined
+  const field = fields.find((f) => f.type === 'minyanim' && lines.every((l) => l.key === f.key || l.key === schedulesKey(f.key)))
+  if (!field) return undefined
+  const key = schedulesKey(field.key)
+  return {
+    field,
+    current: regularMinyanim(current.details[field.key]),
+    proposed: regularMinyanim(payload.details[field.key]),
+    currentSchedules: readSchedules(current.details[key]),
+    proposedSchedules: readSchedules(key in payload.details ? payload.details[key] : current.details[key]),
+  }
 }
 
 const CORE = new Set(['name', 'address', 'phone'])
@@ -112,6 +142,7 @@ export function findingFrom(s: SubmissionRow, current: ResourceRow | null, field
             return { key, label, before, after, choosable, ...(choosable && after === NONE && before !== NONE ? { empties: true } : {}) }
           })
   const name = watchNameOf(s) ?? ''
+  const times = timesOf(s, current, payload, lines, fields)
   return {
     id: s.id,
     operation: s.operation,
@@ -123,6 +154,7 @@ export function findingFrom(s: SubmissionRow, current: ResourceRow | null, field
     at: s.created_at,
     notes: [...new Set([source.note, s.note].filter((n): n is string => typeof n === 'string' && n.trim() !== ''))],
     lines,
+    ...(times ? { times } : {}),
   }
 }
 

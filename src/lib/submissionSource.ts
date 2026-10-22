@@ -3,6 +3,7 @@ import { KEYSTONE_WATCH_NAME } from './keystoneWatch'
 import { MEKOR_NAME, MEKOR_WATCH_NAME } from './mekorWatch'
 import { LISTING_PAGE_WATCH_NAME } from './listingPageWatch'
 import { GOOGLE, KEYSTONE_NAME } from './sourceNames'
+import { readPartSource, type PartSource } from './timesParts'
 
 // Where a suggestion came from, for the moderation queue (agreed Oct 5,
 // canvas QList/QOpen): every card says it, an AI-read one is labelled "Read
@@ -36,6 +37,10 @@ export type SubmissionSource = {
   /** Dishes read off the place's menu: its link, or null for photos of it.
    *  Approval dates them "on its menu" and keeps the link for "Full menu". */
   menu?: { url: string | null }
+  /** A shul's times: which of the three it changes, the usual weekday
+   *  times, the usual Shabbos times or this week's schedule (timesParts.ts).
+   *  Approved, only that part goes on the listing, as the listing is then. */
+  part?: PartSource
 }
 
 type SourceInput = {
@@ -63,6 +68,7 @@ export function statedSource(payload: Record<string, unknown> | null | undefined
     ...(text('photoUrl') ? { photoUrl: text('photoUrl') } : {}),
     ...(text('note') ? { note: text('note') } : {}),
     ...(text('named') ? { named: (text('named') as string).trim() } : {}),
+    ...(readPartSource(r.part) ? { part: readPartSource(r.part)! } : {}),
   }
 }
 

@@ -173,7 +173,14 @@ export async function POST(request: Request) {
     const { watches, available } = await listWatches(slug)
     if (!available) return Response.json({ ok: false, errors: ['This needs database migration 070.'] }, { status: 400 })
     const { pages, stopped, marker } = placeWatches(watches, resourceId)
-    const read = async (ws: Watch[]) => Promise.all(ws.map(async (w) => (await runAndRecord(w, undefined, undefined, { full: true })).watch))
+    // One page after another: each read sees what the one before it
+    // filed, so a shul's three pages can't each file the same part of its
+    // times at once (Sons of Israel, Oct 21).
+    const read = async (ws: Watch[]) => {
+      const done: Watch[] = []
+      for (const w of ws) done.push((await runAndRecord(w, undefined, undefined, { full: true })).watch)
+      return done
+    }
     const reply = (ps: readonly Watch[], st: readonly Watch[], rest: Record<string, unknown> = {}) => Response.json({ ok: true, pages: shown(ps), stopped: shown(st), off: false, ...rest })
     const again = async (w: Watch) => {
       await updateWatch(slug, w.id, { createdBy: LISTING_PAGE_WATCH_CREATOR, active: true })
