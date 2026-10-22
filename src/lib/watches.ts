@@ -77,6 +77,9 @@ export type WatchCheck = {
   /** A shul's page: the parts of its times it gave (timesParts.ts), for
    *  Shul times' Reads to name it by. */
   parts?: PartGiven[]
+  /** A Refuah watch's: the guide's entries it knows came from Refuah, by
+   *  field and name (refuahWatch.ts), so only those are ever taken off. */
+  refuahHad?: string[]
 }
 
 /** A check whose differences were filed, now or before, so they're a

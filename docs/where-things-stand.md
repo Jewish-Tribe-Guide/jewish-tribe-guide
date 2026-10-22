@@ -414,7 +414,37 @@ agreed:
      section's box; one across sections shows whole with Compare.
    - Not built, as the drawing says: the Contact box (phone and email
      Google doesn't keep), part of "keeping listings current".
-5. Hospitals.
+5. Hospitals. **Built Oct 22** (compared with its drawing on dev,
+   computer and phone; updates stubbed in the browser):
+   - An opened hospital is its listing's boxes that hold contacts (Who to
+     call, Kosher food, A place to stay, Rides, Also; `hospitalBoxes.ts`).
+     A box Refuah updates comes first, open: each person a row, "From X ·
+     who · note" under the name, phones on the right, a changed phone
+     beside what it was, a person going crossed out "Not on Refuah". Boxes
+     that agree sit closed, "Same as Refuah". Reads is last: the one
+     Refuah page, its × stops it (kept as a stopped page, so the daily
+     match doesn't put it back), "Not on Refuah" when it can't be read.
+   - Refuah's reading is filed a box at a time, its source naming the box
+     and its keys, and approved onto the listing as it is then
+     (`rebaseSection`). A box waiting with the same reading stays; one
+     filed before isn't filed again. Edit is the box's own editor, the one
+     visitors use (a row a person, Add a person), filled with Refuah's.
+   - **Only what came from Refuah is ever crossed out.** Entries carry no
+     source, so the watch remembers the entries it matched
+     (`WatchCheck.refuahHad`, carried forward each read). An entry the
+     guide has that Refuah doesn't is crossed out only if it's on that
+     list; otherwise it's kept, and listed in the note as added by hand.
+     The first read matches everything, so nothing is crossed out until a
+     later one. The cost: an entry Refuah dropped before the first read
+     (or before choosing a different Refuah page) counts as hand-added and
+     stays until someone removes it.
+   - An older whole-hospital filing shows in a "From Refuah" box with
+     Compare.
+   - Found while comparing: Mikvah hours strikes a changed day's old hours
+     (the shared `BoxRow`), where its drawing has "was 8:30–10:30 PM" in
+     small grey, as Hospitals now does. Not changed yet: `MikvahHours.tsx`
+     and `TimesProposal.tsx` were being edited by the Contact/Phone boxes
+     session.
 6. Kosher.
 7. Eruv.
 

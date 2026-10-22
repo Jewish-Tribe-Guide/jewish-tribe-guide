@@ -181,6 +181,15 @@ export function notOnRefuahUrl(resourceId: string): string {
   return `https://refuah.com/hospitals?not-on-refuah=${resourceId}`
 }
 
+/** The `created_by` of a hospital's Refuah page an admin stopped reading
+ *  (Hospitals' Reads, its ×). Kept, not read, so the daily match leaves
+ *  the hospital be (an admin's own page, to wantedRefuahWatches). */
+export const REFUAH_STOPPED_CREATOR = 'Refuah (stopped)'
+
+export function isStoppedRefuah(w: Pick<Watch, 'createdBy'>): boolean {
+  return w.createdBy === REFUAH_STOPPED_CREATOR
+}
+
 export function isNotOnRefuah(w: Pick<Watch, 'createdBy'>): boolean {
   return w.createdBy === REFUAH_NOT_LISTED_CREATOR
 }

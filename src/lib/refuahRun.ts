@@ -1,8 +1,9 @@
-// One run of a Refuah watch: read the hospital's record from Refuah and put
-// what differs from the guide in the moderation queue (refuahWatch.ts has
-// the rules). Changes no listing: an admin approves or rejects the
-// suggestion with Refuah's entries in front of them. A hospital Refuah
-// agrees with only has its date moved forward (sourceConfirm.ts).
+// One run of a Refuah watch: read the hospital's record from Refuah and file
+// what differs from the guide, a box of the listing at a time, for the
+// Hospitals page (refuahWatch.ts has the rules, hospitalBoxes.ts the
+// boxes). Changes no listing: an admin uses or keeps each box with Refuah's
+// entries in front of them. A hospital Refuah agrees with only has its date
+// moved forward (sourceConfirm.ts).
 //
 // Run daily by /api/cron/watches for every website watch on a Refuah
 // hospital page, and on demand from the admin Watches tab.
@@ -11,7 +12,9 @@ import { createHash } from 'node:crypto'
 import { getAdminClient } from '@/lib/supabase/admin'
 import { sendWatchDigest } from '@/lib/email'
 import { findingPage } from '@/lib/watchFindings'
-import { submitListingUpdate } from '@/lib/submissionStore'
+import { replacePendingSuggestion, submitListingUpdate } from '@/lib/submissionStore'
+import { readSectionSource, type SectionSource } from '@/lib/hoursSections'
+import { boxOf, contactBoxes } from '@/lib/hospitalBoxes'
 import { getCategoryById } from '@/lib/categoryStore'
 import { confirmFromSource } from '@/lib/sourceConfirm'
 import { WATCH_FETCH_HEADERS } from '@/lib/websiteWatch'
@@ -23,10 +26,12 @@ import {
   compareRefuah,
   refuahFields,
   refuahFingerprint,
+  refuahHadNow,
   refuahHospitalId,
   refuahKey,
   refuahHasEntries,
   refuahNote,
+  type FieldDifference,
   type RefuahHospital,
 } from '@/lib/refuahWatch'
 import type { RefuahListed } from '@/lib/refuahMatch'
@@ -93,7 +98,13 @@ async function readRefuahPage(args: { latitude: number; longitude: number }, fet
 
 type Row = { id: string; category: string; name: string; address: string | null; phone: string | null; anchor_id: string; distance: number | null; details: Record<string, unknown> | null }
 
-export async function runRefuahWatch(community: string, url: string, resourceId: string | null): Promise<WatchOutcome> {
+type Filed = { id: string; status: string; payload: unknown }
+const detailsOf = (s: Filed) => ((s.payload as { details?: Record<string, unknown> } | null)?.details ?? {}) as Record<string, unknown>
+const boxOfFiled = (s: Filed): SectionSource | null => readSectionSource((s.payload as { source?: { section?: unknown } } | null)?.source?.section)
+
+/** `last`: the watch's last check, for the entries it knows came from
+ *  Refuah (refuahHadNow). */
+export async function runRefuahWatch(community: string, url: string, resourceId: string | null, last?: WatchCheck | null): Promise<WatchOutcome> {
   const hospitalId = refuahHospitalId(url)
   if (!hospitalId) return { ok: false, error: 'Not a Refuah hospital page' }
   if (!resourceId) return { ok: false, error: 'Tie this watch to its hospital in the guide, so Refuah has something to be compared with' }
@@ -125,7 +136,11 @@ export async function runRefuahWatch(community: string, url: string, resourceId:
   const refuah = refuahFields(record, new Set(contacts.map((f) => f.key)), new Set(contacts.filter((f) => f.entryFrom).map((f) => f.key)))
   const pageHash = createHash('sha256').update(refuahFingerprint(refuah)).digest('hex')
   const details = row.details ?? {}
-  const diffs = compareRefuah(details, refuah, Object.fromEntries(contacts.map((f) => [f.key, f.label])))
+  const labels = Object.fromEntries(contacts.map((f) => [f.key, f.label]))
+  // What came from Refuah: what it matched before, and what it matches now.
+  const had = (last?.refuahHad ?? []).filter((h) => contacts.some((f) => h.startsWith(`${f.key}:`)))
+  const diffs = compareRefuah(details, refuah, labels, had)
+  const refuahHad = refuahHadNow(details, refuah, had)
   // What it compared, for the Watches tab (watches.ts, WatchCheck).
   const listed = Object.values(refuah).reduce((n, entries) => n + entries.length, 0)
   const check = (queue: WatchCheck['queue']): CheckFound => ({
@@ -135,6 +150,7 @@ export async function runRefuahWatch(community: string, url: string, resourceId:
     read: listed ? [`${listed} contact${listed === 1 ? '' : 's'} on Refuah`] : [],
     differences: diffs.flatMap((d) => d.lines),
     queue: diffs.length ? queue : null,
+    refuahHad,
   })
   if (diffs.length === 0) {
     // Refuah agrees: the hospital's date moves forward (sourceConfirm.ts).
@@ -142,27 +158,43 @@ export async function runRefuahWatch(community: string, url: string, resourceId:
     return { ok: true, filed: 0, pageHash, check: check(null) }
   }
 
-  const fields = Object.fromEntries(diffs.map((d) => [d.key, d.after]))
   // Everything this watch has filed for the listing, whatever became of it.
   const { data: earlier, error: earlierError } = await supabase
     .from('submission')
-    .select('payload')
+    .select('id, status, payload')
     .eq('community_id', community)
     .eq('target_id', row.id)
     .eq('submitted_by->>name', REFUAH_WATCH_NAME)
   if (earlierError) return { ok: false, error: `Couldn’t read earlier suggestions: ${earlierError.message}` }
-  const key = refuahKey(row.id, fields)
-  const filedBefore = (earlier ?? []).some((s) => {
-    const d = ((s.payload as { details?: Record<string, unknown> } | null)?.details ?? {}) as Record<string, unknown>
-    return refuahKey(row.id, Object.fromEntries(Object.keys(fields).map((k) => [k, d[k]]))) === key
-  })
-  if (filedBefore) return { ok: true, filed: 0, pageHash, check: check('before') }
+  const filedEarlier = (earlier ?? []) as Filed[]
 
-  const note = refuahNote(row.name, url, diffs)
-  await submitListingUpdate(
-    community,
-    row.id,
-    {
+  // A box at a time, in the listing's order.
+  const boxes = category ? contactBoxes(category, details) : []
+  const byBox = new Map<string, { box: SectionSource; diffs: FieldDifference[] }>()
+  for (const d of diffs) {
+    const b = boxOf(boxes, d.key, labels[d.key] ?? d.key)
+    const got = byBox.get(b.title) ?? byBox.set(b.title, { box: { section: b.title, keys: b.keys }, diffs: [] }).get(b.title)!
+    got.diffs.push(d)
+  }
+  const outcomes: ('filed' | 'waiting' | 'before')[] = []
+  const filed: string[] = []
+  for (const { box, diffs: those } of byBox.values()) {
+    const fields = Object.fromEntries(box.keys.map((k) => [k, those.find((d) => d.key === k)?.after ?? details[k] ?? null]))
+    const key = refuahKey(row.id, fields)
+    const keyOf = (s: Filed) => refuahKey(row.id, Object.fromEntries(box.keys.map((k) => [k, detailsOf(s)[k]])))
+    const waiting = filedEarlier.filter((s) => s.status === 'pending' && boxOfFiled(s)?.section === box.section)
+    if (waiting.some((s) => keyOf(s) === key)) {
+      outcomes.push('waiting')
+      continue
+    }
+    // Filed before as this box, or inside a whole reading from before the
+    // boxes.
+    if (filedEarlier.some((s) => (boxOfFiled(s)?.section ?? box.section) === box.section && keyOf(s) === key)) {
+      outcomes.push('before')
+      continue
+    }
+    const note = refuahNote(row.name, url, those)
+    const payload = {
       category: row.category,
       name: row.name,
       anchorId: row.anchor_id,
@@ -170,13 +202,20 @@ export async function runRefuahWatch(community: string, url: string, resourceId:
       address: row.address ?? '',
       phone: row.phone ?? '',
       details: { ...details, ...fields },
-      source: { readBy: 'automatic', from: REFUAH_NAME, named: REFUAH_NAME, original: note },
-    } as Parameters<typeof submitListingUpdate>[2],
-    note,
-    { name: REFUAH_WATCH_NAME },
-  )
-  await sendWatchDigest(community, REFUAH_NAME, [{ name: row.name, what: diffs.flatMap((d) => d.lines).join('; ') }], findingPage(community, 'hospitals')).catch((err) =>
-    console.error('[watch-refuah] digest failed:', err),
-  )
-  return { ok: true, filed: 1, pageHash, check: check('filed') }
+      source: { readBy: 'automatic', from: REFUAH_NAME, named: REFUAH_NAME, original: note, section: box },
+    } as Parameters<typeof submitListingUpdate>[2]
+    // What Refuah says of a box replaces what it said before, still waiting.
+    if (!(waiting[0] && (await replacePendingSuggestion(community, waiting[0].id, payload, note)))) {
+      await submitListingUpdate(community, row.id, payload, note, { name: REFUAH_WATCH_NAME })
+    }
+    outcomes.push('filed')
+    filed.push(`${box.section}: ${those.flatMap((d) => d.lines).join('; ')}`)
+  }
+  const queue = outcomes.includes('filed') ? 'filed' : outcomes.includes('waiting') ? 'waiting' : 'before'
+  if (filed.length) {
+    await sendWatchDigest(community, REFUAH_NAME, [{ name: row.name, what: filed.join('; ') }], findingPage(community, 'hospitals')).catch((err) =>
+      console.error('[watch-refuah] digest failed:', err),
+    )
+  }
+  return { ok: true, filed: filed.length, pageHash, check: check(queue) }
 }

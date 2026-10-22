@@ -1,32 +1,45 @@
 'use client'
 
 import { useCallback, useState } from 'react'
-import Link from 'next/link'
 import { useLoadOnMount } from '@/lib/useLoadOnMount'
 import { fetchJson } from '@/lib/fetchJson'
 import { withCommunity } from '@/lib/useCommunityData'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { adminBase } from '@/lib/adminNav'
 import { milesText } from '@/lib/geo'
-import { hospitalCounts, hospitalSection, type HospitalSection } from '@/lib/watchJobs'
-import type { Watch } from '@/lib/watches'
+import { boxPill, contactRows } from '@/lib/hospitalBoxes'
+import { readContacts } from '@/lib/contacts'
+import { editorRows } from '@/lib/editorRows'
+import { hospitalSection } from '@/lib/watchJobs'
+import { watchHealth, type Watch } from '@/lib/watches'
 import type { Finding } from '@/lib/watchFindings'
 import type { Decided } from '@/lib/watchFindingStore'
-import CollapsibleSection from './CollapsibleSection'
+import type { CategoryConfig } from '@/lib/categories'
+import type { DirectoryResource } from '@/types'
+import { updatesPill } from '@/lib/dishProposal'
+import BoxEditSheet, { type BoxEdit } from '@/components/resources/BoxEditSheet'
 import FindingCompare, { type Decision } from './FindingCompare'
+import { JobPage, day, jobTabs, needsYou, type JobStatus, type JobTab } from './JobPage'
+import { Box, BoxActions, BoxRow, BoxRows, LINK, PlaceRow, Reads, SourceLine, type ReadPage, type Tone } from './JobBoxes'
 
 // ── The Watches tab's Hospitals page (the user, Oct 21) ─────────────────────
 // Every hospital in the guide, each matched to its Refuah page by where it
-// is on the map (refuahMatch.ts), and read every morning. Grouped by what
-// the last read found, what needs the admin first. One Refuah didn't match
-// can be given its page by hand, or said not to be on Refuah; one matched
-// wrong can be given a different one; any can be turned off and back on.
+// is on the map (refuahMatch.ts), and read every morning.
 //
-// What Refuah has that the listing doesn't waits here, on its row, beside
-// what the listing says (FindingCompare, step 6, Oct 21), not in the
-// moderation queue.
+// Drawn on artifact Jf2Nvzj8dy1fWop5ZzVFmy (agreed Oct 21), on the pieces
+// every job page shares (JobBoxes.tsx), the way Mikvah hours is: a hospital
+// opened is its listing's own boxes (Who to call, Kosher food, A place to
+// stay, Rides, Also). What Refuah says of a box comes first and open, its
+// people marked: a new one highlighted, a changed phone beside what it
+// was, one Refuah no longer has crossed out, "Not on Refuah" (only one
+// that came from Refuah; one added by hand is kept, refuahWatch.ts). Then
+// Use this / Edit / Keep the listing and "From Refuah · read Oct 21". A box
+// Refuah agrees with is a closed "Same" box. Reads last: its Refuah link,
+// with a × to stop reading it, Add a page, Read them now, Not on Refuah.
 
 type Refuah = { id: string; name: string; street: string | null; url: string }
+/** One of its listing's boxes of contacts, as the listing has it now. */
+export type ListedBox = { title: string; keys: string[]; labels: string[]; now: Record<string, unknown> }
 export type Hospital = {
   id: string
   name: string
@@ -41,50 +54,101 @@ export type Hospital = {
   findings?: Finding[]
   /** When its last finding was decided, and how. */
   decided?: Decided | null
+  boxes?: ListedBox[]
 }
 type Settled = ReadonlyMap<string, Decision>
-/** As the sections count it: its findings not decided yet, this visit included. */
-const stateOf = (h: Hospital, settled: Settled) => ({ ...h, waiting: (h.findings ?? []).filter((f) => !settled.has(f.id)).length })
 type Loaded = { available: boolean; refuahError: string | null; hospitals: Hospital[] }
+type BoxFinding = Finding & { section: string; values: Record<string, unknown> }
 
-const BUTTON = 'rounded border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50'
-const INPUT = 'w-full rounded-md border border-slate-300 px-3 py-2 text-sm'
+/** As the tabs count it: its findings not decided yet, this visit included. */
+const stateOf = (h: Hospital, settled: Settled) => ({ ...h, waiting: (h.findings ?? []).filter((f) => !settled.has(f.id)).length })
+const today = () => day(new Date().toISOString())
+const doneText = (d: Decision) => `${d === 'approved' ? 'Used' : 'Kept'} ${today()}`
+const loads = (w: Watch, now: number) => !['failing', 'stale'].includes(watchHealth(w, now).state)
 
-function day(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+/** How its last read compares with the listing. Nothing on Refuah is
+ *  among Can't be read (the drawing), with its own pill. */
+export function hospitalStatus(h: Hospital, now: number, settled: Settled = new Map()): JobStatus {
+  const s = hospitalSection(stateOf(h, settled), now)
+  if (s === 'off') return 'off'
+  if (s === 'waiting') return 'not_read'
+  if (s === 'to_check') return 'differs'
+  if (s === 'checked') return 'same'
+  if (s === 'nothing') return 'cant_read'
+  return h.watch ? 'didnt_load' : 'cant_read'
 }
 
-const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`
-
-/** What its last read found, in a line. */
-function readLine(h: Hospital, section: HospitalSection): string | null {
-  const w = h.watch
-  if (section === 'off') return h.notOnRefuah ? 'Said not to be on Refuah.' : 'Turned off: not read.'
-  if (!w) return null
-  if (section === 'waiting') return w.lastRunAt ? 'Its page opens; not compared with the listing yet.' : 'Not read yet.'
-  if (section === 'cant_read') return `Its Refuah page didn’t load${w.lastError ? `: ${w.lastError}` : ''}.`
-  const at = w.lastCheck?.at ?? w.lastRunAt
-  const when = at ? `Read ${day(at)}: ` : ''
-  const c = w.lastCheck!
-  if (c.result === 'nothing') return `${when}Refuah lists no contacts there yet.`
-  if (c.result === 'differs') {
-    const n = c.differences.length
-    // Decided here, and Refuah still says what it said.
-    if (section === 'checked' && h.decided) {
-      return h.decided.status === 'approved' ? `Updated on the listing ${day(h.decided.at)}.` : `Skipped ${day(h.decided.at)}: shown again if Refuah changes.`
-    }
-    const visitor = !h.findings?.length && c.queue === 'waiting'
-    return `${when}${n ? plural(n, 'difference') : 'differences'} from the listing${visitor ? '. Not shown here: someone’s suggestion for it waits in the moderation queue' : ''}.`
-  }
-  return `${when}${c.read[0] ? `${c.read[0]}, ` : ''}all on the listing.`
+/** The sentence over the page: does anything need you? `one`: the one
+ *  hospital with updates has only one box of them. */
+export function hospitalSay(statuses: readonly JobStatus[], one = false): { head: string } {
+  const differs = statuses.filter((s) => s === 'differs').length
+  const head = differs === 1 ? `1 hospital has ${one ? 'an update' : 'updates'} from Refuah.` : differs ? `${differs} hospitals have updates from Refuah.` : 'No hospital has an update from Refuah.'
+  const unread = statuses.filter((s) => s === 'not_read').length
+  return { head: unread ? `${head} ${unread} not read yet.` : head }
 }
 
-function GivePage({ hospital, busy, label, onChoose, onCancel }: { hospital: Hospital; busy: boolean; label: string; onChoose: (url: string) => void; onCancel?: () => void }) {
+/** Its row's pill. */
+function hospitalPill(h: Hospital, status: JobStatus, reading: boolean, settled: Settled): { text: string; tone: Tone } {
+  const findings = h.findings ?? []
+  const waiting = findings.filter((f) => !settled.has(f.id))
+  if (status === 'off') return { text: h.notOnRefuah ? 'Not on Refuah' : 'Not read', tone: 'grey' }
+  if (reading) return { text: 'Reading…', tone: 'grey' }
+  if (findings.length && !waiting.length) return { text: `${findings.some((f) => settled.get(f.id) === 'approved') ? 'Used' : 'Kept'} ${today()}`, tone: 'grey' }
+  if (waiting.length) return { text: updatesPill(waiting.length), tone: 'amber' }
+  if (status === 'not_read') return { text: 'Not read yet', tone: 'grey' }
+  if (status === 'didnt_load') return { text: 'Didn’t load', tone: 'red' }
+  if (status === 'cant_read') return { text: h.watch ? 'Nothing on Refuah' : 'No Refuah page', tone: 'grey' }
+  if (status === 'differs') return { text: 'In the queue', tone: 'amber' }
+  return { text: 'Same', tone: 'green' }
+}
+
+/** A box's people, under each list's own name when it has more than one
+ *  ("Pantry", "Food packages"). */
+function People({ box, next }: { box: ListedBox; next?: Record<string, unknown> }) {
+  const many = box.keys.length > 1
+  return (
+    <>
+      {box.keys.map((k, i) => {
+        const rows = contactRows(box.now[k], next && k in next ? next[k] : box.now[k])
+        if (many && !rows.length) return null
+        return (
+          <div key={k}>
+            {many && <h4 className="pb-0.5 text-xs font-semibold uppercase tracking-wider text-slate-500">{box.labels[i]}</h4>}
+            <BoxRows>
+              {rows.length ? (
+                rows.map((r, j) => (
+                  <BoxRow
+                    key={j}
+                    name={r.name}
+                    sub={r.sub || undefined}
+                    // "was (845) 425-4070", as the drawing has it, not struck.
+                    right={
+                      <>
+                        {r.right}
+                        {r.was && <span className="block text-xs text-slate-500">was {r.was}</span>}
+                      </>
+                    }
+                    mark={r.mark}
+                    why={r.mark === 'gone' ? 'Not on Refuah' : undefined}
+                  />
+                ))
+              ) : (
+                <BoxRow name="None" />
+              )}
+            </BoxRows>
+          </div>
+        )
+      })}
+    </>
+  )
+}
+
+/** Give its Refuah page: one of Refuah's hospitals near it, or its address. */
+function ChoosePage({ hospital, busy, onChoose, onCancel }: { hospital: Hospital; busy: boolean; onChoose: (url: string) => void; onCancel: () => void }) {
   const choices = hospital.nearby.filter((r) => r.id !== hospital.refuah?.id)
   const [url, setUrl] = useState('')
   return (
     <div className="space-y-2 rounded-md border border-slate-200 bg-slate-50 p-3">
-      <p className="text-sm font-semibold text-slate-800">{label}</p>
       {choices.length > 0 && (
         <ul className="space-y-1">
           {choices.map((r) => (
@@ -104,19 +168,17 @@ function GivePage({ hospital, busy, label, onChoose, onCancel }: { hospital: Hos
           if (url.trim()) onChoose(url.trim())
         }}
       >
-        <label className="min-w-0 flex-1 text-xs text-slate-600">
-          {choices.length ? 'Or its page on Refuah' : 'Its page on Refuah'}
-          <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="refuah.com/hospitals/…" className={`mt-1 ${INPUT}`} />
+        <label className="min-w-0 flex-1 basis-60 text-xs text-slate-600">
+          Its page on Refuah
+          <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="refuah.com/hospitals/…" className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm" />
         </label>
         <div className="flex items-end gap-2">
           <button type="submit" disabled={busy || !url.trim()} className="rounded-md bg-primary px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">
             Save and read
           </button>
-          {onCancel && (
-            <button type="button" onClick={onCancel} className={BUTTON}>
-              Cancel
-            </button>
-          )}
+          <button type="button" onClick={onCancel} className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">
+            Cancel
+          </button>
         </div>
       </form>
     </div>
@@ -125,146 +187,227 @@ function GivePage({ hospital, busy, label, onChoose, onCancel }: { hospital: Hos
 
 function HospitalRow({
   hospital: h,
-  section,
+  status,
   busy,
-  queueHref,
+  reading,
   token,
+  community,
   settled,
+  now,
   onAct,
   onDecided,
 }: {
   hospital: Hospital
-  section: HospitalSection
+  status: JobStatus
   busy: boolean
-  queueHref: string
+  reading: boolean
   token: string
+  community: string
   settled: Settled
+  now: number
   onAct: (body: Record<string, unknown>) => void
   onDecided: (f: Finding, d: Decision) => void
 }) {
-  const community = useCommunitySlug()
-  const [open, setOpen] = useState(false)
-  const [choosing, setChoosing] = useState(false)
-  const read = readLine(h, section)
-  const c = h.watch?.lastCheck
+  const [saving, setSaving] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [adding, setAdding] = useState(false)
+  const [editing, setEditing] = useState<{ item: DirectoryResource; category: CategoryConfig; edit: BoxEdit } | null>(null)
+  const off = status === 'off'
+  const boxes = h.boxes ?? []
+  const findings = h.findings ?? []
+  const isBox = (f: Finding): f is BoxFinding => f.operation === 'update' && !!f.values && boxes.some((b) => b.title === f.section)
+  const own = findings.filter(isBox)
+  const others = findings.filter((f) => !isBox(f))
+  const w = h.watch
+  const c = w?.lastCheck
+  const headers = { Authorization: `Bearer ${token}` }
+  const boxOf = (f: BoxFinding) => boxes.find((b) => b.title === f.section)!
+  const readAt = c?.at ?? w?.lastRunAt ?? null
+
+  async function decide(f: Finding, body: Record<string, unknown>, d: Decision) {
+    setError(null)
+    setSaving(f.id)
+    try {
+      await fetchJson(withCommunity(`/api/admin/submissions/${f.id}`, community), { method: 'PATCH', headers: { ...headers, 'Content-Type': 'application/json' }, body: JSON.stringify(body) }, 'Could not save that.')
+      onDecided(f, d)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not save that.')
+    } finally {
+      setSaving(null)
+    }
+  }
+
+  /** Edit: the box's own editor, the one visitors use (a row a person,
+   *  Add a person), filled with Refuah's version, saved straight to the
+   *  listing. */
+  async function edit(f: BoxFinding) {
+    setError(null)
+    const b = boxOf(f)
+    try {
+      const { item, category } = await fetchJson<{ item: DirectoryResource; category: CategoryConfig }>(withCommunity(`/api/admin/watches/hospitals?item=${h.id}`, community), { headers }, 'Could not open its box.')
+      const row = editorRows(category, (item.details ?? {}) as Record<string, unknown>).find((r) => r.id.startsWith('box:') && r.title === b.title)
+      if (!row) return
+      setEditing({
+        item,
+        category,
+        edit: {
+          title: b.title,
+          fields: [],
+          rows: [row.id],
+          preset: f.values,
+          save: {
+            label: 'Save to the listing',
+            via: async ({ payload }) => {
+              const d = (payload.details ?? {}) as Record<string, unknown>
+              return fetch(withCommunity(`/api/admin/submissions/${f.id}`, community), {
+                method: 'PATCH',
+                headers: { ...headers, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: 'approved', payload: { details: Object.fromEntries(b.keys.map((k) => [k, d[k] ?? null])) } }),
+              })
+            },
+            onSaved: () => {
+              setEditing(null)
+              onDecided(f, 'approved')
+            },
+          },
+        },
+      })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not open its box.')
+    }
+  }
+
+  // Updates still to decide first, in the listing's order, then the ones
+  // decided this visit.
+  const order = (f: BoxFinding) => boxes.findIndex((b) => b.title === f.section)
+  const ordered = [...own].sort((a, b) => Number(settled.has(a.id)) - Number(settled.has(b.id)) || order(a) - order(b))
+  // Read, and Refuah agrees with the rest: each box with anything in it.
+  const read = !!w && !off && loads(w, now) && (c?.result === 'agrees' || c?.result === 'differs')
+  const same = read ? boxes.filter((b) => !own.some((f) => f.section === b.title) && b.keys.some((k) => readContacts(b.now[k]).length)) : []
+  const shown = ordered.length + same.length + others.length
+
+  const pages: ReadPage[] = w
+    ? [
+        {
+          key: w.id,
+          url: w.url,
+          label: read ? 'Refuah link · every box' : 'Refuah link',
+          right: off ? '' : !loads(w, now) ? 'didn’t load' : !w.lastRunAt || !c ? 'not read yet' : c.result === 'nothing' ? 'nothing on it' : `read ${day(c.at)}`,
+          none: !read,
+          onRemove: off ? undefined : () => onAct({ action: 'stop' }),
+        },
+      ]
+    : []
+
   return (
-    <li className="px-4 py-3" data-testid="hospital-row">
-      <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} className="block w-full cursor-pointer text-left">
-        <span className="flex items-start gap-3">
-          <span className="min-w-0 flex-1 space-y-0.5">
-            <span className="block font-semibold text-slate-900">{h.name}</span>
-            <span className="block text-sm text-slate-700">{h.line}</span>
-            {read && <span className={`block text-sm ${section === 'cant_read' ? 'font-medium text-red-700' : 'text-slate-600'}`}>{read}</span>}
-          </span>
-          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true" className={`mt-1 shrink-0 text-slate-400 ${open ? 'rotate-180' : ''}`}>
-            <path d="M4 6l4 4 4-4" />
-          </svg>
-        </span>
-      </button>
-      {(h.findings?.length ?? 0) > 0 && (
-        <ul className="mt-2 space-y-2">
-          {h.findings!.map((f) => (
-            <li key={f.id}>
-              <FindingCompare finding={f} token={token} community={community} jobName="Hospitals" decided={settled.get(f.id)} onDecided={(d) => onDecided(f, d)} />
-            </li>
-          ))}
-        </ul>
-      )}
-      {open && (
-        <div className="mt-2 space-y-2">
-          {h.watch && (
-            <p className="text-xs text-slate-600">
-              <a href={h.watch.url} target="_blank" rel="noopener noreferrer" className="text-primary underline">
-                Its page on Refuah
-              </a>
-              {h.source === 'match' ? ', found by where it is on the map' : ', given by hand'}
-            </p>
-          )}
-          {c && c.differences.length > 0 && (
-            <ul className="list-disc space-y-0.5 pl-5 text-sm text-slate-800">
-              {c.differences.map((d) => (
-                <li key={d}>{d}</li>
-              ))}
-            </ul>
-          )}
-          {section === 'to_check' && !h.findings?.length && c?.queue === 'waiting' && (
-            <p className="text-sm">
-              <Link href={queueHref} className="font-semibold text-primary hover:underline">
-                See it in the moderation queue
-              </Link>
-            </p>
-          )}
-          {section === 'nothing' && (
-            <p className="text-sm text-slate-700">
-              Still read every morning. Its contacts come here to check once Refuah adds them.{' '}
-              <a href={h.href} target="_blank" rel="noopener noreferrer" className="font-semibold text-primary hover:underline">
-                Fill it in yourself
-              </a>
-            </p>
-          )}
-          {section === 'cant_read' && !h.watch && (
-            <GivePage hospital={h} busy={busy} label="Give its Refuah page" onChoose={(url) => onAct({ action: 'choose', url })} />
-          )}
-          {choosing && <GivePage hospital={h} busy={busy} label="Choose a different Refuah hospital" onChoose={(url) => onAct({ action: 'choose', url })} onCancel={() => setChoosing(false)} />}
-          <div className="flex flex-wrap gap-2">
-            {section === 'off' ? (
-              <button type="button" disabled={busy} onClick={() => onAct({ action: 'on' })} className={BUTTON}>
-                {busy ? 'Reading…' : 'Turn back on'}
+    <PlaceRow name={h.name} pill={hospitalPill(h, status, reading, settled)} back="Hospitals">
+      {ordered.map((f) => {
+        const b = boxOf(f)
+        const decided = settled.get(f.id)
+        const rows = b.keys.flatMap((k) => contactRows(b.now[k], k in f.values ? f.values[k] : b.now[k]))
+        return (
+          <Box key={decided ? `${f.id}-done` : f.id} name={b.title} pill={decided ? { text: doneText(decided), tone: 'grey' } : { text: boxPill(rows), tone: 'amber' }} defaultOpen={!decided}>
+            <People box={b} next={f.values} />
+            {!decided && <BoxActions busy={busy || saving === f.id} onUse={() => void decide(f, { status: 'approved' }, 'approved')} onEdit={() => void edit(f)} onKeep={() => void decide(f, { status: 'rejected' }, 'rejected')} />}
+            <SourceLine url={w?.url} what="Refuah" at={readAt ?? f.at} />
+          </Box>
+        )
+      })}
+      {others.map((f) => (
+        <Box key={settled.has(f.id) ? `${f.id}-done` : f.id} name={`From ${f.from}`} pill={settled.has(f.id) ? { text: doneText(settled.get(f.id)!), tone: 'grey' } : { text: updatesPill(f.lines.length), tone: 'amber' }} defaultOpen={!settled.has(f.id)}>
+          <FindingCompare finding={f} token={token} community={community} jobName="Hospitals" decided={settled.get(f.id)} onDecided={(d) => onDecided(f, d)} />
+        </Box>
+      ))}
+      {same.map((b) => (
+        <Box key={b.title} name={b.title} pill={{ text: 'Same', tone: 'green' }}>
+          <People box={b} />
+          <SourceLine lead="Same as" url={w!.url} what="Refuah" at={readAt} />
+        </Box>
+      ))}
+      {error && <p className="rounded-md border border-red-200 bg-red-50 p-2 text-sm text-red-700">{error}</p>}
+      <Reads
+        on={!off}
+        busy={busy}
+        onSwitch={(on) => onAct({ action: on ? 'on' : 'off' })}
+        pages={pages}
+        pill={off ? 'Off' : pages.length ? undefined : 'No page'}
+        defaultOpen={shown === 0}
+        below={
+          adding && (
+            <ChoosePage
+              hospital={h}
+              busy={busy}
+              onChoose={(url) => {
+                setAdding(false)
+                onAct({ action: 'choose', url })
+              }}
+              onCancel={() => setAdding(false)}
+            />
+          )
+        }
+        links={
+          <>
+            {!adding && (
+              <button type="button" disabled={busy} onClick={() => setAdding(true)} className={LINK}>
+                Add a page
               </button>
-            ) : (
-              <>
-                {h.watch && (
-                  <button type="button" disabled={busy} onClick={() => onAct({ action: 'check', id: h.watch!.id })} className={BUTTON}>
-                    {busy ? 'Reading…' : 'Check now'}
-                  </button>
-                )}
-                {h.watch && !choosing && (
-                  <button type="button" disabled={busy} onClick={() => setChoosing(true)} className={BUTTON}>
-                    Choose a different Refuah hospital
-                  </button>
-                )}
-                <button type="button" disabled={busy} onClick={() => onAct({ action: 'off' })} className={BUTTON}>
-                  {h.watch ? 'Turn off' : 'Not on Refuah'}
-                </button>
-              </>
             )}
-          </div>
-        </div>
-      )}
-    </li>
+            {w && !off && (
+              <button type="button" disabled={busy} onClick={() => onAct({ action: 'check', id: w.id })} className={LINK}>
+                {busy ? 'Reading…' : 'Read them now'}
+              </button>
+            )}
+            {status === 'cant_read' && (
+              <button type="button" disabled={busy} onClick={() => onAct({ action: 'none' })} className={LINK}>
+                Not on Refuah
+              </button>
+            )}
+            <a href={h.href} target="_blank" rel="noopener noreferrer" className={LINK}>
+              Open its listing
+            </a>
+          </>
+        }
+      />
+      {editing && <BoxEditSheet item={editing.item} category={editing.category} edit={editing.edit} onClose={() => setEditing(null)} />}
+    </PlaceRow>
   )
 }
 
 export default function HospitalsJob({ token }: { token: string }) {
   const community = useCommunitySlug()
+  const api = '/api/admin/watches/hospitals'
   const [data, setData] = useState<Loaded | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [now] = useState(() => Date.now())
-  // A row acted on stays in the section it was in until the page reloads,
-  // so it doesn't jump away under the admin's hand.
-  const [kept, setKept] = useState<ReadonlyMap<string, HospitalSection>>(new Map())
   // Findings updated or skipped this visit.
   const [settled, setSettled] = useState<Settled>(new Map())
+  // Each hospital's tab, as it was when the page loaded, and the one showing.
+  const [tabOf, setTabOf] = useState<ReadonlyMap<string, JobTab>>(new Map())
+  const [tab, setTab] = useState<JobTab>('to_check')
 
   const load = useCallback(async () => {
     setError(null)
     try {
-      setData(await fetchJson<Loaded>(withCommunity('/api/admin/watches/hospitals', community), { headers: { Authorization: `Bearer ${token}` } }, 'Failed to load the hospitals.'))
+      const got = await fetchJson<Loaded>(withCommunity(api, community), { headers: { Authorization: `Bearer ${token}` } }, 'Failed to load the hospitals.')
+      const t = Date.now()
+      const { rows, tabs, first } = jobTabs(got.hospitals, (h) => hospitalStatus(h, t), (h) => h.name)
+      setData({ ...got, hospitals: rows })
+      setTabOf(tabs)
+      setTab(first)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.')
     }
   }, [token, community])
   useLoadOnMount(load)
 
-  async function act(h: Hospital, section: HospitalSection, body: Record<string, unknown>) {
+  async function act(h: Hospital, body: Record<string, unknown>) {
     setSaveError(null)
     setBusy(h.id)
-    setKept((k) => (k.has(h.id) ? k : new Map(k).set(h.id, section)))
     try {
-      // Check now is the Watches tab's own; the rest are this page's.
-      const path = body.action === 'check' ? '/api/admin/watches' : '/api/admin/watches/hospitals'
+      // Read them now is the Watches tab's own; the rest are this page's.
+      const path = body.action === 'check' ? '/api/admin/watches' : api
       const res = await fetchJson<{ watch?: Watch | null; notOnRefuah?: boolean }>(
         withCommunity(path, community),
         { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ resourceId: h.id, ...body }) },
@@ -278,9 +421,9 @@ export default function HospitalsJob({ token }: { token: string }) {
       setData((d) => d && { ...d, hospitals: d.hospitals.map((x) => (x.id === h.id ? { ...x, watch: res.watch === undefined ? x.watch : res.watch, notOnRefuah: res.notOnRefuah ?? x.notOnRefuah } : x)) })
       // A read that filed something: fetch it, to compare here.
       if (res.watch?.lastCheck?.queue === 'filed') {
-        const fresh = await fetchJson<Loaded>(withCommunity('/api/admin/watches/hospitals', community), { headers: { Authorization: `Bearer ${token}` } }, '')
+        const fresh = await fetchJson<Loaded>(withCommunity(api, community), { headers: { Authorization: `Bearer ${token}` } }, '')
         const got = fresh.hospitals.find((x) => x.id === h.id)
-        if (got) setData((d) => d && { ...d, hospitals: d.hospitals.map((x) => (x.id === h.id ? { ...x, findings: got.findings, decided: got.decided } : x)) })
+        if (got) setData((d) => d && { ...d, hospitals: d.hospitals.map((x) => (x.id === h.id ? { ...x, findings: got.findings, decided: got.decided, boxes: got.boxes } : x)) })
       }
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : 'Could not save.')
@@ -289,89 +432,59 @@ export default function HospitalsJob({ token }: { token: string }) {
     }
   }
 
-  const back = (
-    <Link href={`${adminBase(community)}/watches`} className="text-sm font-semibold text-primary hover:underline">
-      ‹ Watches
-    </Link>
-  )
-  if (error) return <div className="space-y-3">{back}<p className="bg-red-50 border border-red-200 rounded-md p-3 text-sm text-red-700">{error}</p></div>
-  if (!data) return <div className="space-y-3">{back}<p className="text-sm text-muted">Loading hospitals…</p></div>
+  const backHref = `${adminBase(community)}/watches`
+  if (error || !data) {
+    const notice = error ? <p className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</p> : <p className="text-sm text-muted">Loading hospitals…</p>
+    return <JobPage backHref={backHref} title="Hospitals" intro="" needYou={0} total={0} noun="hospital" notice={notice} />
+  }
 
-  const liveSection = (h: Hospital) => hospitalSection(stateOf(h, settled), now)
-  const sectionOf = (h: Hospital) => kept.get(h.id) ?? liveSection(h)
-  const inSection = (s: HospitalSection) => data.hospitals.filter((h) => sectionOf(h) === s)
-  const counts = hospitalCounts(data.hospitals.map((h) => stateOf(h, settled)), now)
-  // Updated or skipped, it says so where it was, and stays there till reload.
+  const statusOf = (h: Hospital) => hospitalStatus(h, now, settled)
+  // Updated or kept, it says so where it was.
   const decide = (h: Hospital, f: Finding, d: Decision) => {
-    setKept((k) => (k.has(h.id) ? k : new Map(k).set(h.id, sectionOf(h))))
     setSettled((m) => new Map(m).set(f.id, d))
     setData((x) => x && { ...x, hospitals: x.hospitals.map((y) => (y.id === h.id ? { ...y, decided: { at: new Date().toISOString(), status: d } } : y)) })
   }
-  const off = inSection('off')
-  const waiting = inSection('waiting')
-  const queueHref = adminBase(community)
-  const rows = (list: Hospital[]) => (
-    <ul className="divide-y divide-slate-100">
-      {list.map((h) => (
-        // Placed by where it was; its line and buttons say what it is now.
-        <HospitalRow
-          key={h.id}
-          hospital={h}
-          section={liveSection(h)}
-          busy={busy === h.id}
-          queueHref={queueHref}
-          token={token}
-          settled={settled}
-          onAct={(body) => void act(h, sectionOf(h), body)}
-          onDecided={(f, d) => decide(h, f, d)}
-        />
-      ))}
-    </ul>
-  )
-  const section = (title: string, description: string, list: Hospital[], empty = 'None right now.') => (
-    <section className="bg-white border border-slate-200 rounded-lg shadow-sm" aria-label={title}>
-      <h3 className="px-4 pt-3 text-sm font-semibold text-slate-800">
-        {title} ({list.length})
-      </h3>
-      <p className="px-4 pb-2 text-xs text-muted">{description}</p>
-      {list.length > 0 ? rows(list) : <p className="px-4 pb-3 text-sm text-slate-600">{empty}</p>}
-    </section>
-  )
-
+  const counts = { to_check: 0, cant_read: 0, checked: 0, off: 0 }
+  for (const h of data.hospitals) counts[tabOf.get(h.id) ?? 'to_check']++
+  const differing = data.hospitals.filter((h) => statusOf(h) === 'differs')
   return (
-    <div className="space-y-4">
-      {back}
-      <div>
-        <h2 className="text-lg font-semibold text-slate-900">Hospitals</h2>
-        <p className="text-sm text-muted">
-          {plural(data.hospitals.length, 'hospital')}. Each matched to Refuah by where it is on the map, and read every morning. What Refuah has that a
-          listing doesn&rsquo;t waits on its row, beside what the listing says: Compare it, then update the listing or skip it.
-        </p>
-      </div>
-      {!data.available && <p className="bg-amber-50 border border-amber-200 rounded-md p-3 text-sm text-amber-800">Reading Refuah needs database migration 070.</p>}
-      {data.refuahError && (
-        <p className="bg-amber-50 border border-amber-200 rounded-md p-3 text-sm text-amber-800">
-          Refuah couldn&rsquo;t be reached just now ({data.refuahError}). What each hospital last read is below; matching waits.
-        </p>
-      )}
-      {saveError && <p className="bg-red-50 border border-red-200 rounded-md p-3 text-sm text-red-700">{saveError}</p>}
-      <p className="text-sm font-semibold text-slate-800" data-testid="hospital-counts">
-        {counts.checked} checked · {counts.toCheck} to check · {counts.nothing} nothing on Refuah yet · {counts.cantRead + counts.didntLoad} can&rsquo;t be read
-        {waiting.length > 0 && <> · {waiting.length} not read yet</>}
-        {off.length > 0 && <> · {off.length} off</>}
-      </p>
-      {section('To check', 'Refuah has contacts the listing doesn’t, or different ones.', inSection('to_check'))}
-      {inSection('cant_read').length > 0 && section('Can’t be read', 'No Refuah page was found for it, or its page didn’t load. Give its Refuah page, or say it isn’t on Refuah.', inSection('cant_read'))}
-      {waiting.length > 0 && section('Not read yet', 'Not compared with the listing yet. Read tomorrow morning, or open one and Check now.', waiting)}
-      {section('Checked', 'Refuah’s contacts agree with the listing.', inSection('checked'))}
-      <CollapsibleSection title="Nothing on Refuah yet" description="Matched, but Refuah lists no contacts there. Nothing for you to do." count={inSection('nothing').length} contentClassName="">
-        {rows(inSection('nothing'))}
-      </CollapsibleSection>
-      {off.length > 0 && (
-        <CollapsibleSection title="Off" description="Not read. Turn one back on and it’s read straight away." count={off.length} contentClassName="">
-          {rows(off)}
-        </CollapsibleSection>
-      )}
-    </div>
+    <JobPage
+      backHref={backHref}
+      title="Hospitals"
+      intro=""
+      needYou={data.hospitals.filter((h) => needsYou(statusOf(h))).length}
+      total={data.hospitals.length}
+      noun="hospital"
+      say={hospitalSay(data.hospitals.map(statusOf), differing.every((h) => (h.findings ?? []).filter((f) => !settled.has(f.id)).length === 1))}
+      tabs={{ counts, active: tab, onChange: setTab }}
+      notice={
+        <>
+          {!data.available && <p className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">Reading Refuah needs database migration 070.</p>}
+          {data.refuahError && <p className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">Refuah couldn’t be reached just now ({data.refuahError}).</p>}
+          {saveError && <p className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">{saveError}</p>}
+        </>
+      }
+    >
+      {data.hospitals
+        .filter((h) => (tabOf.get(h.id) ?? 'to_check') === tab)
+        .map((h) => {
+          const status = statusOf(h)
+          return (
+            <HospitalRow
+              key={h.id}
+              hospital={h}
+              status={status}
+              busy={busy === h.id}
+              reading={busy === h.id && status === 'not_read'}
+              token={token}
+              community={community}
+              settled={settled}
+              now={now}
+              onAct={(body) => void act(h, body)}
+              onDecided={(f, d) => decide(h, f, d)}
+            />
+          )
+        })}
+    </JobPage>
   )
 }

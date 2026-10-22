@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { compareRefuah, refuahEntry, refuahFields, refuahHasEntries, refuahHospitalId, refuahKey, refuahNote, type RefuahHospital } from './refuahWatch'
+import { compareRefuah, refuahEntry, refuahEntryId, refuahFields, refuahHadNow, refuahHasEntries, refuahHospitalId, refuahKey, refuahNote, type RefuahHospital } from './refuahWatch'
 
 // HUP's record as Refuah's data service gave it on Oct 17, 2026, trimmed to
 // what the watch reads.
@@ -101,19 +101,62 @@ describe('compareRefuah', () => {
     expect(compareRefuah(renamed, hup())).toEqual([])
   })
 
-  it('removes nothing: an entry Refuah doesn’t have is kept and said on the card', () => {
+  it('an entry added by hand that Refuah doesn’t have is kept and said on the card', () => {
     const extra = { ...HUP_LISTING, transportation: [...HUP_LISTING.transportation, { name: 'Philly Chesed Rides', phones: ['+1 215-555-0199'] }] }
     const more = { ...HUP, services: [...HUP.services!, { name: 'Chai Lifeline', phone1: '+1 215-555-0100', type: 'transportations' }] }
-    const [diff] = compareRefuah(extra, refuahFields(more, KEYS, FROM))
+    const had = refuahHadNow(HUP_LISTING, hup())
+    const [diff] = compareRefuah(extra, refuahFields(more, KEYS, FROM), {}, had)
     expect(diff.after.map((e) => e.name)).toContain('Philly Chesed Rides')
     expect(diff.notOnRefuah).toEqual(['Philly Chesed Rides'])
-    expect(refuahNote('HUP', 'https://refuah.com/hospitals/x', [diff])).toContain('In the guide, not on Refuah (kept, not removed): Philly Chesed Rides')
+    expect(diff.gone).toEqual([])
+    expect(refuahNote('HUP', 'https://refuah.com/hospitals/x', [diff])).toContain('In the guide, added by hand, not on Refuah (kept): Philly Chesed Rides')
+  })
+
+  // The user, Oct 22: cross out only what came from Refuah.
+  it('an entry that came from Refuah and is gone from it is taken off, crossed out on the card', () => {
+    const had = refuahHadNow(HUP_LISTING, hup())
+    const dropped = { ...HUP, services: HUP.services!.filter((s) => s.name !== 'Chesed of Boro Park') }
+    const [diff] = compareRefuah(HUP_LISTING, refuahFields(dropped, KEYS, FROM), { transportation: 'Rides' }, had)
+    expect(diff.key).toBe('transportation')
+    expect(diff.gone).toEqual(['Chesed of Boro Park'])
+    expect(diff.after.map((e) => e.name)).toEqual(['Gemach Hatzolah – Monroe', 'Darchei Chesed', 'Bikur Cholim of Philadelphia'])
+    expect(diff.lines).toEqual(['− Rides: Chesed of Boro Park (not on Refuah)'])
+    // Without knowing it came from Refuah, it's kept.
+    expect(compareRefuah(HUP_LISTING, refuahFields(dropped, KEYS, FROM))).toEqual([])
+  })
+
+  it('a field Refuah has emptied is still compared, for the entries it gave', () => {
+    const had = refuahHadNow(HUP_LISTING, hup())
+    const noPantry = { ...HUP, services: HUP.services!.filter((s) => s.type !== 'pantry') }
+    const [diff] = compareRefuah(HUP_LISTING, refuahFields(noPantry, KEYS, FROM), {}, had)
+    expect(diff).toMatchObject({ key: 'pantry', after: [], gone: [expect.stringContaining('1st Floor')] })
   })
 
   it('an empty field in the guide takes Refuah’s entries', () => {
     const [diff] = compareRefuah({ ...HUP_LISTING, pantry: [] }, hup())
     expect(diff.key).toBe('pantry')
     expect(diff.after).toHaveLength(1)
+  })
+})
+
+describe('refuahHadNow — what the watch knows came from Refuah', () => {
+  it('is every entry of the guide’s that Refuah has, by field and name, a reworded one included', () => {
+    const renamed = { ...HUP_LISTING, transportation: HUP_LISTING.transportation.map((e) => (e.name === 'Darchei Chesed' ? { ...e, name: 'Darchei Chesed (Monsey rides)' } : e)) }
+    const had = refuahHadNow(renamed, hup())
+    expect(had).toContain(refuahEntryId('transportation', { name: 'Darchei Chesed (Monsey rides)' }))
+    expect(had).toContain(refuahEntryId('liaisons', { name: 'Bikur Cholim of Philadelphia' }))
+  })
+
+  it('never takes in an entry added by hand, and keeps what it knew while the guide still has it', () => {
+    const extra = { ...HUP_LISTING, transportation: [...HUP_LISTING.transportation, { name: 'Philly Chesed Rides', phones: ['+1 215-555-0199'] }] }
+    const before = refuahHadNow(extra, hup())
+    expect(before).not.toContain(refuahEntryId('transportation', { name: 'Philly Chesed Rides' }))
+    const dropped = refuahFields({ ...HUP, services: HUP.services!.filter((s) => s.name !== 'Chesed of Boro Park') }, KEYS, FROM)
+    const boro = refuahEntryId('transportation', { name: 'Chesed of Boro Park' })
+    expect(refuahHadNow(extra, dropped, before)).toContain(boro)
+    // Taken off the guide, it's forgotten.
+    const off = { ...extra, transportation: extra.transportation.filter((e) => e.name !== 'Chesed of Boro Park') }
+    expect(refuahHadNow(off, dropped, before)).not.toContain(boro)
   })
 })
 

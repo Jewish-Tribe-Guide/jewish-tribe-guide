@@ -3,6 +3,8 @@ import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore
 import { listApprovedResources } from '@/lib/resourceStore'
 import { jobFindings } from '@/lib/watchFindingStore'
 import { listCategories } from '@/lib/categoryStore'
+import { contactBoxes } from '@/lib/hospitalBoxes'
+import type { CategoryConfig } from '@/lib/categories'
 import { addWatch, listWatches, removeWatch, updateWatch } from '@/lib/watchStore'
 import { runAndRecord } from '@/lib/watchRunner'
 import { normalizeWatchUrl, type Watch } from '@/lib/watches'
@@ -13,8 +15,10 @@ import {
   HOSPITAL_CATEGORY,
   REFUAH_MATCH_CREATOR,
   REFUAH_NOT_LISTED_CREATOR,
+  REFUAH_STOPPED_CREATOR,
   givenLine,
   isNotOnRefuah,
+  isStoppedRefuah,
   matchLine,
   matchRefuah,
   nearestRefuah,
@@ -40,6 +44,8 @@ import type { DirectoryResource } from '@/types'
 //      (watchFindings.ts), and when its last one was decided.
 //      `nearby`: Refuah's hospitals nearest it, for "Choose a different
 //      Refuah hospital". One request to Refuah per hospital (readRefuahNear).
+//      `boxes`: its listing's boxes of contacts, with what each has now.
+//      `?item=<id>`: one hospital's listing and category, for a box's Edit.
 //      Admin only.
 // POST body: { action: 'choose', resourceId, url }
 //      "Give its Refuah page" / "Choose a different Refuah hospital": the
@@ -52,6 +58,12 @@ import type { DirectoryResource } from '@/types'
 // POST body: { action: 'on', resourceId }
 //      "Turn back on": its page is read again straight away; a "Not on
 //      Refuah" goes, and the hospital is matched again now.
+// POST body: { action: 'stop', resourceId }
+//      Reads' ×: its Refuah page is no longer read, and kept so the daily
+//      match doesn't add it again. Add a page reads one again.
+// POST body: { action: 'none', resourceId }
+//      Reads' "Not on Refuah": its page goes, and it's said not to be on
+//      Refuah (Off).
 
 export const maxDuration = 60
 
@@ -64,14 +76,24 @@ function asRefuah(r: RefuahListed): Refuah {
 }
 
 /** The watches the page reads for one hospital: its Refuah page (one an
- *  admin gave first) and its "Not on Refuah". */
+ *  admin gave first), one it stopped reading, and its "Not on Refuah". */
 function hospitalWatches(watches: readonly Watch[], id: string) {
-  const pages = watches.filter((w) => w.resourceId === id && refuahHospitalId(w.url))
+  const own = watches.filter((w) => w.resourceId === id && refuahHospitalId(w.url))
+  const pages = own.filter((w) => !isStoppedRefuah(w))
   return {
     pages,
+    stopped: own.filter(isStoppedRefuah),
     watch: pages.find((w) => w.createdBy !== REFUAH_MATCH_CREATOR) ?? pages[0] ?? null,
     marker: watches.find((w) => w.resourceId === id && isNotOnRefuah(w)) ?? null,
   }
+}
+
+/** Its listing's boxes of contacts, each with what the listing has in it
+ *  now, for Hospitals to show a box at a time (hospitalBoxes.ts). */
+function listedBoxes(h: DirectoryResource, category: CategoryConfig | undefined) {
+  if (!category) return []
+  const labelOf = (k: string) => category.detailFields.find((f) => f.key === k)?.label ?? k
+  return contactBoxes(category, h as unknown as Record<string, unknown>).map((b) => ({ ...b, labels: b.keys.map(labelOf), now: Object.fromEntries(b.keys.map((k) => [k, h[k] ?? null])) }))
 }
 
 /** Where its Refuah page came from, or why it has none. */
@@ -93,6 +115,14 @@ export async function GET(request: Request) {
   if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
 
   try {
+    const itemId = new URL(request.url).searchParams.get('item')
+    if (itemId !== null) {
+      if (!UUID.test(itemId)) return Response.json({ ok: false, errors: ['Invalid request.'] }, { status: 400 })
+      const item = (await hospitalsIn(community.slug)).find((h) => h.id === itemId)
+      const category = item && (await listCategories(community.slug)).find((c) => c.id === HOSPITAL_CATEGORY)
+      if (!item || !category) return Response.json({ ok: false, errors: ['That hospital isn’t in this guide.'] }, { status: 404 })
+      return Response.json({ ok: true, item, category })
+    }
     const [{ watches, available }, hospitals] = await Promise.all([listWatches(community.slug), hospitalsIn(community.slug)])
     // The Watches tab asks for these every time it opens: no hospitals, no request.
     const list = await readRefuahNear(hospitals.flatMap((h) => (h.geo ? [h.geo] : [])))
@@ -103,7 +133,9 @@ export async function GET(request: Request) {
 
     // What Refuah has that a listing doesn't, waiting here to compare, and
     // when each hospital's last one was decided (watchFindings.ts).
-    const { findings, decided } = hospitals.length ? await jobFindings(community.slug, 'hospitals', await listCategories(community.slug)) : { findings: [], decided: new Map() }
+    const categories = hospitals.length ? await listCategories(community.slug) : []
+    const category = categories.find((c) => c.id === HOSPITAL_CATEGORY)
+    const { findings, decided } = hospitals.length ? await jobFindings(community.slug, 'hospitals', categories) : { findings: [], decided: new Map() }
 
     return Response.json({
       ok: true,
@@ -126,6 +158,7 @@ export async function GET(request: Request) {
             nearby: nearestRefuah(h.geo, refuah).map((r) => ({ ...asRefuah(r), miles: r.miles })),
             findings: findings.filter((f) => f.targetId === h.id),
             decided: decided.get(h.id) ?? null,
+            boxes: listedBoxes(h, category),
           }
         })
         .sort((a, b) => a.name.localeCompare(b.name)),
@@ -144,10 +177,10 @@ export async function POST(request: Request) {
   const body = (await request.json().catch(() => null)) as Record<string, unknown> | null
   const action = body?.action
   const resourceId = typeof body?.resourceId === 'string' ? body.resourceId : ''
-  if (!['choose', 'off', 'on'].includes(String(action)) || !UUID.test(resourceId)) {
+  if (!['choose', 'off', 'on', 'stop', 'none'].includes(String(action)) || !UUID.test(resourceId)) {
     return Response.json({ ok: false, errors: ['Invalid request.'] }, { status: 400 })
   }
-  if (action !== 'off') {
+  if (action === 'choose' || action === 'on') {
     const limited = await enforceRateLimit(request, 'admin-watch-check', CHECK_LIMIT)
     if (limited) return limited
   }
@@ -158,7 +191,7 @@ export async function POST(request: Request) {
     if (!hospital) return Response.json({ ok: false, errors: ['That hospital isn’t in this guide.'] }, { status: 400 })
     const { watches, available } = await listWatches(slug)
     if (!available) return Response.json({ ok: false, errors: ['This needs database migration 070.'] }, { status: 400 })
-    const { pages, watch, marker } = hospitalWatches(watches, resourceId)
+    const { pages, stopped, watch, marker } = hospitalWatches(watches, resourceId)
 
     if (action === 'choose') {
       const url = normalizeWatchUrl(typeof body?.url === 'string' ? body.url : '')
@@ -170,11 +203,22 @@ export async function POST(request: Request) {
         const other = (await hospitalsIn(slug)).find((h) => h.id === elsewhere.resourceId)
         return Response.json({ ok: false, errors: [`That Refuah page is already read for ${other?.name ?? 'another hospital'}.`] }, { status: 409 })
       }
-      for (const w of [...pages, ...(marker ? [marker] : [])]) await removeWatch(slug, w.id)
+      for (const w of [...pages, ...stopped, ...(marker ? [marker] : [])]) await removeWatch(slug, w.id)
       const added = await addWatch(slug, { kind: 'website', url: page, resourceId, label: refuahWatchLabel(hospital.name), createdBy: admin.email })
       if (!added) return Response.json({ ok: false, errors: ['Could not save that page.'] }, { status: 409 })
       const { watch: read } = await runAndRecord(added, undefined, undefined, { full: true })
       return Response.json({ ok: true, watch: read, notOnRefuah: false })
+    }
+
+    if (action === 'stop') {
+      for (const w of pages) await updateWatch(slug, w.id, { createdBy: REFUAH_STOPPED_CREATOR, active: false })
+      return Response.json({ ok: true, watch: null, notOnRefuah: !!marker })
+    }
+
+    if (action === 'none') {
+      for (const w of [...pages, ...stopped]) await removeWatch(slug, w.id)
+      if (!marker) await addWatch(slug, { kind: 'website', url: notOnRefuahUrl(resourceId), resourceId, label: `${hospital.name}: not on Refuah`, createdBy: REFUAH_NOT_LISTED_CREATOR, active: false })
+      return Response.json({ ok: true, watch: null, notOnRefuah: true })
     }
 
     if (action === 'off') {

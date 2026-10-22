@@ -23,7 +23,7 @@ export const BUILT_IN_WATCHES: Pick<Watch, 'communityId' | 'kind' | 'url'>[] = [
 ]
 
 export async function runWatch(
-  watch: Pick<Watch, 'communityId' | 'kind' | 'url'> & Partial<Pick<Watch, 'resourceId' | 'createdBy' | 'pageHash' | 'pageChangedAt' | 'createdAt' | 'lastFiled'>>,
+  watch: Pick<Watch, 'communityId' | 'kind' | 'url'> & Partial<Pick<Watch, 'resourceId' | 'createdBy' | 'pageHash' | 'pageChangedAt' | 'createdAt' | 'lastFiled' | 'lastCheck'>>,
   budget?: MenuReadBudget,
   now = Date.now(),
   { full = false }: { full?: boolean } = {},
@@ -48,7 +48,7 @@ export async function runWatch(
     // A hospital's page on Refuah builds itself in the browser, so it's read
     // from the data it's built from, and compared with the hospital's
     // listing (refuahWatch.ts).
-    if (refuahHospitalId(watch.url)) return await runRefuahWatch(watch.communityId, watch.url, watch.resourceId ?? null)
+    if (refuahHospitalId(watch.url)) return await runRefuahWatch(watch.communityId, watch.url, watch.resourceId ?? null, watch.lastCheck)
     // A food place's menu, read by the AI only when it changed (menuWatch.ts).
     if (watch.createdBy === MENU_WATCH_CREATOR) {
       return await runMenuWatch({ communityId: watch.communityId, url: watch.url, resourceId: watch.resourceId ?? null, pageHash: watch.pageHash ?? null }, budget, { full })

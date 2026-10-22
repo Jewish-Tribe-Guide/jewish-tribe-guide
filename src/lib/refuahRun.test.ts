@@ -2,8 +2,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const m = vi.hoisted(() => ({
   listing: null as Record<string, unknown> | null,
-  earlier: [] as { payload: unknown }[],
+  earlier: [] as { id?: string; status?: string; payload: unknown }[],
   submitListingUpdate: vi.fn(),
+  replacePendingSuggestion: vi.fn(),
   sendWatchDigest: vi.fn(),
   getCategoryById: vi.fn(),
   confirmFromSource: vi.fn(),
@@ -24,7 +25,7 @@ vi.mock('@/lib/supabase/admin', () => ({
     },
   }),
 }))
-vi.mock('@/lib/submissionStore', () => ({ submitListingUpdate: m.submitListingUpdate }))
+vi.mock('@/lib/submissionStore', () => ({ submitListingUpdate: m.submitListingUpdate, replacePendingSuggestion: m.replacePendingSuggestion }))
 vi.mock('@/lib/email', () => ({ sendWatchDigest: m.sendWatchDigest }))
 vi.mock('@/lib/categoryStore', () => ({ getCategoryById: m.getCategoryById }))
 vi.mock('@/lib/sourceConfirm', () => ({ confirmFromSource: m.confirmFromSource }))
@@ -47,6 +48,7 @@ function refuahAnswers(value: unknown) {
 beforeEach(() => {
   vi.restoreAllMocks()
   m.submitListingUpdate.mockReset().mockResolvedValue({ id: 's1' })
+  m.replacePendingSuggestion.mockReset().mockResolvedValue(true)
   m.sendWatchDigest.mockReset().mockResolvedValue(undefined)
   m.confirmFromSource.mockReset().mockResolvedValue(1)
   m.getCategoryById.mockReset().mockResolvedValue({ detailFields: [{ key: 'liaisons', label: 'Liaisons', type: 'contacts' }] })
@@ -112,6 +114,75 @@ describe('runRefuahWatch', () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ status: 'error', errorMessage: 'Could not find function' })))
     expect(await runRefuahWatch('philly', URL_, HOSPITAL)).toMatchObject({ ok: false, error: expect.stringContaining('Could not find function') })
     expect(m.submitListingUpdate).not.toHaveBeenCalled()
+  })
+
+  describe('a box of the listing at a time (Oct 22)', () => {
+    const CATEGORY = {
+      detailFields: [
+        { key: 'liaisons', label: 'Liaisons', type: 'contacts' },
+        { key: 'transportation', label: 'Transportation', type: 'contacts', entryFrom: true },
+      ],
+      listingParts: { boxes: [{ title: 'Who to call', fields: ['liaisons'] }, { title: 'Rides', fields: ['transportation'] }] },
+    }
+    const RIDES = [
+      { from: 'Monsey', name: 'Darchei Chesed', phones: ['+1 845-425-4070'] },
+      { from: 'Boro Park', name: 'Chesed of Boro Park', phones: ['+1 718-431-0111'] },
+    ]
+    const both = (liaison: string, rides: { name: string; info: string; phone1: string }[]) => ({ ...record(liaison), services: rides.map((r) => ({ ...r, type: 'transportations' })) })
+    const DARCHEI = { name: 'Darchei Chesed', info: 'Servicing: Monsey', phone1: '+1 845-425-4070' }
+    const BORO = { name: 'Chesed of Boro Park', info: 'Servicing: Boro Park', phone1: '+1 718-431-0111' }
+
+    beforeEach(() => {
+      m.getCategoryById.mockResolvedValue(CATEGORY)
+      m.listing = { ...m.listing!, details: { ...(m.listing!.details as object), transportation: RIDES } }
+    })
+
+    it('files each box Refuah changes on its own, with only that box’s change', async () => {
+      refuahAnswers(both('+1 215-805-9000', [{ ...DARCHEI, phone1: '+1 845-555-0118' }, BORO]))
+      const out = await runRefuahWatch('philly', URL_, HOSPITAL)
+      expect(out).toMatchObject({ ok: true, filed: 2, check: { result: 'differs', queue: 'filed' } })
+      const [who, rides] = m.submitListingUpdate.mock.calls.map((c) => c[2])
+      expect(who.source.section).toEqual({ section: 'Who to call', keys: ['liaisons'] })
+      expect(who.details.liaisons[0].phones).toEqual(['+1 215-805-9000'])
+      expect(who.details.transportation).toEqual(RIDES)
+      expect(rides.source.section).toEqual({ section: 'Rides', keys: ['transportation'] })
+      expect(rides.details.transportation[0].phones).toEqual(['+1 845-555-0118'])
+      expect(rides.details.liaisons[0].phones).toEqual(['+1 215-805-8668'])
+      // One email for the run.
+      expect(m.sendWatchDigest).toHaveBeenCalledTimes(1)
+    })
+
+    it('remembers what came from Refuah, and takes off only that when Refuah drops it', async () => {
+      refuahAnswers(both('+1 215-805-8668', [DARCHEI, BORO]))
+      const first = await runRefuahWatch('philly', URL_, HOSPITAL)
+      expect(first).toMatchObject({ ok: true, filed: 0, check: { result: 'agrees' } })
+      const had = (first as { check: { refuahHad: string[] } }).check.refuahHad
+      expect(had).toContain('transportation:chesedofboropark')
+
+      // A ride added by hand since, and Boro Park gone from Refuah.
+      m.listing = { ...m.listing!, details: { ...(m.listing!.details as object), transportation: [...RIDES, { name: 'Philly Chesed Rides', phones: ['+1 215-555-0199'] }] } }
+      vi.restoreAllMocks()
+      refuahAnswers(both('+1 215-805-8668', [DARCHEI]))
+      const out = await runRefuahWatch('philly', URL_, HOSPITAL, { ...(first as { check: object }).check, at: '2026-10-21T00:00:00Z' } as never)
+      expect(out).toMatchObject({ ok: true, filed: 1 })
+      const [payload] = m.submitListingUpdate.mock.calls.map((c) => c[2])
+      expect(payload.details.transportation.map((e: { name: string }) => e.name)).toEqual(['Darchei Chesed', 'Philly Chesed Rides'])
+      // Never matched, it isn't remembered as Refuah's.
+      expect((out as { check: { refuahHad: string[] } }).check.refuahHad).not.toContain('transportation:phillychesedrides')
+    })
+
+    it('what Refuah now says of a box replaces its suggestion still waiting; the same one waits', async () => {
+      refuahAnswers(both('+1 215-805-8668', [{ ...DARCHEI, phone1: '+1 845-555-0118' }, BORO]))
+      m.earlier = [{ id: 'old', status: 'pending', payload: { details: { transportation: [{ ...RIDES[0], phones: ['+1 845-555-0000'] }, RIDES[1]] }, source: { section: { section: 'Rides', keys: ['transportation'] } } } }]
+      expect(await runRefuahWatch('philly', URL_, HOSPITAL)).toMatchObject({ ok: true, filed: 1, check: { queue: 'filed' } })
+      expect(m.replacePendingSuggestion).toHaveBeenCalledWith('philly', 'old', expect.objectContaining({ source: expect.objectContaining({ section: { section: 'Rides', keys: ['transportation'] } }) }), expect.any(String))
+      expect(m.submitListingUpdate).not.toHaveBeenCalled()
+
+      m.replacePendingSuggestion.mockClear()
+      m.earlier = [{ id: 'old', status: 'pending', payload: { details: { transportation: [{ ...RIDES[0], phones: ['+1 845-555-0118'] }, RIDES[1]] }, source: { section: { section: 'Rides', keys: ['transportation'] } } } }]
+      expect(await runRefuahWatch('philly', URL_, HOSPITAL)).toMatchObject({ ok: true, filed: 0, check: { queue: 'waiting' } })
+      expect(m.replacePendingSuggestion).not.toHaveBeenCalled()
+    })
   })
 
   it('needs the hospital it’s for', async () => {

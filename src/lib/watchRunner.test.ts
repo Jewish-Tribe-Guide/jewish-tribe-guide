@@ -5,7 +5,8 @@ import { NEWSLETTER_WATCH_CREATOR } from './newsletter'
 // whether its newsletter has gone quiet (newsletter.ts).
 const m = vi.hoisted(() => ({ readWebsite: vi.fn() }))
 vi.mock('./keystoneRun', () => ({ runKeystoneWatch: vi.fn() }))
-vi.mock('./refuahRun', () => ({ runRefuahWatch: vi.fn() }))
+const refuah = vi.hoisted(() => ({ run: vi.fn() }))
+vi.mock('./refuahRun', () => ({ runRefuahWatch: refuah.run }))
 const mekor = vi.hoisted(() => ({ run: vi.fn() }))
 vi.mock('./mekorRun', () => ({ runMekorWatch: mekor.run }))
 vi.mock('./menuWatchRun', () => ({ runMenuWatch: vi.fn() }))
@@ -79,5 +80,17 @@ describe('runWatch: a listing’s own page', () => {
     await runWatch({ ...shulPage, createdBy: 'admin@example.org' })
     expect(page.run).not.toHaveBeenCalled()
     expect(m.readWebsite).toHaveBeenCalledWith(shulPage.url)
+  })
+})
+
+// A hospital's page on Refuah (refuahRun.ts) remembers what it matched, so
+// only entries that came from Refuah are ever taken off.
+describe('runWatch: a hospital’s Refuah page', () => {
+  it('is read with what it remembered last time', async () => {
+    const url = 'https://refuah.com/hospitals/abcdefghijklmnopqrst1234'
+    const lastCheck = { at: '2026-10-21T00:00:00Z', what: 'contacts' as const, from: 'page' as const, result: 'agrees' as const, read: [], differences: [], queue: null, refuahHad: ['transportation:dovid'] }
+    refuah.run.mockResolvedValue({ ok: true, filed: 0 })
+    await runWatch({ communityId: 'philly', kind: 'website', url, resourceId: 'h1', lastCheck })
+    expect(refuah.run).toHaveBeenCalledWith('philly', url, 'h1', lastCheck)
   })
 })
