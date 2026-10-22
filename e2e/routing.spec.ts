@@ -329,4 +329,12 @@ test.describe('URLs', () => {
     // hardcode content, and a page title is content.
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
   })
+
+  // The admin's Eruvim tab became part of the Categories tab's Eruv row
+  // (Oct 22): an old link or bookmark lands there, before anything renders.
+  test('the old admin Eruvim tab goes to Categories', async ({ request }) => {
+    const res = await request.get('/philly/admin/eruvim', { maxRedirects: 0 })
+    expect(res.status()).toBe(307)
+    expect(res.headers()['location']).toBe('/philly/admin/categories')
+  })
 })
