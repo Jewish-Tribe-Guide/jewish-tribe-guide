@@ -159,6 +159,16 @@ describe('kosherPlaces', () => {
     expect(newPlaces).toEqual([{ name: 'Old Deli', address: '', on: [expect.objectContaining({ list: 'mekor' })], archived: 'Old Deli', filed: 'next' }])
   })
 
+  // The user, Oct 22: "We only need to check Food, not grocery stores".
+  it('a grocery isn’t a place on the page, and one on a list isn’t a new place', () => {
+    const giant = listing({ id: 'giant', category: 'grocery', name: 'GIANT', address: '50 E Wynnewood Rd' })
+    const k = keystone({ slug: 'giant-wynnewood', name: 'GIANT', kinds: ['groceries', 'bakeries'] })
+    const m = mekor({ slug: 'giant', name: 'GIANT', kinds: ['Bakery'], address: '50 E Wynnewood Rd' })
+    expect(kosherPlaces({ listings: [giant, cherry], keystone: [k, cherryEntry], mekor: [m] })).toEqual({ places: [expect.objectContaining({ id: 'cherry' })], newPlaces: [] })
+    // Nor is a grocery the guide doesn't have.
+    expect(kosherPlaces({ listings: [], keystone: [k], mekor: null }).newPlaces).toEqual([])
+  })
+
   it('a place new on both lists is one place, waiting if either filed it', () => {
     const k = keystone({ slug: 'shug', name: 'Shug Sisters', kinds: ['bakeries'] })
     const m = mekor({ slug: 'shug-sisters', name: 'Shug Sisters', kinds: ['Bakery'] })

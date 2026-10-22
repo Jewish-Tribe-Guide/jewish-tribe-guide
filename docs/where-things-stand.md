@@ -502,6 +502,10 @@ agreed:
      in) / Leave it out. One left out isn't shown again.
    - An older finding wider than the box shows whole, with Compare. A
      grocery has no hechsher, so no Kosher box: its findings show whole.
+   - Food only (the user, Oct 22: "We only need to check Food, not grocery
+     stores"). Groceries aren't on the page and no new grocery is
+     suggested; they're still matched with the lists, so one on a list
+     isn't a new place (`KOSHER_JOB_CATEGORIES`, `kosherJob.ts`).
    - Not as drawn: the tabs show their counts on all four (the other job
      pages hide an empty one), and "It's … now" uses the list's full
      name for the place.

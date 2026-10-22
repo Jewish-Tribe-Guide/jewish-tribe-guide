@@ -298,29 +298,22 @@ export function compareKeystone(entries: KeystoneEntry[], listings: WatchedListi
   for (const entry of entries) {
     if (matched.has(entry.slug)) continue
     const food = entry.kinds.filter((k) => FOOD_KINDS[k])
-    const grocery = entry.kinds.includes('groceries')
-    if (!grocery && food.length === 0) continue // wholesale products, a tofu maker: not places to go
-    if (grocery) {
-      findings.push({
-        kind: 'new',
-        entry,
-        category: 'grocery',
-        details: { isKosher: 'Kosher Items', ...(entry.website ? { website: entry.website } : {}) },
-      })
-    } else {
-      findings.push({
-        kind: 'new',
-        entry,
-        category: 'restaurant',
-        details: {
-          kosherCert: [KEYSTONE_CERT],
-          k: entry.url,
-          foodType: food.map((k) => FOOD_KINDS[k]),
-          ...(entry.levels.length ? { t: entry.levels } : {}),
-          ...(entry.website ? { website: entry.website } : {}),
-        },
-      })
-    }
+    if (food.length === 0) continue // wholesale products, a tofu maker: not places to go
+    // A grocery isn't checked (the user, Oct 22: "We only need to check
+    // Food, not grocery stores").
+    if (entry.kinds.includes('groceries')) continue
+    findings.push({
+      kind: 'new',
+      entry,
+      category: 'restaurant',
+      details: {
+        kosherCert: [KEYSTONE_CERT],
+        k: entry.url,
+        foodType: food.map((k) => FOOD_KINDS[k]),
+        ...(entry.levels.length ? { t: entry.levels } : {}),
+        ...(entry.website ? { website: entry.website } : {}),
+      },
+    })
   }
   return findings
 }
