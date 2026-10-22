@@ -193,7 +193,8 @@ describe('/api/admin/main-dishes', () => {
     m.readMenu.mockResolvedValue({ sourceUrl: 'https://judah.example/menu.pdf', dishes: [{ name: 'Shawarma', quote: 'Shawarma', checked: false }], note: null, model: 'gpt' })
     await POST(req('POST', { action: 'read', resourceId: ID }))
     expect(m.readMenuPage).toHaveBeenCalledWith('https://judah.example/menu.pdf', { render, trouble: expect.any(Function) })
-    expect(m.findMenu).not.toHaveBeenCalled()
+    // Its website is looked at too, for the rest of its menu (Oct 22).
+    expect(m.findMenu).toHaveBeenCalledWith('https://judah.example', { render })
     expect(m.readMenu).toHaveBeenCalledWith(expect.objectContaining({ url: 'https://judah.example/menu.pdf' }), 'Judah', expect.anything())
 
     m.readMenuPage.mockResolvedValue(null)
@@ -324,8 +325,18 @@ describe('/api/admin/main-dishes', () => {
       expect(m.revalidatePublicContent).toHaveBeenCalled()
       expect(m.readMenuPage).toHaveBeenCalledWith('https://judah.example/menu', { render, trouble: expect.any(Function) })
       expect(closeRenderer).toHaveBeenCalled()
-      expect(m.findMenu).not.toHaveBeenCalled()
+      expect(m.findMenu).toHaveBeenCalledWith('https://judah.example', { render })
       expect(body).toMatchObject({ ok: true, menuUrl: 'https://judah.example/menu', reading: { status: 'proposed' } })
+    })
+
+    // Rita's, Oct 22: its menu link is its location's page, and its flavors
+    // are on the site's Treats page; both are read, the link first.
+    it('a menu link is read with the other menu pages on the place’s website', async () => {
+      m.readMenuPage.mockResolvedValue({ url: 'https://judah.example/menu', text: 'menu', pdf: null })
+      m.findMenu.mockResolvedValue({ url: 'https://judah.example/treats/', text: 'treats', pdf: null })
+      m.readMenu.mockResolvedValue({ sourceUrl: 'https://judah.example/menu', dishes: [], note: null, model: 'gpt' })
+      await POST(req('POST', { action: 'link', resourceId: ID, url: 'judah.example/menu' }))
+      expect(m.readMenu.mock.calls.map(([s]) => s.url)).toEqual(['https://judah.example/menu', 'https://judah.example/treats/'])
     })
 
     it('a link that can’t be read is still saved, and says what to do instead; an ordering app’s says why', async () => {

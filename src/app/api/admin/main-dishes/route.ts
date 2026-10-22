@@ -5,7 +5,7 @@ import { getResourceById, listApprovedResources } from '@/lib/resourceStore'
 import { revalidatePublicContent } from '@/lib/revalidateContent'
 import { listingFacts } from '@/lib/listingView'
 import { addedItemName, cleanItemName, itemMarks } from '@/lib/itemMarks'
-import { isOrderingApp, readMenu, readMenus, readMenuPage, troubleClause, type MenuDish, type Trouble } from '@/lib/menuReader'
+import { findMenus, isOrderingApp, menuPages, readMenu, readMenus, readMenuPage, troubleClause, type MenuDish, type Trouble } from '@/lib/menuReader'
 import { menuWebsite, readMenuLink } from '@/lib/menuLink'
 import { dishKinds, listedNames, menuLinkOf, newestMenuDate, readPlaceMenu } from '@/lib/menuPlaceRead'
 import {
@@ -264,8 +264,12 @@ export async function POST(request: Request) {
       if (!apiKey) return Response.json({ ok: true, menuUrl: url, reading: null })
       const renderer = pageRenderer()
       const linkTrouble: { t?: Trouble } = {}
-      const source = await readMenuPage(url, { render: renderer.render, trouble: (t) => void (linkTrouble.t ??= t) }).finally(() => renderer.close())
-      const read = source ? (await readMenus([source], listing.name, { apiKey, listed: listedNames(listing, kind.field) }))! : null
+      // With the rest of the place's menu on its website (menuPages).
+      const website = menuWebsite(listing, kind.category)
+      const sources = await readMenuPage(url, { render: renderer.render, trouble: (t) => void (linkTrouble.t ??= t) })
+        .then(async (source) => (source ? menuPages(source, website ? await findMenus(website, { render: renderer.render }).catch(() => []) : []) : []))
+        .finally(() => renderer.close())
+      const read = sources.length ? (await readMenus(sources, listing.name, { apiKey, listed: listedNames(listing, kind.field) }))! : null
       const reading = await saveMenuReading(community.slug, resourceId, {
         status: read?.dishes.length ? 'proposed' : 'failed',
         sourceUrl: read?.sourceUrl ?? url,

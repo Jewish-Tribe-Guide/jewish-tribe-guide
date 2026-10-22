@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { fetchPublic, findMenu, findMenus, htmlToText, isOrderingApp, isPrivateAddress, MAX_MENU_PAGES, MAX_MENU_PICTURES, menuLinks, menuMessages, menuPictures, readMenu, readMenuPage, readMenus, tidyMenuReading, troubleClause, unreadMenuNote, type MenuSource, type Trouble } from './menuReader'
+import { fetchPublic, findMenu, findMenus, htmlToText, isOrderingApp, isPrivateAddress, MAX_MENU_PAGES, MAX_MENU_PICTURES, menuLinks, menuMessages, menuPages, menuPictures, menuText, readMenu, readMenuPage, readMenus, tidyMenuReading, troubleClause, unreadMenuNote, type MenuSource, type Trouble } from './menuReader'
 
 const publicDns = async () => ['93.184.216.34']
 const page = (body: string, type = 'text/html; charset=utf-8', status = 200, headers: Record<string, string> = {}) =>
@@ -339,6 +339,14 @@ describe('a menu posted as pictures', () => {
     expect(menuPictures(many, 'https://grill.example/menu', { menuPage: true })).toHaveLength(MAX_MENU_PICTURES)
   })
 
+  // Magical Sweet Shop's Sweet Shop page, Oct 22: a Wix picture's
+  // address has commas in it, and its Bakery Menu came out as /quality_auto/….
+  it('a srcset address with commas in it is one address', () => {
+    const wix = (w: number) => `https://static.wixstatic.com/media/885a~mv2.jpg/v1/fill/w_${w},h_747,al_c,q_85/Bakery%20Menu.jpg`
+    const html = `<img srcset="${wix(975)} 1x, ${wix(1950)} 2x" src="${wix(975)}" alt="Bakery Menu.jpg">`
+    expect(menuPictures(html, 'https://sweet.example/sweet-shop', { menuPage: true })).toEqual([wix(1950)])
+  })
+
   it('a picture is fetched only when asked for, as safely as a page', async () => {
     expect(await fetchPublic('https://g.example/menu.jpg', { fetchImpl: vi.fn().mockResolvedValue(jpeg()), resolve: publicDns })).toBeNull()
     expect(await fetchPublic('https://g.example/menu.jpg', { fetchImpl: vi.fn().mockResolvedValue(jpeg()), resolve: publicDns, pictures: true })).toEqual({
@@ -485,6 +493,20 @@ describe('a menu on another page, or by another name', () => {
     ])
   })
 
+  // Nothing Bundt Cakes, Oct 22: its Flavors page is its menu, and its
+  // "Find a bakery" page is a list of its shops.
+  it('a Flavors page counts; a chain’s list of its shops never does', () => {
+    const html = `<a href="/flavors/">Flavors</a><a href="/find-a-bakery/">Find a bakery</a><a href="/locations/">Our bakery locations</a><a href="/store-locator">Store locator</a>`
+    expect(menuLinks(html, 'https://bundt.example/')).toEqual(['https://bundt.example/flavors/'])
+  })
+
+  // Rita's Treats page, Oct 22: each treat is named only in its picture.
+  it('a menu page’s words include what its pictures are called, never a file’s name or a logo', () => {
+    const html = `<h2>Our treats</h2><img src="/blendini.png" alt="Blendini"><p>Custard and ice, blended.</p><img src="/x.jpg" alt="Bakery Menu.jpg"><img src="/l.png" alt="Rita&#8217;s logo"><img src="/y.png">`
+    expect(menuText(html)).toBe('Our treats\nBlendini\nCustard and ice, blended.')
+    expect(htmlToText(html)).not.toContain('Blendini')
+  })
+
   // House of Kosher's home page, Oct 22: its Thanksgiving menu came first.
   it('a holiday’s menu comes after the everyday one', () => {
     const html = `
@@ -524,6 +546,39 @@ describe('a menu on another page, or by another name', () => {
     const none = vi.fn().mockResolvedValueOnce(answer([], 'Coming soon.')).mockResolvedValueOnce(answer([], 'A home page.'))
     expect(await readMenus(sources, 'Diane’s', { apiKey: 'k', fetchImpl: none, resolve: publicDns })).toMatchObject({ sourceUrl: 'https://diane.example/menu', dishes: [], note: 'Coming soon.' })
     expect(await readMenus([], 'Diane’s', { apiKey: 'k', fetchImpl: vi.fn() })).toBeNull()
+  })
+
+  // The user, Oct 22: Playa Bowls' bowls and smoothies are on two pages,
+  // Magical Sweet Shop's catering and bakery menus too.
+  it('reads each page and puts together what they name: the first page’s first, each dish once, ten at most', async () => {
+    const sources: MenuSource[] = [
+      { url: 'https://playa.example/bowls', text: 'Acai bowl. Pitaya bowl.', pdf: null },
+      { url: 'https://playa.example/about', text: 'About us.', pdf: null },
+      { url: 'https://playa.example/smoothies', text: 'Smoothies.', pdf: null },
+    ]
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValueOnce(answer([{ name: 'Acai Bowls', quote: 'Acai bowl' }, { name: 'Pitaya Bowls', quote: 'Pitaya bowl' }]))
+      .mockResolvedValueOnce(answer([], 'About us.'))
+      .mockResolvedValueOnce(answer([{ name: 'acai bowls', quote: 'Smoothies' }, { name: 'Smoothies', quote: 'Smoothies' }]))
+    const r = await readMenus(sources, 'Playa', { apiKey: 'k', fetchImpl, resolve: publicDns })
+    expect(fetchImpl).toHaveBeenCalledTimes(3)
+    expect(r).toMatchObject({ sourceUrl: 'https://playa.example/bowls' })
+    expect(r!.dishes.map((d) => d.name)).toEqual(['Acai Bowls', 'Pitaya Bowls', 'Smoothies'])
+
+    const ten = (from: number) => Array.from({ length: 10 }, (_, i) => ({ name: `Dish ${from + i}`, quote: 'Dish' }))
+    const full = vi.fn().mockResolvedValueOnce(answer(ten(0))).mockResolvedValueOnce(answer(ten(5)))
+    const dishes = [1, 2].map((n): MenuSource => ({ url: `https://playa.example/${n}`, text: 'Dish of the day.', pdf: null }))
+    const both = await readMenus(dishes, 'Playa', { apiKey: 'k', fetchImpl: full, resolve: publicDns })
+    expect(both!.dishes.map((d) => d.name)).toEqual(ten(0).map((d) => d.name))
+  })
+
+  it(`a menu link first, then the other menu pages on its website, ${MAX_MENU_PAGES} in all`, () => {
+    const at = (url: string): MenuSource => ({ url, text: 'menu', pdf: null })
+    const linked = at('https://rita.example/location/grant-ave/')
+    const pages = menuPages(linked, [at('https://rita.example/location/grant-ave'), at('https://rita.example/treats/'), at('https://rita.example/catering/'), at('https://rita.example/')])
+    expect(pages.map((p) => p.url)).toEqual(['https://rita.example/location/grant-ave/', 'https://rita.example/treats/', 'https://rita.example/catering/'])
+    expect(menuPages(linked, [])).toEqual([linked])
   })
 
   it('stops trying more pages once its time is up, so a request still answers', async () => {

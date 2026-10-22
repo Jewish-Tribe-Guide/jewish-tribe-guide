@@ -3,7 +3,7 @@ import { listCategoriesUncached } from '@/lib/categoryStore'
 import { normalizeRow } from '@/lib/resourceStore'
 import { itemsField } from '@/lib/listingView'
 import { itemMarks, itemWording } from '@/lib/itemMarks'
-import { findMenus, readMenuPage, readMenus, unreadMenuNote, type Trouble } from '@/lib/menuReader'
+import { findMenus, readMenuPage, readMenus, unreadMenuNote, menuPages, type Trouble } from '@/lib/menuReader'
 import { MENU_LINK_KEY, menuWebsite, readMenuLink } from '@/lib/menuLink'
 import { listMenuReadings, saveMenuReading, type StoredMenuReading } from '@/lib/menuReadingStore'
 import { pageRenderer } from '@/lib/renderPage'
@@ -60,7 +60,11 @@ export async function readPlaceMenu(slug: string, listing: DirectoryResource, ki
   let sources
   try {
     const linked = menuUrl ? await readMenuPage(menuUrl, { render: renderer.render, trouble: (t) => void (trouble.link ??= t) }) : null
-    sources = linked ? [linked] : website ? await findMenus(website, { render: renderer.render, trouble: (t) => void (trouble.site ??= t) }) : []
+    sources = linked
+      ? menuPages(linked, website ? await findMenus(website, { render: renderer.render }).catch(() => []) : [])
+      : website
+        ? await findMenus(website, { render: renderer.render, trouble: (t) => void (trouble.site ??= t) })
+        : []
   } finally {
     await renderer.close()
   }

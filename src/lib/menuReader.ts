@@ -288,10 +288,24 @@ export function htmlToText(html: string): string {
     .join('\n')
 }
 
+/** A page's words as a menu: its text, with what each picture is called
+ *  (its alt text) where the picture is. Rita's Treats page names its
+ *  Blendini, Concrete and Shakes only in pictures (Oct 22). Never a file's
+ *  name, or a logo's. */
+export function menuText(html: string): string {
+  return htmlToText(
+    html.replace(/<img\b[^>]*>/gi, (tag) => {
+      const alt = (/\balt\s*=\s*(["'])(.*?)\1/i.exec(tag)?.[2] ?? '').trim()
+      const says = alt.length <= 60 && /[a-z]/i.test(alt) && !/\.(jpe?g|png|webp|gif|svg)$/i.test(alt) && !NOT_A_MENU_PICTURE.test(alt)
+      return says ? `\n${alt}\n` : ' '
+    }),
+  )
+}
+
 /** What a food place calls its menu when it doesn't say "menu" (Oct 20):
  *  a bakery's "Sweet Shop", a caterer's "Catering", LUHV's "Our Food",
  *  Gelbstein's "Online Ordering" on its own store. */
-const MENU_BY_ANOTHER_NAME = /\b(our food|food|products?|catering|meals|shop|store|bakery|baked goods|sweets|treats|order online|online ordering)\b/
+const MENU_BY_ANOTHER_NAME = /\b(our food|food|products?|catering|meals|shop|store|bakery|baked goods|sweets|treats|flavors|order online|online ordering)\b/
 
 /** A menu for one holiday or season, not the everyday one. */
 const SEASONAL_MENU = /\b(thanksgiving|christmas|easter|holiday|seasonal|pesach|passover|rosh hashan[ao]h?|yom tov|sukkos|sukkot|shavuos|shavuot|purim|chanukah|hanukkah)\b/
@@ -334,7 +348,8 @@ export function menuLinks(html: string, base: string): string[] {
           : !pdf && (MENU_BY_ANOTHER_NAME.test(text) || MENU_BY_ANOTHER_NAME.test(path.replace(/[-_/]+/g, ' ')))
             ? 1
             : 0
-    if (score === 0 || /order|cart|checkout|login|account/.test(path)) continue
+    // Nor a chain's list of its shops ("Find a bakery", Nothing Bundt Cakes).
+    if (score === 0 || /order|cart|checkout|login|account|find-a-|locations?\b|locator/.test(path)) continue
     const key = url.toString()
     // A holiday's menu after the everyday one: House of Kosher's
     // Thanksgiving menu came before its catering menu (Oct 22).
@@ -397,8 +412,9 @@ export function pagePictures(html: string, base: string): PagePicture[] {
   for (const m of html.matchAll(/<img\b[^>]*>/gi)) {
     const attr = (name: string) => new RegExp(`\\b${name}\\s*=\\s*(["'])(.*?)\\1`, 'i').exec(m[0])?.[2]
     const srcset = attr('srcset') ?? attr('data-srcset')
-    // The largest of a srcset: its last entry, as sites write them.
-    const largest = srcset?.split(',').at(-1)?.trim().split(/\s+/)[0]
+    // The largest of a srcset: its last entry, as sites write them. Entries
+    // are split at a comma and a space: a Wix address has commas in it.
+    const largest = srcset?.split(/,\s+/).at(-1)?.trim().split(/\s+/)[0]
     // Its size as the picture is (Squarespace's data-image-dimensions), else as it's drawn.
     const dims = /^(\d+)x(\d+)$/.exec(attr('data-image-dimensions') ?? '')
     const [w, h] = dims ? [Number(dims[1]), Number(dims[2])] : [Number(attr('width')), Number(attr('height'))]
@@ -463,7 +479,7 @@ const isPictureAddress = (url: string) => {
 /** A page as a menu: its words when there are enough, and its pictures
  *  that may be the menu. Null when it has neither. */
 function pageAsMenu(page: { url: string; body: string }, menuPage: boolean): MenuSource | null {
-  const text = htmlToText(page.body)
+  const text = menuText(page.body)
   const ranked = rankedMenuPictures(page.body, page.url, { menuPage })
   const pictures = ranked.map((p) => p.url)
   if (text.length < MIN_TEXT && pictures.length === 0) return null
@@ -753,9 +769,13 @@ export async function readMenu(
   }
 }
 
-/** Reads the pages a menu may be on (findMenus), best first, until one
- *  names dishes. When none does, the first page's reading, which says why.
- *  Stops trying more once `budgetMs` has gone (a request has a minute). */
+/** Reads the pages a menu may be on (findMenus), best first, each of
+ *  them, and puts together what they name (the user, Oct 22: a place's
+ *  menu is often spread over pages, Magical Sweet Shop's Catering and
+ *  Sweet Shop, Playa Bowls' Bowls and Smoothies). The first page that
+ *  names dishes is the reading's source; its dishes come first. When none
+ *  does, the first page's reading, which says why. Stops trying more once
+ *  `budgetMs` has gone (a request has a minute). */
 export async function readMenus(
   sources: readonly MenuSource[],
   placeName: string,
@@ -764,11 +784,39 @@ export async function readMenus(
   const now = opts.now ?? Date.now
   const start = now()
   let first: Awaited<ReturnType<typeof readMenu>> | null = null
-  for (const source of sources) {
+  const named: Awaited<ReturnType<typeof readMenu>>[] = []
+  for (const source of sources.slice(0, MAX_MENU_PAGES)) {
     if (first && now() - start > (opts.budgetMs ?? 30_000)) break
     const read = await readMenu(source, placeName, opts)
-    if (read.dishes.length) return read
+    if (read.dishes.length) named.push(read)
     first ??= read
   }
-  return first
+  if (named.length <= 1) return named[0] ?? first
+  const [main, ...rest] = named
+  const keyOf = (name: string) => name.toLowerCase()
+  const seen = new Set(main.dishes.map((d) => keyOf(d.name)))
+  const dishes = [...main.dishes]
+  for (const d of rest.flatMap((r) => r.dishes)) {
+    if (seen.has(keyOf(d.name))) continue
+    // Ten at most, as one page's; one already on the listing is always kept.
+    if (!d.onListing && dishes.filter((x) => !x.onListing).length >= MAX_DISHES) continue
+    seen.add(keyOf(d.name))
+    dishes.push(d)
+  }
+  // Not named by any of them; said only when one was read whole.
+  const whole = named.filter((r) => r.missing)
+  const missing = whole.length ? whole[0].missing!.filter((n) => !seen.has(keyOf(n))) : undefined
+  const { fromPictures: _p, ...head } = main
+  void _p
+  return { ...head, dishes, ...(missing ? { missing } : {}), ...(named.every((r) => r.fromPictures) ? { fromPictures: true } : {}) }
+}
+
+/** A menu page and the rest of its place's menu: the other pages its
+ *  website links to as its menu (`found`, from findMenus), MAX_MENU_PAGES
+ *  in all, for readMenus to put together. Rita's menu link is its
+ *  location's page, which says "Please call for today's flavors"; its
+ *  flavors are on the site's Treats page (Oct 22). */
+export function menuPages(menu: MenuSource, found: readonly MenuSource[]): MenuSource[] {
+  const same = (a: string | null, b: string | null) => !!a && !!b && a.replace(/\/+$/, '') === b.replace(/\/+$/, '')
+  return [menu, ...found.filter((m) => !same(m.url, menu.url))].slice(0, MAX_MENU_PAGES)
 }

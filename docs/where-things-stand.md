@@ -623,10 +623,18 @@ agreed:
      menus as pictures). A holiday's menu link comes after the everyday
      one (House of Kosher's Thanksgiving PDF came first). House of Kosher's
      menu link is still the Thanksgiving PDF: set it to the catering menu.
-     Open: Rita's and Nothing Bundt Cakes' location pages have no menu
-     (the chain's Treats and Flavors pages do); Playa Bowls reads only its
-     Bowls page; Magical Sweet Shop only its Catering page. All want more
-     than one page read per place.
+   - Main dishes: up to three menu pages per place, put together (the
+     user, Oct 22). A menu link is read with the other menu pages its
+     website links to (Rita's location page and Treats page, Playa Bowls'
+     Bowls and Smoothies, the Sweet Shop's Catering and Sweet Shop);
+     dishes from the first page come first, each once, ten at most. Each
+     page is an AI read, from the morning run's budget too. A picture's
+     alt text counts as the page's words (Rita's Blendini, Concrete and
+     Shakes are named only in pictures); a Wix picture's address is read
+     whole (the Sweet Shop's Bakery Menu came out broken). A chain's
+     "Find a bakery" or locations page is never a menu page. A menu page
+     whose pictures have alt text has a new fingerprint, so the morning
+     run reads it once more. On dev, Read now on each.
 
 Each page is compared with its drawing, side by side, before it's called
 done. All of it is on dev. Anything live (Refuah watches, hospital fields)
