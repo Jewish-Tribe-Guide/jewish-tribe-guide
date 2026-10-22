@@ -38,8 +38,10 @@ import {
   listingPageNote,
   listingPageSource,
   MAX_PAGE_TEXT,
+  NOTES_READ_FROM,
   pageCheck,
   pageReadsFor,
+  sameNoteAsListed,
   suggestionKey,
   timesReadLines,
   type PageReads,
@@ -286,7 +288,7 @@ export async function readPageFor(
     buildCatalog([listing], [offered]),
     { apiKey, communityName, about: listing.id, fetchImpl },
   )
-  const changes = hoursReads(reading.proposals, listing.id, reads.keys, reads.notes)
+  const changes = sameNoteAsListed(hoursReads(reading.proposals, listing.id, reads.keys, reads.notes), reads.notes, listing)
   const lines = hoursReadLines(changes, category)
   if (changes.length === 0) return { read: lines, proposal: null }
   const { values, unread } = readFieldChanges(category, listing, changes)
@@ -444,9 +446,11 @@ export async function runListingPageWatch(
   // A page that gives none of them says nothing of them.
   const contactReading = contactRead && (contactRead.same.length || Object.keys(contactRead.changes).length) ? contactRead : null
   const contactUnread = !!contactReading && !watch.lastCheck?.contact
+  // A mikvah's page read before its notes were (NOTES_READ_FROM).
+  const notesUnread = reads.kind === 'hours' && reads.notes.length > 0 && !!watch.pageHash && !(watch.lastCheck && watch.lastCheck.at >= NOTES_READ_FROM)
   // Else the first read sets the baseline; an unchanged page is left
   // alone, and its listing's date with it.
-  if (!opts.full && !changed && !firstFound && !contactUnread) return { ok: true, filed: 0, pageHash }
+  if (!opts.full && !changed && !firstFound && !contactUnread && !notesUnread) return { ok: true, filed: 0, pageHash }
 
   // Changed. A suggestion already waiting, no AI, or this run's reads spent:
   // the old fingerprint stays, so the change is still news next time. A
@@ -461,7 +465,7 @@ export async function runListingPageWatch(
   const contact = contactReading ? await fileContact(watch, category, listing, contacts, contactReading, waitingNow, blocked, source.text, { now: opts.now, seen }) : null
   const merge = (o: WatchOutcome): WatchOutcome => withContact(o, contact, watch.lastCheck ?? null, reads.kind, checkFrom(source, { pictures: !!source.pictures?.length }))
   // Read for its phone and email alone: the rest waits for the page to change.
-  if (!opts.full && !changed && !firstFound) return merge({ ok: true, filed: 0, pageHash })
+  if (!opts.full && !changed && !firstFound && !notesUnread) return merge({ ok: true, filed: 0, pageHash })
   // Hours Google keeps on this listing are Google's to check, not the website's.
   const ownReads: PageReads = reads.kind === 'hours' ? { ...reads, keys: reads.keys.filter((k) => !(k === 'hours' && googleKeeps(listing, 'hours'))) } : reads
   if (ownReads.kind === 'hours' && !ownReads.keys.length && !ownReads.notes.length) return merge({ ok: true, filed: 0, pageHash })

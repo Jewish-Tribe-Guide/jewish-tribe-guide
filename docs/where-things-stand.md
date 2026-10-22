@@ -607,6 +607,12 @@ agreed:
      its "Add our Calendar" link (`calendar/u/0?cid=…`); its embed is drawn
      by a script. It still needs its page: Add a page,
      southphiladelphiashtiebel.org/calendar.
+   - Mikvah hours: notes as updates (the user, Oct 22). Ohel Leah's pages
+     hadn't changed since notes began to be read, so the morning run never
+     read their notes. A page last read before then (`NOTES_READ_FROM`, the
+     merge of #340) is read once more. A note that differs from the
+     listing's only in its spacing (Lower Merion's blank lines) is the same
+     note. On dev, Read them now reads them.
 
 Each page is compared with its drawing, side by side, before it's called
 done. All of it is on dev. Anything live (Refuah watches, hospital fields)

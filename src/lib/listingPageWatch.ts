@@ -119,6 +119,19 @@ export function hoursReads(proposals: Proposal[], listingId: string, keys: reado
   )
 }
 
+/** A section's note as read, or the listing's own when the two say the
+ *  same in the same words: Lower Merion's page sets its paragraphs a blank
+ *  line apart, the listing one line, and that read as a change (Oct 22). */
+export function sameNoteAsListed(changes: FieldRead[], notes: readonly string[], listing: Record<string, unknown>): FieldRead[] {
+  const words = (v: unknown) => (typeof v === 'string' ? v.replace(/\s+/g, ' ').trim() : null)
+  return changes.map((c) => (notes.includes(c.key) && words(c.value) !== null && words(c.value) === words(listing[c.key]) ? { ...c, value: listing[c.key] } : c))
+}
+
+/** When a mikvah's notes began to be read on the live site (PR #340). A
+ *  page last read before then, and unchanged since, is read once more for
+ *  them (the user, Oct 22: "not viewing some notes as updates"). */
+export const NOTES_READ_FROM = '2026-10-22T17:45:49Z'
+
 /** "Oct 20", the day the page was seen to change. */
 export function changedOn(now: number, timeZone = 'America/New_York'): string {
   return new Date(now).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone })
