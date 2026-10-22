@@ -8,7 +8,7 @@ import { readEruvEdit, eruvIdFor } from '@/lib/eruvEdit'
 import { findEruvStatusPages } from '@/lib/eruvFind'
 import { enforceRateLimit } from '@/lib/rateLimit'
 
-// GET  /api/admin/eruvim — the "Eruvim" tab: every eruv of this community
+// GET  /api/admin/eruvim — the Eruv row's eruvim (Categories): every eruv of this community
 //      (eruv, migrations 074 and 076), hidden ones too, with its status and
 //      the last read of its map. Admin only.
 // POST /api/admin/eruvim  body: { action: 'save', id, edit } | { action: 'add', name }

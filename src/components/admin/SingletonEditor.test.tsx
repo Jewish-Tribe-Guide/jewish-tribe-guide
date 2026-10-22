@@ -7,6 +7,7 @@ import { renderWithProviders } from '@/test/renderWithProviders'
 import { mockRouter } from '@/test/nextNavigationMock'
 import { fetchJson } from '@/lib/fetchJson'
 import type { CategoryConfig } from '@/lib/categories'
+import type { AdminEruv } from '@/lib/eruvStore'
 
 // SingletonEditor is the fixed, code-driven card editor for Map/Zmanim/Eruv/
 // Jewish Medical Resources (see CATEGORY_MANAGER's SINGLETON_EDITABLE_KINDS)
@@ -107,5 +108,32 @@ describe('SingletonEditor — Map zoom radius', () => {
     await waitFor(() => expect(fetchJson).toHaveBeenCalled())
     const body = JSON.parse((vi.mocked(fetchJson).mock.calls[0]![1] as RequestInit).body as string)
     expect(body).not.toHaveProperty('mapZoomRadiusMiles')
+  })
+})
+
+// The eruvim were the admin's Eruvim tab until Oct 22; now they're edited
+// here, on the Eruv row, so no category has a tab of its own.
+describe('SingletonEditor — the Eruv row holds the eruvim', () => {
+  const eruv: AdminEruv = { id: 'center-city', name: 'Center City Eruv', covers: null, website: null, hotline: null, alertsUrl: null, statusUrl: null, statusDated: false, statusEmail: null, statusEmailKept: null, status: null, statusWords: null, statusPostedOn: null, statusCheckedAt: null, statusErrorAt: null, statusError: null, lineUrl: null, rawLine: null, lineReadAt: null, lineError: null, lineLeaveOut: [], lineHidePoints: false, lineMissing: [], lineColor: null, sortOrder: 1, active: true }
+  const eruvCategory: CategoryConfig = { id: 'eruv-information', label: 'Eruv', pluralLabel: 'Eruv', icon: '', description: '', detailFields: [], kind: 'eruv' }
+  const eruvimCalls = () => vi.mocked(fetchJson).mock.calls.filter(([url]) => String(url).includes('/api/admin/eruvim'))
+
+  beforeEach(() => {
+    vi.mocked(fetchJson).mockImplementation(async (url) =>
+      String(url).includes('/api/admin/eruvim') ? { ok: true, available: true, timezone: 'America/New_York', eruvim: [eruv] } : { ok: true },
+    )
+  })
+
+  it('lists each eruv, with Add an eruv, under the card’s own fields', async () => {
+    renderWithProviders(<SingletonEditor token="t" category={eruvCategory} onSaved={vi.fn()} onCancel={vi.fn()} />)
+    expect(await screen.findByTestId('admin-eruv')).toHaveTextContent('Center City Eruv')
+    expect(screen.getByRole('heading', { name: 'Eruvim' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Add an eruv')).toBeInTheDocument()
+  })
+
+  it('is on the Eruv row only', () => {
+    renderWithProviders(<SingletonEditor token="t" category={zmanimCategory()} onSaved={vi.fn()} onCancel={vi.fn()} />)
+    expect(eruvimCalls()).toHaveLength(0)
+    expect(screen.queryByRole('heading', { name: 'Eruvim' })).not.toBeInTheDocument()
   })
 })
