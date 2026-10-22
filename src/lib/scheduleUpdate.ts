@@ -377,7 +377,7 @@ const other = (s: Season): Season => (s === 'winter' ? 'summer' : 'winter')
 
 function contentKey(m: Omit<Minyan, 'days' | 'id'>): string {
   const signUp = m.signUp ? [m.signUp.link ?? null, m.signUp.name ?? null, m.signUp.phone ?? null] : null
-  return JSON.stringify([m.tefillah, m.time, m.anchor ?? null, m.offsetMinutes ?? null, m.notBefore ?? null, m.notAfter ?? null, m.notes ?? null, m.season ?? null, signUp])
+  return JSON.stringify([m.tefillah, m.time, m.anchor ?? null, m.offsetMinutes ?? null, m.notBefore ?? null, m.notAfter ?? null, m.notes ?? null, m.season ?? null, signUp, m.joinLink ?? null])
 }
 
 /** Slots back into minyanim: the same time on several days is one minyan,

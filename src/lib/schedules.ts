@@ -1,5 +1,5 @@
 import { DAY_KEYS, dayLabel, type DayKey } from './hours'
-import { formatAnchorRule, isMinyanim, parseTimeToMinutes, SEASON_LABELS, TEFILLAH_LABELS, TEFILLAH_ORDER, type Minyan, type MinyanDayKey } from './davening'
+import { formatAnchorRule, isMinyanim, joinText, parseTimeToMinutes, SEASON_LABELS, TEFILLAH_LABELS, TEFILLAH_ORDER, type Minyan, type MinyanDayKey } from './davening'
 import type { CalendarDay } from './jewishDays'
 
 // ── Special schedules: a shul's Yom Tov times (step 4, agreed Oct 1) ────────
@@ -262,7 +262,7 @@ export function formatSchedulesSummary(schedules: readonly SpecialSchedule[]): s
       const head = `${s.name} · ${dateText(s.from)} – ${dateText(s.to)} · ${s.mode === 'replace' ? 'in place of the regular times' : 'as well as the regular times'}`
       const lines = [...s.minyanim]
         .sort((a, b) => TEFILLAH_ORDER.indexOf(a.tefillah) - TEFILLAH_ORDER.indexOf(b.tefillah) || parseTimeToMinutes(a.time) - parseTimeToMinutes(b.time))
-        .map((m) => [TEFILLAH_LABELS[m.tefillah], m.on.map(scheduleDayText).join(', '), m.time, m.season && SEASON_LABELS[m.season], m.notes].filter(Boolean).join(' · '))
+        .map((m) => [TEFILLAH_LABELS[m.tefillah], m.on.map(scheduleDayText).join(', '), m.time, m.season && SEASON_LABELS[m.season], m.joinLink && joinText(m.joinLink), m.notes].filter(Boolean).join(' · '))
       return [head, ...lines.map((l) => `  ${l}`)].join('\n')
     })
     .join('\n')
@@ -363,6 +363,18 @@ export function weekByDates(post: Pick<SpecialSchedule, 'name' | 'from' | 'to'>)
 export function usualSignUp(regular: readonly Minyan[], m: { tefillah: Minyan['tefillah']; signUp?: Minyan['signUp'] }, weekdays: readonly DayKey[]): Minyan['signUp'] {
   if (m.signUp) return m.signUp
   return regular.find((r) => r.signUp && r.tefillah === m.tefillah && weekdays.some((d) => r.days.includes(d)))?.signUp
+}
+
+/** The join link a week's minyan has: its own, else that of the usual
+ *  minyan it is, the same tefillah on one of its weekdays at the same
+ *  time. A calendar or newsletter may give the time without the Zoom link
+ *  the usual minyan has; a different time that day may be a minyan in the
+ *  room only. */
+export function usualJoinLink(regular: readonly Minyan[], m: Pick<Minyan, 'tefillah' | 'time' | 'joinLink'>, weekdays: readonly DayKey[]): string | undefined {
+  if (m.joinLink) return m.joinLink
+  const at = parseTimeToMinutes(m.time)
+  if (!Number.isFinite(at)) return undefined
+  return regular.find((r) => r.joinLink && r.tefillah === m.tefillah && weekdays.some((d) => r.days.includes(d)) && parseTimeToMinutes(r.time) === at)?.joinLink
 }
 
 /** A week post's minyanim as rows on weekdays, the way its box shows them

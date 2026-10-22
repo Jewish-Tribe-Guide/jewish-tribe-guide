@@ -12,6 +12,7 @@ import { dayLabel, type DayKey } from '@/lib/hours'
 import { useNow } from '@/lib/useNow'
 import { useCommunityTimezone } from '@/lib/communityContext'
 import { SignUpButton } from './SignUp'
+import { JoinLink } from './JoinLink'
 
 // ── The minyan you tapped (the user, Oct 16) ────────────────────────────────
 // A minyan in Minyanim by time opens its place, where the address, the
@@ -50,7 +51,7 @@ export function useTappedMinyan(itemId: string): TappedMinyan | null {
 }
 
 /** The place's minyan by its id: a regular one, or a special schedule's. */
-function findMinyan(item: DirectoryResource, category: CategoryConfig, id: string): Pick<Minyan, 'tefillah' | 'notes' | 'signUp'> | null {
+function findMinyan(item: DirectoryResource, category: CategoryConfig, id: string): Pick<Minyan, 'tefillah' | 'notes' | 'signUp' | 'joinLink'> | null {
   const key = category.detailFields.find((f) => f.type === 'minyanim')?.key
   if (!key) return null
   const regular = isMinyanim(item[key]) ? (item[key] as Minyan[]) : []
@@ -90,6 +91,7 @@ export function TappedMinyanBox({ item, category }: { item: DirectoryResource; c
         {clockTime(tapped.minutes)}
       </p>
       {note && <p className="text-sm text-slate-700">{note}</p>}
+      <JoinLink link={minyan.joinLink} className="block text-[15px]" />
       {/* One box, in the same blue: where to sign up goes in it, not in a
           second box under the times (the user, Oct 16). */}
       {minyan.signUp && (

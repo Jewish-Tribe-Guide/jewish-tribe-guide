@@ -420,8 +420,8 @@ agreed:
    - A calendar's lines carry an event's end ("8:10 AM–8:40 AM"), so the
      reader can note it (Rodeph Shalom's Thursday minyan, the user, Oct
      22). Every calendar's lines change, so each is read once more.
-   - Not done: a Zoom link. Rodeph Shalom's is only on each event's own
-     page, and a minyan has nowhere to keep a link but its sign-up.
+   - A Zoom link: **built Oct 22** on `redesign/minyan-join-link` (see
+     "Done Oct 22: a minyan's join link" below).
    - Kol Tzedek's Friday night is on its Weekly Services page
      (kol-tzedek.org/shabbat.html, "All Friday services begin at
      6:30pm"), which isn't one of its watched pages; its calendar has no
@@ -1220,6 +1220,38 @@ compare, and one it can't read, on desktop and phone.
        Calendars the reader takes: iCal links, Google Calendar embeds,
        event lists in a page's scripts, and (since later Oct 21) a month
        posted as pictures. Not: one drawn by a script from its own server.
+
+## Done Oct 22: a minyan's join link (on `redesign/minyan-join-link`)
+
+The user, Oct 22: Rodeph Shalom's watch "didn't pick up on … zoom link for
+8:10 minyan".
+
+- A minyan can have a join link (`joinLink`: Zoom, Google Meet, a YouTube
+  or Vimeo live link, or any web link). The listing shows it on the
+  minyan's own row: "Join on Zoom", "Watch on YouTube", the whole phrase
+  the link. In the usual weekday table, whose cells hold times, it goes
+  under the table and names the minyan ("Join Thu Shacharis on Zoom").
+  Also on the tapped minyan's box. A week's time with none takes its
+  usual minyan's link, the same tefillah that weekday at the same time.
+- Anyone can set it in the minyan editor under More ("Zoom or livestream
+  link"); a web link only. The queue, the admin's times proposal and the
+  schedule summary all say it ("Online: upenn.zoom.us/j/…").
+- The website reader fills it from a shul's calendar, by code (the reader
+  prompt is unchanged and never sees the links): a feed's own join link
+  (its URL, LOCATION, a Google Meet, or a short DESCRIPTION with one), or
+  the event's own page, opened for services only (minyan, service,
+  shacharit…), from today, at most 4 pages a read. A page gives its link
+  only when it has one meeting, outside its header and footer; a channel
+  link (Rodeph Shalom's footer YouTube) isn't one. The link goes on the
+  website's week's time at the same date and time, and the admin's note
+  says so. Its links are in the page's fingerprint, so a new one is read
+  the next morning.
+- Rodeph Shalom: its feed's URL and LOCATION are the minyan's page, and
+  that page's one link is `upenn.zoom.us/j/97084263584`. It fills on the
+  next read after this deploys: its fingerprint changes with the link.
+- Not done: the usual (regular) minyan isn't given the calendar's link;
+  only the week's time is. A person can add it to the usual minyan in
+  the editor.
 
 ## Done Oct 22: the admin nav is five groups (on top of the Eruvim move, #343)
 
